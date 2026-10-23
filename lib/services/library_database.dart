@@ -9,7 +9,7 @@ import 'package:mornye/services/library_queue_store.dart';
 import 'package:mornye/services/library_file_sizes.dart';
 import 'package:mornye/services/library_cleanup.dart';
 import 'package:mornye/services/library_search.dart';
-import 'package:mornye/services/library_database_models.dart';
+import 'package:mornye/models/library_database_models.dart';
 import 'package:mornye/services/library_duplicates.dart';
 import 'package:mornye/services/network_storage_service.dart';
 import 'package:mornye/services/library_ingestion_store.dart';
@@ -19,7 +19,7 @@ import 'package:mornye/services/library_schema.dart';
 import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/services/sqlite_helpers.dart' as sqlite;
 
-export 'library_database_models.dart';
+export 'package:mornye/models/library_database_models.dart';
 
 export 'library_queue_store.dart'
     show confirmedMissingLyricsSqlPredicate, missingReplayGainSqlPredicate;

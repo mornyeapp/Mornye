@@ -14,7 +14,6 @@ import 'package:mornye/widgets/expressive_button.dart';
 import 'package:mornye/widgets/re_enrich_review_sheet.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:mornye/services/deleted_library_files.dart';
 import 'package:mornye/services/file_access_check.dart';
 import 'package:mornye/services/network_storage_service.dart';
 import 'package:mornye/services/library_database.dart';
@@ -23,6 +22,7 @@ import 'package:mornye/utils/re_enrich_result.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:mornye/providers/deleted_library_files.dart';
 import 'package:mornye/providers/download_queue_provider.dart';
 import 'package:mornye/providers/local_library_provider.dart';
 import 'package:mornye/providers/playback_provider.dart';
@@ -77,9 +77,9 @@ import 'package:mornye/widgets/settings_group.dart';
 import 'package:mornye/constants/music_services.dart';
 import 'package:mornye/controllers/batch_track_actions.dart'
     show convertLibraryTrack;
+import 'package:mornye/controllers/clickable_metadata.dart';
 import 'package:mornye/controllers/collapsing_header_scroll_mixin.dart';
 import 'package:mornye/screens/track_metadata_edit_sheet.dart';
-import 'package:mornye/utils/clickable_metadata.dart';
 
 part 'track_metadata_screen_cover.dart';
 part 'track_metadata_screen_display.dart';

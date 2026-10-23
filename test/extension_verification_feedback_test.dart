@@ -3,10 +3,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mornye/controllers/extension_auth_launcher.dart';
 import 'package:mornye/l10n/app_localizations.dart';
 import 'package:mornye/services/app_navigation_service.dart';
 import 'package:mornye/services/platform_bridge.dart';
-import 'package:mornye/utils/extension_auth_launcher.dart';
 import 'package:mornye/widgets/app_alert_dialog.dart';
 
 void main() {

@@ -1,7 +1,7 @@
 import 'dart:collection';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mornye/controllers/track_history_snapshot.dart';
 import 'package:mornye/models/track.dart';
-import 'package:mornye/screens/track_history_snapshot.dart';
 
 class _CountingTracks extends ListBase<Track> {
   final List<Track> values;

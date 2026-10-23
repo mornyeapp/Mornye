@@ -7,7 +7,7 @@ import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/utils/logger.dart';
 import 'package:mornye/utils/string_utils.dart';
 import 'package:mornye/utils/editorial_notes.dart';
-import 'package:mornye/utils/extension_auth_launcher.dart';
+import 'package:mornye/controllers/extension_auth_launcher.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/providers/extension_provider.dart';
 

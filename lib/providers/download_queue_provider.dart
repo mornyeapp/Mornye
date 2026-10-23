@@ -51,7 +51,7 @@ import 'package:mornye/utils/string_utils.dart';
 import 'package:mornye/utils/audio_format_utils.dart';
 import 'package:mornye/utils/int_utils.dart';
 import 'package:mornye/utils/path_match_keys.dart';
-import 'package:mornye/utils/extension_auth_launcher.dart';
+import 'package:mornye/controllers/extension_auth_launcher.dart';
 import 'package:mornye/utils/download_error_type.dart';
 import 'package:mornye/utils/lyrics_metadata_helper.dart';
 import 'package:mornye/utils/progress_stream_poller.dart';

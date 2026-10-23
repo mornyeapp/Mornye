@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite/sqflite.dart';
-import 'package:mornye/services/library_database_models.dart';
+import 'package:mornye/models/library_database_models.dart';
 import 'package:mornye/services/library_row_mapper.dart';
 import 'package:mornye/services/library_schema.dart';
 

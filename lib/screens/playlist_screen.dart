@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:mornye/screens/track_history_snapshot.dart';
+import 'package:mornye/controllers/track_history_snapshot.dart';
 import 'package:mornye/widgets/album_detail_header.dart';
 import 'package:mornye/widgets/collection_header_actions.dart';
-import 'package:mornye/screens/selection_mode_mixin.dart';
+import 'package:mornye/controllers/selection_mode_mixin.dart';
 import 'package:mornye/widgets/collection_scaffold.dart';
 import 'package:mornye/widgets/selection_action_button.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';

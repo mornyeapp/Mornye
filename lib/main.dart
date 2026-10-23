@@ -11,6 +11,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mornye/app.dart';
 import 'package:mornye/constants/app_info.dart';
+import 'package:mornye/controllers/extension_auth_launcher.dart';
 import 'package:mornye/models/library_database_models.dart';
 import 'package:mornye/models/settings.dart';
 import 'package:mornye/providers/download_queue_provider.dart';
@@ -37,7 +38,6 @@ import 'package:mornye/screens/now_playing_screen.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/utils/local_library_scan_prefs.dart';
 import 'package:mornye/utils/logger.dart';
-import 'package:mornye/utils/extension_auth_launcher.dart';
 import 'package:mornye/widgets/desktop/desktop_inspector.dart'
     show bindDesktopFullScreenLyrics;
 import 'package:mornye/widgets/desktop/desktop_window.dart'

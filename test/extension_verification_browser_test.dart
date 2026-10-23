@@ -3,10 +3,10 @@ import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mornye/controllers/extension_auth_launcher.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/providers/track_provider.dart';
 import 'package:mornye/services/platform_bridge.dart';
-import 'package:mornye/utils/extension_auth_launcher.dart';
 
 import 'support/fixed_settings.dart';
 

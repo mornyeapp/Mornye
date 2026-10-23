@@ -1,5 +1,5 @@
 import 'package:sqflite/sqflite.dart';
-import 'package:mornye/services/library_database_models.dart';
+import 'package:mornye/models/library_database_models.dart';
 import 'package:mornye/services/library_schema.dart';
 import 'package:mornye/services/network_storage_service.dart';
 import 'package:mornye/utils/path_match_keys.dart';
