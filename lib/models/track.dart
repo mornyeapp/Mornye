@@ -72,15 +72,10 @@ class Track {
     this.upc,
   });
 
-  bool get isSingle {
-    switch (albumType?.toLowerCase()) {
-      case 'single':
-      case 'ep':
-        return true;
-      default:
-        return false;
-    }
-  }
+  bool get isSingle => switch (albumType?.toLowerCase()) {
+    'single' || 'ep' => true,
+    _ => false,
+  };
 
   bool get isAlbumItem => itemType == 'album';
 

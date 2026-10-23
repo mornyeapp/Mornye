@@ -49,19 +49,15 @@ class DownloadDecryptionDescriptor {
     );
   }
 
-  String get normalizedStrategy {
-    switch (strategy.trim().toLowerCase()) {
-      case '':
-      case 'ffmpeg.mov_key':
-      case 'ffmpeg_mov_key':
-      case 'mov_decryption_key':
-      case 'mp4_decryption_key':
-      case 'ffmpeg.mp4_decryption_key':
-        return 'ffmpeg.mov_key';
-      default:
-        return strategy.trim();
-    }
-  }
+  String get normalizedStrategy => switch (strategy.trim().toLowerCase()) {
+    '' ||
+    'ffmpeg.mov_key' ||
+    'ffmpeg_mov_key' ||
+    'mov_decryption_key' ||
+    'mp4_decryption_key' ||
+    'ffmpeg.mp4_decryption_key' => 'ffmpeg.mov_key',
+    _ => strategy.trim(),
+  };
 
   String? get normalizedOutputExtension {
     final trimmed = (outputExtension ?? '').trim().toLowerCase();

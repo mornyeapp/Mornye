@@ -455,15 +455,11 @@ class SearchBehavior {
       return (thumbnailWidth!.toDouble(), thumbnailHeight!.toDouble());
     }
 
-    switch (thumbnailRatio) {
-      case 'wide':
-        return (defaultSize * 16 / 9, defaultSize);
-      case 'portrait':
-        return (defaultSize * 2 / 3, defaultSize);
-      case 'square':
-      default:
-        return (defaultSize, defaultSize);
-    }
+    return switch (thumbnailRatio) {
+      'wide' => (defaultSize * 16 / 9, defaultSize),
+      'portrait' => (defaultSize * 2 / 3, defaultSize),
+      _ => (defaultSize, defaultSize),
+    };
   }
 }
 

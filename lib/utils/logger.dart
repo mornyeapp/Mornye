@@ -394,19 +394,14 @@ class LogBuffer extends ChangeNotifier {
 
     for (final entry in _entries) {
       switch (entry.level) {
-        case 'ERROR':
-        case 'FATAL':
+        case 'ERROR' || 'FATAL':
           errorCount++;
-          break;
         case 'WARN':
           warnCount++;
-          break;
         case 'INFO':
           infoCount++;
-          break;
         case 'DEBUG':
           debugCount++;
-          break;
       }
       if (entry.isFromNative) nativeCount++;
     }
@@ -481,22 +476,14 @@ class BufferedOutput extends LogOutput {
     );
   }
 
-  String _levelToString(Level level) {
-    switch (level) {
-      case Level.debug:
-        return 'DEBUG';
-      case Level.info:
-        return 'INFO';
-      case Level.warning:
-        return 'WARN';
-      case Level.error:
-        return 'ERROR';
-      case Level.fatal:
-        return 'FATAL';
-      default:
-        return 'LOG';
-    }
-  }
+  String _levelToString(Level level) => switch (level) {
+    Level.debug => 'DEBUG',
+    Level.info => 'INFO',
+    Level.warning => 'WARN',
+    Level.error => 'ERROR',
+    Level.fatal => 'FATAL',
+    _ => 'LOG',
+  };
 }
 
 class AppLogger {

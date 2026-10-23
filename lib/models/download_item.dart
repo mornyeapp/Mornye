@@ -135,20 +135,17 @@ class DownloadItem {
   String get errorMessage {
     if (error == null) return '';
 
-    switch (errorType) {
-      case DownloadErrorType.notFound:
-        return 'Song not found on any service';
-      case DownloadErrorType.rateLimit:
-        return 'Service rate limit reached. Wait before retrying.';
-      case DownloadErrorType.network:
-        return 'Connection failed, check your internet';
-      case DownloadErrorType.permission:
-        return 'Cannot write to folder, check storage permission';
-      case DownloadErrorType.verificationRequired:
-        return 'Verification required. Open the extension and complete the security check.';
-      default:
-        return error ?? 'An error occurred';
-    }
+    return switch (errorType) {
+      DownloadErrorType.notFound => 'Song not found on any service',
+      DownloadErrorType.rateLimit =>
+        'Service rate limit reached. Wait before retrying.',
+      DownloadErrorType.network => 'Connection failed, check your internet',
+      DownloadErrorType.permission =>
+        'Cannot write to folder, check storage permission',
+      DownloadErrorType.verificationRequired =>
+        'Verification required. Open the extension and complete the security check.',
+      _ => error ?? 'An error occurred',
+    };
   }
 
   factory DownloadItem.fromJson(Map<String, dynamic> json) =>
