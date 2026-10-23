@@ -544,7 +544,6 @@ extension _EditMetadataSheetAutoFill on _EditMetadataSheetState {
                 return MornyeFilterChip(
                   label: _fieldLabel(key),
                   selected: selected,
-                  glass: false,
                   icon: selected
                       ? CupertinoIcons.checkmark_circle_fill
                       : CupertinoIcons.circle,

@@ -496,7 +496,6 @@ class _BatchConvertSheetState extends State<BatchConvertSheet> {
         selected: selected,
         onTap: onTap,
         icon: selected ? CupertinoIcons.checkmark : null,
-        glass: false,
       );
     }
     return AppChoiceChip(

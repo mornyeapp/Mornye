@@ -479,16 +479,14 @@ class _MornyeGlassRim extends CustomPainter {
       dark != oldDelegate.dark;
 }
 
-/// A searchable category uses the same material as the navigation capsule.
-class MornyeFilterChip extends ConsumerWidget {
+/// A searchable category chip; callers supply any glass around it.
+class MornyeFilterChip extends StatelessWidget {
   const MornyeFilterChip({
     super.key,
     required this.label,
     required this.selected,
     required this.onTap,
     this.icon,
-    this.blurEnabled = true,
-    this.glass = true,
     this.tonal = true,
   });
 
@@ -496,24 +494,20 @@ class MornyeFilterChip extends ConsumerWidget {
   final bool selected;
   final VoidCallback? onTap;
   final IconData? icon;
-  final bool blurEnabled;
-  final bool glass;
   final bool tonal;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final content = Semantics(
       button: true,
       selected: selected,
       enabled: onTap != null,
       child: Material(
-        color: !glass && !tonal
+        color: !tonal
             ? Colors.transparent
             : selected
             ? scheme.primary.withValues(alpha: 0.12)
-            : glass
-            ? Colors.transparent
             : MornyeTheme.controlFill(context, enabled: onTap != null),
         child: InkWell(
           onTap: onTap,
@@ -539,14 +533,7 @@ class MornyeFilterChip extends ConsumerWidget {
         ),
       ),
     );
-    if (!glass) {
-      return ClipRRect(borderRadius: BorderRadius.circular(24), child: content);
-    }
-    return MornyeGlass.navigation(
-      radius: 24,
-      blurEnabled: blurEnabled && ref.watch(mornyeBlurEnabledProvider),
-      child: content,
-    );
+    return ClipRRect(borderRadius: BorderRadius.circular(24), child: content);
   }
 }
 

@@ -23,7 +23,6 @@ void main() {
                         child: MornyeFilterChip(
                           label: 'Albums',
                           selected: selected,
-                          glass: false,
                           tonal: selected,
                           onTap: () => setState(() => selected = !selected),
                         ),

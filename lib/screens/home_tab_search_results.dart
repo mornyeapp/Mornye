@@ -219,7 +219,6 @@ extension _HomeTabSearchResultsUI on _HomeTabState {
                         return MornyeFilterChip(
                           label: _sortOptionLabel(option),
                           selected: tempSort == option,
-                          glass: false,
                           onTap: () => setSheetState(() => tempSort = option),
                         );
                       }
@@ -721,7 +720,6 @@ extension _HomeTabSearchResultsUI on _HomeTabState {
                 label: label,
                 selected: selectedFilter == id,
                 icon: icon == null ? null : mornyeIconFor(icon),
-                glass: false,
                 tonal: selectedFilter == id,
                 onTap: select,
               ),
