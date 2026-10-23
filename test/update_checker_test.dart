@@ -359,7 +359,6 @@ void main() {
                     version: '5.3.0',
                     changelog: '- Desktop builds',
                     downloadUrl: 'https://example.test/releases/v5.3.0',
-                    publishedAt: DateTime(2026, 10, 20),
                     installKind: UpdateInstallKind.releasePage,
                   ),
                   onDisableUpdates: () {},

@@ -152,15 +152,6 @@ class BackupBundle {
   }
 
   bool get hasExtensions => extensionCount > 0;
-  bool get isEmpty =>
-      !hasSettings &&
-      profile == null &&
-      historyCount == 0 &&
-      likedCount == 0 &&
-      wishlistCount == 0 &&
-      playlistCount == 0 &&
-      favoriteArtistCount == 0 &&
-      extensionCount == 0;
 }
 
 class BackupService {

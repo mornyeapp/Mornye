@@ -188,8 +188,6 @@ class LocalLibraryItem {
     );
   }
 
-  String get matchKey =>
-      '${sqlite.normalizeLookupText(trackName)}|${sqlite.normalizeLookupText(artistName)}';
   String get albumKey =>
       '${sqlite.normalizeLookupText(albumName)}|${sqlite.normalizeLookupText(albumArtist ?? artistName)}';
 }

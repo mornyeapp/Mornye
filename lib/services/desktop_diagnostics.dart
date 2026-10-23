@@ -45,9 +45,6 @@ class DesktopDiagnostics {
   /// The running app's diagnostics; null on mobile and before [initialize].
   static DesktopDiagnostics? get instance => _instance;
 
-  @visibleForTesting
-  static set debugInstance(DesktopDiagnostics? value) => _instance = value;
-
   static const logFileName = 'mornye.log';
   static const panicLogFileName = 'rust-panic.log';
   static const _markerFileName = 'session.running';

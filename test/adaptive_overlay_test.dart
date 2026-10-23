@@ -535,7 +535,6 @@ void main() {
                       version: '9.0.0',
                       changelog: 'Playback and library improvements.\n' * 8,
                       downloadUrl: 'https://example.com/release',
-                      publishedAt: DateTime(2026),
                       releasesBehind: 3,
                     ),
                     onDisableUpdates: () =>
