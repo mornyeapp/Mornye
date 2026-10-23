@@ -147,7 +147,6 @@ List<IsrcDuplicateGroup> _groups(TargetPlatform platform, {int count = 10}) => [
             source: 'local',
             trackName: 'Track $group',
             artistName: 'Artist',
-            albumName: 'Album',
             filePath: platform == TargetPlatform.windows
                 ? r'C:\Music\Albums\Artist\Album'
                       '\\$copy\\Track $group.flac'

@@ -8,9 +8,8 @@ import 'package:mornye/utils/string_utils.dart';
 
 class SavedCoverResult {
   final String fileName;
-  final String location;
 
-  const SavedCoverResult({required this.fileName, required this.location});
+  const SavedCoverResult({required this.fileName});
 }
 
 class CoverDownloadService {
@@ -70,7 +69,7 @@ class CoverDownloadService {
         if (uri.isEmpty || fileName.isEmpty) {
           throw const FileSystemException('Failed to write cover to storage');
         }
-        return SavedCoverResult(fileName: fileName, location: uri);
+        return SavedCoverResult(fileName: fileName);
       }
 
       var outputDirectory = settings.downloadDirectory.trim();
@@ -96,10 +95,7 @@ class CoverDownloadService {
         requestedFileName,
       );
       await tempFile.copy(outputPath);
-      return SavedCoverResult(
-        fileName: p.basename(outputPath),
-        location: outputPath,
-      );
+      return SavedCoverResult(fileName: p.basename(outputPath));
     } finally {
       if (iosBookmarkAccess != null) {
         await PlatformBridge.stopAccessingIosBookmark(iosBookmarkAccess);

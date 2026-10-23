@@ -263,7 +263,6 @@ void main() {
           if (local.id == '2') throw StateError('lookup failed');
           if (local.id == '4') cancelled = true;
           return LocalTrackRedownloadResolution(
-            localItem: local,
             match: local.id == '3'
                 ? null
                 : Track(
@@ -273,8 +272,6 @@ void main() {
                     albumName: 'Album',
                     duration: 1,
                   ),
-            score: 100,
-            reason: 'fixture',
           );
         },
       );

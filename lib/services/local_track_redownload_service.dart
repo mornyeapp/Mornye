@@ -5,17 +5,9 @@ import 'package:mornye/services/library_database.dart';
 import 'package:mornye/services/platform_bridge.dart';
 
 class LocalTrackRedownloadResolution {
-  final LocalLibraryItem localItem;
   final Track? match;
-  final int score;
-  final String reason;
 
-  const LocalTrackRedownloadResolution({
-    required this.localItem,
-    required this.match,
-    required this.score,
-    required this.reason,
-  });
+  const LocalTrackRedownloadResolution({required this.match});
 
   bool get canQueue => match != null;
 }
@@ -45,12 +37,7 @@ class LocalTrackRedownloadService {
     );
 
     if (rawResults.isEmpty) {
-      return LocalTrackRedownloadResolution(
-        localItem: item,
-        match: null,
-        score: 0,
-        reason: 'No candidates found',
-      );
+      return const LocalTrackRedownloadResolution(match: null);
     }
 
     final scored =
@@ -66,12 +53,7 @@ class LocalTrackRedownloadService {
           ..sort((a, b) => b.score.compareTo(a.score));
 
     if (scored.isEmpty) {
-      return LocalTrackRedownloadResolution(
-        localItem: item,
-        match: null,
-        score: 0,
-        reason: 'No usable candidates found',
-      );
+      return const LocalTrackRedownloadResolution(match: null);
     }
 
     final best = scored.first;
@@ -86,20 +68,10 @@ class LocalTrackRedownloadService {
         (best.score - runnerUp.score) <= _ambiguousScoreGap;
 
     if (!exactIsrc && (best.score < _minimumConfidenceScore || isAmbiguous)) {
-      return LocalTrackRedownloadResolution(
-        localItem: item,
-        match: null,
-        score: best.score,
-        reason: isAmbiguous ? 'Ambiguous match' : 'Low-confidence match',
-      );
+      return const LocalTrackRedownloadResolution(match: null);
     }
 
-    return LocalTrackRedownloadResolution(
-      localItem: item,
-      match: best.track,
-      score: best.score,
-      reason: exactIsrc ? 'Exact ISRC match' : 'High-confidence metadata match',
-    );
+    return LocalTrackRedownloadResolution(match: best.track);
   }
 
   static String preferredFlacService(

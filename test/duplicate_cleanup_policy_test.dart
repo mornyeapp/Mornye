@@ -8,7 +8,6 @@ IsrcDuplicateEntry _entry(String id) {
     source: 'local',
     trackName: 'Track $id',
     artistName: 'Artist',
-    albumName: 'Album',
     filePath: '/music/$id.flac',
   );
 }
@@ -48,7 +47,6 @@ void main() {
         source: 'downloaded',
         trackName: 'Track',
         artistName: 'Artist',
-        albumName: 'Album',
         filePath: 'file://${copy.filePath}',
       );
       final removedRows = <String>[];

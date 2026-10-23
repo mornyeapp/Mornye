@@ -8,7 +8,6 @@ final _log = AppLogger('AudioRoute');
 class AudioRouteInfo {
   const AudioRouteInfo({
     this.platform,
-    this.sdk,
     this.mixerSampleRate,
     this.framesPerBuffer,
     this.ioBufferMs,
@@ -32,7 +31,6 @@ class AudioRouteInfo {
     final stream = map['stream'];
     return AudioRouteInfo(
       platform: map['platform'] as String?,
-      sdk: _int(map['sdk']),
       mixerSampleRate: _int(map['mixerSampleRate']),
       framesPerBuffer: _int(map['framesPerBuffer']),
       ioBufferMs: _double(map['ioBufferMs']),
@@ -56,7 +54,6 @@ class AudioRouteInfo {
   }
 
   final String? platform;
-  final int? sdk;
 
   /// The system mixer's native rate; sources at other rates are resampled
   /// unless a bit-perfect path bypasses the mixer.
@@ -94,8 +91,6 @@ class AudioRouteDevice {
     this.sampleRates = const [],
     this.bitDepths = const [],
     this.floatOutput = false,
-    this.channelCounts = const [],
-    this.bitPerfectCapable,
     this.mixerSampleRate,
     this.mixerBitDepth,
     this.mixerBitPerfect,
@@ -109,8 +104,6 @@ class AudioRouteDevice {
       sampleRates: _ints(map['sampleRates']),
       bitDepths: _ints(map['bitDepths']),
       floatOutput: map['float'] == true,
-      channelCounts: _ints(map['channelCounts']),
-      bitPerfectCapable: map['bitPerfectCapable'] as bool?,
       mixerSampleRate: mixer is Map ? _int(mixer['sampleRate']) : null,
       mixerBitDepth: mixer is Map ? _int(mixer['bitDepth']) : null,
       mixerBitPerfect: mixer is Map ? mixer['bitPerfect'] as bool? : null,
@@ -125,8 +118,6 @@ class AudioRouteDevice {
   final List<int> sampleRates;
   final List<int> bitDepths;
   final bool floatOutput;
-  final List<int> channelCounts;
-  final bool? bitPerfectCapable;
   final int? mixerSampleRate;
   final int? mixerBitDepth;
   final bool? mixerBitPerfect;

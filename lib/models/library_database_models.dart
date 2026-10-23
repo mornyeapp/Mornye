@@ -282,7 +282,6 @@ class IsrcDuplicateEntry {
   final String source; // 'downloaded' (history row) or 'local' (library row)
   final String trackName;
   final String artistName;
-  final String albumName;
   final String filePath;
   final int? bitDepth;
   final int? sampleRate;
@@ -294,7 +293,6 @@ class IsrcDuplicateEntry {
     required this.source,
     required this.trackName,
     required this.artistName,
-    required this.albumName,
     required this.filePath,
     this.bitDepth,
     this.sampleRate,
