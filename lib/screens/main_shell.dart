@@ -49,6 +49,7 @@ import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/app_loading_indicator.dart';
 import 'package:mornye/widgets/mornye_chrome.dart';
 import 'package:mornye/theme/mornye_theme.dart';
+import 'package:mornye/theme/player_artwork_theme.dart';
 import 'package:mornye/widgets/selection_bottom_bar.dart';
 import 'package:mornye/widgets/desktop/desktop_commands.dart';
 import 'package:mornye/widgets/desktop/desktop_inspector.dart';
@@ -1156,38 +1157,58 @@ class _MainShellState extends ConsumerState<MainShell>
                   ),
                 );
               }
-              final bottomBar = Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const MiniPlayer(),
-                  // The bar's container fill separates it; no divider, so
-                  // the mini player and the bar read as one surface.
-                  if (!useNavigationRail)
-                    ExpressiveNavigationBar(
-                      selectedIndex: _currentIndex.clamp(0, maxIndex),
-                      onDestinationSelected: _onNavTap,
-                      isTablet: isTablet,
-                      backgroundColor: settingsGroupColor(
-                        context,
-                      ).withValues(alpha: 0.72),
-                      destinations: destinations,
+              final blurEnabled = ref.watch(backdropBlurEnabledProvider);
+              // The mini player and the bar read as one surface, so the bar
+              // takes the playing track's artwork scheme too; with nothing
+              // playing both keep the app scheme. Only this scope listens
+              // to the track, so a cover change does not rebuild the shell.
+              return Consumer(
+                builder: (context, ref, child) => PlayerArtworkTheme(
+                  artUri: ref.watch(
+                    currentMediaItemProvider.select(
+                      (item) => item.value?.artUri?.toString(),
                     ),
-                ],
-              );
-              // The backdrop blur re-filters everything scrolling underneath on
-              // every frame; low-end devices get an opaque base instead unless
-              // the user forces blur on in appearance settings.
-              if (!ref.watch(backdropBlurEnabledProvider)) {
-                return ColoredBox(
-                  color: settingsGroupColor(context),
-                  child: bottomBar,
-                );
-              }
-              return ClipRect(
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                  blendMode: BlendMode.src,
-                  child: bottomBar,
+                  ),
+                  child: child!,
+                ),
+                child: Builder(
+                  builder: (context) {
+                    final bottomBar = Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const MiniPlayer(),
+                        // The bar's container fill separates it; no divider,
+                        // so the mini player and the bar read as one surface.
+                        if (!useNavigationRail)
+                          ExpressiveNavigationBar(
+                            selectedIndex: _currentIndex.clamp(0, maxIndex),
+                            onDestinationSelected: _onNavTap,
+                            isTablet: isTablet,
+                            backgroundColor: settingsGroupColor(
+                              context,
+                            ).withValues(alpha: 0.72),
+                            destinations: destinations,
+                          ),
+                      ],
+                    );
+                    // The backdrop blur re-filters everything scrolling
+                    // underneath on every frame; low-end devices get an
+                    // opaque base instead unless the user forces blur on in
+                    // appearance settings.
+                    if (!blurEnabled) {
+                      return ColoredBox(
+                        color: settingsGroupColor(context),
+                        child: bottomBar,
+                      );
+                    }
+                    return ClipRect(
+                      child: BackdropFilter(
+                        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                        blendMode: BlendMode.src,
+                        child: bottomBar,
+                      ),
+                    );
+                  },
                 ),
               );
             },
