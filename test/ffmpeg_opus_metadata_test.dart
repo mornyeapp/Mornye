@@ -3,7 +3,8 @@ import 'dart:io';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mornye/services/ffmpeg_service.dart';
+import 'package:mornye/services/ffmpeg_metadata.dart';
+import 'package:mornye/services/ffmpeg_models.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -118,7 +119,7 @@ void main() {
         List<int>? pictureBytes;
 
         expect(
-          await FFmpegService.embedMetadataToOpus(
+          await FFmpegMetadata.embedMetadataToOpus(
             opusPath: opusPath,
             coverPath: coverFile.path,
             execute: (arguments) async {
@@ -218,7 +219,7 @@ void main() {
         );
       }
       expect(
-        await FFmpegService.embedMetadataToOpus(
+        await FFmpegMetadata.embedMetadataToOpus(
           opusPath: path,
           coverPath: coverPath,
           metadata: scenario.metadata,

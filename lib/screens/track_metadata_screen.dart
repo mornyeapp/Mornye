@@ -32,7 +32,10 @@ import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/services/music_player_service.dart'
     show readPlaybackFileMetadataWithRetry;
 import 'package:mornye/services/downloaded_embedded_cover_resolver.dart';
-import 'package:mornye/services/ffmpeg_service.dart';
+import 'package:mornye/services/ffmpeg_conversion.dart';
+import 'package:mornye/services/ffmpeg_metadata.dart';
+import 'package:mornye/services/ffmpeg_models.dart';
+import 'package:mornye/services/ffmpeg_probe.dart';
 import 'package:mornye/services/replaygain_service.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/utils/adaptive_layout.dart';

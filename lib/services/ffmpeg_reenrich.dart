@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:mornye/services/ffmpeg_service.dart';
+import 'package:mornye/services/ffmpeg_metadata.dart';
 import 'package:mornye/services/library_database.dart';
 import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/utils/file_access.dart';
@@ -89,7 +89,7 @@ Future<bool> applyFfmpegReEnrichResult({
 
     String? ffmpegResult;
     if (isMp3) {
-      ffmpegResult = await FFmpegService.embedMetadataToMp3(
+      ffmpegResult = await FFmpegMetadata.embedMetadataToMp3(
         mp3Path: ffmpegTarget,
         coverPath: effectiveCoverPath,
         metadata: metadata,
@@ -97,7 +97,7 @@ Future<bool> applyFfmpegReEnrichResult({
         preserveMetadata: true,
       );
     } else if (isM4A) {
-      ffmpegResult = await FFmpegService.embedMetadataToM4a(
+      ffmpegResult = await FFmpegMetadata.embedMetadataToM4a(
         m4aPath: ffmpegTarget,
         coverPath: effectiveCoverPath,
         metadata: metadata,
@@ -105,7 +105,7 @@ Future<bool> applyFfmpegReEnrichResult({
         preserveMetadata: true,
       );
     } else if (isOpus) {
-      ffmpegResult = await FFmpegService.embedMetadataToOpus(
+      ffmpegResult = await FFmpegMetadata.embedMetadataToOpus(
         opusPath: ffmpegTarget,
         coverPath: effectiveCoverPath,
         metadata: metadata,

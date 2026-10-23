@@ -562,19 +562,19 @@ extension _TrackMetadataLyricsAndSaving on _TrackMetadataScreenState {
         );
         String? ffmpegResult;
         if (isMp3) {
-          ffmpegResult = await FFmpegService.embedMetadataToMp3(
+          ffmpegResult = await FFmpegMetadata.embedMetadataToMp3(
             mp3Path: workingPath,
             coverPath: coverPath,
             metadata: metadata,
           );
         } else if (isM4A) {
-          ffmpegResult = await FFmpegService.embedMetadataToM4a(
+          ffmpegResult = await FFmpegMetadata.embedMetadataToM4a(
             m4aPath: workingPath,
             coverPath: coverPath,
             metadata: metadata,
           );
         } else {
-          ffmpegResult = await FFmpegService.embedMetadataToOpus(
+          ffmpegResult = await FFmpegMetadata.embedMetadataToOpus(
             opusPath: workingPath,
             coverPath: coverPath,
             metadata: metadata,
@@ -1008,21 +1008,21 @@ extension _TrackMetadataLyricsAndSaving on _TrackMetadataScreenState {
 
           String? ffmpegResult;
           if (lower.endsWith('.mp3')) {
-            ffmpegResult = await FFmpegService.embedMetadataToMp3(
+            ffmpegResult = await FFmpegMetadata.embedMetadataToMp3(
               mp3Path: ffmpegTarget,
               coverPath: effectiveCoverPath,
               metadata: metadata,
               artistTagMode: artistTagMode,
             );
           } else if (lower.endsWith('.m4a') || lower.endsWith('.aac')) {
-            ffmpegResult = await FFmpegService.embedMetadataToM4a(
+            ffmpegResult = await FFmpegMetadata.embedMetadataToM4a(
               m4aPath: ffmpegTarget,
               coverPath: effectiveCoverPath,
               metadata: metadata,
               artistTagMode: artistTagMode,
             );
           } else if (lower.endsWith('.opus') || lower.endsWith('.ogg')) {
-            ffmpegResult = await FFmpegService.embedMetadataToOpus(
+            ffmpegResult = await FFmpegMetadata.embedMetadataToOpus(
               opusPath: ffmpegTarget,
               coverPath: effectiveCoverPath,
               metadata: metadata,

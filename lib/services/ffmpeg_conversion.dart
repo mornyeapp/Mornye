@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:mornye/services/audio_metadata_mapper.dart';
 import 'package:mornye/services/ffmpeg_metadata.dart';
 import 'package:mornye/services/ffmpeg_models.dart';
@@ -107,7 +108,7 @@ abstract final class FFmpegConversion {
   static Future<String?> convertM4aToFlac(
     String inputPath, {
     String? sourceCodec,
-    Future<FFmpegResult> Function(List<String>)? execute,
+    @visibleForTesting Future<FFmpegResult> Function(List<String>)? execute,
   }) async {
     final plan = await FFmpegOutput.plan(
       inputPath,

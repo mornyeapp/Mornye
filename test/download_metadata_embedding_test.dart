@@ -9,7 +9,7 @@ import 'package:mornye/models/metadata_separators.dart';
 import 'package:mornye/models/track.dart';
 import 'package:mornye/providers/extension_provider.dart';
 import 'package:mornye/services/download_metadata_embedding.dart';
-import 'package:mornye/services/ffmpeg_service.dart';
+import 'package:mornye/services/ffmpeg_models.dart';
 import 'package:mornye/utils/artist_utils.dart';
 
 class EmbeddingHarness {

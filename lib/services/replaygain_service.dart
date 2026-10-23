@@ -1,7 +1,8 @@
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
-import 'package:mornye/services/ffmpeg_service.dart';
+import 'package:mornye/services/ffmpeg_models.dart';
+import 'package:mornye/services/ffmpeg_replaygain.dart';
 import 'package:mornye/services/music_player_service.dart';
 import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/utils/file_access.dart';
@@ -67,7 +68,7 @@ class ReplayGainService {
     final written = await _updateFile(filePath, (workingPath) async {
       final rg = scan != null
           ? await scan(workingPath)
-          : await FFmpegService.scanReplayGain(
+          : await FFmpegReplayGain.scan(
               workingPath,
               onUnsupportedDecoder: onUnsupportedDecoder,
             );
@@ -162,8 +163,8 @@ class ReplayGainService {
       final lower = path.toLowerCase();
       if (lower.endsWith('.opus') || lower.endsWith('.ogg')) return false;
       written = album
-          ? await FFmpegService.writeAlbumReplayGainTags(path, gain, peak)
-          : await FFmpegService.writeTrackReplayGainTags(path, gain, peak);
+          ? await FFmpegReplayGain.writeAlbumTags(path, gain, peak)
+          : await FFmpegReplayGain.writeTrackTags(path, gain, peak);
     }
     if (!written) return false;
 

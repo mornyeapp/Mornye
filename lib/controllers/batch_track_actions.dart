@@ -9,7 +9,7 @@ import 'package:mornye/providers/download_history_provider.dart';
 import 'package:mornye/providers/local_library_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/services/conversion_library_service.dart';
-import 'package:mornye/services/ffmpeg_service.dart';
+import 'package:mornye/services/ffmpeg_conversion.dart';
 import 'package:mornye/services/library_database.dart';
 import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/services/replaygain_service.dart';
@@ -446,7 +446,7 @@ Future<LibraryTrackConversionResult> convertLibraryTrack({
     }
 
     failureStage = 'FFmpeg conversion';
-    final newPath = await FFmpegService.convertAudioFormat(
+    final newPath = await FFmpegConversion.convertAudioFormat(
       inputPath: workingPath,
       targetFormat: targetFormat.toLowerCase(),
       bitrate: bitrate,

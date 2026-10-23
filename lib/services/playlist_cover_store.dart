@@ -3,7 +3,8 @@ import 'dart:io';
 
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
-import 'package:mornye/services/ffmpeg_service.dart';
+import 'package:mornye/services/ffmpeg_metadata.dart';
+import 'package:mornye/services/ffmpeg_probe.dart';
 import 'package:mornye/utils/file_access.dart';
 
 const _playlistCoverMaxDimension = 1024;
@@ -41,9 +42,7 @@ class PlaylistCoverStore {
       '.$playlistId.${DateTime.now().microsecondsSinceEpoch}.jpg',
     );
     try {
-      final dimensions = await FFmpegService.probeImageDimensions(
-        sourceFilePath,
-      );
+      final dimensions = await FFmpegProbe.imageDimensions(sourceFilePath);
       final longestEdge = dimensions == null
           ? _playlistCoverMaxDimension
           : (dimensions.width > dimensions.height
@@ -53,7 +52,7 @@ class PlaylistCoverStore {
           .clamp(64, _playlistCoverMaxDimension)
           .toInt();
       while (true) {
-        final resized = await FFmpegService.resizeCoverArt(
+        final resized = await FFmpegMetadata.resizeCoverArt(
           inputPath: sourceFilePath,
           outputPath: tempPath,
           maxDimension: targetDimension,
@@ -87,7 +86,7 @@ class PlaylistCoverStore {
         await file.length() > _playlistCoverMaxStoredBytes) {
       return true;
     }
-    final dimensions = await FFmpegService.probeImageDimensions(path);
+    final dimensions = await FFmpegProbe.imageDimensions(path);
     return dimensions == null ||
         dimensions.width > _playlistCoverMaxDimension ||
         dimensions.height > _playlistCoverMaxDimension;

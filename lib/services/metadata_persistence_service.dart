@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:mornye/services/ffmpeg_service.dart';
+import 'package:mornye/services/ffmpeg_metadata.dart';
 import 'package:mornye/services/metadata_cover_resources.dart';
 import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/utils/artist_utils.dart';
@@ -219,19 +219,19 @@ class MetadataPersistenceService {
     Map<String, String> metadata,
     String artistTagMode,
   ) => switch (codec) {
-    MetadataSaveCodec.mp3 => FFmpegService.embedMetadataToMp3(
+    MetadataSaveCodec.mp3 => FFmpegMetadata.embedMetadataToMp3(
       mp3Path: path,
       coverPath: coverPath,
       metadata: metadata,
       preserveMetadata: true,
     ),
-    MetadataSaveCodec.m4a => FFmpegService.embedMetadataToM4a(
+    MetadataSaveCodec.m4a => FFmpegMetadata.embedMetadataToM4a(
       m4aPath: path,
       coverPath: coverPath,
       metadata: metadata,
       preserveMetadata: true,
     ),
-    MetadataSaveCodec.opus => FFmpegService.embedMetadataToOpus(
+    MetadataSaveCodec.opus => FFmpegMetadata.embedMetadataToOpus(
       opusPath: path,
       coverPath: coverPath,
       metadata: metadata,

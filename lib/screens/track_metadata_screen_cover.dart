@@ -147,9 +147,7 @@ extension _TrackMetadataCover on _TrackMetadataScreenState {
         if (cachedCover != null && cachedCover.previewPath == newPreviewPath) {
           newDimensions = cachedCover.dimensions;
         } else {
-          newDimensions = await FFmpegService.probeImageDimensions(
-            newPreviewPath,
-          );
+          newDimensions = await FFmpegProbe.imageDimensions(newPreviewPath);
           await _cacheEmbeddedCoverPreview(
             cacheKey,
             sourcePath,

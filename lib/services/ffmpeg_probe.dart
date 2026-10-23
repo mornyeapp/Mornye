@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:mornye/services/ffmpeg_support.dart';
 import 'package:mornye/utils/logger.dart';
 import 'package:mornye/utils/audio_format_utils.dart' as audio;
@@ -27,6 +28,7 @@ abstract final class FFmpegProbe {
 
   static void invalidate(String path) => _cache.remove(path);
 
+  @visibleForTesting
   static ({int width, int height})? imageDimensionsFromProperties(
     Map<dynamic, dynamic> properties,
   ) {

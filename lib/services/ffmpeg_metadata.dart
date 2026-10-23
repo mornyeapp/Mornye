@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
-import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:mornye/services/audio_metadata_mapper.dart';
 import 'package:mornye/services/ffmpeg_models.dart';
@@ -16,6 +16,7 @@ final _log = AppLogger('FFmpeg');
 
 /// Container-specific metadata and artwork operations, independent of encoding.
 abstract final class FFmpegMetadata {
+  @visibleForTesting
   static List<String> buildCoverResizeArguments({
     required String inputPath,
     required String outputPath,
@@ -267,7 +268,7 @@ abstract final class FFmpegMetadata {
     Map<String, String>? metadata,
     String artistTagMode = artistTagModeJoined,
     bool preserveMetadata = false,
-    Future<FFmpegResult> Function(List<String>)? execute,
+    @visibleForTesting Future<FFmpegResult> Function(List<String>)? execute,
   }) async {
     final tempOutput = await FFmpegOutput.tempPath('.opus');
     // Opus tags are on the audio stream. Copy to output globals, override the
@@ -328,7 +329,7 @@ abstract final class FFmpegMetadata {
     Map<String, String>? metadata,
     String artistTagMode = artistTagModeJoined,
     bool preserveMetadata = true,
-    Future<FFmpegResult> Function(List<String>)? execute,
+    @visibleForTesting Future<FFmpegResult> Function(List<String>)? execute,
   }) async {
     if (metadata != null) {
       metadata = applyArtistTagModeToMetadata(metadata, artistTagMode);

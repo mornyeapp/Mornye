@@ -4,7 +4,7 @@ import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/services/ffmpeg_desktop.dart';
-import 'package:mornye/services/ffmpeg_service.dart';
+import 'package:mornye/services/ffmpeg_conversion.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 
 Map<String, Uint8List> _itunesAtoms(Uint8List file) {
@@ -112,7 +112,7 @@ void main() {
       final sibling = File('${directory.path}/Song "live".$extension');
       await sibling.writeAsString('existing file');
 
-      final converted = await FFmpegService.convertAudioFormat(
+      final converted = await FFmpegConversion.convertAudioFormat(
         inputPath: path,
         targetFormat: format,
         bitrate: '128k',
@@ -165,7 +165,7 @@ void main() {
             artist,
             metadata: explicitTags ? const {} : metadata,
           );
-          final converted = await FFmpegService.convertAudioFormat(
+          final converted = await FFmpegConversion.convertAudioFormat(
             inputPath: path,
             targetFormat: 'aac',
             bitrate: '256k',
@@ -194,7 +194,7 @@ void main() {
     final path = '${directory.path}/Invalid.flac';
     await File(path).writeAsString('invalid audio');
 
-    final converted = await FFmpegService.convertAudioFormat(
+    final converted = await FFmpegConversion.convertAudioFormat(
       inputPath: path,
       targetFormat: 'aac',
       bitrate: '256k',

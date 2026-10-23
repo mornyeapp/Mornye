@@ -1,7 +1,8 @@
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:mornye/services/ffmpeg_service.dart';
+import 'package:mornye/services/ffmpeg_metadata.dart';
+import 'package:mornye/services/ffmpeg_probe.dart';
 import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/utils/logger.dart';
 
@@ -70,7 +71,7 @@ class MetadataCoverResources {
 
   Future<MetadataCoverDetails?> readDetails(String path) async {
     try {
-      final dimensions = await FFmpegService.probeImageDimensions(path);
+      final dimensions = await FFmpegProbe.imageDimensions(path);
       if (dimensions == null) return null;
       return (
         width: dimensions.width,
@@ -164,7 +165,7 @@ class MetadataCoverResources {
 
   Future<MetadataCoverPreview> resize(String source, int maxDimension) {
     return _create('metadata_resized_cover_', 'cover.jpg', (path) async {
-      final resized = await FFmpegService.resizeCoverArt(
+      final resized = await FFmpegMetadata.resizeCoverArt(
         inputPath: source,
         outputPath: path,
         maxDimension: maxDimension,

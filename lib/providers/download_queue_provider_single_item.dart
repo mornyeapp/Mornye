@@ -1222,9 +1222,9 @@ class _DownloadRun {
             branch = 'skip';
             return null;
           }
-          final codec = await FFmpegService.probePrimaryAudioCodec(tempPath);
+          final codec = await FFmpegProbe.audioCodec(tempPath);
           final isAlreadyNativeFlac =
-              codec == 'flac' && await FFmpegService.isNativeFlacFile(tempPath);
+              codec == 'flac' && await FFmpegProbe.isNativeFlacFile(tempPath);
           final shouldAttemptConversion =
               shouldAttemptLosslessContainerConversion(
                 forceConversion: forceContainerConversion,
@@ -1268,7 +1268,7 @@ class _DownloadRun {
               DownloadStatus.finalizing,
               progress: 0.95,
             );
-            final flacPath = await FFmpegService.convertM4aToFlac(
+            final flacPath = await FFmpegConversion.convertM4aToFlac(
               tempPath,
               sourceCodec: codec,
             );
@@ -1363,12 +1363,10 @@ class _DownloadRun {
             'File is too small (<1KB), skipping conversion. Download might be corrupt.',
           );
         } else {
-          final codec = await FFmpegService.probePrimaryAudioCodec(
-            currentFilePath,
-          );
+          final codec = await FFmpegProbe.audioCodec(currentFilePath);
           final isAlreadyNativeFlac =
               codec == 'flac' &&
-              await FFmpegService.isNativeFlacFile(currentFilePath);
+              await FFmpegProbe.isNativeFlacFile(currentFilePath);
           final shouldAttemptConversion =
               shouldAttemptLosslessContainerConversion(
                 forceConversion: forceContainerConversion,
@@ -1385,7 +1383,7 @@ class _DownloadRun {
               'Native FLAC payload detected; ensuring .flac '
               'extension and embedding metadata.',
             );
-            final flacPath = await FFmpegService.ensureNativeFlacExtension(
+            final flacPath = await FFmpegConversion.ensureNativeFlacExtension(
               currentFilePath,
             );
             filePath = flacPath;
@@ -1398,7 +1396,7 @@ class _DownloadRun {
               DownloadStatus.finalizing,
               progress: 0.95,
             );
-            final flacPath = await FFmpegService.convertM4aToFlac(
+            final flacPath = await FFmpegConversion.convertM4aToFlac(
               currentFilePath,
               sourceCodec: codec,
             );

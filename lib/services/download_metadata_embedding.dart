@@ -7,7 +7,9 @@ import 'package:mornye/models/metadata_separators.dart';
 import 'package:mornye/models/track.dart';
 import 'package:mornye/models/extension.dart';
 import 'package:mornye/services/download_metadata_resolver.dart';
-import 'package:mornye/services/ffmpeg_service.dart';
+import 'package:mornye/services/ffmpeg_metadata.dart';
+import 'package:mornye/services/ffmpeg_models.dart';
+import 'package:mornye/services/ffmpeg_replaygain.dart';
 import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/services/replaygain_service.dart';
 import 'package:mornye/utils/artist_utils.dart';
@@ -57,7 +59,7 @@ class DownloadMetadataEmbedding {
   }) : _loadCover = loadCover ?? _downloadCover,
        _loadLyrics = loadLyrics ?? _fetchLyrics,
        _editMetadata = editMetadata ?? PlatformBridge.editFileMetadata,
-       _scanReplayGain = scanReplayGain ?? FFmpegService.scanReplayGain,
+       _scanReplayGain = scanReplayGain ?? FFmpegReplayGain.scan,
        _scanAndApplyReplayGain =
            scanAndApplyReplayGain ?? ReplayGainService.scanAndApplyToFile,
        _writeReplayGain = writeReplayGain ?? ReplayGainService.writeTrackTags,
@@ -412,25 +414,25 @@ class DownloadMetadataEmbedding {
     Map<String, String> metadata,
     String artistMode,
   ) => switch (format) {
-    'flac' => FFmpegService.embedMetadata(
+    'flac' => FFmpegMetadata.embedMetadata(
       flacPath: path,
       coverPath: cover,
       metadata: metadata,
       artistTagMode: artistMode,
     ),
-    'm4a' => FFmpegService.embedMetadataToM4a(
+    'm4a' => FFmpegMetadata.embedMetadataToM4a(
       m4aPath: path,
       coverPath: cover,
       metadata: metadata,
       artistTagMode: artistMode,
     ),
-    'mp3' => FFmpegService.embedMetadataToMp3(
+    'mp3' => FFmpegMetadata.embedMetadataToMp3(
       mp3Path: path,
       coverPath: cover,
       metadata: metadata,
       artistTagMode: artistMode,
     ),
-    _ => FFmpegService.embedMetadataToOpus(
+    _ => FFmpegMetadata.embedMetadataToOpus(
       opusPath: path,
       coverPath: cover,
       metadata: metadata,

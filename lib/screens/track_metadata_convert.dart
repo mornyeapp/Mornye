@@ -640,7 +640,7 @@ extension _TrackMetadataConvertAndCueSplit on _TrackMetadataScreenState {
         'date': date,
       };
 
-      final outputPaths = await FFmpegService.splitCueToTracks(
+      final outputPaths = await FFmpegConversion.splitCueToTracks(
         audioPath: workingAudioPath,
         outputDir: outputDir,
         tracks: tracks,

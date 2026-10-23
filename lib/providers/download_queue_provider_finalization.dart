@@ -21,8 +21,8 @@ bool _isMp4Container(String path) {
 
 extension _DownloadQueueFinalization on DownloadQueueNotifier {
   DownloadFileFinalizer get _fileFinalizer => DownloadFileFinalizer(
-    decryptFile: FFmpegService.decryptWithDescriptor,
-    probeCodec: FFmpegService.probePrimaryAudioCodec,
+    decryptFile: FFmpegDecryption.decrypt,
+    probeCodec: FFmpegProbe.audioCodec,
     repairAc4: (path, source) async {
       await PlatformBridge.ensureAC4Config(path, source);
     },
@@ -32,7 +32,7 @@ extension _DownloadQueueFinalization on DownloadQueueNotifier {
           required targetFormat,
           required bitrate,
           required deleteOriginal,
-        }) => FFmpegService.convertAudioFormat(
+        }) => FFmpegConversion.convertAudioFormat(
           inputPath: inputPath,
           targetFormat: targetFormat,
           bitrate: bitrate,
@@ -768,10 +768,10 @@ extension _DownloadQueueFinalization on DownloadQueueNotifier {
     required String filePath,
   }) =>
       DownloadContainerFinalizer(
-        probeCodec: FFmpegService.probePrimaryAudioCodec,
-        isNativeFlac: FFmpegService.isNativeFlacFile,
-        ensureFlacExtension: FFmpegService.ensureNativeFlacExtension,
-        convertToFlac: FFmpegService.convertM4aToFlac,
+        probeCodec: FFmpegProbe.audioCodec,
+        isNativeFlac: FFmpegProbe.isNativeFlacFile,
+        ensureFlacExtension: FFmpegConversion.ensureNativeFlacExtension,
+        convertToFlac: FFmpegConversion.convertM4aToFlac,
         replaceSafFile: _replaceSafFileVia,
         debug: _log.d,
       ).finalize(
