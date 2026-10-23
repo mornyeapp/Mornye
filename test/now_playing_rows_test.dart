@@ -10,6 +10,7 @@ import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/theme/player_artwork_theme.dart';
 import 'package:mornye/widgets/album_track_tile.dart';
 import 'package:mornye/widgets/app_content_card.dart';
+import 'package:mornye/widgets/decorative_phase.dart';
 import 'package:mornye/widgets/desktop/track_table.dart';
 import 'package:mornye/widgets/now_playing_indicator.dart';
 import 'package:mornye/widgets/track_card.dart';
@@ -152,23 +153,23 @@ void main() {
         ),
       );
       await tester.pump(const Duration(milliseconds: 100));
-      expect(tester.binding.hasScheduledFrame, isTrue);
+      expect(DecorativePhase.debugClockRunning, isTrue);
 
       playing.value = false;
       await tester.pump();
       await tester.pump();
-      expect(tester.binding.hasScheduledFrame, isFalse);
+      expect(DecorativePhase.debugClockRunning, isFalse);
 
       playing.value = true;
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 100));
-      expect(tester.binding.hasScheduledFrame, isTrue);
+      expect(DecorativePhase.debugClockRunning, isTrue);
     });
 
     testWidgets('stays still under reduced motion', (tester) async {
       await tester.pumpWidget(host(playing: true, reduceMotion: true));
       await tester.pump();
-      expect(tester.binding.hasScheduledFrame, isFalse);
+      expect(DecorativePhase.debugClockRunning, isFalse);
     });
 
     testWidgets('stops its ticker while hidden', (tester) async {
@@ -182,7 +183,7 @@ void main() {
         ),
       );
       await tester.pump();
-      expect(tester.binding.hasScheduledFrame, isFalse);
+      expect(DecorativePhase.debugClockRunning, isFalse);
     });
 
     testWidgets('is a 16dp glyph outside the semantics tree', (tester) async {
@@ -219,7 +220,7 @@ void main() {
       expect(title?.fontWeight, FontWeight.w700);
       expect(_textStyle(tester, 'Alpha')?.fontWeight, FontWeight.w500);
       // The glyph moves while the track plays.
-      expect(tester.binding.hasScheduledFrame, isTrue);
+      expect(DecorativePhase.debugClockRunning, isTrue);
     });
 
     testWidgets('keeps row height and title alignment', (tester) async {
