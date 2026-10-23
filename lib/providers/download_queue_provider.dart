@@ -961,22 +961,6 @@ class DownloadQueueNotifier extends Notifier<DownloadQueueState> {
     _saveQueueToStorage();
   }
 
-  void updateProgress(String id, double progress, {double? speedMBps}) {
-    final item = state.lookup.byItemId[id];
-    if (item == null) return;
-    if (item.status == DownloadStatus.skipped ||
-        item.status == DownloadStatus.completed ||
-        item.status == DownloadStatus.failed) {
-      return;
-    }
-    updateItemStatus(
-      id,
-      DownloadStatus.downloading,
-      progress: progress,
-      speedMBps: speedMBps,
-    );
-  }
-
   @visibleForTesting
   String relativeOutputDirFor(
     Track track,

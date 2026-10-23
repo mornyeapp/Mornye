@@ -402,7 +402,11 @@ void main() {
         if (!dispose) {
           // Late progress for removed work and a repeated Clear all must not
           // recreate rows or issue cancellation for completed/failed/skipped IDs.
-          queue.updateProgress('0', 0.9);
+          queue.updateItemStatus(
+            '0',
+            DownloadStatus.downloading,
+            progress: 0.9,
+          );
           queue.clearAll();
           expect(container.read(downloadQueueProvider).items, isEmpty);
           expect(calls, hasLength(3));

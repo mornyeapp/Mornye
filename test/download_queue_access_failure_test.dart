@@ -211,7 +211,6 @@ void main() {
         progress: 1,
         filePath: '/selected/64',
       );
-      queue.updateProgress('item-64', 0.5);
       expect(container.read(downloadQueueProvider), same(after));
       expect(publications, 1);
     } finally {
