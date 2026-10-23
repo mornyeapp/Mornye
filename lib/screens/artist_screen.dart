@@ -823,20 +823,12 @@ class _ArtistScreenState extends ConsumerState<ArtistScreen>
     super.toggleSelection(itemId);
   }
 
-  void _deselectAll() {
-    setState(() {
-      selectedIds.clear();
-    });
-  }
-
   Widget _buildSelectionBar(
     BuildContext context,
     ColorScheme colorScheme,
     List<ArtistAlbum> allAlbums,
     double bottomPadding,
   ) {
-    final allSelected =
-        selectedIds.length == allAlbums.length && allAlbums.isNotEmpty;
     final selectedCount = selectedIds.length;
     final selectedAlbums = allAlbums
         .where((a) => selectedIds.contains(a.id))
@@ -846,13 +838,9 @@ class _ArtistScreenState extends ConsumerState<ArtistScreen>
       (sum, a) => sum + a.totalTracks,
     );
 
-    return SelectionBottomBar(
-      selectedCount: selectedCount,
-      allSelected: allSelected,
-      onClose: exitSelectionMode,
-      onToggleSelectAll: allSelected
-          ? _deselectAll
-          : () => selectAll(allAlbums.map((a) => a.id)),
+    return buildSelectionBar(
+      ids: [for (final album in allAlbums) album.id],
+      onDeselectAll: () => setState(selectedIds.clear),
       bottomPadding: bottomPadding,
       allSelectedLabel: context.l10n.tracksCount(totalTracks),
       tapToSelectLabel: selectedCount > 0

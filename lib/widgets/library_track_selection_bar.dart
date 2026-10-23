@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/utils/desktop_platform.dart';
-import 'package:mornye/widgets/app_action_button.dart';
+import 'package:mornye/widgets/destructive_selection_button.dart';
 import 'package:mornye/widgets/selection_action_button.dart';
 import 'package:mornye/widgets/selection_bottom_bar.dart';
 
@@ -113,26 +113,11 @@ class LibraryTrackSelectionBar extends StatelessWidget {
         ),
         if (!isDesktopPlatform) ...[
           const SizedBox(height: 8),
-          SizedBox(
-            width: double.infinity,
-            child: AppActionButton(
-              isDestructive: true,
-              onPressed: hasSelection ? onDelete : null,
-              icon: const Icon(Icons.delete_outline),
-              label: Text(deleteLabel),
-              style: FilledButton.styleFrom(
-                backgroundColor: hasSelection
-                    ? colorScheme.error
-                    : colorScheme.surfaceContainerHighest,
-                foregroundColor: hasSelection
-                    ? colorScheme.onError
-                    : colorScheme.onSurfaceVariant,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-              ),
-            ),
+          DestructiveSelectionButton(
+            count: selectedCount,
+            colorScheme: colorScheme,
+            onPressed: onDelete,
+            label: deleteLabel,
           ),
         ],
       ],

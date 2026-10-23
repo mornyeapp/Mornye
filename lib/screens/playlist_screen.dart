@@ -4,7 +4,6 @@ import 'package:mornye/widgets/album_detail_header.dart';
 import 'package:mornye/widgets/collection_header_actions.dart';
 import 'package:mornye/screens/selection_mode_mixin.dart';
 import 'package:mornye/widgets/collection_scaffold.dart';
-import 'package:mornye/widgets/selection_bottom_bar.dart';
 import 'package:mornye/widgets/selection_action_button.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/services/platform_bridge.dart';
@@ -89,25 +88,12 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen>
   Widget _buildSelectionBottomBar(
     BuildContext context,
     ColorScheme colorScheme,
+    List<String> ids,
     double bottomPadding,
   ) {
     final selectedCount = selectedIds.length;
-    final allSelected = _tracks.isNotEmpty && selectedCount == _tracks.length;
-
-    return SelectionBottomBar(
-      selectedCount: selectedCount,
-      allSelected: allSelected,
-      onClose: exitSelectionMode,
-      onToggleSelectAll: () {
-        if (allSelected) {
-          exitSelectionMode();
-        } else {
-          selectAll([
-            for (var index = 0; index < _tracks.length; index++)
-              _trackSelectionId(_tracks[index], index),
-          ]);
-        }
-      },
+    return buildSelectionBar(
+      ids: ids,
       bottomPadding: bottomPadding,
       children: [
         SizedBox(
@@ -279,18 +265,14 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen>
         ? MediaQuery.paddingOf(context).bottom
         : 0.0;
 
-    pruneSelection({
+    final ids = [
       for (var index = 0; index < _tracks.length; index++)
         _trackSelectionId(_tracks[index], index),
-    });
+    ];
+    pruneSelection(ids.toSet());
 
     return DesktopListScope(
-      onSelectAll: _tracks.isEmpty
-          ? null
-          : () => selectAll([
-              for (var index = 0; index < _tracks.length; index++)
-                _trackSelectionId(_tracks[index], index),
-            ]),
+      onSelectAll: ids.isEmpty ? null : () => selectAll(ids),
       onClearSelection: isSelectionMode ? exitSelectionMode : null,
       onActivate: () => _desktopActivations[selectionAnchorId]?.call(),
       child: CollectionScaffold(
@@ -300,6 +282,7 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen>
         selectionBar: _buildSelectionBottomBar(
           context,
           colorScheme,
+          ids,
           bottomPadding,
         ),
         appBar: _buildAppBar(context, colorScheme),

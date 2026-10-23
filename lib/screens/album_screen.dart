@@ -39,7 +39,6 @@ import 'package:mornye/widgets/audio_quality_badges.dart';
 import 'package:mornye/widgets/motion_header_banner.dart';
 import 'package:mornye/widgets/track_detail_actions.dart';
 import 'package:mornye/widgets/selection_action_button.dart';
-import 'package:mornye/widgets/selection_bottom_bar.dart';
 import 'package:mornye/widgets/downloadable_cover.dart';
 import 'package:mornye/widgets/disc_separator_chip.dart';
 import 'package:mornye/widgets/mornye_artist_header.dart';
@@ -454,10 +453,11 @@ class _AlbumScreenState extends ConsumerState<AlbumScreen>
         ? MediaQuery.paddingOf(context).bottom
         : 0.0;
 
-    pruneSelection({
+    final ids = [
       for (var index = 0; index < tracks.length; index++)
         _trackSelectionId(tracks[index], index),
-    });
+    ];
+    pruneSelection(ids.toSet());
 
     final scaffold = CollectionScaffold(
       scrollController: scrollController,
@@ -468,6 +468,7 @@ class _AlbumScreenState extends ConsumerState<AlbumScreen>
         context,
         colorScheme,
         tracks,
+        ids,
         bottomPadding,
       ),
       appBar: _buildAppBar(
@@ -507,12 +508,7 @@ class _AlbumScreenState extends ConsumerState<AlbumScreen>
       ],
     );
     return DesktopListScope(
-      onSelectAll: tracks.isEmpty
-          ? null
-          : () => selectAll([
-              for (var index = 0; index < tracks.length; index++)
-                _trackSelectionId(tracks[index], index),
-            ]),
+      onSelectAll: ids.isEmpty ? null : () => selectAll(ids),
       onClearSelection: isSelectionMode ? exitSelectionMode : null,
       onActivate: () => _desktopActivations[selectionAnchorId]?.call(),
       child: scaffold,
@@ -817,25 +813,12 @@ class _AlbumScreenState extends ConsumerState<AlbumScreen>
     BuildContext barContext,
     ColorScheme colorScheme,
     List<Track> tracks,
+    List<String> ids,
     double bottomPadding,
   ) {
     final selectedCount = selectedIds.length;
-    final allSelected = tracks.isNotEmpty && selectedCount == tracks.length;
-
-    return SelectionBottomBar(
-      selectedCount: selectedCount,
-      allSelected: allSelected,
-      onClose: exitSelectionMode,
-      onToggleSelectAll: () {
-        if (allSelected) {
-          exitSelectionMode();
-        } else {
-          selectAll([
-            for (var index = 0; index < tracks.length; index++)
-              _trackSelectionId(tracks[index], index),
-          ]);
-        }
-      },
+    return buildSelectionBar(
+      ids: ids,
       bottomPadding: bottomPadding,
       children: [
         SizedBox(
