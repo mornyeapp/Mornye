@@ -8,7 +8,11 @@ class _ExtensionOverviewSurface extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final content = Padding(padding: const EdgeInsets.all(20), child: child);
-    if (context.isMornye) return MornyeGlassPanel(child: content);
+    if (context.isMornye) {
+      // The card scrolls over the plain page background, so a backdrop pass
+      // would only filter a flat color.
+      return MornyeGlassPanel(samplesBackdrop: false, child: content);
+    }
     return DecoratedBox(
       decoration: BoxDecoration(
         color: Theme.of(

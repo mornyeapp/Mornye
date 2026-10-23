@@ -10,7 +10,9 @@ import 'package:mornye/l10n/app_localizations.dart';
 import 'package:mornye/providers/extension_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/screens/settings/extension_detail_page.dart';
+import 'package:mornye/screens/settings/extensions_page.dart';
 import 'package:mornye/theme/mornye_theme.dart';
+import 'package:mornye/widgets/mornye_chrome.dart';
 import 'package:mornye/widgets/settings_group.dart';
 
 import 'support/fixed_settings.dart';
@@ -165,5 +167,54 @@ void main() {
         expect(tester.takeException(), isNull);
       },
     );
+  }
+
+  for (final page in [
+    const ExtensionDetailPage(extensionId: 'example.account'),
+    const ExtensionsPage(),
+  ]) {
+    testWidgets('${page.runtimeType} glass skips the plain page backdrop', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(800, 2400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+            channel,
+            (call) async => call.method == 'getExtensionSettings' ? '{}' : null,
+          );
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            settingsProvider.overrideWith(FixedSettingsNotifier.new),
+            extensionProvider.overrideWith(_Extensions.new),
+          ],
+          child: MaterialApp(
+            theme: MornyeTheme.build(Brightness.dark),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: page,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final glass = find.ancestor(
+        of: find.text(
+          page is ExtensionsPage
+              ? 'Install Extension'
+              : 'Music with optional personal account access.',
+        ),
+        matching: find.byType(MornyeGlass),
+      );
+      expect(glass, findsOneWidget);
+      expect(tester.widget<MornyeGlass>(glass).samplesBackdrop, isFalse);
+      expect(
+        find.descendant(of: glass, matching: find.byType(BackdropFilter)),
+        findsNothing,
+      );
+      expect(tester.takeException(), isNull);
+    });
   }
 }
