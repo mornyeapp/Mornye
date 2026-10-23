@@ -1114,8 +1114,6 @@ Future<List<PlaylistPickerSummary>> readPlaylistPickerSummaries(
         p.id,
         p.name,
         p.cover_image_path,
-        p.created_at,
-        p.updated_at,
         COUNT(pt.track_key) AS track_count,
         CASE WHEN p.cover_image_path IS NULL OR p.cover_image_path = '' THEN (
           SELECT preview.track_json
@@ -1156,11 +1154,6 @@ Future<List<PlaylistPickerSummary>> readPlaylistPickerSummaries(
   return playlistRows
       .map((row) {
         final id = row['id']?.toString() ?? '';
-        final createdAt =
-            DateTime.tryParse(row['created_at']?.toString() ?? '') ??
-            DateTime.now();
-        final updatedAt =
-            DateTime.tryParse(row['updated_at']?.toString() ?? '') ?? createdAt;
         String? previewCover;
         final previewJson = row['preview_track_json'] as String?;
         if (previewJson != null && previewJson.isNotEmpty) {
@@ -1177,8 +1170,6 @@ Future<List<PlaylistPickerSummary>> readPlaylistPickerSummaries(
           name: row['name']?.toString() ?? '',
           coverImagePath: row['cover_image_path'] as String?,
           previewCover: previewCover,
-          createdAt: createdAt,
-          updatedAt: updatedAt,
           trackCount: (row['track_count'] as num?)?.toInt() ?? 0,
           containsAllRequestedTracks:
               uniqueTrackKeys.isNotEmpty &&

@@ -77,15 +77,6 @@ class CollectionTrackEntry {
     'track': track.toJson(),
     'addedAt': addedAt.toIso8601String(),
   };
-
-  factory CollectionTrackEntry.fromJson(Map<String, dynamic> json) {
-    final addedAtRaw = json['addedAt'] as String?;
-    return CollectionTrackEntry(
-      key: json['key'] as String,
-      track: Track.fromJson(Map<String, dynamic>.from(json['track'] as Map)),
-      addedAt: DateTime.tryParse(addedAtRaw ?? '') ?? DateTime.now(),
-    );
-  }
 }
 
 class CollectionArtistEntry {
@@ -220,27 +211,6 @@ class UserPlaylistCollection {
     'updatedAt': updatedAt.toIso8601String(),
     'tracks': tracks.map((e) => e.toJson()).toList(),
   };
-
-  factory UserPlaylistCollection.fromJson(Map<String, dynamic> json) {
-    final createdAtRaw = json['createdAt'] as String?;
-    final updatedAtRaw = json['updatedAt'] as String?;
-    final createdAt = DateTime.tryParse(createdAtRaw ?? '') ?? DateTime.now();
-    final updatedAt = DateTime.tryParse(updatedAtRaw ?? '') ?? createdAt;
-    final tracksRaw = (json['tracks'] as List?) ?? const [];
-    return UserPlaylistCollection(
-      id: json['id'] as String,
-      name: json['name'] as String? ?? '',
-      coverImagePath: json['coverImagePath'] as String?,
-      createdAt: createdAt,
-      updatedAt: updatedAt,
-      tracks: tracksRaw
-          .whereType<Map<Object?, Object?>>()
-          .map(
-            (e) => CollectionTrackEntry.fromJson(Map<String, dynamic>.from(e)),
-          )
-          .toList(growable: false),
-    );
-  }
 }
 
 /// A bounded database projection shared directly with playlist picker UI.
@@ -249,8 +219,6 @@ class PlaylistPickerSummary {
   final String name;
   final String? coverImagePath;
   final String? previewCover;
-  final DateTime createdAt;
-  final DateTime updatedAt;
   final int trackCount;
   final bool containsAllRequestedTracks;
 
@@ -259,8 +227,6 @@ class PlaylistPickerSummary {
     required this.name,
     this.coverImagePath,
     this.previewCover,
-    required this.createdAt,
-    required this.updatedAt,
     required this.trackCount,
     required this.containsAllRequestedTracks,
   });
@@ -437,42 +403,6 @@ class LibraryCollectionsState {
     'playlists': playlists.map((e) => e.toJson()).toList(),
     'favoriteArtists': favoriteArtists.map((e) => e.toJson()).toList(),
   };
-
-  factory LibraryCollectionsState.fromJson(Map<String, dynamic> json) {
-    final wishlistRaw = (json['wishlist'] as List?) ?? const [];
-    final lovedRaw = (json['loved'] as List?) ?? const [];
-    final playlistsRaw = (json['playlists'] as List?) ?? const [];
-    final favoriteArtistsRaw = (json['favoriteArtists'] as List?) ?? const [];
-
-    return LibraryCollectionsState(
-      wishlist: wishlistRaw
-          .whereType<Map<Object?, Object?>>()
-          .map(
-            (e) => CollectionTrackEntry.fromJson(Map<String, dynamic>.from(e)),
-          )
-          .toList(growable: false),
-      loved: lovedRaw
-          .whereType<Map<Object?, Object?>>()
-          .map(
-            (e) => CollectionTrackEntry.fromJson(Map<String, dynamic>.from(e)),
-          )
-          .toList(growable: false),
-      playlists: playlistsRaw
-          .whereType<Map<Object?, Object?>>()
-          .map(
-            (e) =>
-                UserPlaylistCollection.fromJson(Map<String, dynamic>.from(e)),
-          )
-          .toList(growable: false),
-      favoriteArtists: favoriteArtistsRaw
-          .whereType<Map<Object?, Object?>>()
-          .map(
-            (e) => CollectionArtistEntry.fromJson(Map<String, dynamic>.from(e)),
-          )
-          .toList(growable: false),
-      isLoaded: true,
-    );
-  }
 }
 
 Set<String> _buildPlaylistTrackKeys(List<UserPlaylistCollection> playlists) {
