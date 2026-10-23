@@ -232,45 +232,46 @@ class MornyeGlass extends ConsumerWidget {
       top: firstInGroup ? Radius.circular(radius) : Radius.zero,
       bottom: lastInGroup ? Radius.circular(radius) : Radius.zero,
     );
-    final artworkTint = Theme.of(
-      context,
-    ).extension<MornyeTheme>()?.chromeSurface;
-    var tintSource =
-        tintColor ?? (dark ? scheme.surfaceContainerHigh : Colors.white);
-    var opacity = tintOpacity ?? (strongTint ? 0.80 : 0.60);
-    if (tintColor == null && artworkTint != null) {
-      // The artwork color is already known; retain its hue with a richer tint
-      // instead of a saturation filter over changing page content.
-      final hsl = HSLColor.fromColor(scheme.surfaceContainerHigh);
-      final coverTint = hsl
-          .withSaturation((hsl.saturation * 1.6).clamp(0, 1))
-          .toColor();
-      tintSource = dark
-          ? coverTint
-          : Color.lerp(Colors.white, coverTint, 0.15)!;
-      opacity = opacity.clamp(0.60, 1.0);
-    }
-    // Light glass needs a white veil over saturated or dark artwork.
-    // Keep this in the existing fill so whitening adds no backdrop pass.
-    var baseTint = tintSource.withValues(
-      alpha: dark ? opacity * 0.82 : (opacity * 0.88).clamp(0.50, 1.0),
-    );
-    if (dark) {
-      // Bound bright artwork with paint instead of filtering backdrop luma.
-      baseTint = Color.alphaBlend(
+    var tint = scheme.surfaceContainerHigh;
+    if (translucent) {
+      final artworkTint = Theme.of(
+        context,
+      ).extension<MornyeTheme>()?.chromeSurface;
+      var tintSource =
+          tintColor ?? (dark ? scheme.surfaceContainerHigh : Colors.white);
+      var opacity = tintOpacity ?? (strongTint ? 0.80 : 0.60);
+      if (tintColor == null && artworkTint != null) {
+        // The artwork color is already known; retain its hue with a richer
+        // tint instead of a saturation filter over changing page content.
+        final hsl = HSLColor.fromColor(scheme.surfaceContainerHigh);
+        final coverTint = hsl
+            .withSaturation((hsl.saturation * 1.6).clamp(0, 1))
+            .toColor();
+        tintSource = dark
+            ? coverTint
+            : Color.lerp(Colors.white, coverTint, 0.15)!;
+        opacity = opacity.clamp(0.60, 1.0);
+      }
+      // Light glass needs a white veil over saturated or dark artwork.
+      // Keep this in the existing fill so whitening adds no backdrop pass.
+      var baseTint = tintSource.withValues(
+        alpha: dark ? opacity * 0.82 : (opacity * 0.88).clamp(0.50, 1.0),
+      );
+      if (dark) {
+        // Bound bright artwork with paint instead of filtering backdrop luma.
+        baseTint = Color.alphaBlend(
+          baseTint,
+          Colors.black.withValues(alpha: 0.35),
+        );
+      }
+      // Let the upper end of the clarity slider reveal more of the page. Keep
+      // the tinted endpoint opaque and the single-pass blur budget unchanged.
+      final tintStrength = (1 - clarity) * (1 - clarity);
+      tint = Color.alphaBlend(
+        scheme.surfaceContainerHigh.withValues(alpha: tintStrength),
         baseTint,
-        Colors.black.withValues(alpha: 0.35),
       );
     }
-    // Let the upper end of the clarity slider reveal more of the page. Keep
-    // the tinted endpoint opaque and the single-pass blur budget unchanged.
-    final tintStrength = (1 - clarity) * (1 - clarity);
-    final tint = translucent
-        ? Color.alphaBlend(
-            scheme.surfaceContainerHigh.withValues(alpha: tintStrength),
-            baseTint,
-          )
-        : scheme.surfaceContainerHigh;
     final insideGlass =
         context.dependOnInheritedWidgetOfExactType<_GlassBackdropScope>() !=
         null;
