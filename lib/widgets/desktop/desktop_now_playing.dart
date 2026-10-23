@@ -438,7 +438,6 @@ class _PlayerColumn extends StatelessWidget {
                               color: colorScheme.onSurface,
                             ),
                     maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                   ),
                   if (subtitle.isNotEmpty)
                     Text(

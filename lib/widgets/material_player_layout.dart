@@ -255,7 +255,6 @@ class MaterialPlayerLayout extends StatelessWidget {
                                 ),
                         textAlign: TextAlign.center,
                         maxLines: compact ? 1 : 2,
-                        overflow: TextOverflow.ellipsis,
                       ),
                       SizedBox(height: compact ? 4 : 6),
                       Consumer(

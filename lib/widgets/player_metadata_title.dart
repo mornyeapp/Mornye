@@ -13,7 +13,6 @@ class PlayerMetadataTitle extends StatelessWidget {
     this.style,
     this.textAlign,
     this.maxLines,
-    this.overflow = TextOverflow.clip,
   });
 
   final MediaItem mediaItem;
@@ -21,7 +20,6 @@ class PlayerMetadataTitle extends StatelessWidget {
   final TextStyle? style;
   final TextAlign? textAlign;
   final int? maxLines;
-  final TextOverflow overflow;
 
   @override
   Widget build(BuildContext context) => ListenableBuilder(
@@ -38,7 +36,7 @@ class PlayerMetadataTitle extends StatelessWidget {
         style: style,
         textAlign: textAlign,
         maxLines: maxLines,
-        overflow: overflow,
+        overflow: TextOverflow.ellipsis,
       );
     },
   );

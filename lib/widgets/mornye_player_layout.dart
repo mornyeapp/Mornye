@@ -505,7 +505,6 @@ class MornyePlayerLayout extends ConsumerWidget {
                           mediaItem: mediaItem,
                           metadata: metadata,
                           maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontSize: 22 - 4 * progress,
                             fontWeight: FontWeight.w600,
