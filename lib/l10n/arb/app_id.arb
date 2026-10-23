@@ -303,10 +303,6 @@
   "@homeEmptySubtitle": {
     "description": "Subtitle shown on home when no providers are available yet"
   },
-  "homeSupports": "Mendukung: URL Track, Album, Playlist, Artis",
-  "@homeSupports": {
-    "description": "Info text about supported URL types"
-  },
   "homeRecent": "Terbaru",
   "@homeRecent": {
     "description": "Section header for recent searches"
@@ -4140,15 +4136,6 @@
   "collectionPlaylistRemoveCover": "Hapus foto cover",
   "@collectionPlaylistRemoveCover": {
     "description": "Bottom sheet action to remove custom cover image from a playlist"
-  },
-  "selectionShareCount": "Bagikan {count} {count, plural, =1{lagu} other{lagu}}",
-  "@selectionShareCount": {
-    "description": "Share button text with count in selection mode",
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
   },
   "selectionConvertCount": "Ubah format {count} {count, plural, =1{lagu} other{lagu}}",
   "@selectionConvertCount": {

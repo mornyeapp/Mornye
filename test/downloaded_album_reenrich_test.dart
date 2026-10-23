@@ -300,7 +300,6 @@ void main() {
         final l10n = AppLocalizations.of(
           tester.element(find.byType(SelectionBottomBar)),
         );
-        expect(find.text(l10n.selectionShareCount(1)), findsNothing);
 
         Future<void> openReEnrich() async {
           await tester.tap(find.text('${l10n.trackReEnrich} (1)'));

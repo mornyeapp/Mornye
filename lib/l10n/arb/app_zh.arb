@@ -33,10 +33,6 @@
   "@homeEmptySubtitle": {
     "description": "Subtitle shown on home when no providers are available yet"
   },
-  "homeSupports": "支持：歌曲、专辑、播放列表、艺人网址",
-  "@homeSupports": {
-    "description": "Info text about supported URL types"
-  },
   "homeRecent": "最近",
   "@homeRecent": {
     "description": "Section header for recent searches"
@@ -3648,15 +3644,6 @@
   "collectionPlaylistRemoveCover": "Remove cover image",
   "@collectionPlaylistRemoveCover": {
     "description": "Bottom sheet action to remove custom cover image from a playlist"
-  },
-  "selectionShareCount": "Share {count} {count, plural, =1{track} other{tracks}}",
-  "@selectionShareCount": {
-    "description": "Share button text with count in selection mode",
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
   },
   "selectionConvertCount": "Convert {count} {count, plural, =1{track} other{tracks}}",
   "@selectionConvertCount": {

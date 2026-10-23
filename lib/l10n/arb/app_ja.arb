@@ -97,10 +97,6 @@
   "@homeEmptySubtitle": {
     "description": "Subtitle shown on home when no providers are available yet"
   },
-  "homeSupports": "サポート: トラック、アルバム、プレイリスト、アーティスト、URL",
-  "@homeSupports": {
-    "description": "Info text about supported URL types"
-  },
   "homeRecent": "最近",
   "@homeRecent": {
     "description": "Section header for recent searches"
@@ -3836,15 +3832,6 @@
   "collectionPlaylistRemoveCover": "カバー画像を削除",
   "@collectionPlaylistRemoveCover": {
     "description": "Bottom sheet action to remove custom cover image from a playlist"
-  },
-  "selectionShareCount": "{count} {count, plural, =1{個のトラック} other{個のトラック}}を共有",
-  "@selectionShareCount": {
-    "description": "Share button text with count in selection mode",
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
   },
   "selectionConvertCount": "Convert {count} {count, plural, =1{track} other{tracks}}",
   "@selectionConvertCount": {

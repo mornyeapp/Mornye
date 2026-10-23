@@ -97,10 +97,6 @@
   "@homeEmptySubtitle": {
     "description": "Subtitle shown on home when no providers are available yet"
   },
-  "homeSupports": "Поддерживается: Трек, Альбом, Плейлист, URL исполнителя",
-  "@homeSupports": {
-    "description": "Info text about supported URL types"
-  },
   "homeRecent": "Недавние",
   "@homeRecent": {
     "description": "Section header for recent searches"
@@ -3836,15 +3832,6 @@
   "collectionPlaylistRemoveCover": "Удалить обложку",
   "@collectionPlaylistRemoveCover": {
     "description": "Bottom sheet action to remove custom cover image from a playlist"
-  },
-  "selectionShareCount": "Отправить {count} {count, plural, one {трек} few {трека} many {треков} =1{трек} other{треков}}",
-  "@selectionShareCount": {
-    "description": "Share button text with count in selection mode",
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
   },
   "selectionConvertCount": "Конвертировать {count} {count, plural, one {трек} few {трека} many {треков} =1{трек} other{треков}}",
   "@selectionConvertCount": {
