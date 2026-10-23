@@ -370,13 +370,11 @@ class LibraryDatabase {
     });
   }
 
-  Future<List<Map<String, dynamic>>> getAll({int? limit, int? offset}) async {
+  Future<List<Map<String, dynamic>>> getAll() async {
     final db = await database;
     final rows = await db.query(
       visibleLibraryView,
       orderBy: 'album_artist, album_name, disc_number, track_number',
-      limit: limit,
-      offset: offset,
     );
     return rows.map(LibraryRowMapper.decode).toList();
   }

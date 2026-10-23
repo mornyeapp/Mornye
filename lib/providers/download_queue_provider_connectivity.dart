@@ -13,10 +13,8 @@ extension _DownloadQueueConnectivity on DownloadQueueNotifier {
     );
   }
 
-  void _stopConnectivityMonitoring({bool clearNetworkPause = true}) {
-    if (clearNetworkPause) {
-      _networkPausedByWifiOnly = false;
-    }
+  void _stopConnectivityMonitoring() {
+    _networkPausedByWifiOnly = false;
     // Keep listening while network-failed items remain so the reconnect
     // retry prompt can still fire when the queue is otherwise idle.
     if (_hasNetworkFailedItems) return;
