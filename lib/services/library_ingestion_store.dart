@@ -124,52 +124,6 @@ class LibraryIngestionStore {
     );
   }
 
-  void _putPathKeysInBatch(Batch batch, String id, String? filePath) =>
-      sqlite.putPathKeysInBatch(batch, 'library_path_keys', id, filePath);
-
-  Future<void> upsert(Map<String, dynamic> json, {String? sourceId}) async {
-    final db = await database;
-    await sqlite.transactionWithBusyRetry(db, (txn) async {
-      await txn.insert(
-        'library',
-        LibraryRowMapper.encode(json, sourceId: sourceId),
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
-      final batch = txn.batch();
-      _putPathKeysInBatch(
-        batch,
-        json['id'] as String,
-        json['filePath'] as String?,
-      );
-      await batch.commit(noResult: true);
-    });
-  }
-
-  Future<void> upsertBatch(
-    List<Map<String, dynamic>> items, {
-    String? sourceId,
-  }) async {
-    if (items.isEmpty) return;
-    final db = await database;
-    await sqlite.transactionWithBusyRetry(db, (txn) async {
-      final batch = txn.batch();
-      for (final json in items) {
-        batch.insert(
-          'library',
-          LibraryRowMapper.encode(json, sourceId: sourceId),
-          conflictAlgorithm: ConflictAlgorithm.replace,
-        );
-        _putPathKeysInBatch(
-          batch,
-          json['id'] as String,
-          json['filePath'] as String?,
-        );
-      }
-      await batch.commit(noResult: true);
-    });
-    _log.i('Batch inserted ${items.length} items');
-  }
-
   /// Removes rows from one source whose normalized path keys already exist in
   /// download History, without materializing either database's paths in Dart.
   Future<int> deleteDownloadedRowsForSource(String sourceId) async {
@@ -326,33 +280,6 @@ class LibraryIngestionStore {
       await db.execute('DROP TABLE IF EXISTS $_incrementalStagePathKeysTable');
       await db.execute('DROP TABLE IF EXISTS $_incrementalStageTable');
     }
-  }
-
-  Future<void> replaceAll(List<Map<String, dynamic>> items) async {
-    final db = await database;
-    await sqlite.transactionWithBusyRetry(db, (txn) async {
-      await txn.delete('library_path_keys');
-      await txn.delete('library');
-      if (items.isEmpty) {
-        return;
-      }
-
-      final batch = txn.batch();
-      for (final json in items) {
-        batch.insert(
-          'library',
-          LibraryRowMapper.encode(json),
-          conflictAlgorithm: ConflictAlgorithm.replace,
-        );
-        _putPathKeysInBatch(
-          batch,
-          json['id'] as String,
-          json['filePath'] as String?,
-        );
-      }
-      await batch.commit(noResult: true);
-    });
-    _log.i('Replaced library with ${items.length} items');
   }
 
   /// Stages scan rows in bounded, independently committed batches, then swaps

@@ -33,7 +33,6 @@ class LibraryDatabase {
   static const int schemaVersion = LibrarySchema.version;
   static const String legacySourceId = LocalLibraryItem.legacySourceId;
   static const String visibleLibraryView = LibrarySchema.visibleView;
-  static const String searchFtsTable = LibrarySchema.searchFtsTable;
   static const String lookupSummaryTable = LibrarySchema.lookupSummaryTable;
   // v4 records ReplayGain availability; older rows rescan once.
   static const int audioMetadataScanVersion = libraryAudioMetadataScanVersion;
@@ -186,14 +185,6 @@ class LibraryDatabase {
     return '${normalizeLookupText(albumName)}|${normalizeLookupText(albumArtist ?? artistName)}';
   }
 
-  Future<void> upsert(Map<String, dynamic> json, {String? sourceId}) =>
-      _ingestion.upsert(json, sourceId: sourceId);
-
-  Future<void> upsertBatch(
-    List<Map<String, dynamic>> items, {
-    String? sourceId,
-  }) => _ingestion.upsertBatch(items, sourceId: sourceId);
-
   /// Removes rows from one source whose normalized path keys already exist in
   /// download History, without materializing either database's paths in Dart.
   Future<int> deleteDownloadedRowsForSource(String sourceId) =>
@@ -206,24 +197,6 @@ class LibraryDatabase {
     List<Map<String, dynamic>> items, {
     required String sourceId,
   }) => _ingestion.upsertBatchExcludingHistory(items, sourceId: sourceId);
-
-  Future<void> replaceAll(List<Map<String, dynamic>> items) =>
-      _ingestion.replaceAll(items);
-
-  /// Stages scan rows in bounded, independently committed batches, then swaps
-  /// only this source in one short transaction. Download-history exclusion is
-  /// an indexed SQLite anti-join, avoiding a full History path set in Dart.
-  Future<({int inserted, int skipped})> replaceSourceStream(
-    String sourceId,
-    Stream<Map<String, dynamic>> items, {
-    int batchSize = 300,
-    bool preserveMissing = false,
-  }) => _ingestion.replaceSourceStream(
-    sourceId,
-    items,
-    batchSize: batchSize,
-    preserveMissing: preserveMissing,
-  );
 
   Future<List<LocalLibrarySource>> getSources() async {
     final db = await database;
@@ -820,10 +793,6 @@ class LibraryDatabase {
     );
   }
 
-  Future<void> delete(String id) async {
-    await deleteByIds([id]);
-  }
-
   Future<void> deleteByIds(Iterable<String> ids) async {
     if (ids.isEmpty) return;
     await deleteLibraryItemsByIds(await database, ids);
@@ -922,12 +891,6 @@ class LibraryDatabase {
       );
     }
     await batch.commit(noResult: true);
-  }
-
-  Future<Set<String>> getAllFilePaths() async {
-    final db = await database;
-    final rows = await db.rawQuery('SELECT file_path FROM library');
-    return rows.map((r) => r['file_path'] as String).toSet();
   }
 
   Future<int> deleteByPaths(List<String> filePaths) async {
