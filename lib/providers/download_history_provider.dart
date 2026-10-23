@@ -273,10 +273,10 @@ class DownloadHistoryNotifier extends Notifier<DownloadHistoryState> {
       );
       _historyLog.d('Updated existing history entry: ${item.trackName}');
     } else {
-      state = state.copyWith(
+      state = state.copyWithPrependedLookup(
+        item,
         items: [item, ...state.items],
         totalCount: state.totalCount + 1,
-        lookupItems: [item, ...state.lookupItems],
       );
       _historyLog.d('Added new history entry: ${item.trackName}');
     }
@@ -411,15 +411,21 @@ class DownloadHistoryNotifier extends Notifier<DownloadHistoryState> {
       item,
       ...state.items.where((existing) => existing.id != item.id),
     ];
-    final lookupItems = [
-      item,
-      ...state.lookupItems.where((existing) => existing.id != item.id),
-    ];
-    state = state.copyWith(
-      items: items,
-      totalCount: isReplacement ? state.totalCount : state.totalCount + 1,
-      lookupItems: lookupItems,
-    );
+    final totalCount = isReplacement ? state.totalCount : state.totalCount + 1;
+    state = state.lookupItems.any((existing) => existing.id == item.id)
+        ? state.copyWith(
+            items: items,
+            totalCount: totalCount,
+            lookupItems: [
+              item,
+              ...state.lookupItems.where((existing) => existing.id != item.id),
+            ],
+          )
+        : state.copyWithPrependedLookup(
+            item,
+            items: items,
+            totalCount: totalCount,
+          );
     _historyLog.d('Added independent history variant: ${item.trackName}');
     return item;
   }

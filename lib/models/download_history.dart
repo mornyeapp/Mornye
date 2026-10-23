@@ -254,6 +254,12 @@ Map<String, DownloadHistoryItem> _indexRecentHistoryItems(
   return index;
 }
 
+Map<String, DownloadHistoryItem> _indexWithNewest(
+  Map<String, DownloadHistoryItem> index,
+  String? key,
+  DownloadHistoryItem item,
+) => key == null || key.isEmpty ? index : ({...index, key: item});
+
 class DownloadHistoryState {
   final List<DownloadHistoryItem> items;
   final int totalCount;
@@ -291,6 +297,25 @@ class DownloadHistoryState {
        _bySpotifyId = source._bySpotifyId,
        _byIsrc = source._byIsrc,
        _byTrackArtistKey = source._byTrackArtistKey;
+
+  DownloadHistoryState._withPrependedLookup({
+    required DownloadHistoryState source,
+    required DownloadHistoryItem item,
+    required this.items,
+    required this.totalCount,
+  }) : loadedIndexVersion = source.loadedIndexVersion,
+       _lookupItems = List.unmodifiable([item, ...source._lookupItems]),
+       _bySpotifyId = _indexWithNewest(
+         source._bySpotifyId,
+         item.spotifyId,
+         item,
+       ),
+       _byIsrc = _indexWithNewest(source._byIsrc, item.isrc, item),
+       _byTrackArtistKey = _indexWithNewest(
+         source._byTrackArtistKey,
+         _trackArtistKey(item.trackName, item.artistName),
+         item,
+       );
 
   static String _trackArtistKey(String trackName, String artistName) {
     final normalizedTrack = trackName.trim().toLowerCase();
@@ -338,4 +363,17 @@ class DownloadHistoryState {
       lookupItems: lookupItems,
     );
   }
+
+  /// Same lookups as `copyWith(lookupItems: [item, ...lookupItems])`: the
+  /// first occurrence wins each key, so [item] only overwrites its own keys.
+  DownloadHistoryState copyWithPrependedLookup(
+    DownloadHistoryItem item, {
+    required List<DownloadHistoryItem> items,
+    required int totalCount,
+  }) => DownloadHistoryState._withPrependedLookup(
+    source: this,
+    item: item,
+    items: items,
+    totalCount: totalCount,
+  );
 }
