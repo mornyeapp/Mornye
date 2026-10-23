@@ -99,16 +99,7 @@ class MornyePlayerLayout extends ConsumerWidget {
         ? Duration.zero
         : const Duration(milliseconds: 380);
     final queue = ref.watch(playQueueProvider).value ?? const <MediaItem>[];
-    final reportedIndex = ref.watch(
-      playbackStateProvider.select((state) => state.value?.queueIndex),
-    );
-    final currentIndex =
-        reportedIndex != null &&
-            reportedIndex >= 0 &&
-            reportedIndex < queue.length &&
-            queue[reportedIndex].id == mediaItem.id
-        ? reportedIndex
-        : queue.indexWhere((item) => item.id == mediaItem.id);
+    final currentIndex = ref.watch(currentQueueIndexProvider);
     final landscape =
         MediaQuery.sizeOf(context).width > MediaQuery.sizeOf(context).height;
     Widget hideControls(Widget child) => PlayerLyricsControlsVisibility(

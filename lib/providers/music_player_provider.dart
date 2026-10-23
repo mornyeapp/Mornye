@@ -309,6 +309,21 @@ final playQueueProvider = StreamProvider<List<MediaItem>>((ref) {
   return ref.watch(musicPlayerRuntimeProvider).queueEvents();
 });
 
+/// Prefers the reported queue index while it still names the current item.
+final currentQueueIndexProvider = Provider<int>((ref) {
+  final queue = ref.watch(playQueueProvider).value ?? const <MediaItem>[];
+  final id = ref.watch(currentMediaItemProvider.select((s) => s.value?.id));
+  final index = ref.watch(
+    playbackStateProvider.select((state) => state.value?.queueIndex),
+  );
+  return index != null &&
+          index >= 0 &&
+          index < queue.length &&
+          queue[index].id == id
+      ? index
+      : queue.indexWhere((item) => item.id == id);
+});
+
 class MusicPlayerController {
   MusicPlayerController({MusicPlayerRuntime? runtime})
     : _runtime = runtime ?? musicPlayerRuntime;

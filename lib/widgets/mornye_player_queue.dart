@@ -17,27 +17,15 @@ class MornyePlayerQueue extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final queue = ref.watch(playQueueProvider).value ?? const <MediaItem>[];
-    final currentId = ref.watch(
-      currentMediaItemProvider.select((item) => item.value?.id),
-    );
     final playback = ref.watch(
       playbackStateProvider.select(
         (state) => (
-          index: state.value?.queueIndex,
           shuffle: state.value?.shuffleMode == AudioServiceShuffleMode.all,
           repeat: state.value?.repeatMode ?? AudioServiceRepeatMode.none,
         ),
       ),
     );
-    final reportedIndex = playback.index;
-    final currentIndex =
-        reportedIndex != null &&
-            reportedIndex >= 0 &&
-            reportedIndex < queue.length &&
-            queue[reportedIndex].id == currentId
-        ? reportedIndex
-        : queue.indexWhere((item) => item.id == currentId);
-    final start = currentIndex + 1;
+    final start = ref.watch(currentQueueIndexProvider) + 1;
     final count = queue.length - start;
     final controller = ref.read(musicPlayerControllerProvider);
     final autoMix = ref.watch(settingsProvider.select((s) => s.autoMix));
