@@ -688,27 +688,3 @@ class _ScanProgressTile extends StatelessWidget {
     );
   }
 }
-
-class _AutoScanOption extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final bool selected;
-  final VoidCallback onTap;
-
-  const _AutoScanOption({
-    required this.icon,
-    required this.title,
-    required this.selected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return AppSheetOption.choice(
-      leading: AppIcon(icon),
-      title: Text(title),
-      selected: selected,
-      onTap: onTap,
-    );
-  }
-}
