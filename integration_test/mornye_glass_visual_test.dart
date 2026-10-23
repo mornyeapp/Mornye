@@ -95,6 +95,7 @@ void main() {
 
     Future<void> capture(
       String name, {
+      required int reads,
       Map<String, Object?> details = const {},
     }) async {
       await tester.pump();
@@ -125,6 +126,19 @@ void main() {
       // Profile builds need the retained layer, since debugLayer is debug-only.
       // ignore: invalid_use_of_protected_member
       visit(tester.binding.renderViews.first.layer!);
+      // Batched lenses compose their blur, so no stock blur layer remains.
+      // Each batch key costs one read; an excluded lens takes its own.
+      final lensKeys = [
+        for (final lens in find.byType(LiquidGlassLens).evaluate())
+          LiquidGlassBatch.backdropIdOf(lens),
+      ];
+      expect(histogram['BackdropFilterLayer'] ?? 0, 0, reason: name);
+      expect(
+        lensKeys.nonNulls.toSet().length +
+            lensKeys.where((key) => key == null).length,
+        reads,
+        reason: name,
+      );
       poses[name] = {
         ...details,
         'collapseProgress': fold().value,
@@ -132,6 +146,7 @@ void main() {
         'shaderBackdrops': histogram['_ImpellerShaderBackdropLayer'] ?? 0,
         'stockBlurLayers': histogram['BackdropFilterLayer'] ?? 0,
         'batchBlurLayers': histogram['LiquidGlassBatchBackdropLayer'] ?? 0,
+        'lensBatchKeys': lensKeys,
         'attachedLayerTypes': histogram,
       };
       await tester.runAsync(() => binding.takeScreenshot(name));
@@ -252,14 +267,16 @@ void main() {
       for (final lens in lenses) {
         expect(lens.style.specular?.thickness, outlines ? 0.75 * 5.4 : 0);
       }
-      await capture('${prefix}_expanded');
+      // Folding capsules cross the tabs and sample on their own. At rest
+      // they share the player's read.
+      await capture('${prefix}_expanded', reads: 1);
       await halfway(true);
-      await capture('${prefix}_folding_half');
+      await capture('${prefix}_folding_half', reads: 3);
       (fold().parent as AnimationController).forward();
       await wait(450);
-      await capture('${prefix}_compact');
+      await capture('${prefix}_compact', reads: 1);
       await halfway(false);
-      await capture('${prefix}_reopening_half');
+      await capture('${prefix}_reopening_half', reads: 3);
       (fold().parent as AnimationController).reverse();
       await wait(450);
       Offset tab(String label) => tester.getCenter(
@@ -339,6 +356,8 @@ void main() {
         expect(glass.refractionDepth, closeTo(0.60, 0.001));
         await capture(
           '${prefix}_held_halfway',
+          // The held selection lens refracts the bar, so it reads alone.
+          reads: 2,
           details: {
             'restingCapsule': bounds(restingCapsule),
             'heldCapsule': bounds(heldCapsule),

@@ -98,6 +98,9 @@ class _MornyeBottomBarState extends ConsumerState<MornyeBottomBar>
     curve: Curves.easeInOutCubic,
   );
   late final _tabOpacity = ReverseAnimation(_collapse);
+  // Side capsules move between backdrop batches; keep their lenses mounted.
+  final _leadingSurfaceKey = GlobalKey();
+  final _searchSurfaceKey = GlobalKey();
 
   void _updateCollapse() {
     final target = widget.collapsed ? 1.0 : 0.0;
@@ -153,7 +156,8 @@ class _MornyeBottomBarState extends ConsumerState<MornyeBottomBar>
     // These contents do not depend on animation progress. Retain their widget
     // instances so folding only updates geometry and foreground opacity. A
     // backdrop inside a fading layer loses access to the page behind the bar.
-    Widget sideSurface() => ScaleTransition(
+    Widget sideSurface(Key key) => ScaleTransition(
+      key: key,
       scale: _collapse,
       child: RepaintBoundary(
         child: MornyeGlass.navigation(
@@ -165,8 +169,8 @@ class _MornyeBottomBarState extends ConsumerState<MornyeBottomBar>
         ),
       ),
     );
-    final leadingSurface = sideSurface();
-    final searchSurface = sideSurface();
+    final leadingSurface = sideSurface(_leadingSurfaceKey);
+    final searchSurface = sideSurface(_searchSurfaceKey);
     final searchSelected = selectedIndex == destinations.length - 1;
     final leadingIndex = searchSelected ? 0 : selectedIndex;
     final scheme = Theme.of(context).colorScheme;
@@ -249,7 +253,11 @@ class _MornyeBottomBarState extends ConsumerState<MornyeBottomBar>
                         Positioned.fill(
                           child: Offstage(
                             offstage: amount == 0,
-                            child: surface,
+                            // While folding, a capsule crosses the tab bar
+                            // and needs a backdrop sample of its own.
+                            child: amount == 1
+                                ? surface
+                                : LiquidGlassBatch(child: surface),
                           ),
                         ),
                         Material(
@@ -289,14 +297,14 @@ class _MornyeBottomBarState extends ConsumerState<MornyeBottomBar>
               );
             }
 
-            return Stack(
-              clipBehavior: Clip.none,
-              children: [
-                // Only the non-overlapping player and tab surfaces share a
-                // backdrop. Moving side capsules stay outside this group: they
-                // cross the tab bar while folding and need separate samples.
-                LiquidGlassBatch(
-                  child: BackdropGroup(
+            // Only non-overlapping surfaces share a backdrop: the player, the
+            // tabs and, at rest, the side capsules. Frosted capsules stay out
+            // of the blur group, since they cross the tab bar while folding.
+            return LiquidGlassBatch(
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  BackdropGroup(
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -351,10 +359,10 @@ class _MornyeBottomBarState extends ConsumerState<MornyeBottomBar>
                       ],
                     ),
                   ),
-                ),
-                movingIcon(leading: true, surface: leadingSurface),
-                movingIcon(leading: false, surface: searchSurface),
-              ],
+                  movingIcon(leading: true, surface: leadingSurface),
+                  movingIcon(leading: false, surface: searchSurface),
+                ],
+              ),
             );
           },
         );
