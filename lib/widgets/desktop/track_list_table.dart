@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/models/track.dart';
@@ -15,7 +16,7 @@ import 'package:mornye/widgets/track_list_tile.dart';
 /// [TrackListTile] rows. Right-click opens the track options; a click and
 /// Enter run [onActivate], which should match a tap on a mobile row (see
 /// [TrackListTile.activate]).
-class TrackListTable extends ConsumerWidget {
+class TrackListTable extends ConsumerStatefulWidget {
   const TrackListTable({
     super.key,
     required this.tracks,
@@ -58,9 +59,28 @@ class TrackListTable extends ConsumerWidget {
   final bool showAlbum;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final indexById = {for (var i = 0; i < ids.length; i++) ids[i]: i};
-    final rows = [
+  ConsumerState<TrackListTable> createState() => _TrackListTableState();
+}
+
+class _TrackListTableState extends ConsumerState<TrackListTable> {
+  // Rows depend only on the tracks, ids, history flags and artwork, so a
+  // selection change keeps the same list and the table keeps its order.
+  late List<TrackTableRow> _rows = _buildRows();
+
+  @override
+  void didUpdateWidget(TrackListTable oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.showArtwork != oldWidget.showArtwork ||
+        !listEquals(widget.tracks, oldWidget.tracks) ||
+        !listEquals(widget.ids, oldWidget.ids) ||
+        !listEquals(widget.isInHistory, oldWidget.isInHistory)) {
+      _rows = _buildRows();
+    }
+  }
+
+  List<TrackTableRow> _buildRows() {
+    final TrackListTable(:tracks, :ids, :isInHistory, :showArtwork) = widget;
+    return [
       for (var i = 0; i < tracks.length; i++)
         TrackTableRow(
           id: ids[i],
@@ -85,6 +105,13 @@ class TrackListTable extends ConsumerWidget {
           playback: catalogTrackPlaybackUiProvider(catalogTrackKey(tracks[i])),
         ),
     ];
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ids = widget.ids;
+    final indexById = {for (var i = 0; i < ids.length; i++) ids[i]: i};
+    final rows = _rows;
     return SliverPadding(
       padding: EdgeInsets.symmetric(horizontal: wideListInset(context)),
       sliver: SliverTrackTable(
@@ -93,31 +120,31 @@ class TrackListTable extends ConsumerWidget {
           TrackTableColumn.number,
           TrackTableColumn.title,
           TrackTableColumn.artist,
-          if (showAlbum) TrackTableColumn.album,
+          if (widget.showAlbum) TrackTableColumn.album,
           // Catalog pages often list no quality before a download.
           if (rows.any((row) => row.quality?.isNotEmpty ?? false))
             TrackTableColumn.quality,
           TrackTableColumn.duration,
         ],
-        selectedIds: selectedIds,
-        albumLayout: albumLayout,
-        albumArtist: albumArtist,
-        onSelect: onSelect,
+        selectedIds: widget.selectedIds,
+        albumLayout: widget.albumLayout,
+        albumArtist: widget.albumArtist,
+        onSelect: widget.onSelect,
         onActivate: (id) {
           final index = indexById[id];
-          if (index != null) onActivate(index);
+          if (index != null) widget.onActivate(index);
         },
         onContextMenu: (id, position) {
           final index = indexById[id];
           if (index == null) return;
-          final override = onContextMenu;
+          final override = widget.onContextMenu;
           if (override != null) return override(index, position);
           TrackCollectionQuickActions.showTrackOptionsSheet(
             context,
             ref,
-            tracks[index],
+            widget.tracks[index],
             position: position,
-            hasLocalPlaybackCandidate: isInHistory[index],
+            hasLocalPlaybackCandidate: widget.isInHistory[index],
           );
         },
       ),
