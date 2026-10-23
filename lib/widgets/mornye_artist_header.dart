@@ -36,6 +36,14 @@ class MornyeArtistSurface extends StatefulWidget {
 }
 
 class _MornyeArtistSurfaceState extends State<MornyeArtistSurface> {
+  // Page rebuilds reuse the derived themes while their inputs are unchanged.
+  ThemeData? _baseTheme;
+  TargetPlatform? _basePlatform;
+  late ThemeData _darkTheme;
+  late ThemeData _outerTheme;
+  (Color, Color, Color, bool)? _innerKey;
+  late ThemeData _innerTheme;
+
   @override
   void dispose() {
     ShellNavigationService.clearChromeBrightness(this);
@@ -47,14 +55,23 @@ class _MornyeArtistSurfaceState extends State<MornyeArtistSurface> {
     // Desktop album and playlist pages keep the plain pane background and
     // app accent; artist pages keep their artwork tint, as in Apple Music.
     if (isDesktopPlatform && widget.neutralActions) return widget.child;
-    final darkTheme = MornyeTheme.fromContext(
-      context,
-      brightness: Brightness.dark,
-    );
+    final baseTheme = Theme.of(context);
+    if (!identical(baseTheme, _baseTheme) ||
+        defaultTargetPlatform != _basePlatform) {
+      _baseTheme = baseTheme;
+      _basePlatform = defaultTargetPlatform;
+      _innerKey = null;
+      _darkTheme = MornyeTheme.fromContext(
+        context,
+        brightness: Brightness.dark,
+      );
+      _outerTheme = _darkTheme.copyWith(
+        colorScheme: _darkTheme.colorScheme.copyWith(primary: Colors.grey),
+      );
+    }
+    final darkTheme = _darkTheme;
     return Theme(
-      data: darkTheme.copyWith(
-        colorScheme: darkTheme.colorScheme.copyWith(primary: Colors.grey),
-      ),
+      data: _outerTheme,
       child: CoverPaletteBuilder(
         imageSource: widget.imageSource,
         builder: (context, palette) {
@@ -119,26 +136,40 @@ class _MornyeArtistSurfaceState extends State<MornyeArtistSurface> {
                   : primaryLuminance > 0.179
                   ? Colors.black
                   : Colors.white;
-              final scheme = darkTheme.colorScheme.copyWith(
-                primary: primary,
-                onPrimary: onPrimary,
-                onSurfaceVariant: widget.neutralActions ? Colors.white70 : null,
-                surface: surface,
-                surfaceContainer: Color.alphaBlend(
-                  Colors.white.withValues(alpha: 0.08),
-                  surface,
-                ),
-                surfaceContainerHigh: Color.alphaBlend(
-                  Colors.white.withValues(alpha: 0.12),
-                  surface,
-                ),
+              final innerKey = (
+                surface,
+                primary,
+                onPrimary,
+                widget.neutralActions,
               );
-              return Theme(
-                data: darkTheme.copyWith(
+              if (innerKey != _innerKey) {
+                _innerKey = innerKey;
+                _innerTheme = darkTheme.copyWith(
                   scaffoldBackgroundColor: surface,
-                  colorScheme: scheme,
+                  colorScheme: darkTheme.colorScheme.copyWith(
+                    primary: primary,
+                    onPrimary: onPrimary,
+                    onSurfaceVariant: widget.neutralActions
+                        ? Colors.white70
+                        : null,
+                    surface: surface,
+                    surfaceContainer: Color.alphaBlend(
+                      Colors.white.withValues(alpha: 0.08),
+                      surface,
+                    ),
+                    surfaceContainerHigh: Color.alphaBlend(
+                      Colors.white.withValues(alpha: 0.12),
+                      surface,
+                    ),
+                  ),
+                );
+              }
+              return Theme(
+                data: _innerTheme,
+                child: HeaderPalette(
+                  scheme: _innerTheme.colorScheme,
+                  child: widget.child,
                 ),
-                child: HeaderPalette(scheme: scheme, child: widget.child),
               );
             },
           );

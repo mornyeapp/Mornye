@@ -265,4 +265,40 @@ void main() {
     expect(tester.widget(appBar), same(firstBar));
     expect(tester.widget<AnimatedOpacity>(title).opacity, 1);
   });
+
+  testWidgets('artist surface reuses its themes across parent rebuilds', (
+    tester,
+  ) async {
+    late StateSetter rebuild;
+    const action = Text('Artist action');
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: MornyeTheme.build(Brightness.light),
+        home: StatefulBuilder(
+          builder: (context, setState) {
+            rebuild = setState;
+            // A new surface widget, as a page rebuild creates.
+            return MornyeArtistSurface(imageSource: null, child: action);
+          },
+        ),
+      ),
+    );
+    List<ThemeData> themes() => [
+      for (final theme in tester.widgetList<Theme>(
+        find.ancestor(
+          of: find.text('Artist action'),
+          matching: find.byType(Theme),
+        ),
+      ))
+        theme.data,
+    ];
+    final first = themes();
+    rebuild(() {});
+    await tester.pump();
+    final second = themes();
+    expect(second, hasLength(first.length));
+    for (var i = 0; i < first.length; i++) {
+      expect(second[i], same(first[i]));
+    }
+  });
 }
