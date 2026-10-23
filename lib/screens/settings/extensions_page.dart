@@ -218,6 +218,7 @@ class _ExtensionsPageState extends ConsumerState<ExtensionsPage> {
                       child: context.isMornye
                           ? MornyeGlassPanel.overlay(
                               radius: 28,
+                              samplesBackdrop: false,
                               child: installButton,
                             )
                           : installButton,

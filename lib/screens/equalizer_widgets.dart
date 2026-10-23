@@ -376,6 +376,7 @@ class _BandEditor extends StatelessWidget {
           labels: [for (final value in counts) '$value'],
           selectedIndex: counts.indexOf(count),
           onChanged: select,
+          samplesBackdrop: false,
         ),
       );
     }

@@ -897,6 +897,7 @@ class _QueueTabState extends ConsumerState<QueueTab> {
                           focusNode: _searchFocusNode,
                           hintText: context.l10n.librarySearchHint,
                           clearTooltip: context.l10n.dialogClear,
+                          samplesBackdrop: false,
                           onChanged: _onSearchChanged,
                           onClear: () {
                             _clearSearch();

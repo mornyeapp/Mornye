@@ -17,11 +17,15 @@ class MornyeSegmentedControl extends ConsumerWidget {
     required this.labels,
     required this.selectedIndex,
     required this.onChanged,
+    this.samplesBackdrop = true,
   });
 
   final List<String> labels;
   final int selectedIndex;
   final ValueChanged<int> onChanged;
+
+  /// See [MornyeGlass.samplesBackdrop].
+  final bool samplesBackdrop;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -41,6 +45,7 @@ class MornyeSegmentedControl extends ConsumerWidget {
         child: MornyeGlass.navigation(
           blurEnabled: ref.watch(mornyeBlurEnabledProvider),
           radius: height / 2,
+          samplesBackdrop: samplesBackdrop,
           child: MornyeSelectionPill(
             contrastBlocked: contrastBlocked,
             // The held lens follows a finger. A click never holds it, and over
@@ -83,6 +88,7 @@ class MornyeGlassPanel extends ConsumerWidget {
     this.tintOpacity,
     this.tintColor,
     this.blurEnabled = true,
+    this.samplesBackdrop = true,
     this.highlightBorder = false,
     this.smoothCorners = false,
     this.highlightIntensity = 1,
@@ -98,6 +104,7 @@ class MornyeGlassPanel extends ConsumerWidget {
     this.tintOpacity = 0.78,
     this.tintColor,
     this.blurEnabled = true,
+    this.samplesBackdrop = true,
     this.highlightBorder = false,
     this.smoothCorners = false,
     this.highlightIntensity = 1,
@@ -112,6 +119,9 @@ class MornyeGlassPanel extends ConsumerWidget {
   final double? tintOpacity;
   final Color? tintColor;
   final bool blurEnabled;
+
+  /// See [MornyeGlass.samplesBackdrop].
+  final bool samplesBackdrop;
   final bool highlightBorder;
   final bool smoothCorners;
   final double highlightIntensity;
@@ -127,6 +137,7 @@ class MornyeGlassPanel extends ConsumerWidget {
       tintOpacity: tintOpacity,
       tintColor: tintColor,
       blurEnabled: blurEnabled && ref.watch(mornyeBlurEnabledProvider),
+      samplesBackdrop: samplesBackdrop,
       highlightBorder: highlightBorder,
       smoothCorners: smoothCorners,
       highlightIntensity: highlightIntensity,

@@ -361,21 +361,33 @@ void main() {
       ProviderScope(
         child: MaterialApp(
           theme: MornyeTheme.build(Brightness.dark),
-          home: const Scaffold(
+          home: Scaffold(
             body: Column(
               children: [
-                MornyeGlass.navigation(
+                const MornyeGlass.navigation(
                   key: ValueKey('sampled'),
                   blurEnabled: true,
                   child: SizedBox(width: 200, height: 40),
                 ),
-                MornyeGlass.navigation(
+                const MornyeGlass.navigation(
                   key: ValueKey('plain-page'),
                   blurEnabled: true,
                   samplesBackdrop: false,
                   child: SizedBox(width: 200, height: 40),
                 ),
-                ExtensionRepoCard(child: SizedBox(width: 200, height: 40)),
+                const ExtensionRepoCard(
+                  child: SizedBox(width: 200, height: 40),
+                ),
+                const MornyeGlassPanel.overlay(
+                  samplesBackdrop: false,
+                  child: SizedBox(width: 200, height: 40),
+                ),
+                MornyeSegmentedControl(
+                  labels: const ['One', 'Two'],
+                  selectedIndex: 0,
+                  onChanged: (_) {},
+                  samplesBackdrop: false,
+                ),
               ],
             ),
           ),
@@ -394,13 +406,19 @@ void main() {
       find.descendant(of: plain, matching: find.byType(BackdropFilter)),
       findsNothing,
     );
-    expect(
-      find.descendant(
-        of: find.byType(ExtensionRepoCard),
-        matching: find.byType(BackdropFilter),
-      ),
-      findsNothing,
-    );
+    for (final type in [
+      ExtensionRepoCard,
+      MornyeGlassPanel,
+      MornyeSegmentedControl,
+    ]) {
+      expect(
+        find.descendant(
+          of: find.byType(type),
+          matching: find.byType(BackdropFilter),
+        ),
+        findsNothing,
+      );
+    }
     // Same translucent material, so the page looks identical behind it.
     expect(tintOf(plain), tintOf(sampled));
     expect(tintOf(plain)!.a, lessThan(1));

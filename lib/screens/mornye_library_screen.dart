@@ -399,6 +399,7 @@ class _MornyeLibraryScreenState extends ConsumerState<MornyeLibraryScreen> {
                   autofocus: true,
                   hintText: context.l10n.librarySearchHint,
                   clearTooltip: context.l10n.dialogClear,
+                  samplesBackdrop: false,
                   onChanged: _searchChanged,
                   onClear: () {
                     _search.clear();

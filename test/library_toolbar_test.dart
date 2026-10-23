@@ -343,6 +343,14 @@ void main() {
           '(desktop: $desktop, Mornye: $mornye)', (tester) async {
         await pumpLibrary(tester, desktop: desktop, mornye: mornye);
         final l10n = l10nOf(tester);
+        // The search field scrolls with the page over its plain background.
+        expect(
+          find.descendant(
+            of: find.byType(AppSearchField),
+            matching: find.byType(BackdropFilter),
+          ),
+          findsNothing,
+        );
         await tester.tap(
           find
               .text(
