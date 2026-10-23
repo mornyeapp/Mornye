@@ -471,14 +471,6 @@ class DownloadHistoryNotifier extends Notifier<DownloadHistoryState> {
     );
   }
 
-  DownloadHistoryItem? getBySpotifyId(String spotifyId) {
-    return state.getBySpotifyId(spotifyId);
-  }
-
-  DownloadHistoryItem? getByIsrc(String isrc) {
-    return state.getByIsrc(isrc);
-  }
-
   Future<DownloadHistoryItem?> getBySpotifyIdAsync(String spotifyId) async {
     final inMemory = state.getBySpotifyId(spotifyId);
     if (inMemory != null) return inMemory;
@@ -1131,12 +1123,6 @@ class DownloadHistoryNotifier extends Notifier<DownloadHistoryState> {
       _historyLog.e('Failed to clear database: $error', error, stack);
     }
   }
-
-  /// Replaces all download history with [items] (each in the
-  /// [DownloadHistoryItem.toJson] shape) from a restored backup, then reloads
-  /// the in-memory state from storage.
-  Future<void> restoreFromBackup(List<Map<String, dynamic>> items) =>
-      restoreFromBackupStream(Stream.fromIterable(items));
 
   /// Serializes backup replacement with existing history writes. Repair iOS
   /// paths before publishing the restored history to Library and maintenance.

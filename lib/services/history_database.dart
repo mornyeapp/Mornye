@@ -581,30 +581,6 @@ class HistoryDatabase {
     return Sqflite.firstIntValue(result) ?? 0;
   }
 
-  Future<Map<String, dynamic>?> findExisting({
-    String? spotifyId,
-    String? isrc,
-  }) async {
-    if (spotifyId != null && spotifyId.isNotEmpty) {
-      final bySpotify = await getBySpotifyId(spotifyId);
-      if (bySpotify != null) return bySpotify;
-
-      if (spotifyId.startsWith('deezer:')) {
-        final deezerId = spotifyId.substring(7);
-        final byDeezer = await _firstRow(await database, 'spotify_id LIKE ?', [
-          'deezer:$deezerId',
-        ], newestFirst: false);
-        if (byDeezer != null) return byDeezer;
-      }
-    }
-
-    if (isrc != null && isrc.isNotEmpty) {
-      return await getByIsrc(isrc);
-    }
-
-    return null;
-  }
-
   Future<void> close() async {
     final db = await database;
     await db.close();
@@ -673,45 +649,6 @@ class HistoryDatabase {
       await batch.commit(noResult: true);
       return true;
     });
-  }
-
-  Future<void> updateAudioMetadata(
-    String id, {
-    String? newQuality,
-    int? newBitDepth,
-    int? newSampleRate,
-    bool? hasLyrics,
-    int? lyricsMetadataScanVersion,
-  }) async {
-    final db = await database;
-    final values = <String, dynamic>{};
-    if (newQuality != null) {
-      values['quality'] = newQuality;
-    }
-    if (newBitDepth != null) {
-      values['bit_depth'] = newBitDepth;
-    }
-    if (newSampleRate != null) {
-      values['sample_rate'] = newSampleRate;
-    }
-    if (hasLyrics != null) {
-      values['has_lyrics'] = hasLyrics ? 1 : 0;
-    }
-    if (lyricsMetadataScanVersion != null) {
-      values['lyrics_metadata_scan_version'] = lyricsMetadataScanVersion;
-    }
-    if (values.isEmpty) {
-      return;
-    }
-    await db.update('history', values, where: 'id = ?', whereArgs: [id]);
-  }
-
-  Future<Set<String>> getAllFilePaths() async {
-    final db = await database;
-    final rows = await db.rawQuery(
-      "SELECT file_path FROM history WHERE file_path IS NOT NULL AND file_path != ''",
-    );
-    return rows.map((r) => r['file_path'] as String).toSet();
   }
 
   Future<List<Map<String, dynamic>>> getEntriesWithPathsPage({
