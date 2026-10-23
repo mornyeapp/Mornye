@@ -1031,7 +1031,10 @@ class _SidebarAccountRow extends ConsumerWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final profile = ref.watch(desktopSidebarProfileProvider);
     final name = profile?.name.trim() ?? '';
-    final label = name.isEmpty ? context.l10n.profileSetUp : name;
+    // The sidebar is too narrow for the full invitation in long languages,
+    // where it ellipsized mid-word; screen readers still hear all of it.
+    final label = name.isEmpty ? context.l10n.profileTitle : name;
+    final semanticLabel = name.isEmpty ? context.l10n.profileSetUp : name;
     final radius = BorderRadius.circular(_SidebarRow.radius);
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -1049,7 +1052,7 @@ class _SidebarAccountRow extends ConsumerWidget {
             Expanded(
               child: Semantics(
                 button: true,
-                label: label,
+                label: semanticLabel,
                 excludeSemantics: true,
                 child: InkWell(
                   key: const ValueKey('desktop-sidebar-account'),

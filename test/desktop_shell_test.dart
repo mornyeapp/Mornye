@@ -106,24 +106,25 @@ void main() {
     desktopSidebarLink.value = null;
   });
 
-  List<Override> overrides({MediaItem? item = _track, bool playing = false}) =>
-      [
-        currentMediaItemProvider.overrideWithBuild(
-          (ref, notifier) => Stream.value(item),
-        ),
-        playbackStateProvider.overrideWith(
-          (ref) => Stream.value(PlaybackState(playing: playing)),
-        ),
-        musicPlayerControllerProvider.overrideWithValue(controller),
-        systemVolumeProvider.overrideWith((ref) => Stream.value(0.5)),
-        systemVolumeWriterProvider.overrideWithValue((value) async {
-          volumeWrites.add(value);
-        }),
-        desktopSidebarPlaylistsProvider.overrideWithValue([_playlist]),
-        desktopSidebarProfileProvider.overrideWithValue(
-          const UserProfile(name: 'Ada Lovelace'),
-        ),
-      ];
+  List<Override> overrides({
+    MediaItem? item = _track,
+    bool playing = false,
+    UserProfile profile = const UserProfile(name: 'Ada Lovelace'),
+  }) => [
+    currentMediaItemProvider.overrideWithBuild(
+      (ref, notifier) => Stream.value(item),
+    ),
+    playbackStateProvider.overrideWith(
+      (ref) => Stream.value(PlaybackState(playing: playing)),
+    ),
+    musicPlayerControllerProvider.overrideWithValue(controller),
+    systemVolumeProvider.overrideWith((ref) => Stream.value(0.5)),
+    systemVolumeWriterProvider.overrideWithValue((value) async {
+      volumeWrites.add(value);
+    }),
+    desktopSidebarPlaylistsProvider.overrideWithValue([_playlist]),
+    desktopSidebarProfileProvider.overrideWithValue(profile),
+  ];
 
   Future<void> pumpShell(
     WidgetTester tester, {
@@ -133,6 +134,7 @@ void main() {
     List<DesktopSidebarLink> libraryLinks = const [],
     ValueChanged<String>? onOpenLibraryLink,
     VoidCallback? onOpenProfile,
+    UserProfile profile = const UserProfile(name: 'Ada Lovelace'),
   }) async {
     tester.view.physicalSize = Size(width, 800);
     tester.view.devicePixelRatio = 1;
@@ -140,7 +142,7 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpWidget(
       ProviderScope(
-        overrides: overrides(item: item),
+        overrides: overrides(item: item, profile: profile),
         child: MaterialApp(
           theme: mornye
               ? MornyeTheme.build(Brightness.light)
@@ -455,6 +457,28 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('desktop-sidebar-account')));
       expect(profileOpened, 1);
       expect(selections, isEmpty);
+    });
+
+    testWidgets('an unnamed account row shows a label that fits', (
+      tester,
+    ) async {
+      final semantics = tester.ensureSemantics();
+      await pumpShell(
+        tester,
+        mornye: true,
+        width: 1400,
+        profile: const UserProfile(),
+      );
+
+      expect(find.text('Profile'), findsOneWidget);
+      expect(find.text('Set up your profile'), findsNothing);
+      expect(
+        tester.getSemantics(
+          find.byKey(const ValueKey('desktop-sidebar-account')),
+        ),
+        matchesSemantics(label: 'Set up your profile', isButton: true),
+      );
+      semantics.dispose();
     });
 
     testWidgets('sidebar stays in narrow windows and ignores the shortcut', (
