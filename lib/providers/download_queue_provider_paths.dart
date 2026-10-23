@@ -225,19 +225,13 @@ extension _DownloadQueuePaths on DownloadQueueNotifier {
 
   Future<String> _buildOutputDir(
     Track track,
-    String folderOrganization, {
-    bool separateSingles = false,
-    String albumFolderStructure = 'artist_album',
+    AppSettings settings, {
     String? customFolderPath,
-    bool createPlaylistFolder = false,
-    bool useAlbumArtistForFolders = true,
-    bool usePrimaryArtistOnly = false,
-    bool filterContributingArtistsInAlbumArtist = false,
     String? playlistName,
   }) async {
     final baseDir = state.outputDir;
-    if (createPlaylistFolder &&
-        folderOrganization != 'playlist' &&
+    if (settings.createPlaylistFolder &&
+        settings.folderOrganization != 'playlist' &&
         playlistName != null &&
         playlistName.isNotEmpty) {
       final playlistFolder = _sanitizeFolderName(playlistName);
@@ -251,15 +245,8 @@ extension _DownloadQueuePaths on DownloadQueueNotifier {
 
     final relativeDir = _buildRelativeOutputDir(
       track,
-      folderOrganization,
-      separateSingles: separateSingles,
-      albumFolderStructure: albumFolderStructure,
+      settings,
       customFolderPath: customFolderPath,
-      createPlaylistFolder: createPlaylistFolder,
-      useAlbumArtistForFolders: useAlbumArtistForFolders,
-      usePrimaryArtistOnly: usePrimaryArtistOnly,
-      filterContributingArtistsInAlbumArtist:
-          filterContributingArtistsInAlbumArtist,
       playlistName: playlistName,
     );
     if (relativeDir.isEmpty) {
@@ -409,111 +396,61 @@ extension _DownloadQueuePaths on DownloadQueueNotifier {
 
   String _buildRelativeOutputDir(
     Track track,
-    String folderOrganization, {
-    bool separateSingles = false,
-    String albumFolderStructure = 'artist_album',
+    AppSettings settings, {
     String? customFolderPath,
-    bool createPlaylistFolder = false,
-    bool useAlbumArtistForFolders = true,
-    bool usePrimaryArtistOnly = false,
-    bool filterContributingArtistsInAlbumArtist = false,
     String? playlistName,
   }) {
+    final organization = settings.folderOrganization;
+    final hasPlaylist = playlistName != null && playlistName.isNotEmpty;
     final playlistPrefix =
-        createPlaylistFolder &&
-            folderOrganization != 'playlist' &&
-            playlistName != null &&
-            playlistName.isNotEmpty
+        settings.createPlaylistFolder &&
+            organization != 'playlist' &&
+            hasPlaylist
         ? _sanitizeFolderName(playlistName)
         : '';
-    if (!separateSingles && folderOrganization == 'custom') {
+    if (!settings.separateSingles && organization == 'custom') {
       return _joinRelativePath(
         playlistPrefix,
         customFolderPath ??
             (throw StateError('Folder template was not resolved')),
       );
     }
-    final folderArtist = _folderArtistForTrack(
-      track,
-      useAlbumArtistForFolders: useAlbumArtistForFolders,
-      usePrimaryArtistOnly: usePrimaryArtistOnly,
-      filterContributingArtistsInAlbumArtist:
-          filterContributingArtistsInAlbumArtist,
+    final artistName = _sanitizeFolderName(
+      _folderArtistForTrack(track, settings),
     );
+    final albumName = _sanitizeFolderName(track.albumName);
 
-    if (separateSingles) {
-      final isSingle = _shouldTreatAsSingleRelease(track);
-      final artistName = _sanitizeFolderName(folderArtist);
-
-      if (albumFolderStructure == 'artist_album_singles') {
-        if (isSingle) {
-          return _joinRelativePath(playlistPrefix, '$artistName/Singles');
-        }
-        final albumName = _sanitizeFolderName(track.albumName);
-        return _joinRelativePath(playlistPrefix, '$artistName/$albumName');
+    if (settings.separateSingles) {
+      final structure = settings.albumFolderStructure;
+      if (_shouldTreatAsSingleRelease(track)) {
+        return _joinRelativePath(playlistPrefix, switch (structure) {
+          'artist_album_singles' => '$artistName/Singles',
+          'artist_album_flat' => artistName,
+          _ => 'Singles',
+        });
       }
-
-      if (albumFolderStructure == 'artist_album_flat') {
-        if (isSingle) {
-          return _joinRelativePath(playlistPrefix, artistName);
-        }
-        final albumName = _sanitizeFolderName(track.albumName);
-        return _joinRelativePath(playlistPrefix, '$artistName/$albumName');
-      }
-
-      if (isSingle) {
-        return _joinRelativePath(playlistPrefix, 'Singles');
-      }
-
-      final albumName = _sanitizeFolderName(track.albumName);
       final year = _extractYear(track.releaseDate);
-      switch (albumFolderStructure) {
-        case 'album_only':
-          return _joinRelativePath(playlistPrefix, 'Albums/$albumName');
-        case 'artist_year_album':
-          final yearAlbum = year != null ? '[$year] $albumName' : albumName;
-          return _joinRelativePath(
-            playlistPrefix,
-            'Albums/$artistName/$yearAlbum',
-          );
-        case 'year_album':
-          final yearAlbum = year != null ? '[$year] $albumName' : albumName;
-          return _joinRelativePath(playlistPrefix, 'Albums/$yearAlbum');
-        default:
-          return _joinRelativePath(
-            playlistPrefix,
-            'Albums/$artistName/$albumName',
-          );
-      }
+      final yearAlbum = year != null ? '[$year] $albumName' : albumName;
+      return _joinRelativePath(playlistPrefix, switch (structure) {
+        'artist_album_singles' ||
+        'artist_album_flat' => '$artistName/$albumName',
+        'album_only' => 'Albums/$albumName',
+        'artist_year_album' => 'Albums/$artistName/$yearAlbum',
+        'year_album' => 'Albums/$yearAlbum',
+        _ => 'Albums/$artistName/$albumName',
+      });
     }
 
-    if (folderOrganization == 'none') {
-      return playlistPrefix;
-    }
-
-    switch (folderOrganization) {
-      case 'playlist':
-        if (playlistName != null && playlistName.isNotEmpty) {
-          return _sanitizeFolderName(playlistName);
-        }
-        return '';
-      case 'artist':
-        return _joinRelativePath(
-          playlistPrefix,
-          _sanitizeFolderName(folderArtist),
-        );
-      case 'album':
-        return _joinRelativePath(
-          playlistPrefix,
-          _sanitizeFolderName(track.albumName),
-        );
-      case 'artist_album':
-        final artistName = _sanitizeFolderName(folderArtist);
-        final albumName = _sanitizeFolderName(track.albumName);
-        return _joinRelativePath(playlistPrefix, '$artistName/$albumName');
-      default:
-        return playlistPrefix;
-    }
+    return switch (organization) {
+      'playlist' => hasPlaylist ? _sanitizeFolderName(playlistName) : '',
+      'artist' => _joinRelativePath(playlistPrefix, artistName),
+      'album' => _joinRelativePath(playlistPrefix, albumName),
+      'artist_album' => _joinRelativePath(
+        playlistPrefix,
+        '$artistName/$albumName',
+      ),
+      _ => playlistPrefix,
+    };
   }
 
   String _joinRelativePath(String prefix, String suffix) {
@@ -522,19 +459,15 @@ extension _DownloadQueuePaths on DownloadQueueNotifier {
     return '$prefix/$suffix';
   }
 
-  String _folderArtistForTrack(
-    Track track, {
-    required bool useAlbumArtistForFolders,
-    required bool usePrimaryArtistOnly,
-    required bool filterContributingArtistsInAlbumArtist,
-  }) {
+  String _folderArtistForTrack(Track track, AppSettings settings) {
     final albumArtist = normalizeOptionalString(track.albumArtist);
-    var artist = useAlbumArtistForFolders
+    final useAlbumArtist = settings.useAlbumArtistForFolders;
+    var artist = useAlbumArtist
         ? albumArtist ?? track.artistName
         : track.artistName;
-    if (usePrimaryArtistOnly ||
-        (useAlbumArtistForFolders &&
-            filterContributingArtistsInAlbumArtist &&
+    if (settings.usePrimaryArtistOnly ||
+        (useAlbumArtist &&
+            settings.filterContributingArtistsInAlbumArtist &&
             albumArtist != null)) {
       artist = _extractPrimaryArtist(artist);
     }
@@ -558,13 +491,7 @@ extension _DownloadQueuePaths on DownloadQueueNotifier {
         quality: quality,
         playlistPosition: _validPlaylistPosition(item),
       ),
-      'artist': _folderArtistForTrack(
-        track,
-        useAlbumArtistForFolders: settings.useAlbumArtistForFolders,
-        usePrimaryArtistOnly: settings.usePrimaryArtistOnly,
-        filterContributingArtistsInAlbumArtist:
-            settings.filterContributingArtistsInAlbumArtist,
-      ),
+      'artist': _folderArtistForTrack(track, settings),
       'album_artist':
           normalizeOptionalString(track.albumArtist) ?? track.artistName,
       'playlist': item.playlistName ?? '',
@@ -584,14 +511,7 @@ extension _DownloadQueuePaths on DownloadQueueNotifier {
     if (track.albumName.trim().isNotEmpty) return '';
     String folderFor(Track value) => _buildRelativeOutputDir(
       value,
-      settings.folderOrganization,
-      separateSingles: settings.separateSingles,
-      albumFolderStructure: settings.albumFolderStructure,
-      createPlaylistFolder: settings.createPlaylistFolder,
-      useAlbumArtistForFolders: settings.useAlbumArtistForFolders,
-      usePrimaryArtistOnly: settings.usePrimaryArtistOnly,
-      filterContributingArtistsInAlbumArtist:
-          settings.filterContributingArtistsInAlbumArtist,
+      settings,
       playlistName: item.playlistName,
     );
     final planned = folderFor(track);
@@ -689,23 +609,13 @@ extension _DownloadQueuePaths on DownloadQueueNotifier {
         .downloadProviderReplacesLegacyProvider(service, legacyProviderId);
   }
 
-  String _mimeTypeForExt(String ext) {
-    switch (ext.toLowerCase()) {
-      case '.m4a':
-      case '.mp4':
-        return 'audio/mp4';
-      case '.mp3':
-        return 'audio/mpeg';
-      case '.opus':
-        return 'audio/ogg';
-      case '.flac':
-        return 'audio/flac';
-      case '.lrc':
-        return 'application/octet-stream';
-      default:
-        return 'application/octet-stream';
-    }
-  }
+  String _mimeTypeForExt(String ext) => switch (ext.toLowerCase()) {
+    '.m4a' || '.mp4' => 'audio/mp4',
+    '.mp3' => 'audio/mpeg',
+    '.opus' => 'audio/ogg',
+    '.flac' => 'audio/flac',
+    _ => 'application/octet-stream',
+  };
 
   Future<String?> _getSafMimeType(String uri) async {
     try {

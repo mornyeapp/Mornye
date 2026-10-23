@@ -888,28 +888,14 @@ extension _DownloadQueueNativeWorker on DownloadQueueNotifier {
     final rawOutputDir = isSafMode
         ? _buildRelativeOutputDir(
             item.track,
-            settings.folderOrganization,
-            separateSingles: settings.separateSingles,
-            albumFolderStructure: settings.albumFolderStructure,
+            settings,
             customFolderPath: customFolderPath,
-            createPlaylistFolder: settings.createPlaylistFolder,
-            useAlbumArtistForFolders: settings.useAlbumArtistForFolders,
-            usePrimaryArtistOnly: settings.usePrimaryArtistOnly,
-            filterContributingArtistsInAlbumArtist:
-                settings.filterContributingArtistsInAlbumArtist,
             playlistName: item.playlistName,
           )
         : await _buildOutputDir(
             item.track,
-            settings.folderOrganization,
-            separateSingles: settings.separateSingles,
-            albumFolderStructure: settings.albumFolderStructure,
+            settings,
             customFolderPath: customFolderPath,
-            createPlaylistFolder: settings.createPlaylistFolder,
-            useAlbumArtistForFolders: settings.useAlbumArtistForFolders,
-            usePrimaryArtistOnly: settings.usePrimaryArtistOnly,
-            filterContributingArtistsInAlbumArtist:
-                settings.filterContributingArtistsInAlbumArtist,
             playlistName: item.playlistName,
           );
     final outputDir = isSafMode

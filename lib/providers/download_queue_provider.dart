@@ -109,6 +109,16 @@ final _explicitQualityFilenameTokenPattern = RegExp(
   caseSensitive: false,
 );
 
+extension on DownloadItem {
+  DownloadItem resetToQueued() => copyWith(
+    status: DownloadStatus.queued,
+    progress: 0,
+    speedMBps: 0,
+    bytesReceived: 0,
+    bytesTotal: 0,
+  );
+}
+
 class DownloadQueueNotifier extends Notifier<DownloadQueueState> {
   late final _queuePersistence = DownloadQueuePersistence(
     currentItems: () => state.items,
@@ -372,13 +382,7 @@ class DownloadQueueNotifier extends Notifier<DownloadQueueState> {
             if (!requeueItemIds.contains(item.id)) {
               return item;
             }
-            return item.copyWith(
-              status: DownloadStatus.queued,
-              progress: 0,
-              speedMBps: 0,
-              bytesReceived: 0,
-              bytesTotal: 0,
-            );
+            return item.resetToQueued();
           })
           .toList(growable: false);
       if (state.isProcessing) {
@@ -981,15 +985,8 @@ class DownloadQueueNotifier extends Notifier<DownloadQueueState> {
     String? playlistName,
   }) => _buildRelativeOutputDir(
     track,
-    settings.folderOrganization,
-    separateSingles: settings.separateSingles,
-    albumFolderStructure: settings.albumFolderStructure,
+    settings,
     customFolderPath: customFolderPath,
-    createPlaylistFolder: settings.createPlaylistFolder,
-    useAlbumArtistForFolders: settings.useAlbumArtistForFolders,
-    usePrimaryArtistOnly: settings.usePrimaryArtistOnly,
-    filterContributingArtistsInAlbumArtist:
-        settings.filterContributingArtistsInAlbumArtist,
     playlistName: playlistName,
   );
 
@@ -1014,13 +1011,7 @@ class DownloadQueueNotifier extends Notifier<DownloadQueueState> {
               item.status == DownloadStatus.skipped) {
             return item;
           }
-          return item.copyWith(
-            status: DownloadStatus.queued,
-            progress: 0,
-            speedMBps: 0,
-            bytesReceived: 0,
-            bytesTotal: 0,
-          );
+          return item.resetToQueued();
         })
         .toList(growable: false);
 
@@ -1312,12 +1303,7 @@ class DownloadQueueNotifier extends Notifier<DownloadQueueState> {
           }
           _verificationRetryGuard.clearItem(item.id);
           _rateLimitRetriedItemIds.remove(item.id);
-          return item.copyWith(
-            status: DownloadStatus.queued,
-            progress: 0,
-            speedMBps: 0,
-            bytesReceived: 0,
-            bytesTotal: 0,
+          return item.resetToQueued().copyWith(
             error: null,
             errorType: null,
             filePath: null,

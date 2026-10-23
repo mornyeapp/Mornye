@@ -355,13 +355,11 @@ extension _DownloadQueueFinalization on DownloadQueueNotifier {
         mimeType: mimeType,
         srcPath: srcPath,
       );
-      _logSafPublishTimings(result);
-      final uri = (result['uri'] as String? ?? '').trim();
-      final publishedName = (result['file_name'] as String? ?? '').trim();
-      if (uri.isEmpty || publishedName.isEmpty) return null;
+      final published = _publishedSafFile(result);
+      if (published == null) return null;
       return (
-        uri: uri,
-        fileName: publishedName,
+        uri: published.uri,
+        fileName: published.fileName,
         alreadyExists: result['already_exists'] == true,
       );
     } catch (e) {
@@ -370,11 +368,17 @@ extension _DownloadQueueFinalization on DownloadQueueNotifier {
     }
   }
 
-  void _logSafPublishTimings(Map<String, dynamic> result) {
+  ({String uri, String fileName})? _publishedSafFile(
+    Map<String, dynamic> result,
+  ) {
     final timings = result['publish_timings_ms'];
     if (timings is Map && timings.isNotEmpty) {
       _log.d('SAF publish timings (ms): $timings');
     }
+    final uri = (result['uri'] as String? ?? '').trim();
+    final fileName = (result['file_name'] as String? ?? '').trim();
+    if (uri.isEmpty || fileName.isEmpty) return null;
+    return (uri: uri, fileName: fileName);
   }
 
   Future<({String uri, String fileName})?> _writeTempToSafUnique({
@@ -394,11 +398,7 @@ extension _DownloadQueueFinalization on DownloadQueueNotifier {
         srcPath: srcPath,
         preservedSuffix: preservedSuffix,
       );
-      _logSafPublishTimings(result);
-      final uri = (result['uri'] as String? ?? '').trim();
-      final publishedName = (result['file_name'] as String? ?? '').trim();
-      if (uri.isEmpty || publishedName.isEmpty) return null;
-      return (uri: uri, fileName: publishedName);
+      return _publishedSafFile(result);
     } catch (e) {
       _log.w('Failed to write unique temp file to SAF: $e');
       return null;
@@ -424,11 +424,7 @@ extension _DownloadQueueFinalization on DownloadQueueNotifier {
         srcPath: srcPath,
         preservedSuffix: preservedSuffix,
       );
-      _logSafPublishTimings(result);
-      final uri = (result['uri'] as String? ?? '').trim();
-      final publishedName = (result['file_name'] as String? ?? '').trim();
-      if (uri.isEmpty || publishedName.isEmpty) return null;
-      return (uri: uri, fileName: publishedName);
+      return _publishedSafFile(result);
     } catch (e) {
       _log.w('Failed to write collision-aware temp file to SAF: $e');
       return null;

@@ -341,15 +341,8 @@ class _DownloadRun {
     final relativeOutputDir = isSafMode || isNetworkDownload
         ? n._buildRelativeOutputDir(
             trackToDownload,
-            settings.folderOrganization,
-            separateSingles: settings.separateSingles,
-            albumFolderStructure: settings.albumFolderStructure,
+            settings,
             customFolderPath: customFolderPath,
-            createPlaylistFolder: settings.createPlaylistFolder,
-            useAlbumArtistForFolders: settings.useAlbumArtistForFolders,
-            usePrimaryArtistOnly: settings.usePrimaryArtistOnly,
-            filterContributingArtistsInAlbumArtist:
-                settings.filterContributingArtistsInAlbumArtist,
             playlistName: item.playlistName,
           )
         : '';
@@ -360,15 +353,8 @@ class _DownloadRun {
         ? relativeOutputDir
         : await n._buildOutputDir(
             trackToDownload,
-            settings.folderOrganization,
-            separateSingles: settings.separateSingles,
-            albumFolderStructure: settings.albumFolderStructure,
+            settings,
             customFolderPath: customFolderPath,
-            createPlaylistFolder: settings.createPlaylistFolder,
-            useAlbumArtistForFolders: settings.useAlbumArtistForFolders,
-            usePrimaryArtistOnly: settings.usePrimaryArtistOnly,
-            filterContributingArtistsInAlbumArtist:
-                settings.filterContributingArtistsInAlbumArtist,
             playlistName: item.playlistName,
           );
     effectiveOutputDir = isSafMode
@@ -586,15 +572,8 @@ class _DownloadRun {
             appOutputDir ??
             await n._buildOutputDir(
               trackToDownload,
-              settings.folderOrganization,
-              separateSingles: settings.separateSingles,
-              albumFolderStructure: settings.albumFolderStructure,
+              settings,
               customFolderPath: customFolderPath,
-              createPlaylistFolder: settings.createPlaylistFolder,
-              useAlbumArtistForFolders: settings.useAlbumArtistForFolders,
-              usePrimaryArtistOnly: settings.usePrimaryArtistOnly,
-              filterContributingArtistsInAlbumArtist:
-                  settings.filterContributingArtistsInAlbumArtist,
               playlistName: item.playlistName,
             );
         appOutputDir = fallbackDir;
