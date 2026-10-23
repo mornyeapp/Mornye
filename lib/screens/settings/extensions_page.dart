@@ -126,9 +126,9 @@ class _ExtensionsPageState extends ConsumerState<ExtensionsPage> {
               child: SettingsGroup(
                 connected: true,
                 children: [
-                  _DownloadPriorityItem(),
-                  _DownloadFallbackItem(),
-                  _MetadataPriorityItem(),
+                  _ExtensionPriorityLink(_PriorityLink.download),
+                  _ExtensionPriorityLink(_PriorityLink.fallback),
+                  _ExtensionPriorityLink(_PriorityLink.metadata),
                   _SearchProviderSelector(),
                   _HomeFeedProviderSelector(),
                   HomeFeedRegionSetting(),
