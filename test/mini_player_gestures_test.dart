@@ -22,9 +22,6 @@ class _Controller implements MusicPlayerController {
   Future<void> previous() async => calls.add('previous');
 
   @override
-  Future<void> stop() async => calls.add('stop');
-
-  @override
   Future<void> togglePlayPause(bool isPlaying) async =>
       calls.add(isPlaying ? 'pause' : 'play');
 

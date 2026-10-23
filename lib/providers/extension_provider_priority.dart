@@ -428,12 +428,6 @@ extension ExtensionNotifierProviderPriority on ExtensionNotifier {
       ? _distinctProviderIds(raw.whereType<String>())
       : const <String>[];
 
-  Future<void> cleanup() async {
-    if (_cleanupInFlight) return;
-    _cleanupInFlight = true;
-    await _cleanupExtensions(reason: 'manual');
-  }
-
   List<String> getAllDownloadProviders() {
     return _distinctProviderIds(
       state.extensions

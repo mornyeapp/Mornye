@@ -28,12 +28,6 @@ class PreviewPlayerState {
   bool isActiveUrl(String? url) =>
       url != null && url.isNotEmpty && url == activeUrl;
 
-  double get progress {
-    final total = duration.inMilliseconds;
-    if (total <= 0) return 0;
-    return (position.inMilliseconds / total).clamp(0.0, 1.0);
-  }
-
   PreviewPlayerState copyWith({
     String? activeUrl,
     bool clearActiveUrl = false,

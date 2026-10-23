@@ -874,9 +874,6 @@ class SettingsNotifier extends Notifier<AppSettings> {
     LogBuffer.loggingEnabled = enabled;
   }
 
-  void setUseExtensionProviders(bool enabled) =>
-      _commit(state.copyWith(useExtensionProviders: true));
-
   void setDownloadFallbackExtensionIds(List<String>? extensionIds) {
     _commit(
       state.copyWith(

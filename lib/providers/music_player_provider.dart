@@ -402,9 +402,6 @@ class MusicPlayerController {
     return true;
   }
 
-  Future<void> play() async => _handler?.play();
-  Future<void> pause() async => _handler?.pause();
-  Future<void> stop() async => _handler?.stop();
   Future<void> seek(Duration position) async => _handler?.seek(position);
   Future<void> next() async => _handler?.skipToNext();
   Future<void> previous() async => _handler?.skipToPrevious();

@@ -34,14 +34,6 @@ class RepoCategory {
   static const String utility = 'utility';
   static const String lyrics = 'lyrics';
   static const String integration = 'integration';
-
-  static const List<String> all = [
-    metadata,
-    download,
-    utility,
-    lyrics,
-    integration,
-  ];
 }
 
 class RepoExtension {
@@ -50,15 +42,12 @@ class RepoExtension {
   final String displayName;
   final String version;
   final String description;
-  final String downloadUrl;
   final String? iconUrl;
   final String category;
   final List<String> tags;
-  final int downloads;
   final String updatedAt;
   final String? minAppVersion;
   final bool isInstalled;
-  final String? installedVersion;
   final bool hasUpdate;
 
   const RepoExtension({
@@ -67,15 +56,12 @@ class RepoExtension {
     required this.displayName,
     required this.version,
     required this.description,
-    required this.downloadUrl,
     this.iconUrl,
     required this.category,
     this.tags = const [],
-    this.downloads = 0,
     required this.updatedAt,
     this.minAppVersion,
     this.isInstalled = false,
-    this.installedVersion,
     this.hasUpdate = false,
   });
 
@@ -87,15 +73,12 @@ class RepoExtension {
           json['display_name'] as String? ?? json['name'] as String? ?? '',
       version: json['version'] as String? ?? '0.0.0',
       description: json['description'] as String? ?? '',
-      downloadUrl: json['download_url'] as String? ?? '',
       iconUrl: json['icon_url'] as String?,
       category: json['category'] as String? ?? 'utility',
       tags: (json['tags'] as List<dynamic>?)?.cast<String>() ?? [],
-      downloads: json['downloads'] as int? ?? 0,
       updatedAt: json['updated_at'] as String? ?? '',
       minAppVersion: json['min_app_version'] as String?,
       isInstalled: json['is_installed'] as bool? ?? false,
-      installedVersion: json['installed_version'] as String?,
       hasUpdate: json['has_update'] as bool? ?? false,
     );
   }
@@ -450,10 +433,6 @@ class RepoNotifier extends Notifier<RepoState> {
       );
       return false;
     }
-  }
-
-  void clearError() {
-    state = state.copyWith(clearError: true);
   }
 }
 
