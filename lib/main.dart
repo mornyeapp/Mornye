@@ -133,12 +133,18 @@ void main() {
       };
 
       final prefs = await SharedPreferences.getInstance();
-      await _prepareAndroidInstallationState(prefs);
-      final bootstrapSettings = loadBootstrapSettings(prefs);
+      var bootstrapSettings = loadBootstrapSettings(prefs);
+      // The SAF check overlaps the install marker read. An installation
+      // reset rewrites the settings, so its result is then replaced.
+      var safValidation = _startSafTreeValidation(bootstrapSettings);
+      if (await _prepareAndroidInstallationState(prefs)) {
+        bootstrapSettings = loadBootstrapSettings(prefs);
+        safValidation = _startSafTreeValidation(bootstrapSettings);
+      }
       musicPlayerRuntime.configure(bootstrapSettings);
       final bootstrapTheme = loadBootstrapThemeSettings(prefs);
       final initialSafAccessLost = await _detectInitialSafAccessLoss(
-        bootstrapSettings,
+        safValidation,
       );
       final runtimeProfile = await _resolveRuntimeProfile(prefs);
       _configureImageCache(runtimeProfile);
@@ -275,9 +281,12 @@ class _StartupBenchmark {
 
 const _runtimeProfileTierKey = 'runtime_profile_tier_v1';
 
-Future<void> _prepareAndroidInstallationState(SharedPreferences prefs) async {
-  if (!Platform.isAndroid) return;
+/// Returns whether a restored-installation reset started, which may have
+/// rewritten the stored settings.
+Future<bool> _prepareAndroidInstallationState(SharedPreferences prefs) async {
+  if (!Platform.isAndroid) return false;
 
+  var resetStarted = false;
   try {
     final hasPersistedSettings = hasPersistedAppSettings(prefs);
     final installState = await PlatformBridge.ensureInstallMarker();
@@ -285,8 +294,9 @@ Future<void> _prepareAndroidInstallationState(SharedPreferences prefs) async {
       hasPersistedSettings: hasPersistedSettings,
       installState: installState,
     );
-    if (!shouldReset) return;
+    if (!shouldReset) return false;
 
+    resetStarted = true;
     _log.w(
       'Android restored state into a fresh installation; resetting '
       'installation-bound settings',
@@ -300,26 +310,38 @@ Future<void> _prepareAndroidInstallationState(SharedPreferences prefs) async {
     // bridge implementation prevents install-marker inspection.
     _log.w('Failed to inspect restored installation state: $e');
   }
+  return resetStarted;
 }
 
-Future<bool> _detectInitialSafAccessLoss(AppSettings settings) async {
+/// Starts the startup SAF grant check for [settings]. A failure is captured
+/// with the result, so a check that is replaced never reports an error.
+Future<(bool, Object?)>? _startSafTreeValidation(AppSettings settings) {
   if (!Platform.isAndroid ||
       settings.isFirstLaunch ||
       settings.storageMode != 'saf' ||
       settings.downloadTreeUri.isEmpty) {
-    return false;
+    return null;
   }
 
-  try {
-    return !await PlatformBridge.validateSafTreeAccess(
-      settings.downloadTreeUri,
-    ).timeout(const Duration(seconds: 2));
-  } catch (e) {
+  return PlatformBridge.validateSafTreeAccess(settings.downloadTreeUri)
+      .timeout(const Duration(seconds: 2))
+      .then<(bool, Object?)>(
+        (accessible) => (accessible, null),
+        onError: (Object error) => (true, error),
+      );
+}
+
+Future<bool> _detectInitialSafAccessLoss(
+  Future<(bool, Object?)>? validation,
+) async {
+  if (validation == null) return false;
+  final (accessible, error) = await validation;
+  if (error != null) {
     // A transient bridge failure must not trap the user at launch. Download
     // preflight validates strictly again before any write starts.
-    _log.w('Failed to validate SAF access during startup: $e');
-    return false;
+    _log.w('Failed to validate SAF access during startup: $error');
   }
+  return !accessible;
 }
 
 Future<_RuntimeProfile> _resolveRuntimeProfile(SharedPreferences prefs) async {
