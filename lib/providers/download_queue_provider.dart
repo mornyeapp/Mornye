@@ -973,6 +973,26 @@ class DownloadQueueNotifier extends Notifier<DownloadQueueState> {
     );
   }
 
+  @visibleForTesting
+  String relativeOutputDirFor(
+    Track track,
+    AppSettings settings, {
+    String? customFolderPath,
+    String? playlistName,
+  }) => _buildRelativeOutputDir(
+    track,
+    settings.folderOrganization,
+    separateSingles: settings.separateSingles,
+    albumFolderStructure: settings.albumFolderStructure,
+    customFolderPath: customFolderPath,
+    createPlaylistFolder: settings.createPlaylistFolder,
+    useAlbumArtistForFolders: settings.useAlbumArtistForFolders,
+    usePrimaryArtistOnly: settings.usePrimaryArtistOnly,
+    filterContributingArtistsInAlbumArtist:
+        settings.filterContributingArtistsInAlbumArtist,
+    playlistName: playlistName,
+  );
+
   DownloadItem? _findItemById(String id) {
     return state.lookup.byItemId[id];
   }
