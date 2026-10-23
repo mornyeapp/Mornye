@@ -274,8 +274,6 @@ extension _HomeTabExploreUI on _HomeTabState {
                     artistName: item.artists,
                     coverUrl: item.coverUrl,
                     extensionId: item.providerId,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: colorScheme.onSurfaceVariant,
                       fontSize: isTablet ? 14 : 12,
@@ -482,8 +480,6 @@ extension _HomeTabExploreUI on _HomeTabState {
                           extensionId: item.providerId,
                           style: Theme.of(context).textTheme.bodyMedium
                               ?.copyWith(color: colorScheme.onSurfaceVariant),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ),

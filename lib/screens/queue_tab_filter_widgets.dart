@@ -1117,8 +1117,6 @@ extension _QueueTabFilterWidgets on _QueueTabState {
               ClickableArtistName(
                 artistName: artistName,
                 coverUrl: coverUrl,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: colorScheme.onSurfaceVariant,
                 ),

@@ -311,8 +311,6 @@ class _TrackItemWithStatus extends ConsumerWidget {
                             extensionId: extensionId,
                             style: Theme.of(context).textTheme.bodySmall
                                 ?.copyWith(color: colorScheme.onSurfaceVariant),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
                           ),
                           badges: [
                             ...buildQualityBadges(
@@ -824,8 +822,6 @@ class _QuickPicksPageViewState extends State<_QuickPicksPageView> {
                       artistName: item.artists,
                       coverUrl: item.coverUrl,
                       extensionId: item.providerId,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: widget.colorScheme.onSurfaceVariant,
                       ),

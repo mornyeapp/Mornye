@@ -574,8 +574,6 @@ class ClickableArtistName extends StatefulWidget {
   final String? coverUrl;
   final String? extensionId;
   final TextStyle? style;
-  final int? maxLines;
-  final TextOverflow? overflow;
   final TextAlign? textAlign;
 
   const ClickableArtistName({
@@ -585,8 +583,6 @@ class ClickableArtistName extends StatefulWidget {
     this.coverUrl,
     this.extensionId,
     this.style,
-    this.maxLines,
-    this.overflow,
     this.textAlign,
   });
 
@@ -676,8 +672,8 @@ class _ClickableArtistNameState extends State<ClickableArtistName> {
       return Text(
         widget.artistName,
         style: widget.style,
-        maxLines: widget.maxLines,
-        overflow: widget.overflow,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
         textAlign: widget.textAlign,
       );
     }
@@ -695,8 +691,8 @@ class _ClickableArtistNameState extends State<ClickableArtistName> {
         child: Text(
           target.name,
           style: widget.style,
-          maxLines: widget.maxLines,
-          overflow: widget.overflow,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
           textAlign: widget.textAlign,
         ),
       );
@@ -704,8 +700,8 @@ class _ClickableArtistNameState extends State<ClickableArtistName> {
 
     return Text.rich(
       TextSpan(style: widget.style, children: _buildMultiArtistSpans()),
-      maxLines: widget.maxLines,
-      overflow: widget.overflow ?? TextOverflow.clip,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
       textAlign: widget.textAlign ?? TextAlign.start,
     );
   }

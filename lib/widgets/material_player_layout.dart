@@ -270,8 +270,6 @@ class MaterialPlayerLayout extends StatelessWidget {
                             style: Theme.of(context).textTheme.titleMedium
                                 ?.copyWith(color: colorScheme.onSurfaceVariant),
                             textAlign: TextAlign.center,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
                           );
                         },
                       ),

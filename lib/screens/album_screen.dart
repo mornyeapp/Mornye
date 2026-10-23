@@ -627,8 +627,6 @@ class _AlbumScreenState extends ConsumerState<AlbumScreen>
                             : FontWeight.w600,
                       ),
                 textAlign: TextAlign.center,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
               ),
             )
           : null,

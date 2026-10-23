@@ -441,8 +441,6 @@ class _TrackOptionsSheet extends ConsumerWidget {
                                     ?.copyWith(
                                       color: colorScheme.onSurfaceVariant,
                                     ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
                               ),
                             ],
                           ),

@@ -139,8 +139,6 @@ extension _QueueTabItemWidgets on _QueueTabState {
                   artistId: item.track.artistId,
                   coverUrl: item.track.coverUrl,
                   extensionId: item.track.source,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: colorScheme.onSurfaceVariant,
                   ),
@@ -1051,8 +1049,6 @@ extension _QueueTabItemWidgets on _QueueTabState {
             ClickableArtistName(
               artistName: item.artistName,
               coverUrl: item.coverUrl,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
               style: Theme.of(
                 context,
               ).textTheme.bodySmall?.copyWith(color: textColor),
@@ -1320,8 +1316,6 @@ extension _QueueTabItemWidgets on _QueueTabState {
       subtitle: ClickableArtistName(
         artistName: item.artistName,
         coverUrl: item.coverUrl,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
         style: Theme.of(
           context,
         ).textTheme.labelSmall?.copyWith(color: colorScheme.onSurfaceVariant),

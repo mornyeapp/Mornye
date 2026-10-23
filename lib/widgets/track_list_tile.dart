@@ -97,8 +97,6 @@ class TrackListTile extends ConsumerWidget {
                 artistId: track.artistId,
                 coverUrl: track.coverUrl,
                 extensionId: track.source,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
               )
             : Text(
                 track.artistName,
