@@ -49,6 +49,8 @@ Widget _host(Widget child, {bool reduceMotion = false, bool visible = true}) =>
     );
 
 void main() {
+  tearDown(DecorativePhase.debugResetClock);
+
   group('DecorativePhase', () {
     testWidgets('advances at most 30 times a second at loop speed', (
       tester,
@@ -102,6 +104,43 @@ void main() {
       second.stop();
       expect(DecorativePhase.debugClockRunning, isFalse);
     });
+
+    testWidgets('holds while the app is hidden and resumes from there', (
+      tester,
+    ) async {
+      addTearDown(
+        () => tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.resumed,
+        ),
+      );
+      final phase = DecorativePhase(const Duration(seconds: 1));
+      addTearDown(phase.dispose);
+      phase.start();
+      await tester.binding.delayed(const Duration(milliseconds: 340));
+      expect(phase.value, closeTo(0.34, 1e-9));
+
+      for (final state in [
+        AppLifecycleState.inactive,
+        AppLifecycleState.hidden,
+        AppLifecycleState.paused,
+      ]) {
+        tester.binding.handleAppLifecycleStateChanged(state);
+        expect(DecorativePhase.debugClockRunning, state == .inactive);
+      }
+      await tester.binding.delayed(const Duration(seconds: 1));
+      expect(phase.value, closeTo(0.34, 1e-9));
+
+      // Starting while hidden waits for frames too.
+      phase.stop();
+      phase.start();
+      expect(DecorativePhase.debugClockRunning, isFalse);
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      expect(DecorativePhase.debugClockRunning, isTrue);
+      await tester.binding.delayed(DecorativePhase.interval);
+      expect(phase.value, closeTo(0.374, 1e-9));
+      phase.stop();
+    });
   });
 
   group('NowPlayingIndicator', () {
@@ -134,6 +173,31 @@ void main() {
         expect(DecorativePhase.debugClockRunning, isFalse);
         expect(await _framesInOneSecond(tester), 0);
       }
+    });
+
+    testWidgets('stops waking the app while it is in the background', (
+      tester,
+    ) async {
+      addTearDown(
+        () => tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.resumed,
+        ),
+      );
+      await tester.pumpWidget(_host(const NowPlayingIndicator(playing: true)));
+      await tester.pump(const Duration(milliseconds: 300));
+      final indicator = find.byType(NowPlayingIndicator);
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      expect(DecorativePhase.debugClockRunning, isFalse);
+      final held = await _pixels(tester, indicator);
+      await tester.binding.delayed(const Duration(seconds: 1));
+      expect(DecorativePhase.debugClockRunning, isFalse);
+      expect(await _pixels(tester, indicator), orderedEquals(held));
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      expect(DecorativePhase.debugClockRunning, isTrue);
+      expect(await _framesInOneSecond(tester), inInclusiveRange(29, 30));
+      expect(await _pixels(tester, indicator), isNot(orderedEquals(held)));
     });
   });
 
