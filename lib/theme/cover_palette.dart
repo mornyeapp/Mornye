@@ -39,12 +39,12 @@ int paletteSeedFromColorCounts(List<List<int>> colors) {
 /// The palette seed and [coverSourceColor] of one cover sample, in a single
 /// background job. Without native [colors] the same quantizer runs here.
 Future<(int, Color?)> _seedAndSourceColor(
-  (List<List<int>>?, Uint8List, Uint8List?) sample,
+  (List<List<int>>?, Uint8List?, Uint8List?) sample,
 ) async {
   final (colors, premultiplied, straight) = sample;
   return (
     paletteSeedFromColorCounts(
-      colors ?? await _quantizePaletteInIsolate(premultiplied),
+      colors ?? await _quantizePaletteInIsolate(premultiplied!),
     ),
     _sourceColorOf(straight),
   );
@@ -78,7 +78,7 @@ class CoverPalette {
   static const int _maxEntries = 32;
 
   /// [sourceColor] by versioned source, from either resolver. A null value
-  /// marks a decoded cover without opaque pixels.
+  /// marks a decoded cover without opaque pixels or a failed pixel readback.
   static final Map<String, Color?> _coverColors = {};
   static final Map<String, String> _coverVersions = {};
   static final Map<String, Future<Color?>> _pendingCoverColors = {};
@@ -281,7 +281,7 @@ class CoverPalette {
       }
       final (seed, sourceColor) = await compute(_seedAndSourceColor, (
         colors,
-        premultiplied!,
+        colors == null ? premultiplied : null,
         straight,
       ));
       final scheme = ColorScheme.fromSeed(

@@ -27,7 +27,7 @@ replacing them.
 | `lib/theme/material_symbols.dart` | Material Symbols Rounded counterparts of `Icons.*` for the Material style |
 | `lib/theme/material_expressive.dart` | `materialExpressiveEnabled` and `MaterialExpressiveScope`, the bridge to the Material UI and Material 3 Expressive packages |
 | `lib/theme/app_motion.dart` | `AppMotionSpec`, `SpringCurve` and `AppMotion` spring presets |
-| `lib/theme/cover_palette.dart` | `CoverPalette`, `HeaderPalette` and `CoverPaletteBuilder`: colors extracted from artwork |
+| `lib/theme/cover_palette.dart` | `CoverPalette`, `HeaderPalette`, `CoverPaletteBuilder` and `CoverSourceColorBuilder`: colors extracted from artwork |
 | `lib/theme/player_artwork_theme.dart` | `PlayerArtworkTheme`: the current track's artwork scheme for the Material player surfaces, through a local `Theme` |
 
 ## How a Theme Is Built
