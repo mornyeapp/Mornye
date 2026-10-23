@@ -1037,62 +1037,69 @@ extension _QueueTabItemWidgets on _QueueTabState {
         context.tokens.coverList,
       ),
     );
-    final subtitle = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        // The history service is where the audio was downloaded from;
-        // artist lookups use the user's search provider instead.
-        ClickableArtistName(
-          artistName: item.artistName,
-          coverUrl: item.coverUrl,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: Theme.of(
-            context,
-          ).textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
-        ),
-        const SizedBox(height: 2),
-        Row(
+    // The text reads the row's supporting colour, which follows the fill of
+    // the current track; the badges keep their own surfaces.
+    final subtitle = Builder(
+      builder: (context) {
+        final textColor = DefaultTextStyle.of(context).style.color;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              padding: context.tokens.badgePadding,
-              decoration: BoxDecoration(
-                color: sourceColor,
-                borderRadius: context.tokens.borderRadiusBadge,
-              ),
-              child: Text(
-                sourceLabel,
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: sourceTextColor,
-                  fontSize: context.tokens.badgeFontSize,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Flexible(
-              child: Text(
-                dateStr,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ),
-            if (quality != null && quality.isNotEmpty) ...[
-              const SizedBox(width: 8),
-              _buildLibraryQualityBadge(
+            // The history service is where the audio was downloaded from;
+            // artist lookups use the user's search provider instead.
+            ClickableArtistName(
+              artistName: item.artistName,
+              coverUrl: item.coverUrl,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(
                 context,
-                colorScheme,
-                quality,
-                listStyle: true,
-              ),
-            ],
+              ).textTheme.bodySmall?.copyWith(color: textColor),
+            ),
+            const SizedBox(height: 2),
+            Row(
+              children: [
+                Container(
+                  padding: context.tokens.badgePadding,
+                  decoration: BoxDecoration(
+                    color: sourceColor,
+                    borderRadius: context.tokens.borderRadiusBadge,
+                  ),
+                  child: Text(
+                    sourceLabel,
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: sourceTextColor,
+                      fontSize: context.tokens.badgeFontSize,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    dateStr,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(
+                      context,
+                    ).textTheme.labelSmall?.copyWith(color: textColor),
+                  ),
+                ),
+                if (quality != null && quality.isNotEmpty) ...[
+                  const SizedBox(width: 8),
+                  _buildLibraryQualityBadge(
+                    context,
+                    colorScheme,
+                    quality,
+                    listStyle: true,
+                  ),
+                ],
+              ],
+            ),
           ],
-        ),
-      ],
+        );
+      },
     );
     final trailing = ValueListenableBuilder<bool>(
       valueListenable: fileExistsListenable,

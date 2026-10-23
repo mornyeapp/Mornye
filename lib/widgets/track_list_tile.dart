@@ -99,13 +99,11 @@ class TrackListTile extends ConsumerWidget {
                 extensionId: track.source,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(color: colorScheme.onSurfaceVariant),
               )
             : Text(
                 track.artistName,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(color: colorScheme.onSurfaceVariant),
               ),
         badges: [
           ...buildQualityBadges(

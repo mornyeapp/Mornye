@@ -19,7 +19,6 @@ class AlbumTrackTile extends StatelessWidget {
     required this.subtitle,
     required this.isSelectionMode,
     required this.isSelected,
-    required this.colorScheme,
     required this.onToggleSelection,
     required this.onOpen,
     required this.onEnterSelectionMode,
@@ -33,7 +32,6 @@ class AlbumTrackTile extends StatelessWidget {
   final Widget subtitle;
   final bool isSelectionMode;
   final bool isSelected;
-  final ColorScheme colorScheme;
   final VoidCallback onToggleSelection;
   final VoidCallback onOpen;
   final VoidCallback onEnterSelectionMode;
@@ -57,12 +55,10 @@ class AlbumTrackTile extends StatelessWidget {
       onLongPress: isSelectionMode ? null : onEnterSelectionMode,
       leading: SizedBox(
         width: 24,
+        // Takes the row's supporting colour, which follows a current fill.
         child: Text(
           trackNumber?.toString() ?? '-',
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: colorScheme.onSurfaceVariant,
-            fontWeight: FontWeight.w500,
-          ),
+          style: const TextStyle(fontWeight: FontWeight.w500),
           textAlign: TextAlign.center,
         ),
       ),

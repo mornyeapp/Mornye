@@ -1,5 +1,6 @@
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/l10n/app_localizations.dart';
@@ -389,6 +390,57 @@ void main() {
       expect(_scheme(tester, find.text('Other')).primary, isNot(cover.primary));
     });
 
+    testWidgets('text and controls on the fill take its content colour', (
+      tester,
+    ) async {
+      // A black and white cover fills the row with a container close to
+      // the app's supporting colour, which would hide uncoloured text.
+      final cover = ColorScheme.fromSeed(
+        seedColor: Colors.grey,
+        brightness: Brightness.dark,
+        dynamicSchemeVariant: DynamicSchemeVariant.monochrome,
+      );
+      PlayerArtworkTheme.debugPalette = _CachedPalette(cover);
+      addTearDown(() => PlayerArtworkTheme.debugPalette = null);
+      Widget row(String title, String number, {bool current = false}) =>
+          TrackCard(
+            leading: Text(number),
+            title: title,
+            subtitle: Text('$title artist'),
+            trailing: Icon(Icons.more_vert, key: ValueKey(title)),
+            isCurrent: current,
+          );
+      await tester.pumpWidget(
+        _app(
+          Column(
+            children: [row('Song', '1', current: true), row('Other', '2')],
+          ),
+          currentId: 'media',
+          artUri: 'https://example.com/cover.jpg',
+        ),
+      );
+      await _pumpFor(tester, _settle);
+
+      Color? textColor(String text) => tester
+          .renderObject<RenderParagraph>(find.text(text))
+          .text
+          .style
+          ?.color;
+      ColorScheme trailing(String title) =>
+          _scheme(tester, find.byKey(ValueKey(title)));
+
+      expect(textColor('Song artist'), cover.onPrimaryContainer);
+      expect(textColor('1'), cover.onPrimaryContainer);
+      expect(trailing('Song').onSurfaceVariant, cover.onPrimaryContainer);
+      expect(trailing('Song').primary, cover.onPrimaryContainer);
+      expect(trailing('Song').onPrimary, cover.primaryContainer);
+      // Other rows keep the app's supporting colour.
+      final app = _scheme(tester, find.text('Other'));
+      expect(textColor('Other artist'), app.onSurfaceVariant);
+      expect(textColor('2'), app.onSurfaceVariant);
+      expect(trailing('Other'), app);
+    });
+
     testWidgets('reduced motion switches the shape in place', (tester) async {
       // The route caches its page, so the change comes from inside it.
       final current = ValueNotifier(false);
@@ -501,7 +553,6 @@ void main() {
       subtitle: const Text('Artist'),
       isSelectionMode: false,
       isSelected: false,
-      colorScheme: AppTheme.light().colorScheme,
       onToggleSelection: () {},
       onOpen: () {},
       onEnterSelectionMode: () {},

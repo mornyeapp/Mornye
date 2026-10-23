@@ -548,7 +548,7 @@ class _LocalAlbumScreenState extends ConsumerState<LocalAlbumScreen>
               child: StaggeredListItem(
                 index: index,
                 animate: widget.loadTracks == null,
-                child: _buildTrackItem(context, colorScheme, track),
+                child: _buildTrackItem(context, track),
               ),
             );
           }, childCount: discTracks.length),
@@ -673,11 +673,7 @@ class _LocalAlbumScreenState extends ConsumerState<LocalAlbumScreen>
     );
   }
 
-  Widget _buildTrackItem(
-    BuildContext context,
-    ColorScheme colorScheme,
-    LocalLibraryItem track,
-  ) {
+  Widget _buildTrackItem(BuildContext context, LocalLibraryItem track) {
     return Consumer(
       builder: (context, ref, _) {
         final isCurrent = ref.watch(
@@ -698,30 +694,19 @@ class _LocalAlbumScreenState extends ConsumerState<LocalAlbumScreen>
                   track.artistName,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: colorScheme.onSurfaceVariant),
                 ),
               ),
               if (track.format != null) ...[
-                Text(
-                  ' • ',
-                  style: TextStyle(
-                    color: colorScheme.onSurfaceVariant,
-                    fontSize: 12,
-                  ),
-                ),
+                const Text(' • ', style: TextStyle(fontSize: 12)),
                 Text(
                   track.format!.toUpperCase(),
-                  style: TextStyle(
-                    color: colorScheme.onSurfaceVariant,
-                    fontSize: 12,
-                  ),
+                  style: const TextStyle(fontSize: 12),
                 ),
               ],
             ],
           ),
           isSelectionMode: isSelectionMode,
           isSelected: selectedIds.contains(track.id),
-          colorScheme: colorScheme,
           onToggleSelection: () => toggleSelection(track.id),
           onOpen: () => _openMetadata(track),
           onEnterSelectionMode: () => enterSelectionMode(track.id),

@@ -1064,7 +1064,6 @@ class _CollectionTrackTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final track = entry.track;
-    final colorScheme = Theme.of(context).colorScheme;
     final rawCoverUrl = _resolveRawCoverUrl(track);
     final localCoverUrl = rawCoverUrl == null
         ? ref
@@ -1154,7 +1153,6 @@ class _CollectionTrackTile extends ConsumerWidget {
               track.artistName,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(color: colorScheme.onSurfaceVariant),
             ),
           ),
           if (isInLocalLibrary || isInHistory) ...[
@@ -1163,26 +1161,33 @@ class _CollectionTrackTile extends ConsumerWidget {
           ],
         ],
       ),
+      // The button reads its colours inside the row, which follow the fill
+      // of the current track.
       trailing: isInHistory || isInLocalLibrary
-          ? AppIconButton(
-              tooltip: isPlaying
-                  ? context.l10n.actionPause
-                  : context.l10n.tooltipPlay,
-              onPressed: isCurrent
-                  ? () => ref
-                        .read(musicPlayerControllerProvider)
-                        .togglePlayPause(isPlaying)
-                  : () => _playFromHere(context, ref),
-              icon: Icon(
-                isPlaying ? Icons.pause : Icons.play_arrow,
-                color: colorScheme.primary,
-              ),
-              style: IconButton.styleFrom(
-                minimumSize: Size.square(context.tokens.minTouchTarget),
-                backgroundColor: colorScheme.primaryContainer.withValues(
-                  alpha: 0.3,
-                ),
-              ),
+          ? Builder(
+              builder: (context) {
+                final colorScheme = Theme.of(context).colorScheme;
+                return AppIconButton(
+                  tooltip: isPlaying
+                      ? context.l10n.actionPause
+                      : context.l10n.tooltipPlay,
+                  onPressed: isCurrent
+                      ? () => ref
+                            .read(musicPlayerControllerProvider)
+                            .togglePlayPause(isPlaying)
+                      : () => _playFromHere(context, ref),
+                  icon: Icon(
+                    isPlaying ? Icons.pause : Icons.play_arrow,
+                    color: colorScheme.primary,
+                  ),
+                  style: IconButton.styleFrom(
+                    minimumSize: Size.square(context.tokens.minTouchTarget),
+                    backgroundColor: colorScheme.primaryContainer.withValues(
+                      alpha: 0.3,
+                    ),
+                  ),
+                );
+              },
             )
           : null,
       onTap: isSelectionMode

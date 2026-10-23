@@ -598,13 +598,7 @@ class _DownloadedAlbumScreenState extends ConsumerState<DownloadedAlbumScreen>
               key: ValueKey(track.id),
               child: StaggeredListItem(
                 index: index,
-                child: _buildTrackItem(
-                  context,
-                  colorScheme,
-                  track,
-                  tracks,
-                  index,
-                ),
+                child: _buildTrackItem(context, track, tracks, index),
               ),
             );
           }, childCount: tracks.length),
@@ -639,7 +633,6 @@ class _DownloadedAlbumScreenState extends ConsumerState<DownloadedAlbumScreen>
                 index: discRevealStart + index,
                 child: _buildTrackItem(
                   context,
-                  colorScheme,
                   track,
                   tracks,
                   navigationIndexById[track.id] ?? 0,
@@ -759,7 +752,6 @@ class _DownloadedAlbumScreenState extends ConsumerState<DownloadedAlbumScreen>
 
   Widget _buildTrackItem(
     BuildContext context,
-    ColorScheme colorScheme,
     DownloadHistoryItem track,
     List<DownloadHistoryItem> navigationItems,
     int navigationIndex,
@@ -768,7 +760,6 @@ class _DownloadedAlbumScreenState extends ConsumerState<DownloadedAlbumScreen>
       track.artistName,
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
-      style: TextStyle(color: colorScheme.onSurfaceVariant),
     );
     return _TrackPlaybackBuilder(
       playbackKey: _playbackKey(track),
@@ -780,7 +771,6 @@ class _DownloadedAlbumScreenState extends ConsumerState<DownloadedAlbumScreen>
         isSelected: selectedIds.contains(track.id),
         isCurrent: playback.isCurrent,
         isPlaying: playback.isPlaying,
-        colorScheme: colorScheme,
         onToggleSelection: () => toggleSelection(track.id),
         onOpen: () => _navigateToMetadataScreen(
           track,
