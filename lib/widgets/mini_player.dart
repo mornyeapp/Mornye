@@ -142,11 +142,11 @@ class _MiniPlayerBodyState extends ConsumerState<_MiniPlayerBody> {
     final expressive = materialExpressiveEnabled(context);
     final compact = mornye && widget.compact;
     // Frosted and flat glass levels run on constrained Android hardware. They
-    // skip keeping a paused video decoder for the full player's motion cover,
-    // and stop the title marquee after a few passes: every marquee frame
-    // re-filters the blurred chrome around it.
+    // skip keeping a paused video decoder for the full player's motion cover.
     final fullEffects = !mornye || ref.watch(mornyeLiquidGlassProvider);
-    final marqueeCycles = fullEffects ? null : 2;
+    // Every marquee frame re-filters the glass chrome around it, so Mornye
+    // stops the title after a few passes on every glass level.
+    final marqueeCycles = mornye ? 2 : null;
     if (mornye &&
         fullEffects &&
         ref.watch(settingsProvider.select((s) => s.motionArtworkEnabled)) &&
