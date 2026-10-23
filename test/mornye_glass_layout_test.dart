@@ -27,7 +27,7 @@ void main() {
             home: Scaffold(
               body: Column(
                 children: [
-                  MornyeGlass(
+                  MornyeGlass.navigation(
                     blurEnabled: true,
                     child: Builder(
                       builder: (context) {

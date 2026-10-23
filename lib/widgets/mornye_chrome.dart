@@ -140,23 +140,6 @@ class MornyeGlassPanel extends ConsumerWidget {
 /// Bounded glass: Impeller lenses refract a blurred backdrop, while frosted
 /// surfaces share ordinary blur passes. Foreground content stays above glass.
 class MornyeGlass extends ConsumerWidget {
-  const MornyeGlass({
-    super.key,
-    required this.child,
-    required this.blurEnabled,
-    this.radius = 32,
-    this.strongTint = false,
-    this.tintOpacity,
-    this.tintColor,
-    this.highlightBorder = false,
-    this.refractionDepth = 0.30,
-    this.smoothCorners = false,
-    this.highlightIntensity = 1,
-    this.glassProgress = 1,
-  }) : firstInGroup = true,
-       lastInGroup = true,
-       samplesBackdrop = true;
-
   const MornyeGlass.navigation({
     super.key,
     required this.child,

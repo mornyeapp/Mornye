@@ -186,7 +186,7 @@ void main() {
           home: Scaffold(
             body: Column(
               children: [
-                const MornyeGlass(
+                const MornyeGlass.navigation(
                   blurEnabled: true,
                   child: SizedBox(width: 200, height: 50),
                 ),
@@ -417,7 +417,7 @@ void main() {
           home: Scaffold(
             body: Column(
               children: [
-                const MornyeGlass(
+                const MornyeGlass.navigation(
                   blurEnabled: true,
                   child: SizedBox(width: 200, height: 50),
                 ),
