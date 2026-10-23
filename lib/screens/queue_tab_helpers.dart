@@ -57,7 +57,6 @@ class _GroupedLocalAlbum {
 }
 
 class _FilterContentData {
-  final List<DownloadHistoryItem> historyItems;
   final List<UnifiedLibraryItem> unifiedItems;
   final List<UnifiedLibraryItem> filteredUnifiedItems;
   final List<_GroupedAlbum> filteredGroupedAlbums;
@@ -67,7 +66,6 @@ class _FilterContentData {
   final int? totalAlbumCountOverride;
 
   const _FilterContentData({
-    required this.historyItems,
     required this.unifiedItems,
     required this.filteredUnifiedItems,
     required this.filteredGroupedAlbums,
@@ -378,7 +376,6 @@ class _QueueLibraryPageData implements QueueLibraryPageContent {
               )
               .toList(growable: false);
     return _FilterContentData(
-      historyItems: historyItems,
       unifiedItems: items,
       filteredUnifiedItems: filteredItems,
       filteredGroupedAlbums: groupedAlbums,

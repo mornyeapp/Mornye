@@ -348,11 +348,8 @@ class ListeningRewindScreen extends ConsumerWidget {
     final colors = Theme.of(context).colorScheme;
     final background = mornye ? Colors.black : colors.surface;
     final foreground = mornye ? Colors.white : colors.onSurface;
-    Widget message(String text) => _RewindMessage(
-      text: text,
-      background: background,
-      foreground: foreground,
-    );
+    Widget message(String text) =>
+        _RewindMessage(text: text, foreground: foreground);
     return Scaffold(
       backgroundColor: background,
       body: rewind.when(
@@ -367,14 +364,9 @@ class ListeningRewindScreen extends ConsumerWidget {
 }
 
 class _RewindMessage extends StatelessWidget {
-  const _RewindMessage({
-    required this.text,
-    required this.background,
-    required this.foreground,
-  });
+  const _RewindMessage({required this.text, required this.foreground});
 
   final String text;
-  final Color background;
   final Color foreground;
 
   @override
