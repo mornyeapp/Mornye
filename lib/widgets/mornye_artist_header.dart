@@ -76,10 +76,15 @@ class _MornyeArtistSurfaceState extends State<MornyeArtistSurface> {
         imageSource: widget.imageSource,
         builder: (context, palette) {
           final source = widget.imageSource;
+          // Album surfaces use only the source colour, which the player may
+          // already have resolved without a scheme.
           final dominant = HSLColor.fromColor(
             source == null
                 ? Colors.grey
-                : CoverPalette.sourceColor(source, Brightness.dark) ??
+                : (widget.neutralActions
+                          ? CoverPalette.peekSourceColor(source)
+                          : null) ??
+                      CoverPalette.sourceColor(source, Brightness.dark) ??
                       Colors.grey,
           );
           // Averaging a portrait mixes its highlights and foliage into gray.

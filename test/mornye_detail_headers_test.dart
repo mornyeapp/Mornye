@@ -229,6 +229,51 @@ void main() {
     },
   );
 
+  testWidgets('album surface is tinted on its first frame from the player', (
+    tester,
+  ) async {
+    final directory = Directory.systemTemp.createTempSync('album-tint-');
+    addTearDown(() => directory.deleteSync(recursive: true));
+    final cover = File('${directory.path}/cover.png');
+    final source = await tester.runAsync(() async {
+      final recorder = ui.PictureRecorder();
+      Canvas(recorder).drawColor(Colors.teal, BlendMode.src);
+      final picture = recorder.endRecording();
+      final image = await picture.toImage(32, 32);
+      final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+      image.dispose();
+      picture.dispose();
+      await cover.writeAsBytes(bytes!.buffer.asUint8List());
+      // The Mornye player resolves only the source colour, never a scheme.
+      return CoverPalette.resolveSourceColor(cover.path);
+    });
+    expect(CoverPalette.peek(cover.path, Brightness.dark), isNull);
+    final dominant = HSLColor.fromColor(source!);
+    final tinted = dominant
+        .withSaturation((dominant.saturation * 0.45).clamp(0.0, 0.22))
+        .withLightness(0.24 + dominant.lightness * 0.20)
+        .toColor();
+
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          theme: MornyeTheme.build(Brightness.light),
+          home: MornyeArtistSurface(
+            imageSource: cover.path,
+            neutralActions: true,
+            child: const Text('Album action'),
+          ),
+        ),
+      ),
+    );
+    final scheme = Theme.of(
+      tester.element(find.text('Album action')),
+    ).colorScheme;
+    expect(scheme.surface.toARGB32(), tinted.toARGB32());
+    expect(scheme.surface.r, isNot(scheme.surface.b));
+    await tester.pumpWidget(const SizedBox());
+  });
+
   testWidgets('unavailable artist logo keeps the name and actions readable', (
     tester,
   ) async {
