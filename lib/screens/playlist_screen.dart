@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:mornye/screens/track_history_snapshot.dart';
 import 'package:mornye/widgets/album_detail_header.dart';
-import 'package:mornye/widgets/expressive_button_group.dart';
+import 'package:mornye/widgets/collection_header_actions.dart';
 import 'package:mornye/screens/selection_mode_mixin.dart';
 import 'package:mornye/widgets/collection_scaffold.dart';
 import 'package:mornye/widgets/selection_bottom_bar.dart';
@@ -13,7 +12,6 @@ import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/models/track.dart';
 import 'package:mornye/providers/download_queue_provider.dart';
 import 'package:mornye/providers/extension_provider.dart';
-import 'package:mornye/providers/library_collections_provider.dart';
 import 'package:mornye/utils/image_cache_utils.dart';
 import 'package:mornye/utils/cover_art_utils.dart';
 import 'package:mornye/utils/adaptive_layout.dart';
@@ -377,40 +375,25 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen>
           ),
         ],
       ),
-      actions: isDesktopPlatform
-          ? Row(
-              mainAxisSize: MainAxisSize.min,
-              spacing: 10,
-              children: [
-                _buildLoveAllButton(),
-                _buildDownloadAllCenterButton(context),
-                _buildAddToPlaylistButton(context),
-              ],
-            )
-          : context.isMornye
-          ? Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _buildLoveAllButton(),
-                const SizedBox(width: 16),
-                Flexible(
-                  child: SizedBox(
-                    width: 172,
-                    child: _buildDownloadAllCenterButton(context),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                _buildAddToPlaylistButton(context),
-              ],
-            )
-          : ExpressiveButtonGroup(
-              flexible: const {1},
-              children: [
-                _buildLoveAllButton(),
-                _buildDownloadAllCenterButton(context),
-                _buildAddToPlaylistButton(context),
-              ],
-            ),
+      actions: CollectionHeaderActions(
+        tracks: _tracks,
+        onLoveAll: () => loveAllTracks(this.context, ref, _tracks),
+        downloadIcon: Icons.download_rounded,
+        tonalDownload: true,
+        onDownloadAll: () => confirmDownloadAllDialog(
+          context,
+          _tracks.length,
+          () => _downloadAll(context),
+        ),
+        addToPlaylistIcon: Icons.playlist_add,
+        onAddToPlaylist: () => showAddTracksToPlaylistSheet(
+          context,
+          ref,
+          _tracks,
+          playlistNamePrefill: widget.playlistName,
+          preserveOccurrences: true,
+        ),
+      ),
     );
   }
 
@@ -577,77 +560,11 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen>
     );
   }
 
-  Widget _buildLoveAllButton() {
-    return Consumer(
-      builder: (context, ref, _) {
-        ref.watch(libraryCollectionsProvider.select((state) => state.loved));
-        final collectionsState = ref.read(libraryCollectionsProvider);
-        final allLoved =
-            _tracks.isNotEmpty &&
-            _tracks.every((t) => collectionsState.isLoved(t));
-        return HeaderCircleButton(
-          icon: allLoved ? Icons.favorite : Icons.favorite_border,
-          tonal: true,
-          iconColor: allLoved ? Theme.of(context).colorScheme.error : null,
-          tooltip: allLoved
-              ? context.l10n.trackOptionRemoveFromLoved
-              : context.l10n.tooltipLoveAll,
-          onPressed: _tracks.isEmpty ? null : () => _loveAll(_tracks),
-        );
-      },
-    );
-  }
-
-  Widget _buildDownloadAllCenterButton(BuildContext context) {
-    return HeaderFilledButton(
-      icon: context.isMornye
-          ? CupertinoIcons.arrow_down_circle_fill
-          : Icons.download_rounded,
-      tonal: true,
-      label: context.isMornye
-          ? context.l10n.dialogDownload
-          : context.l10n.downloadAllCount(_tracks.length),
-      onPressed: _tracks.isEmpty ? null : () => _confirmDownloadAll(context),
-    );
-  }
-
-  Widget _buildAddToPlaylistButton(BuildContext context) {
-    return HeaderCircleButton(
-      icon: Icons.playlist_add,
-      tonal: true,
-      tooltip: context.l10n.tooltipAddToPlaylist,
-      onPressed: _tracks.isEmpty
-          ? null
-          : () => showAddTracksToPlaylistSheet(
-              context,
-              ref,
-              _tracks,
-              playlistNamePrefill: widget.playlistName,
-              preserveOccurrences: true,
-            ),
-    );
-  }
-
-  void _confirmDownloadAll(BuildContext context) {
-    confirmDownloadAllDialog(
-      context,
-      _tracks.length,
-      () => _downloadAll(context),
-    );
-  }
-
-  Future<void> _loveAll(List<Track> tracks) =>
-      loveAllTracks(context, ref, tracks);
-
-  void _downloadAll(BuildContext context) {
-    _downloadTracks(context, _tracks);
-  }
-
-  Future<void> _downloadTracks(BuildContext context, List<Track> tracks) async {
+  Future<void> _downloadAll(BuildContext context) async {
     await queueTracksSkippingDownloaded(
       context,
       ref,
-      tracks,
+      _tracks,
       artistNameForPicker: _playlistName,
       recommendedService: _recommendedDownloadService(),
       playlistName: _playlistName,
