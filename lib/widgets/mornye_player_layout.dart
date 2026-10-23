@@ -106,6 +106,9 @@ class MornyePlayerLayout extends ConsumerWidget {
       hidden: showLyrics && lyricsControlsHidden && !landscape,
       child: child,
     );
+    // Any rebuild below this builder, such as a position tick, lays it out
+    // and so repaints its parent; what it returns keeps its own layer (the
+    // scroll viewport has one already).
     final body = LayoutBuilder(
       builder: (context, constraints) {
         final screenSize = MediaQuery.sizeOf(context);
@@ -369,18 +372,20 @@ class MornyePlayerLayout extends ConsumerWidget {
         );
 
         if (landscape) {
-          return MornyeLandscapePlayer(
-            page: page,
-            isPlaying: ref.watch(playbackPlayingProvider),
-            controlsHeldOpen: lyricsOptionsOpen,
-            onPageChanged: onPageChanged,
-            artwork: stage(artworkOnly: true),
-            header: _trackHeader(context, colorScheme, compact: true),
-            lyrics: lyricsBuilder(true),
-            lyricsOptions: showLyrics ? lyricsOptions : null,
-            queue: MornyePlayerQueue(colorScheme: colorScheme),
-            controls: controls(),
-            volume: const PlayerVolumeControl(),
+          return RepaintBoundary(
+            child: MornyeLandscapePlayer(
+              page: page,
+              isPlaying: ref.watch(playbackPlayingProvider),
+              controlsHeldOpen: lyricsOptionsOpen,
+              onPageChanged: onPageChanged,
+              artwork: stage(artworkOnly: true),
+              header: _trackHeader(context, colorScheme, compact: true),
+              lyrics: lyricsBuilder(true),
+              lyricsOptions: showLyrics ? lyricsOptions : null,
+              queue: MornyePlayerQueue(colorScheme: colorScheme),
+              controls: controls(),
+              volume: const PlayerVolumeControl(),
+            ),
           );
         }
 
@@ -451,7 +456,7 @@ class MornyePlayerLayout extends ConsumerWidget {
             child: SizedBox(height: minHeight, child: content()),
           );
         }
-        return content();
+        return RepaintBoundary(child: content());
       },
     );
     return PlayerTrackSwipe(

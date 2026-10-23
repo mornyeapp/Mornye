@@ -68,106 +68,109 @@ class PlayerPlaybackControls extends ConsumerWidget {
       textDirection: TextDirection.ltr,
       child: Column(
         children: [
-          ValueListenableBuilder<Duration?>(
-            valueListenable: seekPreview,
-            builder: (context, preview, _) => Consumer(
-              builder: (context, ref, quality) {
-                final position = ref.watch(playbackPositionProvider);
-                final elapsedSeconds = (preview ?? position).inSeconds;
-                return Padding(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: edgeAligned
-                        ? 0
-                        : mornye
-                        ? _mornyeTimelinePadding
-                        : 16,
-                  ),
-                  child: Column(
-                    children: [
-                      SliderTheme(
-                        data: SliderThemeData(
-                          trackHeight: 4,
-                          activeTrackColor: mornye
-                              ? colorScheme.onSurface
-                              : colorScheme.primary,
-                          // Material matches the volume slider's M3 inactive
-                          // track below it.
-                          inactiveTrackColor: mornye
-                              ? colorScheme.onSurface.withValues(alpha: 0.18)
-                              : colorScheme.secondaryContainer,
-                          thumbColor: mornye
-                              ? colorScheme.onSurface
-                              : colorScheme.primary,
-                          // A 7dp thumb was hard to grab; 10dp with a 24dp overlay
-                          // gives the drag gesture a full-size target.
-                          thumbShape: const RoundSliderThumbShape(
-                            enabledThumbRadius: 10,
+          // Position ticks repaint only the timeline.
+          RepaintBoundary(
+            child: ValueListenableBuilder<Duration?>(
+              valueListenable: seekPreview,
+              builder: (context, preview, _) => Consumer(
+                builder: (context, ref, quality) {
+                  final position = ref.watch(playbackPositionProvider);
+                  final elapsedSeconds = (preview ?? position).inSeconds;
+                  return Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: edgeAligned
+                          ? 0
+                          : mornye
+                          ? _mornyeTimelinePadding
+                          : 16,
+                    ),
+                    child: Column(
+                      children: [
+                        SliderTheme(
+                          data: SliderThemeData(
+                            trackHeight: 4,
+                            activeTrackColor: mornye
+                                ? colorScheme.onSurface
+                                : colorScheme.primary,
+                            // Material matches the volume slider's M3 inactive
+                            // track below it.
+                            inactiveTrackColor: mornye
+                                ? colorScheme.onSurface.withValues(alpha: 0.18)
+                                : colorScheme.secondaryContainer,
+                            thumbColor: mornye
+                                ? colorScheme.onSurface
+                                : colorScheme.primary,
+                            // A 7dp thumb was hard to grab; 10dp with a 24dp overlay
+                            // gives the drag gesture a full-size target.
+                            thumbShape: const RoundSliderThumbShape(
+                              enabledThumbRadius: 10,
+                            ),
+                            overlayShape: const RoundSliderOverlayShape(
+                              overlayRadius: 24,
+                            ),
                           ),
-                          overlayShape: const RoundSliderOverlayShape(
-                            overlayRadius: 24,
+                          child: PlaybackSeekSlider(
+                            key: ValueKey(mediaId),
+                            position: position,
+                            duration: duration,
+                            onSeek: controller.seek,
+                            preview: seekPreview,
+                            playing: isPlaying && !isLoading,
+                            edgeAligned: edgeAligned,
                           ),
                         ),
-                        child: PlaybackSeekSlider(
-                          key: ValueKey(mediaId),
-                          position: position,
-                          duration: duration,
-                          onSeek: controller.seek,
-                          preview: seekPreview,
-                          playing: isPlaying && !isLoading,
-                          edgeAligned: edgeAligned,
+                        if (!mornye) const SizedBox(height: 8),
+                        Padding(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: edgeAligned
+                                ? 0
+                                : mornye
+                                ? MornyePlayerSlider.horizontalInset
+                                : 12,
+                          ),
+                          child: Row(
+                            children: [
+                              if (mornye)
+                                MornyePlaybackTime(
+                                  key: ValueKey('elapsed:$mediaId'),
+                                  seconds: elapsedSeconds,
+                                  style: timeStyle,
+                                )
+                              else
+                                Text(
+                                  formatClock(elapsedSeconds),
+                                  style: timeStyle,
+                                ),
+                              Expanded(child: Center(child: quality)),
+                              if (mornye)
+                                MornyePlaybackTime(
+                                  key: ValueKey('remaining:$mediaId'),
+                                  // Subtract whole seconds so both labels roll together,
+                                  // even when the track duration includes milliseconds.
+                                  seconds: (duration.inSeconds - elapsedSeconds)
+                                      .clamp(0, duration.inSeconds),
+                                  remaining: true,
+                                  style: timeStyle,
+                                )
+                              else
+                                Text(
+                                  formatClock(duration.inSeconds),
+                                  style: timeStyle,
+                                ),
+                            ],
+                          ),
                         ),
-                      ),
-                      if (!mornye) const SizedBox(height: 8),
-                      Padding(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: edgeAligned
-                              ? 0
-                              : mornye
-                              ? MornyePlayerSlider.horizontalInset
-                              : 12,
-                        ),
-                        child: Row(
-                          children: [
-                            if (mornye)
-                              MornyePlaybackTime(
-                                key: ValueKey('elapsed:$mediaId'),
-                                seconds: elapsedSeconds,
-                                style: timeStyle,
-                              )
-                            else
-                              Text(
-                                formatClock(elapsedSeconds),
-                                style: timeStyle,
-                              ),
-                            Expanded(child: Center(child: quality)),
-                            if (mornye)
-                              MornyePlaybackTime(
-                                key: ValueKey('remaining:$mediaId'),
-                                // Subtract whole seconds so both labels roll together,
-                                // even when the track duration includes milliseconds.
-                                seconds: (duration.inSeconds - elapsedSeconds)
-                                    .clamp(0, duration.inSeconds),
-                                remaining: true,
-                                style: timeStyle,
-                              )
-                            else
-                              Text(
-                                formatClock(duration.inSeconds),
-                                style: timeStyle,
-                              ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _QualityBadge(metadata: metadata, colorScheme: colorScheme),
-                  const AutoMixStatusBadge(),
-                ],
+                      ],
+                    ),
+                  );
+                },
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _QualityBadge(metadata: metadata, colorScheme: colorScheme),
+                    const AutoMixStatusBadge(),
+                  ],
+                ),
               ),
             ),
           ),

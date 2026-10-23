@@ -7,7 +7,7 @@ import 'package:audio_service/audio_service.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart'
-    show RenderParagraph, RenderRepaintBoundary;
+    show RenderParagraph, RenderRepaintBoundary, debugOnProfilePaint;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -51,6 +51,8 @@ import 'package:mornye/widgets/mini_player.dart';
 import 'package:mornye/widgets/material_player_layout.dart';
 import 'package:mornye/widgets/material_player_backdrop.dart';
 import 'package:mornye/widgets/mornye_player_layout.dart';
+import 'package:mornye/widgets/player_lyrics.dart';
+import 'package:mornye/widgets/player_lyrics_controls.dart';
 import 'package:mornye/widgets/player_metadata_title.dart';
 import 'package:mornye/widgets/playback_seek_slider.dart';
 import 'package:mornye/widgets/player_artwork.dart';
@@ -2456,6 +2458,84 @@ void main() {
     await positionAt(36000);
     expectTimes(36, 144);
     await settlePlayer(tester);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Mornye position ticks and lyric control fades stay local', (
+    tester,
+  ) async {
+    metadataOverrides['lyrics'] = List.generate(
+      20,
+      (index) => '[0${index ~/ 3}:${index % 3 * 2}0.00]Lyric $index',
+    ).join('\n');
+    final playbackEvents = StreamController<PlaybackState>();
+    addTearDown(playbackEvents.close);
+    await pumpNowPlaying(
+      tester,
+      theme: MornyeTheme.build(Brightness.dark),
+      size: const Size(393, 780),
+      playbackEvents: playbackEvents.stream,
+    );
+    mediaItems.add(item('many'));
+    Future<void> positionAt(int milliseconds, {bool playing = false}) async {
+      playbackEvents.add(
+        PlaybackState(
+          processingState: AudioProcessingState.ready,
+          playing: playing,
+          updatePosition: Duration(milliseconds: milliseconds),
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+    }
+
+    await positionAt(10000);
+    await settlePlayer(tester);
+    // The header and transport do not change with the position.
+    final unchanged = {
+      ...tester.renderObjectList(find.text('Second')),
+      ...tester.renderObjectList(find.byType(MornyePlaybackButton)),
+    };
+    var unchangedPaints = 0;
+    var lyricBuilds = 0;
+    debugOnProfilePaint = (object) {
+      if (unchanged.contains(object)) unchangedPaints++;
+    };
+    debugOnRebuildDirtyWidget = (element, _) {
+      if (element.widget is SyncedLyricsView) lyricBuilds++;
+    };
+    try {
+      await positionAt(10500);
+      expect(unchangedPaints, 0);
+      // A new second lays out the digits once, then rolls them in place.
+      await positionAt(11000);
+      await tester.pump(const Duration(milliseconds: 16));
+      unchangedPaints = 0;
+      for (var frame = 0; frame < 10; frame++) {
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      expect(unchangedPaints, 0);
+
+      // Synced lyrics ignore the covered height that animates while the
+      // controls fade out, so only the hiding rebuild reaches the list.
+      await positionAt(20000, playing: true);
+      await tester.tap(findAppIcon(CupertinoIcons.quote_bubble));
+      await settlePlayer(tester);
+      final hidden = find.byWidgetPredicate(
+        (widget) => widget is PlayerLyricsControlsVisibility && widget.hidden,
+      );
+      expect(hidden, findsNothing);
+      lyricBuilds = 0;
+      await tester.pump(const Duration(seconds: 5));
+      for (var frame = 0; frame < 16; frame++) {
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      expect(hidden, findsWidgets);
+      expect(lyricBuilds, lessThanOrEqualTo(1));
+    } finally {
+      debugOnProfilePaint = null;
+      debugOnRebuildDirtyWidget = null;
+    }
     expect(tester.takeException(), isNull);
   });
 

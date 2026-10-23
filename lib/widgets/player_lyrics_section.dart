@@ -50,33 +50,38 @@ class PlayerLyricsSection extends ConsumerWidget {
   }
 
   Widget _buildLyricsSection(BuildContext context, (bool, bool) visibility) {
-    // Center in the part the player's controls leave visible.
-    final covered = LyricsCoveredBottom.of(context);
+    // Center in the part the player's controls leave visible. Only these
+    // states depend on it, so a lyric list does not rebuild as they fade.
     if (metadata.loading || metadata.searchingOnline) {
-      return Padding(
-        padding: EdgeInsets.only(bottom: covered),
-        child: const Center(child: AppLoadingIndicator()),
+      return Builder(
+        builder: (context) => Padding(
+          padding: EdgeInsets.only(bottom: LyricsCoveredBottom.of(context)),
+          child: const Center(child: AppLoadingIndicator()),
+        ),
       );
     }
     if (metadata.lyrics.isEmpty) {
       // Scrolls when a short screen leaves too little room above the
       // controls, so the search button stays reachable.
       return LayoutBuilder(
-        builder: (context, constraints) => SingleChildScrollView(
-          padding: EdgeInsets.only(bottom: covered),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              minWidth: constraints.maxWidth,
-              minHeight: constraints.hasBoundedHeight
-                  ? (constraints.maxHeight - covered).clamp(
-                      0.0,
-                      double.infinity,
-                    )
-                  : 0,
+        builder: (context, constraints) {
+          final covered = LyricsCoveredBottom.of(context);
+          return SingleChildScrollView(
+            padding: EdgeInsets.only(bottom: covered),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                minWidth: constraints.maxWidth,
+                minHeight: constraints.hasBoundedHeight
+                    ? (constraints.maxHeight - covered).clamp(
+                        0.0,
+                        double.infinity,
+                      )
+                    : 0,
+              ),
+              child: Center(child: _noLyrics(context)),
             ),
-            child: Center(child: _noLyrics(context)),
-          ),
-        ),
+          );
+        },
       );
     }
     return _lyricsContent(context, visibility);
