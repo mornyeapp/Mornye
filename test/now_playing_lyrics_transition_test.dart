@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:ui' show ImageFilter;
 import 'dart:ui' as ui;
 
 import 'package:audio_service/audio_service.dart';
@@ -35,6 +34,7 @@ import 'package:mornye/widgets/expressive_icon_button.dart';
 import 'package:mornye/widgets/expressive_playback_transport.dart';
 import 'package:mornye/widgets/expressive_seek_track.dart';
 import 'package:mornye/widgets/player_volume_control.dart';
+import 'package:mornye/widgets/lyric_blur.dart';
 import 'package:mornye/widgets/lyric_gap_indicator.dart';
 import 'package:mornye/widgets/mornye_player_queue.dart';
 import 'package:mornye/widgets/mornye_playback_button.dart';
@@ -1860,15 +1860,15 @@ void main() {
         expect(find.byType(LyricGapIndicator).hitTestable(), findsOneWidget);
         expect(dotAlphas(), expected);
         if (layout != 'material') {
-          final filter = tester.widget<ImageFiltered>(
+          final blur = tester.widget<LyricBlur>(
             find
                 .ancestor(
                   of: find.text(seconds >= 12 ? 'Last vocal' : 'First vocal'),
-                  matching: find.byType(ImageFiltered),
+                  matching: find.byType(LyricBlur),
                 )
                 .first,
           );
-          expect(filter.enabled, isTrue);
+          expect(blur.sigma, greaterThan(0));
         }
       }
 
@@ -1962,14 +1962,14 @@ void main() {
 
     void expectLine(String text, {required bool active}) {
       final line = find.text(text);
-      final filter = tester.widget<ImageFiltered>(
-        find.ancestor(of: line, matching: find.byType(ImageFiltered)).first,
+      final blur = tester.widget<LyricBlur>(
+        find.ancestor(of: line, matching: find.byType(LyricBlur)).first,
       );
       final opacity = tester.widget<AnimatedOpacity>(
         find.ancestor(of: line, matching: find.byType(AnimatedOpacity)).first,
       );
       expect(opacity.opacity, active ? 1 : 0.48);
-      expect(filter.enabled, !active, reason: '$text: ${filter.imageFilter}');
+      expect(blur.sigma > 0, !active, reason: '$text: ${blur.sigma}');
     }
 
     expectLine('First line', active: false);
@@ -2042,21 +2042,24 @@ void main() {
       expect(activeText.style?.fontSize, 34);
       expect(tester.getTopLeft(active).dx, tester.getTopLeft(inactive).dx);
       expect(tester.getTopLeft(active).dx, seekTrackBounds(tester).left);
-      final activeFilters = tester.widgetList<ImageFiltered>(
-        find.ancestor(of: active, matching: find.byType(ImageFiltered)),
+      LyricBlur blur(Finder line) => tester.widget<LyricBlur>(
+        find.ancestor(of: line, matching: find.byType(LyricBlur)),
       );
-      expect(activeFilters.any((filter) => !filter.enabled), isTrue);
-      final inactiveFilters = tester.widgetList<ImageFiltered>(
-        find.ancestor(of: inactive, matching: find.byType(ImageFiltered)),
-      );
-      expect(
-        inactiveFilters.any(
-          (filter) =>
-              filter.enabled &&
-              filter.imageFilter == ImageFilter.blur(sigmaX: 2.4, sigmaY: 2.4),
-        ),
-        isTrue,
-      );
+      RenderLyricBlurSnapshot snapshot(Finder line) =>
+          tester.renderObject<RenderLyricBlurSnapshot>(
+            find.ancestor(
+              of: line,
+              matching: find.byWidgetPredicate(
+                (widget) => widget.runtimeType.toString() == '_BlurSnapshot',
+              ),
+            ),
+          );
+      expect(blur(active).sigma, 0);
+      expect(snapshot(active).debugSnapshot, isNull);
+      // The settled defocused line draws one cached blur instead of a filter.
+      expect(blur(inactive).sigma, 2.4);
+      expect(blur(inactive).settled, isTrue);
+      expect(snapshot(inactive).debugSnapshot, isNotNull);
       expect(tester.takeException(), isNull);
     },
   );

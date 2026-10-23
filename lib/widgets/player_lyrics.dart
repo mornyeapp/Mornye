@@ -19,6 +19,7 @@ import 'package:mornye/utils/lyrics_parser.dart';
 import 'package:mornye/utils/lyrics_timeline.dart';
 import 'package:mornye/utils/synced_lyrics_scroll.dart';
 import 'package:mornye/widgets/aligned_lyric_pronunciation.dart';
+import 'package:mornye/widgets/lyric_blur.dart';
 import 'package:mornye/widgets/lyric_supplement_transition.dart';
 import 'package:mornye/widgets/lyric_scroll_motion.dart';
 import 'package:mornye/widgets/lyric_gap_indicator.dart';
@@ -865,7 +866,7 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
     final blurLyrics =
         mornye &&
         !highContrast &&
-        // Every defocused line is filtered again on each playback frame.
+        // Defocused lines are filtered on every frame while their focus eases.
         ref.watch(mornyeLiquidGlassProvider);
     // Line emphasis eases over most of the scroll, so the new line brightens
     // as it arrives instead of switching ahead of the movement.
@@ -1125,6 +1126,9 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
                 reverseDuration: const Duration(milliseconds: 260),
                 switchInCurve: Curves.easeOutCubic,
                 switchOutCurve: Curves.easeInCubic,
+                transitionBuilder: mornye
+                    ? LyricBlur.fadeTransition
+                    : AnimatedSwitcher.defaultTransitionBuilder,
                 child: KeyedSubtree(
                   key: ValueKey(timed),
                   child: SizedBox(width: double.infinity, child: content),
@@ -1152,11 +1156,11 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
                   tween: Tween(end: sigma),
                   duration: motion,
                   curve: Curves.easeInOutCubic,
-                  child: RepaintBoundary(child: content),
-                  builder: (context, value, child) => ImageFiltered(
-                    enabled: value > 0,
-                    imageFilter: ImageFilter.blur(sigmaX: value, sigmaY: value),
-                    child: child,
+                  child: content,
+                  builder: (context, value, child) => LyricBlur(
+                    sigma: value,
+                    settled: value == sigma,
+                    child: child!,
                   ),
                 );
                 content = FittedBox(
