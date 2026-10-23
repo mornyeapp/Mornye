@@ -386,7 +386,6 @@ class _LibraryTracksFolderScreenState
                     child: _CollectionTrackTile(
                       entry: entry,
                       mode: widget.mode,
-                      playlistId: widget.playlistId,
                       folderTracks: folderTracks,
                       trackIndex: index,
                       isInHistory: isInHistory,
@@ -1043,7 +1042,6 @@ class _LibraryTracksFolderScreenState
 class _CollectionTrackTile extends ConsumerWidget {
   final CollectionTrackEntry entry;
   final LibraryTracksFolderMode mode;
-  final String? playlistId;
   final List<Track> folderTracks;
   final int trackIndex;
   final bool isInHistory;
@@ -1055,7 +1053,6 @@ class _CollectionTrackTile extends ConsumerWidget {
   const _CollectionTrackTile({
     required this.entry,
     required this.mode,
-    required this.playlistId,
     required this.folderTracks,
     required this.trackIndex,
     required this.isInHistory,
