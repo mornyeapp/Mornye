@@ -332,37 +332,28 @@ one.ts
     },
   );
 
-  test(
-    'deadline and failed consumers close their client and loopback server',
-    () async {
-      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-      addTearDown(() => server.close(force: true));
-      server.listen((request) async {
-        request.response.write('video');
-        await request.response.close();
-      });
-      final source = Uri.parse('http://127.0.0.1:${server.port}/cover.mp4');
-      Uri? expired;
-      final client = HttpClient();
-      await expectLater(
-        withMotionArtworkProxy<void>(source, (local) async {
-          expired = local;
-          throw StateError('remux failed');
-        }, client: client),
-        throwsStateError,
-      );
-      await expectLater(fetch(expired!), throwsA(isA<SocketException>()));
-      expect(() => client.getUrl(source), throwsStateError);
-      final proxy = await MotionArtworkProxy.start(
-        source,
-        lifetime: const Duration(milliseconds: 30),
-      );
-      addTearDown(proxy.close);
-      await Future<void>.delayed(const Duration(milliseconds: 60));
-      expect(proxy.isClosed, isTrue);
-      await expectLater(fetch(proxy.source), throwsA(isA<SocketException>()));
-    },
-  );
+  test('deadline and close release their client and loopback server', () async {
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(() => server.close(force: true));
+    server.listen((request) async {
+      request.response.write('video');
+      await request.response.close();
+    });
+    final source = Uri.parse('http://127.0.0.1:${server.port}/cover.mp4');
+    final client = HttpClient();
+    final closed = await MotionArtworkProxy.start(source, client: client);
+    await closed.close();
+    await expectLater(fetch(closed.source), throwsA(isA<SocketException>()));
+    expect(() => client.getUrl(source), throwsStateError);
+    final proxy = await MotionArtworkProxy.start(
+      source,
+      lifetime: const Duration(milliseconds: 30),
+    );
+    addTearDown(proxy.close);
+    await Future<void>.delayed(const Duration(milliseconds: 60));
+    expect(proxy.isClosed, isTrue);
+    await expectLater(fetch(proxy.source), throwsA(isA<SocketException>()));
+  });
 
   test(
     'playlist references cannot enable local file or non-HTTP resources',

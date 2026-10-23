@@ -271,23 +271,3 @@ class MotionArtworkProxy {
       })
       .join('\n');
 }
-
-Future<T> withMotionArtworkProxy<T>(
-  Uri source,
-  Future<T> Function(Uri source) action, {
-  HttpClient? client,
-  int maxBytes = 24 << 20,
-  Duration lifetime = const Duration(seconds: 30),
-}) async {
-  final proxy = await MotionArtworkProxy.start(
-    source,
-    client: client,
-    maxBytes: maxBytes,
-    lifetime: lifetime,
-  );
-  try {
-    return await action(proxy.source);
-  } finally {
-    await proxy.close();
-  }
-}
