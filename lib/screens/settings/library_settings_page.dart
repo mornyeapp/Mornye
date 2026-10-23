@@ -232,9 +232,7 @@ class _LibrarySettingsPageState extends ConsumerState<LibrarySettingsPage> {
       confirmLabel: context.l10n.dialogClear,
       cancelIsDefault: true,
       destructive: true,
-      confirmStyle: FilledButton.styleFrom(
-        backgroundColor: Theme.of(context).colorScheme.error,
-      ),
+      errorConfirm: true,
     );
 
     if (confirmed) {
@@ -289,9 +287,7 @@ class _LibrarySettingsPageState extends ConsumerState<LibrarySettingsPage> {
       confirmLabel: context.l10n.dialogRemove,
       cancelIsDefault: true,
       destructive: true,
-      confirmStyle: FilledButton.styleFrom(
-        backgroundColor: Theme.of(context).colorScheme.error,
-      ),
+      errorConfirm: true,
     );
     if (!confirmed) return;
     await ref.read(localLibraryProvider.notifier).removeSource(source.id);
