@@ -14,6 +14,7 @@ import 'package:mornye/services/folder_path_template.dart';
 import 'package:mornye/services/secure_storage_options.dart';
 import 'package:mornye/utils/artist_utils.dart';
 import 'package:mornye/utils/audio_format_utils.dart';
+import 'package:mornye/utils/audio_quality_badge_policy.dart';
 import 'package:mornye/utils/file_access.dart';
 import 'package:mornye/utils/logger.dart';
 
@@ -202,7 +203,7 @@ class SettingsNotifier extends Notifier<AppSettings> {
           defaultLibraryView: _normalizeDefaultLibraryView(
             loaded.defaultLibraryView,
           ),
-          libraryQualityLabelMode: _normalizeLibraryQualityLabelMode(
+          libraryQualityLabelMode: normalizeLibraryQualityLabelMode(
             loaded.libraryQualityLabelMode,
           ),
           autoConvertFormat: normalizeAutoConvertFormat(
@@ -466,22 +467,6 @@ class SettingsNotifier extends Notifier<AppSettings> {
     final normalized = value.trim().toLowerCase();
     if (_libraryViewValues.contains(normalized)) return normalized;
     return 'last';
-  }
-
-  String _normalizeLibraryQualityLabelMode(String value) {
-    return switch (value) {
-      AppSettings.libraryQualityLabelFileFormat =>
-        AppSettings.libraryQualityLabelFileFormat,
-      AppSettings.libraryQualityLabelBitDepthOnly =>
-        AppSettings.libraryQualityLabelBitDepthOnly,
-      AppSettings.libraryQualityLabelBitDepth =>
-        AppSettings.libraryQualityLabelBitDepth,
-      AppSettings.libraryQualityLabelBitDepthBitrate =>
-        AppSettings.libraryQualityLabelBitDepthBitrate,
-      AppSettings.libraryQualityLabelBitrate =>
-        AppSettings.libraryQualityLabelBitrate,
-      _ => AppSettings.libraryQualityLabelBitDepthOnly,
-    };
   }
 
   String _normalizeExtensionVerificationBrowserMode(String value) {
@@ -976,7 +961,7 @@ class SettingsNotifier extends Notifier<AppSettings> {
 
   void setLibraryQualityLabelMode(String mode) {
     state = state.copyWith(
-      libraryQualityLabelMode: _normalizeLibraryQualityLabelMode(mode),
+      libraryQualityLabelMode: normalizeLibraryQualityLabelMode(mode),
     );
     _saveSettings();
   }
