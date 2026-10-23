@@ -6,13 +6,19 @@ import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/models/track.dart';
 import 'package:mornye/providers/download_queue_provider.dart';
 import 'package:mornye/providers/library_collections_provider.dart';
+import 'package:mornye/providers/local_library_provider.dart';
 import 'package:mornye/providers/music_player_provider.dart';
+import 'package:mornye/providers/player_motion_artwork_provider.dart';
 import 'package:mornye/providers/recent_access_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/providers/track_provider.dart';
 import 'package:mornye/screens/album_screen.dart';
 import 'package:mornye/screens/artist_screen.dart';
+import 'package:mornye/screens/downloaded_album_screen.dart';
+import 'package:mornye/screens/library_tracks_folder_screen.dart';
+import 'package:mornye/screens/local_album_screen.dart';
 import 'package:mornye/screens/playlist_screen.dart';
+import 'package:mornye/services/library_database.dart';
 import 'package:mornye/theme/app_theme.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -43,9 +49,67 @@ final _albums = [
     ),
 ];
 
+final _downloaded = [
+  for (var i = 0; i < 30; i++)
+    DownloadHistoryItem(
+      id: 'example-download-$i',
+      trackName: 'Example song $i',
+      artistName: 'Example artist',
+      albumName: 'Example album',
+      filePath: '/music/example-$i.flac',
+      service: 'example',
+      downloadedAt: DateTime(2026),
+      trackNumber: i + 1,
+    ),
+];
+
+final _local = [
+  for (var i = 0; i < 30; i++)
+    LocalLibraryItem(
+      id: 'example-local-$i',
+      trackName: 'Example song $i',
+      artistName: 'Example artist',
+      albumName: 'Example album',
+      filePath: '/music/example-$i.flac',
+      scannedAt: DateTime(2026),
+      trackNumber: i + 1,
+    ),
+];
+
 class _Collections extends LibraryCollectionsNotifier {
   @override
-  LibraryCollectionsState build() => LibraryCollectionsState(isLoaded: true);
+  LibraryCollectionsState build() => LibraryCollectionsState(
+    isLoaded: true,
+    playlists: [
+      UserPlaylistCollection(
+        id: 'example-playlist',
+        name: 'Example playlist',
+        createdAt: DateTime(2026),
+        updatedAt: DateTime(2026),
+        tracks: [
+          for (final track in _tracks)
+            CollectionTrackEntry(
+              key: track.id,
+              track: track,
+              addedAt: DateTime(2026),
+            ),
+        ],
+      ),
+    ],
+  );
+
+  @override
+  Future<void> ensurePlaylistLoaded(String playlistId) async {}
+}
+
+class _Library extends LocalLibraryNotifier {
+  @override
+  LocalLibraryState build() => LocalLibraryState();
+}
+
+class _History extends DownloadHistoryNotifier {
+  @override
+  DownloadHistoryState build() => DownloadHistoryState();
 }
 
 class _Recent extends RecentAccessNotifier {
@@ -82,7 +146,14 @@ List<double> _titleOpacities(WidgetTester tester) => [
 ];
 
 void main() {
-  for (final page in ['album', 'playlist', 'artist']) {
+  for (final page in [
+    'album',
+    'playlist',
+    'artist',
+    'downloaded album',
+    'local album',
+    'library folder',
+  ]) {
     for (final mornye in [false, true]) {
       testWidgets('$page title flip leaves the page unbuilt in '
           'Mornye=$mornye', (tester) async {
@@ -109,6 +180,23 @@ void main() {
             downloadHistoryVisibleBatchExistsProvider.overrideWith(
               (ref, request) => const <String>{},
             ),
+            downloadedAlbumTracksProvider(
+              const DownloadedAlbumTracksRequest(
+                albumName: 'Example album',
+                artistName: 'Example artist',
+              ),
+            ).overrideWith((ref) async => _downloaded),
+            localLibraryProvider.overrideWith(_Library.new),
+            downloadHistoryProvider.overrideWith(_History.new),
+            localLibraryCoverProvider.overrideWith(
+              (ref, request) async => null,
+            ),
+            localLibraryFirstCoverProvider.overrideWith(
+              (ref, request) async => null,
+            ),
+            playerMotionArtworkProvider.overrideWith(
+              (ref, album) async => null,
+            ),
           ],
         );
         addTearDown(container.dispose);
@@ -122,13 +210,28 @@ void main() {
             playlistName: 'Example playlist',
             tracks: _tracks,
           ),
-          _ => ArtistScreen(
+          'artist' => ArtistScreen(
             artistId: 'example-artist',
             artistName: 'Example artist',
             albums: _albums,
             topTracks: _tracks.take(10).toList(),
           ),
+          'downloaded album' => const DownloadedAlbumScreen(
+            albumName: 'Example album',
+            artistName: 'Example artist',
+          ),
+          'local album' => LocalAlbumScreen(
+            albumName: 'Example album',
+            artistName: 'Example artist',
+            tracks: _local,
+          ),
+          _ => const LibraryTracksFolderScreen(
+            mode: LibraryTracksFolderMode.playlist,
+            playlistId: 'example-playlist',
+          ),
         };
+        // The Mornye folder header always shows its toolbar title.
+        final fades = !(mornye && page == 'library folder');
         await tester.pumpWidget(
           UncontrolledProviderScope(
             container: container,
@@ -171,16 +274,18 @@ void main() {
         await scrollTo(0);
 
         expect(pageBuilds, 0);
-        expect(shown, isNot(equals(hidden)));
         expect(_titleOpacities(tester), hidden);
-        // The title fades through intermediate frames both ways.
-        expect(
-          frames.where(
-            (opacities) =>
-                opacities.any((opacity) => opacity > 0 && opacity < 1),
-          ),
-          isNotEmpty,
-        );
+        if (fades) {
+          expect(shown, isNot(equals(hidden)));
+          // The title fades through intermediate frames both ways.
+          expect(
+            frames.where(
+              (opacities) =>
+                  opacities.any((opacity) => opacity > 0 && opacity < 1),
+            ),
+            isNotEmpty,
+          );
+        }
         expect(tester.takeException(), isNull);
         await tester.pumpWidget(const SizedBox());
       });

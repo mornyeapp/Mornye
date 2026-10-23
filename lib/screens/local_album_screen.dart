@@ -24,7 +24,7 @@ import 'package:mornye/providers/local_library_provider.dart';
 import 'package:mornye/providers/playback_provider.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/player_motion_artwork_provider.dart';
-import 'package:mornye/screens/collapsing_header_scroll_mixin.dart';
+import 'package:mornye/controllers/collapsing_header_scroll_mixin.dart';
 import 'package:mornye/screens/selection_mode_mixin.dart';
 import 'package:mornye/screens/track_metadata_screen.dart';
 import 'package:mornye/widgets/collection_scaffold.dart';
@@ -92,6 +92,9 @@ class _LocalAlbumScreenState extends ConsumerState<LocalAlbumScreen>
   bool get _hasMultipleDiscsCache => _trackOrder.discGroups.length > 1;
   String? _commonQualityCache;
   String? _commonQualityModeCache;
+
+  @override
+  bool get rebuildsOnTitleFlip => false;
 
   @override
   void initState() {
@@ -361,7 +364,8 @@ class _LocalAlbumScreenState extends ConsumerState<LocalAlbumScreen>
       immersive: context.isMornye,
       squareArtwork: motion == null,
       expandedHeight: expandedHeight,
-      showTitleInAppBar: showTitleInAppBar,
+      showTitleInAppBar: false,
+      showTitleListenable: showTitleNotifier,
       background: motion == null
           ? background
           : MotionHeaderBanner(videoUrl: motion.source, fallback: background),

@@ -36,7 +36,7 @@ import 'package:mornye/providers/local_library_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/utils/adaptive_layout.dart';
 import 'package:mornye/utils/cover_art_utils.dart';
-import 'package:mornye/screens/collapsing_header_scroll_mixin.dart';
+import 'package:mornye/controllers/collapsing_header_scroll_mixin.dart';
 import 'package:mornye/screens/selection_mode_mixin.dart';
 import 'package:mornye/controllers/library_tracks_folder_data.dart';
 import 'package:mornye/screens/track_metadata_screen.dart';
@@ -79,6 +79,9 @@ class _LibraryTracksFolderScreenState
         CollapsingHeaderScrollMixin<LibraryTracksFolderScreen> {
   UserPlaylistCollection? playlist;
   final _folderData = LibraryTracksFolderData();
+
+  @override
+  bool get rebuildsOnTitleFlip => false;
 
   @override
   void initState() {
@@ -721,7 +724,8 @@ class _LibraryTracksFolderScreenState
           ? context.l10n.selectionSelected(selectedIds.length)
           : title,
       expandedHeight: expandedHeight,
-      showTitleInAppBar: showTitleInAppBar,
+      showTitleInAppBar: false,
+      showTitleListenable: showTitleNotifier,
       background: background,
       paletteSource: coverUrl,
       blurAndScrimBackground: hasCustomCover || hasCoverUrl,
