@@ -1,9 +1,11 @@
 import 'dart:math' as math;
 
 import 'package:flutter/gestures.dart' show DragStartBehavior;
+import 'package:flutter/semantics.dart' show SemanticsRole;
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:material_3_expressive/components/progress_indicators/components/m3e_linear_progress_painter.dart';
 import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/widgets/app_icon.dart';
@@ -23,6 +25,7 @@ import 'package:mornye/screens/now_playing_screen.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/utils/string_utils.dart';
 import 'package:mornye/widgets/audio_quality_badges.dart';
+import 'package:mornye/widgets/decorative_phase.dart';
 import 'package:mornye/widgets/overflow_marquee.dart';
 import 'package:mornye/widgets/player_artwork.dart';
 import 'package:mornye/widgets/settings_group.dart';
@@ -404,25 +407,111 @@ class _MiniPlayerProgress extends ConsumerWidget {
       context,
       const AppMotionSpec(Duration(milliseconds: 300), Curves.easeOut),
     );
-    // The wave settles flat while paused; its ticker stops once flat so an
-    // idle mini player does not repaint every frame.
+    // The wave settles flat while paused and stops moving once flat.
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
       child: TweenAnimationBuilder<double>(
         tween: Tween(end: playing ? 1 : 0),
         duration: motion.duration,
         curve: motion.curve,
-        builder: (context, amplitude, _) => TickerMode(
-          enabled: amplitude > 0,
-          child: MaterialExpressiveScope(
-            child: M3EProgressIndicator.linearWavy(
-              value: progress,
-              linearSize: M3EProgressIndicatorSize.s,
-              trackColor: backgroundColor,
-              // Taper toward both ends instead of the theme's hard cutoff.
-              amplitudeForProgress: (value) =>
-                  amplitude *
-                  (math.min(value, 1 - value) / 0.05).clamp(0.0, 1.0),
+        builder: (context, amplitude, _) => MaterialExpressiveScope(
+          child: _MiniPlayerWave(
+            progress: progress,
+            trackColor: backgroundColor,
+            amplitude: amplitude,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// `M3EProgressIndicator.linearWavy` at the small size, with the wave moved
+/// by a [DecorativePhase] instead of a ticker on every display refresh.
+class _MiniPlayerWave extends StatefulWidget {
+  const _MiniPlayerWave({
+    required this.progress,
+    required this.trackColor,
+    required this.amplitude,
+  });
+
+  final double progress;
+  final Color trackColor;
+  final double amplitude;
+
+  @override
+  State<_MiniPlayerWave> createState() => _MiniPlayerWaveState();
+}
+
+class _MiniPlayerWaveState extends State<_MiniPlayerWave> {
+  // The package's wave travels one wavelength per second.
+  final _phase = DecorativePhase(const Duration(seconds: 1));
+  bool _visible = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _visible = TickerMode.valuesOf(context).enabled;
+    _sync();
+  }
+
+  @override
+  void didUpdateWidget(_MiniPlayerWave oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _sync();
+  }
+
+  void _sync() =>
+      _visible && widget.amplitude > 0 ? _phase.start() : _phase.stop();
+
+  @override
+  void dispose() {
+    _phase.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = M3ETheme.of(context);
+    final linear = theme.progressIndicatorTheme.linear;
+    final layout = linear.resolveFlat(M3EProgressIndicatorSize.s);
+    final progress = widget.progress;
+    // Taper toward both ends instead of the theme's hard cutoff.
+    final amplitude =
+        (widget.amplitude *
+                (math.min(progress, 1 - progress) / 0.05).clamp(0.0, 1.0))
+            .clamp(0.0, 1.0);
+    return Semantics(
+      role: SemanticsRole.progressBar,
+      minValue: '0',
+      maxValue: '100',
+      value: '${(progress * 100).round()}%',
+      child: RepaintBoundary(
+        child: SizedBox(
+          height: math.max(
+            layout.trackHeight + 2 * linear.waveAmplitude * amplitude,
+            linear.wavyContainerHeight,
+          ),
+          width: double.infinity,
+          child: ValueListenableBuilder(
+            valueListenable: _phase,
+            builder: (context, phase, _) => CustomPaint(
+              painter: M3ELinearProgressPainter(
+                value: progress,
+                active: linear.activeColor(theme.colorScheme),
+                track: widget.trackColor,
+                strokeWidth: layout.trackHeight,
+                trackStrokeWidth: layout.trackHeight,
+                gap: layout.gap,
+                stopSize: layout.dotDiameter,
+                isWavy: true,
+                waveAmplitude: linear.waveAmplitude,
+                wavelength: linear.determinateWavelength,
+                phase: phase * 2 * math.pi,
+                amplitudeFactor: amplitude,
+                trailingMargin: layout.trailingMargin,
+                textDirection: Directionality.of(context),
+              ),
             ),
           ),
         ),
