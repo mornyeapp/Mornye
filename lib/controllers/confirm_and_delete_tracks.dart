@@ -26,31 +26,19 @@ Future<int?> confirmAndDeleteTracks({
   Future<void> Function(List<String> ids)? persistDeletedItems,
   required VoidCallback onExitSelectionMode,
 }) async {
-  final confirmed = await showAppDialog<bool>(
-    context: context,
-    builder: (ctx) => AppAlertDialog(
-      title: Text(context.l10n.downloadedAlbumDeleteSelected),
-      content: Text(context.l10n.downloadedAlbumDeleteMessage(ids.length)),
-      actions: [
-        AppDialogAction(
-          isDefault: true,
-          onPressed: () => Navigator.pop(ctx, false),
-          child: Text(context.l10n.dialogCancel),
-        ),
-        AppDialogAction(
-          filled: true,
-          isDestructive: true,
-          onPressed: () => Navigator.pop(ctx, true),
-          style: FilledButton.styleFrom(
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
-          child: Text(context.l10n.dialogDelete),
-        ),
-      ],
+  final confirmed = await showAppConfirmDialog(
+    context,
+    title: context.l10n.downloadedAlbumDeleteSelected,
+    message: context.l10n.downloadedAlbumDeleteMessage(ids.length),
+    confirmLabel: context.l10n.dialogDelete,
+    destructive: true,
+    cancelIsDefault: true,
+    confirmStyle: FilledButton.styleFrom(
+      backgroundColor: Theme.of(context).colorScheme.error,
     ),
   );
 
-  if (confirmed != true || !context.mounted) return null;
+  if (!confirmed || !context.mounted) return null;
 
   final deletedIds = <String>[];
   try {

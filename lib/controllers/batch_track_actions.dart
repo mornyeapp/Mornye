@@ -195,53 +195,39 @@ Future<void> _performBatchConversion(
 
   final isLossless = isLosslessConversionTarget(targetFormat);
   final losslessLabels = context.l10n.losslessConversionLabels;
-  final confirmed = await showAppDialog<bool>(
-    context: context,
-    builder: (ctx) => AppAlertDialog(
-      title: Text(context.l10n.selectionBatchConvertConfirmTitle),
-      content: Text(
-        keepOriginal
-            ? context.l10n.selectionBatchConvertConfirmKeepOriginal(
-                convertibleItems.length,
-                targetFormat,
-              )
-            : isLossless && losslessQuality.hasCaps
-            ? context.l10n.selectionBatchConvertConfirmMessageLosslessCapped(
-                convertibleItems.length,
-                targetFormat,
-                losslessQualityLabel(
-                  losslessQuality,
-                  originalLabel: losslessLabels.original,
-                  originalQualityLabel: losslessLabels.originalQuality,
-                ),
-              )
-            : isLossless
-            ? context.l10n.selectionBatchConvertConfirmMessageLossless(
-                convertibleItems.length,
-                targetFormat,
-              )
-            : context.l10n.selectionBatchConvertConfirmMessage(
-                convertibleItems.length,
-                targetFormat,
-                bitrate,
-              ),
-      ),
-      actions: [
-        AppDialogAction(
-          onPressed: () => Navigator.pop(ctx, false),
-          child: Text(context.l10n.dialogCancel),
-        ),
-        AppDialogAction(
-          filled: true,
-          isDefault: true,
-          onPressed: () => Navigator.pop(ctx, true),
-          child: Text(context.l10n.trackConvertFormat),
-        ),
-      ],
-    ),
+  final confirmed = await showAppConfirmDialog(
+    context,
+    title: context.l10n.selectionBatchConvertConfirmTitle,
+    message: keepOriginal
+        ? context.l10n.selectionBatchConvertConfirmKeepOriginal(
+            convertibleItems.length,
+            targetFormat,
+          )
+        : isLossless && losslessQuality.hasCaps
+        ? context.l10n.selectionBatchConvertConfirmMessageLosslessCapped(
+            convertibleItems.length,
+            targetFormat,
+            losslessQualityLabel(
+              losslessQuality,
+              originalLabel: losslessLabels.original,
+              originalQualityLabel: losslessLabels.originalQuality,
+            ),
+          )
+        : isLossless
+        ? context.l10n.selectionBatchConvertConfirmMessageLossless(
+            convertibleItems.length,
+            targetFormat,
+          )
+        : context.l10n.selectionBatchConvertConfirmMessage(
+            convertibleItems.length,
+            targetFormat,
+            bitrate,
+          ),
+    confirmLabel: context.l10n.trackConvertFormat,
+    confirmIsDefault: true,
   );
 
-  if (confirmed != true || !context.mounted) return;
+  if (!confirmed || !context.mounted) return;
 
   int successCount = 0;
   final failures = <String>[];
@@ -673,41 +659,22 @@ Future<void> runBatchReplayGain(
 
   onConfirmOpen?.call();
 
-  final confirmed = await showAppDialog<bool>(
-    context: context,
-    builder: (ctx) => AppAlertDialog(
-      title: Text(
-        remove
-            ? ctx.l10n.trackRemoveReplayGain
-            : ctx.l10n.replayGainBatchConfirmTitle,
-      ),
-      content: Text(
-        remove
-            ? ctx.l10n.replayGainRemoveConfirmMessage(selectedItems.length)
-            : ctx.l10n.replayGainBatchConfirmMessage(selectedItems.length),
-      ),
-      actions: [
-        AppDialogAction(
-          onPressed: () => Navigator.pop(ctx, false),
-          child: Text(ctx.l10n.dialogCancel),
-        ),
-        AppDialogAction(
-          filled: true,
-          isDefault: true,
-          onPressed: () => Navigator.pop(ctx, true),
-          child: Text(
-            remove
-                ? ctx.l10n.trackRemoveReplayGain
-                : ctx.l10n.replayGainBatchConfirmTitle,
-          ),
-        ),
-      ],
-    ),
+  final title = remove
+      ? context.l10n.trackRemoveReplayGain
+      : context.l10n.replayGainBatchConfirmTitle;
+  final confirmed = await showAppConfirmDialog(
+    context,
+    title: title,
+    message: remove
+        ? context.l10n.replayGainRemoveConfirmMessage(selectedItems.length)
+        : context.l10n.replayGainBatchConfirmMessage(selectedItems.length),
+    confirmLabel: title,
+    confirmIsDefault: true,
   );
 
-  await onConfirmClosed?.call(confirmed == true);
+  await onConfirmClosed?.call(confirmed);
 
-  if (confirmed != true || !context.mounted) return;
+  if (!confirmed || !context.mounted) return;
 
   var cancelled = false;
   int successCount = 0;

@@ -124,30 +124,19 @@ extension _TrackMetadataFileActions on _TrackMetadataScreenState {
     if (_isDeleting) return;
     final filePath = cleanFilePath;
     final cueItem = _isCueVirtualTrack ? _localLibraryItem : null;
-    final confirmed = await showAppDialog<bool>(
-      context: screenContext,
-      builder: (dialogContext) => AppAlertDialog(
-        title: Text(dialogContext.l10n.trackDeleteConfirmTitle),
-        content: Text(
-          _isNetworkItem
-              ? dialogContext.l10n.trackDeleteNetworkConfirmMessage
-              : dialogContext.l10n.trackDeleteConfirmMessage,
-        ),
-        actions: [
-          AppDialogAction(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: Text(dialogContext.l10n.dialogCancel),
-          ),
-          AppDialogAction(
-            isDestructive: true,
-            onPressed: () => Navigator.pop(dialogContext, true),
-            style: TextButton.styleFrom(foregroundColor: colorScheme.error),
-            child: Text(dialogContext.l10n.dialogDelete),
-          ),
-        ],
-      ),
+    final l10n = screenContext.l10n;
+    final confirmed = await showAppConfirmDialog(
+      screenContext,
+      title: l10n.trackDeleteConfirmTitle,
+      message: _isNetworkItem
+          ? l10n.trackDeleteNetworkConfirmMessage
+          : l10n.trackDeleteConfirmMessage,
+      confirmLabel: l10n.dialogDelete,
+      destructive: true,
+      filled: false,
+      confirmStyle: TextButton.styleFrom(foregroundColor: colorScheme.error),
     );
-    if (confirmed != true || !mounted || filePath != cleanFilePath) return;
+    if (!confirmed || !mounted || filePath != cleanFilePath) return;
     _isDeleting = true;
     final container = ProviderScope.containerOf(context, listen: false);
     try {

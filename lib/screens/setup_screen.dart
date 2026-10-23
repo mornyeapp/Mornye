@@ -255,7 +255,7 @@ class _SetupScreenState extends ConsumerState<SetupScreen>
           var manageStatus = await Permission.manageExternalStorage.status;
           if (!manageStatus.isGranted) {
             final shouldOpen = await _showAndroid11StorageDialog();
-            if (shouldOpen == true) {
+            if (shouldOpen) {
               await Permission.manageExternalStorage.request();
               await Future<void>.delayed(const Duration(milliseconds: 500));
               manageStatus = await Permission.manageExternalStorage.status;
@@ -288,29 +288,14 @@ class _SetupScreenState extends ConsumerState<SetupScreen>
     }
   }
 
-  Future<bool?> _showAndroid11StorageDialog() {
-    return showAppDialog<bool>(
-      context: context,
-      builder: (context) => AppAlertDialog(
-        title: Text(context.l10n.setupStorageAccessRequired),
-        content: Text(
-          '${context.l10n.setupStorageAccessMessageAndroid11}\n\n'
-          '${context.l10n.setupAllowAccessToManageFiles}',
-        ),
-        actions: [
-          AppDialogAction(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text(context.l10n.dialogCancel),
-          ),
-          AppDialogAction(
-            filled: true,
-            onPressed: () => Navigator.pop(context, true),
-            child: Text(context.l10n.setupOpenSettings),
-          ),
-        ],
-      ),
-    );
-  }
+  Future<bool> _showAndroid11StorageDialog() => showAppConfirmDialog(
+    context,
+    title: context.l10n.setupStorageAccessRequired,
+    message:
+        '${context.l10n.setupStorageAccessMessageAndroid11}\n\n'
+        '${context.l10n.setupAllowAccessToManageFiles}',
+    confirmLabel: context.l10n.setupOpenSettings,
+  );
 
   Future<void> _requestNotificationPermission() async {
     if (_isLoading) return;
@@ -412,27 +397,13 @@ class _SetupScreenState extends ConsumerState<SetupScreen>
         if (_selectedTreeUri == null || _selectedTreeUri!.isEmpty) {
           final defaultDir = await _getDefaultDirectory();
           if (mounted) {
-            final useDefault = await showAppDialog<bool>(
-              context: context,
-              builder: (context) => AppAlertDialog(
-                title: Text(context.l10n.setupUseDefaultFolder),
-                content: Text(
-                  '${context.l10n.setupNoFolderSelected}\n\n$defaultDir',
-                ),
-                actions: [
-                  AppDialogAction(
-                    onPressed: () => Navigator.pop(context, false),
-                    child: Text(context.l10n.dialogCancel),
-                  ),
-                  AppDialogAction(
-                    filled: true,
-                    onPressed: () => Navigator.pop(context, true),
-                    child: Text(context.l10n.setupUseDefault),
-                  ),
-                ],
-              ),
+            final useDefault = await showAppConfirmDialog(
+              context,
+              title: context.l10n.setupUseDefaultFolder,
+              message: '${context.l10n.setupNoFolderSelected}\n\n$defaultDir',
+              confirmLabel: context.l10n.setupUseDefault,
             );
-            if (useDefault == true) {
+            if (useDefault) {
               if (!mounted) return;
               setState(() {
                 _selectedTreeUri = '';

@@ -602,32 +602,20 @@ class _ExtensionDetailsScreenState
   }
 
   Future<void> _uninstallExtension(RepoExtension ext) async {
-    final confirm = await showAppDialog<bool>(
-      context: context,
-      builder: (context) => AppAlertDialog(
-        title: Text(context.l10n.dialogUninstallExtension),
-        content: Text(
-          context.l10n.dialogUninstallExtensionMessage(ext.displayName),
-        ),
-        actions: [
-          AppDialogAction(
-            isDefault: true,
-            onPressed: () => Navigator.pop(context, false),
-            child: Text(context.l10n.dialogCancel),
-          ),
-          AppDialogAction(
-            isDestructive: true,
-            onPressed: () => Navigator.pop(context, true),
-            style: TextButton.styleFrom(
-              foregroundColor: Theme.of(context).colorScheme.error,
-            ),
-            child: Text(context.l10n.dialogUninstall),
-          ),
-        ],
+    final confirm = await showAppConfirmDialog(
+      context,
+      title: context.l10n.dialogUninstallExtension,
+      message: context.l10n.dialogUninstallExtensionMessage(ext.displayName),
+      confirmLabel: context.l10n.dialogUninstall,
+      destructive: true,
+      filled: false,
+      cancelIsDefault: true,
+      confirmStyle: TextButton.styleFrom(
+        foregroundColor: Theme.of(context).colorScheme.error,
       ),
     );
 
-    if (confirm == true) {
+    if (confirm) {
       await ref.read(extensionProvider.notifier).removeExtension(ext.id);
       await ref.read(repoProvider.notifier).refresh();
       if (mounted) {

@@ -121,29 +121,17 @@ class _DuplicateReviewSheetState extends ConsumerState<DuplicateReviewSheet> {
   }
 
   Future<bool> _confirmDelete(String message) async {
-    final confirmed = await showAppDialog<bool>(
-      context: context,
-      builder: (ctx) => AppAlertDialog(
-        title: Text(ctx.l10n.dialogDeleteSelectedTitle),
-        content: Text(message),
-        actions: [
-          AppDialogAction(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(ctx.l10n.dialogCancel),
-          ),
-          AppDialogAction(
-            filled: true,
-            isDestructive: true,
-            onPressed: () => Navigator.pop(ctx, true),
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(ctx).colorScheme.error,
-            ),
-            child: Text(ctx.l10n.dialogDelete),
-          ),
-        ],
+    final confirmed = await showAppConfirmDialog(
+      context,
+      title: context.l10n.dialogDeleteSelectedTitle,
+      message: message,
+      confirmLabel: context.l10n.dialogDelete,
+      destructive: true,
+      confirmStyle: FilledButton.styleFrom(
+        backgroundColor: Theme.of(context).colorScheme.error,
       ),
     );
-    return confirmed == true && mounted;
+    return confirmed && mounted;
   }
 
   Future<void> _deleteEntries(

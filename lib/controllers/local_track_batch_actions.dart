@@ -41,26 +41,14 @@ Future<void> queueLocalTracksAsFlac(
     return;
   }
 
-  final confirmed = await showAppDialog<bool>(
-    context: context,
-    builder: (ctx) => AppAlertDialog(
-      title: Text(context.l10n.queueFlacAction),
-      content: Text(context.l10n.queueFlacConfirmMessage(selected.length)),
-      actions: [
-        AppDialogAction(
-          onPressed: () => Navigator.pop(ctx, false),
-          child: Text(context.l10n.dialogCancel),
-        ),
-        AppDialogAction(
-          filled: true,
-          onPressed: () => Navigator.pop(ctx, true),
-          child: Text(context.l10n.queueFlacAction),
-        ),
-      ],
-    ),
+  final confirmed = await showAppConfirmDialog(
+    context,
+    title: context.l10n.queueFlacAction,
+    message: context.l10n.queueFlacConfirmMessage(selected.length),
+    confirmLabel: context.l10n.queueFlacAction,
   );
 
-  if (confirmed != true || !context.mounted || !isActive()) {
+  if (!confirmed || !context.mounted || !isActive()) {
     return;
   }
 
@@ -557,30 +545,18 @@ Future<void> deleteLibraryTracks(
   required VoidCallback onComplete,
 }) async {
   if (selected.isEmpty) return;
-  final confirmed = await showAppDialog<bool>(
-    context: context,
-    builder: (ctx) => AppAlertDialog(
-      title: Text(context.l10n.dialogDeleteSelectedTitle),
-      content: Text(context.l10n.dialogDeleteSelectedMessage(selected.length)),
-      actions: [
-        AppDialogAction(
-          isDefault: true,
-          onPressed: () => Navigator.pop(ctx, false),
-          child: Text(context.l10n.dialogCancel),
-        ),
-        AppDialogAction(
-          filled: true,
-          isDestructive: true,
-          onPressed: () => Navigator.pop(ctx, true),
-          style: FilledButton.styleFrom(
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
-          child: Text(context.l10n.dialogDelete),
-        ),
-      ],
+  final confirmed = await showAppConfirmDialog(
+    context,
+    title: context.l10n.dialogDeleteSelectedTitle,
+    message: context.l10n.dialogDeleteSelectedMessage(selected.length),
+    confirmLabel: context.l10n.dialogDelete,
+    destructive: true,
+    cancelIsDefault: true,
+    confirmStyle: FilledButton.styleFrom(
+      backgroundColor: Theme.of(context).colorScheme.error,
     ),
   );
-  if (confirmed != true || !isActive() || !context.mounted) return;
+  if (!confirmed || !isActive() || !context.mounted) return;
 
   final container = ProviderScope.containerOf(context, listen: false);
   final messenger = ScaffoldMessenger.of(context);

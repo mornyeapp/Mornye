@@ -141,25 +141,13 @@ extension _TrackMetadataConvertAndCueSplit on _TrackMetadataScreenState {
   Future<void> _removeReplayGain() async {
     if (!_fileExists) return;
     final sourcePath = cleanFilePath;
-    final confirmed = await showAppDialog<bool>(
-      context: context,
-      builder: (ctx) => AppAlertDialog(
-        title: Text(ctx.l10n.trackRemoveReplayGain),
-        content: Text(ctx.l10n.replayGainRemoveConfirmMessage(1)),
-        actions: [
-          AppDialogAction(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(ctx.l10n.dialogCancel),
-          ),
-          AppDialogAction(
-            filled: true,
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(ctx.l10n.trackRemoveReplayGain),
-          ),
-        ],
-      ),
+    final confirmed = await showAppConfirmDialog(
+      context,
+      title: context.l10n.trackRemoveReplayGain,
+      message: context.l10n.replayGainRemoveConfirmMessage(1),
+      confirmLabel: context.l10n.trackRemoveReplayGain,
     );
-    if (confirmed != true || !mounted || sourcePath != cleanFilePath) return;
+    if (!confirmed || !mounted || sourcePath != cleanFilePath) return;
     await _updateReplayGain(remove: true);
   }
 
