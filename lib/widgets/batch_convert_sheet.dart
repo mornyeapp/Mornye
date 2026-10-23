@@ -125,203 +125,86 @@ class _BatchConvertSheetState extends State<BatchConvertSheet> {
                 ],
                 const SizedBox(height: 20),
 
-                _card(
+                _choiceSection(
                   cs,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _sectionLabel(cs, context.l10n.trackConvertTargetFormat),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: widget.formats.map((format) {
-                          return _choice(
-                            cs,
-                            label: format,
-                            selected: format == _selectedFormat,
-                            onTap: () {
-                              setState(() {
-                                _selectedFormat = format;
-                                _isLosslessTarget = isLosslessConversionTarget(
-                                  format,
-                                );
-                                if (!_isLosslessTarget) {
-                                  _selectedBitrate = _defaultBitrateForFormat(
-                                    format,
-                                  );
-                                } else {
-                                  _selectedMaxBitDepth = null;
-                                  _selectedMaxSampleRate = null;
-                                  _selectedDither = 'none';
-                                  _selectedResampler = 'swr';
-                                }
-                              });
-                            },
-                          );
-                        }).toList(),
-                      ),
-                    ],
-                  ),
+                  context.l10n.trackConvertTargetFormat,
+                  values: widget.formats,
+                  labelOf: (format) => format,
+                  selected: _selectedFormat,
+                  onSelect: (format) {
+                    _selectedFormat = format;
+                    _isLosslessTarget = isLosslessConversionTarget(format);
+                    if (!_isLosslessTarget) {
+                      _selectedBitrate = _defaultBitrateForFormat(format);
+                    } else {
+                      _selectedMaxBitDepth = null;
+                      _selectedMaxSampleRate = null;
+                      _selectedDither = 'none';
+                      _selectedResampler = 'swr';
+                    }
+                  },
                 ),
 
                 if (!_isLosslessTarget)
-                  _card(
+                  _choiceSection(
                     cs,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _sectionLabel(cs, context.l10n.trackConvertBitrate),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: _bitrates.map((br) {
-                            return _choice(
-                              cs,
-                              label: br,
-                              selected: br == _selectedBitrate,
-                              onTap: () =>
-                                  setState(() => _selectedBitrate = br),
-                            );
-                          }).toList(),
-                        ),
-                      ],
-                    ),
+                    context.l10n.trackConvertBitrate,
+                    values: _bitrates,
+                    labelOf: (br) => br,
+                    selected: _selectedBitrate,
+                    onSelect: (br) => _selectedBitrate = br,
                   ),
 
                 if (_isLosslessTarget && bitDepthOptions.isNotEmpty)
-                  _card(
+                  _choiceSection<int?>(
                     cs,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _sectionLabel(cs, context.l10n.audioAnalysisBitDepth),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            _choice(
-                              cs,
-                              label: losslessBitDepthLabel(
-                                null,
-                                originalLabel: labels.original,
-                              ),
-                              selected: _selectedMaxBitDepth == null,
-                              onTap: () => setState(() {
-                                _selectedMaxBitDepth = null;
-                                _selectedDither = 'none';
-                              }),
-                            ),
-                            ...bitDepthOptions.map((depth) {
-                              return _choice(
-                                cs,
-                                label: losslessBitDepthLabel(
-                                  depth,
-                                  originalLabel: labels.original,
-                                ),
-                                selected: depth == _selectedMaxBitDepth,
-                                onTap: () => setState(
-                                  () => _selectedMaxBitDepth = depth,
-                                ),
-                              );
-                            }),
-                          ],
-                        ),
-                      ],
+                    context.l10n.audioAnalysisBitDepth,
+                    values: [null, ...bitDepthOptions],
+                    labelOf: (depth) => losslessBitDepthLabel(
+                      depth,
+                      originalLabel: labels.original,
                     ),
+                    selected: _selectedMaxBitDepth,
+                    onSelect: (depth) {
+                      _selectedMaxBitDepth = depth;
+                      if (depth == null) _selectedDither = 'none';
+                    },
                   ),
 
                 if (_isLosslessTarget && sampleRateOptions.isNotEmpty)
-                  _card(
+                  _choiceSection<int?>(
                     cs,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _sectionLabel(cs, context.l10n.audioAnalysisSampleRate),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            _choice(
-                              cs,
-                              label: losslessSampleRateLabel(
-                                null,
-                                originalLabel: labels.original,
-                              ),
-                              selected: _selectedMaxSampleRate == null,
-                              onTap: () => setState(() {
-                                _selectedMaxSampleRate = null;
-                                _selectedResampler = 'swr';
-                              }),
-                            ),
-                            ...sampleRateOptions.map((rate) {
-                              return _choice(
-                                cs,
-                                label: losslessSampleRateLabel(
-                                  rate,
-                                  originalLabel: labels.original,
-                                ),
-                                selected: rate == _selectedMaxSampleRate,
-                                onTap: () => setState(
-                                  () => _selectedMaxSampleRate = rate,
-                                ),
-                              );
-                            }),
-                          ],
-                        ),
-                      ],
+                    context.l10n.audioAnalysisSampleRate,
+                    values: [null, ...sampleRateOptions],
+                    labelOf: (rate) => losslessSampleRateLabel(
+                      rate,
+                      originalLabel: labels.original,
                     ),
+                    selected: _selectedMaxSampleRate,
+                    onSelect: (rate) {
+                      _selectedMaxSampleRate = rate;
+                      if (rate == null) _selectedResampler = 'swr';
+                    },
                   ),
 
                 if (_isLosslessTarget && _selectedMaxBitDepth != null)
-                  _card(
+                  _choiceSection(
                     cs,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _sectionLabel(cs, context.l10n.trackConvertDithering),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: losslessDitherOptions.map((mode) {
-                            return _choice(
-                              cs,
-                              label: context.l10n.losslessDitherOptionLabel(
-                                mode,
-                              ),
-                              selected: mode == _selectedDither,
-                              onTap: () =>
-                                  setState(() => _selectedDither = mode),
-                            );
-                          }).toList(),
-                        ),
-                      ],
-                    ),
+                    context.l10n.trackConvertDithering,
+                    values: losslessDitherOptions,
+                    labelOf: context.l10n.losslessDitherOptionLabel,
+                    selected: _selectedDither,
+                    onSelect: (mode) => _selectedDither = mode,
                   ),
 
                 if (_isLosslessTarget && _selectedMaxSampleRate != null)
-                  _card(
+                  _choiceSection(
                     cs,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _sectionLabel(cs, context.l10n.trackConvertResampler),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: losslessResamplerOptions.map((mode) {
-                            return _choice(
-                              cs,
-                              label: context.l10n.losslessResamplerOptionLabel(
-                                mode,
-                              ),
-                              selected: mode == _selectedResampler,
-                              onTap: () =>
-                                  setState(() => _selectedResampler = mode),
-                            );
-                          }).toList(),
-                        ),
-                      ],
-                    ),
+                    context.l10n.trackConvertResampler,
+                    values: losslessResamplerOptions,
+                    labelOf: context.l10n.losslessResamplerOptionLabel,
+                    selected: _selectedResampler,
+                    onSelect: (mode) => _selectedResampler = mode,
                   ),
 
                 if (_isLosslessTarget && widget.sourceIsLossless)
@@ -470,16 +353,44 @@ class _BatchConvertSheetState extends State<BatchConvertSheet> {
     );
   }
 
-  Widget _sectionLabel(ColorScheme cs, String text) {
-    return Padding(
-      padding: const EdgeInsetsDirectional.only(start: 2, bottom: 12),
-      child: Text(
-        text,
-        style: Theme.of(context).textTheme.labelMedium?.copyWith(
-          color: cs.onSurfaceVariant,
-          fontWeight: FontWeight.w600,
-          letterSpacing: 0.1,
-        ),
+  Widget _choiceSection<T>(
+    ColorScheme cs,
+    String label, {
+    required Iterable<T> values,
+    required String Function(T value) labelOf,
+    required T selected,
+    required void Function(T value) onSelect,
+  }) {
+    return _card(
+      cs,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsetsDirectional.only(start: 2, bottom: 12),
+            child: Text(
+              label,
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                color: cs.onSurfaceVariant,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.1,
+              ),
+            ),
+          ),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final value in values)
+                _choice(
+                  cs,
+                  label: labelOf(value),
+                  selected: value == selected,
+                  onTap: () => setState(() => onSelect(value)),
+                ),
+            ],
+          ),
+        ],
       ),
     );
   }
