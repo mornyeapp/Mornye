@@ -6,6 +6,7 @@ import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/providers/extension_provider.dart';
 import 'package:mornye/screens/settings/download_fallback_extensions_page.dart';
+import 'package:mornye/services/local_network_access.dart';
 import 'package:mornye/utils/audio_format_utils.dart';
 import 'package:mornye/utils/nav_bar_inset.dart';
 import 'package:mornye/widgets/app_bottom_sheet.dart';
@@ -230,9 +231,15 @@ class _DownloadSettingsPageState extends ConsumerState<DownloadSettingsPage> {
                         ? context.l10n.downloadAllowLocalNetworkEnabled
                         : context.l10n.downloadAllowLocalNetworkDisabled,
                     value: settings.allowLocalNetwork,
-                    onChanged: (value) => ref
-                        .read(settingsProvider.notifier)
-                        .setAllowLocalNetwork(value),
+                    onChanged: (value) {
+                      ref
+                          .read(settingsProvider.notifier)
+                          .setAllowLocalNetwork(value);
+                      // Android 17 also gates extension sockets to LAN hosts.
+                      if (value) {
+                        LocalNetworkAccess.instance.ensureGranted().ignore();
+                      }
+                    },
                     showDivider: false,
                   ),
                 ],

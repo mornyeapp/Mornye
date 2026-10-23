@@ -35,6 +35,14 @@ class LocalNetworkAccess {
     await (_pending ??= _request().whenComplete(() => _pending = null));
   }
 
+  /// For settings that open LAN access before any target is known, such as
+  /// extension requests to a local media server.
+  Future<void> ensureGranted() async {
+    if (!_isAndroid) return;
+    if (await _channel.invokeMethod<bool>('isGranted') == true) return;
+    await (_pending ??= _request().whenComplete(() => _pending = null));
+  }
+
   Future<void> _request() async {
     if (await _channel.invokeMethod<bool>('request') != true) {
       throw const LocalNetworkPermissionException();

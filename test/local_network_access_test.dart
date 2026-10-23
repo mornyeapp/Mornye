@@ -95,8 +95,28 @@ void main() {
   test('other platforms do not call the Android permission channel', () async {
     final access = LocalNetworkAccess(isAndroid: false);
     await access.ensureAccess(Uri.parse('smb://nas.local/music/'));
+    await access.ensureGranted();
     expect(checks, 0);
     expect(requests, 0);
+  });
+
+  test('ensureGranted requests without a target and reports denial', () async {
+    final access = LocalNetworkAccess(
+      isAndroid: true,
+      lookup: (_) async => fail('No target to resolve'),
+    );
+    await access.ensureGranted();
+    expect(requests, 1);
+    granted = true;
+    await access.ensureGranted();
+    expect(requests, 1);
+    granted = false;
+    allowRequest = false;
+    await expectLater(
+      access.ensureGranted(),
+      throwsA(isA<LocalNetworkPermissionException>()),
+    );
+    expect(requests, 2);
   });
 
   for (final local in [false, true]) {
