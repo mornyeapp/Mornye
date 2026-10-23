@@ -92,6 +92,8 @@ class _Deck implements PlaybackDeck {
 class _Session implements AudioSession {
   int configurations = 0;
   final activations = <bool>[];
+  bool focusGranted = true;
+  Object? activationError;
   Completer<void>? configureBarrier;
   final interruptions = StreamController<AudioInterruptionEvent>.broadcast();
 
@@ -114,7 +116,8 @@ class _Session implements AudioSession {
         const AudioSessionConfiguration.music(),
   }) async {
     activations.add(active);
-    return true;
+    if (activationError case final error?) throw error;
+    return !active || focusGranted;
   }
 
   @override
@@ -181,8 +184,19 @@ MusicPlayerRuntime _runtime({
   ListeningRecorder? recorder,
   AutoplayPersonalization Function()? createPersonalization,
   bool isIOS = false,
+  bool isAndroid = false,
+  Future<void> Function()? synchronizePlaybackState,
   _Session? session,
 }) {
+  if (isAndroid) {
+    const channel = MethodChannel(
+      'com.ryanheise.audio_service.handler.methods',
+    );
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(channel, (_) async => null);
+    addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+  }
   final audioSession = session ?? _Session();
   addTearDown(audioSession.dispose);
   final runtime = MusicPlayerRuntime(
@@ -199,6 +213,7 @@ MusicPlayerRuntime _runtime({
           },
       audioSession: () async => audioSession,
       initializeHandler: initialize ?? (builder) async => builder(),
+      synchronizePlaybackState: synchronizePlaybackState ?? () async {},
       readMetadata: (_, {displayName}) async => {
         'replaygain_track_gain': '-6 dB',
       },
@@ -212,7 +227,7 @@ MusicPlayerRuntime _runtime({
           ),
       volumeChanges: volumeChanges,
       sourceDeletionEvents: sourceDeletionEvents ?? SourceDeletionEvents(),
-      isAndroid: false,
+      isAndroid: isAndroid,
       isIOS: isIOS,
     ),
   );
@@ -389,6 +404,142 @@ void main() {
       expect(learning.observations, 1);
       expect(handler.playbackState.value.playing, isTrue);
       expect(handler.mediaItem.value?.id, 'one');
+    },
+  );
+
+  test(
+    'denied audio focus leaves a new source paused and allows retry',
+    () async {
+      final session = _Session()..focusGranted = false;
+      final decks = <_Deck>[];
+      final handler = await _runtime(
+        session: session,
+        decks: decks,
+      ).initialize();
+      await handler.setQueueAndPlay([_track]);
+      expect(decks.single.state, isNot(PlaybackDeckState.playing));
+      expect(handler.playbackState.value.playing, isFalse);
+
+      session.focusGranted = true;
+      await handler.play();
+      expect(decks.single.state, PlaybackDeckState.playing);
+      expect(handler.playbackState.value.playing, isTrue);
+      expect(handler.mediaItem.value?.id, _track.id);
+    },
+  );
+
+  test('denied or failed audio focus cannot resume a paused source', () async {
+    final session = _Session();
+    final decks = <_Deck>[];
+    final handler = await _runtime(session: session, decks: decks).initialize();
+    await handler.setQueueAndPlay([_track]);
+    await handler.pause();
+    session.focusGranted = false;
+    await handler.play();
+    expect(decks.single.state, PlaybackDeckState.paused);
+    expect(handler.playbackState.value.playing, isFalse);
+
+    session.activationError = PlatformException(code: 'focus-unavailable');
+    await handler.play();
+    expect(decks.single.state, PlaybackDeckState.paused);
+    expect(handler.playbackState.value.playing, isFalse);
+
+    session.activationError = null;
+    session.focusGranted = true;
+    await handler.play();
+    expect(decks.single.state, PlaybackDeckState.playing);
+    expect(handler.playbackState.value.playing, isTrue);
+  });
+
+  test(
+    'Android awaits foreground service acknowledgement before resuming',
+    () async {
+      final session = _Session();
+      final decks = <_Deck>[];
+      Completer<void>? promotion;
+      final handler = await _runtime(
+        session: session,
+        decks: decks,
+        isAndroid: true,
+        synchronizePlaybackState: () async => promotion?.future,
+      ).initialize();
+      await handler.setQueueAndPlay([_track]);
+      await handler.pause();
+      session.activations.clear();
+      promotion = Completer<void>();
+      final resume = handler.play();
+      await _settle();
+      expect(session.activations, isEmpty);
+      expect(decks.single.state, PlaybackDeckState.paused);
+      expect(
+        handler.playbackState.value.processingState,
+        AudioProcessingState.loading,
+      );
+      promotion.complete();
+      await resume;
+      expect(session.activations, [true]);
+      expect(decks.single.state, PlaybackDeckState.playing);
+
+      session.interruptions.add(
+        AudioInterruptionEvent(true, AudioInterruptionType.pause),
+      );
+      await _settle();
+      expect(decks.single.state, PlaybackDeckState.paused);
+      session.activations.clear();
+      promotion = Completer<void>();
+      session.interruptions.add(
+        AudioInterruptionEvent(false, AudioInterruptionType.pause),
+      );
+      await _settle();
+      expect(session.activations, isEmpty);
+      expect(decks.single.state, PlaybackDeckState.paused);
+      promotion.complete();
+      await _settle();
+      expect(session.activations, [true]);
+      expect(decks.single.state, PlaybackDeckState.playing);
+    },
+  );
+
+  test('pause cancels a resume awaiting foreground promotion', () async {
+    final session = _Session();
+    final decks = <_Deck>[];
+    Completer<void>? promotion;
+    final handler = await _runtime(
+      session: session,
+      decks: decks,
+      isAndroid: true,
+      synchronizePlaybackState: () async => promotion?.future,
+    ).initialize();
+    await handler.setQueueAndPlay([_track]);
+    await handler.pause();
+    session.activations.clear();
+    promotion = Completer<void>();
+    final resume = handler.play();
+    await _settle();
+    final pause = handler.pause();
+    promotion.complete();
+    await Future.wait([resume, pause]);
+    expect(session.activations, isEmpty);
+    expect(decks.single.state, PlaybackDeckState.paused);
+    expect(handler.playbackState.value.playing, isFalse);
+  });
+
+  test(
+    'foreground promotion failure prevents audio focus and playback',
+    () async {
+      final session = _Session();
+      final decks = <_Deck>[];
+      final handler = await _runtime(
+        session: session,
+        decks: decks,
+        isAndroid: true,
+        synchronizePlaybackState: () async =>
+            throw PlatformException(code: 'foreground-denied'),
+      ).initialize();
+      await handler.setQueueAndPlay([_track]);
+      expect(session.activations, isEmpty);
+      expect(decks.single.state, isNot(PlaybackDeckState.playing));
+      expect(handler.playbackState.value.playing, isFalse);
     },
   );
 

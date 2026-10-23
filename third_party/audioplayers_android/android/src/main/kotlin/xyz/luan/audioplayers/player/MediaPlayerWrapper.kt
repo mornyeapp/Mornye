@@ -39,6 +39,9 @@ class MediaPlayerWrapper(
             setOnBufferingUpdateListener { _, percent -> wrappedPlayer.onBuffering(percent) }
         }
         wrappedPlayer.context.setAttributesOnPlayer(mediaPlayer)
+        if (wrappedPlayer.context.stayAwake) {
+            mediaPlayer.setWakeMode(wrappedPlayer.applicationContext, PowerManager.PARTIAL_WAKE_LOCK)
+        }
         return mediaPlayer
     }
 

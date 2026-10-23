@@ -39,6 +39,7 @@ class PlaybackDependencies {
     this.readNetworkMetadata = _readNetworkMetadata,
     this.resolveNetworkSource = _resolveNetworkSource,
     this.initializeHandler = _initializeAudioHandler,
+    this.synchronizePlaybackState = AudioService.synchronizePlaybackState,
     this.createPersonalization = AutoplayPersonalization.new,
     AppStateDatabase? sessionDatabase,
     LibraryDatabase? libraryDatabase,
@@ -69,6 +70,7 @@ class PlaybackDependencies {
   final Future<String> Function(String) resolveNetworkSource;
   final Future<MusicPlayerHandler> Function(MusicPlayerHandler Function())
   initializeHandler;
+  final Future<void> Function() synchronizePlaybackState;
   final MethodChannel notificationChannel;
   final AutoplayPersonalization Function() createPersonalization;
   final AppStateDatabase? _sessionDatabase;
@@ -121,8 +123,9 @@ class PlaybackDependencies {
         // System UI draws only the small icon's alpha. The opaque launcher
         // default became a blank dot in the status bar and output switcher.
         androidNotificationIcon: 'drawable/ic_launcher_monochrome',
-        androidNotificationOngoing: true,
-        androidStopForegroundOnPause: true,
+        // Keep background resume eligible for audio focus. The Android fork
+        // releases the CPU wake lock on pause and demotes the service on stop.
+        androidStopForegroundOnPause: false,
       ),
     );
   }

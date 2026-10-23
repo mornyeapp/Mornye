@@ -688,9 +688,15 @@ class MusicPlayerHandler extends BaseAudioHandler
     _sleepTimerEndsAt = null;
   }
 
-  Future<void> _activateAudioSession() async {
-    if (isDesktopPlatform) return;
+  Future<bool> _activateAudioSession(int generation) async {
+    if (isDesktopPlatform) return true;
     try {
+      // Android 15+ rejects background focus requests without an active
+      // foreground service. Publishing Dart state alone does not await it.
+      if (_dependencies.isAndroid) {
+        await _dependencies.synchronizePlaybackState();
+      }
+      if (generation != _playRequestGeneration || _disposed) return false;
       final session = _audioSession ?? await _dependencies.audioSession();
       _audioSession = session;
       // Other media plugins can change the process-wide iOS category/options
@@ -698,12 +704,15 @@ class MusicPlayerHandler extends BaseAudioHandler
       if (_dependencies.isIOS) {
         await session.configure(const AudioSessionConfiguration.music());
       }
+      if (generation != _playRequestGeneration || _disposed) return false;
       final granted = await session.setActive(true);
       if (!granted) {
         _log.w('Audio focus request was not granted');
       }
+      return granted;
     } catch (e) {
       _log.w('Failed to activate audio session: $e');
+      return false;
     }
   }
 
@@ -1483,8 +1492,17 @@ class MusicPlayerHandler extends BaseAudioHandler
       if (!_isCurrentPlayRequest(generation, media)) return;
       await _player.configureOutput();
       if (!_isCurrentPlayRequest(generation, media)) return;
-      await _activateAudioSession();
+      final focusGranted = await _activateAudioSession(generation);
       if (!_isCurrentPlayRequest(generation, media)) return;
+      if (!focusGranted) {
+        _sourceReady = false;
+        _pendingRestorePosition = effectiveStartPosition;
+        await _player.pause();
+        if (_isCurrentPlayRequest(generation, media)) {
+          _broadcastState(playerState: PlaybackDeckState.paused);
+        }
+        return;
+      }
       await _player.stop();
       _sourceReady = false;
       if (!_isCurrentPlayRequest(generation, media)) return;
@@ -1770,8 +1788,18 @@ class MusicPlayerHandler extends BaseAudioHandler
     final generation = _playRequestGeneration;
     await _serializeSourceChange(() async {
       if (generation != _playRequestGeneration || _disposed) return;
-      await _activateAudioSession();
+      if (_dependencies.isAndroid) {
+        _broadcastState(playerState: PlaybackDeckState.playing, loading: true);
+      }
+      final focusGranted = await _activateAudioSession(generation);
       if (generation != _playRequestGeneration || _disposed) return;
+      if (!focusGranted) {
+        await _player.pause();
+        if (generation == _playRequestGeneration && !_disposed) {
+          _broadcastState(playerState: PlaybackDeckState.paused);
+        }
+        return;
+      }
       await _claimHardwareMediaButtons();
       if (generation != _playRequestGeneration || _disposed) return;
       try {

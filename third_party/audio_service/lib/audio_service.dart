@@ -962,6 +962,9 @@ class AudioService {
 
   static late AudioServiceConfig _config;
   static late AudioHandler _handler;
+  static PlaybackState? _synchronizedPlaybackState;
+  static final _playbackStateWaiters =
+      Map<PlaybackState, List<Completer<void>>>.identity();
 
   /// The current configuration.
   static AudioServiceConfig get config => _config;
@@ -1129,13 +1132,41 @@ class AudioService {
       try {
         await _platform
             .setState(SetStateRequest(state: playbackState._toMessage()));
+        _synchronizedPlaybackState = playbackState;
+        for (final waiter in _playbackStateWaiters.remove(playbackState) ??
+            <Completer<void>>[]) {
+          waiter.complete();
+        }
         if (playbackState.processingState == AudioProcessingState.idle &&
             previousState?.processingState != AudioProcessingState.idle) {
           await AudioService._stop();
         }
         previousState = playbackState;
-      } catch (e) {
+      } catch (e, stackTrace) {
+        for (final waiter in _playbackStateWaiters.remove(playbackState) ??
+            <Completer<void>>[]) {
+          waiter.completeError(e, stackTrace);
+        }
         _asyncError.add(e);
+      }
+    }
+  }
+
+  /// Waits until the native service acknowledges the current playback state.
+  /// On Android, use this after publishing a playing state and before requesting
+  /// audio focus from the background, so foreground promotion has completed.
+  static Future<void> synchronizePlaybackState() async {
+    final state = _handler.playbackState.value;
+    if (identical(state, _synchronizedPlaybackState)) return;
+    final waiter = Completer<void>();
+    final waiters = _playbackStateWaiters.putIfAbsent(state, () => []);
+    waiters.add(waiter);
+    try {
+      await waiter.future.timeout(const Duration(seconds: 5));
+    } finally {
+      waiters.remove(waiter);
+      if (waiters.isEmpty && identical(_playbackStateWaiters[state], waiters)) {
+        _playbackStateWaiters.remove(state);
       }
     }
   }
