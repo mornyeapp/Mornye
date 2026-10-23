@@ -19,6 +19,7 @@ Future<String> _hashApkInBackground(String path) async =>
 
 class ApkDownloader {
   static const _streamIdleTimeout = Duration(seconds: 60);
+  static const _progressInterval = Duration(milliseconds: 500);
 
   static Future<String?> downloadApk({
     required String url,
@@ -104,15 +105,24 @@ class ApkDownloader {
         mode: isResume ? FileMode.append : FileMode.writeOnly,
       );
       var received = resumeOffset;
+      var reported = received;
+      final progressClock = Stopwatch()..start();
       onProgress?.call(received, total);
       await for (final chunk in response.stream.timeout(_streamIdleTimeout)) {
         sink.add(chunk);
         received += chunk.length;
-        onProgress?.call(received, total);
+        if (progressClock.elapsed >= _progressInterval) {
+          onProgress?.call(received, total);
+          reported = received;
+          progressClock.reset();
+        }
       }
       await sink.flush();
       await sink.close();
       sink = null;
+      // Always deliver the final byte count, including unknown-length streams,
+      // without leaving a trailing timer that could outlive the download.
+      if (received != reported) onProgress?.call(received, total);
 
       if (total > 0 && received != total) {
         _log.w('Incomplete APK download: $received/$total bytes');
