@@ -32,7 +32,6 @@ import 'package:mornye/widgets/library_track_selection_bar.dart';
 import 'package:mornye/widgets/library_selection_playback_actions.dart';
 import 'package:mornye/widgets/local_library_artwork_builder.dart';
 import 'package:mornye/widgets/library_playlist_drag_source.dart';
-import 'package:mornye/widgets/mornye_chrome.dart';
 import 'package:mornye/widgets/playlist_picker_sheet.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -67,7 +66,6 @@ import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/providers/local_library_provider.dart';
 import 'package:mornye/providers/playback_provider.dart';
 import 'package:mornye/providers/music_player_provider.dart';
-import 'package:mornye/providers/runtime_profile_provider.dart';
 import 'package:mornye/services/music_player_service.dart';
 import 'package:mornye/services/library_database.dart';
 import 'package:mornye/services/album_completeness.dart';
@@ -94,7 +92,6 @@ import 'package:mornye/widgets/animated_library_sliver_grid.dart';
 import 'package:mornye/widgets/animation_utils.dart';
 import 'package:mornye/widgets/selection_bottom_bar.dart';
 import 'package:mornye/widgets/smoothed_progress.dart';
-import 'package:mornye/widgets/scroll_edge_fade.dart';
 import 'package:mornye/widgets/two_finger_pinch_listener.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/widgets/desktop/context_menu.dart';
@@ -870,93 +867,25 @@ class _QueueTabState extends ConsumerState<QueueTab> {
                         16 + listInset,
                         4,
                       ),
-                      child: LayoutBuilder(
-                        builder: (context, constraints) {
-                          final activePage = _pageIndexFor(historyFilterMode);
-                          final playlistCount = _getVisibleCollectionEntries(
-                            collectionState,
-                          ).length;
-                          if (!context.isMornye) {
-                            return _LibraryPageTabs(
-                              selectedIndex: activePage,
-                              onSelected: _animateToFilterPage,
-                              tabs: [
-                                (
-                                  context.l10n.searchSongs,
-                                  queueCounts.allTrackCount,
-                                ),
-                                (
-                                  context.l10n.historyFilterAlbums,
-                                  queueCounts.albumCount,
-                                ),
-                                // Artist totals need a full scan; the tab
-                                // shows none rather than a guess.
-                                (context.l10n.searchArtists, null),
-                                (context.l10n.searchPlaylists, playlistCount),
-                              ],
-                            );
-                          }
-                          Widget tab(
-                            int index,
-                            IconData icon,
-                            String label,
-                            int? count,
-                          ) => _FilterChip(
-                            label: label,
-                            icon: icon,
-                            count: count,
-                            isSelected: activePage == index,
-                            onTap: () => _animateToFilterPage(index),
-                          );
-                          return ScrollEdgeFade(
-                            axis: Axis.horizontal,
-                            size: 48,
-                            child: SingleChildScrollView(
-                              scrollDirection: Axis.horizontal,
-                              padding: const EdgeInsets.symmetric(vertical: 4),
-                              child: ConstrainedBox(
-                                constraints: BoxConstraints(
-                                  minWidth: constraints.maxWidth,
-                                ),
-                                child: Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    tab(
-                                      0,
-                                      Icons.music_note_outlined,
-                                      context.l10n.searchSongs,
-                                      queueCounts.allTrackCount,
-                                    ),
-                                    const SizedBox(width: 8),
-                                    tab(
-                                      1,
-                                      Icons.album_outlined,
-                                      context.l10n.historyFilterAlbums,
-                                      queueCounts.albumCount,
-                                    ),
-                                    const SizedBox(width: 8),
-                                    // Artist totals need a full scan; the
-                                    // tab shows none rather than a guess.
-                                    tab(
-                                      2,
-                                      Icons.person_outline,
-                                      context.l10n.searchArtists,
-                                      null,
-                                    ),
-                                    const SizedBox(width: 8),
-                                    tab(
-                                      3,
-                                      Icons.queue_music_outlined,
-                                      context.l10n.searchPlaylists,
-                                      playlistCount,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          );
-                        },
+                      child: _LibraryPageTabs(
+                        selectedIndex: _pageIndexFor(historyFilterMode),
+                        onSelected: _animateToFilterPage,
+                        tabs: [
+                          (context.l10n.searchSongs, queueCounts.allTrackCount),
+                          (
+                            context.l10n.historyFilterAlbums,
+                            queueCounts.albumCount,
+                          ),
+                          // Artist totals need a full scan; the tab shows
+                          // none rather than a guess.
+                          (context.l10n.searchArtists, null),
+                          (
+                            context.l10n.searchPlaylists,
+                            _getVisibleCollectionEntries(
+                              collectionState,
+                            ).length,
+                          ),
+                        ],
                       ),
                     ),
                   ),
