@@ -1,11 +1,14 @@
 import 'dart:async';
 
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/services/playback_deck.dart';
+import 'package:mornye/services/playback_output_volume.dart';
 import 'package:mornye/services/system_volume_service.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/desktop_platform.dart';
@@ -128,6 +131,79 @@ void main() {
     expect(slider().value, 0.3);
     expect(tester.takeException(), isNull);
   });
+
+  for (final mornye in [false, true]) {
+    testWidgets(
+      'Desktop wheel adjusts volume without scrolling the page ($mornye)',
+      (tester) async {
+        PlaybackOutputVolumeStore.debugReset();
+        debugDesktopPlatformOverride = true;
+        playbackOutputVolume.value = 0.5;
+        addTearDown(() {
+          PlaybackOutputVolumeStore.debugReset();
+          debugDesktopPlatformOverride = null;
+          playbackOutputVolume.value = 1;
+        });
+        final scroll = ScrollController();
+        addTearDown(scroll.dispose);
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              systemVolumeProvider.overrideWith(
+                (ref) => playbackOutputVolumeChanges(),
+              ),
+            ],
+            child: MaterialApp(
+              theme: mornye ? MornyeTheme.build(Brightness.dark) : ThemeData(),
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              home: Scaffold(
+                body: ListView(
+                  controller: scroll,
+                  children: const [
+                    PlayerVolumeControl(),
+                    SizedBox(height: 2000),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final icon = find.byIcon(
+          mornye ? CupertinoIcons.speaker_3_fill : Icons.volume_up_rounded,
+        );
+        final position = tester.getCenter(icon);
+        void wheel(Offset delta) => tester.binding.handlePointerEvent(
+          PointerScrollEvent(position: position, scrollDelta: delta),
+        );
+
+        // Repeated events before a rebuild still use the latest app gain.
+        for (var i = 0; i < 3; i++) {
+          wheel(const Offset(0, -20));
+        }
+        expect(playbackOutputVolume.value, closeTo(0.65, 0.000001));
+        wheel(const Offset(0, 20));
+        expect(playbackOutputVolume.value, closeTo(0.6, 0.000001));
+        wheel(const Offset(20, 0));
+        expect(playbackOutputVolume.value, closeTo(0.6, 0.000001));
+        await tester.pumpAndSettle();
+        expect(scroll.offset, 0);
+
+        for (var i = 0; i < 30; i++) {
+          wheel(const Offset(0, 20));
+        }
+        expect(playbackOutputVolume.value, 0);
+        for (var i = 0; i < 30; i++) {
+          wheel(const Offset(0, -20));
+        }
+        expect(playbackOutputVolume.value, 1);
+        await tester.pumpAndSettle();
+        expect(scroll.offset, 0);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 
   for (final reducedMotion in [false, true]) {
     testWidgets(

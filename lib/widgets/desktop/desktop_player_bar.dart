@@ -21,6 +21,7 @@ import 'package:mornye/widgets/desktop/desktop_commands.dart';
 import 'package:mornye/widgets/desktop/desktop_downloads_button.dart';
 import 'package:mornye/widgets/desktop/desktop_inspector.dart';
 import 'package:mornye/widgets/desktop/desktop_window.dart';
+import 'package:mornye/widgets/desktop/desktop_volume_scroll.dart';
 import 'package:mornye/widgets/mornye_chrome.dart';
 import 'package:mornye/widgets/mornye_playback_button.dart';
 import 'package:mornye/widgets/mornye_player_background.dart';
@@ -815,12 +816,14 @@ class _MornyeVolumeButtonState extends ConsumerState<_MornyeVolumeButton> {
           child: PlayerVolumeControl(foreground: colorScheme.onSurface),
         ),
       ],
-      child: AppIconButton(
-        key: const ValueKey('desktop-player-volume'),
-        tooltip: context.l10n.nowPlayingVolume,
-        color: colorScheme.onSurface,
-        icon: AppIcon(icon),
-        onPressed: () => _menu.isOpen ? _menu.close() : _menu.open(),
+      child: DesktopVolumeScroll(
+        child: AppIconButton(
+          key: const ValueKey('desktop-player-volume'),
+          tooltip: context.l10n.nowPlayingVolume,
+          color: colorScheme.onSurface,
+          icon: AppIcon(icon),
+          onPressed: () => _menu.isOpen ? _menu.close() : _menu.open(),
+        ),
       ),
     );
   }

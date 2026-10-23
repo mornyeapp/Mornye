@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,6 +12,7 @@ import 'package:mornye/l10n/app_localizations.dart';
 import 'package:mornye/models/library_collections.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/system_volume_provider.dart';
+import 'package:mornye/services/playback_deck.dart';
 import 'package:mornye/services/shell_navigation_service.dart';
 import 'package:mornye/services/user_profile_store.dart';
 import 'package:mornye/theme/app_theme.dart';
@@ -360,6 +362,22 @@ void main() {
       await pumpShell(tester, mornye: true, width: 1400);
 
       expect(find.byType(Slider), findsOneWidget, reason: 'seek bar only');
+      playbackOutputVolume.value = 0.5;
+      addTearDown(() => playbackOutputVolume.value = 1);
+      tester.binding.handlePointerEvent(
+        PointerScrollEvent(
+          position: tester.getCenter(
+            find.byKey(const ValueKey('desktop-player-volume')),
+          ),
+          scrollDelta: const Offset(0, -20),
+        ),
+      );
+      await tester.pump();
+      expect(volumeWrites.single, closeTo(0.55, 0.000001));
+      expect(
+        find.byKey(const ValueKey('desktop-player-volume-popover')),
+        findsNothing,
+      );
       await tester.tap(find.byKey(const ValueKey('desktop-player-volume')));
       await tester.pumpAndSettle();
       expect(
