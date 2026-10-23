@@ -13,8 +13,6 @@ final _log = AppLogger('MotionHeaderBanner');
 class MotionHeaderBanner extends ConsumerStatefulWidget {
   final String videoUrl;
   final Widget fallback;
-  final BoxFit fit;
-  final Alignment alignment;
   final ValueChanged<double>? onAspectRatioChanged;
   final VoidCallback? onError;
   final VideoPlayerController? controller;
@@ -24,8 +22,6 @@ class MotionHeaderBanner extends ConsumerStatefulWidget {
     super.key,
     required this.videoUrl,
     required this.fallback,
-    this.fit = BoxFit.cover,
-    this.alignment = Alignment.topCenter,
     this.onAspectRatioChanged,
     this.onError,
     this.controller,
@@ -208,8 +204,8 @@ class _MotionHeaderBannerState extends ConsumerState<MotionHeaderBanner>
           duration: widget.fadeDuration,
           child: showVideo
               ? FittedBox(
-                  fit: widget.fit,
-                  alignment: widget.alignment,
+                  fit: BoxFit.cover,
+                  alignment: Alignment.topCenter,
                   clipBehavior: Clip.hardEdge,
                   child: SizedBox(
                     width: controller.value.size.width,
