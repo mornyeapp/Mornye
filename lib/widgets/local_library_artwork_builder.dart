@@ -58,10 +58,8 @@ class _LocalLibraryArtworkBuilderState
     } catch (_) {
       // An expired scan path must not hide recoverable embedded artwork.
     }
-    if (!mounted || generation != _generation) return;
-    setState(() {
-      if (!available) _coverPath = null;
-    });
+    if (available || !mounted || generation != _generation) return;
+    setState(() => _coverPath = null);
   }
 
   void _onCoverChanged() {
