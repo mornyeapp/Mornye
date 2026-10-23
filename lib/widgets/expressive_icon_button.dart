@@ -31,19 +31,11 @@ class ExpressiveIconButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final icon = symbolIconWidget(this.icon);
-    final scheme = Theme.of(context).colorScheme;
-    final foreground = WidgetStateProperty.resolveWith<Color?>((states) {
-      if (states.contains(WidgetState.disabled)) {
-        return scheme.onSurface.withValues(alpha: 0.38);
-      }
-      return foregroundColor;
-    });
-    final background = WidgetStateProperty.resolveWith<Color?>((states) {
-      if (backgroundColor == null) return Colors.transparent;
-      return states.contains(WidgetState.disabled)
-          ? scheme.onSurface.withValues(alpha: 0.12)
-          : backgroundColor;
-    });
+    final fill = expressiveFill(
+      Theme.of(context).colorScheme,
+      foregroundColor,
+      backgroundColor,
+    );
     if (!materialExpressiveEnabled(context)) {
       return IconButton(
         icon: icon,
@@ -53,8 +45,8 @@ class ExpressiveIconButton extends StatelessWidget {
         isSelected: selected,
         style: ButtonStyle(
           minimumSize: WidgetStatePropertyAll(Size.square(size)),
-          foregroundColor: foreground,
-          backgroundColor: background,
+          foregroundColor: fill.foregroundColor,
+          backgroundColor: fill.backgroundColor,
         ),
       );
     }
@@ -80,13 +72,31 @@ class ExpressiveIconButton extends StatelessWidget {
             variant: backgroundColor == null
                 ? M3EIconButtonVariant.standard
                 : M3EIconButtonVariant.filled,
-            decoration: M3EIconButtonDecoration(
-              foregroundColor: foreground,
-              backgroundColor: background,
-            ),
+            decoration: fill,
           ),
         ),
       ),
     );
   }
 }
+
+/// Icon button colors that fade like Material's when disabled. Without a
+/// [background] the button stays transparent.
+M3EIconButtonDecoration expressiveFill(
+  ColorScheme scheme,
+  Color? foreground,
+  Color? background,
+) => M3EIconButtonDecoration(
+  foregroundColor: WidgetStateProperty.resolveWith(
+    (states) => states.contains(WidgetState.disabled)
+        ? scheme.onSurface.withValues(alpha: 0.38)
+        : foreground,
+  ),
+  backgroundColor: WidgetStateProperty.resolveWith(
+    (states) => background == null
+        ? Colors.transparent
+        : states.contains(WidgetState.disabled)
+        ? scheme.onSurface.withValues(alpha: 0.12)
+        : background,
+  ),
+);

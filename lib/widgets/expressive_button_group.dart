@@ -51,16 +51,29 @@ class ExpressiveButtonGroupSlot extends InheritedWidget {
       width != oldWidget.width;
 }
 
-class _ExpressiveButtonGroupState extends State<ExpressiveButtonGroup> {
-  static const _squishRatio = 0.15;
+/// Tracks which slot of an expressive group is pressed, so it can widen by
+/// [squishRatio] on [pressSpring] while its neighbours give way.
+mixin ExpressivePressSquish<T extends StatefulWidget> on State<T> {
   static final _pressSpring = SpringCurve(M3EMotion.expressiveSpatialPress);
 
-  int? _pressed;
+  double get squishRatio => 0.15;
+  SpringCurve get pressSpring => _pressSpring;
+  int? pressedIndex;
+
+  Widget pressSlot(int index, Widget child) => Listener(
+    onPointerDown: (_) => _press(index),
+    onPointerUp: (_) => _press(null),
+    onPointerCancel: (_) => _press(null),
+    child: child,
+  );
 
   void _press(int? index) {
-    if (_pressed != index) setState(() => _pressed = index);
+    if (pressedIndex != index) setState(() => pressedIndex = index);
   }
+}
 
+class _ExpressiveButtonGroupState extends State<ExpressiveButtonGroup>
+    with ExpressivePressSquish {
   @override
   Widget build(BuildContext context) {
     final children = widget.children;
@@ -82,26 +95,21 @@ class _ExpressiveButtonGroupState extends State<ExpressiveButtonGroup> {
   }
 
   Widget _slot(int index) {
-    final pressed = _pressed;
+    final pressed = pressedIndex;
     final neighbour = pressed != null && (index - pressed).abs() == 1;
-    final child = Listener(
-      onPointerDown: (_) => _press(index),
-      onPointerUp: (_) => _press(null),
-      onPointerCancel: (_) => _press(null),
-      child: widget.children[index],
-    );
+    final child = pressSlot(index, widget.children[index]);
     if (widget.flexible.contains(index)) {
       // A flexible action grows into whatever its fixed neighbours yield; it
       // only trades weight with another flexible action.
       final weight = pressed == index
-          ? 1 + _squishRatio
+          ? 1 + squishRatio
           : neighbour && widget.flexible.contains(pressed)
-          ? 1 - _squishRatio
+          ? 1 - squishRatio
           : 1.0;
       return TweenAnimationBuilder<double>(
         tween: Tween(end: weight),
-        duration: _pressSpring.duration,
-        curve: _pressSpring,
+        duration: pressSpring.duration,
+        curve: pressSpring,
         builder: (context, weight, child) =>
             Expanded(flex: math.max(1, (weight * 1000).round()), child: child!),
         child: child,
@@ -110,14 +118,14 @@ class _ExpressiveButtonGroupState extends State<ExpressiveButtonGroup> {
     final width =
         widget.slotWidth *
         (pressed == index
-            ? 1 + _squishRatio
+            ? 1 + squishRatio
             : neighbour
-            ? 1 - _squishRatio
+            ? 1 - squishRatio
             : 1.0);
     return TweenAnimationBuilder<double>(
       tween: Tween(end: width),
-      duration: _pressSpring.duration,
-      curve: _pressSpring,
+      duration: pressSpring.duration,
+      curve: pressSpring,
       builder: (context, width, child) {
         final slot = math.max(0.0, width);
         return SizedBox(
