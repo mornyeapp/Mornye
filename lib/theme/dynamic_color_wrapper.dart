@@ -16,7 +16,22 @@ class DynamicColorWrapper extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final themeSettings = ref.watch(themeProvider);
+    // Lyrics size and font names live in ThemeSettings but not in ThemeData.
+    final themeSettings = ref.watch(
+      themeProvider.select(
+        (s) => (
+          style: s.style,
+          themeMode: s.themeMode,
+          useDynamicColor: s.useDynamicColor,
+          seedColor: s.seedColor,
+          useAmoled: s.useAmoled,
+          mornyeAccent: s.mornyeAccent,
+          useSystemFont: s.useSystemFont,
+          mornyeGlassClarity: s.mornyeGlassClarity,
+          mornyeGlassOutlines: s.mornyeGlassOutlines,
+        ),
+      ),
+    );
     final fontFamily = ref.watch(customFontFamilyProvider).asData?.value;
 
     // Both styles build below the same DynamicColorBuilder. Switching styles

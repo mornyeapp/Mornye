@@ -201,7 +201,8 @@ class MornyeApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    ref.watch(equalizerProvider.select((value) => value.settings.enabled));
+    // Keeps the equalizer loaded for the app's lifetime without rebuilding.
+    ref.listen(equalizerProvider, (_, _) {});
     final router = ref.watch(_routerProvider);
     final localeString = ref.watch(settingsProvider.select((s) => s.locale));
     final heroAnimationsEnabled = ref.watch(
