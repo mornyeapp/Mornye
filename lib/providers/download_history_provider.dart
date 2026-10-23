@@ -1132,11 +1132,6 @@ class DownloadHistoryNotifier extends Notifier<DownloadHistoryState> {
         await _db.migrateIosContainerPaths(force: true);
         await _loadFromDatabase();
       });
-
-  /// Restores a large v2 backup without retaining the complete history in
-  /// Dart memory. SQLite writes are grouped to keep JNI/channel overhead low.
-  Future<void> restoreFromBackupStream(Stream<Map<String, dynamic>> items) =>
-      restoreFromBackupOperation(() => _db.replaceAll(items));
 }
 
 final downloadHistoryProvider =

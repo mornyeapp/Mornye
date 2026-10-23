@@ -33,6 +33,25 @@ Map<String, dynamic> _download(String id, String path) => DownloadHistoryItem(
   downloadedAt: DateTime.utc(2026),
 ).toJson();
 
+Future<void> _replaceHistory(
+  Database db,
+  Iterable<Map<String, dynamic>> items,
+) async {
+  final batch = db.batch()
+    ..delete('history_path_keys')
+    ..delete('history');
+  for (final row in items.map(HistoryRowMapper.jsonToDbRow)) {
+    batch.insert('history', row);
+    sqlite.putPathKeysInBatch(
+      batch,
+      'history_path_keys',
+      row['id'] as String,
+      row['file_path'] as String?,
+    );
+  }
+  await batch.commit(noResult: true);
+}
+
 // Supply iOS storage policy on the host while exercising the real notifier,
 // codecs, migration, SQLite schemas, and Library queries.
 class _IosRestoreDatabase implements HistoryDatabase {
@@ -58,17 +77,9 @@ class _IosRestoreDatabase implements HistoryDatabase {
   @override
   Future<bool> migrateFromSharedPreferences() async => false;
 
-  @override
-  Future<void> replaceAll(Stream<Map<String, dynamic>> items) async {
-    var count = 0;
-    await replaceHistoryRows(
-      rows,
-      items.map((item) {
-        count++;
-        return HistoryRowMapper.jsonToDbRow(item);
-      }),
-    );
-    _restoredCount = count;
+  Future<void> restore(Map<String, dynamic> item) async {
+    await _replaceHistory(rows, [item]);
+    _restoredCount = 1;
   }
 
   @override
@@ -144,12 +155,7 @@ void main() {
   test(
     'startup repairs a previous restore despite an unchanged container',
     () async {
-      await replaceHistoryRows(
-        history,
-        Stream.value(
-          HistoryRowMapper.jsonToDbRow(_download('download', _oldPath)),
-        ),
-      );
+      await _replaceHistory(history, [_download('download', _oldPath)]);
       await addLocal('scanned', _currentPath);
       const request = QueueLibraryDbQuery();
       expect((await store.trackPage(request)).rows, hasLength(2));
@@ -204,54 +210,44 @@ void main() {
     },
   );
 
-  for (final streamed in [false, true]) {
-    test(
-      'restore repairs paths before publication (streamed: $streamed)',
-      () async {
-        await migrateIosHistoryPaths(
-          history,
-          prefs,
-          containerPath: _currentContainer,
-        );
-        await addLocal('scanned', _currentPath);
-        final db = _IosRestoreDatabase(history, prefs);
-        final container = ProviderContainer(
-          overrides: [downloadHistoryProvider.overrideWith(() => _History(db))],
-        );
-        addTearDown(container.dispose);
-        final publications = <String>[];
-        container.listen(downloadHistoryProvider, (_, next) {
-          publications.addAll(next.items.map((item) => item.filePath));
-        });
-        final notifier = container.read(downloadHistoryProvider.notifier);
-        for (var attempt = 0; attempt < 2; attempt++) {
-          final input = Stream.value(_download('download', _oldPath));
-          if (streamed) {
-            await notifier.restoreFromBackupStream(input);
-          } else {
-            await notifier.restoreFromBackupOperation(
-              () => db.replaceAll(input),
-            );
-          }
-          expect(
-            container.read(downloadHistoryProvider).items.single.filePath,
-            _currentPath,
-          );
-          expect(
-            (await store.trackPage(const QueueLibraryDbQuery())).rows,
-            hasLength(1),
-          );
-          expect(
-            (await history.query('history')).single['file_path'],
-            _currentPath,
-          );
-        }
-        expect(db.forcedMigrations, [true, true]);
-        expect(publications, isNotEmpty);
-        expect(publications.every((path) => path == _currentPath), isTrue);
-      },
+  test('restore repairs paths before publication', () async {
+    await migrateIosHistoryPaths(
+      history,
+      prefs,
+      containerPath: _currentContainer,
     );
-  }
+    await addLocal('scanned', _currentPath);
+    final db = _IosRestoreDatabase(history, prefs);
+    final container = ProviderContainer(
+      overrides: [downloadHistoryProvider.overrideWith(() => _History(db))],
+    );
+    addTearDown(container.dispose);
+    final publications = <String>[];
+    container.listen(downloadHistoryProvider, (_, next) {
+      publications.addAll(next.items.map((item) => item.filePath));
+    });
+    final notifier = container.read(downloadHistoryProvider.notifier);
+    for (var attempt = 0; attempt < 2; attempt++) {
+      await notifier.restoreFromBackupOperation(
+        () => db.restore(_download('download', _oldPath)),
+      );
+      expect(
+        container.read(downloadHistoryProvider).items.single.filePath,
+        _currentPath,
+      );
+      expect(
+        (await store.trackPage(const QueueLibraryDbQuery())).rows,
+        hasLength(1),
+      );
+      expect(
+        (await history.query('history')).single['file_path'],
+        _currentPath,
+      );
+    }
+    expect(db.forcedMigrations, [true, true]);
+    expect(publications, isNotEmpty);
+    expect(publications.every((path) => path == _currentPath), isTrue);
+  });
 
   test(
     'a failed path repair does not publish restored history as successful',
@@ -268,7 +264,7 @@ void main() {
       );
       await expectLater(
         notifier.restoreFromBackupOperation(
-          () => db.replaceAll(Stream.value(_download('download', _oldPath))),
+          () => db.restore(_download('download', _oldPath)),
         ),
         throwsStateError,
       );
@@ -280,18 +276,13 @@ void main() {
   test(
     'paged repair rolls back paths, keys, and markers on a late failure',
     () async {
-      await replaceHistoryRows(
-        history,
-        Stream.fromIterable([
-          for (var i = 0; i < 257; i++)
-            HistoryRowMapper.jsonToDbRow(
-              _download(
-                'track-${i.toString().padLeft(3, '0')}',
-                '$_oldContainer/Documents/$i.flac',
-              ),
-            ),
-        ]),
-      );
+      await _replaceHistory(history, [
+        for (var i = 0; i < 257; i++)
+          _download(
+            'track-${i.toString().padLeft(3, '0')}',
+            '$_oldContainer/Documents/$i.flac',
+          ),
+      ]);
       final beforeKeys = await history.query(
         'history_path_keys',
         orderBy: 'item_id,path_key',
@@ -344,13 +335,9 @@ void main() {
       'content://example.documents/tree/root/document/song.flac',
       '$_oldContainer/Documents/../tmp/Song.flac',
     ];
-    await replaceHistoryRows(
-      history,
-      Stream.fromIterable([
-        for (var i = 0; i < paths.length; i++)
-          HistoryRowMapper.jsonToDbRow(_download('$i', paths[i])),
-      ]),
-    );
+    await _replaceHistory(history, [
+      for (var i = 0; i < paths.length; i++) _download('$i', paths[i]),
+    ]);
     expect(
       await migrateIosHistoryPaths(
         history,

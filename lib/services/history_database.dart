@@ -310,12 +310,6 @@ class HistoryDatabase {
     });
   }
 
-  Future<void> replaceAll(Stream<Map<String, dynamic>> items) async =>
-      replaceHistoryRows(
-        await database,
-        items.map(HistoryRowMapper.jsonToDbRow),
-      );
-
   Future<Set<String>> updateExistingBatch(
     List<Map<String, dynamic>> items,
   ) async {
