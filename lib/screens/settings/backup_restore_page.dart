@@ -191,7 +191,6 @@ class _BackupRestorePageState extends ConsumerState<BackupRestorePage> {
 
   Future<bool> _confirmRestore(BackupBundle bundle) {
     final l10n = context.l10n;
-    final theme = Theme.of(context);
     return showAppConfirmDialog(
       context,
       title: l10n.backupRestoreConfirmTitle,
@@ -204,10 +203,12 @@ class _BackupRestorePageState extends ConsumerState<BackupRestorePage> {
         children: [
           Text(l10n.backupSelectedRestoreMessage),
           const SizedBox(height: 16),
-          Text(
-            l10n.backupContentsTitle,
-            style: theme.textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.w700,
+          Builder(
+            builder: (dialogContext) => Text(
+              l10n.backupContentsTitle,
+              style: Theme.of(
+                dialogContext,
+              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
             ),
           ),
           const SizedBox(height: 6),
