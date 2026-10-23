@@ -127,9 +127,7 @@ class _DuplicateReviewSheetState extends ConsumerState<DuplicateReviewSheet> {
       message: message,
       confirmLabel: context.l10n.dialogDelete,
       destructive: true,
-      confirmStyle: FilledButton.styleFrom(
-        backgroundColor: Theme.of(context).colorScheme.error,
-      ),
+      errorConfirm: true,
     );
     return confirmed && mounted;
   }

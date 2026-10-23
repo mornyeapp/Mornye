@@ -610,9 +610,7 @@ class _ExtensionDetailsScreenState
       destructive: true,
       filled: false,
       cancelIsDefault: true,
-      confirmStyle: TextButton.styleFrom(
-        foregroundColor: Theme.of(context).colorScheme.error,
-      ),
+      errorConfirm: true,
     );
 
     if (confirm) {

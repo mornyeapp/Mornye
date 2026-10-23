@@ -71,6 +71,8 @@ Future<T?> showAppDialog<T>({
 /// Asks a yes/no question: the cancel action pops false, the confirm action
 /// pops true, and dismissing the dialog counts as cancel. [content] replaces
 /// the plain [message] text; the flags map onto the two [AppDialogAction]s.
+/// [errorConfirm] paints the confirm action in the dialog theme's error
+/// color: the fill when [filled], the label otherwise.
 Future<bool> showAppConfirmDialog(
   BuildContext context, {
   required String title,
@@ -83,9 +85,11 @@ Future<bool> showAppConfirmDialog(
   bool cancelIsDefault = false,
   bool confirmIsDefault = false,
   ButtonStyle? confirmStyle,
+  bool errorConfirm = false,
   bool barrierDismissible = true,
 }) async {
   assert(message == null || content == null, 'Pass message or content.');
+  assert(!errorConfirm || confirmStyle == null, 'Pass one confirm style.');
   final result = await showAppDialog<bool>(
     context: context,
     barrierDismissible: barrierDismissible,
@@ -102,7 +106,15 @@ Future<bool> showAppConfirmDialog(
           filled: filled,
           isDefault: confirmIsDefault,
           isDestructive: destructive,
-          style: confirmStyle,
+          style: !errorConfirm
+              ? confirmStyle
+              : filled
+              ? FilledButton.styleFrom(
+                  backgroundColor: Theme.of(context).colorScheme.error,
+                )
+              : TextButton.styleFrom(
+                  foregroundColor: Theme.of(context).colorScheme.error,
+                ),
           onPressed: () => Navigator.pop(context, true),
           child: Text(confirmLabel),
         ),

@@ -302,6 +302,62 @@ void main() {
         });
       }
 
+      for (final filled in [true, false]) {
+        testWidgets('errorConfirm follows the dialog theme (filled=$filled)', (
+          tester,
+        ) async {
+          final base = _theme(mornye);
+          final theme = ValueNotifier(base);
+          addTearDown(theme.dispose);
+          await tester.pumpWidget(
+            ProviderScope(
+              child: ValueListenableBuilder(
+                valueListenable: theme,
+                builder: (context, data, _) => MaterialApp(
+                  theme: data,
+                  localizationsDelegates:
+                      AppLocalizations.localizationsDelegates,
+                  supportedLocales: AppLocalizations.supportedLocales,
+                  home: Builder(
+                    builder: (context) => Scaffold(
+                      body: TextButton(
+                        onPressed: () => showAppConfirmDialog(
+                          context,
+                          title: 'Title',
+                          confirmLabel: 'Go',
+                          filled: filled,
+                          errorConfirm: true,
+                        ),
+                        child: const Text('Open'),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+          await tester.tap(find.text('Open'));
+          await tester.pumpAndSettle();
+          Color? errorColor() {
+            final style = tester
+                .widget<AppDialogAction>(
+                  find.widgetWithText(AppDialogAction, 'Go'),
+                )
+                .style!;
+            return (filled ? style.backgroundColor : style.foregroundColor)
+                ?.resolve(const {});
+          }
+
+          expect(errorColor(), base.colorScheme.error);
+          const changed = Color(0xFF00AA00);
+          theme.value = base.copyWith(
+            colorScheme: base.colorScheme.copyWith(error: changed),
+          );
+          await tester.pumpAndSettle();
+          expect(errorColor(), changed);
+        });
+      }
+
       testWidgets('barrierDismissible false keeps the dialog open', (
         tester,
       ) async {
