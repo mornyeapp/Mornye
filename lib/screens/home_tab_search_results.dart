@@ -744,14 +744,17 @@ extension _HomeTabSearchResultsUI on _HomeTabState {
     ];
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 16 + wideListInset(context)),
-      // A mouse cannot swipe a clipped row, so desktop windows wrap every
-      // filter onto view.
-      child: isDesktopPlatform
-          ? Wrap(spacing: 8, runSpacing: 8, children: chips)
-          : SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(spacing: 8, children: chips),
-            ),
+      // The chips never overlap, so their glass shares one backdrop read.
+      child: LiquidGlassBatch(
+        // A mouse cannot swipe a clipped row, so desktop windows wrap every
+        // filter onto view.
+        child: isDesktopPlatform
+            ? Wrap(spacing: 8, runSpacing: 8, children: chips)
+            : SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(spacing: 8, children: chips),
+              ),
+      ),
     );
   }
 

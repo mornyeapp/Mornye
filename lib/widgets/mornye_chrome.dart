@@ -87,7 +87,7 @@ class MornyeGlassPanel extends ConsumerWidget {
     this.smoothCorners = false,
     this.highlightIntensity = 1,
     this.glassProgress = 1,
-  }) : _composedBackdrop = false;
+  });
 
   const MornyeGlassPanel.overlay({
     super.key,
@@ -102,8 +102,7 @@ class MornyeGlassPanel extends ConsumerWidget {
     this.smoothCorners = false,
     this.highlightIntensity = 1,
     this.glassProgress = 1,
-  }) : strongTint = true,
-       _composedBackdrop = true;
+  }) : strongTint = true;
 
   final Widget child;
   final double radius;
@@ -117,11 +116,10 @@ class MornyeGlassPanel extends ConsumerWidget {
   final bool smoothCorners;
   final double highlightIntensity;
   final double glassProgress;
-  final bool _composedBackdrop;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final glass = MornyeGlass.navigation(
+    return MornyeGlass.navigation(
       radius: radius,
       firstInGroup: firstInGroup,
       lastInGroup: lastInGroup,
@@ -136,10 +134,6 @@ class MornyeGlassPanel extends ConsumerWidget {
       // Tile ink must paint above the glass tint rather than beneath it.
       child: Material(type: MaterialType.transparency, child: child),
     );
-    // One overlay gets its own key: the package composes blur and refraction
-    // into one backdrop read, including while the route moves. Sharing that
-    // key with the page or another overlapping menu would lose their glass.
-    return _composedBackdrop ? LiquidGlassBatch(child: glass) : glass;
   }
 }
 
@@ -188,6 +182,10 @@ class MornyeGlass extends ConsumerWidget {
     for (final sigma in _blurSigmas)
       ImageFilter.blur(sigmaX: sigma, sigmaY: sigma),
   ];
+
+  /// Host tests cannot run shader filters; this lets them build the lens.
+  @visibleForTesting
+  static bool? debugShaderFilterSupport;
 
   final Widget child;
   final bool blurEnabled;
@@ -288,7 +286,7 @@ class MornyeGlass extends ConsumerWidget {
         firstInGroup &&
         lastInGroup &&
         level == MornyeGlassLevel.liquid &&
-        ImageFilter.isShaderFilterSupported;
+        (debugShaderFilterSupport ?? ImageFilter.isShaderFilterSupported);
     // Clear glass softens the backdrop less. Keep the mid-range fallback at
     // its small blur budget, and reuse these filters in the lens renderer too.
     final filterIndex = level == MornyeGlassLevel.frosted
@@ -325,7 +323,7 @@ class MornyeGlass extends ConsumerWidget {
             ),
           ]
         : null;
-    final backdrop = useLens
+    final lens = useLens
         ? MornyeLiquidBackdrop(
             borderRadius: shape,
             clarity: clarity,
@@ -335,6 +333,14 @@ class MornyeGlass extends ConsumerWidget {
             highlightIntensity: highlightIntensity * reveal,
             child: surface,
           )
+        : null;
+    // A batched lens composes blur and refraction into one backdrop read.
+    // Outside a batch it takes a key of its own: sharing one with the page or
+    // an overlapping menu would lose their glass.
+    final backdrop = lens != null
+        ? LiquidGlassBatch.backdropIdOf(context) == null
+              ? LiquidGlassBatch(child: lens)
+              : lens
         : sampleBackdrop
         ? BackdropFilter.grouped(filter: _blurs[filterIndex], child: surface)
         : surface;
