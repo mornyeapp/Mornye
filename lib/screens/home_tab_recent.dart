@@ -454,63 +454,53 @@ extension _HomeTabRecentUI on _HomeTabState {
     switch (item.type) {
       case RecentAccessType.artist:
         if (_isEnabledMetadataExtension(item.providerId)) {
-          Navigator.push(
+          pushPage<void>(
             context,
-            MaterialPageRoute<void>(
-              builder: (context) => ExtensionArtistScreen(
-                extensionId: item.providerId!,
-                artistId: item.id,
-                artistName: item.name,
-                coverUrl: item.imageUrl,
-              ),
+            (context) => ExtensionArtistScreen(
+              extensionId: item.providerId!,
+              artistId: item.id,
+              artistName: item.name,
+              coverUrl: item.imageUrl,
             ),
           );
         } else {
-          Navigator.push(
+          pushPage<void>(
             context,
-            MaterialPageRoute<void>(
-              builder: (context) => ArtistScreen(
-                artistId: item.id,
-                artistName: item.name,
-                coverUrl: item.imageUrl,
-              ),
+            (context) => ArtistScreen(
+              artistId: item.id,
+              artistName: item.name,
+              coverUrl: item.imageUrl,
             ),
           );
         }
         return;
       case RecentAccessType.album:
         if (item.providerId == 'download') {
-          Navigator.push(
+          pushPage<void>(
             context,
-            MaterialPageRoute<void>(
-              builder: (context) => DownloadedAlbumScreen(
-                albumName: item.name,
-                artistName: item.subtitle ?? '',
-                coverUrl: item.imageUrl,
-              ),
+            (context) => DownloadedAlbumScreen(
+              albumName: item.name,
+              artistName: item.subtitle ?? '',
+              coverUrl: item.imageUrl,
             ),
           );
         } else if (_isEnabledMetadataExtension(item.providerId)) {
-          Navigator.push(
+          pushPage<void>(
             context,
-            MaterialPageRoute<void>(
-              builder: (context) => ExtensionAlbumScreen(
-                extensionId: item.providerId!,
-                albumId: item.id,
-                albumName: item.name,
-                coverUrl: item.imageUrl,
-              ),
+            (context) => ExtensionAlbumScreen(
+              extensionId: item.providerId!,
+              albumId: item.id,
+              albumName: item.name,
+              coverUrl: item.imageUrl,
             ),
           );
         } else {
-          Navigator.push(
+          pushPage<void>(
             context,
-            MaterialPageRoute<void>(
-              builder: (context) => AlbumScreen(
-                albumId: item.id,
-                albumName: item.name,
-                coverUrl: item.imageUrl,
-              ),
+            (context) => AlbumScreen(
+              albumId: item.id,
+              albumName: item.name,
+              coverUrl: item.imageUrl,
             ),
           );
         }
@@ -537,28 +527,24 @@ extension _HomeTabRecentUI on _HomeTabState {
         }
 
         if (_isEnabledMetadataExtension(item.providerId)) {
-          Navigator.push(
+          pushPage<void>(
             context,
-            MaterialPageRoute<void>(
-              builder: (context) => ExtensionPlaylistScreen(
-                extensionId: item.providerId!,
-                playlistId: item.id,
-                playlistName: item.name,
-                coverUrl: item.imageUrl,
-              ),
+            (context) => ExtensionPlaylistScreen(
+              extensionId: item.providerId!,
+              playlistId: item.id,
+              playlistName: item.name,
+              coverUrl: item.imageUrl,
             ),
           );
         } else {
-          Navigator.push(
+          pushPage<void>(
             context,
-            MaterialPageRoute<void>(
-              builder: (context) => PlaylistScreen(
-                playlistName: item.name,
-                coverUrl: item.imageUrl,
-                tracks: const [],
-                playlistId: item.id,
-                metadataProviderId: item.providerId,
-              ),
+            (context) => PlaylistScreen(
+              playlistName: item.name,
+              coverUrl: item.imageUrl,
+              tracks: const [],
+              playlistId: item.id,
+              metadataProviderId: item.providerId,
             ),
           );
         }

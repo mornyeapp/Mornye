@@ -437,14 +437,13 @@ extension _QueueTabSections on _QueueTabState {
             sections.add(_LibrarySection(label, i, entries.length));
           }
         }
-        void openArtist(String artist) => Navigator.of(context).push(
-          MaterialPageRoute<void>(
-            builder: (_) => Scaffold(
-              body: MornyeLibraryScreen(
-                page: MornyeLibraryPage.albums,
-                artist: artist,
-                onOpenSection: (_) {},
-              ),
+        void openArtist(String artist) => pushPage<void>(
+          context,
+          (_) => Scaffold(
+            body: MornyeLibraryScreen(
+              page: MornyeLibraryPage.albums,
+              artist: artist,
+              onOpenSection: (_) {},
             ),
           ),
         );

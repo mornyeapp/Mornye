@@ -543,6 +543,10 @@ void pushViaPreferredNavigator(
   push(activeTabNavigator);
 }
 
+/// Pushes a [MaterialPageRoute] built by [builder] onto the nearest navigator.
+Future<T?> pushPage<T>(BuildContext context, WidgetBuilder builder) =>
+    Navigator.push(context, MaterialPageRoute<T>(builder: builder));
+
 void _showLoadingSnackBar(BuildContext context, String message) {
   ScaffoldMessenger.of(context).showSnackBar(
     SnackBar(

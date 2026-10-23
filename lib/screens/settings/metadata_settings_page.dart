@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mornye/controllers/clickable_metadata.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/utils/artist_utils.dart';
@@ -55,10 +56,9 @@ class MetadataSettingsPage extends ConsumerWidget {
                   SettingsItem(
                     icon: Icons.format_list_bulleted,
                     title: context.l10n.metadataSeparators,
-                    onTap: () => Navigator.of(context).push<void>(
-                      MaterialPageRoute(
-                        builder: (_) => const MetadataSeparatorSettingsPage(),
-                      ),
+                    onTap: () => pushPage<void>(
+                      context,
+                      (_) => const MetadataSeparatorSettingsPage(),
                     ),
                   ),
                   SettingsItem(
@@ -97,11 +97,9 @@ class MetadataSettingsPage extends ConsumerWidget {
                   icon: Icons.source_outlined,
                   title: context.l10n.metadataProvidersTitle,
                   subtitle: context.l10n.metadataProvidersSubtitle,
-                  onTap: () => Navigator.push(
+                  onTap: () => pushPage<void>(
                     context,
-                    MaterialPageRoute<void>(
-                      builder: (_) => const MetadataProviderPriorityPage(),
-                    ),
+                    (_) => const MetadataProviderPriorityPage(),
                   ),
                   showDivider: false,
                 ),

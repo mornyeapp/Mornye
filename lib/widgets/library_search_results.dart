@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mornye/controllers/clickable_metadata.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/models/unified_library_item.dart';
 import 'package:mornye/providers/library_search_provider.dart';
@@ -322,12 +323,11 @@ class _LibrarySearchResultsState extends ConsumerState<LibrarySearchResults> {
           );
           if (!mounted || item == null) return;
           if (!play) {
-            await Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => TrackMetadataScreen(
-                  item: item.historyItem,
-                  localItem: item.localItem,
-                ),
+            await pushPage<void>(
+              context,
+              (_) => TrackMetadataScreen(
+                item: item.historyItem,
+                localItem: item.localItem,
               ),
             );
             return;
@@ -345,12 +345,11 @@ class _LibrarySearchResultsState extends ConsumerState<LibrarySearchResults> {
         case LibrarySearchKind.artists:
           widget.onOpenArtist(hit.title);
         case LibrarySearchKind.playlists:
-          await Navigator.of(context).push(
-            MaterialPageRoute<void>(
-              builder: (_) => LibraryTracksFolderScreen(
-                mode: LibraryTracksFolderMode.playlist,
-                playlistId: hit.id,
-              ),
+          await pushPage<void>(
+            context,
+            (_) => LibraryTracksFolderScreen(
+              mode: LibraryTracksFolderMode.playlist,
+              playlistId: hit.id,
             ),
           );
         case LibrarySearchKind.albums:
@@ -358,24 +357,22 @@ class _LibrarySearchResultsState extends ConsumerState<LibrarySearchResults> {
             final rows = await LibraryDatabase.instance
                 .getQueueLocalAlbumTracksByKey(hit.id);
             if (!mounted) return;
-            await Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => LocalAlbumScreen(
-                  albumName: hit.title,
-                  artistName: hit.artist,
-                  coverPath: hit.cover,
-                  tracks: rows.map(LocalLibraryItem.fromJson).toList(),
-                ),
+            await pushPage<void>(
+              context,
+              (_) => LocalAlbumScreen(
+                albumName: hit.title,
+                artistName: hit.artist,
+                coverPath: hit.cover,
+                tracks: rows.map(LocalLibraryItem.fromJson).toList(),
               ),
             );
           } else {
-            await Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => DownloadedAlbumScreen(
-                  albumName: hit.title,
-                  artistName: hit.artist,
-                  coverUrl: hit.cover,
-                ),
+            await pushPage<void>(
+              context,
+              (_) => DownloadedAlbumScreen(
+                albumName: hit.title,
+                artistName: hit.artist,
+                coverUrl: hit.cover,
               ),
             );
           }

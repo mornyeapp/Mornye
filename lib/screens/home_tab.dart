@@ -666,17 +666,15 @@ class _HomeTabState extends ConsumerState<HomeTab>
         trackState.albumName != null &&
         trackState.tracks.isNotEmpty) {
       final extensionId = trackState.searchExtensionId;
-      Navigator.push(
+      pushPage<void>(
         context,
-        MaterialPageRoute<void>(
-          builder: (context) => AlbumScreen(
-            albumId: trackState.albumId!,
-            albumName: trackState.albumName!,
-            description: trackState.albumDescription,
-            coverUrl: trackState.coverUrl,
-            tracks: trackState.tracks,
-            extensionId: extensionId,
-          ),
+        (context) => AlbumScreen(
+          albumId: trackState.albumId!,
+          albumName: trackState.albumName!,
+          description: trackState.albumDescription,
+          coverUrl: trackState.coverUrl,
+          tracks: trackState.tracks,
+          extensionId: extensionId,
         ),
       );
       ref.read(trackProvider.notifier).clear();
@@ -695,18 +693,16 @@ class _HomeTabState extends ConsumerState<HomeTab>
             providerId: playlistProviderId,
           );
 
-      Navigator.push(
+      pushPage<void>(
         context,
-        MaterialPageRoute<void>(
-          builder: (context) => PlaylistScreen(
-            playlistName: trackState.playlistName!,
-            coverUrl: trackState.coverUrl,
-            tracks: trackState.tracks,
-            playlistId: trackState.playlistId,
-            metadataProviderId: playlistProviderId,
-            recommendedService:
-                trackState.searchExtensionId ?? trackState.searchSource,
-          ),
+        (context) => PlaylistScreen(
+          playlistName: trackState.playlistName!,
+          coverUrl: trackState.coverUrl,
+          tracks: trackState.tracks,
+          playlistId: trackState.playlistId,
+          metadataProviderId: playlistProviderId,
+          recommendedService:
+              trackState.searchExtensionId ?? trackState.searchSource,
         ),
       );
       ref.read(trackProvider.notifier).clear();
@@ -718,22 +714,20 @@ class _HomeTabState extends ConsumerState<HomeTab>
         trackState.artistName != null &&
         trackState.artistAlbums != null) {
       final extensionId = trackState.searchExtensionId;
-      Navigator.push(
+      pushPage<void>(
         context,
-        MaterialPageRoute<void>(
-          builder: (context) => ArtistScreen(
-            artistId: trackState.artistId!,
-            artistName: trackState.artistName!,
-            coverUrl: trackState.coverUrl,
-            headerImageUrl: trackState.headerImageUrl,
-            headerVideoUrl: trackState.headerVideoUrl,
-            headerLogoUrl: trackState.headerLogoUrl,
-            concerts: trackState.artistConcerts,
-            albumsNext: trackState.artistAlbumsNext,
-            albums: trackState.artistAlbums!,
-            topTracks: trackState.artistTopTracks,
-            extensionId: extensionId,
-          ),
+        (context) => ArtistScreen(
+          artistId: trackState.artistId!,
+          artistName: trackState.artistName!,
+          coverUrl: trackState.coverUrl,
+          headerImageUrl: trackState.headerImageUrl,
+          headerVideoUrl: trackState.headerVideoUrl,
+          headerLogoUrl: trackState.headerLogoUrl,
+          concerts: trackState.artistConcerts,
+          albumsNext: trackState.artistAlbumsNext,
+          albums: trackState.artistAlbums!,
+          topTracks: trackState.artistTopTracks,
+          extensionId: extensionId,
         ),
       );
       ref.read(trackProvider.notifier).clear();
@@ -1137,14 +1131,13 @@ class _HomeTabState extends ConsumerState<HomeTab>
     return LibrarySearchResults(
       query: _libraryQuery,
       shelves: true,
-      onOpenArtist: (artist) => Navigator.of(context).push(
-        MaterialPageRoute<void>(
-          builder: (_) => Scaffold(
-            body: MornyeLibraryScreen(
-              page: MornyeLibraryPage.albums,
-              artist: artist,
-              onOpenSection: (_) {},
-            ),
+      onOpenArtist: (artist) => pushPage<void>(
+        context,
+        (_) => Scaffold(
+          body: MornyeLibraryScreen(
+            page: MornyeLibraryPage.albums,
+            artist: artist,
+            onOpenSection: (_) {},
           ),
         ),
       ),

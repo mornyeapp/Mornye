@@ -15,6 +15,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:device_info_plus/device_info_plus.dart';
+import 'package:mornye/controllers/clickable_metadata.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/screens/network_storage_screen.dart';
 import 'package:mornye/models/settings.dart';
@@ -145,10 +146,9 @@ class _FilesSettingsPageState extends ConsumerState<FilesSettingsPage> {
                   subtitle: settings.networkDownloadFolder.isEmpty
                       ? context.l10n.networkUseForDownloads
                       : settings.networkDownloadLabel,
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) => const NetworkStorageScreen(),
-                    ),
+                  onTap: () => pushPage<void>(
+                    context,
+                    (_) => const NetworkStorageScreen(),
                   ),
                   showDivider: settings.networkDownloadFolder.isNotEmpty,
                 ),

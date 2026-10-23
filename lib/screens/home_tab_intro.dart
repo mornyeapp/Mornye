@@ -683,9 +683,7 @@ class _HomeShortcuts extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = context.l10n;
     final colorScheme = Theme.of(context).colorScheme;
-    void open(Widget screen) => Navigator.of(
-      context,
-    ).push(MaterialPageRoute<void>(builder: (_) => screen));
+    void open(Widget screen) => pushPage<void>(context, (_) => screen);
 
     // Shuffle is the one emphasized action; the other tools share a neutral
     // tile so color marks importance rather than varying per tile.

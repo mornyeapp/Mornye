@@ -6,6 +6,7 @@ import 'package:mornye/widgets/extension_row.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path/path.dart' as p;
+import 'package:mornye/controllers/clickable_metadata.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/models/settings.dart';
 import 'package:mornye/providers/extension_provider.dart';
@@ -191,12 +192,9 @@ class _ExtensionsPageState extends ConsumerState<ExtensionsPage> {
                       extension: ext,
                       healthStatus: extState.healthStatuses[ext.id],
                       showDivider: index < extState.extensions.length - 1,
-                      onTap: () => Navigator.push(
+                      onTap: () => pushPage<void>(
                         context,
-                        MaterialPageRoute<void>(
-                          builder: (_) =>
-                              ExtensionDetailPage(extensionId: ext.id),
-                        ),
+                        (_) => ExtensionDetailPage(extensionId: ext.id),
                       ),
                       onToggle: (enabled) => ref
                           .read(extensionProvider.notifier)

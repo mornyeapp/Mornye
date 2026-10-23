@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mornye/controllers/clickable_metadata.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/extension_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
@@ -77,11 +78,9 @@ class LyricsSettingsPage extends ConsumerWidget {
                       settings.lyricsProviders,
                       extensionProviderNames,
                     ),
-                    onTap: () => Navigator.push(
+                    onTap: () => pushPage<void>(
                       context,
-                      MaterialPageRoute<void>(
-                        builder: (_) => const LyricsProviderPriorityPage(),
-                      ),
+                      (_) => const LyricsProviderPriorityPage(),
                     ),
                     showDivider: false,
                   ),

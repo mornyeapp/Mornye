@@ -9,6 +9,7 @@ import 'package:mornye/theme/app_tokens.dart';
 import 'package:mornye/widgets/app_search_field.dart';
 import 'package:mornye/widgets/app_sliver_header.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mornye/controllers/clickable_metadata.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/repo_provider.dart';
@@ -654,10 +655,9 @@ class _RepoTabState extends ConsumerState<RepoTab> {
   }
 
   void _showExtensionDetails(RepoExtension ext) {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (context) => ExtensionDetailsScreen(extension: ext),
-      ),
+    pushPage<void>(
+      context,
+      (context) => ExtensionDetailsScreen(extension: ext),
     );
   }
 

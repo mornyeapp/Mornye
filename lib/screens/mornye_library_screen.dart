@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mornye/controllers/clickable_metadata.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/download_queue_provider.dart';
 import 'package:mornye/providers/library_browse_provider.dart';
@@ -103,14 +104,13 @@ class _MornyeLibraryScreenState extends ConsumerState<MornyeLibraryScreen> {
   }
 
   void _openPage(MornyeLibraryPage page, {String? artist}) {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => Scaffold(
-          body: MornyeLibraryScreen(
-            page: page,
-            artist: artist,
-            onOpenSection: widget.onOpenSection,
-          ),
+    pushPage<void>(
+      context,
+      (_) => Scaffold(
+        body: MornyeLibraryScreen(
+          page: page,
+          artist: artist,
+          onOpenSection: widget.onOpenSection,
         ),
       ),
     );
@@ -118,27 +118,25 @@ class _MornyeLibraryScreenState extends ConsumerState<MornyeLibraryScreen> {
 
   Future<void> _openAlbum(LibraryBrowseEntry entry) async {
     if (entry.source != 'local') {
-      await Navigator.of(context).push(
-        MaterialPageRoute<void>(
-          builder: (_) => DownloadedAlbumScreen(
-            albumName: entry.name,
-            artistName: entry.artist,
-            coverUrl: entry.cover,
-          ),
+      await pushPage<void>(
+        context,
+        (_) => DownloadedAlbumScreen(
+          albumName: entry.name,
+          artistName: entry.artist,
+          coverUrl: entry.cover,
         ),
       );
       return;
     }
     Future<List<LocalLibraryItem>> loadTracks() => _loadLocalAlbum(entry);
 
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => LocalAlbumScreen(
-          albumName: entry.name,
-          artistName: entry.artist,
-          coverPath: entry.cover,
-          loadTracks: loadTracks,
-        ),
+    await pushPage<void>(
+      context,
+      (_) => LocalAlbumScreen(
+        albumName: entry.name,
+        artistName: entry.artist,
+        coverPath: entry.cover,
+        loadTracks: loadTracks,
       ),
     );
   }

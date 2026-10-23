@@ -140,12 +140,7 @@ class _ExtensionPriorityLink extends ConsumerWidget {
             : metadata
             ? l10n.extensionsNoMetadataProvider
             : l10n.extensionsNoDownloadProvider,
-        onTap: enabled
-            ? () => Navigator.push(
-                context,
-                MaterialPageRoute<void>(builder: (_) => page),
-              )
-            : null,
+        onTap: enabled ? () => pushPage<void>(context, (_) => page) : null,
       ),
     );
   }

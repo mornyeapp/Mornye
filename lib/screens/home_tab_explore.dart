@@ -341,15 +341,13 @@ extension _HomeTabExploreUI on _HomeTabState {
           _showMissingExploreProviderMessage();
           return;
         }
-        Navigator.push(
+        pushPage<void>(
           context,
-          MaterialPageRoute<void>(
-            builder: (context) => ExtensionAlbumScreen(
-              extensionId: extensionId,
-              albumId: item.id,
-              albumName: item.name,
-              coverUrl: item.coverUrl,
-            ),
+          (context) => ExtensionAlbumScreen(
+            extensionId: extensionId,
+            albumId: item.id,
+            albumName: item.name,
+            coverUrl: item.coverUrl,
           ),
         );
         return;
@@ -358,15 +356,13 @@ extension _HomeTabExploreUI on _HomeTabState {
           _showMissingExploreProviderMessage();
           return;
         }
-        Navigator.push(
+        pushPage<void>(
           context,
-          MaterialPageRoute<void>(
-            builder: (context) => ExtensionPlaylistScreen(
-              extensionId: extensionId,
-              playlistId: item.id,
-              playlistName: item.name,
-              coverUrl: item.coverUrl,
-            ),
+          (context) => ExtensionPlaylistScreen(
+            extensionId: extensionId,
+            playlistId: item.id,
+            playlistName: item.name,
+            coverUrl: item.coverUrl,
           ),
         );
         return;
@@ -375,15 +371,13 @@ extension _HomeTabExploreUI on _HomeTabState {
           _showMissingExploreProviderMessage();
           return;
         }
-        Navigator.push(
+        pushPage<void>(
           context,
-          MaterialPageRoute<void>(
-            builder: (context) => ExtensionArtistScreen(
-              extensionId: extensionId,
-              artistId: item.id,
-              artistName: item.name,
-              coverUrl: item.coverUrl,
-            ),
+          (context) => ExtensionArtistScreen(
+            extensionId: extensionId,
+            artistId: item.id,
+            artistName: item.name,
+            coverUrl: item.coverUrl,
           ),
         );
         return;
@@ -727,16 +721,15 @@ extension _HomeTabExploreUI on _HomeTabState {
 
   void _openExploreSection(ExploreSection section) {
     final colorScheme = Theme.of(context).colorScheme;
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => _ExploreSectionPage(
-          section: section,
-          itemExtent: _exploreCardSize(context),
-          itemHeight: _exploreSectionHeight(context),
-          itemBuilder: (itemContext, item) =>
-              _buildExploreItem(itemContext, item, colorScheme),
-          onOpen: _navigateToExploreItem,
-        ),
+    pushPage<void>(
+      context,
+      (_) => _ExploreSectionPage(
+        section: section,
+        itemExtent: _exploreCardSize(context),
+        itemHeight: _exploreSectionHeight(context),
+        itemBuilder: (itemContext, item) =>
+            _buildExploreItem(itemContext, item, colorScheme),
+        onOpen: _navigateToExploreItem,
       ),
     );
   }
@@ -749,15 +742,13 @@ extension _HomeTabExploreUI on _HomeTabState {
         return;
       }
 
-      Navigator.push(
+      pushPage<void>(
         context,
-        MaterialPageRoute<void>(
-          builder: (context) => ExtensionAlbumScreen(
-            extensionId: extensionId,
-            albumId: item.albumId!,
-            albumName: item.albumName ?? 'Album',
-            coverUrl: item.coverUrl,
-          ),
+        (context) => ExtensionAlbumScreen(
+          extensionId: extensionId,
+          albumId: item.albumId!,
+          albumName: item.albumName ?? 'Album',
+          coverUrl: item.coverUrl,
         ),
       );
     } else {

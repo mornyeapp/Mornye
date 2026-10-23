@@ -1345,28 +1345,24 @@ extension _ArtistScreenSections on _ArtistScreenState {
     ref.read(settingsProvider.notifier).setHasSearchedBefore();
 
     if (album.providerId != null && album.providerId!.isNotEmpty) {
-      Navigator.push(
+      pushPage<void>(
         context,
-        MaterialPageRoute<void>(
-          builder: (context) => ExtensionAlbumScreen(
-            extensionId: album.providerId!,
-            albumId: album.id,
-            albumName: album.name,
-            coverUrl: album.coverUrl,
-            initialAlbumType: album.albumType,
-            initialTotalTracks: album.totalTracks,
-          ),
+        (context) => ExtensionAlbumScreen(
+          extensionId: album.providerId!,
+          albumId: album.id,
+          albumName: album.name,
+          coverUrl: album.coverUrl,
+          initialAlbumType: album.albumType,
+          initialTotalTracks: album.totalTracks,
         ),
       );
     } else {
-      Navigator.push(
+      pushPage<void>(
         context,
-        MaterialPageRoute<void>(
-          builder: (context) => AlbumScreen(
-            albumId: album.id,
-            albumName: album.name,
-            coverUrl: album.coverUrl,
-          ),
+        (context) => AlbumScreen(
+          albumId: album.id,
+          albumName: album.name,
+          coverUrl: album.coverUrl,
         ),
       );
     }

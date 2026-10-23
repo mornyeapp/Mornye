@@ -576,17 +576,15 @@ extension _HomeTabSearchResultsUI on _HomeTabState {
           providerId: extensionId,
         );
 
-    Navigator.push(
+    pushPage<void>(
       context,
-      MaterialPageRoute<void>(
-        builder: (context) => ExtensionAlbumScreen(
-          extensionId: extensionId,
-          albumId: albumItem.id,
-          albumName: albumItem.name,
-          coverUrl: albumItem.coverUrl,
-          initialAlbumType: albumItem.albumType,
-          initialTotalTracks: albumItem.totalTracks,
-        ),
+      (context) => ExtensionAlbumScreen(
+        extensionId: extensionId,
+        albumId: albumItem.id,
+        albumName: albumItem.name,
+        coverUrl: albumItem.coverUrl,
+        initialAlbumType: albumItem.albumType,
+        initialTotalTracks: albumItem.totalTracks,
       ),
     );
   }
@@ -605,15 +603,13 @@ extension _HomeTabSearchResultsUI on _HomeTabState {
           providerId: extensionId,
         );
 
-    Navigator.push(
+    pushPage<void>(
       context,
-      MaterialPageRoute<void>(
-        builder: (context) => ExtensionPlaylistScreen(
-          extensionId: extensionId,
-          playlistId: playlistItem.id,
-          playlistName: playlistItem.name,
-          coverUrl: playlistItem.coverUrl,
-        ),
+      (context) => ExtensionPlaylistScreen(
+        extensionId: extensionId,
+        playlistId: playlistItem.id,
+        playlistName: playlistItem.name,
+        coverUrl: playlistItem.coverUrl,
       ),
     );
   }
@@ -631,15 +627,13 @@ extension _HomeTabSearchResultsUI on _HomeTabState {
           providerId: extensionId,
         );
 
-    Navigator.push(
+    pushPage<void>(
       context,
-      MaterialPageRoute<void>(
-        builder: (context) => ExtensionArtistScreen(
-          extensionId: extensionId,
-          artistId: artistItem.id,
-          artistName: artistItem.name,
-          coverUrl: artistItem.coverUrl,
-        ),
+      (context) => ExtensionArtistScreen(
+        extensionId: extensionId,
+        artistId: artistItem.id,
+        artistName: artistItem.name,
+        coverUrl: artistItem.coverUrl,
       ),
     );
   }

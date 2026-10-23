@@ -509,10 +509,9 @@ class _QueueTabState extends ConsumerState<QueueTab> {
   Widget build(BuildContext context) {
     if (context.isMornye && widget.librarySection == null) {
       return MornyeLibraryScreen(
-        onOpenSection: (section) => Navigator.of(context).push(
-          MaterialPageRoute<void>(
-            builder: (_) => Scaffold(body: QueueTab(librarySection: section)),
-          ),
+        onOpenSection: (section) => pushPage<void>(
+          context,
+          (_) => Scaffold(body: QueueTab(librarySection: section)),
         ),
       );
     }
@@ -948,14 +947,13 @@ class _QueueTabState extends ConsumerState<QueueTab> {
                       slivers: [
                         LibrarySearchResults(
                           query: _searchQuery,
-                          onOpenArtist: (artist) => Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (_) => Scaffold(
-                                body: MornyeLibraryScreen(
-                                  page: MornyeLibraryPage.albums,
-                                  artist: artist,
-                                  onOpenSection: (_) {},
-                                ),
+                          onOpenArtist: (artist) => pushPage<void>(
+                            context,
+                            (_) => Scaffold(
+                              body: MornyeLibraryScreen(
+                                page: MornyeLibraryPage.albums,
+                                artist: artist,
+                                onOpenSection: (_) {},
                               ),
                             ),
                           ),

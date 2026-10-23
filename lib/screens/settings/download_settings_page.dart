@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mornye/controllers/clickable_metadata.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/providers/extension_provider.dart';
@@ -246,11 +247,9 @@ class _DownloadSettingsPageState extends ConsumerState<DownloadSettingsPage> {
                   icon: Icons.extension_outlined,
                   title: context.l10n.downloadFallbackExtensions,
                   subtitle: context.l10n.downloadFallbackExtensionsSubtitle,
-                  onTap: () => Navigator.push(
+                  onTap: () => pushPage<void>(
                     context,
-                    MaterialPageRoute<void>(
-                      builder: (_) => const DownloadFallbackExtensionsPage(),
-                    ),
+                    (_) => const DownloadFallbackExtensionsPage(),
                   ),
                   showDivider: false,
                 ),

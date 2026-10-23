@@ -1197,9 +1197,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
         await _showSleepTimerSheet(context, controller, colorScheme);
         break;
       case 'equalizer':
-        await Navigator.of(context).push<void>(
-          MaterialPageRoute(builder: (_) => const EqualizerScreen()),
-        );
+        await pushPage<void>(context, (_) => const EqualizerScreen());
         break;
       case 'external':
         await _openExternally(source);

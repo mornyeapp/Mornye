@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mornye/controllers/clickable_metadata.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/services/music_playback_deck.dart';
@@ -99,9 +100,8 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage> {
                 title: context.l10n.equalizerTitle,
                 titleTrailing: const BetaBadge(),
                 subtitle: context.l10n.equalizerDescription,
-                onTap: () => Navigator.of(context).push<void>(
-                  MaterialPageRoute(builder: (_) => const EqualizerScreen()),
-                ),
+                onTap: () =>
+                    pushPage<void>(context, (_) => const EqualizerScreen()),
               ),
               SettingsSwitchItem(
                 icon: Icons.graphic_eq,
