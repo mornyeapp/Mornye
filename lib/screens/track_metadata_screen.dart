@@ -77,7 +77,7 @@ import 'package:mornye/widgets/settings_group.dart';
 import 'package:mornye/constants/music_services.dart';
 import 'package:mornye/controllers/batch_track_actions.dart'
     show convertLibraryTrack;
-import 'package:mornye/screens/collapsing_header_scroll_mixin.dart';
+import 'package:mornye/controllers/collapsing_header_scroll_mixin.dart';
 import 'package:mornye/screens/track_metadata_edit_sheet.dart';
 import 'package:mornye/utils/clickable_metadata.dart';
 
@@ -211,6 +211,9 @@ class _TrackMetadataScreenState extends ConsumerState<TrackMetadataScreen>
 
   /// Shared by the lyrics box and its scrollbar.
   final _lyricsScrollController = ScrollController();
+
+  @override
+  bool get rebuildsOnTitleFlip => false;
 
   @override
   void initState() {
@@ -686,7 +689,7 @@ class _TrackMetadataScreenState extends ConsumerState<TrackMetadataScreen>
         _lyricsLoading = false;
         _lyricsError = null;
         _lyricsSource = null;
-        showTitleInAppBar = false;
+        showTitleNotifier.value = false;
         _lyricsEmbedded = false;
         _isInstrumental = false;
         _embeddedLyricsChecked = false;
@@ -733,9 +736,13 @@ class _TrackMetadataScreenState extends ConsumerState<TrackMetadataScreen>
               stretch: true,
               backgroundColor: colorScheme.surface,
               surfaceTintColor: Colors.transparent,
-              title: AnimatedOpacity(
-                duration: const Duration(milliseconds: 200),
-                opacity: showTitleInAppBar ? 1.0 : 0.0,
+              title: ValueListenableBuilder(
+                valueListenable: showTitleNotifier,
+                builder: (_, showTitle, title) => AnimatedOpacity(
+                  duration: const Duration(milliseconds: 200),
+                  opacity: showTitle ? 1.0 : 0.0,
+                  child: title,
+                ),
                 child: ExplicitTrackTitle(
                   title: trackName,
                   explicit: isExplicit,

@@ -180,7 +180,7 @@ class _ArtistScreenState extends ConsumerState<ArtistScreen>
   int? _monthlyListeners;
   String? _error;
 
-  bool _showTitleInAppBar = false;
+  final _showTitleInAppBar = ValueNotifier(false);
   final ScrollController _scrollController = ScrollController();
   final PageController _popularPageController = PageController();
   final SelectionOverlayController _selectionOverlay =
@@ -285,18 +285,14 @@ class _ArtistScreenState extends ConsumerState<ArtistScreen>
     }
   }
 
-  void _onScroll() {
-    final shouldShow = _scrollController.offset > 280;
-    if (shouldShow != _showTitleInAppBar) {
-      setState(() => _showTitleInAppBar = shouldShow);
-    }
-  }
+  void _onScroll() => _showTitleInAppBar.value = _scrollController.offset > 280;
 
   @override
   void dispose() {
     _selectionOverlay.dispose();
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
+    _showTitleInAppBar.dispose();
     _popularPageController.dispose();
     super.dispose();
   }

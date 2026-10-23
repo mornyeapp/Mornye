@@ -11,7 +11,7 @@ import 'package:mornye/models/artist_concert.dart';
 import 'package:mornye/providers/track_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/screens/album_screen.dart';
-import 'package:mornye/screens/collapsing_header_scroll_mixin.dart';
+import 'package:mornye/controllers/collapsing_header_scroll_mixin.dart';
 import 'package:mornye/screens/artist_screen.dart';
 import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/utils/adaptive_layout.dart';

@@ -91,7 +91,8 @@ extension _ArtistScreenSections on _ArtistScreenState {
         logoUrl: _headerLogoUrl ?? widget.headerLogoUrl,
         badge: _concerts.isEmpty || isSelectionMode ? null : _concertsButton(),
         listeners: listenersText,
-        showTitle: _showTitleInAppBar,
+        showTitle: false,
+        showTitleListenable: _showTitleInAppBar,
         artwork: hasMotionBanner
             ? MotionHeaderBanner(videoUrl: headerVideoUrl, fallback: artwork)
             : artwork,
@@ -297,10 +298,27 @@ extension _ArtistScreenSections on _ArtistScreenState {
       Curves.linear,
     );
     final titleFade = AppMotion.effects(context, fallbackMotion);
-    Widget toolbarTitle = AnimatedOpacity(
-      duration: titleFade.duration,
-      curve: titleFade.curve,
-      opacity: _showTitleInAppBar ? 1.0 : 0.0,
+    final titleSlide = materialExpressiveEnabled(context)
+        ? AppMotion.spatial(context, fallbackMotion)
+        : null;
+    final toolbarTitle = ValueListenableBuilder(
+      valueListenable: _showTitleInAppBar,
+      builder: (_, showTitle, text) {
+        final Widget title = AnimatedOpacity(
+          duration: titleFade.duration,
+          curve: titleFade.curve,
+          opacity: showTitle ? 1.0 : 0.0,
+          child: text,
+        );
+        return titleSlide == null
+            ? title
+            : AnimatedSlide(
+                duration: titleSlide.duration,
+                curve: titleSlide.curve,
+                offset: showTitle ? Offset.zero : const Offset(0, 0.6),
+                child: title,
+              );
+      },
       child: Text(
         widget.artistName,
         style: TextStyle(
@@ -312,15 +330,6 @@ extension _ArtistScreenSections on _ArtistScreenState {
         overflow: TextOverflow.ellipsis,
       ),
     );
-    if (materialExpressiveEnabled(context)) {
-      final titleSlide = AppMotion.spatial(context, fallbackMotion);
-      toolbarTitle = AnimatedSlide(
-        duration: titleSlide.duration,
-        curve: titleSlide.curve,
-        offset: _showTitleInAppBar ? Offset.zero : const Offset(0, 0.6),
-        child: toolbarTitle,
-      );
-    }
     return SliverAppBar(
       expandedHeight: hasDiscography ? 420 : 380,
       pinned: true,

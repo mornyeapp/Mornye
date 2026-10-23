@@ -17,7 +17,7 @@ import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/utils/image_cache_utils.dart';
 import 'package:mornye/utils/string_utils.dart';
 import 'package:mornye/utils/cover_art_utils.dart';
-import 'package:mornye/screens/collapsing_header_scroll_mixin.dart';
+import 'package:mornye/controllers/collapsing_header_scroll_mixin.dart';
 import 'package:mornye/screens/selection_mode_mixin.dart';
 import 'package:mornye/widgets/error_card.dart';
 import 'package:mornye/widgets/album_detail_header.dart';
@@ -122,6 +122,9 @@ class _AlbumScreenState extends ConsumerState<AlbumScreen>
       ref.read(extensionProvider),
     );
   }
+
+  @override
+  bool get rebuildsOnTitleFlip => false;
 
   @override
   void initState() {
@@ -570,7 +573,8 @@ class _AlbumScreenState extends ConsumerState<AlbumScreen>
       immersive: context.isMornye,
       squareArtwork: !hasMotion && headerBgUrl == coverThumbUrl,
       expandedHeight: expandedHeight,
-      showTitleInAppBar: showTitleInAppBar,
+      showTitleInAppBar: false,
+      showTitleListenable: showTitleNotifier,
       backgroundColor: pageBackgroundColor,
       background: background,
       paletteSource: coverThumbUrl,

@@ -27,7 +27,7 @@ import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/widgets/desktop/desktop_selection.dart';
 import 'package:mornye/widgets/desktop/track_list_table.dart';
 import 'package:mornye/widgets/track_detail_actions.dart';
-import 'package:mornye/screens/collapsing_header_scroll_mixin.dart';
+import 'package:mornye/controllers/collapsing_header_scroll_mixin.dart';
 import 'package:mornye/widgets/error_card.dart';
 import 'package:mornye/widgets/downloadable_cover.dart';
 import 'package:mornye/theme/mornye_theme.dart';
@@ -190,6 +190,9 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen>
   }
 
   @override
+  bool get rebuildsOnTitleFlip => false;
+
+  @override
   void initState() {
     super.initState();
     _fetchTracksIfNeeded();
@@ -344,7 +347,8 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen>
       immersive: context.isMornye,
       squareArtwork: !hasMotion,
       expandedHeight: expandedHeight,
-      showTitleInAppBar: showTitleInAppBar,
+      showTitleInAppBar: false,
+      showTitleListenable: showTitleNotifier,
       background: hasMotion
           ? MotionHeaderBanner(videoUrl: motionUrl, fallback: coverImage)
           : coverImage,
