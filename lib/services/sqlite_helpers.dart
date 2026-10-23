@@ -325,6 +325,22 @@ Future<void> addColumnIfMissing(
   }
 }
 
+/// Rewrites every row of [table] by id with [values] computed from its
+/// [columns], in one batch.
+Future<void> backfillRows(
+  Database db,
+  String table,
+  List<String> columns,
+  Map<String, Object?> Function(Map<String, Object?> row) values,
+) async {
+  final rows = await db.query(table, columns: ['id', ...columns]);
+  final batch = db.batch();
+  for (final row in rows) {
+    batch.update(table, values(row), where: 'id = ?', whereArgs: [row['id']]);
+  }
+  await batch.commit(noResult: true);
+}
+
 /// Loads rows whose [column] matches any of [rawValues] (chunked IN clauses)
 /// into [destination], keeping the first row seen per value.
 Future<void> loadRowsByColumn(

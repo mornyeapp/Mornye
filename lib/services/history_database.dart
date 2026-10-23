@@ -357,35 +357,35 @@ class HistoryDatabase {
     return rows.map(_dbRowToJson).toList(growable: false);
   }
 
+  Future<Map<String, dynamic>?> _firstRow(
+    Database db,
+    String where,
+    List<Object?> whereArgs, {
+    List<String>? columns,
+    bool newestFirst = true,
+  }) async {
+    final rows = await db.query(
+      'history',
+      columns: columns,
+      where: where,
+      whereArgs: whereArgs,
+      orderBy: newestFirst ? 'sort_added DESC, id DESC' : null,
+      limit: 1,
+    );
+    return rows.isEmpty ? null : _dbRowToJson(rows.first);
+  }
+
   Future<Map<String, dynamic>?> findByTrackAndArtist(
     String trackName,
     String artistName,
   ) async {
     final key = matchKeyFor(trackName, artistName);
     if (key.isEmpty) return null;
-    final db = await database;
-    final rows = await db.query(
-      'history',
-      where: 'match_key = ?',
-      whereArgs: [key],
-      orderBy: 'sort_added DESC, id DESC',
-      limit: 1,
-    );
-    if (rows.isEmpty) return null;
-    return _dbRowToJson(rows.first);
+    return _firstRow(await database, 'match_key = ?', [key]);
   }
 
-  Future<Map<String, dynamic>?> getById(String id) async {
-    final db = await database;
-    final rows = await db.query(
-      'history',
-      where: 'id = ?',
-      whereArgs: [id],
-      limit: 1,
-    );
-    if (rows.isEmpty) return null;
-    return _dbRowToJson(rows.first);
-  }
+  Future<Map<String, dynamic>?> getById(String id) async =>
+      _firstRow(await database, 'id = ?', [id], newestFirst: false);
 
   Future<Map<String, dynamic>?> findByFilePath(String filePath) async {
     final pathKeys = buildPathMatchKeys(filePath).toList(growable: false);
@@ -408,31 +408,11 @@ class HistoryDatabase {
   Future<List<String>> getPhysicalFileIds(Iterable<String> filePaths) async =>
       sqlite.findPhysicalFileRowIds(await database, 'history', filePaths);
 
-  Future<Map<String, dynamic>?> getBySpotifyId(String spotifyId) async {
-    final db = await database;
-    final rows = await db.query(
-      'history',
-      where: 'spotify_id = ?',
-      whereArgs: [spotifyId],
-      orderBy: 'sort_added DESC, id DESC',
-      limit: 1,
-    );
-    if (rows.isEmpty) return null;
-    return _dbRowToJson(rows.first);
-  }
+  Future<Map<String, dynamic>?> getBySpotifyId(String spotifyId) async =>
+      _firstRow(await database, 'spotify_id = ?', [spotifyId]);
 
-  Future<Map<String, dynamic>?> getByIsrc(String isrc) async {
-    final db = await database;
-    final rows = await db.query(
-      'history',
-      where: 'isrc = ?',
-      whereArgs: [isrc],
-      orderBy: 'sort_added DESC, id DESC',
-      limit: 1,
-    );
-    if (rows.isEmpty) return null;
-    return _dbRowToJson(rows.first);
-  }
+  Future<Map<String, dynamic>?> getByIsrc(String isrc) async =>
+      _firstRow(await database, 'isrc = ?', [isrc]);
 
   Future<Map<String, dynamic>?> findExistingTrack(
     HistoryLookupRequest request, {
@@ -445,44 +425,26 @@ class HistoryDatabase {
       final normalized = spotifyCandidates
           .map(HistoryRowMapper.normalizeSpotifyId)
           .toList();
-      final rows = await db.query(
-        'history',
+      final row = await _firstRow(
+        db,
+        'spotify_id IN ($placeholders) OR spotify_id_norm IN ($placeholders)',
+        [...spotifyCandidates, ...normalized],
         columns: columns,
-        where:
-            'spotify_id IN ($placeholders) OR spotify_id_norm IN ($placeholders)',
-        whereArgs: [...spotifyCandidates, ...normalized],
-        orderBy: 'sort_added DESC, id DESC',
-        limit: 1,
       );
-      if (rows.isNotEmpty) return _dbRowToJson(rows.first);
+      if (row != null) return row;
     }
 
     final isrcNorm = normalizeIsrc(request.isrc);
     if (isrcNorm.isNotEmpty) {
-      final rows = await db.query(
-        'history',
-        columns: columns,
-        where: 'isrc_norm = ?',
-        whereArgs: [isrcNorm],
-        orderBy: 'sort_added DESC, id DESC',
-        limit: 1,
-      );
-      if (rows.isNotEmpty) return _dbRowToJson(rows.first);
+      final row = await _firstRow(db, 'isrc_norm = ?', [
+        isrcNorm,
+      ], columns: columns);
+      if (row != null) return row;
     }
 
     final matchKey = matchKeyFor(request.trackName, request.artistName);
-    if (matchKey.isNotEmpty) {
-      final rows = await db.query(
-        'history',
-        columns: columns,
-        where: 'match_key = ?',
-        whereArgs: [matchKey],
-        orderBy: 'sort_added DESC, id DESC',
-        limit: 1,
-      );
-      if (rows.isNotEmpty) return _dbRowToJson(rows.first);
-    }
-    return null;
+    if (matchKey.isEmpty) return null;
+    return _firstRow(db, 'match_key = ?', [matchKey], columns: columns);
   }
 
   /// Batch variant used by playlist playback and bulk existence checks. A
@@ -629,14 +591,10 @@ class HistoryDatabase {
 
       if (spotifyId.startsWith('deezer:')) {
         final deezerId = spotifyId.substring(7);
-        final db = await database;
-        final rows = await db.query(
-          'history',
-          where: 'spotify_id LIKE ?',
-          whereArgs: ['deezer:$deezerId'],
-          limit: 1,
-        );
-        if (rows.isNotEmpty) return _dbRowToJson(rows.first);
+        final byDeezer = await _firstRow(await database, 'spotify_id LIKE ?', [
+          'deezer:$deezerId',
+        ], newestFirst: false);
+        if (byDeezer != null) return byDeezer;
       }
     }
 

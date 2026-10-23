@@ -90,6 +90,9 @@ abstract final class LibrarySchema {
     int newVersion,
   ) async {
     _log.i('Upgrading library database from v$oldVersion to v$newVersion');
+    Future<void> addColumn(String column, String type) =>
+        sqlite.addColumnIfMissing(db, 'library', column, type);
+    const notNullZero = 'INTEGER NOT NULL DEFAULT 0';
     // Keep historical defaults: older rows require a metadata rescan, while
     // freshly scanned rows are written with their actual scan version.
     for (final addition in const [
@@ -117,7 +120,7 @@ abstract final class LibrarySchema {
         'match_key',
         'album_key',
       ]) {
-        await sqlite.addColumnIfMissing(db, 'library', column, 'TEXT');
+        await addColumn(column, 'TEXT');
       }
       await _backfillNormalizedColumns(db);
       await _createNormalizedIndexes(db);
@@ -126,12 +129,7 @@ abstract final class LibrarySchema {
       await sqlite.createPathKeyTable(db, 'library_path_keys');
     }
     if (oldVersion < 9) {
-      await sqlite.addColumnIfMissing(
-        db,
-        'library',
-        'audio_metadata_scan_version',
-        'INTEGER NOT NULL DEFAULT 0',
-      );
+      await addColumn('audio_metadata_scan_version', notNullZero);
     }
     if (oldVersion < 10) {
       for (final column in const [
@@ -140,42 +138,23 @@ abstract final class LibrarySchema {
         'sort_release',
         'sort_added',
       ]) {
-        await sqlite.addColumnIfMissing(
-          db,
-          'library',
-          column,
-          column == 'sort_added' ? 'INTEGER' : 'TEXT',
-        );
+        await addColumn(column, column == 'sort_added' ? 'INTEGER' : 'TEXT');
       }
       await _backfillQueueColumns(db);
       await _createQueueIndexes(db);
     }
     if (oldVersion < 11) {
-      await sqlite.addColumnIfMissing(
-        db,
-        'library',
-        'source_id',
-        "TEXT NOT NULL DEFAULT '$_legacySourceId'",
-      );
+      await addColumn('source_id', "TEXT NOT NULL DEFAULT '$_legacySourceId'");
       await _createSources(db);
     }
-    for (final addition in const [(12, 'explicit'), (13, 'has_lyrics')]) {
+    for (final addition in const [
+      (12, 'explicit'),
+      (13, 'has_lyrics'),
+      (15, 'has_replaygain'),
+    ]) {
       if (oldVersion < addition.$1) {
-        await sqlite.addColumnIfMissing(
-          db,
-          'library',
-          addition.$2,
-          'INTEGER NOT NULL DEFAULT 0',
-        );
+        await addColumn(addition.$2, notNullZero);
       }
-    }
-    if (oldVersion < 15) {
-      await sqlite.addColumnIfMissing(
-        db,
-        'library',
-        'has_replaygain',
-        'INTEGER NOT NULL DEFAULT 0',
-      );
     }
     if (oldVersion < 16) {
       await sqlite.backfillPathKeys(db, 'library', 'library_path_keys');
@@ -185,12 +164,7 @@ abstract final class LibrarySchema {
       await _createLookupSummary(db);
     }
     if (oldVersion < 18) {
-      await sqlite.addColumnIfMissing(
-        db,
-        'library',
-        'network_file_version',
-        'TEXT',
-      );
+      await addColumn('network_file_version', 'TEXT');
     }
   }
 
@@ -267,69 +241,43 @@ abstract final class LibrarySchema {
     }
   }
 
-  static Future<void> _backfillNormalizedColumns(Database db) async {
-    final rows = await db.query(
-      'library',
-      columns: [
-        'id',
-        'track_name',
-        'artist_name',
-        'album_name',
-        'album_artist',
-      ],
-    );
-    final batch = db.batch();
-    for (final row in rows) {
-      batch.update(
+  static Future<void> _backfillNormalizedColumns(Database db) =>
+      sqlite.backfillRows(
+        db,
         'library',
-        LibraryRowMapper.normalized(
+        const ['track_name', 'artist_name', 'album_name', 'album_artist'],
+        (row) => LibraryRowMapper.normalized(
           trackName: row['track_name'] as String? ?? '',
           artistName: row['artist_name'] as String? ?? '',
           albumName: row['album_name'] as String? ?? '',
           albumArtist: row['album_artist'] as String?,
         ),
-        where: 'id = ?',
-        whereArgs: [row['id']],
       );
-    }
-    await batch.commit(noResult: true);
-  }
 
-  static Future<void> _backfillQueueColumns(Database db) async {
-    final rows = await db.query(
-      'library',
-      columns: [
-        'id',
-        'track_name',
-        'artist_name',
-        'album_name',
-        'album_artist',
-        'genre',
-        'release_date',
-        'file_mod_time',
-        'scanned_at',
-      ],
-    );
-    final batch = db.batch();
-    for (final row in rows) {
-      batch.update(
-        'library',
-        LibraryRowMapper.queue(
-          trackName: row['track_name'] as String?,
-          artistName: row['artist_name'] as String?,
-          albumName: row['album_name'] as String?,
-          albumArtist: row['album_artist'] as String?,
-          genre: row['genre'] as String?,
-          releaseDate: row['release_date'] as String?,
-          fileModTime: (row['file_mod_time'] as num?)?.toInt(),
-          scannedAt: row['scanned_at'] as String?,
-        ),
-        where: 'id = ?',
-        whereArgs: [row['id']],
-      );
-    }
-    await batch.commit(noResult: true);
-  }
+  static Future<void> _backfillQueueColumns(Database db) => sqlite.backfillRows(
+    db,
+    'library',
+    const [
+      'track_name',
+      'artist_name',
+      'album_name',
+      'album_artist',
+      'genre',
+      'release_date',
+      'file_mod_time',
+      'scanned_at',
+    ],
+    (row) => LibraryRowMapper.queue(
+      trackName: row['track_name'] as String?,
+      artistName: row['artist_name'] as String?,
+      albumName: row['album_name'] as String?,
+      albumArtist: row['album_artist'] as String?,
+      genre: row['genre'] as String?,
+      releaseDate: row['release_date'] as String?,
+      fileModTime: (row['file_mod_time'] as num?)?.toInt(),
+      scannedAt: row['scanned_at'] as String?,
+    ),
+  );
 
   static Future<void> _createLookupSummary(DatabaseExecutor db) async {
     await db.execute('''
