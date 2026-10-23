@@ -21,12 +21,9 @@ class AppTextField extends StatelessWidget {
     this.keyboardType,
     this.textInputAction,
     this.inputFormatters,
-    this.textCapitalization = TextCapitalization.none,
     this.maxLines = 1,
     this.maxLength,
-    this.showCounter = true,
     this.autofocus = false,
-    this.enabled = true,
     this.outlined = false,
     this.onChanged,
     this.onSubmitted,
@@ -47,12 +44,9 @@ class AppTextField extends StatelessWidget {
   final TextInputType? keyboardType;
   final TextInputAction? textInputAction;
   final List<TextInputFormatter>? inputFormatters;
-  final TextCapitalization textCapitalization;
   final int? maxLines;
   final int? maxLength;
-  final bool showCounter;
   final bool autofocus;
-  final bool enabled;
 
   /// Outlined rather than filled container in the expressive style.
   final bool outlined;
@@ -96,12 +90,9 @@ class AppTextField extends StatelessWidget {
       keyboardType: keyboardType,
       textInputAction: textInputAction,
       inputFormatters: inputFormatters,
-      textCapitalization: textCapitalization,
       maxLines: maxLines,
       maxLength: maxLength,
-      showCounter: showCounter,
       autofocus: autofocus,
-      enabled: enabled,
       onChanged: onChanged ?? this.onChanged,
       onSubmitted: onSubmitted,
     ),
@@ -115,7 +106,6 @@ class AppTextField extends StatelessWidget {
           hintText: hint,
           prefixIcon: leading,
           errorText: errorText,
-          counterText: showCounter ? null : '',
         );
     if (validator != null) {
       return TextFormField(
@@ -124,11 +114,9 @@ class AppTextField extends StatelessWidget {
         keyboardType: keyboardType,
         textInputAction: textInputAction,
         inputFormatters: inputFormatters,
-        textCapitalization: textCapitalization,
         maxLines: maxLines,
         maxLength: maxLength,
         autofocus: autofocus,
-        enabled: enabled,
         onChanged: onChanged,
         onFieldSubmitted: onSubmitted,
         validator: validator,
@@ -142,11 +130,9 @@ class AppTextField extends StatelessWidget {
       keyboardType: keyboardType,
       textInputAction: textInputAction,
       inputFormatters: inputFormatters,
-      textCapitalization: textCapitalization,
       maxLines: maxLines,
       maxLength: maxLength,
       autofocus: autofocus,
-      enabled: enabled,
       onChanged: onChanged,
       onSubmitted: onSubmitted,
       scrollPadding: scrollPadding,
@@ -159,7 +145,6 @@ class _ExpressiveTextFormField extends FormField<String> {
   _ExpressiveTextFormField({required this.field})
     : super(
         initialValue: field.controller?.text ?? '',
-        enabled: field.enabled,
         validator: field.validator,
         builder: (state) => field._expressiveField(
           fieldController: (state as _ExpressiveTextFormFieldState)._controller,
