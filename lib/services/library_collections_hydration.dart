@@ -512,11 +512,10 @@ typedef _PlaylistExportHeader = ({
   DateTime updatedAt,
 });
 
-/// Converts the stable published model snapshot on a worker without cloning
-/// the whole graph in a single send. Playlist headers exclude membership sets
-/// and their tracks are submitted separately in bounded ordered batches.
-/// Backup writers can embed this trusted JSON fragment directly, avoiding a
-/// second transfer of the large exported map from the UI to another worker.
+/// Converts the stable published model snapshot to JSON on a worker without
+/// cloning the whole graph in a single send. Playlist headers exclude
+/// membership sets and their tracks are submitted separately in bounded
+/// ordered batches. Backup writers embed this trusted fragment directly.
 Future<String> exportLibraryCollectionsJson(LibraryCollectionsState state) =>
     _runCollectionWorker<String>(
       mode: _CollectionWorkerMode.exportJson,
