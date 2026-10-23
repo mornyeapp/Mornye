@@ -1,7 +1,4 @@
-import 'dart:convert';
-
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mornye/services/backup_service.dart';
 import 'package:mornye/utils/isrc_utils.dart';
 import 'package:mornye/utils/ordered_range_selection.dart';
 
@@ -35,21 +32,6 @@ void main() {
       expect(toggleOrderedSelection(selected: selected, target: 'c'), 'c');
       expect(toggleOrderedSelection(selected: selected, target: 'c'), 'a');
       expect(selected.toList(), const ['a']);
-    });
-
-    test('backup encoding is indented and remains parseable', () {
-      final encoded = BackupService.encode({
-        'magic': BackupService.magic,
-        'data': {
-          'history': [
-            {'id': 'one'},
-          ],
-        },
-      });
-
-      expect(encoded, contains('\n  "magic"'));
-      expect(encoded, contains('\n    "history"'));
-      expect(jsonDecode(encoded), isA<Map<String, dynamic>>());
     });
   });
 }

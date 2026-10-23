@@ -178,14 +178,14 @@ void main() {
     () async {
       final root = await Directory.systemTemp.createTemp('legacy-backup-');
       addTearDown(() => root.delete(recursive: true));
-      final envelope = BackupService.buildEnvelope(
-        settings: {'theme': 'light'},
-        history: [],
-        collections: {},
-        playlistCovers: {},
-        extensions: {},
-      );
-      expect(envelope['magic'], 'mornye-backup');
+      final envelope = <String, dynamic>{
+        'magic': 'mornye-backup',
+        'format_version': 1,
+        'data': {
+          'settings': {'theme': 'light'},
+          'history': <Object?>[],
+        },
+      };
       expect(BackupService.parse(jsonEncode(envelope))!.hasHistory, isTrue);
       envelope['magic'] = 'spotiflac-backup';
       expect(BackupService.parse(jsonEncode(envelope))!.hasHistory, isTrue);

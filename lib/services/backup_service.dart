@@ -180,36 +180,6 @@ class BackupService {
   static const int _maxProfilePhotoBytes = 2 << 20;
   static const String _profilePhotoEntry = 'profile/avatar.png';
 
-  @visibleForTesting
-  static String encode(Map<String, dynamic> envelope) =>
-      const JsonEncoder.withIndent('  ').convert(envelope);
-
-  /// Legacy JSON envelope retained so backups from earlier releases and unit
-  /// tests remain readable. New backups are written by [writeBackupArchive].
-  @visibleForTesting
-  static Map<String, dynamic> buildEnvelope({
-    required Map<String, dynamic>? settings,
-    required List<Map<String, dynamic>> history,
-    required Map<String, dynamic> collections,
-    required Map<String, dynamic> playlistCovers,
-    required Map<String, dynamic> extensions,
-  }) {
-    return {
-      'magic': magic,
-      'format_version': 1,
-      'app': AppInfo.appName,
-      'app_version': AppInfo.displayVersion,
-      'created_at': DateTime.now().toIso8601String(),
-      'data': {
-        'settings': settings,
-        'history': history,
-        'collections': collections,
-        'playlist_covers': playlistCovers,
-        'extensions': extensions,
-      },
-    };
-  }
-
   static Future<File> writeBackupArchive({
     required Map<String, dynamic>? settings,
     required BackupHistoryPageLoader loadHistoryPage,
