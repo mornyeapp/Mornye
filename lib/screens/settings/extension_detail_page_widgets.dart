@@ -987,7 +987,7 @@ class _QualityOptionItem extends StatelessWidget {
                   ],
                 ),
               ),
-              if (quality.settings.isNotEmpty)
+              if (quality.settingsCount > 0)
                 Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 8,
@@ -998,9 +998,7 @@ class _QualityOptionItem extends StatelessWidget {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
-                    context.l10n.extensionSettingsCount(
-                      quality.settings.length,
-                    ),
+                    context.l10n.extensionSettingsCount(quality.settingsCount),
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
                       color: colorScheme.onSurfaceVariant,
                     ),

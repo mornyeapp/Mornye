@@ -397,7 +397,6 @@ class ExtensionNotifier extends Notifier<ExtensionState> {
       } catch (e) {
         _log.w('Failed to check extension health for $extensionId: $e');
         final status = ExtensionHealthStatus(
-          extensionId: extensionId,
           status: 'unknown',
           checkedAt: DateTime.now(),
           checks: const [],
