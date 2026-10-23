@@ -137,38 +137,6 @@ class LyricTimelineIndex {
   }
 }
 
-/// Hold the latest lead until the next lead starts, including instrumental
-/// gaps. Earlier overlapping parts and backing vocals keep their timed ends.
-Set<int> activeLyricIndices(
-  List<LyricLine> lines,
-  Duration position,
-  int currentIndex,
-) {
-  final active = <int>{};
-  var heldLead = -1;
-  for (var i = 0; i <= currentIndex; i++) {
-    final line = lines[i];
-    if (!line.isBackground &&
-        line.text.isNotEmpty &&
-        (heldLead < 0 || line.time != lines[heldLead].time)) {
-      // Simultaneous singers retain their shared first-row focus.
-      heldLead = i;
-    }
-    final timedVoice =
-        (i < currentIndex || line.voice != null || line.isBackground) &&
-        line.text.isNotEmpty &&
-        line.end != null;
-    // Secondary simultaneous singers and backing parts keep their own ends.
-    final simultaneous =
-        line.text.isNotEmpty && line.time == lines[currentIndex].time;
-    if (timedVoice ? line.end! > position : i == currentIndex || simultaneous) {
-      active.add(i);
-    }
-  }
-  if (heldLead >= 0) active.add(heldLead);
-  return active;
-}
-
 /// Inserts empty, bounded rows for instrumental countdowns in the player.
 /// Unmarked gaps in plain LRC cannot be distinguished from held vocals: only
 /// use explicit empty timestamps or known line/word ends, never an estimate.
