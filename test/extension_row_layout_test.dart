@@ -7,7 +7,8 @@ const _buttonKey = ValueKey('extension-row-button');
 
 Widget _row({
   required double width,
-  bool trailingBelowWhenNarrow = true,
+  double buttonWidth = 140,
+  bool measured = true,
   double textScale = 1,
 }) => MaterialApp(
   theme: AppTheme.light(),
@@ -27,10 +28,10 @@ Widget _row({
           avatar: const ExtensionAvatar(fallbackIcon: Icons.extension),
           title: const Text('Extension name'),
           subtitle: const Text('Description'),
-          trailingBelowWhenNarrow: trailingBelowWhenNarrow,
+          trailingWidth: measured ? buttonWidth : null,
           trailing: SizedBox(
             key: _buttonKey,
-            width: 140,
+            width: buttonWidth,
             height: 40,
             child: FilledButton(onPressed: () {}, child: const Text('Install')),
           ),
@@ -40,16 +41,19 @@ Widget _row({
   ),
 );
 
+bool _buttonBelow(WidgetTester tester) =>
+    tester.getRect(find.byKey(_buttonKey)).top >
+    tester.getRect(find.text('Description')).bottom;
+
 void main() {
-  testWidgets('a phone row puts the button under the description', (
+  testWidgets('a row too narrow for its button puts it under the description', (
     tester,
   ) async {
     await tester.pumpWidget(_row(width: 360));
 
     final title = tester.getRect(find.text('Extension name'));
-    final description = tester.getRect(find.text('Description'));
     final button = tester.getRect(find.byKey(_buttonKey));
-    expect(button.top, greaterThan(description.bottom));
+    expect(_buttonBelow(tester), isTrue);
     expect(button.left, title.left);
     // The title keeps the whole text column.
     final column = find
@@ -62,8 +66,10 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('a wide row keeps the button beside the text', (tester) async {
-    await tester.pumpWidget(_row(width: 700));
+  testWidgets('a phone row keeps a short button beside the text', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_row(width: 380, buttonWidth: 116));
 
     final title = tester.getRect(find.text('Extension name'));
     final button = tester.getRect(find.byKey(_buttonKey));
@@ -72,24 +78,36 @@ void main() {
       button.center.dy,
       closeTo(tester.getRect(find.byType(Row).first).center.dy, 1),
     );
+
+    // A longer label on the same row would squeeze the title.
+    await tester.pumpWidget(_row(width: 380, buttonWidth: 150));
+    expect(_buttonBelow(tester), isTrue);
   });
 
-  testWidgets('large text moves the button below on a wider row too', (
-    tester,
-  ) async {
-    await tester.pumpWidget(_row(width: 500, textScale: 1.3));
+  testWidgets('a wide row keeps the button beside the text', (tester) async {
+    await tester.pumpWidget(_row(width: 700));
 
-    final description = tester.getRect(find.text('Description'));
+    final title = tester.getRect(find.text('Extension name'));
     expect(
-      tester.getRect(find.byKey(_buttonKey)).top,
-      greaterThan(description.bottom),
+      tester.getRect(find.byKey(_buttonKey)).left,
+      greaterThan(title.right),
     );
   });
 
-  testWidgets('a row without the option keeps its control beside the text', (
+  testWidgets('large text needs a wider title beside the button', (
     tester,
   ) async {
-    await tester.pumpWidget(_row(width: 360, trailingBelowWhenNarrow: false));
+    await tester.pumpWidget(_row(width: 420));
+    expect(_buttonBelow(tester), isFalse);
+
+    await tester.pumpWidget(_row(width: 420, textScale: 1.3));
+    expect(_buttonBelow(tester), isTrue);
+  });
+
+  testWidgets('a row without a trailing width keeps its control beside', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_row(width: 360, measured: false));
 
     final title = tester.getRect(find.text('Extension name'));
     expect(

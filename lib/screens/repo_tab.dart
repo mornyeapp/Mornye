@@ -823,6 +823,7 @@ class _RepoListSkeleton extends StatelessWidget {
     final tokens = context.tokens;
     // Placeholders keep their contrast on the Material group surface.
     final surface = context.isMornye ? null : settingsGroupColor(context);
+    final buttonWidth = _storeButtonWidth(context);
     final rows = [
       for (var index = 0; index < _count; index++)
         ExtensionRow(
@@ -877,7 +878,7 @@ class _RepoListSkeleton extends StatelessWidget {
               ],
             ),
           ),
-          trailingBelowWhenNarrow: true,
+          trailingWidth: buttonWidth,
           trailing: ShimmerLoading(
             surface: surface,
             child: SkeletonBox(
@@ -899,6 +900,36 @@ class _RepoListSkeleton extends StatelessWidget {
       child: SettingsGroup(connected: true, children: rows),
     );
   }
+}
+
+/// The widest store button in the current language and text size: the
+/// longest of the Install, Update and Installed labels, the last with its
+/// check icon, plus the buttons' side padding. Store rows and their
+/// skeleton share it, so every row puts its button in the same place.
+double _storeButtonWidth(BuildContext context) {
+  final l10n = context.l10n;
+  final style = Theme.of(context).textTheme.labelLarge;
+  final textScaler = MediaQuery.textScalerOf(context);
+  final textDirection = Directionality.of(context);
+  double labelWidth(String label) {
+    final painter = TextPainter(
+      text: TextSpan(text: label, style: style),
+      textDirection: textDirection,
+      textScaler: textScaler,
+      maxLines: 1,
+    )..layout();
+    final width = painter.width;
+    painter.dispose();
+    return width;
+  }
+
+  final widest = [
+    labelWidth(l10n.storeInstall),
+    labelWidth(l10n.storeUpdate),
+    // The check icon and its gap.
+    labelWidth(l10n.storeInstalled) + 24,
+  ].reduce((a, b) => a > b ? a : b);
+  return widest + 32;
 }
 
 class _ExtensionItem extends StatelessWidget {
@@ -1009,7 +1040,7 @@ class _ExtensionItem extends StatelessWidget {
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
-      trailingBelowWhenNarrow: true,
+      trailingWidth: _storeButtonWidth(context),
       trailing: isDownloading
           ? const AppLoadingIndicator(size: 24)
           : !context.isMornye
