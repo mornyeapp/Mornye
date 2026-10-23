@@ -8,6 +8,7 @@ import 'package:mornye/widgets/app_alert_dialog.dart';
 import 'package:mornye/widgets/app_bottom_sheet.dart';
 import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/discard_changes_dialog.dart';
+import 'package:mornye/widgets/mornye_chrome.dart';
 import 'package:mornye/widgets/settings_group.dart';
 
 // The legacy builders below are the hand-written dialogs and sheets the
@@ -440,6 +441,67 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+
+  testWidgets('Mornye glass groups skip the backdrop pass', (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          theme: MornyeTheme.build(Brightness.dark),
+          home: const Scaffold(
+            body: Column(
+              children: [
+                MornyeGlassPanel(
+                  key: ValueKey('panel'),
+                  child: SizedBox(width: 200, height: 40),
+                ),
+                SettingsGroup(
+                  glass: true,
+                  children: [SettingsItem(title: 'Row')],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    Color? fillOf(Finder glass) => tester
+        .widgetList<DecoratedBox>(
+          find.descendant(of: glass, matching: find.byType(DecoratedBox)),
+        )
+        .map((box) => box.decoration)
+        .whereType<BoxDecoration>()
+        .firstWhere((decoration) => decoration.color != null)
+        .color;
+
+    final group = find.descendant(
+      of: find.byType(SettingsGroup),
+      matching: find.byType(MornyeGlass),
+    );
+    final glass = tester.widget<MornyeGlass>(group);
+    expect(glass.samplesBackdrop, isFalse);
+    expect(
+      find.descendant(
+        of: find.byType(SettingsGroup),
+        matching: find.byType(BackdropFilter),
+      ),
+      findsNothing,
+    );
+    expect(find.text('Row'), findsOneWidget);
+    // Same tint as the default panel, without filtering the flat page.
+    final panelGlass = find.descendant(
+      of: find.byKey(const ValueKey('panel')),
+      matching: find.byType(MornyeGlass),
+    );
+    expect(fillOf(group), isNotNull);
+    expect(fillOf(group)!.a, lessThan(1));
+    final panel = tester.widget<MornyeGlass>(panelGlass);
+    expect(
+      (glass.radius, glass.strongTint, glass.tintOpacity, glass.tintColor),
+      (panel.radius, panel.strongTint, panel.tintOpacity, panel.tintColor),
+    );
+    expect(tester.takeException(), isNull);
+  });
 
   test('settingsSectionSlivers pairs a header with its group', () {
     final rows = <Widget>[const SettingsItem(title: 'Row')];

@@ -2,7 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_3_expressive/material_3_expressive.dart';
+import 'package:mornye/providers/runtime_profile_provider.dart';
 import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/material_expressive.dart';
 import 'package:mornye/widgets/app_icon.dart';
@@ -279,7 +281,17 @@ class SettingsGroup extends StatelessWidget {
           );
 
     if (glass && context.isMornye) {
-      return inset(MornyeGlassPanel(child: child));
+      // Groups scroll over the opaque page color, where a backdrop pass
+      // filters a flat color; keep the glass tint and rim without it.
+      return inset(
+        Consumer(
+          builder: (context, ref, _) => MornyeGlass.navigation(
+            blurEnabled: ref.watch(mornyeBlurEnabledProvider),
+            samplesBackdrop: false,
+            child: Material(type: MaterialType.transparency, child: child),
+          ),
+        ),
+      );
     }
 
     final expressive = materialExpressiveEnabled(context);
