@@ -761,11 +761,6 @@ class LibraryCollectionsDatabase {
     );
   }
 
-  Future<void> deletePlaylist(String playlistId) async {
-    final db = await database;
-    await db.delete(_tablePlaylists, where: 'id = ?', whereArgs: [playlistId]);
-  }
-
   Future<void> deletePlaylists(List<String> playlistIds) async {
     if (playlistIds.isEmpty) return;
     await deleteDatabasePlaylists(await database, playlistIds);
@@ -876,27 +871,6 @@ class LibraryCollectionsDatabase {
     rowsPath: rowsPath,
     expectedCount: expectedCount,
   );
-
-  Future<void> deletePlaylistTrack({
-    required String playlistId,
-    required String trackKey,
-    required String playlistUpdatedAt,
-  }) async {
-    final db = await database;
-    await db.transaction((txn) async {
-      await txn.delete(
-        _tablePlaylistTracks,
-        where: 'playlist_id = ? AND track_key = ?',
-        whereArgs: [playlistId, trackKey],
-      );
-      await txn.update(
-        _tablePlaylists,
-        {'updated_at': playlistUpdatedAt},
-        where: 'id = ?',
-        whereArgs: [playlistId],
-      );
-    });
-  }
 
   Future<void> deletePlaylistTracks({
     required String playlistId,

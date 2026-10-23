@@ -68,7 +68,7 @@ void main() {
             final result = await measureCollectionOperation<int>(() async {
               if (bulk) return notifier.deletePlaylists(ids);
               for (final id in ids) {
-                await notifier.deletePlaylist(id);
+                await notifier.deletePlaylists([id]);
               }
               return count;
             });

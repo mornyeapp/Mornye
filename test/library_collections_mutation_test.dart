@@ -167,10 +167,6 @@ class _CollectionsDatabase implements LibraryCollectionsDatabase {
   });
 
   @override
-  Future<void> deletePlaylist(String playlistId) =>
-      _write('delete:playlist:$playlistId', () => playlists.remove(playlistId));
-
-  @override
   Future<void> deletePlaylists(List<String> ids) =>
       _write('bulk-playlists:remove', () {
         for (final id in ids) {

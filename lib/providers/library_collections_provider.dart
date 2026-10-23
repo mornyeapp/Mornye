@@ -1,6 +1,5 @@
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 import 'package:mornye/models/library_collections.dart';
@@ -343,26 +342,6 @@ class LibraryCollectionsNotifier extends Notifier<LibraryCollectionsState> {
     dbDelete: _db.deleteFavoriteArtistEntry,
   );
 
-  @visibleForTesting
-  Future<void> removeFromWishlist(String trackKey) => _removeEntry(
-    trackKey,
-    contains: (key) => state.containsWishlistKey(key),
-    select: (state) => state.wishlist,
-    keyOf: (entry) => entry.key,
-    withList: (list) => state.copyWith(wishlist: list),
-    dbDelete: _db.deleteWishlistEntry,
-  );
-
-  @visibleForTesting
-  Future<void> removeFromLoved(String trackKey) => _removeEntry(
-    trackKey,
-    contains: (key) => state.containsLovedKey(key),
-    select: (state) => state.loved,
-    keyOf: (entry) => entry.key,
-    withList: (list) => state.copyWith(loved: list),
-    dbDelete: _db.deleteLovedEntry,
-  );
-
   Future<int> _removeTrackEntries(
     Iterable<String> trackKeys, {
     required bool Function(String key) contains,
@@ -449,19 +428,6 @@ class LibraryCollectionsNotifier extends Notifier<LibraryCollectionsState> {
         });
         _invalidatePlaylistPickerSummaries();
       });
-
-  Future<void> deletePlaylist(String playlistId) => _mutate(() async {
-    if (state.playlistById(playlistId) == null) return;
-
-    await _db.deletePlaylist(playlistId);
-    if (!ref.mounted) return;
-    state = state.copyWith(
-      playlists: state.playlists
-          .where((playlist) => playlist.id != playlistId)
-          .toList(growable: false),
-    );
-    _invalidatePlaylistPickerSummaries();
-  });
 
   Future<int> deletePlaylists(Iterable<String> playlistIds) {
     final selected = playlistIds.toSet();
@@ -582,32 +548,6 @@ class LibraryCollectionsNotifier extends Notifier<LibraryCollectionsState> {
       await prepared.dispose();
     }
   });
-
-  @visibleForTesting
-  Future<void> removeTrackFromPlaylist(String playlistId, String trackKey) =>
-      _mutate(() async {
-        var playlist = state.playlistById(playlistId);
-        if (playlist == null || !playlist.containsTrackKey(trackKey)) return;
-        await ensurePlaylistLoaded(playlistId);
-        if (!ref.mounted) return;
-        playlist = state.playlistById(playlistId);
-        if (playlist == null) return;
-
-        final now = DateTime.now();
-        await _db.deletePlaylistTrack(
-          playlistId: playlistId,
-          trackKey: trackKey,
-          playlistUpdatedAt: now.toIso8601String(),
-        );
-        _replacePlaylistById(playlistId, (playlist) {
-          final nextTracks = playlist.tracks
-              .where((entry) => entry.key != trackKey)
-              .toList(growable: false);
-          if (nextTracks.length == playlist.tracks.length) return playlist;
-          return playlist.copyWith(tracks: nextTracks, updatedAt: now);
-        });
-        _invalidatePlaylistPickerSummaries();
-      });
 
   Future<int> removeTracksFromPlaylist(
     String playlistId,

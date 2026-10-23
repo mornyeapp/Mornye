@@ -10,11 +10,6 @@ class PlaylistDeletionDatabase implements LibraryCollectionsDatabase {
   final Database owner;
 
   @override
-  Future<void> deletePlaylist(String id) async {
-    await owner.delete('playlists', where: 'id=?', whereArgs: [id]);
-  }
-
-  @override
   Future<void> deletePlaylists(List<String> ids) =>
       LibraryCollectionsDatabase.deleteDatabasePlaylists(owner, ids);
 
