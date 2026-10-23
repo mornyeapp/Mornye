@@ -85,6 +85,7 @@ Future<bool> showAppConfirmDialog(
   ButtonStyle? confirmStyle,
   bool barrierDismissible = true,
 }) async {
+  assert(message == null || content == null, 'Pass message or content.');
   final result = await showAppDialog<bool>(
     context: context,
     barrierDismissible: barrierDismissible,
