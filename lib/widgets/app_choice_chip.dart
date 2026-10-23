@@ -12,7 +12,6 @@ class AppChoiceChip extends StatelessWidget {
     required this.label,
     required this.selected,
     required this.onSelected,
-    this.visualDensity,
     this.singleChoice = false,
     this.icon,
     this.count,
@@ -21,7 +20,6 @@ class AppChoiceChip extends StatelessWidget {
   final Widget label;
   final bool selected;
   final ValueChanged<bool>? onSelected;
-  final VisualDensity? visualDensity;
   final bool singleChoice;
   final Widget? icon;
   final int? count;
@@ -55,7 +53,6 @@ class AppChoiceChip extends StatelessWidget {
           avatar: icon,
           selected: selected,
           onSelected: onSelected,
-          visualDensity: visualDensity,
         );
       }
       return FilterChip(
@@ -63,7 +60,6 @@ class AppChoiceChip extends StatelessWidget {
         avatar: icon,
         selected: selected,
         onSelected: onSelected,
-        visualDensity: visualDensity,
       );
     }
     final scheme = Theme.of(context).colorScheme;
