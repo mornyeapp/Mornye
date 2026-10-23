@@ -40,9 +40,7 @@ import 'package:mornye/widgets/cached_cover_image.dart';
 import 'package:mornye/widgets/app_snack_bar.dart';
 import 'package:mornye/widgets/album_track_tile.dart';
 import 'package:mornye/widgets/animation_utils.dart';
-import 'package:mornye/widgets/destructive_selection_button.dart';
-import 'package:mornye/widgets/selection_action_button.dart';
-import 'package:mornye/widgets/selection_bottom_bar.dart';
+import 'package:mornye/widgets/library_track_selection_bar.dart';
 import 'package:mornye/widgets/library_selection_playback_actions.dart';
 import 'package:mornye/widgets/disc_separator_chip.dart';
 import 'package:mornye/widgets/album_detail_header.dart';
@@ -306,12 +304,7 @@ class _DownloadedAlbumScreenState extends ConsumerState<DownloadedAlbumScreen>
         onExitSelectionMode: exitSelectionMode,
         appBar: _buildAppBar(context, colorScheme, tracks, qualityLabelMode),
         slivers: [_buildTrackList(context, colorScheme, order)],
-        selectionBar: _buildSelectionBottomBar(
-          context,
-          colorScheme,
-          tracks,
-          bottomPadding,
-        ),
+        selectionBar: _buildSelectionBottomBar(tracks, bottomPadding),
       ),
     );
   }
@@ -818,84 +811,39 @@ class _DownloadedAlbumScreenState extends ConsumerState<DownloadedAlbumScreen>
   }
 
   Widget _buildSelectionBottomBar(
-    BuildContext context,
-    ColorScheme colorScheme,
     List<DownloadHistoryItem> tracks,
     double bottomPadding,
   ) {
-    final selectedCount = selectedIds.length;
-    final allSelected = selectedCount == tracks.length && tracks.isNotEmpty;
+    final allSelected =
+        selectedIds.length == tracks.length && tracks.isNotEmpty;
 
-    return SelectionBottomBar(
-      selectedCount: selectedCount,
+    return LibraryTrackSelectionBar(
+      selectedCount: selectedIds.length,
       allSelected: allSelected,
       onClose: exitSelectionMode,
-      onToggleSelectAll: () {
-        if (allSelected) {
-          exitSelectionMode();
-        } else {
-          selectAll(tracks.map((e) => e.id));
-        }
-      },
+      onToggleSelectAll: allSelected
+          ? exitSelectionMode
+          : () => selectAll(tracks.map((e) => e.id)),
       bottomPadding: bottomPadding,
-      children: [
-        LibrarySelectionPlaybackActions(
-          items: _selectedUnifiedItems(tracks),
-          onClose: exitSelectionMode,
-        ),
-        Padding(
-          padding: const EdgeInsets.only(bottom: 8),
-          child: Text(context.l10n.trackEditMetadata),
-        ),
-        SelectionActionGrid(
-          children: [
-            SelectionActionButton(
-              icon: Icons.auto_fix_high_outlined,
-              label: '${context.l10n.trackReEnrich} ($selectedCount)',
-              onPressed: selectedCount > 0
-                  ? () => _reEnrichSelected(tracks)
-                  : null,
-              colorScheme: colorScheme,
-            ),
-            SelectionActionButton(
-              icon: Icons.swap_horiz,
-              label: context.l10n.selectionConvertCount(selectedCount),
-              onPressed: selectedCount > 0
-                  ? () => showBatchConvertSheet(
-                      this.context,
-                      ref,
-                      _selectedUnifiedItems(tracks),
-                      onExitSelectionMode: exitSelectionMode,
-                    )
-                  : null,
-              colorScheme: colorScheme,
-            ),
-            for (final remove in [false, true])
-              SelectionActionButton(
-                icon: remove ? Icons.remove_circle_outline : Icons.graphic_eq,
-                label: remove
-                    ? context.l10n.selectionRemoveReplayGainCount(selectedCount)
-                    : context.l10n.selectionReplayGainCount(selectedCount),
-                onPressed: selectedCount > 0
-                    ? () => runBatchReplayGain(
-                        this.context,
-                        _selectedUnifiedItems(tracks),
-                        onExitSelectionMode: exitSelectionMode,
-                        remove: remove,
-                      )
-                    : null,
-                colorScheme: colorScheme,
-              ),
-          ],
-        ),
-
-        const SizedBox(height: 8),
-        DestructiveSelectionButton(
-          count: selectedCount,
-          colorScheme: colorScheme,
-          onPressed: () => _deleteSelected(tracks),
-        ),
-      ],
+      albumDelete: true,
+      playbackActions: LibrarySelectionPlaybackActions(
+        items: _selectedUnifiedItems(tracks),
+        onClose: exitSelectionMode,
+      ),
+      onReEnrich: () => _reEnrichSelected(tracks),
+      onConvert: () => showBatchConvertSheet(
+        context,
+        ref,
+        _selectedUnifiedItems(tracks),
+        onExitSelectionMode: exitSelectionMode,
+      ),
+      onReplayGain: ({required remove}) => runBatchReplayGain(
+        context,
+        _selectedUnifiedItems(tracks),
+        onExitSelectionMode: exitSelectionMode,
+        remove: remove,
+      ),
+      onDelete: () => _deleteSelected(tracks),
     );
   }
 }
