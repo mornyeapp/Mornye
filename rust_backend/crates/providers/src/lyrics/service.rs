@@ -14,7 +14,10 @@ use std::time::{Duration, Instant, SystemTime};
 
 const POLL: Duration = Duration::from_millis(25);
 const NEGATIVE_TTL: Duration = Duration::from_secs(5 * 60);
-const UNAVAILABLE_COOLDOWN: Duration = Duration::from_secs(10 * 60);
+// Share a short recovery window across downloads, then retry the lookup once.
+// A transient outage must not disable lyrics for the rest of an album.
+const UNAVAILABLE_COOLDOWN: Duration = Duration::from_secs(2);
+const RATE_LIMIT_COOLDOWN: Duration = Duration::from_secs(60);
 const PRIORITY_GRACE: Duration = Duration::from_secs(5);
 const MAX_NEGATIVE: usize = 500;
 
@@ -296,6 +299,14 @@ impl LyricsService {
         }))
         .unwrap_or_else(|_| Err(LyricsError::Other("lyrics provider panicked".into())));
         self.inner.check(&check)?;
+        if result.as_ref().is_ok_and(LyricsResponse::has_usable_text) {
+            self.inner
+                .state
+                .lock()
+                .expect("lyrics service lock")
+                .health
+                .remove(&provider);
+        }
         result
     }
 
@@ -337,9 +348,8 @@ impl Inner {
     fn finish(&self, key: &(u64, String), flight: &Arc<LyricsFlight>, result: FetchResult) {
         let mut state = self.state.lock().expect("lyrics service lock");
         if state.generation == key.0 && !self.closed.load(Ordering::Acquire) {
-            if result.as_ref().is_err_and(|error| {
-                !matches!(error, LyricsError::Cancelled(_) | LyricsError::Recursive(_))
-            }) {
+            // Network and malformed-response failures do not prove absence.
+            if matches!(&result, Err(LyricsError::NotFound(_))) {
                 let now = Instant::now();
                 state.negative.retain(|_, expiry| now < *expiry);
                 while state.negative.len() >= MAX_NEGATIVE {
@@ -396,31 +406,42 @@ impl Inner {
                 fallback = Some(cached);
             }
         }
-        let result = self.search(&providers, request, generation, check, PRIORITY_GRACE);
-        self.check(check)?;
-        if let Err(error @ LyricsError::Cancelled(_)) = result {
-            return Err(error);
-        }
-        let recursive = match &result {
-            Err(error @ LyricsError::Recursive(_)) => Some(error.clone()),
-            _ => None,
-        };
-        if let Ok(lyrics) = result
-            && lyrics.has_usable_text()
+        let mut result = self.search(&providers, request, generation, check, PRIORITY_GRACE);
+        if fallback.is_none()
+            && matches!(
+                &result,
+                Err(LyricsError::Unavailable(_) | LyricsError::Other(_))
+            )
         {
-            self.store(generation, key, &lyrics, check)?;
-            return Ok(lyrics);
+            let deadline = Instant::now() + UNAVAILABLE_COOLDOWN;
+            loop {
+                self.check(check)?;
+                let remaining = deadline.saturating_duration_since(Instant::now());
+                if remaining.is_zero() {
+                    break;
+                }
+                std::thread::sleep(POLL.min(remaining));
+            }
+            result = self.search(&providers, request, generation, check, PRIORITY_GRACE);
         }
+        self.check(check)?;
+        let result = match result {
+            Err(error @ LyricsError::Cancelled(_)) => return Err(error),
+            Ok(lyrics) if lyrics.has_usable_text() => {
+                self.store(generation, key, &lyrics, check)?;
+                return Ok(lyrics);
+            }
+            other => other,
+        };
         if let Some(mut cached) = fallback {
             cached.source.push_str(" (cached fallback)");
             return Ok(cached);
         }
-        if let Some(error) = recursive {
-            return Err(error);
-        }
-        Err(LyricsError::Other(
-            "lyrics not found from any source".into(),
-        ))
+        result.and_then(|_| {
+            Err(LyricsError::NotFound(
+                "lyrics not found from any source".into(),
+            ))
+        })
     }
 
     fn store(
@@ -446,15 +467,17 @@ impl Inner {
         check: &Check<'_>,
         grace: Duration,
     ) -> FetchResult {
-        let candidates: Vec<_> = {
+        let (candidates, cooling): (Vec<_>, bool) = {
             let mut state = self.state.lock().expect("lyrics service lock");
             let now = Instant::now();
             state.health.retain(|_, expiry| now < *expiry);
-            providers
+            let candidates: Vec<_> = providers
                 .iter()
                 .enumerate()
                 .filter(|(_, name)| !state.health.contains_key(*name))
-                .collect()
+                .collect();
+            let cooling = candidates.len() < providers.len();
+            (candidates, cooling)
         };
         let stopped = AtomicBool::new(false);
         let next = AtomicUsize::new(0);
@@ -495,11 +518,17 @@ impl Inner {
                                     Ok(lyrics) if lyrics.has_usable_text() => {
                                         state.health.remove(name);
                                     }
-                                    Err(LyricsError::Unavailable(_)) => {
-                                        state.health.insert(
-                                            name.clone(),
-                                            Instant::now() + UNAVAILABLE_COOLDOWN,
-                                        );
+                                    Err(LyricsError::Unavailable(message)) => {
+                                        // The HTTP client reports status failures in this form.
+                                        // A rate limit needs a longer pause than a transport failure.
+                                        let cooldown = if message == "HTTP 429" {
+                                            RATE_LIMIT_COOLDOWN
+                                        } else {
+                                            UNAVAILABLE_COOLDOWN
+                                        };
+                                        state
+                                            .health
+                                            .insert(name.clone(), Instant::now() + cooldown);
                                     }
                                     _ => {}
                                 }
@@ -516,7 +545,11 @@ impl Inner {
             let mut best: Option<(usize, LyricsResponse)> = None;
             let mut deadline = None;
             let mut last_error = None;
+            let mut other_error = None;
             let mut recursive = None;
+            let mut unavailable = cooling.then(|| {
+                LyricsError::Unavailable("lyrics providers are temporarily unavailable".into())
+            });
             let result = loop {
                 if let Err(error) = self.check(check) {
                     break Err(error);
@@ -535,6 +568,14 @@ impl Inner {
                         if let Err(error @ LyricsError::Recursive(_)) = &result {
                             recursive = Some(error.clone());
                         }
+                        if let Err(error @ LyricsError::Unavailable(_)) = &result {
+                            unavailable = Some(error.clone());
+                        }
+                        if let Err(error @ (LyricsError::Other(_) | LyricsError::Cancelled(_))) =
+                            &result
+                        {
+                            other_error = Some(error.clone());
+                        }
                         if let Err(error) = &result {
                             last_error = Some(error.clone());
                         }
@@ -549,9 +590,13 @@ impl Inner {
                     Err(mpsc::RecvTimeoutError::Timeout) => {}
                     Err(mpsc::RecvTimeoutError::Disconnected) => {
                         break best.map(|(_, lyrics)| lyrics).ok_or_else(|| {
-                            recursive.or(last_error).unwrap_or_else(|| {
-                                LyricsError::Other("lyrics not found from any source".into())
-                            })
+                            recursive
+                                .or(unavailable)
+                                .or(other_error)
+                                .or(last_error)
+                                .unwrap_or_else(|| {
+                                    LyricsError::NotFound("lyrics not found from any source".into())
+                                })
                         });
                     }
                 }

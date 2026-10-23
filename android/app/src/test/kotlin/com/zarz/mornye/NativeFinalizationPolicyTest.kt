@@ -170,6 +170,38 @@ class NativeFinalizationPolicyTest {
     }
 
     @Test
+    fun downloadLyricsFallBackWhenProviderContentContainsNoLyrics() {
+        for (supplied in listOf(null, "", "  ", "[ar:Artist]\n[ti:Title]", "[00:01.00]\n<00:01.10>\nv1:")) {
+            var calls = 0
+            val resolved = NativeFinalizationPolicy.resolveLyricsContent(supplied) {
+                calls++
+                "  [00:01.00]Recovered lyric  "
+            }
+            assertEquals(1, calls)
+            assertEquals("[00:01.00]Recovered lyric", resolved)
+        }
+    }
+
+    @Test
+    fun downloadLyricsReuseRealLyricsAndInstrumentalMarkersWithoutFetching() {
+        for (supplied in listOf("[00:01.00]Existing lyric", "Plain lyric", "[instrumental:true]")) {
+            assertEquals(
+                supplied,
+                NativeFinalizationPolicy.resolveLyricsContent("  $supplied  ") {
+                    error("Usable provider content must not trigger another lookup")
+                },
+            )
+        }
+    }
+
+    @Test
+    fun downloadLyricsRejectUnusableFallbackContent() {
+        for (fetched in listOf("", "[ar:Artist]\n[ti:Title]", "[00:01.00]")) {
+            assertEquals("", NativeFinalizationPolicy.resolveLyricsContent(null) { fetched })
+        }
+    }
+
+    @Test
     fun automaticConversionSettingsAreNormalizedAndComparable() {
         val target = checkNotNull(
             NativeFinalizationPolicy.autoConversionTarget(

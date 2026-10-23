@@ -75,6 +75,13 @@ internal object NativeFinalizationPolicy {
         return false
     }
 
+    fun resolveLyricsContent(existing: String?, fetch: () -> String): String {
+        val supplied = existing.orEmpty().trim()
+        if (hasUsableLyricsContent(supplied)) return supplied
+        val fetched = fetch().trim()
+        return if (hasUsableLyricsContent(fetched)) fetched else ""
+    }
+
     data class AutoConversionTarget(
         val codec: String,
         val extension: String,

@@ -427,6 +427,27 @@ void main() {
     },
   );
 
+  test(
+    'header-only download lyrics fall back to fetched lyrics before embedding',
+    () async {
+      for (final format in ['flac', 'm4a', 'mp3', 'opus']) {
+        final harness = EmbeddingHarness();
+        final result = await harness.service.embed(
+          '${directory.path}/song.$format',
+          track,
+          settings: const AppSettings(lyricsMode: 'embed'),
+          extensionState: const ExtensionState(),
+          format: format,
+          lyricsLrc: '[ar:Artist]\n[ti:Song]\n[00:01.00]',
+        );
+        expect(harness.events, ['lyrics', 'native']);
+        expect(result, '[00:01.00]Line');
+        expect(harness.nativeWrites.single['lyrics'], result);
+        expect(await File('${directory.path}/song.lrc').exists(), isFalse);
+      }
+    },
+  );
+
   for (final invalidLyrics in [
     '[instrumental:true]',
     '[ar:Artist]\n[ti:Song]',
