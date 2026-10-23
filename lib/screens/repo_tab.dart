@@ -96,6 +96,7 @@ class _RepoTabState extends ConsumerState<RepoTab> {
       );
     }
     final colorScheme = Theme.of(context).colorScheme;
+    final l10n = context.l10n;
     // Controls share the centered column of the extension list on tablets.
     // Desktop fills the pane with a grid instead, with the same edges as the
     // other tabs.
@@ -155,53 +156,24 @@ class _RepoTabState extends ConsumerState<RepoTab> {
                 child: _CategoryChipRow(
                   edge: edge,
                   children: [
-                    _CategoryChip(
-                      label: context.l10n.storeFilterAll,
-                      icon: Icons.apps,
-                      isSelected: selectedCategory == null,
-                      onTap: () =>
-                          ref.read(repoProvider.notifier).setCategory(null),
-                    ),
-                    _CategoryChip(
-                      label: context.l10n.storeFilterMetadata,
-                      icon: Icons.label_outline,
-                      isSelected: selectedCategory == RepoCategory.metadata,
-                      onTap: () => ref
-                          .read(repoProvider.notifier)
-                          .setCategory(RepoCategory.metadata),
-                    ),
-                    _CategoryChip(
-                      label: context.l10n.storeFilterDownload,
-                      icon: Icons.download_outlined,
-                      isSelected: selectedCategory == RepoCategory.download,
-                      onTap: () => ref
-                          .read(repoProvider.notifier)
-                          .setCategory(RepoCategory.download),
-                    ),
-                    _CategoryChip(
-                      label: context.l10n.storeFilterUtility,
-                      icon: Icons.build_outlined,
-                      isSelected: selectedCategory == RepoCategory.utility,
-                      onTap: () => ref
-                          .read(repoProvider.notifier)
-                          .setCategory(RepoCategory.utility),
-                    ),
-                    _CategoryChip(
-                      label: context.l10n.storeFilterLyrics,
-                      icon: Icons.lyrics_outlined,
-                      isSelected: selectedCategory == RepoCategory.lyrics,
-                      onTap: () => ref
-                          .read(repoProvider.notifier)
-                          .setCategory(RepoCategory.lyrics),
-                    ),
-                    _CategoryChip(
-                      label: context.l10n.storeFilterIntegration,
-                      icon: Icons.link,
-                      isSelected: selectedCategory == RepoCategory.integration,
-                      onTap: () => ref
-                          .read(repoProvider.notifier)
-                          .setCategory(RepoCategory.integration),
-                    ),
+                    for (final (category, label) in [
+                      (null, l10n.storeFilterAll),
+                      (RepoCategory.metadata, l10n.storeFilterMetadata),
+                      (RepoCategory.download, l10n.storeFilterDownload),
+                      (RepoCategory.utility, l10n.storeFilterUtility),
+                      (RepoCategory.lyrics, l10n.storeFilterLyrics),
+                      (RepoCategory.integration, l10n.storeFilterIntegration),
+                    ])
+                      _CategoryChip(
+                        label: label,
+                        icon: category == null
+                            ? Icons.apps
+                            : _getCategoryIcon(category),
+                        isSelected: selectedCategory == category,
+                        onTap: () => ref
+                            .read(repoProvider.notifier)
+                            .setCategory(category),
+                      ),
                   ],
                 ),
               ),
@@ -932,6 +904,23 @@ double _storeButtonWidth(BuildContext context) {
   return widest + 32;
 }
 
+IconData _getCategoryIcon(String category) {
+  switch (category) {
+    case RepoCategory.metadata:
+      return Icons.label_outline;
+    case RepoCategory.download:
+      return Icons.download_outlined;
+    case RepoCategory.utility:
+      return Icons.build_outlined;
+    case RepoCategory.lyrics:
+      return Icons.lyrics_outlined;
+    case RepoCategory.integration:
+      return Icons.link;
+    default:
+      return Icons.extension;
+  }
+}
+
 class _ExtensionItem extends StatelessWidget {
   final RepoExtension extension;
   final bool showDivider;
@@ -948,23 +937,6 @@ class _ExtensionItem extends StatelessWidget {
     required this.onUpdate,
     this.onTap,
   });
-
-  IconData _getCategoryIcon(String category) {
-    switch (category) {
-      case RepoCategory.metadata:
-        return Icons.label_outline;
-      case RepoCategory.download:
-        return Icons.download_outlined;
-      case RepoCategory.utility:
-        return Icons.build_outlined;
-      case RepoCategory.lyrics:
-        return Icons.lyrics_outlined;
-      case RepoCategory.integration:
-        return Icons.link;
-      default:
-        return Icons.extension;
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
