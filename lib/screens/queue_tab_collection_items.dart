@@ -775,7 +775,6 @@ extension _QueueTabCollectionItemWidgets on _QueueTabState {
               end: 4,
               child: IgnorePointer(
                 child: AnimatedSelectionCheckbox(
-                  visible: true,
                   selected: isSelected,
                   colorScheme: colorScheme,
                   size: 20,
@@ -838,7 +837,6 @@ extension _QueueTabCollectionItemWidgets on _QueueTabState {
                   ),
                   child: Center(
                     child: AnimatedSelectionCheckbox(
-                      visible: true,
                       selected: isSelected,
                       colorScheme: colorScheme,
                       size: 24,

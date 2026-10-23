@@ -1265,7 +1265,6 @@ extension _ArtistScreenSections on _ArtistScreenState {
                         top: 8,
                         end: 8,
                         child: AnimatedSelectionCheckbox(
-                          visible: true,
                           selected: isSelected,
                           colorScheme: colorScheme,
                           size: 28,

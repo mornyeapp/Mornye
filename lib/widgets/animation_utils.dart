@@ -1291,10 +1291,9 @@ class SkeletonCrossfade extends StatelessWidget {
   }
 }
 
-/// An animated selection indicator that scales in/out and crossfades the
-/// checked/unchecked state.
+/// An animated selection indicator that crossfades the checked/unchecked
+/// state.
 class AnimatedSelectionCheckbox extends StatelessWidget {
-  final bool visible;
   final bool selected;
   final ColorScheme colorScheme;
   final double size;
@@ -1304,7 +1303,6 @@ class AnimatedSelectionCheckbox extends StatelessWidget {
 
   const AnimatedSelectionCheckbox({
     super.key,
-    required this.visible,
     required this.selected,
     required this.colorScheme,
     this.size = 20,
@@ -1313,48 +1311,39 @@ class AnimatedSelectionCheckbox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scale = AppMotion.spatialFast(
-      context,
-      const AppMotionSpec(Duration(milliseconds: 200), Curves.easeOutBack),
-    );
     final fill = AppMotion.effectsFast(
       context,
       const AppMotionSpec(Duration(milliseconds: 200), Curves.linear),
     );
-    return AnimatedScale(
-      scale: visible ? 1.0 : 0.0,
-      duration: scale.duration,
-      curve: scale.curve,
-      child: AnimatedContainer(
-        duration: fill.duration,
-        curve: fill.curve,
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          color: selected
-              ? colorScheme.primary
-              : unselectedColor ?? Colors.transparent,
-          shape: BoxShape.circle,
-          border: Border.all(
-            color: selected ? colorScheme.primary : colorScheme.outline,
-            width: 2,
-          ),
+    return AnimatedContainer(
+      duration: fill.duration,
+      curve: fill.curve,
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: selected
+            ? colorScheme.primary
+            : unselectedColor ?? Colors.transparent,
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: selected ? colorScheme.primary : colorScheme.outline,
+          width: 2,
         ),
-        child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 150),
-          child: selected
-              ? Icon(
-                  Icons.check,
-                  key: const ValueKey('checked'),
-                  size: size - 6,
-                  color: colorScheme.onPrimary,
-                )
-              : SizedBox(
-                  key: const ValueKey('unchecked'),
-                  width: size - 6,
-                  height: size - 6,
-                ),
-        ),
+      ),
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 150),
+        child: selected
+            ? Icon(
+                Icons.check,
+                key: const ValueKey('checked'),
+                size: size - 6,
+                color: colorScheme.onPrimary,
+              )
+            : SizedBox(
+                key: const ValueKey('unchecked'),
+                width: size - 6,
+                height: size - 6,
+              ),
       ),
     );
   }

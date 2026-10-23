@@ -1303,7 +1303,6 @@ extension _QueueTabItemWidgets on _QueueTabState {
             end: 4,
             top: 4,
             child: AnimatedSelectionCheckbox(
-              visible: true,
               selected: isSelected,
               colorScheme: colorScheme,
               size: 24,

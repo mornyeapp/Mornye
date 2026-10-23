@@ -307,7 +307,6 @@ class TrackCard extends StatelessWidget {
                         ? context.l10n.a11yDeselectTrack
                         : context.l10n.a11ySelectTrack,
                     child: AnimatedSelectionCheckbox(
-                      visible: true,
                       selected: isSelected,
                       colorScheme: colorScheme,
                       size: 24,
