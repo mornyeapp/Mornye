@@ -283,7 +283,7 @@ class _CollectionHydrationAccumulator {
   );
 }
 
-enum _CollectionWorkerMode { snapshot, playlist, export, exportJson }
+enum _CollectionWorkerMode { snapshot, playlist, exportJson }
 
 typedef _CollectionWorkerRequest = ({
   SendPort result,
@@ -416,14 +416,8 @@ void _collectionHydrationWorker(_CollectionWorkerRequest request) async {
       request.result.send(true);
     } else if (message == null) {
       commands.close();
-      if (request.mode == _CollectionWorkerMode.export ||
-          request.mode == _CollectionWorkerMode.exportJson) {
-        final exported = exporter.finish();
-        Isolate.exit(request.result, [
-          request.mode == _CollectionWorkerMode.exportJson
-              ? jsonEncode(exported)
-              : exported,
-        ]);
+      if (request.mode == _CollectionWorkerMode.exportJson) {
+        Isolate.exit(request.result, [jsonEncode(exporter.finish())]);
       }
       if (request.mode == _CollectionWorkerMode.snapshot) {
         Isolate.exit(request.result, [accumulator.finish()]);
@@ -521,63 +515,42 @@ typedef _PlaylistExportHeader = ({
 /// Converts the stable published model snapshot on a worker without cloning
 /// the whole graph in a single send. Playlist headers exclude membership sets
 /// and their tracks are submitted separately in bounded ordered batches.
-Future<Map<String, dynamic>> exportLibraryCollectionsState(
-  LibraryCollectionsState state,
-) async {
-  var count =
-      state.wishlistCount +
-      state.lovedCount +
-      state.favoriteArtistCount +
-      state.playlistCount;
-  for (final playlist in state.playlists) {
-    if (count >= _workerRowThreshold) break;
-    count += playlist.tracks.length;
-  }
-  if (count < _workerRowThreshold) return state.toJson();
-  return _exportLibraryCollectionsInWorker(state, _CollectionWorkerMode.export);
-}
-
 /// Backup writers can embed this trusted JSON fragment directly, avoiding a
 /// second transfer of the large exported map from the UI to another worker.
 Future<String> exportLibraryCollectionsJson(LibraryCollectionsState state) =>
-    _exportLibraryCollectionsInWorker(state, _CollectionWorkerMode.exportJson);
+    _runCollectionWorker<String>(
+      mode: _CollectionWorkerMode.exportJson,
+      feed: (sendBatch) async {
+        Future<void> entries(
+          _CollectionExportRows kind,
+          List<Object> values,
+        ) async {
+          for (var offset = 0; offset < values.length; offset += 256) {
+            await sendBatch((
+              kind: kind,
+              entries: values.sublist(
+                offset,
+                (offset + 256).clamp(0, values.length),
+              ),
+            ));
+          }
+        }
 
-Future<T> _exportLibraryCollectionsInWorker<T>(
-  LibraryCollectionsState state,
-  _CollectionWorkerMode mode,
-) => _runCollectionWorker<T>(
-  mode: mode,
-  feed: (sendBatch) async {
-    Future<void> entries(
-      _CollectionExportRows kind,
-      List<Object> values,
-    ) async {
-      for (var offset = 0; offset < values.length; offset += 256) {
-        await sendBatch((
-          kind: kind,
-          entries: values.sublist(
-            offset,
-            (offset + 256).clamp(0, values.length),
-          ),
-        ));
-      }
-    }
-
-    await entries(_CollectionExportRows.wishlist, state.wishlist);
-    await entries(_CollectionExportRows.loved, state.loved);
-    for (final playlist in state.playlists) {
-      await sendBatch((
-        id: playlist.id,
-        name: playlist.name,
-        cover: playlist.coverImagePath,
-        createdAt: playlist.createdAt,
-        updatedAt: playlist.updatedAt,
-      ));
-      await entries(_CollectionExportRows.playlistTrack, playlist.tracks);
-    }
-    await entries(_CollectionExportRows.artist, state.favoriteArtists);
-  },
-);
+        await entries(_CollectionExportRows.wishlist, state.wishlist);
+        await entries(_CollectionExportRows.loved, state.loved);
+        for (final playlist in state.playlists) {
+          await sendBatch((
+            id: playlist.id,
+            name: playlist.name,
+            cover: playlist.coverImagePath,
+            createdAt: playlist.createdAt,
+            updatedAt: playlist.updatedAt,
+          ));
+          await entries(_CollectionExportRows.playlistTrack, playlist.tracks);
+        }
+        await entries(_CollectionExportRows.artist, state.favoriteArtists);
+      },
+    );
 
 class _CollectionExportAccumulator {
   final wishlist = <Map<String, dynamic>>[];

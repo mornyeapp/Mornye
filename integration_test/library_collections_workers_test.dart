@@ -282,7 +282,6 @@ void main() {
   testWidgets(
     'collection export worker preserves model JSON and caller heartbeat',
     (tester) async {
-      report['collection_export'] = await benchmarkCollectionExport();
       report['collection_json_export'] = await benchmarkCollectionJsonExport();
       publish();
     },

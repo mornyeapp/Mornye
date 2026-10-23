@@ -257,43 +257,6 @@ Future<Map<String, dynamic>> benchmarkPlaylistMetadataCopy({
   };
 }
 
-Future<Map<String, dynamic>> benchmarkCollectionExport({
-  int rows = 40000,
-}) async {
-  final state = await compute(
-    decodeLibraryCollectionsSnapshot,
-    await compute(_fixture, rows),
-  );
-  final expected = await compute(_encodedState, state);
-  await exportLibraryCollectionsState(state);
-  final baseline = <Map<String, int>>[];
-  final worker = <Map<String, int>>[];
-  for (var sample = 0; sample < 5; sample++) {
-    for (final useWorker in sample.isEven ? [false, true] : [true, false]) {
-      final result = await measureCollectionOperation<Map<String, dynamic>>(
-        () => useWorker ? exportLibraryCollectionsState(state) : state.toJson(),
-      );
-      final digest = await compute(_jsonDigest, result.value);
-      if (digest != expected) {
-        throw StateError('Collection export parity failed');
-      }
-      (useWorker ? worker : baseline).add(result.timing);
-    }
-  }
-  return {
-    'rows': rows,
-    'baseline': baseline,
-    'worker': worker,
-    'note':
-        'Model-to-map conversion; worker prioritizes caller responsiveness.',
-  };
-}
-
-String _encodedState(LibraryCollectionsState state) =>
-    _jsonDigest(state.toJson());
-String _jsonDigest(Map<String, dynamic> value) =>
-    sha256.convert(utf8.encode(jsonEncode(value))).toString();
-
 Future<String> _encodeExportMap(Map<String, dynamic> value) =>
     Isolate.run(() => jsonEncode(value));
 Future<String> _legacyJsonExport(LibraryCollectionsState state) =>

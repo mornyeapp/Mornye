@@ -15,7 +15,6 @@ void main() {
         'collection_hydration': await benchmarkCollectionHydration(),
         'playlist_search': await benchmarkPlaylistSearch(),
         'playlist_metadata_copy': await benchmarkPlaylistMetadataCopy(),
-        'collection_export': await benchmarkCollectionExport(),
         'collection_json_export': await benchmarkCollectionJsonExport(),
       };
       const output = String.fromEnvironment('COLLECTIONS_BENCHMARK_OUTPUT');
