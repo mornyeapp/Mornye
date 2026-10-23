@@ -601,12 +601,6 @@ class ExtensionNotifier extends Notifier<ExtensionState> {
     }
   }
 
-  List<Extension> searchProviders() {
-    return state.extensions
-        .where((ext) => ext.enabled && ext.hasCustomSearch)
-        .toList();
-  }
-
   /// Collects the keys flagged as `secret` in an extension's manifest schema
   /// (top-level settings and quality-specific settings).
   Set<String> _secretKeysFromManifest(Map<String, dynamic> raw) {

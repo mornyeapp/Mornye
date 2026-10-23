@@ -409,7 +409,6 @@ extension _HomeTabSearchResultsUI on _HomeTabState {
           itemBuilder: (index, showDivider) => _TrackItemWithStatus(
             key: ValueKey(sortedTracks[index].id),
             track: sortedTracks[index],
-            index: sortedTrackIndexes[index],
             showDivider: showDivider,
             onDownload: ({bool forceQualityPicker = false}) => _downloadTrack(
               sortedTrackIndexes[index],

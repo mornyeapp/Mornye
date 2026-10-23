@@ -156,7 +156,6 @@ class _SearchProviderDropdown extends ConsumerWidget {
 
 class _TrackItemWithStatus extends ConsumerWidget {
   final Track track;
-  final int index;
   final bool showDivider;
   final void Function({bool forceQualityPicker}) onDownload;
   final String? searchExtensionId;
@@ -171,7 +170,6 @@ class _TrackItemWithStatus extends ConsumerWidget {
   const _TrackItemWithStatus({
     super.key,
     required this.track,
-    required this.index,
     required this.showDivider,
     required this.onDownload,
     required this.searchExtensionId,
