@@ -125,7 +125,7 @@ class _BackupRestorePageState extends ConsumerState<BackupRestorePage> {
       return;
     }
     final confirmed = await _confirmRestore(bundle);
-    if (confirmed != true || !mounted) {
+    if (!confirmed || !mounted) {
       await bundle.cleanup();
       return;
     }
@@ -189,84 +189,67 @@ class _BackupRestorePageState extends ConsumerState<BackupRestorePage> {
     }
   }
 
-  Future<bool?> _confirmRestore(BackupBundle bundle) {
+  Future<bool> _confirmRestore(BackupBundle bundle) {
     final l10n = context.l10n;
-    return showAppDialog<bool>(
-      context: context,
-      builder: (dialogContext) {
-        final theme = Theme.of(dialogContext);
-        return AppAlertDialog(
-          title: Text(l10n.backupRestoreConfirmTitle),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(l10n.backupSelectedRestoreMessage),
-              const SizedBox(height: 16),
-              Text(
-                l10n.backupContentsTitle,
-                style: theme.textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 6),
-              if (bundle.hasSettings)
-                _ContentRow(
-                  icon: Icons.settings_outlined,
-                  label: l10n.backupContentsSettings,
-                ),
-              if (bundle.profile != null)
-                _ContentRow(
-                  icon: Icons.person_outline,
-                  label: l10n.profileTitle,
-                ),
-              if (bundle.hasHistory)
-                _ContentRow(
-                  icon: Icons.history,
-                  label: l10n.backupContentsHistory(bundle.historyCount),
-                ),
-              if (bundle.hasCollections)
-                _ContentRow(
-                  icon: Icons.favorite_outline,
-                  label: l10n.backupContentsLiked(bundle.likedCount),
-                ),
-              if (bundle.hasCollections)
-                _ContentRow(
-                  icon: Icons.bookmark_outline,
-                  label: l10n.backupContentsWishlist(bundle.wishlistCount),
-                ),
-              if (bundle.hasCollections)
-                _ContentRow(
-                  icon: Icons.queue_music_outlined,
-                  label: l10n.backupContentsPlaylists(bundle.playlistCount),
-                ),
-              if (bundle.favoriteArtistCount > 0)
-                _ContentRow(
-                  icon: Icons.person_outline,
-                  label: l10n.backupContentsArtists(bundle.favoriteArtistCount),
-                ),
-              if (bundle.extensionCount > 0)
-                _ContentRow(
-                  icon: Icons.extension_outlined,
-                  label: l10n.backupContentsExtensions(bundle.extensionCount),
-                ),
-            ],
+    final theme = Theme.of(context);
+    return showAppConfirmDialog(
+      context,
+      title: l10n.backupRestoreConfirmTitle,
+      confirmLabel: l10n.backupRestoreConfirmButton,
+      cancelIsDefault: true,
+      destructive: true,
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(l10n.backupSelectedRestoreMessage),
+          const SizedBox(height: 16),
+          Text(
+            l10n.backupContentsTitle,
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
           ),
-          actions: [
-            AppDialogAction(
-              isDefault: true,
-              onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: Text(l10n.dialogCancel),
+          const SizedBox(height: 6),
+          if (bundle.hasSettings)
+            _ContentRow(
+              icon: Icons.settings_outlined,
+              label: l10n.backupContentsSettings,
             ),
-            AppDialogAction(
-              filled: true,
-              isDestructive: true,
-              onPressed: () => Navigator.of(dialogContext).pop(true),
-              child: Text(l10n.backupRestoreConfirmButton),
+          if (bundle.profile != null)
+            _ContentRow(icon: Icons.person_outline, label: l10n.profileTitle),
+          if (bundle.hasHistory)
+            _ContentRow(
+              icon: Icons.history,
+              label: l10n.backupContentsHistory(bundle.historyCount),
             ),
-          ],
-        );
-      },
+          if (bundle.hasCollections)
+            _ContentRow(
+              icon: Icons.favorite_outline,
+              label: l10n.backupContentsLiked(bundle.likedCount),
+            ),
+          if (bundle.hasCollections)
+            _ContentRow(
+              icon: Icons.bookmark_outline,
+              label: l10n.backupContentsWishlist(bundle.wishlistCount),
+            ),
+          if (bundle.hasCollections)
+            _ContentRow(
+              icon: Icons.queue_music_outlined,
+              label: l10n.backupContentsPlaylists(bundle.playlistCount),
+            ),
+          if (bundle.favoriteArtistCount > 0)
+            _ContentRow(
+              icon: Icons.person_outline,
+              label: l10n.backupContentsArtists(bundle.favoriteArtistCount),
+            ),
+          if (bundle.extensionCount > 0)
+            _ContentRow(
+              icon: Icons.extension_outlined,
+              label: l10n.backupContentsExtensions(bundle.extensionCount),
+            ),
+        ],
+      ),
     );
   }
 
@@ -278,104 +261,96 @@ class _BackupRestorePageState extends ConsumerState<BackupRestorePage> {
       body: CustomScrollView(
         slivers: [
           AppSliverHeader.page(title: l10n.backupTitle),
-          SliverToBoxAdapter(
-            child: SettingsSectionHeader(title: l10n.backupExportSectionTitle),
+          ...settingsSectionSlivers(
+            title: l10n.backupExportSectionTitle,
+            children: [
+              SettingsItem(
+                icon: Icons.settings_outlined,
+                title: l10n.backupSettingsOnly,
+                onTap: _isBusy
+                    ? null
+                    : () => setState(() {
+                        _includeSettings = true;
+                        _includeHistory = false;
+                        _includeCollections = false;
+                        _includeExtensions = false;
+                        _includeSecrets = false;
+                      }),
+              ),
+              SettingsSwitchItem(
+                icon: Icons.settings_outlined,
+                title: l10n.backupContentsSettings,
+                subtitle: l10n.backupIncludesProfile,
+                value: _includeSettings,
+                onChanged: _isBusy
+                    ? null
+                    : (value) => setState(() => _includeSettings = value),
+              ),
+              SettingsSwitchItem(
+                icon: Icons.history,
+                title: l10n.backupSelectHistory,
+                value: _includeHistory,
+                onChanged: _isBusy
+                    ? null
+                    : (value) => setState(() => _includeHistory = value),
+              ),
+              SettingsSwitchItem(
+                icon: Icons.library_music_outlined,
+                title: l10n.backupSelectCollections,
+                subtitle: l10n.backupSelectCollectionsDescription,
+                value: _includeCollections,
+                onChanged: _isBusy
+                    ? null
+                    : (value) => setState(() => _includeCollections = value),
+              ),
+              SettingsSwitchItem(
+                icon: Icons.extension_outlined,
+                title: l10n.backupSelectExtensions,
+                value: _includeExtensions,
+                onChanged: _isBusy
+                    ? null
+                    : (value) => setState(() {
+                        _includeExtensions = value;
+                        if (!value) _includeSecrets = false;
+                      }),
+              ),
+              SettingsSwitchItem(
+                icon: Icons.vpn_key_outlined,
+                title: l10n.backupIncludeSecrets,
+                subtitle: l10n.backupIncludeSecretsDescription,
+                value: _includeSecrets,
+                onChanged: _isBusy || !_includeExtensions
+                    ? null
+                    : (value) => setState(() => _includeSecrets = value),
+              ),
+              SettingsItem(
+                icon: Icons.ios_share,
+                title: l10n.backupExportButton,
+                subtitle: _hasSelection
+                    ? l10n.backupSelectedExportDescription
+                    : l10n.backupSelectAtLeastOne,
+                onTap: _isBusy || !_hasSelection ? null : _createBackup,
+                trailing: _isExporting
+                    ? const AppLoadingIndicator(size: 20, strokeWidth: 2)
+                    : null,
+                showDivider: false,
+              ),
+            ],
           ),
-          SliverToBoxAdapter(
-            child: SettingsGroup(
-              children: [
-                SettingsItem(
-                  icon: Icons.settings_outlined,
-                  title: l10n.backupSettingsOnly,
-                  onTap: _isBusy
-                      ? null
-                      : () => setState(() {
-                          _includeSettings = true;
-                          _includeHistory = false;
-                          _includeCollections = false;
-                          _includeExtensions = false;
-                          _includeSecrets = false;
-                        }),
-                ),
-                SettingsSwitchItem(
-                  icon: Icons.settings_outlined,
-                  title: l10n.backupContentsSettings,
-                  subtitle: l10n.backupIncludesProfile,
-                  value: _includeSettings,
-                  onChanged: _isBusy
-                      ? null
-                      : (value) => setState(() => _includeSettings = value),
-                ),
-                SettingsSwitchItem(
-                  icon: Icons.history,
-                  title: l10n.backupSelectHistory,
-                  value: _includeHistory,
-                  onChanged: _isBusy
-                      ? null
-                      : (value) => setState(() => _includeHistory = value),
-                ),
-                SettingsSwitchItem(
-                  icon: Icons.library_music_outlined,
-                  title: l10n.backupSelectCollections,
-                  subtitle: l10n.backupSelectCollectionsDescription,
-                  value: _includeCollections,
-                  onChanged: _isBusy
-                      ? null
-                      : (value) => setState(() => _includeCollections = value),
-                ),
-                SettingsSwitchItem(
-                  icon: Icons.extension_outlined,
-                  title: l10n.backupSelectExtensions,
-                  value: _includeExtensions,
-                  onChanged: _isBusy
-                      ? null
-                      : (value) => setState(() {
-                          _includeExtensions = value;
-                          if (!value) _includeSecrets = false;
-                        }),
-                ),
-                SettingsSwitchItem(
-                  icon: Icons.vpn_key_outlined,
-                  title: l10n.backupIncludeSecrets,
-                  subtitle: l10n.backupIncludeSecretsDescription,
-                  value: _includeSecrets,
-                  onChanged: _isBusy || !_includeExtensions
-                      ? null
-                      : (value) => setState(() => _includeSecrets = value),
-                ),
-                SettingsItem(
-                  icon: Icons.ios_share,
-                  title: l10n.backupExportButton,
-                  subtitle: _hasSelection
-                      ? l10n.backupSelectedExportDescription
-                      : l10n.backupSelectAtLeastOne,
-                  onTap: _isBusy || !_hasSelection ? null : _createBackup,
-                  trailing: _isExporting
-                      ? const AppLoadingIndicator(size: 20, strokeWidth: 2)
-                      : null,
-                  showDivider: false,
-                ),
-              ],
-            ),
-          ),
-          SliverToBoxAdapter(
-            child: SettingsSectionHeader(title: l10n.backupImportSectionTitle),
-          ),
-          SliverToBoxAdapter(
-            child: SettingsGroup(
-              children: [
-                SettingsItem(
-                  icon: Icons.settings_backup_restore,
-                  title: l10n.backupImportButton,
-                  subtitle: l10n.backupImportSectionDescription,
-                  onTap: _isBusy ? null : _restoreBackup,
-                  trailing: _isImporting
-                      ? const AppLoadingIndicator(size: 20, strokeWidth: 2)
-                      : null,
-                  showDivider: false,
-                ),
-              ],
-            ),
+          ...settingsSectionSlivers(
+            title: l10n.backupImportSectionTitle,
+            children: [
+              SettingsItem(
+                icon: Icons.settings_backup_restore,
+                title: l10n.backupImportButton,
+                subtitle: l10n.backupImportSectionDescription,
+                onTap: _isBusy ? null : _restoreBackup,
+                trailing: _isImporting
+                    ? const AppLoadingIndicator(size: 20, strokeWidth: 2)
+                    : null,
+                showDivider: false,
+              ),
+            ],
           ),
           const SliverToBoxAdapter(child: SizedBox(height: 24)),
         ],

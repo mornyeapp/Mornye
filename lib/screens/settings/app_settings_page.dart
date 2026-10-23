@@ -28,119 +28,105 @@ class AppSettingsPage extends ConsumerWidget {
           slivers: [
             AppSliverHeader.page(title: context.l10n.settingsApp),
 
-            SliverToBoxAdapter(
-              child: SettingsSectionHeader(title: context.l10n.sectionApp),
-            ),
-            SliverToBoxAdapter(
-              child: SettingsGroup(
-                connected: true,
-                children: [
-                  SettingsSwitchItem(
-                    icon: Icons.extension,
-                    title: context.l10n.optionsExtensionStore,
-                    subtitle: context.l10n.optionsExtensionStoreSubtitle,
-                    value: settings.showExtensionStore,
-                    onChanged: (v) => ref
-                        .read(settingsProvider.notifier)
-                        .setShowExtensionStore(v),
+            ...settingsSectionSlivers(
+              title: context.l10n.sectionApp,
+              connected: true,
+              children: [
+                SettingsSwitchItem(
+                  icon: Icons.extension,
+                  title: context.l10n.optionsExtensionStore,
+                  subtitle: context.l10n.optionsExtensionStoreSubtitle,
+                  value: settings.showExtensionStore,
+                  onChanged: (v) => ref
+                      .read(settingsProvider.notifier)
+                      .setShowExtensionStore(v),
+                ),
+                _VerificationBrowserModeSelector(
+                  currentMode: settings.extensionVerificationBrowserMode,
+                  onChanged: (mode) => ref
+                      .read(settingsProvider.notifier)
+                      .setExtensionVerificationBrowserMode(mode),
+                ),
+                SettingsSwitchItem(
+                  icon: Icons.system_update,
+                  title: context.l10n.optionsCheckUpdates,
+                  subtitle: context.l10n.optionsCheckUpdatesSubtitle,
+                  value: settings.checkForUpdates,
+                  onChanged: (v) =>
+                      ref.read(settingsProvider.notifier).setCheckForUpdates(v),
+                  showDivider: settings.checkForUpdates,
+                ),
+                if (settings.checkForUpdates)
+                  _UpdateChannelSelector(
+                    currentChannel: settings.updateChannel,
+                    onChanged: (v) =>
+                        ref.read(settingsProvider.notifier).setUpdateChannel(v),
                   ),
-                  _VerificationBrowserModeSelector(
-                    currentMode: settings.extensionVerificationBrowserMode,
-                    onChanged: (mode) => ref
-                        .read(settingsProvider.notifier)
-                        .setExtensionVerificationBrowserMode(mode),
-                  ),
-                  SettingsSwitchItem(
-                    icon: Icons.system_update,
-                    title: context.l10n.optionsCheckUpdates,
-                    subtitle: context.l10n.optionsCheckUpdatesSubtitle,
-                    value: settings.checkForUpdates,
-                    onChanged: (v) => ref
-                        .read(settingsProvider.notifier)
-                        .setCheckForUpdates(v),
-                    showDivider: settings.checkForUpdates,
-                  ),
-                  if (settings.checkForUpdates)
-                    _UpdateChannelSelector(
-                      currentChannel: settings.updateChannel,
-                      onChanged: (v) => ref
-                          .read(settingsProvider.notifier)
-                          .setUpdateChannel(v),
-                    ),
-                ],
-              ),
+              ],
             ),
 
-            SliverToBoxAdapter(
-              child: SettingsSectionHeader(title: context.l10n.sectionData),
-            ),
-            SliverToBoxAdapter(
-              child: SettingsGroup(
-                children: [
-                  SettingsItem(
-                    icon: Icons.cleaning_services_outlined,
-                    title: context.l10n.cleanupOrphanedDownloads,
-                    subtitle: context.l10n.cleanupOrphanedDownloadsSubtitle,
-                    onTap: () => _cleanupOrphanedDownloads(context, ref),
-                  ),
-                  SettingsItem(
-                    icon: Icons.delete_forever,
-                    title: context.l10n.optionsClearHistory,
-                    subtitle: context.l10n.optionsClearHistorySubtitle,
-                    onTap: () =>
-                        _showClearHistoryDialog(context, ref, colorScheme),
-                  ),
-                  SettingsSwitchItem(
-                    icon: Icons.history_toggle_off_outlined,
-                    title: context.l10n.settingsSaveDownloadHistory,
-                    subtitle: context.l10n.settingsSaveDownloadHistorySubtitle,
-                    value: settings.saveDownloadHistory,
-                    onChanged: (enabled) {
-                      if (enabled) {
-                        ref
-                            .read(settingsProvider.notifier)
-                            .setSaveDownloadHistory(true);
-                        return;
-                      }
-
-                      final hasHistory = ref
-                          .read(downloadHistoryProvider)
-                          .items
-                          .isNotEmpty;
-                      if (hasHistory) {
-                        _showDisableHistoryDialog(context, ref, colorScheme);
-                        return;
-                      }
-
+            ...settingsSectionSlivers(
+              title: context.l10n.sectionData,
+              children: [
+                SettingsItem(
+                  icon: Icons.cleaning_services_outlined,
+                  title: context.l10n.cleanupOrphanedDownloads,
+                  subtitle: context.l10n.cleanupOrphanedDownloadsSubtitle,
+                  onTap: () => _cleanupOrphanedDownloads(context, ref),
+                ),
+                SettingsItem(
+                  icon: Icons.delete_forever,
+                  title: context.l10n.optionsClearHistory,
+                  subtitle: context.l10n.optionsClearHistorySubtitle,
+                  onTap: () =>
+                      _showClearHistoryDialog(context, ref, colorScheme),
+                ),
+                SettingsSwitchItem(
+                  icon: Icons.history_toggle_off_outlined,
+                  title: context.l10n.settingsSaveDownloadHistory,
+                  subtitle: context.l10n.settingsSaveDownloadHistorySubtitle,
+                  value: settings.saveDownloadHistory,
+                  onChanged: (enabled) {
+                    if (enabled) {
                       ref
                           .read(settingsProvider.notifier)
-                          .setSaveDownloadHistory(false);
-                    },
-                    showDivider: false,
-                  ),
-                ],
-              ),
+                          .setSaveDownloadHistory(true);
+                      return;
+                    }
+
+                    final hasHistory = ref
+                        .read(downloadHistoryProvider)
+                        .items
+                        .isNotEmpty;
+                    if (hasHistory) {
+                      _showDisableHistoryDialog(context, ref, colorScheme);
+                      return;
+                    }
+
+                    ref
+                        .read(settingsProvider.notifier)
+                        .setSaveDownloadHistory(false);
+                  },
+                  showDivider: false,
+                ),
+              ],
             ),
 
-            SliverToBoxAdapter(
-              child: SettingsSectionHeader(title: context.l10n.sectionDebug),
-            ),
-            SliverToBoxAdapter(
-              child: SettingsGroup(
-                children: [
-                  SettingsSwitchItem(
-                    icon: Icons.bug_report,
-                    title: context.l10n.optionsDetailedLogging,
-                    subtitle: settings.enableLogging
-                        ? context.l10n.optionsDetailedLoggingOn
-                        : context.l10n.optionsDetailedLoggingOff,
-                    value: settings.enableLogging,
-                    onChanged: (v) =>
-                        ref.read(settingsProvider.notifier).setEnableLogging(v),
-                    showDivider: false,
-                  ),
-                ],
-              ),
+            ...settingsSectionSlivers(
+              title: context.l10n.sectionDebug,
+              children: [
+                SettingsSwitchItem(
+                  icon: Icons.bug_report,
+                  title: context.l10n.optionsDetailedLogging,
+                  subtitle: settings.enableLogging
+                      ? context.l10n.optionsDetailedLoggingOn
+                      : context.l10n.optionsDetailedLoggingOff,
+                  value: settings.enableLogging,
+                  onChanged: (v) =>
+                      ref.read(settingsProvider.notifier).setEnableLogging(v),
+                  showDivider: false,
+                ),
+              ],
             ),
 
             const SliverToBoxAdapter(child: SizedBox(height: 32)),
