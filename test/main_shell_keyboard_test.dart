@@ -95,6 +95,10 @@ void main() {
   ) async {
     await pumpShell(tester);
     expect(languageTags, ['en']);
+    // A back press at a tab root checks the keyboard too.
+    await tester.binding.handlePopRoute();
+    await tester.pump();
+    expect(find.text('Press back again to exit'), findsOneWidget);
     final homeTab = find.byKey(const ValueKey('tab-home')).first;
     final tabs = tester.widget(homeTab);
 
@@ -106,6 +110,9 @@ void main() {
     expect(languageTags, ['en']);
     // The shell did not rebuild its tab navigators.
     expect(tester.widget(homeTab), same(tabs));
+    // Lets the back press snack bar time out.
+    await tester.pump(const Duration(seconds: 3));
+    await tester.pump(const Duration(seconds: 1));
     expect(tester.takeException(), isNull);
   });
 

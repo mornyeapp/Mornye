@@ -505,6 +505,13 @@ class _MainShellState extends ConsumerState<MainShell>
     }
   }
 
+  /// Reads the keyboard inset without depending on it, so keyboard frames
+  /// do not rebuild the shell.
+  bool get _keyboardVisible {
+    final media = context.getInheritedWidgetOfExactType<MediaQuery>()!;
+    return media.data.viewInsets.bottom > 0;
+  }
+
   Future<void> _handleBackPress() async {
     final rootNavigator = Navigator.of(context, rootNavigator: true);
     final handledByRootNavigator = await rootNavigator.maybePop();
@@ -529,8 +536,6 @@ class _MainShellState extends ConsumerState<MainShell>
     final trackState = ref.read(trackProvider);
     final isSearchTab =
         _currentIndex == (context.isMornye ? (showStore ? 3 : 2) : 0);
-
-    final isKeyboardVisible = MediaQuery.viewInsetsOf(context).bottom > 0;
 
     if (isSearchTab &&
         trackState.isShowingRecentAccess &&
@@ -562,7 +567,7 @@ class _MainShellState extends ConsumerState<MainShell>
       return;
     }
 
-    if (isSearchTab && isKeyboardVisible) {
+    if (isSearchTab && _keyboardVisible) {
       FocusManager.instance.primaryFocus?.unfocus();
       _lastBackPress = null;
       return;
@@ -982,19 +987,14 @@ class _MainShellState extends ConsumerState<MainShell>
         context.isMornye &&
         !useNavigationRail &&
         MediaQuery.textScalerOf(context).scale(15) <= 20;
-    // The chrome stays expanded while the keyboard is up. The shell reads the
-    // insets without depending on them, so keyboard frames do not rebuild it.
-    bool keyboardHidden() {
-      final media = context.getInheritedWidgetOfExactType<MediaQuery>()!;
-      return media.data.viewInsets.bottom == 0;
-    }
 
     Widget observeScroll(Widget child, int index) =>
         NotificationListener<ScrollNotification>(
           onNotification: (notification) {
+            // The chrome stays expanded while the keyboard is up.
             if (canMinimizeChrome &&
                 index == _currentIndex &&
-                keyboardHidden()) {
+                !_keyboardVisible) {
               return _mornyeChrome.handleScroll(notification);
             }
             return false;
