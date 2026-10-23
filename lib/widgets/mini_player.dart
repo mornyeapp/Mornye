@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/gestures.dart' show DragStartBehavior;
@@ -18,6 +19,7 @@ import 'package:mornye/providers/player_artwork_video_provider.dart';
 import 'package:mornye/providers/runtime_profile_provider.dart';
 import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/app_tokens.dart';
+import 'package:mornye/theme/cover_palette.dart';
 import 'package:mornye/theme/material_expressive.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/theme/player_artwork_theme.dart';
@@ -42,6 +44,41 @@ class MiniPlayer extends ConsumerStatefulWidget {
 }
 
 class _MiniPlayerState extends ConsumerState<MiniPlayer> {
+  Uri? _warmedArtUri;
+
+  @override
+  void initState() {
+    super.initState();
+    ref.listenManual(
+      currentMediaItemProvider.select((item) => item.value?.artUri),
+      (_, artUri) => _warmCoverColour(artUri),
+    );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _warmCoverColour(ref.read(currentMediaItemProvider).value?.artUri);
+  }
+
+  // The Mornye full player shades itself from the cover's source colour;
+  // resolving it with the track lets the player open on its final colour.
+  void _warmCoverColour(Uri? artUri) {
+    if (!context.isMornye || artUri == _warmedArtUri) return;
+    _warmedArtUri = artUri;
+    final String? source;
+    try {
+      source = artUri?.scheme == 'file'
+          ? artUri!.toFilePath()
+          : artUri?.toString();
+    } catch (_) {
+      return;
+    }
+    if (source != null && source.isNotEmpty) {
+      unawaited(CoverPalette.resolveSourceColor(source));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final body = _MiniPlayerBody(
