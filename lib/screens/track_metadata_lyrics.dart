@@ -75,7 +75,7 @@ extension _TrackMetadataLyricsAndSaving on _TrackMetadataScreenState {
                     ),
                     ExpressiveButton(
                       text: true,
-                      onPressed: _fetchOnlineLyrics,
+                      onPressed: _fetchLyrics,
                       child: Text(context.l10n.dialogRetry),
                     ),
                   ],
@@ -180,7 +180,7 @@ extension _TrackMetadataLyricsAndSaving on _TrackMetadataScreenState {
                   Center(
                     child: ExpressiveButton(
                       tonal: true,
-                      onPressed: _fetchOnlineLyrics,
+                      onPressed: _fetchLyrics,
                       icon: const Icon(Icons.cloud_download_outlined),
                       child: Text(context.l10n.trackFetchOnlineLyrics),
                     ),
@@ -191,7 +191,7 @@ extension _TrackMetadataLyricsAndSaving on _TrackMetadataScreenState {
               Center(
                 child: ExpressiveButton(
                   tonal: true,
-                  onPressed: _fetchLyrics,
+                  onPressed: () => _fetchLyrics(checkEmbedded: true),
                   icon: const Icon(Icons.download),
                   child: Text(context.l10n.trackLoadLyrics),
                 ),
@@ -291,8 +291,10 @@ extension _TrackMetadataLyricsAndSaving on _TrackMetadataScreenState {
     }
   }
 
-  /// Fetch lyrics from online providers. Only called by user action.
-  Future<void> _fetchOnlineLyrics() async {
+  /// Fetches lyrics from online providers. Only called by user action.
+  /// With [checkEmbedded], lyrics embedded in an existing file win; the
+  /// "Load Lyrics" button uses that.
+  Future<void> _fetchLyrics({bool checkEmbedded = false}) async {
     if (_lyricsLoading) return;
 
     _setState(() {
@@ -305,83 +307,7 @@ extension _TrackMetadataLyricsAndSaving on _TrackMetadataScreenState {
     try {
       final durationMs = (duration ?? 0) * 1000;
 
-      final result = await PlatformBridge.getLyricsLRCWithSource(
-        _spotifyId ?? '',
-        trackName,
-        artistName,
-        filePath: null,
-        durationMs: durationMs,
-      ).timeout(const Duration(seconds: 20));
-
-      final lrcText = result['lyrics']?.toString() ?? '';
-      final source = result['source']?.toString() ?? '';
-      final instrumental =
-          (result['instrumental'] as bool? ?? false) ||
-          isInstrumentalLyricsMarker(lrcText);
-      final cleanLyrics = cleanLyricsForDisplay(lrcText);
-
-      if (mounted) {
-        if (instrumental) {
-          _setState(() {
-            _lyrics = null;
-            _rawLyrics = null;
-            _isInstrumental = true;
-            _lyricsSource = source.isNotEmpty ? source : null;
-            _lyricsEmbedded = false;
-            _lyricsLoading = false;
-          });
-        } else if (cleanLyrics.isEmpty) {
-          _setState(() {
-            _lyrics = null;
-            _rawLyrics = null;
-            _lyricsSource = null;
-            _lyricsEmbedded = false;
-            _lyricsError = context.l10n.trackLyricsNotAvailable;
-            _lyricsLoading = false;
-          });
-        } else {
-          _setState(() {
-            _lyrics = cleanLyrics;
-            _rawLyrics = lrcText;
-            _lyricsSource = source.isNotEmpty ? source : null;
-            _lyricsEmbedded = false;
-            _lyricsLoading = false;
-          });
-        }
-      }
-    } on TimeoutException {
-      if (mounted) {
-        _setState(() {
-          _lyricsError = context.l10n.trackLyricsTimeout;
-          _lyricsLoading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        _setState(() {
-          _lyricsError = context.l10n.trackLyricsLoadFailed;
-          _lyricsLoading = false;
-        });
-      }
-    }
-  }
-
-  /// Full lyrics fetch: check embedded first, then online.
-  /// Used by the "Load Lyrics" button when file doesn't exist (non-local items).
-  Future<void> _fetchLyrics() async {
-    if (_lyricsLoading) return;
-
-    _setState(() {
-      _lyricsLoading = true;
-      _lyricsError = null;
-      _isInstrumental = false;
-      _lyricsSource = null;
-    });
-
-    try {
-      final durationMs = (duration ?? 0) * 1000;
-
-      if (_fileExists) {
+      if (checkEmbedded && _fileExists) {
         final embeddedResult = await _readLocalLyrics(cleanFilePath);
 
         final embeddedLyrics = embeddedResult['lyrics']?.toString() ?? '';
