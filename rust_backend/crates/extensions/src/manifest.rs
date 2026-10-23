@@ -594,7 +594,9 @@ impl ExtensionManifest {
             .iter()
             .any(|allowed| {
                 let allowed = allowed.trim().to_lowercase();
-                allowed == domain || (allowed.starts_with("*.") && domain.ends_with(&allowed[1..]))
+                allowed == "*"
+                    || allowed == domain
+                    || (allowed.starts_with("*.") && domain.ends_with(&allowed[1..]))
             })
     }
 
@@ -626,5 +628,31 @@ impl ExtensionManifest {
                 && (parsed.hostname == host || parsed.hostname.ends_with(&format!(".{host}")))
                 && (path.is_empty() || parsed.path.starts_with(format!("/{path}").as_bytes()))
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn manifest(network: Value) -> Result<ExtensionManifest, ManifestError> {
+        ExtensionManifest::parse(
+            &serde_json::json!({
+                "name":"generic-media","version":"1.0.0","description":"Generic fixture",
+                "type":["download_provider"],"permissions":{"storage":true,"network":network},
+                "signedSession":{"namespace":"generic","baseUrl":"https://accounts.example.test"}
+            })
+            .to_string(),
+        )
+    }
+
+    #[test]
+    fn any_domain_wildcard_covers_listed_hosts() {
+        let any = manifest(serde_json::json!(["*"])).unwrap();
+        assert!(any.is_domain_allowed("accounts.example.test"));
+        assert!(any.is_domain_allowed("192.168.178.20"));
+        let scoped = manifest(serde_json::json!(["*.example.test"])).unwrap();
+        assert!(!scoped.is_domain_allowed("example.org"));
+        assert!(manifest(serde_json::json!(["example.org"])).is_err());
     }
 }

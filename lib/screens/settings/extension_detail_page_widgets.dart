@@ -365,7 +365,13 @@ class _PermissionItem extends StatelessWidget {
     IconData icon = Icons.security;
     String description = permission;
 
-    if (permission.startsWith('network:')) {
+    if (permission == 'network:*') {
+      icon = Icons.language;
+      description = 'Network access to: all domains';
+    } else if (permission == 'network:http') {
+      icon = Icons.warning_amber_outlined;
+      description = 'Unencrypted HTTP connections allowed';
+    } else if (permission.startsWith('network:')) {
       icon = Icons.language;
       description = 'Network access to: ${permission.substring(8)}';
     } else if (permission.startsWith('storage:')) {
