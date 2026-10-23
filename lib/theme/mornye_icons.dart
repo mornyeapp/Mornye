@@ -17,6 +17,13 @@ const IconData mornyeArrowForward = IconData(
 /// ([CupertinoIcons.back], not [CupertinoIcons.chevron_back]).
 IconData mornyeIconFor(IconData icon) {
   if (icon.fontFamily == CupertinoIcons.iconFont) return icon;
+  // The switch compares each pattern in turn; rows look icons up per build.
+  return _mornyeIcons[icon] ??= _cupertinoFor(icon);
+}
+
+final _mornyeIcons = <IconData, IconData>{};
+
+IconData _cupertinoFor(IconData icon) {
   return switch (icon) {
     Icons.extension ||
     Icons.extension_outlined ||
