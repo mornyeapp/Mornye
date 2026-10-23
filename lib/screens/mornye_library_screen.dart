@@ -25,6 +25,7 @@ import 'package:mornye/widgets/desktop/hover_play_button.dart';
 import 'package:mornye/widgets/cached_cover_image.dart';
 import 'package:mornye/widgets/local_library_artwork_builder.dart';
 import 'package:mornye/widgets/library_search_results.dart';
+import 'package:mornye/widgets/sliver_layout_info_builder.dart';
 
 enum MornyeLibraryPage { overview, albums, artists }
 
@@ -568,16 +569,17 @@ class _MornyeLibraryScreenState extends ConsumerState<MornyeLibraryScreen> {
               else
                 SliverPadding(
                   padding: EdgeInsets.symmetric(horizontal: 24 + listInset),
-                  sliver: SliverLayoutBuilder(
-                    builder: (context, constraints) {
+                  sliver: SliverLayoutInfoBuilder(
+                    select: (constraints) => constraints.crossAxisExtent,
+                    builder: (context, crossAxisExtent) {
                       // ~160dp covers: two on phones, more columns rather
                       // than giant covers on tablets.
-                      final columns = (constraints.crossAxisExtent / 160)
-                          .floor()
-                          .clamp(2, 8);
+                      final columns = (crossAxisExtent / 160).floor().clamp(
+                        2,
+                        8,
+                      );
                       final width =
-                          (constraints.crossAxisExtent - 20 * (columns - 1)) /
-                          columns;
+                          (crossAxisExtent - 20 * (columns - 1)) / columns;
                       final textHeight =
                           MediaQuery.textScalerOf(context).scale(16) * 3.2 + 24;
                       return SliverGrid.builder(

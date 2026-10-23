@@ -23,6 +23,7 @@ import 'package:mornye/widgets/app_icon_button.dart';
 import 'package:mornye/widgets/app_loading_indicator.dart';
 import 'package:mornye/widgets/app_sliver_header.dart';
 import 'package:mornye/widgets/extension_health.dart';
+import 'package:mornye/widgets/sliver_layout_info_builder.dart';
 
 part 'extension_detail_page_widgets.dart';
 
@@ -107,14 +108,14 @@ class _ExtensionDetailPageState extends ConsumerState<ExtensionDetailPage> {
           slivers: [
             AppSliverHeader.page(title: extension.displayName),
 
-            SliverLayoutBuilder(
-              builder: (context, constraints) => SliverToBoxAdapter(
+            SliverLayoutInfoBuilder(
+              select: (constraints) =>
+                  settingsHorizontalInset(constraints.crossAxisExtent),
+              builder: (context, inset) => SliverToBoxAdapter(
                 child: Padding(
                   // Same column as the settings groups below on wide panes.
                   padding: EdgeInsets.symmetric(
-                    horizontal: settingsHorizontalInset(
-                      constraints.crossAxisExtent,
-                    ),
+                    horizontal: inset,
                     vertical: 16,
                   ),
                   child: _ExtensionOverviewSurface(

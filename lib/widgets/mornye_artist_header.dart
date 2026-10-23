@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'dart:ui';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/providers/runtime_profile_provider.dart';
@@ -10,6 +11,7 @@ import 'package:mornye/services/shell_navigation_service.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/widgets/album_detail_header.dart';
 import 'package:mornye/widgets/cached_cover_image.dart';
+import 'package:mornye/widgets/sliver_layout_info_builder.dart';
 
 /// Share the same artwork-derived dark surface while loading and after the
 /// artist metadata arrives, including when the app itself uses light mode.
@@ -155,6 +157,7 @@ class MornyeArtistHeader extends StatelessWidget {
     required this.artwork,
     required this.actions,
     required this.showTitle,
+    this.showTitleListenable,
     this.listeners,
     this.logoUrl,
     this.badge,
@@ -164,6 +167,9 @@ class MornyeArtistHeader extends StatelessWidget {
   final Widget artwork;
   final List<Widget> actions;
   final bool showTitle;
+
+  /// Replaces [showTitle] when set; see [headerToolbarTitle].
+  final ValueListenable<bool>? showTitleListenable;
   final String? listeners;
   final String? logoUrl;
   final Widget? badge;
@@ -175,12 +181,28 @@ class MornyeArtistHeader extends StatelessWidget {
 
   List<Widget> buildSlivers(BuildContext context) {
     final surface = Theme.of(context).colorScheme.surface;
+    final back = Padding(
+      padding: EdgeInsetsDirectional.only(start: isDesktopPlatform ? 16 : 12),
+      child: Align(
+        alignment: AlignmentDirectional.centerStart,
+        widthFactor: 1,
+        child: HeaderCircleButton(
+          icon: Icons.arrow_back,
+          tooltip: MaterialLocalizations.of(context).backButtonTooltip,
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+    );
     return [
       // Keep safe-area dependencies inside this sliver: folding the shell
       // navigation must not rebuild the artist's entire discography.
-      SliverLayoutBuilder(
-        builder: (context, constraints) {
-          final width = constraints.crossAxisExtent;
+      SliverLayoutInfoBuilder(
+        select: (constraints) => (
+          constraints.crossAxisExtent,
+          isDesktopPlatform ? constraints.viewportMainAxisExtent : 0.0,
+        ),
+        builder: (context, extents) {
+          final (width, viewportHeight) = extents;
           final textWidth = (width - 48).clamp(0.0, double.infinity);
           final textScaler = MediaQuery.textScalerOf(context);
           double textHeight(String text, TextStyle style) {
@@ -220,10 +242,7 @@ class MornyeArtistHeader extends StatelessWidget {
           final expandedHeight = isDesktopPlatform
               ? math.max(
                   contentHeight + 160,
-                  (constraints.viewportMainAxisExtent * 0.82).clamp(
-                    420.0,
-                    820.0,
-                  ),
+                  (viewportHeight * 0.82).clamp(420.0, 820.0),
                 )
               : photoHeight + contentHeight;
           return SliverAppBar(
@@ -233,30 +252,21 @@ class MornyeArtistHeader extends StatelessWidget {
             backgroundColor: surface,
             surfaceTintColor: Colors.transparent,
             leadingWidth: 64,
-            leading: Padding(
-              padding: EdgeInsetsDirectional.only(
-                start: isDesktopPlatform ? 16 : 12,
-              ),
-              child: Align(
-                alignment: AlignmentDirectional.centerStart,
-                widthFactor: 1,
-                child: HeaderCircleButton(
-                  icon: Icons.arrow_back,
-                  tooltip: MaterialLocalizations.of(context).backButtonTooltip,
-                  onPressed: () => Navigator.pop(context),
-                ),
-              ),
-            ),
-            title: AnimatedOpacity(
-              opacity: showTitle ? 1 : 0,
-              duration: const Duration(milliseconds: 180),
-              child: Text(
-                name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w600,
+            leading: back,
+            title: headerToolbarTitle(
+              showTitleListenable,
+              showTitle,
+              (showTitle) => AnimatedOpacity(
+                opacity: showTitle ? 1 : 0,
+                duration: const Duration(milliseconds: 180),
+                child: Text(
+                  name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ),

@@ -1023,9 +1023,9 @@ class _ExploreSectionPage extends StatelessWidget {
           AppSliverHeader.page(title: section.title),
           SliverPadding(
             padding: EdgeInsets.fromLTRB(inset, 8, inset, 24),
-            sliver: SliverLayoutBuilder(
-              builder: (context, constraints) {
-                final width = constraints.crossAxisExtent;
+            sliver: SliverLayoutInfoBuilder(
+              select: (constraints) => constraints.crossAxisExtent,
+              builder: (context, width) {
                 final featuredColumns = _columns(width, 360, 3);
                 final featuredWidth =
                     (width - _gap * (featuredColumns - 1)) / featuredColumns;
