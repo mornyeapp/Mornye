@@ -2049,8 +2049,10 @@ void main() {
           tester.renderObject<RenderLyricBlurSnapshot>(
             find.ancestor(
               of: line,
-              matching: find.byWidgetPredicate(
-                (widget) => widget.runtimeType.toString() == '_BlurSnapshot',
+              matching: find.byElementPredicate(
+                (element) =>
+                    element is RenderObjectElement &&
+                    element.renderObject is RenderLyricBlurSnapshot,
               ),
             ),
           );

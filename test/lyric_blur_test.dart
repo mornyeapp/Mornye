@@ -87,8 +87,10 @@ RenderLyricBlurSnapshot _render(WidgetTester tester) =>
     tester.renderObject<RenderLyricBlurSnapshot>(
       find.descendant(
         of: find.byType(LyricBlur),
-        matching: find.byWidgetPredicate(
-          (widget) => widget.runtimeType.toString() == '_BlurSnapshot',
+        matching: find.byElementPredicate(
+          (element) =>
+              element is RenderObjectElement &&
+              element.renderObject is RenderLyricBlurSnapshot,
         ),
       ),
     );

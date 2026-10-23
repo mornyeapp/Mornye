@@ -9,9 +9,12 @@ import 'package:flutter/widgets.dart';
 /// While [sigma] is still easing the blur is composited live, as an
 /// [ImageFiltered]. Once it has [settled], the blurred line is rasterized once
 /// and later frames draw that image, so scrolling, fading or scaling the row
-/// does not run the blur again. A new [child], a repaint or relayout below it,
-/// or a new sigma or device pixel ratio drops the image; the line then blurs
-/// live until it is unchanged for a frame.
+/// does not run the blur again. A new [child] widget, a new sigma or device
+/// pixel ratio, a relayout below it, or a repaint below it that is not inside
+/// a nested layer drops the image; the line then blurs live until it is
+/// unchanged for a frame. A paint-only change inside a nested layer (such as
+/// an [Opacity] or [FadeTransition]) does not, unless it comes with a rebuild
+/// or, for [fadeTransition], an animation tick.
 class LyricBlur extends StatelessWidget {
   const LyricBlur({
     super.key,
