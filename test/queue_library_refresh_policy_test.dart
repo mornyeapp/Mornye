@@ -413,29 +413,26 @@ void main() {
     final source = File(
       'lib/screens/queue_tab_collection_items.dart',
     ).readAsStringSync();
-    final gridStart = source.indexOf('Widget _buildBridgeGridItem(');
-    final listStart = source.indexOf('Widget _buildBridgeListItem(');
+    // One builder draws both the grid cell and the list row.
+    final bridgeStart = source.indexOf('Widget _buildBridgeItem(');
     final badgeStart = source.indexOf('Widget _buildLibraryQualityBadge(');
 
-    expect(gridStart, greaterThanOrEqualTo(0));
-    expect(listStart, greaterThan(gridStart));
-    expect(badgeStart, greaterThan(listStart));
+    expect(bridgeStart, greaterThanOrEqualTo(0));
+    expect(badgeStart, greaterThan(bridgeStart));
 
-    final gridSource = source.substring(gridStart, listStart);
-    final listSource = source.substring(listStart, badgeStart);
+    final bridgeSource = source.substring(bridgeStart, badgeStart);
 
-    expect(gridSource, contains('resolveCompletionBridgePlayablePath('));
-    expect(gridSource, contains('_completionBridgePlayableProbe.listenable('));
-    expect(gridSource, contains('CompletionBridgePlayableStatus.checking'));
-    expect(gridSource, contains('semanticLabel:'));
-    expect(gridSource, contains('queueCheckingDownloadedFile'));
-    expect(gridSource, contains('_LibraryPlaybackButton('));
-    expect(gridSource, contains('grid: true'));
-    expect(listSource, contains('resolveCompletionBridgePlayablePath('));
-    expect(listSource, contains('_completionBridgePlayableProbe.listenable('));
-    expect(listSource, contains('CompletionBridgePlayableStatus.checking'));
-    expect(listSource, contains('semanticLabel:'));
-    expect(listSource, contains('queueCheckingDownloadedFile'));
-    expect(listSource, contains('_LibraryPlaybackButton('));
+    expect(bridgeSource, contains('resolveCompletionBridgePlayablePath('));
+    expect(
+      bridgeSource,
+      contains('_completionBridgePlayableProbe.listenable('),
+    );
+    expect(bridgeSource, contains('CompletionBridgePlayableStatus.checking'));
+    expect(bridgeSource, contains('semanticLabel:'));
+    expect(bridgeSource, contains('queueCheckingDownloadedFile'));
+    expect(bridgeSource, contains('_LibraryPlaybackButton('));
+    expect(bridgeSource, contains('grid: grid'));
+    expect(bridgeSource, contains('TrackGridCard('));
+    expect(bridgeSource, contains('TrackCard('));
   });
 }
