@@ -220,9 +220,9 @@ class _LyricsShareScreenState extends State<LyricsShareScreen> {
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(28),
                         child: FittedBox(
-                          child: CoverPaletteBuilder(
+                          child: CoverSourceColorBuilder(
                             imageSource: source,
-                            builder: (context, _) => RepaintBoundary(
+                            builder: (context, coverColor) => RepaintBoundary(
                               key: _cardKey,
                               child: LyricsShareCard(
                                 title: widget.mediaItem.title,
@@ -230,12 +230,7 @@ class _LyricsShareScreenState extends State<LyricsShareScreen> {
                                 artUri: widget.mediaItem.artUri?.toString(),
                                 lines: _quoted,
                                 background: _background,
-                                coverColor: source == null
-                                    ? null
-                                    : CoverPalette.sourceColor(
-                                        source,
-                                        Theme.of(context).brightness,
-                                      ),
+                                coverColor: coverColor,
                                 placeholder: l10n.lyricsShareSelectHint(
                                   lyricsShareMaxLines,
                                 ),

@@ -36,14 +36,11 @@ class MornyePlayerBackground extends StatelessWidget {
           primary: const Color(0xff808080),
         ),
       ),
-      child: CoverPaletteBuilder(
+      child: CoverSourceColorBuilder(
         imageSource: source,
-        builder: (context, _) {
+        builder: (context, sourceColor) {
           final dominant = HSLColor.fromColor(
-            source == null
-                ? const Color(0xff808080)
-                : CoverPalette.sourceColor(source, Brightness.dark) ??
-                      const Color(0xff808080),
+            sourceColor ?? const Color(0xff808080),
           );
           final muted = dominant.withSaturation(
             dominant.saturation.clamp(0.0, 0.34),
