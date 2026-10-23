@@ -60,7 +60,6 @@ class _CollectionsDatabase implements LibraryCollectionsDatabase {
         );
   }
 
-  @override
   Future<List<Map<String, dynamic>>> loadPlaylistTracks(
     String playlistId,
   ) async {

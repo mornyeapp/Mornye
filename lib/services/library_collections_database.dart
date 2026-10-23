@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
@@ -344,23 +343,6 @@ class LibraryCollectionsDatabase {
         favoriteArtistRows: favoriteArtistRows,
       );
     });
-  }
-
-  @visibleForTesting
-  Future<List<Map<String, dynamic>>> loadPlaylistTracks(
-    String playlistId,
-  ) async {
-    final db = await database;
-    return db.transaction(
-      (txn) => _readDateOrderedRows(
-        txn,
-        _tablePlaylistTracks,
-        'added_at',
-        ascending: true,
-        where: 'playlist_id=?',
-        whereArgs: [playlistId],
-      ),
-    );
   }
 
   Future<LibraryPlaylistTracksSnapshot> loadPlaylistTracksSnapshot(
