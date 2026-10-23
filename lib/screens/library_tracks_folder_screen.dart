@@ -80,9 +80,6 @@ class _LibraryTracksFolderScreenState
   final _folderData = LibraryTracksFolderData();
 
   @override
-  bool get rebuildsOnTitleFlip => false;
-
-  @override
   void initState() {
     super.initState();
     final playlistId = widget.playlistId;

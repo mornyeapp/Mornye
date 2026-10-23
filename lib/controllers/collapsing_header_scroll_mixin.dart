@@ -14,12 +14,6 @@ mixin CollapsingHeaderScrollMixin<T extends StatefulWidget> on State<T> {
   final ScrollController scrollController = ScrollController();
   final ValueNotifier<bool> showTitleNotifier = ValueNotifier(false);
 
-  bool get showTitleInAppBar => showTitleNotifier.value;
-
-  /// Whether a title flip also rebuilds the screen. Screens that hand
-  /// [showTitleNotifier] to their header return false.
-  bool get rebuildsOnTitleFlip => true;
-
   @override
   void initState() {
     super.initState();
@@ -39,10 +33,7 @@ mixin CollapsingHeaderScrollMixin<T extends StatefulWidget> on State<T> {
 
   void _onHeaderScroll() {
     final expandedHeight = calculateExpandedHeight(context);
-    final shouldShow =
+    showTitleNotifier.value =
         scrollController.offset > (expandedHeight - kToolbarHeight - 20);
-    if (shouldShow == showTitleInAppBar) return;
-    showTitleNotifier.value = shouldShow;
-    if (rebuildsOnTitleFlip) setState(() {});
   }
 }

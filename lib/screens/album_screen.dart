@@ -121,9 +121,6 @@ class _AlbumScreenState extends ConsumerState<AlbumScreen>
   }
 
   @override
-  bool get rebuildsOnTitleFlip => false;
-
-  @override
   void initState() {
     super.initState();
 

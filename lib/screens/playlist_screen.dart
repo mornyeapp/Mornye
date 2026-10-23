@@ -174,9 +174,6 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen>
   }
 
   @override
-  bool get rebuildsOnTitleFlip => false;
-
-  @override
   void initState() {
     super.initState();
     _fetchTracksIfNeeded();

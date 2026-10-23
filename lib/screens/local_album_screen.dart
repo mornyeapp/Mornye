@@ -92,9 +92,6 @@ class _LocalAlbumScreenState extends ConsumerState<LocalAlbumScreen>
   String? _commonQualityModeCache;
 
   @override
-  bool get rebuildsOnTitleFlip => false;
-
-  @override
   void initState() {
     super.initState();
     _rebuildTrackCaches();

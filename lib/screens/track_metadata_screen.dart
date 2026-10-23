@@ -213,9 +213,6 @@ class _TrackMetadataScreenState extends ConsumerState<TrackMetadataScreen>
   final _lyricsScrollController = ScrollController();
 
   @override
-  bool get rebuildsOnTitleFlip => false;
-
-  @override
   void initState() {
     super.initState();
     _currentDownloadItem = widget.item;
