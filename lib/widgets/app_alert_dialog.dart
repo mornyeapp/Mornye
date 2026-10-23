@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/app_tokens.dart';
 import 'package:mornye/theme/material_expressive.dart';
@@ -65,6 +66,49 @@ Future<T?> showAppDialog<T>({
     barrierDismissible: barrierDismissible,
     useRootNavigator: useRootNavigator,
   );
+}
+
+/// Asks a yes/no question: the cancel action pops false, the confirm action
+/// pops true, and dismissing the dialog counts as cancel. [content] replaces
+/// the plain [message] text; the flags map onto the two [AppDialogAction]s.
+Future<bool> showAppConfirmDialog(
+  BuildContext context, {
+  required String title,
+  String? message,
+  Widget? content,
+  required String confirmLabel,
+  String? cancelLabel,
+  bool destructive = false,
+  bool filled = true,
+  bool cancelIsDefault = false,
+  bool confirmIsDefault = false,
+  ButtonStyle? confirmStyle,
+  bool barrierDismissible = true,
+}) async {
+  final result = await showAppDialog<bool>(
+    context: context,
+    barrierDismissible: barrierDismissible,
+    builder: (context) => AppAlertDialog(
+      title: Text(title),
+      content: content ?? (message == null ? null : Text(message)),
+      actions: [
+        AppDialogAction(
+          isDefault: cancelIsDefault,
+          onPressed: () => Navigator.pop(context, false),
+          child: Text(cancelLabel ?? context.l10n.dialogCancel),
+        ),
+        AppDialogAction(
+          filled: filled,
+          isDefault: confirmIsDefault,
+          isDestructive: destructive,
+          style: confirmStyle,
+          onPressed: () => Navigator.pop(context, true),
+          child: Text(confirmLabel),
+        ),
+      ],
+    ),
+  );
+  return result ?? false;
 }
 
 /// The confirmation glass also hosts larger dialogs such as release notes.

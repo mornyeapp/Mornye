@@ -335,6 +335,53 @@ Future<T?> showAppScrollableBottomSheet<T>({
   ),
 );
 
+/// One row of [showAppChoiceSheet].
+class AppChoice<T> {
+  const AppChoice(this.value, this.icon, this.title, {this.subtitle});
+
+  final T value;
+  final IconData icon;
+  final String title;
+  final String? subtitle;
+}
+
+/// A single-choice sheet: tapping a row reports its value through
+/// [onSelected], then closes the sheet. [bottomSpacing] of 0 adds no gap.
+Future<void> showAppChoiceSheet<T>({
+  required BuildContext context,
+  required String title,
+  String? subtitle,
+  required T selected,
+  required List<AppChoice<T>> choices,
+  required ValueChanged<T> onSelected,
+  double bottomSpacing = 16,
+}) => showAppScrollableBottomSheet<void>(
+  context: context,
+  title: title,
+  subtitle: subtitle,
+  builder: (sheetContext, controller) => SingleChildScrollView(
+    controller: controller,
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (final choice in choices)
+          AppSheetOption.choice(
+            leading: AppIcon(choice.icon),
+            title: Text(choice.title),
+            subtitle: choice.subtitle == null ? null : Text(choice.subtitle!),
+            selected: choice.value == selected,
+            onTap: () {
+              onSelected(choice.value);
+              Navigator.pop(sheetContext);
+            },
+          ),
+        if (bottomSpacing > 0) SizedBox(height: bottomSpacing),
+      ],
+    ),
+  ),
+);
+
 /// Adaptive surface for sheets which already supply their own header/layout.
 ///
 /// Desktop windows present the sheet as a centered dialog instead
