@@ -427,4 +427,35 @@ void main() {
     }
     handle.dispose();
   });
+
+  testWidgets('a rebuild with unchanged rows reuses the month sections', (
+    tester,
+  ) async {
+    await pumpLibrary(
+      tester,
+      dates: [
+        for (var day = 1; day <= 6; day++) DateTime(2026, 3, day),
+        DateTime(2025, 12, 24),
+      ],
+    );
+    final sectionList = find.byWidgetPredicate(
+      (widget) => widget.runtimeType.toString() == '_LibrarySectionList',
+    );
+    // Read the private list's sections without adding a test hook.
+    List<Object?> sections() =>
+        // ignore: avoid_dynamic_calls
+        (tester.widget(sectionList) as dynamic).sections as List<Object?>;
+    final widgetBefore = tester.widget(sectionList);
+    final before = sections();
+    expect(before, hasLength(2));
+
+    // Badge text is display-only: the Library rebuilds with the same rows.
+    ProviderScope.containerOf(tester.element(find.byType(QueueTab)))
+        .read(settingsProvider.notifier)
+        .setLibraryQualityLabelMode(AppSettings.libraryQualityLabelFileFormat);
+    await tester.pump();
+
+    expect(tester.widget(sectionList), isNot(same(widgetBefore)));
+    expect(sections(), same(before));
+  });
 }

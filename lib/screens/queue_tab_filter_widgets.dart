@@ -65,9 +65,6 @@ extension _QueueTabFilterWidgets on _QueueTabState {
               .reversed
               .toList(growable: false);
 
-    final libIdSet = <String>{
-      for (final item in allFilteredUnifiedItems) item.id,
-    };
     final bridgeHistoryById = <String, DownloadHistoryItem?>{
       for (final entry in _completionBridge.entries)
         entry.key: _historyItemForCompletionBridge(
@@ -79,6 +76,9 @@ extension _QueueTabFilterWidgets on _QueueTabState {
     if (hasQueueItems &&
         filterMode != 'albums' &&
         _completionBridge.isNotEmpty) {
+      final libIdSet = <String>{
+        for (final item in allFilteredUnifiedItems) item.id,
+      };
       final now = DateTime.now();
       final stale = <String>[];
       final pending = <String>[];

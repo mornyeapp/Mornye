@@ -41,6 +41,9 @@ class QueueLibraryPager<
 
   final Map<C, QueueLibraryCounts> _countsCache = {};
   final Map<R, P> _pageDataCache = {};
+
+  /// Recent combine results with their source pages, newest first.
+  final List<(List<P>, P)> _combined = [];
   DateTime? _lastBlankRepairAt;
 
   int pageOffsetFor(String filterMode) => _pageOffsetByFilter[filterMode] ?? 0;
@@ -52,6 +55,7 @@ class QueueLibraryPager<
   void resetPaging() {
     resetOffsets();
     _pageDataCache.clear();
+    _combined.clear();
   }
 
   void _loadMore({
@@ -144,16 +148,35 @@ class QueueLibraryPager<
       if (page != null) pages.add(page);
     }
 
-    final combined = _combinePages(pages);
+    final combined = _combine(pages);
     if (combined.isEmpty && nonEmptyFallback != null) {
       return nonEmptyFallback();
     }
     return combined;
   }
 
+  /// Reuses the result for the same page objects, so rebuilds keep the
+  /// combined lists (and every cache keyed on them) instead of copying all
+  /// loaded rows again.
+  P _combine(List<P> pages) {
+    search:
+    for (final (sources, combined) in _combined) {
+      if (sources.length != pages.length) continue;
+      for (var i = 0; i < pages.length; i++) {
+        if (!identical(sources[i], pages[i])) continue search;
+      }
+      return combined;
+    }
+    final combined = _combinePages(pages);
+    _combined.insert(0, (pages, combined));
+    if (_combined.length > 4) _combined.removeLast();
+    return combined;
+  }
+
   void _invalidateDataCaches() {
     _countsCache.clear();
     _pageDataCache.clear();
+    _combined.clear();
   }
 
   /// Clears the snapshots and runs [repair] after the frame when the queue

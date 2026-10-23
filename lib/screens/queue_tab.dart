@@ -208,6 +208,26 @@ class _QueueTabState extends ConsumerState<QueueTab> {
   String? _sectionLocale;
   List<_LibrarySection> _cachedTrackSections = const [];
 
+  /// In-memory History snapshots and counts, regrouped only when the
+  /// (immutable) History list changes.
+  List<DownloadHistoryItem>? _snapshotHistory;
+  final Map<(String, int), _QueueLibraryPageData> _historySnapshots = {};
+  final Map<int, QueueLibraryCounts> _historySnapshotCountsByTotal = {};
+
+  /// Filter data per mode with the page, collections and totals it came
+  /// from, so an unchanged page keeps its filtered rows across rebuilds.
+  final Map<
+    String,
+    (
+      _QueueLibraryPageData,
+      LibraryCollectionsState,
+      int?,
+      int?,
+      _FilterContentData,
+    )
+  >
+  _filterDataByMode = {};
+
   final QueueLibraryPager<
     _QueueLibraryCountsRequest,
     _QueueLibraryPageRequest,
@@ -638,14 +658,22 @@ class _QueueTabState extends ConsumerState<QueueTab> {
             ),
           )
         : ref.watch(_queueLibraryCountsProvider(countsRequest));
+    if (!identical(_snapshotHistory, inMemoryHistoryItems)) {
+      _snapshotHistory = inMemoryHistoryItems;
+      _historySnapshots.clear();
+      _historySnapshotCountsByTotal.clear();
+    }
     final historySnapshotFallbackEnabled =
         hasQueueItems &&
         inMemoryHistoryItems.isNotEmpty &&
         countsRequest.allowsInMemoryHistoryFallback;
     final historySnapshotCounts = historySnapshotFallbackEnabled
-        ? _historySnapshotCounts(
-            inMemoryHistoryItems,
-            persistedTotalCount: historyTotalCount,
+        ? _historySnapshotCountsByTotal.putIfAbsent(
+            historyTotalCount,
+            () => _historySnapshotCounts(
+              inMemoryHistoryItems,
+              persistedTotalCount: historyTotalCount,
+            ),
           )
         : null;
     final queueCounts = _pager.resolveCounts(
@@ -696,42 +724,65 @@ class _QueueTabState extends ConsumerState<QueueTab> {
 
     // The in-memory snapshot regroups every history item. It is only needed
     // when a page is still empty, so build it on demand and at most once per
-    // mode for this build's (immutable) history list.
-    final historySnapshots = <(String, int), _QueueLibraryPageData>{};
-    _QueueLibraryPageData pageData(String filterMode) {
-      final request = filterMode == historyFilterMode
-          ? activePageRequest
-          : pageRequest(filterMode);
-      final historySnapshotAvailable =
-          hasQueueItems &&
-          inMemoryHistoryItems.isNotEmpty &&
-          request.allowsInMemoryHistoryFallback;
-      return _pager.resolvePageData(
-        filterMode == historyFilterMode ? activePageValue : null,
-        request,
-        nonEmptyFallback: historySnapshotAvailable
-            ? () => historySnapshots.putIfAbsent(
-                (request.filterMode, request.limit),
-                () => _QueueLibraryPageData.fromHistorySnapshot(
-                  inMemoryHistoryItems,
-                  filterMode: request.filterMode,
-                  limit: request.limit,
-                ),
-              )
-            : null,
-      );
-    }
+    // mode for the (immutable) history list. Each mode resolves once per
+    // build; the page view and the selection overlay share the result.
+    final pageDataByMode = <String, _QueueLibraryPageData>{};
+    _QueueLibraryPageData pageData(String filterMode) =>
+        pageDataByMode.putIfAbsent(filterMode, () {
+          final request = filterMode == historyFilterMode
+              ? activePageRequest
+              : pageRequest(filterMode);
+          final historySnapshotAvailable =
+              hasQueueItems &&
+              inMemoryHistoryItems.isNotEmpty &&
+              request.allowsInMemoryHistoryFallback;
+          return _pager.resolvePageData(
+            filterMode == historyFilterMode ? activePageValue : null,
+            request,
+            nonEmptyFallback: historySnapshotAvailable
+                ? () => _historySnapshots.putIfAbsent(
+                    (request.filterMode, request.limit),
+                    () => _QueueLibraryPageData.fromHistorySnapshot(
+                      inMemoryHistoryItems,
+                      filterMode: request.filterMode,
+                      limit: request.limit,
+                    ),
+                  )
+                : null,
+          );
+        });
 
     _FilterContentData getFilterData(String filterMode) {
-      return pageData(filterMode).toFilterContentData(
+      final page = pageData(filterMode);
+      final totalTrackCount = switch (filterMode) {
+        'singles' => queueCounts.singleTrackCount,
+        'albums' || 'playlists' => 0,
+        _ => queueCounts.allTrackCount,
+      };
+      final totalAlbumCount = filterMode == 'albums'
+          ? queueCounts.albumCount
+          : null;
+      final cached = _filterDataByMode[filterMode];
+      if (cached != null &&
+          identical(cached.$1, page) &&
+          identical(cached.$2, collectionState) &&
+          cached.$3 == totalTrackCount &&
+          cached.$4 == totalAlbumCount) {
+        return cached.$5;
+      }
+      final data = page.toFilterContentData(
         collectionState,
-        totalTrackCount: switch (filterMode) {
-          'singles' => queueCounts.singleTrackCount,
-          'albums' || 'playlists' => 0,
-          _ => queueCounts.allTrackCount,
-        },
-        totalAlbumCount: filterMode == 'albums' ? queueCounts.albumCount : null,
+        totalTrackCount: totalTrackCount,
+        totalAlbumCount: totalAlbumCount,
       );
+      _filterDataByMode[filterMode] = (
+        page,
+        collectionState,
+        totalTrackCount,
+        totalAlbumCount,
+        data,
+      );
+      return data;
     }
 
     final currentPageData = pageData(historyFilterMode);

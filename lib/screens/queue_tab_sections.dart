@@ -134,10 +134,18 @@ extension _QueueTabSections on _QueueTabState {
       return _cachedTrackSections;
     }
     final sections = <_LibrarySection>[];
+    // Date labels name only the month, so each month is formatted once.
+    final monthLabels = _dateSorts.contains(_sortMode) ? <int, String>{} : null;
     String? label;
     var start = 0;
     for (var i = 0; i < items.length; i++) {
-      final next = _trackSectionLabel(context, items[i]) ?? '';
+      final added = items[i].addedAt;
+      final next = monthLabels != null
+          ? monthLabels.putIfAbsent(
+              added.year * 12 + added.month,
+              () => _trackSectionLabel(context, items[i]) ?? '',
+            )
+          : _trackSectionLabel(context, items[i]) ?? '';
       if (i == 0) {
         label = next;
       } else if (next != label) {
