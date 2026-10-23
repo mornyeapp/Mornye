@@ -445,6 +445,63 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('Search lists collection sections and guards missing sources', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(430, 1600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          settingsProvider.overrideWith(_Settings.new),
+          extensionProvider.overrideWith(_Extensions.new),
+          exploreProvider.overrideWith(_Explore.new),
+          downloadHistoryProvider.overrideWith(_History.new),
+          recentAccessProvider.overrideWith(_Recent.new),
+          trackProvider.overrideWith(_CollectionSearch.new),
+        ],
+        child: MaterialApp(
+          theme: MornyeTheme.build(Brightness.dark),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: const Scaffold(body: HomeTab(mode: HomeTabMode.search)),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'Example');
+    await tester.testTextInput.receiveAction(TextInputAction.search);
+    await tester.pumpAndSettle();
+
+    // The filter chips repeat these labels above the section headers.
+    final headers = [
+      for (final title in ['Artists', 'Albums', 'Playlists'])
+        tester.getTopLeft(find.text(title).last).dy,
+    ];
+    expect(headers, orderedEquals([...headers]..sort()));
+    expect(find.text('Sort'), findsOneWidget);
+    expect(
+      tester.getCenter(find.text('Sort')).dy,
+      closeTo(tester.getCenter(find.text('Artists').last).dy, 24),
+    );
+    for (final kind in ['artist', 'album', 'playlist']) {
+      expect(find.byKey(ValueKey('$kind-$kind-0')), findsOneWidget);
+      await tester.tap(find.text('Found $kind'));
+      await tester.pump();
+      expect(
+        find.text('Cannot load $kind: missing extension source'),
+        findsOneWidget,
+      );
+      ScaffoldMessenger.of(
+        tester.element(find.byType(HomeTab)),
+      ).removeCurrentSnackBar();
+      await tester.pumpAndSettle();
+    }
+    expect(find.byType(HomeTab), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   for (final (brightness, itemType) in [
     for (final brightness in Brightness.values)
       for (final itemType in ['artist', 'track']) (brightness, itemType),
@@ -916,6 +973,33 @@ class _Recent extends RecentAccessNotifier {
       ),
     ),
   );
+}
+
+class _CollectionSearch extends TrackNotifier {
+  @override
+  Future<void> customSearch(
+    String extensionId,
+    String query, {
+    Map<String, dynamic>? options,
+    String? selectedFilter,
+    bool allowVerificationRetry = true,
+  }) async {
+    state = TrackState(
+      hasSearchText: true,
+      searchExtensionId: 'example',
+      tracks: [
+        for (final kind in ['playlist', 'album', 'artist'])
+          Track(
+            id: '$kind-0',
+            name: 'Found $kind',
+            artistName: '',
+            albumName: '',
+            duration: 0,
+            itemType: kind,
+          ),
+      ],
+    );
+  }
 }
 
 class _Search extends TrackNotifier {

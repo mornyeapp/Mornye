@@ -355,57 +355,39 @@ extension _HomeTabSearchResultsUI on _HomeTabState {
 
     bool sortButtonShown = false;
 
-    if (artistItems.isNotEmpty) {
+    for (final (items, kind, title, open) in [
+      (
+        artistItems,
+        'artist',
+        context.l10n.searchArtists,
+        _navigateToExtensionArtist,
+      ),
+      (
+        albumItems,
+        'album',
+        context.l10n.searchAlbums,
+        _navigateToExtensionAlbum,
+      ),
+      (
+        playlistItems,
+        'playlist',
+        context.l10n.searchPlaylists,
+        _navigateToExtensionPlaylist,
+      ),
+    ]) {
+      if (items.isEmpty) continue;
       slivers.addAll(
         _buildVirtualizedResultSection(
-          title: context.l10n.searchArtists,
-          itemCount: artistItems.length,
+          title: title,
+          itemCount: items.length,
           colorScheme: colorScheme,
           showSortButton: !sortButtonShown,
           itemBuilder: (index, showDivider) => _CollectionItemWidget(
-            key: ValueKey('artist-${artistItems[index].id}'),
-            item: artistItems[index],
+            key: ValueKey('$kind-${items[index].id}'),
+            item: items[index],
             showDivider: showDivider,
-            onTap: () => _navigateToExtensionArtist(artistItems[index]),
-            onSaveCover: () => _saveSearchResultCover(artistItems[index]),
-          ),
-        ),
-      );
-      sortButtonShown = true;
-    }
-
-    if (albumItems.isNotEmpty) {
-      slivers.addAll(
-        _buildVirtualizedResultSection(
-          title: context.l10n.searchAlbums,
-          itemCount: albumItems.length,
-          colorScheme: colorScheme,
-          showSortButton: !sortButtonShown,
-          itemBuilder: (index, showDivider) => _CollectionItemWidget(
-            key: ValueKey('album-${albumItems[index].id}'),
-            item: albumItems[index],
-            showDivider: showDivider,
-            onTap: () => _navigateToExtensionAlbum(albumItems[index]),
-            onSaveCover: () => _saveSearchResultCover(albumItems[index]),
-          ),
-        ),
-      );
-      sortButtonShown = true;
-    }
-
-    if (playlistItems.isNotEmpty) {
-      slivers.addAll(
-        _buildVirtualizedResultSection(
-          title: context.l10n.searchPlaylists,
-          itemCount: playlistItems.length,
-          colorScheme: colorScheme,
-          showSortButton: !sortButtonShown,
-          itemBuilder: (index, showDivider) => _CollectionItemWidget(
-            key: ValueKey('playlist-${playlistItems[index].id}'),
-            item: playlistItems[index],
-            showDivider: showDivider,
-            onTap: () => _navigateToExtensionPlaylist(playlistItems[index]),
-            onSaveCover: () => _saveSearchResultCover(playlistItems[index]),
+            onTap: () => open(items[index]),
+            onSaveCover: () => _saveSearchResultCover(items[index]),
           ),
         ),
       );
@@ -567,18 +549,22 @@ extension _HomeTabSearchResultsUI on _HomeTabState {
     ];
   }
 
-  void _navigateToExtensionAlbum(Track albumItem) async {
-    final extensionId = albumItem.source;
+  String? _extensionSourceOrWarn(Track item, String kind) {
+    final extensionId = item.source;
     if (extensionId == null || extensionId.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(context.l10n.errorMissingExtensionSource('album')),
-        ),
+        SnackBar(content: Text(context.l10n.errorMissingExtensionSource(kind))),
       );
-      return;
+      return null;
     }
 
     ref.read(settingsProvider.notifier).setHasSearchedBefore();
+    return extensionId;
+  }
+
+  void _navigateToExtensionAlbum(Track albumItem) async {
+    final extensionId = _extensionSourceOrWarn(albumItem, 'album');
+    if (extensionId == null) return;
 
     ref
         .read(recentAccessProvider.notifier)
@@ -606,17 +592,8 @@ extension _HomeTabSearchResultsUI on _HomeTabState {
   }
 
   void _navigateToExtensionPlaylist(Track playlistItem) async {
-    final extensionId = playlistItem.source;
-    if (extensionId == null || extensionId.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(context.l10n.errorMissingExtensionSource('playlist')),
-        ),
-      );
-      return;
-    }
-
-    ref.read(settingsProvider.notifier).setHasSearchedBefore();
+    final extensionId = _extensionSourceOrWarn(playlistItem, 'playlist');
+    if (extensionId == null) return;
 
     ref
         .read(recentAccessProvider.notifier)
@@ -642,17 +619,8 @@ extension _HomeTabSearchResultsUI on _HomeTabState {
   }
 
   void _navigateToExtensionArtist(Track artistItem) {
-    final extensionId = artistItem.source;
-    if (extensionId == null || extensionId.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(context.l10n.errorMissingExtensionSource('artist')),
-        ),
-      );
-      return;
-    }
-
-    ref.read(settingsProvider.notifier).setHasSearchedBefore();
+    final extensionId = _extensionSourceOrWarn(artistItem, 'artist');
+    if (extensionId == null) return;
 
     ref
         .read(recentAccessProvider.notifier)
