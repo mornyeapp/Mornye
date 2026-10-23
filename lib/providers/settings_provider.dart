@@ -355,6 +355,11 @@ class SettingsNotifier extends Notifier<AppSettings> {
     }
   }
 
+  Future<void> _commit(AppSettings next) {
+    state = next;
+    return _saveSettings();
+  }
+
   Future<void> _saveSettings() {
     _pendingSettingsJson = jsonEncode(state.toJson());
 
@@ -490,8 +495,7 @@ class SettingsNotifier extends Notifier<AppSettings> {
   Future<void> _normalizeSongLinkRegionIfNeeded() async {
     final normalized = _normalizeSongLinkRegion(state.songLinkRegion);
     if (normalized == state.songLinkRegion) return;
-    state = state.copyWith(songLinkRegion: normalized);
-    await _saveSettings();
+    await _commit(state.copyWith(songLinkRegion: normalized));
   }
 
   List<String>? _sanitizeDownloadFallbackExtensionIds(List<String>? ids) {
@@ -519,50 +523,40 @@ class SettingsNotifier extends Notifier<AppSettings> {
     }
   }
 
-  void setDefaultService(String service) {
-    state = state.copyWith(
+  void setDefaultService(String service) => _commit(
+    state.copyWith(
       defaultService: _sanitizeRetiredBuiltInProviderId(service) ?? '',
-    );
-    _saveSettings();
-  }
+    ),
+  );
 
-  void setAudioQuality(String quality) {
-    state = state.copyWith(audioQuality: quality);
-    _saveSettings();
-  }
+  void setAudioQuality(String quality) =>
+      _commit(state.copyWith(audioQuality: quality));
 
-  void setFilenameFormat(String format) {
-    state = state.copyWith(filenameFormat: format);
-    _saveSettings();
-  }
+  void setFilenameFormat(String format) =>
+      _commit(state.copyWith(filenameFormat: format));
 
-  void setSingleFilenameFormat(String format) {
-    state = state.copyWith(singleFilenameFormat: format);
-    _saveSettings();
-  }
+  void setSingleFilenameFormat(String format) =>
+      _commit(state.copyWith(singleFilenameFormat: format));
 
-  void setDownloadDirectory(String directory, {String? iosBookmark}) {
-    state = state.copyWith(
+  void setDownloadDirectory(String directory, {String? iosBookmark}) => _commit(
+    state.copyWith(
       networkDownloadFolder: '',
       networkDownloadLabel: '',
       downloadDirectory: directory,
       downloadDirectoryBookmark: iosBookmark ?? '',
-    );
-    _saveSettings();
-  }
+    ),
+  );
 
-  void setStorageMode(String mode) {
-    final normalized = mode == 'saf' ? 'saf' : 'app';
-    state = state.copyWith(storageMode: normalized);
-    _saveSettings();
-  }
+  void setStorageMode(String mode) =>
+      _commit(state.copyWith(storageMode: mode == 'saf' ? 'saf' : 'app'));
 
   Future<void> setNetworkDownloadFolder(String source, String label) async {
-    state = state.copyWith(
-      networkDownloadFolder: source,
-      networkDownloadLabel: label,
+    await _commit(
+      state.copyWith(
+        networkDownloadFolder: source,
+        networkDownloadLabel: label,
+      ),
     );
-    await _saveSettings();
   }
 
   /// Atomically leaves SAF and persists a writable app-managed destination.
@@ -571,202 +565,140 @@ class SettingsNotifier extends Notifier<AppSettings> {
   /// where app-folder mode still points at the SAF display name, or where an
   /// invalid tree URI can switch the mode back to SAF.
   Future<void> useAppFolderStorage(String directory) async {
-    state = state.copyWith(
-      storageMode: 'app',
-      downloadDirectory: directory,
-      downloadDirectoryBookmark: '',
-      downloadTreeUri: '',
+    await _commit(
+      state.copyWith(
+        storageMode: 'app',
+        downloadDirectory: directory,
+        downloadDirectoryBookmark: '',
+        downloadTreeUri: '',
+      ),
     );
-    await _saveSettings();
   }
 
-  void setDownloadTreeUri(String uri, {String? displayName}) {
-    final nextDisplay = displayName ?? state.downloadDirectory;
-    state = state.copyWith(
+  void setDownloadTreeUri(String uri, {String? displayName}) => _commit(
+    state.copyWith(
       networkDownloadFolder: '',
       networkDownloadLabel: '',
       downloadTreeUri: uri,
       storageMode: uri.isNotEmpty ? 'saf' : state.storageMode,
-      downloadDirectory: nextDisplay,
+      downloadDirectory: displayName ?? state.downloadDirectory,
       downloadDirectoryBookmark: uri.isNotEmpty
           ? ''
           : state.downloadDirectoryBookmark,
-    );
-    _saveSettings();
-  }
+    ),
+  );
 
-  void setAutoFallback(bool enabled) {
-    state = state.copyWith(autoFallback: enabled);
-    _saveSettings();
-  }
+  void setAutoFallback(bool enabled) =>
+      _commit(state.copyWith(autoFallback: enabled));
 
-  void setEmbedLyrics(bool enabled) {
-    state = state.copyWith(embedLyrics: enabled);
-    _saveSettings();
-  }
+  void setEmbedLyrics(bool enabled) =>
+      _commit(state.copyWith(embedLyrics: enabled));
 
-  void setEmbedReplayGain(bool enabled) {
-    state = state.copyWith(embedReplayGain: enabled);
-    _saveSettings();
-  }
+  void setEmbedReplayGain(bool enabled) =>
+      _commit(state.copyWith(embedReplayGain: enabled));
 
-  void setPlaybackNormalization(bool enabled) {
-    state = state.copyWith(playbackNormalization: enabled);
-    _saveSettings();
-  }
+  void setPlaybackNormalization(bool enabled) =>
+      _commit(state.copyWith(playbackNormalization: enabled));
 
-  void setPlaybackNormalizationPreamp(double db) {
-    state = state.copyWith(
+  void setPlaybackNormalizationPreamp(double db) => _commit(
+    state.copyWith(
       playbackNormalizationPreamp: playbackNormalizationPreampFromJson(db),
-    );
-    _saveSettings();
-  }
+    ),
+  );
 
-  void setPlaybackNormalizationMode(String mode) {
-    state = state.copyWith(
+  void setPlaybackNormalizationMode(String mode) => _commit(
+    state.copyWith(
       playbackNormalizationMode: playbackNormalizationModeFromJson(mode),
-    );
-    _saveSettings();
-  }
+    ),
+  );
 
-  void setPauseOnMute(bool enabled) {
-    state = state.copyWith(pauseOnMute: enabled);
-    _saveSettings();
-  }
+  void setPauseOnMute(bool enabled) =>
+      _commit(state.copyWith(pauseOnMute: enabled));
 
-  void setPlayOnHeadphonesConnected(bool enabled) {
-    state = state.copyWith(playOnHeadphonesConnected: enabled);
-    _saveSettings();
-  }
+  void setPlayOnHeadphonesConnected(bool enabled) =>
+      _commit(state.copyWith(playOnHeadphonesConnected: enabled));
 
-  void setAutoMix(bool enabled) {
-    state = state.copyWith(autoMix: enabled);
-    _saveSettings();
-  }
+  void setAutoMix(bool enabled) => _commit(state.copyWith(autoMix: enabled));
 
-  void setAutoMixDuration(int seconds) {
-    state = state.copyWith(autoMixDuration: autoMixDurationFromJson(seconds));
-    _saveSettings();
-  }
+  void setAutoMixDuration(int seconds) => _commit(
+    state.copyWith(autoMixDuration: autoMixDurationFromJson(seconds)),
+  );
 
-  void setAutoMixEffect(AutoMixEffect effect) {
-    state = state.copyWith(
+  void setAutoMixEffect(AutoMixEffect effect) => _commit(
+    state.copyWith(
       autoMixEffect: effect,
       autoMixPitch: effect == AutoMixEffect.pitch && state.autoMixPitch == 0
           ? 2
           : state.autoMixPitch,
-    );
-    _saveSettings();
-  }
+    ),
+  );
 
-  void setAutoMixSpeed(double speed) {
-    state = state.copyWith(autoMixSpeed: autoMixSpeedFromJson(speed));
-    _saveSettings();
-  }
+  void setAutoMixSpeed(double speed) =>
+      _commit(state.copyWith(autoMixSpeed: autoMixSpeedFromJson(speed)));
 
-  void setAutoMixPitch(double semitones) {
-    state = state.copyWith(autoMixPitch: autoMixPitchFromJson(semitones));
-    _saveSettings();
-  }
+  void setAutoMixPitch(double semitones) =>
+      _commit(state.copyWith(autoMixPitch: autoMixPitchFromJson(semitones)));
 
-  void setAutoMixEcho(bool enabled) {
-    state = state.copyWith(autoMixEcho: enabled);
-    _saveSettings();
-  }
+  void setAutoMixEcho(bool enabled) =>
+      _commit(state.copyWith(autoMixEcho: enabled));
 
-  void setAutoMixLowPass(bool enabled) {
-    state = state.copyWith(autoMixLowPass: enabled);
-    _saveSettings();
-  }
+  void setAutoMixLowPass(bool enabled) =>
+      _commit(state.copyWith(autoMixLowPass: enabled));
 
-  void setDiscordRichPresenceEnabled(bool enabled) {
-    state = state.copyWith(discordRichPresenceEnabled: enabled);
-    _saveSettings();
-  }
+  void setDiscordRichPresenceEnabled(bool enabled) =>
+      _commit(state.copyWith(discordRichPresenceEnabled: enabled));
 
-  void setAutoplay(bool enabled) {
-    state = state.copyWith(autoplay: enabled);
-    _saveSettings();
-  }
+  void setAutoplay(bool enabled) => _commit(state.copyWith(autoplay: enabled));
 
-  void setAutoplayPersonalization(bool enabled) {
-    state = state.copyWith(autoplayPersonalization: enabled);
-    _saveSettings();
-  }
+  void setAutoplayPersonalization(bool enabled) =>
+      _commit(state.copyWith(autoplayPersonalization: enabled));
 
-  void setMusicHaptics(bool enabled) {
-    state = state.copyWith(musicHaptics: enabled);
-    _saveSettings();
-  }
+  void setMusicHaptics(bool enabled) =>
+      _commit(state.copyWith(musicHaptics: enabled));
 
-  void setMusicHapticsSensitivity(double value) {
-    state = state.copyWith(
-      musicHapticsSensitivity: musicHapticsLevelFromJson(value),
-    );
-    _saveSettings();
-  }
+  void setMusicHapticsSensitivity(double value) => _commit(
+    state.copyWith(musicHapticsSensitivity: musicHapticsLevelFromJson(value)),
+  );
 
-  void setMusicHapticsStrength(double value) {
-    state = state.copyWith(
-      musicHapticsStrength: musicHapticsLevelFromJson(value),
-    );
-    _saveSettings();
-  }
+  void setMusicHapticsStrength(double value) => _commit(
+    state.copyWith(musicHapticsStrength: musicHapticsLevelFromJson(value)),
+  );
 
-  void setPlayerCoverStyle(String style) {
-    state = state.copyWith(playerCoverStyle: playerCoverStyleFromJson(style));
-    _saveSettings();
-  }
+  void setPlayerCoverStyle(String style) => _commit(
+    state.copyWith(playerCoverStyle: playerCoverStyleFromJson(style)),
+  );
 
-  void setUsbBitPerfect(bool enabled) {
-    state = state.copyWith(usbBitPerfect: enabled);
-    _saveSettings();
-  }
+  void setUsbBitPerfect(bool enabled) =>
+      _commit(state.copyWith(usbBitPerfect: enabled));
 
-  void setUsbDirect(bool enabled) {
-    state = state.copyWith(
-      usbDirect: enabled,
-      dapExclusive: enabled ? false : null,
-    );
-    _saveSettings();
-  }
+  void setUsbDirect(bool enabled) => _commit(
+    state.copyWith(usbDirect: enabled, dapExclusive: enabled ? false : null),
+  );
 
-  void setUsbDsdOverPcm(bool enabled) {
-    state = state.copyWith(usbDsdOverPcm: enabled);
-    _saveSettings();
-  }
+  void setUsbDsdOverPcm(bool enabled) =>
+      _commit(state.copyWith(usbDsdOverPcm: enabled));
 
-  void setUsbAllowFixedVolume(bool enabled) {
-    state = state.copyWith(usbAllowFixedVolume: enabled);
-    _saveSettings();
-  }
+  void setUsbAllowFixedVolume(bool enabled) =>
+      _commit(state.copyWith(usbAllowFixedVolume: enabled));
 
-  void setDapExclusive(bool enabled) {
-    state = state.copyWith(
-      dapExclusive: enabled,
-      usbDirect: enabled ? false : null,
-    );
-    _saveSettings();
-  }
+  void setDapExclusive(bool enabled) => _commit(
+    state.copyWith(dapExclusive: enabled, usbDirect: enabled ? false : null),
+  );
 
-  void setEmbedMetadata(bool enabled) {
-    state = state.copyWith(embedMetadata: enabled);
-    _saveSettings();
-  }
+  void setEmbedMetadata(bool enabled) =>
+      _commit(state.copyWith(embedMetadata: enabled));
 
-  void setEmbeddedCoverMaxDimension(int maxDimension) {
-    state = state.copyWith(
+  void setEmbeddedCoverMaxDimension(int maxDimension) => _commit(
+    state.copyWith(
       embeddedCoverMaxDimension: _normalizeEmbeddedCoverMaxDimension(
         maxDimension,
       ),
-    );
-    _saveSettings();
-  }
+    ),
+  );
 
   void setArtistTagMode(String mode) {
     if (artistTagModes.contains(mode)) {
-      state = state.copyWith(artistTagMode: mode);
-      _saveSettings();
+      _commit(state.copyWith(artistTagMode: mode));
     }
   }
 
@@ -775,69 +707,60 @@ class SettingsNotifier extends Notifier<AppSettings> {
         MetadataSeparators.validSeparator(separator) != separator) {
       return;
     }
-    state = state.copyWith(
-      metadataSeparators: state.metadataSeparators.withField(field, separator),
+    _commit(
+      state.copyWith(
+        metadataSeparators: state.metadataSeparators.withField(
+          field,
+          separator,
+        ),
+      ),
     );
-    _saveSettings();
   }
 
-  void setKeepScreenOnLyrics(bool enabled) {
-    state = state.copyWith(keepScreenOnLyrics: enabled);
-    _saveSettings();
-  }
+  void setKeepScreenOnLyrics(bool enabled) =>
+      _commit(state.copyWith(keepScreenOnLyrics: enabled));
 
-  void setMotionArtworkEnabled(bool enabled) {
-    state = state.copyWith(motionArtworkEnabled: enabled);
-    _saveSettings();
-  }
+  void setMotionArtworkEnabled(bool enabled) =>
+      _commit(state.copyWith(motionArtworkEnabled: enabled));
 
-  void setListeningStatisticsEnabled(bool enabled) {
-    state = state.copyWith(listeningStatisticsEnabled: enabled);
-    _saveSettings();
-  }
+  void setListeningStatisticsEnabled(bool enabled) =>
+      _commit(state.copyWith(listeningStatisticsEnabled: enabled));
 
   void setLyricsMode(String mode) {
     if (mode == 'embed' || mode == 'external' || mode == 'both') {
-      state = state.copyWith(lyricsMode: mode);
-      _saveSettings();
+      _commit(state.copyWith(lyricsMode: mode));
     }
   }
 
   void setLyricsProviders(List<String> providers) {
-    state = state.copyWith(lyricsProviders: providers);
-    _saveSettings();
+    _commit(state.copyWith(lyricsProviders: providers));
     _syncLyricsSettingsToBackend();
   }
 
   void setLyricsIncludeTranslationNetease(bool enabled) {
-    state = state.copyWith(lyricsIncludeTranslationNetease: enabled);
-    _saveSettings();
+    _commit(state.copyWith(lyricsIncludeTranslationNetease: enabled));
     _syncLyricsSettingsToBackend();
   }
 
   void setLyricsIncludeRomanizationNetease(bool enabled) {
-    state = state.copyWith(lyricsIncludeRomanizationNetease: enabled);
-    _saveSettings();
+    _commit(state.copyWith(lyricsIncludeRomanizationNetease: enabled));
     _syncLyricsSettingsToBackend();
   }
 
   void setLyricsMultiPersonWordByWord(bool enabled) {
-    state = state.copyWith(lyricsMultiPersonWordByWord: enabled);
-    _saveSettings();
+    _commit(state.copyWith(lyricsMultiPersonWordByWord: enabled));
     _syncLyricsSettingsToBackend();
   }
 
   void setLyricsAppleElrcWordSync(bool enabled) {
-    state = state.copyWith(lyricsAppleElrcWordSync: enabled);
-    _saveSettings();
+    _commit(state.copyWith(lyricsAppleElrcWordSync: enabled));
     _syncLyricsSettingsToBackend();
   }
 
   void setMusixmatchLanguage(String languageCode) {
-    state = state.copyWith(
-      musixmatchLanguage: languageCode.trim().toLowerCase(),
+    _commit(
+      state.copyWith(musixmatchLanguage: languageCode.trim().toLowerCase()),
     );
-    _saveSettings();
     _syncLyricsSettingsToBackend();
   }
 
@@ -870,296 +793,203 @@ class SettingsNotifier extends Notifier<AppSettings> {
     }
   }
 
-  void setCheckForUpdates(bool enabled) {
-    state = state.copyWith(checkForUpdates: enabled);
-    _saveSettings();
-  }
+  void setCheckForUpdates(bool enabled) =>
+      _commit(state.copyWith(checkForUpdates: enabled));
 
-  void setUpdateChannel(String channel) {
-    state = state.copyWith(updateChannel: channel);
-    _saveSettings();
-  }
+  void setUpdateChannel(String channel) =>
+      _commit(state.copyWith(updateChannel: channel));
 
   void setHasSearchedBefore() {
     if (!state.hasSearchedBefore) {
-      state = state.copyWith(hasSearchedBefore: true);
-      _saveSettings();
+      _commit(state.copyWith(hasSearchedBefore: true));
     }
   }
 
-  void setFolderOrganization(String organization) {
-    state = state.copyWith(folderOrganization: organization);
-    _saveSettings();
-  }
+  void setFolderOrganization(String organization) =>
+      _commit(state.copyWith(folderOrganization: organization));
 
   void setFolderPathTemplate(String template) {
     if (!FolderPathTemplate.isValid(template)) return;
-    state = state.copyWith(
-      folderPathTemplate: template.trim(),
-      folderOrganization: 'custom',
-      separateSingles: false,
+    _commit(
+      state.copyWith(
+        folderPathTemplate: template.trim(),
+        folderOrganization: 'custom',
+        separateSingles: false,
+      ),
     );
-    _saveSettings();
   }
 
-  void setCreatePlaylistFolder(bool enabled) {
-    state = state.copyWith(createPlaylistFolder: enabled);
-    _saveSettings();
-  }
+  void setCreatePlaylistFolder(bool enabled) =>
+      _commit(state.copyWith(createPlaylistFolder: enabled));
 
-  void setUseAlbumArtistForFolders(bool enabled) {
-    state = state.copyWith(useAlbumArtistForFolders: enabled);
-    _saveSettings();
-  }
+  void setUseAlbumArtistForFolders(bool enabled) =>
+      _commit(state.copyWith(useAlbumArtistForFolders: enabled));
 
-  void setUsePrimaryArtistOnly(bool enabled) {
-    state = state.copyWith(usePrimaryArtistOnly: enabled);
-    _saveSettings();
-  }
+  void setUsePrimaryArtistOnly(bool enabled) =>
+      _commit(state.copyWith(usePrimaryArtistOnly: enabled));
 
-  void setFilterContributingArtistsInAlbumArtist(bool enabled) {
-    state = state.copyWith(filterContributingArtistsInAlbumArtist: enabled);
-    _saveSettings();
-  }
+  void setFilterContributingArtistsInAlbumArtist(bool enabled) =>
+      _commit(state.copyWith(filterContributingArtistsInAlbumArtist: enabled));
 
-  void setHistoryViewMode(String mode) {
-    state = state.copyWith(historyViewMode: mode);
-    _saveSettings();
-  }
+  void setHistoryViewMode(String mode) =>
+      _commit(state.copyWith(historyViewMode: mode));
 
-  void setHistoryFilterMode(String mode) {
-    state = state.copyWith(historyFilterMode: mode);
-    _saveSettings();
-  }
+  void setHistoryFilterMode(String mode) =>
+      _commit(state.copyWith(historyFilterMode: mode));
 
-  void setAskQualityBeforeDownload(bool enabled) {
-    state = state.copyWith(askQualityBeforeDownload: enabled);
-    _saveSettings();
-  }
+  void setAskQualityBeforeDownload(bool enabled) =>
+      _commit(state.copyWith(askQualityBeforeDownload: enabled));
 
   void setSearchProvider(String? provider) {
     final sanitized = _sanitizeRetiredBuiltInProviderId(provider);
-    if (sanitized == null || sanitized.isEmpty) {
-      state = state.copyWith(clearSearchProvider: true);
-    } else {
-      state = state.copyWith(searchProvider: sanitized);
-    }
-    _saveSettings();
-  }
-
-  void setDefaultSearchTab(String tab) {
-    state = state.copyWith(defaultSearchTab: _normalizeDefaultSearchTab(tab));
-    _saveSettings();
-  }
-
-  void setDefaultLibraryView(String view) {
-    state = state.copyWith(
-      defaultLibraryView: _normalizeDefaultLibraryView(view),
+    _commit(
+      sanitized == null || sanitized.isEmpty
+          ? state.copyWith(clearSearchProvider: true)
+          : state.copyWith(searchProvider: sanitized),
     );
-    _saveSettings();
   }
 
-  void setLibraryQualityLabelMode(String mode) {
-    state = state.copyWith(
+  void setDefaultSearchTab(String tab) => _commit(
+    state.copyWith(defaultSearchTab: _normalizeDefaultSearchTab(tab)),
+  );
+
+  void setDefaultLibraryView(String view) => _commit(
+    state.copyWith(defaultLibraryView: _normalizeDefaultLibraryView(view)),
+  );
+
+  void setLibraryQualityLabelMode(String mode) => _commit(
+    state.copyWith(
       libraryQualityLabelMode: normalizeLibraryQualityLabelMode(mode),
-    );
-    _saveSettings();
-  }
+    ),
+  );
 
-  void setHomeFeedProvider(String? provider) {
-    if (provider == null || provider.isEmpty) {
-      state = state.copyWith(clearHomeFeedProvider: true);
-    } else {
-      state = state.copyWith(homeFeedProvider: provider);
-    }
-    _saveSettings();
-  }
+  void setHomeFeedProvider(String? provider) => _commit(
+    provider == null || provider.isEmpty
+        ? state.copyWith(clearHomeFeedProvider: true)
+        : state.copyWith(homeFeedProvider: provider),
+  );
 
   void setEnableLogging(bool enabled) {
-    state = state.copyWith(enableLogging: enabled);
-    _saveSettings();
+    _commit(state.copyWith(enableLogging: enabled));
     LogBuffer.loggingEnabled = enabled;
   }
 
-  void setUseExtensionProviders(bool enabled) {
-    state = state.copyWith(useExtensionProviders: true);
-    _saveSettings();
-  }
+  void setUseExtensionProviders(bool enabled) =>
+      _commit(state.copyWith(useExtensionProviders: true));
 
   void setDownloadFallbackExtensionIds(List<String>? extensionIds) {
-    final sanitized = _sanitizeDownloadFallbackExtensionIds(extensionIds);
-    state = state.copyWith(
-      downloadFallbackExtensionIds: sanitized,
-      clearDownloadFallbackExtensionIds:
-          extensionIds == null && state.downloadFallbackExtensionIds != null,
+    _commit(
+      state.copyWith(
+        downloadFallbackExtensionIds: _sanitizeDownloadFallbackExtensionIds(
+          extensionIds,
+        ),
+        clearDownloadFallbackExtensionIds:
+            extensionIds == null && state.downloadFallbackExtensionIds != null,
+      ),
     );
-    _saveSettings();
     unawaited(_syncExtensionFallbackSettingsToBackend());
   }
 
-  void setSeparateSingles(bool enabled) {
-    state = state.copyWith(separateSingles: enabled);
-    _saveSettings();
-  }
+  void setSeparateSingles(bool enabled) =>
+      _commit(state.copyWith(separateSingles: enabled));
 
-  void setAlbumFolderStructure(String structure) {
-    state = state.copyWith(albumFolderStructure: structure);
-    _saveSettings();
-  }
+  void setAlbumFolderStructure(String structure) =>
+      _commit(state.copyWith(albumFolderStructure: structure));
 
-  void setShowExtensionStore(bool enabled) {
-    state = state.copyWith(showExtensionStore: enabled);
-    _saveSettings();
-  }
+  void setShowExtensionStore(bool enabled) =>
+      _commit(state.copyWith(showExtensionStore: enabled));
 
-  void setHeroAnimationsEnabled(bool enabled) {
-    state = state.copyWith(heroAnimationsEnabled: enabled);
-    _saveSettings();
-  }
+  void setHeroAnimationsEnabled(bool enabled) =>
+      _commit(state.copyWith(heroAnimationsEnabled: enabled));
 
-  void setForceBackdropBlur(bool enabled) {
-    state = state.copyWith(forceBackdropBlur: enabled);
-    _saveSettings();
-  }
+  void setForceBackdropBlur(bool enabled) =>
+      _commit(state.copyWith(forceBackdropBlur: enabled));
 
-  void setExtensionVerificationBrowserMode(String mode) {
-    state = state.copyWith(
+  void setExtensionVerificationBrowserMode(String mode) => _commit(
+    state.copyWith(
       extensionVerificationBrowserMode:
           _normalizeExtensionVerificationBrowserMode(mode),
-    );
-    _saveSettings();
-  }
+    ),
+  );
 
-  void setLocale(String locale) {
-    state = state.copyWith(locale: locale);
-    _saveSettings();
-  }
+  void setLocale(String locale) => _commit(state.copyWith(locale: locale));
 
-  void setAutoConvertDownloads(bool enabled) {
-    state = state.copyWith(autoConvertDownloads: enabled);
-    _saveSettings();
-  }
+  void setAutoConvertDownloads(bool enabled) =>
+      _commit(state.copyWith(autoConvertDownloads: enabled));
 
-  void setRedownloadFakeHiRes(bool enabled) {
-    state = state.copyWith(redownloadFakeHiRes: enabled);
-    _saveSettings();
-  }
+  void setRedownloadFakeHiRes(bool enabled) =>
+      _commit(state.copyWith(redownloadFakeHiRes: enabled));
 
-  void setAutoConvertFormat(String format) {
-    state = state.copyWith(
-      autoConvertFormat: normalizeAutoConvertFormat(format),
-    );
-    _saveSettings();
-  }
+  void setAutoConvertFormat(String format) => _commit(
+    state.copyWith(autoConvertFormat: normalizeAutoConvertFormat(format)),
+  );
 
-  void setAutoConvertBitrate(String bitrate) {
-    state = state.copyWith(
-      autoConvertBitrate: normalizeAutoConvertBitrate(bitrate),
-    );
-    _saveSettings();
-  }
+  void setAutoConvertBitrate(String bitrate) => _commit(
+    state.copyWith(autoConvertBitrate: normalizeAutoConvertBitrate(bitrate)),
+  );
 
-  void setUseAllFilesAccess(bool enabled) {
-    state = state.copyWith(useAllFilesAccess: enabled);
-    _saveSettings();
-  }
+  void setUseAllFilesAccess(bool enabled) =>
+      _commit(state.copyWith(useAllFilesAccess: enabled));
 
-  void setAutoExportFailedDownloads(bool enabled) {
-    state = state.copyWith(autoExportFailedDownloads: enabled);
-    _saveSettings();
-  }
+  void setAutoExportFailedDownloads(bool enabled) =>
+      _commit(state.copyWith(autoExportFailedDownloads: enabled));
 
-  void setDownloadNetworkMode(String mode) {
-    state = state.copyWith(downloadNetworkMode: mode);
-    _saveSettings();
-  }
+  void setDownloadNetworkMode(String mode) =>
+      _commit(state.copyWith(downloadNetworkMode: mode));
 
-  void setConcurrentDownloads(int count) {
-    state = state.copyWith(concurrentDownloads: count.clamp(1, 3));
-    _saveSettings();
-  }
+  void setConcurrentDownloads(int count) =>
+      _commit(state.copyWith(concurrentDownloads: count.clamp(1, 3)));
 
   void setNetworkCompatibilityMode(bool enabled) {
-    state = state.copyWith(networkCompatibilityMode: enabled);
-    _saveSettings();
+    _commit(state.copyWith(networkCompatibilityMode: enabled));
     unawaited(_syncNetworkCompatibilitySettingsToBackend());
   }
 
   void setAllowLocalNetwork(bool enabled) {
-    state = state.copyWith(allowLocalNetwork: enabled);
-    _saveSettings();
+    _commit(state.copyWith(allowLocalNetwork: enabled));
     unawaited(_syncNetworkCompatibilitySettingsToBackend());
   }
 
-  void setSongLinkRegion(String region) {
-    final normalized = _normalizeSongLinkRegion(region);
-    state = state.copyWith(songLinkRegion: normalized);
-    _saveSettings();
-  }
+  void setSongLinkRegion(String region) =>
+      _commit(state.copyWith(songLinkRegion: _normalizeSongLinkRegion(region)));
 
-  void setNativeDownloadWorkerEnabled(bool enabled) {
-    state = state.copyWith(nativeDownloadWorkerEnabled: enabled);
-    _saveSettings();
-  }
+  void setNativeDownloadWorkerEnabled(bool enabled) =>
+      _commit(state.copyWith(nativeDownloadWorkerEnabled: enabled));
 
-  void setLocalLibraryEnabled(bool enabled) {
-    state = state.copyWith(localLibraryEnabled: enabled);
-    _saveSettings();
-  }
+  void setLocalLibraryEnabled(bool enabled) =>
+      _commit(state.copyWith(localLibraryEnabled: enabled));
 
-  void setLocalLibraryPathAndBookmark(String path, String bookmark) {
-    state = state.copyWith(
-      localLibraryPath: path,
-      localLibraryBookmark: bookmark,
-    );
-    _saveSettings();
-  }
+  void setLocalLibraryPathAndBookmark(String path, String bookmark) => _commit(
+    state.copyWith(localLibraryPath: path, localLibraryBookmark: bookmark),
+  );
 
-  void setLocalLibraryShowDuplicates(bool show) {
-    state = state.copyWith(localLibraryShowDuplicates: show);
-    _saveSettings();
-  }
+  void setLocalLibraryShowDuplicates(bool show) =>
+      _commit(state.copyWith(localLibraryShowDuplicates: show));
 
-  void setLocalLibraryAutoScan(String mode) {
-    state = state.copyWith(localLibraryAutoScan: mode);
-    _saveSettings();
-  }
+  void setLocalLibraryAutoScan(String mode) =>
+      _commit(state.copyWith(localLibraryAutoScan: mode));
 
-  void setTutorialComplete() {
-    state = state.copyWith(hasCompletedTutorial: true);
-    _saveSettings();
-  }
+  void setTutorialComplete() =>
+      _commit(state.copyWith(hasCompletedTutorial: true));
 
-  void setDeduplicateDownloads(bool enabled) {
-    state = state.copyWith(deduplicateDownloads: enabled);
-    _saveSettings();
-  }
+  void setDeduplicateDownloads(bool enabled) =>
+      _commit(state.copyWith(deduplicateDownloads: enabled));
 
-  void setAllowQualityVariants(bool enabled) {
-    state = state.copyWith(allowQualityVariants: enabled);
-    _saveSettings();
-  }
+  void setAllowQualityVariants(bool enabled) =>
+      _commit(state.copyWith(allowQualityVariants: enabled));
 
-  void setSaveDownloadHistory(bool enabled) {
-    state = state.copyWith(saveDownloadHistory: enabled);
-    _saveSettings();
-  }
+  void setSaveDownloadHistory(bool enabled) =>
+      _commit(state.copyWith(saveDownloadHistory: enabled));
 
-  void setPlayerMode(String mode) {
-    final normalized = mode == 'internal' ? 'internal' : 'external';
-    state = state.copyWith(playerMode: normalized);
-    _saveSettings();
-  }
+  void setPlayerMode(String mode) => _commit(
+    state.copyWith(playerMode: mode == 'internal' ? 'internal' : 'external'),
+  );
 
-  void setPlayerShowPronunciation(bool visible) {
-    state = state.copyWith(playerShowPronunciation: visible);
-    _saveSettings();
-  }
+  void setPlayerShowPronunciation(bool visible) =>
+      _commit(state.copyWith(playerShowPronunciation: visible));
 
-  void setPlayerShowTranslation(bool visible) {
-    state = state.copyWith(playerShowTranslation: visible);
-    _saveSettings();
-  }
+  void setPlayerShowTranslation(bool visible) =>
+      _commit(state.copyWith(playerShowTranslation: visible));
 }
 
 final settingsProvider = NotifierProvider<SettingsNotifier, AppSettings>(
