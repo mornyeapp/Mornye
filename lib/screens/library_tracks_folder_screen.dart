@@ -41,7 +41,6 @@ import 'package:mornye/screens/selection_mode_mixin.dart';
 import 'package:mornye/controllers/library_tracks_folder_data.dart';
 import 'package:mornye/screens/track_metadata_screen.dart';
 import 'package:mornye/widgets/selection_action_button.dart';
-import 'package:mornye/widgets/selection_bottom_bar.dart';
 import 'package:mornye/widgets/in_library_badge.dart';
 import 'package:mornye/widgets/playlist_picker_sheet.dart';
 import 'package:mornye/widgets/animation_utils.dart';
@@ -326,6 +325,7 @@ class _LibraryTracksFolderScreenState
       for (final lookup in historyLookups)
         existingHistoryKeys.contains(lookup.lookupKey),
     ];
+    final ids = [for (final entry in entries) entry.key];
     final scaffold = CollectionScaffold(
       scrollController: scrollController,
       isSelectionMode: showsSelectionBar,
@@ -334,6 +334,7 @@ class _LibraryTracksFolderScreenState
         context,
         colorScheme,
         entries,
+        ids,
         bottomPadding,
       ),
       appBar: _buildAppBar(context, colorScheme, title, entries, playlist),
@@ -349,7 +350,7 @@ class _LibraryTracksFolderScreenState
         else if (isDesktopPlatform)
           TrackListTable(
             tracks: folderTracks,
-            ids: [for (final entry in entries) entry.key],
+            ids: ids,
             isInHistory: inHistory,
             selectedIds: selectedIds,
             onSelect: applyDesktopClick,
@@ -406,9 +407,7 @@ class _LibraryTracksFolderScreenState
       ],
     );
     return DesktopListScope(
-      onSelectAll: entries.isEmpty
-          ? null
-          : () => selectAll(entries.map((entry) => entry.key)),
+      onSelectAll: entries.isEmpty ? null : () => selectAll(ids),
       onClearSelection: isSelectionMode ? exitSelectionMode : null,
       onDelete: isSelectionMode ? () => _removeSelected(entries) : null,
       onActivate: () {
@@ -519,23 +518,14 @@ class _LibraryTracksFolderScreenState
     BuildContext context,
     ColorScheme colorScheme,
     List<CollectionTrackEntry> entries,
+    List<String> ids,
     double bottomPadding,
   ) {
     final selectedCount = selectedIds.length;
-    final allSelected = selectedCount == entries.length && entries.isNotEmpty;
     final isWishlist = widget.mode == LibraryTracksFolderMode.wishlist;
 
-    return SelectionBottomBar(
-      selectedCount: selectedCount,
-      allSelected: allSelected,
-      onClose: exitSelectionMode,
-      onToggleSelectAll: () {
-        if (allSelected) {
-          exitSelectionMode();
-        } else {
-          selectAll(entries.map((e) => e.key));
-        }
-      },
+    return buildSelectionBar(
+      ids: ids,
       bottomPadding: bottomPadding,
       children: [
         Row(
