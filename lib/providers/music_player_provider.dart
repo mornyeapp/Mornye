@@ -352,30 +352,6 @@ class MusicPlayerController {
 
   Future<void> playSingle(PlayableMedia item) => playAll([item]);
 
-  Future<void> playHistory(
-    List<DownloadHistoryItem> items, {
-    int initialIndex = 0,
-  }) async {
-    final media = items
-        .where((i) => i.filePath.trim().isNotEmpty)
-        .map(playableFromHistory)
-        .toList();
-    if (media.isEmpty) return;
-    await playAll(media, initialIndex: initialIndex.clamp(0, media.length - 1));
-  }
-
-  Future<void> playLocal(
-    List<LocalLibraryItem> items, {
-    int initialIndex = 0,
-  }) async {
-    final media = items
-        .where((i) => i.filePath.trim().isNotEmpty)
-        .map(playableFromLocal)
-        .toList();
-    if (media.isEmpty) return;
-    await playAll(media, initialIndex: initialIndex.clamp(0, media.length - 1));
-  }
-
   Future<({LocalLibraryItem item, List<LocalLibraryItem> tracks})?>
   localAlbumFor(String mediaId) async {
     final database = _runtime.dependencies.libraryDatabase;

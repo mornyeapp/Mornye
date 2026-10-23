@@ -53,7 +53,6 @@ class PlaybackController extends Notifier<PlaybackState> {
     required String artist,
     String album = '',
     String coverUrl = '',
-    Track? track,
     Duration? duration,
     int? bitDepth,
     int? sampleRate,
@@ -77,16 +76,12 @@ class PlaybackController extends Notifier<PlaybackState> {
               artist: artist,
               album: album,
               artUri: _normalizeArtUri(coverUrl),
-              duration:
-                  duration ??
-                  ((track != null && track.duration > 0)
-                      ? Duration(seconds: track.duration)
-                      : null),
+              duration: duration,
               bitDepth: bitDepth,
               sampleRate: sampleRate,
               bitrate: bitrate,
               format: format,
-              explicit: explicit ?? track?.isExplicit ?? false,
+              explicit: explicit ?? false,
             ),
           );
       return;
@@ -101,47 +96,42 @@ class PlaybackController extends Notifier<PlaybackState> {
   Future<void> playLocalLibraryQueue(
     List<LocalLibraryItem> items, {
     required LocalLibraryItem startItem,
-  }) async {
-    final playable = items
-        .where(
-          (i) => i.filePath.trim().isNotEmpty && !isCueVirtualPath(i.filePath),
-        )
-        .toList();
-    if (playable.isEmpty) return;
-    var startIndex = playable.indexWhere((i) => i.id == startItem.id);
-    if (startIndex < 0) startIndex = 0;
-
-    if (await _useInternalPlayer(source: playable[startIndex].filePath)) {
-      await ref
-          .read(musicPlayerControllerProvider)
-          .playLocal(playable, initialIndex: startIndex);
-    } else {
-      await openFile(playable[startIndex].filePath);
-    }
-  }
+  }) => _playQueue(
+    items,
+    (i) => i.id == startItem.id,
+    (i) => i.filePath,
+    playableFromLocal,
+  );
 
   /// Plays a downloaded-history album/list starting at [startItem], queuing the
   /// rest. Honors player mode.
   Future<void> playHistoryQueue(
     List<DownloadHistoryItem> items, {
     required DownloadHistoryItem startItem,
-  }) async {
+  }) => _playQueue(
+    items,
+    (i) => i.id == startItem.id,
+    (i) => i.filePath,
+    playableFromHistory,
+  );
+
+  Future<void> _playQueue<T>(
+    List<T> items,
+    bool Function(T item) isStart,
+    String Function(T item) path,
+    PlayableMedia Function(T item) toMedia,
+  ) async {
     final playable = items
-        .where(
-          (i) => i.filePath.trim().isNotEmpty && !isCueVirtualPath(i.filePath),
-        )
+        .where((i) => path(i).trim().isNotEmpty && !isCueVirtualPath(path(i)))
         .toList();
     if (playable.isEmpty) return;
-    var startIndex = playable.indexWhere((i) => i.id == startItem.id);
+    var startIndex = playable.indexWhere(isStart);
     if (startIndex < 0) startIndex = 0;
-
-    if (await _useInternalPlayer(source: playable[startIndex].filePath)) {
-      await ref
-          .read(musicPlayerControllerProvider)
-          .playHistory(playable, initialIndex: startIndex);
-    } else {
-      await openFile(playable[startIndex].filePath);
-    }
+    await playMediaQueue(
+      playable.map(toMedia),
+      startIndex: startIndex,
+      externalPath: path(playable[startIndex]),
+    );
   }
 
   /// Plays a prebuilt media queue starting at [startIndex]. Honors player mode
