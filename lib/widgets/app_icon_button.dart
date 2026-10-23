@@ -3,7 +3,7 @@ import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:mornye/theme/material_expressive.dart';
 import 'package:mornye/widgets/app_icon.dart';
 
-enum _AppIconButtonVariant { standard, filled, tonal, outlined }
+enum _AppIconButtonVariant { standard, filled, tonal }
 
 /// Drop-in [IconButton] with the Material 3 Expressive shape and press motion.
 ///
@@ -54,21 +54,6 @@ class AppIconButton extends StatelessWidget {
     this.constraints,
     this.visualDensity,
   }) : _variant = _AppIconButtonVariant.tonal;
-
-  const AppIconButton.outlined({
-    super.key,
-    required this.icon,
-    required this.onPressed,
-    this.tooltip,
-    this.color,
-    this.iconSize,
-    this.isSelected,
-    this.selectedIcon,
-    this.style,
-    this.padding,
-    this.constraints,
-    this.visualDensity,
-  }) : _variant = _AppIconButtonVariant.outlined;
 
   final Widget icon;
   final VoidCallback? onPressed;
@@ -146,19 +131,6 @@ class AppIconButton extends StatelessWidget {
           constraints: constraints,
           visualDensity: visualDensity,
         ),
-        _AppIconButtonVariant.outlined => IconButton.outlined(
-          icon: icon,
-          selectedIcon: selectedIcon,
-          onPressed: onPressed,
-          tooltip: tooltip,
-          color: color,
-          iconSize: iconSize,
-          isSelected: isSelected,
-          style: style,
-          padding: padding,
-          constraints: constraints,
-          visualDensity: visualDensity,
-        ),
       };
     }
     final enabledColor = color;
@@ -190,7 +162,6 @@ class AppIconButton extends StatelessWidget {
             _AppIconButtonVariant.standard => M3EIconButtonVariant.standard,
             _AppIconButtonVariant.filled => M3EIconButtonVariant.filled,
             _AppIconButtonVariant.tonal => M3EIconButtonVariant.tonal,
-            _AppIconButtonVariant.outlined => M3EIconButtonVariant.outlined,
           },
           decoration: M3EIconButtonDecoration(
             foregroundColor: foreground,

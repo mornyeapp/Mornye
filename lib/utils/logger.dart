@@ -297,19 +297,6 @@ class LogBuffer extends ChangeNotifier {
     notifyListeners();
   }
 
-  String export() {
-    final buffer = StringBuffer();
-    buffer.writeln('${AppInfo.appName} Log Export');
-    buffer.writeln('Generated: ${DateTime.now().toIso8601String()}');
-    buffer.writeln('Entries: ${_entries.length}');
-    buffer.writeln('=' * 60);
-    buffer.writeln();
-    for (final entry in _entries) {
-      buffer.writeln(entry.toString());
-    }
-    return buffer.toString();
-  }
-
   Future<String> exportWithDeviceInfo() async {
     final buffer = StringBuffer();
 

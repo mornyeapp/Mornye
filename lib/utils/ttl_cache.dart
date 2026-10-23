@@ -38,10 +38,6 @@ class TtlCache<T> {
     }
   }
 
-  void remove(String key) => _entries.remove(key);
-
-  void clear() => _entries.clear();
-
   int get length {
     _removeExpired();
     return _entries.length;

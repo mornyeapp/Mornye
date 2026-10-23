@@ -1,12 +1,9 @@
 // Hand-maintained list of locales offered in the UI.
-// A locale is enabled once its Crowdin coverage reaches about 70 percent
-// (translationThreshold below). Edit this list by hand when a locale crosses
-// that threshold in either direction.
+// A locale is enabled once its Crowdin coverage reaches about 70 percent.
+// Edit this list by hand when a locale crosses that threshold in either
+// direction.
 
 import 'package:flutter/widgets.dart';
-
-/// Minimum translation completion threshold used to filter languages.
-const int translationThreshold = 70;
 
 /// List of locales that meet the translation threshold.
 /// Only these languages will be available in the app.
