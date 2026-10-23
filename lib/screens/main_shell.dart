@@ -189,11 +189,23 @@ class _MainShellState extends ConsumerState<MainShell>
     });
   }
 
+  /// What the services below were last configured with. Theme and media
+  /// query changes also reach [didChangeDependencies]; the services only
+  /// need a new language.
+  AppLocalizations? _servicesL10n;
+  String? _servicesLanguageTag;
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     _keepTabAcrossStyles();
     final l10n = context.l10n;
+    final languageTag = Localizations.localeOf(context).toLanguageTag();
+    if (identical(l10n, _servicesL10n) && languageTag == _servicesLanguageTag) {
+      return;
+    }
+    _servicesL10n = l10n;
+    _servicesLanguageTag = languageTag;
     NotificationService().updateStrings(l10n);
     final playback = ref.read(musicPlayerRuntimeProvider);
     playback.updateStrings(
@@ -210,11 +222,7 @@ class _MainShellState extends ConsumerState<MainShell>
     listeningRecorder.setEnabled(settings.listeningStatisticsEnabled);
     // Deezer & co. localize artist/genre names by IP unless told the app's
     // language (issue #480).
-    unawaited(
-      PlatformBridge.setMetadataLanguage(
-        Localizations.localeOf(context).toLanguageTag(),
-      ),
-    );
+    unawaited(PlatformBridge.setMetadataLanguage(languageTag));
   }
 
   @override
@@ -973,13 +981,20 @@ class _MainShellState extends ConsumerState<MainShell>
         !isDesktopPlatform &&
         context.isMornye &&
         !useNavigationRail &&
-        MediaQuery.viewInsetsOf(context).bottom == 0 &&
         MediaQuery.textScalerOf(context).scale(15) <= 20;
+    // The chrome stays expanded while the keyboard is up. The shell reads the
+    // insets without depending on them, so keyboard frames do not rebuild it.
+    bool keyboardHidden() {
+      final media = context.getInheritedWidgetOfExactType<MediaQuery>()!;
+      return media.data.viewInsets.bottom == 0;
+    }
 
     Widget observeScroll(Widget child, int index) =>
         NotificationListener<ScrollNotification>(
           onNotification: (notification) {
-            if (canMinimizeChrome && index == _currentIndex) {
+            if (canMinimizeChrome &&
+                index == _currentIndex &&
+                keyboardHidden()) {
               return _mornyeChrome.handleScroll(notification);
             }
             return false;
@@ -1140,7 +1155,13 @@ class _MainShellState extends ConsumerState<MainShell>
                                 valueListenable: _mornyeChrome,
                                 builder: (context, collapsed, _) =>
                                     MornyeBottomBar(
-                                      collapsed: canMinimizeChrome && collapsed,
+                                      collapsed:
+                                          canMinimizeChrome &&
+                                          collapsed &&
+                                          MediaQuery.viewInsetsOf(
+                                                context,
+                                              ).bottom ==
+                                              0,
                                       destinations: destinations,
                                       selectedIndex: selectedDestination,
                                       onSelected: _onNavTap,
