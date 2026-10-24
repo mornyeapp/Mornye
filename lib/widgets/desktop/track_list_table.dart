@@ -1,12 +1,14 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/models/track.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/utils/adaptive_layout.dart';
 import 'package:mornye/widgets/cached_cover_image.dart';
 import 'package:mornye/widgets/desktop/desktop_selection.dart';
 import 'package:mornye/widgets/desktop/track_table.dart';
+import 'package:mornye/widgets/preview_button.dart';
 import 'package:mornye/widgets/track_card.dart';
 import 'package:mornye/widgets/track_collection_quick_actions.dart';
 import 'package:mornye/widgets/track_list_tile.dart';
@@ -30,6 +32,8 @@ class TrackListTable extends ConsumerStatefulWidget {
     this.showAlbum = false,
     this.albumLayout = false,
     this.albumArtist,
+    this.showPreview = false,
+    this.onSaveCover,
   });
 
   /// See [SliverTrackTable.albumLayout] and [SliverTrackTable.albumArtist].
@@ -58,6 +62,14 @@ class TrackListTable extends ConsumerStatefulWidget {
   final bool showArtwork;
   final bool showAlbum;
 
+  /// Search results keep the preview button of their phone rows beside the
+  /// title.
+  final bool showPreview;
+
+  /// Saves the cover of the row at this index on a long press of its
+  /// artwork, as the phone search rows do.
+  final ValueChanged<int>? onSaveCover;
+
   @override
   ConsumerState<TrackListTable> createState() => _TrackListTableState();
 }
@@ -71,6 +83,8 @@ class _TrackListTableState extends ConsumerState<TrackListTable> {
   void didUpdateWidget(TrackListTable oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.showArtwork != oldWidget.showArtwork ||
+        widget.showPreview != oldWidget.showPreview ||
+        (widget.onSaveCover == null) != (oldWidget.onSaveCover == null) ||
         !listEquals(widget.tracks, oldWidget.tracks) ||
         !listEquals(widget.ids, oldWidget.ids) ||
         !listEquals(widget.isInHistory, oldWidget.isInHistory)) {
@@ -79,7 +93,16 @@ class _TrackListTableState extends ConsumerState<TrackListTable> {
   }
 
   List<TrackTableRow> _buildRows() {
-    final TrackListTable(:tracks, :ids, :isInHistory, :showArtwork) = widget;
+    final TrackListTable(
+      :tracks,
+      :ids,
+      :isInHistory,
+      :showArtwork,
+      :showPreview,
+      :onSaveCover,
+    ) = widget;
+    Widget badges(int i) =>
+        TrackListTileBadges(track: tracks[i], isInHistory: isInHistory[i]);
     return [
       for (var i = 0; i < tracks.length; i++)
         TrackTableRow(
@@ -92,11 +115,25 @@ class _TrackListTableState extends ConsumerState<TrackListTable> {
           duration: tracks[i].duration > 0
               ? Duration(seconds: tracks[i].duration)
               : null,
-          leading: showArtwork ? _Artwork(url: tracks[i].coverUrl) : null,
-          titleTrailing: TrackListTileBadges(
-            track: tracks[i],
-            isInHistory: isInHistory[i],
-          ),
+          leading: showArtwork
+              ? _Artwork(
+                  url: tracks[i].coverUrl,
+                  title: tracks[i].name,
+                  // Reads the current callback, as the rows outlive it.
+                  onSave: onSaveCover == null
+                      ? null
+                      : () => widget.onSaveCover?.call(i),
+                )
+              : null,
+          titleTrailing: showPreview
+              ? Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    PreviewButton(track: tracks[i], size: 20, dense: true),
+                    badges(i),
+                  ],
+                )
+              : badges(i),
           trailing: TrackCollectionQuickActions(
             track: tracks[i],
             hasLocalPlaybackCandidate: isInHistory[i],
@@ -153,9 +190,13 @@ class _TrackListTableState extends ConsumerState<TrackListTable> {
 }
 
 class _Artwork extends StatelessWidget {
-  const _Artwork({required this.url});
+  const _Artwork({required this.url, required this.title, this.onSave});
 
   final String? url;
+  final String title;
+
+  /// Saves the cover on a long press.
+  final VoidCallback? onSave;
 
   @override
   Widget build(BuildContext context) {
@@ -164,7 +205,7 @@ class _Artwork extends StatelessWidget {
       return const TrackCoverPlaceholder(size: 32);
     }
     // Collection tracks can carry a local artwork path.
-    return LocalOrNetworkCoverImage(
+    final image = LocalOrNetworkCoverImage(
       url: url,
       width: 32,
       height: 32,
@@ -172,6 +213,21 @@ class _Artwork extends StatelessWidget {
       networkCacheWidth: 96,
       localCacheWidth: 96,
       placeholder: (_) => const TrackCoverPlaceholder(size: 32),
+    );
+    final onSave = this.onSave;
+    if (onSave == null) return image;
+    return Semantics(
+      label:
+          '${context.l10n.dialogDownload} '
+          '${context.l10n.editMetadataFieldCover}: $title',
+      button: true,
+      onLongPress: onSave,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        excludeFromSemantics: true,
+        onLongPress: onSave,
+        child: image,
+      ),
     );
   }
 }
