@@ -515,11 +515,18 @@ class SettingsNotifier extends Notifier<AppSettings> {
   }
 
   Future<void> _cleanupRetiredSpotifySettings() async {
-    final storedSecret = await _secureStorage.read(
-      key: _spotifyClientSecretKey,
-    );
-    if (storedSecret != null && storedSecret.isNotEmpty) {
-      await _secureStorage.delete(key: _spotifyClientSecretKey);
+    try {
+      final storedSecret = await _secureStorage.read(
+        key: _spotifyClientSecretKey,
+      );
+      if (storedSecret != null && storedSecret.isNotEmpty) {
+        await _secureStorage.delete(key: _spotifyClientSecretKey);
+      }
+    } catch (e) {
+      // The retired secret is optional; active credentials share this vault.
+      _log.w(
+        'Could not clean up retired credentials; continuing settings load: $e',
+      );
     }
   }
 
