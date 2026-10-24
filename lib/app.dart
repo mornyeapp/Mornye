@@ -68,39 +68,6 @@ final _routerProvider = Provider<GoRouter>((ref) {
   );
 });
 
-Locale _fallbackLocale(Iterable<Locale> supportedLocales) {
-  for (final supportedLocale in supportedLocales) {
-    if (supportedLocale.languageCode == 'en') {
-      return supportedLocale;
-    }
-  }
-  return supportedLocales.first;
-}
-
-Locale _resolveSupportedLocale(
-  Locale? requestedLocale,
-  Iterable<Locale> supportedLocales,
-) {
-  if (requestedLocale == null) {
-    return _fallbackLocale(supportedLocales);
-  }
-
-  for (final supportedLocale in supportedLocales) {
-    if (supportedLocale.languageCode == requestedLocale.languageCode &&
-        supportedLocale.countryCode == requestedLocale.countryCode) {
-      return supportedLocale;
-    }
-  }
-
-  for (final supportedLocale in supportedLocales) {
-    if (supportedLocale.languageCode == requestedLocale.languageCode) {
-      return supportedLocale;
-    }
-  }
-
-  return _fallbackLocale(supportedLocales);
-}
-
 /// iOS-style fluid scroll on mobile and macOS: momentum glide + bounce instead
 /// of the Android clamping stop. Widgets that set explicit physics (queue filter
 /// PageView, bottom sheets) are unaffected.
@@ -222,19 +189,7 @@ class MornyeApp extends ConsumerWidget {
       disableOverscrollEffects: disableOverscrollEffects,
     );
 
-    Locale? locale;
-    if (localeString != 'system' && localeString.isNotEmpty) {
-      if (localeString.contains('_')) {
-        final parts = localeString.split('_');
-        if (parts.length == 2) {
-          locale = Locale(parts[0], parts[1]);
-        } else {
-          locale = Locale(parts[0]);
-        }
-      } else {
-        locale = Locale(localeString);
-      }
-    }
+    final locale = localeFromSetting(localeString);
 
     return DynamicColorWrapper(
       builder: (lightTheme, darkTheme, themeMode) {
@@ -284,7 +239,7 @@ class MornyeApp extends ConsumerWidget {
           routerConfig: router,
           locale: locale,
           localeResolutionCallback: (deviceLocale, supportedLocales) {
-            return _resolveSupportedLocale(
+            return resolveSupportedLocale(
               locale ?? deviceLocale,
               supportedLocales,
             );

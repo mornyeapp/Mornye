@@ -4,13 +4,18 @@ import 'dart:io';
 import 'package:audio_service/audio_service.dart';
 import 'package:audio_session/audio_session.dart';
 import 'package:flutter/services.dart';
+import 'package:mornye/l10n/supported_locales.dart';
 import 'package:mornye/models/settings.dart';
 import 'package:mornye/services/app_state_database.dart';
 import 'package:mornye/services/autoplay_personalization.dart';
+import 'package:mornye/services/background_favorites.dart';
 import 'package:mornye/services/discord_presence_service.dart';
+import 'package:mornye/services/history_database.dart';
+import 'package:mornye/services/library_collections_database.dart';
 import 'package:mornye/services/library_database.dart';
 import 'package:mornye/services/listening_statistics.dart';
 import 'package:mornye/services/media_kit_playback_deck.dart';
+import 'package:mornye/services/media_library_browser.dart';
 import 'package:mornye/services/media_session_desktop.dart';
 import 'package:mornye/services/music_playback_deck.dart';
 import 'package:mornye/services/music_player_service.dart';
@@ -43,6 +48,8 @@ class PlaybackDependencies {
     this.createPersonalization = AutoplayPersonalization.new,
     AppStateDatabase? sessionDatabase,
     LibraryDatabase? libraryDatabase,
+    HistoryDatabase? historyDatabase,
+    LibraryCollectionsDatabase? collectionsDatabase,
     ListeningRecorder? recorder,
     SourceDeletionEvents? sourceDeletionEvents,
     Stream<double>? volumeChanges,
@@ -53,6 +60,8 @@ class PlaybackDependencies {
     ),
   }) : _sessionDatabase = sessionDatabase,
        _libraryDatabase = libraryDatabase,
+       _historyDatabase = historyDatabase,
+       _collectionsDatabase = collectionsDatabase,
        _recorder = recorder,
        _sourceDeletionEvents = sourceDeletionEvents,
        _volumeChanges = volumeChanges,
@@ -75,6 +84,8 @@ class PlaybackDependencies {
   final AutoplayPersonalization Function() createPersonalization;
   final AppStateDatabase? _sessionDatabase;
   final LibraryDatabase? _libraryDatabase;
+  final HistoryDatabase? _historyDatabase;
+  final LibraryCollectionsDatabase? _collectionsDatabase;
   final ListeningRecorder? _recorder;
   final SourceDeletionEvents? _sourceDeletionEvents;
   final Stream<double>? _volumeChanges;
@@ -84,6 +95,10 @@ class PlaybackDependencies {
       _sessionDatabase ?? AppStateDatabase.instance;
   LibraryDatabase get libraryDatabase =>
       _libraryDatabase ?? LibraryDatabase.instance;
+  HistoryDatabase get historyDatabase =>
+      _historyDatabase ?? HistoryDatabase.instance;
+  LibraryCollectionsDatabase get collectionsDatabase =>
+      _collectionsDatabase ?? LibraryCollectionsDatabase.instance;
   ListeningRecorder get recorder => _recorder ?? listeningRecorder;
   SourceDeletionEvents get sourceDeletionEvents =>
       _sourceDeletionEvents ?? SourceDeletionEvents.instance;
@@ -126,6 +141,7 @@ class PlaybackDependencies {
         // Keep background resume eligible for audio focus. The Android fork
         // releases the CPU wake lock on pause and demotes the service on stop.
         androidStopForegroundOnPause: false,
+        androidBrowsableRootExtras: MediaLibraryBrowser.rootExtras,
       ),
     );
   }
@@ -156,7 +172,17 @@ class MusicPlayerRuntime {
   String _unknownTitle = 'Unknown title', _unknownArtist = 'Unknown artist';
   PlaybackNotification _notification = const PlaybackNotification();
   Future<bool> Function(MediaItem)? _toggleFavorite;
+  StreamSubscription<MediaItem?>? _backgroundFavorites;
   Future<void> Function()? exclusiveAudioHook;
+
+  /// The Library that media browsers such as Android Auto show.
+  late final browser = MediaLibraryBrowser(
+    library: dependencies.libraryDatabase,
+    history: dependencies.historyDatabase,
+    collections: dependencies.collectionsDatabase,
+    includeLocal: () => _settings.localLibraryEnabled,
+    strings: () => appLocalizationsFor(_settings.locale),
+  );
 
   AppSettings get settings => _settings;
   MusicPlayerHandler? get handler => _initializing ? null : _handler;
@@ -185,10 +211,41 @@ class MusicPlayerRuntime {
     _unknownArtist = unknownArtist;
   }
 
+  /// Media controls for playback that started while the app shell is closed,
+  /// such as from a car. Its star loves songs through [favorites] and shows
+  /// whether the current song is loved, until the shell configures them.
+  void configureBackgroundNotification({
+    required PlaybackNotification presentation,
+    required BackgroundFavorites favorites,
+  }) {
+    if (_toggleFavorite != null || _disposed) return;
+    _notification = presentation;
+    _toggleFavorite = favorites.toggle;
+    _handler?.refreshNotificationControls();
+    ({String id, Object? source})? shown;
+    _backgroundFavorites = mediaItemEvents().listen((item) async {
+      final current = item == null
+          ? null
+          : (id: item.id, source: item.extras?['source']);
+      if (item == null || current == shown) return;
+      shown = current;
+      try {
+        final loved = await favorites.isLoved(item);
+        if (_backgroundFavorites != null && shown == current) {
+          updateFavorite(item, loved);
+        }
+      } catch (error) {
+        _log.w('Could not read whether the song is loved: $error');
+      }
+    });
+  }
+
   void configureNotification({
     required PlaybackNotification presentation,
     required Future<bool> Function(MediaItem) toggleFavorite,
   }) {
+    unawaited(_backgroundFavorites?.cancel());
+    _backgroundFavorites = null;
     _notification = presentation;
     _toggleFavorite = toggleFavorite;
     _handler?.refreshNotificationControls();
@@ -307,6 +364,8 @@ class MusicPlayerRuntime {
   Future<void> _dispose() async {
     _disposed = true;
     _toggleFavorite = null;
+    unawaited(_backgroundFavorites?.cancel());
+    _backgroundFavorites = null;
     exclusiveAudioHook = null;
     await _handler?.dispose();
     try {

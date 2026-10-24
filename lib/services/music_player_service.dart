@@ -15,6 +15,7 @@ import 'package:audio_session/audio_session.dart'
         AudioInterruptionType;
 import 'package:mornye/services/listening_statistics.dart' show ListeningTrack;
 import 'package:mornye/services/library_database.dart';
+import 'package:mornye/services/media_library_browser.dart';
 import 'package:mornye/services/sqlite_helpers.dart' show normalizeLookupText;
 import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/services/playback_normalization.dart';
@@ -2020,12 +2021,21 @@ class MusicPlayerHandler extends BaseAudioHandler
     String parentMediaId, [
     Map<String, dynamic>? options,
   ]) async {
-    if (parentMediaId == AudioService.browsableRootId ||
-        parentMediaId == AudioService.recentRootId) {
-      return List<MediaItem>.unmodifiable(_queueItems);
+    // Media resumption asks for the song to resume, which a cold start has
+    // only once the saved session is back.
+    if (parentMediaId == AudioService.recentRootId) {
+      await _runtime.restoreSession();
+      final item = mediaItem.value;
+      return item == null ? const [] : [item];
     }
-    return const [];
+    return _runtime.browser.children(parentMediaId, options);
   }
+
+  @override
+  Future<List<MediaItem>> search(
+    String query, [
+    Map<String, dynamic>? extras,
+  ]) => _runtime.browser.search(query);
 
   @override
   Future<MediaItem?> getMediaItem(String mediaId) async {
@@ -2039,8 +2049,34 @@ class MusicPlayerHandler extends BaseAudioHandler
     String mediaId, [
     Map<String, dynamic>? extras,
   ]) async {
+    if (MediaLibraryBrowser.isBrowserId(mediaId)) {
+      await _playBrowserQueue(await _runtime.browser.queueFor(mediaId));
+      return;
+    }
     final index = _media.indexWhere((m) => m.id == mediaId);
     if (index >= 0) await _playIndex(index);
+  }
+
+  /// Plays a spoken request. Without words it resumes the queue, or shuffles
+  /// the Library when there is none.
+  @override
+  Future<void> playFromSearch(
+    String query, [
+    Map<String, dynamic>? extras,
+  ]) async {
+    if (query.trim().isEmpty) {
+      await _runtime.restoreSession();
+      if (_media.isNotEmpty) return play();
+    }
+    await _playBrowserQueue(
+      await _runtime.browser.queueForSearch(query, extras),
+    );
+  }
+
+  Future<void> _playBrowserQueue(BrowserQueue? queue) async {
+    if (queue == null || _disposed) return;
+    if (queue.shuffle) await setShuffleMode(AudioServiceShuffleMode.all);
+    await setQueueAndPlay(queue.items, initialIndex: queue.index);
   }
 
   @override

@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:mornye/models/library_collections.dart';
+import 'package:mornye/models/track.dart';
 import 'package:mornye/services/collection_restore_codec.dart';
 import 'package:mornye/services/link/sync/link_collection_sync_schema.dart';
 import 'package:mornye/services/platform_bridge.dart';
@@ -613,6 +614,77 @@ class LibraryCollectionsDatabase {
   Future<List<PlaylistPickerSummary>> loadPlaylistPickerSummaries(
     List<String> requestedTrackKeys,
   ) async => readPlaylistPickerSummaries(await database, requestedTrackKeys);
+
+  // Media browsers read bounded lists straight from SQLite: the snapshot's
+  // native job needs the backend channel an Activity registers.
+
+  /// Loved songs, the most recently loved first.
+  Future<List<Track>> loadLovedTracks({int limit = 500}) async => _decodeTracks(
+    await (await database).rawQuery(
+      'SELECT track_json FROM $_tableLoved '
+      'ORDER BY added_at DESC, rowid DESC LIMIT ?',
+      [limit],
+    ),
+  );
+
+  Future<bool> containsLovedTrack(String trackKey) async =>
+      (await (await database).rawQuery(
+        'SELECT 1 FROM $_tableLoved WHERE track_key = ? LIMIT 1',
+        [trackKey],
+      )).isNotEmpty;
+
+  /// Playlists, the newest first, with their song count and the artwork URL
+  /// of their first song.
+  Future<List<({String id, String name, int trackCount, String? coverUrl})>>
+  loadPlaylistSummaries() async {
+    final rows = await (await database).rawQuery('''
+      SELECT p.id, p.name,
+        (SELECT COUNT(*) FROM $_tablePlaylistTracks pt
+          WHERE pt.playlist_id = p.id) AS track_count,
+        (SELECT pt.track_json FROM $_tablePlaylistTracks pt
+          WHERE pt.playlist_id = p.id
+          ORDER BY pt.added_at ASC, pt.rowid ASC LIMIT 1) AS first_track_json
+      FROM $_tablePlaylists p
+      ORDER BY p.created_at DESC, p.rowid DESC
+    ''');
+    return [
+      for (final row in rows)
+        (
+          id: row['id'] as String,
+          name: row['name'] as String? ?? '',
+          trackCount: (row['track_count'] as num?)?.toInt() ?? 0,
+          coverUrl: _decodeTrack(row['first_track_json'])?.coverUrl,
+        ),
+    ];
+  }
+
+  /// A playlist's songs in playlist order.
+  Future<List<Track>> loadPlaylistTracks(
+    String playlistId, {
+    int limit = 500,
+  }) async => _decodeTracks(
+    await (await database).rawQuery(
+      'SELECT track_json FROM $_tablePlaylistTracks WHERE playlist_id = ? '
+      'ORDER BY added_at ASC, rowid ASC LIMIT ?',
+      [playlistId, limit],
+    ),
+  );
+
+  static List<Track> _decodeTracks(List<Map<String, Object?>> rows) => [
+    for (final row in rows) ?_decodeTrack(row['track_json']),
+  ];
+
+  static Track? _decodeTrack(Object? json) {
+    if (json is! String || json.isEmpty) return null;
+    try {
+      final decoded = jsonDecode(json);
+      return decoded is Map
+          ? Track.fromJson(Map<String, dynamic>.from(decoded))
+          : null;
+    } catch (_) {
+      return null;
+    }
+  }
 
   Future<void> _upsertEntry(
     String table,

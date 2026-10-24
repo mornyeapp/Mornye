@@ -6,7 +6,7 @@ import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/services/library_database.dart';
 import 'package:mornye/services/history_database.dart';
 import 'package:mornye/services/music_player_service.dart';
-import 'package:mornye/services/platform_bridge.dart';
+import 'package:mornye/services/track_file_resolver.dart';
 import 'package:mornye/utils/file_access.dart';
 import 'package:mornye/utils/logger.dart';
 
@@ -34,17 +34,6 @@ class PlaybackController extends Notifier<PlaybackState> {
     }
     return await ref.read(musicPlayerControllerProvider).ensureInitialized() !=
         null;
-  }
-
-  String? _normalizeArtUri(String cover) {
-    final value = cover.trim();
-    if (value.isEmpty) return null;
-    if (value.startsWith('http') ||
-        isContentUri(value) ||
-        value.startsWith('file://')) {
-      return value;
-    }
-    return Uri.file(value).toString();
   }
 
   Future<void> playLocalPath({
@@ -75,7 +64,7 @@ class PlaybackController extends Notifier<PlaybackState> {
               title: title,
               artist: artist,
               album: album,
-              artUri: _normalizeArtUri(coverUrl),
+              artUri: normalizeArtUri(coverUrl),
               duration: duration,
               bitDepth: bitDepth,
               sampleRate: sampleRate,
@@ -207,20 +196,7 @@ class PlaybackController extends Notifier<PlaybackState> {
         // Keep the playlist's original order so Previous can reach earlier
         // tracks and reaching its end still respects the player's repeat mode.
         if (index >= safeStart) initialIndex ??= queue.length;
-        queue.add(
-          PlayableMedia(
-            id: resolvedPath,
-            source: resolvedPath,
-            title: track.name,
-            artist: track.artistName,
-            album: track.albumName,
-            artUri: _normalizeArtUri(track.coverUrl ?? ''),
-            duration: track.duration > 0
-                ? Duration(seconds: track.duration)
-                : null,
-            explicit: track.isExplicit,
-          ),
-        );
+        queue.add(playableFromTrack(track, resolvedPath));
       }
 
       if (queue.isNotEmpty) {
@@ -275,94 +251,14 @@ class PlaybackController extends Notifier<PlaybackState> {
 
   Future<List<String?>> _resolveTrackPaths(List<Track> tracks) async {
     if (tracks.isEmpty) return const [];
-    final localFuture = _library.findExistingBatch([
-      for (final track in tracks)
-        LocalLibraryBatchLookupRequest(
-          id: (track.source ?? '').toLowerCase() == 'local' ? track.id : null,
-          isrc: track.isrc,
-          trackName: track.name,
-          artistName: track.artistName,
-        ),
-    ]);
-    final historyFuture = _history.findExistingTracks([
-      for (final track in tracks)
-        HistoryLookupRequest(
-          spotifyId: track.id,
-          isrc: track.isrc,
-          trackName: track.name,
-          artistName: track.artistName,
-        ),
-    ]);
-    final localMatches = await localFuture;
-    final historyMatches = await historyFuture;
-
-    final results = List<String?>.filled(tracks.length, null);
-    final existsChecks = <String, Future<bool>>{};
-    final unknownSafPaths = <String>{};
-    final safPaths = <String>{
-      for (final row in [...localMatches, ...historyMatches])
-        if (isContentUri(
-          stripCueTrackSuffix(row?['filePath']?.toString() ?? ''),
-        ))
-          stripCueTrackSuffix(row!['filePath'].toString()),
-    }.toList(growable: false);
-    for (var start = 0; start < safPaths.length; start += 64) {
-      final batch = safPaths.sublist(
-        start,
-        (start + 64).clamp(0, safPaths.length),
-      );
-      try {
-        final checks = await PlatformBridge.safExistsBatch(batch);
-        for (final path in batch) {
-          final exists = checks[path];
-          if (exists != null) {
-            existsChecks[path] = Future.value(exists);
-          } else {
-            unknownSafPaths.add(path);
-          }
-        }
-      } catch (_) {
-        // Older bindings may lack the batch API; retain per-file fallback.
-        unknownSafPaths.addAll(batch);
-      }
-    }
-    final invalidHistoryIds = <String>{};
-    var next = 0;
-    final workerCount = tracks.length < 8 ? tracks.length : 8;
-
-    Future<bool> pathExists(String path) {
-      final realPath = stripCueTrackSuffix(path);
-      return existsChecks.putIfAbsent(realPath, () => fileExists(path));
-    }
-
-    Future<void> worker() async {
-      while (true) {
-        final index = next++;
-        if (index >= tracks.length) return;
-        final localPath = localMatches[index]?['filePath']?.toString() ?? '';
-        if (localPath.isNotEmpty && await pathExists(localPath)) {
-          results[index] = localPath;
-          continue;
-        }
-
-        final historyMatch = historyMatches[index];
-        final historyPath = historyMatch?['filePath']?.toString() ?? '';
-        if (historyPath.isNotEmpty && await pathExists(historyPath)) {
-          results[index] = historyPath;
-          continue;
-        }
-        final historyId = historyMatch?['id']?.toString() ?? '';
-        if (historyId.isNotEmpty &&
-            !unknownSafPaths.contains(stripCueTrackSuffix(historyPath))) {
-          invalidHistoryIds.add(historyId);
-        }
-      }
-    }
-
-    await Future.wait(List.generate(workerCount, (_) => worker()));
+    final (:paths, :missingHistoryIds) = await resolveTrackFiles(
+      tracks,
+      library: _library,
+      history: _history,
+    );
     final historyNotifier = ref.read(downloadHistoryProvider.notifier);
-    await historyNotifier.removeManyFromHistory(invalidHistoryIds);
-    return results;
+    await historyNotifier.removeManyFromHistory(missingHistoryIds);
+    return paths;
   }
 }
 

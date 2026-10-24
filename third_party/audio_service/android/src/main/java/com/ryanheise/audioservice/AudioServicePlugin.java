@@ -71,6 +71,24 @@ public class AudioServicePlugin implements FlutterPlugin, ActivityAware {
         flutterEngineArguments = arguments.clone();
     }
 
+    /** Configures each shared engine after it is created and before Dart starts. */
+    public interface FlutterEngineConfigurator {
+        void configure(Context applicationContext, FlutterEngine engine);
+    }
+
+    private static FlutterEngineConfigurator flutterEngineConfigurator;
+
+    /**
+     * Registers app channels on the shared engine whichever component creates
+     * it. A media browser can start the engine without an Activity.
+     */
+    public static synchronized void setFlutterEngineConfigurator(FlutterEngineConfigurator configurator) {
+        if (FlutterEngineCache.getInstance().get(flutterEngineId) != null) {
+            throw new IllegalStateException("The Flutter engine configurator must be set before engine creation");
+        }
+        flutterEngineConfigurator = configurator;
+    }
+
     /** Must be called BEFORE any FlutterEngine is created. e.g. in Application class. */
     public static void setFlutterEngineId(String id) {
         flutterEngineId = id;
@@ -118,6 +136,9 @@ public class AudioServicePlugin implements FlutterPlugin, ActivityAware {
                 initialRoute = "/";
             }
             flutterEngine.getNavigationChannel().setInitialRoute(initialRoute);
+            if (flutterEngineConfigurator != null) {
+                flutterEngineConfigurator.configure(context.getApplicationContext(), flutterEngine);
+            }
             flutterEngine.getDartExecutor().executeDartEntrypoint(DartExecutor.DartEntrypoint.createDefault());
             FlutterEngineCache.getInstance().put(flutterEngineId, flutterEngine);
         }

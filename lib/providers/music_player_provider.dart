@@ -9,8 +9,11 @@ import 'package:mornye/providers/download_queue_provider.dart';
 import 'package:mornye/services/history_database.dart';
 import 'package:mornye/services/history_row_mapper.dart';
 import 'package:mornye/services/library_database.dart';
+import 'package:mornye/services/library_media_identity.dart';
 import 'package:mornye/services/music_player_service.dart';
-import 'package:mornye/utils/file_access.dart';
+
+export 'package:mornye/services/playable_media.dart'
+    show playableFromHistory, playableFromLocal;
 
 final musicPlayerRuntimeProvider = Provider<MusicPlayerRuntime>(
   (ref) => musicPlayerRuntime,
@@ -40,41 +43,21 @@ class CurrentMediaItemNotifier extends StreamNotifier<MediaItem?> {
   }
 }
 
-/// The download or Library record of the file a media item plays: by its
-/// source path, then by its media id, then by title and artist with the same
-/// path. Null when the file has no record.
+/// [libraryItemForMedia] with the download History the app has loaded.
 Future<UnifiedLibraryItem?> _libraryItemForMedia(
   Ref ref, {
   required String id,
   required String source,
   required String title,
   required String artist,
-}) async {
-  if (source.isNotEmpty) {
-    final history = await ref
-        .read(downloadHistoryProvider.notifier)
-        .getByFilePathAsync(source);
-    if (history != null) return UnifiedLibraryItem.fromDownloadHistory(history);
-  }
-  final database = ref
-      .watch(musicPlayerRuntimeProvider)
-      .dependencies
-      .libraryDatabase;
-  final row = await database.getById(id);
-  if (row != null) {
-    return UnifiedLibraryItem.fromLocalLibrary(LocalLibraryItem.fromJson(row));
-  }
-  if (source.isNotEmpty) {
-    final matches = await database.findByTrackAndArtist(title, artist);
-    for (final row in matches) {
-      final local = LocalLibraryItem.fromJson(row);
-      if (local.filePath == source) {
-        return UnifiedLibraryItem.fromLocalLibrary(local);
-      }
-    }
-  }
-  return null;
-}
+}) => libraryItemForMedia(
+  id: id,
+  source: source,
+  title: title,
+  artist: artist,
+  historyByPath: ref.read(downloadHistoryProvider.notifier).getByFilePathAsync,
+  library: ref.watch(musicPlayerRuntimeProvider).dependencies.libraryDatabase,
+);
 
 /// Use the Library's identity for favorites, including restored queues and
 /// playback started from a file path rather than a Library row ID.
@@ -87,16 +70,7 @@ final playerCollectionTrackProvider = FutureProvider.autoDispose
         title: item.title,
         artist: item.artist ?? '',
       );
-      if (match != null) return match.toTrack();
-      return Track(
-        id: item.id,
-        name: item.title,
-        artistName: item.artist ?? '',
-        albumName: item.album ?? '',
-        coverUrl: item.artUri?.toString(),
-        duration: item.duration?.inSeconds ?? 0,
-        source: 'local',
-      );
+      return collectionTrackForMedia(item, match);
     });
 
 final playbackStateProvider = StreamProvider<PlaybackState>((ref) {
@@ -369,36 +343,7 @@ class MusicPlayerController {
   /// from a random one with shuffle on. The queue keeps the Library order
   /// underneath, so turning shuffle off returns to that order.
   Future<bool> shuffleLibrary() async {
-    const pageSize = 1000;
-    final database = _runtime.dependencies.libraryDatabase;
-    final includeLocal = _runtime.settings.localLibraryEnabled;
-    final media = <PlayableMedia>[];
-    QueueLibraryDbCursor? cursor;
-    for (var offset = 0; ; offset += pageSize) {
-      final page = await database.getQueueTrackPageResult(
-        QueueLibraryDbQuery(
-          includeLocal: includeLocal,
-          limit: pageSize,
-          offset: offset,
-          cursor: cursor,
-        ),
-      );
-      for (final row in page.rows) {
-        final item = Map<String, dynamic>.from(row['item'] as Map);
-        final playable = switch (row['source']) {
-          'local' => playableFromLocal(LocalLibraryItem.fromJson(item)),
-          'downloaded' => playableFromHistory(
-            DownloadHistoryItem.fromJson(item),
-          ),
-          _ => null,
-        };
-        if (playable != null && playable.source.trim().isNotEmpty) {
-          media.add(playable);
-        }
-      }
-      if (page.rows.length < pageSize) break;
-      cursor = page.nextCursor;
-    }
+    final media = await _runtime.browser.librarySongs();
     if (media.isEmpty) return false;
     final handler = await _runtime.initialize();
     await handler.setShuffleMode(AudioServiceShuffleMode.all);
@@ -486,52 +431,3 @@ final musicPlayerControllerProvider = Provider<MusicPlayerController>(
   (ref) =>
       MusicPlayerController(runtime: ref.watch(musicPlayerRuntimeProvider)),
 );
-
-PlayableMedia playableFromHistory(DownloadHistoryItem item) {
-  return PlayableMedia(
-    id: item.id,
-    source: item.filePath,
-    title: item.trackName,
-    artist: item.artistName,
-    album: item.albumName,
-    artUri: (item.coverUrl != null && item.coverUrl!.trim().isNotEmpty)
-        ? item.coverUrl
-        : null,
-    duration: (item.duration != null && item.duration! > 0)
-        ? Duration(seconds: item.duration!)
-        : null,
-    bitDepth: item.bitDepth,
-    sampleRate: item.sampleRate,
-    bitrate: item.bitrate,
-    format: item.format,
-    explicit: item.explicit,
-    genre: item.genre,
-  );
-}
-
-PlayableMedia playableFromLocal(LocalLibraryItem item) {
-  String? art;
-  final cover = item.coverPath;
-  if (cover != null && cover.trim().isNotEmpty) {
-    art = cover.startsWith('http') || isContentUri(cover)
-        ? cover
-        : Uri.file(cover).toString();
-  }
-  return PlayableMedia(
-    id: item.id,
-    source: item.filePath,
-    title: item.trackName,
-    artist: item.artistName,
-    album: item.albumName,
-    artUri: art,
-    duration: (item.duration != null && item.duration! > 0)
-        ? Duration(seconds: item.duration!)
-        : null,
-    bitDepth: item.bitDepth,
-    sampleRate: item.sampleRate,
-    bitrate: item.bitrate,
-    format: item.format,
-    explicit: item.explicit,
-    genre: item.genre,
-  );
-}

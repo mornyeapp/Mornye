@@ -60,7 +60,7 @@ class _CollectionsDatabase implements LibraryCollectionsDatabase {
         );
   }
 
-  Future<List<Map<String, dynamic>>> loadPlaylistTracks(
+  Future<List<Map<String, dynamic>>> _readPlaylistRows(
     String playlistId,
   ) async {
     playlistReads++;
@@ -75,7 +75,7 @@ class _CollectionsDatabase implements LibraryCollectionsDatabase {
   Future<LibraryPlaylistTracksSnapshot> loadPlaylistTracksSnapshot(
     String playlistId,
   ) async {
-    final rows = await loadPlaylistTracks(playlistId);
+    final rows = await _readPlaylistRows(playlistId);
     return stagedPlaylistRows ?? LibraryPlaylistTracksSnapshot(rows: rows);
   }
 

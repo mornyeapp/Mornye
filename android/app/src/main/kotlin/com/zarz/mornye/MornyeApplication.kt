@@ -10,5 +10,6 @@ class MornyeApplication : Application() {
         // audio_service creates the cached engine before a FlutterFragment can
         // supply shell args, including when playback starts without an Activity.
         AudioServicePlugin.setFlutterEngineArguments(flutterRendererShellArgs())
+        AudioServicePlugin.setFlutterEngineConfigurator(SharedEngineChannels::configure)
     }
 }

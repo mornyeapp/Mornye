@@ -17,6 +17,13 @@ from the upstream package are not vendored.
   The app supplies its device compatibility flags in `Application.onCreate`;
   fragment shell arguments arrive too late when attaching this cached engine.
   This also covers engine creation by a background media service.
+- Android: register app channels on the shared engine through
+  `AudioServicePlugin.setFlutterEngineConfigurator`, also set in
+  `Application.onCreate`. `getFlutterEngine` calls it after creating the
+  engine and before running Dart, whichever component creates it. Android
+  Auto can start the service and engine without an Activity, so playback
+  channels registered only by the Activity would be missing. Setting it
+  after the engine exists throws.
 - Android: include custom media actions in MediaStyle notifications on Android
   12 and older. Upstream exposes them only through PlaybackState, which hides
   them on those versions. Keep custom action order and compact indices aligned.
@@ -88,7 +95,8 @@ Compared against the pub.dev 0.18.19 package in the local pub cache:
 2. Record the local patch:
    `diff -ru ~/.pub-cache/hosted/pub.dev/audio_service-0.18.19 third_party/audio_service`.
 3. Replace the runtime sources with the new upstream files, then re-apply
-   each patch above by hand. Check first whether upstream now shows custom
+   each patch above by hand. Check first whether upstream now configures
+   engines it creates, shows custom
    actions on Android 12 and older, bounds its metadata cache, or reuses its
    media executor.
 4. Keep the Gradle values in step with the app's `android/app/build.gradle.kts`.

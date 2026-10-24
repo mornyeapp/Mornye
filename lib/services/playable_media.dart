@@ -1,5 +1,9 @@
 import 'package:audio_service/audio_service.dart' show MediaItem;
+import 'package:mornye/models/download_history.dart';
+import 'package:mornye/models/library_database_models.dart';
+import 'package:mornye/models/track.dart';
 import 'package:mornye/services/music_player_runtime.dart';
+import 'package:mornye/utils/file_access.dart' show isContentUri;
 import 'package:mornye/utils/int_utils.dart';
 import 'package:mornye/utils/ios_container_paths.dart';
 import 'package:mornye/utils/string_utils.dart';
@@ -141,4 +145,77 @@ class PlayableMedia {
       },
     );
   }
+}
+
+/// A cover path or URL as a media artwork URI.
+String? normalizeArtUri(String cover) {
+  final value = cover.trim();
+  if (value.isEmpty) return null;
+  if (value.startsWith('http') ||
+      isContentUri(value) ||
+      value.startsWith('file://')) {
+    return value;
+  }
+  return Uri.file(value).toString();
+}
+
+/// A collection or catalog [track] that plays the file at [path].
+PlayableMedia playableFromTrack(Track track, String path) => PlayableMedia(
+  id: path,
+  source: path,
+  title: track.name,
+  artist: track.artistName,
+  album: track.albumName,
+  artUri: normalizeArtUri(track.coverUrl ?? ''),
+  duration: track.duration > 0 ? Duration(seconds: track.duration) : null,
+  explicit: track.isExplicit,
+);
+
+PlayableMedia playableFromHistory(DownloadHistoryItem item) {
+  return PlayableMedia(
+    id: item.id,
+    source: item.filePath,
+    title: item.trackName,
+    artist: item.artistName,
+    album: item.albumName,
+    artUri: (item.coverUrl != null && item.coverUrl!.trim().isNotEmpty)
+        ? item.coverUrl
+        : null,
+    duration: (item.duration != null && item.duration! > 0)
+        ? Duration(seconds: item.duration!)
+        : null,
+    bitDepth: item.bitDepth,
+    sampleRate: item.sampleRate,
+    bitrate: item.bitrate,
+    format: item.format,
+    explicit: item.explicit,
+    genre: item.genre,
+  );
+}
+
+PlayableMedia playableFromLocal(LocalLibraryItem item) {
+  String? art;
+  final cover = item.coverPath;
+  if (cover != null && cover.trim().isNotEmpty) {
+    art = cover.startsWith('http') || isContentUri(cover)
+        ? cover
+        : Uri.file(cover).toString();
+  }
+  return PlayableMedia(
+    id: item.id,
+    source: item.filePath,
+    title: item.trackName,
+    artist: item.artistName,
+    album: item.albumName,
+    artUri: art,
+    duration: (item.duration != null && item.duration! > 0)
+        ? Duration(seconds: item.duration!)
+        : null,
+    bitDepth: item.bitDepth,
+    sampleRate: item.sampleRate,
+    bitrate: item.bitrate,
+    format: item.format,
+    explicit: item.explicit,
+    genre: item.genre,
+  );
 }

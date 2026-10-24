@@ -12,8 +12,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mornye/app.dart';
 import 'package:mornye/constants/app_info.dart';
 import 'package:mornye/controllers/extension_auth_launcher.dart';
+import 'package:mornye/l10n/supported_locales.dart';
 import 'package:mornye/models/library_database_models.dart';
 import 'package:mornye/models/settings.dart';
+import 'package:mornye/models/theme_settings.dart';
 import 'package:mornye/providers/download_queue_provider.dart';
 import 'package:mornye/providers/extension_provider.dart';
 import 'package:mornye/providers/local_library_provider.dart';
@@ -29,11 +31,13 @@ import 'package:mornye/services/app_navigation_service.dart';
 import 'package:mornye/services/app_orientation.dart';
 import 'package:mornye/services/activity_attachment.dart';
 import 'package:mornye/services/app_crash_service.dart';
+import 'package:mornye/services/background_favorites.dart';
 import 'package:mornye/services/desktop_deep_links.dart';
 import 'package:mornye/services/desktop_diagnostics.dart';
 import 'package:mornye/services/desktop_library_watcher.dart';
 import 'package:mornye/services/link/desktop/link_desktop_host.dart';
 import 'package:mornye/services/music_player_service.dart';
+import 'package:mornye/services/playback_notification.dart';
 import 'package:mornye/services/player_widget_service.dart';
 import 'package:mornye/screens/now_playing_screen.dart';
 import 'package:mornye/utils/desktop_platform.dart';
@@ -61,7 +65,12 @@ void main() {
       if (Platform.isAndroid) {
         // A media service can start the engine before MainActivity registers
         // the backend and platform channels. Calls made earlier would fail or
-        // never be answered, leaving extensions uninitialized.
+        // never be answered, leaving extensions uninitialized. Playback has
+        // its channels on the engine, so a car's media browser that started
+        // the app can browse and play at once.
+        if (!isActivityAttached(binding)) {
+          unawaited(_startBackgroundPlayback());
+        }
         await waitForActivityAttachment(binding);
       }
       // Desktop: log files and the unclean-exit marker, before the error
@@ -280,6 +289,43 @@ class _StartupBenchmark {
     await File(
       '${support.path}/core-backend-probe-result.json',
     ).writeAsString(jsonEncode({'pid': pid, ...result}), flush: true);
+  }
+}
+
+/// The player, its saved session and the media controls, from the stored
+/// settings, for a media browser such as Android Auto that starts the app
+/// without an Activity. The app shell takes the controls over once it opens.
+Future<void> _startBackgroundPlayback() async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    // An Activity that attached meanwhile runs the full startup instead.
+    if (isActivityAttached(WidgetsBinding.instance)) return;
+    final settings = loadBootstrapSettings(prefs);
+    final runtime = musicPlayerRuntime..configure(settings);
+    final l10n = appLocalizationsFor(settings.locale);
+    runtime.updateStrings(
+      unknownTitle: l10n.unknownTitle,
+      unknownArtist: l10n.unknownArtist,
+    );
+    final dependencies = runtime.dependencies;
+    runtime.configureBackgroundNotification(
+      presentation: PlaybackNotification(
+        mornye: loadBootstrapThemeSettings(prefs).style == AppThemeStyle.mornye,
+        favoriteLabel: l10n.trackOptionAddToLoved,
+        unfavoriteLabel: l10n.trackOptionRemoveFromLoved,
+        shuffleOnLabel: l10n.nowPlayingShuffleOn,
+        shuffleOffLabel: l10n.nowPlayingPlayInOrder,
+      ),
+      favorites: BackgroundFavorites(
+        library: dependencies.libraryDatabase,
+        history: dependencies.historyDatabase,
+        collections: dependencies.collectionsDatabase,
+      ),
+    );
+    await runtime.restoreSession();
+    await runtime.initialize();
+  } catch (error, stack) {
+    _log.e('Failed to start playback without the app open', error, stack);
   }
 }
 
