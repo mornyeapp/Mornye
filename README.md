@@ -435,6 +435,12 @@ Interested in contributing? Check out the [Contributing Guide](CONTRIBUTING.md) 
 
 ---
 
+## Code signing policy
+
+See the [Windows code signing policy and release setup](.github/signpath/README.md#code-signing-policy).
+
+---
+
 ## <picture><source media="(prefers-color-scheme: dark)" srcset="assets/readme/sections/section-disclaimer-dark.svg"><img src="assets/readme/sections/section-disclaimer-light.svg" height="32" align="top" alt=""></picture> Disclaimer
 
 Mornye is licensed under the [GNU Lesser General Public License v3.0 only (LGPL-3.0-only)](LICENSE), together with the incorporated [GNU GPL v3.0 terms](COPYING). Copyright 2026 zarzet. Third-party components retain their own license notices.

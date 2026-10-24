@@ -642,6 +642,8 @@ jobs:
     # The release goes out without Windows assets if this job fails. Remove
     # once a release run of this job is green.
     continue-on-error: true
+    outputs:
+      signed: ${{ steps.verify-installer.outputs.signed }}
     permissions:
       contents: read
       actions: read
@@ -649,13 +651,42 @@ jobs:
       run:
         shell: pwsh
     env:
-      # Signing runs only once SignPath approves the project and the token is
-      # configured; until then the installer ships unsigned.
-      SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
+      SIGNPATH_ENABLED: ${{ vars.SIGNPATH_ENABLED }}
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Validate Windows signing configuration
+        env:
+          SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
+          SIGNPATH_ORGANIZATION_ID: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          SIGNPATH_PROJECT_SLUG: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          SIGNPATH_SIGNING_POLICY_SLUG: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
+          SIGNPATH_APP_ARTIFACT_CONFIGURATION: ${{ vars.SIGNPATH_APP_ARTIFACT_CONFIGURATION }}
+          SIGNPATH_INSTALLER_ARTIFACT_CONFIGURATION: ${{ vars.SIGNPATH_INSTALLER_ARTIFACT_CONFIGURATION }}
+          SIGNPATH_CERTIFICATE_THUMBPRINT: ${{ vars.SIGNPATH_CERTIFICATE_THUMBPRINT }}
+        run: |
+          if ([string]$env:SIGNPATH_ENABLED -notin '', 'false', 'true') {
+            throw 'SIGNPATH_ENABLED must be true or false.'
+          }
+          if ($env:SIGNPATH_ENABLED -ne 'true') {
+            Write-Host '::warning::Windows code signing is disabled. See .github/signpath/README.md.'
+            return
+          }
+          foreach ($name in 'SIGNPATH_API_TOKEN', 'SIGNPATH_ORGANIZATION_ID', 'SIGNPATH_PROJECT_SLUG',
+              'SIGNPATH_SIGNING_POLICY_SLUG', 'SIGNPATH_APP_ARTIFACT_CONFIGURATION',
+              'SIGNPATH_INSTALLER_ARTIFACT_CONFIGURATION', 'SIGNPATH_CERTIFICATE_THUMBPRINT') {
+            if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($name))) {
+              throw "Missing Windows signing setting: $name"
+            }
+          }
+          if ($env:SIGNPATH_SIGNING_POLICY_SLUG -ne 'release-signing') {
+            throw 'Public releases require the release-signing policy.'
+          }
+          if ($env:SIGNPATH_CERTIFICATE_THUMBPRINT.Replace(' ', '') -notmatch '^[0-9a-fA-F]{40}$') {
+            throw 'SIGNPATH_CERTIFICATE_THUMBPRINT must identify the issued release certificate.'
+          }
 
       - name: Activate pinned Rust toolchain
         working-directory: rust_backend
@@ -704,10 +735,13 @@ jobs:
           $bundle = 'build\windows\${{ matrix.arch }}\runner\Release'
           ./scripts/check_windows_bundle.ps1 -BundleDir $bundle -Arch ${{ matrix.arch }}
           "MORNYE_WINDOWS_BUNDLE=$bundle" >> $env:GITHUB_ENV
+          $productVersion = (Get-Item "$bundle\mornye.exe").VersionInfo.ProductVersion
+          if ([string]::IsNullOrWhiteSpace($productVersion)) { throw 'App ProductVersion is missing' }
+          "MORNYE_WINDOWS_APP_VERSION=$productVersion" >> $env:GITHUB_ENV
 
       - name: Upload unsigned app for signing
         id: unsigned-app
-        if: env.SIGNPATH_API_TOKEN != ''
+        if: env.SIGNPATH_ENABLED == 'true'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: windows-unsigned-app-${{ matrix.arch }}
@@ -715,8 +749,8 @@ jobs:
           retention-days: 1
           path: build/windows/${{ matrix.arch }}/runner/Release/
 
-      - name: Sign app executables
-        if: env.SIGNPATH_API_TOKEN != ''
+      - name: Sign Mornye app
+        if: env.SIGNPATH_ENABLED == 'true'
         uses: signpath/github-action-submit-signing-request@f6d04783b4569d051e0c80105fe66e82819d0092 # v3.0
         with:
           api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
@@ -725,23 +759,34 @@ jobs:
           signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
           artifact-configuration-slug: ${{ vars.SIGNPATH_APP_ARTIFACT_CONFIGURATION }}
           github-artifact-id: ${{ steps.unsigned-app.outputs.artifact-id }}
+          parameters: |
+            version: ${{ toJSON(env.MORNYE_WINDOWS_APP_VERSION) }}
           wait-for-completion: true
+          wait-for-completion-timeout-in-seconds: 3600
           output-artifact-directory: build/windows-signed
 
       - name: Use signed app
-        if: env.SIGNPATH_API_TOKEN != ''
+        if: env.SIGNPATH_ENABLED == 'true'
+        env:
+          CERTIFICATE_THUMBPRINT: ${{ vars.SIGNPATH_CERTIFICATE_THUMBPRINT }}
         run: |
-          if (-not (Test-Path 'build\windows-signed\mornye.exe')) { throw 'Signed app is missing' }
+          ./scripts/check_windows_signature.ps1 -Path 'build\windows-signed\mornye.exe' -CertificateThumbprint $env:CERTIFICATE_THUMBPRINT
+          ./scripts/check_windows_bundle.ps1 -BundleDir 'build\windows-signed' -Arch ${{ matrix.arch }} -InspectOnly
           "MORNYE_WINDOWS_BUNDLE=build\windows-signed" >> $env:GITHUB_ENV
 
       - name: Package installer and portable zip
         env:
           VERSION: ${{ needs.get-version.outputs.version }}
-        run: ./scripts/package_windows.ps1 -Version $env:VERSION -Arch ${{ matrix.arch }} -BundleDir $env:MORNYE_WINDOWS_BUNDLE
+        run: |
+          ./scripts/package_windows.ps1 -Version $env:VERSION -Arch ${{ matrix.arch }} -BundleDir $env:MORNYE_WINDOWS_BUNDLE
+          $installer = Get-Item "build\desktop\Mornye-$env:VERSION-windows-${{ matrix.arch }}-setup.exe"
+          $productVersion = $installer.VersionInfo.ProductVersion
+          if ([string]::IsNullOrWhiteSpace($productVersion)) { throw 'Installer ProductVersion is missing' }
+          "MORNYE_WINDOWS_INSTALLER_VERSION=$productVersion" >> $env:GITHUB_ENV
 
       - name: Upload unsigned installer for signing
         id: unsigned-installer
-        if: env.SIGNPATH_API_TOKEN != ''
+        if: env.SIGNPATH_ENABLED == 'true'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: windows-unsigned-installer-${{ matrix.arch }}
@@ -750,7 +795,7 @@ jobs:
           path: build/desktop/Mornye-*-setup.exe
 
       - name: Sign installer
-        if: env.SIGNPATH_API_TOKEN != ''
+        if: env.SIGNPATH_ENABLED == 'true'
         uses: signpath/github-action-submit-signing-request@f6d04783b4569d051e0c80105fe66e82819d0092 # v3.0
         with:
           api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
@@ -759,8 +804,24 @@ jobs:
           signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
           artifact-configuration-slug: ${{ vars.SIGNPATH_INSTALLER_ARTIFACT_CONFIGURATION }}
           github-artifact-id: ${{ steps.unsigned-installer.outputs.artifact-id }}
+          parameters: |
+            version: ${{ toJSON(env.MORNYE_WINDOWS_INSTALLER_VERSION) }}
           wait-for-completion: true
-          output-artifact-directory: build/desktop
+          wait-for-completion-timeout-in-seconds: 3600
+          output-artifact-directory: build/windows-signed-installer
+
+      - name: Verify and use signed installer
+        id: verify-installer
+        if: env.SIGNPATH_ENABLED == 'true'
+        env:
+          VERSION: ${{ needs.get-version.outputs.version }}
+          CERTIFICATE_THUMBPRINT: ${{ vars.SIGNPATH_CERTIFICATE_THUMBPRINT }}
+        run: |
+          $name = "Mornye-$env:VERSION-windows-${{ matrix.arch }}-setup.exe"
+          $signed = Join-Path 'build\windows-signed-installer' $name
+          ./scripts/check_windows_signature.ps1 -Path $signed -CertificateThumbprint $env:CERTIFICATE_THUMBPRINT
+          Copy-Item -LiteralPath $signed -Destination (Join-Path 'build\desktop' $name) -Force
+          'signed=true' >> $env:GITHUB_OUTPUT
 
       - name: Record checksums
         run: |
@@ -941,6 +1002,7 @@ jobs:
         env:
           VERSION: ${{ needs.get-version.outputs.version }}
           REPOSITORY: ${{ github.repository }}
+          WINDOWS_SIGNED: ${{ needs.build-windows.outputs.signed }}
         run: |
           CURRENT_REF=$(git rev-list -n 1 "$VERSION" 2>/dev/null || git rev-parse HEAD)
           PREVIOUS_TAG=$(git describe --tags --abbrev=0 "${CURRENT_REF}^" 2>/dev/null || true)
@@ -975,6 +1037,8 @@ jobs:
           desktop_row "macOS" "Mornye-${VERSION}-macos-universal.dmg" "Apple silicon and Intel, macOS 12 or later"
           desktop_row "Windows" "Mornye-${VERSION}-windows-x64-setup.exe" "Installer (x64), no administrator rights needed"
           desktop_row "Windows" "Mornye-${VERSION}-windows-x64-portable.zip" "Portable (x64): extract and run mornye.exe"
+          desktop_row "Windows" "Mornye-${VERSION}-windows-arm64-setup.exe" "Installer (ARM64), no administrator rights needed"
+          desktop_row "Windows" "Mornye-${VERSION}-windows-arm64-portable.zip" "Portable (ARM64): extract and run mornye.exe"
           desktop_row "Linux" "Mornye-${VERSION}-linux-x86_64.AppImage" "AppImage (x86_64), updates itself"
           desktop_row "Linux" "Mornye-${VERSION}-linux-aarch64.AppImage" "AppImage (aarch64), updates itself"
           desktop_row "Linux" "Mornye-${VERSION}-linux-amd64.deb" "Debian/Ubuntu (amd64)"
@@ -986,9 +1050,16 @@ jobs:
 
           ### Installation
           **macOS**: Open the dmg and drag Mornye to Applications. Mornye is not notarized yet, so macOS blocks the first launch: open System Settings > Privacy & Security, scroll to Security and click "Open Anyway" next to the Mornye message, then confirm with "Open". Later updates open the new dmg for you.
-          **Windows**: Run the setup. The installer is not code signed yet, so SmartScreen may warn: click "More info", then "Run anyway".
+          **Windows**: Run the setup, or extract the portable ZIP and run \`mornye.exe\`.
+          [Code signing policy](https://github.com/${REPOSITORY}/blob/${VERSION}/.github/signpath/README.md#code-signing-policy).
           **Linux**: AppImage: \`chmod +x\` the file and run it. deb: \`sudo apt install ./Mornye-${VERSION}-linux-amd64.deb\` (or the arm64 file); deb installs update through new releases.
           FOOTER
+
+          if [ "$WINDOWS_SIGNED" = 'true' ]; then
+            printf '\nWindows installers and mornye.exe have verified, timestamped SignPath signatures. SmartScreen may still display a reputation warning.\n' >> /tmp/release_body.txt
+          elif compgen -G 'release/Mornye-*-windows-*-setup.exe' > /dev/null; then
+            printf '\nWindows packages in this release are unsigned.\n' >> /tmp/release_body.txt
+          fi
 
           echo "Release body:"
           cat /tmp/release_body.txt
