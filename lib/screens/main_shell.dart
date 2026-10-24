@@ -741,19 +741,33 @@ class _MainShellState extends ConsumerState<MainShell>
   /// or a playlist picked in the Material rail, in the Library tab, in place
   /// of the page it showed.
   void _openDesktopLibraryLink(String id) {
-    _onShellTabRequested(ShellTab.library);
     final page = _desktopLibraryPage(id);
-    // The Library navigator mounts with the tab on its first visit.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final navigator = _libraryTabNavigatorKey.currentState;
-      if (!mounted || navigator == null) return;
+    // A link replaces the Library page at once, as in a source list, so the
+    // Library root never shows on the way from another tab.
+    void show(NavigatorState navigator) {
       navigator.popUntil((route) => route.isFirst);
       if (page != null) {
         unawaited(
-          navigator.push(MaterialPageRoute<void>(builder: (_) => page)),
+          navigator.push(
+            PageRouteBuilder<void>(
+              transitionDuration: Duration.zero,
+              reverseTransitionDuration: Duration.zero,
+              pageBuilder: (_, _, _) => page,
+            ),
+          ),
         );
       }
       desktopSidebarLink.value = page == null ? null : id;
+    }
+
+    final navigator = _libraryTabNavigatorKey.currentState;
+    if (navigator != null) show(navigator);
+    _onShellTabRequested(ShellTab.library);
+    if (navigator != null) return;
+    // The Library navigator mounts with the tab on its first visit.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final navigator = _libraryTabNavigatorKey.currentState;
+      if (mounted && navigator != null) show(navigator);
     });
     WidgetsBinding.instance.ensureVisualUpdate();
   }
