@@ -14,13 +14,13 @@ dependencies:
   flutter_localizations:
     sdk: flutter
   intl: ^0.20.3
-  timezone: ^0.11.1
+  timezone: ^0.11.2
 
   # State Management
   flutter_riverpod: ^3.4.2
 
   # Navigation
-  go_router: ^18.0.2
+  go_router: ^18.1.1
 
 # Storage & Persistence
   shared_preferences: ^2.5.6
@@ -35,21 +35,21 @@ dependencies:
   path: ^1.9.1
   # Desktop backend library bindings (lib/services/backend).
   ffi: ^2.2.0
-  sqflite: ^2.4.4+1
+  sqflite: ^2.4.5
   # Windows and Linux have no sqflite plugin; they use FFI with bundled SQLite.
-  sqflite_common_ffi: ^2.4.4
+  sqflite_common_ffi: ^2.4.5
 
 # HTTP & Network
   http: ^1.6.0
-  # 7.3.2 requires dbus 0.8, while stable notifications still require 0.7.
+  # 7.3.2 requires dbus 0.8, while desktop_drop 0.8.4 still requires 0.7.
   connectivity_plus: ^7.3.1
   crypto: ^3.0.7
 
   # Streaming backup archives
-  archive: ^4.5.0
+  archive: ^4.5.2
 
   # UI Components
-  cached_network_image: ^4.0.4
+  cached_network_image: ^4.0.5
   flutter_cache_manager: ^3.4.5
   liquid_glass_easy: 5.0.0
   cupertino_icons: ^2.0.0
@@ -58,8 +58,8 @@ dependencies:
 
   # Material Expressive 3 / Dynamic Color
   dynamic_color: ^2.1.0
-  material_ui: ^1.6.0
-  material_3_expressive: ^1.1.6
+  material_ui: ^1.8.0
+  material_3_expressive: ^1.2.0
   material_color_utilities: 0.13.0
 
   # Permissions
@@ -83,17 +83,17 @@ dependencies:
 
   # FFmpeg for audio conversion
   ffmpeg_kit_flutter_new_audio: 2.5.7
-  open_filex: ^4.7.0
+  open_filex: ^5.0.0
 
   video_player: ^2.14.1
 
   xml: ^7.1.0
   html: ^0.15.7
   dart_smb2: 0.1.3
-  synchronized: ^3.4.0
+  synchronized: ^3.5.0
 
   # Notifications
-  flutter_local_notifications: ^22.3.0
+  flutter_local_notifications: ^22.3.2
   audioplayers: ^6.8.1
   audio_service:
     path: third_party/audio_service
@@ -151,11 +151,11 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   clock: 1.1.3
-  analyzer: ^14.5.0
+  analyzer: ^14.6.0
   flutter_lints: ^6.0.0
-  build_runner: ^2.16.2
+  build_runner: ^2.17.1
   riverpod_lint: ^3.1.9
-  json_serializable: ^6.14.1
+  json_serializable: ^6.15.2
   flutter_launcher_icons: ^0.14.4
   path_provider_platform_interface: 2.1.3
   video_player_platform_interface: 6.9.0

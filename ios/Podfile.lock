@@ -3,14 +3,11 @@ PODS:
   - mornye_discord (0.1.0):
     - Flutter
   - MornyeBackend (0.1.0)
-  - open_filex (0.0.2):
-    - Flutter
 
 DEPENDENCIES:
   - Flutter (from `Flutter`)
   - mornye_discord (from `.symlinks/plugins/mornye_discord/ios`)
   - MornyeBackend (from `../rust_backend/target/ios`)
-  - open_filex (from `.symlinks/plugins/open_filex/ios`)
 
 EXTERNAL SOURCES:
   Flutter:
@@ -19,15 +16,12 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/mornye_discord/ios"
   MornyeBackend:
     :path: "../rust_backend/target/ios"
-  open_filex:
-    :path: ".symlinks/plugins/open_filex/ios"
 
 SPEC CHECKSUMS:
   Flutter: 71a624a5bc0c04062bf19101d501e466baf2fb47
-  mornye_discord: 887fd7dbf567a168483cd5952c8548fa8793c16f
-  MornyeBackend: b0b40c32d081dfa67019e14b03ad92b10ea048d5
-  open_filex: 432f3cd11432da3e39f47fcc0df2b1603854eff1
+  mornye_discord: 0801108e8862434a830d74e573c4a9b7a0f8da5e
+  MornyeBackend: f730b6606987c98f66090675e3dd5df0e34cc73f
 
-PODFILE CHECKSUM: 7b70d875d42af9b3193d6df5b19083cfd0103753
+PODFILE CHECKSUM: 2a86f7ef483a679fb0ab500ff10e34d61b687be4
 
 COCOAPODS: 1.17.0
