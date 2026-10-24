@@ -11,6 +11,7 @@ import 'package:mornye/models/settings.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/services/app_state_database.dart';
 import 'package:mornye/services/autoplay_personalization.dart';
+import 'package:mornye/services/library_database.dart';
 import 'package:mornye/services/listening_statistics.dart';
 import 'package:mornye/services/music_player_service.dart';
 import 'package:mornye/services/playback_deck.dart';
@@ -173,6 +174,29 @@ class _Recorder extends ListeningRecorder {
   }
 }
 
+/// Serves Library songs by offset, as the queue query does for rows that
+/// have no seek cursor.
+class _QueueLibrary implements LibraryDatabase {
+  _QueueLibrary(this.rows);
+
+  final List<Map<String, dynamic>> rows;
+  final requests = <QueueLibraryDbQuery>[];
+
+  @override
+  Future<QueueLibraryDbPage> getQueueTrackPageResult(
+    QueueLibraryDbQuery request,
+  ) async {
+    requests.add(request);
+    return QueueLibraryDbPage(
+      rows: rows.skip(request.offset).take(request.limit).toList(),
+      nextCursor: null,
+    );
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
 MusicPlayerRuntime _runtime({
   AppSettings settings = const AppSettings(pauseOnMute: false),
   Future<MusicPlayerHandler> Function(MusicPlayerHandler Function())?
@@ -187,6 +211,7 @@ MusicPlayerRuntime _runtime({
   bool isAndroid = false,
   Future<void> Function()? synchronizePlaybackState,
   _Session? session,
+  LibraryDatabase? libraryDatabase,
 }) {
   if (isAndroid) {
     const channel = MethodChannel(
@@ -218,6 +243,7 @@ MusicPlayerRuntime _runtime({
         'replaygain_track_gain': '-6 dB',
       },
       sessionDatabase: _SessionStore(),
+      libraryDatabase: libraryDatabase,
       recorder:
           recorder ??
           ListeningRecorder(
@@ -1102,6 +1128,61 @@ void main() {
         container.read(currentMediaItemProvider).value?.extras?['source'],
         _track.source,
       );
+    },
+  );
+
+  test(
+    'Library shuffle queues downloads and scanned songs in Library order',
+    () async {
+      const added = '2026-01-01T00:00:00.000Z';
+      Map<String, dynamic> row(int i) => {
+        'source': i.isEven ? 'downloaded' : 'local',
+        'item': {
+          'id': 'song-$i',
+          'trackName': 'Song $i',
+          'artistName': 'Artist',
+          'albumName': 'Album',
+          // One scanned row has no file to play.
+          'filePath': i == 1 ? '' : '/song-$i.flac',
+          if (i.isEven) ...{'service': 'extension', 'downloadedAt': added},
+          if (i.isOdd) 'scannedAt': added,
+        },
+      };
+      // More than one page of 1,000 songs.
+      final library = _QueueLibrary([for (var i = 0; i < 1001; i++) row(i)]);
+      final runtime = _runtime(
+        settings: const AppSettings(
+          pauseOnMute: false,
+          localLibraryEnabled: true,
+        ),
+        libraryDatabase: library,
+      );
+      final container = ProviderContainer(
+        overrides: [musicPlayerRuntimeProvider.overrideWithValue(runtime)],
+      );
+      addTearDown(container.dispose);
+      final controller = container.read(musicPlayerControllerProvider);
+
+      expect(await controller.shuffleLibrary(), isTrue);
+      expect(library.requests.map((request) => request.offset), [0, 1000]);
+      expect(library.requests.every((request) => request.includeLocal), true);
+      final handler = runtime.handler!;
+      final libraryOrder = [
+        for (var i = 0; i < 1001; i++)
+          if (i != 1) 'song-$i',
+      ];
+      expect(
+        handler.playbackState.value.shuffleMode,
+        AudioServiceShuffleMode.all,
+      );
+      expect(handler.queue.value.first.id, handler.mediaItem.value?.id);
+      expect(
+        handler.queue.value.map((item) => item.id).toSet(),
+        libraryOrder.toSet(),
+      );
+
+      await controller.setShuffle(false);
+      expect(handler.queue.value.map((item) => item.id), libraryOrder);
     },
   );
 

@@ -370,15 +370,6 @@ class LibraryDatabase {
     });
   }
 
-  Future<List<Map<String, dynamic>>> getAll() async {
-    final db = await database;
-    final rows = await db.query(
-      visibleLibraryView,
-      orderBy: 'album_artist, album_name, disc_number, track_number',
-    );
-    return rows.map(LibraryRowMapper.decode).toList();
-  }
-
   String _orderByForSort(LocalLibrarySortMode sortMode) {
     return switch (sortMode) {
       LocalLibrarySortMode.title =>

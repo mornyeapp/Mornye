@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -363,18 +365,47 @@ class MusicPlayerController {
     return tracks.isEmpty ? null : (item: item, tracks: tracks);
   }
 
+  /// Plays every Library song, downloads and enabled scanned sources alike,
+  /// from a random one with shuffle on. The queue keeps the Library order
+  /// underneath, so turning shuffle off returns to that order.
   Future<bool> shuffleLibrary() async {
-    final rows = await _runtime.dependencies.libraryDatabase.getAll();
-    final media = rows
-        .map(LocalLibraryItem.fromJson)
-        .where((item) => item.filePath.trim().isNotEmpty)
-        .map(playableFromLocal)
-        .toList();
+    const pageSize = 1000;
+    final database = _runtime.dependencies.libraryDatabase;
+    final includeLocal = _runtime.settings.localLibraryEnabled;
+    final media = <PlayableMedia>[];
+    QueueLibraryDbCursor? cursor;
+    for (var offset = 0; ; offset += pageSize) {
+      final page = await database.getQueueTrackPageResult(
+        QueueLibraryDbQuery(
+          includeLocal: includeLocal,
+          limit: pageSize,
+          offset: offset,
+          cursor: cursor,
+        ),
+      );
+      for (final row in page.rows) {
+        final item = Map<String, dynamic>.from(row['item'] as Map);
+        final playable = switch (row['source']) {
+          'local' => playableFromLocal(LocalLibraryItem.fromJson(item)),
+          'downloaded' => playableFromHistory(
+            DownloadHistoryItem.fromJson(item),
+          ),
+          _ => null,
+        };
+        if (playable != null && playable.source.trim().isNotEmpty) {
+          media.add(playable);
+        }
+      }
+      if (page.rows.length < pageSize) break;
+      cursor = page.nextCursor;
+    }
     if (media.isEmpty) return false;
     final handler = await _runtime.initialize();
-    media.shuffle();
     await handler.setShuffleMode(AudioServiceShuffleMode.all);
-    await handler.setQueueAndPlay(media);
+    await handler.setQueueAndPlay(
+      media,
+      initialIndex: Random().nextInt(media.length),
+    );
     return true;
   }
 
