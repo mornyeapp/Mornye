@@ -98,7 +98,9 @@ async fn rest(state: &Arc<State>, method: &str, request: http::Request<Incoming>
             };
             subsonic::handle(&state.shared, request).await
         }
-        Err((code, message)) => subsonic::error_response(&params, code, message),
+        Err((code, message)) => {
+            subsonic::error_response(&state.shared.config.app_version, &params, code, message)
+        }
     }
 }
 

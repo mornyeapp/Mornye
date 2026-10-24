@@ -62,6 +62,7 @@ async fn unknown_methods_and_bad_parameters_fail_with_http_200() {
 #[tokio::test]
 async fn error_response_follows_the_requested_format() {
     let json_reply = Reply::from(error_response(
+        "5.3.0",
         &[("f".to_owned(), "json".to_owned())],
         40,
         "Wrong username or password",
@@ -72,13 +73,14 @@ async fn error_response_follows_the_requested_format() {
     let response = json_reply.subsonic();
     assert_eq!(response["status"], "failed");
     assert_eq!(response["version"], "1.16.1");
+    assert_eq!(response["serverVersion"], "5.3.0");
     assert_eq!(response["type"], "mornye");
     assert_eq!(response["openSubsonic"], true);
     assert_eq!(
         response["error"],
         json!({ "code": 40, "message": "Wrong username or password" })
     );
-    let xml_reply = Reply::from(error_response(&[], 44, "Invalid API key")).await;
+    let xml_reply = Reply::from(error_response("5.3.0", &[], 44, "Invalid API key")).await;
     assert_eq!(xml_reply.status, 200);
     assert_eq!(xml_reply.header("content-type"), Some(XML_TYPE));
     let text = xml_reply.text();

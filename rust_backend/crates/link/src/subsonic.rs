@@ -117,12 +117,17 @@ pub async fn handle(shared: &Shared, request: SubsonicRequest) -> HttpResponse {
 }
 
 /// A Subsonic error response (`code` 0, 10, 40, 44, 70, ...), formatted per
-/// the request's `f` parameter (JSON or XML). Without server state its
-/// `serverVersion` is this crate's version.
-pub fn error_response(params: &[(String, String)], code: u32, message: &str) -> HttpResponse {
+/// the request's `f` parameter (JSON or XML). `server_version` is the app
+/// version, as in every other response.
+pub fn error_response(
+    server_version: &str,
+    params: &[(String, String)],
+    code: u32,
+    message: &str,
+) -> HttpResponse {
     render(
         Format::of(params),
-        env!("CARGO_PKG_VERSION"),
+        server_version,
         Err(Failure::new(code, message)),
     )
 }
