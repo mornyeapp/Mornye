@@ -40,6 +40,7 @@ pub(crate) static SUPPORTED_RUNTIME_FEATURES: LazyLock<BTreeMap<String, isize>> 
             ("accountForms", 1),
             ("accountDownloadMode", 1),
             ("directMedia", 1),
+            ("deferredPreview", 1),
         ]
         .into_iter()
         .map(|(name, version)| (name.to_owned(), version))
@@ -726,5 +727,26 @@ pub fn compare_versions(first: &str, second: &str) -> Comparison {
         if !result.is_eq() {
             return result;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn deferred_preview_extensions_require_this_app_build() {
+        let manifest = ExtensionManifest::parse(
+            &serde_json::json!({
+                "name":"generic-media","version":"1.0.0","description":"Generic fixture",
+                "type":["metadata_provider"],"minAppVersion":"5.3.0",
+                "requiredRuntimeFeatures":["deferredPreview@1"]
+            })
+            .to_string(),
+        )
+        .unwrap();
+        assert!(validate_gates(&manifest, "5.3.0", &SUPPORTED_RUNTIME_FEATURES).is_ok());
+        let without = BTreeMap::new();
+        assert!(validate_gates(&manifest, "5.3.0", &without).is_err());
     }
 }

@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:convert';
 
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/providers/music_player_provider.dart';
@@ -97,6 +99,70 @@ void main() {
     await Future<void>.delayed(Duration.zero);
     expect(deck.calls.last, 'dispose');
     await runtime.dispose();
+  });
+
+  group('deferred preview links', () {
+    const backend = MethodChannel('com.zarz.mornye/backend');
+    const link = 'mornye-preview:example-provider/track%2F1';
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    tearDown(() => messenger.setMockMethodCallHandler(backend, null));
+
+    test('resolve through their extension before playback', () async {
+      final actions = <MethodCall>[];
+      messenger.setMockMethodCallHandler(backend, (call) async {
+        if (call.method != 'invokeExtensionAction') return null;
+        actions.add(call);
+        return '{"preview_url":"https://example.com/sample.mp3"}';
+      });
+      final deck = _PreviewDeck();
+      final runtime = MusicPlayerRuntime(
+        dependencies: PlaybackDependencies(createPreviewDeck: (_) => deck),
+      );
+      final container = previews(runtime);
+
+      await container.read(previewPlayerProvider.notifier).play(link);
+      final arguments = actions.single.arguments as Map;
+      expect(arguments['extension_id'], 'example-provider');
+      expect(arguments['action'], 'resolvePreview');
+      expect(jsonDecode(arguments['arguments_json'] as String), [
+        {'id': 'track/1'},
+      ]);
+      expect(deck.calls, contains('network https://example.com/sample.mp3'));
+      expect(container.read(previewPlayerProvider).isActiveUrl(link), isTrue);
+
+      container.dispose();
+      await Future<void>.delayed(Duration.zero);
+      await runtime.dispose();
+    });
+
+    test('fail before playback without a playable URL', () async {
+      messenger.setMockMethodCallHandler(backend, (call) async {
+        if (call.method != 'invokeExtensionAction') return null;
+        return '{"preview_url":""}';
+      });
+      final decks = <_PreviewDeck>[];
+      final runtime = MusicPlayerRuntime(
+        dependencies: PlaybackDependencies(
+          createPreviewDeck: (_) {
+            final deck = _PreviewDeck();
+            decks.add(deck);
+            return deck;
+          },
+        ),
+      );
+      final container = previews(runtime);
+
+      await expectLater(
+        container.read(previewPlayerProvider.notifier).play(link),
+        throwsStateError,
+      );
+      expect(decks, isEmpty);
+      expect(container.read(previewPlayerProvider).isActive, isFalse);
+
+      container.dispose();
+      await runtime.dispose();
+    });
   });
 }
 
