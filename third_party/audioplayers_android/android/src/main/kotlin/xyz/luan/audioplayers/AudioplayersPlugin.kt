@@ -67,11 +67,16 @@ class AudioplayersPlugin : FlutterPlugin {
             }
 
             "setAudioContext" -> {
+                val audioContext = call.audioContext()
                 val audioManager = getAudioManager()
-                audioManager.mode = defaultAudioContext.audioMode
-                audioManager.isSpeakerphoneOn = defaultAudioContext.isSpeakerphoneOn
+                if (audioContext.audioMode != defaultAudioContext.audioMode) {
+                    audioManager.mode = audioContext.audioMode
+                }
+                if (audioContext.isSpeakerphoneOn != defaultAudioContext.isSpeakerphoneOn) {
+                    audioManager.isSpeakerphoneOn = audioContext.isSpeakerphoneOn
+                }
 
-                defaultAudioContext = call.audioContext()
+                defaultAudioContext = audioContext
             }
 
             "emitLog" -> {

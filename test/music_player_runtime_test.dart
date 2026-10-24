@@ -408,6 +408,29 @@ void main() {
   );
 
   test(
+    'initializing and restoring a paused session does not request audio focus',
+    () async {
+      final session = _Session();
+      final decks = <_Deck>[];
+      final handler = await _runtime(
+        session: session,
+        decks: decks,
+        isAndroid: true,
+      ).initialize();
+      await handler.restoreSession(
+        items: [_track],
+        index: 0,
+        position: const Duration(seconds: 12),
+        shuffle: false,
+      );
+      await _settle();
+      expect(session.activations, isEmpty);
+      expect(handler.playbackState.value.playing, isFalse);
+      expect(decks.single.state, PlaybackDeckState.stopped);
+    },
+  );
+
+  test(
     'denied audio focus leaves a new source paused and allows retry',
     () async {
       final session = _Session()..focusGranted = false;

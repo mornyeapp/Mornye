@@ -170,11 +170,14 @@ class WrappedPlayer internal constructor(
         ) {
             focusManager.handleStop()
         }
+        // Changing player-only settings must not reset the system's audio route.
+        if (context.audioMode != audioContext.audioMode) {
+            audioManager.mode = audioContext.audioMode
+        }
+        if (context.isSpeakerphoneOn != audioContext.isSpeakerphoneOn) {
+            audioManager.isSpeakerphoneOn = audioContext.isSpeakerphoneOn
+        }
         this.context = audioContext.copy()
-
-        // AudioManager values are set globally
-        audioManager.mode = context.audioMode
-        audioManager.isSpeakerphoneOn = context.isSpeakerphoneOn
 
         player?.let { p ->
             p.stop()
