@@ -51,10 +51,14 @@ class MornyePlayerActionsSheet extends ConsumerWidget {
     super.key,
     required this.mediaItem,
     this.sleepTimerSubtitle,
+    this.volumeShown = true,
   });
 
   final MediaItem mediaItem;
   final String? sleepTimerSubtitle;
+
+  /// Whether the player shows its volume slider, which the menu toggles.
+  final bool volumeShown;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -129,6 +133,16 @@ class MornyePlayerActionsSheet extends ConsumerWidget {
               'equalizer',
               context.l10n.equalizerTitle,
               CupertinoIcons.slider_horizontal_3,
+            ),
+            _action(
+              context,
+              'volume',
+              volumeShown
+                  ? context.l10n.nowPlayingHideVolume
+                  : context.l10n.nowPlayingShowVolume,
+              volumeShown
+                  ? CupertinoIcons.speaker_slash
+                  : CupertinoIcons.speaker_2,
             ),
             _action(
               context,

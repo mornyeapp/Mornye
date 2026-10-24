@@ -1087,6 +1087,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
               context,
             ).formatTimeOfDay(TimeOfDay.fromDateTime(sleepTimerEndsAt)),
           );
+    final volumeShown = ref.read(settingsProvider).playerShowVolume;
     final action = context.isMornye
         ? await showMornyeContextMenu<String>(
             context: context,
@@ -1096,6 +1097,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
             builder: (_) => MornyePlayerActionsSheet(
               mediaItem: mediaItem,
               sleepTimerSubtitle: sleepTimerSubtitle,
+              volumeShown: volumeShown,
             ),
           )
         : await showAppBottomSheet<String>(
@@ -1134,6 +1136,15 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                     icon: Icons.equalizer,
                     title: sheetContext.l10n.equalizerTitle,
                     onTap: () => Navigator.of(sheetContext).pop('equalizer'),
+                  ),
+                  SettingsItem(
+                    icon: volumeShown
+                        ? Icons.volume_off_outlined
+                        : Icons.volume_up_outlined,
+                    title: volumeShown
+                        ? sheetContext.l10n.nowPlayingHideVolume
+                        : sheetContext.l10n.nowPlayingShowVolume,
+                    onTap: () => Navigator.of(sheetContext).pop('volume'),
                   ),
                   SettingsItem(
                     icon: Icons.open_in_new,
@@ -1198,6 +1209,9 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
         break;
       case 'equalizer':
         await pushPage<void>(context, (_) => const EqualizerScreen());
+        break;
+      case 'volume':
+        ref.read(settingsProvider.notifier).setPlayerShowVolume(!volumeShown);
         break;
       case 'external':
         await _openExternally(source);

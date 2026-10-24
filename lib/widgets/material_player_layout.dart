@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/controllers/clickable_metadata.dart';
 import 'package:mornye/controllers/player_metadata_controller.dart';
 import 'package:mornye/providers/music_player_provider.dart';
+import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/routes/now_playing_route.dart';
 import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/utils/playback_seek_preview.dart';
@@ -291,10 +292,17 @@ class MaterialPlayerLayout extends StatelessWidget {
         metadata: metadata,
         compact: compact,
       ),
-      if (showVolume) ...[
-        SizedBox(height: compact ? 8 : 12),
-        const PlayerVolumeControl(),
-      ],
+      if (showVolume)
+        // The player menu can hide it; the hardware buttons still apply. The
+        // gap stays so the transport keeps its room above the footer.
+        Consumer(
+          builder: (context, ref, _) => Padding(
+            padding: EdgeInsets.only(top: compact ? 8 : 12),
+            child: ref.watch(settingsProvider.select((s) => s.playerShowVolume))
+                ? const PlayerVolumeControl()
+                : null,
+          ),
+        ),
     ];
   }
 }

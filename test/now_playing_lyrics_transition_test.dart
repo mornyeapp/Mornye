@@ -55,6 +55,7 @@ import 'package:mornye/widgets/mornye_player_layout.dart';
 import 'package:mornye/widgets/player_lyrics.dart';
 import 'package:mornye/widgets/player_lyrics_controls.dart';
 import 'package:mornye/widgets/player_metadata_title.dart';
+import 'package:mornye/widgets/player_playback_controls.dart';
 import 'package:mornye/widgets/playback_seek_slider.dart';
 import 'package:mornye/widgets/player_artwork.dart';
 
@@ -4533,6 +4534,57 @@ void main() {
     expect(find.text('45 minutes'), findsOneWidget);
     expect(find.text('60 minutes'), findsOneWidget);
     expect(find.text('Turn off sleep timer'), findsNothing);
+  });
+
+  testWidgets('Now Playing menu hides and restores the volume', (tester) async {
+    await pumpNowPlaying(tester);
+    mediaItems.add(item('first'));
+    await settlePlayer(tester);
+    expect(find.byType(PlayerVolumeControl), findsOneWidget);
+
+    await tester.tap(findAppIcon(Icons.more_vert));
+    await settlePlayer(tester);
+    await tester.tap(find.text('Hide volume'));
+    await settlePlayer(tester);
+    expect(find.byType(PlayerVolumeControl), findsNothing);
+    expect(find.byType(PlayerPlaybackControls), findsOneWidget);
+
+    await tester.tap(findAppIcon(Icons.more_vert));
+    await settlePlayer(tester);
+    await tester.tap(find.text('Show volume'));
+    await settlePlayer(tester);
+    expect(find.byType(PlayerVolumeControl), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Mornye player menu hides the volume in both orientations', (
+    tester,
+  ) async {
+    await pumpNowPlaying(
+      tester,
+      theme: MornyeTheme.build(Brightness.dark),
+      size: const Size(393, 780),
+    );
+    mediaItems.add(item('first'));
+    await settlePlayer(tester);
+    expect(find.byType(PlayerVolumeControl), findsOneWidget);
+
+    await tester.tap(findAppIcon(CupertinoIcons.ellipsis).hitTestable());
+    await settlePlayer(tester);
+    await tester.ensureVisible(find.text('Hide volume'));
+    await tester.tap(find.text('Hide volume'));
+    await settlePlayer(tester);
+    expect(find.byType(PlayerVolumeControl), findsNothing);
+    final transport = find.byType(PlayerPlaybackControls);
+    expect(
+      tester.getRect(transport).bottom,
+      lessThan(tester.getRect(findAppIcon(CupertinoIcons.quote_bubble)).top),
+    );
+
+    tester.view.physicalSize = const Size(844, 390);
+    await settlePlayer(tester);
+    expect(find.byType(PlayerVolumeControl), findsNothing);
+    expect(tester.takeException(), isNull);
   });
 }
 

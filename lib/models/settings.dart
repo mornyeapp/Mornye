@@ -196,6 +196,9 @@ class AppSettings {
   final bool playerShowPronunciation;
   final bool playerShowTranslation;
 
+  /// Whether the phone Now Playing screen shows its volume slider.
+  final bool playerShowVolume;
+
   const AppSettings({
     this.defaultService = '',
     this.audioQuality = 'LOSSLESS',
@@ -308,6 +311,7 @@ class AppSettings {
     this.playerMode = 'internal',
     this.playerShowPronunciation = true,
     this.playerShowTranslation = true,
+    this.playerShowVolume = true,
   });
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -428,6 +432,7 @@ class AppSettings {
     String? playerMode,
     bool? playerShowPronunciation,
     bool? playerShowTranslation,
+    bool? playerShowVolume,
   }) {
     return AppSettings(
       defaultService: defaultService ?? this.defaultService,
@@ -573,6 +578,7 @@ class AppSettings {
           playerShowPronunciation ?? this.playerShowPronunciation,
       playerShowTranslation:
           playerShowTranslation ?? this.playerShowTranslation,
+      playerShowVolume: playerShowVolume ?? this.playerShowVolume,
     );
   }
 

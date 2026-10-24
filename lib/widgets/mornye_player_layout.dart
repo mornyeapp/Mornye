@@ -6,6 +6,7 @@ import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:mornye/controllers/player_metadata_controller.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/music_player_provider.dart';
+import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/routes/now_playing_route.dart';
 import 'package:mornye/utils/playback_seek_preview.dart';
 import 'package:mornye/widgets/mornye_context_menu.dart';
@@ -100,6 +101,9 @@ class MornyePlayerLayout extends ConsumerWidget {
         : const Duration(milliseconds: 380);
     final queue = ref.watch(playQueueProvider).value ?? const <MediaItem>[];
     final currentIndex = ref.watch(currentQueueIndexProvider);
+    final showVolume = ref.watch(
+      settingsProvider.select((s) => s.playerShowVolume),
+    );
     final landscape =
         MediaQuery.sizeOf(context).width > MediaQuery.sizeOf(context).height;
     Widget hideControls(Widget child) => PlayerLyricsControlsVisibility(
@@ -384,7 +388,7 @@ class MornyePlayerLayout extends ConsumerWidget {
               lyricsOptions: showLyrics ? lyricsOptions : null,
               queue: MornyePlayerQueue(colorScheme: colorScheme),
               controls: controls(),
-              volume: const PlayerVolumeControl(),
+              volume: showVolume ? const PlayerVolumeControl() : null,
             ),
           );
         }
@@ -434,14 +438,16 @@ class MornyePlayerLayout extends ConsumerWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 controls(),
-                SizedBox(height: volumeGap - transportShift),
-                AnimatedBuilder(
-                  animation: artworkForeground,
-                  builder: (context, _) => PlayerVolumeControl(
-                    key: artworkKeys.volume,
-                    foreground: foreground('volume').onSurface,
+                if (showVolume) ...[
+                  SizedBox(height: volumeGap - transportShift),
+                  AnimatedBuilder(
+                    animation: artworkForeground,
+                    builder: (context, _) => PlayerVolumeControl(
+                      key: artworkKeys.volume,
+                      foreground: foreground('volume').onSurface,
+                    ),
                   ),
-                ),
+                ],
                 const SizedBox(height: 8),
               ],
             ),

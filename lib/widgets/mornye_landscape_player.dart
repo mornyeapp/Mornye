@@ -16,7 +16,7 @@ class MornyeLandscapePlayer extends StatefulWidget {
     required this.lyrics,
     required this.queue,
     required this.controls,
-    required this.volume,
+    this.volume,
     required this.page,
     required this.isPlaying,
     required this.onPageChanged,
@@ -29,7 +29,9 @@ class MornyeLandscapePlayer extends StatefulWidget {
   final Widget lyrics;
   final Widget queue;
   final Widget controls;
-  final Widget volume;
+
+  /// Null when the person hid the volume from the player menu.
+  final Widget? volume;
   final int page;
   final bool isPlaying;
   final bool controlsHeldOpen;
@@ -155,7 +157,7 @@ class _MornyeLandscapePlayerState extends State<MornyeLandscapePlayer> {
                                           MainAxisAlignment.spaceEvenly,
                                       children: [
                                         widget.controls,
-                                        widget.volume,
+                                        ?widget.volume,
                                         const SizedBox(height: 48),
                                       ],
                                     ),

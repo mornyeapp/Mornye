@@ -990,6 +990,9 @@ class SettingsNotifier extends Notifier<AppSettings> {
 
   void setPlayerShowTranslation(bool visible) =>
       _commit(state.copyWith(playerShowTranslation: visible));
+
+  void setPlayerShowVolume(bool visible) =>
+      _commit(state.copyWith(playerShowVolume: visible));
 }
 
 final settingsProvider = NotifierProvider<SettingsNotifier, AppSettings>(

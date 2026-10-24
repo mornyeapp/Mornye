@@ -6656,6 +6656,8 @@
     "description": "Confirmation after cancelling the playback sleep timer"
   },
   "nowPlayingOpenInExternalPlayer": "Buka di pemutar eksternal",
+  "nowPlayingHideVolume": "Sembunyikan volume",
+  "nowPlayingShowVolume": "Tampilkan volume",
   "@nowPlayingOpenInExternalPlayer": {
     "description": "Menu item to open the current track in an external player"
   },

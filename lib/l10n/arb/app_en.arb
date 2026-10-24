@@ -6729,6 +6729,14 @@
   "@nowPlayingOpenInExternalPlayer": {
     "description": "Menu item to open the current track in an external player"
   },
+  "nowPlayingHideVolume": "Hide volume",
+  "@nowPlayingHideVolume": {
+    "description": "Now Playing menu item that removes the volume slider from the player"
+  },
+  "nowPlayingShowVolume": "Show volume",
+  "@nowPlayingShowVolume": {
+    "description": "Now Playing menu item that brings the volume slider back to the player"
+  },
   "nowPlayingTabPlayer": "Player",
   "@nowPlayingTabPlayer": {
     "description": "Tab label for the player view"
