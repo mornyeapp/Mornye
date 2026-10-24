@@ -6,7 +6,6 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.os.Build
 import android.os.Bundle
-import android.os.ParcelFileDescriptor
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import io.flutter.embedding.android.FlutterFragmentActivity
@@ -154,8 +153,6 @@ class MainActivity: FlutterFragmentActivity() {
     internal var libraryScanProgressEventSink: EventChannel.EventSink? = null
     internal var lastLibraryScanProgressPayload: String? = null
     internal var flutterBackCallback: OnBackPressedCallback? = null
-    internal val playbackLeaseLock = Any()
-    internal val playbackLeases = LinkedHashMap<String, ParcelFileDescriptor>()
     @Volatile internal var safScanCancel = false
     @Volatile internal var safScanPaused = false
     @Volatile internal var safScanActive = false
@@ -413,13 +410,11 @@ class MainActivity: FlutterFragmentActivity() {
         // active scans/downloads on the UI thread).
         stopDownloadProgressStream()
         stopLibraryScanProgressStream()
-        closeAllSafPlaybackLeases()
         super.onDestroy()
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-        PlayerWidgetBridge.attach(this, flutterEngine)
         // Select and initialize the runtime before Flutter can dispatch a call.
         val selectedBackend = coreBackend
         sweepStaleCacheFiles()
@@ -437,20 +432,13 @@ class MainActivity: FlutterFragmentActivity() {
         onBackPressedDispatcher.addCallback(this, flutterBackCallback!!)
 
         val messenger = flutterEngine.dartExecutor.binaryMessenger
-        if (!flutterEngine.plugins.has(LocalNetworkPlugin::class.java)) {
-            flutterEngine.plugins.add(LocalNetworkPlugin())
-        }
-        if (!flutterEngine.plugins.has(UsbBitPerfectPlugin::class.java)) {
-            flutterEngine.plugins.add(UsbBitPerfectPlugin())
-        }
-        if (!flutterEngine.plugins.has(MusicHapticsPlugin::class.java)) {
-            flutterEngine.plugins.add(MusicHapticsPlugin())
-        }
         registerConcertCalendarChannel(messenger)
         registerAudioOutputChannel(messenger)
 
         registerProgressStreams(messenger)
 
+        // Replaces the playback subset the engine registered without an
+        // Activity (see SharedEngineChannels) with every backend method.
         val channel = MethodChannel(messenger, CHANNEL)
         backendChannel = channel
         registerLibraryStorageReceiver()
@@ -508,7 +496,7 @@ class MainActivity: FlutterFragmentActivity() {
                         "openContentUri" -> handleOpenContentUri(call, result)
                         "shareContentUri" -> handleShareContentUri(call, result)
                         "rewriteSplitArtistTags" -> handleRewriteSplitArtistTags(call, result)
-                        "readFileMetadata" -> handleReadFileMetadata(call, result)
+                        "readFileMetadata" -> handleReadFileMetadata(call, result, selectedBackend)
                         "checkHiResAuthenticity" -> handleCheckHiResAuthenticity(call, result)
                         "editFileMetadata" -> handleEditFileMetadata(call, result)
                         "writeM4AFreeformTags" -> handleWriteM4AFreeformTags(call, result)

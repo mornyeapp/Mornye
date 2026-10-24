@@ -1,0 +1,508 @@
+import 'dart:io';
+
+import 'package:audio_service/audio_service.dart';
+import 'package:flutter/widgets.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:mornye/l10n/app_localizations.dart';
+import 'package:mornye/models/track.dart';
+import 'package:mornye/services/history_database.dart';
+import 'package:mornye/services/library_collections_database.dart';
+import 'package:mornye/services/library_database.dart';
+import 'package:mornye/services/library_search.dart';
+import 'package:mornye/services/media_library_browser.dart';
+
+const _added = '2026-01-01T00:00:00.000Z';
+
+Map<String, dynamic> _download(
+  String id, {
+  String album = 'Album',
+  String artist = 'Artist',
+  int? disc,
+  int? track,
+  String? path,
+}) => {
+  'id': id,
+  'trackName': 'Song $id',
+  'artistName': artist,
+  'albumName': album,
+  'filePath': path ?? '/music/$id.flac',
+  'coverUrl': 'https://covers.example/$id.jpg',
+  'service': 'extension',
+  'downloadedAt': _added,
+  'discNumber': ?disc,
+  'trackNumber': ?track,
+};
+
+Map<String, dynamic> _scanned(String id, {int? track}) => {
+  'id': id,
+  'trackName': 'Song $id',
+  'artistName': 'Artist',
+  'albumName': 'Album',
+  'filePath': '/scanned/$id.flac',
+  'coverPath': '/covers/$id.jpg',
+  'scannedAt': _added,
+  'trackNumber': ?track,
+};
+
+class _Library implements LibraryDatabase {
+  _Library({
+    this.songs = const [],
+    this.albums = const [],
+    this.artists = const [],
+    this.localAlbum = const [],
+    this.hits = const {},
+    this.byId = const {},
+    this.filesByTitle = const {},
+  });
+
+  final List<Map<String, dynamic>> songs;
+  final List<Map<String, dynamic>> albums;
+  final List<Map<String, dynamic>> artists;
+  final List<Map<String, dynamic>> localAlbum;
+  final Map<LibrarySearchKind, List<LibrarySearchHit>> hits;
+  final Map<String, Map<String, dynamic>> byId;
+  final Map<String, String> filesByTitle;
+  final albumRequests = <QueueLibraryDbQuery>[];
+
+  @override
+  Future<QueueLibraryDbPage> getQueueTrackPageResult(
+    QueueLibraryDbQuery request,
+  ) async => QueueLibraryDbPage(
+    rows: songs.skip(request.offset).take(request.limit).toList(),
+    nextCursor: null,
+  );
+
+  @override
+  Future<QueueLibraryDbPage> getQueueAlbumPageResult(
+    QueueLibraryDbQuery request,
+  ) async {
+    albumRequests.add(request);
+    return QueueLibraryDbPage(
+      rows: [
+        for (final album in albums)
+          if (request.albumArtist == null ||
+              album['artist_name'] == request.albumArtist)
+            album,
+      ],
+      nextCursor: null,
+    );
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> getQueueArtistPage(
+    QueueLibraryDbQuery request,
+  ) async => artists;
+
+  @override
+  Future<List<Map<String, dynamic>>> getQueueLocalAlbumTracksByKey(
+    String albumKey,
+  ) async => albumKey == 'scanned-album' ? localAlbum : const [];
+
+  @override
+  Future<List<LibrarySearchHit>> searchLibrary({
+    required String query,
+    required LibrarySearchKind kind,
+    required bool includeLocal,
+    int limit = 40,
+    int offset = 0,
+  }) async => (hits[kind] ?? const []).take(limit).toList();
+
+  @override
+  Future<Map<String, dynamic>?> getById(String id) async => byId[id];
+
+  @override
+  Future<List<Map<String, dynamic>?>> findExistingBatch(
+    List<LocalLibraryBatchLookupRequest> requests,
+  ) async => [
+    for (final request in requests)
+      if (filesByTitle[request.trackName] case final path?)
+        {'filePath': path}
+      else
+        null,
+  ];
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _History implements HistoryDatabase {
+  _History({this.album = const [], this.byId = const {}});
+
+  final List<Map<String, dynamic>> album;
+  final Map<String, Map<String, dynamic>> byId;
+
+  @override
+  Future<List<Map<String, dynamic>>> getAlbumTracks(
+    String albumName,
+    String artistName,
+  ) async => albumName == 'Album' && artistName == 'Artist' ? album : const [];
+
+  @override
+  Future<Map<String, dynamic>?> getById(String id) async => byId[id];
+
+  @override
+  Future<List<Map<String, dynamic>?>> findExistingTracks(
+    List<HistoryLookupRequest> requests,
+  ) async => List.filled(requests.length, null);
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _Collections implements LibraryCollectionsDatabase {
+  _Collections({this.loved = const [], this.playlists = const {}});
+
+  final List<Track> loved;
+  final Map<String, List<Track>> playlists;
+
+  @override
+  Future<List<Track>> loadLovedTracks({int limit = 500}) async => loved;
+
+  @override
+  Future<List<({String id, String name, int trackCount, String? coverUrl})>>
+  loadPlaylistSummaries() async => [
+    for (final MapEntry(:key, :value) in playlists.entries)
+      (id: key, name: key, trackCount: value.length, coverUrl: null),
+  ];
+
+  @override
+  Future<List<Track>> loadPlaylistTracks(
+    String playlistId, {
+    int limit = 500,
+  }) async => playlists[playlistId] ?? const [];
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+Track _track(String name) => Track(
+  id: 'catalog-$name',
+  name: name,
+  artistName: 'Artist',
+  albumName: 'Album',
+  duration: 200,
+);
+
+MediaLibraryBrowser _browser({
+  _Library? library,
+  _History? history,
+  _Collections? collections,
+}) => MediaLibraryBrowser(
+  library: library ?? _Library(),
+  history: history ?? _History(),
+  collections: collections ?? _Collections(),
+  includeLocal: () => true,
+  strings: () => lookupAppLocalizations(const Locale('en')),
+);
+
+List<String> _titles(List<MediaItem> items) => [
+  for (final item in items) item.title,
+];
+
+void main() {
+  test('the root shows song, album, artist and playlist tabs', () async {
+    final tabs = await _browser().children(AudioService.browsableRootId);
+
+    expect(_titles(tabs), ['Songs', 'Albums', 'Artists', 'Playlists']);
+    expect(tabs.every((tab) => !tab.playable!), isTrue);
+    expect(
+      tabs[1].extras?[AndroidContentStyle.browsableHintKey],
+      AndroidContentStyle.gridItemHintValue,
+    );
+    expect(
+      MediaLibraryBrowser.rootExtras['android.media.browse.SEARCH_SUPPORTED'],
+      isTrue,
+    );
+  });
+
+  test(
+    'Songs lists the first songs and plays the whole Library from one',
+    () async {
+      final songs = [
+        for (var i = 0; i <= MediaLibraryBrowser.listLimit; i++)
+          i.isEven
+              ? {'source': 'downloaded', 'item': _download('d$i')}
+              : {'source': 'local', 'item': _scanned('l$i')},
+      ];
+      final browser = _browser(library: _Library(songs: songs));
+
+      final items = await browser.children(MediaLibraryBrowser.songsId);
+      expect(items.first.id, MediaLibraryBrowser.shuffleId);
+      expect(items.first.title, 'Shuffle library');
+      expect(items, hasLength(MediaLibraryBrowser.listLimit + 1));
+      expect(items[1].title, 'Song d0');
+      expect(items[1].artUri.toString(), 'https://covers.example/d0.jpg');
+      // A car cannot open the app's own cover files.
+      expect(items[2].artUri, isNull);
+
+      final queue = (await browser.queueFor(items[2].id))!;
+      expect(queue.items, hasLength(MediaLibraryBrowser.listLimit + 1));
+      expect(queue.items[queue.index].source, '/scanned/l1.flac');
+      expect(queue.shuffle, isFalse);
+
+      final shuffled = (await browser.queueFor(MediaLibraryBrowser.shuffleId))!;
+      expect(shuffled.shuffle, isTrue);
+      expect(shuffled.items, hasLength(MediaLibraryBrowser.listLimit + 1));
+    },
+  );
+
+  test('an album plays in disc and track order from the chosen song', () async {
+    final browser = _browser(
+      library: _Library(
+        albums: [
+          {
+            'queue_source': 'downloaded',
+            'album_key': 'album|artist',
+            'album_name': 'Album',
+            'artist_name': 'Artist',
+            'cover_url': 'https://covers.example/album.jpg',
+          },
+          {
+            'queue_source': 'local',
+            'album_key': 'scanned-album',
+            'album_name': 'Scanned',
+            'artist_name': 'Artist',
+            'cover_path': '/covers/scanned.jpg',
+          },
+        ],
+        localAlbum: [_scanned('b', track: 2), _scanned('a', track: 1)],
+      ),
+      history: _History(
+        album: [
+          _download('c', disc: 2, track: 1),
+          _download('b', disc: 1, track: 2),
+          _download('a', disc: 1, track: 1),
+        ],
+      ),
+    );
+
+    final albums = await browser.children(MediaLibraryBrowser.albumsId);
+    expect(_titles(albums), ['Album', 'Scanned']);
+    expect(albums.first.playable, isFalse);
+    expect(albums.first.artist, 'Artist');
+
+    final downloaded = await browser.children(albums.first.id);
+    expect(_titles(downloaded), ['Song a', 'Song b', 'Song c']);
+    final queue = (await browser.queueFor(downloaded[1].id))!;
+    expect([for (final media in queue.items) media.id], ['a', 'b', 'c']);
+    expect(queue.index, 1);
+
+    final scanned = await browser.children(albums.last.id);
+    expect(_titles(scanned), ['Song a', 'Song b']);
+  });
+
+  test('an artist opens its albums', () async {
+    final library = _Library(
+      artists: [
+        {'artist_key': 'artist', 'artist_name': 'Artist'},
+      ],
+      albums: [
+        {
+          'queue_source': 'downloaded',
+          'album_name': 'Album',
+          'artist_name': 'Artist',
+        },
+        {
+          'queue_source': 'downloaded',
+          'album_name': 'Other',
+          'artist_name': 'Someone else',
+        },
+      ],
+    );
+    final browser = _browser(library: library);
+
+    final artists = await browser.children(MediaLibraryBrowser.artistsId);
+    expect(_titles(artists), ['Artist']);
+    expect(
+      artists.single.extras?[AndroidContentStyle.browsableHintKey],
+      AndroidContentStyle.gridItemHintValue,
+    );
+    final albums = await browser.children(artists.single.id);
+    expect(_titles(albums), ['Album']);
+    expect(library.albumRequests.last.albumArtist, 'Artist');
+  });
+
+  test(
+    'playlists list Loved first and play the songs that have a file',
+    () async {
+      final directory = await Directory.systemTemp.createTemp('browser');
+      addTearDown(() => directory.delete(recursive: true));
+      Future<String> file(String name) async =>
+          (await File('${directory.path}/$name.flac').create()).path;
+      final first = await file('first');
+      final third = await file('third');
+      final browser = _browser(
+        library: _Library(
+          filesByTitle: {'First': first, 'Third': third, 'Loved': first},
+        ),
+        collections: _Collections(
+          loved: [_track('Loved')],
+          playlists: {
+            'Road trip': [_track('First'), _track('Missing'), _track('Third')],
+            'Empty': const [],
+          },
+        ),
+      );
+
+      final playlists = await browser.children(MediaLibraryBrowser.playlistsId);
+      expect(_titles(playlists), ['Loved', 'Road trip']);
+      expect(_titles(await browser.children(playlists.first.id)), ['Loved']);
+
+      final songs = await browser.children(playlists.last.id);
+      expect(_titles(songs), ['First', 'Third']);
+      final queue = (await browser.queueFor(songs.last.id))!;
+      expect([for (final media in queue.items) media.source], [first, third]);
+      expect(queue.index, 1);
+    },
+  );
+
+  test('search groups its results by kind and plays found songs', () async {
+    final browser = _browser(
+      library: _Library(
+        hits: {
+          LibrarySearchKind.songs: const [
+            LibrarySearchHit(
+              kind: LibrarySearchKind.songs,
+              id: 'b',
+              title: 'Blue',
+              source: 'downloaded',
+            ),
+            LibrarySearchHit(
+              kind: LibrarySearchKind.songs,
+              id: 'l',
+              title: 'Blue too',
+              source: 'local',
+            ),
+          ],
+          LibrarySearchKind.albums: const [
+            LibrarySearchHit(
+              kind: LibrarySearchKind.albums,
+              id: 'album|artist',
+              title: 'Album',
+              artist: 'Artist',
+              source: 'downloaded',
+            ),
+          ],
+          LibrarySearchKind.artists: const [
+            LibrarySearchHit(
+              kind: LibrarySearchKind.artists,
+              id: 'artist',
+              title: 'Blue Band',
+            ),
+          ],
+        },
+        byId: {'l': _scanned('l')},
+      ),
+      history: _History(byId: {'b': _download('b')}),
+      collections: _Collections(
+        playlists: {
+          'Blue mornings': [_track('First')],
+          'Other': [_track('First')],
+        },
+      ),
+    );
+
+    final results = await browser.search('blue');
+    expect(_titles(results), [
+      'Song b',
+      'Song l',
+      'Album',
+      'Blue Band',
+      'Blue mornings',
+    ]);
+    const group = 'android.media.browse.CONTENT_STYLE_GROUP_TITLE_HINT';
+    expect(
+      [for (final item in results) item.extras?[group]],
+      ['Songs', 'Songs', 'Albums', 'Artists', 'Playlists'],
+    );
+    final queue = (await browser.queueFor(results[1].id))!;
+    expect([for (final media in queue.items) media.id], ['b', 'l']);
+    expect(queue.index, 1);
+    expect(await browser.search('  '), isEmpty);
+  });
+
+  test('a spoken request plays songs first or the kind it asks for', () async {
+    final library = _Library(
+      songs: [
+        {'source': 'downloaded', 'item': _download('x')},
+      ],
+      hits: {
+        LibrarySearchKind.songs: const [
+          LibrarySearchHit(
+            kind: LibrarySearchKind.songs,
+            id: 'b',
+            title: 'Blue',
+            source: 'downloaded',
+          ),
+        ],
+        LibrarySearchKind.albums: const [
+          LibrarySearchHit(
+            kind: LibrarySearchKind.albums,
+            id: 'album|artist',
+            title: 'Album',
+            artist: 'Artist',
+            source: 'downloaded',
+          ),
+        ],
+      },
+    );
+    final browser = _browser(
+      library: library,
+      history: _History(
+        byId: {'b': _download('b')},
+        album: [_download('a1', track: 1), _download('a2', track: 2)],
+      ),
+    );
+    List<String> ids(BrowserQueue? queue) => [
+      for (final media in queue!.items) media.id,
+    ];
+
+    expect(ids(await browser.queueForSearch('blue')), ['b']);
+    expect(
+      ids(
+        await browser.queueForSearch('album', {
+          'android.intent.extra.focus': 'vnd.android.cursor.item/album',
+        }),
+      ),
+      ['a1', 'a2'],
+    );
+    final shuffled = await browser.queueForSearch('');
+    expect(ids(shuffled), ['x']);
+    expect(shuffled!.shuffle, isTrue);
+
+    final albumsOnly = _browser(
+      library: _Library(
+        hits: {LibrarySearchKind.albums: library.hits.values.last},
+      ),
+      history: _History(album: [_download('a1')]),
+    );
+    expect(ids(await albumsOnly.queueForSearch('album')), ['a1']);
+    expect(await _browser().queueForSearch('nothing'), isNull);
+  });
+
+  test('a browser that asks for pages gets one page', () async {
+    final browser = _browser(
+      library: _Library(
+        artists: [
+          for (var i = 0; i < 5; i++)
+            {'artist_key': 'a$i', 'artist_name': 'Artist $i'},
+        ],
+      ),
+    );
+
+    final page = await browser.children(MediaLibraryBrowser.artistsId, {
+      'android.media.browse.extra.PAGE': 1,
+      'android.media.browse.extra.PAGE_SIZE': 2,
+    });
+    expect(_titles(page), ['Artist 2', 'Artist 3']);
+    expect(
+      await browser.children(MediaLibraryBrowser.artistsId, {
+        'android.media.browse.extra.PAGE': 3,
+        'android.media.browse.extra.PAGE_SIZE': 2,
+      }),
+      isEmpty,
+    );
+    expect(await browser.children('another-app:root'), isEmpty);
+    expect(await browser.queueFor('song-id'), isNull);
+  });
+}

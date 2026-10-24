@@ -1,5 +1,6 @@
 package com.zarz.mornye
 
+import android.content.Context
 import android.net.Uri
 import androidx.documentfile.provider.DocumentFile
 import io.flutter.plugin.common.MethodCall
@@ -45,7 +46,11 @@ internal suspend fun MainActivity.handleRewriteSplitArtistTags(call: MethodCall,
     result.success(response)
 }
 
-internal suspend fun MainActivity.handleReadFileMetadata(call: MethodCall, result: MethodChannel.Result) {
+internal suspend fun Context.handleReadFileMetadata(
+    call: MethodCall,
+    result: MethodChannel.Result,
+    coreBackend: CoreBackend,
+) {
     val filePath = call.argument<String>("file_path") ?: ""
     val displayName = call.argument<String>("display_name") ?: ""
     val response = withContext(Dispatchers.IO) {

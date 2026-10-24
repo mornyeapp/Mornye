@@ -7,12 +7,19 @@ import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart' show AppLifecycleState;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mornye/models/library_collections.dart';
 import 'package:mornye/models/settings.dart';
+import 'package:mornye/models/unified_library_item.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/services/app_state_database.dart';
 import 'package:mornye/services/autoplay_personalization.dart';
+import 'package:mornye/services/background_favorites.dart';
+import 'package:mornye/services/history_database.dart';
+import 'package:mornye/services/library_collections_database.dart';
 import 'package:mornye/services/library_database.dart';
+import 'package:mornye/services/library_search.dart';
 import 'package:mornye/services/listening_statistics.dart';
+import 'package:mornye/services/media_library_browser.dart';
 import 'package:mornye/services/music_player_service.dart';
 import 'package:mornye/services/playback_deck.dart';
 import 'package:mornye/services/playback_notification.dart';
@@ -133,6 +140,8 @@ class _Session implements AudioSession {
 
 class _SessionStore implements AppStateDatabase {
   @override
+  Future<Map<String, dynamic>?> getPlaybackSession() async => null;
+  @override
   Future<void> savePlaybackSession(Map<String, dynamic> session) async {}
   @override
   Future<bool> updatePlaybackSessionState({
@@ -197,6 +206,107 @@ class _QueueLibrary implements LibraryDatabase {
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
+/// One scanned album and the songs a search finds, as a media browser such
+/// as Android Auto reads them.
+class _BrowsedLibrary implements LibraryDatabase {
+  static Map<String, dynamic> song(String id, int number) => {
+    'id': id,
+    'trackName': 'Song $id',
+    'artistName': 'Artist',
+    'albumName': 'Album',
+    'filePath': '/album/$id.flac',
+    'scannedAt': '2026-01-01T00:00:00.000Z',
+    'trackNumber': number,
+  };
+
+  final album = [song('c', 3), song('a', 1), song('b', 2)];
+
+  @override
+  Future<QueueLibraryDbPage> getQueueAlbumPageResult(
+    QueueLibraryDbQuery request,
+  ) async => const QueueLibraryDbPage(
+    rows: [
+      {
+        'queue_source': 'local',
+        'album_key': 'album',
+        'album_name': 'Album',
+        'artist_name': 'Artist',
+      },
+    ],
+    nextCursor: null,
+  );
+
+  @override
+  Future<List<Map<String, dynamic>>> getQueueLocalAlbumTracksByKey(
+    String albumKey,
+  ) async => albumKey == 'album' ? album : const [];
+
+  @override
+  Future<List<LibrarySearchHit>> searchLibrary({
+    required String query,
+    required LibrarySearchKind kind,
+    required bool includeLocal,
+    int limit = 40,
+    int offset = 0,
+  }) async => kind == LibrarySearchKind.songs && query == 'song b'
+      ? const [
+          LibrarySearchHit(
+            kind: LibrarySearchKind.songs,
+            id: 'b',
+            title: 'Song b',
+            source: 'local',
+          ),
+        ]
+      : const [];
+
+  @override
+  Future<Map<String, dynamic>?> getById(String id) async {
+    for (final row in album) {
+      if (row['id'] == id) return row;
+    }
+    return null;
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> findByTrackAndArtist(
+    String trackName,
+    String artistName,
+  ) async => const [];
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _NoHistory implements HistoryDatabase {
+  @override
+  Future<Map<String, dynamic>?> findByFilePath(String filePath) async => null;
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+/// The Loved collection by track key.
+class _Loved implements LibraryCollectionsDatabase {
+  final keys = <String>{};
+
+  @override
+  Future<bool> containsLovedTrack(String trackKey) async =>
+      keys.contains(trackKey);
+
+  @override
+  Future<void> upsertLovedEntry({
+    required String trackKey,
+    required String trackJson,
+    required String addedAt,
+  }) async => keys.add(trackKey);
+
+  @override
+  Future<void> deleteLovedEntry(String trackKey) async => keys.remove(trackKey);
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
 MusicPlayerRuntime _runtime({
   AppSettings settings = const AppSettings(pauseOnMute: false),
   Future<MusicPlayerHandler> Function(MusicPlayerHandler Function())?
@@ -212,6 +322,8 @@ MusicPlayerRuntime _runtime({
   Future<void> Function()? synchronizePlaybackState,
   _Session? session,
   LibraryDatabase? libraryDatabase,
+  HistoryDatabase? historyDatabase,
+  LibraryCollectionsDatabase? collectionsDatabase,
 }) {
   if (isAndroid) {
     const channel = MethodChannel(
@@ -244,6 +356,8 @@ MusicPlayerRuntime _runtime({
       },
       sessionDatabase: _SessionStore(),
       libraryDatabase: libraryDatabase,
+      historyDatabase: historyDatabase,
+      collectionsDatabase: collectionsDatabase,
       recorder:
           recorder ??
           ListeningRecorder(
@@ -1185,6 +1299,120 @@ void main() {
       expect(handler.queue.value.map((item) => item.id), libraryOrder);
     },
   );
+
+  test('a media browser plays the album a song was chosen from', () async {
+    final runtime = _runtime(
+      libraryDatabase: _BrowsedLibrary(),
+      historyDatabase: _NoHistory(),
+    );
+    final handler = await runtime.initialize();
+
+    final album = (await handler.getChildren(
+      MediaLibraryBrowser.albumsId,
+    )).single;
+    final songs = await handler.getChildren(album.id);
+    expect(
+      [for (final song in songs) song.title],
+      ['Song a', 'Song b', 'Song c'],
+    );
+    await handler.playFromMediaId(songs[1].id);
+
+    expect(handler.queue.value.map((item) => item.id), ['a', 'b', 'c']);
+    expect(handler.mediaItem.value?.id, 'b');
+    expect(
+      handler.playbackState.value.shuffleMode,
+      AudioServiceShuffleMode.none,
+    );
+    // Media resumption offers the song that plays.
+    expect(
+      (await handler.getChildren(
+        AudioService.recentRootId,
+      )).map((item) => item.id),
+      ['b'],
+    );
+    // Queue items still play by their own ids.
+    await handler.playFromMediaId('c');
+    expect(handler.mediaItem.value?.id, 'c');
+  });
+
+  test(
+    'a spoken request plays what it names and resumes without words',
+    () async {
+      final runtime = _runtime(
+        libraryDatabase: _BrowsedLibrary(),
+        historyDatabase: _NoHistory(),
+      );
+      final handler = await runtime.initialize();
+
+      await handler.playFromSearch('song b');
+      expect(handler.queue.value.map((item) => item.id), ['b']);
+      expect(handler.playbackState.value.playing, isTrue);
+
+      await handler.pause();
+      await handler.playFromSearch('');
+      expect(handler.playbackState.value.playing, isTrue);
+      expect(handler.queue.value.map((item) => item.id), ['b']);
+    },
+  );
+
+  test('the star loves songs until the app shell takes it over', () async {
+    final loved = _Loved();
+    final runtime = _runtime(
+      libraryDatabase: _BrowsedLibrary(),
+      historyDatabase: _NoHistory(),
+      collectionsDatabase: loved,
+    );
+    String keyFor(String id) => trackCollectionKey(
+      UnifiedLibraryItem.fromLocalLibrary(
+        LocalLibraryItem.fromJson(_BrowsedLibrary.song(id, 1)),
+      ).toTrack(),
+    );
+    final dependencies = runtime.dependencies;
+    runtime.configureBackgroundNotification(
+      presentation: const PlaybackNotification(),
+      favorites: BackgroundFavorites(
+        library: dependencies.libraryDatabase,
+        history: dependencies.historyDatabase,
+        collections: loved,
+      ),
+    );
+    final handler = await runtime.initialize();
+    final album = (await handler.getChildren(
+      MediaLibraryBrowser.albumsId,
+    )).single;
+    await handler.playFromMediaId(
+      (await handler.getChildren(album.id)).first.id,
+    );
+
+    await handler.customAction(PlaybackNotification.favoriteAction);
+    expect(loved.keys, {keyFor('a')});
+    expect(runtime.notification.mediaId, 'a');
+    expect(runtime.notification.loved, isTrue);
+
+    // A song loved earlier shows a filled star when it starts.
+    loved.keys.add(keyFor('b'));
+    await handler.skipToNext();
+    await pumpEventQueue();
+    expect(runtime.notification.mediaId, 'b');
+    expect(runtime.notification.loved, isTrue);
+
+    final shellToggles = <String>[];
+    runtime.configureNotification(
+      presentation: const PlaybackNotification(),
+      toggleFavorite: (item) async {
+        shellToggles.add(item.id);
+        return false;
+      },
+    );
+    await handler.customAction(PlaybackNotification.favoriteAction);
+    expect(shellToggles, ['b']);
+    expect(loved.keys, contains(keyFor('b')));
+    await handler.skipToNext();
+    await pumpEventQueue();
+    // The background binding no longer follows the playing song.
+    expect(runtime.notification.mediaId, 'b');
+    expect(runtime.notification.loved, isFalse);
+  });
 
   test(
     'pre-init events have empty values and cancellation never waits for init',
