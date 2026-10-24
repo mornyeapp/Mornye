@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:mornye/theme/app_tokens.dart';
 import 'package:mornye/theme/mornye_theme.dart';
@@ -62,19 +64,24 @@ class AppSliverHeader extends StatelessWidget {
     final tokens = context.tokens;
     final colorScheme = Theme.of(context).colorScheme;
     final topPadding = normalizedHeaderTopPadding(context);
-    // Short landscape windows give the large title less headroom so content
-    // starts higher. Portrait phones, even small ones, keep the full header.
-    final screenSize = MediaQuery.sizeOf(context);
-    final expandedHeight =
-        screenSize.height < screenSize.width && screenSize.height < 720
-        ? tokens.headerExpandedHeight - 24
-        : tokens.headerExpandedHeight;
-    final maxHeight = expandedHeight + topPadding;
-    final edgeInset = detailHeaderEdgeInset(context);
     // A page at the root of a nested navigator, such as the desktop settings
     // detail pane, has nothing to go back to.
     final showLeading =
         _showLeading && (leading != null || !_isNestedNavigatorRoot(context));
+    // Short landscape windows give the large title less headroom so content
+    // starts higher. Portrait phones, even small ones, keep the full header.
+    final screenSize = MediaQuery.sizeOf(context);
+    final shortened =
+        screenSize.height < screenSize.width && screenSize.height < 720
+        ? tokens.headerExpandedHeight - 24
+        : tokens.headerExpandedHeight;
+    // A back button needs the full phone header: the shorter desktop and
+    // landscape headers left the large title touching it.
+    final expandedHeight = showLeading
+        ? math.max(shortened, AppTokens.standard.headerExpandedHeight)
+        : shortened;
+    final maxHeight = expandedHeight + topPadding;
+    final edgeInset = detailHeaderEdgeInset(context);
 
     return SliverAppBar(
       expandedHeight: maxHeight,

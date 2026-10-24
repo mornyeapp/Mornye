@@ -7,6 +7,8 @@ import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/adaptive_layout.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/widgets/app_bottom_sheet.dart';
+import 'package:mornye/widgets/app_icon_button.dart';
+import 'package:mornye/widgets/app_sliver_header.dart';
 import 'package:mornye/widgets/desktop/track_table.dart';
 import 'package:mornye/widgets/selection_action_button.dart';
 import 'package:mornye/widgets/selection_bottom_bar.dart';
@@ -172,4 +174,41 @@ void main() {
       }
     }
   });
+
+  for (final height in [1000.0, 700.0]) {
+    testWidgets('a pushed page title clears its back button at $height', (
+      tester,
+    ) async {
+      tester.view.physicalSize = Size(1280, height);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        app(
+          mornye: false,
+          child: Builder(
+            builder: (context) => TextButton(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const Scaffold(
+                    body: CustomScrollView(
+                      slivers: [AppSliverHeader.page(title: 'Playlists')],
+                    ),
+                  ),
+                ),
+              ),
+              child: const Text('open'),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+
+      // The tab root keeps the compact desktop header; a back button gets
+      // the full one, with room between the button and the large title.
+      final back = tester.getRect(find.byType(AppIconButton));
+      final title = tester.getRect(find.text('Playlists'));
+      expect(title.top - back.bottom, greaterThanOrEqualTo(12));
+    });
+  }
 }
