@@ -28,6 +28,7 @@ import 'package:mornye/widgets/desktop/desktop_window.dart';
 import 'package:mornye/widgets/expressive_navigation_bar.dart';
 import 'package:mornye/widgets/mini_player.dart';
 import 'package:mornye/widgets/mornye_bottom_bar.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class _FakeController implements MusicPlayerController {
   final calls = <String>[];
@@ -90,6 +91,8 @@ void main() {
   late List<ShellTab> selections;
 
   setUp(() {
+    // The rail's menu button saves its state.
+    SharedPreferences.setMockInitialValues({});
     debugDesktopPlatformOverride = true;
     debugDesktopTitleBarInContentOverride = false;
     desktopSidebarCollapsed.value = false;
@@ -130,6 +133,7 @@ void main() {
     WidgetTester tester, {
     required bool mornye,
     required double width,
+    ShellTab selected = ShellTab.home,
     MediaItem? item = _track,
     List<DesktopSidebarLink> libraryLinks = const [],
     ValueChanged<String>? onOpenLibraryLink,
@@ -152,7 +156,7 @@ void main() {
           home: Scaffold(
             body: DesktopShellLayout(
               destinations: _destinations(mornye: mornye),
-              selected: ShellTab.home,
+              selected: selected,
               onSelected: selections.add,
               libraryLinks: libraryLinks,
               onOpenLibraryLink: onOpenLibraryLink,
@@ -262,6 +266,23 @@ void main() {
       expect(find.byType(DesktopDownloadsButton), findsOneWidget);
     });
 
+    testWidgets('the sidebar shortcut remembers the rail state', (
+      tester,
+    ) async {
+      SharedPreferences.setMockInitialValues({});
+      final prefs = await SharedPreferences.getInstance();
+      restoreDesktopSidebar(prefs);
+      // Wide windows open with the rail expanded.
+      expect(desktopSidebarCollapsed.value, isFalse);
+
+      toggleDesktopSidebar();
+      await tester.pump();
+      expect(desktopSidebarCollapsed.value, isTrue);
+      desktopSidebarCollapsed.value = false;
+      restoreDesktopSidebar(prefs);
+      expect(desktopSidebarCollapsed.value, isTrue);
+    });
+
     testWidgets('expanded rail keeps a gap between indicators', (tester) async {
       await pumpShell(tester, mornye: false, width: 1400);
 
@@ -271,47 +292,168 @@ void main() {
       expect(library.center.dy - home.center.dy, closeTo(56 + 8, 0.5));
     });
 
-    testWidgets('rail starts collapsed with no menu button', (tester) async {
+    testWidgets('collapsed rail shows icons alone and its menu expands it', (
+      tester,
+    ) async {
       desktopSidebarCollapsed.value = true;
       await pumpShell(tester, mornye: false, width: 1400);
       double railWidth() =>
           tester.getSize(find.byType(DesktopNavigationRail)).width;
       expect(railWidth(), closeTo(desktopCollapsedRailWidth, 0.5));
-      for (final icon in [Icons.menu, Icons.menu_open]) {
-        expect(
-          find.byWidgetPredicate((w) => w is AppIcon && w.icon == icon),
-          findsNothing,
-        );
-      }
+      Finder menuIcon(IconData icon) =>
+          find.byWidgetPredicate((w) => w is AppIcon && w.icon == icon);
+      expect(menuIcon(Icons.menu), findsOneWidget);
+      // The menu button sits over the destination icons.
+      expect(
+        tester.getCenter(menuIcon(Icons.menu)).dx,
+        closeTo(tester.getCenter(find.byTooltip('library')).dx, 0.5),
+      );
+      // No labels under the icons: tooltips and semantics name them, and
+      // the whole 56dp square around an icon takes the click.
+      expect(find.text('library'), findsNothing);
+      expect(find.byTooltip('library'), findsOneWidget);
+      final semantics = tester.ensureSemantics();
+      await tester.pump();
+      expect(
+        tester
+            .getSemantics(find.byKey(const ValueKey('desktop-rail:library')))
+            .label,
+        // The label, then the badge count.
+        'library\n2',
+      );
+      semantics.dispose();
+      final library = tester.getRect(find.byTooltip('library'));
+      expect(library.size, const Size(56, 56));
+      await tester.tapAt(library.topLeft + const Offset(4, 4));
+      expect(selections, [ShellTab.library]);
 
-      // The sidebar shortcut expands it; halfway, the rail is between its
-      // widths with one label showing.
-      desktopSidebarCollapsed.value = false;
+      // The menu button expands it; halfway, the rail is between its widths
+      // with one label showing.
+      await tester.tap(find.byKey(const ValueKey('desktop-rail-menu')));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 120));
+      expect(desktopSidebarCollapsed.value, isFalse);
       expect(railWidth(), greaterThan(desktopCollapsedRailWidth));
       expect(railWidth(), lessThan(desktopSidebarWidth));
       expect(find.text('library'), findsOneWidget);
       await tester.pumpAndSettle();
       expect(railWidth(), closeTo(desktopSidebarWidth, 0.5));
+      expect(menuIcon(Icons.menu_open), findsOneWidget);
     });
 
-    testWidgets('expanded rail pills hug their labels and take the clicks', (
+    testWidgets('narrow windows hide the rail menu button', (tester) async {
+      await pumpShell(tester, mornye: false, width: 900);
+
+      expect(find.byKey(const ValueKey('desktop-rail-menu')), findsNothing);
+    });
+
+    testWidgets('expanded rail lists the playlists under the destinations', (
+      tester,
+    ) async {
+      final opened = <String>[];
+      await pumpShell(
+        tester,
+        mornye: false,
+        width: 1400,
+        onOpenLibraryLink: opened.add,
+      );
+
+      final settings = tester.getRect(find.text('settings'));
+      final allPlaylists = tester.getRect(find.text('All Playlists'));
+      final playlist = tester.getRect(find.text('Road trip'));
+      expect(find.text('Playlists'), findsOneWidget);
+      expect(
+        allPlaylists.top,
+        greaterThan(tester.getRect(find.text('repository')).bottom),
+      );
+      expect(playlist.top, greaterThan(allPlaylists.bottom));
+      expect(settings.top, greaterThan(playlist.bottom));
+      // Rows start their icons at the destination icons and fill the rail.
+      final row = tester.getRect(
+        find.byKey(const ValueKey('desktop-rail-link:playlist:mix')),
+      );
+      expect(row.height, 44);
+      expect(
+        tester
+            .getRect(find.byKey(const ValueKey('desktop-rail-link:playlists')))
+            .width,
+        row.width,
+      );
+
+      await tester.tap(find.text('Road trip'));
+      await tester.tap(find.text('All Playlists'));
+      expect(opened, ['playlist:mix', 'playlists']);
+
+      // An open playlist takes the selection from Library.
+      await pumpShell(
+        tester,
+        mornye: false,
+        width: 1400,
+        selected: ShellTab.library,
+        onOpenLibraryLink: opened.add,
+      );
+      bool selectedFill(Finder finder) =>
+          tester
+              .widget<Material>(
+                find.descendant(of: finder, matching: find.byType(Material)),
+              )
+              .type ==
+          MaterialType.canvas;
+      final mix = find.byKey(const ValueKey('desktop-rail-link:playlist:mix'));
+      expect(selectedFill(mix), isFalse);
+      desktopSidebarLink.value = 'playlist:mix';
+      await tester.pumpAndSettle();
+      expect(selectedFill(mix), isTrue);
+
+      // Collapsed, only the destinations show.
+      desktopSidebarCollapsed.value = true;
+      await tester.pumpAndSettle();
+      expect(find.text('Playlists'), findsNothing);
+      expect(find.text('Road trip'), findsNothing);
+    });
+
+    testWidgets('Library leaves an open playlist for the Library root', (
+      tester,
+    ) async {
+      final opened = <String>[];
+      await pumpShell(
+        tester,
+        mornye: false,
+        width: 1400,
+        onOpenLibraryLink: opened.add,
+      );
+
+      // Nothing open: Library switches tabs.
+      await tester.tap(find.text('library'));
+      expect(selections, [ShellTab.library]);
+      expect(opened, isEmpty);
+
+      // A playlist left open from another tab: Library returns to the root
+      // instead of showing the playlist again.
+      desktopSidebarLink.value = DesktopSidebarLink.allPlaylistsId;
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('library'));
+      expect(opened, [DesktopSidebarLink.libraryRootId]);
+      expect(selections, [ShellTab.library]);
+    });
+
+    testWidgets('expanded rail pills span the rail and take the clicks', (
       tester,
     ) async {
       await pumpShell(tester, mornye: false, width: 1400);
 
       final library = tester.getRect(find.text('library'));
       final settings = tester.getRect(find.text('settings'));
-      // Beside a pill, inside the rail: nothing happens.
+      // In the rail's margin beside a pill: nothing happens.
       final rail = tester.getRect(find.byType(DesktopNavigationRail));
       await tester.tapAt(Offset(rail.right - 12, library.center.dy));
       await tester.tapAt(Offset(rail.right - 12, settings.center.dy));
       expect(selections, isEmpty);
 
-      // On the pill, just past the label: selects.
-      await tester.tapAt(Offset(library.right + 8, library.center.dy));
-      await tester.tapAt(Offset(settings.right + 8, settings.center.dy));
+      // Near the pill's far end, past any label: selects, as the Playlists
+      // rows do.
+      await tester.tapAt(Offset(rail.right - 28, library.center.dy));
+      await tester.tapAt(Offset(rail.right - 28, settings.center.dy));
       expect(selections, [ShellTab.library, ShellTab.settings]);
     });
   });

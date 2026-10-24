@@ -148,7 +148,7 @@ class _MainShellState extends ConsumerState<MainShell>
   late final _PreviewStopNavigatorObserver _searchPreviewStopObserver;
 
   /// Desktop: whether Library shows its root page, so the Mornye sidebar
-  /// returns to the Library root's link.
+  /// returns to the Library root's link and the Material rail to Library.
   late final _libraryDepthObserver = _PageDepthObserver(
     onRoot: () => desktopSidebarLink.value = null,
   );
@@ -702,7 +702,7 @@ class _MainShellState extends ConsumerState<MainShell>
     ];
   }
 
-  /// The page a Mornye desktop sidebar link opens in the Library tab, or
+  /// The page a desktop sidebar or rail link opens in the Library tab, or
   /// null for the Library root.
   Widget? _desktopLibraryPage(String id) {
     const playlistPrefix = 'playlist:';
@@ -737,8 +737,9 @@ class _MainShellState extends ConsumerState<MainShell>
     };
   }
 
-  /// Shows a Library page or playlist picked in the Mornye desktop sidebar
-  /// in the Library tab, in place of the page it showed.
+  /// Shows a Library page or playlist picked in the Mornye desktop sidebar,
+  /// or a playlist picked in the Material rail, in the Library tab, in place
+  /// of the page it showed.
   void _openDesktopLibraryLink(String id) {
     _onShellTabRequested(ShellTab.library);
     final page = _desktopLibraryPage(id);
@@ -1060,7 +1061,8 @@ class _MainShellState extends ConsumerState<MainShell>
             libraryLinks: mornye
                 ? _desktopLibraryLinks(queueCount: queueState)
                 : const [],
-            onOpenLibraryLink: mornye ? _openDesktopLibraryLink : null,
+            // The Material rail opens playlists alone.
+            onOpenLibraryLink: _openDesktopLibraryLink,
             onOpenProfile: mornye ? _openDesktopProfile : null,
             // The selection bar floats over the pages, not the sidebar.
             body: SelectionOverlayHost(child: pageView),

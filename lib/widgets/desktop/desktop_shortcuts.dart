@@ -128,7 +128,7 @@ class _DesktopShortcutsState extends ConsumerState<DesktopShortcuts> {
       case DesktopCommand.upNext:
         toggleDesktopInspector(DesktopInspectorPanel.upNext);
       case DesktopCommand.toggleSidebar:
-        desktopSidebarCollapsed.value = !desktopSidebarCollapsed.value;
+        toggleDesktopSidebar();
       case DesktopCommand.refresh:
         AppRefreshIndicator.refreshVisible();
       case DesktopCommand.miniPlayer:
