@@ -2,11 +2,13 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:mornye/models/library_collections.dart';
 import 'package:mornye/services/collection_restore_codec.dart';
+import 'package:mornye/services/link/sync/link_collection_sync_schema.dart';
 import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/services/collection_track_batch.dart';
 import 'package:mornye/services/sqlite_helpers.dart' as sqlite;
@@ -16,7 +18,14 @@ import 'package:mornye/utils/logger.dart';
 final _log = AppLogger('LibraryCollectionsDb');
 
 const _dbFileName = 'library_collections.db';
-const _dbVersion = 2;
+
+/// v3 adds Mornye Link change tracking (tables and triggers) beside the
+/// unchanged collection tables.
+const _dbVersion = 3;
+
+/// Native jobs read and write private copies holding only the collection
+/// tables, whose schema is still the one they validate as v2.
+const _nativeSchemaVersion = 2;
 
 const _tableWishlist = 'wishlist_tracks';
 const _tableLoved = 'loved_tracks';
@@ -73,10 +82,38 @@ class LibraryCollectionsDatabase {
       sqlite.SingleFlightInitializer<Database>();
 
   final Future<SharedPreferences> _prefs = SharedPreferences.getInstance();
+  final Database? _databaseOverride;
 
-  LibraryCollectionsDatabase._init();
+  LibraryCollectionsDatabase._init() : _databaseOverride = null;
+
+  /// Uses an already open [database] (tests open it with
+  /// [openWithFactory]).
+  @visibleForTesting
+  LibraryCollectionsDatabase.withDatabase(Database database)
+    : _databaseOverride = database;
+
+  /// Opens [path] with the app schema and connection settings through
+  /// [factory], for host tests that use FFI.
+  @visibleForTesting
+  static Future<Database> openWithFactory(
+    DatabaseFactory factory,
+    String path,
+  ) => factory.openDatabase(
+    path,
+    options: OpenDatabaseOptions(
+      version: _dbVersion,
+      onConfigure: (db) async {
+        await db.execute('PRAGMA foreign_keys = ON');
+        await db.execute('PRAGMA recursive_triggers = ON');
+      },
+      onCreate: _createDb,
+      onUpgrade: _upgradeDb,
+    ),
+  );
 
   Future<Database> get database {
+    final override = _databaseOverride;
+    if (override != null) return Future.value(override);
     return _database.getOrCreate(
       () => sqlite.openAppDatabase(
         _dbFileName,
@@ -88,9 +125,14 @@ class LibraryCollectionsDatabase {
     );
   }
 
-  Future<void> _createDb(Database db, int version) async {
+  static Future<void> _createDb(Database db, int version) async {
     _log.i('Creating collections database schema v$version');
+    await _createCollectionTables(db);
+    await createLinkCollectionSyncSchema(db);
+  }
 
+  /// The collection tables alone, as native jobs expect them (v2).
+  static Future<void> _createCollectionTables(Database db) async {
     await db.execute('''
       CREATE TABLE $_tableWishlist (
         track_key TEXT PRIMARY KEY,
@@ -147,14 +189,21 @@ class LibraryCollectionsDatabase {
     );
   }
 
-  Future<void> _upgradeDb(Database db, int oldVersion, int newVersion) async {
+  static Future<void> _upgradeDb(
+    Database db,
+    int oldVersion,
+    int newVersion,
+  ) async {
     _log.i('Upgrading collections database from v$oldVersion to v$newVersion');
     if (oldVersion < 2) {
       await _createFavoriteArtistsTable(db);
     }
+    if (oldVersion < 3) {
+      await createLinkCollectionSyncSchema(db);
+    }
   }
 
-  Future<void> _createFavoriteArtistsTable(Database db) async {
+  static Future<void> _createFavoriteArtistsTable(Database db) async {
     await db.execute('''
       CREATE TABLE IF NOT EXISTS $_tableFavoriteArtists (
         artist_key TEXT PRIMARY KEY,
@@ -540,7 +589,7 @@ class LibraryCollectionsDatabase {
             where.contains('?') ? [playlistId] : const [],
           );
         }
-        await txn.execute('PRAGMA $alias.user_version=$_dbVersion');
+        await txn.execute('PRAGMA $alias.user_version=$_nativeSchemaVersion');
         await txn.execute(
           'CREATE INDEX $alias.collection_read_members '
           'ON $_tablePlaylistTracks(playlist_id)',
@@ -951,11 +1000,13 @@ class LibraryCollectionsDatabase {
         // into the live database, preserving its WAL and connection caches.
         final stagedPath = '${temporary.path}/$_dbFileName';
         sqlite.ensureAppDatabaseFactory();
+        // Staging holds only the collection tables: the live database's
+        // triggers record the published rows.
         final stagedDatabase = await openDatabase(
           stagedPath,
-          version: _dbVersion,
+          version: _nativeSchemaVersion,
           onConfigure: (staged) => staged.execute('PRAGMA foreign_keys=ON'),
-          onCreate: instance._createDb,
+          onCreate: (staged, _) => _createCollectionTables(staged),
         );
         detached = false;
         await stagedDatabase.close();

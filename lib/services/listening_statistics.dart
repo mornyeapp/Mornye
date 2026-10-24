@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
+import 'package:mornye/services/link/sync/link_history_sync_schema.dart';
 import 'package:mornye/services/sqlite_helpers.dart' as sqlite;
 import 'package:mornye/utils/artist_utils.dart';
 import 'package:mornye/utils/logger.dart';
@@ -260,69 +262,59 @@ class ListeningStatisticsStore {
 
   final _database = sqlite.SingleFlightInitializer<Database>();
 
+  /// v2 adds Mornye Link change tracking beside the `listening` table.
+  static const _version = 2;
+
   Future<Database> _open() => _database.getOrCreate(
     () => sqlite.openAppDatabase(
       'listening_statistics.db',
-      version: 1,
-      onCreate: (db, _) => db.execute('''
-        CREATE TABLE listening (
-          day TEXT NOT NULL,
-          track_key TEXT NOT NULL,
-          title TEXT NOT NULL,
-          artist TEXT NOT NULL,
-          album TEXT NOT NULL,
-          artwork TEXT,
-          milliseconds INTEGER NOT NULL DEFAULT 0,
-          plays INTEGER NOT NULL DEFAULT 0,
-          PRIMARY KEY (day, track_key)
-        )
-      '''),
-      onUpgrade: (_, _, _) async {},
+      version: _version,
+      onCreate: _create,
+      onUpgrade: _upgrade,
     ),
   );
 
-  Future<void> add(List<ListeningDelta> deltas) async {
-    final db = await _open();
-    await db.transaction((transaction) async {
-      final batch = transaction.batch();
-      for (final delta in deltas) {
-        batch.rawInsert(
-          '''
-          INSERT OR IGNORE INTO listening
-            (day, track_key, title, artist, album, artwork, milliseconds, plays)
-          VALUES (?, ?, ?, ?, ?, ?, 0, 0)
-        ''',
-          [
-            delta.day,
-            delta.track.key,
-            delta.track.title,
-            delta.track.artist,
-            delta.track.album,
-            delta.track.artwork,
-          ],
-        );
-        // Avoid UPSERT syntax unavailable in older Android SQLite versions.
-        batch.rawUpdate(
-          '''
-          UPDATE listening SET title = ?, artist = ?, album = ?, artwork = ?,
-            milliseconds = milliseconds + ?, plays = plays + ?
-          WHERE day = ? AND track_key = ?
-        ''',
-          [
-            delta.track.title,
-            delta.track.artist,
-            delta.track.album,
-            delta.track.artwork,
-            delta.milliseconds,
-            delta.plays,
-            delta.day,
-            delta.track.key,
-          ],
-        );
-      }
-      await batch.commit(noResult: true);
-    });
+  static Future<void> _create(Database db, int version) async {
+    await db.execute('''
+      CREATE TABLE listening (
+        day TEXT NOT NULL,
+        track_key TEXT NOT NULL,
+        title TEXT NOT NULL,
+        artist TEXT NOT NULL,
+        album TEXT NOT NULL,
+        artwork TEXT,
+        milliseconds INTEGER NOT NULL DEFAULT 0,
+        plays INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (day, track_key)
+      )
+    ''');
+    await createLinkHistorySyncSchema(db);
   }
+
+  static Future<void> _upgrade(Database db, int oldVersion, int _) async {
+    if (oldVersion < 2) await createLinkHistorySyncSchema(db);
+  }
+
+  /// Opens [path] with the statistics schema through [factory], for host
+  /// tests that use FFI.
+  @visibleForTesting
+  static Future<Database> openWithFactory(
+    DatabaseFactory factory,
+    String path,
+  ) => factory.openDatabase(
+    path,
+    options: OpenDatabaseOptions(
+      version: _version,
+      onCreate: _create,
+      onUpgrade: _upgrade,
+    ),
+  );
+
+  /// The statistics database (Mornye Link history sync).
+  Future<Database> get database => _open();
+
+  Future<void> add(List<ListeningDelta> deltas) async =>
+      writeListeningDeltas(await _open(), deltas);
 
   Future<ListeningSummary> load(DateTime start, DateTime end) async {
     final db = await _open();
@@ -334,6 +326,52 @@ class ListeningStatisticsStore {
       query(await _open());
 
   Future<void> clear() async => (await _open()).delete('listening');
+}
+
+/// Adds [deltas] to the per-day totals in one transaction.
+Future<void> writeListeningDeltas(
+  Database db,
+  List<ListeningDelta> deltas,
+) async {
+  await db.transaction((transaction) async {
+    final batch = transaction.batch();
+    for (final delta in deltas) {
+      batch.rawInsert(
+        '''
+        INSERT OR IGNORE INTO listening
+          (day, track_key, title, artist, album, artwork, milliseconds, plays)
+        VALUES (?, ?, ?, ?, ?, ?, 0, 0)
+      ''',
+        [
+          delta.day,
+          delta.track.key,
+          delta.track.title,
+          delta.track.artist,
+          delta.track.album,
+          delta.track.artwork,
+        ],
+      );
+      // Avoid UPSERT syntax unavailable in older Android SQLite versions.
+      batch.rawUpdate(
+        '''
+        UPDATE listening SET title = ?, artist = ?, album = ?, artwork = ?,
+          milliseconds = milliseconds + ?, plays = plays + ?
+        WHERE day = ? AND track_key = ?
+      ''',
+        [
+          delta.track.title,
+          delta.track.artist,
+          delta.track.album,
+          delta.track.artwork,
+          delta.milliseconds,
+          delta.plays,
+          delta.day,
+          delta.track.key,
+        ],
+      );
+    }
+    await batch.commit(noResult: true);
+  });
 }
 
 /// Aggregate in SQLite so an annual recap transfers one row per song, artist
