@@ -1765,6 +1765,7 @@ dependencies = [
  "md-5",
  "mdns-sd",
  "rcgen",
+ "roxmltree",
  "rustls",
  "serde",
  "serde_json",
@@ -1776,6 +1777,7 @@ dependencies = [
  "tokio-rustls",
  "tokio-tungstenite",
  "tokio-util",
+ "unicode-normalization",
  "url",
 ]
 

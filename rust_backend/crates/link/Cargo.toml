@@ -32,9 +32,11 @@ md-5.workspace = true
 time.workspace = true
 if-addrs.workspace = true
 socket2.workspace = true
+unicode-normalization.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true
+roxmltree.workspace = true
 
 [lints]
 workspace = true
