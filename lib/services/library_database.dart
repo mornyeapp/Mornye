@@ -415,6 +415,12 @@ class LibraryDatabase {
     QueueLibraryDbQuery request,
   ) async => (await _queueStore()).counts(request);
 
+  /// Ids, paths and covers of every Library song, for the Folders index.
+  Future<List<Map<String, Object?>>> getDirectoryEntries({
+    required bool includeLocal,
+  }) async =>
+      (await _queueStore()).directoryEntries(includeLocal: includeLocal);
+
   @visibleForTesting
   Future<List<Map<String, dynamic>>> getQueueAlbumPage(
     QueueLibraryDbQuery request,

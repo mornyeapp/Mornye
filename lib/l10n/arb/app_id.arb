@@ -324,6 +324,12 @@
   "libraryNoActiveDownloads": "Tidak sedang download",
   "librarySearchHint": "Telusuri koleksi Anda",
   "libraryEmptyCollection": "Musik Anda akan muncul di sini",
+  "libraryFolders": "Folder",
+  "libraryFolderCount": "{count, plural, =1{1 folder} other{{count} folder}}",
+  "libraryFoldersEmptyTitle": "Belum ada folder",
+  "libraryFoldersEmptyMessage": "Unduh lagu atau tambahkan folder musik di setelan Koleksi Lokal untuk menjelajahinya per folder.",
+  "libraryFolderMissing": "Folder ini tidak ada lagi di Koleksi",
+  "libraryFoldersLoadFailed": "Tidak dapat membaca folder",
   "settingsTitle": "Setelan",
   "@settingsTitle": {
     "description": "Settings screen title"

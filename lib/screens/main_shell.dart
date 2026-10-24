@@ -19,6 +19,7 @@ import 'package:mornye/providers/track_provider.dart';
 import 'package:mornye/providers/user_profile_provider.dart';
 import 'package:mornye/providers/preview_player_provider.dart';
 import 'package:mornye/screens/home_tab.dart';
+import 'package:mornye/screens/library_directory_screen.dart';
 import 'package:mornye/screens/library_tracks_folder_screen.dart';
 import 'package:mornye/screens/mornye_library_screen.dart';
 import 'package:mornye/screens/repo_tab.dart';
@@ -708,6 +709,11 @@ class _MainShellState extends ConsumerState<MainShell>
         label: l10n.searchSongs,
       ),
       DesktopSidebarLink(
+        id: 'folders',
+        icon: CupertinoIcons.folder,
+        label: l10n.libraryFolders,
+      ),
+      DesktopSidebarLink(
         id: 'downloads',
         icon: CupertinoIcons.arrow_down_circle,
         label: l10n.libraryDownloads,
@@ -741,6 +747,7 @@ class _MainShellState extends ConsumerState<MainShell>
         ),
       ),
       'songs' => const Scaffold(body: QueueTab(librarySection: 'all')),
+      'folders' => const LibraryDirectoryScreen(),
       'downloads' => const Scaffold(
         body: QueueTab(librarySection: 'downloads'),
       ),

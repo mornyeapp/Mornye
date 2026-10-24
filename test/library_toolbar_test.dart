@@ -21,6 +21,7 @@ import 'package:mornye/theme/app_theme.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/widgets/app_search_field.dart';
+import 'package:mornye/widgets/library_directory_view.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 
@@ -405,6 +406,29 @@ void main() {
     expect(find.byType(M3EButtonGroup), findsNothing);
     expect(find.text(l10n.libraryFilterSortLatest), findsOneWidget);
     expect(find.text(l10n.libraryFilterTitle), findsOneWidget);
+  });
+
+  testWidgets('the Folders tab browses the Library by folder', (tester) async {
+    await pumpLibrary(tester);
+    final l10n = l10nOf(tester);
+
+    await tester.tap(
+      find.descendant(
+        of: find.byType(TabBar),
+        matching: find.text(l10n.libraryFolders),
+      ),
+    );
+    for (var i = 0; i < 20; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+
+    expect(find.byType(LibraryDirectoryView), findsOneWidget);
+    // The mocked database has no songs.
+    expect(find.text(l10n.libraryFoldersEmptyTitle), findsOneWidget);
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(QueueTab)),
+    );
+    expect(container.read(settingsProvider).historyFilterMode, 'folders');
   });
 
   testWidgets('Mornye keeps its filter button', (tester) async {

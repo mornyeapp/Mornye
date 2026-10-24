@@ -104,6 +104,40 @@ class LibraryQueueStore {
     );
   }
 
+  /// Every Library file for the Folders index: downloads, then the scanned
+  /// files no download shadows, the set the Songs page lists.
+  Future<List<Map<String, Object?>>> directoryEntries({
+    required bool includeLocal,
+  }) => _db.rawQuery('''
+    SELECT
+      'downloaded' AS source,
+      h.id,
+      h.file_path,
+      h.cover_url AS cover,
+      h.disc_number,
+      h.track_number,
+      h.download_tree_uri,
+      h.saf_relative_dir,
+      h.saf_file_name
+    FROM history_db.history h
+    WHERE COALESCE(h.file_path, '') != ''
+    ${includeLocal ? '''
+    UNION ALL
+    SELECT
+      'local' AS source,
+      l.id,
+      l.file_path,
+      l.cover_path AS cover,
+      l.disc_number,
+      l.track_number,
+      NULL AS download_tree_uri,
+      NULL AS saf_relative_dir,
+      NULL AS saf_file_name
+    FROM ${LibrarySchema.visibleView} l
+    WHERE COALESCE(l.file_path, '') != '' AND ${_notShadowedByHistory('l')}
+    ''' : ''}
+  ''');
+
   Future<QueueLibraryCounts> counts(QueueLibraryDbQuery request) async {
     final fastCounts = await _getUnfilteredQueueCounts(request);
     if (fastCounts != null) return fastCounts;

@@ -381,6 +381,22 @@ class HistoryDatabase {
   Future<Map<String, dynamic>?> getById(String id) async =>
       _firstRow(await database, 'id = ?', [id], newestFirst: false);
 
+  /// Rows for [ids], keyed by id; ids no longer in the history are absent.
+  Future<Map<String, Map<String, dynamic>>> getByIds(
+    Iterable<String> ids,
+  ) async {
+    final rows = <String, Map<String, dynamic>>{};
+    await sqlite.loadRowsByColumn(
+      await database,
+      table: 'history',
+      column: 'id',
+      rawValues: ids,
+      destination: rows,
+      mapRow: _dbRowToJson,
+    );
+    return rows;
+  }
+
   Future<Map<String, dynamic>?> findByFilePath(String filePath) async {
     final pathKeys = buildPathMatchKeys(filePath).toList(growable: false);
     if (pathKeys.isEmpty) return null;

@@ -52,7 +52,7 @@ final List<_Sheet> _library = [
   ),
   (
     (l) => l.libraryDefaultView,
-    ['last', 'all', 'albums', 'singles', 'artists', 'playlists'],
+    ['last', 'all', 'albums', 'singles', 'artists', 'playlists', 'folders'],
     [
       Icons.history,
       Icons.music_note,
@@ -60,6 +60,7 @@ final List<_Sheet> _library = [
       Icons.audiotrack,
       Icons.person,
       Icons.queue_music,
+      Icons.folder_outlined,
     ],
     (s) => s.defaultLibraryView,
   ),

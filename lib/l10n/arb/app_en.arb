@@ -313,6 +313,35 @@
   "libraryNoActiveDownloads": "No active downloads",
   "librarySearchHint": "Search your library",
   "libraryEmptyCollection": "Your music will appear here",
+  "libraryFolders": "Folders",
+  "@libraryFolders": {
+    "description": "Library view that browses downloaded and scanned songs by the folders their files are in"
+  },
+  "libraryFolderCount": "{count, plural, =1{1 folder} other{{count} folders}}",
+  "@libraryFolderCount": {
+    "description": "Number of folders inside a Library folder",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "libraryFoldersEmptyTitle": "No folders yet",
+  "@libraryFoldersEmptyTitle": {
+    "description": "Title of the Folders view when the Library has no songs"
+  },
+  "libraryFoldersEmptyMessage": "Download songs or add a music folder in Local Library settings to browse them by folder.",
+  "@libraryFoldersEmptyMessage": {
+    "description": "Next step shown in the empty Folders view"
+  },
+  "libraryFolderMissing": "This folder is no longer in your Library",
+  "@libraryFolderMissing": {
+    "description": "Shown on an open folder page after its songs were deleted or moved"
+  },
+  "libraryFoldersLoadFailed": "Couldn't read your folders",
+  "@libraryFoldersLoadFailed": {
+    "description": "Shown when the Folders view fails to load"
+  },
   "settingsTitle": "Settings",
   "@settingsTitle": {
     "description": "Settings screen title"
