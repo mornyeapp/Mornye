@@ -32,6 +32,7 @@ import 'package:mornye/services/app_crash_service.dart';
 import 'package:mornye/services/desktop_deep_links.dart';
 import 'package:mornye/services/desktop_diagnostics.dart';
 import 'package:mornye/services/desktop_library_watcher.dart';
+import 'package:mornye/services/link/desktop/link_desktop_host.dart';
 import 'package:mornye/services/music_player_service.dart';
 import 'package:mornye/services/player_widget_service.dart';
 import 'package:mornye/screens/now_playing_screen.dart';
@@ -480,6 +481,8 @@ class _EagerInitializationState extends ConsumerState<EagerInitialization>
         _desktopDeepLinks = DesktopDeepLinks()..start();
         listenDesktopWindowFullScreen();
         bindDesktopFullScreenLyrics();
+        // Starts the Mornye Link server when the owner turned it on.
+        ref.read(linkDesktopHostProvider);
       }
       _initializeAppServices();
       _initializeExtensions();

@@ -8014,6 +8014,291 @@
   "@desktopDownloadsCancel": {
     "description": "Tooltip of the button that cancels one download in the desktop downloads popover"
   },
+  "linkDesktopSettingsTitle": "Mornye on your phone",
+  "@linkDesktopSettingsTitle": {
+    "description": "Desktop Settings page that shares this computer's library with the Mornye phone app over the local network"
+  },
+  "linkDesktopSettingsSubtitle": "Stream your library and control playback from your phone",
+  "@linkDesktopSettingsSubtitle": {
+    "description": "Subtitle of the Mornye on your phone entry in desktop Settings"
+  },
+  "linkDesktopEnableTitle": "Share with Mornye on your phone",
+  "@linkDesktopEnableTitle": {
+    "description": "Switch that turns on the local server phones connect to"
+  },
+  "linkDesktopEnableSubtitle": "Your phone can browse, play and download through this computer on your local network",
+  "@linkDesktopEnableSubtitle": {
+    "description": "Subtitle of the switch that shares the library with phones, while it is off"
+  },
+  "linkDesktopStatusStarting": "Starting",
+  "@linkDesktopStatusStarting": {
+    "description": "Status of the phone link server while it starts"
+  },
+  "linkDesktopStatusRunning": "On, {count, plural, =0{no phone connected} =1{1 phone connected} other{{count} phones connected}}",
+  "@linkDesktopStatusRunning": {
+    "description": "Status of the phone link server while it runs, with the number of connected phones",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "linkDesktopStatusFailed": "Could not start: {error}",
+  "@linkDesktopStatusFailed": {
+    "description": "Status of the phone link server when it failed to start",
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "linkDesktopFirewallHint": "Your computer may ask whether Mornye can accept incoming network connections. Allow it so your phone can connect.",
+  "@linkDesktopFirewallHint": {
+    "description": "Hint shown while the phone link server is on, about the operating system firewall prompt"
+  },
+  "linkDesktopSectionComputer": "This computer",
+  "@linkDesktopSectionComputer": {
+    "description": "Section of the phone link settings about this computer's name and address"
+  },
+  "linkDesktopDeviceName": "Name",
+  "@linkDesktopDeviceName": {
+    "description": "Row and field label for the name phones see for this computer"
+  },
+  "linkDesktopDeviceNameHint": "Phones show this name when they find this computer",
+  "@linkDesktopDeviceNameHint": {
+    "description": "Helper text of the field that renames this computer for phones"
+  },
+  "linkDesktopAddress": "Address",
+  "@linkDesktopAddress": {
+    "description": "Row that shows the network addresses phones and Subsonic apps connect to"
+  },
+  "linkDesktopSecurityCode": "Security code",
+  "@linkDesktopSecurityCode": {
+    "description": "Row that shows the short certificate fingerprint phones compare while pairing"
+  },
+  "linkDesktopSecurityCodeHint": "Your phone shows the same code when it pairs",
+  "@linkDesktopSecurityCodeHint": {
+    "description": "Subtitle explaining the security code row"
+  },
+  "linkDesktopCatalogSongs": "{count, plural, =1{1 song shared} other{{count} songs shared}}",
+  "@linkDesktopCatalogSongs": {
+    "description": "How many Library songs phones can see",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "linkDesktopSectionPhones": "Phones",
+  "@linkDesktopSectionPhones": {
+    "description": "Section of the phone link settings that lists paired phones"
+  },
+  "linkDesktopPairPhone": "Pair a phone",
+  "@linkDesktopPairPhone": {
+    "description": "Row and dialog title that shows a code to pair a phone with this computer"
+  },
+  "linkDesktopPairPhoneSubtitle": "Show a code to enter on your phone",
+  "@linkDesktopPairPhoneSubtitle": {
+    "description": "Subtitle of the Pair a phone row"
+  },
+  "linkDesktopNoDevices": "No phones paired yet",
+  "@linkDesktopNoDevices": {
+    "description": "Shown in the paired phones list when it is empty"
+  },
+  "linkDesktopDeviceConnected": "Connected",
+  "@linkDesktopDeviceConnected": {
+    "description": "Status of a paired phone that is connected now"
+  },
+  "linkDesktopDeviceLastSeen": "Last seen {date}",
+  "@linkDesktopDeviceLastSeen": {
+    "description": "Status of a paired phone that is not connected",
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "linkDesktopDeviceNeverSeen": "Not connected yet",
+  "@linkDesktopDeviceNeverSeen": {
+    "description": "Status of a paired device that never connected"
+  },
+  "linkDesktopSubsonicApp": "Subsonic app",
+  "@linkDesktopSubsonicApp": {
+    "description": "Label of a paired device that is a third-party Subsonic app"
+  },
+  "linkDesktopRevoke": "Remove",
+  "@linkDesktopRevoke": {
+    "description": "Tooltip and confirm button that removes a paired phone or Subsonic app"
+  },
+  "linkDesktopRevokeTitle": "Remove {name}?",
+  "@linkDesktopRevokeTitle": {
+    "description": "Title of the dialog that confirms removing a paired device",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkDesktopRevokeMessage": "It has to pair again before it can connect to this computer.",
+  "@linkDesktopRevokeMessage": {
+    "description": "Message of the dialog that confirms removing a paired device"
+  },
+  "linkDesktopRevoked": "{name} removed",
+  "@linkDesktopRevoked": {
+    "description": "Snackbar after removing a paired device",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkDesktopSectionOtherApps": "Other apps",
+  "@linkDesktopSectionOtherApps": {
+    "description": "Section of the phone link settings for third-party Subsonic apps"
+  },
+  "linkDesktopAddSubsonicApp": "Add another Subsonic app",
+  "@linkDesktopAddSubsonicApp": {
+    "description": "Row and dialog title that creates a key for a third-party Subsonic app"
+  },
+  "linkDesktopAddSubsonicAppSubtitle": "Create a key for a Subsonic player on another device",
+  "@linkDesktopAddSubsonicAppSubtitle": {
+    "description": "Subtitle of the Add another Subsonic app row"
+  },
+  "linkDesktopAppName": "App name",
+  "@linkDesktopAppName": {
+    "description": "Field label for the name of a third-party Subsonic app"
+  },
+  "linkDesktopCreateKey": "Create key",
+  "@linkDesktopCreateKey": {
+    "description": "Button that creates a key for a third-party Subsonic app"
+  },
+  "linkDesktopAppKeyTitle": "Connect {name}",
+  "@linkDesktopAppKeyTitle": {
+    "description": "Title of the dialog that shows the details for a new Subsonic app key",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkDesktopAppKeyMessage": "Enter these details in the app. The key is shown only now.",
+  "@linkDesktopAppKeyMessage": {
+    "description": "Message of the dialog that shows a new Subsonic app key"
+  },
+  "linkDesktopServerAddress": "Server address",
+  "@linkDesktopServerAddress": {
+    "description": "Label of the server address a Subsonic app connects to"
+  },
+  "linkDesktopUsername": "Username",
+  "@linkDesktopUsername": {
+    "description": "Label of the username a Subsonic app uses"
+  },
+  "linkDesktopApiKey": "Password or API key",
+  "@linkDesktopApiKey": {
+    "description": "Label of the key a Subsonic app uses as its password or API key"
+  },
+  "linkDesktopCopy": "Copy {label}",
+  "@linkDesktopCopy": {
+    "description": "Tooltip of a copy button next to a value",
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "linkDesktopPairInstructions": "Open Mornye on your phone, choose this computer and enter this code.",
+  "@linkDesktopPairInstructions": {
+    "description": "Instructions in the pairing dialog above the code"
+  },
+  "linkDesktopPairCheckCode": "Check that your phone shows security code {code}.",
+  "@linkDesktopPairCheckCode": {
+    "description": "Line in the pairing dialog asking to compare the short certificate fingerprint",
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
+  "linkDesktopPairExpires": "The code expires in {time}",
+  "@linkDesktopPairExpires": {
+    "description": "Countdown in the pairing dialog, as minutes and seconds",
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "linkDesktopPaired": "Paired with {name}",
+  "@linkDesktopPaired": {
+    "description": "Snackbar after a phone paired",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkDesktopPairExpired": "The code expired. Pair again to get a new one.",
+  "@linkDesktopPairExpired": {
+    "description": "Snackbar when the pairing code expired"
+  },
+  "linkDesktopPairAttempts": "Too many wrong codes. Pair again to get a new one.",
+  "@linkDesktopPairAttempts": {
+    "description": "Snackbar when pairing ended after too many wrong codes"
+  },
+  "linkDesktopPairFailed": "Could not start pairing",
+  "@linkDesktopPairFailed": {
+    "description": "Snackbar when the pairing code could not be created"
+  },
+  "linkDesktopDevicesTitle": "Phones",
+  "@linkDesktopDevicesTitle": {
+    "description": "Tooltip of the player bar button and title of its popover that list connected phones"
+  },
+  "linkDesktopPhoneNothingPlaying": "Nothing playing",
+  "@linkDesktopPhoneNothingPlaying": {
+    "description": "Shown for a connected phone that plays nothing"
+  },
+  "linkDesktopContinueOnPhone": "Continue on phone",
+  "@linkDesktopContinueOnPhone": {
+    "description": "Button that moves the desktop queue and position to a phone and pauses the desktop"
+  },
+  "linkDesktopOpenOnPhone": "Open a link on phone",
+  "@linkDesktopOpenOnPhone": {
+    "description": "Button that sends a link to a phone to open"
+  },
+  "linkDesktopOpenLinkTitle": "Open a link on {name}",
+  "@linkDesktopOpenLinkTitle": {
+    "description": "Title of the dialog that sends a link to a phone",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkDesktopOpenLinkLabel": "Link",
+  "@linkDesktopOpenLinkLabel": {
+    "description": "Field label for the link to open on a phone"
+  },
+  "linkDesktopOpen": "Open",
+  "@linkDesktopOpen": {
+    "description": "Button that sends the link to the phone"
+  },
+  "linkDesktopSentToPhone": "Sent to {name}",
+  "@linkDesktopSentToPhone": {
+    "description": "Snackbar after something was sent to a phone",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkDesktopNotDelivered": "The phone did not receive it",
+  "@linkDesktopNotDelivered": {
+    "description": "Snackbar when a message could not reach a phone"
+  },
+  "linkDesktopNothingToContinue": "Nothing is playing on this computer",
+  "@linkDesktopNothingToContinue": {
+    "description": "Snackbar when Continue on phone is used without a current song"
+  },
   "desktopScrollBack": "Scroll back",
   "@desktopScrollBack": {
     "description": "Tooltip of the desktop button that scrolls a horizontal shelf of albums or artists back"

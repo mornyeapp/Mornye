@@ -20,6 +20,7 @@ import 'package:mornye/widgets/audio_quality_badges.dart';
 import 'package:mornye/widgets/desktop/desktop_commands.dart';
 import 'package:mornye/widgets/desktop/desktop_downloads_button.dart';
 import 'package:mornye/widgets/desktop/desktop_inspector.dart';
+import 'package:mornye/widgets/desktop/desktop_link_devices_button.dart';
 import 'package:mornye/widgets/desktop/desktop_window.dart';
 import 'package:mornye/widgets/desktop/desktop_volume_scroll.dart';
 import 'package:mornye/widgets/mornye_chrome.dart';
@@ -668,10 +669,11 @@ class _MornyeLcdLines extends StatelessWidget {
 }
 
 /// Lyrics and Up Next, which toggle the trailing inspector, downloads, and
-/// volume. Material fills its third of the bar, with downloads after Up
-/// Next and the volume slider last. The Mornye capsule leads with downloads
-/// and ends with a volume button whose slider opens in a popover, as Music
-/// does.
+/// volume. Material fills its third of the bar, with phones and downloads
+/// after Up Next and the volume slider last. The Mornye capsule leads with
+/// phones and downloads and ends with a volume button whose slider opens in
+/// a popover, as Music does. The phones button shows only while a phone is
+/// connected over Mornye Link.
 class _TrailingControls extends StatelessWidget {
   const _TrailingControls({required this.enabled, this.appTheme});
 
@@ -692,7 +694,10 @@ class _TrailingControls extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.end,
       mainAxisSize: mornye ? MainAxisSize.min : MainAxisSize.max,
       children: [
-        if (mornye) const DesktopDownloadsButton(),
+        if (mornye) ...[
+          const DesktopLinkDevicesButton(),
+          const DesktopDownloadsButton(),
+        ],
         ValueListenableBuilder<DesktopInspectorPanel?>(
           valueListenable: desktopInspectorPanel,
           builder: (context, panel, _) => Row(
@@ -748,7 +753,10 @@ class _TrailingControls extends StatelessWidget {
         else ...[
           Theme(
             data: appTheme ?? Theme.of(context),
-            child: const DesktopDownloadsButton(),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [DesktopLinkDevicesButton(), DesktopDownloadsButton()],
+            ),
           ),
           // A narrow window leaves too little room for a usable slider;
           // the volume shortcuts still work there.

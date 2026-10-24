@@ -190,6 +190,16 @@ class PlatformBridge {
       StreamController<String>.broadcast();
   static final StreamController<String> _libraryFolderChangeEvents =
       StreamController<String>.broadcast();
+  static final StreamController<Map<String, dynamic>> _linkRequestEvents =
+      StreamController<Map<String, dynamic>>.broadcast();
+  static final StreamController<Map<String, dynamic>> _linkMessageEvents =
+      StreamController<Map<String, dynamic>>.broadcast();
+  static final StreamController<Map<String, dynamic>> _linkClientEvents =
+      StreamController<Map<String, dynamic>>.broadcast();
+  static final StreamController<Map<String, dynamic>> _linkPairedEvents =
+      StreamController<Map<String, dynamic>>.broadcast();
+  static final StreamController<String> _linkPairingEndedEvents =
+      StreamController<String>.broadcast();
   static bool _backendEventHandlerInstalled = false;
 
   /// The Rust backend answers on Android and iOS through the MethodChannel
@@ -288,6 +298,104 @@ class PlatformBridge {
   static Stream<List<String>> iosBackgroundDownloadExpirationEvents() =>
       _events(_iosBackgroundDownloadExpirationEvents);
 
+  // Mornye Link, the desktop server phones connect to. The Rust backend owns
+  // the server; these calls and events follow the bridge table of the link
+  // contract.
+
+  /// Starts the server as [name]; returns `port`, `fingerprint`, `serverId`,
+  /// `name` and `addresses`.
+  static Future<Map<String, dynamic>> linkStart({
+    required String name,
+    int? port,
+  }) async => _linkMap(
+    await _channel.invokeMethod('linkStart', {'name': name, 'port': ?port}),
+  );
+
+  static Future<void> linkStop() => _invokeVoid('linkStop');
+
+  /// `running`, `port`, `fingerprint`, `serverId`, `name`, `addresses` and
+  /// the connected `clients`.
+  static Future<Map<String, dynamic>> linkStatus() async =>
+      _linkMap(await _channel.invokeMethod('linkStatus'));
+
+  /// Hands the NDJSON catalog at [path] to the server; returns `songs` and
+  /// `version`.
+  static Future<Map<String, dynamic>> linkSetCatalog(String path) async =>
+      _linkMap(await _channel.invokeMethod('linkSetCatalog', {'path': path}));
+
+  /// Opens a pairing window: `pin`, `expiresMs` and `fingerprint`.
+  static Future<Map<String, dynamic>> linkBeginPairing() async =>
+      _linkMap(await _channel.invokeMethod('linkBeginPairing'));
+
+  static Future<void> linkEndPairing() => _invokeVoid('linkEndPairing');
+
+  /// Paired devices and Subsonic app keys.
+  static Future<List<Map<String, dynamic>>> linkDevices() async {
+    final result = await _channel.invokeMethod<List<dynamic>>('linkDevices');
+    return [
+      for (final device in result ?? const [])
+        if (device is Map) _linkMap(device),
+    ];
+  }
+
+  static Future<void> linkRevoke(String deviceId) =>
+      _invokeVoid('linkRevoke', {'deviceId': deviceId});
+
+  /// Mints a key for a third-party Subsonic app: `deviceId` and `apiKey`.
+  static Future<Map<String, dynamic>> linkCreateKey(String name) async =>
+      _linkMap(await _channel.invokeMethod('linkCreateKey', {'name': name}));
+
+  /// Answers a `linkRequest` with [result], or with [error] (`code`,
+  /// `message`).
+  static Future<void> linkReply(
+    String requestId, {
+    Object? result,
+    Map<String, dynamic>? error,
+  }) => _invokeVoid('linkReply', {
+    'requestId': requestId,
+    if (error != null) 'error': error else 'result': result,
+  });
+
+  /// Sends [message] over the WebSocket of [deviceId], or of every connected
+  /// phone when null. Returns how many received it.
+  static Future<int> linkSend(
+    Map<String, dynamic> message, {
+    String? deviceId,
+  }) async {
+    final result = _linkMap(
+      await _channel.invokeMethod('linkSend', {
+        'deviceId': ?deviceId,
+        'message': message,
+      }),
+    );
+    return (result['delivered'] as num?)?.toInt() ?? 0;
+  }
+
+  /// Forwarded requests: `requestId`, `op`, `deviceId` and `args`.
+  static Stream<Map<String, dynamic>> linkRequestEvents() =>
+      _events(_linkRequestEvents);
+
+  /// WebSocket messages from phones: `deviceId` and `message`.
+  static Stream<Map<String, dynamic>> linkMessageEvents() =>
+      _events(_linkMessageEvents);
+
+  /// The connected phones whenever one connects or disconnects: `clients`.
+  static Stream<Map<String, dynamic>> linkClientEvents() =>
+      _events(_linkClientEvents);
+
+  /// A phone finished pairing: `deviceId`, `name` and `platform`.
+  static Stream<Map<String, dynamic>> linkPairedEvents() =>
+      _events(_linkPairedEvents);
+
+  /// Why a pairing window closed: `paired`, `expired`, `attempts` or
+  /// `cancelled`.
+  static Stream<String> linkPairingEndedEvents() =>
+      _events(_linkPairingEndedEvents);
+
+  static Map<String, dynamic> _linkMap(Object? value) => value is Map
+      ? value.map((key, value) => MapEntry(key.toString(), value))
+      : <String, dynamic>{};
+
   static void _ensureBackendEventHandler() {
     if (_backendEventHandlerInstalled) return;
     _backendEventHandlerInstalled = true;
@@ -333,6 +441,31 @@ class PlatformBridge {
           final args = call.arguments;
           final root = args is Map ? args['root']?.toString() ?? '' : '';
           if (root.isNotEmpty) _libraryFolderChangeEvents.add(root);
+          return null;
+        case 'linkRequest':
+          if (call.arguments is Map) {
+            _linkRequestEvents.add(_linkMap(call.arguments));
+          }
+          return null;
+        case 'linkMessage':
+          if (call.arguments is Map) {
+            _linkMessageEvents.add(_linkMap(call.arguments));
+          }
+          return null;
+        case 'linkClients':
+          if (call.arguments is Map) {
+            _linkClientEvents.add(_linkMap(call.arguments));
+          }
+          return null;
+        case 'linkPaired':
+          if (call.arguments is Map) {
+            _linkPairedEvents.add(_linkMap(call.arguments));
+          }
+          return null;
+        case 'linkPairingEnded':
+          final args = call.arguments;
+          final reason = args is Map ? args['reason']?.toString() : null;
+          _linkPairingEndedEvents.add(reason ?? 'cancelled');
           return null;
         case 'extensionVerificationNotificationTapped':
           _verificationNotificationEvents.add(null);

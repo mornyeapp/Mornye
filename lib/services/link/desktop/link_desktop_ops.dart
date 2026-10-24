@@ -1,0 +1,381 @@
+import 'dart:math' as math;
+
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mornye/models/download_item.dart';
+import 'package:mornye/models/track.dart';
+import 'package:mornye/services/desktop_deep_links.dart';
+import 'package:mornye/services/link/desktop/link_catalog_index.dart';
+import 'package:mornye/services/link/desktop/link_downloads.dart';
+import 'package:mornye/services/link/desktop/link_player.dart';
+import 'package:mornye/services/link/link_host_router.dart';
+import 'package:mornye/services/link/link_protocol.dart';
+import 'package:mornye/services/platform_bridge.dart';
+import 'package:mornye/services/playable_media.dart';
+import 'package:mornye/services/share_intent_service.dart';
+
+const _openableSchemes = {'http', 'https', 'spotify', 'mornye'};
+
+/// Whether a phone may ask the desktop to open [url]: web links, Spotify
+/// URIs and `mornye://` links, the kinds the app accepts when shared.
+bool linkOpenableUrl(String url) {
+  final uri = Uri.tryParse(url.trim());
+  if (uri == null) return false;
+  final scheme = uri.scheme.toLowerCase();
+  if (!_openableSchemes.contains(scheme)) return false;
+  return !scheme.startsWith('http') || uri.host.isNotEmpty;
+}
+
+/// Opens [url] as if it had been shared with the app: `mornye://` links go
+/// to the deep link inbox, anything else to the shell's shared link
+/// handler, which resolves it on the Search page.
+Future<void> linkOpenSharedUrl(String url) async {
+  final uri = Uri.tryParse(url);
+  if (uri != null && DesktopDeepLinks.isAppLink(uri)) {
+    await PlatformBridge.queueExtensionCallbackUrl(url);
+    return;
+  }
+  ShareIntentService().injectUrl(url);
+}
+
+/// How the desktop opens a URL a phone sent (`POST open`). Tests override
+/// it.
+final linkOpenUrlProvider = Provider<Future<void> Function(String url)>(
+  (ref) => linkOpenSharedUrl,
+);
+
+/// [song] as the desktop player plays it from the Library.
+PlayableMedia linkPlayableFor(LinkCatalogSong song, {String? coverPath}) =>
+    PlayableMedia(
+      id: linkRecordIdOf(song.id),
+      source: song.path,
+      title: song.title,
+      artist: song.artist,
+      album: song.album ?? '',
+      artUri: coverPath == null ? null : Uri.file(coverPath).toString(),
+      duration: song.durationMs == null
+          ? null
+          : Duration(milliseconds: song.durationMs!),
+    );
+
+/// A play queue a Subsonic client saved (`savePlayQueue`).
+class LinkSavedPlayQueue {
+  const LinkSavedPlayQueue({
+    required this.songIds,
+    required this.positionMs,
+    required this.changedMs,
+    required this.changedBy,
+    this.currentId,
+  });
+
+  final List<String> songIds;
+  final String? currentId;
+  final int positionMs;
+  final int changedMs;
+  final String changedBy;
+
+  Map<String, dynamic> toJson() => {
+    'songIds': songIds,
+    'currentId': ?currentId,
+    'positionMs': positionMs,
+    'changedMs': changedMs,
+    'changedBy': changedBy,
+  };
+}
+
+String? _stringArg(Map<String, dynamic> args, String key) {
+  final value = args[key];
+  if (value is! String) return null;
+  final trimmed = value.trim();
+  return trimmed.isEmpty ? null : trimmed;
+}
+
+int? _intArg(Map<String, dynamic> args, String key) {
+  final value = args[key];
+  return value is num ? value.toInt() : null;
+}
+
+LinkException _invalid(String message) => LinkException('invalid', message);
+
+/// The forwarded operations the desktop host answers itself (contract 6.1
+/// and the play queue ops of 6.2): player state and commands, handoff,
+/// downloads, opening links, track resolution and the Subsonic play queue.
+class LinkDesktopOps {
+  LinkDesktopOps({
+    required LinkPlayerPort player,
+    required LinkDownloadsPort downloads,
+    required List<DownloadItem> Function() downloadItems,
+    required Future<void> Function(String url) openUrl,
+    required DesktopLinkCatalogIndex? Function() index,
+    required String Function() desktopName,
+    String Function(String deviceId)? deviceName,
+    int Function()? nowMs,
+  }) : _player = player,
+       _downloads = downloads,
+       _downloadItems = downloadItems,
+       _openUrl = openUrl,
+       _index = index,
+       _desktopName = desktopName,
+       _deviceName = deviceName ?? ((deviceId) => deviceId),
+       _nowMs = nowMs ?? (() => DateTime.now().millisecondsSinceEpoch);
+
+  /// The longest play queue the Subsonic `getPlayQueue` answer carries.
+  static const maxPlayQueue = 1000;
+
+  final LinkPlayerPort _player;
+  final LinkDownloadsPort _downloads;
+  final List<DownloadItem> Function() _downloadItems;
+  final Future<void> Function(String url) _openUrl;
+  final DesktopLinkCatalogIndex? Function() _index;
+  final String Function() _desktopName;
+  final String Function(String deviceId) _deviceName;
+  final int Function() _nowMs;
+
+  final _savedQueues = <String, LinkSavedPlayQueue>{};
+  List<LinkPlayerItem>? _observedQueue;
+  String? _observedCurrent;
+  int _desktopQueueChangedMs = 0;
+
+  /// Registers these ops on [router].
+  void register(LinkHostRouter router) {
+    router
+      ..register(LinkOps.state, (_) async => state().toJson())
+      ..register(LinkOps.command, _command)
+      ..register(LinkOps.handoffPlay, (request) => playHandoff(request.args))
+      ..register(LinkOps.handoffCurrent, (_) async => linkHandoffArgs(state()))
+      ..register(LinkOps.downloads, _downloadsOp)
+      ..register(LinkOps.open, _open)
+      ..register(LinkOps.resolve, _resolve)
+      ..register(LinkOps.getPlayQueue, _getPlayQueue)
+      ..register(LinkOps.savePlayQueue, _savePlayQueue);
+  }
+
+  /// The desktop player as phones see it.
+  LinkPlayerState state() =>
+      linkPlayerState(_player.snapshot(), index: _index());
+
+  /// Notes the desktop's own queue, so `getPlayQueue` knows when it last
+  /// changed. The host calls it on every player change.
+  void observe(LinkPlayerSnapshot snapshot) {
+    final current = snapshot.current;
+    final currentKey = current == null
+        ? null
+        : '${current.id}\n${current.path}';
+    if (identical(snapshot.queue, _observedQueue) &&
+        currentKey == _observedCurrent) {
+      return;
+    }
+    _observedQueue = snapshot.queue;
+    _observedCurrent = currentKey;
+    _desktopQueueChangedMs = _nowMs();
+  }
+
+  Future<Object?> _command(LinkRequest request) async {
+    final command = LinkCommand.fromJson(request.args);
+    if (command == null) throw _invalid('Missing action');
+    await runCommand(command);
+    return const {'ok': true};
+  }
+
+  /// Runs a player [command] from a phone on the desktop player.
+  Future<void> runCommand(LinkCommand command) async {
+    final args = command.args;
+    switch (command.action) {
+      case LinkActions.play:
+        await _player.play();
+      case LinkActions.pause:
+        await _player.pause();
+      case LinkActions.toggle:
+        await (_player.snapshot().playing ? _player.pause() : _player.play());
+      case LinkActions.next:
+        await _player.next();
+      case LinkActions.previous:
+        await _player.previous();
+      case LinkActions.seek:
+        final positionMs = _intArg(args, 'positionMs');
+        if (positionMs == null) throw _invalid('Missing positionMs');
+        await _player.seek(Duration(milliseconds: math.max(0, positionMs)));
+      case LinkActions.volume:
+        final value = args['value'];
+        if (value is! num) throw _invalid('Missing value');
+        await _player.setVolume(value.toDouble().clamp(0, 1));
+      case LinkActions.shuffle:
+        final enabled = args['enabled'];
+        if (enabled is! bool) throw _invalid('Missing enabled');
+        await _player.setShuffle(enabled);
+      case LinkActions.repeat:
+        final mode = LinkRepeatMode.values.asNameMap()[args['mode']];
+        if (mode == null) throw _invalid('Unknown repeat mode');
+        await _player.setRepeat(mode);
+      case LinkActions.jump:
+        // Phones index the queue window the state carries.
+        final index = _intArg(args, 'index');
+        final snapshot = _player.snapshot();
+        final window = linkQueueWindow(snapshot.queue.length, snapshot.index);
+        if (index == null || index < 0 || window.start + index >= window.end) {
+          throw _invalid('Index out of range');
+        }
+        await _player.jumpTo(window.start + index);
+      case LinkActions.playQueue:
+        await playHandoff(args);
+      default:
+        throw _invalid('Unknown action ${command.action}');
+    }
+  }
+
+  /// `handoff/play`: plays the songs of [args] the Library has, from the
+  /// requested entry (or the next one it has) and position, and reports
+  /// the entries it could not find.
+  Future<Map<String, dynamic>> playHandoff(Map<String, dynamic> args) async {
+    final queue = args['queue'];
+    if (queue is! List) throw _invalid('Missing queue');
+    final index = _index();
+    if (index == null) {
+      throw const LinkException('unavailable', 'The catalog is not ready');
+    }
+    final requested = _intArg(args, 'index') ?? 0;
+    final media = <PlayableMedia>[];
+    final missing = <int>[];
+    var start = -1;
+    var exact = false;
+    for (var i = 0; i < queue.length; i++) {
+      final ref = TrackRef.fromJson(queue[i]);
+      final songId = ref == null ? null : index.songIdForRef(ref);
+      final song = songId == null ? null : index.songById(songId);
+      if (song == null) {
+        missing.add(i);
+        continue;
+      }
+      if (i == requested) {
+        start = media.length;
+        exact = true;
+      } else if (i > requested && start < 0) {
+        start = media.length;
+      }
+      media.add(linkPlayableFor(song, coverPath: index.coverPathFor(song.id)));
+    }
+    if (media.isNotEmpty) {
+      await _player.playQueue(
+        media,
+        index: start < 0 ? media.length - 1 : start,
+        position: exact
+            ? Duration(
+                milliseconds: math.max(0, _intArg(args, 'positionMs') ?? 0),
+              )
+            : Duration.zero,
+        playing: args['playing'] != false,
+      );
+    }
+    return {'resolved': media.length, 'missing': missing};
+  }
+
+  Future<Object?> _downloadsOp(LinkRequest request) async {
+    if (request.method == 'GET') return linkDownloadsPayload(_downloadItems());
+    final args = request.args;
+    final url = _stringArg(args, 'url');
+    if (url != null) {
+      final link = await _downloads.resolveUrl(url);
+      return {
+        'queued': _downloads.enqueue(
+          link.tracks,
+          playlistName: link.playlistName,
+        ),
+      };
+    }
+    final tracks = args['tracks'];
+    if (tracks is! List || tracks.isEmpty) throw _invalid('Pass url or tracks');
+    final parsed = <Track>[];
+    for (final json in tracks) {
+      try {
+        parsed.add(Track.fromJson(Map<String, dynamic>.from(json as Map)));
+      } on Object {
+        throw _invalid('Malformed track');
+      }
+    }
+    return {
+      'queued': _downloads.enqueue(
+        parsed,
+        service: _stringArg(args, 'service'),
+        quality: _stringArg(args, 'quality'),
+        playlistName: _stringArg(args, 'playlistName'),
+      ),
+    };
+  }
+
+  Future<Object?> _open(LinkRequest request) async {
+    final url = _stringArg(request.args, 'url');
+    if (url == null || !linkOpenableUrl(url)) {
+      throw _invalid('Unsupported link');
+    }
+    await _openUrl(url);
+    return const {'ok': true};
+  }
+
+  Future<Object?> _resolve(LinkRequest request) async {
+    final tracks = request.args['tracks'];
+    if (tracks is! List) throw _invalid('Missing tracks');
+    final index = _index();
+    if (index == null) {
+      throw const LinkException('unavailable', 'The catalog is not ready');
+    }
+    return {
+      'songIds': [
+        for (final json in tracks)
+          switch (TrackRef.fromJson(json)) {
+            null => null,
+            final ref => index.songIdForRef(ref),
+          },
+      ],
+    };
+  }
+
+  /// `subsonic/getPlayQueue`: what the device saved, unless the desktop's
+  /// own queue changed since; then the desktop's queue.
+  Future<Object?> _getPlayQueue(LinkRequest request) async {
+    final saved = _savedQueues[request.deviceId];
+    if (saved != null && saved.changedMs >= _desktopQueueChangedMs) {
+      return saved.toJson();
+    }
+    final snapshot = _player.snapshot();
+    final index = _index();
+    final window = linkQueueWindow(
+      snapshot.queue.length,
+      snapshot.index,
+      max: maxPlayQueue,
+    );
+    final songIds = <String>[];
+    String? currentId;
+    for (var i = window.start; i < window.end; i++) {
+      final item = snapshot.queue[i];
+      final id = index?.songIdForMedia(id: item.id, path: item.path);
+      if (id == null) continue;
+      songIds.add(id);
+      if (i == snapshot.index) currentId = id;
+    }
+    return {
+      'songIds': songIds,
+      'currentId': ?currentId,
+      'positionMs': currentId == null ? 0 : snapshot.positionMs,
+      'changedMs': _desktopQueueChangedMs == 0
+          ? _nowMs()
+          : _desktopQueueChangedMs,
+      'changedBy': _desktopName(),
+    };
+  }
+
+  Future<Object?> _savePlayQueue(LinkRequest request) async {
+    final args = request.args;
+    final songs = args['songs'];
+    _savedQueues[request.deviceId] = LinkSavedPlayQueue(
+      songIds: [
+        if (songs is List)
+          for (final song in songs)
+            if (song is Map && song['id'] is String) song['id'] as String,
+      ],
+      currentId: _stringArg(args, 'currentId'),
+      positionMs: math.max(0, _intArg(args, 'positionMs') ?? 0),
+      changedMs: _nowMs(),
+      changedBy: _deviceName(request.deviceId),
+    );
+    return const <String, dynamic>{};
+  }
+}
