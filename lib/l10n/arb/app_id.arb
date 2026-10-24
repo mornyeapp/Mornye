@@ -6736,6 +6736,7 @@
   "linkDesktopQueue": "Antrean di {name}",
   "linkDesktopDownloads": "Download di {name}",
   "linkHandoffStarted": "Diputar di {name}",
+  "linkHandoffSending": "Mengirim lagu ini ke {name}...",
   "linkHandoffMissing": "Diputar di {name}. Tidak ditemukan di sana: {titles}",
   "linkHandoffNotFound": "{name} tidak punya satu pun lagu ini",
   "linkHandoffNothingPlaying": "Tidak ada yang diputar di ponsel ini",

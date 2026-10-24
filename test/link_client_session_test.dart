@@ -136,6 +136,9 @@ void main() {
             response.write(jsonEncode({'resolved': 2, 'missing': <String>[]}));
           case '/mornye/v1/open':
             response.statusCode = 204;
+          case final path when path.startsWith('/mornye/v1/files/'):
+            response.headers.contentType = ContentType.json;
+            response.write(jsonEncode({'name': request.uri.pathSegments.last}));
           case '/mornye/v1/secret':
             response.statusCode = 401;
           default:
@@ -185,6 +188,36 @@ void main() {
 
     test('an empty success answers null', () async {
       expect(await session.post(LinkOps.open, {'url': 'x'}), isNull);
+    });
+
+    test('upload PUTs the file under files/<name>', () async {
+      final dir = await Directory.systemTemp.createTemp('link_upload_');
+      addTearDown(() => dir.delete(recursive: true));
+      final file = File('${dir.path}/song.flac');
+      await file.writeAsString('fLaC data');
+      final name = '${linkFileIdFor(file.path, 9)}.flac';
+      final progress = <int>[];
+      await session.upload(name, file, onProgress: progress.add);
+      final request = requests.single;
+      expect(request.method, 'PUT');
+      expect(request.uri.path, '/mornye/v1/files/$name');
+      expect(request.headers.value('authorization'), 'Bearer key-1');
+      expect(request.headers.contentLength, 9);
+      expect(bodies.single, 'fLaC data');
+      expect(progress.last, 9);
+    });
+
+    test('an upload name that is not an id and format is refused', () async {
+      final file = File('unused.flac');
+      for (final name in ['../a.flac', '${'0' * 32}.exe', 'song.flac']) {
+        await expectLater(
+          session.upload(name, file),
+          throwsA(
+            isA<LinkException>().having((e) => e.code, 'code', 'invalid'),
+          ),
+        );
+      }
+      expect(requests, isEmpty);
     });
 
     test('error bodies become LinkException', () async {

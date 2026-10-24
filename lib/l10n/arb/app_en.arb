@@ -6867,6 +6867,15 @@
       }
     }
   },
+  "linkHandoffSending": "Sending this song to {name}...",
+  "@linkHandoffSending": {
+    "description": "Mornye Link: the phone uploads the current song, which the paired desktop lacks, before it plays there",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "linkHandoffMissing": "Playing on {name}. Not found there: {titles}",
   "@linkHandoffMissing": {
     "description": "Mornye Link: the paired desktop took over the phone's queue but lacks some tracks, listed by title",

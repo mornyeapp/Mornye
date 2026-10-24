@@ -423,12 +423,7 @@ class LinkClientSession implements LinkSession {
     Map<String, String> query = const {},
     Map<String, dynamic>? body,
   }) async {
-    if (_disposed) {
-      throw const LinkException(
-        LinkClientErrors.unavailable,
-        'The link was closed',
-      );
-    }
+    _ensureOpen();
     if (!_validOp(op)) {
       throw LinkException(LinkClientErrors.invalid, 'Invalid operation $op');
     }
@@ -451,6 +446,51 @@ class LinkClientSession implements LinkSession {
     } catch (error) {
       throw linkTransportException(error);
     }
+    return _answer(response);
+  }
+
+  @override
+  Future<void> upload(
+    String name,
+    File file, {
+    void Function(int sent)? onProgress,
+  }) async {
+    _ensureOpen();
+    final dot = name.lastIndexOf('.');
+    if (dot < 0 ||
+        !isLinkFileId(name.substring(0, dot)) ||
+        !linkUploadExtensions.contains(name.substring(dot + 1))) {
+      throw LinkException(LinkClientErrors.invalid, 'Invalid file name $name');
+    }
+    final origin = _origin;
+    final LinkHttpResponse response;
+    try {
+      await _ensureAccess(origin);
+      response = await linkHttpUpload(
+        _client,
+        origin.replace(path: '$linkFilesPath/$name'),
+        file,
+        headers: _authorization,
+        onProgress: onProgress,
+        timeout: _requestTimeout,
+      );
+    } catch (error) {
+      throw linkTransportException(error);
+    }
+    _answer(response);
+  }
+
+  void _ensureOpen() {
+    if (_disposed) {
+      throw const LinkException(
+        LinkClientErrors.unavailable,
+        'The link was closed',
+      );
+    }
+  }
+
+  /// The body of a successful [response]; throws the failure otherwise.
+  Object? _answer(LinkHttpResponse response) {
     if (response.ok) return response.body;
     final failure = linkResponseException(response);
     if (response.statusCode == 401) _issue = LinkSessionIssue.unauthorized;

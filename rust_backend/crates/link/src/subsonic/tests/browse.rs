@@ -141,7 +141,10 @@ async fn artists_are_indexed_by_initial_with_others_last() {
     assert_eq!(beyonce["id"], fixture.artist_id("Beyoncé"));
     assert_eq!(beyonce["name"], "Beyoncé");
     assert_eq!(beyonce["albumCount"], 1);
-    assert!(beyonce.get("coverArt").is_none(), "no album with a cover");
+    assert_eq!(
+        beyonce["coverArt"], beyonce["id"],
+        "no cover file, but a FLAC that may embed one"
+    );
     let band = &index[1]["artist"][0];
     assert_eq!(band["name"], "The Band");
     assert_eq!(band["coverArt"], band["id"]);
@@ -232,6 +235,7 @@ async fn song_children_carry_open_subsonic_fields() {
             "year": 2008,
             "genre": "pop",
             "genres": [{ "name": "pop" }],
+            "coverArt": album,
             "size": 4,
             "contentType": "audio/flac",
             "suffix": "flac",
@@ -264,7 +268,11 @@ async fn song_children_carry_open_subsonic_fields() {
     assert_eq!(loose["explicitStatus"], "");
     assert!(loose.get("replayGain").is_none());
     assert!(loose.get("isrc").is_none());
-    assert!(loose.get("coverArt").is_none());
+    assert_eq!(
+        loose["coverArt"],
+        fixture.album_id("l:40"),
+        "a FLAC may embed a cover"
+    );
 }
 
 #[tokio::test]

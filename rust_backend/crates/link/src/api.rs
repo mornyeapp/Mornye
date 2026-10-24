@@ -3,9 +3,12 @@
 //!   merged after the query: Subsonic authentication, then the Subsonic layer;
 //! - `GET /mornye/v1/info` and `POST /mornye/v1/pair`, no authentication;
 //! - `GET /mornye/v1/ws`, the WebSocket;
+//! - `PUT /mornye/v1/files/<name>`: Bearer authentication, then the body is
+//!   stored as a received song file;
 //! - any other `/mornye/v1/<op>`: Bearer authentication, then forwarded to
 //!   the app as `linkRequest` with `_method` added to the arguments.
 
+use crate::files::{self, ReceiveError};
 use crate::pairing::{PAIRED, PairError};
 use crate::server::{MAX_BODY, State};
 use crate::types::{Device, HttpResponse, SubsonicRequest, json};
@@ -34,6 +37,9 @@ pub(crate) async fn route(
     let Some(op) = path.strip_prefix("/mornye/v1/") else {
         return not_found();
     };
+    if let Some(name) = op.strip_prefix("files/") {
+        return upload(state, name, request).await;
+    }
     match op {
         "info" if request.method() == Method::GET => info(state),
         "pair" if request.method() == Method::POST => pair(state, peer, request).await,
@@ -222,6 +228,35 @@ async fn forward(state: &Arc<State>, op: &str, request: http::Request<Incoming>)
     }
 }
 
+/// `PUT /mornye/v1/files/<name>`: a song file from the phone, streamed to
+/// `<state_dir>/received/<name>`. Replies `{"name","size"}`; 413 beyond
+/// [`files::MAX_UPLOAD`].
+async fn upload(state: &Arc<State>, name: &str, request: http::Request<Incoming>) -> HttpResponse {
+    let Some(record) = auth::bearer(&state.store, request.headers()) else {
+        return unauthorized();
+    };
+    if request.method() != Method::PUT {
+        return method_not_allowed();
+    }
+    if !files::valid_name(name) {
+        return invalid("The name must be 32 lowercase hex digits and an audio extension");
+    }
+    if declared_length(request.headers()).is_some_and(|length| length > files::MAX_UPLOAD) {
+        return BodyError::TooLarge.response();
+    }
+    state.store.touch(&record.device_id);
+    let dir = files::received_dir(&state.shared.config.state_dir);
+    match files::upload(&dir, name, request.into_body()).await {
+        Ok(size) => json(200, &object!({"name": name, "size": size})),
+        Err(ReceiveError::TooLarge) => BodyError::TooLarge.response(),
+        Err(ReceiveError::Unreadable) => BodyError::Unreadable.response(),
+        Err(ReceiveError::Storage(error)) => json(
+            500,
+            &object!({"error": "internal", "message": format!("The file could not be saved: {error}")}),
+        ),
+    }
+}
+
 /// The query as a JSON object of strings; a repeated key keeps its last
 /// value.
 fn query_map(query: Option<&str>) -> Map<String, Value> {
@@ -262,13 +297,17 @@ impl BodyError {
     }
 }
 
-/// The whole body, at most [`MAX_BODY`] bytes (413 beyond).
-async fn read_body(headers: &HeaderMap, body: Incoming) -> Result<Bytes, BodyError> {
-    let declared = headers
+/// The `Content-Length` the client declared.
+fn declared_length(headers: &HeaderMap) -> Option<u64> {
+    headers
         .get(header::CONTENT_LENGTH)
         .and_then(|value| value.to_str().ok())
-        .and_then(|value| value.parse::<u64>().ok());
-    if declared.is_some_and(|length| length > MAX_BODY as u64) {
+        .and_then(|value| value.parse::<u64>().ok())
+}
+
+/// The whole body, at most [`MAX_BODY`] bytes (413 beyond).
+async fn read_body(headers: &HeaderMap, body: Incoming) -> Result<Bytes, BodyError> {
+    if declared_length(headers).is_some_and(|length| length > MAX_BODY as u64) {
         return Err(BodyError::TooLarge);
     }
     match Limited::new(body, MAX_BODY).collect().await {

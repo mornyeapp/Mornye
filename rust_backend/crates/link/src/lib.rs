@@ -1,10 +1,11 @@
 //! Mornye Link: the desktop app's HTTPS server for the phone app. It speaks
 //! OpenSubsonic for the library (`/rest`), Mornye endpoints under
-//! `/mornye/v1` forwarded to the app, and a WebSocket for pushes. The
-//! contract is `docs/internal/desktop/LINK_CONTRACT.md`.
+//! `/mornye/v1` forwarded to the app, song files sent by the phone, and a
+//! WebSocket for pushes. The contract is
+//! `docs/internal/desktop/LINK_CONTRACT.md`.
 //!
 //! Module owners: L1a `server`, `tls`, `store`, `auth`, `pairing`, `ws`,
-//! `mdns`, `api`; L1b `catalog`, `subsonic`, `xml`, `media`.
+//! `mdns`, `api`, `files`; L1b `catalog`, `subsonic`, `xml`, `media`.
 //!
 //! [`LinkServer`] owns its own Tokio runtime. Start and stop it from a plain
 //! thread (the desktop worker pool), not from inside an async task.
@@ -15,6 +16,7 @@ pub mod types;
 
 mod api;
 mod auth;
+mod files;
 mod mdns;
 mod pairing;
 mod server;
@@ -23,6 +25,7 @@ mod tls;
 mod ws;
 
 pub use catalog::Catalog;
+pub use files::received_dir;
 pub use server::Tuning;
 pub use types::{Device, Host, HostError, LinkConfig, Shared};
 
@@ -159,7 +162,9 @@ impl LinkServer {
         self.discovery_error.as_deref()
     }
 
-    /// The `linkStart` result: `{"port","fingerprint","serverId","name","addresses"}`.
+    /// The `linkStart` result:
+    /// `{"port","fingerprint","serverId","name","addresses","receivedDir"}`,
+    /// where `receivedDir` is the absolute folder of files sent by phones.
     pub fn summary(&self) -> Value {
         json!({
             "port": self.state.port(),
@@ -167,6 +172,7 @@ impl LinkServer {
             "serverId": self.state.shared.server_id,
             "name": self.state.name(),
             "addresses": self.state.addresses(),
+            "receivedDir": received_dir(&self.state.shared.config.state_dir).to_string_lossy(),
         })
     }
 

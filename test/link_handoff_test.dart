@@ -1,8 +1,13 @@
+import 'dart:io';
+
+import 'package:audio_service/audio_service.dart' show MediaItem;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/services/link/features/link_handoff.dart';
+import 'package:mornye/services/link/features/link_phone_files.dart';
 import 'package:mornye/services/link/features/link_phone_player.dart';
 import 'package:mornye/services/link/features/link_track_resolver.dart';
 import 'package:mornye/services/link/link_protocol.dart';
+import 'package:mornye/services/playable_media.dart';
 
 import 'support/link_fakes.dart';
 
@@ -99,6 +104,197 @@ void main() {
       final result = await handoff(client, FakePhonePlayer()).playOnDesktop();
       expect(result, isNull);
       expect(client.posts, isEmpty);
+    });
+  });
+
+  group('Play on desktop with songs only the phone has', () {
+    late Directory dir;
+    late LinkPhoneFiles files;
+
+    setUp(() async {
+      dir = await Directory.systemTemp.createTemp('link_handoff_');
+      files = LinkPhoneFiles(copyContentUri: (_) async => null);
+    });
+
+    tearDown(() => dir.delete(recursive: true));
+
+    /// A queued song whose file is on the phone when [bytes] is given.
+    Future<MediaItem> song(String name, {List<int>? bytes}) async {
+      final path = '${dir.path}/$name.flac';
+      if (bytes != null) await File(path).writeAsBytes(bytes);
+      return linkMediaItem(
+        PlayableMedia(
+          id: name,
+          source: path,
+          title: name,
+          artist: 'Artist',
+          album: 'Album',
+        ),
+      );
+    }
+
+    LinkHandoff withFiles(FakeLinkClient client, FakePhonePlayer player) {
+      final records = FakeLibraryLookup();
+      return LinkHandoff(
+        client: client,
+        player: player,
+        refs: LinkTrackRefCache(lookup: records, server: client.server),
+        resolver: LinkTrackResolver(lookup: records, server: client.server),
+        files: files,
+      );
+    }
+
+    /// The desktop: `check` reports [missing], playing answers `h1`.
+    FakeLinkClient desktop(List<int> missing) => FakeLinkClient(
+      onPost: (op, body) => switch (op) {
+        LinkOps.handoffPlay when body['check'] == true => {
+          'resolved': (body['queue'] as List).length - missing.length,
+          'missing': missing,
+        },
+        LinkOps.handoffPlay => {
+          'resolved': (body['queue'] as List).length,
+          'missing': <int>[],
+          'handoffId': 'h1',
+        },
+        _ => {'resolved': 1},
+      },
+    );
+
+    List<String> titles(Map<String, dynamic> body) => [
+      for (final item in body['queue'] as List)
+        (item as Map)['title'] as String,
+    ];
+
+    Future<void> until(bool Function() done) async {
+      for (var i = 0; i < 200 && !done(); i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 5));
+      }
+    }
+
+    test('uploads the current song before the desktop plays it', () async {
+      final a = await song('a', bytes: [1, 2, 3]);
+      final b = await song('b');
+      final player = FakePhonePlayer(
+        LinkPhoneSnapshot(queue: [a, b], index: 0, playing: true),
+      );
+      final client = desktop([0]);
+      final progress = <(int, int)>[];
+      final result = await withFiles(
+        client,
+        player,
+      ).playOnDesktop(onSending: (sent, total) => progress.add((sent, total)));
+
+      final fileId = linkFileIdFor(a.extras!['source'] as String, 3);
+      expect(client.uploads.single.name, '$fileId.flac');
+      expect(client.uploads.single.bytes, [1, 2, 3]);
+      expect(progress.last, (3, 3));
+      final check = client.posts.first;
+      expect(check.body['check'], isTrue);
+      final play = client.posts[1].body;
+      expect(play['check'], isNull);
+      expect(titles(play), ['a', 'b']);
+      expect(((play['queue'] as List).first as Map)['fileId'], fileId);
+      expect(((play['queue'] as List).last as Map)['fileId'], isNull);
+      expect(result!.started, isTrue);
+      expect(player.calls, ['pause']);
+    });
+
+    test(
+      'sends later songs in the background and queues them in order',
+      () async {
+        final player = FakePhonePlayer(
+          LinkPhoneSnapshot(
+            queue: [
+              await song('a'),
+              await song('b', bytes: [1]),
+              await song('c'),
+              await song('d', bytes: [2]),
+            ],
+            index: 0,
+            playing: true,
+          ),
+        );
+        final client = desktop([1, 3]);
+        await withFiles(client, player).playOnDesktop();
+
+        expect(titles(client.posts[1].body), ['a']);
+        await until(() => client.posts.length == 4);
+        expect(
+          [for (final upload in client.uploads) upload.bytes],
+          [
+            [1],
+            [2],
+          ],
+        );
+        final appends = client.posts.skip(2).toList();
+        expect(
+          [for (final post in appends) post.op],
+          [LinkOps.handoffAppend, LinkOps.handoffAppend],
+        );
+        expect(appends.first.body['handoffId'], 'h1');
+        expect(titles(appends.first.body), ['b', 'c']);
+        expect(titles(appends.last.body), ['d']);
+      },
+    );
+
+    test(
+      'a song that fails to send is skipped, the rest still queue',
+      () async {
+        final player = FakePhonePlayer(
+          LinkPhoneSnapshot(
+            queue: [
+              await song('a'),
+              await song('b', bytes: [1]),
+              await song('c'),
+            ],
+            index: 0,
+            playing: true,
+          ),
+        );
+        final client = desktop([1])
+          ..onUpload = (_) => const LinkException('unavailable', 'gone');
+        await withFiles(client, player).playOnDesktop();
+
+        await until(() => client.posts.length == 3);
+        expect(client.posts.last.op, LinkOps.handoffAppend);
+        expect(titles(client.posts.last.body), ['c']);
+      },
+    );
+
+    test('sending another queue stops the uploads of the one before', () async {
+      final player = FakePhonePlayer(
+        LinkPhoneSnapshot(
+          queue: [
+            await song('a'),
+            await song('b', bytes: [1]),
+          ],
+          index: 0,
+          playing: true,
+        ),
+      );
+      final client = desktop([1]);
+      client.onUpload = (_) {
+        files.begin();
+        return null;
+      };
+      await withFiles(client, player).playOnDesktop();
+
+      await until(() => client.uploads.isNotEmpty);
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(
+        client.posts.map((post) => post.op),
+        isNot(contains(LinkOps.handoffAppend)),
+      );
+    });
+
+    test('asks nothing more when no queued song is a phone file', () async {
+      final player = FakePhonePlayer(
+        LinkPhoneSnapshot(queue: [await song('a')], index: 0, playing: true),
+      );
+      final client = desktop(const []);
+      await withFiles(client, player).playOnDesktop();
+      expect(client.posts.single.body['check'], isNull);
+      expect(client.uploads, isEmpty);
     });
   });
 

@@ -18,11 +18,50 @@ const linkPortLast = 47729;
 const linkApiPath = '/mornye/v1';
 const linkSocketPath = '$linkApiPath/ws';
 
+/// `PUT <linkFilesPath>/<id>.<extension>` uploads a song file the phone has
+/// and the desktop lacks; [TrackRef.fileId] then names it.
+const linkFilesPath = '$linkApiPath/files';
+
+/// The audio extensions the desktop accepts in an upload name.
+const linkUploadExtensions = {
+  'flac',
+  'mp3',
+  'm4a',
+  'mp4',
+  'aac',
+  'ogg',
+  'oga',
+  'opus',
+  'wav',
+  'aif',
+  'aiff',
+  'aifc',
+  'wv',
+  'ape',
+  'dsf',
+  'dff',
+  'mka',
+  'wma',
+  'webm',
+};
+
+final _fileId = RegExp(r'^[0-9a-f]{32}$');
+
+/// Whether [value] is a [TrackRef.fileId]: 32 lowercase hex characters.
+bool isLinkFileId(String? value) => value != null && _fileId.hasMatch(value);
+
+/// The [TrackRef.fileId] of the phone's file at [source] (a path or content
+/// URI) with [size] bytes: the same file keeps its id, so the desktop does
+/// not receive it twice.
+String linkFileIdFor(String source, int size) =>
+    sha256.convert(utf8.encode('$source\n$size')).toString().substring(0, 32);
+
 /// Forwarded `/mornye/v1` operations (the path after [linkApiPath]).
 abstract final class LinkOps {
   static const state = 'state';
   static const command = 'command';
   static const handoffPlay = 'handoff/play';
+  static const handoffAppend = 'handoff/append';
   static const handoffCurrent = 'handoff/current';
   static const downloads = 'downloads';
   static const open = 'open';
@@ -100,6 +139,7 @@ class TrackRef {
     this.matchKey,
     this.songId,
     this.serverId,
+    this.fileId,
   });
 
   final String title;
@@ -113,6 +153,11 @@ class TrackRef {
   final String? songId;
   final String? serverId;
 
+  /// The phone's file for this track, once uploaded to the desktop
+  /// ([linkFileIdFor]). The desktop plays it when its Library lacks the
+  /// track.
+  final String? fileId;
+
   Map<String, dynamic> toJson() => {
     'title': title,
     'artist': artist,
@@ -122,7 +167,21 @@ class TrackRef {
     if (matchKey != null) 'matchKey': matchKey,
     if (songId != null) 'songId': songId,
     if (serverId != null) 'serverId': serverId,
+    if (fileId != null) 'fileId': fileId,
   };
+
+  /// This ref naming the uploaded file [fileId].
+  TrackRef withFileId(String fileId) => TrackRef(
+    title: title,
+    artist: artist,
+    album: album,
+    durationMs: durationMs,
+    isrc: isrc,
+    matchKey: matchKey,
+    songId: songId,
+    serverId: serverId,
+    fileId: fileId,
+  );
 
   static TrackRef? fromJson(Object? json) {
     if (json is! Map) return null;
@@ -137,6 +196,10 @@ class TrackRef {
       matchKey: _string(json['matchKey']),
       songId: _string(json['songId']),
       serverId: _string(json['serverId']),
+      fileId: switch (_string(json['fileId'])) {
+        final fileId? when isLinkFileId(fileId) => fileId,
+        _ => null,
+      },
     );
   }
 
@@ -150,7 +213,8 @@ class TrackRef {
       other.isrc == isrc &&
       other.matchKey == matchKey &&
       other.songId == songId &&
-      other.serverId == serverId;
+      other.serverId == serverId &&
+      other.fileId == fileId;
 
   @override
   int get hashCode => Object.hash(
@@ -162,6 +226,7 @@ class TrackRef {
     matchKey,
     songId,
     serverId,
+    fileId,
   );
 }
 

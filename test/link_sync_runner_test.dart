@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -86,6 +87,13 @@ class _FakeClient implements LinkClientApi {
     posts.add((op, wire));
     return _dispatch(op, {...wire, '_method': 'POST'});
   }
+
+  @override
+  Future<void> upload(
+    String name,
+    File file, {
+    void Function(int sent)? onProgress,
+  }) => throw UnimplementedError();
 
   Future<void> close() async {
     await states.close();

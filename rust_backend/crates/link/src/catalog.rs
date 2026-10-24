@@ -30,6 +30,8 @@ pub(crate) const VARIOUS_ARTISTS: &str = "Various Artists";
 const MAX_ID_LEN: usize = 4096;
 /// Upper bound for preallocation from the header's `count`.
 const MAX_PREALLOCATE: usize = 1_000_000;
+/// Songs whose embedded picture is tried for one `coverArt` id.
+const EMBEDDED_COVER_TRIES: usize = 3;
 
 /// An indexed catalog snapshot. Immutable once loaded.
 #[derive(Debug, Default)]
@@ -109,6 +111,34 @@ impl Song {
             u32::try_from(size.saturating_mul(8) / ms).ok()
         })
     }
+
+    /// The `mornye_core::tags::extract_cover` format for this song's file,
+    /// when its container can embed a cover.
+    pub(crate) fn embedded_cover_format(&self) -> Option<&'static str> {
+        Some(match self.suffix.as_str() {
+            "flac" => "flac",
+            "m4a" | "mp4" | "m4b" | "alac" => "m4a",
+            "aac" => "aac",
+            "mp3" => "mp3",
+            "ogg" | "oga" => "ogg",
+            "opus" => "opus",
+            "wav" => "wav",
+            "aiff" => "aiff",
+            "aif" => "aif",
+            "aifc" => "aifc",
+            _ => return None,
+        })
+    }
+}
+
+/// Where the image behind a `coverArt` id comes from.
+#[derive(Debug)]
+pub(crate) enum CoverSource<'a> {
+    /// A separate image file.
+    File(&'a Path),
+    /// Pictures embedded in these audio files (path and
+    /// [`Song::embedded_cover_format`]), tried in order.
+    Embedded(Vec<(&'a Path, &'static str)>),
 }
 
 /// Songs grouped by album key.
@@ -121,7 +151,8 @@ pub(crate) struct Album {
     pub(crate) artist: usize,
     /// Song indexes by disc, track, then title.
     pub(crate) songs: Vec<usize>,
-    /// The first song (in album order) with a cover.
+    /// The first song (in album order) with a cover file, else the first
+    /// whose container can embed a cover.
     pub(crate) cover: Option<usize>,
     pub(crate) year: Option<i32>,
     pub(crate) genre: Option<String>,
@@ -312,22 +343,43 @@ impl Catalog {
         artist.cover_album.map(|_| artist.id.as_str())
     }
 
-    /// The image file behind a `coverArt` id (album, artist or song id).
-    pub(crate) fn cover_path(&self, id: &str) -> Option<&Path> {
-        let album = if let Some(index) = self.album_index(id) {
-            Some(index)
+    /// The image behind a `coverArt` id (album, artist or song id): a song's
+    /// own cover file, else its album's cover file, else the pictures
+    /// embedded in the song itself and then in its album's songs, in album
+    /// order.
+    pub(crate) fn cover_source(&self, id: &str) -> Option<CoverSource<'_>> {
+        let (album, own) = if let Some(index) = self.album_index(id) {
+            (index, None)
         } else if let Some(index) = self.artist_index(id) {
-            self.artists[index].cover_album
-        } else if let Some(song) = self.song(id) {
-            if let Some(path) = &song.cover_path {
-                return Some(path);
-            }
-            Some(song.album)
+            (self.artists[index].cover_album?, None)
         } else {
-            None
+            let index = self.song_index(id)?;
+            let song = &self.songs[index];
+            if let Some(path) = &song.cover_path {
+                return Some(CoverSource::File(path));
+            }
+            (song.album, Some(index))
         };
-        let song = self.albums[album?].cover?;
-        self.songs[song].cover_path.as_deref()
+        let album = &self.albums[album];
+        if let Some(path) = &self.songs[album.cover?].cover_path {
+            return Some(CoverSource::File(path));
+        }
+        let embedded = own
+            .into_iter()
+            .chain(
+                album
+                    .songs
+                    .iter()
+                    .copied()
+                    .filter(|index| Some(*index) != own),
+            )
+            .filter_map(|index| {
+                let song = &self.songs[index];
+                Some((song.path.as_path(), song.embedded_cover_format()?))
+            })
+            .take(EMBEDDED_COVER_TRIES)
+            .collect();
+        Some(CoverSource::Embedded(embedded))
     }
 
     /// Songs matching every term (title, artist or album), export order.
@@ -593,7 +645,14 @@ impl Builder {
                 .songs
                 .iter()
                 .copied()
-                .find(|index| songs[*index].cover_path.is_some());
+                .find(|index| songs[*index].cover_path.is_some())
+                .or_else(|| {
+                    album
+                        .songs
+                        .iter()
+                        .copied()
+                        .find(|index| songs[*index].embedded_cover_format().is_some())
+                });
             album.year = members.clone().find_map(|song| song.year);
             album.genre = members.clone().find_map(|song| song.genre.clone());
             album.duration_secs = members.clone().filter_map(Song::duration_secs).sum();

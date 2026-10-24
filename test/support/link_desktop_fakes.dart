@@ -233,6 +233,15 @@ class FakeLinkPlayer implements LinkPlayerPort {
     playedPosition = position;
     playedPlaying = playing;
   }
+
+  /// Every batch [append] added, in order.
+  final appended = <List<PlayableMedia>>[];
+
+  @override
+  Future<void> append(List<PlayableMedia> items) async {
+    calls.add('append');
+    appended.add(items);
+  }
 }
 
 /// The download queue in memory.

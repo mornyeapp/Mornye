@@ -46,9 +46,17 @@ Future<void> linkPlayOnDesktop(BuildContext context, WidgetRef ref) async {
   final handoff = ref.read(linkHandoffProvider);
   if (handoff == null) return;
   final name = linkDesktopName(handoff.client);
+  var sending = false;
   try {
-    final result = await handoff.playOnDesktop();
+    final result = await handoff.playOnDesktop(
+      onSending: (_, _) {
+        if (sending || !context.mounted) return;
+        sending = true;
+        _notify(context, context.l10n.linkHandoffSending(name));
+      },
+    );
     if (!context.mounted) return;
+    if (sending) ScaffoldMessenger.of(context).hideCurrentSnackBar();
     final l10n = context.l10n;
     if (result == null) {
       _notify(context, l10n.linkHandoffNothingPlaying);

@@ -20,6 +20,7 @@ class LinkHostServer {
     required this.serverId,
     required this.name,
     this.addresses = const [],
+    this.receivedDir = '',
   });
 
   factory LinkHostServer.fromJson(Map<String, dynamic> json) => LinkHostServer(
@@ -28,6 +29,7 @@ class LinkHostServer {
     serverId: _string(json['serverId']),
     name: _string(json['name']),
     addresses: _strings(json['addresses']),
+    receivedDir: _string(json['receivedDir']),
   );
 
   final int port;
@@ -40,6 +42,9 @@ class LinkHostServer {
   /// Local addresses phones can reach. The server sends full
   /// `https://<ip>:<port>` URLs; a bare IP is also accepted.
   final List<String> addresses;
+
+  /// Where song files phones upload (`PUT files/<name>`) land, or empty.
+  final String receivedDir;
 
   /// The first 8 hex characters phones show while pairing.
   String get shortFingerprint => linkShortFingerprint(fingerprint);

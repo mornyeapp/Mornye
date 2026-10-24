@@ -131,6 +131,52 @@ Future<LinkHttpResponse> linkHttpSend(
     request.abort();
     rethrow;
   }
+  return _readResponse(response, timeout);
+}
+
+/// Uploads [file] with `PUT` and reads the JSON answer. [onProgress] gets
+/// the bytes sent so far. The upload may take as long as a slow network
+/// needs for the file's size; [timeout] covers connecting and the answer.
+Future<LinkHttpResponse> linkHttpUpload(
+  HttpClient client,
+  Uri uri,
+  File file, {
+  Map<String, String> headers = const {},
+  void Function(int sent)? onProgress,
+  Duration timeout = linkRequestTimeout,
+}) async {
+  final size = await file.length();
+  final request = await client.openUrl('PUT', uri).timeout(timeout);
+  final HttpClientResponse response;
+  try {
+    request.followRedirects = false;
+    request.headers.set(HttpHeaders.acceptHeader, 'application/json');
+    headers.forEach(request.headers.set);
+    request.headers.contentType = ContentType.binary;
+    request.contentLength = size;
+    var sent = 0;
+    await request
+        .addStream(
+          file.openRead().map((chunk) {
+            sent += chunk.length;
+            onProgress?.call(sent);
+            return chunk;
+          }),
+        )
+        // At least 256 KiB a second, so a stalled network ends the upload.
+        .timeout(timeout + Duration(seconds: size ~/ (256 * 1024)));
+    response = await request.close().timeout(timeout);
+  } catch (_) {
+    request.abort();
+    rethrow;
+  }
+  return _readResponse(response, timeout);
+}
+
+Future<LinkHttpResponse> _readResponse(
+  HttpClientResponse response,
+  Duration timeout,
+) async {
   final certificate = response.certificate;
   final bytes = BytesBuilder(copy: false);
   await for (final chunk in response.timeout(timeout)) {

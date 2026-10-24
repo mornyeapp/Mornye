@@ -694,7 +694,9 @@ pub(crate) static METHODS: &[Entry] = &[
         c.rt.link.stop();
         Ok(Reply::null())
     }),
-    pool("linkStatus", |c, _| Ok(c.rt.link.status().into())),
+    pool("linkStatus", |c, _| {
+        Ok(c.rt.link.status(&c.rt.config).into())
+    }),
     pool("linkSetCatalog", |c, a| c.rt.link.set_catalog(a)),
     pool("linkBeginPairing", |c, _| c.rt.link.begin_pairing()),
     pool("linkEndPairing", |c, _| {

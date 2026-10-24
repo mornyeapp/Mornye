@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -57,6 +58,42 @@ PlayableMedia linkPlayableFor(LinkCatalogSong song, {String? coverPath}) =>
           : Duration(milliseconds: song.durationMs!),
     );
 
+/// The song file a phone uploaded to [path], with the details [ref] gives.
+/// The player shows the cover embedded in the file.
+PlayableMedia linkPlayableForUpload(TrackRef ref, String path) => PlayableMedia(
+  id: path,
+  source: path,
+  title: ref.title,
+  artist: ref.artist,
+  album: ref.album ?? '',
+  duration: ref.durationMs == null
+      ? null
+      : Duration(milliseconds: ref.durationMs!),
+);
+
+/// The uploaded song files in [dir] by [TrackRef.fileId]. Partial uploads
+/// and other files are left out; a missing [dir] has none.
+Future<Map<String, String>> linkReceivedFiles(String dir) async {
+  final files = <String, String>{};
+  if (dir.isEmpty) return files;
+  try {
+    await for (final entry in Directory(dir).list(followLinks: false)) {
+      if (entry is! File) continue;
+      final name = entry.uri.pathSegments.last;
+      final dot = name.indexOf('.');
+      if (dot < 0) continue;
+      final fileId = name.substring(0, dot);
+      if (isLinkFileId(fileId) &&
+          linkUploadExtensions.contains(name.substring(dot + 1))) {
+        files[fileId] = entry.path;
+      }
+    }
+  } on FileSystemException {
+    // Nothing uploaded yet.
+  }
+  return files;
+}
+
 /// A play queue a Subsonic client saved (`savePlayQueue`).
 class LinkSavedPlayQueue {
   const LinkSavedPlayQueue({
@@ -108,6 +145,7 @@ class LinkDesktopOps {
     required DesktopLinkCatalogIndex? Function() index,
     required String Function() desktopName,
     String Function(String deviceId)? deviceName,
+    String Function()? receivedDir,
     int Function()? nowMs,
   }) : _player = player,
        _downloads = downloads,
@@ -116,6 +154,7 @@ class LinkDesktopOps {
        _index = index,
        _desktopName = desktopName,
        _deviceName = deviceName ?? ((deviceId) => deviceId),
+       _receivedDir = receivedDir ?? (() => ''),
        _nowMs = nowMs ?? (() => DateTime.now().millisecondsSinceEpoch);
 
   /// The longest play queue the Subsonic `getPlayQueue` answer carries.
@@ -128,7 +167,13 @@ class LinkDesktopOps {
   final DesktopLinkCatalogIndex? Function() _index;
   final String Function() _desktopName;
   final String Function(String deviceId) _deviceName;
+  final String Function() _receivedDir;
   final int Function() _nowMs;
+  final _random = math.Random();
+
+  /// The queue the last `handoff/play` started, which `handoff/append`
+  /// extends.
+  String? _handoffId;
 
   final _savedQueues = <String, LinkSavedPlayQueue>{};
   List<LinkPlayerItem>? _observedQueue;
@@ -141,6 +186,10 @@ class LinkDesktopOps {
       ..register(LinkOps.state, (_) async => state().toJson())
       ..register(LinkOps.command, _command)
       ..register(LinkOps.handoffPlay, (request) => playHandoff(request.args))
+      ..register(
+        LinkOps.handoffAppend,
+        (request) => appendHandoff(request.args),
+      )
       ..register(LinkOps.handoffCurrent, (_) async => linkHandoffArgs(state()))
       ..register(LinkOps.downloads, _downloadsOp)
       ..register(LinkOps.open, _open)
@@ -222,26 +271,22 @@ class LinkDesktopOps {
     }
   }
 
-  /// `handoff/play`: plays the songs of [args] the Library has, from the
-  /// requested entry (or the next one it has) and position, and reports
-  /// the entries it could not find.
+  /// `handoff/play`: plays the songs of [args] the Library has or a phone
+  /// uploaded, from the requested entry (or the next one it has) and
+  /// position, and reports the entries it could not find. With `check` it
+  /// only reports them. A `handoffId` names the queue for `handoff/append`.
   Future<Map<String, dynamic>> playHandoff(Map<String, dynamic> args) async {
     final queue = args['queue'];
     if (queue is! List) throw _invalid('Missing queue');
-    final index = _index();
-    if (index == null) {
-      throw const LinkException('unavailable', 'The catalog is not ready');
-    }
     final requested = _intArg(args, 'index') ?? 0;
+    final resolved = await _resolveQueue(queue);
     final media = <PlayableMedia>[];
     final missing = <int>[];
     var start = -1;
     var exact = false;
-    for (var i = 0; i < queue.length; i++) {
-      final ref = TrackRef.fromJson(queue[i]);
-      final songId = ref == null ? null : index.songIdForRef(ref);
-      final song = songId == null ? null : index.songById(songId);
-      if (song == null) {
+    for (var i = 0; i < resolved.length; i++) {
+      final item = resolved[i];
+      if (item == null) {
         missing.add(i);
         continue;
       }
@@ -251,8 +296,12 @@ class LinkDesktopOps {
       } else if (i > requested && start < 0) {
         start = media.length;
       }
-      media.add(linkPlayableFor(song, coverPath: index.coverPathFor(song.id)));
+      media.add(item);
     }
+    if (args['check'] == true) {
+      return {'resolved': media.length, 'missing': missing};
+    }
+    String? handoffId;
     if (media.isNotEmpty) {
       await _player.playQueue(
         media,
@@ -264,8 +313,52 @@ class LinkDesktopOps {
             : Duration.zero,
         playing: args['playing'] != false,
       );
+      handoffId = _handoffId = '${_nowMs()}-${_random.nextInt(1 << 32)}';
     }
-    return {'resolved': media.length, 'missing': missing};
+    return {
+      'resolved': media.length,
+      'missing': missing,
+      'handoffId': ?handoffId,
+    };
+  }
+
+  /// `handoff/append`: adds the songs of `queue` the desktop has to the
+  /// end of the queue `handoffId` started, while that queue still plays.
+  Future<Map<String, dynamic>> appendHandoff(Map<String, dynamic> args) async {
+    final queue = args['queue'];
+    if (queue is! List) throw _invalid('Missing queue');
+    final handoffId = _stringArg(args, 'handoffId');
+    if (handoffId == null || handoffId != _handoffId) {
+      throw _invalid('Another queue plays on the computer now');
+    }
+    final media = [...(await _resolveQueue(queue)).nonNulls];
+    if (media.isNotEmpty) await _player.append(media);
+    return {'resolved': media.length};
+  }
+
+  /// Each entry of [queue] as the desktop plays it: the Library's song, else
+  /// the file a phone uploaded for it, else null.
+  Future<List<PlayableMedia?>> _resolveQueue(List<Object?> queue) async {
+    final index = _index();
+    if (index == null) {
+      throw const LinkException('unavailable', 'The catalog is not ready');
+    }
+    final refs = [for (final item in queue) TrackRef.fromJson(item)];
+    final received = refs.any((ref) => ref?.fileId != null)
+        ? await linkReceivedFiles(_receivedDir())
+        : const <String, String>{};
+    PlayableMedia? resolve(TrackRef? ref) {
+      if (ref == null) return null;
+      final songId = index.songIdForRef(ref);
+      final song = songId == null ? null : index.songById(songId);
+      if (song != null) {
+        return linkPlayableFor(song, coverPath: index.coverPathFor(song.id));
+      }
+      final path = received[ref.fileId];
+      return path == null ? null : linkPlayableForUpload(ref, path);
+    }
+
+    return [for (final ref in refs) resolve(ref)];
   }
 
   Future<Object?> _downloadsOp(LinkRequest request) async {

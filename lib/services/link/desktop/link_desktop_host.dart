@@ -332,6 +332,7 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
       index: () => _index,
       desktopName: () => state.name,
       deviceName: _deviceName,
+      receivedDir: () => state.server?.receivedDir ?? '',
     );
   }
 

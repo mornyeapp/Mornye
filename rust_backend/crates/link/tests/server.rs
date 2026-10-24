@@ -7,7 +7,8 @@ use bytes::Bytes;
 use futures_util::future::BoxFuture;
 use futures_util::{SinkExt, StreamExt};
 use hmac::{Hmac, KeyInit, Mac};
-use http_body_util::{BodyExt, Full};
+use http_body_util::{BodyExt, Full, StreamBody};
+use hyper::body::Frame;
 use hyper_util::rt::TokioIo;
 use mornye_link::{Host, HostError, LinkConfig, LinkServer, Tuning};
 use rustls::client::danger::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier};
@@ -16,6 +17,7 @@ use rustls::pki_types::{CertificateDer, ServerName, UnixTime};
 use rustls::{DigitallySignedStruct, SignatureScheme};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
+use std::convert::Infallible;
 use std::future::Future;
 use std::net::{IpAddr, Ipv4Addr};
 use std::sync::{Arc, Condvar, Mutex};
@@ -281,6 +283,27 @@ impl Fixture {
         self.request("POST", path, key, Some(("application/json", &body)))
     }
 
+    /// `PUT` with a binary `body` and the Bearer `key`.
+    fn put<B>(&self, path: &str, key: Option<&str>, body: B) -> Response
+    where
+        B: hyper::body::Body + Send + 'static,
+        B::Data: Send,
+        B::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
+    {
+        let mut builder = http::Request::builder()
+            .method("PUT")
+            .uri(path)
+            .header("host", "mornye.local")
+            .header("content-type", "application/octet-stream");
+        if let Some(key) = key {
+            builder = builder.header("authorization", format!("Bearer {key}"));
+        }
+        let request = builder.body(body).unwrap();
+        let port = self.server().port();
+        let fingerprint = self.server().fingerprint().to_owned();
+        self.run(send(port, fingerprint, request))
+    }
+
     fn begin_pairing(&self) -> String {
         let window = self.server().begin_pairing().unwrap();
         assert_eq!(window["fingerprint"], self.server().fingerprint());
@@ -396,7 +419,12 @@ async fn connect(port: u16, fingerprint: &str) -> TlsStream<TcpStream> {
         .unwrap()
 }
 
-async fn send(port: u16, fingerprint: String, request: http::Request<Full<Bytes>>) -> Response {
+async fn send<B>(port: u16, fingerprint: String, request: http::Request<B>) -> Response
+where
+    B: hyper::body::Body + Send + 'static,
+    B::Data: Send,
+    B::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
+{
     let tls = connect(port, &fingerprint).await;
     let (mut sender, connection) = hyper::client::conn::http1::handshake(TokioIo::new(tls))
         .await
@@ -699,6 +727,81 @@ fn forwards_requests_to_the_app() {
             .status,
         405
     );
+}
+
+#[test]
+fn phones_upload_song_files_into_the_received_folder() {
+    let fixture = Fixture::new();
+    let key = fixture.pair("phone-1");
+    let name = "0123456789abcdef0123456789abcdef.flac";
+    let path = format!("/mornye/v1/files/{name}");
+    let body: Vec<u8> = (0..300_000u32).map(|index| (index % 251) as u8).collect();
+
+    let stored = fixture.put(&path, Some(&key), Full::new(Bytes::from(body.clone())));
+    assert_eq!(stored.status, 200, "{}", stored.text());
+    assert_eq!(stored.json(), json!({"name": name, "size": body.len()}));
+    let received = fixture.dir.path().join("link").join("received");
+    assert_eq!(std::fs::read(received.join(name)).unwrap(), body);
+    let replaced = fixture.put(&path, Some(&key), Full::new(Bytes::from_static(b"fLaC")));
+    assert_eq!(replaced.json(), json!({"name": name, "size": 4}));
+    assert_eq!(std::fs::read(received.join(name)).unwrap(), b"fLaC");
+    let left: Vec<_> = std::fs::read_dir(&received)
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name())
+        .collect();
+    assert_eq!(left, [name], "no part file left");
+
+    let received_dir = received.to_string_lossy();
+    assert_eq!(
+        fixture.server().summary()["receivedDir"],
+        received_dir.as_ref()
+    );
+    assert_eq!(
+        fixture.server().status()["receivedDir"],
+        received_dir.as_ref()
+    );
+
+    let unauthorized = fixture.put(&path, None, Full::new(Bytes::from_static(b"x")));
+    assert_eq!(unauthorized.status, 401);
+    assert_eq!(unauthorized.json(), json!({"error": "unauthorized"}));
+    for bad in [
+        "0123456789ABCDEF0123456789abcdef.flac",
+        "0123456789abcdef0123456789abcdef.txt",
+        "0123456789abcdef0123456789abcdef",
+        "..%2Fstate",
+        "a/0123456789abcdef0123456789abcdef.flac",
+    ] {
+        let refused = fixture.put(
+            &format!("/mornye/v1/files/{bad}"),
+            Some(&key),
+            Full::new(Bytes::from_static(b"x")),
+        );
+        assert_eq!(refused.status, 400, "{bad}");
+        assert_eq!(refused.json()["error"], "invalid");
+    }
+    assert_eq!(fixture.get(&path, Some(&key)).status, 405);
+    let posted = fixture.request("POST", &path, Some(&key), Some(("audio/flac", "x")));
+    assert_eq!(posted.status, 405);
+    assert_eq!(posted.json(), json!({"error": "method_not_allowed"}));
+
+    // A declared length beyond 2 GiB is refused before any byte is read.
+    let request = http::Request::builder()
+        .method("PUT")
+        .uri(&path)
+        .header("host", "mornye.local")
+        .header("authorization", format!("Bearer {key}"))
+        .header("content-length", (3u64 << 30).to_string())
+        .body(StreamBody::new(futures_util::stream::pending::<
+            Result<Frame<Bytes>, Infallible>,
+        >()))
+        .unwrap();
+    let port = fixture.server().port();
+    let fingerprint = fixture.server().fingerprint().to_owned();
+    let too_large = fixture.run(send(port, fingerprint, request));
+    assert_eq!(too_large.status, 413);
+    assert_eq!(too_large.json(), json!({"error": "too_large"}));
+    assert_eq!(std::fs::read(received.join(name)).unwrap(), b"fLaC");
+    assert!(fixture.host.requests.lock().unwrap().is_empty());
 }
 
 #[test]

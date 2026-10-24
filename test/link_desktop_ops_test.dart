@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/models/download_item.dart';
 import 'package:mornye/models/track.dart';
@@ -16,6 +18,7 @@ void main() {
   late List<String> opened;
   late DesktopLinkCatalogIndex? index;
   late int now;
+  late String received;
   late LinkHostRouter router;
   late LinkDesktopOps ops;
 
@@ -37,6 +40,7 @@ void main() {
       covers: const {'l:a': '/covers/a.jpg'},
     );
     now = 1000;
+    received = '';
     router = LinkHostRouter();
     ops = LinkDesktopOps(
       player: player,
@@ -46,6 +50,7 @@ void main() {
       index: () => index,
       desktopName: () => 'Studio',
       deviceName: (id) => 'Phone $id',
+      receivedDir: () => received,
       nowMs: () => now,
     )..register(router);
   });
@@ -82,6 +87,7 @@ void main() {
       LinkOps.state,
       LinkOps.command,
       LinkOps.handoffPlay,
+      LinkOps.handoffAppend,
       LinkOps.handoffCurrent,
       LinkOps.downloads,
       LinkOps.open,
@@ -222,6 +228,7 @@ void main() {
       expect(result, {
         'resolved': 3,
         'missing': [1],
+        'handoffId': isA<String>(),
       });
       expect(player.playedQueue!.map((media) => media.id), ['a', 'c', 'd']);
       expect(player.playedQueue!.first.source, '/music/a.flac');
@@ -272,6 +279,117 @@ void main() {
         call(LinkOps.handoffPlay, {'queue': <Object?>[]}),
         throwsA(linkError('unavailable')),
       );
+    });
+
+    test('check only reports what is missing', () async {
+      final result = await call(LinkOps.handoffPlay, {
+        'queue': [
+          {'title': 'Title a', 'artist': 'Artist a'},
+          {'title': 'Missing', 'artist': 'Nobody'},
+        ],
+        'check': true,
+      });
+      expect(result, {
+        'resolved': 1,
+        'missing': [1],
+      });
+      expect(player.calls, isEmpty);
+    });
+  });
+
+  group('songs a phone uploaded', () {
+    const fileId = '0123456789abcdef0123456789abcdef';
+    late Directory dir;
+
+    setUp(() async {
+      dir = await Directory.systemTemp.createTemp('link_received_');
+      received = dir.path;
+      await File('${dir.path}/$fileId.flac').writeAsBytes([1]);
+      // Partial uploads and foreign names are not songs.
+      await File('${dir.path}/.$fileId.flac.1a2b.part').writeAsBytes([1]);
+      await File('${dir.path}/notes.txt').writeAsBytes([1]);
+    });
+
+    tearDown(() => dir.delete(recursive: true));
+
+    Map<String, dynamic> phoneSong(String title, {String? id = fileId}) => {
+      'title': title,
+      'artist': 'Phone',
+      'album': 'Pocket',
+      'durationMs': 180000,
+      'fileId': ?id,
+    };
+
+    test('play from the uploaded file when the Library lacks them', () async {
+      final result = await call(LinkOps.handoffPlay, {
+        'queue': [
+          phoneSong('Only on the phone'),
+          phoneSong('Not sent', id: 'ffffffffffffffffffffffffffffffff'),
+          {'title': 'Title b', 'artist': 'Artist b'},
+        ],
+        'index': 0,
+        'positionMs': 5000,
+      });
+      expect(result, containsPair('missing', [1]));
+      final first = player.playedQueue!.first;
+      expect(first.source, '${dir.path}/$fileId.flac');
+      expect(first.title, 'Only on the phone');
+      expect(first.album, 'Pocket');
+      expect(first.duration, const Duration(minutes: 3));
+      expect(first.artUri, isNull);
+      expect(player.playedQueue!.last.id, 'b');
+      expect(player.playedPosition, const Duration(seconds: 5));
+    });
+
+    test('the Library copy wins over an uploaded file', () async {
+      await call(LinkOps.handoffPlay, {
+        'queue': [
+          {
+            ...phoneSong('Title a'),
+            'artist': 'Artist a',
+            'durationMs': 200000,
+          },
+        ],
+      });
+      expect(player.playedQueue!.single.source, '/music/a.flac');
+    });
+
+    test('append queues more songs while that handoff plays', () async {
+      final started = await call(LinkOps.handoffPlay, {
+        'queue': [
+          {'title': 'Title a', 'artist': 'Artist a'},
+        ],
+      });
+      final handoffId = (started! as Map)['handoffId'];
+      final result = await call(LinkOps.handoffAppend, {
+        'handoffId': handoffId,
+        'queue': [
+          phoneSong('Sent later'),
+          {'title': 'Missing', 'artist': 'Nobody'},
+          {'title': 'Title b', 'artist': 'Artist b'},
+        ],
+      });
+      expect(result, {'resolved': 2});
+      expect(player.appended.single.map((media) => media.title), [
+        'Sent later',
+        'Title b',
+      ]);
+    });
+
+    test('append refuses a queue that no longer plays', () async {
+      await call(LinkOps.handoffPlay, {
+        'queue': [
+          {'title': 'Title a', 'artist': 'Artist a'},
+        ],
+      });
+      await expectLater(
+        call(LinkOps.handoffAppend, {
+          'handoffId': 'old',
+          'queue': [phoneSong('Late')],
+        }),
+        throwsA(linkError('invalid')),
+      );
+      expect(player.appended, isEmpty);
     });
   });
 

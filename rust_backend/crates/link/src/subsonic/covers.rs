@@ -1,9 +1,11 @@
 //! `getCoverArt`: the cover file, or a JPEG resized to `size` (aspect ratio
-//! kept, never upscaled) cached under `<temp_dir>/link-covers/`.
+//! kept, never upscaled) cached under `<temp_dir>/link-covers/`. A picture
+//! embedded in an audio file is first extracted into that cache, then
+//! served like a cover file.
 
 use super::media::file_response;
 use super::{Failure, number, required};
-use crate::catalog::{Catalog, hex};
+use crate::catalog::{Catalog, CoverSource, hex};
 use crate::types::{HttpResponse, Shared, SubsonicRequest, full};
 use http::header::{CACHE_CONTROL, ETAG, IF_NONE_MATCH};
 use http::{HeaderMap, Response};
@@ -11,10 +13,12 @@ use image::codecs::jpeg::JpegEncoder;
 use image::imageops::FilterType;
 use image::{ImageReader, Limits};
 use sha2::{Digest, Sha256};
+use std::collections::HashSet;
 use std::fs;
 use std::io::{Cursor, Read};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{LazyLock, Mutex, PoisonError};
 use std::time::UNIX_EPOCH;
 
 /// Cache folder under the temp dir.
@@ -22,10 +26,18 @@ pub(super) const CACHE_DIR: &str = "link-covers";
 /// Largest edge a client may request.
 const MAX_EDGE: u32 = 2048;
 const JPEG_QUALITY: u8 = 85;
-/// Resized covers kept before the oldest are removed.
+/// Cached covers (resized or extracted) kept before the oldest are removed.
 const MAX_CACHED: usize = 4000;
 /// Cover files larger than this are served as they are, never decoded.
 const MAX_DECODE_BYTES: u64 = 64 * 1024 * 1024;
+/// Extensions of the cached covers.
+const CACHED_EXTENSIONS: &[&str] = &["jpg", "png", "gif", "webp", "bmp"];
+/// Audio files remembered without a picture before the memory starts over.
+const MAX_WITHOUT_PICTURE: usize = 50_000;
+
+/// Audio files known to embed no picture, by [`embedded_key`], so repeated
+/// requests do not read them again. A changed file has a new key.
+static WITHOUT_PICTURE: LazyLock<Mutex<HashSet<[u8; 16]>>> = LazyLock::new(Mutex::default);
 
 pub(super) async fn cover_art(
     shared: &Shared,
@@ -34,7 +46,21 @@ pub(super) async fn cover_art(
 ) -> Result<HttpResponse, Failure> {
     let id = required(request, "id")?;
     let not_found = || Failure::not_found("Cover art").with_status(404);
-    let source = catalog.cover_path(id).ok_or_else(not_found)?.to_owned();
+    let source = match catalog.cover_source(id).ok_or_else(not_found)? {
+        CoverSource::File(path) => path.to_owned(),
+        CoverSource::Embedded(candidates) => {
+            let candidates: Vec<(PathBuf, &'static str)> = candidates
+                .into_iter()
+                .map(|(path, format)| (path.to_owned(), format))
+                .collect();
+            let dir = shared.config.temp_dir.join(CACHE_DIR);
+            tokio::task::spawn_blocking(move || embedded_cover(&dir, &candidates))
+                .await
+                .ok()
+                .flatten()
+                .ok_or_else(not_found)?
+        }
+    };
     let metadata = tokio::fs::metadata(&source)
         .await
         .ok()
@@ -46,11 +72,7 @@ pub(super) async fn cover_art(
     let stamp = format!(
         "{}\0{}\0{}\0{}",
         source.to_string_lossy(),
-        metadata
-            .modified()
-            .ok()
-            .and_then(|time| time.duration_since(UNIX_EPOCH).ok())
-            .map_or(0, |elapsed| elapsed.as_nanos()),
+        modified_nanos(&metadata),
         metadata.len(),
         size.unwrap_or(0)
     );
@@ -82,6 +104,87 @@ pub(super) async fn cover_art(
     file_response(&target, content_type, &request.headers, cache_headers)
         .await
         .map_err(|_| not_found())
+}
+
+/// The modification time in nanoseconds since the epoch, 0 when unknown.
+fn modified_nanos(metadata: &fs::Metadata) -> u128 {
+    metadata
+        .modified()
+        .ok()
+        .and_then(|time| time.duration_since(UNIX_EPOCH).ok())
+        .map_or(0, |elapsed| elapsed.as_nanos())
+}
+
+/// The first picture embedded in `candidates` (audio file and extraction
+/// format), extracted into `dir` on first use. Blocking.
+fn embedded_cover(dir: &Path, candidates: &[(PathBuf, &'static str)]) -> Option<PathBuf> {
+    candidates
+        .iter()
+        .find_map(|(audio, format)| extract_cached(dir, audio, format))
+}
+
+/// Identifies one version of an audio file: its path, size and mtime.
+fn embedded_key(audio: &Path, metadata: &fs::Metadata) -> [u8; 16] {
+    let stamp = format!(
+        "embedded\0{}\0{}\0{}",
+        audio.to_string_lossy(),
+        modified_nanos(metadata),
+        metadata.len()
+    );
+    let mut key = [0u8; 16];
+    key.copy_from_slice(&Sha256::digest(stamp.as_bytes())[..16]);
+    key
+}
+
+/// The cached picture of `audio`, extracted when missing. `None` when the
+/// file is unreadable or embeds no picture (remembered), or the cache is
+/// unwritable.
+fn extract_cached(dir: &Path, audio: &Path, format: &str) -> Option<PathBuf> {
+    let metadata = fs::metadata(audio).ok().filter(fs::Metadata::is_file)?;
+    let key = embedded_key(audio, &metadata);
+    let without_picture = || {
+        WITHOUT_PICTURE
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+    };
+    if without_picture().contains(&key) {
+        return None;
+    }
+    let name = hex(&key);
+    if let Some(cached) = CACHED_EXTENSIONS
+        .iter()
+        .map(|extension| dir.join(format!("{name}.{extension}")))
+        .find(|path| fs::metadata(path).is_ok_and(|cached| cached.is_file() && cached.len() > 0))
+    {
+        return Some(cached);
+    }
+    let mut file = fs::File::open(audio).ok()?;
+    let cover = match mornye_core::tags::extract_cover(&mut file, format, &|| Ok(())) {
+        Ok(cover) if !cover.data.is_empty() => cover,
+        _ => {
+            let mut remembered = without_picture();
+            if remembered.len() >= MAX_WITHOUT_PICTURE {
+                remembered.clear();
+            }
+            remembered.insert(key);
+            return None;
+        }
+    };
+    let target = dir.join(format!("{name}.{}", image_extension(&cover.mime)));
+    store(dir, &target, &cover.data)?;
+    Some(target)
+}
+
+/// The cache file extension for an embedded picture's MIME type.
+fn image_extension(mime: &str) -> &'static str {
+    let mime = mime.trim().to_ascii_lowercase();
+    match mime.strip_prefix("image/").unwrap_or(&mime) {
+        "png" => "png",
+        "gif" => "gif",
+        "webp" => "webp",
+        "bmp" => "bmp",
+        _ => "jpg",
+    }
 }
 
 fn matches_etag(headers: &HeaderMap, etag: &str) -> bool {
@@ -133,6 +236,15 @@ fn resize_into(source: &Path, size: u32, dir: &Path, target: &Path) -> Option<Pa
     JpegEncoder::new_with_quality(&mut encoded, JPEG_QUALITY)
         .encode_image(&rgb)
         .ok()?;
+    store(dir, target, &encoded)?;
+    Some(target.to_owned())
+}
+
+static STAGING: AtomicU64 = AtomicU64::new(0);
+
+/// Writes `bytes` to `target` in the cache `dir` through a staging file,
+/// then trims the cache.
+fn store(dir: &Path, target: &Path, bytes: &[u8]) -> Option<()> {
     fs::create_dir_all(dir).ok()?;
     let staging = dir.join(format!(
         ".{}-{}-{}.tmp",
@@ -140,7 +252,7 @@ fn resize_into(source: &Path, size: u32, dir: &Path, target: &Path) -> Option<Pa
         STAGING.fetch_add(1, Ordering::Relaxed),
         target.file_stem()?.to_string_lossy()
     ));
-    if fs::write(&staging, &encoded)
+    if fs::write(&staging, bytes)
         .and_then(|()| fs::rename(&staging, target))
         .is_err()
     {
@@ -148,10 +260,8 @@ fn resize_into(source: &Path, size: u32, dir: &Path, target: &Path) -> Option<Pa
         return None;
     }
     trim_cache(dir, MAX_CACHED);
-    Some(target.to_owned())
+    Some(())
 }
-
-static STAGING: AtomicU64 = AtomicU64::new(0);
 
 /// Removes the oldest cached covers beyond `keep`.
 pub(super) fn trim_cache(dir: &Path, keep: usize) {
@@ -161,10 +271,9 @@ pub(super) fn trim_cache(dir: &Path, keep: usize) {
     let mut files: Vec<(std::time::SystemTime, PathBuf)> = entries
         .filter_map(Result::ok)
         .filter(|entry| {
-            entry
-                .path()
-                .extension()
-                .is_some_and(|extension| extension == "jpg")
+            entry.path().extension().is_some_and(|extension| {
+                CACHED_EXTENSIONS.iter().any(|cached| extension == *cached)
+            })
         })
         .filter_map(|entry| {
             let modified = entry.metadata().ok()?.modified().ok()?;

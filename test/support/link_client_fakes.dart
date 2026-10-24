@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
@@ -74,6 +75,13 @@ class FakeLinkSession implements LinkSession {
   @override
   Future<Object?> post(String op, Map<String, dynamic> body) =>
       throw UnimplementedError();
+
+  @override
+  Future<void> upload(
+    String name,
+    File file, {
+    void Function(int sent)? onProgress,
+  }) => throw UnimplementedError();
 
   @override
   void start() => calls.add('start');

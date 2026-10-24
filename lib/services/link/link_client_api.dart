@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/services/link/link_protocol.dart';
 
@@ -75,6 +77,15 @@ abstract interface class LinkClientApi {
 
   /// `POST /mornye/v1/<op>` with a JSON [body]; throws [LinkException].
   Future<Object?> post(String op, Map<String, dynamic> body);
+
+  /// `PUT /mornye/v1/files/<name>` with the bytes of [file], `<name>` being
+  /// a [TrackRef.fileId] and an audio extension. [onProgress] gets the bytes
+  /// sent so far. Throws [LinkException].
+  Future<void> upload(
+    String name,
+    File file, {
+    void Function(int sent)? onProgress,
+  });
 }
 
 /// The phone's session with the desktop it is linked to, or null when none

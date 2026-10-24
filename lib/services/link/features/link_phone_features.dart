@@ -7,6 +7,7 @@ import 'package:mornye/providers/system_volume_provider.dart';
 import 'package:mornye/services/link/features/link_handoff.dart';
 import 'package:mornye/services/link/features/link_library_lookup.dart';
 import 'package:mornye/services/link/features/link_phone_client.dart';
+import 'package:mornye/services/link/features/link_phone_files.dart';
 import 'package:mornye/services/link/features/link_phone_player.dart';
 import 'package:mornye/services/link/features/link_phone_session.dart';
 import 'package:mornye/services/link/features/link_save_offline.dart';
@@ -57,6 +58,12 @@ final linkTrackResolverProvider = Provider<LinkTrackResolver>(
   ),
 );
 
+/// Sends this phone's song files to the paired desktop. One instance for the
+/// app, so a new handoff stops the uploads of the one before.
+final linkPhoneFilesProvider = Provider<LinkPhoneFiles>(
+  (ref) => LinkPhoneFiles(),
+);
+
 /// Handoff with the paired desktop, or null when none is paired.
 final linkHandoffProvider = Provider<LinkHandoff?>((ref) {
   final client = ref.watch(linkPhoneClientProvider);
@@ -66,6 +73,7 @@ final linkHandoffProvider = Provider<LinkHandoff?>((ref) {
     player: ref.watch(linkPhonePlayerProvider),
     refs: ref.watch(linkTrackRefCacheProvider),
     resolver: ref.watch(linkTrackResolverProvider),
+    files: ref.watch(linkPhoneFilesProvider),
   );
 });
 

@@ -33,6 +33,7 @@ time.workspace = true
 if-addrs.workspace = true
 socket2.workspace = true
 unicode-normalization.workspace = true
+mornye-core.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

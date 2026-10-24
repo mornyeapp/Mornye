@@ -365,10 +365,10 @@ fn library_watcher_reports_changed_roots() {
 
 #[test]
 fn link_methods_answer_while_stopped() {
-    fixture();
+    let received = fixture().root.join("support").join("link").join("received");
     assert_eq!(
         call("linkStatus", Value::Null).unwrap(),
-        json!({"running": false})
+        json!({"running": false, "receivedDir": received})
     );
     assert_eq!(call("linkDevices", Value::Null).unwrap(), json!([]));
     assert_eq!(

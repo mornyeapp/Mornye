@@ -31,6 +31,22 @@ fn album_of<'a>(catalog: &'a Catalog, song_id: &str) -> &'a Album {
     &catalog.albums()[catalog.song(song_id).expect("song").album]
 }
 
+/// The cover file behind `id`, when it is a file.
+fn cover_file<'a>(catalog: &'a Catalog, id: &str) -> Option<&'a Path> {
+    match catalog.cover_source(id)? {
+        CoverSource::File(path) => Some(path),
+        CoverSource::Embedded(_) => None,
+    }
+}
+
+/// The audio files tried for an embedded cover behind `id`.
+fn embedded<'a>(catalog: &'a Catalog, id: &str) -> Vec<(&'a Path, &'static str)> {
+    match catalog.cover_source(id) {
+        Some(CoverSource::Embedded(candidates)) => candidates,
+        _ => Vec::new(),
+    }
+}
+
 #[test]
 fn rejects_missing_or_invalid_headers() {
     assert!(read(&[]).unwrap_err().contains("missing"));
@@ -316,26 +332,35 @@ fn covers_genres_years_and_newest() {
             "Band",
             json!({ "album": "C", "coverPath": "/c/5.jpg" }),
         ),
-        row("l:6", "Six", "Solo", json!({ "album": "D" })),
+        row(
+            "l:6",
+            "Six",
+            "Solo",
+            json!({ "album": "D", "suffix": "wma" }),
+        ),
     ]);
     let a = catalog.song("l:1").expect("song").album;
-    assert_eq!(catalog.albums()[a].cover, catalog.song_index("l:2"));
+    assert_eq!(
+        catalog.albums()[a].cover,
+        catalog.song_index("l:2"),
+        "a cover file wins over an earlier song that may embed one"
+    );
     assert_eq!(
         catalog.song_cover_id(catalog.song_index("l:1").expect("song")),
         Some(catalog.albums()[a].id.as_str())
     );
     let six = catalog.song_index("l:6").expect("song");
     assert_eq!(catalog.song_cover_id(six), None);
-    assert_eq!(catalog.cover_path("l:1"), Some(Path::new("/c/2.jpg")));
-    assert_eq!(catalog.cover_path("l:5"), Some(Path::new("/c/5.jpg")));
+    assert_eq!(cover_file(&catalog, "l:1"), Some(Path::new("/c/2.jpg")));
+    assert_eq!(cover_file(&catalog, "l:5"), Some(Path::new("/c/5.jpg")));
     assert_eq!(
-        catalog.cover_path(&catalog.albums()[a].id),
+        cover_file(&catalog, &catalog.albums()[a].id),
         Some(Path::new("/c/2.jpg"))
     );
     let band = catalog.song("l:1").expect("song").artist_ref;
-    assert!(catalog.cover_path(&catalog.artists()[band].id).is_some());
-    assert_eq!(catalog.cover_path("l:6"), None);
-    assert_eq!(catalog.cover_path("unknown"), None);
+    assert!(cover_file(&catalog, &catalog.artists()[band].id).is_some());
+    assert!(catalog.cover_source("l:6").is_none());
+    assert!(catalog.cover_source("unknown").is_none());
     assert_eq!(catalog.albums()[a].year, Some(1999));
     let rock = catalog.genre("ROCK").expect("genre");
     assert_eq!(rock.name, "Rock");
@@ -348,6 +373,81 @@ fn covers_genres_years_and_newest() {
         .map(|index| catalog.albums()[*index].name.as_str())
         .collect();
     assert_eq!(newest, ["A", "C", "B", "D"]);
+}
+
+#[test]
+fn covers_fall_back_to_songs_that_can_embed_one() {
+    let catalog = catalog(&[
+        row(
+            "e:1",
+            "One",
+            "Band",
+            json!({ "album": "E", "track": 1, "suffix": "wma" }),
+        ),
+        row("e:2", "Two", "Band", json!({ "album": "E", "track": 2 })),
+        row(
+            "e:3",
+            "Three",
+            "Band",
+            json!({ "album": "E", "track": 3, "path": "/music/e3.m4a", "suffix": "" }),
+        ),
+        row(
+            "e:4",
+            "Four",
+            "Band",
+            json!({ "album": "E", "track": 4, "suffix": "MP3" }),
+        ),
+        row(
+            "e:5",
+            "Five",
+            "Band",
+            json!({ "album": "E", "track": 5, "suffix": "opus" }),
+        ),
+        row(
+            "f:1",
+            "Solo",
+            "Other",
+            json!({ "album": "F", "suffix": "dsf" }),
+        ),
+    ]);
+    let e = catalog.song("e:1").expect("song").album;
+    let album = &catalog.albums()[e];
+    assert_eq!(album.cover, catalog.song_index("e:2"));
+    assert_eq!(catalog.album_cover_id(e), Some(album.id.as_str()));
+    let one = catalog.song_index("e:1").expect("song");
+    assert_eq!(catalog.song_cover_id(one), Some(album.id.as_str()));
+    let band = catalog.songs()[one].artist_ref;
+    assert_eq!(
+        catalog.artist_cover_id(band),
+        Some(catalog.artists()[band].id.as_str())
+    );
+    let in_album_order = [
+        (Path::new("/music/e:2.flac"), "flac"),
+        (Path::new("/music/e3.m4a"), "m4a"),
+        (Path::new("/music/e:4.flac"), "mp3"),
+    ];
+    assert_eq!(embedded(&catalog, &album.id), in_album_order, "three tries");
+    assert_eq!(
+        embedded(&catalog, &catalog.artists()[band].id),
+        in_album_order
+    );
+    assert_eq!(embedded(&catalog, "e:1"), in_album_order);
+    assert_eq!(
+        embedded(&catalog, "e:5"),
+        [
+            (Path::new("/music/e:5.flac"), "opus"),
+            (Path::new("/music/e:2.flac"), "flac"),
+            (Path::new("/music/e3.m4a"), "m4a"),
+        ],
+        "a song tries its own picture first"
+    );
+    let solo = catalog.song("f:1").expect("song").album;
+    assert_eq!(catalog.album_cover_id(solo), None);
+    assert_eq!(
+        catalog.song_cover_id(catalog.song_index("f:1").expect("song")),
+        None
+    );
+    assert!(catalog.cover_source("f:1").is_none());
 }
 
 /// Run with `cargo test --release -p mornye-link -- --ignored --nocapture`.

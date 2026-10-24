@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:audio_service/audio_service.dart' show MediaItem;
 import 'package:mornye/services/link/features/link_phone_player.dart';
@@ -122,6 +123,25 @@ class FakeLinkClient implements LinkClientApi {
     final reply = onPost?.call(op, body);
     if (reply is Exception) throw reply;
     return reply ?? {'ok': true};
+  }
+
+  /// Fails the upload of a file name when it returns an exception.
+  Exception? Function(String name)? onUpload;
+
+  /// The file names uploaded so far, with their bytes.
+  final uploads = <({String name, List<int> bytes})>[];
+
+  @override
+  Future<void> upload(
+    String name,
+    File file, {
+    void Function(int sent)? onProgress,
+  }) async {
+    final failure = onUpload?.call(name);
+    if (failure != null) throw failure;
+    final bytes = await file.readAsBytes();
+    uploads.add((name: name, bytes: bytes));
+    onProgress?.call(bytes.length);
   }
 
   Future<void> close() async {

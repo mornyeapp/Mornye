@@ -145,10 +145,17 @@ impl Link {
         }
     }
 
-    /// `linkStatus`: `{"running": false}` while stopped.
-    pub(crate) fn status(&self) -> Value {
-        self.current()
-            .map_or_else(|| json!({"running": false}), |server| server.status())
+    /// `linkStatus`: `{"running": false, "receivedDir"}` while stopped
+    /// (`receivedDir` only once `app_support_dir` is configured).
+    pub(crate) fn status(&self, config: &Config) -> Value {
+        if let Some(server) = self.current() {
+            return server.status();
+        }
+        let mut status = json!({"running": false});
+        if let Ok(dir) = state_dir(config) {
+            status["receivedDir"] = Value::from(mornye_link::received_dir(&dir).to_string_lossy());
+        }
+        status
     }
 
     /// `linkSetCatalog {"path"}`.
@@ -375,7 +382,14 @@ mod tests {
             app_support_dir: dir.path().to_owned(),
             ..Config::default()
         };
-        assert_eq!(link.status(), json!({"running": false}));
+        assert_eq!(
+            link.status(&config),
+            json!({
+                "running": false,
+                "receivedDir": dir.path().join("link").join("received").to_string_lossy(),
+            })
+        );
+        assert_eq!(link.status(&Config::default()), json!({"running": false}));
         assert_eq!(link.devices(&config).unwrap(), Reply::Json(json!([])));
         assert!(
             link.revoke(&config, &args(json!({"deviceId": "phone"})))
