@@ -44,7 +44,6 @@ import 'package:mornye/providers/recent_access_provider.dart';
 import 'package:mornye/providers/explore_provider.dart';
 import 'package:mornye/providers/user_profile_provider.dart';
 import 'package:mornye/widgets/desktop/desktop_scroll_arrows.dart';
-import 'package:mornye/widgets/desktop/track_list_table.dart';
 import 'package:mornye/widgets/explore_featured_section.dart';
 import 'package:mornye/providers/local_library_provider.dart';
 import 'package:mornye/providers/music_player_provider.dart';
@@ -172,10 +171,6 @@ class _HomeTabState extends ConsumerState<HomeTab>
   HomeSearchSortOption? _sortedTracksMode;
   List<Track>? _sortedTracksCache;
   List<int>? _sortedTrackIndexesCache;
-
-  /// The wide All view lists every song after its Show all, when the
-  /// provider offers no songs filter to switch to.
-  bool _searchSongsExpanded = false;
 
   double _exploreCardSize(BuildContext context) {
     // Six phone-sized cards across an iPad made the feed look like a desktop
@@ -424,7 +419,6 @@ class _HomeTabState extends ConsumerState<HomeTab>
       _searchBucketsCache = null;
       _invalidateSearchSortCaches();
       _historySnapshot.update(const []);
-      _searchSongsExpanded = false;
     }
     if (previous != null &&
         !next.hasContent &&
@@ -1397,9 +1391,7 @@ class _HomeTabState extends ConsumerState<HomeTab>
                   colorScheme: colorScheme,
                   hasResults: hasResults,
                   showEmptySearchResult: showEmptySearchResult,
-                  searchExtensionId: searchExtensionId,
                   showLocalLibraryIndicator: showLocalLibraryIndicator,
-                  thumbnailSizesByExtensionId: thumbnailSizesByExtensionId,
                   extensions: extensions,
                 )
               : _buildSearchResults(

@@ -1128,23 +1128,20 @@ enum HomeSearchSkeletonLayout {
   /// Phone rows: an Artists section of avatars, then Albums.
   rows,
 
-  /// A wide Songs filter: the song table on desktop, rows elsewhere.
-  songs,
-
-  /// A wide album or playlist filter: a grid of covers.
+  /// A wide song, album or playlist filter: a grid of covers.
   coverGrid,
 
   /// A wide artist filter: a grid of avatars.
   artistGrid,
 
-  /// The wide All view: five songs, then an artist and an album shelf.
+  /// The wide All view: a song shelf, then an artist and an album shelf.
   overview,
 }
 
 /// Home search skeleton – mimics the sectioned results (an Artists section of
 /// round avatars, then an Albums section of covers). The real filter chips
 /// stay visible above it, so it draws none of its own. Wide layouts mirror
-/// their cover grids, shelves and song table instead.
+/// their cover grids and shelves instead.
 class HomeSearchSkeleton extends StatelessWidget {
   const HomeSearchSkeleton({
     super.key,
@@ -1163,7 +1160,6 @@ class HomeSearchSkeleton extends StatelessWidget {
           const SizedBox(height: 8),
           _sectionSkeleton(context, 65, 4, round: false),
         ],
-        HomeSearchSkeletonLayout.songs => _songsSkeleton(context, 8),
         HomeSearchSkeletonLayout.coverGrid => [
           _headerSkeleton(context, 65),
           _CoverGridSkeleton(round: false),
@@ -1173,7 +1169,8 @@ class HomeSearchSkeleton extends StatelessWidget {
           _CoverGridSkeleton(round: true),
         ],
         HomeSearchSkeletonLayout.overview => [
-          ..._songsSkeleton(context, 5),
+          _headerSkeleton(context, 60),
+          const _CoverShelfSkeleton(round: false),
           _headerSkeleton(context, 70),
           const _CoverShelfSkeleton(round: true),
           _headerSkeleton(context, 65),
@@ -1181,15 +1178,6 @@ class HomeSearchSkeleton extends StatelessWidget {
         ],
       },
     );
-  }
-
-  /// A Songs header over the desktop song table, or over search rows on a
-  /// tablet.
-  static List<Widget> _songsSkeleton(BuildContext context, int count) {
-    if (!isDesktopPlatform) {
-      return [_sectionSkeleton(context, 60, count, round: false)];
-    }
-    return [_headerSkeleton(context, 60), TrackListSkeleton(itemCount: count)];
   }
 
   /// A section title and its trailing action, inset like the loaded header.

@@ -7,7 +7,6 @@ import 'package:mornye/models/settings.dart';
 import 'package:mornye/utils/adaptive_layout.dart';
 import 'package:mornye/widgets/animation_utils.dart';
 import 'package:mornye/widgets/desktop/desktop_scroll_arrows.dart';
-import 'package:mornye/widgets/desktop/track_list_table.dart';
 
 import 'support/search_results_fixture.dart';
 
@@ -55,6 +54,13 @@ void _expectCoverSaveStarted() {
   );
 }
 
+/// The cover cell of the fixture's song [index]; its key also carries the
+/// result index.
+Finder _songCell(int index) => find.byWidgetPredicate((widget) {
+  final key = widget.key;
+  return key is ValueKey<String> && key.value.startsWith('track-track-$index#');
+});
+
 Future<void> _dismissSnackBars(WidgetTester tester) async {
   ScaffoldMessenger.of(
     tester.element(find.byType(Scaffold).first),
@@ -77,19 +83,19 @@ void main() {
         results: SearchFixtureResults(count: 3, songCount: 8),
         filters: searchFixtureAllFilters,
       );
-      expect(find.byType(TrackListTable), findsNothing);
+      expect(_songCell(0), findsNothing);
       expect(find.byType(DesktopScrollArrows), findsNothing);
       expect(find.text('Found track 7'), findsOneWidget);
 
       await tester.tap(_viewTool('Grid'));
       await tester.pumpAndSettle();
-      expect(find.byType(TrackListTable), findsOneWidget);
-      expect(find.byType(DesktopScrollArrows), findsNWidgets(3));
+      expect(_songCell(0), findsOneWidget);
+      expect(find.byType(DesktopScrollArrows), findsNWidgets(4));
       expect(_viewTool('Grid'), findsNothing);
 
       await tester.tap(_viewTool('List'));
       await tester.pumpAndSettle();
-      expect(find.byType(TrackListTable), findsNothing);
+      expect(_songCell(0), findsNothing);
       expect(_viewTool('Grid'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
@@ -208,7 +214,7 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('$style wide All view lists songs, then shelves', (
+    testWidgets('$style wide All view shows one shelf per kind', (
       tester,
     ) async {
       final results = SearchFixtureResults(count: 3, songCount: 8);
@@ -223,15 +229,22 @@ void main() {
       );
       expect(results.requestedFilters, [null]);
 
-      // Songs come first, in the desktop table, limited to five.
+      // Songs come first, as covers like every other kind.
       final headers = [
         for (final title in ['Songs', 'Artists', 'Albums', 'Playlists'])
           tester.getTopLeft(find.text(title)).dy,
       ];
       expect(headers, orderedEquals([...headers]..sort()));
-      expect(find.byType(TrackListTable), findsOneWidget);
-      expect(find.text('Found track 4'), findsOneWidget);
-      expect(find.text('Found track 5'), findsNothing);
+      final songShelf = find.byKey(const ValueKey('search-shelf-track'));
+      expect(songShelf, findsOneWidget);
+      expect(
+        find.descendant(of: songShelf, matching: _songCell(0)),
+        findsOneWidget,
+      );
+      expect(
+        tester.getSize(_songCell(0)).width,
+        tester.getSize(find.byKey(const ValueKey('album-album-0'))).width,
+      );
 
       // One sideways shelf per kind, with arrows for the mouse.
       for (final kind in ['artist', 'album', 'playlist']) {
@@ -245,7 +258,7 @@ void main() {
           findsOneWidget,
         );
       }
-      expect(find.byType(DesktopScrollArrows), findsNWidgets(3));
+      expect(find.byType(DesktopScrollArrows), findsNWidgets(4));
       expect(find.byType(SliverGrid), findsNothing);
 
       // Show all switches to that kind's filter.
@@ -259,11 +272,12 @@ void main() {
       await tester.tap(find.bySemanticsLabel('Show all Songs'));
       await tester.pumpAndSettle();
       expect(results.requestedFilters.last, 'track');
-      expect(find.text('Found track 7'), findsOneWidget);
+      expect(find.byType(SliverGrid), findsOneWidget);
+      expect(_songCell(7), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('$style Show all expands songs without a songs filter', (
+    testWidgets('$style tablet All view shelves songs without a filter', (
       tester,
     ) async {
       final results = SearchFixtureResults(count: 2, songCount: 8);
@@ -275,21 +289,16 @@ void main() {
         results: results,
         filters: searchFixtureCollectionFilters,
       );
-      // Tablets keep the song rows; there is no table off desktop.
-      expect(find.byType(TrackListTable), findsNothing);
-      expect(find.text('Found track 4'), findsOneWidget);
-      expect(find.text('Found track 5'), findsNothing);
+      // Without a songs filter to switch to, the shelf holds every song.
+      expect(find.byKey(const ValueKey('search-shelf-track')), findsOneWidget);
       expect(find.byKey(const ValueKey('search-shelf-album')), findsOneWidget);
-
-      await tester.tap(find.bySemanticsLabel('Show all Songs'));
-      await tester.pumpAndSettle();
-      expect(results.requestedFilters, [null]);
-      expect(find.text('Found track 5'), findsOneWidget);
       expect(find.bySemanticsLabel('Show all Songs'), findsNothing);
+      expect(find.bySemanticsLabel('Show all Albums'), findsOneWidget);
+      expect(results.requestedFilters, [null]);
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('$style desktop song table activates like the phone row', (
+    testWidgets('$style song covers activate like the phone row', (
       tester,
     ) async {
       // Without a download extension, a song tap ends in this notice.
@@ -309,7 +318,8 @@ void main() {
         desktop: true,
         settings: settings,
       );
-      expect(find.byType(TrackListTable), findsNothing);
+      // A narrow window keeps the rows.
+      expect(_songCell(0), findsNothing);
       await tester.tap(find.text('Found track 0'));
       await tester.pump();
       expect(find.text(notice), findsOneWidget);
@@ -324,7 +334,8 @@ void main() {
       );
       await tester.tap(find.text('Songs filter'));
       await tester.pumpAndSettle();
-      expect(find.byType(TrackListTable), findsOneWidget);
+      expect(find.byType(SliverGrid), findsOneWidget);
+      expect(_songCell(0), findsOneWidget);
       expect(find.text(notice), findsNothing);
       await tester.tap(find.text('Found track 0'));
       await tester.pump();
@@ -381,7 +392,25 @@ void main() {
         skeletonCover,
       );
 
-      // The All view loads as five song rows of the table and shelves.
+      // The Songs filter loads as the same cover grid.
+      const songSettings = AppSettings(
+        searchProvider: 'example',
+        hasSearchedBefore: true,
+        defaultSearchTab: 'track',
+        searchViewMode: 'grid',
+      );
+      await pumpSearchFixture(
+        tester,
+        size: _desktop,
+        mornye: mornye,
+        desktop: true,
+        settings: songSettings,
+        filters: searchFixtureAllFilters,
+        results: SearchFixtureResults(holdLoading: true),
+      );
+      expect(largestBox(), skeletonCover);
+
+      // The All view loads as shelves, songs included.
       await pumpSearchFixture(
         tester,
         size: _desktop,
@@ -391,7 +420,7 @@ void main() {
         filters: searchFixtureAllFilters,
         results: SearchFixtureResults(holdLoading: true),
       );
-      expect(find.byType(TrackListSkeleton), findsOneWidget);
+      expect(find.byType(TrackListSkeleton), findsNothing);
       expect(largestBox(), searchCoverShelfExtent);
       expect(tester.takeException(), isNull);
     });

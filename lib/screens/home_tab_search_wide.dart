@@ -2,14 +2,9 @@
 part of 'home_tab.dart';
 
 /// Search results once the content is [searchCoverLayoutMinWidth] wide, on
-/// tablets and desktop windows: the album, artist and playlist filters show
-/// a grid of covers, and the All view shows the first songs, then one shelf
-/// per kind of collection. Songs use the desktop song table on desktop and
-/// keep their phone rows, at the reading width, on tablets.
+/// tablets and desktop windows: every filter, Songs included, shows a grid
+/// of covers, and the All view shows one shelf of covers per kind.
 extension _HomeTabSearchWideUI on _HomeTabState {
-  /// The songs the All view lists before its Show all.
-  static const int _overviewSongCount = 5;
-
   List<Widget> _buildWideSearchResults({
     required WidgetRef resultsRef,
     required List<Track> tracks,
@@ -18,9 +13,7 @@ extension _HomeTabSearchWideUI on _HomeTabState {
     required ColorScheme colorScheme,
     required bool hasResults,
     required bool showEmptySearchResult,
-    required String? searchExtensionId,
     required bool showLocalLibraryIndicator,
-    required Map<String, (double, double)> thumbnailSizesByExtensionId,
     required List<Extension> extensions,
   }) {
     final currentSearchProvider = resultsRef.watch(
@@ -58,9 +51,10 @@ extension _HomeTabSearchWideUI on _HomeTabState {
                 ? 'all'
                 : canonicalExtensionSearchFilterId(displayFilter)) {
               'all' => HomeSearchSkeletonLayout.overview,
-              'track' => HomeSearchSkeletonLayout.songs,
               'artist' => HomeSearchSkeletonLayout.artistGrid,
-              'album' || 'playlist' => HomeSearchSkeletonLayout.coverGrid,
+              'track' ||
+              'album' ||
+              'playlist' => HomeSearchSkeletonLayout.coverGrid,
               _ => HomeSearchSkeletonLayout.rows,
             },
           ),
@@ -88,59 +82,41 @@ extension _HomeTabSearchWideUI on _HomeTabState {
     var sortButtonShown = false;
     final viewToggle = _buildSearchViewToggle(grid: true);
 
+    // Songs are covers too, as the other kinds are.
     void addSongs() {
-      final limited =
-          overview &&
-          !_searchSongsExpanded &&
-          songs.length > _overviewSongCount;
-      final count = limited ? _overviewSongCount : songs.length;
-      slivers.addAll(
-        isDesktopPlatform
-            ? _buildSearchSongTable(
-                resultsRef: resultsRef,
-                tracks: songs,
-                indexes: songIndexes,
-                count: count,
-                colorScheme: colorScheme,
-                showSortButton: !sortButtonShown,
-                viewToggle: sortButtonShown ? null : viewToggle,
-              )
-            : _buildSearchSongRows(
-                resultsRef: resultsRef,
-                tracks: songs,
-                indexes: songIndexes,
-                colorScheme: colorScheme,
-                showSortButton: !sortButtonShown,
-                viewToggle: sortButtonShown ? null : viewToggle,
-                searchExtensionId: searchExtensionId,
-                showLocalLibraryIndicator: showLocalLibraryIndicator,
-                thumbnailSizesByExtensionId: thumbnailSizesByExtensionId,
-                itemCount: count,
-              ),
-      );
-      if (limited) {
-        final songFilter = filterFor('track');
-        slivers.add(
-          SliverToBoxAdapter(
-            child: Padding(
-              // The button's own padding puts its label on the rows' edge.
-              padding: EdgeInsetsDirectional.only(
-                start: 8 + wideListInset(context),
-                top: 4,
-              ),
-              child: Align(
-                alignment: AlignmentDirectional.centerStart,
-                child: _buildShowAllButton(
-                  context.l10n.searchSongs,
-                  songFilter != null
-                      ? () => _selectSearchFilter(songFilter)
-                      : () => setState(() => _searchSongsExpanded = true),
-                ),
-              ),
+      final isInHistory = _watchSearchHistory(resultsRef, songs);
+      final songFilter = overview ? filterFor('track') : null;
+      Widget cell(BuildContext context, int index, double extent) =>
+          _SearchSongCoverCell(
+            // Result ids can repeat; the result index keeps each unique.
+            key: ValueKey('track-${songs[index].id}#${songIndexes[index]}'),
+            track: songs[index],
+            extent: extent,
+            isInHistory: isInHistory(index),
+            showLocalLibraryIndicator: showLocalLibraryIndicator,
+            onDownload: ({bool forceQualityPicker = false}) => _downloadTrack(
+              songIndexes[index],
+              forceQualityPicker: forceQualityPicker,
             ),
+            onSaveCover: () => _saveSearchResultCover(songs[index]),
+          );
+      slivers
+        ..add(
+          _buildResultSectionHeader(
+            title: context.l10n.searchSongs,
+            colorScheme: colorScheme,
+            showSortButton: !sortButtonShown,
+            viewToggle: sortButtonShown ? null : viewToggle,
+            onShowAll: songFilter == null
+                ? null
+                : () => _selectSearchFilter(songFilter),
           ),
+        )
+        ..add(
+          overview
+              ? _buildSearchCoverShelf(songs.length, 'track', cell)
+              : _buildSearchCoverGrid(songs.length, cell),
         );
-      }
       sortButtonShown = true;
     }
 
@@ -169,6 +145,14 @@ extension _HomeTabSearchWideUI on _HomeTabState {
       if (items.isEmpty) continue;
       final sorted = _sortCollectionResults(items);
       final filter = overview ? filterFor(kind) : null;
+      Widget cell(BuildContext context, int index, double extent) =>
+          _SearchCoverCell(
+            key: ValueKey('$kind-${sorted[index].id}'),
+            item: sorted[index],
+            extent: extent,
+            onTap: () => open(sorted[index]),
+            onSaveCover: () => _saveSearchResultCover(sorted[index]),
+          );
       slivers
         ..add(
           _buildResultSectionHeader(
@@ -183,8 +167,8 @@ extension _HomeTabSearchWideUI on _HomeTabState {
         )
         ..add(
           overview
-              ? _buildSearchCoverShelf(sorted, kind, open)
-              : _buildSearchCoverGrid(sorted, kind, open),
+              ? _buildSearchCoverShelf(sorted.length, kind, cell)
+              : _buildSearchCoverGrid(sorted.length, cell),
         );
       sortButtonShown = true;
     }
@@ -214,90 +198,11 @@ extension _HomeTabSearchWideUI on _HomeTabState {
     );
   }
 
-  /// The Songs section as the desktop song table, with the first [count] of
-  /// [tracks]. A click does what a tap on the phone row does.
-  List<Widget> _buildSearchSongTable({
-    required WidgetRef resultsRef,
-    required List<Track> tracks,
-    required List<int> indexes,
-    required int count,
-    required ColorScheme colorScheme,
-    required bool showSortButton,
-    ToolButton? viewToggle,
-  }) {
-    final isInHistory = _watchSearchHistory(resultsRef, tracks);
-    final shown = count < tracks.length ? tracks.sublist(0, count) : tracks;
-    final inHistory = [for (var i = 0; i < shown.length; i++) isInHistory(i)];
-    return [
-      _buildResultSectionHeader(
-        title: context.l10n.searchSongs,
-        colorScheme: colorScheme,
-        showSortButton: showSortButton,
-        viewToggle: viewToggle,
-      ),
-      TrackListTable(
-        key: const ValueKey('search-song-table'),
-        tracks: shown,
-        // Result ids can repeat; the result index keeps each row unique.
-        ids: [
-          for (var i = 0; i < shown.length; i++) '${shown[i].id}#${indexes[i]}',
-        ],
-        isInHistory: inHistory,
-        // Search has no selection, so modified clicks select nothing.
-        selectedIds: const {},
-        onSelect: (_, _, _) {},
-        onActivate: (index) => _TrackItemWithStatus.activate(
-          context,
-          ref,
-          shown[index],
-          isQueued: ref
-              .read(downloadQueueLookupProvider)
-              .byTrackId
-              .containsKey(shown[index].id),
-          isInHistory: inHistory[index],
-          isInLocalLibrary: _isSearchTrackInLocalLibrary(shown[index]),
-          onDownload: ({bool forceQualityPicker = false}) => _downloadTrack(
-            indexes[index],
-            forceQualityPicker: forceQualityPicker,
-          ),
-        ),
-        onContextMenu: (index, position) =>
-            TrackCollectionQuickActions.showTrackOptionsSheet(
-              context,
-              ref,
-              shown[index],
-              position: position,
-              hasLocalPlaybackCandidate:
-                  inHistory[index] ||
-                  _isSearchTrackInLocalLibrary(shown[index]),
-            ),
-        showArtwork: true,
-        showAlbum: true,
-        showPreview: true,
-        onSaveCover: (index) => _saveSearchResultCover(shown[index]),
-      ),
-    ];
-  }
-
-  /// Whether [track] is in the local library, when the rows show it.
-  bool _isSearchTrackInLocalLibrary(Track track) {
-    final settings = ref.read(settingsProvider);
-    return settings.localLibraryEnabled &&
-        settings.localLibraryShowDuplicates &&
-        ref
-            .read(localLibraryProvider)
-            .existsInLibrary(
-              isrc: track.isrc,
-              trackName: track.name,
-              artistName: track.artistName,
-            );
-  }
-
-  /// A filtered collection: covers in as many columns as the pane fits.
+  /// A filtered kind: [count] covers from [cell] in as many columns as the
+  /// pane fits.
   Widget _buildSearchCoverGrid(
-    List<Track> items,
-    String kind,
-    void Function(Track item) open,
+    int count,
+    Widget Function(BuildContext context, int index, double extent) cell,
   ) {
     final edge = searchCoverEdge(context);
     return SliverPadding(
@@ -314,26 +219,20 @@ extension _HomeTabSearchWideUI on _HomeTabState {
               crossAxisSpacing: searchCoverGap,
               mainAxisExtent: extent + searchCoverTextHeight(context),
             ),
-            itemCount: items.length,
-            itemBuilder: (context, index) => _SearchCoverCell(
-              key: ValueKey('$kind-${items[index].id}'),
-              item: items[index],
-              extent: extent,
-              onTap: () => open(items[index]),
-              onSaveCover: () => _saveSearchResultCover(items[index]),
-            ),
+            itemCount: count,
+            itemBuilder: (context, index) => cell(context, index, extent),
           );
         },
       ),
     );
   }
 
-  /// One kind of collection in the All view: a row of covers that scrolls
-  /// sideways, with arrows for a mouse on desktop.
+  /// One [kind] in the All view: [count] covers from [cell] in a row that
+  /// scrolls sideways, with arrows for a mouse on desktop.
   Widget _buildSearchCoverShelf(
-    List<Track> items,
+    int count,
     String kind,
-    void Function(Track item) open,
+    Widget Function(BuildContext context, int index, double extent) cell,
   ) {
     final edge = searchCoverEdge(context);
     return SliverToBoxAdapter(
@@ -345,18 +244,179 @@ extension _HomeTabSearchWideUI on _HomeTabState {
             controller: controller,
             scrollDirection: Axis.horizontal,
             padding: EdgeInsets.symmetric(horizontal: edge),
-            itemCount: items.length,
+            itemCount: count,
             separatorBuilder: (_, _) => const SizedBox(width: searchCoverGap),
             itemBuilder: (context, index) => SizedBox(
-              key: ValueKey('$kind-${items[index].id}'),
               width: searchCoverShelfExtent,
-              child: _SearchCoverCell(
-                item: items[index],
-                extent: searchCoverShelfExtent,
-                onTap: () => open(items[index]),
-                onSaveCover: () => _saveSearchResultCover(items[index]),
-              ),
+              child: cell(context, index, searchCoverShelfExtent),
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A song result on wide screens: its cover over the title and artist, as
+/// the other kinds show. A click does what a tap on the phone row does
+/// (usually a download); the preview button sits on the cover, In Library
+/// marks a song you have, and the right-click menu or a long press opens the
+/// song's options. A long press on the cover saves it, as on the phone row.
+class _SearchSongCoverCell extends ConsumerWidget {
+  const _SearchSongCoverCell({
+    super.key,
+    required this.track,
+    required this.extent,
+    required this.isInHistory,
+    required this.showLocalLibraryIndicator,
+    required this.onDownload,
+    required this.onSaveCover,
+  });
+
+  final Track track;
+
+  /// The side of the cover.
+  final double extent;
+  final bool isInHistory;
+  final bool showLocalLibraryIndicator;
+  final void Function({bool forceQualityPicker}) onDownload;
+  final VoidCallback onSaveCover;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final l10n = context.l10n;
+    final mornye = context.isMornye;
+    final isQueued = ref.watch(
+      downloadQueueLookupProvider.select(
+        (lookup) => lookup.byTrackId.containsKey(track.id),
+      ),
+    );
+    final isInLocalLibrary =
+        showLocalLibraryIndicator &&
+        ref.watch(
+          localLibraryProvider.select(
+            (state) => state.existsInLibrary(
+              isrc: track.isrc,
+              trackName: track.name,
+              artistName: track.artistName,
+            ),
+          ),
+        );
+    final hasCover = track.coverUrl?.isNotEmpty == true;
+    // The Library grids' cover corners.
+    final radius = BorderRadius.circular(mornye ? 8 : 12);
+
+    void showOptions({Offset? position}) =>
+        TrackCollectionQuickActions.showTrackOptionsSheet(
+          context,
+          ref,
+          track,
+          position: position,
+          hasLocalPlaybackCandidate: isInHistory || isInLocalLibrary,
+        );
+
+    final placeholder = Container(
+      width: extent,
+      height: extent,
+      color: colorScheme.surfaceContainerHighest,
+      child: AppIcon(
+        Icons.music_note,
+        size: extent * 0.3,
+        color: colorScheme.onSurfaceVariant,
+      ),
+    );
+    final image = hasCover
+        ? CachedCoverImage(
+            imageUrl: track.coverUrl!,
+            width: extent,
+            height: extent,
+            fit: BoxFit.cover,
+            errorWidget: (_, _, _) => placeholder,
+          )
+        : placeholder;
+    final cover = Semantics(
+      label:
+          '${l10n.dialogDownload} '
+          '${l10n.editMetadataFieldCover}: ${track.name}',
+      button: hasCover,
+      onLongPress: hasCover ? onSaveCover : null,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        excludeFromSemantics: true,
+        onLongPress: hasCover ? onSaveCover : null,
+        child: ClipRRect(borderRadius: radius, child: image),
+      ),
+    );
+
+    final desktopMaterial = isDesktopPlatform && !mornye;
+    return DesktopContextMenuRegion(
+      onContextMenu: (position) => showOptions(position: position),
+      child: Material(
+        type: MaterialType.transparency,
+        child: InkWell(
+          onTap: () => _TrackItemWithStatus.activate(
+            context,
+            ref,
+            track,
+            isQueued: isQueued,
+            isInHistory: isInHistory,
+            isInLocalLibrary: isInLocalLibrary,
+            onDownload: onDownload,
+          ),
+          onLongPress: showOptions,
+          borderRadius: radius,
+          // The M3 hover state layer; a pointer press shows as a state
+          // layer rather than a ripple.
+          hoverColor: mornye
+              ? null
+              : colorScheme.onSurface.withValues(alpha: 0.08),
+          highlightColor: desktopMaterial
+              ? colorScheme.onSurface.withValues(alpha: 0.1)
+              : null,
+          splashFactory: desktopMaterial ? NoSplash.splashFactory : null,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox.square(
+                dimension: extent,
+                child: Stack(
+                  children: [
+                    cover,
+                    PositionedDirectional(
+                      start: 4,
+                      bottom: 4,
+                      child: PreviewButton(track: track, size: 28, dense: true),
+                    ),
+                    if (isInLocalLibrary)
+                      const PositionedDirectional(
+                        end: 8,
+                        top: 8,
+                        child: InLibraryBadge(),
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                track.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                track.artistName,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
           ),
         ),
       ),

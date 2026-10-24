@@ -368,4 +368,109 @@ void main() {
       },
     );
   }
+
+  for (final mornye in [false, true]) {
+    testWidgets('wide Library search offers covers, songs included ($mornye)', (
+      tester,
+    ) async {
+      SharedPreferences.setMockInitialValues({});
+      FlutterSecureStorage.setMockInitialValues({});
+      tester.view.physicalSize = const Size(1280, 1600);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final requests = <LibrarySearchRequest>[];
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            librarySearchProvider.overrideWith((ref, request) async {
+              requests.add(request);
+              return List.generate(request.limit, (i) {
+                final hit = _hit(request.kind, request.offset + i);
+                return request.kind == LibrarySearchKind.songs
+                    ? LibrarySearchHit(
+                        kind: hit.kind,
+                        id: hit.id,
+                        title: hit.title,
+                        source: 'local',
+                      )
+                    : hit;
+              });
+            }),
+            librarySearchTrackProvider.overrideWith(
+              (ref, key) async => UnifiedLibraryItem.fromLocalLibrary(
+                LocalLibraryItem(
+                  id: key.id,
+                  trackName: 'Song ${key.id}',
+                  artistName: 'Artist',
+                  albumName: 'Album',
+                  filePath: '/music/${key.id}.mp3',
+                  scannedAt: DateTime(2026),
+                ),
+              ),
+            ),
+          ],
+          child: MaterialApp(
+            theme: mornye ? MornyeTheme.build(Brightness.dark) : ThemeData(),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Scaffold(
+              body: CustomScrollView(
+                slivers: [
+                  LibrarySearchResults(query: 'Found', onOpenArtist: (_) {}),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      // Rows until the shared view setting picks covers.
+      expect(find.byType(TrackCard), findsWidgets);
+      expect(find.byTooltip('Grid'), findsOneWidget);
+
+      await tester.tap(find.byTooltip('Grid'));
+      await tester.pumpAndSettle();
+      expect(find.byType(TrackCard), findsNothing);
+      expect(find.byTooltip('List'), findsOneWidget);
+      // The overview: one shelf per kind, songs as covers the albums' size.
+      expect(find.byType(SliverGrid), findsNothing);
+      final song = find.byKey(const ValueKey('songs:local:0'));
+      expect(song, findsOneWidget);
+      expect(
+        tester.getSize(song).width,
+        tester.getSize(find.byKey(const ValueKey('albums::0'))).width,
+      );
+
+      // One kind fills a grid of covers and still pages.
+      await tester.tap(find.text('Songs').first);
+      await tester.pumpAndSettle();
+      expect(requests.last.kind, LibrarySearchKind.songs);
+      expect(requests.last.limit, 41);
+      expect(find.byType(SliverGrid), findsOneWidget);
+      expect(find.byType(TrackCard), findsNothing);
+
+      // A long press selects, as on the rows.
+      await tester.longPress(find.text('Found songs 0'));
+      await tester.pumpAndSettle();
+      expect(find.text('1 selected'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('songs:local:0')),
+          matching: find.byIcon(Icons.check),
+        ),
+        findsOneWidget,
+      );
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.textContaining('selected'), findsNothing);
+
+      // A narrow pane keeps the rows and offers no switch.
+      tester.view.physicalSize = const Size(700, 1600);
+      await tester.pumpAndSettle();
+      expect(find.byType(SliverGrid), findsNothing);
+      expect(find.byType(TrackCard), findsWidgets);
+      expect(find.byTooltip('List'), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+  }
 }
