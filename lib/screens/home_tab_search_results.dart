@@ -305,6 +305,7 @@ extension _HomeTabSearchResultsUI on _HomeTabState {
     required String? searchExtensionId,
     required bool showLocalLibraryIndicator,
     required Map<String, (double, double)> thumbnailSizesByExtensionId,
+    bool showViewToggle = false,
   }) {
     final hasActualData = tracks.isNotEmpty;
 
@@ -334,6 +335,9 @@ extension _HomeTabSearchResultsUI on _HomeTabState {
     );
 
     bool sortButtonShown = false;
+    final viewToggle = showViewToggle
+        ? _buildSearchViewToggle(grid: false)
+        : null;
 
     for (final (items, kind, title, open) in [
       (
@@ -362,6 +366,7 @@ extension _HomeTabSearchResultsUI on _HomeTabState {
           itemCount: items.length,
           colorScheme: colorScheme,
           showSortButton: !sortButtonShown,
+          viewToggle: sortButtonShown ? null : viewToggle,
           itemBuilder: (index, showDivider) => _CollectionItemWidget(
             key: ValueKey('$kind-${items[index].id}'),
             item: items[index],
@@ -382,6 +387,7 @@ extension _HomeTabSearchResultsUI on _HomeTabState {
           indexes: sortedTrackIndexes,
           colorScheme: colorScheme,
           showSortButton: !sortButtonShown,
+          viewToggle: sortButtonShown ? null : viewToggle,
           searchExtensionId: searchExtensionId,
           showLocalLibraryIndicator: showLocalLibraryIndicator,
           thumbnailSizesByExtensionId: thumbnailSizesByExtensionId,
@@ -456,6 +462,7 @@ extension _HomeTabSearchResultsUI on _HomeTabState {
     required bool showLocalLibraryIndicator,
     required Map<String, (double, double)> thumbnailSizesByExtensionId,
     int? itemCount,
+    Widget? viewToggle,
   }) {
     final isInHistory = _watchSearchHistory(resultsRef, tracks);
     return _buildVirtualizedResultSection(
@@ -463,6 +470,7 @@ extension _HomeTabSearchResultsUI on _HomeTabState {
       itemCount: itemCount ?? tracks.length,
       colorScheme: colorScheme,
       showSortButton: showSortButton,
+      viewToggle: viewToggle,
       itemBuilder: (index, showDivider) => _TrackItemWithStatus(
         key: ValueKey(tracks[index].id),
         track: tracks[index],
@@ -486,6 +494,7 @@ extension _HomeTabSearchResultsUI on _HomeTabState {
     required ColorScheme colorScheme,
     required Widget Function(int index, bool showDivider) itemBuilder,
     bool showSortButton = false,
+    Widget? viewToggle,
   }) {
     // Material result groups are grouped rows, on the settings group tier.
     final sectionColor = colorScheme.surfaceContainer;
@@ -496,6 +505,7 @@ extension _HomeTabSearchResultsUI on _HomeTabState {
         title: title,
         colorScheme: colorScheme,
         showSortButton: showSortButton,
+        viewToggle: viewToggle,
       ),
       SliverPadding(
         padding: EdgeInsets.symmetric(horizontal: wideListInset(context)),
@@ -543,11 +553,13 @@ extension _HomeTabSearchResultsUI on _HomeTabState {
   }
 
   /// A result section's title, with Sort on the first section and, on wide
-  /// screens, the [onShowAll] that switches to the section's own filter.
+  /// screens, the [onShowAll] that switches to the section's own filter and
+  /// the [viewToggle] after Sort.
   Widget _buildResultSectionHeader({
     required String title,
     required ColorScheme colorScheme,
     required bool showSortButton,
+    Widget? viewToggle,
     VoidCallback? onShowAll,
   }) {
     final mornye = context.isMornye;
@@ -607,9 +619,28 @@ extension _HomeTabSearchResultsUI on _HomeTabState {
                   ),
                 ),
               ),
+            ?viewToggle,
           ],
         ),
       ),
+    );
+  }
+
+  /// Switches wide results between the phone rows and the cover layout, as
+  /// the Library's view button does. [grid] is the layout on screen.
+  Widget _buildSearchViewToggle({required bool grid}) {
+    return AppIconButton(
+      tooltip: grid
+          ? context.l10n.appearanceHistoryViewList
+          : context.l10n.appearanceHistoryViewGrid,
+      icon: AppIcon(
+        grid ? Icons.view_list : Icons.grid_view,
+        size: 20,
+        color: Theme.of(context).colorScheme.onSurfaceVariant,
+      ),
+      onPressed: () => ref
+          .read(settingsProvider.notifier)
+          .setSearchViewMode(grid ? 'list' : 'grid'),
     );
   }
 

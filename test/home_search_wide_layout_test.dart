@@ -13,6 +13,12 @@ import 'support/search_results_fixture.dart';
 const _desktop = Size(1280, 1800);
 const _tablet = Size(1180, 1800);
 
+const _grid = AppSettings(
+  searchProvider: 'example',
+  hasSearchedBefore: true,
+  searchViewMode: 'grid',
+);
+
 Future<void> _rightClick(WidgetTester tester, Finder finder) async {
   final gesture = await tester.startGesture(
     tester.getCenter(finder),
@@ -48,6 +54,34 @@ void main() {
   for (final mornye in [false, true]) {
     final style = mornye ? 'Mornye' : 'Material';
 
+    testWidgets('$style wide results keep the rows until grid is picked', (
+      tester,
+    ) async {
+      await pumpSearchFixture(
+        tester,
+        size: _desktop,
+        mornye: mornye,
+        desktop: true,
+        results: SearchFixtureResults(count: 3, songCount: 8),
+        filters: searchFixtureAllFilters,
+      );
+      expect(find.byType(TrackListTable), findsNothing);
+      expect(find.byType(DesktopScrollArrows), findsNothing);
+      expect(find.text('Found track 7'), findsOneWidget);
+
+      await tester.tap(find.byTooltip('Grid'));
+      await tester.pumpAndSettle();
+      expect(find.byType(TrackListTable), findsOneWidget);
+      expect(find.byType(DesktopScrollArrows), findsNWidgets(3));
+      expect(find.byTooltip('Grid'), findsNothing);
+
+      await tester.tap(find.byTooltip('List'));
+      await tester.pumpAndSettle();
+      expect(find.byType(TrackListTable), findsNothing);
+      expect(find.byTooltip('Grid'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
     for (final (platform, size, desktop) in [
       ('desktop', _desktop, true),
       ('tablet', _tablet, false),
@@ -64,6 +98,7 @@ void main() {
           size: size,
           mornye: mornye,
           desktop: desktop,
+          settings: _grid,
           results: results,
           filters: searchFixtureAllFilters,
         );
@@ -138,6 +173,7 @@ void main() {
         size: _desktop,
         mornye: mornye,
         desktop: true,
+        settings: _grid,
         results: SearchFixtureResults(count: 4),
         filters: searchFixtureAllFilters,
       );
@@ -169,6 +205,7 @@ void main() {
         size: _desktop,
         mornye: mornye,
         desktop: true,
+        settings: _grid,
         results: results,
         filters: searchFixtureAllFilters,
       );
@@ -222,6 +259,7 @@ void main() {
         tester,
         size: _tablet,
         mornye: mornye,
+        settings: _grid,
         results: results,
         filters: searchFixtureCollectionFilters,
       );
@@ -248,6 +286,7 @@ void main() {
         hasSearchedBefore: true,
         askQualityBeforeDownload: false,
         deduplicateDownloads: false,
+        searchViewMode: 'grid',
       );
       const notice = 'No extensions with download provider';
 
@@ -293,6 +332,7 @@ void main() {
         searchProvider: 'example',
         hasSearchedBefore: true,
         defaultSearchTab: 'album',
+        searchViewMode: 'grid',
       );
       await pumpSearchFixture(
         tester,
@@ -335,6 +375,7 @@ void main() {
         size: _desktop,
         mornye: mornye,
         desktop: true,
+        settings: _grid,
         filters: searchFixtureAllFilters,
         results: SearchFixtureResults(holdLoading: true),
       );
@@ -353,6 +394,7 @@ void main() {
         desktop: true,
         brightness: Brightness.light,
         textDirection: TextDirection.rtl,
+        settings: _grid,
         filters: searchFixtureAllFilters,
         results: SearchFixtureResults(count: 3),
       );

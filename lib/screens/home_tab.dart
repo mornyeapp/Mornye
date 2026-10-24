@@ -1339,23 +1339,28 @@ class _HomeTabState extends ConsumerState<HomeTab>
       select: (constraints) =>
           coverLayoutAllowed &&
           constraints.crossAxisExtent - 2 * inset >= searchCoverLayoutMinWidth,
-      builder: (context, coverLayout) => _buildSearchResultsConsumer(
+      builder: (context, wide) => _buildSearchResultsConsumer(
         colorScheme: colorScheme,
         hasActiveSearchSurface: hasActiveSearchSurface,
         showEmptySearchResult: showEmptySearchResult,
-        coverLayout: coverLayout,
+        wide: wide,
       ),
     );
   }
 
+  /// [wide] offers the cover layout; the user's view mode picks it.
   Widget _buildSearchResultsConsumer({
     required ColorScheme colorScheme,
     required bool hasActiveSearchSurface,
     required bool showEmptySearchResult,
-    required bool coverLayout,
+    required bool wide,
   }) {
     return Consumer(
       builder: (context, ref, _) {
+        final coverLayout =
+            wide &&
+            ref.watch(settingsProvider.select((s) => s.searchViewMode)) ==
+                'grid';
         final tracks = ref.watch(trackProvider.select((s) => s.tracks));
         final isLoading = ref.watch(trackProvider.select((s) => s.isLoading));
         final error = ref.watch(trackProvider.select((s) => s.error));
@@ -1407,6 +1412,7 @@ class _HomeTabState extends ConsumerState<HomeTab>
                   searchExtensionId: searchExtensionId,
                   showLocalLibraryIndicator: showLocalLibraryIndicator,
                   thumbnailSizesByExtensionId: thumbnailSizesByExtensionId,
+                  showViewToggle: wide,
                 ),
         );
       },

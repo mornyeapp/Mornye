@@ -853,6 +853,9 @@ class SettingsNotifier extends Notifier<AppSettings> {
     state.copyWith(defaultSearchTab: _normalizeDefaultSearchTab(tab)),
   );
 
+  void setSearchViewMode(String mode) =>
+      _commit(state.copyWith(searchViewMode: mode));
+
   void setDefaultLibraryView(String view) => _commit(
     state.copyWith(defaultLibraryView: _normalizeDefaultLibraryView(view)),
   );

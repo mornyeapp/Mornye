@@ -86,6 +86,7 @@ extension _HomeTabSearchWideUI on _HomeTabState {
       colorScheme: colorScheme,
     );
     var sortButtonShown = false;
+    final viewToggle = _buildSearchViewToggle(grid: true);
 
     void addSongs() {
       final limited =
@@ -102,6 +103,7 @@ extension _HomeTabSearchWideUI on _HomeTabState {
                 count: count,
                 colorScheme: colorScheme,
                 showSortButton: !sortButtonShown,
+                viewToggle: sortButtonShown ? null : viewToggle,
               )
             : _buildSearchSongRows(
                 resultsRef: resultsRef,
@@ -109,6 +111,7 @@ extension _HomeTabSearchWideUI on _HomeTabState {
                 indexes: songIndexes,
                 colorScheme: colorScheme,
                 showSortButton: !sortButtonShown,
+                viewToggle: sortButtonShown ? null : viewToggle,
                 searchExtensionId: searchExtensionId,
                 showLocalLibraryIndicator: showLocalLibraryIndicator,
                 thumbnailSizesByExtensionId: thumbnailSizesByExtensionId,
@@ -172,6 +175,7 @@ extension _HomeTabSearchWideUI on _HomeTabState {
             title: title,
             colorScheme: colorScheme,
             showSortButton: !sortButtonShown,
+            viewToggle: sortButtonShown ? null : viewToggle,
             onShowAll: filter == null
                 ? null
                 : () => _selectSearchFilter(filter),
@@ -219,6 +223,7 @@ extension _HomeTabSearchWideUI on _HomeTabState {
     required int count,
     required ColorScheme colorScheme,
     required bool showSortButton,
+    Widget? viewToggle,
   }) {
     final isInHistory = _watchSearchHistory(resultsRef, tracks);
     final shown = count < tracks.length ? tracks.sublist(0, count) : tracks;
@@ -228,6 +233,7 @@ extension _HomeTabSearchWideUI on _HomeTabState {
         title: context.l10n.searchSongs,
         colorScheme: colorScheme,
         showSortButton: showSortButton,
+        viewToggle: viewToggle,
       ),
       TrackListTable(
         key: const ValueKey('search-song-table'),

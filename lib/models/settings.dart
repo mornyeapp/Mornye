@@ -118,6 +118,10 @@ class AppSettings {
   final List<String>? downloadFallbackExtensionIds;
   final String? searchProvider;
   final String defaultSearchTab;
+
+  /// Search results on wide screens: 'list' keeps the phone rows, 'grid'
+  /// shows cover grids and shelves.
+  final String searchViewMode;
   final String? homeFeedProvider;
   final bool separateSingles;
   final String singleFilenameFormat;
@@ -253,6 +257,7 @@ class AppSettings {
     this.downloadFallbackExtensionIds,
     this.searchProvider,
     this.defaultSearchTab = 'all',
+    this.searchViewMode = 'list',
     this.homeFeedProvider,
     this.separateSingles = false,
     this.singleFilenameFormat = '{title} - {artist}',
@@ -377,6 +382,7 @@ class AppSettings {
     String? searchProvider,
     bool clearSearchProvider = false,
     String? defaultSearchTab,
+    String? searchViewMode,
     String? homeFeedProvider,
     bool clearHomeFeedProvider = false,
     bool? separateSingles,
@@ -504,6 +510,7 @@ class AppSettings {
           ? null
           : (searchProvider ?? this.searchProvider),
       defaultSearchTab: defaultSearchTab ?? this.defaultSearchTab,
+      searchViewMode: searchViewMode ?? this.searchViewMode,
       homeFeedProvider: clearHomeFeedProvider
           ? null
           : (homeFeedProvider ?? this.homeFeedProvider),

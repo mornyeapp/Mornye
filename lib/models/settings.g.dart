@@ -105,6 +105,7 @@ AppSettings _$AppSettingsFromJson(Map<String, dynamic> json) => AppSettings(
           .toList(),
   searchProvider: json['searchProvider'] as String?,
   defaultSearchTab: json['defaultSearchTab'] as String? ?? 'all',
+  searchViewMode: json['searchViewMode'] as String? ?? 'list',
   homeFeedProvider: json['homeFeedProvider'] as String?,
   separateSingles: json['separateSingles'] as bool? ?? false,
   singleFilenameFormat:
@@ -229,6 +230,7 @@ Map<String, dynamic> _$AppSettingsToJson(
   'downloadFallbackExtensionIds': instance.downloadFallbackExtensionIds,
   'searchProvider': instance.searchProvider,
   'defaultSearchTab': instance.defaultSearchTab,
+  'searchViewMode': instance.searchViewMode,
   'homeFeedProvider': instance.homeFeedProvider,
   'separateSingles': instance.separateSingles,
   'singleFilenameFormat': instance.singleFilenameFormat,
