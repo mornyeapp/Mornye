@@ -37,16 +37,16 @@ blowfish = { version = "=0.10.0", features = ["zeroize"] }
 zeroize = "1.8"
 getrandom = "0.4"
 tempfile = "3.27"
-zip = { version = "=9.0.1", default-features = false, features = ["deflate-flate2-zlib-rs"] }
+zip = { version = "=9.0.5", default-features = false, features = ["deflate-flate2-zlib-rs"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0", features = ["float_roundtrip", "raw_value"] }
 thiserror = "2.0"
 uniffi = { version = "=0.32.2", default-features = false }
-tokio = { version = "=1.53.2", features = ["rt-multi-thread", "net", "time", "sync", "io-util", "macros"] }
+tokio = { version = "=1.54.1", features = ["rt-multi-thread", "net", "time", "sync", "io-util", "macros"] }
 hyper-util = { version = "=0.1.21", features = ["client-legacy", "http1", "http2", "tokio"] }
 hyper-rustls = { version = "=0.27.10", default-features = false, features = ["http1", "http2", "ring", "tls12"] }
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
-rustls-native-certs = "=0.8.4"
+rustls-native-certs = "=0.8.5"
 rustls-platform-verifier = "=0.7.1"
 rustls-pemfile = "2.2"
 http = "1.4"
@@ -60,9 +60,9 @@ hickory-proto = { version = "=0.26.3", default-features = false, features = ["st
 cookie = "0.18"
 url = "2.5"
 regex = "=1.13.1"
-scraper = { version = "=0.27.0", default-features = false }
+scraper = { version = "=0.29.0", default-features = false }
 # Keep the parser compatible with scraper's HtmlTreeSink implementation.
-html5ever = "=0.39.0"
+html5ever = "=0.40.1"
 # Match the Unicode 15 tables used by the Go backend's title/artist matching.
 unicode-normalization = "=0.1.22"
 unicode-general-category = "=0.6.0"
@@ -76,7 +76,7 @@ cap-std = "=4.0.3"
 rustix = { version = "=1.1.5", features = ["fs"] }
 roxmltree = "=0.21.1"
 rusqlite = { version = "=0.40.2", features = ["bundled", "modern_sqlite", "hooks"] }
-libc = "=0.2.190"
+libc = "=0.2.191"
 windows-sys = "0.61"
 # Desktop library folder watching (crates/desktop).
 notify = "=8.2.0"
