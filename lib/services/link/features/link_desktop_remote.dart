@@ -54,6 +54,7 @@ LinkPlayerState linkPlayerStateWith(
   required int updatedMs,
   TrackRef? track,
   bool? playing,
+  List<TrackRef>? queue,
   int? index,
   bool? shuffle,
   LinkRepeatMode? repeat,
@@ -64,7 +65,7 @@ LinkPlayerState linkPlayerStateWith(
   positionMs: positionMs,
   durationMs: track == null ? state.durationMs : track.durationMs,
   updatedMs: updatedMs,
-  queue: state.queue,
+  queue: queue ?? state.queue,
   index: index ?? state.index,
   shuffle: shuffle ?? state.shuffle,
   repeat: repeat ?? state.repeat,
@@ -229,6 +230,48 @@ class LinkDesktopRemote extends Notifier<LinkRemoteState> {
             track: player.queue[index.toInt()],
           );
         }
+      case LinkActions.move:
+        final from = command.args['from'];
+        final to = command.args['to'];
+        final length = player.queue.length;
+        if (from is int &&
+            to is int &&
+            from != to &&
+            from >= 0 &&
+            from < length &&
+            to >= 0 &&
+            to < length) {
+          final queue = [...player.queue];
+          queue.insert(to, queue.removeAt(from));
+          final current = player.index;
+          next = linkPlayerStateWith(
+            player,
+            positionMs: position,
+            updatedMs: now,
+            queue: queue,
+            index: current == from
+                ? to
+                : from < current && to >= current
+                ? current - 1
+                : from > current && to <= current
+                ? current + 1
+                : current,
+          );
+        }
+      case LinkActions.remove:
+        final at = command.args['index'];
+        if (at is int &&
+            at >= 0 &&
+            at < player.queue.length &&
+            at != player.index) {
+          next = linkPlayerStateWith(
+            player,
+            positionMs: position,
+            updatedMs: now,
+            queue: [...player.queue]..removeAt(at),
+            index: at < player.index ? player.index - 1 : player.index,
+          );
+        }
     }
     if (next != null) state = state.copyWith(player: next);
   }
@@ -256,6 +299,14 @@ class LinkDesktopRemote extends Notifier<LinkRemoteState> {
   /// Plays the item at [index] of the desktop's [LinkPlayerState.queue].
   Future<void> jump(int index) =>
       command(LinkCommand(LinkActions.jump, {'index': index}));
+
+  /// Moves entry [from] of the desktop's [LinkPlayerState.queue] to [to].
+  Future<void> move(int from, int to) =>
+      command(LinkCommand(LinkActions.move, {'from': from, 'to': to}));
+
+  /// Removes entry [index] of the desktop's [LinkPlayerState.queue].
+  Future<void> remove(int index) =>
+      command(LinkCommand(LinkActions.remove, {'index': index}));
 }
 
 final linkDesktopRemoteProvider =

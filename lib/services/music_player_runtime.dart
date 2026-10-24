@@ -26,12 +26,18 @@ import 'package:mornye/services/playback_deck.dart';
 import 'package:mornye/services/playback_notification.dart';
 import 'package:mornye/services/playback_output_volume.dart';
 import 'package:mornye/services/player_widget_service.dart';
+import 'package:mornye/services/remote_media_session.dart';
+import 'package:mornye/services/remote_playback.dart';
 import 'package:mornye/services/source_deletion_events.dart';
 import 'package:mornye/services/system_volume_service.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/utils/logger.dart';
 
 final _log = AppLogger('MusicPlayerRuntime');
+
+/// The handler the system media session talks to, and the player it shows
+/// unless a remote device plays in its place.
+({SwitchAudioHandler session, MusicPlayerHandler local})? _systemSession;
 
 /// The process services used by a player. Tests can replace effects without
 /// changing the queue, transport, interruption or automation algorithms.
@@ -44,7 +50,7 @@ class PlaybackDependencies {
     this.readNetworkMetadata = _readNetworkMetadata,
     this.resolveNetworkSource = _resolveNetworkSource,
     this.initializeHandler = _initializeAudioHandler,
-    this.synchronizePlaybackState = AudioService.synchronizePlaybackState,
+    this.synchronizePlaybackState = _synchronizePlaybackState,
     this.createPersonalization = AutoplayPersonalization.new,
     AppStateDatabase? sessionDatabase,
     LibraryDatabase? libraryDatabase,
@@ -125,13 +131,22 @@ class PlaybackDependencies {
       NetworkMetadataService.instance.read(source);
   static Future<String> _resolveNetworkSource(String source) =>
       NetworkStorageService.instance.resolve(source);
+  static Future<void> _synchronizePlaybackState() async {
+    // The session's switch takes each state from the player a microtask
+    // later; let the one just published reach it first.
+    await Future<void>.delayed(Duration.zero);
+    await AudioService.synchronizePlaybackState();
+  }
+
   static Future<MusicPlayerHandler> _initializeAudioHandler(
     MusicPlayerHandler Function() builder,
-  ) {
+  ) async {
     // MPRIS on Linux and SMTC on Windows; other OSes keep the plugin.
     installDesktopMediaSession();
-    return AudioService.init(
-      builder: builder,
+    late final MusicPlayerHandler handler;
+    final session = await AudioService.init(
+      // The switch lets a remote device take over the system session.
+      builder: () => SwitchAudioHandler(handler = builder()),
       config: const AudioServiceConfig(
         androidNotificationChannelId: 'com.zarz.mornye.playback',
         androidNotificationChannelName: 'Playback',
@@ -144,6 +159,8 @@ class PlaybackDependencies {
         androidBrowsableRootExtras: MediaLibraryBrowser.rootExtras,
       ),
     );
+    _systemSession = (session: session, local: handler);
+    return handler;
   }
 }
 
@@ -174,6 +191,8 @@ class MusicPlayerRuntime {
   Future<bool> Function(MediaItem)? _toggleFavorite;
   StreamSubscription<MediaItem?>? _backgroundFavorites;
   Future<void> Function()? exclusiveAudioHook;
+  RemotePlayback? _remote;
+  RemoteMediaSession? _remoteSession;
 
   /// The Library that media browsers such as Android Auto show.
   late final browser = MediaLibraryBrowser(
@@ -357,6 +376,37 @@ class MusicPlayerRuntime {
   Future<void> restoreSession() =>
       _restoreFuture ??= restorePlaybackSession(this);
 
+  /// Hands the system media session (notification, lock screen, headset and
+  /// car buttons) to [remote] while it plays in this device's place, and
+  /// back to this device's player when null. A Library song picked in the
+  /// car plays here and takes the session back.
+  Future<void> showRemote(RemotePlayback? remote) async {
+    if (identical(remote, _remote)) return;
+    _remote = remote;
+    if (remote != null) {
+      try {
+        await initialize();
+      } on Object {
+        return;
+      }
+    }
+    if (identical(remote, _remote) && !_disposed) _showSession(remote);
+  }
+
+  void _showSession(RemotePlayback? remote) {
+    final system = _systemSession;
+    if (system == null || !identical(system.local, _handler)) return;
+    _remoteSession?.dispose();
+    _remoteSession = null;
+    system.session.inner = remote == null
+        ? system.local
+        : _remoteSession = RemoteMediaSession(
+            remote,
+            local: system.local,
+            onLocal: () => _showSession(null),
+          );
+  }
+
   /// The default runtime lives for the app lifetime. Scoped runtimes close
   /// subscriptions and reject new initialization when their owner disposes.
   Future<void> dispose() => _disposeFuture ??= _dispose();
@@ -367,6 +417,8 @@ class MusicPlayerRuntime {
     unawaited(_backgroundFavorites?.cancel());
     _backgroundFavorites = null;
     exclusiveAudioHook = null;
+    _remoteSession?.dispose();
+    _remoteSession = null;
     await _handler?.dispose();
     try {
       await _initFuture;

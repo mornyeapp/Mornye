@@ -257,19 +257,35 @@ class LinkDesktopOps {
         if (mode == null) throw _invalid('Unknown repeat mode');
         await _player.setRepeat(mode);
       case LinkActions.jump:
-        // Phones index the queue window the state carries.
-        final index = _intArg(args, 'index');
-        final snapshot = _player.snapshot();
-        final window = linkQueueWindow(snapshot.queue.length, snapshot.index);
-        if (index == null || index < 0 || window.start + index >= window.end) {
-          throw _invalid('Index out of range');
+        await _player.jumpTo(_queueIndex(args, 'index'));
+      case LinkActions.move:
+        await _player.moveQueueItem(
+          _queueIndex(args, 'from'),
+          _queueIndex(args, 'to'),
+        );
+      case LinkActions.remove:
+        final index = _queueIndex(args, 'index');
+        if (index == _player.snapshot().index) {
+          throw _invalid('The current song stays in the queue');
         }
-        await _player.jumpTo(window.start + index);
+        await _player.removeQueueItem(index);
       case LinkActions.playQueue:
         await playHandoff(args);
       default:
         throw _invalid('Unknown action ${command.action}');
     }
+  }
+
+  /// The desktop queue index for the queue window entry `args[key]`: phones
+  /// index the window the state carries.
+  int _queueIndex(Map<String, dynamic> args, String key) {
+    final index = _intArg(args, key);
+    final snapshot = _player.snapshot();
+    final window = linkQueueWindow(snapshot.queue.length, snapshot.index);
+    if (index == null || index < 0 || window.start + index >= window.end) {
+      throw _invalid('Index out of range');
+    }
+    return window.start + index;
   }
 
   /// `handoff/play`: plays the songs of [args] the Library has or a phone

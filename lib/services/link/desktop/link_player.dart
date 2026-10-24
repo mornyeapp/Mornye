@@ -100,6 +100,12 @@ abstract interface class LinkPlayerPort {
   /// Plays entry [index] of the current queue.
   Future<void> jumpTo(int index);
 
+  /// Moves queue entry [from] to position [to].
+  Future<void> moveQueueItem(int from, int to);
+
+  /// Removes queue entry [index]; the current song stays.
+  Future<void> removeQueueItem(int index);
+
   /// Replaces the queue with [items] and starts entry [index] at [position],
   /// paused unless [playing].
   Future<void> playQueue(
@@ -219,6 +225,18 @@ class RuntimeLinkPlayerPort implements LinkPlayerPort {
 
   @override
   Future<void> jumpTo(int index) => _controller.jumpTo(index);
+
+  @override
+  Future<void> moveQueueItem(int from, int to) async =>
+      _controller.moveQueueItem(from, to);
+
+  @override
+  Future<void> removeQueueItem(int index) async {
+    final queue = _runtime.handler?.queue.value ?? const <MediaItem>[];
+    if (index >= 0 && index < queue.length) {
+      _controller.removeQueuedItem(queue[index]);
+    }
+  }
 
   @override
   Future<void> playQueue(

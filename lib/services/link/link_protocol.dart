@@ -101,6 +101,12 @@ abstract final class LinkActions {
   static const shuffle = 'shuffle';
   static const repeat = 'repeat';
   static const jump = 'jump';
+
+  /// `{"from","to"}`: moves a queue entry; indexes as for [jump].
+  static const move = 'move';
+
+  /// `{"index"}`: removes a queue entry other than the current one.
+  static const remove = 'remove';
   static const playQueue = 'play_queue';
 }
 

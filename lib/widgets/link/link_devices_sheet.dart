@@ -194,32 +194,15 @@ class LinkPlayingOnLabel extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final remote = ref.watch(activeRemotePlaybackProvider);
-    if (remote == null) return const SizedBox.shrink();
-    final mornye = context.isMornye;
+    if (ref.watch(activeRemotePlaybackProvider) == null) {
+      return const SizedBox.shrink();
+    }
     final color = this.color ?? Theme.of(context).colorScheme.primary;
-    final label = Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        AppIcon(
-          mornye ? CupertinoIcons.desktopcomputer : Icons.computer,
-          size: 16,
-          color: color,
-        ),
-        const SizedBox(width: 6),
-        Flexible(
-          child: Text(
-            context.l10n.linkPlayingOn(remote.name),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(
-              context,
-            ).textTheme.labelLarge?.copyWith(color: color),
-          ),
-        ),
-      ],
+    final label = LinkPlayingOnText(
+      color: color,
+      style: Theme.of(context).textTheme.labelLarge,
     );
-    if (mornye) {
+    if (context.isMornye) {
       return CupertinoButton(
         key: const ValueKey('link-playing-on'),
         padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -239,6 +222,65 @@ class LinkPlayingOnLabel extends ConsumerWidget {
           child: Center(widthFactor: 1, child: label),
         ),
       ),
+    );
+  }
+}
+
+/// "Playing on (desktop)" with a computer glyph, or "Sending this song to
+/// (desktop)..." with its progress while a song only the phone has travels
+/// there. Empty while this phone plays.
+class LinkPlayingOnText extends ConsumerWidget {
+  const LinkPlayingOnText({
+    super.key,
+    required this.color,
+    this.style,
+    this.glyphSize = 16,
+  });
+
+  final Color color;
+
+  /// The text style, drawn in [color].
+  final TextStyle? style;
+  final double glyphSize;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final remote = ref.watch(activeRemotePlaybackProvider);
+    if (remote == null) return const SizedBox.shrink();
+    final transfer = ref.watch(activeRemoteTransferProvider).value;
+    final l10n = context.l10n;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (transfer == null)
+          AppIcon(
+            context.isMornye ? CupertinoIcons.desktopcomputer : Icons.computer,
+            size: glyphSize,
+            color: color,
+          )
+        else
+          SizedBox.square(
+            dimension: glyphSize,
+            child: AppProgressIndicator.circular(
+              key: const ValueKey('link-sending-progress'),
+              value: transfer.fraction,
+              color: color,
+              strokeWidth: 2,
+              wavy: false,
+            ),
+          ),
+        SizedBox(width: glyphSize * 0.375),
+        Flexible(
+          child: Text(
+            transfer == null
+                ? l10n.linkPlayingOn(remote.name)
+                : l10n.linkHandoffSending(remote.name),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: style?.copyWith(color: color) ?? TextStyle(color: color),
+          ),
+        ),
+      ],
     );
   }
 }

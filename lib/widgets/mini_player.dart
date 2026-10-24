@@ -177,8 +177,8 @@ class _MiniPlayerBodyState extends ConsumerState<_MiniPlayerBody> {
 
     final isPlaying = ref.watch(playbackPlayingProvider);
     final isLoading = ref.watch(playbackLoadingProvider);
-    final remoteName = ref.watch(
-      activeRemotePlaybackProvider.select((remote) => remote?.name),
+    final remote = ref.watch(
+      activeRemotePlaybackProvider.select((remote) => remote != null),
     );
 
     final controller = ref.read(musicPlayerControllerProvider);
@@ -284,28 +284,12 @@ class _MiniPlayerBodyState extends ConsumerState<_MiniPlayerBody> {
                           ),
                           // Where the music plays while the paired desktop
                           // plays in this phone's place.
-                          if (remoteName != null)
-                            Row(
+                          if (remote)
+                            LinkPlayingOnText(
                               key: const ValueKey('mini-player-playing-on'),
-                              children: [
-                                AppIcon(
-                                  mornye
-                                      ? CupertinoIcons.desktopcomputer
-                                      : Icons.computer,
-                                  size: 14,
-                                  color: colorScheme.primary,
-                                ),
-                                const SizedBox(width: 4),
-                                Flexible(
-                                  child: Text(
-                                    context.l10n.linkPlayingOn(remoteName),
-                                    style: Theme.of(context).textTheme.bodySmall
-                                        ?.copyWith(color: colorScheme.primary),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ],
+                              color: colorScheme.primary,
+                              style: Theme.of(context).textTheme.bodySmall,
+                              glyphSize: 14,
                             )
                           else
                             OverflowMarquee(

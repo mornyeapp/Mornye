@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,11 +8,13 @@ import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/services/link/features/link_desktop_remote.dart';
 import 'package:mornye/services/link/features/link_handoff.dart';
 import 'package:mornye/services/link/features/link_phone_features.dart';
+import 'package:mornye/services/link/features/link_phone_files.dart';
 import 'package:mornye/services/link/features/link_remote_playback.dart';
 import 'package:mornye/services/link/features/link_track_refs.dart';
 import 'package:mornye/services/link/features/link_track_resolver.dart';
 import 'package:mornye/services/link/link_protocol.dart';
 import 'package:mornye/services/music_player_service.dart';
+import 'package:mornye/services/remote_playback.dart';
 
 import 'support/link_fakes.dart';
 
@@ -198,6 +201,98 @@ void main() {
     await playback.enqueue([linkDesktopMedia('c')], playNext: true);
     expect(client.posts.last.op, LinkOps.queueAdd);
     expect(client.posts.last.body['next'], isTrue);
+  });
+
+  test('queue rows reorder and remove on the desktop', () async {
+    // The first state read lands before this push.
+    await settle();
+    client.push({
+      'type': LinkMessageTypes.playerState,
+      'state': LinkPlayerState(
+        track: _desktopSong('s0'),
+        playing: true,
+        positionMs: 0,
+        updatedMs: 1,
+        queue: [_desktopSong('s0'), _desktopSong('s1'), _desktopSong('s0')],
+        index: 0,
+      ).toJson(),
+    });
+    await settle();
+    final rows = await playback.queues.first;
+    // A song queued twice keeps two rows the queue sheet tells apart.
+    expect(identical(rows[0], rows[2]), isFalse);
+    client.posts.clear();
+
+    await playback.moveQueueItem(1, 2);
+    final moved = await playback.queues.first;
+    expect(moved.map((item) => item.title), ['Song s0', 'Song s0', 'Song s1']);
+    // Moved rows are the same objects in their new places.
+    expect(identical(moved[1], rows[2]), isTrue);
+    expect(identical(moved[2], rows[1]), isTrue);
+
+    await playback.removeQueueItem(rows[2]);
+    expect((await playback.queues.first).map((item) => item.title), [
+      'Song s0',
+      'Song s1',
+    ]);
+    expect(
+      [for (final post in client.posts) post.body],
+      [
+        {
+          'action': 'move',
+          'args': {'from': 1, 'to': 2},
+        },
+        {
+          'action': 'remove',
+          'args': {'index': 1},
+        },
+      ],
+    );
+  });
+
+  test('reports a song file on its way to the desktop', () async {
+    final dir = await Directory.systemTemp.createTemp('link_remote_');
+    addTearDown(() => dir.delete(recursive: true));
+    final path = '${dir.path}/mine.flac';
+    await File(path).writeAsBytes([1, 2, 3]);
+    client.onPost = (op, body) => switch (op) {
+      LinkOps.handoffPlay when body['check'] == true => {
+        'resolved': 0,
+        'missing': [0],
+      },
+      _ => {'resolved': 1, 'missing': <int>[]},
+    };
+    final sending = LinkRemotePlayback(
+      name: 'Studio PC',
+      remote: container.read(linkDesktopRemoteProvider.notifier),
+      handoff: LinkHandoff(
+        client: client,
+        player: FakePhonePlayer(),
+        refs: LinkTrackRefCache(lookup: lookup, server: client.server),
+        resolver: LinkTrackResolver(lookup: lookup, server: client.server),
+        files: LinkPhoneFiles(copyContentUri: (_) async => null),
+      ),
+      resolveArtwork: (source) async => source,
+    );
+    addTearDown(sending.dispose);
+    final transfers = <RemoteTransfer?>[];
+    final subscription = sending.transfers.listen(transfers.add);
+    addTearDown(subscription.cancel);
+
+    await sending.playAll([
+      PlayableMedia(
+        id: 'mine',
+        source: path,
+        title: 'Mine',
+        artist: 'Artist',
+        album: 'Album',
+      ),
+    ]);
+    await settle();
+    expect(client.uploads, hasLength(1));
+    expect(transfers.first, isNull);
+    expect(transfers.whereType<RemoteTransfer>().last.fraction, 1);
+    expect(transfers.last, isNull);
   });
 
   test('keeps the song just sent until the desktop state arrives', () async {

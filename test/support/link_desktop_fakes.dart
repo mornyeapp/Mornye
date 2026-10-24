@@ -221,6 +221,13 @@ class FakeLinkPlayer implements LinkPlayerPort {
   Future<void> jumpTo(int index) async => calls.add('jump:$index');
 
   @override
+  Future<void> moveQueueItem(int from, int to) async =>
+      calls.add('move:$from:$to');
+
+  @override
+  Future<void> removeQueueItem(int index) async => calls.add('remove:$index');
+
+  @override
   Future<void> playQueue(
     List<PlayableMedia> items, {
     required int index,

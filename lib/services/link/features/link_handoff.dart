@@ -167,17 +167,18 @@ class LinkHandoff {
   }
 
   /// Adds [items] to the desktop's queue, after its current song when
-  /// [playNext], sending the songs only the phone has first. Reports how
-  /// many the desktop queued.
+  /// [playNext], sending the songs only the phone has first; [onSending]
+  /// reports each one's progress. Reports how many the desktop queued.
   Future<int> addToDesktopQueue(
     List<MediaItem> items, {
     bool playNext = false,
+    void Function(int sent, int total)? onSending,
   }) async {
     final (:queue, :phoneFiles) = await _refs(items);
     final files = this.files;
     if (files != null) {
       for (final i in await _missing(queue, phoneFiles, current: 0)) {
-        await files.upload(client, phoneFiles[i]!);
+        await files.upload(client, phoneFiles[i]!, onProgress: onSending);
       }
     }
     final reply = await client.post(LinkOps.queueAdd, {

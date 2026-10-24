@@ -162,6 +162,56 @@ void main() {
     expect(player.volume, 1.0);
   });
 
+  test('reorders and trims the queue at once', () async {
+    client.onGet = (op, query) => op == LinkOps.state
+        ? LinkPlayerState(
+            track: const TrackRef(title: 'B', artist: 'Artist'),
+            playing: true,
+            positionMs: 0,
+            updatedMs: 5,
+            queue: const [
+              TrackRef(title: 'A', artist: 'Artist'),
+              TrackRef(title: 'B', artist: 'Artist'),
+              TrackRef(title: 'C', artist: 'Artist'),
+              TrackRef(title: 'D', artist: 'Artist'),
+            ],
+            index: 1,
+          ).toJson()
+        : null;
+    final remote = await start();
+    List<String> titles() => [
+      for (final ref in read().player!.queue) ref.title,
+    ];
+
+    await remote.move(3, 0);
+    expect(titles(), ['D', 'A', 'B', 'C']);
+    expect(read().player!.index, 2);
+    await remote.move(2, 3);
+    expect(titles(), ['D', 'A', 'C', 'B']);
+    expect(read().player!.index, 3);
+    await remote.remove(0);
+    expect(titles(), ['A', 'C', 'B']);
+    expect(read().player!.index, 2);
+    expect(read().player!.track?.title, 'B');
+    expect(
+      [for (final post in client.posts) post.body],
+      [
+        {
+          'action': 'move',
+          'args': {'from': 3, 'to': 0},
+        },
+        {
+          'action': 'move',
+          'args': {'from': 2, 'to': 3},
+        },
+        {
+          'action': 'remove',
+          'args': {'index': 0},
+        },
+      ],
+    );
+  });
+
   test('shows a command at once and takes it back when it fails', () async {
     final remote = await start();
     await remote.pause();

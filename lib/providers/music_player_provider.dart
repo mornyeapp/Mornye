@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:audio_service/audio_service.dart';
@@ -29,6 +30,12 @@ final activeRemotePlaybackProvider = Provider<RemotePlayback?>((ref) => null);
 final activeRemoteVolumeProvider = StreamProvider<double>(
   (ref) =>
       ref.watch(activeRemotePlaybackProvider)?.volumes ?? const Stream.empty(),
+);
+
+/// The song file on its way to the active remote device, or null.
+final activeRemoteTransferProvider = StreamProvider<RemoteTransfer?>(
+  (ref) =>
+      ref.watch(activeRemotePlaybackProvider)?.transfers ?? Stream.value(null),
 );
 
 /// What the player screens show: the active remote device's track, else the
@@ -484,13 +491,20 @@ class MusicPlayerController {
   Future<void> jumpTo(int index) async =>
       remote?.jumpTo(index) ?? _handler?.skipToQueueItem(index);
 
-  /// Reorders the local queue; a remote device's queue stays as it is.
   void moveQueueItem(int oldIndex, int newIndex) {
-    if (remote == null) _handler?.moveQueueItem(oldIndex, newIndex);
+    if (remote case final remote?) {
+      unawaited(remote.moveQueueItem(oldIndex, newIndex));
+    } else {
+      _handler?.moveQueueItem(oldIndex, newIndex);
+    }
   }
 
   void removeQueuedItem(MediaItem item) {
-    if (remote == null) _handler?.removeQueuedItem(item);
+    if (remote case final remote?) {
+      unawaited(remote.removeQueueItem(item));
+    } else {
+      _handler?.removeQueuedItem(item);
+    }
   }
 }
 

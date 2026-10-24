@@ -37,10 +37,18 @@ class _PlaysOnDesktop extends LinkPlaysOnDesktop {
   bool build() => initial;
 }
 
-/// The desktop as the player screens see it; only its name is read.
+/// The desktop as the player screens see it; only its name and the song
+/// on its way there are read.
 class _Remote implements RemotePlayback {
+  _Remote([this.transfer]);
+
+  final RemoteTransfer? transfer;
+
   @override
   String get name => 'Studio PC';
+
+  @override
+  Stream<RemoteTransfer?> get transfers => Stream.value(transfer);
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
@@ -335,6 +343,30 @@ void main() {
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 500));
         expect(find.byType(LinkDevicesSheet), findsOneWidget);
+      });
+
+      testWidgets('the player shows a song on its way to the desktop', (
+        tester,
+      ) async {
+        await tester.pumpWidget(
+          host(
+            theme: theme,
+            client: desktop(),
+            onDesktop: true,
+            remote: _Remote(const RemoteTransfer(sent: 25, total: 100)),
+            child: const LinkPlayingOnLabel(),
+          ),
+        );
+        await tester.pump();
+        expect(
+          find.textContaining('Sending this song to Studio PC'),
+          findsOneWidget,
+        );
+        expect(find.text('Playing on Studio PC'), findsNothing);
+        expect(
+          find.byKey(const ValueKey('link-sending-progress')),
+          findsOneWidget,
+        );
       });
     });
   }

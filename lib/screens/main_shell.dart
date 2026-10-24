@@ -842,6 +842,9 @@ class _MainShellState extends ConsumerState<MainShell>
     ref.listen(settingsProvider, (_, settings) {
       ref.read(musicPlayerRuntimeProvider).configure(settings);
     });
+    ref.listen(activeRemotePlaybackProvider, (_, remote) {
+      unawaited(ref.read(musicPlayerRuntimeProvider).showRemote(remote));
+    });
     ref.listen(settingsProvider.select((s) => s.discordRichPresenceEnabled), (
       _,
       enabled,

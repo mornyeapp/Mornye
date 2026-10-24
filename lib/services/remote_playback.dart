@@ -20,6 +20,10 @@ abstract interface class RemotePlayback {
   Stream<double> get volumes;
   Future<void> setVolume(double value);
 
+  /// Songs on their way there before it can play them, or null while none
+  /// travel.
+  Stream<RemoteTransfer?> get transfers;
+
   Future<void> play();
   Future<void> pause();
   Future<void> seek(Duration position);
@@ -28,6 +32,12 @@ abstract interface class RemotePlayback {
 
   /// Plays entry [index] of the queue [queues] reports.
   Future<void> jumpTo(int index);
+
+  /// Moves entry [from] of that queue to position [to].
+  Future<void> moveQueueItem(int from, int to);
+
+  /// Removes [item], an entry of that queue other than the current one.
+  Future<void> removeQueueItem(MediaItem item);
   Future<void> setShuffle(bool enabled);
   Future<void> setRepeatMode(AudioServiceRepeatMode mode);
 
@@ -36,4 +46,15 @@ abstract interface class RemotePlayback {
 
   /// Adds [items] there, after the current song when [playNext].
   Future<void> enqueue(List<PlayableMedia> items, {bool playNext = false});
+}
+
+/// A song file being sent to a [RemotePlayback]: [sent] of [total] bytes.
+class RemoteTransfer {
+  const RemoteTransfer({required this.sent, required this.total});
+
+  final int sent;
+  final int total;
+
+  /// The share sent, 0 to 1, or null while the size is unknown.
+  double? get fraction => total > 0 ? (sent / total).clamp(0.0, 1.0) : null;
 }

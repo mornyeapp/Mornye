@@ -198,6 +198,41 @@ void main() {
       expect(player.calls, isEmpty);
     });
 
+    test('moves and removes queue entries of the window', () async {
+      final queue = [for (var i = 0; i < 500; i++) playerItem('q$i')];
+      player.current = snapshot(queue: queue, index: 450);
+      // The window starts at entry 300.
+      await call(LinkOps.command, {
+        'action': 'move',
+        'args': {'from': 160, 'to': 151},
+      });
+      await call(LinkOps.command, {
+        'action': 'remove',
+        'args': {'index': 152},
+      });
+      expect(player.calls, ['move:460:451', 'remove:452']);
+    });
+
+    test('keeps the current song and the window bounds', () async {
+      for (final args in [
+        {'index': 1},
+        {'index': 3},
+      ]) {
+        await expectLater(
+          call(LinkOps.command, {'action': 'remove', 'args': args}),
+          throwsA(linkError('invalid')),
+        );
+      }
+      await expectLater(
+        call(LinkOps.command, {
+          'action': 'move',
+          'args': {'from': 0, 'to': 3},
+        }),
+        throwsA(linkError('invalid')),
+      );
+      expect(player.calls, isEmpty);
+    });
+
     test('play_queue plays the handed-off queue', () async {
       await call(LinkOps.command, {
         'action': 'play_queue',

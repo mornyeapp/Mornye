@@ -17,8 +17,9 @@ final _log = AppLogger('LinkRemotePlayback');
 
 /// Whether the paired desktop plays in this phone's place, as after Play on
 /// desktop. The phone takes over again after Continue on this phone, when
-/// the desktop is unpaired, and when the phone's own player starts from its
-/// notification, a headset or the car.
+/// the desktop is unpaired, and when the phone's own player starts, such as
+/// for a Library song picked in the car. The notification and headset
+/// drive the desktop meanwhile.
 class LinkPlaysOnDesktop extends Notifier<bool> {
   @override
   bool build() {
@@ -110,6 +111,11 @@ class LinkRemotePlayback implements RemotePlayback {
   final _playbackState = _Latest<PlaybackState>(PlaybackState());
   final _queue = _Latest<List<MediaItem>>(const []);
   final _volume = _Latest<double>(1);
+  final _transfer = _Latest<RemoteTransfer?>(null);
+
+  /// The item each entry of [_queue] copies. Every entry is its own object,
+  /// as in the local queue, so a repeated song keeps distinct rows.
+  List<MediaItem> _queueBases = const [];
 
   /// The best item known for each track, and the tracks whose lookup ran.
   final _items = <TrackRef, MediaItem>{};
@@ -133,6 +139,9 @@ class LinkRemotePlayback implements RemotePlayback {
   @override
   Stream<double> get volumes => _volume.stream;
 
+  @override
+  Stream<RemoteTransfer?> get transfers => _transfer.stream;
+
   /// Shows the desktop's [state].
   void update(LinkRemoteState state) {
     if (_disposed || (state.loading && state.player == null)) return;
@@ -155,13 +164,34 @@ class LinkRemotePlayback implements RemotePlayback {
     final refs = player?.queue ?? const <TrackRef>[];
     if (force || !listEquals(refs, _queueRefs)) {
       _queueRefs = refs;
-      _queue.add(List.unmodifiable([for (final ref in refs) _itemFor(ref)]));
+      _showQueue([for (final ref in refs) _itemFor(ref)]);
     }
     if (track != null) unawaited(_resolve(track));
     final start = player?.index ?? 0;
     for (final ref in refs.skip(start < 0 ? 0 : start).take(_resolveAhead)) {
       unawaited(_resolve(ref));
     }
+  }
+
+  /// Shows a queue of [bases], keeping the entry objects of the songs it
+  /// already showed, so moved rows keep their identity.
+  void _showQueue(List<MediaItem> bases) {
+    final spare = Map<MediaItem, List<MediaItem>>.identity();
+    final shown = _queue.value;
+    for (var i = 0; i < _queueBases.length && i < shown.length; i++) {
+      spare.putIfAbsent(_queueBases[i], () => []).add(shown[i]);
+    }
+    _queueBases = bases;
+    final entries = <MediaItem>[];
+    for (final base in bases) {
+      final reused = spare[base];
+      entries.add(
+        reused != null && reused.isNotEmpty
+            ? reused.removeAt(0)
+            : base.copyWith(),
+      );
+    }
+    _queue.add(List.unmodifiable(entries));
   }
 
   void _showPlayback() {
@@ -268,6 +298,16 @@ class LinkRemotePlayback implements RemotePlayback {
   Future<void> jumpTo(int index) => _send(() => _remote.jump(index));
 
   @override
+  Future<void> moveQueueItem(int from, int to) =>
+      _send(() => _remote.move(from, to));
+
+  @override
+  Future<void> removeQueueItem(MediaItem item) async {
+    final index = _queue.value.indexWhere((entry) => identical(entry, item));
+    if (index >= 0) await _send(() => _remote.remove(index));
+  }
+
+  @override
   Future<void> setShuffle(bool enabled) =>
       _send(() => _remote.setShuffle(enabled));
 
@@ -286,19 +326,40 @@ class LinkRemotePlayback implements RemotePlayback {
 
   @override
   Future<void> playAll(List<PlayableMedia> items, {int initialIndex = 0}) =>
-      _send(
-        () => _handoff.playItemsOnDesktop([
-          for (final item in items) item.toMediaItem(),
-        ], index: initialIndex),
+      _sending(
+        (onSending) => _handoff.playItemsOnDesktop(
+          [for (final item in items) item.toMediaItem()],
+          index: initialIndex,
+          onSending: onSending,
+        ),
       );
 
   @override
   Future<void> enqueue(List<PlayableMedia> items, {bool playNext = false}) =>
-      _send(
-        () => _handoff.addToDesktopQueue([
-          for (final item in items) item.toMediaItem(),
-        ], playNext: playNext),
+      _sending(
+        (onSending) => _handoff.addToDesktopQueue(
+          [for (final item in items) item.toMediaItem()],
+          playNext: playNext,
+          onSending: onSending,
+        ),
       );
+
+  /// Runs [command], reporting the song files it sends as [transfers].
+  Future<void> _sending(
+    Future<void> Function(void Function(int sent, int total) onSending) command,
+  ) async {
+    try {
+      await _send(
+        () => command((sent, total) {
+          if (!_disposed) {
+            _transfer.add(RemoteTransfer(sent: sent, total: total));
+          }
+        }),
+      );
+    } finally {
+      if (!_disposed && _transfer.value != null) _transfer.add(null);
+    }
+  }
 
   void dispose() {
     _disposed = true;
@@ -307,6 +368,7 @@ class LinkRemotePlayback implements RemotePlayback {
     _playbackState.close();
     _queue.close();
     _volume.close();
+    _transfer.close();
   }
 }
 
