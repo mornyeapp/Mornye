@@ -7835,5 +7835,236 @@
   "desktopShortcutToggleSidebar": "Show or hide sidebar",
   "@desktopShortcutToggleSidebar": {
     "description": "Keyboard Shortcuts row for the shortcut that collapses or expands the desktop sidebar"
+  },
+  "linkSettingsTitle": "Mornye on your computer",
+  "@linkSettingsTitle": {
+    "description": "Phone Settings entry that pairs the phone with the Mornye desktop app on the local network"
+  },
+  "linkSettingsSubtitle": "Play and control your computer's library",
+  "@linkSettingsSubtitle": {
+    "description": "Subtitle of the Mornye on your computer entry in phone Settings"
+  },
+  "linkPageTitle": "Computers",
+  "@linkPageTitle": {
+    "description": "Title of the page listing computers running Mornye that the phone can pair with; kept short for the large title"
+  },
+  "linkPageDescription": "Pair with Mornye on your computer to play its library on this phone and control what it plays. Both devices need to be on the same network.",
+  "@linkPageDescription": {
+    "description": "Introduction at the top of the computers page"
+  },
+  "linkPairedSection": "Paired computers",
+  "@linkPairedSection": {
+    "description": "Section header for computers this phone is paired with"
+  },
+  "linkNearbySection": "On this network",
+  "@linkNearbySection": {
+    "description": "Section header for computers running Mornye found on the local network"
+  },
+  "linkSearching": "Looking for computers...",
+  "@linkSearching": {
+    "description": "Row shown while the phone searches the local network for computers"
+  },
+  "linkNoneFoundTitle": "No computers found",
+  "@linkNoneFoundTitle": {
+    "description": "Row shown when the phone is not searching and found no computer"
+  },
+  "linkNoneFound": "Open Mornye on your computer and turn on Share with Mornye on your phone in its settings.",
+  "@linkNoneFound": {
+    "description": "Hint under the search row when no computer was found yet; Share with Mornye on your phone is the name of the desktop setting"
+  },
+  "linkAddManually": "Add by address",
+  "@linkAddManually": {
+    "description": "Button and dialog title for pairing with a computer by typing its address and port"
+  },
+  "linkManualHost": "Computer address",
+  "@linkManualHost": {
+    "description": "Field label for the computer's IP address or host name"
+  },
+  "linkManualPort": "Port",
+  "@linkManualPort": {
+    "description": "Field label for the network port of the Mornye desktop server"
+  },
+  "linkManualMessage": "Mornye on your computer shows its address and port where you turn on sharing.",
+  "@linkManualMessage": {
+    "description": "Explains where to find the address and port to type"
+  },
+  "linkContinue": "Continue",
+  "@linkContinue": {
+    "description": "Dialog action that continues to the PIN step after typing an address"
+  },
+  "linkStateConnected": "Connected",
+  "@linkStateConnected": {
+    "description": "Status of the paired computer that is connected"
+  },
+  "linkStateConnecting": "Connecting...",
+  "@linkStateConnecting": {
+    "description": "Status of the paired computer while the phone connects to it"
+  },
+  "linkStateDisconnected": "Not connected",
+  "@linkStateDisconnected": {
+    "description": "Status of the paired computer when it cannot be reached"
+  },
+  "linkStateInactive": "Tap to use this computer",
+  "@linkStateInactive": {
+    "description": "Status of a paired computer other than the one in use; tapping it makes it the one in use"
+  },
+  "linkActive": "In use",
+  "@linkActive": {
+    "description": "Label next to the paired computer the phone currently uses, shown when several are paired"
+  },
+  "linkForget": "Forget",
+  "@linkForget": {
+    "description": "Action that unpairs a computer from this phone"
+  },
+  "linkForgetTitle": "Forget {name}?",
+  "@linkForgetTitle": {
+    "description": "Title of the dialog confirming that a paired computer is forgotten",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkForgetMessage": "This phone stops connecting to it. You can pair again later.",
+  "@linkForgetMessage": {
+    "description": "Explanation in the forget computer dialog"
+  },
+  "linkForgetRemoveLibrary": "Also remove its music from Library",
+  "@linkForgetRemoveLibrary": {
+    "description": "Switch in the forget computer dialog that also removes the computer's network connection and Library source"
+  },
+  "linkPinTitle": "Pair with {name}",
+  "@linkPinTitle": {
+    "description": "Title of the dialog asking for the pairing PIN",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkPinMessage": "Enter the 6-digit PIN shown on your computer.",
+  "@linkPinMessage": {
+    "description": "Instruction in the pairing PIN dialog"
+  },
+  "linkPinField": "PIN",
+  "@linkPinField": {
+    "description": "Label of the pairing PIN field"
+  },
+  "linkPinCode": "Your computer shows the code {code} next to the PIN. Pair only if it matches.",
+  "@linkPinCode": {
+    "description": "Security check in the PIN dialog; the placeholder is 8 hexadecimal characters of the computer's certificate fingerprint",
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
+  "linkPinNotOpen": "Pairing is not open yet. Start pairing in Mornye on your computer to show a PIN.",
+  "@linkPinNotOpen": {
+    "description": "Note in the PIN dialog when the computer reports that no pairing window is open"
+  },
+  "linkPair": "Pair",
+  "@linkPair": {
+    "description": "Action that sends the PIN to pair with the computer"
+  },
+  "linkPaired": "Paired with {name}. Its music is being added to Library.",
+  "@linkPaired": {
+    "description": "Message after pairing succeeded",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkPairAgain": "Pair again",
+  "@linkPairAgain": {
+    "description": "Action that repeats pairing with a computer that no longer accepts this phone"
+  },
+  "linkErrorBadPin": "That PIN is not right. Check the PIN on your computer and try again.",
+  "@linkErrorBadPin": {
+    "description": "Pairing error when the PIN is wrong"
+  },
+  "linkErrorPairingClosed": "Pairing is not open on your computer. Start pairing there, then try again.",
+  "@linkErrorPairingClosed": {
+    "description": "Pairing error when the computer has no pairing window open"
+  },
+  "linkErrorTooManyAttempts": "Too many attempts. Wait a moment, then try again.",
+  "@linkErrorTooManyAttempts": {
+    "description": "Pairing error when the computer rate limits pairing attempts"
+  },
+  "linkErrorCertificateTitle": "Computer not verified",
+  "@linkErrorCertificateTitle": {
+    "description": "Title of the warning shown when the computer's certificate does not match what it reported"
+  },
+  "linkErrorCertificate": "The computer's security certificate does not match what it reported. Someone on this network may be intercepting the connection, so pairing stopped.",
+  "@linkErrorCertificate": {
+    "description": "Warning shown when the certificate seen during the connection differs from the computer's reported fingerprint"
+  },
+  "linkErrorIncompatible": "This computer runs a Mornye version that cannot pair with this phone. Update Mornye on both devices.",
+  "@linkErrorIncompatible": {
+    "description": "Pairing error when the computer is not a compatible Mornye desktop"
+  },
+  "linkErrorUnreachable": "The computer could not be reached. Check that Mornye is open on it and that both devices are on the same network.",
+  "@linkErrorUnreachable": {
+    "description": "Pairing error when the computer cannot be reached"
+  },
+  "linkErrorTimeout": "The computer did not answer in time. Try again.",
+  "@linkErrorTimeout": {
+    "description": "Pairing error when the computer does not answer"
+  },
+  "linkErrorInvalidAddress": "Enter a valid address and port, such as 192.168.1.20 and 47710.",
+  "@linkErrorInvalidAddress": {
+    "description": "Error for an address or port that cannot be used"
+  },
+  "linkErrorFailed": "Pairing failed. Try again.",
+  "@linkErrorFailed": {
+    "description": "Generic pairing error"
+  },
+  "linkLocalNetworkTitle": "Local network access needed",
+  "@linkLocalNetworkTitle": {
+    "description": "Title of the notice shown when the phone is not allowed to use the local network"
+  },
+  "linkLocalNetworkMessage": "Mornye needs local network access to find your computer and connect to it.",
+  "@linkLocalNetworkMessage": {
+    "description": "Explains why local network access is needed"
+  },
+  "linkLocalNetworkAllow": "Allow access",
+  "@linkLocalNetworkAllow": {
+    "description": "Button that asks for local network access again"
+  },
+  "linkWifiOffTitle": "Not on Wi-Fi",
+  "@linkWifiOffTitle": {
+    "description": "Title of the notice shown when the phone is not connected to Wi-Fi or Ethernet"
+  },
+  "linkWifiOffMessage": "Connect this phone to the same Wi-Fi network as your computer.",
+  "@linkWifiOffMessage": {
+    "description": "Explains that the phone must join the computer's Wi-Fi network"
+  },
+  "linkIssueUnauthorized": "{name} no longer accepts this phone. Pair again to reconnect.",
+  "@linkIssueUnauthorized": {
+    "description": "Notice when the paired computer refuses the phone's key",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkIssueCertificate": "{name} presented a different security certificate. Pair again only if you reinstalled or reset Mornye on that computer.",
+  "@linkIssueCertificate": {
+    "description": "Warning when a paired computer's certificate changed",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkIssueIncompatible": "Update Mornye on this phone and on {name} to connect.",
+  "@linkIssueIncompatible": {
+    "description": "Notice when the paired computer speaks another protocol version",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
   }
 }
