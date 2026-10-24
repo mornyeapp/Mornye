@@ -86,6 +86,10 @@
 	
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Connect to your music servers and network storage to browse and play your music.</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_mornye._tcp</string>
+	</array>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>

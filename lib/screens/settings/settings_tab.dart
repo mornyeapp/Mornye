@@ -19,6 +19,7 @@ import 'package:mornye/screens/settings/extensions_page.dart';
 import 'package:mornye/screens/settings/files_settings_page.dart';
 import 'package:mornye/screens/settings/keyboard_shortcuts_page.dart';
 import 'package:mornye/screens/settings/library_settings_page.dart';
+import 'package:mornye/screens/settings/link_settings_page.dart';
 import 'package:mornye/screens/network_storage_screen.dart';
 import 'package:mornye/screens/settings/log_screen.dart';
 import 'package:mornye/screens/settings/lyrics_settings_page.dart';
@@ -247,6 +248,23 @@ class _SettingsTabState extends ConsumerState<SettingsTab> {
             ],
             pageBuilder: () => const NetworkStorageScreen(),
           ),
+          if (Platform.isAndroid || Platform.isIOS)
+            _Destination(
+              icon: Icons.computer,
+              iconColor: Colors.deepPurple,
+              title: l10n.linkSettingsTitle,
+              subtitle: l10n.linkSettingsSubtitle,
+              keywords: const [
+                'computer',
+                'desktop',
+                'pc',
+                'mac',
+                'pair',
+                'link',
+                'komputer',
+              ],
+              pageBuilder: () => const LinkSettingsPage(),
+            ),
           _Destination(
             icon: Icons.sell_outlined,
             iconColor: Colors.amber,

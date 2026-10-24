@@ -44,6 +44,8 @@ dependencies:
   # 7.3.2 requires dbus 0.8, while desktop_drop 0.8.4 still requires 0.7.
   connectivity_plus: ^7.3.1
   crypto: ^3.0.7
+  # Mornye Link: finds the desktop app on the local network (mDNS).
+  bonsoir: ^7.1.5
 
   # Streaming backup archives
   archive: ^4.5.2
