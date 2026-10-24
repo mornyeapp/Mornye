@@ -68,6 +68,7 @@ final Map<IconData, IconData> _filledSymbols = {
   Icons.cloud_download: Symbols.cloud_download_rounded,
   Icons.code: Symbols.code_rounded,
   Icons.compare_arrows: Symbols.compare_arrows_rounded,
+  Icons.computer: Symbols.computer_rounded,
   Icons.confirmation_number_rounded: Symbols.confirmation_number_rounded,
   Icons.content_copy_rounded: Symbols.content_copy_rounded,
   Icons.content_paste: Symbols.content_paste_rounded,

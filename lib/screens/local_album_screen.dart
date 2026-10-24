@@ -40,6 +40,7 @@ import 'package:mornye/widgets/album_track_tile.dart';
 import 'package:mornye/widgets/animation_utils.dart';
 import 'package:mornye/widgets/app_snack_bar.dart';
 import 'package:mornye/widgets/library_track_selection_bar.dart';
+import 'package:mornye/widgets/link/link_actions.dart';
 import 'package:mornye/widgets/library_selection_playback_actions.dart';
 import 'package:mornye/widgets/local_library_artwork_builder.dart';
 import 'package:mornye/widgets/disc_separator_chip.dart';
@@ -407,6 +408,9 @@ class _LocalAlbumScreenState extends ConsumerState<LocalAlbumScreen>
         ),
       ),
       meta: _buildLocalHeaderMeta(context, qualityLabelMode),
+      appBarActions: linkHasDesktopSongs(ref, _sortedTracksCache)
+          ? [LinkSaveToPhoneButton(items: _sortedTracksCache)]
+          : null,
       actions: Consumer(
         builder: (context, ref, _) {
           final isCurrent = ref.watch(

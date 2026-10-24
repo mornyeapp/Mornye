@@ -11,6 +11,10 @@ extension _TrackMetadataMenu on _TrackMetadataScreenState {
     AppLocalizations l10n,
   ) {
     final canEditFile = _fileExists && !_isNetworkItem;
+    final localItem = _localLibraryItem;
+    final desktopSongs = localItem == null
+        ? const <LinkOfflineSong>[]
+        : linkDesktopSongsOf(ref, [localItem]);
     return <_MetadataOption>[
       if (_fileExists)
         _MetadataOption(
@@ -23,6 +27,12 @@ extension _TrackMetadataMenu on _TrackMetadataScreenState {
           icon: Icons.queue_music,
           label: l10n.trackAddToQueue,
           onTap: () => _enqueueThis(ref, playNext: false),
+        ),
+      if (desktopSongs.isNotEmpty)
+        _MetadataOption(
+          icon: Icons.phone_android,
+          label: l10n.linkSaveToPhone,
+          onTap: () => linkSaveSongsToPhone(screenContext, ref, desktopSongs),
         ),
       if (albumName.trim().isNotEmpty)
         _MetadataOption(

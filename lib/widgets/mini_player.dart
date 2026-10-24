@@ -24,10 +24,12 @@ import 'package:mornye/theme/material_expressive.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/theme/player_artwork_theme.dart';
 import 'package:mornye/screens/now_playing_screen.dart';
+import 'package:mornye/services/link/features/link_phone_client.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/utils/string_utils.dart';
 import 'package:mornye/widgets/audio_quality_badges.dart';
 import 'package:mornye/widgets/decorative_phase.dart';
+import 'package:mornye/widgets/link/link_devices_sheet.dart';
 import 'package:mornye/widgets/overflow_marquee.dart';
 import 'package:mornye/widgets/player_artwork.dart';
 import 'package:mornye/widgets/settings_group.dart';
@@ -302,6 +304,10 @@ class _MiniPlayerBodyState extends ConsumerState<_MiniPlayerBody> {
                         ],
                       ),
                     ),
+                    if (!compact && ref.watch(linkPhoneClientProvider) != null)
+                      LinkDevicesButton(
+                        color: mornye ? colorScheme.onSurface : null,
+                      ),
                     if (expressive)
                       AppIconButton.filled(
                         tooltip: isPlaying
