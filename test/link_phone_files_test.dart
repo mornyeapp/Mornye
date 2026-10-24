@@ -102,6 +102,44 @@ void main() {
       expect(await File(copy).exists(), isFalse);
     });
 
+    test('says whether the desktop can start the file early', () async {
+      /// An MP4 box of [type] with [length] payload bytes.
+      List<int> box(String type, int length) => [
+        ...[0, 0, (length + 8) >> 8, (length + 8) & 0xff],
+        ...type.codeUnits,
+        ...List.filled(length, 0),
+      ];
+      final files = LinkPhoneFiles();
+      Future<LinkUploadStart?> start(String name, List<int> bytes) async {
+        final path = '${dir.path}/$name';
+        await File(path).writeAsBytes(bytes);
+        LinkUploadStart? started;
+        await files.upload(
+          FakeLinkClient(),
+          (await files.fileFor(item(path)))!,
+          onStart: (value) => started = value,
+        );
+        return started;
+      }
+
+      final fastStart = await start('fast.m4a', [
+        ...box('ftyp', 8),
+        ...box('moov', 16),
+        ...box('mdat', 64),
+      ]);
+      expect(fastStart!.streamable, isTrue);
+      expect(fastStart.size, 112);
+      expect(fastStart.name, endsWith('.m4a'));
+      // The index comes after the audio, so the file must arrive whole.
+      final indexLast = await start('late.m4a', [
+        ...box('ftyp', 8),
+        ...box('mdat', 64),
+        ...box('moov', 16),
+      ]);
+      expect(indexLast!.streamable, isFalse);
+      expect((await start('song.flac', [1, 2, 3]))!.streamable, isTrue);
+    });
+
     test('fails when the content URI cannot be read', () async {
       final files = LinkPhoneFiles(copyContentUri: (_) async => null);
       final file = (await files.fileFor(item('content://media/9')))!;

@@ -25,6 +25,39 @@ class LinkPhoneFile {
   final String? extension;
 }
 
+/// An upload as it starts: the name the desktop stores it under, its size,
+/// and whether a player can start it before all of it arrives.
+typedef LinkUploadStart = ({String name, int size, bool streamable});
+
+/// Whether a player can start [file] before all of it arrives. MP4 files
+/// keep their index (`moov`) at either end; one after the audio (`mdat`)
+/// arrives last.
+Future<bool> _startsBeforeWhole(File file, String extension) async {
+  if (!const {'m4a', 'mp4'}.contains(extension)) return true;
+  final input = await file.open();
+  try {
+    final length = await input.length();
+    var offset = 0;
+    for (var boxes = 0; boxes < 64 && offset + 8 <= length; boxes++) {
+      await input.setPosition(offset);
+      final header = await input.read(16);
+      if (header.length < 8) return false;
+      final type = String.fromCharCodes(header.sublist(4, 8));
+      if (type == 'moov') return true;
+      if (type == 'mdat') return false;
+      var size = header.take(4).fold(0, (value, byte) => value << 8 | byte);
+      if (size == 1 && header.length == 16) {
+        size = header.skip(8).fold(0, (value, byte) => value << 8 | byte);
+      }
+      if (size < 8) return false;
+      offset += size;
+    }
+    return false;
+  } finally {
+    await input.close();
+  }
+}
+
 /// The lowercase extension of [path] when the desktop accepts it.
 String? _uploadExtension(String path) {
   final name = path.split(RegExp(r'[\\/]')).last;
@@ -71,11 +104,13 @@ class LinkPhoneFiles {
     }
   }
 
-  /// Uploads [file] through [client]; [onProgress] gets the bytes sent and
-  /// the file's size. A content URI is copied to a temporary file first.
+  /// Uploads [file] through [client]. [onStart] learns its name and size
+  /// before the first byte goes; [onProgress] gets the bytes sent and the
+  /// file's size. A content URI is copied to a temporary file first.
   Future<void> upload(
     LinkClientApi client,
     LinkPhoneFile file, {
+    void Function(LinkUploadStart start)? onStart,
     void Function(int sent, int total)? onProgress,
   }) async {
     if (file.extension case final extension?) {
@@ -84,6 +119,7 @@ class LinkPhoneFiles {
         file.fileId,
         extension,
         File(file.source),
+        onStart,
         onProgress,
       );
       return;
@@ -98,7 +134,14 @@ class LinkPhoneFiles {
       if (extension == null) {
         throw const LinkException('invalid', 'The computer cannot play it');
       }
-      await _send(client, file.fileId, extension, temporary, onProgress);
+      await _send(
+        client,
+        file.fileId,
+        extension,
+        temporary,
+        onStart,
+        onProgress,
+      );
     } finally {
       await deleteFileQuietly(temporary);
     }
@@ -109,11 +152,18 @@ class LinkPhoneFiles {
     String fileId,
     String extension,
     File local,
+    void Function(LinkUploadStart start)? onStart,
     void Function(int sent, int total)? onProgress,
   ) async {
     final total = await local.length();
+    final name = '$fileId.$extension';
+    onStart?.call((
+      name: name,
+      size: total,
+      streamable: await _startsBeforeWhole(local, extension),
+    ));
     await client.upload(
-      '$fileId.$extension',
+      name,
       local,
       onProgress: onProgress == null ? null : (sent) => onProgress(sent, total),
     );

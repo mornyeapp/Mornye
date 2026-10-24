@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:audio_service/audio_service.dart' show MediaItem;
 import 'package:mornye/services/link/features/link_phone_files.dart';
@@ -94,6 +95,14 @@ class LinkHandoffQueue {
       playing: json['playing'] != false,
     );
   }
+}
+
+/// How much of a [total]-byte song the desktop needs before it starts the
+/// song at [fraction] of its length: the bytes up to there and a margin
+/// for the header and the player's first buffer.
+int linkStartBytes(int total, double fraction) {
+  const margin = 512 * 1024;
+  return min(total, (total * fraction.clamp(0.0, 1.0)).ceil() + margin);
 }
 
 List<int> _indexes(Object? reply, String key) {
@@ -239,8 +248,20 @@ class LinkHandoff {
 
     // Songs the desktop lacks that the phone can send.
     final pending = await _missing(queue, phoneFiles, current: current);
+    ({LinkUploadStart? start, Future<void> whole})? upload;
     if (pending.remove(current)) {
-      await files!.upload(client, phoneFiles[current]!, onProgress: onSending);
+      final duration = items[current].duration?.inMilliseconds ?? 0;
+      final position = positionMs();
+      upload = await _startUpload(
+        files!,
+        phoneFiles[current]!,
+        fraction: position <= 0
+            ? 0
+            : duration > 0
+            ? position / duration
+            : 1,
+        onSending: onSending,
+      );
     }
 
     // The desktop starts with the songs around the current one up to the
@@ -254,15 +275,19 @@ class LinkHandoff {
       last++;
     }
     final played = queue.sublist(first, last + 1);
-    final reply = await client.post(
-      LinkOps.handoffPlay,
-      LinkHandoffQueue(
+    final arriving = upload?.start;
+    final reply = await client.post(LinkOps.handoffPlay, {
+      ...LinkHandoffQueue(
         queue: played,
         index: current - first,
         positionMs: positionMs(),
         playing: true,
       ).toJson(),
-    );
+      if (arriving != null)
+        'arriving': [
+          {'name': arriving.name, 'size': arriving.size},
+        ],
+    });
     final resolved = reply is Map ? reply['resolved'] : null;
     final handoffId = reply is Map ? reply['handoffId'] : null;
     final result = LinkHandoffResult(
@@ -273,23 +298,81 @@ class LinkHandoff {
     if (result.started) await player.pause();
     final later = [...pending.where((i) => i > last)]..sort();
     if (files != null && handoffId is String && later.isNotEmpty) {
-      unawaited(_sendLater(files, run!, handoffId, queue, phoneFiles, later));
+      unawaited(
+        _sendLater(
+          files,
+          run!,
+          handoffId,
+          queue,
+          phoneFiles,
+          later,
+          after: upload?.whole,
+        ),
+      );
     }
     return result;
   }
 
-  /// Uploads the songs at [later] (ascending) one by one. After each, the
-  /// desktop queues it and the songs up to the next one to send, which it
-  /// already has or cannot get. Stops when another queue is sent or the
-  /// desktop plays something else.
+  /// Starts uploading [file] and returns once the desktop can start it at
+  /// [fraction] of its length: when the bytes up to there, and a margin, are
+  /// sent, or all of them for a file that cannot start before it is whole.
+  /// The rest goes on in the background ([whole]) while the desktop streams
+  /// it; [onSending] reports the progress toward the start.
+  Future<({LinkUploadStart? start, Future<void> whole})> _startUpload(
+    LinkPhoneFiles files,
+    LinkPhoneFile file, {
+    required double fraction,
+    void Function(int sent, int total)? onSending,
+  }) async {
+    final ready = Completer<void>();
+    LinkUploadStart? start;
+    final whole = files.upload(
+      client,
+      file,
+      onStart: (value) => start = value,
+      onProgress: (sent, total) {
+        if (ready.isCompleted) return;
+        final needed = start?.streamable ?? false
+            ? linkStartBytes(total, fraction)
+            : total;
+        onSending?.call(sent, needed);
+        if (sent >= needed) ready.complete();
+      },
+    );
+    whole
+        .then(
+          (_) {
+            if (!ready.isCompleted) ready.complete();
+          },
+          onError: (Object error, StackTrace stack) {
+            if (!ready.isCompleted) return ready.completeError(error, stack);
+            _log.w('Could not finish sending a song to the computer: $error');
+          },
+        )
+        .ignore();
+    await ready.future;
+    return (start: start, whole: whole);
+  }
+
+  /// Uploads the songs at [later] (ascending) one by one, once the upload
+  /// [after] (the current song's) ends. After each, the desktop queues it
+  /// and the songs up to the next one to send, which it already has or
+  /// cannot get. Stops when another queue is sent or the desktop plays
+  /// something else.
   Future<void> _sendLater(
     LinkPhoneFiles files,
     int run,
     String handoffId,
     List<TrackRef> queue,
     List<LinkPhoneFile?> phoneFiles,
-    List<int> later,
-  ) async {
+    List<int> later, {
+    Future<void>? after,
+  }) async {
+    try {
+      await after;
+    } on Object {
+      // Reported where it was started.
+    }
     try {
       for (var k = 0; k < later.length; k++) {
         final at = later[k];

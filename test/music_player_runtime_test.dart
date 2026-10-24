@@ -32,6 +32,7 @@ class _Deck implements PlaybackDeck {
   PlaybackDeckState state = PlaybackDeckState.stopped;
   final volumes = <double>[];
   Map<String, bool>? outputOptions;
+  final sources = <String>[];
   Duration position = Duration.zero;
   int disposals = 0;
   bool failStop = false;
@@ -84,6 +85,7 @@ class _Deck implements PlaybackDeck {
     bool allowFixedVolume = false,
     bool dapExclusive = false,
   }) async {
+    sources.add(path);
     outputOptions = {
       'bitPerfect': preferBitPerfect,
       'direct': directUsb,
@@ -92,6 +94,9 @@ class _Deck implements PlaybackDeck {
       'exclusive': dapExclusive,
     };
   }
+
+  @override
+  Future<void> setNetworkSource(String url) async => sources.add('stream $url');
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
@@ -590,6 +595,26 @@ void main() {
       expect(handler.mediaItem.value?.id, _track.id);
     },
   );
+
+  test('a file still arriving plays from its stream until whole', () async {
+    final decks = <_Deck>[];
+    final runtime = _runtime(decks: decks);
+    final handler = await runtime.initialize();
+    final arrived = Completer<void>();
+    runtime.streamWhileArriving(
+      '/one.flac',
+      url: 'http://127.0.0.1:1/one.flac',
+      done: arrived.future,
+    );
+    await handler.setQueueAndPlay([_track]);
+    expect(decks.single.sources, ['stream http://127.0.0.1:1/one.flac']);
+
+    arrived.complete();
+    await _settle();
+    expect(runtime.arrivingFile('/one.flac'), isNull);
+    await handler.skipToQueueItem(0);
+    expect(decks.single.sources.last, '/one.flac');
+  });
 
   test('denied or failed audio focus cannot resume a paused source', () async {
     final session = _Session();

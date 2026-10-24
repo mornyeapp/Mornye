@@ -193,6 +193,7 @@ class MusicPlayerRuntime {
   Future<void> Function()? exclusiveAudioHook;
   RemotePlayback? _remote;
   RemoteMediaSession? _remoteSession;
+  final _arriving = <String, ({String url, Future<void> done})>{};
 
   /// The Library that media browsers such as Android Auto show.
   late final browser = MediaLibraryBrowser(
@@ -375,6 +376,27 @@ class MusicPlayerRuntime {
 
   Future<void> restoreSession() =>
       _restoreFuture ??= restorePlaybackSession(this);
+
+  /// Plays the local file [path], still being written (a song a paired
+  /// phone is sending), from [url] until [done] completes, so it starts
+  /// before the file is whole.
+  void streamWhileArriving(
+    String path, {
+    required String url,
+    required Future<void> done,
+  }) {
+    final entry = (url: url, done: done);
+    _arriving[path] = entry;
+    unawaited(
+      done.then<void>((_) {}, onError: (Object _) {}).whenComplete(() {
+        if (identical(_arriving[path], entry)) _arriving.remove(path);
+      }),
+    );
+  }
+
+  /// The stream and completion of [path] while it is still arriving.
+  ({String url, Future<void> done})? arrivingFile(String path) =>
+      _arriving[path];
 
   /// Hands the system media session (notification, lock screen, headset and
   /// car buttons) to [remote] while it plays in this device's place, and

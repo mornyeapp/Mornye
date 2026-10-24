@@ -128,6 +128,11 @@ class FakeLinkClient implements LinkClientApi {
   /// Fails the upload of a file name when it returns an exception.
   Exception? Function(String name)? onUpload;
 
+  /// Runs while a file of [size] bytes uploads, reporting its progress
+  /// through [sent]; the upload completes when it returns.
+  Future<void> Function(String name, int size, void Function(int sent) sent)?
+  whileUploading;
+
   /// The file names uploaded so far, with their bytes.
   final uploads = <({String name, List<int> bytes})>[];
 
@@ -140,6 +145,11 @@ class FakeLinkClient implements LinkClientApi {
     final failure = onUpload?.call(name);
     if (failure != null) throw failure;
     final bytes = await file.readAsBytes();
+    await whileUploading?.call(
+      name,
+      bytes.length,
+      (sent) => onProgress?.call(sent),
+    );
     uploads.add((name: name, bytes: bytes));
     onProgress?.call(bytes.length);
   }

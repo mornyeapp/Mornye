@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/models/download_item.dart';
 import 'package:mornye/models/track.dart';
 import 'package:mornye/services/desktop_deep_links.dart';
+import 'package:mornye/services/link/desktop/link_arriving_files.dart';
 import 'package:mornye/services/link/desktop/link_catalog_index.dart';
 import 'package:mornye/services/link/desktop/link_downloads.dart';
 import 'package:mornye/services/link/desktop/link_player.dart';
@@ -146,6 +147,7 @@ class LinkDesktopOps {
     required String Function() desktopName,
     String Function(String deviceId)? deviceName,
     String Function()? receivedDir,
+    LinkArrivingFiles? arriving,
     int Function()? nowMs,
   }) : _player = player,
        _downloads = downloads,
@@ -155,6 +157,7 @@ class LinkDesktopOps {
        _desktopName = desktopName,
        _deviceName = deviceName ?? ((deviceId) => deviceId),
        _receivedDir = receivedDir ?? (() => ''),
+       _arriving = arriving,
        _nowMs = nowMs ?? (() => DateTime.now().millisecondsSinceEpoch);
 
   /// The longest play queue the Subsonic `getPlayQueue` answer carries.
@@ -168,6 +171,10 @@ class LinkDesktopOps {
   final String Function() _desktopName;
   final String Function(String deviceId) _deviceName;
   final String Function() _receivedDir;
+
+  /// Streams song files a phone is still sending; without it a song plays
+  /// once its upload is whole.
+  final LinkArrivingFiles? _arriving;
   final int Function() _nowMs;
   final _random = math.Random();
 
@@ -296,7 +303,12 @@ class LinkDesktopOps {
     final queue = args['queue'];
     if (queue is! List) throw _invalid('Missing queue');
     final requested = _intArg(args, 'index') ?? 0;
-    final resolved = await _resolveQueue(queue);
+    final resolved = await _resolveQueue(
+      queue,
+      arriving: args['check'] == true
+          ? const {}
+          : await _expectArriving(args['arriving']),
+    );
     final media = <PlayableMedia>[];
     final missing = <int>[];
     var start = -1;
@@ -366,9 +378,29 @@ class LinkDesktopOps {
     return {'resolved': media.length};
   }
 
+  /// The files of `arriving` (`[{"name","size"}]`, songs the phone is still
+  /// sending) by [TrackRef.fileId], each streamed to the player until whole.
+  Future<Map<String, String>> _expectArriving(Object? files) async {
+    final arriving = _arriving;
+    if (files is! List || arriving == null) return const {};
+    final paths = <String, String>{};
+    for (final entry in files) {
+      if (entry is! Map) continue;
+      final name = entry['name'];
+      final size = entry['size'];
+      if (name is! String || size is! int) continue;
+      final arrival = await arriving.expect(_receivedDir(), name, size);
+      if (arrival != null) paths[name.split('.').first] = arrival.path;
+    }
+    return paths;
+  }
+
   /// Each entry of [queue] as the desktop plays it: the Library's song, else
-  /// the file a phone uploaded for it, else null.
-  Future<List<PlayableMedia?>> _resolveQueue(List<Object?> queue) async {
+  /// the file a phone uploaded or is sending ([arriving]) for it, else null.
+  Future<List<PlayableMedia?>> _resolveQueue(
+    List<Object?> queue, {
+    Map<String, String> arriving = const {},
+  }) async {
     final index = _index();
     if (index == null) {
       throw const LinkException('unavailable', 'The catalog is not ready');
@@ -384,7 +416,7 @@ class LinkDesktopOps {
       if (song != null) {
         return linkPlayableFor(song, coverPath: index.coverPathFor(song.id));
       }
-      final path = received[ref.fileId];
+      final path = received[ref.fileId] ?? arriving[ref.fileId];
       return path == null ? null : linkPlayableForUpload(ref, path);
     }
 

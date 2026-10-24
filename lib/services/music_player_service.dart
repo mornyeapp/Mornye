@@ -992,7 +992,9 @@ class MusicPlayerHandler extends BaseAudioHandler
         return null;
       }
     }
-    if (!media.isContentUri) return media.source;
+    if (!media.isContentUri) {
+      return _runtime.arrivingFile(media.source)?.url ?? media.source;
+    }
     return _sourceCache.resolve(media.source);
   }
 
@@ -1399,7 +1401,9 @@ class MusicPlayerHandler extends BaseAudioHandler
     // AudioPlayer.play combines prepare/seek/resume without a cancellation
     // boundary. A late prepare from an old request could resume the wrong
     // source. Serialize preparation and recheck before making it audible.
-    if (media.isNetwork) {
+    // A file still arriving resolves to its stream.
+    if (media.isNetwork ||
+        const {'http', 'https'}.contains(Uri.tryParse(path)?.scheme)) {
       await _player.setNetworkSource(path);
     } else {
       await _player.setFileSource(
@@ -1616,6 +1620,14 @@ class MusicPlayerHandler extends BaseAudioHandler
     PlayableMedia media,
     int generation,
   ) async {
+    if (_runtime.arrivingFile(media.source) case final arriving?) {
+      try {
+        await arriving.done;
+      } on Object {
+        return;
+      }
+      if (!_isCurrentPlayRequest(generation, media)) return;
+    }
     final artwork = await resolveEmbeddedArtworkUri(
       media.source,
       media.artUri,

@@ -6,7 +6,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/providers/download_history_provider.dart';
 import 'package:mornye/providers/local_library_provider.dart';
+import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
+import 'package:mornye/services/link/desktop/link_arriving_files.dart';
 import 'package:mornye/services/link/desktop/link_catalog_exporter.dart';
 import 'package:mornye/services/link/desktop/link_catalog_index.dart';
 import 'package:mornye/services/link/desktop/link_desktop_backend.dart';
@@ -152,6 +154,7 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
   StreamSubscription<void>? _playerSubscription;
   LinkPlayerPort? _player;
   LinkDesktopOps? _ops;
+  LinkArrivingFiles? _arriving;
   DesktopLinkCatalogIndex? _index;
   LinkPlayerState? _lastSentState;
   Timer? _exportTimer;
@@ -333,6 +336,9 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
       desktopName: () => state.name,
       deviceName: _deviceName,
       receivedDir: () => state.server?.receivedDir ?? '',
+      arriving: _arriving ??= LinkArrivingFiles(
+        register: ref.read(musicPlayerRuntimeProvider).streamWhileArriving,
+      ),
     );
   }
 
@@ -658,6 +664,7 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
     _cancelApp();
     _cancelBackend();
     unawaited(_pairingEvents.close());
+    unawaited(_arriving?.close());
     if (_serverStarted) {
       _serverStarted = false;
       unawaited(

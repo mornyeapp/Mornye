@@ -116,11 +116,27 @@ where
     drop(file);
     let written = copied?;
     flushed.map_err(ReceiveError::Storage)?;
-    tokio::fs::rename(&part.path, dir.join(name))
+    rename_into_place(&part.path, &dir.join(name))
         .await
         .map_err(ReceiveError::Storage)?;
     part.keep();
     Ok(written)
+}
+
+/// Renames `from` to `to`. The app streams a file to its player while it
+/// arrives, and on Windows an open reader blocks the rename for a moment,
+/// so it is retried briefly there.
+async fn rename_into_place(from: &Path, to: &Path) -> io::Result<()> {
+    let mut retries = if cfg!(windows) { 40 } else { 0 };
+    loop {
+        match tokio::fs::rename(from, to).await {
+            Err(_) if retries > 0 => {
+                retries -= 1;
+                tokio::time::sleep(Duration::from_millis(50)).await;
+            }
+            result => return result,
+        }
+    }
 }
 
 /// Removes part files older than `stale_after`, then completed files,

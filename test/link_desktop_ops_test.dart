@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/models/download_item.dart';
 import 'package:mornye/models/track.dart';
+import 'package:mornye/services/link/desktop/link_arriving_files.dart';
 import 'package:mornye/services/link/desktop/link_catalog_index.dart';
 import 'package:mornye/services/link/desktop/link_desktop_ops.dart';
 import 'package:mornye/services/link/desktop/link_player.dart';
@@ -375,6 +376,40 @@ void main() {
       expect(first.artUri, isNull);
       expect(player.playedQueue!.last.id, 'b');
       expect(player.playedPosition, const Duration(seconds: 5));
+    });
+
+    test('plays a song still arriving through its stream', () async {
+      const sending = 'ffffffffffffffffffffffffffffffff';
+      final streams = <String, String>{};
+      final arriving = LinkArrivingFiles(
+        register: (path, {required url, required done}) => streams[path] = url,
+      );
+      addTearDown(arriving.close);
+      await File('${dir.path}/.$sending.flac.9f.part').writeAsBytes([1]);
+      LinkDesktopOps(
+        player: player,
+        downloads: downloads,
+        downloadItems: () => items,
+        openUrl: (url) async {},
+        index: () => index,
+        desktopName: () => 'Studio',
+        receivedDir: () => received,
+        arriving: arriving,
+      ).register(router);
+
+      final result = await call(LinkOps.handoffPlay, {
+        'queue': [phoneSong('On its way', id: sending)],
+        'index': 0,
+        'arriving': [
+          {'name': '$sending.flac', 'size': 4000000},
+          {'name': '../escape.flac', 'size': 1},
+        ],
+      });
+      expect(result, containsPair('missing', isEmpty));
+      final path = '${dir.path}${Platform.pathSeparator}$sending.flac';
+      expect(player.playedQueue!.single.source, path);
+      expect(streams.keys, [path]);
+      expect(streams[path], startsWith('http://127.0.0.1:'));
     });
 
     test('the Library copy wins over an uploaded file', () async {

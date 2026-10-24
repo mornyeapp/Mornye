@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:audio_service/audio_service.dart' show MediaItem;
@@ -119,7 +120,11 @@ void main() {
     tearDown(() => dir.delete(recursive: true));
 
     /// A queued song whose file is on the phone when [bytes] is given.
-    Future<MediaItem> song(String name, {List<int>? bytes}) async {
+    Future<MediaItem> song(
+      String name, {
+      List<int>? bytes,
+      Duration? duration,
+    }) async {
       final path = '${dir.path}/$name.flac';
       if (bytes != null) await File(path).writeAsBytes(bytes);
       return linkMediaItem(
@@ -129,6 +134,7 @@ void main() {
           title: name,
           artist: 'Artist',
           album: 'Album',
+          duration: duration,
         ),
       );
     }
@@ -197,6 +203,86 @@ void main() {
       expect(((play['queue'] as List).last as Map)['fileId'], isNull);
       expect(result!.started, isTrue);
       expect(player.calls, ['pause']);
+    });
+
+    test('the desktop starts a large song before all of it is sent', () async {
+      const size = 2 << 20;
+      final a = await song('a', bytes: List.filled(size, 1));
+      final b = await song('b', bytes: [2]);
+      final player = FakePhonePlayer(
+        LinkPhoneSnapshot(queue: [a, b], index: 0, playing: true),
+      );
+      final client = desktop([0, 1]);
+      final rest = Completer<void>();
+      client.whileUploading = (name, length, sent) async {
+        if (length != size) return;
+        sent(600 * 1024);
+        await rest.future;
+        sent(length);
+      };
+      final progress = <(int, int)>[];
+      await withFiles(
+        client,
+        player,
+      ).playOnDesktop(onSending: (sent, total) => progress.add((sent, total)));
+
+      final play = client.posts[1].body;
+      final fileId = linkFileIdFor(a.extras!['source'] as String, size);
+      expect(play['arriving'], [
+        {'name': '$fileId.flac', 'size': size},
+      ]);
+      expect(titles(play), ['a']);
+      // The start needs the header and a first buffer.
+      expect(progress.single, (600 * 1024, linkStartBytes(size, 0)));
+      expect(player.calls, ['pause']);
+      // The next song waits until this one is whole.
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(client.uploads, isEmpty);
+
+      rest.complete();
+      await until(() => client.posts.length == 3);
+      expect(
+        [for (final upload in client.uploads) upload.bytes.length],
+        [size, 1],
+      );
+      expect(client.posts.last.op, LinkOps.handoffAppend);
+    });
+
+    test('a song resumed deep in waits for the bytes up to there', () async {
+      const size = 4 << 20;
+      final a = await song(
+        'a',
+        bytes: List.filled(size, 1),
+        duration: const Duration(minutes: 4),
+      );
+      final player = FakePhonePlayer(
+        LinkPhoneSnapshot(
+          queue: [a],
+          index: 0,
+          playing: true,
+          positionMs: 120000,
+        ),
+      );
+      final client = desktop([0]);
+      final halfway = Completer<void>();
+      final rest = Completer<void>();
+      client.whileUploading = (name, length, sent) async {
+        sent(1 << 20);
+        await halfway.future;
+        sent(3 << 20);
+        await rest.future;
+        sent(length);
+      };
+      final started = withFiles(client, player).playOnDesktop();
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      // Only the check went out: the desktop would wait on a quarter.
+      expect(client.posts, hasLength(1));
+
+      halfway.complete();
+      await started;
+      expect(client.posts, hasLength(2));
+      expect(client.posts.last.body['positionMs'], 120000);
+      rest.complete();
     });
 
     test(
