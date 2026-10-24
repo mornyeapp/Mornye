@@ -180,7 +180,13 @@ double searchCoverTextHeight(BuildContext context) {
   final scaler = MediaQuery.textScalerOf(context);
   double line(TextStyle? style, double fallback) =>
       scaler.scale(style?.fontSize ?? fallback) * (style?.height ?? 1.3);
-  return 8 + line(textTheme.bodyMedium, 14) + 2 + line(textTheme.bodySmall, 12);
+  // The cover gap, both lines with the gap between them, and slack for
+  // fonts whose line box runs past their nominal height.
+  return 8 +
+      line(textTheme.bodyMedium, 14) +
+      2 +
+      line(textTheme.bodySmall, 12) +
+      4;
 }
 
 /// The side margin of search result grids and shelves: the section titles'
