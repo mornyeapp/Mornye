@@ -223,7 +223,7 @@ extension _HomeTabSearchWideUI on _HomeTabState {
     required int count,
     required ColorScheme colorScheme,
     required bool showSortButton,
-    Widget? viewToggle,
+    ToolButton? viewToggle,
   }) {
     final isInHistory = _watchSearchHistory(resultsRef, tracks);
     final shown = count < tracks.length ? tracks.sublist(0, count) : tracks;

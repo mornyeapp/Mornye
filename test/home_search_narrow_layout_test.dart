@@ -50,17 +50,18 @@ String _paintFingerprint(WidgetTester tester) {
 }
 
 /// SHA-1 of each fingerprint, recorded on the base layout (commit 44cbb57b)
-/// before search results gained cover grids and shelves on wide screens. A
-/// narrow layout must paint exactly these. A deliberate change to the phone
-/// rows records new values; the failure prints the fingerprint.
+/// before search results gained cover grids and shelves on wide screens, with
+/// the Material values re-recorded when sort and view became a grouped
+/// toolbar. A narrow layout must paint exactly these. A deliberate change to
+/// the phone rows records new values; the failure prints the fingerprint.
 const _baseFingerprints = {
-  'phone Material': '2aff7dd72f4ab0b8b9b811d046b1107a561e984a',
+  'phone Material': 'c975d61edc1fef90079a8ac06bf1a8c5307ac43b',
   'phone Mornye': 'b6eb17a3cc554345f3650308f908aeff80858f07',
-  'landscape phone Material': '723e82905357faad4a0be91141ceeb37a3c1e671',
+  'landscape phone Material': '88fd46463538cd4b3d728743a1174612da7a9731',
   'landscape phone Mornye': 'a52f2e86d51d48d56386bae6aed54e9964adb7f7',
-  'portrait tablet Material': '73e90f62a9871050b91ff948583fe3f079d7462f',
+  'portrait tablet Material': '94d41e2ff5146d50d53d7b50f33ec371b88fc11f',
   'portrait tablet Mornye': '4ed79340ac67aefb625dcb4418686de5458b0b79',
-  'narrow desktop window Material': 'd8be719ac008b780d6b11ddbbece8297deaf19a7',
+  'narrow desktop window Material': '99f19818d1765351a8af44786efd41f5962231b3',
   'narrow desktop window Mornye': 'b0e19d226ab2aa594ba4d4e1f41407841790dd4a',
 };
 

@@ -462,7 +462,7 @@ extension _HomeTabSearchResultsUI on _HomeTabState {
     required bool showLocalLibraryIndicator,
     required Map<String, (double, double)> thumbnailSizesByExtensionId,
     int? itemCount,
-    Widget? viewToggle,
+    ToolButton? viewToggle,
   }) {
     final isInHistory = _watchSearchHistory(resultsRef, tracks);
     return _buildVirtualizedResultSection(
@@ -494,7 +494,7 @@ extension _HomeTabSearchResultsUI on _HomeTabState {
     required ColorScheme colorScheme,
     required Widget Function(int index, bool showDivider) itemBuilder,
     bool showSortButton = false,
-    Widget? viewToggle,
+    ToolButton? viewToggle,
   }) {
     // Material result groups are grouped rows, on the settings group tier.
     final sectionColor = colorScheme.surfaceContainer;
@@ -559,10 +559,14 @@ extension _HomeTabSearchResultsUI on _HomeTabState {
     required String title,
     required ColorScheme colorScheme,
     required bool showSortButton,
-    Widget? viewToggle,
+    ToolButton? viewToggle,
     VoidCallback? onShowAll,
   }) {
     final mornye = context.isMornye;
+    final sorted = _searchSortOption != HomeSearchSortOption.defaultOrder;
+    final sortLabel = sorted
+        ? _sortOptionLabel(_searchSortOption)
+        : context.l10n.libraryFilterSort;
     return SliverToBoxAdapter(
       child: Padding(
         // Aligned with the clamped result list below on wide screens.
@@ -588,38 +592,48 @@ extension _HomeTabSearchResultsUI on _HomeTabState {
               ),
             ),
             if (onShowAll != null) _buildShowAllButton(title, onShowAll),
+            // Material groups sort and view as Library pages do.
+            if (!mornye && (showSortButton || viewToggle != null))
+              ToolButtonGroup(
+                tools: [
+                  if (showSortButton)
+                    ToolButton(
+                      icon: const AppIcon(Icons.sort),
+                      label: sortLabel,
+                      onPressed: (_) => _showSortOptions(colorScheme),
+                    ),
+                  ?viewToggle,
+                ],
+              ),
             // Keeps ExpressiveButton's 48dp minimum touch target.
-            if (showSortButton)
+            if (mornye && showSortButton)
               ExpressiveButton(
                 text: true,
                 onPressed: () => _showSortOptions(colorScheme),
-                icon: mornye
-                    ? null
-                    : Icon(
-                        Icons.swap_vert,
-                        size: 18,
-                        color:
-                            _searchSortOption !=
-                                HomeSearchSortOption.defaultOrder
-                            ? colorScheme.primary
-                            : colorScheme.onSurfaceVariant,
-                      ),
                 style: TextButton.styleFrom(
                   padding: const EdgeInsets.symmetric(horizontal: 8),
                 ),
                 child: Text(
-                  _searchSortOption != HomeSearchSortOption.defaultOrder
-                      ? _sortOptionLabel(_searchSortOption)
-                      : context.l10n.libraryFilterSort,
+                  sortLabel,
                   style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color:
-                        _searchSortOption != HomeSearchSortOption.defaultOrder
+                    color: sorted
                         ? colorScheme.primary
                         : colorScheme.onSurfaceVariant,
                   ),
                 ),
               ),
-            ?viewToggle,
+            if (mornye && viewToggle != null)
+              AppIconButton(
+                tooltip: viewToggle.tooltip,
+                icon: IconTheme(
+                  data: IconThemeData(
+                    size: 20,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                  child: viewToggle.icon,
+                ),
+                onPressed: () => viewToggle.onPressed(context),
+              ),
           ],
         ),
       ),
@@ -628,17 +642,13 @@ extension _HomeTabSearchResultsUI on _HomeTabState {
 
   /// Switches wide results between the phone rows and the cover layout, as
   /// the Library's view button does. [grid] is the layout on screen.
-  Widget _buildSearchViewToggle({required bool grid}) {
-    return AppIconButton(
+  ToolButton _buildSearchViewToggle({required bool grid}) {
+    return ToolButton(
       tooltip: grid
           ? context.l10n.appearanceHistoryViewList
           : context.l10n.appearanceHistoryViewGrid,
-      icon: AppIcon(
-        grid ? Icons.view_list : Icons.grid_view,
-        size: 20,
-        color: Theme.of(context).colorScheme.onSurfaceVariant,
-      ),
-      onPressed: () => ref
+      icon: AppIcon(grid ? Icons.view_list : Icons.grid_view),
+      onPressed: (_) => ref
           .read(settingsProvider.notifier)
           .setSearchViewMode(grid ? 'list' : 'grid'),
     );

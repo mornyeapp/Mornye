@@ -1,6 +1,8 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:material_3_expressive/material_3_expressive.dart'
+    show M3EButton;
 import 'package:mornye/models/settings.dart';
 import 'package:mornye/utils/adaptive_layout.dart';
 import 'package:mornye/widgets/animation_utils.dart';
@@ -18,6 +20,16 @@ const _grid = AppSettings(
   hasSearchedBefore: true,
   searchViewMode: 'grid',
 );
+
+/// The list or grid view tool: a tooltip button on Mornye, a tool in the
+/// grouped toolbar on Material.
+Finder _viewTool(String tooltip) => find
+    .byWidgetPredicate(
+      (widget) =>
+          (widget is Tooltip && widget.message == tooltip) ||
+          (widget is M3EButton && widget.tooltip == tooltip),
+    )
+    .hitTestable();
 
 Future<void> _rightClick(WidgetTester tester, Finder finder) async {
   final gesture = await tester.startGesture(
@@ -69,16 +81,16 @@ void main() {
       expect(find.byType(DesktopScrollArrows), findsNothing);
       expect(find.text('Found track 7'), findsOneWidget);
 
-      await tester.tap(find.byTooltip('Grid'));
+      await tester.tap(_viewTool('Grid'));
       await tester.pumpAndSettle();
       expect(find.byType(TrackListTable), findsOneWidget);
       expect(find.byType(DesktopScrollArrows), findsNWidgets(3));
-      expect(find.byTooltip('Grid'), findsNothing);
+      expect(_viewTool('Grid'), findsNothing);
 
-      await tester.tap(find.byTooltip('List'));
+      await tester.tap(_viewTool('List'));
       await tester.pumpAndSettle();
       expect(find.byType(TrackListTable), findsNothing);
-      expect(find.byTooltip('Grid'), findsOneWidget);
+      expect(_viewTool('Grid'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
 
@@ -148,7 +160,7 @@ void main() {
         await _dismissSnackBars(tester);
 
         // Sort orders the grid and each cell keeps its key.
-        await tester.tap(find.text('Sort'));
+        await tester.tap(find.text('Sort').hitTestable());
         await tester.pumpAndSettle();
         await tester.tap(find.text('Title (Z-A)'));
         await tester.tap(find.text('Apply'));

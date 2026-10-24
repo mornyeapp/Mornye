@@ -257,16 +257,16 @@ extension _QueueTabSections on _QueueTabState {
     final filterCount = _activeFilterCount;
     final grid = viewMode == 'grid';
     return [
-      _LibraryToolGroup(
+      ToolButtonGroup(
         tools: [
-          _LibraryTool(
+          ToolButton(
             icon: const AppIcon(Icons.sort),
             label: _sortLabel(context, _sortMode),
             // The menu anchors below the button but opens from the page, so
             // it does not inherit the button's text and icon styles.
             onPressed: (button) => _showSortSheet(context, anchor: button),
           ),
-          _LibraryTool(
+          ToolButton(
             icon: Badge(
               isLabelVisible: filterCount > 0,
               label: Text('$filterCount'),
@@ -277,7 +277,7 @@ extension _QueueTabSections on _QueueTabState {
             onLongPress: filterCount > 0 ? _resetFilters : null,
           ),
           if (viewMode != null)
-            _LibraryTool(
+            ToolButton(
               icon: AppIcon(grid ? Icons.view_list : Icons.grid_view),
               tooltip: grid
                   ? l10n.appearanceHistoryViewList
