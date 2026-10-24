@@ -277,7 +277,7 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
         with:
-          gradle-version: "9.8.1"
+          gradle-version: "9.8.2"
           # Cache public dependencies, not transforms of the decrypted SDK.
           gradle-home-cache-includes: |
             caches/modules-2

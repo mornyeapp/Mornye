@@ -55,7 +55,7 @@ from the upstream package are not vendored.
   1.13.1 to 1.19.1, a `junit:junit:4.13.2` test dependency, and
   `-Xlint:deprecation` dropped (androidx.media 1.8 deprecates the whole compat
   media-session API this plugin uses). The Gradle wrapper moves from 8.7 to
-  9.8.1. These follow the app's Android toolchain.
+  9.8.2. These follow the app's Android toolchain.
 - iOS: allow the active music handler to re-publish retained Now Playing
   metadata after restoring its audio session on app lifecycle/video changes.
   Refresh keeps artwork and extrapolates elapsed time without restarting audio;

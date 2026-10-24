@@ -54,7 +54,7 @@ listener, so the app's queue advanced after a playback failure.
 ### Build
 
 `android/build.gradle`: Kotlin 1.7.10 to 2.4.21, coroutines 1.6.4 to 1.11.0,
-AGP 7.3.1 to 9.4.1, android-junit5 1.7.1.1 to 2.0.1, compileSdk 36 to 37,
+AGP 7.3.1 to 9.4.1, android-junit5 1.7.1.1 to 2.0.2, compileSdk 36 to 37,
 `androidx.core:core-ktx` 1.9.0 to 1.19.1, `kotlin-stdlib-jdk7` replaced by
 `kotlin-stdlib`, and newer JUnit Jupiter and AssertJ test dependencies.
 `CHANGELOG.md` differs only by removed trailing whitespace.
