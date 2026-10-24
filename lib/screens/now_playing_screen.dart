@@ -36,6 +36,7 @@ import 'package:mornye/widgets/desktop/desktop_inspector.dart';
 import 'package:mornye/widgets/lyrics_screen_awake.dart';
 import 'package:mornye/widgets/player_artwork.dart';
 import 'package:mornye/widgets/player_gesture_regions.dart';
+import 'package:mornye/widgets/player_playback_controls.dart';
 import 'package:mornye/widgets/player_queue_sheet.dart';
 import 'package:mornye/widgets/player_details_sheet.dart';
 import 'package:mornye/widgets/material_player_backdrop.dart';
@@ -607,6 +608,9 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                                     : null,
                                 icon: const AppIcon(Icons.lyrics_outlined),
                                 onPressed: _toggleMaterialLyrics,
+                              ),
+                              PlayerPlaybackModeToolbar(
+                                colorScheme: colorScheme,
                               ),
                               AudioOutputButton(
                                 color: colorScheme.onSurfaceVariant,

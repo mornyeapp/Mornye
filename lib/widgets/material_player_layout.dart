@@ -241,7 +241,7 @@ class MaterialPlayerLayout extends StatelessWidget {
               children: [
                 Expanded(
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       PlayerMetadataTitle(
                         mediaItem: mediaItem,
@@ -254,7 +254,7 @@ class MaterialPlayerLayout extends StatelessWidget {
                                   fontWeight: FontWeight.bold,
                                   color: colorScheme.onSurface,
                                 ),
-                        textAlign: TextAlign.center,
+                        textAlign: TextAlign.start,
                         maxLines: compact ? 1 : 2,
                       ),
                       SizedBox(height: compact ? 4 : 6),
@@ -270,7 +270,7 @@ class MaterialPlayerLayout extends StatelessWidget {
                             artistId: track?.artistId,
                             style: Theme.of(context).textTheme.titleMedium
                                 ?.copyWith(color: colorScheme.onSurfaceVariant),
-                            textAlign: TextAlign.center,
+                            textAlign: TextAlign.start,
                           );
                         },
                       ),
@@ -291,6 +291,8 @@ class MaterialPlayerLayout extends StatelessWidget {
         colorScheme: colorScheme,
         metadata: metadata,
         compact: compact,
+        // The footer's toolbar holds shuffle and repeat.
+        showPlaybackModes: false,
       ),
       if (showVolume)
         // The player menu can hide it; the hardware buttons still apply. The

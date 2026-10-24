@@ -2,10 +2,13 @@ import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:material_3_expressive/material_3_expressive.dart' show M3ETheme;
 import 'package:mornye/controllers/player_metadata_controller.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
+import 'package:mornye/theme/app_motion.dart';
+import 'package:mornye/theme/app_tokens.dart';
 import 'package:mornye/theme/material_expressive.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/playback_seek_preview.dart';
@@ -14,6 +17,7 @@ import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/app_loading_indicator.dart';
 import 'package:mornye/widgets/audio_info_sheet.dart';
 import 'package:mornye/widgets/automix_status_badge.dart';
+import 'package:mornye/widgets/expressive_button_group.dart';
 import 'package:mornye/widgets/expressive_icon_button.dart';
 import 'package:mornye/widgets/expressive_playback_transport.dart';
 import 'package:mornye/widgets/mornye_playback_button.dart';
@@ -37,6 +41,10 @@ class PlayerPlaybackControls extends ConsumerWidget {
   /// player.
   final bool edgeAligned;
 
+  /// Material puts shuffle and repeat beside the transport unless the layout
+  /// shows them elsewhere, as the phone player's [PlayerPlaybackModeToolbar].
+  final bool showPlaybackModes;
+
   const PlayerPlaybackControls({
     super.key,
     required this.mediaId,
@@ -47,6 +55,7 @@ class PlayerPlaybackControls extends ConsumerWidget {
     this.compact = false,
     this.transportTopPadding = 16,
     this.edgeAligned = false,
+    this.showPlaybackModes = true,
   });
 
   @override
@@ -185,8 +194,9 @@ class PlayerPlaybackControls extends ConsumerWidget {
                 playing: isPlaying,
                 loading: isLoading,
                 compact: compact,
-                // Shuffle and repeat line up with the timeline's ends.
-                fill: edgeAligned,
+                // Shuffle and repeat line up with the timeline's ends. Without
+                // them, the full-size transport spans the timeline alone.
+                fill: edgeAligned || (!showPlaybackModes && !compact),
                 playTooltip: isPlaying
                     ? context.l10n.actionPause
                     : context.l10n.tooltipPlay,
@@ -195,14 +205,18 @@ class PlayerPlaybackControls extends ConsumerWidget {
                 onPlayPause: () => controller.togglePlayPause(isPlaying),
                 onPrevious: controller.previous,
                 onNext: controller.next,
-                leading: PlayerPlaybackModeButton(
-                  mode: PlayerPlaybackMode.shuffle,
-                  colorScheme: colorScheme,
-                ),
-                trailing: PlayerPlaybackModeButton(
-                  mode: PlayerPlaybackMode.repeat,
-                  colorScheme: colorScheme,
-                ),
+                leading: showPlaybackModes
+                    ? PlayerPlaybackModeButton(
+                        mode: PlayerPlaybackMode.shuffle,
+                        colorScheme: colorScheme,
+                      )
+                    : null,
+                trailing: showPlaybackModes
+                    ? PlayerPlaybackModeButton(
+                        mode: PlayerPlaybackMode.repeat,
+                        colorScheme: colorScheme,
+                      )
+                    : null,
               ),
             )
           else
@@ -217,7 +231,7 @@ class PlayerPlaybackControls extends ConsumerWidget {
                     ? MainAxisAlignment.spaceBetween
                     : MainAxisAlignment.spaceEvenly,
                 children: [
-                  if (!mornye)
+                  if (!mornye && showPlaybackModes)
                     PlayerPlaybackModeButton(
                       mode: PlayerPlaybackMode.shuffle,
                       colorScheme: colorScheme,
@@ -287,7 +301,7 @@ class PlayerPlaybackControls extends ConsumerWidget {
                       icon: const Icon(Icons.skip_next),
                       onPressed: controller.next,
                     ),
-                  if (!mornye)
+                  if (!mornye && showPlaybackModes)
                     PlayerPlaybackModeButton(
                       mode: PlayerPlaybackMode.repeat,
                       colorScheme: colorScheme,
@@ -302,6 +316,67 @@ class PlayerPlaybackControls extends ConsumerWidget {
 }
 
 enum PlayerPlaybackMode { autoplay, repeat, shuffle }
+
+/// The state and action of [mode], watched by the button that shows it.
+({bool selected, IconData icon, String tooltip, VoidCallback onPressed})
+_watchPlaybackMode(
+  BuildContext context,
+  WidgetRef ref,
+  PlayerPlaybackMode mode,
+) {
+  final controller = ref.read(musicPlayerControllerProvider);
+  late final bool selected;
+  late final IconData icon;
+  late final String tooltip;
+  late final VoidCallback onPressed;
+  switch (mode) {
+    case PlayerPlaybackMode.autoplay:
+      selected = ref.watch(
+        settingsProvider.select((settings) => settings.autoplay),
+      );
+      icon = Icons.all_inclusive;
+      tooltip = selected ? context.l10n.autoplayOn : context.l10n.autoplayOff;
+      onPressed = () =>
+          ref.read(settingsProvider.notifier).setAutoplay(!selected);
+    case PlayerPlaybackMode.shuffle:
+      selected = ref.watch(
+        playbackStateProvider.select(
+          (state) => state.value?.shuffleMode == AudioServiceShuffleMode.all,
+        ),
+      );
+      icon = Icons.shuffle;
+      tooltip = selected
+          ? context.l10n.nowPlayingShuffleOn
+          : context.l10n.nowPlayingPlayInOrder;
+      onPressed = () => controller.setShuffle(!selected);
+    case PlayerPlaybackMode.repeat:
+      final repeatMode = ref.watch(
+        playbackStateProvider.select(
+          (state) => state.value?.repeatMode ?? AudioServiceRepeatMode.none,
+        ),
+      );
+      selected = repeatMode != AudioServiceRepeatMode.none;
+      icon = repeatMode == AudioServiceRepeatMode.one
+          ? Icons.repeat_one
+          : Icons.repeat;
+      tooltip = switch (repeatMode) {
+        AudioServiceRepeatMode.one => context.l10n.nowPlayingRepeatOne,
+        AudioServiceRepeatMode.none => context.l10n.nowPlayingRepeatOff,
+        _ => context.l10n.nowPlayingRepeatAll,
+      };
+      onPressed = () => controller.setRepeatMode(switch (repeatMode) {
+        AudioServiceRepeatMode.none => AudioServiceRepeatMode.all,
+        AudioServiceRepeatMode.all => AudioServiceRepeatMode.one,
+        _ => AudioServiceRepeatMode.none,
+      });
+  }
+  return (
+    selected: selected,
+    icon: icon,
+    tooltip: tooltip,
+    onPressed: onPressed,
+  );
+}
 
 /// Queue and transport buttons share behavior while keeping independent watches.
 class PlayerPlaybackModeButton extends ConsumerWidget {
@@ -318,59 +393,22 @@ class PlayerPlaybackModeButton extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final controller = ref.read(musicPlayerControllerProvider);
-    late final bool selected;
-    late final IconData icon;
-    late final String tooltip;
-    late final VoidCallback onPressed;
-    switch (mode) {
-      case PlayerPlaybackMode.autoplay:
-        selected = ref.watch(
-          settingsProvider.select((settings) => settings.autoplay),
-        );
-        icon = Icons.all_inclusive;
-        tooltip = selected ? context.l10n.autoplayOn : context.l10n.autoplayOff;
-        onPressed = () =>
-            ref.read(settingsProvider.notifier).setAutoplay(!selected);
-      case PlayerPlaybackMode.shuffle:
-        selected = ref.watch(
-          playbackStateProvider.select(
-            (state) => state.value?.shuffleMode == AudioServiceShuffleMode.all,
-          ),
-        );
-        icon = Icons.shuffle;
-        tooltip = selected
-            ? context.l10n.nowPlayingShuffleOn
-            : context.l10n.nowPlayingPlayInOrder;
-        onPressed = () => controller.setShuffle(!selected);
-      case PlayerPlaybackMode.repeat:
-        final repeatMode = ref.watch(
-          playbackStateProvider.select(
-            (state) => state.value?.repeatMode ?? AudioServiceRepeatMode.none,
-          ),
-        );
-        selected = repeatMode != AudioServiceRepeatMode.none;
-        icon = repeatMode == AudioServiceRepeatMode.one
-            ? Icons.repeat_one
-            : Icons.repeat;
-        tooltip = switch (repeatMode) {
-          AudioServiceRepeatMode.one => context.l10n.nowPlayingRepeatOne,
-          AudioServiceRepeatMode.none => context.l10n.nowPlayingRepeatOff,
-          _ => context.l10n.nowPlayingRepeatAll,
-        };
-        onPressed = () => controller.setRepeatMode(switch (repeatMode) {
-          AudioServiceRepeatMode.none => AudioServiceRepeatMode.all,
-          AudioServiceRepeatMode.all => AudioServiceRepeatMode.one,
-          _ => AudioServiceRepeatMode.none,
-        });
-    }
+    final (:selected, :icon, :tooltip, :onPressed) = _watchPlaybackMode(
+      context,
+      ref,
+      mode,
+    );
     return ExpressiveIconButton(
       iconSize: 24,
       selected: selected,
       tooltip: tooltip,
       icon: Icon(icon),
+      // Each fill takes its own content role: primary on primaryContainer
+      // turns white on light gray with a neutral cover scheme.
       foregroundColor: selected
-          ? (secondary ? colorScheme.onSecondaryContainer : colorScheme.primary)
+          ? (secondary
+                ? colorScheme.onSecondaryContainer
+                : colorScheme.onPrimaryContainer)
           : colorScheme.onSurfaceVariant,
       backgroundColor: selected
           ? (secondary
@@ -378,6 +416,143 @@ class PlayerPlaybackModeButton extends ConsumerWidget {
                 : colorScheme.primaryContainer)
           : null,
       onPressed: onPressed,
+    );
+  }
+}
+
+/// Shuffle and repeat as one connected button group in the Material phone
+/// player's footer: round outer ends, small inner corners and a hairline
+/// gap, like the Library toolbar. A selected segment fills its own shape
+/// instead of morphing, and a pressed one widens while the other yields.
+class PlayerPlaybackModeToolbar extends StatefulWidget {
+  const PlayerPlaybackModeToolbar({super.key, required this.colorScheme});
+
+  final ColorScheme colorScheme;
+
+  @override
+  State<PlayerPlaybackModeToolbar> createState() =>
+      _PlayerPlaybackModeToolbarState();
+}
+
+class _PlayerPlaybackModeToolbarState extends State<PlayerPlaybackModeToolbar>
+    with ExpressivePressSquish {
+  static const _segmentWidth = 56.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.tokens;
+    final height = tokens.minTouchTarget;
+    final outer = Radius.circular(height / 2);
+    final inner = Radius.circular(tokens.radiusThumb);
+    final expressive = materialExpressiveEnabled(context);
+    Widget slot(int index, PlayerPlaybackMode mode, BorderRadiusGeometry ends) {
+      final pressed = pressedIndex;
+      final width = !expressive || pressed == null
+          ? _segmentWidth
+          : _segmentWidth *
+                (pressed == index ? 1 + squishRatio : 1 - squishRatio);
+      return pressSlot(
+        index,
+        TweenAnimationBuilder<double>(
+          tween: Tween(end: width),
+          duration: pressSpring.duration,
+          curve: pressSpring,
+          builder: (context, width, segment) =>
+              SizedBox(width: width, height: height, child: segment),
+          child: _PlaybackModeSegment(
+            mode: mode,
+            colorScheme: widget.colorScheme,
+            borderRadius: ends,
+          ),
+        ),
+      );
+    }
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        slot(
+          0,
+          PlayerPlaybackMode.shuffle,
+          BorderRadiusDirectional.horizontal(start: outer, end: inner),
+        ),
+        SizedBox(width: M3ETheme.of(context).buttonGroupTheme.connectedGap),
+        slot(
+          1,
+          PlayerPlaybackMode.repeat,
+          BorderRadiusDirectional.horizontal(start: inner, end: outer),
+        ),
+      ],
+    );
+  }
+}
+
+class _PlaybackModeSegment extends ConsumerWidget {
+  const _PlaybackModeSegment({
+    required this.mode,
+    required this.colorScheme,
+    required this.borderRadius,
+  });
+
+  final PlayerPlaybackMode mode;
+  final ColorScheme colorScheme;
+  final BorderRadiusGeometry borderRadius;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final (:selected, :icon, :tooltip, :onPressed) = _watchPlaybackMode(
+      context,
+      ref,
+      mode,
+    );
+    final shape = RoundedRectangleBorder(borderRadius: borderRadius);
+    final motion = AppMotion.effectsFast(
+      context,
+      AppMotionSpec(
+        MediaQuery.disableAnimationsOf(context)
+            ? Duration.zero
+            : const Duration(milliseconds: 150),
+        Curves.easeOut,
+      ),
+    );
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: tooltip,
+      excludeSemantics: true,
+      child: Tooltip(
+        message: tooltip,
+        excludeFromSemantics: true,
+        child: TweenAnimationBuilder<double>(
+          tween: Tween(end: selected ? 1 : 0),
+          duration: motion.duration,
+          curve: motion.curve,
+          builder: (context, fill, _) => Material(
+            color: Color.lerp(
+              colorScheme.surfaceContainerHigh,
+              colorScheme.primaryContainer,
+              fill,
+            ),
+            shape: shape,
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              customBorder: shape,
+              onTap: onPressed,
+              child: Center(
+                child: AppIcon(
+                  icon,
+                  size: 24,
+                  color: Color.lerp(
+                    colorScheme.onSurfaceVariant,
+                    colorScheme.onPrimaryContainer,
+                    fill,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

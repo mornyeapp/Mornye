@@ -1058,9 +1058,7 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
                     child: SizedBox(
                       height: 24,
                       child: Align(
-                        alignment: mornye
-                            ? AlignmentDirectional.centerStart
-                            : Alignment.center,
+                        alignment: AlignmentDirectional.centerStart,
                         child:
                             isActive &&
                                 _visible &&
@@ -1196,12 +1194,11 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
                       // Focus changes paint scale, never font metrics or
                       // wrapping shared by the plain and word-timed line.
                       scale: isActive ? 1.0 : 0.96,
-                      alignment: !mornye
-                          ? Alignment.center
-                          : (textAlign == TextAlign.end
-                                    ? AlignmentDirectional.centerEnd
-                                    : AlignmentDirectional.centerStart)
-                                .resolve(Directionality.of(context)),
+                      alignment:
+                          (textAlign == TextAlign.end
+                                  ? AlignmentDirectional.centerEnd
+                                  : AlignmentDirectional.centerStart)
+                              .resolve(Directionality.of(context)),
                       duration: motion,
                       curve: Curves.easeOutCubic,
                       child: AnimatedOpacity(

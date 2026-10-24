@@ -2168,17 +2168,23 @@ void main() {
       );
       mediaItems.add(item('first'));
       await settlePlayer(tester);
-      // Shuffle, previous, play-pause, next and repeat form the expressive
-      // transport row; the lyrics toggle sits outside it.
+      // Previous, play-pause and next form the expressive transport row;
+      // shuffle and repeat share the footer's toolbar with the lyrics toggle.
       final transport = find.descendant(
         of: find.byType(ExpressivePlaybackTransport),
         matching: find.byType(M3EIconButton),
       );
+      final modes = find.descendant(
+        of: find.byType(PlayerPlaybackModeToolbar),
+        matching: find.byType(InkWell),
+      );
       final lyricsToggle = find.byKey(const ValueKey('material-lyrics-toggle'));
-      expect(transport, findsNWidgets(5));
+      expect(transport, findsNWidgets(3));
+      expect(modes, findsNWidgets(2));
       expect(lyricsToggle, findsOneWidget);
       for (final element in [
         ...transport.evaluate(),
+        ...modes.evaluate(),
         ...lyricsToggle.evaluate(),
       ]) {
         final bounds = tester.getRect(find.byWidget(element.widget));
@@ -2189,6 +2195,49 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+
+  testWidgets('a selected Material playback mode keeps its connected shape', (
+    tester,
+  ) async {
+    await pumpNowPlaying(
+      tester,
+      theme: AppTheme.light(),
+      playback: PlaybackState(shuffleMode: AudioServiceShuffleMode.all),
+    );
+    mediaItems.add(item('first'));
+    await settlePlayer(tester);
+    final segments = tester
+        .widgetList<Material>(
+          find.descendant(
+            of: find.byType(PlayerPlaybackModeToolbar),
+            matching: find.byType(Material),
+          ),
+        )
+        .toList();
+    expect(segments, hasLength(2));
+    BorderRadius corners(Material segment) =>
+        (segment.shape! as RoundedRectangleBorder).borderRadius.resolve(
+          TextDirection.ltr,
+        );
+    // Round outer ends and small inner corners, selected or not.
+    expect(
+      corners(segments.first),
+      const BorderRadius.horizontal(
+        left: Radius.circular(24),
+        right: Radius.circular(8),
+      ),
+    );
+    expect(
+      corners(segments.last),
+      const BorderRadius.horizontal(
+        left: Radius.circular(8),
+        right: Radius.circular(24),
+      ),
+    );
+    // Shuffle is on and repeat is off.
+    expect(segments.first.color, isNot(segments.last.color));
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('Material cover replacement honors reduced motion immediately', (
     tester,
@@ -4488,9 +4537,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('short timed lyric remains horizontally centered', (
-    tester,
-  ) async {
+  testWidgets('short timed lyric starts at the lyrics inset', (tester) async {
     await pumpNowPlaying(tester);
 
     mediaItems.add(item('timed'));
@@ -4498,9 +4545,10 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('material-lyrics-toggle')));
     await settlePlayer(tester);
 
+    // Material lines start-align as Mornye's do, at Material's own inset.
     final lyric = find.bySemanticsLabel('Short');
     expect(lyric, findsOneWidget);
-    expect(tester.getCenter(lyric).dx, closeTo(540, 1));
+    expect(tester.getRect(lyric).left, closeTo(24, 1));
   });
 
   testWidgets('Now Playing menu exposes Go to Album when album is known', (
