@@ -106,7 +106,7 @@ class _MusicAutoMix {
     final nextIndex = index + 1 < handler._media.length
         ? index + 1
         : handler._repeatMode == AudioServiceRepeatMode.all
-        ? 0
+        ? handler._repeatPassStart()
         : -1;
     final pins = <String>{};
     _preparationPins[generation] = pins;
@@ -350,9 +350,13 @@ class _MusicAutoMix {
       _setStatus(
         plan.beatMatched ? AutoMixStatus.mixing : AutoMixStatus.crossfading,
       );
-      handler._index = _nextIndex;
+      // An index at or before the current one wraps to a new repeat-all pass.
+      final nextIndex = _nextIndex > handler._index
+          ? _nextIndex
+          : handler._beginRepeatPass(_nextIndex);
+      handler._index = nextIndex;
       handler._playRequestGeneration++;
-      handler._recordPlayHistory(_nextIndex);
+      handler._recordPlayHistory(nextIndex);
       handler._normalizationVolume = _incomingVolume;
       handler._activeResolvedPath = next.isContentUri ? _nextPath : null;
       handler._pendingRestorePosition = null;

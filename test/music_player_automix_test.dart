@@ -14,6 +14,18 @@ import 'support/music_player_automix_harness.dart';
 const _tracks = testTracks;
 const _until = waitUntil;
 
+/// Enough songs that a reshuffled pass repeats the previous order only about
+/// once in 360,000 draws.
+final _passTracks = [
+  for (var i = 0; i < 10; i++)
+    PlayableMedia(
+      id: 'song-$i',
+      source: '/song-$i.flac',
+      title: 'Song $i',
+      artist: 'Artist',
+    ),
+];
+
 void main() {
   setUpMusicPlayerHarness();
 
@@ -525,6 +537,37 @@ void main() {
     },
   );
 
+  test('repeat all plays each shuffled pass in a new order', () async {
+    await handler.setQueueAndPlay(_passTracks);
+    await handler.setShuffleMode(AudioServiceShuffleMode.all);
+    await handler.setRepeatMode(AudioServiceRepeatMode.all);
+    final planned = handler.queue.value.map((item) => item.id).toList();
+    bool ready() =>
+        handler.playbackState.value.processingState ==
+        AudioProcessingState.ready;
+    for (var i = 1; i < planned.length; i++) {
+      await native.event('music-player', 'audio.onComplete');
+      await _until(() => handler.mediaItem.value?.id == planned[i] && ready());
+    }
+    await native.event('music-player', 'audio.onComplete');
+    await _until(
+      () =>
+          handler.playbackState.value.queueIndex == 0 &&
+          handler.mediaItem.value?.id != planned.last &&
+          ready(),
+    );
+    final pass = handler.queue.value.map((item) => item.id).toList();
+    expect(handler.mediaItem.value?.id, pass.first);
+    expect(pass.toSet(), planned.toSet());
+    expect(pass, isNot(orderedEquals(planned)));
+    await handler.skipToPrevious();
+    expect(handler.mediaItem.value?.id, planned.last);
+    await handler.setShuffleMode(AudioServiceShuffleMode.none);
+    expect(handler.queue.value.map((item) => item.id), [
+      for (final track in _passTracks) track.id,
+    ]);
+  });
+
   test(
     'shuffle restoration retains duplicate entries and explicit queue edits',
     () async {
@@ -776,6 +819,32 @@ void main() {
       await _until(() => handler.mediaItem.value?.id == planned[1]);
       expect(handler.queue.value.map((item) => item.id), planned);
       expect(handler.playbackState.value.queueIndex, 1);
+    },
+  );
+
+  test(
+    'AutoMix into a repeat-all wrap opens the newly shuffled pass',
+    () async {
+      await handler.setShuffleMode(AudioServiceShuffleMode.all);
+      await handler.setRepeatMode(AudioServiceRepeatMode.all);
+      await handler.setQueueAndPlay(_passTracks);
+      final planned = handler.queue.value.map((item) => item.id).toList();
+      await handler.skipToQueueItem(planned.length - 1);
+      setAutoMixEnabled(true);
+      await _until(
+        () => native.calls.any(
+          (call) => call.$1 != 'music-player' && call.$2 == 'setPlaybackRate',
+        ),
+      );
+      final opener = native.sources[native.prepared];
+      expect(opener, isNot('/${planned.last}.flac'));
+      native.positions['music-player'] = 55000;
+      await _until(() => handler.playbackState.value.queueIndex == 0);
+      final pass = handler.queue.value.map((item) => item.id).toList();
+      expect('/${pass.first}.flac', opener);
+      expect(handler.mediaItem.value?.id, pass.first);
+      expect(pass.toSet(), planned.toSet());
+      expect(pass, isNot(orderedEquals(planned)));
     },
   );
 

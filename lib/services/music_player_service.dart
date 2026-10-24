@@ -1037,22 +1037,49 @@ class MusicPlayerHandler extends BaseAudioHandler
     if (_index >= 0) _playHistory.add(_index);
   }
 
-  void _shuffleQueue() {
+  /// Shuffles the queue so that [first] (the current song by default) opens
+  /// it. Autoplay additions keep their order after the chosen songs.
+  void _shuffleQueue([int? first]) {
     _originalQueueOrder ??= List.of(_queueItems);
+    final start = first ?? _index;
     final manual = [
       for (var i = 0; i < _media.length; i++)
-        if (i == _index || !_media[i].autoplay) i,
+        if (i == start || !_media[i].autoplay) i,
     ];
     final order = buildShuffledQueueOrder(
       mediaCount: manual.length,
-      currentIndex: manual.indexOf(_index),
+      currentIndex: manual.indexOf(start),
       random: _random,
     );
     _applyQueueOrder([
       ...order.map((index) => _queueItems[manual[index]]),
       for (var i = 0; i < _media.length; i++)
-        if (i != _index && _media[i].autoplay) _queueItems[i],
+        if (i != start && _media[i].autoplay) _queueItems[i],
     ]);
+  }
+
+  /// The queue index that opens the next repeat-all pass. In shuffle mode it
+  /// is a random queued song, not an Autoplay addition, other than the one
+  /// that just finished.
+  int _repeatPassStart() {
+    if (!_shuffle) return 0;
+    final candidates = [
+      for (var i = 0; i < _media.length; i++)
+        if (i != _index && !_media[i].autoplay) i,
+    ];
+    if (candidates.isEmpty) return 0;
+    return candidates[_random.nextInt(candidates.length)];
+  }
+
+  /// Returns to the start for repeat all and gives the index to play. In
+  /// shuffle mode each pass plays in a new order that opens with [start],
+  /// so the queue does not loop through the same order again.
+  int _beginRepeatPass(int start) {
+    if (!_shuffle || start < 0 || start >= _media.length) return 0;
+    _shuffleQueue(start);
+    _markSessionQueueChanged();
+    queue.add(List<MediaItem>.unmodifiable(_queueItems));
+    return 0;
   }
 
   void _rememberEnqueued(List<MediaItem> items, {required bool playNext}) {
@@ -1716,7 +1743,7 @@ class MusicPlayerHandler extends BaseAudioHandler
     if (_index >= 0 && _index < _media.length - 1) {
       await _playIndex(_index + 1);
     } else if (_repeatMode == AudioServiceRepeatMode.all && _media.isNotEmpty) {
-      await _playIndex(0);
+      await _playIndex(_beginRepeatPass(_repeatPassStart()));
     } else {
       _broadcastState(playerState: PlaybackDeckState.completed);
     }
