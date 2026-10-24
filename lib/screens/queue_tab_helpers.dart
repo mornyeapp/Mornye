@@ -362,22 +362,13 @@ class _QueueLibraryPageData implements QueueLibraryPageContent {
     );
   }
 
-  _FilterContentData toFilterContentData(
-    LibraryCollectionsState collectionState, {
+  _FilterContentData toFilterContentData({
     int? totalTrackCount,
     int? totalAlbumCount,
   }) {
-    final filteredItems = !collectionState.hasPlaylistTracks
-        ? items
-        : items
-              .where(
-                (item) =>
-                    !collectionState.isTrackInAnyPlaylist(item.collectionKey),
-              )
-              .toList(growable: false);
     return _FilterContentData(
       unifiedItems: items,
-      filteredUnifiedItems: filteredItems,
+      filteredUnifiedItems: items,
       filteredGroupedAlbums: groupedAlbums,
       filteredGroupedLocalAlbums: groupedLocalAlbums,
       showFilteringIndicator: false,

@@ -214,18 +214,9 @@ class _QueueTabState extends ConsumerState<QueueTab> {
   final Map<(String, int), _QueueLibraryPageData> _historySnapshots = {};
   final Map<int, QueueLibraryCounts> _historySnapshotCountsByTotal = {};
 
-  /// Filter data per mode with the page, collections and totals it came
+  /// Filter data per mode with the page and totals it came
   /// from, so an unchanged page keeps its filtered rows across rebuilds.
-  final Map<
-    String,
-    (
-      _QueueLibraryPageData,
-      LibraryCollectionsState,
-      int?,
-      int?,
-      _FilterContentData,
-    )
-  >
+  final Map<String, (_QueueLibraryPageData, int?, int?, _FilterContentData)>
   _filterDataByMode = {};
 
   final QueueLibraryPager<
@@ -764,19 +755,16 @@ class _QueueTabState extends ConsumerState<QueueTab> {
       final cached = _filterDataByMode[filterMode];
       if (cached != null &&
           identical(cached.$1, page) &&
-          identical(cached.$2, collectionState) &&
-          cached.$3 == totalTrackCount &&
-          cached.$4 == totalAlbumCount) {
-        return cached.$5;
+          cached.$2 == totalTrackCount &&
+          cached.$3 == totalAlbumCount) {
+        return cached.$4;
       }
       final data = page.toFilterContentData(
-        collectionState,
         totalTrackCount: totalTrackCount,
         totalAlbumCount: totalAlbumCount,
       );
       _filterDataByMode[filterMode] = (
         page,
-        collectionState,
         totalTrackCount,
         totalAlbumCount,
         data,
