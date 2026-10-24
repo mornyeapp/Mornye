@@ -39,6 +39,7 @@ import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/app_progress_indicator.dart';
 import 'package:mornye/widgets/app_search_field.dart';
 import 'package:mornye/widgets/app_sliver_header.dart';
+import 'package:mornye/widgets/beta_badge.dart';
 import 'package:mornye/widgets/settings_group.dart';
 import 'package:mornye/widgets/profile_avatar.dart';
 import 'package:mornye/widgets/no_scrollbars.dart';
@@ -54,6 +55,7 @@ class _Destination {
     this.keywords = const [],
     this.searchEntries = const [],
     this.showDonationProgress = false,
+    this.beta = false,
   });
 
   final IconData icon;
@@ -62,6 +64,10 @@ class _Destination {
   final String subtitle;
   final Widget Function() pageBuilder;
   final bool showDonationProgress;
+
+  /// Marks the entry with a Beta tag in the phone list. The desktop category
+  /// column is too narrow for it, so those pages show the tag themselves.
+  final bool beta;
 
   /// Extra search terms for things the title does not spell out (e.g. "SAF"
   /// for the Files page), so a user can find a page by what it does.
@@ -265,6 +271,7 @@ class _SettingsTabState extends ConsumerState<SettingsTab> {
                 'komputer',
               ],
               pageBuilder: () => const LinkSettingsPage(),
+              beta: true,
             ),
           if (isDesktopPlatform)
             _Destination(
@@ -461,6 +468,7 @@ class _SettingsTabState extends ConsumerState<SettingsTab> {
       iconColor: _iconColorFor(destination),
       showIconInMornye: true,
       title: destination.title,
+      titleTrailing: destination.beta ? const BetaBadge() : null,
       subtitle: context.isMornye ? null : destination.subtitle,
       footer: destination.showDonationProgress && goal?.isVisible == true
           ? _DonationGoalProgress(goal: goal!)

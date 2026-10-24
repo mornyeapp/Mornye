@@ -14,6 +14,7 @@ import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/app_icon_button.dart';
 import 'package:mornye/widgets/app_sliver_header.dart';
 import 'package:mornye/widgets/app_snack_bar.dart';
+import 'package:mornye/widgets/beta_badge.dart';
 import 'package:mornye/widgets/desktop/link_text_input_dialog.dart';
 import 'package:mornye/widgets/settings_group.dart';
 
@@ -55,6 +56,7 @@ class LinkDesktopSettingsPage extends ConsumerWidget {
                   key: const ValueKey('link-enable'),
                   icon: Icons.phone_android,
                   title: l10n.linkDesktopEnableTitle,
+                  titleTrailing: const BetaBadge(),
                   subtitle: _status(context, host),
                   value: host.enabled,
                   onChanged: (enabled) =>

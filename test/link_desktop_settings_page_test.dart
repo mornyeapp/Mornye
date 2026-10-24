@@ -11,6 +11,7 @@ import 'package:mornye/services/link/desktop/link_desktop_host.dart';
 import 'package:mornye/theme/app_theme.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/desktop_platform.dart';
+import 'package:mornye/widgets/beta_badge.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'support/link_desktop_fakes.dart';
@@ -85,6 +86,13 @@ void main() {
     ) async {
       await pumpPage(tester, mornye: mornye, enabled: false);
       expect(find.text('Share with Mornye on your phone'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('link-enable')),
+          matching: find.byType(BetaBadge),
+        ),
+        findsOneWidget,
+      );
       expect(find.byKey(const ValueKey('link-firewall-hint')), findsNothing);
       expect(find.byKey(const ValueKey('link-pair')), findsNothing);
 
