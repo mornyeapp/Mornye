@@ -28,6 +28,7 @@ import 'package:mornye/screens/settings/settings_tab.dart';
 import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/services/shell_navigation_service.dart';
 import 'package:mornye/services/share_intent_service.dart';
+import 'package:mornye/services/link/features/link_phone_client.dart';
 import 'package:mornye/services/music_playback_deck.dart';
 import 'package:mornye/services/listening_statistics.dart';
 import 'package:mornye/services/discord_presence_service.dart';
@@ -43,6 +44,7 @@ import 'package:mornye/widgets/nav_destination_icons.dart';
 import 'package:mornye/widgets/settings_group.dart';
 import 'package:mornye/widgets/mini_player.dart';
 import 'package:mornye/widgets/lazy_tab_view.dart';
+import 'package:mornye/widgets/link/link_actions.dart';
 import 'package:mornye/widgets/expressive_navigation_bar.dart';
 import 'package:mornye/widgets/mornye_bottom_bar.dart';
 import 'package:mornye/widgets/app_icon.dart';
@@ -337,9 +339,21 @@ class _MainShellState extends ConsumerState<MainShell>
     if (!mounted) return;
     ref.read(settingsProvider.notifier).setHasSearchedBefore();
     if (mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(context.l10n.loadingSharedLink)));
+      final linkClient = ref.read(linkPhoneClientProvider);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(context.l10n.loadingSharedLink),
+          // A paired desktop can take the link instead.
+          action: linkClient == null
+              ? null
+              : SnackBarAction(
+                  label: context.l10n.linkSendToDesktop(
+                    linkDesktopName(linkClient),
+                  ),
+                  onPressed: () => showLinkSharedUrlSheet(context, ref, url),
+                ),
+        ),
+      );
     }
     await ref.read(trackProvider.notifier).fetchFromUrl(url);
     final trackState = ref.read(trackProvider);

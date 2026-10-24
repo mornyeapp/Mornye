@@ -113,14 +113,17 @@ class SubsonicFixture {
             },
           }),
         );
-      } else if ((method == 'stream' || method == 'getCoverArt') &&
+      } else if ((method == 'stream' ||
+              method == 'download' ||
+              method == 'getCoverArt') &&
           !mediaError) {
+        final isAudio = method != 'getCoverArt';
         response.headers.contentType = ContentType.parse(
-          method == 'stream' ? song['contentType'] as String : 'image/png',
+          isAudio ? song['contentType'] as String : 'image/png',
         );
         final range = request.headers.value('range');
         response.statusCode = range == null ? 200 : 206;
-        final media = method == 'stream' ? audio ?? [0, 1, 2, 3] : [0, 1, 2, 3];
+        final media = isAudio ? audio ?? [0, 1, 2, 3] : [0, 1, 2, 3];
         final part = networkByteRange(range, media.length);
         if (range != null) {
           response.headers.set(

@@ -11,6 +11,7 @@ import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/models/track.dart';
 import 'package:mornye/providers/download_queue_provider.dart';
 import 'package:mornye/providers/extension_provider.dart';
+import 'package:mornye/services/link/features/link_phone_client.dart';
 import 'package:mornye/utils/image_cache_utils.dart';
 import 'package:mornye/utils/cover_art_utils.dart';
 import 'package:mornye/utils/adaptive_layout.dart';
@@ -18,6 +19,7 @@ import 'package:mornye/utils/provider_resource_ids.dart';
 import 'package:mornye/widgets/playlist_picker_sheet.dart';
 import 'package:mornye/widgets/animation_utils.dart';
 import 'package:mornye/widgets/cached_cover_image.dart';
+import 'package:mornye/widgets/link/link_actions.dart';
 import 'package:mornye/widgets/motion_header_banner.dart';
 import 'package:mornye/widgets/track_list_tile.dart';
 import 'package:mornye/utils/desktop_platform.dart';
@@ -355,6 +357,15 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen>
           ),
         ],
       ),
+      appBarActions: ref.watch(linkPhoneClientProvider) == null
+          ? null
+          : [
+              LinkDownloadOnDesktopButton(
+                tracks: _tracks,
+                service: _recommendedDownloadService(),
+                playlistName: _playlistName,
+              ),
+            ],
       actions: CollectionHeaderActions(
         tracks: _tracks,
         onLoveAll: () => loveAllTracks(this.context, ref, _tracks),

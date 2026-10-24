@@ -18,6 +18,7 @@ import 'package:mornye/screens/downloaded_album_screen.dart';
 import 'package:mornye/screens/local_album_screen.dart';
 import 'package:mornye/screens/equalizer_screen.dart';
 import 'package:mornye/screens/lyrics_share_screen.dart';
+import 'package:mornye/services/link/features/link_phone_client.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/theme/player_artwork_theme.dart';
 import 'package:mornye/utils/file_access.dart';
@@ -33,6 +34,7 @@ import 'package:mornye/widgets/audio_output_button.dart';
 import 'package:mornye/widgets/desktop/desktop_commands.dart'
     show DesktopCommand, desktopTooltip;
 import 'package:mornye/widgets/desktop/desktop_inspector.dart';
+import 'package:mornye/widgets/link/link_devices_sheet.dart';
 import 'package:mornye/widgets/lyrics_screen_awake.dart';
 import 'package:mornye/widgets/player_artwork.dart';
 import 'package:mornye/widgets/player_gesture_regions.dart';
@@ -451,6 +453,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
           actions: mornye
               ? null
               : [
+                  LinkDevicesButton(color: overCover ? Colors.white : null),
                   AppIconButton(
                     tooltip: context.l10n.nowPlayingUpNext,
                     color: overCover ? Colors.white : null,
@@ -572,6 +575,10 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                                   _scheduleLyricsControlsHide();
                                 },
                               ),
+                              // The row spreads its buttons apart, so the
+                              // Devices entry only takes a slot when paired.
+                              if (ref.watch(linkPhoneClientProvider) != null)
+                                const LinkDevicesButton(color: Colors.white),
                               IconButton(
                                 tooltip: context.l10n.nowPlayingUpNext,
                                 color: Colors.white,

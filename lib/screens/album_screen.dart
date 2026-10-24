@@ -11,6 +11,7 @@ import 'package:mornye/models/track.dart';
 import 'package:mornye/providers/download_queue_provider.dart';
 import 'package:mornye/providers/extension_provider.dart';
 import 'package:mornye/providers/recent_access_provider.dart';
+import 'package:mornye/services/link/features/link_phone_client.dart';
 import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/utils/image_cache_utils.dart';
 import 'package:mornye/utils/string_utils.dart';
@@ -30,6 +31,7 @@ import 'package:mornye/utils/ttl_cache.dart';
 import 'package:mornye/widgets/animation_utils.dart';
 import 'package:mornye/widgets/playlist_picker_sheet.dart';
 import 'package:mornye/widgets/cross_extension_share_sheet.dart';
+import 'package:mornye/widgets/link/link_actions.dart';
 import 'package:mornye/widgets/track_list_tile.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/widgets/desktop/detail_header.dart';
@@ -655,6 +657,11 @@ class _AlbumScreenState extends ConsumerState<AlbumScreen>
       appBarActions: isSelectionMode
           ? const []
           : [
+              if (ref.watch(linkPhoneClientProvider) != null)
+                LinkDownloadOnDesktopButton(
+                  tracks: tracks,
+                  service: _recommendedDownloadService(),
+                ),
               HeaderCircleButton(
                 icon: Icons.open_in_new_rounded,
                 tooltip: context.l10n.openInOtherServices,

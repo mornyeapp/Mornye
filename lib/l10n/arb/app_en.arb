@@ -6802,6 +6802,212 @@
   "@nowPlayingNoMetadata": {
     "description": "Empty state when track metadata cannot be loaded"
   },
+  "linkDevicesTitle": "Devices",
+  "@linkDevicesTitle": {
+    "description": "Mornye Link: title and button tooltip of the phone sheet that controls the paired desktop app"
+  },
+  "linkConnectionConnected": "Connected",
+  "@linkConnectionConnected": {
+    "description": "Mornye Link: the phone is connected to the paired desktop"
+  },
+  "linkConnectionConnecting": "Connecting",
+  "@linkConnectionConnecting": {
+    "description": "Mornye Link: the phone is connecting to the paired desktop"
+  },
+  "linkConnectionDisconnected": "Not connected",
+  "@linkConnectionDisconnected": {
+    "description": "Mornye Link: the paired desktop cannot be reached"
+  },
+  "linkDesktopNothingPlaying": "Nothing is playing on {name}",
+  "@linkDesktopNothingPlaying": {
+    "description": "Mornye Link: the paired desktop's player is empty",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkPlayOnDesktop": "Play on {name}",
+  "@linkPlayOnDesktop": {
+    "description": "Mornye Link: moves the phone's queue to the paired desktop and pauses the phone",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkContinueOnPhone": "Continue on this phone",
+  "@linkContinueOnPhone": {
+    "description": "Mornye Link: takes over what the paired desktop plays and pauses the desktop"
+  },
+  "linkDesktopQueue": "Queue on {name}",
+  "@linkDesktopQueue": {
+    "description": "Mornye Link: heading of the paired desktop's play queue",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkDesktopDownloads": "Downloads on {name}",
+  "@linkDesktopDownloads": {
+    "description": "Mornye Link: heading of the paired desktop's download queue",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkHandoffStarted": "Playing on {name}",
+  "@linkHandoffStarted": {
+    "description": "Mornye Link: the paired desktop took over the phone's queue",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkHandoffMissing": "Playing on {name}. Not found there: {titles}",
+  "@linkHandoffMissing": {
+    "description": "Mornye Link: the paired desktop took over the phone's queue but lacks some tracks, listed by title",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "titles": {
+        "type": "String"
+      }
+    }
+  },
+  "linkHandoffNotFound": "{name} has none of these tracks",
+  "@linkHandoffNotFound": {
+    "description": "Mornye Link: the paired desktop has none of the tracks in the phone's queue",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkHandoffNothingPlaying": "Nothing is playing on this phone",
+  "@linkHandoffNothingPlaying": {
+    "description": "Mornye Link: Play on desktop needs a track playing on the phone"
+  },
+  "linkContinueSkipped": "Not on this phone: {titles}",
+  "@linkContinueSkipped": {
+    "description": "Mornye Link: tracks of the desktop queue the phone could not play, listed by title",
+    "placeholders": {
+      "titles": {
+        "type": "String"
+      }
+    }
+  },
+  "linkContinueNotFound": "None of these tracks are on this phone",
+  "@linkContinueNotFound": {
+    "description": "Mornye Link: the phone has none of the tracks of the desktop queue"
+  },
+  "linkRequestFailed": "Could not reach {name}",
+  "@linkRequestFailed": {
+    "description": "Mornye Link: a request to the paired desktop failed",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkDownloadOnDesktop": "Download on {name}",
+  "@linkDownloadOnDesktop": {
+    "description": "Mornye Link: queues a track, album or link for download in the paired desktop app",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkDownloadQueuedOnDesktop": "{count, plural, =1{Queued 1 track on {name}} other{Queued {count} tracks on {name}}}",
+  "@linkDownloadQueuedOnDesktop": {
+    "description": "Mornye Link: the paired desktop queued downloads",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkOpenOnDesktop": "Open on {name}",
+  "@linkOpenOnDesktop": {
+    "description": "Mornye Link: opens a shared link in the paired desktop app",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkOpenedOnDesktop": "Opened on {name}",
+  "@linkOpenedOnDesktop": {
+    "description": "Mornye Link: the paired desktop opened the link",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkSendToDesktop": "Send to {name}",
+  "@linkSendToDesktop": {
+    "description": "Mornye Link: action on a shared link that offers to open or download it on the paired desktop",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkSaveToPhone": "Save to this phone",
+  "@linkSaveToPhone": {
+    "description": "Mornye Link: downloads songs of the paired desktop's library into the phone's download folder"
+  },
+  "linkSavingToPhone": "Saving to this phone",
+  "@linkSavingToPhone": {
+    "description": "Mornye Link: title of the progress dialog while desktop songs are saved to the phone"
+  },
+  "linkSavedToPhone": "{count, plural, =1{Saved 1 song to this phone} other{Saved {count} songs to this phone}}",
+  "@linkSavedToPhone": {
+    "description": "Mornye Link: desktop songs were saved to the phone",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "linkSaveToPhoneFailed": "{count, plural, =1{1 song could not be saved} other{{count} songs could not be saved}}",
+  "@linkSaveToPhoneFailed": {
+    "description": "Mornye Link: some desktop songs could not be saved to the phone",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "linkSaveToPhoneCancelled": "Saving stopped",
+  "@linkSaveToPhoneCancelled": {
+    "description": "Mornye Link: the listener cancelled saving desktop songs to the phone"
+  },
+  "linkDownloadStatusQueued": "Waiting",
+  "@linkDownloadStatusQueued": {
+    "description": "Mornye Link: a download on the paired desktop has not started"
+  },
+  "linkDownloadStatusDownloading": "Downloading",
+  "@linkDownloadStatusDownloading": {
+    "description": "Mornye Link: a download on the paired desktop is running"
+  },
+  "linkDownloadStatusDone": "Done",
+  "@linkDownloadStatusDone": {
+    "description": "Mornye Link: a download on the paired desktop finished"
+  },
+  "linkDownloadStatusFailed": "Failed",
+  "@linkDownloadStatusFailed": {
+    "description": "Mornye Link: a download on the paired desktop failed"
+  },
   "announcementUnableToOpenLink": "Unable to open link. Please try again.",
   "@announcementUnableToOpenLink": {
     "description": "Snackbar shown when an announcement CTA link cannot be opened"

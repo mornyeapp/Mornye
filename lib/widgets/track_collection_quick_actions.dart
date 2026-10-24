@@ -10,10 +10,12 @@ import 'package:mornye/models/track.dart';
 import 'package:mornye/providers/library_collections_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/services/cover_cache_manager.dart';
+import 'package:mornye/services/link/features/link_phone_client.dart';
 import 'package:mornye/controllers/clickable_metadata.dart';
 import 'package:mornye/controllers/local_playback.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/widgets/desktop/context_menu.dart';
+import 'package:mornye/widgets/link/link_actions.dart';
 import 'package:mornye/widgets/playlist_picker_sheet.dart';
 import 'package:mornye/widgets/mornye_context_menu.dart';
 import 'package:share_plus/share_plus.dart';
@@ -264,6 +266,7 @@ class _TrackOptionsSheet extends ConsumerWidget {
       allowQualityVariants: allowQualityVariants,
       hasLocalPlaybackCandidate: hasLocalPlaybackCandidate,
     );
+    final linkClient = ref.watch(linkPhoneClientProvider);
 
     if (context.isMornye) {
       final l10n = context.l10n;
@@ -319,6 +322,12 @@ class _TrackOptionsSheet extends ConsumerWidget {
                 icon: CupertinoIcons.arrow_down_circle,
                 label: l10n.trackOptionDownloadQualityVariant,
                 onPressed: () => _downloadQualityVariant(context, ref),
+              ),
+            if (linkClient != null)
+              MornyeMenuAction(
+                icon: CupertinoIcons.desktopcomputer,
+                label: l10n.linkDownloadOnDesktop(linkDesktopName(linkClient)),
+                onPressed: () => _downloadOnDesktop(context, ref),
               ),
             MornyeMenuAction(
               icon: CupertinoIcons.square_stack,
@@ -469,6 +478,14 @@ class _TrackOptionsSheet extends ConsumerWidget {
                   title: context.l10n.trackOptionDownloadQualityVariant,
                   onTap: () => _downloadQualityVariant(context, ref),
                 ),
+              if (linkClient != null)
+                _OptionTile(
+                  icon: Icons.computer,
+                  title: context.l10n.linkDownloadOnDesktop(
+                    linkDesktopName(linkClient),
+                  ),
+                  onTap: () => _downloadOnDesktop(context, ref),
+                ),
 
               _OptionTile(
                 icon: Icons.content_copy_rounded,
@@ -570,6 +587,12 @@ class _TrackOptionsSheet extends ConsumerWidget {
     final rootContext = Navigator.of(context, rootNavigator: true).context;
     Navigator.pop(context);
     downloadSingleTrack(rootContext, ref, track, forceQualityPicker: true);
+  }
+
+  void _downloadOnDesktop(BuildContext context, WidgetRef ref) {
+    final rootContext = Navigator.of(context, rootNavigator: true).context;
+    Navigator.pop(context);
+    linkDownloadTracksOnDesktop(rootContext, ref, [track]);
   }
 
   Future<void> _toggleCollection(

@@ -20,6 +20,26 @@ String _decodeSubsonicId(String encoded) {
   return utf8.decode(base64Url.decode(base64Url.normalize(encoded)));
 }
 
+/// The library path of the Subsonic song [id]: `subsonic/song/<id>.<format>`.
+String subsonicSongPath(String id, String format) =>
+    'subsonic/song/${_subsonicId(id)}.$format';
+
+/// The Subsonic song id behind a [subsonicSongPath], or null for any other
+/// path.
+String? subsonicSongIdFromPath(String path) {
+  final segments = path.split('/');
+  if (segments.length != 3 ||
+      segments.first != 'subsonic' ||
+      segments[1] != 'song') {
+    return null;
+  }
+  try {
+    return _decodeSubsonicId(segments.last.split('.').first);
+  } on FormatException {
+    return null;
+  }
+}
+
 Uri _subsonicTarget(
   NetworkConnection connection,
   String method,
@@ -129,7 +149,7 @@ class SubsonicSong {
     };
   }
 
-  String get path => 'subsonic/song/${_subsonicId(id)}.$format';
+  String get path => subsonicSongPath(id, format);
   String? get coverPath =>
       coverId.isEmpty ? null : 'subsonic/cover/${_subsonicId(coverId)}.image';
   NetworkEntry get entry => NetworkEntry(
@@ -447,6 +467,65 @@ class SubsonicClient {
       return target.path;
     } finally {
       if (await staged.exists()) await staged.delete();
+    }
+  }
+
+  /// Saves the original file of the song [id] (the `download` method) to
+  /// [output]. [progress] receives the bytes written and the size the server
+  /// announced; [checkpoint] may throw between chunks to cancel.
+  Future<void> download(
+    String id,
+    File output, {
+    void Function()? checkpoint,
+    void Function(int received, int? total)? progress,
+  }) => _protectTransport(
+    () => _download(id, output, checkpoint: checkpoint, progress: progress),
+  );
+
+  Future<void> _download(
+    String id,
+    File output, {
+    void Function()? checkpoint,
+    void Function(int received, int? total)? progress,
+  }) async {
+    if (_closed) throw StateError('Subsonic request cancelled');
+    final response = await _storage._request(
+      _http,
+      connection,
+      'GET',
+      _subsonicTarget(connection, 'download', {'id': id}),
+    );
+    if (response.statusCode != 200 ||
+        const {
+          'application/json',
+          'application/xml',
+          'text/xml',
+        }.contains(response.headers.contentType?.mimeType)) {
+      await _storage._discardResponse(response);
+      throw HttpException(
+        response.statusCode == 200
+            ? 'Subsonic media unavailable'
+            : 'Server returned ${response.statusCode}',
+      );
+    }
+    final total = response.contentLength >= 0 ? response.contentLength : null;
+    final writer = output.openWrite();
+    var received = 0;
+    try {
+      await for (final chunk in response.timeout(
+        NetworkStorageService.timeout,
+      )) {
+        if (_closed) throw StateError('Subsonic request cancelled');
+        checkpoint?.call();
+        writer.add(chunk);
+        received += chunk.length;
+        progress?.call(received, total);
+      }
+      if (total != null && received != total) {
+        throw const HttpException('Subsonic download ended early');
+      }
+    } finally {
+      await writer.close();
     }
   }
 
