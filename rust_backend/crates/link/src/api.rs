@@ -8,7 +8,7 @@
 
 use crate::pairing::{PAIRED, PairError};
 use crate::server::{MAX_BODY, State};
-use crate::types::{HttpResponse, SubsonicRequest, json};
+use crate::types::{Device, HttpResponse, SubsonicRequest, json};
 use crate::{auth, subsonic, ws};
 use bytes::Bytes;
 use http::{HeaderMap, Method, header};
@@ -80,6 +80,21 @@ async fn rest(state: &Arc<State>, method: &str, request: http::Request<Incoming>
                 params,
                 headers: parts.headers,
                 device: record.device(),
+            };
+            subsonic::handle(&state.shared, request).await
+        }
+        // OpenSubsonic requires the extension list without credentials, so
+        // clients can learn the supported auth methods first.
+        Err(_) if method == "getOpenSubsonicExtensions" => {
+            let request = SubsonicRequest {
+                method,
+                params,
+                headers: parts.headers,
+                device: Device {
+                    device_id: String::new(),
+                    name: String::new(),
+                    platform: String::new(),
+                },
             };
             subsonic::handle(&state.shared, request).await
         }

@@ -741,6 +741,21 @@ fn subsonic_requests_authenticate_before_the_subsonic_layer() {
     assert_eq!(posted.status, 200);
     assert!(seen(&device));
 
+    // OpenSubsonic clients read the extension list before authenticating.
+    let extensions = fixture.get("/rest/getOpenSubsonicExtensions?f=json", None);
+    assert_eq!(extensions.status, 200);
+    assert!(
+        extensions.text().contains("apiKeyAuthentication"),
+        "{}",
+        extensions.text()
+    );
+    assert!(
+        fixture
+            .get("/rest/getMusicFolders?f=json", None)
+            .text()
+            .contains("\"failed\"")
+    );
+
     assert_eq!(fixture.get("/rest/a/b", None).status, 404);
 }
 
