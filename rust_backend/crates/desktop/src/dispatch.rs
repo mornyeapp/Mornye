@@ -688,6 +688,24 @@ pub(crate) static METHODS: &[Entry] = &[
         c.rt.watcher.stop();
         Ok(Reply::null())
     }),
+    // Desktop only: the Mornye Link server (link.rs, LINK_CONTRACT.md 6).
+    pool("linkStart", |c, a| c.rt.link.start(&c.rt.config, a)),
+    pool("linkStop", |c, _| {
+        c.rt.link.stop();
+        Ok(Reply::null())
+    }),
+    pool("linkStatus", |c, _| Ok(c.rt.link.status().into())),
+    pool("linkSetCatalog", |c, a| c.rt.link.set_catalog(a)),
+    pool("linkBeginPairing", |c, _| c.rt.link.begin_pairing()),
+    pool("linkEndPairing", |c, _| {
+        c.rt.link.end_pairing();
+        Ok(Reply::null())
+    }),
+    pool("linkDevices", |c, _| c.rt.link.devices(&c.rt.config)),
+    pool("linkRevoke", |c, a| c.rt.link.revoke(&c.rt.config, a)),
+    pool("linkCreateKey", |c, a| c.rt.link.create_key(a)),
+    pool("linkReply", |c, a| c.rt.link.reply(a)),
+    pool("linkSend", |c, a| c.rt.link.send(a)),
 ];
 
 fn table() -> &'static HashMap<&'static str, &'static Entry> {

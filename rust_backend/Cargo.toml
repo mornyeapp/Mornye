@@ -87,6 +87,10 @@ tokio-rustls = { version = "=0.26.6", default-features = false, features = ["rin
 tokio-tungstenite = { version = "=0.30.0", default-features = false, features = ["handshake"] }
 mdns-sd = "=0.21.6"
 rcgen = { version = "=0.14.10", default-features = false, features = ["crypto", "ring", "pem"] }
+# Already in the tree through mdns-sd and tokio: interface addresses and a
+# dual-stack listener.
+if-addrs = "=0.15.0"
+socket2 = "0.6"
 
 [workspace.lints.rust]
 unsafe_code = "deny"

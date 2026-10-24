@@ -14,7 +14,7 @@ http.workspace = true
 http-body-util.workspace = true
 bytes.workspace = true
 futures-util.workspace = true
-tokio-util.workspace = true
+tokio-util = { workspace = true, features = ["rt"] }
 rustls.workspace = true
 tokio-rustls.workspace = true
 tokio-tungstenite.workspace = true
@@ -28,6 +28,10 @@ base64.workspace = true
 getrandom.workspace = true
 url.workspace = true
 image.workspace = true
+md-5.workspace = true
+time.workspace = true
+if-addrs.workspace = true
+socket2.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

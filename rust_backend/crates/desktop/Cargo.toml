@@ -13,11 +13,13 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 mornye-mobile = { path = "../mobile" }
+mornye-link.workspace = true
 chrono.workspace = true
 getrandom.workspace = true
 notify.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
+tokio.workspace = true
 url.workspace = true
 
 [target.'cfg(windows)'.dependencies]
