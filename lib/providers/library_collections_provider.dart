@@ -721,6 +721,13 @@ class LibraryCollectionsNotifier extends Notifier<LibraryCollectionsState> {
     await _load();
     _invalidatePlaylistPickerSummaries();
   });
+
+  /// Reloads every collection after another writer (Mornye Link sync)
+  /// changed the database. Queued behind pending mutations.
+  Future<void> reloadFromDatabase() => _mutate(() async {
+    await _load();
+    _invalidatePlaylistPickerSummaries();
+  });
 }
 
 final libraryCollectionsProvider =
