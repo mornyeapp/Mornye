@@ -104,7 +104,8 @@ class LinkHandoff {
   final LinkTrackResolver resolver;
 
   /// Sends the phone's queue (at most 200 items around the current one) to
-  /// the desktop and pauses the phone once the desktop plays. Null when the
+  /// the desktop and pauses the phone once the desktop plays. The desktop
+  /// always starts playing, as "Continue on this phone" does. Null when the
   /// phone plays nothing.
   Future<LinkHandoffResult?> playOnDesktop() async {
     final snapshot = player.snapshot;
@@ -120,7 +121,7 @@ class LinkHandoff {
         queue: queue,
         index: snapshot.index - window.start,
         positionMs: player.snapshot.positionMs,
-        playing: snapshot.playing,
+        playing: true,
       ).toJson(),
     );
     final resolved = reply is Map ? reply['resolved'] : null;

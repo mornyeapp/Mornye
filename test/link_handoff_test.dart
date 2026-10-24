@@ -56,6 +56,24 @@ void main() {
       expect(player.calls, ['pause']);
     });
 
+    test('starts the desktop even when the phone is paused', () async {
+      final player = FakePhonePlayer(
+        LinkPhoneSnapshot(
+          queue: [linkMediaItem(linkLocalMedia('a'))],
+          index: 0,
+          playing: false,
+          positionMs: 7000,
+        ),
+      );
+      final client = FakeLinkClient(
+        onPost: (op, body) => {'resolved': 1, 'missing': <int>[]},
+      );
+      await handoff(client, player).playOnDesktop();
+      final post = client.posts.single;
+      expect(post.body['playing'], isTrue);
+      expect(post.body['positionMs'], 7000);
+    });
+
     test('keeps playing when the desktop has none of the tracks', () async {
       final player = FakePhonePlayer(
         LinkPhoneSnapshot(
