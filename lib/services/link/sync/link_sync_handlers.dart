@@ -470,9 +470,10 @@ class _LinkSyncHandlers {
         final id = _string(artist['id']);
         final name = _string(artist['name']);
         if (id == null) continue;
+        final nameKey = name == null ? null : linkArtistNameKey(name);
         final matches = [
           for (final favorite in favorites)
-            if (favorite.catalogId == id || favorite.artistId == id)
+            if (favorite.artistId == id || favorite.nameKey == nameKey)
               favorite.key,
         ];
         if (starred && matches.isEmpty && name != null) {
@@ -491,13 +492,14 @@ class _LinkSyncHandlers {
     return const <String, dynamic>{};
   }
 
-  Future<List<({String key, String artistId, String catalogId})>>
+  Future<List<({String key, String artistId, String name, String nameKey})>>
   _favoriteArtists(DatabaseExecutor db) async {
     final rows = await db.rawQuery(
       'SELECT artist_key, artist_json FROM favorite_artists '
       'ORDER BY added_at DESC, rowid DESC',
     );
-    final favorites = <({String key, String artistId, String catalogId})>[];
+    final favorites =
+        <({String key, String artistId, String name, String nameKey})>[];
     for (final row in rows) {
       try {
         final json = jsonDecode(row['artist_json']! as String);
@@ -508,7 +510,8 @@ class _LinkSyncHandlers {
         favorites.add((
           key: row['artist_key']! as String,
           artistId: artistId is String ? artistId : '',
-          catalogId: linkCatalogArtistId(name),
+          name: name,
+          nameKey: linkArtistNameKey(name),
         ));
       } on FormatException {
         continue;
@@ -526,13 +529,14 @@ class _LinkSyncHandlers {
     final songIds = <String>{
       for (final row in loved) ?_songId(index, _decodeTrack(row['track_json'])),
     };
-    final artistIds = <String>{
-      for (final favorite in await _favoriteArtists(db)) favorite.catalogId,
+    // The server derives artist ids from names itself.
+    final artistNames = <String>{
+      for (final favorite in await _favoriteArtists(db)) favorite.name,
     };
     return {
       'songIds': songIds.toList(),
       'albumIds': const <String>[],
-      'artistIds': artistIds.toList(),
+      'artistNames': artistNames.toList(),
     };
   }
 

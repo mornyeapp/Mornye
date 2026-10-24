@@ -1,7 +1,5 @@
 import 'dart:convert';
 
-import 'package:crypto/crypto.dart';
-
 /// Mornye Link collections and history sync (unit L4). Both directions use
 /// the same JSON, so the desktop (server) and the phone (client) share one
 /// store implementation per database.
@@ -334,14 +332,11 @@ class LinkSongInfo {
       : const [];
 }
 
-/// The Subsonic artist id the server derives from an artist name (contract
-/// section 4): `ar-` plus the first 16 hex characters of SHA-256 over the
-/// normalized name (trimmed, inner whitespace collapsed, lowercase).
-String linkCatalogArtistId(String name) {
-  final normalized = name.trim().replaceAll(RegExp(r'\s+'), ' ').toLowerCase();
-  final digest = sha256.convert(utf8.encode(normalized)).toString();
-  return 'ar-${digest.substring(0, 16)}';
-}
+/// A loose comparison form of an artist name (trimmed, inner whitespace
+/// collapsed, lowercase). Only for matching names the server sends back; the
+/// server alone derives Subsonic artist ids, from names the app reports.
+String linkArtistNameKey(String name) =>
+    name.trim().replaceAll(RegExp(r'\s+'), ' ').toLowerCase();
 
 /// Milliseconds since the epoch for a stored ISO timestamp, or null.
 int? linkSyncIsoToMs(Object? value) =>

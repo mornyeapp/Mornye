@@ -177,8 +177,11 @@ void main() {
 
   test('star, unstar and getStarred map songs and artists', () async {
     final desktop = await _desktop();
-    final artistId = linkCatalogArtistId('Desk  Artist ');
-    expect(artistId, linkCatalogArtistId('desk artist'));
+    const artistId = 'ar-0123456789abcdef';
+    expect(
+      linkArtistNameKey('Desk  Artist '),
+      linkArtistNameKey('desk artist'),
+    );
     expect(
       await desktop.call(LinkSyncSubsonicOps.star, {
         'songs': [linkSongInfo(_songs[0]), linkSongInfo(_songs[1])],
@@ -202,23 +205,24 @@ void main() {
     expect(starred, {
       'songIds': unorderedEquals(['l:1', 'l:2']),
       'albumIds': <String>[],
-      'artistIds': [artistId],
+      'artistNames': ['Desk Artist'],
     });
     final state = desktop.container.read(libraryCollectionsProvider);
     expect(state.loved, hasLength(2));
     expect(state.favoriteArtists.single.name, 'Desk Artist');
 
+    // A Subsonic client unstars by the server's id; the name matches it.
     await desktop.call(LinkSyncSubsonicOps.unstar, {
       'songs': [linkSongInfo(_songs[0])],
       'artists': [
-        {'id': artistId, 'name': 'Desk Artist'},
+        {'id': 'ar-fedcba9876543210', 'name': 'desk  ARTIST'},
       ],
     });
     starred = await desktop.call(LinkSyncSubsonicOps.getStarred);
     expect(starred, {
       'songIds': ['l:2'],
       'albumIds': <String>[],
-      'artistIds': <String>[],
+      'artistNames': <String>[],
     });
   });
 

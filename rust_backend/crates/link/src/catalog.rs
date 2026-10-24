@@ -254,6 +254,11 @@ impl Catalog {
         self.artist_ids.get(id).copied()
     }
 
+    /// The artist the app knows by `name`, so the app never derives ids.
+    pub(crate) fn artist_index_by_name(&self, name: &str) -> Option<usize> {
+        self.artist_index(&short_id("ar-", &normalize(name)))
+    }
+
     pub(crate) fn song(&self, id: &str) -> Option<&Song> {
         self.song_index(id).map(|index| &self.songs[index])
     }

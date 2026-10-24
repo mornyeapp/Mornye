@@ -252,6 +252,22 @@ async fn starred_lists_expand_ids_and_drop_unknown_ones() {
 }
 
 #[tokio::test]
+async fn starred_artists_may_be_named_instead_of_identified() {
+    let fixture = library();
+    let artist = fixture.artist_id("Zed");
+    fixture.host.reply(
+        "subsonic/getStarred",
+        Ok(json!({
+            "songIds": [],
+            "artistIds": [artist],
+            "artistNames": ["  ZED ", "Nobody Here"],
+        })),
+    );
+    let starred = fixture.ok("getStarred2", &[], "starred2").await;
+    assert_eq!(ids(&starred["artist"]), [artist]);
+}
+
+#[tokio::test]
 async fn scrobble_aligns_times_with_known_songs() {
     let fixture = library();
     let response = fixture

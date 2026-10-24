@@ -8,6 +8,7 @@ use super::{Failure, Payload, code, flag, number, payload, required};
 use crate::catalog::Catalog;
 use crate::types::{HostError, Shared, SubsonicRequest};
 use serde_json::{Map, Value, json};
+use std::collections::BTreeSet;
 
 /// Owner reported for playlists and the play queue.
 const OWNER: &str = "mornye";
@@ -276,9 +277,18 @@ pub(super) async fn starred(
             .into_iter()
             .filter_map(|id| catalog.album_index(id))
             .collect(),
+        // The app may name artists instead of computing ids, so the id rule
+        // stays in one place.
         artists: ids("artistIds")
             .into_iter()
             .filter_map(|id| catalog.artist_index(id))
+            .chain(
+                ids("artistNames")
+                    .into_iter()
+                    .filter_map(|name| catalog.artist_index_by_name(name)),
+            )
+            .collect::<BTreeSet<_>>()
+            .into_iter()
             .collect(),
     })
 }
