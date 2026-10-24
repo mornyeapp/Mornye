@@ -19,6 +19,7 @@ import 'package:mornye/screens/settings/extensions_page.dart';
 import 'package:mornye/screens/settings/files_settings_page.dart';
 import 'package:mornye/screens/settings/keyboard_shortcuts_page.dart';
 import 'package:mornye/screens/settings/library_settings_page.dart';
+import 'package:mornye/screens/settings/link_desktop_settings_page.dart';
 import 'package:mornye/screens/network_storage_screen.dart';
 import 'package:mornye/screens/settings/log_screen.dart';
 import 'package:mornye/screens/settings/lyrics_settings_page.dart';
@@ -247,6 +248,23 @@ class _SettingsTabState extends ConsumerState<SettingsTab> {
             ],
             pageBuilder: () => const NetworkStorageScreen(),
           ),
+          if (isDesktopPlatform)
+            _Destination(
+              icon: Icons.phone_android,
+              iconColor: Colors.lightBlue,
+              title: l10n.linkDesktopSettingsTitle,
+              subtitle: l10n.linkDesktopSettingsSubtitle,
+              keywords: const [
+                'phone',
+                'mobile',
+                'pair',
+                'remote',
+                'handoff',
+                'subsonic',
+                'ponsel',
+              ],
+              pageBuilder: () => const LinkDesktopSettingsPage(),
+            ),
           _Destination(
             icon: Icons.sell_outlined,
             iconColor: Colors.amber,
