@@ -12,6 +12,8 @@ import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/providers/equalizer_provider.dart';
 import 'package:mornye/services/app_navigation_service.dart';
 import 'package:mornye/services/app_orientation.dart';
+import 'package:mornye/services/link/client/link_client_controller.dart';
+import 'package:mornye/services/link/sync/link_sync_runner.dart';
 import 'package:mornye/theme/dynamic_color_wrapper.dart';
 import 'package:mornye/l10n/app_localizations.dart';
 import 'package:mornye/l10n/supported_locales.dart';
@@ -203,6 +205,11 @@ class MornyeApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     // Keeps the equalizer loaded for the app's lifetime without rebuilding.
     ref.listen(equalizerProvider, (_, _) {});
+    // On phones, keeps the link to a paired computer and its sync running.
+    if (ref.read(linkClientSupportedProvider)) {
+      ref.listen(linkClientControllerProvider, (_, _) {});
+      ref.listen(linkSyncRunnerProvider, (_, _) {});
+    }
     final router = ref.watch(_routerProvider);
     final localeString = ref.watch(settingsProvider.select((s) => s.locale));
     final heroAnimationsEnabled = ref.watch(
