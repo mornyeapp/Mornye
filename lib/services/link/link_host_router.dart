@@ -1,3 +1,4 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/models/track.dart';
 import 'package:mornye/services/link/link_protocol.dart';
 
@@ -97,3 +98,23 @@ abstract interface class LinkCatalogIndex {
 
   int get length;
 }
+
+/// The desktop's request router. The host service dispatches every
+/// `linkRequest` through it; features register their ops on it.
+final linkHostRouterProvider = Provider<LinkHostRouter>(
+  (ref) => LinkHostRouter(),
+);
+
+/// The identity index of the last catalog export, or null before the first
+/// export. The host unit sets it.
+class LinkCatalogIndexState extends Notifier<LinkCatalogIndex?> {
+  @override
+  LinkCatalogIndex? build() => null;
+
+  void set(LinkCatalogIndex? index) => state = index;
+}
+
+final linkCatalogIndexProvider =
+    NotifierProvider<LinkCatalogIndexState, LinkCatalogIndex?>(
+      LinkCatalogIndexState.new,
+    );

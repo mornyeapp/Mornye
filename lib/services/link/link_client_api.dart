@@ -1,3 +1,4 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/services/link/link_protocol.dart';
 
 /// A paired desktop as the phone remembers it.
@@ -75,3 +76,15 @@ abstract interface class LinkClientApi {
   /// `POST /mornye/v1/<op>` with a JSON [body]; throws [LinkException].
   Future<Object?> post(String op, Map<String, dynamic> body);
 }
+
+/// The phone's session with the desktop it is linked to, or null when none
+/// is paired. The client unit sets it; features and sync watch it.
+class LinkActiveClient extends Notifier<LinkClientApi?> {
+  @override
+  LinkClientApi? build() => null;
+
+  void set(LinkClientApi? client) => state = client;
+}
+
+final linkActiveClientProvider =
+    NotifierProvider<LinkActiveClient, LinkClientApi?>(LinkActiveClient.new);
