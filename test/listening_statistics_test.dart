@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/services/listening_statistics.dart';
 
+import 'support/sqlite_process_database.dart';
+
 const _one = ListeningTrack(
   key: 'one',
   title: 'One',
@@ -174,6 +176,73 @@ void main() {
   });
 
   test(
+    'stored collaborations credit each artist without inflating totals',
+    () async {
+      final db = await SqliteProcessDatabase.open();
+      addTearDown(db.close);
+      await db.execute('''
+        CREATE TABLE listening (
+          day TEXT, track_key TEXT, title TEXT, artist TEXT, album TEXT,
+          artwork TEXT, milliseconds INTEGER, plays INTEGER,
+          PRIMARY KEY(day, track_key)
+        )
+      ''');
+      final rows = <Map<String, Object?>>[
+        {
+          'day': '2026-10-01',
+          'track_key': 'collaboration',
+          'title': 'Collaboration',
+          'artist': 'Artist A, Artist B; artist a',
+          'album': 'Album',
+          'artwork': 'https://example.com/collaboration.jpg',
+          'milliseconds': 180000,
+          'plays': 1,
+        },
+        {
+          'day': '2026-10-02',
+          'track_key': 'solo',
+          'title': 'Solo',
+          'artist': 'Artist A',
+          'album': 'Solo Album',
+          'artwork': null,
+          'milliseconds': 120000,
+          'plays': 1,
+        },
+      ];
+      for (final row in rows) {
+        await db.insert('listening', row);
+      }
+      final summaries = [
+        ListeningSummary.fromRows(rows),
+        await readListeningSummary(db, DateTime(2026), DateTime(2027)),
+      ];
+      for (final summary in summaries) {
+        expect(summary.artists, {'Artist A': 300000, 'Artist B': 180000});
+        expect(summary.milliseconds, 300000);
+        expect(summary.plays, 2);
+        expect(summary.days, {'2026-10-01': 180000, '2026-10-02': 120000});
+        expect(summary.tracks.length, 2);
+        expect(
+          summary.tracks.first.track.artist,
+          'Artist A, Artist B; artist a',
+        );
+        expect(summary.tracks.first.milliseconds, 180000);
+        expect(summary.artistArtwork, {
+          'Artist A': 'https://example.com/collaboration.jpg',
+          'Artist B': 'https://example.com/collaboration.jpg',
+        });
+      }
+      // Reading old credits corrects the presentation without rewriting history.
+      final stored = await db.query(
+        'listening',
+        where: 'track_key = ?',
+        whereArgs: ['collaboration'],
+      );
+      expect(stored.single['artist'], 'Artist A, Artist B; artist a');
+    },
+  );
+
+  test(
     'artist artwork uses the most listened track with an available cover',
     () {
       final summary = ListeningSummary(
@@ -205,7 +274,7 @@ void main() {
             const ListeningTrack(
               key: 'more',
               title: 'More',
-              artist: 'Artist',
+              artist: 'Artist, Collaborator',
               album: 'Album',
               artwork: ' file:///covers/album.jpg ',
             ),
@@ -216,6 +285,7 @@ void main() {
       );
       expect(summary.artistArtwork, {
         'Artist': 'file:///covers/album.jpg',
+        'Collaborator': 'file:///covers/album.jpg',
         'Other Artist': 'https://example.com/other.jpg',
       });
       expect(

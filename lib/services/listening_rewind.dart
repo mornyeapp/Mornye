@@ -1,4 +1,5 @@
 import 'package:mornye/services/listening_statistics.dart';
+import 'package:mornye/utils/artist_utils.dart';
 import 'package:mornye/utils/string_utils.dart';
 import 'package:sqflite/sqflite.dart';
 
@@ -312,33 +313,52 @@ class ListeningRewind {
       : (topArtists.first.value * 100 / summary.milliseconds).round();
 }
 
-/// Year-in-review extras for the window, aggregated in SQLite.
+/// Year-in-review extras, splitting credits from SQLite's daily artist totals.
 Future<ListeningYearDetails> readListeningYearDetails(
   DatabaseExecutor db,
   ListeningRewindRange range,
 ) async {
   final window = [listeningDay(range.start), listeningDay(range.end)];
-  final monthRows = await db.rawQuery('''
-    SELECT substr(day, 6, 2) AS month, artist,
-      SUM(milliseconds) AS milliseconds
-    FROM listening WHERE day >= ? AND day < ?
-    GROUP BY month, artist
+  final artistDays = await db.rawQuery('''
+    SELECT day, artist, SUM(milliseconds) AS milliseconds
+    FROM listening WHERE day >= ? AND day < ? AND milliseconds > 0
+    GROUP BY day, artist
   ''', window);
-  final monthly = <int, (String, int)>{};
-  for (final row in monthRows) {
-    final month = int.parse(row['month'] as String);
+  final monthly = <int, Map<String, int>>{};
+  final days = <String, Set<String>>{};
+  final listeningTime = <String, int>{};
+  for (final row in artistDays) {
+    final day = row['day'] as String;
+    final month = int.parse(day.substring(5, 7));
     final time = row['milliseconds'] as int;
-    if (time <= 0) continue;
-    final best = monthly[month];
-    if (best == null || time > best.$2) {
-      monthly[month] = (row['artist'] as String, time);
+    final totals = monthly.putIfAbsent(month, () => <String, int>{});
+    for (final artist in splitArtistTagValues(row['artist'] as String)) {
+      totals[artist] = (totals[artist] ?? 0) + time;
+      days.putIfAbsent(artist, () => <String>{}).add(day);
+      listeningTime[artist] = (listeningTime[artist] ?? 0) + time;
     }
   }
-  final loyal = await db.rawQuery('''
-    SELECT artist, COUNT(DISTINCT day) AS days
-    FROM listening WHERE day >= ? AND day < ? AND milliseconds > 0
-    GROUP BY artist ORDER BY days DESC, SUM(milliseconds) DESC LIMIT 1
-  ''', window);
+  final monthlyTopArtists = <int, String>{};
+  for (final month in monthly.entries) {
+    for (final artist in month.value.entries) {
+      final best = monthlyTopArtists[month.key];
+      if (best == null || artist.value > month.value[best]!) {
+        monthlyTopArtists[month.key] = artist.key;
+      }
+    }
+  }
+  String? loyalArtist;
+  var loyalDays = 0;
+  var loyalTime = 0;
+  for (final artist in days.entries) {
+    final time = listeningTime[artist.key]!;
+    if (artist.value.length > loyalDays ||
+        (artist.value.length == loyalDays && time > loyalTime)) {
+      loyalArtist = artist.key;
+      loyalDays = artist.value.length;
+      loyalTime = time;
+    }
+  }
   final first = await db.rawQuery('''
     SELECT day, track_key, title, artist, album, artwork
     FROM listening
@@ -350,11 +370,9 @@ Future<ListeningYearDetails> readListeningYearDetails(
   ''', window);
   final firstRow = first.firstOrNull;
   return ListeningYearDetails(
-    monthlyTopArtists: {
-      for (final entry in monthly.entries) entry.key: entry.value.$1,
-    },
-    loyalArtist: loyal.firstOrNull?['artist'] as String?,
-    loyalArtistDays: loyal.firstOrNull?['days'] as int? ?? 0,
+    monthlyTopArtists: monthlyTopArtists,
+    loyalArtist: loyalArtist,
+    loyalArtistDays: loyalDays,
     firstPlay: firstRow == null
         ? null
         : ListeningFirstPlay(
@@ -392,15 +410,30 @@ Future<ListeningRewind> readListeningRewind(
     [start],
   );
   final hasHistory = (earlier.first['count'] as int? ?? 0) > 0;
-  final newArtists = hasHistory
-      ? await db.rawQuery(
-          '''
-          SELECT artist FROM listening GROUP BY artist
-          HAVING MIN(day) >= ? AND MIN(day) < ?
-        ''',
-          [start, end],
-        )
-      : null;
+  Set<String>? newArtistNames;
+  if (hasHistory) {
+    final firstHeard = await db.rawQuery(
+      '''
+      SELECT artist, MIN(day) AS first_day FROM listening
+      WHERE day < ? AND milliseconds > 0 GROUP BY artist
+    ''',
+      [end],
+    );
+    final firstDays = <String, String>{};
+    for (final row in firstHeard) {
+      final day = row['first_day'] as String;
+      for (final artist in splitArtistTagValues(row['artist'] as String)) {
+        final previous = firstDays[artist];
+        if (previous == null || day.compareTo(previous) < 0) {
+          firstDays[artist] = day;
+        }
+      }
+    }
+    newArtistNames = {
+      for (final artist in firstDays.entries)
+        if (artist.value.compareTo(start) >= 0) artist.key,
+    };
+  }
   final replays = await db.rawQuery(
     '''
     SELECT day, track_key, title, artist, album, artwork, plays
@@ -416,9 +449,7 @@ Future<ListeningRewind> readListeningRewind(
     range: range,
     summary: summary,
     previousMilliseconds: previous.first['milliseconds'] as int? ?? 0,
-    newArtistNames: newArtists == null
-        ? null
-        : {for (final row in newArtists) row['artist'] as String},
+    newArtistNames: newArtistNames,
     replay: replay == null
         ? null
         : ListeningReplay(

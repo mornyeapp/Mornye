@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:mornye/services/sqlite_helpers.dart' as sqlite;
+import 'package:mornye/utils/artist_utils.dart';
 import 'package:mornye/utils/logger.dart';
 import 'package:mornye/utils/string_utils.dart';
 import 'package:sqflite/sqflite.dart';
@@ -57,13 +58,14 @@ class ListeningSummary {
     for (final total in tracks) {
       final cover = normalizeCoverReference(total.track.artwork);
       if (cover == null) continue;
-      final artist = total.track.artist;
-      if (listeningTime.containsKey(artist) &&
-          total.milliseconds <= listeningTime[artist]!) {
-        continue;
+      for (final artist in splitArtistTagValues(total.track.artist)) {
+        if (listeningTime.containsKey(artist) &&
+            total.milliseconds <= listeningTime[artist]!) {
+          continue;
+        }
+        artwork[artist] = cover;
+        listeningTime[artist] = total.milliseconds;
       }
-      artwork[artist] = cover;
-      listeningTime[artist] = total.milliseconds;
     }
     return artwork;
   }
@@ -93,7 +95,9 @@ class ListeningSummary {
         (tracks[key]?.milliseconds ?? 0) + time,
         (tracks[key]?.plays ?? 0) + count,
       );
-      artists[artist] = (artists[artist] ?? 0) + time;
+      for (final name in splitArtistTagValues(artist)) {
+        artists[name] = (artists[name] ?? 0) + time;
+      }
       days[day] = (days[day] ?? 0) + time;
     }
     final ranked = tracks.values.toList()
@@ -374,14 +378,19 @@ Future<ListeningSummary> readListeningSummary(
         row['plays'] as int,
       ),
   ];
+  // Split stored credits on read so existing history also credits each artist.
+  // Each collaborator gets the track's time; overall totals still count once.
+  final artists = <String, int>{};
+  for (final row in artistRows) {
+    for (final artist in splitArtistTagValues(row['artist'] as String)) {
+      artists[artist] = (artists[artist] ?? 0) + (row['milliseconds'] as int);
+    }
+  }
   return ListeningSummary(
     milliseconds: tracks.fold(0, (sum, track) => sum + track.milliseconds),
     plays: tracks.fold(0, (sum, track) => sum + track.plays),
     tracks: tracks,
-    artists: {
-      for (final row in artistRows)
-        row['artist'] as String: row['milliseconds'] as int,
-    },
+    artists: artists,
     days: {
       for (final row in dayRows)
         row['day'] as String: row['milliseconds'] as int,

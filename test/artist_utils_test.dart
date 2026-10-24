@@ -2,6 +2,18 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/utils/artist_utils.dart';
 
 void main() {
+  test('artist credits deduplicate names without dropping a final X', () {
+    expect(splitArtistTagValues('One, Two; one & Three feat. TWO'), [
+      'One',
+      'Two',
+      'Three',
+    ]);
+    expect(splitArtistTagValues('One x Two'), ['One', 'Two']);
+    expect(splitArtistTagValues('Malcolm X'), ['Malcolm X']);
+    expect(splitArtistTagValues('X'), ['X']);
+    expect(splitArtistTagValues('  '), isEmpty);
+  });
+
   test('featured variants and confirmed conjunction credits are clickable', () {
     expect(splitArtistNames('One featured Two'), ['One', 'Two']);
     expect(splitArtistNames('One feature Two'), ['One', 'Two']);
