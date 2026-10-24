@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/core", "crates/network", "crates/providers", "crates/extensions", "crates/mobile", "crates/desktop", "crates/bindgen"]
+members = ["crates/core", "crates/network", "crates/providers", "crates/extensions", "crates/mobile", "crates/desktop", "crates/link", "crates/bindgen"]
 exclude = ["vendor/rustix-1.1.5", "vendor/libusb1-sys-0.7.0", "vendor/cap-primitives-4.0.3"]
 resolver = "3"
 
@@ -80,6 +80,13 @@ libc = "=0.2.191"
 windows-sys = "0.61"
 # Desktop library folder watching (crates/desktop).
 notify = "=8.2.0"
+# Mornye Link server (crates/link): HTTPS, WebSocket, mDNS, certificates.
+mornye-link = { path = "crates/link" }
+hyper = { version = "=1.12.0", features = ["server", "http1"] }
+tokio-rustls = { version = "=0.26.6", default-features = false, features = ["ring", "tls12"] }
+tokio-tungstenite = { version = "=0.30.0", default-features = false, features = ["handshake"] }
+mdns-sd = "=0.21.6"
+rcgen = { version = "=0.14.10", default-features = false, features = ["crypto", "ring", "pem"] }
 
 [workspace.lints.rust]
 unsafe_code = "deny"

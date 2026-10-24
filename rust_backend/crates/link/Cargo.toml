@@ -1,0 +1,36 @@
+[package]
+name = "mornye-link"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+tokio = { workspace = true, features = ["fs", "process"] }
+hyper.workspace = true
+hyper-util = { workspace = true, features = ["server", "service"] }
+http.workspace = true
+http-body-util.workspace = true
+bytes.workspace = true
+futures-util.workspace = true
+tokio-util.workspace = true
+rustls.workspace = true
+tokio-rustls.workspace = true
+tokio-tungstenite.workspace = true
+mdns-sd.workspace = true
+rcgen.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+hmac.workspace = true
+base64.workspace = true
+getrandom.workspace = true
+url.workspace = true
+image.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true
