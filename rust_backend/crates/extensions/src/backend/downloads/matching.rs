@@ -6,32 +6,27 @@ use mornye_core::metadata::reenrich::{self, text};
 use mornye_core::resolver::{artists_match, titles_match, track_identity_title};
 use mornye_providers::resolver::Check;
 use serde_json::{Value, json};
-use std::io::{Read, Seek, SeekFrom};
+use std::io::{Seek, SeekFrom};
 
 pub(super) fn probe_result(
     files: &crate::files::ExtensionFiles,
     result: &mut Value,
     album_pending: bool,
     check: &Check<'_>,
-) -> Result<(), String> {
+) -> Result<&'static str, String> {
     let path = text(result, "file_path").to_owned();
     let file = files
         .resolve_legacy(&path)?
         .open(OpenOptions::new().read(true));
+    let mut container = "";
     if let Ok(mut file) = file {
-        let mut header = [0; 8];
-        // Quality is probed only for FLAC/MP4. Missing album folders may use
-        // tags from any supported container, including undecoded audio.
-        let has_header = file.read_exact(&mut header).is_ok();
-        let container = if has_header && &header[..4] == b"fLaC" {
-            "flac"
-        } else if has_header && &header[4..] == b"ftyp" {
-            "m4a"
-        } else {
-            ""
-        };
-        let quality = !container.is_empty();
-        if quality {
+        // Provider labels may disagree with the bytes, which decide the
+        // published suffix. Quality is probed only for FLAC/MP4. Missing
+        // album folders may use tags from any supported container,
+        // including undecoded audio.
+        container = mornye_core::tags::sniff_container(&mut file).unwrap_or_default();
+        let quality = matches!(container, "flac" | "m4a");
+        if !container.is_empty() {
             result["actual_container"] = container.into();
         }
         let album = album_pending && text(result, "album").trim().is_empty();
@@ -49,7 +44,8 @@ pub(super) fn probe_result(
             }
         }
     }
-    check()
+    check()?;
+    Ok(container)
 }
 
 pub(super) fn matches_track(request: &DownloadRequest, result: &Value, skip_names: bool) -> bool {
