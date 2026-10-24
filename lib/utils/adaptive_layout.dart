@@ -147,6 +147,47 @@ double artistAlbumSectionHeight(BuildContext context) =>
     64 +
     ((effectiveTextScale(context) - 1) * 14);
 
+/// Search results trade phone rows for cover grids and shelves once their
+/// content is this wide (Material's expanded window class).
+const double searchCoverLayoutMinWidth = 840;
+
+/// The smallest cover of a search result grid: a wider pane adds columns
+/// rather than growing covers far past it.
+const double searchCoverMinExtent = 160;
+
+/// The cover side of a search result shelf.
+const double searchCoverShelfExtent = 176;
+
+/// The space between search result covers.
+const double searchCoverGap = 16;
+
+/// Columns of a search result grid [width] wide.
+int searchCoverGridColumns(double width) =>
+    ((width + searchCoverGap) / (searchCoverMinExtent + searchCoverGap))
+        .floor()
+        .clamp(2, 12);
+
+/// The cover side of a search result grid [width] wide.
+double searchCoverGridExtent(double width) {
+  final columns = searchCoverGridColumns(width);
+  return (width - searchCoverGap * (columns - 1)) / columns;
+}
+
+/// The title and subtitle under a search result cover, grown with the text
+/// size so neither line clips.
+double searchCoverTextHeight(BuildContext context) {
+  final textTheme = Theme.of(context).textTheme;
+  final scaler = MediaQuery.textScalerOf(context);
+  double line(TextStyle? style, double fallback) =>
+      scaler.scale(style?.fontSize ?? fallback) * (style?.height ?? 1.3);
+  return 8 + line(textTheme.bodyMedium, 14) + 2 + line(textTheme.bodySmall, 12);
+}
+
+/// The side margin of search result grids and shelves: the section titles'
+/// inset, so covers line up under them.
+double searchCoverEdge(BuildContext context) =>
+    (context.isMornye ? 20 : 16) + wideListInset(context);
+
 /// Scales fixed sizes with the shortest screen side, clamped to [min]..[max].
 double responsiveScale({
   required BuildContext context,

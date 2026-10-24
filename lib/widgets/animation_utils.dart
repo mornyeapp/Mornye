@@ -1123,21 +1123,92 @@ class _MornyeTrackSkeleton extends StatelessWidget {
   }
 }
 
+/// The loaded search layout a [HomeSearchSkeleton] stands in for.
+enum HomeSearchSkeletonLayout {
+  /// Phone rows: an Artists section of avatars, then Albums.
+  rows,
+
+  /// A wide Songs filter: the song table on desktop, rows elsewhere.
+  songs,
+
+  /// A wide album or playlist filter: a grid of covers.
+  coverGrid,
+
+  /// A wide artist filter: a grid of avatars.
+  artistGrid,
+
+  /// The wide All view: five songs, then an artist and an album shelf.
+  overview,
+}
+
 /// Home search skeleton – mimics the sectioned results (an Artists section of
 /// round avatars, then an Albums section of covers). The real filter chips
-/// stay visible above it, so it draws none of its own.
+/// stay visible above it, so it draws none of its own. Wide layouts mirror
+/// their cover grids, shelves and song table instead.
 class HomeSearchSkeleton extends StatelessWidget {
-  const HomeSearchSkeleton({super.key});
+  const HomeSearchSkeleton({
+    super.key,
+    this.layout = HomeSearchSkeletonLayout.rows,
+  });
+
+  final HomeSearchSkeletonLayout layout;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _sectionSkeleton(context, 70, 2, round: true),
-        const SizedBox(height: 8),
-        _sectionSkeleton(context, 65, 4, round: false),
-      ],
+      children: switch (layout) {
+        HomeSearchSkeletonLayout.rows => [
+          _sectionSkeleton(context, 70, 2, round: true),
+          const SizedBox(height: 8),
+          _sectionSkeleton(context, 65, 4, round: false),
+        ],
+        HomeSearchSkeletonLayout.songs => _songsSkeleton(context, 8),
+        HomeSearchSkeletonLayout.coverGrid => [
+          _headerSkeleton(context, 65),
+          _CoverGridSkeleton(round: false),
+        ],
+        HomeSearchSkeletonLayout.artistGrid => [
+          _headerSkeleton(context, 70),
+          _CoverGridSkeleton(round: true),
+        ],
+        HomeSearchSkeletonLayout.overview => [
+          ..._songsSkeleton(context, 5),
+          _headerSkeleton(context, 70),
+          const _CoverShelfSkeleton(round: true),
+          _headerSkeleton(context, 65),
+          const _CoverShelfSkeleton(round: false),
+        ],
+      },
+    );
+  }
+
+  /// A Songs header over the desktop song table, or over search rows on a
+  /// tablet.
+  static List<Widget> _songsSkeleton(BuildContext context, int count) {
+    if (!isDesktopPlatform) {
+      return [_sectionSkeleton(context, 60, count, round: false)];
+    }
+    return [_headerSkeleton(context, 60), TrackListSkeleton(itemCount: count)];
+  }
+
+  /// A section title and its trailing action, inset like the loaded header.
+  static Widget _headerSkeleton(BuildContext context, double width) {
+    return Padding(
+      padding:
+          (context.isMornye
+                  ? const EdgeInsetsDirectional.fromSTEB(20, 16, 12, 10)
+                  : const EdgeInsetsDirectional.fromSTEB(16, 8, 8, 8))
+              .add(EdgeInsets.symmetric(horizontal: wideListInset(context))),
+      child: ShimmerLoading(
+        child: Row(
+          children: [
+            SkeletonBox(width: width, height: 16, borderRadius: 4),
+            const Spacer(),
+            const SkeletonBox(width: 50, height: 14, borderRadius: 4),
+          ],
+        ),
+      ),
     );
   }
 
@@ -1194,22 +1265,7 @@ class HomeSearchSkeleton extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding:
-              (mornye
-                      ? const EdgeInsetsDirectional.fromSTEB(20, 16, 12, 10)
-                      : const EdgeInsetsDirectional.fromSTEB(16, 8, 8, 8))
-                  .add(EdgeInsets.symmetric(horizontal: inset)),
-          child: ShimmerLoading(
-            child: Row(
-              children: [
-                SkeletonBox(width: headerWidth, height: 16, borderRadius: 4),
-                const Spacer(),
-                const SkeletonBox(width: 50, height: 14, borderRadius: 4),
-              ],
-            ),
-          ),
-        ),
+        _headerSkeleton(context, headerWidth),
         if (mornye)
           Container(
             margin: EdgeInsets.symmetric(horizontal: 16 + inset),
@@ -1255,6 +1311,131 @@ class HomeSearchSkeleton extends StatelessWidget {
             ),
           ),
       ],
+    );
+  }
+}
+
+/// One search result cover with its title and subtitle lines.
+class _CoverCellSkeleton extends StatelessWidget {
+  const _CoverCellSkeleton({
+    required this.extent,
+    required this.round,
+    required this.index,
+  });
+
+  final double extent;
+  final bool round;
+  final int index;
+
+  @override
+  Widget build(BuildContext context) {
+    final scaler = MediaQuery.textScalerOf(context);
+    return Column(
+      crossAxisAlignment: round
+          ? CrossAxisAlignment.center
+          : CrossAxisAlignment.start,
+      children: [
+        SkeletonBox(
+          width: extent,
+          height: extent,
+          borderRadius: round ? extent / 2 : (context.isMornye ? 8 : 12),
+        ),
+        const SizedBox(height: 8),
+        SkeletonBox(
+          width: extent * (0.6 + (index % 3) * 0.1),
+          height: scaler.scale(14),
+          borderRadius: 4,
+        ),
+        const SizedBox(height: 4),
+        SkeletonBox(
+          width: extent * 0.4,
+          height: scaler.scale(12),
+          borderRadius: 4,
+        ),
+      ],
+    );
+  }
+}
+
+/// Two rows of the search result cover grid, with its columns.
+class _CoverGridSkeleton extends StatelessWidget {
+  const _CoverGridSkeleton({required this.round});
+
+  final bool round;
+
+  @override
+  Widget build(BuildContext context) {
+    final edge = searchCoverEdge(context);
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: edge),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final columns = searchCoverGridColumns(constraints.maxWidth);
+          final extent = searchCoverGridExtent(constraints.maxWidth);
+          final height = extent + searchCoverTextHeight(context);
+          return ExcludeSemantics(
+            child: ShimmerLoading(
+              child: Column(
+                children: [
+                  for (var row = 0; row < 2; row++)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: searchCoverGap),
+                      child: SizedBox(
+                        height: height,
+                        child: Row(
+                          spacing: searchCoverGap,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            for (var column = 0; column < columns; column++)
+                              _CoverCellSkeleton(
+                                extent: extent,
+                                round: round,
+                                index: row * columns + column,
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// A search result shelf of covers.
+class _CoverShelfSkeleton extends StatelessWidget {
+  const _CoverShelfSkeleton({required this.round});
+
+  final bool round;
+
+  @override
+  Widget build(BuildContext context) {
+    final edge = searchCoverEdge(context);
+    return SizedBox(
+      height: searchCoverShelfExtent + searchCoverTextHeight(context) + 8,
+      child: ExcludeSemantics(
+        child: ShimmerLoading(
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            physics: const NeverScrollableScrollPhysics(),
+            padding: EdgeInsets.symmetric(horizontal: edge),
+            itemCount: 8,
+            separatorBuilder: (_, _) => const SizedBox(width: searchCoverGap),
+            itemBuilder: (_, index) => SizedBox(
+              width: searchCoverShelfExtent,
+              child: _CoverCellSkeleton(
+                extent: searchCoverShelfExtent,
+                round: round,
+                index: index,
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

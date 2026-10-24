@@ -43,6 +43,7 @@ import 'package:mornye/providers/recent_access_provider.dart';
 import 'package:mornye/providers/explore_provider.dart';
 import 'package:mornye/providers/user_profile_provider.dart';
 import 'package:mornye/widgets/desktop/desktop_scroll_arrows.dart';
+import 'package:mornye/widgets/desktop/track_list_table.dart';
 import 'package:mornye/widgets/explore_featured_section.dart';
 import 'package:mornye/providers/local_library_provider.dart';
 import 'package:mornye/providers/music_player_provider.dart';
@@ -99,6 +100,7 @@ part 'home_tab_recent.dart';
 part 'home_tab_import.dart';
 part 'home_tab_intro.dart';
 part 'home_tab_search_results.dart';
+part 'home_tab_search_wide.dart';
 part 'home_tab_widgets.dart';
 
 enum HomeTabMode { combined, browse, search }
@@ -169,6 +171,10 @@ class _HomeTabState extends ConsumerState<HomeTab>
   HomeSearchSortOption? _sortedTracksMode;
   List<Track>? _sortedTracksCache;
   List<int>? _sortedTrackIndexesCache;
+
+  /// The wide All view lists every song after its Show all, when the
+  /// provider offers no songs filter to switch to.
+  bool _searchSongsExpanded = false;
 
   double _exploreCardSize(BuildContext context) {
     // Six phone-sized cards across an iPad made the feed look like a desktop
@@ -417,6 +423,7 @@ class _HomeTabState extends ConsumerState<HomeTab>
       _searchBucketsCache = null;
       _invalidateSearchSortCaches();
       _historySnapshot.update(const []);
+      _searchSongsExpanded = false;
     }
     if (previous != null &&
         !next.hasContent &&
@@ -1321,6 +1328,32 @@ class _HomeTabState extends ConsumerState<HomeTab>
     required bool hasActiveSearchSurface,
     required bool showEmptySearchResult,
   }) {
+    // Phones keep their rows in landscape too. Read here, since the select
+    // below runs during layout.
+    final coverLayoutAllowed =
+        isDesktopPlatform || MediaQuery.sizeOf(context).shortestSide >= 600;
+    final inset = wideListInset(context);
+    // Rebuilds only when the layout crosses the breakpoint, not on every
+    // scroll frame.
+    return SliverLayoutInfoBuilder<bool>(
+      select: (constraints) =>
+          coverLayoutAllowed &&
+          constraints.crossAxisExtent - 2 * inset >= searchCoverLayoutMinWidth,
+      builder: (context, coverLayout) => _buildSearchResultsConsumer(
+        colorScheme: colorScheme,
+        hasActiveSearchSurface: hasActiveSearchSurface,
+        showEmptySearchResult: showEmptySearchResult,
+        coverLayout: coverLayout,
+      ),
+    );
+  }
+
+  Widget _buildSearchResultsConsumer({
+    required ColorScheme colorScheme,
+    required bool hasActiveSearchSurface,
+    required bool showEmptySearchResult,
+    required bool coverLayout,
+  }) {
     return Consumer(
       builder: (context, ref, _) {
         final tracks = ref.watch(trackProvider.select((s) => s.tracks));
@@ -1349,18 +1382,32 @@ class _HomeTabState extends ConsumerState<HomeTab>
             hasActiveSearchSurface;
 
         return SliverMainAxisGroup(
-          slivers: _buildSearchResults(
-            resultsRef: ref,
-            tracks: tracks,
-            isLoading: isLoading,
-            error: error,
-            colorScheme: colorScheme,
-            hasResults: hasResults,
-            showEmptySearchResult: showEmptySearchResult,
-            searchExtensionId: searchExtensionId,
-            showLocalLibraryIndicator: showLocalLibraryIndicator,
-            thumbnailSizesByExtensionId: thumbnailSizesByExtensionId,
-          ),
+          slivers: coverLayout
+              ? _buildWideSearchResults(
+                  resultsRef: ref,
+                  tracks: tracks,
+                  isLoading: isLoading,
+                  error: error,
+                  colorScheme: colorScheme,
+                  hasResults: hasResults,
+                  showEmptySearchResult: showEmptySearchResult,
+                  searchExtensionId: searchExtensionId,
+                  showLocalLibraryIndicator: showLocalLibraryIndicator,
+                  thumbnailSizesByExtensionId: thumbnailSizesByExtensionId,
+                  extensions: extensions,
+                )
+              : _buildSearchResults(
+                  resultsRef: ref,
+                  tracks: tracks,
+                  isLoading: isLoading,
+                  error: error,
+                  colorScheme: colorScheme,
+                  hasResults: hasResults,
+                  showEmptySearchResult: showEmptySearchResult,
+                  searchExtensionId: searchExtensionId,
+                  showLocalLibraryIndicator: showLocalLibraryIndicator,
+                  thumbnailSizesByExtensionId: thumbnailSizesByExtensionId,
+                ),
         );
       },
     );

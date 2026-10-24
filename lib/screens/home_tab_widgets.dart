@@ -228,12 +228,14 @@ class _TrackItemWithStatus extends ConsumerWidget {
                 hasLocalPlaybackCandidate: isInHistory || isInLocalLibrary,
               ),
           child: InkWell(
-            onTap: () => _handleTap(
+            onTap: () => activate(
               context,
               ref,
+              track,
               isQueued: isQueued,
               isInHistory: isInHistory,
               isInLocalLibrary: isInLocalLibrary,
+              onDownload: onDownload,
             ),
             onLongPress: () =>
                 TrackCollectionQuickActions.showTrackOptionsSheet(
@@ -345,12 +347,17 @@ class _TrackItemWithStatus extends ConsumerWidget {
     );
   }
 
-  void _handleTap(
+  /// A tap on a search song: skip a queued song, refuse a duplicate unless
+  /// variants are allowed, otherwise download it. The desktop song table
+  /// runs the same on a click, reading the queue and library itself.
+  static Future<void> activate(
     BuildContext context,
-    WidgetRef ref, {
+    WidgetRef ref,
+    Track track, {
     required bool isQueued,
     required bool isInHistory,
     required bool isInLocalLibrary,
+    required void Function({bool forceQualityPicker}) onDownload,
   }) async {
     if (isQueued) return;
 
@@ -413,6 +420,15 @@ class _CollectionItemWidget extends StatelessWidget {
     required this.onTap,
     required this.onSaveCover,
   });
+
+  /// The artist or owner of [item], or its kind when the provider gives
+  /// none.
+  static String subtitleOf(BuildContext context, Track item) {
+    if (item.artistName.isNotEmpty) return item.artistName;
+    if (item.isPlaylistItem) return context.l10n.recentTypePlaylist;
+    if (item.isArtistItem) return context.l10n.recentTypeArtist;
+    return context.l10n.recentTypeAlbum;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -489,13 +505,7 @@ class _CollectionItemWidget extends StatelessWidget {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        item.artistName.isNotEmpty
-                            ? item.artistName
-                            : (isPlaylist
-                                  ? context.l10n.recentTypePlaylist
-                                  : (isArtist
-                                        ? context.l10n.recentTypeArtist
-                                        : context.l10n.recentTypeAlbum)),
+                        subtitleOf(context, item),
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: colorScheme.onSurfaceVariant,
                         ),

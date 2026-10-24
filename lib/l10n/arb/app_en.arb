@@ -1441,6 +1441,20 @@
   "@searchPlaylists": {
     "description": "Search result category - playlists"
   },
+  "searchShowAll": "Show all",
+  "@searchShowAll": {
+    "description": "Button of a search result section on wide screens that shows every result of that kind"
+  },
+  "searchShowAllCategory": "Show all {category}",
+  "@searchShowAllCategory": {
+    "description": "Screen reader label of the Show all button of a search result section",
+    "placeholders": {
+      "category": {
+        "type": "String",
+        "example": "Albums"
+      }
+    }
+  },
   "searchSortTitle": "Sort Results",
   "@searchSortTitle": {
     "description": "Bottom sheet title for search sort options"
