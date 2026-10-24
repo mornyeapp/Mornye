@@ -200,6 +200,25 @@ void main() {
     expect(client.posts.last.body['next'], isTrue);
   });
 
+  test('keeps the song just sent until the desktop state arrives', () async {
+    final sent = linkMediaItem(linkLocalMedia('sent', title: 'Sent'));
+    final seeded = LinkRemotePlayback(
+      name: 'Studio PC',
+      remote: container.read(linkDesktopRemoteProvider.notifier),
+      handoff: LinkHandoff(
+        client: client,
+        player: FakePhonePlayer(),
+        refs: LinkTrackRefCache(lookup: lookup),
+        resolver: LinkTrackResolver(lookup: lookup),
+      ),
+      resolveArtwork: (source) async => source,
+      initialItem: sent,
+    );
+    addTearDown(seeded.dispose);
+    seeded.update(const LinkRemoteState(loading: true));
+    expect((await seeded.mediaItems.first)?.title, 'Sent');
+  });
+
   test('a failed command is logged, not thrown', () async {
     client.onPost = (op, body) => throw StateError('offline');
     client.push(_state());

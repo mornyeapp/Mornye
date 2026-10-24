@@ -64,6 +64,7 @@ final linkRemotePlaybackProvider = Provider<LinkRemotePlayback?>((ref) {
         .watch(musicPlayerRuntimeProvider)
         .dependencies
         .resolveNetworkSource,
+    initialItem: ref.read(localMediaItemProvider).value,
   )..update(ref.read(linkDesktopRemoteProvider));
   ref.onDispose(playback.dispose);
   return playback;
@@ -79,11 +80,13 @@ class LinkRemotePlayback implements RemotePlayback {
     required LinkDesktopRemote remote,
     required LinkHandoff handoff,
     required Future<String> Function(String source) resolveArtwork,
+    MediaItem? initialItem,
     Duration tick = const Duration(milliseconds: 500),
     int Function()? nowMs,
   }) : _remote = remote,
        _handoff = handoff,
        _resolveArtwork = resolveArtwork,
+       _mediaItem = _Latest(initialItem),
        _tick = tick,
        _nowMs = nowMs ?? (() => DateTime.now().millisecondsSinceEpoch);
 
@@ -100,7 +103,10 @@ class LinkRemotePlayback implements RemotePlayback {
   static const _resolveAhead = 20;
   static const _itemLimit = 500;
 
-  final _mediaItem = _Latest<MediaItem?>(null);
+  /// Starts with [LinkRemotePlayback.new]'s `initialItem`, the song just
+  /// sent there, so the player does not empty out until the desktop's state
+  /// arrives.
+  final _Latest<MediaItem?> _mediaItem;
   final _playbackState = _Latest<PlaybackState>(PlaybackState());
   final _queue = _Latest<List<MediaItem>>(const []);
   final _volume = _Latest<double>(1);
@@ -129,7 +135,7 @@ class LinkRemotePlayback implements RemotePlayback {
 
   /// Shows the desktop's [state].
   void update(LinkRemoteState state) {
-    if (_disposed) return;
+    if (_disposed || (state.loading && state.player == null)) return;
     final player = _player = state.player;
     if (player != null) _volume.add(player.volume.clamp(0.0, 1.0));
     _showTracks(force: false);
