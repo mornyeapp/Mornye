@@ -37,7 +37,8 @@ class LinkHostServer {
   final String serverId;
   final String name;
 
-  /// Local addresses phones can reach, without the port.
+  /// Local addresses phones can reach. The server sends full
+  /// `https://<ip>:<port>` URLs; a bare IP is also accepted.
   final List<String> addresses;
 
   /// The first 8 hex characters phones show while pairing.
@@ -46,7 +47,10 @@ class LinkHostServer {
   /// `https://<address>:<port>` for each address.
   List<String> get urls => [
     for (final address in addresses)
-      'https://${address.contains(':') ? '[$address]' : address}:$port',
+      if (address.startsWith('https://'))
+        address
+      else
+        'https://${address.contains(':') ? '[$address]' : address}:$port',
   ];
 }
 

@@ -144,7 +144,11 @@ void main() {
       expect(target.address, 'https://127.0.0.1:${server.port}');
       expect(target.info.serverId, 'server-1');
       expect(target.info.pairing, isTrue);
-      expect(target.shortFingerprint, fingerprint.substring(0, 8));
+      // Grouped exactly as the desktop prints it beside the PIN.
+      expect(
+        target.shortFingerprint,
+        '${fingerprint.substring(0, 4)} ${fingerprint.substring(4, 8)}',
+      );
 
       final result = await client.pair(target, pin: '123456', device: _device);
       expect(result.apiKey, 'key-1');

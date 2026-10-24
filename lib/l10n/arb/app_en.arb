@@ -8443,7 +8443,7 @@
   },
   "linkPinCode": "Your computer shows the code {code} next to the PIN. Pair only if it matches.",
   "@linkPinCode": {
-    "description": "Security check in the PIN dialog; the placeholder is 8 hexadecimal characters of the computer's certificate fingerprint",
+    "description": "Security check in the PIN dialog; the placeholder is 8 hexadecimal characters of the computer's certificate fingerprint, grouped as 'ab12 cd34'",
     "placeholders": {
       "code": {
         "type": "String"

@@ -37,8 +37,10 @@ class LinkPairingTarget {
   /// The fingerprint seen in the handshake, equal to [LinkServerInfo.fingerprint].
   String get fingerprint => info.fingerprint;
 
-  /// The first 8 hex characters, which the desktop shows next to its PIN.
-  String get shortFingerprint => fingerprint.substring(0, 8);
+  /// The first 8 hex characters, grouped as the desktop shows them next to
+  /// its PIN (`ab12 cd34`).
+  String get shortFingerprint =>
+      '${fingerprint.substring(0, 4)} ${fingerprint.substring(4, 8)}';
 }
 
 @immutable

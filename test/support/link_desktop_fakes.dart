@@ -49,7 +49,8 @@ class FakeLinkBackend implements LinkDesktopBackend {
     fingerprint: fakeFingerprint,
     serverId: 'server-1',
     name: name,
-    addresses: const ['192.168.1.5'],
+    // As the Rust server sends them: full URLs, not bare IPs.
+    addresses: const ['https://192.168.1.5:47710'],
   );
 
   void request(
