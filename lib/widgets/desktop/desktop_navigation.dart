@@ -807,13 +807,14 @@ class _RailLinkRow extends StatelessWidget {
 ///
 /// Collapsed, a 56x32 indicator holds the icon alone, named by a tooltip;
 /// a desktop rail of three or four destinations reads better without
-/// labels under the icons. Expanded, a 56dp pill spans the rail with the
+/// labels under the icons. Expanded, a 56dp row spans the rail with the
 /// label beside the icon, as wide as the Playlists rows below (the owner's
-/// call over M3 Expressive's pill that hugs its label). In between the pill
-/// grows from one shape to the other around a fixed icon and the label fades
-/// in, so collapsing and expanding never jump. Only the indicator (the whole
-/// 56dp square while collapsed) takes clicks and hover.
-class _RailDestination extends StatefulWidget {
+/// call over M3 Expressive's pill that hugs its label). Both take the
+/// Playlists rows' fill, hover and ripple, and in between they cross-fade
+/// around a fixed icon while the row narrows with the rail, as the owner
+/// preferred to a morphing pill. Only the row, or the whole 56dp square
+/// while collapsed, takes clicks and hover.
+class _RailDestination extends StatelessWidget {
   const _RailDestination({
     super.key,
     required this.destination,
@@ -832,22 +833,11 @@ class _RailDestination extends StatefulWidget {
   static const double _inset = (desktopCollapsedRailWidth - 56) / 2;
 
   @override
-  State<_RailDestination> createState() => _RailDestinationState();
-}
-
-class _RailDestinationState extends State<_RailDestination> {
-  bool _hovered = false;
-  bool _focused = false;
-  bool _pressed = false;
-
-  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final textTheme = theme.textTheme;
-    final destination = widget.destination;
-    final selected = widget.selected;
-    final t = widget.expansion.clamp(0.0, 1.0);
+    final t = expansion.clamp(0.0, 1.0);
     const inset = _RailDestination._inset;
 
     final expandedStyle = textTheme.labelLarge!.copyWith(
@@ -858,34 +848,30 @@ class _RailDestinationState extends State<_RailDestination> {
     const expandedPillWidth = desktopSidebarWidth - inset * 2;
 
     const height = 56.0;
-    final pill = Rect.fromLTWH(
-      inset,
-      lerpDouble(12, 0, t)!,
-      lerpDouble(56, expandedPillWidth, t)!,
-      lerpDouble(32, 56, t)!,
-    );
-    // Collapsed, the whole square around the indicator takes the click.
-    final target = Rect.lerp(
-      const Rect.fromLTWH(inset, 0, 56, height),
-      pill,
-      t,
-    )!;
-    final iconTop = pill.top + (pill.height - 24) / 2;
-    final expandedLabel = (t * 2 - 1).clamp(0.0, 1.0);
+    // Like the Playlists rows, the expanded row narrows with the rail and
+    // fades, and the collapsed indicator fades in where it ends. Neither
+    // changes shape, so no long flat pill or edge crosses the label.
+    final expanded = ((t - 0.4) / 0.6).clamp(0.0, 1.0);
+    final collapsed = ((0.6 - t) / 0.6).clamp(0.0, 1.0);
+    final rowWidth = lerpDouble(56, expandedPillWidth, t)!;
 
     final foreground = selected
         ? colorScheme.onSecondaryContainer
         : colorScheme.onSurfaceVariant;
-    final stateOpacity = _pressed
-        ? 0.1
-        : _focused
-        ? 0.1
-        : _hovered
-        ? 0.08
-        : 0.0;
-    final motion = AppMotion.spatialFast(
-      context,
-      const AppMotionSpec(Duration(milliseconds: 200), Curves.easeOutCubic),
+
+    // A stadium with the selected fill, the hover layer and the ink ripple
+    // of the Playlists rows.
+    Widget surface({required bool active, Widget? child}) => Material(
+      color: selected ? colorScheme.secondaryContainer : null,
+      type: selected ? MaterialType.canvas : MaterialType.transparency,
+      shape: const StadiumBorder(),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: active ? onTap : null,
+        canRequestFocus: active,
+        hoverColor: foreground.withValues(alpha: 0.08),
+        child: child ?? const SizedBox.expand(),
+      ),
     );
 
     return Semantics(
@@ -893,96 +879,90 @@ class _RailDestinationState extends State<_RailDestination> {
       button: true,
       selected: selected,
       label: destination.label,
+      onTap: onTap,
       child: SizedBox(
         height: height,
         child: Stack(
           clipBehavior: Clip.none,
           children: [
-            // The selected indicator grows out from the pill's center.
-            Positioned.fromRect(
-              rect: pill,
-              child: TweenAnimationBuilder<double>(
-                tween: Tween(end: selected ? 1 : 0),
-                duration: motion.duration,
-                curve: motion.curve,
-                builder: (context, shown, _) => Center(
-                  child: FractionallySizedBox(
-                    widthFactor: shown.clamp(0.0, 1.0),
-                    heightFactor: 1,
-                    child: DecoratedBox(
-                      decoration: ShapeDecoration(
-                        color: colorScheme.secondaryContainer,
-                        shape: const StadiumBorder(),
+            if (collapsed > 0)
+              PositionedDirectional(
+                start: inset,
+                top: 0,
+                width: 56,
+                height: height,
+                child: IgnorePointer(
+                  ignoring: t >= 0.5,
+                  child: ExcludeSemantics(
+                    // Names the icon while the label is hidden; the whole
+                    // square around the indicator takes the click.
+                    child: Tooltip(
+                      message: destination.label,
+                      excludeFromSemantics: true,
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: onTap,
+                        child: Opacity(
+                          opacity: collapsed,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            child: surface(active: t < 0.5),
+                          ),
+                        ),
                       ),
                     ),
                   ),
                 ),
               ),
-            ),
-            if (stateOpacity > 0)
-              Positioned.fromRect(
-                rect: pill,
-                child: DecoratedBox(
-                  decoration: ShapeDecoration(
-                    color: foreground.withValues(alpha: stateOpacity),
-                    shape: const StadiumBorder(),
+            if (expanded > 0)
+              PositionedDirectional(
+                start: inset,
+                top: 0,
+                width: rowWidth,
+                height: height,
+                child: IgnorePointer(
+                  ignoring: t < 0.5,
+                  child: ExcludeSemantics(
+                    child: Opacity(
+                      opacity: expanded,
+                      child: surface(
+                        active: t >= 0.5,
+                        child: Row(
+                          children: [
+                            // The icon is drawn once, above both states.
+                            const SizedBox(width: 16 + 24 + 8),
+                            Expanded(
+                              child: Text(
+                                destination.label,
+                                maxLines: 1,
+                                overflow: TextOverflow.clip,
+                                softWrap: false,
+                                style: expandedStyle.copyWith(
+                                  color: foreground,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                          ],
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ),
             PositionedDirectional(
               start: inset + 16,
-              top: iconTop,
-              child: IconTheme.merge(
-                data: IconThemeData(color: foreground, size: 24),
-                child: Badge(
-                  isLabelVisible: destination.badgeCount > 0,
-                  label: Text('${destination.badgeCount}'),
-                  child: AppIcon(
-                    selected ? destination.selectedIcon : destination.icon,
-                  ),
-                ),
-              ),
-            ),
-            if (expandedLabel > 0)
-              PositionedDirectional(
-                // Slides in from under the icon as it fades in.
-                start: inset + 16 + 24 + 8 - 8 * (1 - expandedLabel),
-                width: expandedPillWidth - (16 + 24 + 8 + 16),
-                top: 0,
-                bottom: 0,
-                child: Opacity(
-                  opacity: expandedLabel,
-                  child: Align(
-                    alignment: AlignmentDirectional.centerStart,
-                    // The destination's semantics already carry the label.
-                    child: ExcludeSemantics(
-                      child: Text(
-                        destination.label,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: expandedStyle.copyWith(color: foreground),
-                      ),
+              top: (height - 24) / 2,
+              child: IgnorePointer(
+                child: IconTheme.merge(
+                  data: IconThemeData(color: foreground, size: 24),
+                  child: Badge(
+                    isLabelVisible: destination.badgeCount > 0,
+                    label: Text('${destination.badgeCount}'),
+                    child: AppIcon(
+                      selected ? destination.selectedIcon : destination.icon,
                     ),
                   ),
-                ),
-              ),
-            Positioned.fromRect(
-              rect: target,
-              // Names the icon while the label is hidden.
-              child: Tooltip(
-                message: expandedLabel > 0 ? '' : destination.label,
-                excludeFromSemantics: true,
-                child: InkWell(
-                  onTap: widget.onTap,
-                  customBorder: const StadiumBorder(),
-                  overlayColor: const WidgetStatePropertyAll(
-                    Colors.transparent,
-                  ),
-                  splashFactory: NoSplash.splashFactory,
-                  onHover: (value) => setState(() => _hovered = value),
-                  onFocusChange: (value) => setState(() => _focused = value),
-                  onHighlightChanged: (value) =>
-                      setState(() => _pressed = value),
                 ),
               ),
             ),
