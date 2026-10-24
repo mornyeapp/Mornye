@@ -28,9 +28,11 @@ base64.workspace = true
 getrandom.workspace = true
 url.workspace = true
 image.workspace = true
+unicode-normalization.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true
+roxmltree.workspace = true
 
 [lints]
 workspace = true
