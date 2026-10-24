@@ -109,8 +109,9 @@ abstract interface class LinkPlayerPort {
     required bool playing,
   });
 
-  /// Adds [items] in this order after the queued songs.
-  Future<void> append(List<PlayableMedia> items);
+  /// Adds [items] in this order after the queued songs, or right after the
+  /// current one when [playNext].
+  Future<void> append(List<PlayableMedia> items, {bool playNext = false});
 }
 
 class RuntimeLinkPlayerPort implements LinkPlayerPort {
@@ -234,8 +235,11 @@ class RuntimeLinkPlayerPort implements LinkPlayerPort {
   }
 
   @override
-  Future<void> append(List<PlayableMedia> items) async =>
-      _runtime.handler?.enqueueAll(items);
+  Future<void> append(
+    List<PlayableMedia> items, {
+    bool playNext = false,
+  }) async =>
+      (await _runtime.initialize()).enqueueAll(items, playNext: playNext);
 }
 
 /// The desktop player the link host reads and drives. Tests override it.

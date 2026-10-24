@@ -24,6 +24,11 @@ String _decodeSubsonicId(String encoded) {
 String subsonicSongPath(String id, String format) =>
     'subsonic/song/${_subsonicId(id)}.$format';
 
+/// The library path of the Subsonic cover art [id]:
+/// `subsonic/cover/<id>.image`.
+String subsonicCoverPath(String id) =>
+    'subsonic/cover/${_subsonicId(id)}.image';
+
 /// The Subsonic song id behind a [subsonicSongPath], or null for any other
 /// path.
 String? subsonicSongIdFromPath(String path) {
@@ -150,8 +155,7 @@ class SubsonicSong {
   }
 
   String get path => subsonicSongPath(id, format);
-  String? get coverPath =>
-      coverId.isEmpty ? null : 'subsonic/cover/${_subsonicId(coverId)}.image';
+  String? get coverPath => coverId.isEmpty ? null : subsonicCoverPath(coverId);
   NetworkEntry get entry => NetworkEntry(
     path,
     '$title.$format',

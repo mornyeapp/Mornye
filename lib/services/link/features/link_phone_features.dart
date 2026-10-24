@@ -37,7 +37,10 @@ final linkLibraryLookupProvider = Provider<LinkLibraryLookup>(
 final linkPhonePlayerProvider = Provider<LinkPhonePlayer>(
   (ref) => LinkMusicPhonePlayer(
     runtime: ref.watch(musicPlayerRuntimeProvider),
-    controller: ref.watch(musicPlayerControllerProvider),
+    // This phone's own player, also while the desktop plays in its place.
+    controller: MusicPlayerController(
+      runtime: ref.watch(musicPlayerRuntimeProvider),
+    ),
     writeVolume: ref.watch(systemVolumeWriterProvider),
     volumeChanges: SystemVolumeService.instance.changes,
   ),

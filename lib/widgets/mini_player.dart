@@ -177,6 +177,9 @@ class _MiniPlayerBodyState extends ConsumerState<_MiniPlayerBody> {
 
     final isPlaying = ref.watch(playbackPlayingProvider);
     final isLoading = ref.watch(playbackLoadingProvider);
+    final remoteName = ref.watch(
+      activeRemotePlaybackProvider.select((remote) => remote?.name),
+    );
 
     final controller = ref.read(musicPlayerControllerProvider);
     final colorScheme = Theme.of(context).colorScheme;
@@ -279,28 +282,54 @@ class _MiniPlayerBodyState extends ConsumerState<_MiniPlayerBody> {
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                          OverflowMarquee(
-                            resetKey: (mediaItem.id, mediaItem.artist),
-                            maxCycles: marqueeCycles,
-                            child: Text(
-                              mediaItem.artist ?? '',
-                              style: Theme.of(context).textTheme.bodySmall
-                                  ?.copyWith(
-                                    color: mornye
-                                        ? Color.lerp(
-                                            colorScheme.onSurfaceVariant,
-                                            colorScheme.onSurface,
-                                            colorScheme.brightness ==
-                                                    Brightness.dark
-                                                ? 0.7
-                                                : 0.6,
-                                          )
-                                        : colorScheme.onSurfaceVariant,
+                          // Where the music plays while the paired desktop
+                          // plays in this phone's place.
+                          if (remoteName != null)
+                            Row(
+                              key: const ValueKey('mini-player-playing-on'),
+                              children: [
+                                AppIcon(
+                                  mornye
+                                      ? CupertinoIcons.desktopcomputer
+                                      : Icons.computer,
+                                  size: 14,
+                                  color: colorScheme.primary,
+                                ),
+                                const SizedBox(width: 4),
+                                Flexible(
+                                  child: Text(
+                                    context.l10n.linkPlayingOn(remoteName),
+                                    style: Theme.of(context).textTheme.bodySmall
+                                        ?.copyWith(color: colorScheme.primary),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            )
+                          else
+                            OverflowMarquee(
+                              resetKey: (mediaItem.id, mediaItem.artist),
+                              maxCycles: marqueeCycles,
+                              child: Text(
+                                mediaItem.artist ?? '',
+                                style: Theme.of(context).textTheme.bodySmall
+                                    ?.copyWith(
+                                      color: mornye
+                                          ? Color.lerp(
+                                              colorScheme.onSurfaceVariant,
+                                              colorScheme.onSurface,
+                                              colorScheme.brightness ==
+                                                      Brightness.dark
+                                                  ? 0.7
+                                                  : 0.6,
+                                            )
+                                          : colorScheme.onSurfaceVariant,
+                                    ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
-                          ),
                         ],
                       ),
                     ),

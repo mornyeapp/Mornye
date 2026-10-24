@@ -6818,31 +6818,13 @@
   "@linkConnectionDisconnected": {
     "description": "Mornye Link: the paired desktop cannot be reached"
   },
-  "linkDesktopNothingPlaying": "Nothing is playing on {name}",
-  "@linkDesktopNothingPlaying": {
-    "description": "Mornye Link: the paired desktop's player is empty",
-    "placeholders": {
-      "name": {
-        "type": "String"
-      }
-    }
+  "linkThisPhone": "This phone",
+  "@linkThisPhone": {
+    "description": "Mornye Link: the phone's own row in the Devices sheet; choosing it plays music here again"
   },
-  "linkPlayOnDesktop": "Play on {name}",
-  "@linkPlayOnDesktop": {
-    "description": "Mornye Link: moves the phone's queue to the paired desktop and pauses the phone",
-    "placeholders": {
-      "name": {
-        "type": "String"
-      }
-    }
-  },
-  "linkContinueOnPhone": "Continue on this phone",
-  "@linkContinueOnPhone": {
-    "description": "Mornye Link: takes over what the paired desktop plays and pauses the desktop"
-  },
-  "linkDesktopQueue": "Queue on {name}",
-  "@linkDesktopQueue": {
-    "description": "Mornye Link: heading of the paired desktop's play queue",
+  "linkPlayingOn": "Playing on {name}",
+  "@linkPlayingOn": {
+    "description": "Mornye Link: shown in the player while the paired desktop plays in the phone's place",
     "placeholders": {
       "name": {
         "type": "String"

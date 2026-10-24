@@ -7,6 +7,7 @@ import 'package:mornye/models/library_database_models.dart';
 import 'package:mornye/models/track.dart';
 import 'package:mornye/services/link/features/link_downloads.dart';
 import 'package:mornye/services/link/features/link_phone_features.dart';
+import 'package:mornye/services/link/features/link_remote_playback.dart';
 import 'package:mornye/services/link/features/link_save_offline.dart';
 import 'package:mornye/services/link/link_client_api.dart';
 import 'package:mornye/utils/logger.dart';
@@ -15,13 +16,10 @@ import 'package:mornye/widgets/app_bottom_sheet.dart';
 import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/batch_progress_dialog.dart';
 
-final _log = AppLogger('LinkActions');
+export 'package:mornye/services/link/features/link_phone_client.dart'
+    show linkDesktopName;
 
-/// The paired desktop's name for labels such as "Play on Studio PC".
-String linkDesktopName(LinkClientApi client) {
-  final name = client.server.name.trim();
-  return name.isEmpty ? 'Mornye' : name;
-}
+final _log = AppLogger('LinkActions');
 
 /// Up to three [titles], then how many more there are.
 String linkTitleList(Iterable<String> titles) {
@@ -41,10 +39,12 @@ void _failed(BuildContext context, LinkClientApi client, Object error) {
   _notify(context, context.l10n.linkRequestFailed(linkDesktopName(client)));
 }
 
-/// "Play on (desktop)": moves this phone's queue to the desktop.
+/// "Play on (desktop)": moves this phone's queue to the desktop, which then
+/// plays in the phone's place.
 Future<void> linkPlayOnDesktop(BuildContext context, WidgetRef ref) async {
   final handoff = ref.read(linkHandoffProvider);
   if (handoff == null) return;
+  final target = ref.read(linkPlaysOnDesktopProvider.notifier);
   final name = linkDesktopName(handoff.client);
   var sending = false;
   try {
@@ -55,6 +55,7 @@ Future<void> linkPlayOnDesktop(BuildContext context, WidgetRef ref) async {
         _notify(context, context.l10n.linkHandoffSending(name));
       },
     );
+    if (result != null && result.started) target.set(true);
     if (!context.mounted) return;
     if (sending) ScaffoldMessenger.of(context).hideCurrentSnackBar();
     final l10n = context.l10n;
@@ -82,8 +83,10 @@ Future<void> linkPlayOnDesktop(BuildContext context, WidgetRef ref) async {
 Future<void> linkContinueOnPhone(BuildContext context, WidgetRef ref) async {
   final handoff = ref.read(linkHandoffProvider);
   if (handoff == null) return;
+  final target = ref.read(linkPlaysOnDesktopProvider.notifier);
   try {
     final result = await handoff.continueOnPhone();
+    if (result.started) target.set(false);
     if (!context.mounted) return;
     final l10n = context.l10n;
     if (!result.started) {

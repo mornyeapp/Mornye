@@ -5,6 +5,7 @@ import 'package:crypto/crypto.dart';
 import 'package:mornye/services/link/features/link_track_refs.dart';
 import 'package:mornye/services/link/link_client_api.dart';
 import 'package:mornye/services/link/link_protocol.dart';
+import 'package:mornye/services/network_storage_service.dart';
 import 'package:mornye/services/playable_media.dart';
 
 /// A download or Library record the phone can play, with the identity the
@@ -36,6 +37,31 @@ abstract interface class LinkLibraryLookup {
   /// Records whose title and artist normalize to [matchKey]
   /// (`title|artist`, see [linkMatchKey]).
   Future<List<LinkLocalTrack>> byMatchKey(String matchKey);
+}
+
+/// The desktop catalog song [ref] names, streamed through [server]'s
+/// Subsonic connection with its cover, or null when [ref] names no song of
+/// [server].
+PlayableMedia? linkDesktopPlayable(TrackRef ref, LinkServerRecord? server) {
+  final songId = ref.songId;
+  if (server == null || songId == null || ref.serverId != server.serverId) {
+    return null;
+  }
+  final source = linkDesktopSongSource(server, songId);
+  final durationMs = ref.durationMs;
+  return PlayableMedia(
+    id: 'network_${sha256.convert(utf8.encode(source))}',
+    source: source,
+    title: ref.title,
+    artist: ref.artist,
+    album: ref.album ?? '',
+    // A song id names its cover too: its own, its album's or an embedded one.
+    networkArtworkSource: NetworkStorageService.source(
+      server.connectionId,
+      subsonicCoverPath(songId),
+    ),
+    duration: durationMs == null ? null : Duration(milliseconds: durationMs),
+  );
 }
 
 /// Turns [TrackRef]s from the desktop into something the phone plays: a file
@@ -89,27 +115,16 @@ class LinkTrackResolver {
       if (media != null) return media;
     }
 
-    final server = this.server;
-    final songId = ref.songId;
-    if (server != null && songId != null && ref.serverId == server.serverId) {
+    final desktop = linkDesktopPlayable(ref, server);
+    if (desktop != null) {
       // A row scanned from this desktop already carries its cover and tags.
       for (final track in network) {
-        if (linkDesktopSongId(track.media.source, server) == songId) {
+        if (track.media.source == desktop.source ||
+            linkDesktopSongId(track.media.source, server!) == ref.songId) {
           return track.media;
         }
       }
-      final source = linkDesktopSongSource(server, songId);
-      final durationMs = ref.durationMs;
-      return PlayableMedia(
-        id: 'network_${sha256.convert(utf8.encode(source))}',
-        source: source,
-        title: ref.title,
-        artist: ref.artist,
-        album: ref.album ?? '',
-        duration: durationMs == null
-            ? null
-            : Duration(milliseconds: durationMs),
-      );
+      return desktop;
     }
     return network.isEmpty ? null : network.first.media;
   }

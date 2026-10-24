@@ -191,6 +191,7 @@ class LinkDesktopOps {
         (request) => appendHandoff(request.args),
       )
       ..register(LinkOps.handoffCurrent, (_) async => linkHandoffArgs(state()))
+      ..register(LinkOps.queueAdd, (request) => addToQueue(request.args))
       ..register(LinkOps.downloads, _downloadsOp)
       ..register(LinkOps.open, _open)
       ..register(LinkOps.resolve, _resolve)
@@ -333,6 +334,19 @@ class LinkDesktopOps {
     }
     final media = [...(await _resolveQueue(queue)).nonNulls];
     if (media.isNotEmpty) await _player.append(media);
+    return {'resolved': media.length};
+  }
+
+  /// `queue/add`: adds the songs of `queue` the desktop has to its queue,
+  /// right after the current song when `next`; starts them when nothing is
+  /// queued.
+  Future<Map<String, dynamic>> addToQueue(Map<String, dynamic> args) async {
+    final queue = args['queue'];
+    if (queue is! List) throw _invalid('Missing queue');
+    final media = [...(await _resolveQueue(queue)).nonNulls];
+    if (media.isNotEmpty) {
+      await _player.append(media, playNext: args['next'] == true);
+    }
     return {'resolved': media.length};
   }
 

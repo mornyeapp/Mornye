@@ -11,6 +11,7 @@ import 'package:mornye/services/history_row_mapper.dart';
 import 'package:mornye/services/library_database.dart';
 import 'package:mornye/services/library_media_identity.dart';
 import 'package:mornye/services/music_player_service.dart';
+import 'package:mornye/services/remote_playback.dart';
 
 export 'package:mornye/services/playable_media.dart'
     show playableFromHistory, playableFromLocal;
@@ -19,6 +20,19 @@ final musicPlayerRuntimeProvider = Provider<MusicPlayerRuntime>(
   (ref) => musicPlayerRuntime,
 );
 
+/// The device that plays in this one's place, or null while this one plays.
+/// The app root overrides it with Mornye Link's paired desktop.
+final activeRemotePlaybackProvider = Provider<RemotePlayback?>((ref) => null);
+
+/// The active remote device's volume, 0 to 1; no value while this device
+/// plays.
+final activeRemoteVolumeProvider = StreamProvider<double>(
+  (ref) =>
+      ref.watch(activeRemotePlaybackProvider)?.volumes ?? const Stream.empty(),
+);
+
+/// What the player screens show: the active remote device's track, else the
+/// local player's.
 final currentMediaItemProvider =
     StreamNotifierProvider<CurrentMediaItemNotifier, MediaItem?>(
       CurrentMediaItemNotifier.new,
@@ -27,6 +41,7 @@ final currentMediaItemProvider =
 class CurrentMediaItemNotifier extends StreamNotifier<MediaItem?> {
   @override
   Stream<MediaItem?> build() =>
+      ref.watch(activeRemotePlaybackProvider)?.mediaItems ??
       ref.watch(musicPlayerRuntimeProvider).mediaItemEvents();
 
   @override
@@ -41,6 +56,19 @@ class CurrentMediaItemNotifier extends StreamNotifier<MediaItem?> {
     }
     return super.updateShouldNotify(previous, next);
   }
+}
+
+/// The local player's track, also while a remote device plays in its place:
+/// what this device's media notification shows.
+final localMediaItemProvider =
+    StreamNotifierProvider<LocalMediaItemNotifier, MediaItem?>(
+      LocalMediaItemNotifier.new,
+    );
+
+class LocalMediaItemNotifier extends CurrentMediaItemNotifier {
+  @override
+  Stream<MediaItem?> build() =>
+      ref.watch(musicPlayerRuntimeProvider).mediaItemEvents();
 }
 
 /// [libraryItemForMedia] with the download History the app has loaded.
@@ -74,7 +102,8 @@ final playerCollectionTrackProvider = FutureProvider.autoDispose
     });
 
 final playbackStateProvider = StreamProvider<PlaybackState>((ref) {
-  return ref.watch(musicPlayerRuntimeProvider).playbackStateEvents();
+  return ref.watch(activeRemotePlaybackProvider)?.playbackStates ??
+      ref.watch(musicPlayerRuntimeProvider).playbackStateEvents();
 });
 
 /// Small derived providers keep position ticks from rebuilding widgets that
@@ -282,7 +311,8 @@ final catalogTrackPlaybackUiProvider = Provider.autoDispose
     });
 
 final playQueueProvider = StreamProvider<List<MediaItem>>((ref) {
-  return ref.watch(musicPlayerRuntimeProvider).queueEvents();
+  return ref.watch(activeRemotePlaybackProvider)?.queues ??
+      ref.watch(musicPlayerRuntimeProvider).queueEvents();
 });
 
 /// Prefers the reported queue index while it still names the current item.
@@ -300,11 +330,21 @@ final currentQueueIndexProvider = Provider<int>((ref) {
       : queue.indexWhere((item) => item.id == id);
 });
 
+/// Drives the player the screens show: the local one, or [remote] while
+/// another device plays in its place.
 class MusicPlayerController {
-  MusicPlayerController({MusicPlayerRuntime? runtime})
-    : _runtime = runtime ?? musicPlayerRuntime;
+  MusicPlayerController({
+    MusicPlayerRuntime? runtime,
+    RemotePlayback? Function()? remote,
+  }) : _runtime = runtime ?? musicPlayerRuntime,
+       _remote = remote;
 
   final MusicPlayerRuntime _runtime;
+  final RemotePlayback? Function()? _remote;
+
+  /// The device playing in this one's place at the moment, or null. Read on
+  /// each call, so a button built before a switch drives the new device.
+  RemotePlayback? get remote => _remote?.call();
 
   MusicPlayerHandler? get _handler => _runtime.handler;
 
@@ -322,6 +362,9 @@ class MusicPlayerController {
     List<PlayableMedia> items, {
     int initialIndex = 0,
   }) async {
+    if (remote case final remote?) {
+      return remote.playAll(items, initialIndex: initialIndex);
+    }
     final handler = await ensureInitialized();
     await handler?.setQueueAndPlay(items, initialIndex: initialIndex);
   }
@@ -345,6 +388,11 @@ class MusicPlayerController {
   Future<bool> shuffleLibrary() async {
     final media = await _runtime.browser.librarySongs();
     if (media.isEmpty) return false;
+    if (remote case final remote?) {
+      await remote.setShuffle(true);
+      await remote.playAll(media, initialIndex: Random().nextInt(media.length));
+      return true;
+    }
     final handler = await _runtime.initialize();
     await handler.setShuffleMode(AudioServiceShuffleMode.all);
     await handler.setQueueAndPlay(
@@ -354,15 +402,20 @@ class MusicPlayerController {
     return true;
   }
 
-  Future<void> seek(Duration position) async => _handler?.seek(position);
-  Future<void> next() async => _handler?.skipToNext();
-  Future<void> previous() async => _handler?.skipToPrevious();
+  Future<void> seek(Duration position) async =>
+      remote?.seek(position) ?? _handler?.seek(position);
+  Future<void> next() async => remote?.next() ?? _handler?.skipToNext();
+  Future<void> previous() async =>
+      remote?.previous() ?? _handler?.skipToPrevious();
 
   void setSleepTimer(Duration duration) => _handler?.setSleepTimer(duration);
 
   void cancelSleepTimer() => _handler?.cancelSleepTimer();
 
   Future<void> togglePlayPause(bool isPlaying) async {
+    if (remote case final remote?) {
+      return isPlaying ? remote.pause() : remote.play();
+    }
     final handler = _handler;
     if (handler == null) return;
     final processingState = handler.playbackState.value.processingState;
@@ -378,19 +431,26 @@ class MusicPlayerController {
   }
 
   Future<void> setShuffle(bool enabled) async {
+    if (remote case final remote?) return remote.setShuffle(enabled);
     await _handler?.setShuffleMode(
       enabled ? AudioServiceShuffleMode.all : AudioServiceShuffleMode.none,
     );
   }
 
   Future<void> setRepeatMode(AudioServiceRepeatMode mode) async =>
-      _handler?.setRepeatMode(mode);
+      remote?.setRepeatMode(mode) ?? _handler?.setRepeatMode(mode);
 
-  Future<void> playNext(PlayableMedia item) async =>
-      (await ensureInitialized())?.enqueue(item, playNext: true);
+  Future<void> playNext(PlayableMedia item) async {
+    if (remote case final remote?) {
+      return remote.enqueue([item], playNext: true);
+    }
+    await (await ensureInitialized())?.enqueue(item, playNext: true);
+  }
 
-  Future<void> addToQueue(PlayableMedia item) async =>
-      (await ensureInitialized())?.enqueue(item);
+  Future<void> addToQueue(PlayableMedia item) async {
+    if (remote case final remote?) return remote.enqueue([item]);
+    await (await ensureInitialized())?.enqueue(item);
+  }
 
   Future<void> enqueueLibraryItems(
     List<UnifiedLibraryItem> items, {
@@ -403,6 +463,9 @@ class MusicPlayerController {
         else if (item.historyItem != null)
           playableFromHistory(item.historyItem!),
     ];
+    if (remote case final remote?) {
+      return remote.enqueue(media, playNext: playNext);
+    }
     await (await ensureInitialized())?.enqueueAll(media, playNext: playNext);
   }
 
@@ -418,16 +481,25 @@ class MusicPlayerController {
   Future<void> addToQueueLocal(LocalLibraryItem item) async =>
       addToQueue(playableFromLocal(item));
 
-  Future<void> jumpTo(int index) async => _handler?.skipToQueueItem(index);
+  Future<void> jumpTo(int index) async =>
+      remote?.jumpTo(index) ?? _handler?.skipToQueueItem(index);
 
+  /// Reorders the local queue; a remote device's queue stays as it is.
   void moveQueueItem(int oldIndex, int newIndex) {
-    _handler?.moveQueueItem(oldIndex, newIndex);
+    if (remote == null) _handler?.moveQueueItem(oldIndex, newIndex);
   }
 
-  void removeQueuedItem(MediaItem item) => _handler?.removeQueuedItem(item);
+  void removeQueuedItem(MediaItem item) {
+    if (remote == null) _handler?.removeQueuedItem(item);
+  }
 }
 
+/// The controller the player screens use: it follows the active remote
+/// device. Features that drive this device's own player build a
+/// [MusicPlayerController] without one.
 final musicPlayerControllerProvider = Provider<MusicPlayerController>(
-  (ref) =>
-      MusicPlayerController(runtime: ref.watch(musicPlayerRuntimeProvider)),
+  (ref) => MusicPlayerController(
+    runtime: ref.watch(musicPlayerRuntimeProvider),
+    remote: () => ref.read(activeRemotePlaybackProvider),
+  ),
 );

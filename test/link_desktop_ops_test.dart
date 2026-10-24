@@ -89,6 +89,7 @@ void main() {
       LinkOps.handoffPlay,
       LinkOps.handoffAppend,
       LinkOps.handoffCurrent,
+      LinkOps.queueAdd,
       LinkOps.downloads,
       LinkOps.open,
       LinkOps.resolve,
@@ -344,11 +345,7 @@ void main() {
     test('the Library copy wins over an uploaded file', () async {
       await call(LinkOps.handoffPlay, {
         'queue': [
-          {
-            ...phoneSong('Title a'),
-            'artist': 'Artist a',
-            'durationMs': 200000,
-          },
+          {...phoneSong('Title a'), 'artist': 'Artist a', 'durationMs': 200000},
         ],
       });
       expect(player.playedQueue!.single.source, '/music/a.flac');
@@ -390,6 +387,24 @@ void main() {
         throwsA(linkError('invalid')),
       );
       expect(player.appended, isEmpty);
+    });
+
+    test('queue/add queues the songs it has, next when asked', () async {
+      final result = await call(LinkOps.queueAdd, {
+        'queue': [
+          phoneSong('Sent'),
+          {'title': 'Missing', 'artist': 'Nobody'},
+          {'title': 'Title b', 'artist': 'Artist b'},
+        ],
+        'next': true,
+      });
+      expect(result, {'resolved': 2});
+      expect(player.calls, ['playNext']);
+      expect(player.appended.single.map((media) => media.title), [
+        'Sent',
+        'Title b',
+      ]);
+      await expectLater(call(LinkOps.queueAdd), throwsA(linkError('invalid')));
     });
   });
 

@@ -238,8 +238,11 @@ class FakeLinkPlayer implements LinkPlayerPort {
   final appended = <List<PlayableMedia>>[];
 
   @override
-  Future<void> append(List<PlayableMedia> items) async {
-    calls.add('append');
+  Future<void> append(
+    List<PlayableMedia> items, {
+    bool playNext = false,
+  }) async {
+    calls.add(playNext ? 'playNext' : 'append');
     appended.add(items);
   }
 }

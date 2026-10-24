@@ -625,6 +625,8 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                             ],
                           ),
                         ),
+                      if (!_landscape)
+                        LinkPlayingOnLabel(color: mornye ? Colors.white : null),
                       if (!_landscape) const SizedBox(height: 8),
                     ],
                   ),

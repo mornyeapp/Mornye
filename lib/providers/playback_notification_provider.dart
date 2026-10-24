@@ -22,7 +22,7 @@ final playbackNotificationProvider = Provider.autoDispose
       final mornye = ref.watch(
         themeProvider.select((theme) => theme.style == AppThemeStyle.mornye),
       );
-      final item = ref.watch(currentMediaItemProvider).value;
+      final item = ref.watch(localMediaItemProvider).value;
       final track = item == null
           ? null
           : ref.watch(playerCollectionTrackProvider(item)).value;

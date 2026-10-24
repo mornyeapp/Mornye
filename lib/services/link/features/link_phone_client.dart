@@ -7,6 +7,12 @@ import 'package:mornye/utils/desktop_platform.dart';
 /// [debugDesktopPlatformOverride].
 bool get isLinkPhonePlatform => !isDesktopPlatform;
 
+/// The paired desktop's name for labels such as "Play on Studio PC".
+String linkDesktopName(LinkClientApi client) {
+  final name = client.server.name.trim();
+  return name.isEmpty ? 'Mornye' : name;
+}
+
 /// The paired desktop's session on a phone, or null when none is paired or
 /// this is the desktop app. Phone UI shows link actions only while it is set.
 final linkPhoneClientProvider = Provider<LinkClientApi?>((ref) {

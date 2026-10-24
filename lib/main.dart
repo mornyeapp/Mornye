@@ -19,6 +19,7 @@ import 'package:mornye/models/theme_settings.dart';
 import 'package:mornye/providers/download_queue_provider.dart';
 import 'package:mornye/providers/extension_provider.dart';
 import 'package:mornye/providers/local_library_provider.dart';
+import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/runtime_profile_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/providers/theme_provider.dart';
@@ -36,6 +37,7 @@ import 'package:mornye/services/desktop_deep_links.dart';
 import 'package:mornye/services/desktop_diagnostics.dart';
 import 'package:mornye/services/desktop_library_watcher.dart';
 import 'package:mornye/services/link/desktop/link_desktop_host.dart';
+import 'package:mornye/services/link/features/link_remote_playback.dart';
 import 'package:mornye/services/music_player_service.dart';
 import 'package:mornye/services/playback_notification.dart';
 import 'package:mornye/services/player_widget_service.dart';
@@ -181,6 +183,11 @@ void main() {
               initialSafAccessLost,
             ),
             initialThemeSettingsProvider.overrideWithValue(bootstrapTheme),
+            // While the paired desktop plays in the phone's place, the
+            // player screens show and drive it.
+            activeRemotePlaybackProvider.overrideWith(
+              (ref) => ref.watch(linkRemotePlaybackProvider),
+            ),
           ],
           child: EagerInitialization(
             child: MornyeApp(

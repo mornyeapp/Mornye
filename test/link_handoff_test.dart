@@ -296,6 +296,45 @@ void main() {
       expect(client.posts.single.body['check'], isNull);
       expect(client.uploads, isEmpty);
     });
+
+    test('songs picked while the desktop plays start there', () async {
+      final player = FakePhonePlayer();
+      final client = desktop(const [0]);
+      final items = [
+        await song('a', bytes: [1, 2]),
+        await song('b'),
+      ];
+      final result = await withFiles(
+        client,
+        player,
+      ).playItemsOnDesktop(items, index: 1);
+
+      expect(client.uploads, isEmpty);
+      final play = client.posts.last.body;
+      expect(titles(play), ['b']);
+      expect(play['index'], 0);
+      expect(play['positionMs'], 0);
+      expect(result!.started, isTrue);
+      // 'a' plays before 'b', so it is not sent.
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(client.uploads, isEmpty);
+    });
+
+    test('songs added while the desktop plays are sent first', () async {
+      final client = desktop(const [0]);
+      final queued = await withFiles(client, FakePhonePlayer())
+          .addToDesktopQueue([
+            await song('a', bytes: [1, 2]),
+            await song('b'),
+          ], playNext: true);
+
+      expect(client.uploads, hasLength(1));
+      final add = client.posts.last;
+      expect(add.op, LinkOps.queueAdd);
+      expect(titles(add.body), ['a', 'b']);
+      expect(add.body['next'], isTrue);
+      expect(queued, 1);
+    });
   });
 
   group('Continue on this phone', () {

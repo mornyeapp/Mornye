@@ -63,6 +63,7 @@ abstract final class LinkOps {
   static const handoffPlay = 'handoff/play';
   static const handoffAppend = 'handoff/append';
   static const handoffCurrent = 'handoff/current';
+  static const queueAdd = 'queue/add';
   static const downloads = 'downloads';
   static const open = 'open';
   static const resolve = 'resolve';

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:audio_service/audio_service.dart' show MediaItem;
 import 'package:mornye/services/link/features/link_phone_files.dart';
 import 'package:mornye/services/link/features/link_phone_player.dart';
 import 'package:mornye/services/link/features/link_track_refs.dart';
@@ -139,10 +140,59 @@ class LinkHandoff {
     final snapshot = player.snapshot;
     if (snapshot.current == null) return null;
     final window = linkQueueWindow(snapshot.queue.length, snapshot.index);
-    final items = snapshot.queue.sublist(window.start, window.end);
-    final current = snapshot.index - window.start;
+    return _sendQueue(
+      snapshot.queue.sublist(window.start, window.end),
+      current: snapshot.index - window.start,
+      positionMs: () => player.snapshot.positionMs,
+      onSending: onSending,
+    );
+  }
+
+  /// Starts [items] on the desktop from [index], as [playOnDesktop] sends
+  /// the phone's queue: what the phone picks while the desktop plays in its
+  /// place.
+  Future<LinkHandoffResult?> playItemsOnDesktop(
+    List<MediaItem> items, {
+    required int index,
+    void Function(int sent, int total)? onSending,
+  }) async {
+    if (index < 0 || index >= items.length) return null;
+    final window = linkQueueWindow(items.length, index);
+    return _sendQueue(
+      items.sublist(window.start, window.end),
+      current: index - window.start,
+      positionMs: () => 0,
+      onSending: onSending,
+    );
+  }
+
+  /// Adds [items] to the desktop's queue, after its current song when
+  /// [playNext], sending the songs only the phone has first. Reports how
+  /// many the desktop queued.
+  Future<int> addToDesktopQueue(
+    List<MediaItem> items, {
+    bool playNext = false,
+  }) async {
+    final (:queue, :phoneFiles) = await _refs(items);
     final files = this.files;
-    final run = files?.begin();
+    if (files != null) {
+      for (final i in await _missing(queue, phoneFiles, current: 0)) {
+        await files.upload(client, phoneFiles[i]!);
+      }
+    }
+    final reply = await client.post(LinkOps.queueAdd, {
+      'queue': [for (final ref in queue) ref.toJson()],
+      'next': playNext,
+    });
+    final resolved = reply is Map ? reply['resolved'] : null;
+    return resolved is num ? resolved.toInt() : 0;
+  }
+
+  /// The refs [items] travel as, with the phone's file behind each, if any.
+  Future<({List<TrackRef> queue, List<LinkPhoneFile?> phoneFiles})> _refs(
+    List<MediaItem> items,
+  ) async {
+    final files = this.files;
     final phoneFiles = <LinkPhoneFile?>[];
     final queue = <TrackRef>[];
     for (final item in items) {
@@ -151,28 +201,45 @@ class LinkHandoff {
       phoneFiles.add(file);
       queue.add(file == null ? ref : ref.withFileId(file.fileId));
     }
+    return (queue: queue, phoneFiles: phoneFiles);
+  }
+
+  /// The entries of [queue] the desktop lacks and the phone can send.
+  Future<Set<int>> _missing(
+    List<TrackRef> queue,
+    List<LinkPhoneFile?> phoneFiles, {
+    required int current,
+  }) async {
+    if (files == null || phoneFiles.every((file) => file == null)) return {};
+    final check = await client.post(LinkOps.handoffPlay, {
+      ...LinkHandoffQueue(
+        queue: queue,
+        index: current,
+        positionMs: 0,
+        playing: true,
+      ).toJson(),
+      'check': true,
+    });
+    return {
+      for (final i in _indexes(check, 'missing'))
+        if (i >= 0 && i < queue.length && phoneFiles[i] != null) i,
+    };
+  }
+
+  Future<LinkHandoffResult> _sendQueue(
+    List<MediaItem> items, {
+    required int current,
+    required int Function() positionMs,
+    void Function(int sent, int total)? onSending,
+  }) async {
+    final files = this.files;
+    final run = files?.begin();
+    final (:queue, :phoneFiles) = await _refs(items);
 
     // Songs the desktop lacks that the phone can send.
-    final pending = <int>{};
-    if (files != null && phoneFiles.any((file) => file != null)) {
-      final check = await client.post(LinkOps.handoffPlay, {
-        ...LinkHandoffQueue(
-          queue: queue,
-          index: current,
-          positionMs: 0,
-          playing: true,
-        ).toJson(),
-        'check': true,
-      });
-      pending.addAll(
-        _indexes(
-          check,
-          'missing',
-        ).where((i) => i >= 0 && i < items.length && phoneFiles[i] != null),
-      );
-      if (pending.remove(current)) {
-        await files.upload(client, phoneFiles[current]!, onProgress: onSending);
-      }
+    final pending = await _missing(queue, phoneFiles, current: current);
+    if (pending.remove(current)) {
+      await files!.upload(client, phoneFiles[current]!, onProgress: onSending);
     }
 
     // The desktop starts with the songs around the current one up to the
@@ -191,7 +258,7 @@ class LinkHandoff {
       LinkHandoffQueue(
         queue: played,
         index: current - first,
-        positionMs: player.snapshot.positionMs,
+        positionMs: positionMs(),
         playing: true,
       ).toJson(),
     );
