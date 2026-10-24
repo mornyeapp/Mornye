@@ -360,6 +360,7 @@ class _LinkDesktopPairingDialogState extends State<LinkDesktopPairingDialog> {
   late final StreamSubscription<LinkPairingEvent> _events;
   Timer? _ticker;
   Timer? _pairedFallback;
+  bool _closed = false;
   late int _remainingMs = _remaining();
 
   int _now() => widget.nowMs?.call() ?? DateTime.now().millisecondsSinceEpoch;
@@ -394,6 +395,10 @@ class _LinkDesktopPairingDialogState extends State<LinkDesktopPairingDialog> {
   }
 
   void _close(LinkPairingEvent? event) {
+    // The dialog stays mounted while it animates out, and ending the window
+    // makes the server report it ended; a second pop would close the page.
+    if (_closed) return;
+    _closed = true;
     _ticker?.cancel();
     _pairedFallback?.cancel();
     if (mounted) Navigator.of(context).pop(event);

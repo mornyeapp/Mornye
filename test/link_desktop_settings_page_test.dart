@@ -41,6 +41,7 @@ void main() {
     WidgetTester tester, {
     bool mornye = false,
     bool enabled = true,
+    bool pushed = false,
   }) async {
     SharedPreferences.setMockInitialValues({
       linkDesktopEnabledKey: enabled,
@@ -61,7 +62,13 @@ void main() {
               : AppTheme.light(),
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
-          home: const LinkDesktopSettingsPage(),
+          // Pushed over a root page, as in the app, so a stray pop shows.
+          initialRoute: pushed ? '/link' : '/',
+          routes: {
+            '/': (_) =>
+                pushed ? const SizedBox() : const LinkDesktopSettingsPage(),
+            '/link': (_) => const LinkDesktopSettingsPage(),
+          },
         ),
       ),
     );
@@ -154,6 +161,24 @@ void main() {
     await settle(tester);
     expect(pin(), findsNothing);
     expect(backend.calls, contains('endPairing'));
+  });
+
+  testWidgets('the end event after cancelling does not pop the page', (
+    tester,
+  ) async {
+    await pumpPage(tester, pushed: true);
+    await tester.tap(find.byKey(const ValueKey('link-pair')));
+    await settle(tester);
+    await tester.tap(find.text('Cancel'));
+    await tester.pump();
+    // The server reports the cancelled window while the dialog animates out.
+    backend.pairingEvent(
+      const LinkPairingEndedEvent(LinkPairingEndReason.cancelled),
+    );
+    await settle(tester);
+    expect(pin(), findsNothing);
+    expect(find.byType(LinkDesktopSettingsPage), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('an expired or exhausted window is reported', (tester) async {
