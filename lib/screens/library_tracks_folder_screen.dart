@@ -8,6 +8,7 @@ import 'package:mornye/widgets/app_icon_button.dart';
 import 'package:mornye/widgets/collection_scaffold.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/widgets/desktop/context_menu.dart';
+import 'package:mornye/widgets/desktop/desktop_link_transfer_actions.dart';
 import 'package:mornye/widgets/desktop/desktop_selection.dart';
 import 'package:mornye/widgets/desktop/track_list_table.dart';
 import 'package:mornye/widgets/expressive_button.dart';
@@ -500,6 +501,11 @@ class _LibraryTracksFolderScreenState
             onSelected: () => _addSelectedToPlaylist(entries),
           ),
         ],
+        if (widget.mode != LibraryTracksFolderMode.wishlist)
+          desktopLinkTransferTrackActions(context, ref, [
+            for (final entry in entries)
+              if (selectedIds.contains(entry.key)) entry.track,
+          ], onDone: exitSelectionMode),
         [
           ContextMenuAction(
             icon: Icons.remove_circle_outline,
@@ -664,6 +670,12 @@ class _LibraryTracksFolderScreenState
     final hasCustomCover =
         customCoverPath != null && customCoverPath.isNotEmpty;
     final hasCoverUrl = coverUrl != null;
+    // Desktop: Mornye Link transfers of the whole collection while a phone
+    // is connected.
+    final linkTransfers =
+        widget.mode != LibraryTracksFolderMode.wishlist &&
+        entries.isNotEmpty &&
+        watchDesktopLinkPhones(ref);
 
     final dpr = MediaQuery.devicePixelRatioOf(context);
     final cacheWidth = (MediaQuery.sizeOf(context).width * dpr).round().clamp(
@@ -831,6 +843,13 @@ class _LibraryTracksFolderScreenState
           ),
         ],
       ],
+      moreMenu: linkTransfers && !isSelectionMode
+          ? () => [
+              desktopLinkTransferTrackActions(context, ref, [
+                for (final entry in entries) entry.track,
+              ]),
+            ]
+          : null,
       // Centered so the tight leading slot cannot stretch it.
       leading: Center(
         child: HeaderCircleButton(

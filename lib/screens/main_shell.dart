@@ -58,6 +58,7 @@ import 'package:mornye/theme/player_artwork_theme.dart';
 import 'package:mornye/widgets/selection_bottom_bar.dart';
 import 'package:mornye/widgets/desktop/desktop_commands.dart';
 import 'package:mornye/widgets/desktop/desktop_inspector.dart';
+import 'package:mornye/widgets/desktop/desktop_link_transfer_actions.dart';
 import 'package:mornye/widgets/desktop/desktop_navigation.dart';
 import 'package:mornye/utils/logger.dart';
 import 'package:mornye/utils/adaptive_layout.dart';
@@ -1140,19 +1141,21 @@ class _MainShellState extends ConsumerState<MainShell>
         repoUpdatesCount: repoUpdatesCount,
       );
       return DownloadQueueFeedback(
-        child: Scaffold(
-          body: DesktopShellLayout(
-            destinations: destinations,
-            selected: selectedTab,
-            onSelected: _onShellTabRequested,
-            libraryLinks: mornye
-                ? _desktopLibraryLinks(queueCount: queueState)
-                : const [],
-            // The Material rail opens playlists alone.
-            onOpenLibraryLink: _openDesktopLibraryLink,
-            onOpenProfile: mornye ? _openDesktopProfile : null,
-            // The selection bar floats over the pages, not the sidebar.
-            body: SelectionOverlayHost(child: pageView),
+        child: DesktopLinkTransferNotices(
+          child: Scaffold(
+            body: DesktopShellLayout(
+              destinations: destinations,
+              selected: selectedTab,
+              onSelected: _onShellTabRequested,
+              libraryLinks: mornye
+                  ? _desktopLibraryLinks(queueCount: queueState)
+                  : const [],
+              // The Material rail opens playlists alone.
+              onOpenLibraryLink: _openDesktopLibraryLink,
+              onOpenProfile: mornye ? _openDesktopProfile : null,
+              // The selection bar floats over the pages, not the sidebar.
+              body: SelectionOverlayHost(child: pageView),
+            ),
           ),
         ),
       );
