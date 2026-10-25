@@ -14,10 +14,14 @@ import 'package:mornye/services/link/desktop/link_catalog_index.dart';
 import 'package:mornye/services/link/desktop/link_desktop_backend.dart';
 import 'package:mornye/services/link/desktop/link_desktop_ops.dart';
 import 'package:mornye/services/link/desktop/link_downloads.dart';
+import 'package:mornye/services/link/desktop/link_phone_catalogs.dart';
+import 'package:mornye/services/link/desktop/link_phone_library.dart';
+import 'package:mornye/services/link/desktop/link_phone_sources.dart';
 import 'package:mornye/services/link/desktop/link_player.dart';
 import 'package:mornye/services/link/link_host_router.dart';
 import 'package:mornye/services/link/link_protocol.dart';
 import 'package:mornye/services/link/sync/link_sync_handlers.dart';
+import 'package:mornye/services/network_storage_service.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/utils/logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -155,6 +159,8 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
   LinkPlayerPort? _player;
   LinkDesktopOps? _ops;
   LinkArrivingFiles? _arriving;
+  LinkPhoneCatalogs? _phoneCatalogs;
+  LinkPhoneSources? _phoneSources;
   DesktopLinkCatalogIndex? _index;
   LinkPlayerState? _lastSentState;
   Timer? _exportTimer;
@@ -165,14 +171,56 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
   bool _exporting = false;
   bool _exportAgain = false;
   bool _serverStarted = false;
+  String _lastReceivedDir = '';
 
   @override
   LinkDesktopHostState build() {
     _backend = ref.watch(linkDesktopBackendProvider);
     ref.onDispose(_dispose);
-    if (isDesktopPlatform) Future.microtask(_restore);
+    if (isDesktopPlatform) {
+      _installPhoneSongs();
+      Future.microtask(_restore);
+    }
     return const LinkDesktopHostState();
   }
+
+  /// Keeps paired phones' songs and shows them in Library; they play while
+  /// the phone is connected or once received.
+  void _installPhoneSongs() {
+    final catalogs = _phoneCatalogs = LinkPhoneCatalogs(
+      root: ref.read(linkPhoneFolderProvider),
+      paired: _isPairedPhone,
+      onCommit: (deviceId) => unawaited(_onPhoneCommit(deviceId)),
+    );
+    NetworkStorageService.instance.virtualSources = _phoneSources =
+        LinkPhoneSources(
+          catalogs: catalogs,
+          index: () => _index,
+          receivedDir: () => ref.mounted ? _receivedDir() : '',
+          connectedDevice: (sourceId) {
+            if (!ref.mounted) return null;
+            for (final client in state.clients) {
+              if (linkPhoneSourceId(client.deviceId) == sourceId) {
+                return client.deviceId;
+              }
+            }
+            return null;
+          },
+          send: (message, deviceId) => _send(message, deviceId: deviceId),
+          arriving: () => ref.mounted ? _arrivingFiles() : null,
+        );
+  }
+
+  /// The received folder of the running server, or of the last one.
+  String _receivedDir() {
+    final dir = state.server?.receivedDir ?? '';
+    if (dir.isNotEmpty) _lastReceivedDir = dir;
+    return _lastReceivedDir;
+  }
+
+  LinkArrivingFiles _arrivingFiles() => _arriving ??= LinkArrivingFiles(
+    register: ref.read(musicPlayerRuntimeProvider).streamWhileArriving,
+  );
 
   /// `linkPaired` and `linkPairingEnded`, for the pairing dialog.
   Stream<LinkPairingEvent> get pairingEvents => _pairingEvents.stream;
@@ -312,6 +360,7 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
     _lastSentState = null;
     if (!ref.mounted) return;
     ref.read(linkCatalogIndexProvider.notifier).set(null);
+    _phoneSources?.keepConnected(const {});
     state = state.copyWith(
       phase: LinkHostPhase.stopped,
       server: null,
@@ -336,9 +385,7 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
       desktopName: () => state.name,
       deviceName: _deviceName,
       receivedDir: () => state.server?.receivedDir ?? '',
-      arriving: _arriving ??= LinkArrivingFiles(
-        register: ref.read(musicPlayerRuntimeProvider).streamWhileArriving,
-      ),
+      arriving: _arrivingFiles(),
     );
   }
 
@@ -351,6 +398,7 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
   /// and the Subsonic playlist, star and scrobble ops.
   void _registerFeatures(LinkHostRouter router) {
     (_ops ??= _createOps()).register(router);
+    _phoneCatalogs?.register(router);
     registerLinkSyncHandlers(router, ref);
     ref.read(linkCollectionsChangedHookProvider.notifier).set(() {
       if (!ref.mounted || !state.running || state.clients.isEmpty) return;
@@ -370,6 +418,59 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
       }
     }
     return deviceId;
+  }
+
+  /// Whether [deviceId] is a paired phone (not a Subsonic app key); the
+  /// paired devices are reloaded once for a phone that just paired.
+  Future<bool> _isPairedPhone(String deviceId) async {
+    bool known() =>
+        state.clients.any((client) => client.deviceId == deviceId) ||
+        state.devices.any(
+          (device) =>
+              device.deviceId == deviceId && device.platform != 'subsonic',
+        );
+    if (!ref.mounted) return false;
+    if (known()) return true;
+    await refreshDevices();
+    return ref.mounted && known();
+  }
+
+  /// Shows a phone's committed songs: adds its Library source the first
+  /// time, then rescans it.
+  Future<void> _onPhoneCommit(String deviceId) async {
+    final catalogs = _phoneCatalogs;
+    if (catalogs == null || !ref.mounted) return;
+    final sourceId = linkPhoneSourceId(deviceId);
+    final library = ref.read(linkPhoneLibraryProvider);
+    try {
+      if (!await catalogs.hasLibrarySource(sourceId)) {
+        await library.add(sourceId, _deviceName(deviceId));
+        await catalogs.markLibrarySource(sourceId);
+      }
+      if (!ref.mounted) return;
+      await library.rescan(sourceId);
+    } on Object catch (error) {
+      _log.w('Could not show the phone songs in Library: $error');
+    }
+  }
+
+  /// Removes the songs and Library source of phones no longer in
+  /// [devices].
+  Future<void> _prunePhones(List<LinkPairedDevice> devices) async {
+    final catalogs = _phoneCatalogs;
+    if (catalogs == null) return;
+    final paired = {
+      for (final device in devices) linkPhoneSourceId(device.deviceId),
+    };
+    for (final sourceId in await catalogs.sourceIds()) {
+      if (paired.contains(sourceId) || !ref.mounted) continue;
+      try {
+        await ref.read(linkPhoneLibraryProvider).remove(sourceId);
+        await catalogs.remove(sourceId);
+      } on Object catch (error) {
+        _log.w('Could not remove an unpaired phone\'s songs: $error');
+      }
+    }
   }
 
   void _listenBackend() {
@@ -441,6 +542,9 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
   }
 
   void _onMessage(LinkMessageEvent event) {
+    if (_phoneSources?.onMessage(event.deviceId, event.message) ?? false) {
+      return;
+    }
     if (event.type != LinkMessageTypes.playerState) return;
     final phoneState = LinkPlayerState.fromJson(event.message['state']);
     if (phoneState == null || event.deviceId.isEmpty) return;
@@ -459,6 +563,7 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
           if (ids.contains(entry.key)) entry.key: entry.value,
       },
     );
+    _phoneSources?.keepConnected(ids);
     _updateHeartbeat();
     // A phone that just connected gets the desktop's state right away.
     if (!known.containsAll(ids)) {
@@ -565,6 +670,15 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
       _index = export.index;
       ref.read(linkCatalogIndexProvider.notifier).set(export.index);
       state = state.copyWith(catalogSongs: songs);
+      // Phone songs scanned before the index leave out the desktop's own.
+      final library = ref.read(linkPhoneLibraryProvider);
+      for (final sourceId in _phoneSources?.takeUnindexed() ?? <String>[]) {
+        unawaited(
+          library.rescan(sourceId).catchError((Object error) {
+            _log.w('Could not rescan phone songs: $error');
+          }),
+        );
+      }
       // Song ids in the player state may have changed.
       _lastSentState = null;
       _onPlayerChanged();
@@ -583,7 +697,9 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
   Future<void> refreshDevices() async {
     try {
       final devices = await _backend.devices();
-      if (ref.mounted) state = state.copyWith(devices: devices);
+      if (!ref.mounted) return;
+      state = state.copyWith(devices: devices);
+      unawaited(_prunePhones(devices));
     } on Object catch (error) {
       _log.w('Could not list paired devices: $error');
     }
@@ -663,6 +779,14 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
   void _dispose() {
     _cancelApp();
     _cancelBackend();
+    final phoneSources = _phoneSources;
+    if (phoneSources != null) {
+      phoneSources.close();
+      final storage = NetworkStorageService.instance;
+      if (identical(storage.virtualSources, phoneSources)) {
+        storage.virtualSources = null;
+      }
+    }
     unawaited(_pairingEvents.close());
     unawaited(_arriving?.close());
     if (_serverStarted) {

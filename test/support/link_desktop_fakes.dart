@@ -11,6 +11,8 @@ import 'package:mornye/services/link/desktop/link_desktop_backend.dart';
 import 'package:mornye/services/link/desktop/link_desktop_host.dart';
 import 'package:mornye/services/link/desktop/link_desktop_ops.dart';
 import 'package:mornye/services/link/desktop/link_downloads.dart';
+import 'package:mornye/services/link/desktop/link_phone_catalogs.dart';
+import 'package:mornye/services/link/desktop/link_phone_library.dart';
 import 'package:mornye/services/link/desktop/link_player.dart';
 import 'package:mornye/services/link/link_host_router.dart';
 import 'package:mornye/services/link/link_protocol.dart';
@@ -345,14 +347,48 @@ final fakeLibraryRevisionProvider =
       FakeLibraryRevisionNotifier.new,
     );
 
-/// Overrides that run the desktop link host entirely on the fakes.
+/// The desktop Library as phone songs use it, in memory.
+class FakeLinkPhoneLibrary implements LinkPhoneLibrary {
+  final calls = <String>[];
+
+  /// Sources the owner removed or turned off; rescans skip them.
+  final hidden = <String>{};
+
+  @override
+  Future<void> add(String sourceId, String name) async =>
+      calls.add('add:$sourceId:$name');
+
+  @override
+  Future<void> rescan(String sourceId) async {
+    if (!hidden.contains(sourceId)) calls.add('rescan:$sourceId');
+  }
+
+  @override
+  Future<void> remove(String sourceId) async => calls.add('remove:$sourceId');
+}
+
+/// Overrides that run the desktop link host entirely on the fakes. Phone
+/// songs are kept in [phoneFolder], by default a folder that does not
+/// exist until a phone sends its songs.
 List<Override> linkHostOverrides({
   required FakeLinkBackend backend,
   required FakeLinkPlayer player,
   FakeLinkDownloads? downloads,
   FakeLinkCatalogExporter? exporter,
   List<String>? openedUrls,
+  FakeLinkPhoneLibrary? phoneLibrary,
+  Directory? phoneFolder,
 }) => [
+  linkPhoneLibraryProvider.overrideWithValue(
+    phoneLibrary ?? FakeLinkPhoneLibrary(),
+  ),
+  linkPhoneFolderProvider.overrideWithValue(
+    () async =>
+        phoneFolder ??
+        Directory(
+          '${Directory.systemTemp.path}/link-phones-missing-${Object().hashCode}',
+        ),
+  ),
   linkDesktopBackendProvider.overrideWithValue(backend),
   linkDesktopPlayerProvider.overrideWithValue(player),
   linkDesktopDownloadsProvider.overrideWithValue(
