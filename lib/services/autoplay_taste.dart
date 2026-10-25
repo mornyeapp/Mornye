@@ -476,6 +476,9 @@ class AutoplayTasteSignal extends AutoplaySignal {
 
   /// Unit vectors of the session's and candidates' songs and artists only.
   final Map<String, Float32List> vectors;
+
+  @override
+  String get name => 'taste';
   final _scores = <String, double>{};
   double _average = 0;
 

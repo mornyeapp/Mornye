@@ -25,6 +25,9 @@ class _ChainSignal extends AutoplaySignal {
   List<PlayableMedia> session = const [], candidates = const [];
 
   @override
+  String get name => 'chain';
+
+  @override
   void prepare(List<PlayableMedia> session, List<PlayableMedia> candidates) {
     this.session = session;
     this.candidates = candidates;
@@ -142,6 +145,41 @@ void main() {
     expect(signal.candidates, hasLength(4));
     // 'a' scores most on its own; each other song follows only one.
     expect(selected.map((item) => item.id), ['a', 'b', 'c', 'd']);
+  });
+
+  test('picks carry their score parts, which weights multiply', () {
+    final seed = track('seed', artist: 'S', genre: 'Rock');
+    List<AutoplayPick> rank(Map<String, double> weights) => rankAutoplayTracks(
+      seed: seed,
+      candidates: [
+        track('rock', artist: 'R', genre: 'Rock'),
+        track('chain', artist: 'C'),
+      ],
+      upcoming: [],
+      recent: [seed],
+      dismissedSources: {},
+      random: _NoNoise(),
+      limit: 1,
+      signals: [
+        _ChainSignal({'chain': 'seed'}),
+      ],
+      weights: weights,
+    );
+    final first = rank(const {}).single;
+    // Following the seed (10) beats fitting its genre (6); both artists
+    // are new to the session.
+    expect(first.media.id, 'chain');
+    expect(first.parts, {
+      'genre': 0,
+      'signal:chain': 0,
+      'novelty': 1,
+      'follow:chain': 10,
+    });
+    // A listener for whom transitions count little.
+    final rock = rank(const {'follow:chain': 0.5}).single;
+    expect(rock.media.id, 'rock');
+    expect(rock.parts['genre'], 6);
+    expect(rock.parts['follow:chain'], 0);
   });
 
   test('a one-artist Library still fills the queue', () {

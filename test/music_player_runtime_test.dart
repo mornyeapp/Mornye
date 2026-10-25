@@ -13,6 +13,7 @@ import 'package:mornye/models/unified_library_item.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/services/app_state_database.dart';
 import 'package:mornye/services/autoplay_personalization.dart';
+import 'package:mornye/services/autoplay_ranker.dart';
 import 'package:mornye/services/autoplay_taste.dart';
 import 'package:mornye/services/background_favorites.dart';
 import 'package:mornye/services/history_database.dart';
@@ -348,6 +349,7 @@ MusicPlayerRuntime _runtime({
   ListeningRecorder? recorder,
   AutoplayPersonalization Function()? createPersonalization,
   AutoplayTaste Function()? createTaste,
+  AutoplayRanker Function()? createRanker,
   bool isIOS = false,
   bool isAndroid = false,
   Future<void> Function()? synchronizePlaybackState,
@@ -374,6 +376,7 @@ MusicPlayerRuntime _runtime({
       createPersonalization:
           createPersonalization ?? AutoplayPersonalization.new,
       createTaste: createTaste ?? AutoplayTaste.new,
+      createRanker: createRanker ?? AutoplayRanker.new,
       createDeck:
           createDeck ??
           (_) {
@@ -720,6 +723,73 @@ void main() {
     await resetAutoplayLearning(runtime: runtime);
     expect(await taste.readLog(), isEmpty);
     expect(taste.model, isNull);
+  });
+
+  test('how the listener takes autoplay picks teaches the ranker', () async {
+    sqfliteFfiInit();
+    final directory = await Directory.systemTemp.createTemp('autoplay-rank-');
+    addTearDown(() => directory.delete(recursive: true));
+    final db = await AutoplayRanker.openWithFactory(
+      databaseFactoryFfi,
+      '${directory.path}/ranker.db',
+    );
+    addTearDown(db.close);
+    final ranker = AutoplayRanker(
+      open: () async => db,
+      train: (outcomes) async => trainAutoplayRanker(outcomes),
+    );
+    var elapsed = Duration.zero;
+    final learning = AutoplayPersonalization(
+      load: () async => null,
+      save: (_) async {},
+      elapsed: () => elapsed,
+      now: () => DateTime(2026),
+    );
+    final runtime = _runtime(
+      settings: const AppSettings(
+        pauseOnMute: false,
+        autoplay: true,
+        autoplayPersonalization: true,
+      ),
+      createPersonalization: () => learning,
+      createRanker: () => ranker,
+    );
+    final handler = MusicPlayerHandler(
+      runtime: runtime,
+      autoplayLibraryLoader: (_) async => [
+        for (final id in ['two', 'three'])
+          PlayableMedia(
+            id: id,
+            source: '/$id.flac',
+            title: id,
+            artist: 'Artist $id',
+            duration: const Duration(seconds: 60),
+          ),
+      ],
+    );
+    await learning.ensureLoaded();
+    await handler.setQueueAndPlay([_track]);
+    await handler.queue
+        .firstWhere((queue) => queue.length == 3)
+        .timeout(const Duration(seconds: 5));
+    await _settle();
+    // The song the listener chose says nothing about autoplay's ranking.
+    elapsed += const Duration(seconds: 40);
+    await handler.skipToNext();
+    await _settle();
+    expect(await ranker.readOutcomes(), isEmpty);
+    // Skipping the first pick within seconds.
+    elapsed += const Duration(seconds: 5);
+    await handler.skipToNext();
+    await _settle();
+    final outcomes = await ranker.readOutcomes();
+    expect(outcomes, hasLength(1));
+    expect(outcomes.single.reward, 0);
+    // A new artist, before learning has a preference model.
+    expect(outcomes.single.parts, {'novelty': 1});
+
+    await resetAutoplayLearning(runtime: runtime);
+    expect(await ranker.readOutcomes(), isEmpty);
   });
 
   test(

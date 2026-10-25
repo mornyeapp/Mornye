@@ -7,6 +7,7 @@ Future<void> resetAutoplayLearning({MusicPlayerRuntime? runtime}) async {
   final target = runtime ?? musicPlayerRuntime;
   await target.personalization.reset();
   await target.taste.reset();
+  await target.ranker.reset();
   final handler = target.handler;
   if (handler == null || handler.isDisposed) return;
   handler._configurePersonalization();
@@ -113,14 +114,14 @@ const _autoplayArtistGap = 4;
 /// The latest songs, newest weighing most, that set the session's genres.
 const _autoplaySessionWindow = 12;
 
-/// Rank once per refill, so the visible queue is the actual playback order.
-/// Songs score by how well their genres fit the listening session (the
-/// seed, the songs before it and the queued ones, newest weighing most),
-/// with optional local learning on top. Artists heard or queued lately lose
-/// priority, an artist does not return within [_autoplayArtistGap] songs or
-/// twice in one refill while others fit, and songs of a picked album lose
-/// priority, so a favorite artist cannot take over the queue. [signals] add
-/// what metadata cannot tell, such as how well a song follows the one before.
+/// A song autoplay picked, with the parts of its score: what the ranking
+/// learns to weigh from the songs the listener keeps or skips. Each part is
+/// in score points before its weight: `genre`, `artist` and `album` (the
+/// seed's), `preference` (learned), `novelty` and `fatigue` (of the artist
+/// in this session), and `signal:<name>` and `follow:<name>` per signal.
+typedef AutoplayPick = ({PlayableMedia media, Map<String, double> parts});
+
+/// Picks songs like [rankAutoplayTracks], without their score parts.
 List<PlayableMedia> selectAutoplayTracks({
   required PlayableMedia seed,
   required List<PlayableMedia> candidates,
@@ -130,8 +131,57 @@ List<PlayableMedia> selectAutoplayTracks({
   required Random random,
   int limit = 6,
   double Function(PlayableMedia)? preferenceAdjustment,
+  double Function(PlayableMedia)? exploration,
   List<AutoplaySignal> signals = const [],
+  Map<String, double> weights = const {},
+}) => [
+  for (final pick in rankAutoplayTracks(
+    seed: seed,
+    candidates: candidates,
+    upcoming: upcoming,
+    recent: recent,
+    dismissedSources: dismissedSources,
+    random: random,
+    limit: limit,
+    preferenceAdjustment: preferenceAdjustment,
+    exploration: exploration,
+    signals: signals,
+    weights: weights,
+  ))
+    pick.media,
+];
+
+/// Rank once per refill, so the visible queue is the actual playback order.
+/// Songs score by how well their genres fit the listening session (the
+/// seed, the songs before it and the queued ones, newest weighing most),
+/// with optional local learning on top. Artists heard or queued lately lose
+/// priority, an artist does not return within [_autoplayArtistGap] songs or
+/// twice in one refill while others fit, and songs of a picked album lose
+/// priority, so a favorite artist cannot take over the queue. [signals] add
+/// what metadata cannot tell, such as how well a song follows the one before.
+/// [exploration] adds a sampled bonus for trying artists, and [weights]
+/// multiply the score parts by name (1 when absent).
+List<AutoplayPick> rankAutoplayTracks({
+  required PlayableMedia seed,
+  required List<PlayableMedia> candidates,
+  required List<PlayableMedia> upcoming,
+  required List<PlayableMedia> recent,
+  required Set<String> dismissedSources,
+  required Random random,
+  int limit = 6,
+  double Function(PlayableMedia)? preferenceAdjustment,
+  double Function(PlayableMedia)? exploration,
+  List<AutoplaySignal> signals = const [],
+  Map<String, double> weights = const {},
 }) {
+  double weighted(Map<String, double> parts) {
+    var total = 0.0;
+    for (final MapEntry(:key, :value) in parts.entries) {
+      total += (weights[key] ?? 1) * value;
+    }
+    return total;
+  }
+
   String normalized(String? value) => normalizeLookupText(value);
   String songKey(PlayableMedia item) =>
       '${normalized(item.artist)}|${normalized(item.title)}';
@@ -196,25 +246,37 @@ List<PlayableMedia> selectAutoplayTracks({
   }
 
   final scored =
-      <({PlayableMedia item, double score, String artist, String album})>[];
+      <
+        ({
+          PlayableMedia item,
+          double score,
+          String artist,
+          String album,
+          Map<String, double> parts,
+        })
+      >[];
   for (final item in eligible) {
     final key = songKey(item);
     final artist = normalized(item.artist);
     final album = normalized(item.album);
-    var score = random.nextDouble() * 1.5;
+    final parts = <String, double>{};
     if (genreTotal > 0) {
       var fit = 0.0;
       for (final genre in _autoplayGenres(item.genre)) {
         fit += genreWeights[genre] ?? 0;
       }
-      score += 6 * min(1.0, fit / genreTotal);
+      parts['genre'] = 6 * min(1.0, fit / genreTotal);
     }
-    if (seedArtist.isNotEmpty && seedArtist == artist) score += 2;
-    if (seedAlbum.isNotEmpty && seedAlbum == album) score += 1;
-    if (preferenceAdjustment != null) score += preferenceAdjustment(item);
+    if (seedArtist.isNotEmpty && seedArtist == artist) parts['artist'] = 2;
+    if (seedAlbum.isNotEmpty && seedAlbum == album) parts['album'] = 1;
+    if (preferenceAdjustment != null) {
+      parts['preference'] = preferenceAdjustment(item);
+    }
     for (final signal in signals) {
-      score += signal.score(item);
+      parts['signal:${signal.name}'] = signal.score(item);
     }
+    var score = random.nextDouble() * 1.5;
+    if (exploration != null) score += exploration(item);
     // Match the latest source OR normalized song occurrence without walking
     // the entire listening history again for every candidate.
     final played = max(
@@ -228,15 +290,22 @@ List<PlayableMedia> selectAutoplayTracks({
       final distance = artistDistance[artist];
       if (distance == null) {
         // An artist the session has not reached yet.
-        score += 1;
+        parts['novelty'] = 1;
       } else {
-        score -= 6 * pow(0.7, distance) + 1.5 * min(4, artistPlays[artist]!);
+        parts['fatigue'] =
+            -6 * pow(0.7, distance) - 1.5 * min(4, artistPlays[artist]!);
       }
     }
-    scored.add((item: item, score: score, artist: artist, album: album));
+    scored.add((
+      item: item,
+      score: score + weighted(parts),
+      artist: artist,
+      album: album,
+      parts: parts,
+    ));
   }
 
-  final selected = <PlayableMedia>[];
+  final selected = <AutoplayPick>[];
   // The artists that played last, newest at the end.
   final latest = [for (final item in session) normalized(item.artist)];
   final picked = <String>{};
@@ -250,11 +319,19 @@ List<PlayableMedia> selectAutoplayTracks({
     };
     final follows = before;
     final totals = [for (final entry in scored) entry.score];
-    if (follows != null) {
-      for (final signal in signals) {
-        for (var i = 0; i < scored.length; i++) {
-          totals[i] += signal.follow(follows, scored[i].item);
-        }
+    // How each candidate follows the song before it, per signal.
+    final transitions = [
+      for (final signal in signals)
+        follows == null
+            ? null
+            : [for (final entry in scored) signal.follow(follows, entry.item)],
+    ];
+    for (var s = 0; s < signals.length; s++) {
+      final values = transitions[s];
+      if (values == null) continue;
+      final weight = weights['follow:${signals[s].name}'] ?? 1;
+      for (var i = 0; i < scored.length; i++) {
+        totals[i] += weight * values[i];
       }
     }
     int? best;
@@ -273,7 +350,15 @@ List<PlayableMedia> selectAutoplayTracks({
       if (best != null) break;
     }
     final next = scored.removeAt(best!);
-    selected.add(next.item);
+    selected.add((
+      media: next.item,
+      parts: {
+        ...next.parts,
+        for (var s = 0; s < signals.length; s++)
+          if (transitions[s] case final values?)
+            'follow:${signals[s].name}': values[best],
+      },
+    ));
     before = next.item;
     latest.add(next.artist);
     if (next.artist.isNotEmpty) picked.add(next.artist);
@@ -287,6 +372,7 @@ List<PlayableMedia> selectAutoplayTracks({
           score: entry.score - 3,
           artist: entry.artist,
           album: entry.album,
+          parts: entry.parts,
         );
       }
     }
@@ -407,9 +493,16 @@ class _MusicAutoplay {
           .where((i) => i >= 0 && i < handler._media.length)
           .map((i) => handler._media[i])
           .toList();
-      final model = handler._runtime.personalization.rankingSnapshot;
+      final runtime = handler._runtime;
+      final learning = runtime.personalization.enabled;
+      final model = runtime.personalization.rankingSnapshot;
+      // How much each part of a score counts for this listener, once that
+      // ranks their recent songs better than the starting weights.
+      final weights = learning
+          ? runtime.ranker.weights
+          : const <String, double>{};
       final revision = handler._sessionQueueRevision;
-      List<PlayableMedia> ordinaryRanking() => selectAutoplayTracks(
+      List<AutoplayPick> ordinaryRanking() => rankAutoplayTracks(
         seed: current,
         candidates: candidates,
         upcoming: upcoming,
@@ -418,8 +511,8 @@ class _MusicAutoplay {
         random: handler._random,
         limit: 6 - upcoming.length,
       );
-      List<PlayableMedia> selected;
-      if (model == null && signals.isEmpty) {
+      List<AutoplayPick> selected;
+      if (model == null && signals.isEmpty && weights.isEmpty) {
         selected = ordinaryRanking();
       } else {
         try {
@@ -433,6 +526,7 @@ class _MusicAutoplay {
               dismissed: Set<String>.of(_dismissed),
               model: model,
               signals: signals,
+              weights: weights,
               randomSeed: handler._random.nextInt(1 << 31),
               at: DateTime.now(),
               limit: 6 - upcoming.length,
@@ -457,9 +551,15 @@ class _MusicAutoplay {
         return;
       }
       if (selected.isEmpty) return;
+      // How the listener takes each pick teaches the weights.
+      if (learning) {
+        for (final pick in selected) {
+          runtime.ranker.remember(pick.media.source, pick.parts);
+        }
+      }
       final additions = [
-        for (final item in selected)
-          PlayableMedia.fromJson({...item.toJson(), 'autoplay': true})!,
+        for (final pick in selected)
+          PlayableMedia.fromJson({...pick.media.toJson(), 'autoplay': true})!,
       ];
       final queueItems = additions.map(handler._toMediaItem).toList();
       handler._media.addAll(additions);
@@ -476,8 +576,8 @@ class _MusicAutoplay {
   }
 }
 
-/// Metadata, a frozen 64 KiB model and plain-data signals only, never the
-/// player or runtime.
+/// Metadata, a frozen 64 KiB model, plain-data signals and weights only,
+/// never the player or runtime.
 class _AutoplayRanking {
   const _AutoplayRanking({
     required this.seed,
@@ -487,6 +587,7 @@ class _AutoplayRanking {
     required this.dismissed,
     required this.model,
     required this.signals,
+    required this.weights,
     required this.randomSeed,
     required this.at,
     required this.limit,
@@ -497,17 +598,18 @@ class _AutoplayRanking {
   final Set<String> dismissed;
   final AutoplayPreferenceModel? model;
   final List<AutoplaySignal> signals;
+  final Map<String, double> weights;
   final int randomSeed;
   final DateTime at;
   final int limit;
 }
 
-List<PlayableMedia> _rankPersonalizedAutoplay(_AutoplayRanking input) {
+List<AutoplayPick> _rankPersonalizedAutoplay(_AutoplayRanking input) {
   final model = input.model;
   final learningSeed = _learningTrack(input.seed);
   final random = Random(input.randomSeed);
   final exploration = model?.explore(Random(random.nextInt(1 << 31)));
-  return selectAutoplayTracks(
+  return rankAutoplayTracks(
     seed: input.seed,
     candidates: input.candidates,
     upcoming: input.upcoming,
@@ -517,15 +619,15 @@ List<PlayableMedia> _rankPersonalizedAutoplay(_AutoplayRanking input) {
     limit: input.limit,
     preferenceAdjustment: model == null
         ? null
-        : (track) {
-            final learning = _learningTrack(track);
-            return model.rankAdjustment(
-                  learning,
-                  previous: learningSeed,
-                  at: input.at,
-                ) +
-                exploration!.adjustment(learning);
-          },
+        : (track) => model.rankAdjustment(
+            _learningTrack(track),
+            previous: learningSeed,
+            at: input.at,
+          ),
+    exploration: exploration == null
+        ? null
+        : (track) => exploration.adjustment(_learningTrack(track)),
     signals: input.signals,
+    weights: input.weights,
   );
 }

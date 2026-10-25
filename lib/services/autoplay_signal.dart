@@ -6,6 +6,9 @@ import 'package:mornye/services/playable_media.dart';
 abstract class AutoplaySignal {
   const AutoplaySignal();
 
+  /// Names the signal's parts of a score, whose weights ranking learns.
+  String get name;
+
   /// Called once per refill before scoring. [session] holds the songs heard
   /// and queued in playback order, newest last; [candidates] the songs that
   /// may be picked.

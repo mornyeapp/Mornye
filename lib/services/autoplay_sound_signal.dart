@@ -16,6 +16,9 @@ class SoundAutoplaySignal extends AutoplaySignal {
   /// Analyzed features by song source.
   final Map<String, Float32List> features;
 
+  @override
+  String get name => 'sound';
+
   /// The most a song gains for sounding like the session.
   static const maxScore = 5.0;
 

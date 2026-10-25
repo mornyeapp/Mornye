@@ -368,6 +368,7 @@ class MusicPlayerHandler extends BaseAudioHandler
         state == AppLifecycleState.paused) {
       unawaited(_runtime.personalization.flush());
       unawaited(_runtime.taste.flush());
+      unawaited(_runtime.ranker.flush());
     }
     if (state == AppLifecycleState.resumed ||
         state == AppLifecycleState.inactive ||
@@ -1951,6 +1952,7 @@ class MusicPlayerHandler extends BaseAudioHandler
     );
     unawaited(_runtime.personalization.flush());
     unawaited(_runtime.taste.flush());
+    unawaited(_runtime.ranker.flush());
     final generation = ++_playRequestGeneration;
     _switchingGeneration = 0;
     _userPaused = true;
@@ -2022,6 +2024,7 @@ class MusicPlayerHandler extends BaseAudioHandler
     _runtime.personalization.finish();
     unawaited(_runtime.personalization.flush());
     unawaited(_runtime.taste.flush());
+    unawaited(_runtime.ranker.flush());
     _playbackAutomation.cancelPendingActions();
     _autoplay.reset();
     cancelSleepTimer();

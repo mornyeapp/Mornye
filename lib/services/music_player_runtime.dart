@@ -11,6 +11,7 @@ import 'package:mornye/services/alsa_output_devices.dart';
 import 'package:mornye/services/app_state_database.dart';
 import 'package:mornye/services/exclusive_output_deck.dart';
 import 'package:mornye/services/autoplay_personalization.dart';
+import 'package:mornye/services/autoplay_ranker.dart';
 import 'package:mornye/services/autoplay_taste.dart';
 import 'package:mornye/services/background_favorites.dart';
 import 'package:mornye/services/discord_presence_service.dart';
@@ -58,6 +59,7 @@ class PlaybackDependencies {
     this.synchronizePlaybackState = _synchronizePlaybackState,
     this.createPersonalization = AutoplayPersonalization.new,
     this.createTaste = AutoplayTaste.new,
+    this.createRanker = AutoplayRanker.new,
     this.createSongAnalysis = _createSongAnalysis,
     AppStateDatabase? sessionDatabase,
     LibraryDatabase? libraryDatabase,
@@ -96,6 +98,7 @@ class PlaybackDependencies {
   final MethodChannel notificationChannel;
   final AutoplayPersonalization Function() createPersonalization;
   final AutoplayTaste Function() createTaste;
+  final AutoplayRanker Function() createRanker;
 
   /// Analysis of how the Library's songs sound, reading songs from it.
   final SongAnalysis Function(LibraryDatabase library) createSongAnalysis;
@@ -198,12 +201,16 @@ class MusicPlayerRuntime {
 
   final PlaybackDependencies dependencies;
   AutoplayPersonalization? _personalization;
-  // What learning observes also teaches [taste] what plays together.
+  // What learning observes also teaches [taste] what plays together and
+  // [ranker] how much each part of a score counts.
   AutoplayPersonalization get personalization =>
       _personalization ??= (dependencies.createPersonalization()
-        ..feedback.listen(taste.record));
+        ..feedback.listen(taste.record)
+        ..feedback.listen(ranker.record));
   AutoplayTaste? _taste;
   AutoplayTaste get taste => _taste ??= dependencies.createTaste();
+  AutoplayRanker? _ranker;
+  AutoplayRanker get ranker => _ranker ??= dependencies.createRanker();
   SongAnalysis? _songAnalysis;
 
   /// How the Library's songs sound, analyzed in the background for Autoplay.
@@ -525,6 +532,7 @@ class MusicPlayerRuntime {
     }
     await _personalization?.dispose();
     await _taste?.dispose();
+    await _ranker?.dispose();
     await _songAnalysis?.dispose();
     await _handlers.close();
     await _mutedPlaybackEvents.close();
