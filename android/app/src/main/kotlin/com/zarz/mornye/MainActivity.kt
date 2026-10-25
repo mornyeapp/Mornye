@@ -64,6 +64,7 @@ class MainActivity: FlutterFragmentActivity() {
     private val nativeBackendMethods = setOf(
         "isAndroidTv",
         "setScreenAwake",
+        "isCharging",
         "getBackendImplementations",
         "ensureInstallMarker",
         "prepareRuntimeState",
@@ -477,6 +478,7 @@ class MainActivity: FlutterFragmentActivity() {
                             result.success(null)
                         }
                         "setScreenAwake" -> handleSetScreenAwake(call, result)
+                        "isCharging" -> handleIsCharging(call, result)
                         "consumeVerificationNotification" -> handleConsumeVerificationNotification(call, result)
                         "ensureInstallMarker" -> handleEnsureInstallMarker(call, result)
                         "prepareRuntimeState" -> handlePrepareRuntimeState(call, result, selectedBackend)

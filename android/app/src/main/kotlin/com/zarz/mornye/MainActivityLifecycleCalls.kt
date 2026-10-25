@@ -1,5 +1,8 @@
 package com.zarz.mornye
 
+import android.content.Intent
+import android.content.IntentFilter
+import android.os.BatteryManager
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import kotlinx.coroutines.Dispatchers
@@ -13,6 +16,12 @@ internal fun MainActivity.handleSetScreenAwake(call: MethodCall, result: MethodC
         window.clearFlags(flag)
     }
     result.success(null)
+}
+
+/** Whether the device is on external power, from the sticky battery broadcast. */
+internal fun MainActivity.handleIsCharging(call: MethodCall, result: MethodChannel.Result) {
+    val battery = registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+    result.success((battery?.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) ?: 0) != 0)
 }
 
 internal fun MainActivity.handleConsumeVerificationNotification(call: MethodCall, result: MethodChannel.Result) {

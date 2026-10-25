@@ -421,6 +421,10 @@ class LibraryDatabase {
   }) async =>
       (await _queueStore()).directoryEntries(includeLocal: includeLocal);
 
+  /// Paths and durations of every downloaded and scanned song.
+  Future<List<Map<String, Object?>>> getSongFiles() async =>
+      (await _queueStore()).songFiles();
+
   @visibleForTesting
   Future<List<Map<String, dynamic>>> getQueueAlbumPage(
     QueueLibraryDbQuery request,

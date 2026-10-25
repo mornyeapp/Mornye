@@ -32,6 +32,7 @@ import 'package:mornye/services/playback_output_volume.dart';
 import 'package:mornye/services/player_widget_service.dart';
 import 'package:mornye/services/remote_media_session.dart';
 import 'package:mornye/services/remote_playback.dart';
+import 'package:mornye/services/song_analysis.dart';
 import 'package:mornye/services/source_deletion_events.dart';
 import 'package:mornye/services/system_volume_service.dart';
 import 'package:mornye/utils/desktop_platform.dart';
@@ -57,6 +58,7 @@ class PlaybackDependencies {
     this.synchronizePlaybackState = _synchronizePlaybackState,
     this.createPersonalization = AutoplayPersonalization.new,
     this.createTaste = AutoplayTaste.new,
+    this.createSongAnalysis = _createSongAnalysis,
     AppStateDatabase? sessionDatabase,
     LibraryDatabase? libraryDatabase,
     HistoryDatabase? historyDatabase,
@@ -94,6 +96,9 @@ class PlaybackDependencies {
   final MethodChannel notificationChannel;
   final AutoplayPersonalization Function() createPersonalization;
   final AutoplayTaste Function() createTaste;
+
+  /// Analysis of how the Library's songs sound, reading songs from it.
+  final SongAnalysis Function(LibraryDatabase library) createSongAnalysis;
   final AppStateDatabase? _sessionDatabase;
   final LibraryDatabase? _libraryDatabase;
   final HistoryDatabase? _historyDatabase;
@@ -144,6 +149,8 @@ class PlaybackDependencies {
       ? _createDeck(playerId)
       : AudioplayersPlaybackDeck(playerId: playerId, equalizerAvailable: false);
   static Future<AudioSession> _getAudioSession() => AudioSession.instance;
+  static SongAnalysis _createSongAnalysis(LibraryDatabase library) =>
+      SongAnalysis(library: library);
   static Future<Map<String, dynamic>> _readNetworkMetadata(String source) =>
       NetworkMetadataService.instance.read(source);
   static Future<String> _resolveNetworkSource(String source) =>
@@ -197,6 +204,13 @@ class MusicPlayerRuntime {
         ..feedback.listen(taste.record));
   AutoplayTaste? _taste;
   AutoplayTaste get taste => _taste ??= dependencies.createTaste();
+  SongAnalysis? _songAnalysis;
+
+  /// How the Library's songs sound, analyzed in the background for Autoplay.
+  SongAnalysis get songAnalysis =>
+      _songAnalysis ??= dependencies.createSongAnalysis(
+        dependencies.libraryDatabase,
+      )..configure(_settings);
   AppSettings _settings;
   MusicPlayerHandler? _handler;
   void Function()? _unsubscribeSourceDeletion;
@@ -269,7 +283,14 @@ class MusicPlayerRuntime {
     final previous = _settings;
     _settings = settings;
     _configureExclusiveOutput(settings);
+    _songAnalysis?.configure(settings);
     _handler?.applySettings(previous);
+  }
+
+  /// Starts analyzing Library songs in the background, and the song playing
+  /// soon after it starts.
+  void startSongAnalysis() {
+    if (!_disposed) songAnalysis.start(mediaItemEvents());
   }
 
   void updateStrings({
@@ -504,6 +525,7 @@ class MusicPlayerRuntime {
     }
     await _personalization?.dispose();
     await _taste?.dispose();
+    await _songAnalysis?.dispose();
     await _handlers.close();
     await _mutedPlaybackEvents.close();
   }

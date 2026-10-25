@@ -138,6 +138,18 @@ class LibraryQueueStore {
     ''' : ''}
   ''');
 
+  /// The path and duration in seconds of every Library song, the same set
+  /// as [directoryEntries], for analyzing how each sounds.
+  Future<List<Map<String, Object?>>> songFiles() => _db.rawQuery('''
+    SELECT 'downloaded' AS source, h.file_path, h.duration
+    FROM history_db.history h
+    WHERE COALESCE(h.file_path, '') != ''
+    UNION ALL
+    SELECT 'local' AS source, l.file_path, l.duration
+    FROM ${LibrarySchema.visibleView} l
+    WHERE COALESCE(l.file_path, '') != '' AND ${_notShadowedByHistory('l')}
+  ''');
+
   Future<QueueLibraryCounts> counts(QueueLibraryDbQuery request) async {
     final fastCounts = await _getUnfilteredQueueCounts(request);
     if (fastCounts != null) return fastCounts;

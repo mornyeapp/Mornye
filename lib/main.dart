@@ -202,6 +202,9 @@ void main() {
           ),
         ),
       );
+      // Waits until startup settles, then analyzes how songs sound for
+      // Autoplay. Media browsers that start without the app shell skip it.
+      musicPlayerRuntime.startSongAnalysis();
       if (Platform.isAndroid || Platform.isIOS) {
         unawaited(
           PlayerWidgetService.instance.initialize((command) async {

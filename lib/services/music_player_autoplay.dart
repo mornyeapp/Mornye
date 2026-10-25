@@ -364,15 +364,28 @@ class _MusicAutoplay {
   Future<List<AutoplaySignal>> _loadSignals(
     List<PlayableMedia> candidates,
   ) async {
-    // What the listener plays with the session's songs, while learning is on.
-    final taste = handler._runtime.personalization.enabled
-        ? await handler._runtime.taste.signal([
-            for (final i in handler._playHistory)
-              if (i >= 0 && i < handler._media.length) handler._media[i],
-            if (handler._index >= 0) ...handler._media.skip(handler._index),
-          ], candidates)
-        : null;
-    return [?taste];
+    // The songs ranking takes as the session: history, then the current
+    // song and the queued ones.
+    final media = handler._media;
+    final session = [
+      for (final i in [...handler._playHistory, handler._index])
+        if (i >= 0 && i < media.length) media[i],
+      if (handler._index >= 0) ...media.skip(handler._index + 1),
+    ];
+    final runtime = handler._runtime;
+    final (sound, taste) = await (
+      // Only the latest songs set the session's sound.
+      runtime.songAnalysis.loadSignal(
+        session: session.skip(max(0, session.length - 16)),
+        candidates: candidates,
+      ),
+      // What the listener plays with the session's songs, while learning
+      // is on.
+      runtime.personalization.enabled
+          ? runtime.taste.signal(session, candidates)
+          : Future<AutoplaySignal?>.value(),
+    ).wait;
+    return [?sound, ?taste];
   }
 
   Future<void> _fill(PlayableMedia seed, int generation) async {

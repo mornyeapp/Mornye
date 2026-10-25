@@ -137,6 +137,12 @@ class PlatformBridge {
     await _channel.invokeMethod<void>('setScreenAwake', {'enabled': enabled});
   }
 
+  /// Whether this Android device is on external power; false elsewhere.
+  static Future<bool> isCharging() async {
+    if (!Platform.isAndroid) return false;
+    return await _channel.invokeMethod<bool>('isCharging') ?? false;
+  }
+
   static const _jsonResultFileKey = '__json_file';
   static const _backgroundJsonDecodeThresholdBytes = 128 * 1024;
   static const _metadataCacheTtl = Duration(minutes: 20);

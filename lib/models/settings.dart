@@ -95,6 +95,14 @@ class AppSettings {
   final String exclusiveOutputDevice;
   final bool autoplay;
   final bool autoplayPersonalization;
+
+  /// Analyze how each Library song sounds, on this device, so Autoplay picks
+  /// songs that sound like the session.
+  final bool songAnalysis;
+
+  /// Android: analyze the Library only while charging. The song playing is
+  /// analyzed either way.
+  final bool songAnalysisOnlyWhileCharging;
   final bool musicHaptics;
   @JsonKey(fromJson: musicHapticsLevelFromJson)
   final double musicHapticsSensitivity;
@@ -249,6 +257,8 @@ class AppSettings {
     this.exclusiveOutputDevice = '',
     this.autoplay = false,
     this.autoplayPersonalization = true,
+    this.songAnalysis = true,
+    this.songAnalysisOnlyWhileCharging = true,
     this.musicHaptics = false,
     this.musicHapticsSensitivity = 0.5,
     this.musicHapticsStrength = 0.5,
@@ -376,6 +386,8 @@ class AppSettings {
     String? exclusiveOutputDevice,
     bool? autoplay,
     bool? autoplayPersonalization,
+    bool? songAnalysis,
+    bool? songAnalysisOnlyWhileCharging,
     bool? musicHaptics,
     double? musicHapticsSensitivity,
     double? musicHapticsStrength,
@@ -500,6 +512,9 @@ class AppSettings {
       autoplay: autoplay ?? this.autoplay,
       autoplayPersonalization:
           autoplayPersonalization ?? this.autoplayPersonalization,
+      songAnalysis: songAnalysis ?? this.songAnalysis,
+      songAnalysisOnlyWhileCharging:
+          songAnalysisOnlyWhileCharging ?? this.songAnalysisOnlyWhileCharging,
       musicHaptics: musicHaptics ?? this.musicHaptics,
       musicHapticsSensitivity:
           musicHapticsSensitivity ?? this.musicHapticsSensitivity,
