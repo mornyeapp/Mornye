@@ -3,6 +3,7 @@ import 'package:flutter/services.dart' show HapticFeedback;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/controllers/player_metadata_controller.dart';
 import 'package:mornye/l10n/l10n.dart';
+import 'package:mornye/providers/lyrics_translation_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/lyrics_parser.dart';
@@ -43,13 +44,36 @@ class PlayerLyricsSection extends ConsumerWidget {
             (settings.playerShowPronunciation, settings.playerShowTranslation),
       ),
     );
+    // The AI translation is keyed by these; a change picks another one.
+    ref.watch(
+      settingsProvider.select(
+        (settings) => (
+          settings.lyricsAiProvider,
+          settings.lyricsAiModel,
+          settings.lyricsAiBaseUrl,
+          settings.lyricsTranslationLanguage,
+          settings.locale,
+          settings.lyricsAutoTranslate,
+        ),
+      ),
+    );
+    ref.watch(lyricsTranslationProvider.select((state) => state.results));
+    final translation = ref.read(lyricsTranslationProvider.notifier);
     return ListenableBuilder(
       listenable: metadata,
-      builder: (context, _) => _buildLyricsSection(context, visibility),
+      builder: (context, _) => _buildLyricsSection(
+        context,
+        visibility,
+        translation.display(metadata.lyrics),
+      ),
     );
   }
 
-  Widget _buildLyricsSection(BuildContext context, (bool, bool) visibility) {
+  Widget _buildLyricsSection(
+    BuildContext context,
+    (bool, bool) visibility,
+    ParsedLyrics lyrics,
+  ) {
     // Center in the part the player's controls leave visible. Only these
     // states depend on it, so a lyric list does not rebuild as they fade.
     if (metadata.loading || metadata.searchingOnline) {
@@ -84,7 +108,7 @@ class PlayerLyricsSection extends ConsumerWidget {
         },
       );
     }
-    return _lyricsContent(context, visibility);
+    return _lyricsContent(context, visibility, lyrics);
   }
 
   Widget _noLyrics(BuildContext context) => Padding(
@@ -119,13 +143,17 @@ class PlayerLyricsSection extends ConsumerWidget {
     ),
   );
 
-  Widget _lyricsContent(BuildContext context, (bool, bool) visibility) {
+  Widget _lyricsContent(
+    BuildContext context,
+    (bool, bool) visibility,
+    ParsedLyrics lyrics,
+  ) {
     if (metadata.lyrics.synced) {
       return Stack(
         fit: StackFit.expand,
         children: [
           SyncedLyricsView(
-            lyrics: metadata.lyrics,
+            lyrics: lyrics,
             seekPreview: seekPreview,
             credits: _lyricsCredits(),
             colorScheme: colorScheme,

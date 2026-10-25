@@ -207,6 +207,24 @@ class AppSettings {
   final String
   musixmatchLanguage; // Optional ISO language code for Musixmatch localized lyrics
 
+  /// AI lyrics translation. The API key lives in secure storage, never here.
+  final String lyricsAiProvider;
+
+  /// API root of a custom OpenAI-compatible server.
+  final String lyricsAiBaseUrl;
+
+  /// Empty uses the provider's default model.
+  final String lyricsAiModel;
+
+  /// BCP-47 target language; empty follows the app language.
+  final String lyricsTranslationLanguage;
+
+  /// Optional guidance added to the translation prompt.
+  final String lyricsAiInstruction;
+
+  /// Translate lyrics without a translation as they open.
+  final bool lyricsAutoTranslate;
+
   final String
   lastSeenVersion; // Last app version the user has acknowledged (e.g. '3.7.0')
 
@@ -331,6 +349,12 @@ class AppSettings {
     this.lyricsMultiPersonWordByWord = true,
     this.lyricsAppleElrcWordSync = true,
     this.musixmatchLanguage = '',
+    this.lyricsAiProvider = 'openai',
+    this.lyricsAiBaseUrl = '',
+    this.lyricsAiModel = '',
+    this.lyricsTranslationLanguage = '',
+    this.lyricsAiInstruction = '',
+    this.lyricsAutoTranslate = false,
     this.lastSeenVersion = '',
     this.deduplicateDownloads = true,
     this.allowQualityVariants = false,
@@ -466,6 +490,12 @@ class AppSettings {
     bool? lyricsMultiPersonWordByWord,
     bool? lyricsAppleElrcWordSync,
     String? musixmatchLanguage,
+    String? lyricsAiProvider,
+    String? lyricsAiBaseUrl,
+    String? lyricsAiModel,
+    String? lyricsTranslationLanguage,
+    String? lyricsAiInstruction,
+    bool? lyricsAutoTranslate,
     String? lastSeenVersion,
     bool? deduplicateDownloads,
     bool? allowQualityVariants,
@@ -618,6 +648,13 @@ class AppSettings {
       lyricsAppleElrcWordSync:
           lyricsAppleElrcWordSync ?? this.lyricsAppleElrcWordSync,
       musixmatchLanguage: musixmatchLanguage ?? this.musixmatchLanguage,
+      lyricsAiProvider: lyricsAiProvider ?? this.lyricsAiProvider,
+      lyricsAiBaseUrl: lyricsAiBaseUrl ?? this.lyricsAiBaseUrl,
+      lyricsAiModel: lyricsAiModel ?? this.lyricsAiModel,
+      lyricsTranslationLanguage:
+          lyricsTranslationLanguage ?? this.lyricsTranslationLanguage,
+      lyricsAiInstruction: lyricsAiInstruction ?? this.lyricsAiInstruction,
+      lyricsAutoTranslate: lyricsAutoTranslate ?? this.lyricsAutoTranslate,
       lastSeenVersion: lastSeenVersion ?? this.lastSeenVersion,
       deduplicateDownloads: deduplicateDownloads ?? this.deduplicateDownloads,
       allowQualityVariants: allowQualityVariants ?? this.allowQualityVariants,

@@ -11,6 +11,7 @@ import 'package:mornye/controllers/player_metadata_controller.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/download_history_provider.dart';
 import 'package:mornye/providers/library_collections_provider.dart';
+import 'package:mornye/providers/lyrics_translation_provider.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/routes/now_playing_route.dart';
@@ -35,6 +36,7 @@ import 'package:mornye/widgets/desktop/desktop_commands.dart'
 import 'package:mornye/widgets/desktop/desktop_inspector.dart';
 import 'package:mornye/widgets/link/link_actions.dart';
 import 'package:mornye/widgets/link/link_devices_sheet.dart';
+import 'package:mornye/widgets/lyrics_options_button.dart';
 import 'package:mornye/widgets/lyrics_screen_awake.dart';
 import 'package:mornye/widgets/player_artwork.dart';
 import 'package:mornye/widgets/player_gesture_regions.dart';
@@ -112,6 +114,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
   ProviderSubscription<bool>? _lyricsPlayingSub;
   late final _trackMetadata =
       widget.metadataControllerFactory?.call() ?? PlayerMetadataController();
+  late final LyricsTranslationController _lyricsTranslation;
   late int _currentPage = widget.initialPage;
   bool _landscape = false;
   bool _queueSheetShowing = false;
@@ -139,6 +142,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
   @override
   void initState() {
     super.initState();
+    _lyricsTranslation = ref.read(lyricsTranslationProvider.notifier);
     if (widget.embedded) desktopInspectorPanel.addListener(_onInspectorChanged);
     _mediaItemSub = ref.listenManual<AsyncValue<MediaItem?>>(
       currentMediaItemProvider,
@@ -231,6 +235,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
     _lyricsIdleTimer?.cancel();
     _mediaItemSub?.close();
     _lyricsPlayingSub?.close();
+    _lyricsTranslation.cancel(owner: this);
     _trackMetadata.dispose();
     _artworkForeground.dispose();
     _seekPreview.dispose();
@@ -923,142 +928,18 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
     );
   }
 
-  Widget _lyricsOptionsButton(ColorScheme colorScheme) => ListenableBuilder(
-    listenable: _trackMetadata,
-    builder: (context, _) =>
-        _buildLyricsOptionsButton(colorScheme) ?? const SizedBox.shrink(),
+  Widget _lyricsOptionsButton(ColorScheme colorScheme) => LyricsOptionsButton(
+    metadata: _trackMetadata,
+    colorScheme: colorScheme,
+    translationOwner: this,
+    onOpenChanged: _onLyricsOptionsOpenChanged,
   );
 
-  Widget? _buildLyricsOptionsButton(ColorScheme colorScheme) {
-    if (_trackMetadata.loading || !_trackMetadata.lyrics.synced) return null;
-    final pronunciation = _trackMetadata.lyrics.lines.any(
-      (line) => line.romanization?.trim().isNotEmpty == true,
-    );
-    final translation = _trackMetadata.lyrics.lines.any(
-      (line) => line.translation?.trim().isNotEmpty == true,
-    );
-    if (!pronunciation && !translation) return null;
-    return Builder(
-      builder: (buttonContext) => AppIconButton.filledTonal(
-        key: const ValueKey('lyrics-language-options'),
-        tooltip: context.l10n.nowPlayingLyricsLanguageOptions,
-        icon: const AppIcon(Icons.translate_rounded),
-        style: IconButton.styleFrom(
-          foregroundColor: _lyricsOptionsOpen
-              ? colorScheme.surface
-              : colorScheme.onSurface,
-          backgroundColor: colorScheme.onSurface.withValues(
-            alpha: _lyricsOptionsOpen ? 0.85 : 0.16,
-          ),
-        ),
-        onPressed: () => _showLyricsOptions(
-          buttonContext,
-          pronunciation: pronunciation,
-          translation: translation,
-        ),
-      ),
-    );
-  }
-
-  Future<void> _showLyricsOptions(
-    BuildContext buttonContext, {
-    required bool pronunciation,
-    required bool translation,
-  }) async {
-    final settings = ref.read(settingsProvider);
-    final l10n = context.l10n;
-    final actions = <(String, String, IconData)>[
-      if (pronunciation)
-        (
-          'pronunciation',
-          settings.playerShowPronunciation
-              ? l10n.nowPlayingHidePronunciation
-              : l10n.nowPlayingShowPronunciation,
-          settings.playerShowPronunciation
-              ? Icons.voice_over_off_outlined
-              : Icons.record_voice_over_outlined,
-        ),
-      if (translation)
-        (
-          'translation',
-          settings.playerShowTranslation
-              ? l10n.nowPlayingHideTranslation
-              : l10n.nowPlayingShowTranslation,
-          Icons.translate_rounded,
-        ),
-    ];
-    _lyricsIdleTimer?.cancel();
-    setState(() => _lyricsOptionsOpen = true);
-    try {
-      final anchor = mornyeMenuAnchor(buttonContext);
-      var menuWidth = 240.0;
-      for (final (_, label, _) in actions) {
-        final painter = TextPainter(
-          text: TextSpan(
-            text: label,
-            style: Theme.of(
-              context,
-            ).textTheme.bodyLarge?.copyWith(fontSize: 15),
-          ),
-          textDirection: Directionality.of(context),
-          textScaler: MediaQuery.textScalerOf(context),
-        )..layout();
-        if (painter.width + 80 > menuWidth) menuWidth = painter.width + 80;
-        painter.dispose();
-      }
-      final action = context.isMornye
-          ? await showMornyeContextMenu<String>(
-              context: buttonContext,
-              anchor: anchor,
-              preferAbove: true,
-              maxWidth: menuWidth,
-              builder: (menuContext) => MornyeContextMenu(
-                dense: true,
-                groups: [
-                  [
-                    for (final (value, label, icon) in actions)
-                      MornyeMenuAction(
-                        icon: icon,
-                        label: label,
-                        onPressed: () => Navigator.of(menuContext).pop(value),
-                      ),
-                  ],
-                ],
-              ),
-            )
-          : await showMenu<String>(
-              context: buttonContext,
-              position: RelativeRect.fromRect(
-                anchor ?? Rect.zero,
-                Offset.zero & MediaQuery.sizeOf(context),
-              ),
-              items: [
-                for (final (value, label, icon) in actions)
-                  PopupMenuItem(
-                    value: value,
-                    child: Row(
-                      children: [
-                        AppIcon(icon),
-                        const SizedBox(width: 12),
-                        Flexible(child: Text(label)),
-                      ],
-                    ),
-                  ),
-              ],
-            );
-      if (!mounted) return;
-      final notifier = ref.read(settingsProvider.notifier);
-      if (action == 'pronunciation') {
-        notifier.setPlayerShowPronunciation(!settings.playerShowPronunciation);
-      } else if (action == 'translation') {
-        notifier.setPlayerShowTranslation(!settings.playerShowTranslation);
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _lyricsOptionsOpen = false);
-        _scheduleLyricsControlsHide();
-      }
-    }
+  void _onLyricsOptionsOpenChanged(bool open) {
+    if (!mounted) return;
+    if (open) _lyricsIdleTimer?.cancel();
+    setState(() => _lyricsOptionsOpen = open);
+    if (!open) _scheduleLyricsControlsHide();
   }
 
   Future<void> _openExternally(String source) async {

@@ -787,6 +787,27 @@ class SettingsNotifier extends Notifier<AppSettings> {
     _syncLyricsSettingsToBackend();
   }
 
+  /// Switching provider resets the model to the new provider's default.
+  void setLyricsAiProvider(String provider) {
+    if (provider == state.lyricsAiProvider) return;
+    _commit(state.copyWith(lyricsAiProvider: provider, lyricsAiModel: ''));
+  }
+
+  void setLyricsAiBaseUrl(String url) =>
+      _commit(state.copyWith(lyricsAiBaseUrl: url.trim()));
+
+  void setLyricsAiModel(String model) =>
+      _commit(state.copyWith(lyricsAiModel: model.trim()));
+
+  void setLyricsTranslationLanguage(String code) =>
+      _commit(state.copyWith(lyricsTranslationLanguage: code.trim()));
+
+  void setLyricsAiInstruction(String instruction) =>
+      _commit(state.copyWith(lyricsAiInstruction: instruction.trim()));
+
+  void setLyricsAutoTranslate(bool enabled) =>
+      _commit(state.copyWith(lyricsAutoTranslate: enabled));
+
   Future<void> setFirstLaunchComplete() async {
     // The router leaves setup as soon as this flag changes. Persist the final
     // folder settings first so a restart cannot send the user back to setup.

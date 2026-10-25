@@ -3,9 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/controllers/clickable_metadata.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/extension_provider.dart';
+import 'package:mornye/providers/lyrics_translation_provider.dart';
 import 'package:mornye/providers/runtime_profile_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
+import 'package:mornye/screens/settings/lyrics_ai_translation_page.dart';
 import 'package:mornye/screens/settings/lyrics_provider_priority_page.dart';
+import 'package:mornye/services/lyrics_ai_client.dart';
 import 'package:mornye/widgets/settings_group.dart';
 import 'package:mornye/widgets/app_text_field.dart';
 import 'package:mornye/widgets/app_sliver_header.dart';
@@ -14,6 +17,7 @@ import 'package:mornye/widgets/app_alert_dialog.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/lyrics_provider_names.dart';
 import 'package:mornye/utils/nav_bar_inset.dart';
+import 'package:mornye/widgets/lyrics_options_button.dart';
 import 'package:mornye/widgets/lyrics_size_setting.dart';
 
 class LyricsSettingsPage extends ConsumerWidget {
@@ -26,6 +30,11 @@ class LyricsSettingsPage extends ConsumerWidget {
       for (final extension in ref.watch(extensionProvider).extensions)
         'extension:${extension.id.toLowerCase()}': extension.displayName,
     };
+    final aiProvider = LyricsAiProvider.fromId(settings.lyricsAiProvider);
+    final aiReady = lyricsAiReady(
+      settings,
+      ref.watch(lyricsAiKeyProvider(aiProvider.id)).value ?? '',
+    );
 
     return PopScope(
       canPop: true,
@@ -50,6 +59,18 @@ class LyricsSettingsPage extends ConsumerWidget {
                   onChanged: (value) => ref
                       .read(settingsProvider.notifier)
                       .setKeepScreenOnLyrics(value),
+                ),
+                SettingsItem(
+                  key: const ValueKey('lyrics-ai-translation'),
+                  icon: Icons.auto_awesome_outlined,
+                  title: context.l10n.lyricsAiTranslation,
+                  subtitle: aiReady
+                      ? lyricsAiProviderName(context.l10n, aiProvider)
+                      : context.l10n.lyricsAiTranslationOff,
+                  onTap: () => pushPage<void>(
+                    context,
+                    (_) => const LyricsAiTranslationPage(),
+                  ),
                 ),
                 SettingsSwitchItem(
                   icon: Icons.subtitles_outlined,

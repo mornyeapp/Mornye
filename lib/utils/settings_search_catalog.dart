@@ -446,6 +446,19 @@ class SettingsSearchCatalog {
           keywords: const ['screen timeout', 'awake', 'sleep', 'layar'],
         ),
         SettingsSearchEntry(
+          icon: Icons.auto_awesome_outlined,
+          title: l10n.lyricsAiTranslation,
+          keywords: const [
+            'translate lyrics',
+            'api key',
+            'openai',
+            'gemini',
+            'claude',
+            'openrouter',
+            'ollama',
+          ],
+        ),
+        SettingsSearchEntry(
           icon: Icons.subtitles_outlined,
           title: l10n.optionsEmbedLyrics,
           keywords: const ['write lyrics', 'lrc'],

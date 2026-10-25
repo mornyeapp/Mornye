@@ -6812,6 +6812,262 @@
   "@nowPlayingNoLyricsOnline": {
     "description": "Empty state after an online lyrics search for the playing track found nothing"
   },
+  "nowPlayingTranslateLyrics": "Translate Lyrics",
+  "@nowPlayingTranslateLyrics": {
+    "description": "Player lyrics menu action that translates the current lyrics with the user's AI provider"
+  },
+  "nowPlayingCancelTranslation": "Cancel Translation",
+  "@nowPlayingCancelTranslation": {
+    "description": "Player lyrics menu action that stops an AI lyrics translation in progress"
+  },
+  "nowPlayingTranslatingLyrics": "Translating lyrics, {percent}%",
+  "@nowPlayingTranslatingLyrics": {
+    "description": "Tooltip and screen reader label of the lyrics menu button while an AI translation runs",
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "lyricsTranslateSheetTitle": "Translate Into",
+  "@lyricsTranslateSheetTitle": {
+    "description": "Title of the sheet that picks the language to translate the current lyrics into"
+  },
+  "lyricsTranslateSheetSubtitle": "The lyrics are sent to {provider}.",
+  "@lyricsTranslateSheetSubtitle": {
+    "description": "Notice under the translate sheet title naming the AI provider that receives the lyrics",
+    "placeholders": {
+      "provider": {
+        "type": "String"
+      }
+    }
+  },
+  "lyricsTranslatePartial": "{count, plural, =1{1 line} other{{count} lines}} could not be translated",
+  "@lyricsTranslatePartial": {
+    "description": "Snackbar after an AI translation that left some lines untranslated",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "lyricsAiTranslation": "AI Translation",
+  "@lyricsAiTranslation": {
+    "description": "Lyrics settings row and page title for translating lyrics with the user's own AI provider"
+  },
+  "lyricsAiTranslationOff": "Not set up",
+  "@lyricsAiTranslationOff": {
+    "description": "Subtitle of the AI Translation settings row before a provider is configured"
+  },
+  "lyricsAiTranslationNotice": "Lyrics you translate are sent to the provider you choose, using your own API key. The provider's terms and pricing apply. Translations are saved on this device and never change your lyric files.",
+  "@lyricsAiTranslationNotice": {
+    "description": "Privacy notice at the top of the AI translation settings page"
+  },
+  "lyricsAiSectionProvider": "Provider",
+  "@lyricsAiSectionProvider": {
+    "description": "AI translation settings section for the provider, key and model"
+  },
+  "lyricsAiSectionTranslation": "Translation",
+  "@lyricsAiSectionTranslation": {
+    "description": "AI translation settings section for the target language and behavior"
+  },
+  "lyricsAiProvider": "Provider",
+  "@lyricsAiProvider": {
+    "description": "AI translation setting that picks the AI service"
+  },
+  "lyricsAiProviderCustom": "Custom Server",
+  "@lyricsAiProviderCustom": {
+    "description": "AI provider choice for a self-hosted or other OpenAI-compatible server"
+  },
+  "lyricsAiProviderCustomSubtitle": "Any OpenAI-compatible server, such as Ollama or LM Studio",
+  "@lyricsAiProviderCustomSubtitle": {
+    "description": "Subtitle of the custom AI provider choice"
+  },
+  "lyricsAiBaseUrl": "Server URL",
+  "@lyricsAiBaseUrl": {
+    "description": "AI translation setting for the address of a custom OpenAI-compatible server"
+  },
+  "lyricsAiBaseUrlInvalid": "Enter a URL that starts with http:// or https://",
+  "@lyricsAiBaseUrlInvalid": {
+    "description": "Validation error for the custom AI server URL"
+  },
+  "lyricsAiNotSet": "Not set",
+  "@lyricsAiNotSet": {
+    "description": "Subtitle of an AI translation setting that has no value yet"
+  },
+  "lyricsAiApiKey": "API Key",
+  "@lyricsAiApiKey": {
+    "description": "AI translation setting for the user's API key"
+  },
+  "lyricsAiApiKeyOptional": "Optional for local servers",
+  "@lyricsAiApiKeyOptional": {
+    "description": "Subtitle of the API key setting for a custom server without a key"
+  },
+  "lyricsAiApiKeySaved": "Saved, ends in {suffix}",
+  "@lyricsAiApiKeySaved": {
+    "description": "Subtitle of the API key setting showing only its last characters",
+    "placeholders": {
+      "suffix": {
+        "type": "String"
+      }
+    }
+  },
+  "lyricsAiApiKeyDescription": "Kept in this device's secure storage and only sent to {provider}.",
+  "@lyricsAiApiKeyDescription": {
+    "description": "Explanation in the API key sheet",
+    "placeholders": {
+      "provider": {
+        "type": "String"
+      }
+    }
+  },
+  "lyricsAiModel": "Model",
+  "@lyricsAiModel": {
+    "description": "AI translation setting for the model id"
+  },
+  "lyricsAiModelDefault": "Default ({model})",
+  "@lyricsAiModelDefault": {
+    "description": "Subtitle of the model setting when the provider's default model is used",
+    "placeholders": {
+      "model": {
+        "type": "String"
+      }
+    }
+  },
+  "lyricsAiModelHint": "Model ID",
+  "@lyricsAiModelHint": {
+    "description": "Hint of the model id text field"
+  },
+  "lyricsAiModelUseDefault": "Use Default",
+  "@lyricsAiModelUseDefault": {
+    "description": "Action in the model sheet that returns to the provider's default model"
+  },
+  "lyricsAiModelLoad": "Load Models",
+  "@lyricsAiModelLoad": {
+    "description": "Button in the model sheet that lists the models the provider offers"
+  },
+  "lyricsAiModelsEmpty": "The provider listed no models",
+  "@lyricsAiModelsEmpty": {
+    "description": "Shown in the model sheet when the provider's model list is empty"
+  },
+  "lyricsAiTestConnection": "Test Connection",
+  "@lyricsAiTestConnection": {
+    "description": "AI translation settings action that translates one line to check the key and model"
+  },
+  "lyricsAiTestConnectionSubtitle": "Translates one line to check the key and model",
+  "@lyricsAiTestConnectionSubtitle": {
+    "description": "Subtitle of the test connection action"
+  },
+  "lyricsAiTestSuccess": "The connection works",
+  "@lyricsAiTestSuccess": {
+    "description": "Snackbar after a successful AI translation connection test"
+  },
+  "lyricsAiTargetLanguage": "Translate Into",
+  "@lyricsAiTargetLanguage": {
+    "description": "AI translation setting for the target language"
+  },
+  "lyricsAiTargetLanguageApp": "App language ({language})",
+  "@lyricsAiTargetLanguageApp": {
+    "description": "Target language choice that follows the app language",
+    "placeholders": {
+      "language": {
+        "type": "String"
+      }
+    }
+  },
+  "lyricsAiInstruction": "Extra Instruction",
+  "@lyricsAiInstruction": {
+    "description": "AI translation setting for optional guidance added to the translation request"
+  },
+  "lyricsAiInstructionNone": "None",
+  "@lyricsAiInstructionNone": {
+    "description": "Subtitle of the extra instruction setting when it is empty"
+  },
+  "lyricsAiInstructionHint": "For example: keep the rhymes where you can",
+  "@lyricsAiInstructionHint": {
+    "description": "Hint of the extra instruction text field"
+  },
+  "lyricsAiAutoTranslate": "Translate Automatically",
+  "@lyricsAiAutoTranslate": {
+    "description": "AI translation switch that translates lyrics as they open"
+  },
+  "lyricsAiAutoTranslateSubtitle": "Translates synced lyrics that have no translation when you open them, using your provider's quota",
+  "@lyricsAiAutoTranslateSubtitle": {
+    "description": "Subtitle of the automatic AI translation switch"
+  },
+  "lyricsAiClearCache": "Clear Saved Translations",
+  "@lyricsAiClearCache": {
+    "description": "AI translation settings action that deletes saved translations"
+  },
+  "lyricsAiClearCacheSubtitle": "{count, plural, =0{No saved translations} =1{1 song} other{{count} songs}}",
+  "@lyricsAiClearCacheSubtitle": {
+    "description": "Subtitle of the clear saved translations action",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "lyricsAiClearCacheConfirm": "Clear saved translations?",
+  "@lyricsAiClearCacheConfirm": {
+    "description": "Title of the confirmation before deleting saved AI translations"
+  },
+  "lyricsAiClearCacheMessage": "Songs will need to be translated again, which uses your provider's quota.",
+  "@lyricsAiClearCacheMessage": {
+    "description": "Message of the confirmation before deleting saved AI translations"
+  },
+  "lyricsAiClearCacheDone": "Saved translations cleared",
+  "@lyricsAiClearCacheDone": {
+    "description": "Snackbar after deleting saved AI translations"
+  },
+  "lyricsAiErrorNotConfigured": "Set up AI translation in Lyrics settings first",
+  "@lyricsAiErrorNotConfigured": {
+    "description": "AI translation error when no provider, key or model is set"
+  },
+  "lyricsAiErrorInvalidKey": "The provider did not accept the API key",
+  "@lyricsAiErrorInvalidKey": {
+    "description": "AI translation error for a rejected API key"
+  },
+  "lyricsAiErrorRateLimited": "The provider is limiting requests. Try again in a moment",
+  "@lyricsAiErrorRateLimited": {
+    "description": "AI translation error when the provider rate limits the requests"
+  },
+  "lyricsAiErrorQuota": "Your provider account is out of credit or quota",
+  "@lyricsAiErrorQuota": {
+    "description": "AI translation error for an exhausted quota or billing problem"
+  },
+  "lyricsAiErrorNetwork": "Could not reach the provider. Check your connection",
+  "@lyricsAiErrorNetwork": {
+    "description": "AI translation error when the provider cannot be reached"
+  },
+  "lyricsAiErrorTimeout": "The provider took too long to answer",
+  "@lyricsAiErrorTimeout": {
+    "description": "AI translation error when a request times out"
+  },
+  "lyricsAiErrorModelNotFound": "The provider does not offer this model",
+  "@lyricsAiErrorModelNotFound": {
+    "description": "AI translation error for an unknown model id"
+  },
+  "lyricsAiErrorRefused": "The model declined to translate these lyrics",
+  "@lyricsAiErrorRefused": {
+    "description": "AI translation error when the model refuses the request"
+  },
+  "lyricsAiErrorTruncated": "The model's answer was cut off. Try another model",
+  "@lyricsAiErrorTruncated": {
+    "description": "AI translation error when the reply hit the output limit"
+  },
+  "lyricsAiErrorBadResponse": "The model's answer could not be read. Try another model",
+  "@lyricsAiErrorBadResponse": {
+    "description": "AI translation error when the reply is not the expected JSON"
+  },
+  "lyricsAiErrorService": "The provider had a problem. Try again later",
+  "@lyricsAiErrorService": {
+    "description": "AI translation error for other provider failures"
+  },
+  "lyricsAiErrorNoLyrics": "These lyrics have nothing to translate",
+  "@lyricsAiErrorNoLyrics": {
+    "description": "AI translation error when the lyrics have no translatable lines"
+  },
   "nowPlayingLibraryEmpty": "Your library is empty",
   "@nowPlayingLibraryEmpty": {
     "description": "Snackbar when shuffle library is requested but library has no tracks"
