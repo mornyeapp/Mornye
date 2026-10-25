@@ -13,6 +13,7 @@ import 'package:mornye/models/unified_library_item.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/services/app_state_database.dart';
 import 'package:mornye/services/autoplay_personalization.dart';
+import 'package:mornye/services/autoplay_taste.dart';
 import 'package:mornye/services/background_favorites.dart';
 import 'package:mornye/services/history_database.dart';
 import 'package:mornye/services/library_collections_database.dart';
@@ -29,6 +30,8 @@ import 'package:mornye/services/playback_notification.dart';
 import 'package:mornye/services/source_deletion_events.dart';
 import 'package:mornye/utils/file_access.dart';
 import 'package:mornye/utils/logger.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart'
+    show databaseFactoryFfi, sqfliteFfiInit;
 
 class _Deck implements PlaybackDeck {
   @override
@@ -344,6 +347,7 @@ MusicPlayerRuntime _runtime({
   SourceDeletionEvents? sourceDeletionEvents,
   ListeningRecorder? recorder,
   AutoplayPersonalization Function()? createPersonalization,
+  AutoplayTaste Function()? createTaste,
   bool isIOS = false,
   bool isAndroid = false,
   Future<void> Function()? synchronizePlaybackState,
@@ -369,6 +373,7 @@ MusicPlayerRuntime _runtime({
     dependencies: PlaybackDependencies(
       createPersonalization:
           createPersonalization ?? AutoplayPersonalization.new,
+      createTaste: createTaste ?? AutoplayTaste.new,
       createDeck:
           createDeck ??
           (_) {
@@ -636,6 +641,86 @@ void main() {
       expect(handler.playbackState.value.playing, isTrue);
     },
   );
+
+  test('songs played together rank through the real autoplay worker', () async {
+    sqfliteFfiInit();
+    final directory = await Directory.systemTemp.createTemp('autoplay-taste-');
+    addTearDown(() => directory.delete(recursive: true));
+    final db = await AutoplayTaste.openWithFactory(
+      databaseFactoryFfi,
+      '${directory.path}/taste.db',
+    );
+    addTearDown(db.close);
+    final taste = AutoplayTaste(
+      open: () async => db,
+      train: (plays) async => trainAutoplayTaste(plays),
+    );
+    // Night artists play together, and Day artists, never with each other.
+    for (var session = 0; session < 16; session++) {
+      final group = session.isEven ? 'Night' : 'Day';
+      for (var i = 0; i < 8; i++) {
+        taste.record(
+          AutoplayFeedback(
+            kind: AutoplayFeedbackKind.listened,
+            track: AutoplayLearningTrack(
+              source: '/$group/$i.flac',
+              title: 'Song ${i % 4}',
+              artist: '$group ${1 + i % 3}',
+            ),
+            previous: null,
+            at: DateTime(
+              2026,
+            ).add(Duration(hours: 3 * session, minutes: 4 * i)),
+            reward: 1,
+          ),
+        );
+      }
+    }
+    await taste.train();
+    expect(taste.model?.positives, 128);
+    final runtime = _runtime(
+      settings: const AppSettings(
+        pauseOnMute: false,
+        autoplay: true,
+        autoplayPersonalization: true,
+      ),
+      createPersonalization: () =>
+          AutoplayPersonalization(load: () async => null, save: (_) async {}),
+      createTaste: () => taste,
+    );
+    final handler = MusicPlayerHandler(
+      runtime: runtime,
+      autoplayLibraryLoader: (_) async => [
+        const PlayableMedia(
+          id: 'day',
+          source: '/day.flac',
+          title: 'Song 2',
+          artist: 'Day 2',
+        ),
+        const PlayableMedia(
+          id: 'night',
+          source: '/night.flac',
+          title: 'Song 2',
+          artist: 'Night 3',
+        ),
+      ],
+    );
+    await handler.setQueueAndPlay([
+      const PlayableMedia(
+        id: 'one',
+        source: '/one.flac',
+        title: 'Song 0',
+        artist: 'Night 1',
+      ),
+    ]);
+    await handler.queue
+        .firstWhere((queue) => queue.length == 3)
+        .timeout(const Duration(seconds: 5));
+    expect(handler.queue.value.map((item) => item.id), ['one', 'night', 'day']);
+    await resetAutoplayLearning(runtime: runtime);
+    expect(await taste.readLog(), isEmpty);
+    expect(taste.model, isNull);
+  });
 
   test(
     'player learns explicit skips, excludes pauses and obeys live opt-out',

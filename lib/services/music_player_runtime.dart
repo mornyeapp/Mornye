@@ -11,6 +11,7 @@ import 'package:mornye/services/alsa_output_devices.dart';
 import 'package:mornye/services/app_state_database.dart';
 import 'package:mornye/services/exclusive_output_deck.dart';
 import 'package:mornye/services/autoplay_personalization.dart';
+import 'package:mornye/services/autoplay_taste.dart';
 import 'package:mornye/services/background_favorites.dart';
 import 'package:mornye/services/discord_presence_service.dart';
 import 'package:mornye/services/history_database.dart';
@@ -55,6 +56,7 @@ class PlaybackDependencies {
     this.initializeHandler = _initializeAudioHandler,
     this.synchronizePlaybackState = _synchronizePlaybackState,
     this.createPersonalization = AutoplayPersonalization.new,
+    this.createTaste = AutoplayTaste.new,
     AppStateDatabase? sessionDatabase,
     LibraryDatabase? libraryDatabase,
     HistoryDatabase? historyDatabase,
@@ -91,6 +93,7 @@ class PlaybackDependencies {
   final Future<void> Function() synchronizePlaybackState;
   final MethodChannel notificationChannel;
   final AutoplayPersonalization Function() createPersonalization;
+  final AutoplayTaste Function() createTaste;
   final AppStateDatabase? _sessionDatabase;
   final LibraryDatabase? _libraryDatabase;
   final HistoryDatabase? _historyDatabase;
@@ -188,8 +191,12 @@ class MusicPlayerRuntime {
 
   final PlaybackDependencies dependencies;
   AutoplayPersonalization? _personalization;
+  // What learning observes also teaches [taste] what plays together.
   AutoplayPersonalization get personalization =>
-      _personalization ??= dependencies.createPersonalization();
+      _personalization ??= (dependencies.createPersonalization()
+        ..feedback.listen(taste.record));
+  AutoplayTaste? _taste;
+  AutoplayTaste get taste => _taste ??= dependencies.createTaste();
   AppSettings _settings;
   MusicPlayerHandler? _handler;
   void Function()? _unsubscribeSourceDeletion;
@@ -496,6 +503,7 @@ class MusicPlayerRuntime {
       // Initialization may have failed because its pending handler was closed.
     }
     await _personalization?.dispose();
+    await _taste?.dispose();
     await _handlers.close();
     await _mutedPlaybackEvents.close();
   }

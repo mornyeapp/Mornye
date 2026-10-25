@@ -6,6 +6,7 @@ typedef AutoplayLibraryLoader =
 Future<void> resetAutoplayLearning({MusicPlayerRuntime? runtime}) async {
   final target = runtime ?? musicPlayerRuntime;
   await target.personalization.reset();
+  await target.taste.reset();
   final handler = target.handler;
   if (handler == null || handler.isDisposed) return;
   handler._configurePersonalization();
@@ -362,7 +363,17 @@ class _MusicAutoplay {
   /// What the refill knows beyond metadata, loaded beside its candidates.
   Future<List<AutoplaySignal>> _loadSignals(
     List<PlayableMedia> candidates,
-  ) async => const [];
+  ) async {
+    // What the listener plays with the session's songs, while learning is on.
+    final taste = handler._settings.autoplayPersonalization
+        ? await handler._runtime.taste.signal([
+            for (final i in handler._playHistory)
+              if (i >= 0 && i < handler._media.length) handler._media[i],
+            if (handler._index >= 0) ...handler._media.skip(handler._index),
+          ], candidates)
+        : null;
+    return [?taste];
+  }
 
   Future<void> _fill(PlayableMedia seed, int generation) async {
     try {
