@@ -24,6 +24,7 @@ import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/widgets/app_snack_bar.dart';
 import 'package:mornye/widgets/desktop/desktop_shortcuts.dart';
 import 'package:mornye/widgets/desktop/library_drop_target.dart';
+import 'package:mornye/widgets/link/link_actions.dart';
 import 'package:mornye/widgets/mornye_glass_preparation.dart';
 import 'package:mornye/widgets/playback_feedback.dart';
 import 'package:mornye/widgets/tv_navigation.dart';
@@ -181,6 +182,7 @@ class MornyeApp extends ConsumerWidget {
       ref.listen(linkClientControllerProvider, (_, _) {});
       ref.listen(linkSyncRunnerProvider, (_, _) {});
       ref.listen(linkPhoneFeaturesProvider, (_, _) {});
+      ref.listen(linkTransferOfferNoticesProvider, (_, _) {});
     }
     final router = ref.watch(_routerProvider);
     final localeString = ref.watch(settingsProvider.select((s) => s.locale));

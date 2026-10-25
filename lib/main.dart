@@ -37,6 +37,7 @@ import 'package:mornye/services/desktop_deep_links.dart';
 import 'package:mornye/services/desktop_diagnostics.dart';
 import 'package:mornye/services/desktop_library_watcher.dart';
 import 'package:mornye/services/link/desktop/link_desktop_host.dart';
+import 'package:mornye/services/link/features/link_phone_features.dart';
 import 'package:mornye/services/link/features/link_remote_playback.dart';
 import 'package:mornye/services/link/link_client_api.dart';
 import 'package:mornye/services/music_player_service.dart';
@@ -191,8 +192,12 @@ void main() {
             activeRemotePlaybackProvider.overrideWith(
               (ref) => ref.watch(linkRemotePlaybackProvider),
             ),
+            // Also while songs transfer, so the computer can still ask for
+            // this phone's files and hear how a transfer stands.
             linkKeepConnectedProvider.overrideWith(
-              (ref) => ref.watch(linkRemotePlaybackProvider) != null,
+              (ref) =>
+                  ref.watch(linkRemotePlaybackProvider) != null ||
+                  ref.watch(linkPhoneTransfersActiveProvider),
             ),
           ],
           child: EagerInitialization(
