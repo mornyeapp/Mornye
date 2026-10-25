@@ -403,6 +403,14 @@ void main() {
           ),
         );
         expect(find.text('Playing on Studio PC'), findsOneWidget);
+        // Mornye names the device in Music's small footnote type.
+        expect(
+          tester
+              .widget<Text>(find.text('Playing on Studio PC'))
+              .style
+              ?.fontSize,
+          style == 'mornye' ? 13 : 14,
+        );
         await tester.tap(find.text('Playing on Studio PC'));
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 500));

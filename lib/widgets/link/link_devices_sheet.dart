@@ -209,11 +209,18 @@ class LinkPlayingOnLabel extends ConsumerWidget {
       return const SizedBox.shrink();
     }
     final color = this.color ?? Theme.of(context).colorScheme.primary;
+    final textTheme = Theme.of(context).textTheme;
+    final mornye = context.isMornye;
+    // Music names the playback route in small footnote type under the
+    // player's actions.
     final label = LinkPlayingOnText(
       color: color,
-      style: Theme.of(context).textTheme.labelLarge,
+      style: mornye
+          ? textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600)
+          : textTheme.labelLarge,
+      glyphSize: mornye ? 13 : 16,
     );
-    if (context.isMornye) {
+    if (mornye) {
       return CupertinoButton(
         key: const ValueKey('link-playing-on'),
         padding: const EdgeInsets.symmetric(horizontal: 12),
