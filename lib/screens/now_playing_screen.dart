@@ -323,10 +323,10 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
               ? 1.0
               : (screen.width / (screen.height * 0.56)).clamp(0.5, 1.0)
         : motionRatio;
-    // Two-pane landscape keeps its side-by-side cover.
+    final materialBackdrop = !mornye && fullScreenCover;
+    // Two-pane landscape keeps its side-by-side cover over the blurred surface.
     final materialFullScreen =
-        !mornye &&
-        fullScreenCover &&
+        materialBackdrop &&
         MediaQuery.orientationOf(context) == Orientation.portrait;
     final overCover = materialFullScreen && _currentPage != 1;
     if (!fullBleed && _artworkForeground.value.isNotEmpty) {
@@ -410,14 +410,14 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
         ? 0
         : 36;
     final player = Scaffold(
-      backgroundColor: mornye || materialFullScreen
+      backgroundColor: mornye || materialBackdrop
           ? Colors.transparent
           : colorScheme.surface,
       appBar: _FadingAppBar(
         opacity: contentOpacity,
         hidden: !mornye && _lyricsImmersive,
         child: AppBar(
-          backgroundColor: mornye || materialFullScreen
+          backgroundColor: mornye || materialBackdrop
               ? Colors.transparent
               : colorScheme.surface,
           foregroundColor: overCover ? Colors.white : colorScheme.onSurface,
@@ -650,14 +650,14 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
       ),
     );
     if (!mornye) {
-      if (!materialFullScreen) return _lyricsPointerListener(player);
+      if (!materialBackdrop) return _lyricsPointerListener(player);
       return Stack(
         fit: StackFit.expand,
         children: [
           MaterialPlayerBackdrop(
             mediaItem: mediaItem,
             colorScheme: colorScheme,
-            showArtwork: _currentPage != 1,
+            showArtwork: materialFullScreen && _currentPage != 1,
           ),
           _lyricsPointerListener(player),
         ],

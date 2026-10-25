@@ -32,6 +32,12 @@ class MaterialPlayerBackdrop extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
+    final blurredCover = _BlurredCover(
+      artUri: mediaItem.artUri?.toString(),
+      colorScheme: colorScheme,
+    );
+    // Landscape keeps the sharp cover and its Hero in the player pane.
+    if (size.width > size.height) return blurredCover;
     final artUri = mediaItem.artUri?.toString();
     final appBarHeight = MediaQuery.paddingOf(context).top + kToolbarHeight;
     final motion = MediaQuery.disableAnimationsOf(context)
@@ -40,7 +46,7 @@ class MaterialPlayerBackdrop extends StatelessWidget {
     return Stack(
       fit: StackFit.expand,
       children: [
-        _BlurredCover(artUri: artUri, colorScheme: colorScheme),
+        blurredCover,
         Positioned(
           top: 0,
           left: 0,

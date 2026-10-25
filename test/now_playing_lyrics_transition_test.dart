@@ -415,13 +415,44 @@ void main() {
       tester.view.physicalSize = const Size(844, 390);
       await settlePlayer(tester);
       if (!mornye) {
-        expect(find.byType(MaterialPlayerBackdrop), findsNothing);
+        expect(find.byType(MaterialPlayerBackdrop), findsOneWidget);
+        expect(
+          tester
+              .widget<MaterialPlayerBackdrop>(
+                find.byType(MaterialPlayerBackdrop),
+              )
+              .showArtwork,
+          isFalse,
+        );
         expect(
           tester
               .widget<MaterialPlayerLayout>(find.byType(MaterialPlayerLayout))
               .fullScreenArtwork,
           isFalse,
         );
+        final playerScaffold = tester.widget<Scaffold>(
+          find.descendant(
+            of: find.byType(NowPlayingScreen),
+            matching: find.byType(Scaffold),
+          ),
+        );
+        expect(playerScaffold.backgroundColor, Colors.transparent);
+        final playerAppBar = tester.widget<AppBar>(
+          find.descendant(
+            of: find.byType(NowPlayingScreen),
+            matching: find.byType(AppBar),
+          ),
+        );
+        expect(playerAppBar.backgroundColor, Colors.transparent);
+        final lyricsToggle = find.byKey(
+          const ValueKey('material-lyrics-toggle'),
+        );
+        await tester.tap(lyricsToggle);
+        await settlePlayer(tester);
+        expect(find.byType(SyncedLyricsView), findsOneWidget);
+        expect(find.byType(MaterialPlayerBackdrop), findsOneWidget);
+        await tester.tap(lyricsToggle);
+        await settlePlayer(tester);
       }
       expect(tester.takeException(), isNull);
       tester.view.physicalSize = const Size(390, 844);

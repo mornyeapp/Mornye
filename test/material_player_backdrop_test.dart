@@ -147,6 +147,11 @@ void main() {
     final landscape = _blur(tester);
     expect((landscape.width, landscape.height), (200, 100));
     expect(dark.debugDisposed, isTrue);
+    expect(
+      find.byType(Hero),
+      findsNothing,
+      reason: 'The landscape cover card owns the artwork Hero',
+    );
 
     await tester.pumpWidget(const SizedBox());
     expect(landscape.debugDisposed, isTrue);
