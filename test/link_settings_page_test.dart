@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -5,9 +7,14 @@ import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/screens/settings/link_pairing_dialogs.dart';
 import 'package:mornye/screens/settings/link_settings_page.dart';
 import 'package:mornye/services/link/client/link_client_pairing.dart';
+import 'package:mornye/services/link/client/link_client_store.dart';
 import 'package:mornye/services/link/features/link_phone_options.dart';
+import 'package:mornye/services/link/link_client_api.dart';
+import 'package:mornye/services/link/link_transfers.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/app_alert_dialog.dart';
+import 'package:mornye/widgets/link/link_transfer_tile.dart';
+import 'package:mornye/widgets/link/link_transfers_view.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'support/link_client_fakes.dart';
@@ -296,6 +303,7 @@ void main() {
           expect(find.text(_l10n.linkShareSongsTitle), findsOneWidget);
           final follow = find.text(_l10n.linkFollowDesktopTitle);
           await tester.ensureVisible(follow);
+          await tester.pump();
           await tester.tap(follow);
           await _settle(tester);
           final prefs = await SharedPreferences.getInstance();
@@ -349,5 +357,116 @@ void main() {
       await tester.pumpWidget(const SizedBox());
       await tester.pump();
     });
+
+    testWidgets('has no Transfers row before a computer is paired', (
+      tester,
+    ) async {
+      await pumpPage(tester);
+      expect(find.byKey(const ValueKey('link-transfers-row')), findsNothing);
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump();
+    });
+
+    for (final mornye in [false, true]) {
+      testWidgets(
+        '${mornye ? 'Mornye' : 'Material'}: the Transfers row follows transfers',
+        (tester) async {
+          SharedPreferences.setMockInitialValues({
+            LinkClientStore.serversKey: jsonEncode([
+              const LinkServerRecord(
+                serverId: 'a',
+                name: 'Studio',
+                connectionId: 'connection-a',
+                address: 'https://10.0.0.2:47710',
+                fingerprint: 'ab',
+              ).toJson(),
+            ]),
+            LinkClientStore.activeServerKey: 'a',
+          });
+          tester.view.physicalSize = const Size(800, 2400);
+          tester.view.devicePixelRatio = 1;
+          addTearDown(tester.view.reset);
+          await tester.pumpWidget(
+            ProviderScope(
+              overrides: LinkClientHarness().overrides,
+              child: _app(const LinkSettingsPage(), mornye: mornye),
+            ),
+          );
+          await _settle(tester);
+          final row = find.byKey(const ValueKey('link-transfers-row'));
+          expect(row, findsOneWidget);
+          expect(
+            find.descendant(
+              of: row,
+              matching: find.text(_l10n.linkTransfersEmptyTitle),
+            ),
+            findsOneWidget,
+          );
+
+          final store = ProviderScope.containerOf(
+            tester.element(row),
+          ).read(linkTransfersProvider.notifier);
+          LinkTransfer transfer(String c, int total) => LinkTransfer(
+            direction: LinkTransferDirection.outgoing,
+            peerId: 'a',
+            peerName: 'Studio',
+            entries: [
+              for (var i = 0; i < total; i++)
+                LinkTransferEntry(title: 'Song $i', artist: 'Artist'),
+            ],
+            status: LinkTransferStatus(
+              transferId: List.filled(32, c).join(),
+              state: LinkTransferState.running,
+              total: total,
+              index: total ~/ 2,
+            ),
+            startedAt: DateTime(2026),
+          );
+          store.add(transfer('a', 12));
+          await _settle(tester);
+          expect(find.text('Sending 12 songs to Studio · 50%'), findsOneWidget);
+          expect(
+            find.descendant(
+              of: row,
+              matching: find.byType(LinkTransferProgressBar),
+            ),
+            findsOneWidget,
+          );
+
+          store.add(transfer('b', 4));
+          await _settle(tester);
+          expect(find.text('2 transfers · 50%'), findsOneWidget);
+
+          for (final c in ['a', 'b']) {
+            store.update(
+              LinkTransferStatus(
+                transferId: List.filled(32, c).join(),
+                state: LinkTransferState.done,
+                total: 1,
+                index: 1,
+              ),
+            );
+          }
+          await _settle(tester);
+          expect(find.text('2 transfers finished'), findsOneWidget);
+          expect(
+            find.descendant(
+              of: row,
+              matching: find.byType(LinkTransferProgressBar),
+            ),
+            findsNothing,
+          );
+
+          await tester.ensureVisible(row);
+          await tester.tap(row);
+          await _settle(tester);
+          expect(find.byType(LinkTransfersPage), findsOneWidget);
+          expect(find.text('Song 0 to Studio'), findsNWidgets(2));
+
+          await tester.pumpWidget(const SizedBox());
+          await tester.pump();
+        },
+      );
+    }
   });
 }

@@ -8,11 +8,13 @@ import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/services/link/desktop/link_desktop_host.dart';
 import 'package:mornye/services/link/desktop/link_player.dart';
 import 'package:mornye/services/link/link_protocol.dart';
+import 'package:mornye/services/link/link_transfers.dart';
 import 'package:mornye/theme/app_theme.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/widgets/app_slider.dart';
 import 'package:mornye/widgets/desktop/desktop_link_devices_button.dart';
+import 'package:mornye/widgets/link/link_transfers_view.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'support/link_desktop_fakes.dart';
@@ -276,4 +278,67 @@ void main() {
     expect(backend.sent.last.deviceId, 'p1');
     expect(find.text('Sent to Pixel'), findsOneWidget);
   });
+
+  for (final mornye in [false, true]) {
+    final style = mornye ? 'Mornye' : 'Material';
+
+    testWidgets('$style: rings while songs transfer and opens Transfers', (
+      tester,
+    ) async {
+      final ring = find.byKey(const ValueKey('desktop-link-transfers-ring'));
+      final entry = find.byKey(const ValueKey('link-transfers-entry'));
+      await pumpButton(tester, mornye: mornye);
+      await connectPhone(tester);
+      final size = tester.getSize(button());
+      expect(ring, findsNothing);
+      await tester.tap(button());
+      await settle(tester);
+      // No entry until a transfer exists.
+      expect(entry, findsNothing);
+
+      final store = ProviderScope.containerOf(
+        tester.element(button()),
+      ).read(linkTransfersProvider.notifier);
+      final status = LinkTransferStatus(
+        transferId: List.filled(32, 'a').join(),
+        state: LinkTransferState.running,
+        total: 4,
+        index: 1,
+      );
+      store.add(
+        LinkTransfer(
+          direction: LinkTransferDirection.incoming,
+          peerId: 'p1',
+          peerName: 'Pixel',
+          entries: [
+            for (var i = 0; i < 4; i++)
+              LinkTransferEntry(title: 'Song $i', artist: 'Artist'),
+          ],
+          status: status,
+          startedAt: DateTime(2026),
+        ),
+      );
+      await settle(tester);
+      expect(ring, findsOneWidget);
+      // The ring sits outside the glyph, so the player bar keeps its layout.
+      expect(tester.getSize(button()), size);
+      expect(entry, findsOneWidget);
+      expect(find.text('Receiving 4 songs from Pixel · 25%'), findsOneWidget);
+
+      store.update(status.copyWith(state: LinkTransferState.done, index: 4));
+      await settle(tester);
+      expect(ring, findsNothing);
+      expect(find.text('1 transfer finished'), findsOneWidget);
+
+      await tester.tap(entry);
+      await settle(tester);
+      expect(
+        find.byKey(const ValueKey('desktop-link-devices-popover')),
+        findsNothing,
+      );
+      expect(find.byType(LinkTransfersDialog), findsOneWidget);
+      expect(find.text('4 songs from Pixel'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
 }

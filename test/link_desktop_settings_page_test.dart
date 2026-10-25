@@ -12,6 +12,7 @@ import 'package:mornye/theme/app_theme.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/widgets/beta_badge.dart';
+import 'package:mornye/widgets/link/link_transfers_view.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'support/link_desktop_fakes.dart';
@@ -290,6 +291,45 @@ void main() {
     expect(find.byKey(const ValueKey('link-pair')), findsNothing);
     expect(find.byKey(const ValueKey('link-add-app')), findsNothing);
   });
+
+  for (final mornye in [false, true]) {
+    testWidgets(
+      '${mornye ? 'Mornye' : 'Material'}: a Transfers row follows paired phones',
+      (tester) async {
+        final row = find.byKey(const ValueKey('link-transfers-row'));
+        await pumpPage(tester, mornye: mornye);
+        expect(row, findsNothing);
+        // A fresh scope loads the paired phones again.
+        await tester.pumpWidget(const SizedBox());
+
+        backend.deviceList = [
+          const LinkPairedDevice(
+            deviceId: 'p1',
+            name: 'Pixel',
+            platform: 'ios',
+          ),
+        ];
+        await pumpPage(tester, mornye: mornye);
+        expect(row, findsOneWidget);
+        expect(
+          find.descendant(of: row, matching: find.text('No transfers yet')),
+          findsOneWidget,
+        );
+        // Below the phones, in their group.
+        expect(
+          tester.getTopLeft(row).dy,
+          greaterThan(
+            tester.getTopLeft(find.byKey(const ValueKey('link-device-p1'))).dy,
+          ),
+        );
+
+        await tester.tap(row);
+        await settle(tester);
+        expect(find.byType(LinkTransfersDialog), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 
   testWidgets('adds a Subsonic app and shows its key to copy', (tester) async {
     final copied = <String>[];

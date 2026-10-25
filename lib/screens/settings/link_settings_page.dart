@@ -17,11 +17,12 @@ import 'package:mornye/widgets/app_alert_dialog.dart';
 import 'package:mornye/widgets/app_progress_indicator.dart';
 import 'package:mornye/widgets/app_sliver_header.dart';
 import 'package:mornye/widgets/expressive_icon_button.dart';
+import 'package:mornye/widgets/link/link_transfers_view.dart';
 import 'package:mornye/widgets/settings_group.dart';
 
-/// Mornye on your computer: paired computers with their connection, what
-/// this phone shares with them, the computers found on the network, and
-/// pairing.
+/// Mornye on your computer: paired computers with their connection and the
+/// songs copied with them, what this phone shares with them, the computers
+/// found on the network, and pairing.
 class LinkSettingsPage extends ConsumerStatefulWidget {
   const LinkSettingsPage({super.key});
 
@@ -311,8 +312,11 @@ class _LinkSettingsPageState extends ConsumerState<LinkSettingsPage> {
           if (state.servers.isNotEmpty)
             ...settingsSectionSlivers(
               title: l10n.linkPairedSection,
+              // The Transfers row is its own widget, so mark the rows.
+              connected: true,
               children: [
                 for (final record in state.servers) _pairedRow(state, record),
+                const LinkTransfersSettingsItem(),
               ],
             ),
           if (state.servers.isNotEmpty)
