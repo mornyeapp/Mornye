@@ -30,7 +30,6 @@ import 'package:mornye/screens/settings/settings_tab.dart';
 import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/services/shell_navigation_service.dart';
 import 'package:mornye/services/share_intent_service.dart';
-import 'package:mornye/services/link/features/link_phone_client.dart';
 import 'package:mornye/services/music_playback_deck.dart';
 import 'package:mornye/services/listening_statistics.dart';
 import 'package:mornye/services/discord_presence_service.dart';

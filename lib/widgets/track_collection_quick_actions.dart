@@ -10,7 +10,6 @@ import 'package:mornye/models/track.dart';
 import 'package:mornye/providers/library_collections_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/services/cover_cache_manager.dart';
-import 'package:mornye/services/link/features/link_phone_client.dart';
 import 'package:mornye/controllers/clickable_metadata.dart';
 import 'package:mornye/controllers/local_playback.dart';
 import 'package:mornye/utils/desktop_platform.dart';
