@@ -4,6 +4,7 @@ import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/models/unified_library_item.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/utils/desktop_platform.dart';
+import 'package:mornye/widgets/link/link_actions.dart';
 import 'package:mornye/widgets/playlist_picker_sheet.dart';
 import 'package:mornye/widgets/selection_action_button.dart';
 
@@ -53,6 +54,8 @@ class LibrarySelectionPlaybackActions extends ConsumerWidget {
                   if (context.mounted) onClose();
                 },
         ),
+      // Copying songs to or from the paired computer (Mornye Link).
+      ...linkTransferSelectionActions(context, ref, items, onClose: onClose),
     ];
     return LayoutBuilder(
       builder: (context, constraints) => Padding(

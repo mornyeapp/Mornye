@@ -12,9 +12,20 @@ extension _TrackMetadataMenu on _TrackMetadataScreenState {
   ) {
     final canEditFile = _fileExists && !_isNetworkItem;
     final localItem = _localLibraryItem;
-    final desktopSongs = localItem == null
+    final downloadItem = _downloadItem;
+    final linkTransfers = linkTransfersAvailable(ref);
+    final desktopSongs = localItem == null || !linkTransfers
         ? const <LinkOfflineSong>[]
         : linkDesktopSongsOf(ref, [localItem]);
+    final linkClient = ref.read(linkPhoneClientProvider);
+    final phoneSongs = !linkTransfers || !_fileExists
+        ? const <UnifiedLibraryItem>[]
+        : linkPhoneSongItemsOf([
+            if (localItem != null)
+              UnifiedLibraryItem.fromLocalLibrary(localItem)
+            else if (downloadItem != null)
+              UnifiedLibraryItem.fromDownloadHistory(downloadItem),
+          ]);
     return <_MetadataOption>[
       if (_fileExists)
         _MetadataOption(
@@ -33,6 +44,12 @@ extension _TrackMetadataMenu on _TrackMetadataScreenState {
           icon: Icons.phone_android,
           label: l10n.linkSaveToPhone,
           onTap: () => linkSaveSongsToPhone(screenContext, ref, desktopSongs),
+        ),
+      if (phoneSongs.isNotEmpty && linkClient != null)
+        _MetadataOption(
+          icon: Icons.computer,
+          label: l10n.linkSendToDesktop(linkDesktopName(linkClient)),
+          onTap: () => linkSendSongsToDesktop(screenContext, ref, phoneSongs),
         ),
       if (albumName.trim().isNotEmpty)
         _MetadataOption(

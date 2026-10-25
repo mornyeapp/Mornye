@@ -408,9 +408,9 @@ class _LocalAlbumScreenState extends ConsumerState<LocalAlbumScreen>
         ),
       ),
       meta: _buildLocalHeaderMeta(context, qualityLabelMode),
-      appBarActions: linkHasDesktopSongs(ref, _sortedTracksCache)
-          ? [LinkSaveToPhoneButton(items: _sortedTracksCache)]
-          : null,
+      appBarActions: ref.watch(linkPhoneClientProvider) == null
+          ? null
+          : [LinkTransferButtons(items: _albumItems())],
       actions: Consumer(
         builder: (context, ref, _) {
           final isCurrent = ref.watch(

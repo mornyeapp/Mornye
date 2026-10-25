@@ -43,6 +43,7 @@ import 'package:mornye/screens/playlist_reorder_page.dart';
 import 'package:mornye/screens/track_metadata_screen.dart';
 import 'package:mornye/widgets/selection_action_button.dart';
 import 'package:mornye/widgets/in_library_badge.dart';
+import 'package:mornye/widgets/link/link_actions.dart';
 import 'package:mornye/widgets/playlist_picker_sheet.dart';
 import 'package:mornye/widgets/animation_utils.dart';
 import 'package:mornye/widgets/track_detail_actions.dart';
@@ -780,6 +781,15 @@ class _LibraryTracksFolderScreenState
             tooltip: context.l10n.collectionExportM3u,
             onPressed: () => _exportAsM3u8(context, title, entries),
           ),
+        if (isPlaylistMode &&
+            !isSelectionMode &&
+            entries.isNotEmpty &&
+            ref.watch(linkPhoneClientProvider) != null) ...[
+          const SizedBox(width: 8),
+          LinkTrackTransferButton(
+            tracks: entries.map((e) => e.track).toList(growable: false),
+          ),
+        ],
         if (isPlaylistMode && !isSelectionMode) ...[
           if (entries.length > 1) ...[
             const SizedBox(width: 8),

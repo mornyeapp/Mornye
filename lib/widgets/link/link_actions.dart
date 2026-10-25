@@ -1,12 +1,17 @@
-import 'dart:math' as math;
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/models/library_database_models.dart';
 import 'package:mornye/models/track.dart';
+import 'package:mornye/models/unified_library_item.dart';
+import 'package:mornye/providers/settings_provider.dart';
+import 'package:mornye/services/app_navigation_service.dart';
 import 'package:mornye/services/link/features/link_downloads.dart';
+import 'package:mornye/services/link/features/link_library_lookup.dart';
 import 'package:mornye/services/link/features/link_phone_features.dart';
+import 'package:mornye/services/link/features/link_phone_sender.dart';
 import 'package:mornye/services/link/features/link_remote_playback.dart';
 import 'package:mornye/services/link/features/link_save_offline.dart';
 import 'package:mornye/services/link/link_client_api.dart';
@@ -14,10 +19,12 @@ import 'package:mornye/utils/logger.dart';
 import 'package:mornye/widgets/album_detail_header.dart';
 import 'package:mornye/widgets/app_bottom_sheet.dart';
 import 'package:mornye/widgets/app_icon.dart';
-import 'package:mornye/widgets/batch_progress_dialog.dart';
+import 'package:mornye/widgets/app_snack_bar.dart';
+import 'package:mornye/widgets/link/link_transfers_view.dart';
+import 'package:mornye/widgets/selection_action_button.dart';
 
 export 'package:mornye/services/link/features/link_phone_client.dart'
-    show linkDesktopName;
+    show linkDesktopName, linkPhoneClientProvider;
 
 final _log = AppLogger('LinkActions');
 
@@ -207,65 +214,99 @@ Future<void> showLinkSharedUrlSheet(
   );
 }
 
-/// "Save to this phone": downloads the original files of desktop [songs]
-/// into the download folder, with progress and a way to stop.
-Future<void> linkSaveSongsToPhone(
+/// Shows that a transfer started, named by [message], with a View action
+/// that opens the Transfers list.
+void _showTransfer(BuildContext context, String message) {
+  if (!context.mounted) return;
+  final navigator = Navigator.of(context, rootNavigator: true).context;
+  showAppSnackBar(
+    context,
+    content: Text(message),
+    action: SnackBarAction(
+      label: context.l10n.linkTransferPhoneView,
+      onPressed: () {
+        if (navigator.mounted) unawaited(showLinkTransfers(navigator));
+      },
+    ),
+  );
+}
+
+/// Whether the paired desktop's session is connected, which the transfer
+/// actions need. Rebuilds the widget when it connects or drops.
+bool _watchConnected(WidgetRef ref) =>
+    ref.watch(linkPhoneClientProvider) != null &&
+    ref.watch(linkConnectionStateProvider).value ==
+        LinkConnectionState.connected;
+
+/// [_watchConnected] for menus built once, outside a widget's build.
+bool linkTransfersAvailable(WidgetRef ref) =>
+    ref.read(linkPhoneClientProvider)?.connectionState ==
+    LinkConnectionState.connected;
+
+/// "Save to this phone": queues a transfer that copies the original files
+/// of desktop [songs] into the download folder, and says it started.
+void linkSaveSongsToPhone(
   BuildContext context,
   WidgetRef ref,
   List<LinkOfflineSong> songs,
-) async {
-  final saver = ref.read(linkOfflineSaverProvider);
-  if (saver == null || songs.isEmpty) return;
-  final root = Navigator.of(context, rootNavigator: true).context;
-  final cancel = LinkOfflineCancel();
-  var open = true;
-  void close() {
-    if (!open) return;
-    open = false;
-    if (root.mounted) BatchProgressDialog.dismiss(root);
-  }
-
-  BatchProgressDialog.show(
-    context: root,
-    title: root.l10n.linkSavingToPhone,
-    total: songs.length,
-    icon: Icons.phone_android,
-    onCancel: () {
-      cancel.cancel();
-      close();
-    },
-  );
-  final LinkOfflineResult result;
-  try {
-    result = await saver.save(
-      songs,
-      cancel: cancel,
-      onProgress: (progress) {
-        if (!open) return;
-        final size = progress.size;
-        final percent = size == null || size <= 0
-            ? null
-            : (progress.received * 100 / size).clamp(0, 100).round();
-        BatchProgressDialog.update(
-          current: math.min(progress.done + 1, progress.total),
-          detail: percent == null
-              ? progress.title
-              : '${progress.title} ($percent%)',
-        );
-      },
-    );
-  } finally {
-    close();
-  }
-  if (!root.mounted) return;
-  final l10n = root.l10n;
-  final message = result.cancelled
-      ? l10n.linkSaveToPhoneCancelled
-      : result.failed > 0
-      ? l10n.linkSaveToPhoneFailed(result.failed)
-      : l10n.linkSavedToPhone(result.saved);
-  _notify(root, message);
+) {
+  if (songs.isEmpty) return;
+  final transfer = ref.read(linkPhoneReceiverProvider).save(songs);
+  if (transfer == null || !context.mounted) return;
+  _showTransfer(context, linkTransferTitle(context.l10n, transfer));
 }
+
+/// "Send to (desktop)": offers this phone's own songs among [items] to the
+/// paired desktop, which copies them into its download folder, and says it
+/// started.
+Future<void> linkSendSongsToDesktop(
+  BuildContext context,
+  WidgetRef ref,
+  List<UnifiedLibraryItem> items,
+) async {
+  final client = ref.read(linkPhoneClientProvider);
+  if (client == null) return;
+  final sender = ref.read(linkPhoneSenderProvider);
+  final root = Navigator.of(context, rootNavigator: true).context;
+  final name = linkDesktopName(client);
+  try {
+    final songs = await linkPhoneSongsOf(items);
+    if (!root.mounted) return;
+    if (songs.songs.isEmpty) {
+      _notify(root, root.l10n.linkSendNothing(name));
+      return;
+    }
+    final started = await sender.send(client, songs);
+    if (!root.mounted || started.isEmpty) return;
+    final count = started.fold(0, (sum, next) => sum + next.entries.length);
+    final title = count == 1 ? started.single.entries.single.title : '';
+    _showTransfer(root, root.l10n.linkSendSending(count, title, name));
+  } on Object catch (error) {
+    if (root.mounted) _failed(root, client, error);
+  }
+}
+
+/// Says when the paired desktop starts sending songs to this phone, with
+/// the View action. Watched at the app root on phones; the snackbar shows
+/// over whatever page is open.
+final linkTransferOfferNoticesProvider = Provider<void>((ref) {
+  final subscription = ref.watch(linkPhoneReceiverProvider).offers.listen((
+    transfer,
+  ) {
+    final context = AppNavigationService.rootNavigatorKey.currentContext;
+    if (context == null || !context.mounted) return;
+    final count = transfer.entries.length;
+    _showTransfer(
+      context,
+      context.l10n.linkTransferPhoneOffered(
+        count,
+        count == 1 ? transfer.entries.single.title : '',
+        transfer.peerName,
+      ),
+    );
+  });
+  ref.onDispose(subscription.cancel);
+});
 
 /// The app bar action of an album or playlist that queues its [tracks] on
 /// the paired desktop. Empty while no desktop is paired.
@@ -301,31 +342,168 @@ class LinkDownloadOnDesktopButton extends ConsumerWidget {
   }
 }
 
-/// The app bar action of a Library album that saves its songs from the
-/// paired desktop to this phone. Empty when none of [items] come from it.
-class LinkSaveToPhoneButton extends ConsumerWidget {
-  const LinkSaveToPhoneButton({super.key, required this.items});
+/// This phone's own songs among [items], which it can send to the desktop.
+List<UnifiedLibraryItem> linkPhoneSongItemsOf(
+  Iterable<UnifiedLibraryItem> items,
+) => [
+  for (final item in items)
+    if (isLinkPhoneSongItem(item)) item,
+];
 
-  final List<LocalLibraryItem> items;
+/// The app bar actions of a Library album: "Send to (desktop)" when [items]
+/// hold this phone's own songs and "Save to this phone" when they hold the
+/// paired desktop's, while that desktop is connected. Empty otherwise.
+class LinkTransferButtons extends ConsumerWidget {
+  const LinkTransferButtons({super.key, required this.items});
+
+  final List<UnifiedLibraryItem> items;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final server = ref.watch(linkPhoneClientProvider)?.server;
-    if (server == null) return const SizedBox.shrink();
-    final songs = linkOfflineSongs(items, server);
-    if (songs.isEmpty) return const SizedBox.shrink();
-    return HeaderCircleButton(
-      icon: Icons.phone_android,
-      tooltip: context.l10n.linkSaveToPhone,
-      onPressed: () => linkSaveSongsToPhone(context, ref, songs),
+    final client = ref.watch(linkPhoneClientProvider);
+    if (client == null || !_watchConnected(ref)) {
+      return const SizedBox.shrink();
+    }
+    final phoneSongs = linkPhoneSongItemsOf(items);
+    final desktopSongs = linkOfflineSongs([
+      for (final item in items) ?item.localItem,
+    ], client.server);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      spacing: 8,
+      children: [
+        if (phoneSongs.isNotEmpty)
+          HeaderCircleButton(
+            icon: Icons.computer,
+            tooltip: context.l10n.linkSendToDesktop(linkDesktopName(client)),
+            onPressed: () => linkSendSongsToDesktop(context, ref, phoneSongs),
+          ),
+        if (desktopSongs.isNotEmpty)
+          HeaderCircleButton(
+            icon: Icons.phone_android,
+            tooltip: context.l10n.linkSaveToPhone,
+            onPressed: () => linkSaveSongsToPhone(context, ref, desktopSongs),
+          ),
+      ],
     );
   }
 }
 
-/// Whether [items] hold songs of the paired desktop.
-bool linkHasDesktopSongs(WidgetRef ref, Iterable<LocalLibraryItem> items) {
-  final server = ref.watch(linkPhoneClientProvider)?.server;
-  return server != null && linkOfflineSongs(items, server).isNotEmpty;
+/// The app bar action of a Library playlist: a sheet that sends this
+/// phone's own songs among [tracks] to the paired desktop or saves the
+/// desktop's to this phone, while that desktop is connected. The songs are
+/// looked up when one is chosen. Empty otherwise.
+class LinkTrackTransferButton extends ConsumerWidget {
+  const LinkTrackTransferButton({super.key, required this.tracks});
+
+  final List<Track> tracks;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final client = ref.watch(linkPhoneClientProvider);
+    if (client == null || tracks.isEmpty || !_watchConnected(ref)) {
+      return const SizedBox.shrink();
+    }
+    return HeaderCircleButton(
+      icon: Icons.devices,
+      iconSize: 20,
+      tooltip: context.l10n.linkTransferPhoneWith(linkDesktopName(client)),
+      onPressed: () => _showSheet(context, ref, client),
+    );
+  }
+
+  Future<void> _showSheet(
+    BuildContext context,
+    WidgetRef ref,
+    LinkClientApi client,
+  ) async {
+    final name = linkDesktopName(client);
+    final root = Navigator.of(context, rootNavigator: true).context;
+    Future<List<UnifiedLibraryItem>> items() => linkLibraryItemsFor(
+      tracks,
+      includeLocal: ref.read(settingsProvider).localLibraryEnabled,
+    );
+    await showAppBottomSheet<void>(
+      context: context,
+      useRootNavigator: true,
+      title: context.l10n.linkTransferPhoneWith(name),
+      builder: (sheetContext) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          AppSheetOption(
+            leading: const AppIcon.adaptive(Icons.computer),
+            title: Text(sheetContext.l10n.linkSendToDesktop(name)),
+            onTap: () async {
+              Navigator.pop(sheetContext);
+              final found = await items();
+              if (root.mounted) await linkSendSongsToDesktop(root, ref, found);
+            },
+          ),
+          AppSheetOption(
+            leading: const AppIcon.adaptive(Icons.phone_android),
+            title: Text(sheetContext.l10n.linkSaveToPhone),
+            onTap: () async {
+              Navigator.pop(sheetContext);
+              final found = await items();
+              if (!root.mounted) return;
+              final songs = linkOfflineSongs([
+                for (final item in found) ?item.localItem,
+              ], client.server);
+              if (songs.isEmpty) {
+                _notify(root, root.l10n.linkTransferPhoneNothing(name));
+              } else {
+                linkSaveSongsToPhone(root, ref, songs);
+              }
+            },
+          ),
+          const SizedBox(height: 8),
+        ],
+      ),
+    );
+  }
+}
+
+/// The Library selection toolbar's Mornye Link actions for the selected
+/// [items]: "Send to (desktop)" for this phone's own songs and "Save to
+/// this phone" for the paired desktop's, while that desktop is connected.
+/// [onClose] ends the selection once one starts.
+List<Widget> linkTransferSelectionActions(
+  BuildContext context,
+  WidgetRef ref,
+  List<UnifiedLibraryItem> items, {
+  required VoidCallback onClose,
+}) {
+  final client = ref.watch(linkPhoneClientProvider);
+  if (client == null || !_watchConnected(ref)) return const [];
+  final colors = Theme.of(context).colorScheme;
+  final phoneSongs = linkPhoneSongItemsOf(items);
+  final desktopSongs = linkOfflineSongs([
+    for (final item in items) ?item.localItem,
+  ], client.server);
+  return [
+    if (phoneSongs.isNotEmpty)
+      SelectionActionButton(
+        icon: Icons.computer,
+        label: context.l10n.linkSendToDesktop(linkDesktopName(client)),
+        colorScheme: colors,
+        onPressed: () {
+          final root = Navigator.of(context, rootNavigator: true).context;
+          unawaited(linkSendSongsToDesktop(root, ref, phoneSongs));
+          onClose();
+        },
+      ),
+    if (desktopSongs.isNotEmpty)
+      SelectionActionButton(
+        icon: Icons.phone_android,
+        label: context.l10n.linkSaveToPhone,
+        colorScheme: colors,
+        onPressed: () {
+          final root = Navigator.of(context, rootNavigator: true).context;
+          linkSaveSongsToPhone(root, ref, desktopSongs);
+          onClose();
+        },
+      ),
+  ];
 }
 
 /// The paired desktop's songs among [items], or none.
