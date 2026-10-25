@@ -25,11 +25,13 @@ AutoplayLearningTrack _learningTrack(PlayableMedia media) =>
     );
 
 /// Bounded database pages keep recommendation work independent of Library
-/// size. Both downloaded tracks and enabled scanned sources are local files.
-/// A few songs by the seed's artist join small pages spread across the
-/// Library: one large page in date-added order holds whole albums, so it
-/// offered mostly one artist.
-Future<List<PlayableMedia>> _loadAutoplayLibrary(
+/// size. Downloaded tracks and most scanned sources are local files; songs
+/// of a network Library, a paired phone's included, join while their host
+/// can be reached. A few songs by the seed's artist join small pages spread
+/// across the Library: one large page in date-added order holds whole
+/// albums, so it offered mostly one artist.
+@visibleForTesting
+Future<List<PlayableMedia>> loadAutoplayLibrary(
   PlayableMedia seed,
   MusicPlayerRuntime runtime,
 ) async {
@@ -66,6 +68,16 @@ Future<List<PlayableMedia>> _loadAutoplayLibrary(
   ];
   final result = <PlayableMedia>[];
   final seen = <String>{};
+  // One answer per network host.
+  final reachable = <String, Future<bool>>{};
+  Future<bool> networkReachable(String source) =>
+      reachable.putIfAbsent(Uri.tryParse(source)?.host ?? '', () async {
+        try {
+          return await runtime.dependencies.networkSourceReachable(source);
+        } catch (_) {
+          return false;
+        }
+      });
   for (final row in rows) {
     final data = (row['item'] as Map).cast<String, dynamic>();
     if (!seen.add(data['id'] as String)) continue;
@@ -73,7 +85,10 @@ Future<List<PlayableMedia>> _loadAutoplayLibrary(
     if (source.isEmpty) continue;
     // Do not interpret remote URLs as streamable Library items.
     if (source.startsWith('http://') || source.startsWith('https://')) continue;
-    if (!source.startsWith('content://') && !await File(source).exists()) {
+    if (source.startsWith('network://')) {
+      if (!await networkReachable(source)) continue;
+    } else if (!source.startsWith('content://') &&
+        !await File(source).exists()) {
       continue;
     }
     final cover = data['coverPath'] as String? ?? data['coverUrl'] as String?;

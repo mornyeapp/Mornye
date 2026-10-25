@@ -124,6 +124,10 @@ class LinkPhoneSources implements NetworkVirtualSources {
   @override
   bool owns(String id) => isLinkPhoneSourceId(id);
 
+  /// While the phone is connected; a received copy alone does not count.
+  @override
+  bool reachable(String id) => _connectedDevice(id) != null;
+
   @override
   Stream<NetworkVirtualSong> songs(String id) async* {
     final index = _index();

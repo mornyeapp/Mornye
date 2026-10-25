@@ -3,7 +3,7 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:audio_service/audio_service.dart';
-import 'package:flutter/foundation.dart' show compute;
+import 'package:flutter/foundation.dart' show compute, visibleForTesting;
 import 'package:flutter/widgets.dart'
     show AppLifecycleState, WidgetsBinding, WidgetsBindingObserver;
 import 'package:mornye/services/playback_notification.dart';
@@ -277,7 +277,7 @@ class MusicPlayerHandler extends BaseAudioHandler
     );
     _autoplay = _MusicAutoplay(
       this,
-      autoplayLibraryLoader ?? (seed) => _loadAutoplayLibrary(seed, _runtime),
+      autoplayLibraryLoader ?? (seed) => loadAutoplayLibrary(seed, _runtime),
     );
     try {
       _init();

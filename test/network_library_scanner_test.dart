@@ -58,6 +58,9 @@ class _VirtualSources implements NetworkVirtualSources {
   bool owns(String id) => id == 'virtual';
 
   @override
+  bool reachable(String id) => true;
+
+  @override
   Stream<NetworkVirtualSong> songs(String id) => Stream.fromIterable(songList);
 
   @override

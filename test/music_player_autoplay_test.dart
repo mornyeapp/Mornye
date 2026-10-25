@@ -1,7 +1,9 @@
+import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/models/settings.dart';
+import 'package:mornye/services/library_database.dart';
 import 'package:mornye/services/music_player_service.dart';
 
 PlayableMedia track(
@@ -48,6 +50,30 @@ class _NoNoise implements Random {
   int nextInt(int max) => 0;
   @override
   bool nextBool() => false;
+}
+
+/// A Library whose every page holds [rows].
+class _Library implements LibraryDatabase {
+  _Library(this.rows);
+
+  final List<Map<String, dynamic>> rows;
+
+  @override
+  Future<QueueLibraryCounts> getQueueCounts(
+    QueueLibraryDbQuery request,
+  ) async => QueueLibraryCounts(
+    allTrackCount: rows.length,
+    albumCount: 0,
+    singleTrackCount: 0,
+  );
+
+  @override
+  Future<List<Map<String, dynamic>>> getQueueTrackPage(
+    QueueLibraryDbQuery request,
+  ) async => rows;
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 void main() {
@@ -272,4 +298,47 @@ void main() {
     expect(restored.genre, 'Rock');
     expect(restored.toMediaItem().extras?['autoplay'], isTrue);
   });
+
+  test(
+    'Autoplay draws on network Library songs while their host is reachable',
+    () async {
+      final dir = await Directory.systemTemp.createTemp('autoplay_library');
+      addTearDown(() => dir.delete(recursive: true));
+      final local = File('${dir.path}/local.flac')..writeAsStringSync('x');
+      Map<String, dynamic> row(String id, String path) => {
+        'item': {
+          'id': id,
+          'filePath': path,
+          'trackName': id,
+          'artistName': 'A',
+        },
+      };
+      final asked = <String>[];
+      final runtime = MusicPlayerRuntime(
+        settings: const AppSettings(localLibraryEnabled: true),
+        dependencies: PlaybackDependencies(
+          libraryDatabase: _Library([
+            row('local', local.path),
+            row('missing', '${dir.path}/missing.flac'),
+            row('phone 1', 'network://link-phone-1/a.flac'),
+            row('phone 2', 'network://link-phone-1/b.flac'),
+            row('away', 'network://link-phone-2/c.flac'),
+            row('web', 'https://example.com/d.flac'),
+          ]),
+          networkSourceReachable: (source) async {
+            asked.add(source);
+            return source.contains('link-phone-1');
+          },
+        ),
+      );
+
+      final songs = await loadAutoplayLibrary(track('seed'), runtime);
+      expect(songs.map((song) => song.id), ['local', 'phone 1', 'phone 2']);
+      // One question per host.
+      expect(asked, [
+        'network://link-phone-1/a.flac',
+        'network://link-phone-2/c.flac',
+      ]);
+    },
+  );
 }

@@ -16,6 +16,9 @@ class _VirtualSources implements NetworkVirtualSources {
   bool owns(String id) => id == 'phone';
 
   @override
+  bool reachable(String id) => true;
+
+  @override
   Stream<NetworkVirtualSong> songs(String id) => const Stream.empty();
 
   @override

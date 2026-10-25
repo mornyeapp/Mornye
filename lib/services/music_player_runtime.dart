@@ -55,6 +55,7 @@ class PlaybackDependencies {
     this.readMetadata = PlatformBridge.readFileMetadata,
     this.readNetworkMetadata = _readNetworkMetadata,
     this.resolveNetworkSource = _resolveNetworkSource,
+    this.networkSourceReachable = _networkSourceReachable,
     this.initializeHandler = _initializeAudioHandler,
     this.synchronizePlaybackState = _synchronizePlaybackState,
     this.createPersonalization = AutoplayPersonalization.new,
@@ -92,6 +93,10 @@ class PlaybackDependencies {
   readMetadata;
   final Future<Map<String, dynamic>> Function(String) readNetworkMetadata;
   final Future<String> Function(String) resolveNetworkSource;
+
+  /// Whether a `network://` Library song can play now, as autoplay asks
+  /// before queueing it.
+  final Future<bool> Function(String) networkSourceReachable;
   final Future<MusicPlayerHandler> Function(MusicPlayerHandler Function())
   initializeHandler;
   final Future<void> Function() synchronizePlaybackState;
@@ -158,6 +163,8 @@ class PlaybackDependencies {
       NetworkMetadataService.instance.read(source);
   static Future<String> _resolveNetworkSource(String source) =>
       NetworkStorageService.instance.resolve(source);
+  static Future<bool> _networkSourceReachable(String source) =>
+      NetworkStorageService.instance.reachable(source);
   static Future<void> _synchronizePlaybackState() async {
     // The session's switch takes each state from the player a microtask
     // later; let the one just published reach it first.

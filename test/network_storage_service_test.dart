@@ -29,8 +29,13 @@ NetworkConnection connection(
 );
 
 class _VirtualSources implements NetworkVirtualSources {
+  bool connected = true;
+
   @override
   bool owns(String id) => id == 'phone';
+
+  @override
+  bool reachable(String id) => connected;
 
   @override
   Stream<NetworkVirtualSong> songs(String id) => const Stream.empty();
@@ -257,6 +262,32 @@ void main() {
     // Saved connections never list them.
     expect(await service.connections(), isEmpty);
     expect(stored, isNull);
+  });
+
+  test('a network song can play while its host is reachable', () async {
+    final service = NetworkStorageService(
+      read: () async => null,
+      write: (_) async {},
+    );
+    // A phone's songs after Link stopped belong to no host.
+    expect(await service.reachable('network://phone/song.flac'), isFalse);
+    final sources = _VirtualSources();
+    service.virtualSources = sources;
+    expect(await service.reachable('network://phone/song.flac'), isTrue);
+    sources.connected = false;
+    expect(await service.reachable('network://phone/song.flac'), isFalse);
+
+    await service.save(
+      connection(
+        'smb://server/music/',
+        id: 'nas',
+        protocol: NetworkProtocol.smb,
+      ),
+    );
+    expect(await service.reachable('network://nas/song.flac'), isTrue);
+    service.setReachable('nas', reachable: false);
+    expect(await service.reachable('network://nas/song.flac'), isFalse);
+    expect(await service.reachable('network://gone/song.flac'), isFalse);
   });
 
   group('real HTTP transport', () {

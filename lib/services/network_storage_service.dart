@@ -252,6 +252,9 @@ abstract interface class NetworkVirtualSources {
   /// The tags of [path] under [id], with the keys a network tag read
   /// answers. Answers what it knows while the song cannot be reached.
   Future<Map<String, dynamic>> metadata(String id, String path);
+
+  /// Whether songs under the host [id] can play now.
+  bool reachable(String id);
 }
 
 class NetworkStorageService {
@@ -357,6 +360,17 @@ class NetworkStorageService {
         (c) => c.id == id,
         orElse: () => throw StateError('Network connection unavailable'),
       );
+
+  /// Whether the `network://` [source] can play now: a host its virtual
+  /// source reaches, or a saved connection not known to be out of reach.
+  /// Songs of a host neither knows, such as a phone after Link stopped,
+  /// cannot.
+  Future<bool> reachable(String source) async {
+    final host = Uri.tryParse(source)?.host ?? '';
+    if (virtualFor(host) case final virtual?) return virtual.reachable(host);
+    if (_unreachable.containsKey(host)) return false;
+    return (await connections()).any((c) => c.id == host);
+  }
 
   /// The [virtualSources] when they own the host [id], else null.
   NetworkVirtualSources? virtualFor(String id) {
