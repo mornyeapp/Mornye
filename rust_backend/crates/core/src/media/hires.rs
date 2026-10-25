@@ -21,7 +21,7 @@
 //! [`HiResCheckError::Unsupported`], which callers treat as "check skipped".
 
 mod evidence;
-mod fft;
+pub(crate) mod fft;
 mod replacement;
 pub use replacement::replacement_preserves_audio;
 #[cfg(test)]
