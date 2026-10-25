@@ -39,7 +39,8 @@ class LinkCatalogPage {
   final Uint8List bytes;
   final List<LinkCatalogSong> songs;
 
-  /// The exported cover file of each song in [songs], or null.
+  /// The cover the desktop player shows for each song in [songs]: its
+  /// exported cover file, else its web cover URL, or null.
   final List<String?> covers;
 }
 
@@ -80,6 +81,15 @@ String? _text(Object? value) {
   if (value is! String) return null;
   final trimmed = value.trim();
   return trimmed.isEmpty ? null : trimmed;
+}
+
+/// [value] when it is a web URL.
+String? _webUrl(Object? value) {
+  final text = _text(value);
+  return text != null &&
+          (text.startsWith('https://') || text.startsWith('http://'))
+      ? text
+      : null;
 }
 
 int? _positiveInt(Object? value) {
@@ -206,7 +216,8 @@ LinkCatalogPage mapLinkCatalogRows(List<Map<String, dynamic>> rows) {
       ..add(utf8.encode(jsonEncode(line)))
       ..addByte(0x0A);
     songs.add(song);
-    covers.add(coverPath);
+    // The desktop player also shows a web cover, which the catalog leaves out.
+    covers.add(coverPath ?? _webUrl(item['coverUrl']));
   }
   return LinkCatalogPage(
     bytes: bytes.takeBytes(),
@@ -285,7 +296,7 @@ class LinkCatalogExporter {
           final mapped = await _mapPage(page.rows);
           if (mapped.bytes.isNotEmpty) await file.writeFrom(mapped.bytes);
           for (var i = 0; i < mapped.songs.length; i++) {
-            builder.add(mapped.songs[i], coverPath: mapped.covers[i]);
+            builder.add(mapped.songs[i], cover: mapped.covers[i]);
           }
         }
         if (page.rows.length < pageSize) break;

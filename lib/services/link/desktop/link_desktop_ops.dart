@@ -45,15 +45,16 @@ final linkOpenUrlProvider = Provider<Future<void> Function(String url)>(
   (ref) => linkOpenSharedUrl,
 );
 
-/// [song] as the desktop player plays it from the Library.
-PlayableMedia linkPlayableFor(LinkCatalogSong song, {String? coverPath}) =>
+/// [song] as the desktop player plays it from the Library, with [cover], a
+/// cover file or web URL.
+PlayableMedia linkPlayableFor(LinkCatalogSong song, {String? cover}) =>
     PlayableMedia(
       id: linkRecordIdOf(song.id),
       source: song.path,
       title: song.title,
       artist: song.artist,
       album: song.album ?? '',
-      artUri: coverPath == null ? null : Uri.file(coverPath).toString(),
+      artUri: cover == null ? null : normalizeArtUri(cover),
       duration: song.durationMs == null
           ? null
           : Duration(milliseconds: song.durationMs!),
@@ -444,7 +445,7 @@ class LinkDesktopOps {
       final songId = index.songIdForRef(ref);
       final song = songId == null ? null : index.songById(songId);
       if (song != null) {
-        return linkPlayableFor(song, coverPath: index.coverPathFor(song.id));
+        return linkPlayableFor(song, cover: index.coverFor(song.id));
       }
       final path = received[ref.fileId] ?? arriving[ref.fileId];
       return path == null ? null : linkPlayableForUpload(ref, path);

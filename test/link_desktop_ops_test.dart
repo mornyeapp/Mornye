@@ -40,7 +40,10 @@ void main() {
     index = DesktopLinkCatalogIndex(
       serverId: 'srv',
       songs: songs,
-      covers: const {'l:a': '/covers/a.jpg'},
+      covers: const {
+        'l:a': '/covers/a.jpg',
+        'd:c': 'https://example.com/c.jpg',
+      },
     );
     now = 1000;
     received = '';
@@ -311,6 +314,8 @@ void main() {
         player.playedQueue!.first.artUri,
         Uri.file('/covers/a.jpg').toString(),
       );
+      // A downloaded song's web cover shows as it is.
+      expect(player.playedQueue![1].artUri, 'https://example.com/c.jpg');
       expect(player.playedIndex, 1);
       expect(player.playedPosition, const Duration(seconds: 61));
       expect(player.playedPlaying, isFalse);

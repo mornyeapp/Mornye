@@ -61,9 +61,9 @@ class LinkCatalogIndexBuilder {
 
   int get length => _songs.length;
 
-  void add(LinkCatalogSong song, {String? coverPath}) {
+  void add(LinkCatalogSong song, {String? cover}) {
     _songs.add(song);
-    if (coverPath != null) _covers[song.id] = coverPath;
+    if (cover != null) _covers[song.id] = cover;
   }
 
   DesktopLinkCatalogIndex build(String serverId) => DesktopLinkCatalogIndex(
@@ -117,8 +117,9 @@ class DesktopLinkCatalogIndex implements LinkCatalogIndex {
   @override
   LinkCatalogSong? songById(String id) => _byId[id];
 
-  /// The local cover file exported for [id], or null.
-  String? coverPathFor(String id) => _covers[id];
+  /// The cover file or web cover URL the desktop player shows for [id], or
+  /// null.
+  String? coverFor(String id) => _covers[id];
 
   /// The catalog song that plays the file at [path].
   String? songIdForPath(String path) => _byPath[linkCleanPath(path)];

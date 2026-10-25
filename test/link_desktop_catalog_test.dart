@@ -140,7 +140,8 @@ void main() {
       DateTime.parse('2024-01-02T03:04:05.000Z').millisecondsSinceEpoch,
     );
     expect(first['explicit'], isFalse);
-    expect(page.covers, [cover, null]);
+    // The desktop player keeps the web cover the catalog drops.
+    expect(page.covers, [cover, 'https://example.com/cover.jpg']);
 
     final second = lines.last;
     expect(second['path'], download);
@@ -190,7 +191,8 @@ void main() {
 
     expect(export.index.serverId, 'srv');
     expect(export.index.length, 2);
-    expect(export.index.coverPathFor('l:1'), cover);
+    expect(export.index.coverFor('l:1'), cover);
+    expect(export.index.coverFor('d:h9'), 'https://example.com/cover.jpg');
     expect(export.index.songIdForPath(download), 'd:h9');
   });
 

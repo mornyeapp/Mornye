@@ -154,7 +154,7 @@ void main() {
     expect(index.songIdForMedia(id: 'x', path: 'EXISTS:/music/3.flac'), 'd:3');
     expect(index.songIdForMedia(id: '4', path: '/elsewhere.flac'), 'd:4');
     expect(index.songIdForMedia(id: 'nope', path: ''), isNull);
-    expect(index.coverPathFor('l:1'), '/covers/1.jpg');
+    expect(index.coverFor('l:1'), '/covers/1.jpg');
   });
 
   test('the loose key drops brackets and featured artists', () {
