@@ -11,8 +11,11 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $BundleDir = (Resolve-Path $BundleDir).Path
 $required = 'mornye.exe', 'flutter_windows.dll', 'mornye_desktop.dll',
-    'libmpv-2.dll', 'data\app.so', 'ffmpeg\ffmpeg.exe', 'ffmpeg\ffprobe.exe',
+    'libmpv-2.dll', 'vcruntime140.dll', 'msvcp140.dll', 'data\app.so', 'ffmpeg\ffmpeg.exe', 'ffmpeg\ffprobe.exe',
     'ffmpeg\LICENSE.txt', 'ffmpeg\SOURCE.txt'
+if ($Arch -eq 'x64') {
+    $required += 'vcruntime140_1.dll'
+}
 foreach ($file in $required) {
     if (-not (Test-Path (Join-Path $BundleDir $file) -PathType Leaf)) {
         throw "Missing $file in $BundleDir"

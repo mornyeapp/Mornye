@@ -109,6 +109,20 @@ endif()
 install(FILES "${MORNYE_DESKTOP_LIBRARY}" DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
   COMPONENT Runtime)
 
+# mornye.exe and mornye_desktop.dll link the Visual C++ runtime dynamically.
+# Deploy it app-local, next to them, so the installer and the portable zip run
+# on PCs without the Visual C++ Redistributable.
+set(CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS_SKIP TRUE)
+include(InstallRequiredSystemLibraries)
+if(MORNYE_WINDOWS_ARCH STREQUAL "arm64")
+  # The ARM64 redist also carries the x64 exception-handling runtime.
+  # Native ARM64 uses vcruntime140.dll and cannot load that companion.
+  list(FILTER CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS EXCLUDE
+    REGEX "/vcruntime140_1\\.dll$")
+endif()
+install(PROGRAMS ${CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS}
+  DESTINATION "${INSTALL_BUNDLE_LIB_DIR}" COMPONENT Runtime)
+
 # LGPL ffmpeg.exe and ffprobe.exe, found by lib/services/ffmpeg_desktop.dart
 # in the ffmpeg\ folder next to the executable. They are staged by
 # `bash scripts/fetch_desktop_ffmpeg.sh windows-<arch>`; without them the app

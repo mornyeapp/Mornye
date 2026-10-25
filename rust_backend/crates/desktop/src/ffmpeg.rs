@@ -230,13 +230,22 @@ pub(crate) fn run_ffmpeg(
     if cancelled() {
         return (false, "cancelled".into());
     }
-    let mut child = match Command::new(ffmpeg)
+    let mut command = Command::new(ffmpeg);
+    command
         .args(arguments)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
+        .stderr(Stdio::piped());
+    // The app has no console, so Windows would open a visible one for the
+    // ffmpeg.exe console program on every run. CREATE_NO_WINDOW keeps it
+    // hidden, as dart:io does for Process.start.
+    #[cfg(windows)]
     {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
+    let mut child = match command.spawn() {
         Ok(child) => child,
         Err(error) => {
             return (
