@@ -349,8 +349,22 @@ class FakeLibraryRows {
   List<Map<String, dynamic>> rows;
   final queries = <QueueLibraryDbQuery>[];
 
+  /// The Library revision the library sees.
+  LinkPhoneLibraryRevision revision = (
+    downloads: 0,
+    library: 0,
+    includeLocal: true,
+  );
+
   /// While set, pages wait for it.
   Completer<void>? hold;
+
+  /// Moves [revision] on, as a Library change does.
+  void bump() => revision = (
+    downloads: revision.downloads,
+    library: revision.library + 1,
+    includeLocal: revision.includeLocal,
+  );
 
   Future<QueueLibraryDbPage> load(QueueLibraryDbQuery query) async {
     queries.add(query);
@@ -361,11 +375,10 @@ class FakeLibraryRows {
   }
 
   /// A library over these rows, mapped on the test's isolate.
-  LinkPhoneLibrary library({bool includeLocal = true, int pageSize = 1000}) =>
-      LinkPhoneLibrary(
-        includeLocal: () => includeLocal,
-        loadPage: load,
-        mapPage: (rows) async => mapLinkPhoneRows(rows),
-        pageSize: pageSize,
-      );
+  LinkPhoneLibrary library({int pageSize = 1000}) => LinkPhoneLibrary(
+    revision: () => revision,
+    loadPage: load,
+    mapPage: (rows) async => mapLinkPhoneRows(rows),
+    pageSize: pageSize,
+  );
 }

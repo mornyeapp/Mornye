@@ -70,7 +70,7 @@ void main() {
         {'source': 'local', 'item': 'not a map'},
       ]);
 
-      final catalog = await rows.library().build();
+      final catalog = await rows.library().catalog();
 
       expect(
         [for (final song in catalog.songs) song.name],
@@ -94,7 +94,7 @@ void main() {
       final catalog = await FakeLibraryRows([
         linkLocalRow(song),
         linkLocalRow(uri, {'format': 'flac'}),
-      ]).library().build();
+      ]).library().catalog();
       final files = LinkPhoneFiles();
       MediaItem item(String source) =>
           MediaItem(id: source, title: 'Song', extras: {'source': source});
@@ -128,12 +128,18 @@ void main() {
           'isrc': 'us-abc-21-00001',
           'explicit': 1,
           'scannedAt': '2024-01-02T03:04:05.000Z',
+          'fileModTime': 1700000000000,
         }),
         linkDownloadRow(download, {
           'trackName': null,
           'downloadedAt': '2024-02-03T00:00:00.000Z',
         }),
-      ]).library().build();
+        linkLocalRow('content://media/external/audio/media/1', {
+          'format': 'flac',
+          'scannedAt': '2024-01-02T03:04:05.000Z',
+          'fileModTime': 0,
+        }),
+      ]).library().catalog();
 
       expect(catalog.songs.first.toJson(), {
         'fileId': linkFileIdFor(song, 64),
@@ -153,13 +159,19 @@ void main() {
         'sampleRate': 44100,
         'bitDepth': 16,
         'explicit': true,
-        'addedMs': DateTime.utc(2024, 1, 2, 3, 4, 5).millisecondsSinceEpoch,
+        // A scanned file was added when it was last modified.
+        'addedMs': 1700000000000,
       });
       // Without a title the file name names it.
-      expect(catalog.songs.last.title, 'Two');
+      expect(catalog.songs[1].title, 'Two');
       expect(
-        catalog.songs.last.addedMs,
+        catalog.songs[1].addedMs,
         DateTime.utc(2024, 2, 3).millisecondsSinceEpoch,
+      );
+      // Without a modification time, when it was scanned.
+      expect(
+        catalog.songs[2].addedMs,
+        DateTime.utc(2024, 1, 2, 3, 4, 5).millisecondsSinceEpoch,
       );
     });
 
@@ -167,7 +179,7 @@ void main() {
       final catalog = await FakeLibraryRows([
         linkLocalRow(song),
         linkDownloadRow(song),
-      ]).library().build();
+      ]).library().catalog();
       expect(catalog.songs, hasLength(1));
       expect(catalog.version, version(catalog.songs));
     });
@@ -178,10 +190,8 @@ void main() {
           linkLocalRow('content://media/external/audio/media/$i', {
             'format': 'mp3',
           }),
-      ]);
-      final catalog = await rows
-          .library(includeLocal: false, pageSize: 2)
-          .build();
+      ])..revision = (downloads: 0, library: 0, includeLocal: false);
+      final catalog = await rows.library(pageSize: 2).catalog();
       expect(catalog.songs, hasLength(5));
       expect([for (final query in rows.queries) query.offset], [0, 2, 4]);
       expect(rows.queries.every((query) => !query.includeLocal), isTrue);
@@ -224,7 +234,7 @@ void main() {
           'format': 'flac',
           'coverPath': '${dir.path}/gone.jpg',
         }),
-      ]).library().build();
+      ]).library().catalog();
 
       expect(
         [for (final song in catalog.songs) song.coverId],
@@ -246,6 +256,32 @@ void main() {
     });
   });
 
+  group('the list', () {
+    test('is kept until the Library revision changes', () async {
+      final rows = FakeLibraryRows([linkLocalRow(song)]);
+      final library = rows.library();
+      final first = await library.catalog();
+
+      expect(await library.catalog(), same(first));
+      expect(rows.queries, hasLength(1));
+
+      rows.bump();
+      final second = await library.catalog();
+      expect(second, isNot(same(first)));
+      expect(await library.catalog(), same(second));
+      expect(rows.queries, hasLength(2));
+
+      rows.revision = (
+        downloads: rows.revision.downloads,
+        library: rows.revision.library,
+        includeLocal: false,
+      );
+      await library.catalog();
+      expect(rows.queries, hasLength(3));
+      expect(rows.queries.last.includeLocal, isFalse);
+    });
+  });
+
   group('version', () {
     test('hashes the songs in order and stays while they do', () async {
       final rows = FakeLibraryRows([
@@ -253,31 +289,59 @@ void main() {
         linkDownloadRow(download),
       ]);
       final library = rows.library();
-      final first = await library.build();
+      final first = await library.catalog();
       expect(first.version, version(first.songs));
-      expect((await library.build()).version, first.version);
+      rows.bump();
+      expect((await library.catalog()).version, first.version);
 
-      rows.rows = rows.rows.reversed.toList();
-      expect((await library.build()).version, isNot(first.version));
+      rows
+        ..rows = rows.rows.reversed.toList()
+        ..bump();
+      expect((await library.catalog()).version, isNot(first.version));
     });
 
     test('changes with a file or a field', () async {
       final rows = FakeLibraryRows([linkLocalRow(song)]);
       final library = rows.library();
-      final first = (await library.build()).version;
+      final first = (await library.catalog()).version;
 
       File(song).writeAsBytesSync(List.filled(65, 1));
-      final resized = (await library.build()).version;
+      rows.bump();
+      final resized = (await library.catalog()).version;
       expect(resized, isNot(first));
 
-      rows.rows = [
-        linkLocalRow(song, {'genre': 'Jazz'}),
-      ];
-      expect((await library.build()).version, isNot(resized));
+      rows
+        ..rows = [
+          linkLocalRow(song, {'genre': 'Jazz'}),
+        ]
+        ..bump();
+      expect((await library.catalog()).version, isNot(resized));
+    });
+
+    test('stays through a rescan of unchanged files', () async {
+      final rows = FakeLibraryRows([
+        linkLocalRow(song, {
+          'scannedAt': '2024-01-02T03:04:05.000Z',
+          'fileModTime': 1700000000000,
+        }),
+      ]);
+      final library = rows.library();
+      final first = (await library.catalog()).version;
+
+      rows
+        ..rows = [
+          linkLocalRow(song, {
+            'scannedAt': '2024-05-06T07:08:09.000Z',
+            'fileModTime': 1700000000000,
+          }),
+        ]
+        ..bump();
+      expect((await library.catalog()).version, first);
+      expect(rows.queries, hasLength(2));
     });
 
     test('of an empty Library is the hash of nothing', () async {
-      final catalog = await FakeLibraryRows().library().build();
+      final catalog = await FakeLibraryRows().library().catalog();
       expect(catalog.songs, isEmpty);
       expect(catalog.version, sha256.convert(const []).toString());
     });
@@ -298,14 +362,15 @@ void main() {
     test('build again for an unknown name only after a change', () async {
       final rows = FakeLibraryRows([linkLocalRow(song)]);
       final library = rows.library();
-      await library.build();
+      await library.catalog();
       final name = '${linkFileIdFor(download, 32)}.mp3';
 
       expect(await library.fileNamed(name), isNull);
       expect(rows.queries, hasLength(1));
 
-      rows.rows = [linkLocalRow(song), linkDownloadRow(download)];
-      library.changed();
+      rows
+        ..rows = [linkLocalRow(song), linkDownloadRow(download)]
+        ..bump();
       expect((await library.fileNamed(name))!.source, download);
       expect(rows.queries, hasLength(2));
       expect(await library.fileNamed('not-a-song'), isNull);
@@ -316,10 +381,10 @@ void main() {
       final rows = FakeLibraryRows([linkLocalRow(song)])
         ..hold = Completer<void>();
       final library = rows.library();
-      final first = library.build();
-      final joined = library.build();
-      library.changed();
-      final second = library.build();
+      final first = library.catalog();
+      final joined = library.catalog();
+      rows.bump();
+      final second = library.catalog();
       rows.hold!.complete();
 
       expect(identical(await first, await joined), isTrue);

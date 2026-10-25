@@ -105,20 +105,19 @@ final linkOfflineSaverProvider = Provider<LinkOfflineSaver?>((ref) {
 /// What this phone's song list for the paired desktop depends on: finished
 /// downloads, scans and whether scanned sources show in the Library. Tests
 /// override it.
-final linkPhoneLibraryRevisionProvider =
-    Provider<({int downloads, int library, bool includeLocal})>(
-      (ref) => (
-        downloads: ref.watch(
-          downloadHistoryProvider.select((state) => state.loadedIndexVersion),
-        ),
-        library: ref.watch(
-          localLibraryProvider.select((state) => state.loadedIndexVersion),
-        ),
-        includeLocal: ref.watch(
-          settingsProvider.select((settings) => settings.localLibraryEnabled),
-        ),
-      ),
-    );
+final linkPhoneLibraryRevisionProvider = Provider<LinkPhoneLibraryRevision>(
+  (ref) => (
+    downloads: ref.watch(
+      downloadHistoryProvider.select((state) => state.loadedIndexVersion),
+    ),
+    library: ref.watch(
+      localLibraryProvider.select((state) => state.loadedIndexVersion),
+    ),
+    includeLocal: ref.watch(
+      settingsProvider.select((settings) => settings.localLibraryEnabled),
+    ),
+  ),
+);
 
 /// Pages the phone's Library Songs rows for the paired desktop. Tests
 /// override it.
@@ -132,9 +131,9 @@ final linkPhoneLibraryRowsProvider = Provider<LinkPhoneRowLoader>(
 final linkPhoneLibraryProvider = Provider<LinkPhoneLibraryPublisher?>((ref) {
   final client = ref.watch(linkPhoneClientProvider);
   if (client == null) return null;
-  var includeLocal = true;
+  late LinkPhoneLibraryRevision revision;
   final library = LinkPhoneLibrary(
-    includeLocal: () => includeLocal,
+    revision: () => revision,
     loadPage: ref.watch(linkPhoneLibraryRowsProvider),
   );
   final publisher = LinkPhoneLibraryPublisher(client: client, library: library);
@@ -144,7 +143,7 @@ final linkPhoneLibraryProvider = Provider<LinkPhoneLibraryPublisher?>((ref) {
     files: ref.watch(linkPhoneFilesProvider),
   );
   ref.listen(linkPhoneLibraryRevisionProvider, (previous, next) {
-    includeLocal = next.includeLocal;
+    revision = next;
     if (previous != null) publisher.libraryChanged();
   }, fireImmediately: true);
   publisher.start();

@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/services/link/features/link_phone_features.dart';
 import 'package:mornye/services/link/features/link_phone_files.dart';
+import 'package:mornye/services/link/features/link_phone_library.dart';
 import 'package:mornye/services/link/features/link_phone_library_sync.dart';
 import 'package:mornye/services/link/link_client_api.dart';
 import 'package:mornye/services/link/link_protocol.dart';
@@ -29,18 +30,18 @@ FakeLibraryRows _uriRows(int count) => FakeLibraryRows([
   for (var i = 0; i < count; i++) linkLocalRow(_uri(i), {'format': 'flac'}),
 ]);
 
-typedef _Revision = ({int downloads, int library, bool includeLocal});
-
-class _RevisionNotifier extends Notifier<_Revision> {
+class _RevisionNotifier extends Notifier<LinkPhoneLibraryRevision> {
   @override
-  _Revision build() => (downloads: 0, library: 0, includeLocal: true);
+  LinkPhoneLibraryRevision build() =>
+      (downloads: 0, library: 0, includeLocal: true);
 
-  void set(_Revision revision) => state = revision;
+  void set(LinkPhoneLibraryRevision revision) => state = revision;
 }
 
-final _revisionProvider = NotifierProvider<_RevisionNotifier, _Revision>(
-  _RevisionNotifier.new,
-);
+final _revisionProvider =
+    NotifierProvider<_RevisionNotifier, LinkPhoneLibraryRevision>(
+      _RevisionNotifier.new,
+    );
 
 void main() {
   late Directory dir;
@@ -70,7 +71,7 @@ void main() {
   group('publishing', () {
     test('stops when the desktop holds this version', () async {
       final library = _uriRows(3).library();
-      final version = (await library.build()).version;
+      final version = (await library.catalog()).version;
       final client = FakeLinkClient(onGet: (op, _) => {'version': version});
       final publisher = LinkPhoneLibraryPublisher(
         client: client,
@@ -164,6 +165,40 @@ void main() {
       }
     });
 
+    test('leaves out covers replaced since the build', () async {
+      final kept = jpeg('kept.jpg', 10);
+      final replaced = jpeg('replaced.jpg', 11);
+      final library = FakeLibraryRows([
+        linkLocalRow(_uri(0), {'format': 'flac', 'coverPath': kept}),
+        linkLocalRow(_uri(1), {'format': 'flac', 'coverPath': replaced}),
+      ]).library();
+      await library.catalog();
+      jpeg('replaced.jpg', 20);
+      final client = FakeLinkClient(onGet: (op, _) => const {});
+      final publisher = LinkPhoneLibraryPublisher(
+        client: client,
+        library: library,
+      );
+
+      publisher.publish();
+      await publisher.idle;
+      final covers = client.posts.first.body['covers'] as List;
+      expect(
+        [for (final cover in covers) (cover as Map)['id']],
+        [linkFileIdFor(kept, 10)],
+      );
+
+      // Nothing left to send: no covers request at all.
+      client.posts.clear();
+      jpeg('kept.jpg', 12);
+      publisher.publish();
+      await publisher.idle;
+      expect(
+        [for (final post in client.posts) post.op],
+        [LinkOps.phoneCatalog],
+      );
+    });
+
     test('sends the songs in pages, in order', () async {
       final library = _uriRows(1001).library();
       final client = FakeLinkClient(onGet: (op, _) => {'version': 'old'});
@@ -236,7 +271,7 @@ void main() {
       expect(client.gets, [LinkOps.phoneCatalog]);
       expect(pages(client), [
         {
-          'version': (await FakeLibraryRows().library().build()).version,
+          'version': (await FakeLibraryRows().library().catalog()).version,
           'offset': 0,
           'total': 0,
           'songs': <Object?>[],
@@ -275,7 +310,9 @@ void main() {
       rows.hold!.complete();
       await publisher.idle;
 
-      // The first run stops once its build ends; only the second asks.
+      // The first run stops once its build ends; only the second asks, with
+      // that build.
+      expect(rows.queries, hasLength(1));
       expect(client.gets, [LinkOps.phoneCatalog]);
       expect(pages(client), hasLength(1));
     });
@@ -302,6 +339,53 @@ void main() {
       client.setConnection(LinkConnectionState.connected);
       await tester.pump();
       expect(client.gets, [LinkOps.phoneCatalog, LinkOps.phoneCatalog]);
+      publisher.dispose();
+    });
+
+    testWidgets('reuse the list until the Library changes', (tester) async {
+      // The desktop holds the last list committed.
+      Object? held;
+      final client = FakeLinkClient(
+        onGet: (op, _) => {'version': held},
+        onPost: (op, body) {
+          final songs = body['songs'];
+          if (op == LinkOps.phoneCatalog &&
+              songs is List &&
+              (body['offset'] as int) + songs.length == body['total']) {
+            held = body['version'];
+          }
+          return null;
+        },
+      );
+      final rows = _uriRows(2);
+      final publisher = LinkPhoneLibraryPublisher(
+        client: client,
+        library: rows.library(),
+      )..start();
+      await tester.pump();
+      expect(rows.queries, hasLength(1));
+      expect(pages(client), hasLength(1));
+
+      client
+        ..setConnection(LinkConnectionState.disconnected)
+        ..setConnection(LinkConnectionState.connected);
+      await tester.pump();
+      // Only the version is compared.
+      expect(rows.queries, hasLength(1));
+      expect(client.gets, hasLength(2));
+      expect(pages(client), hasLength(1));
+
+      rows
+        ..rows = [
+          ...rows.rows,
+          linkLocalRow(_uri(2), {'format': 'flac'}),
+        ]
+        ..bump();
+      publisher.libraryChanged();
+      await tester.pump(const Duration(seconds: 2));
+      expect(rows.queries, hasLength(2));
+      expect(pages(client), hasLength(2));
+      expect(pages(client).last['total'], 3);
       publisher.dispose();
     });
 

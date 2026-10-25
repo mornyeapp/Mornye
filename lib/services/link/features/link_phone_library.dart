@@ -13,6 +13,14 @@ import 'package:mornye/utils/isrc_utils.dart';
 /// go without a cover.
 const linkPhoneCoverMaxBytes = 1024 * 1024;
 
+/// What the phone's song list depends on: the downloads and Library index
+/// versions, and whether scanned sources show in the Library.
+typedef LinkPhoneLibraryRevision = ({
+  int downloads,
+  int library,
+  bool includeLocal,
+});
+
 /// One page of Library Songs rows, as `LibraryDatabase` pages them.
 typedef LinkPhoneRowLoader =
     Future<QueueLibraryDbPage> Function(QueueLibraryDbQuery query);
@@ -268,7 +276,11 @@ LinkPhoneSongPage mapLinkPhoneRows(List<Map<String, dynamic>> rows) {
       bitDepth: _positiveInt(item['bitDepth']),
       explicit: item['explicit'] == true || item['explicit'] == 1,
       coverId: cover?.id,
-      addedMs: _epochMs(local ? item['scannedAt'] : item['downloadedAt']),
+      // A rescan stamps every scanned row anew; the file's modification
+      // time (ms) stays while the file does.
+      addedMs: local
+          ? _positiveInt(item['fileModTime']) ?? _epochMs(item['scannedAt'])
+          : _epochMs(item['downloadedAt']),
     );
     songs.add(song);
     files.add(file);
@@ -287,70 +299,72 @@ Future<LinkPhoneSongPage> _mapInIsolate(List<Map<String, dynamic>> rows) =>
     compute(mapLinkPhoneRows, rows);
 
 /// Builds the phone's [LinkPhoneCatalog] from what its Library Songs view
-/// lists, and keeps the one built last for the desktop's file requests.
+/// lists, and keeps the one built last, with the revision it was built
+/// from, for later connections and the desktop's file requests.
 ///
 /// Rows are paged from SQLite and mapped off the UI isolate, page by page,
 /// so only the songs themselves stay in memory.
 class LinkPhoneLibrary {
   LinkPhoneLibrary({
-    required bool Function() includeLocal,
+    required LinkPhoneLibraryRevision Function() revision,
     LinkPhoneRowLoader? loadPage,
     LinkPhoneRowMapper? mapPage,
     this.pageSize = 1000,
-  }) : _includeLocal = includeLocal,
+  }) : _revision = revision,
        _loadPage =
            loadPage ??
            ((query) => LibraryDatabase.instance.getQueueTrackPageResult(query)),
        _mapPage = mapPage ?? _mapInIsolate;
 
-  /// Whether scanned sources show in the Library (the Local Library switch).
-  final bool Function() _includeLocal;
+  /// The Library's revision now.
+  final LinkPhoneLibraryRevision Function() _revision;
   final LinkPhoneRowLoader _loadPage;
   final LinkPhoneRowMapper _mapPage;
   final int pageSize;
 
-  /// Library changes seen so far, and how many of them [_last] and
-  /// [_building] reflect.
-  int _changes = 0;
-  int _lastAt = -1;
-  int _buildingAt = -1;
   LinkPhoneCatalog? _last;
+  LinkPhoneLibraryRevision? _lastRevision;
   Future<LinkPhoneCatalog>? _building;
+  LinkPhoneLibraryRevision? _buildingRevision;
+
+  /// Builds started, and the one [_last] came from: a build that finishes
+  /// after a newer one does not replace it.
+  int _builds = 0;
+  int _lastBuild = 0;
 
   /// The catalog built last, or null before the first build.
   LinkPhoneCatalog? get last => _last;
 
-  /// The Library changed: the next [build] reads it again, and [fileNamed]
-  /// builds again before it gives up on a name.
-  void changed() => _changes++;
-
-  /// Builds the catalog, or joins a build that started since the last
-  /// [changed].
-  Future<LinkPhoneCatalog> build() {
-    final changes = _changes;
-    if (_building case final running? when _buildingAt == changes) {
+  /// The catalog of the Library as it is now: [last] when the revision has
+  /// not changed since it was built, else a new build, shared with one
+  /// already running for this revision.
+  Future<LinkPhoneCatalog> catalog() {
+    final revision = _revision();
+    if (_last case final last? when _lastRevision == revision) {
+      return Future.value(last);
+    }
+    if (_building case final running? when _buildingRevision == revision) {
       return running;
     }
     late final Future<LinkPhoneCatalog> future;
-    future = _build(changes).whenComplete(() {
+    future = _build(revision, ++_builds).whenComplete(() {
       if (identical(_building, future)) _building = null;
     });
     _building = future;
-    _buildingAt = changes;
+    _buildingRevision = revision;
     return future;
   }
 
   /// The file the desktop asks for as `<fileId>.<suffix>`: from [last], or
   /// from a new build when there is none or the Library changed since.
-  Future<LinkPhoneFile?> fileNamed(String name) async {
-    final last = _last;
-    final file = last?.fileNamed(name);
-    if (file != null || (last != null && _lastAt == _changes)) return file;
-    return (await build()).fileNamed(name);
-  }
+  Future<LinkPhoneFile?> fileNamed(String name) async =>
+      _last?.fileNamed(name) ?? (await catalog()).fileNamed(name);
 
-  Future<LinkPhoneCatalog> _build(int changes) async {
-    final includeLocal = _includeLocal();
+  Future<LinkPhoneCatalog> _build(
+    LinkPhoneLibraryRevision revision,
+    int build,
+  ) async {
+    final includeLocal = revision.includeLocal;
     final songs = <LinkPhoneSong>[];
     final files = <String, LinkPhoneFile>{};
     final covers = <String, LinkPhoneCover>{};
@@ -396,9 +410,10 @@ class LinkPhoneLibrary {
       files: files,
       covers: [...covers.values],
     );
-    if (changes >= _lastAt) {
+    if (build > _lastBuild) {
       _last = catalog;
-      _lastAt = changes;
+      _lastRevision = revision;
+      _lastBuild = build;
     }
     return catalog;
   }

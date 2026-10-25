@@ -21,23 +21,59 @@ class _Stale implements Exception {
   const _Stale();
 }
 
+/// Encodes covers for one `POST phone/covers`; the default runs in an
+/// isolate.
+typedef LinkPhoneCoverEncoder =
+    Future<List<Map<String, dynamic>>> Function(List<LinkPhoneCover> covers);
+
+/// Reads [covers] and encodes them as `phone/covers` entries
+/// (`{"id","ext","data"}`), leaving out any that changed since the list was
+/// built. Runs in an isolate.
+List<Map<String, dynamic>> encodeLinkPhoneCovers(List<LinkPhoneCover> covers) {
+  final encoded = <Map<String, dynamic>>[];
+  for (final cover in covers) {
+    final Uint8List bytes;
+    try {
+      bytes = File(cover.path).readAsBytesSync();
+    } on FileSystemException {
+      continue;
+    }
+    // A cover replaced since the build has another id; the next build
+    // lists it.
+    if (bytes.length != cover.size) continue;
+    encoded.add({
+      'id': cover.id,
+      'ext': cover.ext,
+      'data': base64Encode(bytes),
+    });
+  }
+  return encoded;
+}
+
+Future<List<Map<String, dynamic>>> _encodeInIsolate(
+  List<LinkPhoneCover> covers,
+) => compute(encodeLinkPhoneCovers, covers);
+
+/// The base64 length of [bytes] bytes.
+int _base64Length(int bytes) => (bytes + 2) ~/ 3 * 4;
+
 /// Keeps the paired desktop's list of this phone's songs current: on each
 /// connection, and [debounce] after the Library changes while connected, it
-/// builds the list and sends it, with the covers the desktop lacks, when the
-/// desktop holds another version. Failures are logged; the next trigger
-/// tries again.
+/// sends the list, with the covers the desktop lacks, when the desktop holds
+/// another version. The list is built again only when the Library changed
+/// since the last build. Failures are logged; the next trigger tries again.
 class LinkPhoneLibraryPublisher {
   LinkPhoneLibraryPublisher({
     required this.client,
     required this.library,
-    Future<Uint8List> Function(String path)? readCover,
+    LinkPhoneCoverEncoder? encodeCovers,
     this.debounce = const Duration(seconds: 2),
-  }) : _readCover = readCover ?? ((path) => File(path).readAsBytes());
+  }) : _encodeCovers = encodeCovers ?? _encodeInIsolate;
 
   final LinkClientApi client;
   final LinkPhoneLibrary library;
   final Duration debounce;
-  final Future<Uint8List> Function(String path) _readCover;
+  final LinkPhoneCoverEncoder _encodeCovers;
 
   StreamSubscription<LinkConnectionState>? _connection;
   Timer? _debounceTimer;
@@ -72,7 +108,6 @@ class LinkPhoneLibraryPublisher {
   /// connected.
   void libraryChanged() {
     if (_disposed) return;
-    library.changed();
     _debounceTimer?.cancel();
     if (_connected) _debounceTimer = Timer(debounce, publish);
   }
@@ -106,7 +141,7 @@ class LinkPhoneLibraryPublisher {
 
     try {
       check();
-      final catalog = await library.build();
+      final catalog = await library.catalog();
       check();
       final held = await client.get(LinkOps.phoneCatalog);
       check();
@@ -122,7 +157,8 @@ class LinkPhoneLibraryPublisher {
   }
 
   /// Posts the covers the desktop lacks, at most [_coverRequestBytes] of
-  /// base64 a request.
+  /// base64 a request. Each cover's size, known from the build, sets its
+  /// share of a request before it is read.
   Future<void> _sendCovers(
     LinkPhoneCatalog catalog,
     void Function() check,
@@ -132,32 +168,25 @@ class LinkPhoneLibraryPublisher {
     check();
     final ids = reply is Map ? reply['ids'] : null;
     final held = {if (ids is List) ...ids.whereType<String>()};
-    var batch = <Map<String, dynamic>>[];
+    var batch = <LinkPhoneCover>[];
     var batchBytes = 0;
     Future<void> flush() async {
       if (batch.isEmpty) return;
-      await client.post(LinkOps.phoneCovers, {'covers': batch});
+      final covers = await _encodeCovers(batch);
       check();
       batch = [];
       batchBytes = 0;
+      if (covers.isEmpty) return;
+      await client.post(LinkOps.phoneCovers, {'covers': covers});
+      check();
     }
 
     for (final cover in catalog.covers) {
       if (held.contains(cover.id)) continue;
-      final Uint8List bytes;
-      try {
-        bytes = await _readCover(cover.path);
-      } on FileSystemException {
-        continue;
-      }
-      check();
-      // A cover replaced since the build has another id; the next build
-      // lists it.
-      if (bytes.length != cover.size) continue;
-      final data = base64Encode(bytes);
-      if (batchBytes + data.length > _coverRequestBytes) await flush();
-      batch.add({'id': cover.id, 'ext': cover.ext, 'data': data});
-      batchBytes += data.length;
+      final length = _base64Length(cover.size);
+      if (batchBytes + length > _coverRequestBytes) await flush();
+      batch.add(cover);
+      batchBytes += length;
     }
     await flush();
   }
