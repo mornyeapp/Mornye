@@ -2499,6 +2499,11 @@ void main() {
     );
     mediaItems.add(item('first'));
     await settlePlayer(tester);
+    // The card; full screen also draws the cover behind the player.
+    ProviderScope.containerOf(
+      tester.element(find.byType(NowPlayingScreen)),
+    ).read(settingsProvider.notifier).setPlayerCoverStyle('default');
+    await settlePlayer(tester);
     mediaItems.add(item('second'));
     await completeLyrics(tester);
     await tester.pump();

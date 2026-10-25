@@ -18,19 +18,27 @@ import 'package:shared_preferences/shared_preferences.dart';
 void main() {
   test('cover style and music haptics keep their defaults', () {
     final restored = AppSettings.fromJson(const {});
-    expect(restored.playerCoverStyle, 'default');
+    // Unchosen, Material shows the cover full screen and Mornye a card.
+    expect(restored.playerCoverStyle, isEmpty);
+    expect(restored.playerCoverStyleFor(mornye: false), 'fullscreen');
+    expect(restored.playerCoverStyleFor(mornye: true), 'default');
+    // A choice holds in both styles.
+    final card = restored.copyWith(playerCoverStyle: 'default');
+    expect(card.playerCoverStyleFor(mornye: false), 'default');
+    final full = restored.copyWith(playerCoverStyle: 'fullscreen');
+    expect(full.playerCoverStyleFor(mornye: true), 'fullscreen');
     expect(restored.musicHaptics, isFalse);
     expect(restored.landscapeLyricsArtwork, isFalse);
   });
 
   test('cover style and music haptics survive a round trip', () {
     final settings = const AppSettings().copyWith(
-      playerCoverStyle: 'fullscreen',
+      playerCoverStyle: 'default',
       musicHaptics: true,
       landscapeLyricsArtwork: true,
     );
     final restored = AppSettings.fromJson(settings.toJson());
-    expect(restored.playerCoverStyle, 'fullscreen');
+    expect(restored.playerCoverStyle, 'default');
     expect(restored.musicHaptics, isTrue);
     expect(restored.landscapeLyricsArtwork, isTrue);
     expect(
@@ -45,7 +53,7 @@ void main() {
         'playerCoverStyle': value,
         'musicHaptics': true,
       });
-      expect(restored.playerCoverStyle, 'default');
+      expect(restored.playerCoverStyle, isEmpty);
       expect(restored.musicHaptics, isTrue);
     }
   });

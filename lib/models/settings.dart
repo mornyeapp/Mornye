@@ -5,8 +5,10 @@ import 'package:mornye/utils/artist_utils.dart';
 
 part 'settings.g.dart';
 
+/// 'default' (a card) or 'fullscreen' once chosen, else empty for the app
+/// style's own ([AppSettings.playerCoverStyleFor]).
 String playerCoverStyleFromJson(Object? value) =>
-    value == 'fullscreen' ? 'fullscreen' : 'default';
+    value == 'default' || value == 'fullscreen' ? value as String : '';
 
 /// Pre-amp applied on top of ReplayGain during playback, in whole dB.
 /// -7 dB targets -25 LUFS from the -18 LUFS tag reference.
@@ -110,7 +112,7 @@ class AppSettings {
   @JsonKey(fromJson: musicHapticsLevelFromJson)
   final double musicHapticsStrength;
   @JsonKey(fromJson: playerCoverStyleFromJson)
-  final String playerCoverStyle; // 'default' or 'fullscreen'
+  final String playerCoverStyle; // 'default' (card), 'fullscreen' or ''
   final bool landscapeLyricsArtwork;
   final bool isFirstLaunch;
   final bool checkForUpdates;
@@ -263,7 +265,7 @@ class AppSettings {
     this.musicHaptics = false,
     this.musicHapticsSensitivity = 0.5,
     this.musicHapticsStrength = 0.5,
-    this.playerCoverStyle = 'default',
+    this.playerCoverStyle = '',
     this.landscapeLyricsArtwork = false,
     this.isFirstLaunch = true,
     this.checkForUpdates = true,
@@ -347,6 +349,15 @@ class AppSettings {
     'apple_elrc_word_sync': lyricsAppleElrcWordSync,
     'musixmatch_language': musixmatchLanguage,
   };
+
+  /// The cover art style the player shows: the one chosen, else the app
+  /// style's own, full screen in Material and a card in Mornye.
+  String playerCoverStyleFor({required bool mornye}) =>
+      playerCoverStyle.isNotEmpty
+      ? playerCoverStyle
+      : mornye
+      ? 'default'
+      : 'fullscreen';
 
   AppSettings copyWith({
     String? defaultService,

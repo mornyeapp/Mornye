@@ -7572,6 +7572,10 @@
   "@playerCoverStyleDefault": {
     "description": "Cover art style: artwork card above the controls"
   },
+  "playerCoverStyleCard": "Card",
+  "@playerCoverStyleCard": {
+    "description": "Cover art style: artwork as a card above the controls (full screen is the default)"
+  },
   "playerCoverStyleDefaultDescription": "Artwork as a card above the controls",
   "@playerCoverStyleDefaultDescription": {
     "description": "Subtitle of the default cover art style"

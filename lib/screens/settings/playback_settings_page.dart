@@ -138,6 +138,7 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage> {
         settings.exclusiveOutput &&
         defaultTargetPlatform == TargetPlatform.linux;
     final colorScheme = Theme.of(context).colorScheme;
+    final coverStyle = settings.playerCoverStyleFor(mornye: context.isMornye);
     // The charging rule applies to Android's background sweep only.
     final chargingOption = settings.songAnalysis && Platform.isAndroid;
     final progress = _songAnalysis.progress.value;
@@ -353,7 +354,7 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage> {
                 (
                   'default',
                   Icons.crop_square,
-                  context.l10n.playerCoverStyleDefault,
+                  context.l10n.playerCoverStyleCard,
                   context.l10n.playerCoverStyleDefaultDescription,
                 ),
                 (
@@ -367,8 +368,8 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage> {
                   icon: icon,
                   title: title,
                   subtitle: subtitle,
-                  selected: settings.playerCoverStyle == style,
-                  trailing: settings.playerCoverStyle == style
+                  selected: coverStyle == style,
+                  trailing: coverStyle == style
                       ? AppIcon(Icons.check, color: colorScheme.primary)
                       : null,
                   onTap: () => ref

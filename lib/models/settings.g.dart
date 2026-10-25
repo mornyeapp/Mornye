@@ -81,7 +81,7 @@ AppSettings _$AppSettingsFromJson(Map<String, dynamic> json) => AppSettings(
       ? 0.5
       : musicHapticsLevelFromJson(json['musicHapticsStrength']),
   playerCoverStyle: json['playerCoverStyle'] == null
-      ? 'default'
+      ? ''
       : playerCoverStyleFromJson(json['playerCoverStyle']),
   landscapeLyricsArtwork: json['landscapeLyricsArtwork'] as bool? ?? false,
   isFirstLaunch: json['isFirstLaunch'] as bool? ?? true,

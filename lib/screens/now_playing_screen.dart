@@ -240,12 +240,15 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
   @override
   Widget build(BuildContext context) {
     final mediaItem = ref.watch(currentMediaItemProvider).value;
+    final mornye = context.isMornye;
     final fullScreenCover = ref.watch(
-      settingsProvider.select((s) => s.playerCoverStyle == 'fullscreen'),
+      settingsProvider.select(
+        (s) => s.playerCoverStyleFor(mornye: mornye) == 'fullscreen',
+      ),
     );
     return LyricsScreenAwake(
       visible: _currentPage == 1 && mediaItem != null,
-      child: context.isMornye
+      child: mornye
           ? _buildPlayer(context, mediaItem, fullScreenCover: fullScreenCover)
           // Material takes the track's artwork scheme. The providers it needs
           // are read above, so the scoped builder reads none.

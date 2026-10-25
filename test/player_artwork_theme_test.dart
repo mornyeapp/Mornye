@@ -10,6 +10,7 @@ import 'package:mornye/models/track.dart';
 import 'package:mornye/providers/library_collections_provider.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/runtime_profile_provider.dart';
+import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/providers/system_volume_provider.dart';
 import 'package:mornye/screens/now_playing_screen.dart';
 import 'package:mornye/theme/app_theme.dart';
@@ -311,6 +312,10 @@ void main() {
       );
       palette.cached[_coverA] = cover;
       await tester.pumpWidget(app(const NowPlayingScreen(), mornye: false));
+      // The card, whose scaffold shows the scheme's surface.
+      ProviderScope.containerOf(
+        tester.element(find.byType(NowPlayingScreen)),
+      ).read(settingsProvider.notifier).setPlayerCoverStyle('default');
       await tester.pump();
       await tester.pump(const Duration(seconds: 1));
 
