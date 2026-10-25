@@ -113,7 +113,7 @@ async fn static_endpoints_describe_the_server() {
         .await;
     assert_eq!(
         names(&extensions, "name"),
-        ["apiKeyAuthentication", "formPost"]
+        ["apiKeyAuthentication", "formPost", "songLyrics"]
     );
     assert_eq!(extensions[0]["versions"], json!([1]));
     let user = fixture

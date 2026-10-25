@@ -5,6 +5,7 @@ mod browse;
 mod compat;
 mod covers;
 mod forward;
+mod lyrics;
 mod media;
 mod xml;
 

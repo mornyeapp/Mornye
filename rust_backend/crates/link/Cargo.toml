@@ -29,6 +29,7 @@ getrandom.workspace = true
 url.workspace = true
 image.workspace = true
 md-5.workspace = true
+regex.workspace = true
 time.workspace = true
 if-addrs.workspace = true
 socket2.workspace = true
