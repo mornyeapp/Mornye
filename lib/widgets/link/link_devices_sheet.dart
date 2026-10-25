@@ -30,7 +30,9 @@ Future<void> showLinkDevicesSheet(BuildContext context) =>
           LinkDevicesSheet(scrollController: controller),
     );
 
-/// The Devices entry of the player. Empty while no desktop is paired.
+/// The Devices entry of the player, drawn as the device that plays: this
+/// phone, or the desktop playing in its place. Empty while no desktop is
+/// paired.
 class LinkDevicesButton extends ConsumerWidget {
   const LinkDevicesButton({super.key, this.color, this.expressive = false});
 
@@ -52,9 +54,12 @@ class LinkDevicesButton extends ConsumerWidget {
         (remote != null && !context.isMornye
             ? Theme.of(context).colorScheme.primary
             : null);
-    final icon = AppIcon(
-      context.isMornye ? CupertinoIcons.desktopcomputer : Icons.computer,
-    );
+    final icon = AppIcon(switch ((remote == null, context.isMornye)) {
+      (true, true) => CupertinoIcons.device_phone_portrait,
+      (true, false) => Icons.phone_android,
+      (false, true) => CupertinoIcons.desktopcomputer,
+      (false, false) => Icons.computer,
+    });
     final tooltip = remote == null
         ? context.l10n.linkDevicesTitle
         : context.l10n.linkPlayingOn(remote.name);
@@ -133,53 +138,60 @@ class LinkDevicesSheet extends ConsumerWidget {
       }
     }
 
-    return ListView(
+    // A column, not a list view, so the sheet fits its few rows instead of
+    // opening tall and mostly empty.
+    return SingleChildScrollView(
       controller: scrollController,
       padding: const EdgeInsets.only(bottom: 16),
-      children: [
-        SettingsGroup(
-          children: [
-            SettingsItem(
-              key: const ValueKey('link-device-phone'),
-              icon: Icons.phone_android,
-              title: l10n.linkThisPhone,
-              trailing: onDesktop ? null : check,
-              selected: !onDesktop,
-              onTap: onDesktop ? () => choose(playHere) : null,
-            ),
-            SettingsItem(
-              key: const ValueKey('link-device-desktop'),
-              icon: Icons.computer,
-              title: name,
-              subtitle: switch (remote.connection) {
-                LinkConnectionState.connected => l10n.linkConnectionConnected,
-                LinkConnectionState.connecting => l10n.linkConnectionConnecting,
-                LinkConnectionState.disconnected =>
-                  l10n.linkConnectionDisconnected,
-              },
-              trailing: onDesktop ? check : null,
-              selected: onDesktop,
-              onTap: !onDesktop && connected
-                  ? () => choose(playOnDesktop)
-                  : null,
-              showDivider: false,
-            ),
-          ],
-        ),
-        if (remote.downloads.isNotEmpty) ...[
-          SettingsSectionHeader(title: l10n.linkDesktopDownloads(name)),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
           SettingsGroup(
             children: [
-              for (var i = 0; i < remote.downloads.length; i++)
-                LinkDesktopDownloadRow(
-                  key: ValueKey('link-download-${remote.downloads[i].id}'),
-                  download: remote.downloads[i],
-                  showDivider: i < remote.downloads.length - 1,
-                ),
+              SettingsItem(
+                key: const ValueKey('link-device-phone'),
+                icon: Icons.phone_android,
+                title: l10n.linkThisPhone,
+                trailing: onDesktop ? null : check,
+                selected: !onDesktop,
+                onTap: onDesktop ? () => choose(playHere) : null,
+              ),
+              SettingsItem(
+                key: const ValueKey('link-device-desktop'),
+                icon: Icons.computer,
+                title: name,
+                subtitle: switch (remote.connection) {
+                  LinkConnectionState.connected => l10n.linkConnectionConnected,
+                  LinkConnectionState.connecting =>
+                    l10n.linkConnectionConnecting,
+                  LinkConnectionState.disconnected =>
+                    l10n.linkConnectionDisconnected,
+                },
+                trailing: onDesktop ? check : null,
+                selected: onDesktop,
+                onTap: !onDesktop && connected
+                    ? () => choose(playOnDesktop)
+                    : null,
+                showDivider: false,
+              ),
             ],
           ),
+          if (remote.downloads.isNotEmpty) ...[
+            SettingsSectionHeader(title: l10n.linkDesktopDownloads(name)),
+            SettingsGroup(
+              children: [
+                for (var i = 0; i < remote.downloads.length; i++)
+                  LinkDesktopDownloadRow(
+                    key: ValueKey('link-download-${remote.downloads[i].id}'),
+                    download: remote.downloads[i],
+                    showDivider: i < remote.downloads.length - 1,
+                  ),
+              ],
+            ),
+          ],
         ],
-      ],
+      ),
     );
   }
 }

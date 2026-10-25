@@ -1,4 +1,5 @@
 import 'package:audio_service/audio_service.dart' show MediaItem;
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -14,6 +15,7 @@ import 'package:mornye/services/link/link_protocol.dart';
 import 'package:mornye/services/remote_playback.dart';
 import 'package:mornye/theme/app_theme.dart';
 import 'package:mornye/theme/mornye_theme.dart';
+import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/link/link_devices_sheet.dart';
 import 'package:mornye/widgets/settings_group.dart';
 
@@ -317,6 +319,68 @@ void main() {
         await tester.pump(const Duration(milliseconds: 500));
         expect(find.byType(LinkDevicesSheet), findsOneWidget);
         expect(find.text('Studio PC'), findsOneWidget);
+      });
+
+      testWidgets('the Devices button shows the device that plays', (
+        tester,
+      ) async {
+        final mornye = style == 'mornye';
+        Finder glyph(IconData icon) => find.descendant(
+          of: find.byKey(const ValueKey('link-devices-button')),
+          matching: find.byWidgetPredicate(
+            (widget) => widget is AppIcon && widget.icon == icon,
+          ),
+        );
+        await tester.pumpWidget(
+          host(
+            theme: theme,
+            client: desktop(),
+            child: const LinkDevicesButton(),
+          ),
+        );
+        expect(
+          glyph(
+            mornye ? CupertinoIcons.device_phone_portrait : Icons.phone_android,
+          ),
+          findsOneWidget,
+        );
+
+        await tester.pumpWidget(
+          host(
+            theme: theme,
+            client: desktop(),
+            onDesktop: true,
+            remote: _Remote(),
+            child: const LinkDevicesButton(),
+          ),
+        );
+        expect(
+          glyph(mornye ? CupertinoIcons.desktopcomputer : Icons.computer),
+          findsOneWidget,
+        );
+      });
+
+      testWidgets('the sheet is as tall as its rows', (tester) async {
+        await tester.pumpWidget(
+          host(
+            theme: theme,
+            item: phoneItem,
+            client: FakeLinkClient(
+              onGet: (op, query) => switch (op) {
+                LinkOps.downloads => {'items': <Object>[]},
+                _ => <String, dynamic>{},
+              },
+            ),
+          ),
+        );
+        await open(tester);
+
+        expect(find.text('This phone'), findsOneWidget);
+        // Two rows, not most of the screen.
+        expect(
+          tester.getSize(find.byType(LinkDevicesSheet)).height,
+          lessThan(300),
+        );
       });
 
       testWidgets('the player says where the music plays', (tester) async {
