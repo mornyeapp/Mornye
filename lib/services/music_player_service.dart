@@ -1254,6 +1254,7 @@ class MusicPlayerHandler extends BaseAudioHandler
   Future<void> setQueueAndPlay(
     List<PlayableMedia> items, {
     int initialIndex = 0,
+    bool? shuffle,
   }) async {
     if (items.isEmpty) return;
     _autoplay.reset();
@@ -1266,7 +1267,10 @@ class MusicPlayerHandler extends BaseAudioHandler
       ..addAll(items.map(_toMediaItem));
     _originalQueueOrder = null;
     _index = initialIndex.clamp(0, items.length - 1);
-    if (_shuffle) _shuffleQueue();
+    // An explicit mode accompanies a queue already in play order, as when
+    // playback moves between devices. Adopt it without shuffling a second time.
+    if (shuffle != null) _shuffle = shuffle;
+    if (_shuffle && shuffle == null) _shuffleQueue();
     _markSessionQueueChanged();
     _playHistory.clear();
     queue.add(List<MediaItem>.unmodifiable(_queueItems));

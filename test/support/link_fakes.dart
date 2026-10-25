@@ -194,6 +194,8 @@ class FakePhonePlayer implements LinkPhonePlayer {
     bool? shuffle,
     LinkRepeatMode? repeat,
     double? volume,
+    bool? autoplay,
+    bool? autoMix,
   }) => LinkPhoneSnapshot(
     queue: queue ?? snapshot.queue,
     index: index ?? snapshot.index,
@@ -203,6 +205,8 @@ class FakePhonePlayer implements LinkPhonePlayer {
     shuffle: shuffle ?? snapshot.shuffle,
     repeat: repeat ?? snapshot.repeat,
     volume: volume ?? snapshot.volume,
+    autoplay: autoplay ?? snapshot.autoplay,
+    autoMix: autoMix ?? snapshot.autoMix,
   );
 
   @override
@@ -211,6 +215,7 @@ class FakePhonePlayer implements LinkPhonePlayer {
     required int index,
     required Duration position,
     required bool playing,
+    bool? shuffle,
   }) async {
     calls.add('playQueue');
     played = (items: items, index: index, position: position, playing: playing);
@@ -220,6 +225,7 @@ class FakePhonePlayer implements LinkPhonePlayer {
         index: index,
         positionMs: position.inMilliseconds,
         playing: playing,
+        shuffle: shuffle,
       ),
     );
   }
@@ -264,6 +270,18 @@ class FakePhonePlayer implements LinkPhonePlayer {
   Future<void> setRepeat(LinkRepeatMode mode) async {
     calls.add('repeat ${mode.name}');
     update(_with(repeat: mode));
+  }
+
+  @override
+  Future<void> setAutoplay(bool enabled) async {
+    calls.add('autoplay $enabled');
+    update(_with(autoplay: enabled));
+  }
+
+  @override
+  Future<void> setAutoMix(bool enabled) async {
+    calls.add('autoMix $enabled');
+    update(_with(autoMix: enabled));
   }
 
   @override

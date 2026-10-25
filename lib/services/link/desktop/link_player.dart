@@ -113,6 +113,7 @@ abstract interface class LinkPlayerPort {
     required int index,
     required Duration position,
     required bool playing,
+    bool? shuffle,
   });
 
   /// Adds [items] in this order after the queued songs, or right after the
@@ -216,12 +217,14 @@ class RuntimeLinkPlayerPort implements LinkPlayerPort {
   Future<void> setShuffle(bool enabled) => _controller.setShuffle(enabled);
 
   @override
-  Future<void> setRepeat(LinkRepeatMode mode) =>
-      _controller.setRepeatMode(switch (mode) {
-        LinkRepeatMode.none => AudioServiceRepeatMode.none,
-        LinkRepeatMode.one => AudioServiceRepeatMode.one,
-        LinkRepeatMode.all => AudioServiceRepeatMode.all,
-      });
+  Future<void> setRepeat(LinkRepeatMode mode) async {
+    final handler = await _runtime.initialize();
+    await handler.setRepeatMode(switch (mode) {
+      LinkRepeatMode.none => AudioServiceRepeatMode.none,
+      LinkRepeatMode.one => AudioServiceRepeatMode.one,
+      LinkRepeatMode.all => AudioServiceRepeatMode.all,
+    });
+  }
 
   @override
   Future<void> jumpTo(int index) => _controller.jumpTo(index);
@@ -244,10 +247,17 @@ class RuntimeLinkPlayerPort implements LinkPlayerPort {
     required int index,
     required Duration position,
     required bool playing,
+    bool? shuffle,
   }) async {
-    await _controller.playAll(items, initialIndex: index);
-    final handler = _runtime.handler;
-    if (handler == null) return;
+    final handler = await _runtime.initialize();
+    await handler.setQueueAndPlay(
+      items,
+      initialIndex: index,
+      shuffle:
+          shuffle ??
+          (handler.playbackState.value.shuffleMode !=
+              AudioServiceShuffleMode.none),
+    );
     if (position > Duration.zero) await handler.seek(position);
     if (!playing) await handler.pause();
   }
@@ -299,6 +309,8 @@ TrackRef linkTrackRef(LinkPlayerItem item, {DesktopLinkCatalogIndex? index}) {
 LinkPlayerState linkPlayerState(
   LinkPlayerSnapshot snapshot, {
   DesktopLinkCatalogIndex? index,
+  bool? autoplay,
+  bool? autoMix,
 }) {
   final window = linkQueueWindow(snapshot.queue.length, snapshot.index);
   final queue = [
@@ -325,6 +337,8 @@ LinkPlayerState linkPlayerState(
     shuffle: snapshot.shuffle,
     repeat: snapshot.repeat,
     volume: snapshot.volume.clamp(0, 1).toDouble(),
+    autoplay: autoplay,
+    autoMix: autoMix,
   );
 }
 
@@ -335,6 +349,8 @@ bool linkPlayerStateChanged(LinkPlayerState previous, LinkPlayerState next) {
       previous.index != next.index ||
       previous.shuffle != next.shuffle ||
       previous.repeat != next.repeat ||
+      previous.autoplay != next.autoplay ||
+      previous.autoMix != next.autoMix ||
       previous.durationMs != next.durationMs ||
       (previous.volume - next.volume).abs() > 0.005 ||
       previous.track != next.track ||
@@ -353,4 +369,8 @@ Map<String, dynamic> linkHandoffArgs(LinkPlayerState state, {bool? playing}) =>
       'index': state.index,
       'positionMs': state.positionMs,
       'playing': playing ?? state.playing,
+      'shuffle': state.shuffle,
+      'repeat': state.repeat.name,
+      if (state.autoplay != null) 'autoplay': state.autoplay,
+      if (state.autoMix != null) 'autoMix': state.autoMix,
     };

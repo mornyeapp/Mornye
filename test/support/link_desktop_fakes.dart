@@ -180,6 +180,7 @@ class FakeLinkPlayer implements LinkPlayerPort {
   int? playedIndex;
   Duration? playedPosition;
   bool? playedPlaying;
+  bool? playedShuffle;
   final _changes = StreamController<void>.broadcast();
 
   void emit(LinkPlayerSnapshot snapshot) {
@@ -235,12 +236,14 @@ class FakeLinkPlayer implements LinkPlayerPort {
     required int index,
     required Duration position,
     required bool playing,
+    bool? shuffle,
   }) async {
     calls.add('playQueue');
     playedQueue = items;
     playedIndex = index;
     playedPosition = position;
     playedPlaying = playing;
+    playedShuffle = shuffle;
   }
 
   /// Every batch [append] added, in order.

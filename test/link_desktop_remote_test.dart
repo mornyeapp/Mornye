@@ -121,6 +121,8 @@ void main() {
     await remote.setVolume(1.4);
     await remote.setShuffle(true);
     await remote.setRepeat(LinkRepeatMode.one);
+    await remote.setAutoplay(true);
+    await remote.setAutoMix(true);
     await remote.jump(1);
     expect(client.posts.map((post) => post.op).toSet(), {LinkOps.command});
     expect(
@@ -146,6 +148,14 @@ void main() {
         {
           'action': 'repeat',
           'args': {'mode': 'one'},
+        },
+        {
+          'action': 'autoplay',
+          'args': {'enabled': true},
+        },
+        {
+          'action': 'auto_mix',
+          'args': {'enabled': true},
         },
         {
           'action': 'jump',

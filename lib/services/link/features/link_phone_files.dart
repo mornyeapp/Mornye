@@ -70,10 +70,15 @@ String? linkUploadExtensionOf(String path) {
 /// Sends the phone's own song files to the paired desktop, so it can play
 /// songs only the phone has.
 class LinkPhoneFiles {
-  LinkPhoneFiles({Future<String?> Function(String uri)? copyContentUri})
-    : _copyContentUri = copyContentUri ?? PlatformBridge.copyContentUriToTemp;
+  LinkPhoneFiles({
+    Future<String?> Function(String uri)? copyContentUri,
+    Future<Future<void> Function()> Function(String desktopName)?
+    acquireTransfer,
+  }) : _copyContentUri = copyContentUri ?? PlatformBridge.copyContentUriToTemp,
+       _acquireTransfer = acquireTransfer;
 
   final Future<String?> Function(String uri) _copyContentUri;
+  final Future<Future<void> Function()> Function(String)? _acquireTransfer;
   int _run = 0;
 
   /// Starts sending another queue; the uploads of the one before stop.
@@ -108,6 +113,20 @@ class LinkPhoneFiles {
   /// before the first byte goes; [onProgress] gets the bytes sent and the
   /// file's size. A content URI is copied to a temporary file first.
   Future<void> upload(
+    LinkClientApi client,
+    LinkPhoneFile file, {
+    void Function(LinkUploadStart start)? onStart,
+    void Function(int sent, int total)? onProgress,
+  }) async {
+    final release = await _acquireTransfer?.call(client.server.name);
+    try {
+      await _upload(client, file, onStart: onStart, onProgress: onProgress);
+    } finally {
+      await release?.call();
+    }
+  }
+
+  Future<void> _upload(
     LinkClientApi client,
     LinkPhoneFile file, {
     void Function(LinkUploadStart start)? onStart,

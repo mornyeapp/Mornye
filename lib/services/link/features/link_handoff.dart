@@ -60,18 +60,30 @@ class LinkHandoffQueue {
     required this.index,
     required this.positionMs,
     required this.playing,
+    this.shuffle,
+    this.repeat,
+    this.autoplay,
+    this.autoMix,
   });
 
   final List<TrackRef> queue;
   final int index;
   final int positionMs;
   final bool playing;
+  final bool? shuffle;
+  final LinkRepeatMode? repeat;
+  final bool? autoplay;
+  final bool? autoMix;
 
   Map<String, dynamic> toJson() => {
     'queue': [for (final ref in queue) ref.toJson()],
     'index': index,
     'positionMs': positionMs,
     'playing': playing,
+    if (shuffle != null) 'shuffle': shuffle,
+    if (repeat != null) 'repeat': repeat!.name,
+    if (autoplay != null) 'autoplay': autoplay,
+    if (autoMix != null) 'autoMix': autoMix,
   };
 
   static LinkHandoffQueue fromJson(Object? json) {
@@ -93,6 +105,10 @@ class LinkHandoffQueue {
       index: index is num ? index.toInt() : 0,
       positionMs: position is num ? position.toInt() : 0,
       playing: json['playing'] != false,
+      shuffle: json['shuffle'] is bool ? json['shuffle'] as bool : null,
+      repeat: LinkRepeatMode.values.asNameMap()[json['repeat']],
+      autoplay: json['autoplay'] is bool ? json['autoplay'] as bool : null,
+      autoMix: json['autoMix'] is bool ? json['autoMix'] as bool : null,
     );
   }
 }
@@ -163,6 +179,7 @@ class LinkHandoff {
   Future<LinkHandoffResult?> playItemsOnDesktop(
     List<MediaItem> items, {
     required int index,
+    LinkPlayerState? modes,
     void Function(int sent, int total)? onSending,
   }) async {
     if (index < 0 || index >= items.length) return null;
@@ -171,6 +188,7 @@ class LinkHandoff {
       items.sublist(window.start, window.end),
       current: index - window.start,
       positionMs: () => 0,
+      modes: modes,
       onSending: onSending,
     );
   }
@@ -240,6 +258,7 @@ class LinkHandoff {
     List<MediaItem> items, {
     required int current,
     required int Function() positionMs,
+    LinkPlayerState? modes,
     void Function(int sent, int total)? onSending,
   }) async {
     final files = this.files;
@@ -276,12 +295,17 @@ class LinkHandoff {
     }
     final played = queue.sublist(first, last + 1);
     final arriving = upload?.start;
+    final localModes = player.snapshot;
     final reply = await client.post(LinkOps.handoffPlay, {
       ...LinkHandoffQueue(
         queue: played,
         index: current - first,
         positionMs: positionMs(),
         playing: true,
+        shuffle: modes?.shuffle ?? localModes.shuffle,
+        repeat: modes?.repeat ?? localModes.repeat,
+        autoplay: modes?.autoplay ?? localModes.autoplay,
+        autoMix: modes?.autoMix ?? localModes.autoMix,
       ).toJson(),
       if (arriving != null)
         'arriving': [
@@ -410,6 +434,10 @@ class LinkHandoff {
         index: current.index,
         positionMs: current.positionMs,
         playing: true,
+        shuffle: current.shuffle,
+        repeat: current.repeat,
+        autoplay: current.autoplay,
+        autoMix: current.autoMix,
       ),
     );
     if (result.started) {
@@ -446,6 +474,9 @@ class LinkHandoff {
     // Nothing playable at or after the current track: play the last one
     // before it.
     if (start < 0) start = items.length - 1;
+    if (handoff.autoplay case final enabled?) await player.setAutoplay(enabled);
+    if (handoff.autoMix case final enabled?) await player.setAutoMix(enabled);
+    if (handoff.repeat case final mode?) await player.setRepeat(mode);
     await player.playQueue(
       items,
       index: start,
@@ -455,6 +486,7 @@ class LinkHandoff {
             : 0,
       ),
       playing: handoff.playing,
+      shuffle: handoff.shuffle,
     );
     return LinkContinueResult(played: items.length, skipped: skipped);
   }

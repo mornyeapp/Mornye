@@ -59,6 +59,8 @@ LinkPlayerState linkPlayerStateWith(
   bool? shuffle,
   LinkRepeatMode? repeat,
   double? volume,
+  bool? autoplay,
+  bool? autoMix,
 }) => LinkPlayerState(
   track: track ?? state.track,
   playing: playing ?? state.playing,
@@ -70,6 +72,8 @@ LinkPlayerState linkPlayerStateWith(
   shuffle: shuffle ?? state.shuffle,
   repeat: repeat ?? state.repeat,
   volume: volume ?? state.volume,
+  autoplay: autoplay ?? state.autoplay,
+  autoMix: autoMix ?? state.autoMix,
 );
 
 /// The desktop player as the phone's Devices sheet shows and controls it:
@@ -219,6 +223,18 @@ class LinkDesktopRemote extends Notifier<LinkRemoteState> {
             repeat: mode,
           );
         }
+      case LinkActions.autoplay:
+      case LinkActions.autoMix:
+        final enabled = command.args['enabled'];
+        if (enabled is bool) {
+          next = linkPlayerStateWith(
+            player,
+            positionMs: position,
+            updatedMs: now,
+            autoplay: command.action == LinkActions.autoplay ? enabled : null,
+            autoMix: command.action == LinkActions.autoMix ? enabled : null,
+          );
+        }
       case LinkActions.jump:
         final index = command.args['index'];
         if (index is num && index >= 0 && index < player.queue.length) {
@@ -295,6 +311,12 @@ class LinkDesktopRemote extends Notifier<LinkRemoteState> {
 
   Future<void> setRepeat(LinkRepeatMode mode) =>
       command(LinkCommand(LinkActions.repeat, {'mode': mode.name}));
+
+  Future<void> setAutoplay(bool enabled) =>
+      command(LinkCommand(LinkActions.autoplay, {'enabled': enabled}));
+
+  Future<void> setAutoMix(bool enabled) =>
+      command(LinkCommand(LinkActions.autoMix, {'enabled': enabled}));
 
   /// Plays the item at [index] of the desktop's [LinkPlayerState.queue].
   Future<void> jump(int index) =>

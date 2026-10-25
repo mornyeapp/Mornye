@@ -39,6 +39,10 @@ void main() {
           index: 120,
           playing: true,
           positionMs: 42000,
+          shuffle: true,
+          repeat: LinkRepeatMode.one,
+          autoplay: true,
+          autoMix: true,
         ),
       );
       final client = FakeLinkClient(
@@ -57,6 +61,10 @@ void main() {
       expect(post.body['index'], 50);
       expect(post.body['positionMs'], 42000);
       expect(post.body['playing'], isTrue);
+      expect(post.body['shuffle'], isTrue);
+      expect(post.body['repeat'], 'one');
+      expect(post.body['autoplay'], isTrue);
+      expect(post.body['autoMix'], isTrue);
       expect(result!.started, isTrue);
       expect(result.missingTracks.single.title, 'Track 73');
       expect(player.calls, ['pause']);
@@ -440,6 +448,10 @@ void main() {
           'index': 2,
           'positionMs': 30500,
           'playing': false,
+          'shuffle': true,
+          'repeat': 'all',
+          'autoplay': true,
+          'autoMix': true,
         },
       );
       final player = FakePhonePlayer();
@@ -461,6 +473,10 @@ void main() {
       expect(played.index, 1);
       expect(played.position, const Duration(milliseconds: 30500));
       expect(played.playing, isTrue);
+      expect(player.snapshot.shuffle, isTrue);
+      expect(player.snapshot.repeat, LinkRepeatMode.all);
+      expect(player.snapshot.autoplay, isTrue);
+      expect(player.snapshot.autoMix, isTrue);
       final pause = client.posts.single;
       expect(pause.op, LinkOps.command);
       expect(pause.body, {'action': 'pause', 'args': <String, dynamic>{}});

@@ -148,6 +148,10 @@ class LinkDesktopOps {
     String Function(String deviceId)? deviceName,
     String Function()? receivedDir,
     LinkArrivingFiles? arriving,
+    bool Function()? autoplay,
+    bool Function()? autoMix,
+    void Function(bool)? setAutoplay,
+    void Function(bool)? setAutoMix,
     int Function()? nowMs,
   }) : _player = player,
        _downloads = downloads,
@@ -158,6 +162,10 @@ class LinkDesktopOps {
        _deviceName = deviceName ?? ((deviceId) => deviceId),
        _receivedDir = receivedDir ?? (() => ''),
        _arriving = arriving,
+       _autoplay = autoplay,
+       _autoMix = autoMix,
+       _setAutoplay = setAutoplay,
+       _setAutoMix = setAutoMix,
        _nowMs = nowMs ?? (() => DateTime.now().millisecondsSinceEpoch);
 
   /// The longest play queue the Subsonic `getPlayQueue` answer carries.
@@ -175,6 +183,10 @@ class LinkDesktopOps {
   /// Streams song files a phone is still sending; without it a song plays
   /// once its upload is whole.
   final LinkArrivingFiles? _arriving;
+  final bool Function()? _autoplay;
+  final bool Function()? _autoMix;
+  final void Function(bool)? _setAutoplay;
+  final void Function(bool)? _setAutoMix;
   final int Function() _nowMs;
   final _random = math.Random();
 
@@ -207,8 +219,12 @@ class LinkDesktopOps {
   }
 
   /// The desktop player as phones see it.
-  LinkPlayerState state() =>
-      linkPlayerState(_player.snapshot(), index: _index());
+  LinkPlayerState state() => linkPlayerState(
+    _player.snapshot(),
+    index: _index(),
+    autoplay: _autoplay?.call(),
+    autoMix: _autoMix?.call(),
+  );
 
   /// Notes the desktop's own queue, so `getPlayQueue` knows when it last
   /// changed. The host calls it on every player change.
@@ -263,6 +279,15 @@ class LinkDesktopOps {
         final mode = LinkRepeatMode.values.asNameMap()[args['mode']];
         if (mode == null) throw _invalid('Unknown repeat mode');
         await _player.setRepeat(mode);
+      case LinkActions.autoplay:
+      case LinkActions.autoMix:
+        final enabled = args['enabled'];
+        if (enabled is! bool) throw _invalid('Missing enabled');
+        final write = command.action == LinkActions.autoplay
+            ? _setAutoplay
+            : _setAutoMix;
+        if (write == null) throw _invalid('Playback preference is unavailable');
+        write(enabled);
       case LinkActions.jump:
         await _player.jumpTo(_queueIndex(args, 'index'));
       case LinkActions.move:
@@ -332,6 +357,10 @@ class LinkDesktopOps {
     }
     String? handoffId;
     if (media.isNotEmpty) {
+      if (args['autoplay'] case final bool enabled) _setAutoplay?.call(enabled);
+      if (args['autoMix'] case final bool enabled) _setAutoMix?.call(enabled);
+      final repeat = LinkRepeatMode.values.asNameMap()[args['repeat']];
+      if (repeat != null) await _player.setRepeat(repeat);
       await _player.playQueue(
         media,
         index: start < 0 ? media.length - 1 : start,
@@ -341,6 +370,7 @@ class LinkDesktopOps {
               )
             : Duration.zero,
         playing: args['playing'] != false,
+        shuffle: args['shuffle'] is bool ? args['shuffle'] as bool : null,
       );
       handoffId = _handoffId = '${_nowMs()}-${_random.nextInt(1 << 32)}';
     }

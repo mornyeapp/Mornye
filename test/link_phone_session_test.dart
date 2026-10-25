@@ -136,6 +136,8 @@ void main() {
       await command(linked, LinkActions.shuffle, {'enabled': true});
       await command(linked, LinkActions.repeat, {'mode': 'one'});
       await command(linked, LinkActions.repeat, {'mode': 'sideways'});
+      await command(linked, LinkActions.autoplay, {'enabled': true});
+      await command(linked, LinkActions.autoMix, {'enabled': true});
       await command(linked, LinkActions.jump, {'index': 2});
       await command(linked, LinkActions.jump, {'index': 9});
       await command(linked, 'dance');
@@ -149,6 +151,8 @@ void main() {
         'volume 1.0',
         'shuffle true',
         'repeat one',
+        'autoplay true',
+        'autoMix true',
         'jump 2',
       ]);
       await tester.pump(const Duration(milliseconds: 250));

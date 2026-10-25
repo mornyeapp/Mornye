@@ -5,6 +5,8 @@ import 'package:audio_service/audio_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/providers/music_player_provider.dart';
+import 'package:mornye/providers/settings_provider.dart';
+import 'package:mornye/models/settings.dart';
 import 'package:mornye/services/link/features/link_desktop_remote.dart';
 import 'package:mornye/services/link/features/link_handoff.dart';
 import 'package:mornye/services/link/features/link_phone_features.dart';
@@ -28,6 +30,17 @@ class _Runtime extends MusicPlayerRuntime {
 
   @override
   Stream<PlaybackState> playbackStateEvents() => states.stream;
+}
+
+class _PlaybackSettings extends SettingsNotifier {
+  @override
+  AppSettings build() => const AppSettings();
+
+  @override
+  void setAutoplay(bool enabled) => state = state.copyWith(autoplay: enabled);
+
+  @override
+  void setAutoMix(bool enabled) => state = state.copyWith(autoMix: enabled);
 }
 
 TrackRef _desktopSong(String id, {String? isrc}) => TrackRef(
@@ -99,6 +112,75 @@ void main() {
 
   Future<void> settle() =>
       Future<void>.delayed(const Duration(milliseconds: 5));
+
+  test(
+    'active remote preferences stay synchronized through reconnection',
+    () async {
+      var desktopAutoplay = true;
+      var desktopAutoMix = true;
+      client.onGet = (op, _) => op == LinkOps.state
+          ? {
+              ...(_state()['state'] as Map),
+              'autoplay': desktopAutoplay,
+              'autoMix': desktopAutoMix,
+            }
+          : null;
+      client.onPost = (op, body) {
+        final args = body['args'] as Map;
+        if (body['action'] == LinkActions.autoplay) {
+          desktopAutoplay = args['enabled'] as bool;
+        }
+        if (body['action'] == LinkActions.autoMix) {
+          desktopAutoMix = args['enabled'] as bool;
+        }
+        return {'ok': true};
+      };
+      final localStates = StreamController<PlaybackState>.broadcast();
+      addTearDown(localStates.close);
+      final phone = ProviderContainer(
+        overrides: [
+          linkPhoneClientProvider.overrideWithValue(client),
+          musicPlayerRuntimeProvider.overrideWithValue(_Runtime(localStates)),
+          settingsProvider.overrideWith(_PlaybackSettings.new),
+          linkHandoffProvider.overrideWithValue(
+            LinkHandoff(
+              client: client,
+              player: FakePhonePlayer(),
+              refs: LinkTrackRefCache(lookup: lookup),
+              resolver: LinkTrackResolver(lookup: lookup),
+            ),
+          ),
+        ],
+      );
+      addTearDown(phone.dispose);
+      phone.listen(linkRemotePlaybackProvider, (_, _) {});
+      phone.read(linkPlaysOnDesktopProvider.notifier).set(true);
+      await settle();
+      expect(phone.read(settingsProvider).autoplay, isTrue);
+      expect(phone.read(settingsProvider).autoMix, isTrue);
+      expect(client.posts, isEmpty);
+
+      phone.read(settingsProvider.notifier).setAutoplay(false);
+      phone.read(settingsProvider.notifier).setAutoMix(false);
+      await settle();
+      expect(desktopAutoplay, isFalse);
+      expect(desktopAutoMix, isFalse);
+      expect(client.posts, hasLength(2));
+
+      client.setConnection(LinkConnectionState.disconnected);
+      desktopAutoplay = true;
+      client.setConnection(LinkConnectionState.connecting);
+      client.setConnection(LinkConnectionState.connected);
+      await settle();
+      expect(phone.read(settingsProvider).autoplay, isTrue);
+      expect(phone.read(linkPlaysOnDesktopProvider), isTrue);
+      expect(
+        client.posts,
+        hasLength(2),
+        reason: 'Refresh must not echo preferences',
+      );
+    },
+  );
 
   test('shows the desktop song, queue and position as the player', () async {
     client.push(_state());

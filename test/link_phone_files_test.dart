@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:audio_service/audio_service.dart' show MediaItem;
@@ -69,6 +70,52 @@ void main() {
   });
 
   group('upload', () {
+    test('keeps a background lease until the complete file arrives', () async {
+      final path = '${dir.path}/background.flac';
+      await File(path).writeAsBytes([1, 2]);
+      final started = Completer<void>();
+      final finish = Completer<void>();
+      final calls = <String>[];
+      final client = FakeLinkClient()
+        ..whileUploading = (name, size, sent) {
+          started.complete();
+          return finish.future;
+        };
+      final files = LinkPhoneFiles(
+        acquireTransfer: (name) async {
+          calls.add('acquire');
+          return () async => calls.add('release');
+        },
+      );
+      final uploading = files.upload(
+        client,
+        (await files.fileFor(item(path)))!,
+      );
+      await started.future;
+      expect(calls, ['acquire']);
+      finish.complete();
+      await uploading;
+      expect(calls, ['acquire', 'release']);
+    });
+
+    test('failed transfers release their background lease', () async {
+      final path = '${dir.path}/failed.flac';
+      await File(path).writeAsBytes([1]);
+      var released = 0;
+      final client = FakeLinkClient()
+        ..onUpload = (_) => const LinkException('unavailable', 'Offline');
+      final files = LinkPhoneFiles(
+        acquireTransfer: (_) async {
+          return () async => released++;
+        },
+      );
+      await expectLater(
+        files.upload(client, (await files.fileFor(item(path)))!),
+        throwsA(isA<LinkException>()),
+      );
+      expect(released, 1);
+    });
+
     test('sends a local file under its id and extension', () async {
       final path = '${dir.path}/a.mp3';
       await File(path).writeAsBytes([5, 6]);

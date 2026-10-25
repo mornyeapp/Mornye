@@ -19,6 +19,9 @@ import 'package:mornye/services/library_collections_database.dart';
 import 'package:mornye/services/library_database.dart';
 import 'package:mornye/services/library_search.dart';
 import 'package:mornye/services/listening_statistics.dart';
+import 'package:mornye/services/link/desktop/link_player.dart';
+import 'package:mornye/services/link/features/link_phone_player.dart';
+import 'package:mornye/services/link/link_protocol.dart';
 import 'package:mornye/services/media_library_browser.dart';
 import 'package:mornye/services/music_player_service.dart';
 import 'package:mornye/services/playback_deck.dart';
@@ -413,6 +416,64 @@ const _track = PlayableMedia(
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  test(
+    'Link adopts repeat before either player has been initialized',
+    () async {
+      final desktop = _runtime();
+      await RuntimeLinkPlayerPort(desktop).setRepeat(LinkRepeatMode.one);
+      expect(
+        desktop.handler!.playbackState.value.repeatMode,
+        AudioServiceRepeatMode.one,
+      );
+      final phone = _runtime();
+      await LinkMusicPhonePlayer(
+        runtime: phone,
+        controller: MusicPlayerController(runtime: phone),
+        writeVolume: (_) async {},
+      ).setRepeat(LinkRepeatMode.all);
+      expect(
+        phone.handler!.playbackState.value.repeatMode,
+        AudioServiceRepeatMode.all,
+      );
+    },
+  );
+
+  test(
+    'a handed-off shuffled queue keeps its order and current song',
+    () async {
+      final handler = await _runtime().initialize();
+      final media = [
+        for (var i = 0; i < 12; i++)
+          PlayableMedia(
+            id: '$i',
+            source: '/$i.flac',
+            title: 'Song $i',
+            artist: 'Artist',
+          ),
+      ];
+      await handler.setQueueAndPlay(media, initialIndex: 4, shuffle: true);
+      expect(
+        handler.queue.value.map((item) => item.id),
+        media.map((item) => item.id),
+      );
+      expect(handler.mediaItem.value?.id, '4');
+      expect(
+        handler.playbackState.value.shuffleMode,
+        AudioServiceShuffleMode.all,
+      );
+      await handler.setQueueAndPlay(media, initialIndex: 2, shuffle: false);
+      expect(
+        handler.queue.value.map((item) => item.id),
+        media.map((item) => item.id),
+      );
+      expect(handler.mediaItem.value?.id, '2');
+      expect(
+        handler.playbackState.value.shuffleMode,
+        AudioServiceShuffleMode.none,
+      );
+    },
+  );
 
   test('dismissing a paused player ends the saved session and permits new '
       'playback', () async {

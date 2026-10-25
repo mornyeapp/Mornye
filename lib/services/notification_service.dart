@@ -43,6 +43,7 @@ class NotificationService {
 
   static const String libraryScanWorkKind = 'library_scan';
   static const String updateDownloadWorkKind = 'app_update';
+  int _linkTransferSequence = 0;
 
   // Kinds whose progress the Android foreground-service notification shows,
   // replacing the plugin's progress notification so only one is visible.
@@ -77,6 +78,25 @@ class NotificationService {
     libraryScanWorkKind,
     title: _l10n?.notifScanningLibrary ?? 'Scanning local library',
   );
+
+  /// Each upload owns its lease, so finishing one cannot stop another.
+  Future<Future<void> Function()> acquireLinkTransferWork(
+    String desktopName,
+  ) async {
+    final kind = 'link_transfer_${_linkTransferSequence++}';
+    await beginBackgroundWork(
+      kind,
+      title:
+          _l10n?.linkHandoffSending(desktopName) ??
+          'Sending this song to $desktopName...',
+    );
+    var released = false;
+    return () async {
+      if (released) return;
+      released = true;
+      await endBackgroundWork(kind);
+    };
+  }
 
   Future<void> beginUpdateDownloadWork({required String version}) =>
       beginBackgroundWork(

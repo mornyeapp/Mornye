@@ -114,6 +114,8 @@ class LinkPhoneSession {
         last.playing != next.playing ||
         last.shuffle != next.shuffle ||
         last.repeat != next.repeat ||
+        last.autoplay != next.autoplay ||
+        last.autoMix != next.autoMix ||
         last.durationMs != next.durationMs ||
         (last.volume - next.volume).abs() > 0.005) {
       return true;
@@ -141,6 +143,8 @@ class LinkPhoneSession {
         shuffle: snapshot.shuffle,
         repeat: snapshot.repeat,
         volume: snapshot.volume,
+        autoplay: snapshot.autoplay,
+        autoMix: snapshot.autoMix,
       ),
     );
   }
@@ -226,6 +230,12 @@ class LinkPhoneSession {
       case LinkActions.repeat:
         final mode = LinkRepeatMode.values.asNameMap()[args['mode']];
         if (mode != null) await player.setRepeat(mode);
+      case LinkActions.autoplay:
+        final enabled = args['enabled'];
+        if (enabled is bool) await player.setAutoplay(enabled);
+      case LinkActions.autoMix:
+        final enabled = args['enabled'];
+        if (enabled is bool) await player.setAutoMix(enabled);
       case LinkActions.jump:
         final index = args['index'];
         final length = player.snapshot.queue.length;

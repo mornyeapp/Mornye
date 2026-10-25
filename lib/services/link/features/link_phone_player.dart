@@ -17,6 +17,8 @@ class LinkPhoneSnapshot {
     this.shuffle = false,
     this.repeat = LinkRepeatMode.none,
     this.volume = 1,
+    this.autoplay = false,
+    this.autoMix = false,
   });
 
   /// The queue in play order.
@@ -32,6 +34,8 @@ class LinkPhoneSnapshot {
 
   /// 0 to 1.
   final double volume;
+  final bool autoplay;
+  final bool autoMix;
 
   MediaItem? get current =>
       index >= 0 && index < queue.length ? queue[index] : null;
@@ -53,6 +57,7 @@ abstract interface class LinkPhonePlayer {
     required int index,
     required Duration position,
     required bool playing,
+    bool? shuffle,
   });
 
   Future<void> play();
@@ -65,6 +70,8 @@ abstract interface class LinkPhonePlayer {
   Future<void> jump(int index);
   Future<void> setShuffle(bool enabled);
   Future<void> setRepeat(LinkRepeatMode mode);
+  Future<void> setAutoplay(bool enabled);
+  Future<void> setAutoMix(bool enabled);
 
   /// Sets the volume the phone's player slider controls, 0 to 1.
   Future<void> setVolume(double value);
@@ -78,15 +85,21 @@ class LinkMusicPhonePlayer implements LinkPhonePlayer {
     required MusicPlayerController controller,
     required Future<void> Function(double) writeVolume,
     Stream<double>? volumeChanges,
+    void Function(bool)? writeAutoplay,
+    void Function(bool)? writeAutoMix,
   }) : _runtime = runtime,
        _controller = controller,
        _writeVolume = writeVolume,
+       _writeAutoplay = writeAutoplay,
+       _writeAutoMix = writeAutoMix,
        _volumeChanges = volumeChanges ?? const Stream.empty();
 
   final MusicPlayerRuntime _runtime;
   final MusicPlayerController _controller;
   final Future<void> Function(double) _writeVolume;
   final Stream<double> _volumeChanges;
+  final void Function(bool)? _writeAutoplay;
+  final void Function(bool)? _writeAutoMix;
   double _volume = 1;
 
   static LinkRepeatMode _repeat(AudioServiceRepeatMode mode) => switch (mode) {
@@ -99,7 +112,13 @@ class LinkMusicPhonePlayer implements LinkPhonePlayer {
   @override
   LinkPhoneSnapshot get snapshot {
     final handler = _runtime.handler;
-    if (handler == null) return LinkPhoneSnapshot(volume: _volume);
+    if (handler == null) {
+      return LinkPhoneSnapshot(
+        volume: _volume,
+        autoplay: _runtime.settings.autoplay,
+        autoMix: _runtime.settings.autoMix,
+      );
+    }
     final state = handler.playbackState.value;
     final queue = handler.queue.value;
     final current = handler.mediaItem.value;
@@ -120,6 +139,8 @@ class LinkMusicPhonePlayer implements LinkPhonePlayer {
       shuffle: state.shuffleMode != AudioServiceShuffleMode.none,
       repeat: _repeat(state.repeatMode),
       volume: _volume,
+      autoplay: _runtime.settings.autoplay,
+      autoMix: _runtime.settings.autoMix,
     );
   }
 
@@ -147,16 +168,15 @@ class LinkMusicPhonePlayer implements LinkPhonePlayer {
     required int index,
     required Duration position,
     required bool playing,
+    bool? shuffle,
   }) async {
     if (items.isEmpty) return;
     final handler = await _runtime.initialize();
-    // The sender's queue is already in play order; shuffling it again would
-    // change what plays next.
-    if (handler.playbackState.value.shuffleMode !=
-        AudioServiceShuffleMode.none) {
-      await handler.setShuffleMode(AudioServiceShuffleMode.none);
-    }
-    await handler.setQueueAndPlay(items, initialIndex: index);
+    await handler.setQueueAndPlay(
+      items,
+      initialIndex: index,
+      shuffle: shuffle ?? false,
+    );
     if (position > Duration.zero) await handler.seek(position);
     if (!playing) await handler.pause();
   }
@@ -183,12 +203,32 @@ class LinkMusicPhonePlayer implements LinkPhonePlayer {
   Future<void> setShuffle(bool enabled) => _controller.setShuffle(enabled);
 
   @override
-  Future<void> setRepeat(LinkRepeatMode mode) =>
-      _controller.setRepeatMode(switch (mode) {
-        LinkRepeatMode.none => AudioServiceRepeatMode.none,
-        LinkRepeatMode.one => AudioServiceRepeatMode.one,
-        LinkRepeatMode.all => AudioServiceRepeatMode.all,
-      });
+  Future<void> setRepeat(LinkRepeatMode mode) async {
+    final handler = await _runtime.initialize();
+    await handler.setRepeatMode(switch (mode) {
+      LinkRepeatMode.none => AudioServiceRepeatMode.none,
+      LinkRepeatMode.one => AudioServiceRepeatMode.one,
+      LinkRepeatMode.all => AudioServiceRepeatMode.all,
+    });
+  }
+
+  @override
+  Future<void> setAutoplay(bool enabled) async {
+    if (_writeAutoplay case final write?) {
+      write(enabled);
+    } else {
+      _runtime.configure(_runtime.settings.copyWith(autoplay: enabled));
+    }
+  }
+
+  @override
+  Future<void> setAutoMix(bool enabled) async {
+    if (_writeAutoMix case final write?) {
+      write(enabled);
+    } else {
+      _runtime.configure(_runtime.settings.copyWith(autoMix: enabled));
+    }
+  }
 
   @override
   Future<void> setVolume(double value) {

@@ -4,10 +4,12 @@ import 'package:audio_service/audio_service.dart';
 import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/providers/music_player_provider.dart';
+import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/services/link/features/link_desktop_remote.dart';
 import 'package:mornye/services/link/features/link_handoff.dart';
 import 'package:mornye/services/link/features/link_phone_features.dart';
 import 'package:mornye/services/link/features/link_phone_options.dart';
+import 'package:mornye/services/link/features/link_playback_preferences.dart';
 import 'package:mornye/services/link/features/link_track_resolver.dart';
 import 'package:mornye/services/link/link_client_api.dart';
 import 'package:mornye/services/link/link_protocol.dart';
@@ -119,18 +121,48 @@ final linkRemotePlaybackProvider = Provider<LinkRemotePlayback?>((ref) {
   final handoff = ref.watch(linkHandoffProvider);
   if (client == null || handoff == null) return null;
   late final LinkRemotePlayback playback;
+  final remote = ref.read(linkDesktopRemoteProvider.notifier);
+  final preferences = LinkPlaybackPreferencesSync(
+    readAutoplay: () => ref.read(settingsProvider).autoplay,
+    readAutoMix: () => ref.read(settingsProvider).autoMix,
+    writeAutoplay: (enabled) =>
+        ref.read(settingsProvider.notifier).setAutoplay(enabled),
+    writeAutoMix: (enabled) =>
+        ref.read(settingsProvider.notifier).setAutoMix(enabled),
+    sendAutoplay: remote.setAutoplay,
+    sendAutoMix: remote.setAutoMix,
+  );
+  var revision = 0;
+  void update(LinkRemoteState state) {
+    playback.update(state);
+    final current = ++revision;
+    scheduleMicrotask(() {
+      if (ref.mounted && current == revision) {
+        preferences.updateRemote(state.player);
+      }
+    });
+  }
+
   // Listening keeps the desktop's state alive while it plays for the phone.
-  ref.listen(linkDesktopRemoteProvider, (_, next) => playback.update(next));
+  ref.listen(linkDesktopRemoteProvider, (_, next) => update(next));
+  ref.listen(settingsProvider.select((s) => (s.autoplay, s.autoMix)), (_, _) {
+    unawaited(
+      preferences.updateLocal().catchError((Object error) {
+        _log.w('Could not update the computer playback preferences: $error');
+      }),
+    );
+  });
   playback = LinkRemotePlayback(
     name: linkDesktopName(client),
-    remote: ref.read(linkDesktopRemoteProvider.notifier),
+    remote: remote,
     handoff: handoff,
     resolveArtwork: ref
         .watch(musicPlayerRuntimeProvider)
         .dependencies
         .resolveNetworkSource,
     initialItem: ref.read(localMediaItemProvider).value,
-  )..update(ref.read(linkDesktopRemoteProvider));
+  );
+  update(ref.read(linkDesktopRemoteProvider));
   ref.onDispose(playback.dispose);
   return playback;
 });
@@ -394,6 +426,7 @@ class LinkRemotePlayback implements RemotePlayback {
         (onSending) => _handoff.playItemsOnDesktop(
           [for (final item in items) item.toMediaItem()],
           index: initialIndex,
+          modes: _player,
           onSending: onSending,
         ),
       );

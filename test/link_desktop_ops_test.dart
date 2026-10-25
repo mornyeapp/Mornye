@@ -22,6 +22,8 @@ void main() {
   late String received;
   late LinkHostRouter router;
   late LinkDesktopOps ops;
+  late bool autoplay;
+  late bool autoMix;
 
   final songs = [
     catalogSong('l:a'),
@@ -42,6 +44,8 @@ void main() {
     );
     now = 1000;
     received = '';
+    autoplay = false;
+    autoMix = false;
     router = LinkHostRouter();
     ops = LinkDesktopOps(
       player: player,
@@ -52,6 +56,10 @@ void main() {
       desktopName: () => 'Studio',
       deviceName: (id) => 'Phone $id',
       receivedDir: () => received,
+      autoplay: () => autoplay,
+      autoMix: () => autoMix,
+      setAutoplay: (enabled) => autoplay = enabled,
+      setAutoMix: (enabled) => autoMix = enabled,
       nowMs: () => now,
     )..register(router);
   });
@@ -121,6 +129,36 @@ void main() {
     expect(queue, hasLength(3));
     expect((queue.last as Map).containsKey('songId'), isFalse);
   });
+
+  test(
+    'handoff adopts playback modes and reports automation changes',
+    () async {
+      final reply = await call(LinkOps.handoffPlay, {
+        'queue': [
+          {'title': 'Title a', 'artist': 'Artist a'},
+        ],
+        'shuffle': true,
+        'repeat': 'all',
+        'autoplay': true,
+        'autoMix': true,
+      });
+      expect(reply, containsPair('resolved', 1));
+      expect(player.playedShuffle, isTrue);
+      expect(player.calls, contains('repeat:all'));
+      expect(ops.state().autoplay, isTrue);
+      expect(ops.state().autoMix, isTrue);
+      await call(LinkOps.command, {
+        'action': LinkActions.autoplay,
+        'args': {'enabled': false},
+      });
+      await call(LinkOps.command, {
+        'action': LinkActions.autoMix,
+        'args': {'enabled': false},
+      });
+      expect(ops.state().autoplay, isFalse);
+      expect(ops.state().autoMix, isFalse);
+    },
+  );
 
   test('state sends a window of 200 around the current entry', () {
     final queue = [for (var i = 0; i < 500; i++) playerItem('q$i')];
@@ -773,6 +811,8 @@ void main() {
           'index': 0,
           'positionMs': 7,
           'playing': true,
+          'shuffle': false,
+          'repeat': 'none',
         },
       );
     });

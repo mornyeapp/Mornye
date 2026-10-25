@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:mornye/providers/download_history_provider.dart';
@@ -6,6 +8,7 @@ import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/providers/system_volume_provider.dart';
 import 'package:mornye/services/library_database.dart';
+import 'package:mornye/services/notification_service.dart';
 import 'package:mornye/services/link/features/link_handoff.dart';
 import 'package:mornye/services/link/features/link_library_lookup.dart';
 import 'package:mornye/services/link/features/link_phone_client.dart';
@@ -48,6 +51,10 @@ final linkPhonePlayerProvider = Provider<LinkPhonePlayer>(
     ),
     writeVolume: ref.watch(systemVolumeWriterProvider),
     volumeChanges: SystemVolumeService.instance.changes,
+    writeAutoplay: (enabled) =>
+        ref.read(settingsProvider.notifier).setAutoplay(enabled),
+    writeAutoMix: (enabled) =>
+        ref.read(settingsProvider.notifier).setAutoMix(enabled),
   ),
 );
 
@@ -69,7 +76,9 @@ final linkTrackResolverProvider = Provider<LinkTrackResolver>(
 /// Sends this phone's song files to the paired desktop. One instance for the
 /// app, so a new handoff stops the uploads of the one before.
 final linkPhoneFilesProvider = Provider<LinkPhoneFiles>(
-  (ref) => LinkPhoneFiles(),
+  (ref) => LinkPhoneFiles(
+    acquireTransfer: NotificationService().acquireLinkTransferWork,
+  ),
 );
 
 /// Handoff with the paired desktop, or null when none is paired.
@@ -177,6 +186,11 @@ final linkPhoneFeaturesProvider = Provider<LinkPhoneSession?>((ref) {
     handoff: handoff,
     openUrl: ref.watch(linkOpenUrlProvider),
   )..start();
+  ref.listen(settingsProvider.select((s) => (s.autoplay, s.autoMix)), (_, _) {
+    scheduleMicrotask(() {
+      if (ref.mounted) session.pushState();
+    });
+  });
   ref.onDispose(session.dispose);
   return session;
 });

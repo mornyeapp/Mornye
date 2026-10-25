@@ -9,7 +9,7 @@ import 'package:mornye/widgets/app_bottom_sheet.dart';
 import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/expressive_button.dart';
 import 'package:mornye/widgets/player_playback_controls.dart';
-import 'package:mornye/widgets/player_artwork.dart';
+import 'package:mornye/widgets/player_queue_artwork.dart';
 import 'package:mornye/widgets/player_queue_dismissible.dart';
 
 Future<void> showPlayerQueueSheet(
@@ -190,8 +190,8 @@ class PlayerQueueSheet extends ConsumerWidget {
                       ),
                       child: SizedBox.square(
                         dimension: 44,
-                        child: PlayerArtwork(
-                          artUri: item.artUri?.toString(),
+                        child: PlayerQueueArtwork(
+                          item: item,
                           colorScheme: colorScheme,
                           cacheWidth: 132,
                           iconSize: 22,

@@ -144,6 +144,8 @@ abstract final class LinkActions {
   static const volume = 'volume';
   static const shuffle = 'shuffle';
   static const repeat = 'repeat';
+  static const autoplay = 'autoplay';
+  static const autoMix = 'auto_mix';
   static const jump = 'jump';
 
   /// `{"from","to"}`: moves a queue entry; indexes as for [jump].
@@ -428,6 +430,8 @@ class LinkPlayerState {
     this.shuffle = false,
     this.repeat = LinkRepeatMode.none,
     this.volume = 1,
+    this.autoplay,
+    this.autoMix,
   });
 
   /// At most this many queue entries around the current one are sent.
@@ -450,6 +454,10 @@ class LinkPlayerState {
   /// 0 to 1.
   final double volume;
 
+  /// Null when a peer predates playback preference synchronization.
+  final bool? autoplay;
+  final bool? autoMix;
+
   /// The position at [nowMs], advanced while playing.
   int positionAt(int nowMs) {
     if (!playing) return positionMs;
@@ -469,6 +477,8 @@ class LinkPlayerState {
     'shuffle': shuffle,
     'repeat': repeat.name,
     'volume': volume,
+    if (autoplay != null) 'autoplay': autoplay,
+    if (autoMix != null) 'autoMix': autoMix,
   };
 
   static LinkPlayerState? fromJson(Object? json) {
@@ -489,6 +499,8 @@ class LinkPlayerState {
           LinkRepeatMode.values.asNameMap()[json['repeat']] ??
           LinkRepeatMode.none,
       volume: ((json['volume'] as num?)?.toDouble() ?? 1).clamp(0, 1),
+      autoplay: json['autoplay'] is bool ? json['autoplay'] as bool : null,
+      autoMix: json['autoMix'] is bool ? json['autoMix'] as bool : null,
     );
   }
 }

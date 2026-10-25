@@ -386,6 +386,12 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
       deviceName: _deviceName,
       receivedDir: () => state.server?.receivedDir ?? '',
       arriving: _arrivingFiles(),
+      autoplay: () => ref.read(settingsProvider).autoplay,
+      autoMix: () => ref.read(settingsProvider).autoMix,
+      setAutoplay: (enabled) =>
+          ref.read(settingsProvider.notifier).setAutoplay(enabled),
+      setAutoMix: (enabled) =>
+          ref.read(settingsProvider.notifier).setAutoMix(enabled),
     );
   }
 
@@ -494,6 +500,10 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
     _appSubscriptions.addAll([
       ref.listen(linkLibraryRevisionProvider, (_, _) => _scheduleExport()),
       ref.listen(linkDownloadItemsProvider, (_, _) => _scheduleDownloads()),
+      ref.listen(
+        settingsProvider.select((s) => (s.autoplay, s.autoMix)),
+        (_, _) => _onPlayerChanged(),
+      ),
     ]);
     _playerSubscription = _player?.changes.listen((_) => _onPlayerChanged());
     _onPlayerChanged();
@@ -585,7 +595,7 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
     final snapshot = player.snapshot();
     ops.observe(snapshot);
     if (state.clients.isEmpty) return;
-    final next = linkPlayerState(snapshot, index: _index);
+    final next = ops.state();
     final last = _lastSentState;
     if (last != null && !linkPlayerStateChanged(last, next)) return;
     _stateTimer?.cancel();
