@@ -1,9 +1,9 @@
 //! Discovery (contract section 2): advertises `_mornye._tcp.local.` with the
 //! server name as the instance name and TXT `v=1`, `id=<serverId>`,
-//! `fp=<fingerprint>` on every interface. Advertising is best effort; the
-//! server works without it when the phone knows the address.
+//! `fp=<fingerprint>` on every IPv4 interface. Advertising is best effort;
+//! the server works without it when the phone knows the address.
 
-use mdns_sd::{ServiceDaemon, ServiceInfo};
+use mdns_sd::{IfKind, ServiceDaemon, ServiceInfo};
 use std::time::Duration;
 
 const SERVICE_TYPE: &str = "_mornye._tcp.local.";
@@ -22,6 +22,14 @@ pub(crate) fn advertise(
 ) -> Result<Advertiser, String> {
     let fail = |error: mdns_sd::Error| format!("mDNS advertising failed: {error}");
     let daemon = ServiceDaemon::new().map_err(fail)?;
+    // IPv6 answers matched every link-local address to every interface, so
+    // Wi-Fi carried the loopback's fe80::1 (often the router's address).
+    // Android before 14 keeps one resolved address and could pick that
+    // one; the phone prefers IPv4 anyway. Loopback reaches nobody.
+    if let Err(error) = daemon.disable_interface(vec![IfKind::IPv6, IfKind::LoopbackV4]) {
+        let _ = daemon.shutdown();
+        return Err(fail(error));
+    }
     let short_id: String = server_id
         .chars()
         .filter(char::is_ascii_alphanumeric)
