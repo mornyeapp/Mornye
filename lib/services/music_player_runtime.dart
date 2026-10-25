@@ -3,10 +3,13 @@ import 'dart:io';
 
 import 'package:audio_service/audio_service.dart';
 import 'package:audio_session/audio_session.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:mornye/l10n/supported_locales.dart';
 import 'package:mornye/models/settings.dart';
+import 'package:mornye/services/alsa_output_devices.dart';
 import 'package:mornye/services/app_state_database.dart';
+import 'package:mornye/services/exclusive_output_deck.dart';
 import 'package:mornye/services/autoplay_personalization.dart';
 import 'package:mornye/services/background_favorites.dart';
 import 'package:mornye/services/discord_presence_service.dart';
@@ -114,12 +117,23 @@ class PlaybackDependencies {
   bool get isAndroid => _isAndroid ?? Platform.isAndroid;
 
   // Windows and Linux play through libmpv. Without the library they fall
-  // back to audioplayers, which has no equalizer there.
-  static PlaybackDeck _createDeck(String playerId) =>
-      playbackEngine == PlaybackEngine.mediaKit &&
-          MediaKitPlaybackDeck.isAvailable
-      ? MediaKitPlaybackDeck(playerId: playerId)
-      : AudioplayersPlaybackDeck(playerId: playerId);
+  // back to audioplayers, which has no equalizer there. macOS plays through
+  // AVPlayer and moves to libmpv for exclusive output (hog mode).
+  static PlaybackDeck _createDeck(String playerId) {
+    if (playbackEngine == PlaybackEngine.mediaKit &&
+        MediaKitPlaybackDeck.isAvailable) {
+      return MediaKitPlaybackDeck(playerId: playerId);
+    }
+    final shared = AudioplayersPlaybackDeck(playerId: playerId);
+    if (!isDesktopPlatform || defaultTargetPlatform != TargetPlatform.macOS) {
+      return shared;
+    }
+    return ExclusiveOutputDeck(
+      shared: shared,
+      createExclusive: () => MediaKitPlaybackDeck(playerId: playerId),
+      exclusiveAvailable: () => MediaKitPlaybackDeck.isAvailable,
+    );
+  }
 
   // Previews follow the in-app volume on desktop. Mobile previews keep
   // playing without the equalizer.
@@ -217,9 +231,37 @@ class MusicPlayerRuntime {
     if (!_disposed) _mutedPlaybackEvents.add(null);
   }
 
+  /// Feeds the exclusive output setting to the decks.
+  void _configureExclusiveOutput(AppSettings settings) {
+    final exclusive = settings.exclusiveOutput && isDesktopPlatform;
+    if (!exclusive) {
+      playbackExclusiveStatus.value = ExclusiveOutputStatus.pending;
+    } else if (!playbackExclusiveOutput.value) {
+      // Stop a playing preview before its deck would reopen the output too.
+      unawaited(exclusiveAudioHook?.call());
+    }
+    if (exclusive && defaultTargetPlatform == TargetPlatform.linux) {
+      final device = settings.exclusiveOutputDevice;
+      if (device.isNotEmpty) {
+        playbackExclusiveDevice.value = device;
+      } else {
+        // No choice yet: the first card, as ALSA's own default.
+        unawaited(
+          listAlsaOutputDevices().then((devices) {
+            if (devices.isNotEmpty && _settings.exclusiveOutputDevice.isEmpty) {
+              playbackExclusiveDevice.value = devices.first.id;
+            }
+          }),
+        );
+      }
+    }
+    playbackExclusiveOutput.value = exclusive;
+  }
+
   void configure(AppSettings settings) {
     final previous = _settings;
     _settings = settings;
+    _configureExclusiveOutput(settings);
     _handler?.applySettings(previous);
   }
 

@@ -5,6 +5,8 @@ import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/models/track.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/preview_player_provider.dart';
+import 'package:mornye/providers/settings_provider.dart';
+import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/widgets/app_icon_button.dart';
 import 'package:mornye/widgets/app_loading_indicator.dart';
 
@@ -83,7 +85,11 @@ class PreviewButton extends ConsumerWidget {
       );
     }
 
-    if (!track.hasPreview) return const SizedBox.shrink();
+    // A preview would need the output that exclusive mode holds.
+    final exclusive =
+        isDesktopPlatform &&
+        ref.watch(settingsProvider.select((s) => s.exclusiveOutput));
+    if (!track.hasPreview || exclusive) return const SizedBox.shrink();
 
     final status = ref.watch(
       previewPlayerProvider.select(

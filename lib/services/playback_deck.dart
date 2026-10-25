@@ -44,6 +44,34 @@ Stream<double> playbackOutputVolumeChanges() =>
       listener.onCancel = () => playbackOutputVolume.removeListener(changed);
     });
 
+/// Desktop exclusive output, from the `exclusiveOutput` setting, always
+/// through libmpv: WASAPI exclusive on Windows, Core Audio hog mode on macOS
+/// (see `ExclusiveOutputDeck`), an ALSA `hw:` device on Linux. AutoMix and
+/// previews stay off while it is on, so only the main player opens the
+/// device.
+final playbackExclusiveOutput = ValueNotifier<bool>(false);
+
+/// Linux: the ALSA device [playbackExclusiveOutput] opens, as an mpv device
+/// name. Empty until one is known; the output stays shared meanwhile.
+final playbackExclusiveDevice = ValueNotifier<String>('');
+
+/// Whether [playbackExclusiveOutput] took the device for the current track.
+enum ExclusiveOutputStatus {
+  /// Off, or no track has opened the output since it was turned on.
+  pending,
+
+  /// The current track plays in exclusive mode.
+  active,
+
+  /// The device refused exclusive access (another app holds it, or exclusive
+  /// control is disallowed); the track plays through the system mixer.
+  unavailable,
+}
+
+final playbackExclusiveStatus = ValueNotifier<ExclusiveOutputStatus>(
+  ExclusiveOutputStatus.pending,
+);
+
 /// One audio player owned by the music runtime. The main player and each
 /// AutoMix deck are separate instances created through
 /// `PlaybackDependencies.createDeck`.

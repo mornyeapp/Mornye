@@ -102,10 +102,12 @@ dependencies:
   audio_session: ^0.2.4
   app_links: ^7.2.2
   # Windows and Linux playback (libmpv). Android, iOS and macOS keep
-  # audioplayers; the native library packages exist only for those two OSes.
+  # audioplayers; macOS bundles libmpv only for exclusive output (hog mode),
+  # which AVPlayer cannot play through.
   media_kit: ^1.2.6
   media_kit_libs_windows_audio: ^1.0.9
   media_kit_libs_linux: ^1.2.1
+  media_kit_libs_macos_audio: ^1.1.4
   # Desktop media sessions behind audio_service: MPRIS on Linux (D-Bus) and
   # the System Media Transport Controls on Windows.
   audio_service_platform_interface: ^0.1.3

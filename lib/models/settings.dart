@@ -83,6 +83,16 @@ class AppSettings {
   final bool usbDsdOverPcm;
   final bool usbAllowFixedVolume;
   final bool dapExclusive;
+
+  /// Desktop: take the output device for the music player alone, bypassing
+  /// the system mixer (WASAPI exclusive on Windows, hog mode on macOS, an
+  /// ALSA `hw:` device on Linux). AutoMix and previews stay off while it is
+  /// on.
+  final bool exclusiveOutput;
+
+  /// Linux: the ALSA device [exclusiveOutput] opens, as an mpv device name
+  /// (`alsa/hw:CARD=…,DEV=…`). Empty picks the first card.
+  final String exclusiveOutputDevice;
   final bool autoplay;
   final bool autoplayPersonalization;
   final bool musicHaptics;
@@ -234,6 +244,8 @@ class AppSettings {
     this.usbDsdOverPcm = false,
     this.usbAllowFixedVolume = false,
     this.dapExclusive = false,
+    this.exclusiveOutput = false,
+    this.exclusiveOutputDevice = '',
     this.autoplay = false,
     this.autoplayPersonalization = true,
     this.musicHaptics = false,
@@ -358,6 +370,8 @@ class AppSettings {
     bool? usbDsdOverPcm,
     bool? usbAllowFixedVolume,
     bool? dapExclusive,
+    bool? exclusiveOutput,
+    String? exclusiveOutputDevice,
     bool? autoplay,
     bool? autoplayPersonalization,
     bool? musicHaptics,
@@ -477,6 +491,9 @@ class AppSettings {
       usbDsdOverPcm: usbDsdOverPcm ?? this.usbDsdOverPcm,
       usbAllowFixedVolume: usbAllowFixedVolume ?? this.usbAllowFixedVolume,
       dapExclusive: dapExclusive ?? this.dapExclusive,
+      exclusiveOutput: exclusiveOutput ?? this.exclusiveOutput,
+      exclusiveOutputDevice:
+          exclusiveOutputDevice ?? this.exclusiveOutputDevice,
       autoplay: autoplay ?? this.autoplay,
       autoplayPersonalization:
           autoplayPersonalization ?? this.autoplayPersonalization,

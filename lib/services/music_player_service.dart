@@ -192,7 +192,8 @@ class MusicPlayerHandler extends BaseAudioHandler
     }
     if (previous.autoMix != settings.autoMix ||
         previous.autoMixOptions != settings.autoMixOptions ||
-        previous.usbBitPerfect != settings.usbBitPerfect) {
+        previous.usbBitPerfect != settings.usbBitPerfect ||
+        previous.exclusiveOutput != settings.exclusiveOutput) {
       unawaited(_autoMix.cancel());
     }
     // USB changes apply at the next source boundary, without raising volume.

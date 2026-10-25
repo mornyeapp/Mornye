@@ -18,6 +18,10 @@ class FakeMpvEngine implements MpvEngine {
   Duration? openDuration = const Duration(seconds: 90);
   MpvLogError? openError;
   bool rejectFilters = false;
+
+  /// The device refuses exclusive access: a source opened while
+  /// `audio-exclusive` is on reports its duration, then loses its audio.
+  bool refuseExclusive = false;
   bool disposed = false;
 
   @override
@@ -37,6 +41,19 @@ class FakeMpvEngine implements MpvEngine {
         errorEvents.add(error);
       } else if (openDuration case final value?) {
         durationEvents.add(value);
+      }
+      if (refuseExclusive &&
+          (properties['audio-exclusive'] == 'yes' ||
+              (properties['audio-device'] ?? '').startsWith('alsa/'))) {
+        errorEvents
+          ..add((
+            prefix: 'ao',
+            text: "Failed to initialize audio driver 'wasapi'",
+          ))
+          ..add((
+            prefix: 'cplayer',
+            text: 'Could not open/initialize audio device -> no sound.',
+          ));
       }
     });
   }
@@ -76,6 +93,10 @@ class FakeMpvEngine implements MpvEngine {
 
   @override
   Future<String> getProperty(String name) async => properties[name] ?? '';
+
+  @override
+  Future<void> command(List<String> args) async =>
+      calls.add(['command', ...args]);
 
   @override
   Future<void> dispose() async {

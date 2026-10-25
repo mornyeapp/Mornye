@@ -1032,6 +1032,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.2.1"
+  media_kit_libs_macos_audio:
+    dependency: "direct main"
+    description:
+      name: media_kit_libs_macos_audio
+      sha256: "3be21844df98f286de32808592835073cdef2c1a10078bac135da790badca950"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.1.4"
   media_kit_libs_windows_audio:
     dependency: "direct main"
     description:

@@ -1,19 +1,24 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/controllers/clickable_metadata.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/settings_provider.dart';
+import 'package:mornye/services/alsa_output_devices.dart';
 import 'package:mornye/services/music_playback_deck.dart';
+import 'package:mornye/services/playback_deck.dart';
 import 'package:mornye/services/music_player_service.dart'
     show resetAutoplayLearning;
 import 'package:mornye/screens/listening_statistics_screen.dart';
 import 'package:mornye/screens/equalizer_screen.dart';
 import 'package:mornye/utils/desktop_platform.dart';
+import 'package:mornye/utils/exclusive_output_labels.dart';
 import 'package:mornye/utils/nav_bar_inset.dart';
 import 'package:mornye/widgets/animation_utils.dart';
 import 'package:mornye/widgets/app_alert_dialog.dart';
+import 'package:mornye/widgets/app_bottom_sheet.dart';
 import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/app_sliver_header.dart';
 import 'package:mornye/widgets/beta_badge.dart';
@@ -57,6 +62,10 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage> {
   @override
   Widget build(BuildContext context) {
     final settings = ref.watch(settingsProvider);
+    // Linux opens a chosen ALSA device; the other desktops use the default.
+    final linuxDevice =
+        settings.exclusiveOutput &&
+        defaultTargetPlatform == TargetPlatform.linux;
     final colorScheme = Theme.of(context).colorScheme;
     return Scaffold(
       body: CustomScrollView(
@@ -136,7 +145,9 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage> {
                 title: 'AutoMix',
                 subtitle: context.l10n.autoMixDescription,
                 value: settings.autoMix,
-                enabled: !settings.usbBitPerfect,
+                enabled:
+                    !settings.usbBitPerfect &&
+                    !(isDesktopPlatform && settings.exclusiveOutput),
                 onChanged: (value) =>
                     ref.read(settingsProvider.notifier).setAutoMix(value),
                 showDivider: false,
@@ -266,6 +277,41 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage> {
             ),
             const SliverToBoxAdapter(child: DiscordPresenceSettings()),
           ],
+          if (isDesktopPlatform)
+            ...settingsSectionSlivers(
+              title: context.l10n.sectionAudioOutput,
+              children: [
+                ValueListenableBuilder<ExclusiveOutputStatus>(
+                  valueListenable: playbackExclusiveStatus,
+                  builder: (context, status, _) {
+                    final labels = exclusiveOutputLabels(context.l10n);
+                    return SettingsSwitchItem(
+                      icon: Icons.speaker_outlined,
+                      title: labels.title,
+                      subtitle: [
+                        labels.description,
+                        if (settings.exclusiveOutput)
+                          switch (status) {
+                            ExclusiveOutputStatus.pending =>
+                              context.l10n.exclusiveOutputPending,
+                            ExclusiveOutputStatus.active =>
+                              context.l10n.exclusiveOutputActive,
+                            ExclusiveOutputStatus.unavailable =>
+                              labels.unavailable,
+                          },
+                      ].join('\n\n'),
+                      value: settings.exclusiveOutput,
+                      onChanged: (value) => ref
+                          .read(settingsProvider.notifier)
+                          .setExclusiveOutput(value),
+                      showDivider: linuxDevice,
+                    );
+                  },
+                ),
+                if (linuxDevice)
+                  _AlsaDeviceItem(device: settings.exclusiveOutputDevice),
+              ],
+            ),
           if (Platform.isAndroid)
             ...settingsSectionSlivers(
               title: context.l10n.sectionAudioOutput,
@@ -430,6 +476,72 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage> {
           const NavBarSliverSpacer(),
         ],
       ),
+    );
+  }
+}
+
+/// The ALSA device Linux exclusive output opens, chosen from the cards the
+/// system lists.
+class _AlsaDeviceItem extends ConsumerStatefulWidget {
+  const _AlsaDeviceItem({required this.device});
+
+  /// The saved mpv device name; empty for the first card.
+  final String device;
+
+  @override
+  ConsumerState<_AlsaDeviceItem> createState() => _AlsaDeviceItemState();
+}
+
+class _AlsaDeviceItemState extends ConsumerState<_AlsaDeviceItem> {
+  final _devices = listAlsaOutputDevices();
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    return FutureBuilder<List<AlsaOutputDevice>>(
+      future: _devices,
+      builder: (context, snapshot) {
+        final devices = snapshot.data ?? const <AlsaOutputDevice>[];
+        final chosen = devices
+            .where((device) => device.id == widget.device)
+            .firstOrNull;
+        return SettingsItem(
+          icon: Icons.speaker_group_outlined,
+          title: l10n.exclusiveOutputDevice,
+          subtitle: devices.isEmpty && snapshot.hasData
+              ? l10n.exclusiveOutputNoDevices
+              : chosen?.label ??
+                    (widget.device.isEmpty
+                        ? l10n.exclusiveOutputDeviceFirst
+                        : widget.device),
+          onTap: devices.isEmpty
+              ? null
+              : () => showAppChoiceSheet<String>(
+                  context: context,
+                  title: l10n.exclusiveOutputDevice,
+                  selected: widget.device,
+                  choices: [
+                    AppChoice(
+                      '',
+                      Icons.speaker_outlined,
+                      l10n.exclusiveOutputDeviceFirst,
+                      subtitle: devices.first.label,
+                    ),
+                    for (final device in devices)
+                      AppChoice(
+                        device.id,
+                        Icons.speaker_outlined,
+                        device.label,
+                        subtitle: device.id.replaceFirst('alsa/', ''),
+                      ),
+                  ],
+                  onSelected: ref
+                      .read(settingsProvider.notifier)
+                      .setExclusiveOutputDevice,
+                ),
+          showDivider: false,
+        );
+      },
     );
   }
 }

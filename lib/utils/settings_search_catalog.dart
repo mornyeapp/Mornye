@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:mornye/l10n/app_localizations.dart';
+import 'package:mornye/utils/desktop_platform.dart';
+import 'package:mornye/utils/exclusive_output_labels.dart';
 
 /// A control or submenu that can be discovered from the root Settings search.
 ///
@@ -354,6 +356,20 @@ class SettingsSearchCatalog {
             targetLabel: l10n.usbBitPerfect,
           ),
         ],
+        if (isDesktopPlatform)
+          SettingsSearchEntry(
+            icon: Icons.speaker_outlined,
+            title: exclusiveOutputLabels(l10n).title,
+            subtitle: exclusiveOutputLabels(l10n).description,
+            keywords: const [
+              'exclusive',
+              'wasapi',
+              'hog mode',
+              'alsa',
+              'bit-perfect',
+              'mixer',
+            ],
+          ),
       ],
       metadata = [
         SettingsSearchEntry(

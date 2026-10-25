@@ -201,7 +201,8 @@ class PreviewPlayerController extends Notifier<PreviewPlayerState> {
 
   Future<void> play(String url) async {
     final trimmed = url.trim();
-    if (trimmed.isEmpty) return;
+    // The main player holds the device in exclusive mode.
+    if (trimmed.isEmpty || playbackExclusiveOutput.value) return;
 
     try {
       await ref.read(musicPlayerRuntimeProvider).handler?.pause();

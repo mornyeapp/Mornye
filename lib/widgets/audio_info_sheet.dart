@@ -10,6 +10,7 @@ import 'package:mornye/models/equalizer_settings.dart';
 import 'package:mornye/models/settings.dart';
 import 'package:mornye/services/audio_route_info.dart';
 import 'package:mornye/services/music_playback_deck.dart';
+import 'package:mornye/services/playback_deck.dart';
 import 'package:mornye/services/music_player_service.dart';
 import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/services/playback_equalizer.dart';
@@ -485,7 +486,8 @@ class _AudioFacts {
     final String signalPath;
     if (direct && usb.driver == 'usb_direct') {
       signalPath = l10n.audioInfoPathDirect;
-    } else if (direct && usb.driver == 'aaudio_exclusive') {
+    } else if ((direct && usb.driver == 'aaudio_exclusive') ||
+        playbackExclusiveStatus.value == ExclusiveOutputStatus.active) {
       signalPath = l10n.audioInfoPathExclusive;
     } else {
       signalPath = l10n.audioInfoPathSystem;
@@ -518,7 +520,9 @@ class _AudioFacts {
       _Fact(l10n.equalizerTitle, eq),
       _Fact(
         'AutoMix',
-        settings.autoMix && !settings.usbBitPerfect
+        settings.autoMix &&
+                !settings.usbBitPerfect &&
+                !playbackExclusiveOutput.value
             ? l10n.audioInfoOn
             : l10n.audioInfoOff,
       ),

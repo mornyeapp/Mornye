@@ -56,6 +56,8 @@ class _MusicAutoMix {
   bool get _canMix =>
       handler._settings.autoMix &&
       !handler._settings.usbBitPerfect &&
+      // A second deck cannot open a device held in exclusive mode.
+      !playbackExclusiveOutput.value &&
       !handler._player.isDirect &&
       !handler._disposed &&
       handler._sourceReady &&
