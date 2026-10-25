@@ -116,6 +116,9 @@ class NetworkMetadataService {
         _checkStopped();
         final song = await client.song(path);
         final metadata = Map<String, dynamic>.from(song.metadata);
+        // Asked alongside the cover. Servers without the songLyrics
+        // extension fail it, which leaves the tags as they are.
+        final lyrics = client.lyrics(song).catchError((Object _) => '');
         try {
           final cover = await client.cachedCover(
             song,
@@ -128,6 +131,8 @@ class NetworkMetadataService {
         } catch (_) {
           _checkStopped();
         }
+        final text = await lyrics;
+        if (text.trim().isNotEmpty) metadata['lyrics'] = text;
         _checkStopped();
         return _remember(source, metadata);
       } finally {

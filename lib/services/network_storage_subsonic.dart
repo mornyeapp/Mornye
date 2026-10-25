@@ -414,6 +414,44 @@ class SubsonicClient {
     );
   }
 
+  /// The lyrics of [song] from the OpenSubsonic songLyrics extension, as
+  /// LRC or plain text; empty when the server has none. A Mornye desktop
+  /// also sends the stored text (`mornyeRaw`), which keeps word timing.
+  /// Throws when the server lacks the extension.
+  Future<String> lyrics(SubsonicSong song) async {
+    final result = await request('getLyricsBySongId', {'id': song.id});
+    final entries = _subsonicList(
+      _subsonicMap(result['lyricsList'])['structuredLyrics'],
+    );
+    for (final entry in entries) {
+      if (entry['mornyeRaw'] case final String raw when raw.trim().isNotEmpty) {
+        return raw;
+      }
+    }
+    final main = entries.where((entry) => (entry['kind'] ?? 'main') == 'main');
+    final entry =
+        main.where((entry) => entry['synced'] == true).firstOrNull ??
+        main.firstOrNull;
+    if (entry == null) return '';
+    final lines = _subsonicList(entry['line']);
+    if (entry['synced'] != true) {
+      return lines.map((line) => _subsonicText(line, 'value')).join('\n');
+    }
+    // A positive offset shows the lines sooner.
+    final offset = (entry['offset'] as num?)?.toInt() ?? 0;
+    return [
+      for (final line in lines)
+        if (line['start'] case final num start)
+          '[${_lrcTime(start.toInt() - offset)}]${_subsonicText(line, 'value')}',
+    ].join('\n');
+  }
+
+  static String _lrcTime(int milliseconds) {
+    final time = milliseconds < 0 ? 0 : milliseconds;
+    String two(int value) => value.toString().padLeft(2, '0');
+    return '${two(time ~/ 60000)}:${two(time ~/ 1000 % 60)}.${two(time % 1000 ~/ 10)}';
+  }
+
   Stream<SubsonicSong> catalog({
     required Future<void> Function() checkpoint,
   }) async* {

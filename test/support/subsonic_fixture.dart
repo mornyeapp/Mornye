@@ -40,6 +40,10 @@ class SubsonicFixture {
   bool repeatPage = false;
   String? redirect;
   List<int>? audio;
+
+  /// The `lyricsList` answered by getLyricsBySongId; without one the server
+  /// lacks the songLyrics extension.
+  Map<String, dynamic>? lyricsList;
   final song = <String, dynamic>{
     'id': 'song / 日本語?&',
     'title': 'A song',
@@ -187,6 +191,9 @@ class SubsonicFixture {
             },
           },
           'getSong' => {'song': song},
+          'getLyricsBySongId' when lyricsList != null => {
+            'lyricsList': lyricsList,
+          },
           'search3' => {
             'searchResult3': {
               'song': [song],

@@ -263,6 +263,90 @@ void main() {
     },
   );
 
+  test('lyrics come from the songLyrics extension', () async {
+    final source = NetworkStorageService.source(
+      server.connection().id,
+      subsonicSongPath(server.song['id'] as String, 'flac'),
+    );
+    Future<Object?> lyrics() async {
+      final metadata = NetworkMetadataService(
+        storage: storage,
+        cacheDirectory: () async => directory,
+      );
+      final tags = await metadata.read(source);
+      expect(tags['title'], 'A song');
+      return tags['lyrics'];
+    }
+
+    expect(await lyrics(), isNull, reason: 'no songLyrics extension');
+    expect(
+      server.requests.map((uri) => uri.pathSegments.last),
+      contains('getLyricsBySongId.view'),
+    );
+
+    server.lyricsList = {
+      'structuredLyrics': [
+        {
+          'lang': 'xxx',
+          'synced': false,
+          'line': [
+            {'value': 'Plain'},
+          ],
+        },
+        {
+          'kind': 'translation',
+          'lang': 'xxx',
+          'synced': true,
+          'line': [
+            {'start': 0, 'value': 'Translated'},
+          ],
+        },
+        {
+          'lang': 'xxx',
+          'synced': true,
+          'offset': 100,
+          'line': [
+            {'start': 50, 'value': 'First'},
+            {'start': 61234, 'value': 'Second'},
+          ],
+        },
+      ],
+    };
+    expect(await lyrics(), '[00:00.00]First\n[01:01.13]Second');
+
+    server.lyricsList = {
+      'structuredLyrics': [
+        {
+          'lang': 'xxx',
+          'synced': false,
+          'line': [
+            {'value': 'One'},
+            {'value': 'Two'},
+          ],
+        },
+      ],
+    };
+    expect(await lyrics(), 'One\nTwo');
+
+    const stored = '[00:01.00]v1:<00:01.00>Word <00:01.50>timed';
+    server.lyricsList = {
+      'structuredLyrics': [
+        {
+          'lang': 'xxx',
+          'synced': true,
+          'line': [
+            {'start': 1000, 'value': 'Word timed'},
+          ],
+          'mornyeRaw': stored,
+        },
+      ],
+    };
+    expect(await lyrics(), stored);
+
+    server.lyricsList = {'structuredLyrics': <Object>[]};
+    expect(await lyrics(), isNull);
+  });
+
   test(
     'failed catalogue is never published as an empty or partial scan',
     () async {
