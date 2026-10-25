@@ -263,7 +263,7 @@ class LyricsSettingsPage extends ConsumerWidget {
         padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             AppTextField(
               controller: controller,

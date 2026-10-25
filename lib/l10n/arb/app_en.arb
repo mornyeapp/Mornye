@@ -6851,6 +6851,15 @@
       }
     }
   },
+  "lyricsTranslateAlreadyIn": "These lyrics are already in {language}",
+  "@lyricsTranslateAlreadyIn": {
+    "description": "Snackbar after an AI translation returned every line unchanged; language is the target language's own name",
+    "placeholders": {
+      "language": {
+        "type": "String"
+      }
+    }
+  },
   "lyricsAiTranslation": "AI Translation",
   "@lyricsAiTranslation": {
     "description": "Lyrics settings row and page title for translating lyrics with the user's own AI provider"

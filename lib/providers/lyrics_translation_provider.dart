@@ -8,6 +8,7 @@ import 'package:mornye/models/settings.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/services/lyrics_ai_client.dart';
+import 'package:mornye/services/lyrics_language_guess.dart';
 import 'package:mornye/services/lyrics_translation.dart';
 import 'package:mornye/services/lyrics_translation_languages.dart';
 import 'package:mornye/services/secure_storage_options.dart';
@@ -131,22 +132,27 @@ class LyricsTranslationState {
 
 /// How a translation request ended.
 class LyricsTranslationOutcome {
-  const LyricsTranslationOutcome.success({this.missing = 0})
-    : error = null,
-      cancelled = false,
-      busy = false;
+  const LyricsTranslationOutcome.success({
+    this.missing = 0,
+    this.unchanged = false,
+  }) : error = null,
+       cancelled = false,
+       busy = false;
   const LyricsTranslationOutcome.failed(LyricsAiErrorKind this.error)
     : missing = 0,
+      unchanged = false,
       cancelled = false,
       busy = false;
   const LyricsTranslationOutcome.cancelled()
     : error = null,
       missing = 0,
+      unchanged = false,
       cancelled = true,
       busy = false;
   const LyricsTranslationOutcome.busy()
     : error = null,
       missing = 0,
+      unchanged = false,
       cancelled = false,
       busy = true;
 
@@ -154,6 +160,10 @@ class LyricsTranslationOutcome {
 
   /// Lines the model left untranslated.
   final int missing;
+
+  /// The model returned every line as it was: the lyrics are already in
+  /// the target language.
+  final bool unchanged;
   final bool cancelled;
 
   /// Another translation was already running.
@@ -240,6 +250,13 @@ class LyricsTranslationController extends Notifier<LyricsTranslationState> {
         !_autoAttempted.add(key)) {
       return;
     }
+    // A song already in the target language has nothing to translate.
+    if (lyricsAlreadyIn(
+      LyricsTranslationSource.cached(lyrics).texts,
+      lyricsTranslationTargetFor(settings).code,
+    )) {
+      return;
+    }
     final apiKey = await ref.read(
       lyricsAiKeyProvider(settings.lyricsAiProvider).future,
     );
@@ -288,7 +305,8 @@ class LyricsTranslationController extends Notifier<LyricsTranslationState> {
     );
     // A track change abandons the job. The first id seen counts as the
     // track when the player had not reported one yet.
-    var mediaId = ref.read(currentMediaItemProvider).value?.id;
+    final song = ref.read(currentMediaItemProvider).value;
+    var mediaId = song?.id;
     final trackSub = ref.listen(
       currentMediaItemProvider.select((item) => item.value?.id),
       (previous, next) {
@@ -328,6 +346,8 @@ class LyricsTranslationController extends Notifier<LyricsTranslationState> {
         systemPrompt: lyricsTranslationSystemPrompt(
           languageName: target.englishName,
           languageCode: target.code,
+          title: song?.title ?? '',
+          artist: song?.artist ?? '',
           instruction: settings.lyricsAiInstruction,
         ),
         cancel: cancel,
@@ -348,7 +368,10 @@ class LyricsTranslationController extends Notifier<LyricsTranslationState> {
       cancel.throwIfCancelled();
       await cache.write(key, result.translations);
       _finish(id, key, result.translations);
-      return LyricsTranslationOutcome.success(missing: result.missing);
+      return LyricsTranslationOutcome.success(
+        missing: result.missing,
+        unchanged: lyricsTranslationUnchanged(source, result.translations),
+      );
     } on LyricsTranslationCancelled {
       _finish(id, null, null);
       return const LyricsTranslationOutcome.cancelled();

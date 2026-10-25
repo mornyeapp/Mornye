@@ -178,24 +178,38 @@ const _anthropicVersion = '2026-10-21';
 const _geminiBase = 'https://generativelanguage.googleapis.com/v1beta';
 const _anthropicBase = 'https://api.anthropic.com/v1';
 
-/// System prompt for one translation request. [instruction] is the user's
-/// optional extra guidance.
+/// System prompt for one translation request. [title] and [artist] name
+/// the song, when known, so the model reads its lines in context.
+/// [instruction] is the user's optional extra guidance.
 String lyricsTranslationSystemPrompt({
   required String languageName,
   required String languageCode,
+  String title = '',
+  String artist = '',
   String instruction = '',
 }) {
+  final song = title.trim();
+  final by = artist.trim();
   final extra = instruction.trim();
   return [
-    'You translate song lyrics into $languageName ($languageCode).',
-    'The user message is a JSON array of objects with "id" and "text"; '
-        'each text is one sung line.',
-    'Translate every line on its own while keeping the meaning, tone, '
-        'imagery and register of the song. Prefer natural phrasing a native '
-        'speaker would read over word-for-word output. Keep names as they '
-        'are. Return a line unchanged when it is already in the target '
-        'language.',
-    'Do not merge, split, reorder, explain or skip lines.',
+    'You translate the lyrics of a song into $languageName ($languageCode) '
+        'for a listener who reads them while the song plays.',
+    if (song.isNotEmpty) 'The song is "$song"${by.isEmpty ? '' : ' by $by'}.',
+    'The user message is a JSON array of objects with "id" and "text": the '
+        'distinct lines of the song in the order they are first sung, so a '
+        'repeated chorus appears once.',
+    'Read all the lines before translating. Lyrics are poetry: a sentence '
+        'often runs across several lines, and slang, idioms and metaphors '
+        'carry meaning that a literal reading loses. Translate each line in '
+        'the context of the whole song, keeping its meaning, mood, imagery '
+        'and register, in natural phrasing a native speaker would use, never '
+        'word for word.',
+    'Keep each translation concise enough to read while the line is sung. '
+        'Keep names, places and titles as they are, and vocal sounds such as '
+        '"oh", "yeah" or "la la" too. Return a line unchanged when it is '
+        'already in the target language.',
+    'Do not merge, split, reorder or skip lines, and do not add notes, '
+        'quotes, romanization or explanations.',
     'Reply with only a JSON object of the form '
         '{"lines":[{"id":<the same id>,"text":"<translation>"}]} with every '
         'id exactly once.',

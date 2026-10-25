@@ -335,6 +335,10 @@ class _LyricsOptionsButtonState extends ConsumerState<LyricsOptionsButton> {
     final error = outcome.error;
     final message = error != null
         ? lyricsAiErrorMessage(context.l10n, error)
+        : outcome.unchanged
+        ? context.l10n.lyricsTranslateAlreadyIn(
+            lyricsTranslationLanguageFor(code)?.nativeName ?? code,
+          )
         : outcome.missing > 0
         ? context.l10n.lyricsTranslatePartial(outcome.missing)
         : null;

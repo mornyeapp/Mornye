@@ -99,6 +99,30 @@ String lyricsTranslationCacheKey({
 bool lyricsHaveTranslation(ParsedLyrics lyrics) =>
     lyrics.lines.any((line) => line.translation?.trim().isNotEmpty == true);
 
+final _notWord = RegExp(r'[^\p{L}\p{N}]', unicode: true);
+
+/// Whether [translation] only repeats [text], as the model does for a line
+/// already in the target language. Case and punctuation do not count.
+bool lyricsTranslationRepeats(String text, String translation) =>
+    text.toLowerCase().replaceAll(_notWord, '') ==
+    translation.toLowerCase().replaceAll(_notWord, '');
+
+/// Whether [translations] repeat every line of [source] they cover, so
+/// the lyrics were already in the target language.
+bool lyricsTranslationUnchanged(
+  LyricsTranslationSource source,
+  List<String?> translations,
+) {
+  var covered = 0;
+  for (var i = 0; i < translations.length && i < source.texts.length; i++) {
+    final translation = translations[i];
+    if (translation == null || translation.isEmpty) continue;
+    if (!lyricsTranslationRepeats(source.texts[i], translation)) return false;
+    covered++;
+  }
+  return covered > 0;
+}
+
 /// Shows [translations] (indexed like [LyricsTranslationSource.texts]) as
 /// the lines' translations. An AI translation exists only because the user
 /// asked for it, or because the lyrics had none, so it replaces a provider
@@ -120,7 +144,8 @@ ParsedLyrics applyLyricsTranslation(
         : null;
     if (translation == null ||
         translation.isEmpty ||
-        translation == line.translation) {
+        translation == line.translation ||
+        lyricsTranslationRepeats(source.texts[segment!], translation)) {
       lines.add(line);
       continue;
     }

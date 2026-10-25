@@ -204,6 +204,28 @@ void main() {
       ]);
       expect(applyLyricsTranslation(lyrics, source, [null, null]), lyrics);
     });
+
+    test('a line returned as it was shows no translation', () {
+      final lyrics = _lyrics(['Hello there', 'Hola amigo']);
+      final source = LyricsTranslationSource.of(lyrics);
+      final merged = applyLyricsTranslation(lyrics, source, [
+        'hello, there!',
+        'Hello friend',
+      ]);
+      expect(merged.lines.map((line) => line.translation), [
+        null,
+        'Hello friend',
+      ]);
+      expect(
+        lyricsTranslationUnchanged(source, ['Hello there', 'Hola amigo']),
+        isTrue,
+      );
+      expect(
+        lyricsTranslationUnchanged(source, ['Hello there', 'Hello friend']),
+        isFalse,
+      );
+      expect(lyricsTranslationUnchanged(source, [null, null]), isFalse);
+    });
   });
 
   group('batching', () {

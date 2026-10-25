@@ -15,6 +15,7 @@ import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/app_loading_indicator.dart';
 import 'package:mornye/widgets/app_sliver_header.dart';
 import 'package:mornye/widgets/app_snack_bar.dart';
+import 'package:mornye/widgets/app_text_field.dart';
 import 'package:mornye/widgets/expressive_button.dart';
 import 'package:mornye/widgets/lyrics_options_button.dart';
 import 'package:mornye/widgets/settings_group.dart';
@@ -452,22 +453,34 @@ class _TextSheetBodyState extends State<_TextSheetBody> {
             suffix: paste,
             onSubmitted: widget.multiline ? null : (_) => _save(),
           )
-        : TextField(
+        // A key keeps its dedicated field, as other credentials do.
+        : widget.secret
+        ? TextField(
             controller: _controller,
             autofocus: true,
-            obscureText: widget.secret,
-            autocorrect: !widget.secret,
-            enableSuggestions: !widget.secret,
-            enableIMEPersonalizedLearning: !widget.secret,
+            obscureText: true,
+            autocorrect: false,
+            enableSuggestions: false,
+            enableIMEPersonalizedLearning: false,
+            keyboardType: widget.keyboardType,
+            decoration: InputDecoration(
+              hintText: widget.hint,
+              errorText: _error,
+              suffixIcon: paste,
+            ),
+            onSubmitted: (_) => _save(),
+          )
+        : AppTextField(
+            controller: _controller,
+            autofocus: true,
+            hint: widget.hint,
+            errorText: _error,
             keyboardType: widget.multiline
                 ? TextInputType.multiline
                 : widget.keyboardType,
+            textInputAction: widget.multiline ? null : TextInputAction.done,
             maxLines: widget.multiline ? 4 : 1,
             maxLength: widget.multiline ? 500 : null,
-            decoration: InputDecoration(
-              hintText: widget.hint,
-              suffixIcon: paste,
-            ),
             onSubmitted: widget.multiline ? null : (_) => _save(),
           );
     final actions = [
@@ -495,7 +508,8 @@ class _TextSheetBodyState extends State<_TextSheetBody> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           field,
-          if (_error != null)
+          // Material fields show the error themselves.
+          if (_error != null && context.isMornye)
             Padding(
               padding: const EdgeInsetsDirectional.only(start: 4, top: 6),
               child: Text(
@@ -607,80 +621,85 @@ class _ModelSheetState extends State<_ModelSheet> {
         child: Text(l10n.dialogSave),
       ),
     ];
-    return ListView(
+    // Sized to its content, like the other settings sheets; a loaded
+    // model list grows it up to the sheet's limit and scrolls.
+    return SingleChildScrollView(
       controller: widget.scrollController,
       padding: const EdgeInsets.only(bottom: 24),
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
-          child: context.isMornye
-              ? CupertinoTextField(
-                  controller: _controller,
-                  autocorrect: false,
-                  enableSuggestions: false,
-                  placeholder: widget.defaultModel ?? l10n.lyricsAiModelHint,
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: MornyeTheme.controlFill(context),
-                    borderRadius: BorderRadius.circular(12),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
+            child: context.isMornye
+                ? CupertinoTextField(
+                    controller: _controller,
+                    autocorrect: false,
+                    enableSuggestions: false,
+                    placeholder: widget.defaultModel ?? l10n.lyricsAiModelHint,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: MornyeTheme.controlFill(context),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    style: theme.textTheme.bodyLarge,
+                    onChanged: (_) => setState(() {}),
+                    onSubmitted: (_) => _save(),
+                  )
+                // Model ids keep keyboard correction off.
+                : AppTextField(
+                    controller: _controller,
+                    autocorrect: false,
+                    label: l10n.lyricsAiModelHint,
+                    hint: widget.defaultModel,
+                    textInputAction: TextInputAction.done,
+                    onChanged: (_) => setState(() {}),
+                    onSubmitted: (_) => _save(),
                   ),
-                  style: theme.textTheme.bodyLarge,
-                  onChanged: (_) => setState(() {}),
-                  onSubmitted: (_) => _save(),
-                )
-              : TextField(
-                  controller: _controller,
-                  autocorrect: false,
-                  enableSuggestions: false,
-                  decoration: InputDecoration(
-                    labelText: l10n.lyricsAiModelHint,
-                    hintText: widget.defaultModel,
-                  ),
-                  onChanged: (_) => setState(() {}),
-                  onSubmitted: (_) => _save(),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
+            child: Wrap(
+              alignment: WrapAlignment.end,
+              spacing: 8,
+              runSpacing: 8,
+              children: actions,
+            ),
+          ),
+          if (widget.loadModels != null && _models == null)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+              child: Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: ExpressiveButton(
+                  tonal: true,
+                  onPressed: _loading ? null : _load,
+                  icon: _loading
+                      ? const AppLoadingIndicator(size: 18)
+                      : const Icon(Icons.list_alt_outlined),
+                  child: Text(l10n.lyricsAiModelLoad),
                 ),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
-          child: Wrap(
-            alignment: WrapAlignment.end,
-            spacing: 8,
-            runSpacing: 8,
-            children: actions,
-          ),
-        ),
-        if (widget.loadModels != null && _models == null)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-            child: Align(
-              alignment: AlignmentDirectional.centerStart,
-              child: ExpressiveButton(
-                tonal: true,
-                onPressed: _loading ? null : _load,
-                icon: _loading
-                    ? const AppLoadingIndicator(size: 18)
-                    : const Icon(Icons.list_alt_outlined),
-                child: Text(l10n.lyricsAiModelLoad),
               ),
             ),
-          ),
-        if (_message != null)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-            child: Text(
-              _message!,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
+          if (_message != null)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+              child: Text(
+                _message!,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
               ),
             ),
-          ),
-        for (final model in _models ?? const <String>[])
-          AppSheetOption.choice(
-            title: Text(model),
-            selected: model == current,
-            onTap: () => Navigator.pop(context, model),
-          ),
-      ],
+          for (final model in _models ?? const <String>[])
+            AppSheetOption.choice(
+              title: Text(model),
+              selected: model == current,
+              onTap: () => Navigator.pop(context, model),
+            ),
+        ],
+      ),
     );
   }
 }

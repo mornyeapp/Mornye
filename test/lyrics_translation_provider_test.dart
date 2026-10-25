@@ -266,6 +266,41 @@ void main() {
     expect(requests, hasLength(1));
   });
 
+  test('automatic translation skips lyrics already in the target', () async {
+    final container = await containerFor(
+      settings: _settings.copyWith(
+        lyricsAutoTranslate: true,
+        lyricsTranslationLanguage: 'en',
+      ),
+    );
+    const texts = [
+      'I walk the empty streets when the night is falling down',
+      "You told me that you'd stay but now I'm all alone",
+      "And I don't know what to do with all this love I've got",
+      "It's the only thing I want, the only thing I need",
+    ];
+    container
+        .read(lyricsTranslationProvider.notifier)
+        .display(
+          ParsedLyrics(
+            synced: true,
+            wordSynced: false,
+            lines: [
+              for (var i = 0; i < texts.length; i++)
+                LyricLine(
+                  time: Duration(seconds: i),
+                  text: texts[i],
+                ),
+            ],
+            plainText: texts.join('\n'),
+          ),
+        );
+    for (var i = 0; i < 30 && requests.isEmpty; i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+    }
+    expect(requests, isEmpty);
+  });
+
   test('the target follows the app language by default', () {
     expect(
       lyricsTranslationTargetFor(const AppSettings(locale: 'pt_PT')).code,

@@ -158,6 +158,16 @@ void main() {
       expect(prompt, contains('"lines"'));
       expect(prompt, endsWith('keep it poetic'));
       expect(prompt, isNot(contains(String.fromCharCode(0x2014))));
+      expect(prompt, isNot(contains('The song is')));
+      expect(
+        lyricsTranslationSystemPrompt(
+          languageName: 'Japanese',
+          languageCode: 'ja',
+          title: ' Night Drive ',
+          artist: 'Some Band',
+        ),
+        contains('The song is "Night Drive" by Some Band.'),
+      );
     });
 
     test('model list requests per provider', () {
