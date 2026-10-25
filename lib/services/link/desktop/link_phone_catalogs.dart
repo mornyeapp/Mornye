@@ -2,9 +2,10 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
-import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mornye/services/link/link_cover_shrink.dart';
 import 'package:mornye/services/link/link_host_router.dart';
 import 'package:mornye/services/link/link_protocol.dart';
 import 'package:mornye/utils/logger.dart';
@@ -38,9 +39,6 @@ int? _intArg(Map<String, dynamic> args, String key) {
 /// Fetches a cover from its web address; null when it cannot.
 typedef LinkCoverFetcher = Future<Uint8List?> Function(Uri url);
 
-/// A smaller copy of a cover's image; null when it cannot be made.
-typedef LinkCoverShrinker = Future<Uint8List?> Function(Uint8List image);
-
 /// Fetches a cover of at most [LinkPhoneCatalogs.maxFetchedCoverBytes].
 Future<Uint8List?> _fetchCover(Uri url) async {
   const timeout = Duration(seconds: 20);
@@ -56,34 +54,6 @@ Future<Uint8List?> _fetchCover(Uri url) async {
     return bytes.takeBytes();
   } finally {
     client.close(force: true);
-  }
-}
-
-/// [image] as a PNG at most [LinkPhoneCatalogs.shrunkCoverSize] pixels on
-/// its longer side, keeping its shape.
-Future<Uint8List?> shrinkLinkCover(Uint8List image) async {
-  const size = LinkPhoneCatalogs.shrunkCoverSize;
-  ui.Codec? codec;
-  ui.Image? frame;
-  try {
-    // The codec takes the buffer and disposes of it.
-    codec = await ui.instantiateImageCodecWithSize(
-      await ui.ImmutableBuffer.fromUint8List(image),
-      getTargetSize: (width, height) {
-        if (width <= size && height <= size) return ui.TargetImageSize();
-        return width >= height
-            ? ui.TargetImageSize(width: size)
-            : ui.TargetImageSize(height: size);
-      },
-    );
-    frame = (await codec.getNextFrame()).image;
-    final png = await frame.toByteData(format: ui.ImageByteFormat.png);
-    return png?.buffer.asUint8List(png.offsetInBytes, png.lengthInBytes);
-  } on Object {
-    return null;
-  } finally {
-    frame?.dispose();
-    codec?.dispose();
   }
 }
 
@@ -125,15 +95,12 @@ class LinkPhoneCatalogs {
   /// The most songs a phone may list.
   static const maxSongs = 100000;
 
-  /// The largest cover file.
-  static const maxCoverBytes = 1024 * 1024;
+  /// The largest cover file. A phone sends larger covers shrunk.
+  static const maxCoverBytes = 2 * 1024 * 1024;
 
   /// The largest cover fetched from the web; one over [maxCoverBytes] is
-  /// kept shrunk to [shrunkCoverSize].
+  /// kept shrunk to [linkShrunkCoverSize].
   static const maxFetchedCoverBytes = 24 * 1024 * 1024;
-
-  /// The longer side of a shrunk cover, as the Library's own thumbnails.
-  static const shrunkCoverSize = 800;
 
   /// The most base64 characters of covers in one request.
   static const maxCoversRequest = 4 * 1024 * 1024;
@@ -163,6 +130,11 @@ class LinkPhoneCatalogs {
       ..register(LinkOps.phoneCatalog, _catalog)
       ..register(LinkOps.phoneCovers, _covers);
   }
+
+  /// Completes when the writes and cover fetches queued so far for the
+  /// phone [sourceId] are done.
+  @visibleForTesting
+  Future<void> idle(String sourceId) => _queues[sourceId] ?? Future.value();
 
   /// Runs the writes of one phone one after another.
   Future<T> _serial<T>(String sourceId, Future<T> Function() action) {

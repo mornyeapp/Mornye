@@ -9,9 +9,17 @@ import 'package:mornye/services/link/link_protocol.dart';
 import 'package:mornye/utils/file_access.dart';
 import 'package:mornye/utils/isrc_utils.dart';
 
-/// The largest cover file sent with `phone/covers`; songs with a larger one
-/// go without a cover.
+/// The largest cover file sent as it is with `phone/covers`; a larger one
+/// is sent shrunk.
 const linkPhoneCoverMaxBytes = 1024 * 1024;
+
+/// The largest cover file sent shrunk; songs with a larger one go without
+/// a cover. The Library keeps embedded art over 16 megapixels as it is,
+/// often 8 MB or more.
+const linkPhoneCoverSourceMaxBytes = 32 * 1024 * 1024;
+
+/// The largest shrunk cover sent; a larger one is left out.
+const linkPhoneShrunkCoverMaxBytes = 2 * 1024 * 1024;
 
 /// What the phone's song list depends on: the downloads and Library index
 /// versions, and whether scanned sources show in the Library.
@@ -45,6 +53,9 @@ class LinkPhoneCover {
 
   /// `jpg`, `png` or `webp`, from the file's first bytes.
   final String ext;
+
+  /// Whether the cover is sent shrunk, as a PNG.
+  bool get shrinks => size > linkPhoneCoverMaxBytes;
 }
 
 /// One page of Library rows mapped for the desktop.
@@ -183,12 +194,12 @@ String? _imageType(String path) {
 }
 
 /// The cover the desktop can take at [path]: an image file of at most
-/// [linkPhoneCoverMaxBytes].
+/// [linkPhoneCoverSourceMaxBytes].
 LinkPhoneCover? _cover(String path) {
   final stat = FileStat.statSync(path);
   if (stat.type != FileSystemEntityType.file ||
       stat.size <= 0 ||
-      stat.size > linkPhoneCoverMaxBytes) {
+      stat.size > linkPhoneCoverSourceMaxBytes) {
     return null;
   }
   final ext = _imageType(path);

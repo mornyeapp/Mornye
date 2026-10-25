@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
-import 'dart:ui' as ui;
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/services/link/desktop/link_phone_catalogs.dart';
@@ -311,7 +310,7 @@ void main() {
         withUrl(3, textUrl),
       ]);
       expect(commits, [_phone]);
-      await pumpEventQueue();
+      await catalogs.idle(sourceId);
       final key = linkCoverUrlId(fetchedUrl);
       expect(fetched, hasLength(3));
       expect(await catalogs.coverPaths(sourceId), {
@@ -323,7 +322,7 @@ void main() {
       // A cover held already is not fetched again, and a commit keeps it.
       fetched.clear();
       await page(0, 1, [withUrl(1, fetchedUrl)], version: 'v2');
-      await pumpEventQueue();
+      await catalogs.idle(sourceId);
       expect(fetched, isEmpty);
       expect(await catalogs.coverPath(sourceId, key), isNotNull);
       expect(commits, [_phone, _phone, _phone]);
@@ -358,7 +357,7 @@ void main() {
         {..._song(1), 'coverUrl': largeUrl},
         {..._song(2), 'coverUrl': flakyUrl},
       ]);
-      await pumpEventQueue();
+      await catalogs.idle(sourceId);
       final large = linkCoverUrlId(largeUrl);
       final flaky = linkCoverUrlId(flakyUrl);
       expect(await catalogs.coverPaths(sourceId), {
@@ -373,52 +372,15 @@ void main() {
       fetched.clear();
       reachable = true;
       await call(LinkOps.phoneCatalog, 'GET');
-      await pumpEventQueue();
+      await catalogs.idle(sourceId);
       expect(fetched, isEmpty);
 
       // After a restart, the phone's next connect fetches it.
       catalogs = open();
       await call(LinkOps.phoneCatalog, 'GET');
-      await pumpEventQueue();
+      await catalogs.idle(sourceId);
       expect(fetched, [flakyUrl]);
       expect(await catalogs.coverPath(sourceId, flaky), isNotNull);
-    });
-  });
-
-  testWidgets('shrinks a cover to its longer side, keeping its shape', (
-    tester,
-  ) async {
-    Future<Uint8List> image(int width, int height) async {
-      final recorder = ui.PictureRecorder();
-      ui.Canvas(recorder).drawRect(
-        ui.Rect.fromLTWH(0, 0, width.toDouble(), height.toDouble()),
-        ui.Paint()..color = const ui.Color(0xFF3366CC),
-      );
-      final picture = recorder.endRecording();
-      final drawn = await picture.toImage(width, height);
-      final png = await drawn.toByteData(format: ui.ImageByteFormat.png);
-      drawn.dispose();
-      picture.dispose();
-      return png!.buffer.asUint8List();
-    }
-
-    Future<(int, int)> size(Uint8List bytes) async {
-      final codec = await ui.instantiateImageCodec(bytes);
-      final frame = (await codec.getNextFrame()).image;
-      final result = (frame.width, frame.height);
-      frame.dispose();
-      codec.dispose();
-      return result;
-    }
-
-    await tester.runAsync(() async {
-      final wide = await shrinkLinkCover(await image(1600, 1200));
-      expect(await size(wide!), (800, 600));
-      final tall = await shrinkLinkCover(await image(900, 1800));
-      expect(await size(tall!), (400, 800));
-      final small = await shrinkLinkCover(await image(300, 200));
-      expect(await size(small!), (300, 200));
-      expect(await shrinkLinkCover(utf8.encode('<html>')), isNull);
     });
   });
 

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -164,6 +165,55 @@ void main() {
         );
         expect(bytes, lessThanOrEqualTo(4 * 1024 * 1024));
       }
+    });
+
+    test('sends a cover over 1 MiB shrunk, as a PNG', () async {
+      const size = linkPhoneCoverMaxBytes + 1;
+      final small = jpeg('small.jpg', 10);
+      final large = jpeg('large.jpg', size);
+      final huge = jpeg('huge.jpg', size + 1);
+      final png = Uint8List.fromList([0x89, 0x50, 0x4E, 0x47, 1, 2]);
+      final library = FakeLibraryRows([
+        linkLocalRow(_uri(0), {'format': 'flac', 'coverPath': large}),
+        linkLocalRow(_uri(1), {'format': 'flac', 'coverPath': small}),
+        linkLocalRow(_uri(2), {'format': 'flac', 'coverPath': huge}),
+      ]).library();
+      final client = FakeLinkClient(onGet: (op, _) => const {});
+      final shrunk = <int>[];
+      final publisher = LinkPhoneLibraryPublisher(
+        client: client,
+        library: library,
+        encodeCovers: (covers) => encodeLinkPhoneCoversShrinking(
+          covers,
+          shrink: (image) async {
+            shrunk.add(image.length);
+            // One too large even shrunk is left out.
+            return image.length == size
+                ? png
+                : Uint8List(linkPhoneShrunkCoverMaxBytes + 1);
+          },
+          encode: (covers) async => encodeLinkPhoneCovers(covers),
+        ),
+      );
+
+      publisher.publish();
+      await publisher.idle;
+
+      expect(shrunk, [size, size + 1]);
+      expect(client.posts.first.body, {
+        'covers': [
+          {
+            'id': linkFileIdFor(small, 10),
+            'ext': 'jpg',
+            'data': base64Encode(File(small).readAsBytesSync()),
+          },
+          {
+            'id': linkFileIdFor(large, size),
+            'ext': 'png',
+            'data': base64Encode(png),
+          },
+        ],
+      });
     });
 
     test('leaves out covers replaced since the build', () async {

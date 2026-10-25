@@ -199,7 +199,7 @@ void main() {
   });
 
   group('covers', () {
-    test('are the local images of at most 1 MiB, each once', () async {
+    test('are the local images, each once, shrunk over 1 MiB', () async {
       final jpeg = image('cover.jpg', const [0xFF, 0xD8, 0xFF]);
       // The first bytes name the type, not the extension.
       final png = image('art.jpg', const [0x89, 0x50, 0x4E, 0x47]);
@@ -243,15 +243,23 @@ void main() {
           linkFileIdFor(jpeg, 16),
           linkFileIdFor(png, 16),
           linkFileIdFor(webp, 16),
-          null,
+          linkFileIdFor(large, linkPhoneCoverMaxBytes + 1),
           null,
           null,
           null,
         ],
       );
       expect(
-        [for (final cover in catalog.covers) (cover.path, cover.ext)],
-        [(jpeg, 'jpg'), (png, 'png'), (webp, 'webp')],
+        [
+          for (final cover in catalog.covers)
+            (cover.path, cover.ext, cover.shrinks),
+        ],
+        [
+          (jpeg, 'jpg', false),
+          (png, 'png', false),
+          (webp, 'webp', false),
+          (large, 'jpg', true),
+        ],
       );
       // A download without a cover file sends its cover's web address.
       expect(

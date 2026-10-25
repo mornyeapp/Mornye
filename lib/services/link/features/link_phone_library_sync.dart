@@ -8,6 +8,7 @@ import 'package:flutter/foundation.dart';
 import 'package:mornye/services/link/features/link_phone_files.dart';
 import 'package:mornye/services/link/features/link_phone_library.dart';
 import 'package:mornye/services/link/link_client_api.dart';
+import 'package:mornye/services/link/link_cover_shrink.dart';
 import 'package:mornye/services/link/link_protocol.dart';
 import 'package:mornye/utils/logger.dart';
 
@@ -21,8 +22,8 @@ class _Stale implements Exception {
   const _Stale();
 }
 
-/// Encodes covers for one `POST phone/covers`; the default runs in an
-/// isolate.
+/// Encodes covers for one `POST phone/covers`; the default is
+/// [encodeLinkPhoneCoversShrinking].
 typedef LinkPhoneCoverEncoder =
     Future<List<Map<String, dynamic>>> Function(List<LinkPhoneCover> covers);
 
@@ -54,6 +55,35 @@ Future<List<Map<String, dynamic>>> _encodeInIsolate(
   List<LinkPhoneCover> covers,
 ) => compute(encodeLinkPhoneCovers, covers);
 
+/// Encodes [covers] as [encode] does, except the ones that
+/// [LinkPhoneCover.shrinks]: those are read here and sent as the PNG
+/// [shrink] makes, which decodes on this isolate. A shrunk cover over
+/// [linkPhoneShrunkCoverMaxBytes] is left out.
+Future<List<Map<String, dynamic>>> encodeLinkPhoneCoversShrinking(
+  List<LinkPhoneCover> covers, {
+  LinkCoverShrinker shrink = shrinkLinkCover,
+  LinkPhoneCoverEncoder encode = _encodeInIsolate,
+}) async {
+  final encoded = await encode([
+    for (final cover in covers)
+      if (!cover.shrinks) cover,
+  ]);
+  for (final cover in covers) {
+    if (!cover.shrinks) continue;
+    final Uint8List bytes;
+    try {
+      bytes = await File(cover.path).readAsBytes();
+    } on FileSystemException {
+      continue;
+    }
+    if (bytes.length != cover.size) continue;
+    final png = await shrink(bytes);
+    if (png == null || png.length > linkPhoneShrunkCoverMaxBytes) continue;
+    encoded.add({'id': cover.id, 'ext': 'png', 'data': base64Encode(png)});
+  }
+  return encoded;
+}
+
 /// The base64 length of [bytes] bytes.
 int _base64Length(int bytes) => (bytes + 2) ~/ 3 * 4;
 
@@ -68,7 +98,7 @@ class LinkPhoneLibraryPublisher {
     required this.library,
     LinkPhoneCoverEncoder? encodeCovers,
     this.debounce = const Duration(seconds: 2),
-  }) : _encodeCovers = encodeCovers ?? _encodeInIsolate;
+  }) : _encodeCovers = encodeCovers ?? encodeLinkPhoneCoversShrinking;
 
   final LinkClientApi client;
   final LinkPhoneLibrary library;
@@ -157,8 +187,9 @@ class LinkPhoneLibraryPublisher {
   }
 
   /// Posts the covers the desktop lacks, at most [_coverRequestBytes] of
-  /// base64 a request. Each cover's size, known from the build, sets its
-  /// share of a request before it is read.
+  /// base64 a request. Each cover's size, known from the build, or the
+  /// most a shrunk one takes, sets its share of a request before it is
+  /// read.
   Future<void> _sendCovers(
     LinkPhoneCatalog catalog,
     void Function() check,
@@ -183,7 +214,9 @@ class LinkPhoneLibraryPublisher {
 
     for (final cover in catalog.covers) {
       if (held.contains(cover.id)) continue;
-      final length = _base64Length(cover.size);
+      final length = _base64Length(
+        cover.shrinks ? linkPhoneShrunkCoverMaxBytes : cover.size,
+      );
       if (batchBytes + length > _coverRequestBytes) await flush();
       batch.add(cover);
       batchBytes += length;
