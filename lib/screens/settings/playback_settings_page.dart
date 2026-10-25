@@ -9,6 +9,7 @@ import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/services/alsa_output_devices.dart';
+import 'package:mornye/services/autoplay_ranker.dart';
 import 'package:mornye/services/music_playback_deck.dart';
 import 'package:mornye/services/playback_deck.dart';
 import 'package:mornye/services/music_player_service.dart'
@@ -46,6 +47,10 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage> {
   late final SongAnalysis _songAnalysis = ref
       .read(musicPlayerRuntimeProvider)
       .songAnalysis;
+  late final ValueListenable<AutoplayRankEvaluation?> _rankEvaluation = ref
+      .read(musicPlayerRuntimeProvider)
+      .ranker
+      .evaluation;
 
   Future<bool> _confirmAudioVolume(String message) => showAppConfirmDialog(
     context,
@@ -85,17 +90,44 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage> {
   void initState() {
     super.initState();
     _songAnalysis.progress.addListener(_onAnalysisProgress);
+    _rankEvaluation.addListener(_onAnalysisProgress);
     unawaited(_songAnalysis.refreshProgress());
   }
 
   @override
   void dispose() {
     _songAnalysis.progress.removeListener(_onAnalysisProgress);
+    _rankEvaluation.removeListener(_onAnalysisProgress);
     super.dispose();
   }
 
   void _onAnalysisProgress() {
     if (mounted) setState(() {});
+  }
+
+  /// How far ranking has learned the listener, and whether that ranks their
+  /// latest songs better than the standard ranking.
+  String? _learningSummary() {
+    final evaluation = _rankEvaluation.value;
+    if (evaluation == null) return null;
+    final starting = evaluation.starting, learned = evaluation.learned;
+    if (evaluation.tested == 0) {
+      return context.l10n.autoplayLearningProgress(
+        evaluation.outcomes,
+        autoplayRankerMinimum,
+      );
+    }
+    if (starting == null || learned == null) {
+      return context.l10n.autoplayLearningWaiting;
+    }
+    final learnedPercent = (learned * 100).round();
+    final startingPercent = (starting * 100).round();
+    return evaluation.learnedWins
+        ? context.l10n.autoplayLearningTuned(learnedPercent, startingPercent)
+        : context.l10n.autoplayLearningStandard(
+            learnedPercent,
+            startingPercent,
+          );
   }
 
   @override
@@ -236,6 +268,7 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage> {
                 SettingsItem(
                   icon: Icons.restart_alt,
                   title: context.l10n.autoplayResetLearning,
+                  subtitle: _learningSummary(),
                   onTap: _confirmResetLearning,
                 ),
               SettingsSwitchItem(

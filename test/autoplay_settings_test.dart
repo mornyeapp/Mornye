@@ -11,6 +11,7 @@ import 'package:mornye/models/theme_settings.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/screens/settings/playback_settings_page.dart';
+import 'package:mornye/services/autoplay_ranker.dart';
 import 'package:mornye/services/music_player_runtime.dart';
 import 'package:mornye/services/song_analysis.dart';
 import 'package:mornye/services/song_analysis_store.dart';
@@ -19,6 +20,7 @@ import 'package:mornye/utils/settings_search_catalog.dart';
 import 'package:mornye/theme/app_theme.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/settings_group.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 void main() {
   for (final mornye in [false, true]) {
@@ -103,6 +105,82 @@ void main() {
             )
             .enabled,
         isFalse,
+      );
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('reset learning tells how well ranking learned ($mornye)', (
+      tester,
+    ) async {
+      SharedPreferences.setMockInitialValues({});
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      sqfliteFfiInit();
+      final db = (await tester.runAsync(
+        () => AutoplayRanker.openWithFactory(
+          databaseFactoryFfi,
+          inMemoryDatabasePath,
+        ),
+      ))!;
+      addTearDown(() => tester.runAsync(db.close));
+      var evaluation = const AutoplayRankEvaluation(outcomes: 12);
+      final ranker = AutoplayRanker(
+        open: () async => db,
+        train: (_) async =>
+            (weights: const <String, double>{}, evaluation: evaluation),
+      );
+      await tester.runAsync(ranker.train);
+      final container = ProviderContainer(
+        overrides: [
+          initialSettingsProvider.overrideWithValue(const AppSettings()),
+          musicPlayerRuntimeProvider.overrideWithValue(
+            MusicPlayerRuntime(
+              dependencies: PlaybackDependencies(createRanker: () => ranker),
+            ),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            theme: mornye
+                ? MornyeTheme.build(Brightness.dark, accent: MornyeAccent.blue)
+                : AppTheme.light(),
+            locale: const Locale('en'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: const PlaybackSettingsPage(),
+          ),
+        ),
+      );
+      final progress = find.text(
+        'Ranking tunes to you after 40 Autoplay songs (12 so far)',
+      );
+      await tester.scrollUntilVisible(
+        progress,
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+      expect(progress, findsOneWidget);
+
+      evaluation = const AutoplayRankEvaluation(
+        outcomes: 80,
+        tested: 20,
+        starting: 0.642,
+        learned: 0.71,
+      );
+      await tester.runAsync(ranker.train);
+      await tester.pumpAndSettle();
+      expect(
+        find.text(
+          'Tuned to you: 71% accurate on your latest songs '
+          '(standard 64%)',
+        ),
+        findsOneWidget,
       );
       expect(tester.takeException(), isNull);
     });
