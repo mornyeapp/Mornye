@@ -59,7 +59,7 @@ Future<bool> _startsBeforeWhole(File file, String extension) async {
 }
 
 /// The lowercase extension of [path] when the desktop accepts it.
-String? _uploadExtension(String path) {
+String? linkUploadExtensionOf(String path) {
   final name = path.split(RegExp(r'[\\/]')).last;
   final dot = name.lastIndexOf('.');
   if (dot <= 0) return null;
@@ -90,7 +90,7 @@ class LinkPhoneFiles {
       return LinkPhoneFile(fileId: linkFileIdFor(source, 0), source: source);
     }
     if (!source.startsWith('/')) return null;
-    final extension = _uploadExtension(source);
+    final extension = linkUploadExtensionOf(source);
     if (extension == null) return null;
     try {
       final size = await File(source).length();
@@ -130,7 +130,7 @@ class LinkPhoneFiles {
     }
     final temporary = File(copy);
     try {
-      final extension = _uploadExtension(copy);
+      final extension = linkUploadExtensionOf(copy);
       if (extension == null) {
         throw const LinkException('invalid', 'The computer cannot play it');
       }

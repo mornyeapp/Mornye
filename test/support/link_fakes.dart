@@ -1,7 +1,10 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:audio_service/audio_service.dart' show MediaItem;
+import 'package:mornye/models/library_database_models.dart';
+import 'package:mornye/services/link/features/link_phone_library.dart';
 import 'package:mornye/services/link/features/link_phone_player.dart';
 import 'package:mornye/services/link/features/link_track_refs.dart';
 import 'package:mornye/services/link/features/link_track_resolver.dart';
@@ -307,4 +310,62 @@ class FakeLibraryLookup implements LinkLibraryLookup {
           track,
     ];
   }
+}
+
+/// A Library Songs row of a scanned file.
+Map<String, dynamic> linkLocalRow(
+  String filePath, [
+  Map<String, Object?> extra = const {},
+]) => {
+  'source': 'local',
+  'item': {
+    'id': filePath,
+    'trackName': 'Song',
+    'artistName': 'Artist',
+    'filePath': filePath,
+    ...extra,
+  },
+};
+
+/// A Library Songs row of a download.
+Map<String, dynamic> linkDownloadRow(
+  String filePath, [
+  Map<String, Object?> extra = const {},
+]) => {
+  'source': 'downloaded',
+  'item': {
+    'id': filePath,
+    'trackName': 'Song',
+    'artistName': 'Artist',
+    'filePath': filePath,
+    ...extra,
+  },
+};
+
+/// Library Songs rows that a [LinkPhoneLibrary] pages, recording each query.
+class FakeLibraryRows {
+  FakeLibraryRows([List<Map<String, dynamic>>? rows]) : rows = rows ?? [];
+
+  List<Map<String, dynamic>> rows;
+  final queries = <QueueLibraryDbQuery>[];
+
+  /// While set, pages wait for it.
+  Completer<void>? hold;
+
+  Future<QueueLibraryDbPage> load(QueueLibraryDbQuery query) async {
+    queries.add(query);
+    await hold?.future;
+    final start = math.min(query.offset, rows.length);
+    final end = math.min(start + query.limit, rows.length);
+    return QueueLibraryDbPage(rows: rows.sublist(start, end), nextCursor: null);
+  }
+
+  /// A library over these rows, mapped on the test's isolate.
+  LinkPhoneLibrary library({bool includeLocal = true, int pageSize = 1000}) =>
+      LinkPhoneLibrary(
+        includeLocal: () => includeLocal,
+        loadPage: load,
+        mapPage: (rows) async => mapLinkPhoneRows(rows),
+        pageSize: pageSize,
+      );
 }
