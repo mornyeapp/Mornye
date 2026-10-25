@@ -1207,18 +1207,7 @@ class _HomeTabState extends ConsumerState<HomeTab>
           16 + homeContentInset(context),
           (hasResults || showExplore) ? 8 : 16,
         ),
-        // Across a whole desktop pane the field keeps the M3 search width.
-        child: isDesktopPlatform && !context.isMornye
-            ? Align(
-                alignment: AlignmentDirectional.centerStart,
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(
-                    maxWidth: searchBarMaxWidth,
-                  ),
-                  child: _buildSearchBar(),
-                ),
-              )
-            : _buildSearchBar(),
+        child: _buildSearchBar(),
       ),
     );
   }

@@ -137,9 +137,6 @@ double wideListInset(BuildContext context, {double? contentMaxWidth}) =>
 double homeContentInset(BuildContext context) =>
     isDesktopPlatform && !context.isMornye ? 8 : wideListInset(context);
 
-/// M3 search bars stop at 720dp.
-const double searchBarMaxWidth = 720;
-
 const double desktopContentMaxWidth = 1600;
 
 /// The M3 large window class starts at 1200dp; the extra 80dp leaves room

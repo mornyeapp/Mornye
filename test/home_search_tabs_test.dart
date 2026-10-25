@@ -389,7 +389,7 @@ void main() {
     // M3's 24dp window margin, not the centered reading column.
     final search = tester.getRect(find.byType(AppSearchField));
     expect(search.left, 24);
-    expect(search.width, lessThanOrEqualTo(720));
+    expect(search.right, size.width - 24, reason: 'the search runs full');
     for (final title in ['New', 'Best New Songs']) {
       expect(tester.getTopLeft(find.text(title)).dx, 24, reason: title);
     }
