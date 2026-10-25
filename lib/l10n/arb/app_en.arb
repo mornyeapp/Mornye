@@ -8269,6 +8269,15 @@
   "audioInfoLocationLocal": "Device storage",
   "audioInfoLocationShared": "Shared folder",
   "audioInfoLocationNetwork": "Network storage",
+  "audioInfoLocationLink": "{device} via Mornye Link",
+  "@audioInfoLocationLink": {
+    "description": "Audio info location of a song played from a paired computer or phone over Mornye Link; device is that device's name",
+    "placeholders": {
+      "device": {
+        "type": "String"
+      }
+    }
+  },
   "audioInfoPcmRate": "Uncompressed data rate",
   "audioInfoFrequencyRange": "Frequency range",
   "audioInfoFrequencyRangeValue": "Up to {frequency} (Nyquist)",

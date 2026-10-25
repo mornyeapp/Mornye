@@ -13,6 +13,7 @@ import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/providers/download_history_provider.dart';
 import 'package:mornye/providers/local_library_provider.dart';
 import 'package:mornye/services/library_database.dart';
+import 'package:mornye/services/link/link_source_names.dart';
 import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/utils/adaptive_layout.dart';
 import 'package:mornye/utils/nav_bar_inset.dart';
@@ -559,6 +560,12 @@ class _LibrarySettingsPageState extends ConsumerState<LibrarySettingsPage> {
                       );
                       return _LibrarySourceSettingsItem(
                         source: source,
+                        link:
+                            linkSourceName(
+                              ref.watch(linkSourceNamesProvider),
+                              source.path,
+                            ) !=
+                            null,
                         failures: scan.failures,
                         isScanning: scan.active,
                         isFinalizing: scan.finalizing,

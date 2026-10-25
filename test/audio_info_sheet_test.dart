@@ -101,6 +101,46 @@ void main() {
     expect(find.text('2.0 ms · 96 frames'), findsOneWidget);
   });
 
+  testWidgets('a song from a paired device shows where it plays from', (
+    tester,
+  ) async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(_route, (call) async => null);
+    final metadata = PlayerMetadataController(
+      readMetadata: (_) async => const {'format': 'flac', 'bit_depth': 16},
+    );
+    addTearDown(metadata.dispose);
+    await metadata.load(
+      const MediaItem(
+        id: 'track',
+        title: 'Track',
+        extras: {'source': 'network://desk/Album/Song.flac'},
+      ),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Builder(
+          builder: (context) => TextButton(
+            onPressed: () => showAudioInfoSheet(
+              context,
+              metadata: metadata,
+              linkSources: const {'desk': 'Studio Mac'},
+            ),
+            child: const Text('open'),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Studio Mac via Mornye Link'), findsOneWidget);
+    expect(find.text('Network storage'), findsNothing);
+  });
+
   testWidgets('late route replies cannot replace the latest track snapshot', (
     tester,
   ) async {

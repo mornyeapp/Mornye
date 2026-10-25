@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/screens/network_storage_screen.dart';
+import 'package:mornye/services/link/link_source_names.dart';
 import 'package:mornye/services/local_network_access.dart';
 import 'package:mornye/services/network_certificate.dart';
 import 'package:mornye/services/network_storage_service.dart';
@@ -253,6 +254,50 @@ void main() {
         expect(tester.takeException(), isNull);
       },
     );
+    testWidgets('a paired computer shows as Mornye Link (Mornye: $mornye)', (
+      tester,
+    ) async {
+      final service = _NetworkFixture();
+      await service.save(
+        const NetworkConnection(
+          id: 'desk',
+          name: 'Studio Mac',
+          protocol: NetworkProtocol.subsonic,
+          address: 'https://192.168.1.20:4533/',
+        ),
+      );
+      await service.save(
+        const NetworkConnection(
+          id: 'nas',
+          name: 'My NAS',
+          protocol: NetworkProtocol.subsonic,
+          address: 'https://nas.test/',
+        ),
+      );
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            linkSourceNamesProvider.overrideWithValue(const {
+              'desk': 'Studio Mac',
+            }),
+          ],
+          child: MaterialApp(
+            theme: mornye
+                ? MornyeTheme.build(Brightness.dark)
+                : ThemeData(useMaterial3: true),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: NetworkStorageScreen(service: service),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Mornye Link · 192.168.1.20'), findsOneWidget);
+      expect(find.text('Subsonic · nas.test'), findsOneWidget);
+      // Link manages the computer, so only the NAS can be edited here.
+      expect(find.byTooltip('Edit connection'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
     testWidgets(
       'connection form saves in the selected theme (Mornye: $mornye)',
       (tester) async {

@@ -9,6 +9,7 @@ import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/models/equalizer_settings.dart';
 import 'package:mornye/models/settings.dart';
 import 'package:mornye/services/audio_route_info.dart';
+import 'package:mornye/services/link/link_source_names.dart';
 import 'package:mornye/services/music_playback_deck.dart';
 import 'package:mornye/services/playback_deck.dart';
 import 'package:mornye/services/music_player_service.dart';
@@ -26,23 +27,33 @@ import 'package:mornye/widgets/hires_check_card.dart';
 import 'package:mornye/widgets/settings_group.dart';
 
 /// Technical details of the playing track, from the file through the
-/// processing chain to the output device.
+/// processing chain to the output device. [linkSources] names the Mornye
+/// Link devices behind network sources (`linkSourceNamesProvider`).
 Future<void> showAudioInfoSheet(
   BuildContext context, {
   required PlayerMetadataController metadata,
+  Map<String, String> linkSources = const {},
 }) => showAppScrollableBottomSheet<void>(
   context: context,
   title: context.l10n.audioInfoTitle,
   subtitle: metadata.qualityLabel,
-  builder: (context, controller) =>
-      _AudioInfoSheet(metadata: metadata, controller: controller),
+  builder: (context, controller) => _AudioInfoSheet(
+    metadata: metadata,
+    controller: controller,
+    linkSources: linkSources,
+  ),
 );
 
 class _AudioInfoSheet extends StatefulWidget {
-  const _AudioInfoSheet({required this.metadata, required this.controller});
+  const _AudioInfoSheet({
+    required this.metadata,
+    required this.controller,
+    required this.linkSources,
+  });
 
   final PlayerMetadataController metadata;
   final ScrollController controller;
+  final Map<String, String> linkSources;
 
   @override
   State<_AudioInfoSheet> createState() => _AudioInfoSheetState();
@@ -120,6 +131,10 @@ class _AudioInfoSheetState extends State<_AudioInfoSheet> {
         equalizer: playbackEqualizer.value,
         processing: musicPlayerRuntime.handler?.processing,
         settings: musicPlayerRuntime.settings,
+        linkDevice: linkSourceName(
+          widget.linkSources,
+          widget.metadata.filePath,
+        ),
       );
       final sections = facts.sections();
       final path = widget.metadata.filePath;
@@ -336,6 +351,7 @@ class _AudioFacts {
     required this.equalizer,
     required this.processing,
     required this.settings,
+    this.linkDevice,
   });
 
   final AppLocalizations l10n;
@@ -347,6 +363,9 @@ class _AudioFacts {
   final EqualizerSettings equalizer;
   final PlaybackProcessing? processing;
   final AppSettings settings;
+
+  /// The paired computer or phone the network song plays from.
+  final String? linkDevice;
 
   late final String format = (metadata['format'] ?? '').toString().trim();
   late final String codec = (metadata['audio_codec'] ?? '').toString().trim();
@@ -430,7 +449,12 @@ class _AudioFacts {
   String? get _location {
     final path = this.path;
     if (path == null || path.isEmpty) return null;
-    if (path.startsWith('network://')) return l10n.audioInfoLocationNetwork;
+    if (path.startsWith('network://')) {
+      final device = linkDevice;
+      return device == null
+          ? l10n.audioInfoLocationNetwork
+          : l10n.audioInfoLocationLink(device);
+    }
     if (path.startsWith('content://')) return l10n.audioInfoLocationShared;
     if (path.startsWith('/')) return l10n.audioInfoLocationLocal;
     return null;
