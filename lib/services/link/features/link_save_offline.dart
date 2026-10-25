@@ -12,12 +12,53 @@ import 'package:mornye/services/cover_download_service.dart';
 import 'package:mornye/services/folder_path_template.dart';
 import 'package:mornye/services/link/features/link_track_refs.dart';
 import 'package:mornye/services/link/link_client_api.dart';
+import 'package:mornye/services/link/link_protocol.dart';
 import 'package:mornye/services/network_storage_service.dart';
 import 'package:mornye/services/platform_bridge.dart';
 
 /// A Library song scanned from the paired desktop, which the phone can save.
 class LinkOfflineSong {
   const LinkOfflineSong({required this.item, required this.songId});
+
+  /// A song the desktop offered (`transfers.offer`), named and recorded with
+  /// the tags it sent.
+  factory LinkOfflineSong.offered(
+    LinkTransferSong song,
+    LinkServerRecord server,
+  ) {
+    String? text(String? value) =>
+        value == null || value.trim().isEmpty ? null : value.trim();
+    final durationMs = song.durationMs;
+    return LinkOfflineSong(
+      songId: song.songId,
+      item: LocalLibraryItem(
+        id: 'link_offer_${song.songId}',
+        trackName: song.title,
+        artistName: song.artist,
+        albumName: text(song.album) ?? '',
+        albumArtist: text(song.albumArtist),
+        filePath: linkDesktopSongSource(
+          server,
+          song.songId,
+          format: song.suffix,
+        ),
+        scannedAt: DateTime.fromMillisecondsSinceEpoch(0),
+        isrc: text(song.isrc),
+        trackNumber: song.track,
+        discNumber: song.disc,
+        duration: durationMs == null || durationMs <= 0
+            ? null
+            : (durationMs / 1000).round(),
+        releaseDate: song.year?.toString(),
+        bitDepth: song.bitDepth,
+        sampleRate: song.sampleRate,
+        bitrate: song.bitRate,
+        genre: text(song.genre),
+        explicit: song.explicit,
+        format: song.suffix,
+      ),
+    );
+  }
 
   final LocalLibraryItem item;
 
@@ -73,13 +114,23 @@ class LinkOfflineStored {
 /// The phone's download folder.
 abstract interface class LinkOfflineDestination {
   /// Copies [file] to [relativeDir]/[fileName] in the download folder,
-  /// renaming it when the name is taken.
+  /// renaming it when the name is taken. Throws [LinkOfflineNoFolder] when
+  /// the folder is unavailable.
   Future<LinkOfflineStored> store(
     File file, {
     required String relativeDir,
     required String fileName,
     required String mimeType,
   });
+}
+
+/// The download folder is unavailable (no storage access granted), so no
+/// song can be saved.
+class LinkOfflineNoFolder implements Exception {
+  const LinkOfflineNoFolder();
+
+  @override
+  String toString() => 'LinkOfflineNoFolder: no storage access';
 }
 
 class LinkOfflineProgress {
@@ -91,7 +142,7 @@ class LinkOfflineProgress {
     this.size,
   });
 
-  /// Songs finished (saved or failed) before the current one.
+  /// Songs finished (saved, skipped or failed) before the current one.
   final int done;
   final int total;
 
@@ -111,14 +162,25 @@ class LinkOfflineProgress {
   }
 }
 
+/// How one song of a [LinkOfflineSaver.save] run ended.
+enum LinkOfflineOutcome {
+  saved,
+
+  /// This phone already had it.
+  skipped,
+  failed,
+}
+
 class LinkOfflineResult {
   const LinkOfflineResult({
     required this.saved,
     required this.failed,
     required this.cancelled,
+    this.skipped = 0,
   });
 
   final int saved;
+  final int skipped;
   final int failed;
   final bool cancelled;
 }
@@ -146,16 +208,17 @@ class _Cancelled implements Exception {
 /// it a Library download straight away.
 class LinkOfflineSaver {
   LinkOfflineSaver({
-    required this.connectionId,
+    required this.serverId,
     required this.openTransport,
     required this.destination,
     required this.record,
     required this.temporaryDirectory,
+    this.exists,
     DateTime Function()? now,
   }) : _now = now ?? DateTime.now;
 
-  /// The desktop's Subsonic connection the songs come from.
-  final String connectionId;
+  /// The paired desktop the songs come from ([LinkServerRecord.serverId]).
+  final String serverId;
 
   /// A transport for one [save] run, closed when the run ends.
   final LinkOfflineTransport Function() openTransport;
@@ -164,14 +227,28 @@ class LinkOfflineSaver {
   /// Adds the history record of a saved song.
   final Future<void> Function(DownloadHistoryItem item) record;
   final Future<Directory> Function() temporaryDirectory;
+
+  /// Whether the history record with this id exists and its file is still
+  /// there; such songs are skipped. Without it every song is fetched.
+  final Future<bool> Function(String historyId)? exists;
   final DateTime Function() _now;
 
   static const service = 'Mornye Link';
 
-  /// The history id of [songId]: the same song saved again replaces its
-  /// record.
+  /// The history id of [songId] (contract section 13.2): the same song
+  /// saved again replaces its record.
   String historyId(String songId) =>
-      'link_${sha256.convert(utf8.encode('$connectionId/$songId'))}';
+      'link_${sha256.convert(utf8.encode('$serverId/$songId'))}';
+
+  Future<bool> _has(LinkOfflineSong song) async {
+    final exists = this.exists;
+    if (exists == null) return false;
+    try {
+      return await exists(historyId(song.songId));
+    } on Object {
+      return false;
+    }
+  }
 
   static String _extension(LocalLibraryItem item) {
     final format = item.format?.trim().toLowerCase() ?? '';
@@ -241,14 +318,19 @@ class LinkOfflineSaver {
     );
   }
 
-  /// Saves [songs] one by one. A song that fails is counted and skipped;
-  /// [cancel] stops the run and discards the song in flight.
+  /// Saves [songs] one by one, skipping those this phone already has
+  /// ([exists]). A song that fails is counted and the run goes on; [onSong]
+  /// learns how each one ended, by its index. [cancel] stops the run and
+  /// discards the song in flight. Throws [LinkOfflineNoFolder] when the
+  /// download folder is unavailable.
   Future<LinkOfflineResult> save(
     List<LinkOfflineSong> songs, {
     void Function(LinkOfflineProgress progress)? onProgress,
+    void Function(int index, LinkOfflineOutcome outcome)? onSong,
     LinkOfflineCancel? cancel,
   }) async {
     var saved = 0;
+    var skipped = 0;
     var failed = 0;
     final transport = openTransport();
     cancel?._onCancel = transport.close;
@@ -258,13 +340,20 @@ class LinkOfflineSaver {
 
     try {
       final temp = await temporaryDirectory();
-      for (final song in songs) {
+      for (var index = 0; index < songs.length; index++) {
         if (cancel?.cancelled ?? false) break;
-        final done = saved + failed;
+        final song = songs[index];
+        final done = index;
         final title = song.item.trackName;
         onProgress?.call(
           LinkOfflineProgress(done: done, total: songs.length, title: title),
         );
+        if (await _has(song)) {
+          if (cancel?.cancelled ?? false) break;
+          skipped++;
+          onSong?.call(index, LinkOfflineOutcome.skipped);
+          continue;
+        }
         final file = File(
           p.join(
             temp.path,
@@ -272,6 +361,7 @@ class LinkOfflineSaver {
             '.${_extension(song.item)}',
           ),
         );
+        LinkOfflineOutcome outcome;
         try {
           await transport.download(
             song.songId,
@@ -297,9 +387,13 @@ class LinkOfflineSaver {
           );
           await record(_history(song, stored));
           saved++;
+          outcome = LinkOfflineOutcome.saved;
+        } on LinkOfflineNoFolder {
+          rethrow;
         } on Object {
           if (cancel?.cancelled ?? false) break;
           failed++;
+          outcome = LinkOfflineOutcome.failed;
         } finally {
           try {
             if (await file.exists()) await file.delete();
@@ -307,16 +401,22 @@ class LinkOfflineSaver {
             // A leftover temporary file is cleaned with the cache.
           }
         }
+        onSong?.call(index, outcome);
       }
     } finally {
       cancel?._onCancel = null;
       transport.close();
     }
     onProgress?.call(
-      LinkOfflineProgress(done: saved + failed, total: songs.length, title: ''),
+      LinkOfflineProgress(
+        done: saved + skipped + failed,
+        total: songs.length,
+        title: '',
+      ),
     );
     return LinkOfflineResult(
       saved: saved,
+      skipped: skipped,
       failed: failed,
       cancelled: cancel?.cancelled ?? false,
     );
@@ -380,9 +480,7 @@ class LinkDownloadFolderDestination implements LinkOfflineDestination {
   }) async {
     if (Platform.isAndroid && settings.storageMode == 'saf') {
       final treeUri = settings.downloadTreeUri.trim();
-      if (treeUri.isEmpty) {
-        throw const FileSystemException('No storage access');
-      }
+      if (treeUri.isEmpty) throw const LinkOfflineNoFolder();
       final result = await PlatformBridge.createUniqueSafFileFromPath(
         treeUri: treeUri,
         relativeDir: relativeDir,
@@ -413,9 +511,7 @@ class LinkDownloadFolderDestination implements LinkOfflineDestination {
           settings.downloadDirectoryBookmark,
         );
         final resolved = access?.path.trim() ?? '';
-        if (resolved.isEmpty) {
-          throw const FileSystemException('No storage access');
-        }
+        if (resolved.isEmpty) throw const LinkOfflineNoFolder();
         root = resolved;
       }
       if (root.isEmpty) {

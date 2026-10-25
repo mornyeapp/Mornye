@@ -5,6 +5,7 @@ import 'package:mornye/models/download_history.dart';
 import 'package:mornye/models/library_database_models.dart';
 import 'package:mornye/services/link/features/link_save_offline.dart';
 import 'package:mornye/services/link/features/link_track_refs.dart';
+import 'package:mornye/services/link/link_protocol.dart';
 import 'package:path/path.dart' as p;
 
 import 'support/link_fakes.dart';
@@ -120,14 +121,16 @@ void main() {
 
   LinkOfflineSaver saver(
     _FakeTransport transport,
-    _FakeDestination destination,
-    List<DownloadHistoryItem> records,
-  ) => LinkOfflineSaver(
-    connectionId: linkTestServer.connectionId,
+    LinkOfflineDestination destination,
+    List<DownloadHistoryItem> records, {
+    Future<bool> Function(String historyId)? exists,
+  }) => LinkOfflineSaver(
+    serverId: linkTestServer.serverId,
     openTransport: () => transport,
     destination: destination,
     record: (item) async => records.add(item),
     temporaryDirectory: () async => temp,
+    exists: exists,
     now: () => DateTime(2026, 10, 25),
   );
 
@@ -221,4 +224,129 @@ void main() {
     expect(transport.closed, 2);
     expect(temp.listSync(), isEmpty);
   });
+
+  test('skips songs already saved and reports each outcome', () async {
+    final transport = _FakeTransport(failing: {'3'});
+    final records = <DownloadHistoryItem>[];
+    final probe = saver(transport, _FakeDestination(root), records);
+    final asked = <String>[];
+    final outcomes = <(int, LinkOfflineOutcome)>[];
+    final result =
+        await saver(
+          transport,
+          _FakeDestination(root),
+          records,
+          exists: (id) async {
+            asked.add(id);
+            return id == probe.historyId('2');
+          },
+        ).save(
+          linkOfflineSongs([_row('1'), _row('2'), _row('3')], linkTestServer),
+          onSong: (index, outcome) => outcomes.add((index, outcome)),
+        );
+
+    expect(asked, [
+      for (final id in ['1', '2', '3']) probe.historyId(id),
+    ]);
+    expect(transport.requested, ['1', '3']);
+    expect(outcomes, [
+      (0, LinkOfflineOutcome.saved),
+      (1, LinkOfflineOutcome.skipped),
+      (2, LinkOfflineOutcome.failed),
+    ]);
+    expect(result.saved, 1);
+    expect(result.skipped, 1);
+    expect(result.failed, 1);
+    expect(records.single.id, probe.historyId('1'));
+  });
+
+  test('history ids follow the desktop and the song', () {
+    final first = saver(_FakeTransport(), _FakeDestination(root), []);
+    final other = LinkOfflineSaver(
+      serverId: 'server-2',
+      openTransport: _FakeTransport.new,
+      destination: _FakeDestination(root),
+      record: (_) async {},
+      temporaryDirectory: () async => temp,
+    );
+    expect(first.historyId('1'), startsWith('link_'));
+    expect(first.historyId('1'), first.historyId('1'));
+    expect(first.historyId('1'), isNot(first.historyId('2')));
+    expect(first.historyId('1'), isNot(other.historyId('1')));
+  });
+
+  test('stops the run when the download folder is gone', () async {
+    final transport = _FakeTransport();
+    final records = <DownloadHistoryItem>[];
+    await expectLater(
+      saver(
+        transport,
+        const _NoFolder(),
+        records,
+      ).save(linkOfflineSongs([_row('1'), _row('2')], linkTestServer)),
+      throwsA(isA<LinkOfflineNoFolder>()),
+    );
+    expect(transport.requested, ['1']);
+    expect(transport.closed, 1);
+    expect(records, isEmpty);
+    expect(temp.listSync(), isEmpty);
+  });
+
+  test('an offered song is named and recorded with its tags', () async {
+    final song = LinkTransferSong.fromJson({
+      'songId': 'd:42',
+      'suffix': 'm4a',
+      'title': 'Offered',
+      'artist': 'Artist',
+      'album': 'Album',
+      'albumArtist': 'Band',
+      'track': 4,
+      'disc': 2,
+      'year': 2024,
+      'durationMs': 201400,
+      'isrc': 'USABC2400042',
+      'sampleRate': 44100,
+      'bitRate': 256,
+      'explicit': true,
+    })!;
+    final offered = LinkOfflineSong.offered(song, linkTestServer);
+    expect(offered.songId, 'd:42');
+    expect(
+      linkOfflineSongs([offered.item], linkTestServer).single.songId,
+      'd:42',
+    );
+    expect(LinkOfflineSaver.relativeDirFor(offered.item), 'Band/Album');
+    expect(LinkOfflineSaver.fileNameFor(offered.item), 'Offered - Artist.m4a');
+
+    final records = <DownloadHistoryItem>[];
+    await saver(
+      _FakeTransport(),
+      _FakeDestination(root),
+      records,
+    ).save([offered]);
+    final item = records.single;
+    expect(item.trackName, 'Offered');
+    expect(item.albumArtist, 'Band');
+    expect(item.trackNumber, 4);
+    expect(item.discNumber, 2);
+    expect(item.duration, 201);
+    expect(item.releaseDate, '2024');
+    expect(item.isrc, 'USABC2400042');
+    expect(item.sampleRate, 44100);
+    expect(item.bitrate, 256);
+    expect(item.format, 'm4a');
+    expect(item.explicit, isTrue);
+  });
+}
+
+class _NoFolder implements LinkOfflineDestination {
+  const _NoFolder();
+
+  @override
+  Future<LinkOfflineStored> store(
+    File file, {
+    required String relativeDir,
+    required String fileName,
+    required String mimeType,
+  }) async => throw const LinkOfflineNoFolder();
 }

@@ -7026,6 +7026,82 @@
   "@linkSaveToPhoneCancelled": {
     "description": "Mornye Link: the listener cancelled saving desktop songs to the phone"
   },
+  "linkTransferPhoneReceiving": "{count, plural, =1{Saving {title} from {name}} other{Saving {count} songs from {name}}}",
+  "@linkTransferPhoneReceiving": {
+    "description": "Mornye Link: snackbar and notification when the phone starts copying songs from the paired computer into its download folder; title is the song's title when there is one song",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "title": {
+        "type": "String"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkTransferPhoneOffered": "{count, plural, =1{{name} is sending {title} to this phone} other{{name} is sending {count} songs to this phone}}",
+  "@linkTransferPhoneOffered": {
+    "description": "Mornye Link: snackbar when the paired computer starts sending songs to the phone; title is the song's title when there is one song",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "title": {
+        "type": "String"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkTransferPhoneView": "View",
+  "@linkTransferPhoneView": {
+    "description": "Mornye Link: snackbar action that opens the list of song transfers"
+  },
+  "linkTransferPhoneWith": "Transfer with {name}",
+  "@linkTransferPhoneWith": {
+    "description": "Mornye Link: tooltip and sheet title of a playlist's button that sends its songs to the paired computer or saves the computer's songs to the phone",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkTransferPhoneNothing": "None of these songs are on {name}",
+  "@linkTransferPhoneNothing": {
+    "description": "Mornye Link: Save to this phone found none of the chosen songs in the paired computer's library",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkSendSending": "{count, plural, =1{Sending {title} to {name}} other{Sending {count} songs to {name}}}",
+  "@linkSendSending": {
+    "description": "Mornye Link: snackbar and notification when the phone starts copying its own songs to the paired computer; title is the song's title when there is one song",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "title": {
+        "type": "String"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkSendNothing": "None of these songs can be sent to {name}",
+  "@linkSendNothing": {
+    "description": "Mornye Link: none of the chosen songs is a file on this phone in a format the paired computer takes",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "linkDownloadStatusQueued": "Waiting",
   "@linkDownloadStatusQueued": {
     "description": "Mornye Link: a download on the paired desktop has not started"

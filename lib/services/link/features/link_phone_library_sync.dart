@@ -262,22 +262,27 @@ class LinkPhoneLibraryPublisher {
   }
 }
 
-/// Answers the desktop's `files.request` for a song of this phone's list:
-/// uploads its file, saying `files.sending` as the upload starts and
-/// `files.failed` when it cannot. At most [maxUploads] run at once; further
-/// requests wait in order, and one for a song already waiting or uploading
-/// is ignored.
+/// Answers the desktop's `files.request` for a song of this phone's list,
+/// or one a running transfer offered ([offered]): uploads its file, saying
+/// `files.sending` as the upload starts and `files.failed` when it cannot.
+/// At most [maxUploads] run at once; further requests wait in order, and
+/// one for a song already waiting or uploading is ignored.
 class LinkPhoneFileRequests {
   LinkPhoneFileRequests({
     required this.client,
     required this.library,
     required this.files,
+    this.offered,
     this.maxUploads = 2,
   });
 
   final LinkClientApi client;
   final LinkPhoneLibrary library;
   final LinkPhoneFiles files;
+
+  /// The file a running transfer offered under a name, looked up before
+  /// the song list, so it is sent even while the list is not shared.
+  final LinkPhoneFile? Function(String name)? offered;
   final int maxUploads;
 
   final _subscriptions = <StreamSubscription<Object?>>[];
@@ -342,7 +347,7 @@ class LinkPhoneFileRequests {
 
   Future<void> _send(String name) async {
     try {
-      final file = await library.fileNamed(name);
+      final file = offered?.call(name) ?? await library.fileNamed(name);
       if (file == null) {
         throw const LinkException('not_found', 'Not a song of this phone');
       }
