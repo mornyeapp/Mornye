@@ -7,6 +7,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/models/library_database_models.dart';
 import 'package:mornye/models/unified_library_item.dart';
+import 'package:mornye/providers/download_history_provider.dart';
+import 'package:mornye/providers/local_library_provider.dart';
 import 'package:mornye/services/app_navigation_service.dart';
 import 'package:mornye/services/link/features/link_phone_features.dart';
 import 'package:mornye/services/link/features/link_save_offline.dart';
@@ -47,6 +49,31 @@ class _NoDestination implements LinkOfflineDestination {
     required String fileName,
     required String mimeType,
   }) => throw UnimplementedError();
+}
+
+class _Library extends LocalLibraryNotifier {
+  _Library(this.items);
+
+  final Map<String, LocalLibraryItem> items;
+
+  @override
+  LocalLibraryState build() => LocalLibraryState();
+
+  @override
+  Future<LocalLibraryItem?> getById(String id) async => items[id];
+}
+
+class _Downloads extends DownloadHistoryNotifier {
+  _Downloads(this.items);
+
+  final Map<String, DownloadHistoryItem> items;
+
+  @override
+  DownloadHistoryState build() => DownloadHistoryState();
+
+  @override
+  Future<DownloadHistoryItem?> getByFilePathAsync(String filePath) async =>
+      items[filePath];
 }
 
 UnifiedLibraryItem _phoneSong(String title) =>
@@ -192,6 +219,73 @@ void main() {
     await settle(tester);
     expect(find.text('Send to Studio PC'), findsNothing);
     expect(find.text('Save to this phone'), findsNothing);
+  });
+
+  testWidgets('the player menu finds the playing song: the desktop\'s to '
+      'save, this phone\'s own or downloaded to send', (tester) async {
+    final desktop = _desktopSong('l:5', 'Theirs').localItem!;
+    final mine = _phoneSong('Mine').localItem!;
+    final download = DownloadHistoryItem(
+      id: 'download-1',
+      trackName: 'Fetched',
+      artistName: 'Artist',
+      albumName: 'Album',
+      filePath: '/music/Fetched.flac',
+      service: 'qobuz',
+      downloadedAt: DateTime(2026),
+    );
+    late WidgetRef ref;
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          linkPhoneClientProvider.overrideWithValue(client),
+          localLibraryProvider.overrideWith(
+            () => _Library({desktop.id: desktop, mine.id: mine}),
+          ),
+          downloadHistoryProvider.overrideWith(
+            () => _Downloads({download.filePath: download}),
+          ),
+        ],
+        child: Consumer(
+          builder: (context, widgetRef, _) {
+            ref = widgetRef;
+            return const SizedBox();
+          },
+        ),
+      ),
+    );
+
+    final theirs = await linkTransferSongsOfPlaying(
+      ref,
+      mediaId: desktop.id,
+      source: desktop.filePath,
+    );
+    expect(theirs.desktop.single.songId, 'l:5');
+    expect(theirs.phone, isEmpty);
+
+    final own = await linkTransferSongsOfPlaying(
+      ref,
+      mediaId: mine.id,
+      source: mine.filePath,
+    );
+    expect(own.desktop, isEmpty);
+    expect(own.phone.single.trackName, 'Mine');
+
+    final fetched = await linkTransferSongsOfPlaying(
+      ref,
+      mediaId: download.id,
+      source: download.filePath,
+    );
+    expect(fetched.phone.single.trackName, 'Fetched');
+
+    client.connectionState = LinkConnectionState.disconnected;
+    final offline = await linkTransferSongsOfPlaying(
+      ref,
+      mediaId: mine.id,
+      source: mine.filePath,
+    );
+    expect(offline.phone, isEmpty);
+    expect(offline.desktop, isEmpty);
   });
 
   testWidgets('an offer from the desktop says so wherever the app is', (

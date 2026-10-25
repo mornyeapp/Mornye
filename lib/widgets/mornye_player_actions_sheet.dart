@@ -52,6 +52,8 @@ class MornyePlayerActionsSheet extends ConsumerWidget {
     required this.mediaItem,
     this.sleepTimerSubtitle,
     this.volumeShown = true,
+    this.sendToDesktop,
+    this.saveToPhone = false,
   });
 
   final MediaItem mediaItem;
@@ -59,6 +61,12 @@ class MornyePlayerActionsSheet extends ConsumerWidget {
 
   /// Whether the player shows its volume slider, which the menu toggles.
   final bool volumeShown;
+
+  /// The paired desktop's name while this phone's song can go there.
+  final String? sendToDesktop;
+
+  /// Whether the song is the paired desktop's, which can be saved here.
+  final bool saveToPhone;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -126,6 +134,20 @@ class MornyePlayerActionsSheet extends ConsumerWidget {
               context.l10n.lyricsShareTitle,
               CupertinoIcons.quote_bubble,
             ),
+            if (sendToDesktop case final name?)
+              _action(
+                context,
+                'linkSend',
+                context.l10n.linkSendToDesktop(name),
+                CupertinoIcons.desktopcomputer,
+              ),
+            if (saveToPhone)
+              _action(
+                context,
+                'linkSave',
+                context.l10n.linkSaveToPhone,
+                CupertinoIcons.device_phone_portrait,
+              ),
           ],
           [
             _action(

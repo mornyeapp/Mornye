@@ -18,7 +18,6 @@ import 'package:mornye/screens/downloaded_album_screen.dart';
 import 'package:mornye/screens/local_album_screen.dart';
 import 'package:mornye/screens/equalizer_screen.dart';
 import 'package:mornye/screens/lyrics_share_screen.dart';
-import 'package:mornye/services/link/features/link_phone_client.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/theme/player_artwork_theme.dart';
 import 'package:mornye/utils/file_access.dart';
@@ -34,6 +33,7 @@ import 'package:mornye/widgets/audio_output_button.dart';
 import 'package:mornye/widgets/desktop/desktop_commands.dart'
     show DesktopCommand, desktopTooltip;
 import 'package:mornye/widgets/desktop/desktop_inspector.dart';
+import 'package:mornye/widgets/link/link_actions.dart';
 import 'package:mornye/widgets/link/link_devices_sheet.dart';
 import 'package:mornye/widgets/lyrics_screen_awake.dart';
 import 'package:mornye/widgets/player_artwork.dart';
@@ -1143,6 +1143,17 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
             ).formatTimeOfDay(TimeOfDay.fromDateTime(sleepTimerEndsAt)),
           );
     final volumeShown = ref.read(settingsProvider).playerShowVolume;
+    final linkClient = ref.read(linkPhoneClientProvider);
+    final transfer = await linkTransferSongsOfPlaying(
+      ref,
+      mediaId: mediaItem.id,
+      source: source,
+    );
+    if (!mounted || !context.mounted) return;
+    final sendToDesktop = transfer.phone.isEmpty || linkClient == null
+        ? null
+        : linkDesktopName(linkClient);
+    final saveToPhone = transfer.desktop.isNotEmpty;
     final action = context.isMornye
         ? await showMornyeContextMenu<String>(
             context: context,
@@ -1153,6 +1164,8 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
               mediaItem: mediaItem,
               sleepTimerSubtitle: sleepTimerSubtitle,
               volumeShown: volumeShown,
+              sendToDesktop: sendToDesktop,
+              saveToPhone: saveToPhone,
             ),
           )
         : await showAppBottomSheet<String>(
@@ -1181,6 +1194,18 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                     title: sheetContext.l10n.lyricsShareTitle,
                     onTap: () => Navigator.of(sheetContext).pop('shareLyrics'),
                   ),
+                  if (sendToDesktop != null)
+                    SettingsItem(
+                      icon: Icons.computer,
+                      title: sheetContext.l10n.linkSendToDesktop(sendToDesktop),
+                      onTap: () => Navigator.of(sheetContext).pop('linkSend'),
+                    ),
+                  if (saveToPhone)
+                    SettingsItem(
+                      icon: Icons.phone_android,
+                      title: sheetContext.l10n.linkSaveToPhone,
+                      onTap: () => Navigator.of(sheetContext).pop('linkSave'),
+                    ),
                   SettingsItem(
                     icon: Icons.bedtime_outlined,
                     title: sheetContext.l10n.nowPlayingSleepTimer,
@@ -1248,6 +1273,12 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
         break;
       case 'shareLyrics':
         await _shareLyrics();
+        break;
+      case 'linkSend':
+        await linkSendSongsToDesktop(context, ref, transfer.phone);
+        break;
+      case 'linkSave':
+        linkSaveSongsToPhone(context, ref, transfer.desktop);
         break;
       case 'details':
         unawaited(

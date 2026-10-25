@@ -6,6 +6,9 @@ import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/models/library_database_models.dart';
 import 'package:mornye/models/track.dart';
 import 'package:mornye/models/unified_library_item.dart';
+import 'package:mornye/providers/download_history_provider.dart';
+import 'package:mornye/providers/local_library_provider.dart';
+import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/services/app_navigation_service.dart';
 import 'package:mornye/services/link/features/link_downloads.dart';
@@ -513,6 +516,44 @@ List<LinkOfflineSong> linkDesktopSongsOf(
 ) {
   final server = ref.read(linkPhoneClientProvider)?.server;
   return server == null ? const [] : linkOfflineSongs(items, server);
+}
+
+/// The Library song that plays on this phone as [mediaId] from [source],
+/// for the player's menu: the paired desktop's song to save here, or this
+/// phone's own to send there. Both empty unless that desktop is connected
+/// and this phone plays.
+Future<({List<LinkOfflineSong> desktop, List<UnifiedLibraryItem> phone})>
+linkTransferSongsOfPlaying(
+  WidgetRef ref, {
+  required String mediaId,
+  required String source,
+}) async {
+  const none = (desktop: <LinkOfflineSong>[], phone: <UnifiedLibraryItem>[]);
+  final server = ref.read(linkPhoneClientProvider)?.server;
+  if (server == null ||
+      !linkTransfersAvailable(ref) ||
+      ref.read(activeRemotePlaybackProvider) != null) {
+    return none;
+  }
+  // Library songs play by their row id, downloads are found by file.
+  final downloads = ref.read(downloadHistoryProvider.notifier);
+  final local = await ref.read(localLibraryProvider.notifier).getById(mediaId);
+  final download = local != null || source.isEmpty
+      ? null
+      : await downloads.getByFilePathAsync(source);
+  if (local != null) {
+    return (
+      desktop: linkOfflineSongs([local], server),
+      phone: linkPhoneSongItemsOf([UnifiedLibraryItem.fromLocalLibrary(local)]),
+    );
+  }
+  if (download == null) return none;
+  return (
+    desktop: const <LinkOfflineSong>[],
+    phone: linkPhoneSongItemsOf([
+      UnifiedLibraryItem.fromDownloadHistory(download),
+    ]),
+  );
 }
 
 /// Reports a request to the paired desktop that failed.
