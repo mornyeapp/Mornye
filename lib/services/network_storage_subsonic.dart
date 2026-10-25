@@ -554,15 +554,17 @@ class SubsonicClient {
     final writer = output.openWrite();
     var received = 0;
     try {
-      await for (final chunk in response.timeout(
-        NetworkStorageService.timeout,
-      )) {
-        if (_closed) throw StateError('Subsonic request cancelled');
-        checkpoint?.call();
-        writer.add(chunk);
-        received += chunk.length;
-        progress?.call(received, total);
-      }
+      // Let file writes pause the HTTP stream instead of queueing the entire
+      // download in the sink when storage is slower than the connection.
+      await writer.addStream(
+        response.timeout(NetworkStorageService.timeout).map((chunk) {
+          if (_closed) throw StateError('Subsonic request cancelled');
+          checkpoint?.call();
+          received += chunk.length;
+          progress?.call(received, total);
+          return chunk;
+        }),
+      );
       if (total != null && received != total) {
         throw const HttpException('Subsonic download ended early');
       }

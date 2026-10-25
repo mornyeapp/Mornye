@@ -179,7 +179,7 @@ impl LyricsService {
     pub fn fetch(&self, mut request: SearchRequest, check: &Check<'_>) -> FetchResult {
         self.inner.check(check)?;
         let extensions = self.inner.fetcher.extensions();
-        let (flight, start, flight_key, providers, _dependency) = {
+        let (flight, start, flight_key, providers, _dependency, _waiter) = {
             let mut state = self.inner.state.lock().expect("lyrics service lock");
             self.inner.check(check)?;
             request.options = state.options.clone();
@@ -199,7 +199,7 @@ impl LyricsService {
             }
             state.negative.remove(&key);
             let flight_key = (state.generation, key);
-            let existing = state.flights.existing(&flight_key);
+            let existing = state.flights.try_join(&flight_key);
             let (flight, start) = if let Some(flight) = existing {
                 (flight, false)
             } else {
@@ -208,8 +208,13 @@ impl LyricsService {
                         "too many concurrent lyrics searches".into(),
                     ));
                 }
-                (Flight::new(self.inner.calls.node()), true)
+                let flight = Flight::new(self.inner.calls.node());
+                flight.join();
+                (flight, true)
             };
+            // Dependency validation can reject a joined flight. Release that
+            // registration too, including when it was the final live waiter.
+            let waiter = Waiter::new(Arc::clone(&flight));
             let dependency = request
                 .caller
                 .as_ref()
@@ -222,10 +227,8 @@ impl LyricsService {
                     .insert(flight_key.clone(), Arc::clone(&flight));
             }
             request.caller = Some(flight.tag().clone());
-            flight.join();
-            (flight, start, flight_key, providers, dependency)
+            (flight, start, flight_key, providers, dependency, waiter)
         };
-        let _waiter = Waiter::new(Arc::clone(&flight));
         if start {
             let inner = Arc::clone(&self.inner);
             let worker_flight = Arc::clone(&flight);

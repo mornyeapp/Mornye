@@ -57,6 +57,10 @@ from the upstream package are not vendored.
   service is no longer attached" when the service changed or the interface
   was destroyed; `destroy()` also clears the method handler and shuts the
   executor down.
+- Android: close the `ParcelFileDescriptor` used for content artwork after
+  decoding, including failure paths. The service listener stays attached while
+  an Activity retains its Flutter engine across service recreation; engine
+  detachment clears the listener with its handler interface.
 - Android build (`android/build.gradle.kts`): AGP 9.0.1 to 9.4.1, compileSdk
   35 to 37, `androidx.media:media` 1.7.0 to 1.8.0, `androidx.core:core`
   1.13.1 to 1.19.1, a `junit:junit:4.13.2` test dependency, and

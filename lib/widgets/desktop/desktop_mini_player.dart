@@ -276,14 +276,43 @@ class _MiniPlayerLyrics extends ConsumerStatefulWidget {
   ConsumerState<_MiniPlayerLyrics> createState() => _MiniPlayerLyricsState();
 }
 
-class _MiniPlayerLyricsState extends ConsumerState<_MiniPlayerLyrics> {
+class _MiniPlayerLyricsState extends ConsumerState<_MiniPlayerLyrics>
+    with WidgetsBindingObserver {
   Timer? _nextLine;
   final _seekPreview = ValueNotifier<Duration?>(null);
+  bool _tickerEnabled = true;
+
+  bool get _visible =>
+      _tickerEnabled &&
+      switch (WidgetsBinding.instance.lifecycleState) {
+        null || AppLifecycleState.resumed || AppLifecycleState.inactive => true,
+        _ => false,
+      };
 
   PlayerMetadataController get metadata => widget.metadata;
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _tickerEnabled = TickerMode.valuesOf(context).enabled;
+    if (!_visible) _nextLine?.cancel();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (!_visible) _nextLine?.cancel();
+    if (mounted) setState(() {});
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _nextLine?.cancel();
     _seekPreview.dispose();
     super.dispose();
@@ -293,11 +322,21 @@ class _MiniPlayerLyricsState extends ConsumerState<_MiniPlayerLyrics> {
   /// state changes, so a timer rebuilds the view when the next line starts.
   int _followPlayback(WidgetRef ref, List<LyricLine> lines) {
     _nextLine?.cancel();
-    final state = ref.watch(playbackStateProvider).value;
+    final state =
+        (_visible
+                ? ref.watch(playbackStateProvider)
+                : ref.read(playbackStateProvider))
+            .value;
     final position = state?.position ?? Duration.zero;
     final current = _sungLineAt(lines, position);
     final next = _leadLineAfter(lines, current);
-    if (state != null && state.playing && state.speed > 0 && next >= 0) {
+    if (_visible &&
+        state != null &&
+        state.playing &&
+        state.processingState == AudioProcessingState.ready &&
+        state.speed.isFinite &&
+        state.speed > 0 &&
+        next >= 0) {
       final wait = lines[next].time - position;
       _nextLine = Timer(
         Duration(microseconds: (wait.inMicroseconds / state.speed).ceil()),
@@ -366,10 +405,7 @@ class _MiniPlayerLyricsState extends ConsumerState<_MiniPlayerLyrics> {
                         WordTimedLyricLine(
                           line: lines[current],
                           initialPosition:
-                              ref
-                                  .watch(playbackStateProvider)
-                                  .value
-                                  ?.position ??
+                              ref.read(playbackStateProvider).value?.position ??
                               Duration.zero,
                           seekPreview: _seekPreview,
                           style: textTheme.titleLarge!.copyWith(

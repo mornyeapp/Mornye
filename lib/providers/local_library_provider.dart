@@ -255,7 +255,7 @@ class LocalLibraryNotifier extends Notifier<LocalLibraryState> {
   }
 
   Future<void> _ensureLoadedFromDatabase() {
-    if (_hasLoadedFromDatabase) {
+    if (!ref.mounted || _hasLoadedFromDatabase) {
       return Future<void>.value();
     }
     return _loadFuture ??= _loadFromDatabase();

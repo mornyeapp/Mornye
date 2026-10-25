@@ -41,6 +41,7 @@ enum ReleaseMode: String {
 
   private var completionObserver: TimeObserver?
   private var playerItemStatusObservation: NSKeyValueObservation?
+  private var playerItemStatusContinuation: CheckedContinuation<Void, Error>?
 
   init(
     reference: AudioplayersDarwinPlugin,
@@ -86,6 +87,7 @@ enum ReleaseMode: String {
       equalizerAttached = false
       // Need to observe item status immediately after creating:
       try await setUpPlayerItemStatusObservation(playerItem)
+      guard player.currentItem === playerItem else { throw CancellationError() }
       // Needs to be called after the preparation has completed.
       self.updateDuration()
 
@@ -212,31 +214,38 @@ enum ReleaseMode: String {
     _ playerItem: AVPlayerItem
   ) async throws {
     try await withCheckedThrowingContinuation { continuation in
+      playerItemStatusContinuation = continuation
       playerItemStatusObservation = playerItem.observe(\AVPlayerItem.status) {
         [weak self] (playerItem, change) in
-        guard let self = self else {
-          return
-        }
         let status = playerItem.status
-        self.eventHandler.onLog(message: "player status: \(status), change: \(change)")
-
-        switch status {
-        case .readyToPlay:
-          continuation.resume()
-        case .failed:
-          self.reset()
-          continuation.resume(throwing: AudioPlayerError.error("Failed to set playerItem"))
-        default:
-          // Do not resume continuation yet
-          break
+        let message = "player status: \(status), change: \(change)"
+        Task { @MainActor [weak self, weak playerItem] in
+          guard let self, let playerItem, self.player.currentItem === playerItem else { return }
+          self.eventHandler.onLog(message: message)
+          switch status {
+          case .readyToPlay:
+            self.finishPlayerItemPreparation(.success(()))
+          case .failed:
+            self.finishPlayerItemPreparation(
+              .failure(AudioPlayerError.error("Failed to set playerItem")))
+            self.reset()
+          default:
+            // Do not resume continuation yet.
+            break
+          }
         }
       }
       // Replacing the player item triggers continuation of the observation.
       self.player.replaceCurrentItem(with: playerItem)
     }
+  }
 
+  private func finishPlayerItemPreparation(_ result: Result<Void, Error>) {
     playerItemStatusObservation?.invalidate()
     playerItemStatusObservation = nil
+    let continuation = playerItemStatusContinuation
+    playerItemStatusContinuation = nil
+    continuation?.resume(with: result)
   }
 
   private func setUpSoundCompletedObserver(_ player: AVPlayer, _ playerItem: AVPlayerItem) {
@@ -244,13 +253,12 @@ enum ReleaseMode: String {
       forName: NSNotification.Name.AVPlayerItemDidPlayToEndTime,
       object: playerItem,
       queue: nil
-    ) {
-      (notification) in
-      Task { @MainActor [weak self] in
-        guard let self = self else {
+    ) { [weak self, weak playerItem] _ in
+      Task { @MainActor [weak self, weak playerItem] in
+        guard let self, let playerItem, self.player.currentItem === playerItem else {
           return
         }
-        await self.onSoundComplete()
+        await self.onSoundComplete(playerItem)
       }
     }
     self.completionObserver = TimeObserver(player: player, observer: observer)
@@ -264,8 +272,7 @@ enum ReleaseMode: String {
   }
 
   private func reset() {
-    playerItemStatusObservation?.invalidate()
-    playerItemStatusObservation = nil
+    finishPlayerItemPreparation(.failure(CancellationError()))
     if let cObserver = completionObserver {
       NotificationCenter.default.removeObserver(cObserver.observer)
       completionObserver = nil
@@ -284,15 +291,14 @@ enum ReleaseMode: String {
     }
   }
 
-  private func onSoundComplete() async {
-    if !isPlaying {
-      return
-    }
+  private func onSoundComplete(_ playerItem: AVPlayerItem) async {
+    guard isPlaying, player.currentItem === playerItem else { return }
 
     reference.controlAudioSession()
     eventHandler.onComplete()
 
     await seek(time: toCMTime(millis: 0))
+    guard player.currentItem === playerItem else { return }
     if self.releaseMode == ReleaseMode.loop {
       self.resume()
     } else if self.releaseMode == ReleaseMode.release {

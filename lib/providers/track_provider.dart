@@ -120,7 +120,7 @@ class TrackState {
       hasSearchText: hasSearchText ?? this.hasSearchText,
       isShowingRecentAccess:
           isShowingRecentAccess ?? this.isShowingRecentAccess,
-      searchExtensionId: searchExtensionId,
+      searchExtensionId: searchExtensionId ?? this.searchExtensionId,
       selectedSearchFilter: clearSelectedSearchFilter
           ? null
           : (selectedSearchFilter ?? this.selectedSearchFilter),

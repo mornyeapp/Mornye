@@ -198,6 +198,67 @@ void main() {
         await tester.pumpWidget(const SizedBox.shrink());
       },
     );
+
+    testWidgets('word sweep follows the AutoMix playback rate ($mornye)', (
+      tester,
+    ) async {
+      final playback = StreamController<PlaybackState>.broadcast();
+      final preview = ValueNotifier<Duration?>(null);
+      addTearDown(playback.close);
+      addTearDown(preview.dispose);
+      final theme = mornye
+          ? MornyeTheme.build(Brightness.dark)
+          : ThemeData.dark();
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            playbackStateProvider.overrideWith((ref) => playback.stream),
+          ],
+          child: MaterialApp(
+            theme: theme,
+            home: Scaffold(
+              body: WordTimedLyricLine(
+                line: _lyrics.lines.single,
+                initialPosition: const Duration(seconds: 2),
+                seekPreview: preview,
+                style: theme.textTheme.titleLarge!,
+              ),
+            ),
+          ),
+        ),
+      );
+      addTearDown(() => tester.pumpWidget(const SizedBox.shrink()));
+      Duration position() {
+        final painter = tester.widget<CustomPaint>(_paint).painter!;
+        // Inspect the clock already supplied to the painter.
+        // ignore: avoid_dynamic_calls
+        return (painter as dynamic).currentPosition() as Duration;
+      }
+
+      // AutoMix changes rate while playing. No further report arrives between
+      // these samples, so the word sweep must extrapolate at that rate itself.
+      for (final speed in [2.0, 0.5]) {
+        playback.add(
+          PlaybackState(
+            playing: true,
+            processingState: AudioProcessingState.ready,
+            updatePosition: const Duration(seconds: 2),
+            speed: speed,
+          ),
+        );
+        await tester.pump();
+        final before = position();
+        final elapsed = Stopwatch()..start();
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 160)),
+        );
+        final advanced = (position() - before).inMicroseconds;
+        elapsed.stop();
+        expect(advanced, closeTo(elapsed.elapsedMicroseconds * speed, 40000));
+      }
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
   }
 
   testWidgets('the word sweep keeps moving behind another app window', (

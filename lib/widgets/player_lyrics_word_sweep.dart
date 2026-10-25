@@ -71,11 +71,13 @@ class _WordHighlightedLyricLineState
   ProviderSubscription<Duration>? _positionSubscription;
   ProviderSubscription<bool>? _playingSubscription;
   ProviderSubscription<bool>? _loadingSubscription;
+  ProviderSubscription<double>? _speedSubscription;
 
   late Duration _anchorPosition;
   Duration _anchorElapsed = Duration.zero;
   bool _playing = false;
   bool _loading = false;
+  double _speed = 1;
   bool _tickerEnabled = true;
   bool _useInitialPosition = true;
   Duration _visualEnd = Duration.zero;
@@ -91,14 +93,22 @@ class _WordHighlightedLyricLineState
       };
 
   bool get _advancing =>
-      _visible && _playing && !_loading && widget.seekPreview.value == null;
+      _visible &&
+      _playing &&
+      !_loading &&
+      _speed > 0 &&
+      widget.seekPreview.value == null;
 
   bool get _shouldAnimate => _advancing && _currentPosition() < _visualEnd;
 
   Duration _positionAt({required bool advance}) {
     return interpolatedSyncedLyricsPosition(
       anchorPosition: _anchorPosition,
-      elapsedSinceAnchor: _elapsedClock.elapsed - _anchorElapsed,
+      elapsedSinceAnchor: Duration(
+        microseconds:
+            ((_elapsedClock.elapsed - _anchorElapsed).inMicroseconds * _speed)
+                .round(),
+      ),
       isPlaying: advance,
     );
   }
@@ -133,9 +143,11 @@ class _WordHighlightedLyricLineState
       _positionSubscription?.close();
       _playingSubscription?.close();
       _loadingSubscription?.close();
+      _speedSubscription?.close();
       _positionSubscription = null;
       _playingSubscription = null;
       _loadingSubscription = null;
+      _speedSubscription = null;
       _animationClock.stop();
       return;
     }
@@ -145,6 +157,8 @@ class _WordHighlightedLyricLineState
     }
     _playing = ref.read(playbackPlayingProvider);
     _loading = ref.read(playbackLoadingProvider);
+    final speed = ref.read(playbackStateProvider).value?.speed ?? 1;
+    _speed = speed.isFinite && speed > 0 ? speed : 0;
     if (!_useInitialPosition) {
       _anchorAt(widget.seekPreview.value ?? ref.read(playbackPositionProvider));
     }
@@ -160,6 +174,10 @@ class _WordHighlightedLyricLineState
     _loadingSubscription = ref.listenManual<bool>(
       playbackLoadingProvider,
       (previous, next) => _updateTransportState(loading: next),
+    );
+    _speedSubscription = ref.listenManual<double>(
+      playbackStateProvider.select((state) => state.value?.speed ?? 1),
+      (previous, next) => _updateTransportState(speed: next),
     );
     _syncAnimationClock();
   }
@@ -224,11 +242,12 @@ class _WordHighlightedLyricLineState
     }
   }
 
-  void _updateTransportState({bool? playing, bool? loading}) {
+  void _updateTransportState({bool? playing, bool? loading, double? speed}) {
     if (!mounted) return;
     final position = _currentPosition();
     if (playing != null) _playing = playing;
     if (loading != null) _loading = loading;
+    if (speed != null) _speed = speed.isFinite && speed > 0 ? speed : 0;
     _anchorAt(
       widget.seekPreview.value ??
           (_advancing ? position : ref.read(playbackPositionProvider)),
@@ -291,6 +310,7 @@ class _WordHighlightedLyricLineState
     _positionSubscription?.close();
     _playingSubscription?.close();
     _loadingSubscription?.close();
+    _speedSubscription?.close();
     _animationClock.dispose();
     _elapsedClock.stop();
     super.dispose();

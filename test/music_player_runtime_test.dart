@@ -102,6 +102,20 @@ class _Deck implements PlaybackDeck {
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
+class _DelayedSeekDeck extends _Deck {
+  final seekStarted = Completer<void>();
+  final seekBarrier = Completer<void>();
+  final seekSources = <String>[];
+
+  @override
+  Future<void> seek(Duration value) async {
+    seekStarted.complete();
+    await seekBarrier.future;
+    seekSources.add(sources.last);
+    await super.seek(value);
+  }
+}
+
 class _Session implements AudioSession {
   int configurations = 0;
   final activations = <bool>[];
@@ -393,6 +407,32 @@ const _track = PlayableMedia(
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  test('a pending seek cannot move the next song', () async {
+    final deck = _DelayedSeekDeck();
+    final runtime = _runtime(createDeck: (_) => deck);
+    final handler = await runtime.initialize();
+    const nextTrack = PlayableMedia(
+      id: 'two',
+      source: '/two.flac',
+      title: 'Two',
+      artist: 'Artist',
+    );
+    await handler.setQueueAndPlay([_track, nextTrack]);
+    final seek = handler.seek(const Duration(seconds: 12));
+    await deck.seekStarted.future;
+    final next = handler.skipToNext();
+    try {
+      await _settle();
+      expect(deck.sources, ['/one.flac']);
+    } finally {
+      deck.seekBarrier.complete();
+      await Future.wait([seek, next]);
+    }
+    expect(deck.seekSources, ['/one.flac']);
+    expect(handler.mediaItem.value?.id, 'two');
+    expect(handler.playbackState.value.updatePosition, Duration.zero);
+  });
 
   test(
     'trained personalized ranking runs through the real autoplay worker',

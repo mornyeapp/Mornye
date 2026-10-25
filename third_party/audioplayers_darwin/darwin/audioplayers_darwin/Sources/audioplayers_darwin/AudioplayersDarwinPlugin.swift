@@ -255,6 +255,8 @@ public class AudioplayersDarwinPlugin: NSObject, FlutterPlugin {
           url: url!, isLocal: isLocal,
           mimeType: mimeType
         )
+      } catch is CancellationError {
+        // Replacing or disposing a loading source completes its method call.
       } catch let error {
         player.eventHandler.onError(
           code: "DarwinAudioError",
@@ -272,6 +274,7 @@ public class AudioplayersDarwinPlugin: NSObject, FlutterPlugin {
     } else if method == "getDuration" {
       let duration = player.getDuration()
       result(duration)
+      return
     } else if method == "setVolume" {
       guard let volume = args["volume"] as? Double else {
         result(

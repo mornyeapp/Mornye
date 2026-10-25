@@ -16,10 +16,10 @@ use hyper_util::rt::TokioIo;
 use serde::Serialize;
 use serde_json::{Value, json as object};
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, watch};
 use tokio::time::Instant;
 use tokio_tungstenite::WebSocketStream;
 use tokio_tungstenite::tungstenite::Message;
@@ -35,6 +35,8 @@ pub(crate) const CLOSE_REPLACED: u16 = 4409;
 const CLOSE_GOING_AWAY: u16 = 1001;
 /// Same limit as request bodies.
 const MAX_MESSAGE: usize = crate::server::MAX_BODY;
+/// Bound tiny pushes by count and larger pushes by their combined bytes.
+const MAX_OUTGOING: usize = 64;
 /// How long sending a close frame may take before the socket is dropped.
 const CLOSE_TIMEOUT: Duration = Duration::from_secs(2);
 
@@ -49,15 +51,14 @@ pub(crate) struct ClientInfo {
     pub(crate) connected_ms: i64,
 }
 
-enum Outgoing {
-    Text(String),
-    Close(u16, &'static str),
-}
+type CloseReason = (u16, &'static str);
 
 struct Client {
     id: u64,
     info: ClientInfo,
-    sender: mpsc::UnboundedSender<Outgoing>,
+    sender: mpsc::Sender<String>,
+    pending_bytes: Arc<AtomicUsize>,
+    closing: watch::Sender<Option<CloseReason>>,
 }
 
 /// The open WebSocket connections, one per device.
@@ -69,12 +70,20 @@ pub(crate) struct Clients {
 
 impl Clients {
     /// Registers a connection; an older one for the same device is closed.
-    fn insert(&self, info: ClientInfo, sender: mpsc::UnboundedSender<Outgoing>) -> u64 {
+    fn insert(
+        &self,
+        info: ClientInfo,
+        sender: mpsc::Sender<String>,
+        pending_bytes: Arc<AtomicUsize>,
+        closing: watch::Sender<Option<CloseReason>>,
+    ) -> u64 {
         let id = self.next_id.fetch_add(1, Ordering::Relaxed) + 1;
         let client = Client {
             id,
             info: info.clone(),
             sender,
+            pending_bytes,
+            closing,
         };
         let replaced = self
             .by_device
@@ -82,9 +91,7 @@ impl Clients {
             .expect("link clients")
             .insert(info.device_id, client);
         if let Some(replaced) = replaced {
-            let _ = replaced
-                .sender
-                .send(Outgoing::Close(CLOSE_REPLACED, "replaced"));
+            let _ = replaced.closing.send(Some((CLOSE_REPLACED, "replaced")));
         }
         id
     }
@@ -126,10 +133,26 @@ impl Clients {
         let clients = self.by_device.lock().expect("link clients");
         let mut queued = 0;
         for client in clients.values() {
-            if device_id.is_none_or(|id| client.info.device_id == id)
-                && client.sender.send(Outgoing::Text(text.to_owned())).is_ok()
+            if device_id.is_some_and(|id| client.info.device_id != id)
+                || client.closing.borrow().is_some()
             {
+                continue;
+            }
+            let pending = client.pending_bytes.load(Ordering::Relaxed);
+            if text.len() > MAX_MESSAGE.saturating_sub(pending) {
+                let _ = client.closing.send(Some((CLOSE_GOING_AWAY, "slow client")));
+                continue;
+            }
+            client
+                .pending_bytes
+                .fetch_add(text.len(), Ordering::Relaxed);
+            if client.sender.try_send(text.to_owned()).is_ok() {
                 queued += 1;
+            } else {
+                client
+                    .pending_bytes
+                    .fetch_sub(text.len(), Ordering::Relaxed);
+                let _ = client.closing.send(Some((CLOSE_GOING_AWAY, "slow client")));
             }
         }
         queued
@@ -144,7 +167,7 @@ impl Clients {
             .expect("link clients")
             .remove(device_id);
         if let Some(client) = client {
-            let _ = client.sender.send(Outgoing::Close(code, reason));
+            let _ = client.closing.send(Some((code, reason)));
             return true;
         }
         false
@@ -161,8 +184,8 @@ impl Clients {
             .collect();
         for client in clients {
             let _ = client
-                .sender
-                .send(Outgoing::Close(CLOSE_GOING_AWAY, "server stopping"));
+                .closing
+                .send(Some((CLOSE_GOING_AWAY, "server stopping")));
         }
     }
 }
@@ -236,78 +259,90 @@ where
         return;
     };
     let device_id = device.device_id;
-    let (sender, mut outgoing) = mpsc::unbounded_channel();
-    let id = state.clients.insert(info, sender);
+    let (sender, mut outgoing) = mpsc::channel(MAX_OUTGOING);
+    let pending_bytes = Arc::new(AtomicUsize::new(0));
+    let (closing, mut closed) = watch::channel(None);
+    let id = state
+        .clients
+        .insert(info, sender, Arc::clone(&pending_bytes), closing);
     let welcome = object!({
         "type": "welcome",
         "serverId": state.shared.server_id,
         "name": state.name(),
         "protocol": 1,
     });
-    if socket
-        .send(Message::Text(welcome.to_string().into()))
-        .await
-        .is_err()
-    {
-        if state.clients.remove(&device_id, id) {
+    // Keep disconnects outside the write loop so even a blocked welcome,
+    // push or ping can be interrupted. Close signals bypass the text queue.
+    let reason = tokio::select! {
+        biased;
+        _ = state.shutdown.cancelled() => Some((CLOSE_GOING_AWAY, "server stopping")),
+        _ = closed.changed() => *closed.borrow(),
+        reason = async {
+            let timeout = state.tuning.idle_timeout;
+            if !send(&mut socket, Message::Text(welcome.to_string().into()), timeout).await {
+                return None;
+            }
+            state.store.touch(&device_id);
             state.emit_clients();
-        }
-        return;
-    }
-    state.store.touch(&device_id);
-    state.emit_clients();
 
-    let period = state.tuning.ping_interval;
-    let mut ping = tokio::time::interval_at(Instant::now() + period, period);
-    let mut last_heard = Instant::now();
-    loop {
-        tokio::select! {
-            _ = state.shutdown.cancelled() => {
-                close(&mut socket, CLOSE_GOING_AWAY, "server stopping").await;
-                break;
-            }
-            message = outgoing.recv() => match message {
-                Some(Outgoing::Text(text)) => {
-                    if socket.send(Message::Text(text.into())).await.is_err() {
-                        break;
-                    }
-                }
-                Some(Outgoing::Close(code, reason)) => {
-                    close(&mut socket, code, reason).await;
-                    break;
-                }
-                None => break,
-            },
-            message = socket.next() => match message {
-                Some(Ok(message)) => {
-                    last_heard = Instant::now();
-                    match message {
-                        Message::Text(text) => forward(&state, &device_id, text.as_str()),
-                        Message::Close(_) => {
-                            // Sends the close reply tungstenite queued.
-                            let _ = tokio::time::timeout(CLOSE_TIMEOUT, socket.flush()).await;
-                            break;
+            let period = state.tuning.ping_interval;
+            let mut ping = tokio::time::interval_at(Instant::now() + period, period);
+            let mut last_heard = Instant::now();
+            loop {
+                tokio::select! {
+                    message = outgoing.recv() => match message {
+                        Some(text) => {
+                            pending_bytes.fetch_sub(text.len(), Ordering::Relaxed);
+                            if !send(&mut socket, Message::Text(text.into()), timeout).await {
+                                return None;
+                            }
                         }
-                        // Pings are answered by tungstenite; binary is unused.
-                        _ => {}
+                        None => return None,
+                    },
+                    message = socket.next() => match message {
+                        Some(Ok(message)) => {
+                            last_heard = Instant::now();
+                            match message {
+                                Message::Text(text) => forward(&state, &device_id, text.as_str()),
+                                Message::Close(_) => {
+                                    // Sends the close reply tungstenite queued.
+                                    let _ = tokio::time::timeout(CLOSE_TIMEOUT, socket.flush()).await;
+                                    return None;
+                                }
+                                // Pings are answered by tungstenite; binary is unused.
+                                _ => {}
+                            }
+                        }
+                        Some(Err(_)) | None => return None,
+                    },
+                    _ = ping.tick() => {
+                        if last_heard.elapsed() >= timeout {
+                            return Some((CLOSE_GOING_AWAY, "idle"));
+                        }
+                        if !send(&mut socket, Message::Ping(Bytes::new()), timeout).await {
+                            return None;
+                        }
                     }
                 }
-                Some(Err(_)) | None => break,
-            },
-            _ = ping.tick() => {
-                if last_heard.elapsed() >= state.tuning.idle_timeout {
-                    close(&mut socket, CLOSE_GOING_AWAY, "idle").await;
-                    break;
-                }
-                if socket.send(Message::Ping(Bytes::new())).await.is_err() {
-                    break;
-                }
             }
-        }
+        } => reason,
+    };
+    if let Some((code, reason)) = reason {
+        close(&mut socket, code, reason).await;
     }
     if state.clients.remove(&device_id, id) {
         state.emit_clients();
     }
+}
+
+/// A client that stops reading must not retain its session indefinitely.
+async fn send<S>(socket: &mut WebSocketStream<S>, message: Message, timeout: Duration) -> bool
+where
+    S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
+{
+    tokio::time::timeout(timeout, socket.send(message))
+        .await
+        .is_ok_and(|result| result.is_ok())
 }
 
 /// The first text frame, skipping control frames.
@@ -376,3 +411,6 @@ where
     };
     let _ = tokio::time::timeout(CLOSE_TIMEOUT, socket.close(Some(frame))).await;
 }
+
+#[cfg(test)]
+mod tests;

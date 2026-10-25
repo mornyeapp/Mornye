@@ -267,11 +267,23 @@ class LinkClientSession implements LinkSession {
         scheme: origin.scheme == 'http' ? 'ws' : 'wss',
         path: linkSocketPath,
       );
-      socket = await _connectSocket(
-        uri,
-        _authorization,
-        _client,
-      ).timeout(_handshakeTimeout);
+      var expired = false;
+      socket = await _connectSocket(uri, _authorization, _client)
+          .then((opened) {
+            if (expired) {
+              unawaited(opened.close(1001).catchError((Object _) {}));
+            }
+            return opened;
+          })
+          .timeout(
+            _handshakeTimeout,
+            onTimeout: () {
+              expired = true;
+              throw TimeoutException(
+                'The computer did not open the link in time',
+              );
+            },
+          );
       if (attempt != _attempt) {
         unawaited(socket.close(1001).catchError((Object _) {}));
         return;

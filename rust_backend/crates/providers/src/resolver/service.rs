@@ -133,7 +133,7 @@ impl PlatformResolverService {
                 artist: hint.artist.clone(),
                 cached,
             };
-            let existing = state.flights.existing(&key);
+            let existing = state.flights.try_join(&key);
             let (flight, start) = if let Some(flight) = existing {
                 (flight, false)
             } else {
@@ -141,10 +141,10 @@ impl PlatformResolverService {
                     return Err(ResolverError::Busy);
                 }
                 let flight = Flight::new(());
+                flight.join();
                 state.flights.insert(key.clone(), Arc::clone(&flight));
                 (flight, true)
             };
-            flight.join();
             (key, flight, start)
         };
         let _waiter = Waiter::new(Arc::clone(&flight));

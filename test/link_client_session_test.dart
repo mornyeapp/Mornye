@@ -431,6 +431,45 @@ void main() {
       expect(sockets, hasLength(2));
     });
 
+    test(
+      'a socket opened after timeout is closed without disrupting retry',
+      () async {
+        final timers = _Timers();
+        final connecting = Completer<LinkSocket>();
+        final late = _FakeSocket();
+        final retry = _FakeSocket();
+        var attempts = 0;
+        final session = LinkClientSession(
+          server: _record('https://10.0.0.2:47710'),
+          apiKey: 'key-1',
+          device: _device,
+          ensureAccess: (_) async {},
+          timer: timers.call,
+          handshakeTimeout: const Duration(milliseconds: 10),
+          connectSocket: (_, _, _) =>
+              attempts++ == 0 ? connecting.future : Future.value(retry),
+        );
+        addTearDown(session.dispose);
+        final disconnected = session.connectionStates.firstWhere(
+          (state) => state == LinkConnectionState.disconnected,
+        );
+        session.start();
+        await disconnected.timeout(const Duration(seconds: 1));
+        await pumpEventQueue();
+        expect(timers.delays, [LinkClientSession.minBackoff]);
+
+        timers.last.fire();
+        await pumpEventQueue();
+        expect(session.connectionState, LinkConnectionState.connected);
+        connecting.complete(late);
+        await pumpEventQueue();
+        expect(late.closed, isTrue);
+        expect(late.sent, isEmpty);
+        expect(retry.closed, isFalse);
+        expect(session.connectionState, LinkConnectionState.connected);
+      },
+    );
+
     test('pause closes the link and resume reconnects at once', () async {
       final timers = _Timers();
       final sockets = <_FakeSocket>[];

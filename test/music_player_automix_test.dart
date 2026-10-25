@@ -357,6 +357,29 @@ void main() {
     );
   }
 
+  for (final action in ['pause', 'stop', 'dispose']) {
+    test('$action cancels a source that never finishes preparing', () async {
+      final gate = Completer<void>();
+      native.sourceGates['/one.flac'] = gate;
+      final first = handler.setQueueAndPlay(_tracks);
+      await _until(() => native.calls.any((c) => c.$2 == 'setSourceUrl'));
+      final cancel = switch (action) {
+        'pause' => handler.pause(),
+        'stop' => handler.stop(),
+        _ => handler.dispose(),
+      };
+      try {
+        await cancel.timeout(const Duration(seconds: 1));
+        await first;
+        expect(native.resumedSources, isEmpty);
+        expect(native.playing, isEmpty);
+      } finally {
+        gate.complete();
+        await Future.wait([first, cancel]);
+      }
+    });
+  }
+
   test('notification actions survive theme changes', () async {
     await handler.restoreSession(
       items: _tracks,

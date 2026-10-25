@@ -150,6 +150,59 @@ fn abandoning_all_waiters_cancels_work_without_negative_caching() {
 }
 
 #[test]
+fn rejecting_recursive_joins_releases_their_waiter_registrations() {
+    let gate = Arc::new(AtomicBool::new(false));
+    let service = service({
+        let gate = gate.clone();
+        move |_, _, check| {
+            wait_gate(&gate, check)?;
+            Ok(lyrics("LRCLIB"))
+        }
+    });
+    let cancelled = Arc::new(AtomicBool::new(false));
+    let worker = {
+        let service = service.clone();
+        let cancelled = cancelled.clone();
+        thread::spawn(move || {
+            service.fetch(request(), &|| {
+                if cancelled.load(Ordering::Acquire) {
+                    Err("cancelled".into())
+                } else {
+                    Ok(())
+                }
+            })
+        })
+    };
+    until(|| waiters(&service) == 1);
+    let caller = service
+        .inner
+        .state
+        .lock()
+        .unwrap()
+        .flights
+        .values()
+        .next()
+        .unwrap()
+        .tag()
+        .clone();
+    for _ in 0..3 {
+        let mut recursive = request();
+        recursive.caller = Some(caller.clone());
+        assert!(matches!(
+            service.fetch(recursive, &|| Ok(())),
+            Err(LyricsError::Recursive(_))
+        ));
+        assert_eq!(waiters(&service), 1);
+    }
+    cancelled.store(true, Ordering::Release);
+    assert!(matches!(
+        worker.join().unwrap(),
+        Err(LyricsError::Cancelled(_))
+    ));
+    until(|| service.inner.state.lock().unwrap().flights.active() == 0);
+}
+
+#[test]
 fn provider_priority_waits_within_grace_then_cancels_slow_workers() {
     let calls = Arc::new(AtomicUsize::new(0));
     let cancelled = Arc::new(AtomicBool::new(false));

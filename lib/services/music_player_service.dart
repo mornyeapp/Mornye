@@ -1935,6 +1935,7 @@ class MusicPlayerHandler extends BaseAudioHandler
     final generation = ++_playRequestGeneration;
     _switchingGeneration = 0;
     _userPaused = true;
+    await _player.cancelPreparation();
     await _autoMix.cancel();
     await _serializeSourceChange(() async {
       if (generation != _playRequestGeneration || _disposed) return;
@@ -1947,9 +1948,14 @@ class MusicPlayerHandler extends BaseAudioHandler
 
   @override
   Future<void> seek(Duration position) async {
+    final generation = _playRequestGeneration;
     await _autoMix.cancel();
-    await _player.seek(position);
-    _broadcastPosition(position, force: true);
+    await _serializeSourceChange(() async {
+      if (generation != _playRequestGeneration || _disposed) return;
+      await _player.seek(position);
+      if (generation != _playRequestGeneration || _disposed) return;
+      _broadcastPosition(position, force: true);
+    });
   }
 
   @override
@@ -2002,6 +2008,7 @@ class MusicPlayerHandler extends BaseAudioHandler
     final generation = ++_playRequestGeneration;
     _switchingGeneration = 0;
     _userPaused = true;
+    await _player.cancelPreparation();
     await _autoMix.cancel();
     await _serializeSourceChange(() => _stopSession(generation));
   }
@@ -2218,6 +2225,7 @@ class MusicPlayerHandler extends BaseAudioHandler
     await _automationVolumeSubscription?.cancel();
     await _automationDevicesSubscription?.cancel();
     await _playbackAutomation.dispose();
+    await _player.cancelPreparation();
     await _sourceChangeTail;
     await _autoMix.dispose();
     _haptics.dispose();

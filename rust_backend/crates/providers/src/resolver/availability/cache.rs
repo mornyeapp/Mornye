@@ -212,7 +212,7 @@ impl AvailabilityService {
             state.cache.remove(&key);
             let generation = state.generation;
             let flight_key = (generation, key.clone());
-            let existing = state.flights.existing(&flight_key);
+            let existing = state.flights.try_join(&flight_key);
             let (flight, start) = if let Some(flight) = existing {
                 (flight, false)
             } else {
@@ -220,10 +220,10 @@ impl AvailabilityService {
                     return Err(ResolverError::Busy);
                 }
                 let flight = Flight::new(());
+                flight.join();
                 state.flights.insert(flight_key, flight.clone());
                 (flight, true)
             };
-            flight.join();
             (key, generation, flight, start)
         };
         let _waiter = Waiter::new(flight.clone());

@@ -178,6 +178,7 @@ public class AudioService extends MediaBrowserServiceCompat {
     Bitmap loadArtBitmap(String artUriString, String loadThumbnailUri) {
         Bitmap bitmap = artBitmapCache.get(artUriString);
         if (bitmap != null) return bitmap;
+        ParcelFileDescriptor parcelFileDescriptor = null;
         try {
             // There are 3 cases handled by this function:
             //   1. content URI with openFileDescriptor
@@ -203,7 +204,7 @@ public class AudioService extends MediaBrowserServiceCompat {
                             return null;
                         }
                     } else {
-                        ParcelFileDescriptor parcelFileDescriptor = getContentResolver().openFileDescriptor(artUri, "r");
+                        parcelFileDescriptor = getContentResolver().openFileDescriptor(artUri, "r");
                         if (parcelFileDescriptor != null) {
                             fileDescriptor = parcelFileDescriptor.getFileDescriptor();
                         } else {
@@ -247,6 +248,14 @@ public class AudioService extends MediaBrowserServiceCompat {
         } catch (Exception e) {
             e.printStackTrace();
             return null;
+        } finally {
+            if (parcelFileDescriptor != null) {
+                try {
+                    parcelFileDescriptor.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
         }
     }
 
@@ -370,7 +379,6 @@ public class AudioService extends MediaBrowserServiceCompat {
         super.onDestroy();
         if (listener != null) {
             listener.onDestroy();
-            listener = null;
         }
         mediaMetadata = null;
         artBitmap = null;

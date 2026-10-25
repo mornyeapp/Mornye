@@ -330,6 +330,9 @@ public class AudioServicePlugin implements FlutterPlugin, ActivityAware {
             System.out.println("### destroying audio handler interface");
             audioHandlerInterface.destroy();
             audioHandlerInterface = null;
+            // The listener belongs to this engine. A service can be recreated
+            // while its Activity keeps the engine and handler alive.
+            AudioService.init(null);
         }
         flutterPluginBinding = null;
     }
