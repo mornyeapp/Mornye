@@ -196,7 +196,8 @@ class _PreviewDeck implements PlaybackDeck {
   @override
   Future<void> setPlaybackRate(double rate) async => calls.add('rate $rate');
   @override
-  Future<void> setNetworkSource(String url) async => calls.add('network $url');
+  Future<void> setNetworkSource(String url, {bool arriving = false}) async =>
+      calls.add('network $url');
   @override
   Future<void> setFileSource(
     String path, {

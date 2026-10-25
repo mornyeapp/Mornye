@@ -11,6 +11,13 @@ import 'package:mornye/services/playback_equalizer.dart';
 
 final _log = AppLogger('AudioOutput');
 
+/// [url] marked for the Darwin audioplayers fork as a file still arriving.
+/// The fork then prepares it without indexing its timing first, which would
+/// read to the end of a file still being written and time out (see
+/// third_party/audioplayers_darwin/MORNYE_PATCHES.md).
+@visibleForTesting
+String darwinArrivingUrl(String url) => '$url#mornye-arriving';
+
 /// Only verified native playback reports active. File metadata alone never does.
 final usbAudioStatus = ValueNotifier<UsbAudioStatus>(const UsbAudioStatus());
 
@@ -288,12 +295,18 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
   }
 
   @override
-  Future<void> setNetworkSource(String url) async {
+  Future<void> setNetworkSource(String url, {bool arriving = false}) async {
     await stop();
     _source = null;
     _routeLost = false;
     _nativeStarted = false;
-    await _setOrdinarySource(UrlSource(url));
+    await _setOrdinarySource(
+      UrlSource(
+        arriving && (Platform.isMacOS || Platform.isIOS)
+            ? darwinArrivingUrl(url)
+            : url,
+      ),
+    );
   }
 
   @override

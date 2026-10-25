@@ -110,7 +110,9 @@ abstract interface class PlaybackDeck {
   Future<void> setVolume(double volume);
   Future<void> setPlaybackRate(double rate);
 
-  Future<void> setNetworkSource(String url);
+  /// Loads [url]. [arriving] marks a file still being written behind it (a
+  /// song a paired phone is sending), which must start before it is whole.
+  Future<void> setNetworkSource(String url, {bool arriving = false});
 
   /// Loads a local file. The output flags request Android's native USB and
   /// exclusive paths; other decks ignore them, except that [requiresDsd]

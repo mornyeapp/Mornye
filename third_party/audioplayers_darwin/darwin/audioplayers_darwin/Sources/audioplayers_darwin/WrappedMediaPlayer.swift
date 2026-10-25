@@ -17,6 +17,10 @@ enum ReleaseMode: String {
 }
 
 @MainActor class WrappedMediaPlayer {
+  /// The URL fragment the app adds to a file still arriving
+  /// (`darwinArrivingUrl` in lib/services/music_playback_deck.dart).
+  static let arrivingFragment = "mornye-arriving"
+
   private(set) var eventHandler: AudioPlayersStreamHandler
   private(set) var isPlaying: Bool
   var releaseMode: ReleaseMode
@@ -195,9 +199,24 @@ enum ReleaseMode: String {
       throw AudioPlayerError.error("Url not valid: \(url)")
     }
 
+    // A file still being written (the app marks its URL) cannot be indexed:
+    // that reads to its end, which stalls until the upload ends and times out.
+    var assetUrl = parsedUrl
+    var arriving = false
+    if !isLocal, parsedUrl.fragment == Self.arrivingFragment,
+      var components = URLComponents(url: parsedUrl, resolvingAgainstBaseURL: false)
+    {
+      components.fragment = nil
+      if let unmarked = components.url {
+        assetUrl = unmarked
+        arriving = true
+      }
+    }
+
     // FLAC can otherwise seek to different audio while reporting the requested
     // time. Exact seek tolerances alone do not fix an approximate asset index.
-    var options: [String: Any] = [AVURLAssetPreferPreciseDurationAndTimingKey: true]
+    var options: [String: Any] =
+      arriving ? [:] : [AVURLAssetPreferPreciseDurationAndTimingKey: true]
     if let unwrappedMimeType = mimeType {
       if #available(iOS 17, macOS 14.0, *) {
         options[AVURLAssetOverrideMIMETypeKey] = unwrappedMimeType
@@ -205,7 +224,7 @@ enum ReleaseMode: String {
         options["AVURLAssetOutOfBandMIMETypeKey"] = unwrappedMimeType
       }
     }
-    let playerItem = AVPlayerItem(asset: AVURLAsset(url: parsedUrl, options: options))
+    let playerItem = AVPlayerItem(asset: AVURLAsset(url: assetUrl, options: options))
     playerItem.audioTimePitchAlgorithm = AVAudioTimePitchAlgorithm.timeDomain
     return playerItem
   }

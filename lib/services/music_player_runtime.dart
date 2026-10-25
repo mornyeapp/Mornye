@@ -481,6 +481,10 @@ class MusicPlayerRuntime {
   ({String url, Future<void> done})? arrivingFile(String path) =>
       _arriving[path];
 
+  /// Whether [url] streams a file that is still arriving.
+  bool streamsArrivingFile(String url) =>
+      _arriving.values.any((entry) => entry.url == url);
+
   /// Hands the system media session (notification, lock screen, headset and
   /// car buttons) to [remote] while it plays in this device's place, and
   /// back to this device's player when null. A Library song picked in the

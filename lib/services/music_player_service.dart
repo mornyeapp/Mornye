@@ -1464,7 +1464,10 @@ class MusicPlayerHandler extends BaseAudioHandler
     // A file still arriving resolves to its stream.
     if (media.isNetwork ||
         const {'http', 'https'}.contains(Uri.tryParse(path)?.scheme)) {
-      await _player.setNetworkSource(path);
+      await _player.setNetworkSource(
+        path,
+        arriving: _runtime.streamsArrivingFile(path),
+      );
     } else {
       await _player.setFileSource(
         path,

@@ -47,6 +47,15 @@ from tens of seconds earlier or later. This affects both macOS and iOS,
 including lyric taps and timeline scrubbing. Preparing a variable-bitrate
 network asset can take longer because its timing must be indexed.
 
+A URL with the fragment `#mornye-arriving` is the exception: the app marks
+a song a paired phone is still sending (Mornye Link), served over loopback
+HTTP while it is written. Indexing reads to the end of the file, which
+stalls until the upload ends, and AVPlayer fails with a request timeout
+when the upload is slower than about 2 MB/s. Such an asset is created
+without the precise key, from the URL without the fragment, so it starts
+at once; its seeks may be approximate until it plays again from the whole
+file.
+
 ### Packaging
 
 - `darwin/audioplayers_darwin.podspec` adds

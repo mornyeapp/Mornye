@@ -463,7 +463,8 @@ class MediaKitPlaybackDeck implements PlaybackDeck {
   Future<void> setPlaybackRate(double rate) => _engine.setSpeed(rate);
 
   @override
-  Future<void> setNetworkSource(String url) => _load(url);
+  Future<void> setNetworkSource(String url, {bool arriving = false}) =>
+      _load(url);
 
   @override
   Future<void> setFileSource(

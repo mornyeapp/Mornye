@@ -167,9 +167,9 @@ class ExclusiveOutputDeck implements PlaybackDeck {
   }
 
   @override
-  Future<void> setNetworkSource(String url) {
-    _source = (deck) => deck.setNetworkSource(url);
-    return _active.setNetworkSource(url);
+  Future<void> setNetworkSource(String url, {bool arriving = false}) {
+    _source = (deck) => deck.setNetworkSource(url, arriving: arriving);
+    return _active.setNetworkSource(url, arriving: arriving);
   }
 
   @override

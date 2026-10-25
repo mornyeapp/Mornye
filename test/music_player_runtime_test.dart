@@ -103,7 +103,8 @@ class _Deck implements PlaybackDeck {
   }
 
   @override
-  Future<void> setNetworkSource(String url) async => sources.add('stream $url');
+  Future<void> setNetworkSource(String url, {bool arriving = false}) async =>
+      sources.add('${arriving ? 'arriving' : 'stream'} $url');
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
@@ -922,7 +923,8 @@ void main() {
       done: arrived.future,
     );
     await handler.setQueueAndPlay([_track]);
-    expect(decks.single.sources, ['stream http://127.0.0.1:1/one.flac']);
+    // Marked, so AVPlayer starts it without reading to its unwritten end.
+    expect(decks.single.sources, ['arriving http://127.0.0.1:1/one.flac']);
 
     arrived.complete();
     await _settle();
