@@ -276,6 +276,8 @@ LinkPhoneSongPage mapLinkPhoneRows(List<Map<String, dynamic>> rows) {
       bitDepth: _positiveInt(item['bitDepth']),
       explicit: item['explicit'] == true || item['explicit'] == 1,
       coverId: cover?.id,
+      // A download keeps its cover's web address; the desktop fetches it.
+      coverUrl: cover == null && !local ? linkCoverUrl(item['coverUrl']) : null,
       // A rescan stamps every scanned row anew; the file's modification
       // time (ms) stays while the file does.
       addedMs: local

@@ -253,6 +253,20 @@ void main() {
         [for (final cover in catalog.covers) (cover.path, cover.ext)],
         [(jpeg, 'jpg'), (png, 'png'), (webp, 'webp')],
       );
+      // A download without a cover file sends its cover's web address.
+      expect(
+        [for (final song in catalog.songs) song.coverUrl],
+        [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          'https://images.example.com/a.jpg',
+          null,
+        ],
+      );
     });
   });
 

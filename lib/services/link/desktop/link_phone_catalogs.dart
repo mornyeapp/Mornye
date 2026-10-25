@@ -34,18 +34,59 @@ int? _intArg(Map<String, dynamic> args, String key) {
   return value is num ? value.toInt() : null;
 }
 
+/// Fetches a cover from its web address; null when it cannot.
+typedef LinkCoverFetcher = Future<Uint8List?> Function(Uri url);
+
+/// Fetches a cover of at most [LinkPhoneCatalogs.maxCoverBytes].
+Future<Uint8List?> _fetchCover(Uri url) async {
+  const timeout = Duration(seconds: 20);
+  final client = HttpClient()..connectionTimeout = const Duration(seconds: 10);
+  try {
+    final response = await (await client.getUrl(url)).close().timeout(timeout);
+    if (response.statusCode != HttpStatus.ok) return null;
+    final bytes = BytesBuilder(copy: false);
+    await for (final chunk in response.timeout(timeout)) {
+      bytes.add(chunk);
+      if (bytes.length > LinkPhoneCatalogs.maxCoverBytes) return null;
+    }
+    return bytes.takeBytes();
+  } finally {
+    client.close(force: true);
+  }
+}
+
+/// `jpg`, `png` or `webp` from an image's first bytes, else null.
+String? _imageExtension(Uint8List bytes) {
+  bool starts(int offset, List<int> magic) {
+    if (bytes.length < offset + magic.length) return false;
+    for (var i = 0; i < magic.length; i++) {
+      if (bytes[offset + i] != magic[i]) return false;
+    }
+    return true;
+  }
+
+  if (starts(0, const [0xFF, 0xD8, 0xFF])) return 'jpg';
+  if (starts(0, const [0x89, 0x50, 0x4E, 0x47])) return 'png';
+  if (starts(0, ascii.encode('RIFF')) && starts(8, ascii.encode('WEBP'))) {
+    return 'webp';
+  }
+  return null;
+}
+
 /// The song lists and covers paired phones send for the desktop's Library
 /// (contract 12.2 and 12.3). Each phone has a folder named after its
 /// [linkPhoneSourceId] under [root]: `catalog.ndjson` (a `{"version"}` line,
-/// then one [LinkPhoneSong] per line) and `covers/<coverId>.<ext>`.
+/// then one [LinkPhoneSong] per line) and `covers/<coverKey>.<ext>`.
 class LinkPhoneCatalogs {
   LinkPhoneCatalogs({
     required Future<Directory> Function() root,
     required Future<bool> Function(String deviceId) paired,
     void Function(String deviceId)? onCommit,
+    LinkCoverFetcher? fetchCover,
   }) : _root = root,
        _paired = paired,
-       _onCommit = onCommit;
+       _onCommit = onCommit,
+       _fetch = fetchCover ?? _fetchCover;
 
   /// The most songs a phone may list.
   static const maxSongs = 100000;
@@ -65,6 +106,7 @@ class LinkPhoneCatalogs {
   final Future<Directory> Function() _root;
   final Future<bool> Function(String deviceId) _paired;
   final void Function(String deviceId)? _onCommit;
+  final LinkCoverFetcher _fetch;
   final _uploads = <String, _Upload>{};
   final _versions = <String, String?>{};
   final _coverBytes = <String, int>{};
@@ -164,7 +206,90 @@ class LinkPhoneCatalogs {
     _versions[sourceId] = version;
     await _pruneCovers(sourceId, upload.coverIds);
     _onCommit?.call(deviceId);
+    final coverUrls = upload.coverUrls;
+    if (coverUrls.isNotEmpty) {
+      // The phone's request does not wait for them.
+      unawaited(
+        _serial(sourceId, () => _fetchCovers(deviceId, sourceId, coverUrls)),
+      );
+    }
     return const {'ok': true};
+  }
+
+  /// Fetches the covers of [urls] (by cover key) not held yet, then shows
+  /// the phone's songs again when any arrived.
+  Future<void> _fetchCovers(
+    String deviceId,
+    String sourceId,
+    Map<String, String> urls,
+  ) async {
+    final held = await coverPaths(sourceId);
+    final missing = [
+      for (final MapEntry(:key, :value) in urls.entries)
+        if (!held.containsKey(key)) (id: key, url: Uri.parse(value)),
+    ];
+    if (missing.isEmpty) return;
+    final folder = '${await _folder(sourceId)}/covers';
+    await Directory(folder).create(recursive: true);
+    var stored = await _storedBytes(sourceId, held);
+    var added = 0;
+    try {
+      // A few at a time, so a large first list does not flood the network.
+      fetching:
+      for (var start = 0; start < missing.length; start += 4) {
+        final batch = missing.skip(start).take(4).toList();
+        final fetched = await Future.wait([
+          for (final cover in batch)
+            _fetch(
+              cover.url,
+            ).then<Uint8List?>((bytes) => bytes, onError: (Object _) => null),
+        ]);
+        for (var i = 0; i < batch.length; i++) {
+          final bytes = fetched[i];
+          final ext = bytes == null || bytes.length > maxCoverBytes
+              ? null
+              : _imageExtension(bytes);
+          if (ext == null) continue;
+          if (stored + bytes!.length > maxCoverStore) {
+            _log.w('Phone covers are over their limit; leaving the rest out');
+            break fetching;
+          }
+          await _writeCover(folder, batch[i].id, ext, bytes);
+          stored += bytes.length;
+          added++;
+        }
+      }
+    } on Object catch (error) {
+      _log.w('Could not fetch the phone songs\' covers: $error');
+    } finally {
+      _coverBytes[sourceId] = stored;
+    }
+    if (added > 0) _onCommit?.call(deviceId);
+  }
+
+  /// The bytes of the covers held for the phone [sourceId].
+  Future<int> _storedBytes(String sourceId, Map<String, String> held) async {
+    if (_coverBytes[sourceId] case final bytes?) return bytes;
+    var bytes = 0;
+    for (final path in held.values) {
+      try {
+        bytes += await File(path).length();
+      } on FileSystemException {
+        // Removed meanwhile.
+      }
+    }
+    return bytes;
+  }
+
+  Future<void> _writeCover(
+    String folder,
+    String id,
+    String ext,
+    Uint8List bytes,
+  ) async {
+    final staged = File('$folder/.$id.$ext.tmp');
+    await staged.writeAsBytes(bytes, flush: true);
+    await staged.rename('$folder/$id.$ext');
   }
 
   Future<Object?> _covers(LinkRequest request) async {
@@ -193,19 +318,7 @@ class LinkPhoneCatalogs {
     final folder = '${await _folder(sourceId)}/covers';
     await Directory(folder).create(recursive: true);
     final held = await coverPaths(sourceId);
-    var stored =
-        _coverBytes[sourceId] ??
-        await () async {
-          var bytes = 0;
-          for (final path in held.values) {
-            try {
-              bytes += await File(path).length();
-            } on FileSystemException {
-              // Removed meanwhile.
-            }
-          }
-          return bytes;
-        }();
+    var stored = await _storedBytes(sourceId, held);
     try {
       for (final cover in covers) {
         if (cover is! Map) continue;
@@ -230,11 +343,8 @@ class LinkPhoneCatalogs {
           _log.w('Phone covers are over their limit; leaving the rest out');
           break;
         }
-        final path = '$folder/$id.$ext';
-        final staged = File('$folder/.$id.$ext.tmp');
-        await staged.writeAsBytes(bytes, flush: true);
-        await staged.rename(path);
-        held[id] = path;
+        await _writeCover(folder, id, ext as String, bytes);
+        held[id] = '$folder/$id.$ext';
         stored += bytes.length;
       }
     } finally {
@@ -427,7 +537,12 @@ class _Upload {
   final File file;
   final String version;
   final int total;
+
+  /// The cover keys the songs name.
   final coverIds = <String>{};
+
+  /// The web addresses of covers the phone holds no file of, by cover key.
+  final coverUrls = <String, String>{};
 
   /// The offset of the next page.
   int next = 0;
@@ -450,7 +565,10 @@ class _Upload {
       final line = jsonEncode(song.toJson());
       if (line.length > LinkPhoneCatalogs.maxSongLine) continue;
       buffer.writeln(line);
-      if (song.coverId case final coverId?) coverIds.add(coverId);
+      if (song.coverKey case final key?) {
+        coverIds.add(key);
+        if (song.coverId == null) coverUrls[key] = song.coverUrl!;
+      }
     }
     if (buffer.isNotEmpty) {
       await file.writeAsString(

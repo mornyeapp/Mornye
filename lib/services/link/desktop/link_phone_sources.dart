@@ -116,7 +116,7 @@ class LinkPhoneSources implements NetworkVirtualSources {
     await for (final song in _catalogs.songs(id)) {
       // The desktop's own copy stands for it.
       if (index?.songIdForRef(linkPhoneSongRef(song)) != null) continue;
-      final cover = covers[song.coverId];
+      final cover = covers[song.coverKey];
       yield (
         path: song.name,
         tags: linkPhoneSongTags(song, coverPath: cover),
@@ -271,10 +271,10 @@ class LinkPhoneSources implements NetworkVirtualSources {
       await sending.done.then<void>((_) {}, onError: (Object _) {});
     }
     final song = await _catalogs.song(id, fileId);
-    final coverId = song?.coverId;
-    final cover = coverId == null
+    final coverKey = song?.coverKey;
+    final cover = coverKey == null
         ? null
-        : await _catalogs.coverPath(id, coverId);
+        : await _catalogs.coverPath(id, coverKey);
     final received = (await linkReceivedFiles(_receivedDir()))[fileId];
     if (received != null) {
       try {

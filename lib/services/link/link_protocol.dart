@@ -69,6 +69,19 @@ String linkPhoneSourceId(String deviceId) =>
 bool isLinkPhoneSourceId(String id) =>
     RegExp(r'^link-phone-[0-9a-f]{16}$').hasMatch(id);
 
+/// The id the desktop keeps a cover fetched from [url] under: the first 32
+/// hex characters of its SHA-256.
+String linkCoverUrlId(String url) =>
+    sha256.convert(utf8.encode(url)).toString().substring(0, 32);
+
+/// [value] when it is an `https` address of at most 2048 characters.
+String? linkCoverUrl(Object? value) {
+  if (value is! String || value.length > 2048) return null;
+  final uri = Uri.tryParse(value.trim());
+  if (uri == null || uri.scheme != 'https' || uri.host.isEmpty) return null;
+  return uri.toString();
+}
+
 /// Forwarded `/mornye/v1` operations (the path after [linkApiPath]).
 abstract final class LinkOps {
   static const state = 'state';
@@ -290,6 +303,7 @@ class LinkPhoneSong {
     this.bitDepth,
     this.explicit = false,
     this.coverId,
+    this.coverUrl,
     this.addedMs,
   });
 
@@ -320,10 +334,21 @@ class LinkPhoneSong {
 
   /// The cover sent with `phone/covers`: 32 lowercase hex characters.
   final String? coverId;
+
+  /// The `https` address of the cover when the phone holds no cover file,
+  /// as for a downloaded song; the desktop fetches it.
+  final String? coverUrl;
   final int? addedMs;
 
   /// The upload name: `<fileId>.<suffix>`.
   String get name => '$fileId.$suffix';
+
+  /// The id the desktop keeps the cover under: [coverId], else the
+  /// [linkCoverUrlId] of [coverUrl].
+  String? get coverKey {
+    final url = coverUrl;
+    return coverId ?? (url == null ? null : linkCoverUrlId(url));
+  }
 
   Map<String, dynamic> toJson() => {
     'fileId': fileId,
@@ -344,6 +369,7 @@ class LinkPhoneSong {
     if (bitDepth != null) 'bitDepth': bitDepth,
     if (explicit) 'explicit': true,
     if (coverId != null) 'coverId': coverId,
+    if (coverUrl != null) 'coverUrl': coverUrl,
     if (addedMs != null) 'addedMs': addedMs,
   };
 
@@ -381,6 +407,7 @@ class LinkPhoneSong {
         final coverId? when isLinkFileId(coverId) => coverId,
         _ => null,
       },
+      coverUrl: linkCoverUrl(json['coverUrl']),
       addedMs: _int(json['addedMs']),
     );
   }

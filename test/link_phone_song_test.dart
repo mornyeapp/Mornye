@@ -31,6 +31,34 @@ void main() {
     expect(copy.name, '$fileId.flac');
   });
 
+  test('a cover address is https only and keys the cover', () {
+    final fileId = linkFileIdFor('/music/song.flac', 1234);
+    const url = 'https://images.example.com/a.jpg';
+    final song = LinkPhoneSong.fromJson({
+      'fileId': fileId,
+      'suffix': 'flac',
+      'title': 'Song',
+      'coverUrl': url,
+    })!;
+    expect(song.coverUrl, url);
+    expect(song.coverKey, linkCoverUrlId(url));
+    expect(isLinkFileId(song.coverKey), isTrue);
+    expect(LinkPhoneSong.fromJson(song.toJson())!.coverUrl, url);
+
+    final coverId = linkFileIdFor('/covers/a.jpg', 56);
+    final both = LinkPhoneSong.fromJson({
+      ...song.toJson(),
+      'coverId': coverId,
+    })!;
+    expect(both.coverKey, coverId);
+    for (final bad in ['http://images.example.com/a.jpg', 'file:///a.jpg']) {
+      expect(
+        LinkPhoneSong.fromJson({...song.toJson(), 'coverUrl': bad})!.coverUrl,
+        isNull,
+      );
+    }
+  });
+
   test('a phone song needs a file id, a known suffix and a title', () {
     final fileId = linkFileIdFor('content://media/1', 0);
     final valid = {'fileId': fileId, 'suffix': 'MP3', 'title': 'Song'};

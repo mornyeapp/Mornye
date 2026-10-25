@@ -279,6 +279,53 @@ void main() {
         coverB: '${root.path}/$sourceId/covers/$coverB.png',
       });
     });
+
+    test('covers named by address are fetched after the commit', () async {
+      const fetchedUrl = 'https://images.example.com/a.jpg';
+      const missingUrl = 'https://images.example.com/gone.jpg';
+      const textUrl = 'https://images.example.com/page.html';
+      final fetched = <Uri>[];
+      catalogs = LinkPhoneCatalogs(
+        root: () async => root,
+        paired: (deviceId) async => paired.contains(deviceId),
+        onCommit: commits.add,
+        fetchCover: (url) async {
+          fetched.add(url);
+          return switch (url.toString()) {
+            fetchedUrl => base64Decode(jpeg),
+            textUrl => utf8.encode('<html>'),
+            _ => throw const SocketException('unreachable'),
+          };
+        },
+      )..register(router = LinkHostRouter());
+      Map<String, dynamic> withUrl(int i, String url) => {
+        ..._song(i),
+        'coverUrl': url,
+      };
+
+      await page(0, 3, [
+        withUrl(1, fetchedUrl),
+        withUrl(2, missingUrl),
+        withUrl(3, textUrl),
+      ]);
+      expect(commits, [_phone]);
+      await pumpEventQueue();
+      final key = linkCoverUrlId(fetchedUrl);
+      expect(fetched, hasLength(3));
+      expect(await catalogs.coverPaths(sourceId), {
+        key: '${root.path}/$sourceId/covers/$key.jpg',
+      });
+      // The songs show again with the cover.
+      expect(commits, [_phone, _phone]);
+
+      // A cover held already is not fetched again, and a commit keeps it.
+      fetched.clear();
+      await page(0, 1, [withUrl(1, fetchedUrl)], version: 'v2');
+      await pumpEventQueue();
+      expect(fetched, isEmpty);
+      expect(await catalogs.coverPath(sourceId, key), isNotNull);
+      expect(commits, [_phone, _phone, _phone]);
+    });
   });
 
   test('remembers the Library source and removes everything', () async {
