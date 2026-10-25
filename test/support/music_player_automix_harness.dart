@@ -91,6 +91,7 @@ class AudioNative {
   final sourceContents = <String, String>{};
   final preparedContents = <String, String>{};
   final sourceGates = <String, Completer<void>>{};
+  final releases = <String, int>{};
   final sourceFailures = <String>{};
   final resumeFailures = <String>{};
   bool failResumeMethod = false;
@@ -137,7 +138,10 @@ class AudioNative {
             );
           case 'setSourceUrl':
             final source = args['url']! as String;
+            final released = releases[id];
             await sourceGates[source]?.future;
+            // A release meanwhile reset the player and its old prepare.
+            if (releases[id] != released) return null;
             if (sourceFailures.contains(source)) {
               unawaited(error(id));
               return null;
@@ -178,6 +182,7 @@ class AudioNative {
             playing.remove(id);
             clocks[id]?.stop();
           case 'release':
+            releases[id] = (releases[id] ?? 0) + 1;
             playing.remove(id);
             sources.remove(id);
             preparedContents.remove(id);

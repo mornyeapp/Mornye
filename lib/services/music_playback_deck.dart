@@ -207,6 +207,7 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
   bool _polling = false;
   bool _direct = false;
   bool _preparing = false;
+  Completer<void>? _ordinaryPreparation;
   bool _disposed = false;
   int _token = 0;
   Duration? _duration;
@@ -225,6 +226,11 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
   @override
   Future<void> cancelPreparation() async {
     if (_preparing) await stop();
+    final preparation = _ordinaryPreparation;
+    if (preparation == null) return;
+    _ordinaryPreparation = null;
+    preparation.complete();
+    await _ordinary.release();
   }
 
   @override
@@ -392,7 +398,17 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
     // reuse the previous MediaPlayer or its pending preparation callbacks.
     await _ordinary.release();
     _ordinaryError = null;
-    await _ordinary.setSource(source);
+    final abandoned = _ordinaryPreparation = Completer<void>();
+    try {
+      // A network source waits for its server, up to the plugin's prepare
+      // timeout; a newer song abandons it instead of queueing behind it.
+      await Future.any([_ordinary.setSource(source), abandoned.future]);
+    } finally {
+      if (identical(_ordinaryPreparation, abandoned)) {
+        _ordinaryPreparation = null;
+      }
+    }
+    if (abandoned.isCompleted) return;
     await _syncEqualizer();
   }
 

@@ -348,6 +348,10 @@ class LinkClientController extends Notifier<LinkClientState> {
       issue: session.issue,
       clearIssue: session.issue == null,
     );
+    _library.setReachable(
+      session.server.connectionId,
+      reachable: session.issue != LinkSessionIssue.unreachable,
+    );
     _updateDiscovery();
   }
 

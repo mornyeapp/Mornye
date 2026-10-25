@@ -148,9 +148,16 @@ class FakeLinkBridge implements LinkLibraryBridge {
   final connections = <String, NetworkConnection>{};
   final calls = <String>[];
 
+  /// The latest reachability reported for each connection.
+  final reachable = <String, bool>{};
+
   @override
   Future<NetworkConnection?> connection(String connectionId) async =>
       connections[connectionId];
+
+  @override
+  void setReachable(String connectionId, {required bool reachable}) =>
+      this.reachable[connectionId] = reachable;
 
   @override
   Future<void> saveConnection(NetworkConnection connection) async {

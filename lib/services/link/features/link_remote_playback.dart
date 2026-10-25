@@ -8,6 +8,7 @@ import 'package:mornye/services/link/features/link_desktop_remote.dart';
 import 'package:mornye/services/link/features/link_handoff.dart';
 import 'package:mornye/services/link/features/link_phone_features.dart';
 import 'package:mornye/services/link/features/link_track_resolver.dart';
+import 'package:mornye/services/link/link_client_api.dart';
 import 'package:mornye/services/link/link_protocol.dart';
 import 'package:mornye/services/playable_media.dart';
 import 'package:mornye/services/remote_playback.dart';
@@ -18,12 +19,29 @@ final _log = AppLogger('LinkRemotePlayback');
 /// Whether the paired desktop plays in this phone's place, as after Play on
 /// desktop. The phone takes over again after Continue on this phone, when
 /// the desktop is unpaired, and when the phone's own player starts, such as
-/// for a Library song picked in the car. The notification and headset
-/// drive the desktop meanwhile.
+/// for a Library song picked in the car. It also takes over when the
+/// desktop cannot be reached, so songs picked then play here instead of
+/// waiting for it. The notification and headset drive the desktop
+/// meanwhile.
 class LinkPlaysOnDesktop extends Notifier<bool> {
   @override
   bool build() {
-    if (ref.watch(linkPhoneClientProvider) == null) return false;
+    final client = ref.watch(linkPhoneClientProvider);
+    if (client == null) return false;
+    // A failed attempt goes from connecting to disconnected. The session
+    // pausing in the background disconnects a connected one instead, which
+    // keeps the desktop.
+    var connection = client.connectionState;
+    final connections = client.connectionStates.listen((next) {
+      final was = connection;
+      connection = next;
+      if (was == LinkConnectionState.connecting &&
+          next == LinkConnectionState.disconnected &&
+          state) {
+        state = false;
+      }
+    });
+    ref.onDispose(connections.cancel);
     bool? playing;
     final subscription = ref
         .watch(musicPlayerRuntimeProvider)

@@ -240,6 +240,11 @@ class NetworkStorageService {
   final Future<void> Function(String) _write;
   final Future<void> Function(Uri) _ensureAccess;
   static const timeout = Duration(seconds: 20);
+  static const _probeTimeout = Duration(seconds: 3);
+  static const _probeReuse = Duration(seconds: 10);
+
+  /// Connections known to be out of reach, with when a probe last failed.
+  final _unreachable = <String, DateTime?>{};
   Future<List<NetworkConnection>>? _loading;
   List<NetworkConnection>? _connections;
   Future<HttpServer>? _server;
@@ -379,7 +384,9 @@ class NetworkStorageService {
     }
     final path = networkPath(uri.pathSegments.join('/'));
     final c = await connection(uri.host);
-    await _ensureAccess(networkTarget(c, path));
+    final target = networkTarget(c, path);
+    await _ensureAccess(target);
+    await _checkReachable(c.id, target);
     _server ??= HttpServer.bind(InternetAddress.loopbackIPv4, 0).then((server) {
       server.listen((request) => unawaited(_serve(request)));
       return server;
@@ -397,6 +404,42 @@ class NetworkStorageService {
     }
     _routes[token] = (id: uri.host, path: path);
     return 'http://127.0.0.1:${server.port}/$token';
+  }
+
+  /// Marks connection [id] out of reach, as a paired Mornye Link desktop
+  /// whose session cannot connect, or reachable again. Songs of a marked
+  /// connection check its server briefly before playing instead of
+  /// waiting [timeout] for it.
+  void setReachable(String id, {required bool reachable}) {
+    if (reachable) {
+      _unreachable.remove(id);
+    } else {
+      _unreachable.putIfAbsent(id, () => null);
+    }
+  }
+
+  /// Throws at once for a connection marked out of reach, unless its
+  /// server accepts a connection again. A failed check is reused briefly
+  /// so a song and its cover wait for one check.
+  Future<void> _checkReachable(String id, Uri target) async {
+    if (!_unreachable.containsKey(id) || target.port == 0) return;
+    final failedAt = _unreachable[id];
+    if (failedAt == null || DateTime.now().difference(failedAt) > _probeReuse) {
+      try {
+        final socket = await Socket.connect(
+          target.host,
+          target.port,
+          timeout: _probeTimeout,
+        );
+        socket.destroy();
+        _unreachable.remove(id);
+        return;
+      } on SocketException {
+        if (!_unreachable.containsKey(id)) return;
+        _unreachable[id] = DateTime.now();
+      }
+    }
+    throw const SocketException('The server cannot be reached');
   }
 
   Future<NetworkSmbClient> _smb(NetworkConnection c, Uri target) async {

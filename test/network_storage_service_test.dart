@@ -337,6 +337,25 @@ void main() {
       },
     );
 
+    test('a server marked out of reach fails fast until it answers', () async {
+      final closed = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+      final port = closed.port;
+      await closed.close();
+      await service.save(connection('http://127.0.0.1:$port/', id: 'gone'));
+      await service.save(connection('$origin/music/'));
+      final gone = NetworkStorageService.source('gone', 'A B.flac');
+      final back = NetworkStorageService.source('server', 'A B.flac');
+
+      service.setReachable('gone', reachable: false);
+      await expectLater(service.resolve(gone), throwsA(isA<SocketException>()));
+      service.setReachable('gone', reachable: true);
+      expect(await service.resolve(gone), startsWith('http://127.0.0.1:'));
+
+      // A server that answers again plays as usual.
+      service.setReachable('server', reachable: false);
+      expect(await service.resolve(back), startsWith('http://127.0.0.1:'));
+    });
+
     test(
       'authenticated listing, proxy range seek, HEAD, and revocation',
       () async {

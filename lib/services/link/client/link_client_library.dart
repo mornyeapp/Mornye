@@ -19,6 +19,10 @@ abstract interface class LinkLibraryBridge {
   /// Points the connection at the desktop's new `https://host:port`.
   Future<void> updateAddress(String connectionId, String address);
 
+  /// Whether the session reaches the desktop; its songs fail quickly while
+  /// it does not.
+  void setReachable(String connectionId, {required bool reachable});
+
   /// Adds the connection's root to Library and scans it, as the network
   /// storage screen does after adding a Subsonic server.
   Future<void> addLibrarySource(NetworkConnection connection);
@@ -80,6 +84,10 @@ class LinkNetworkLibraryBridge implements LinkLibraryBridge {
       ),
     );
   }
+
+  @override
+  void setReachable(String connectionId, {required bool reachable}) =>
+      _storage.setReachable(connectionId, reachable: reachable);
 
   @override
   Future<void> addLibrarySource(NetworkConnection connection) async {

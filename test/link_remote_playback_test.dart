@@ -12,6 +12,7 @@ import 'package:mornye/services/link/features/link_phone_files.dart';
 import 'package:mornye/services/link/features/link_remote_playback.dart';
 import 'package:mornye/services/link/features/link_track_refs.dart';
 import 'package:mornye/services/link/features/link_track_resolver.dart';
+import 'package:mornye/services/link/link_client_api.dart';
 import 'package:mornye/services/link/link_protocol.dart';
 import 'package:mornye/services/music_player_service.dart';
 import 'package:mornye/services/remote_playback.dart';
@@ -348,6 +349,21 @@ void main() {
       expect(phone.read(linkPlaysOnDesktopProvider), isTrue);
 
       runtime.states.add(PlaybackState(playing: true));
+      expect(phone.read(linkPlaysOnDesktopProvider), isFalse);
+    });
+
+    test('the phone takes over when the desktop cannot be reached', () {
+      phone.listen(linkPlaysOnDesktopProvider, (_, _) {});
+      phone.read(linkPlaysOnDesktopProvider.notifier).set(true);
+      // The session pauses in the background and reconnects on return.
+      client.setConnection(LinkConnectionState.disconnected);
+      client.setConnection(LinkConnectionState.connecting);
+      client.setConnection(LinkConnectionState.connected);
+      expect(phone.read(linkPlaysOnDesktopProvider), isTrue);
+
+      client.setConnection(LinkConnectionState.disconnected);
+      client.setConnection(LinkConnectionState.connecting);
+      client.setConnection(LinkConnectionState.disconnected);
       expect(phone.read(linkPlaysOnDesktopProvider), isFalse);
     });
 

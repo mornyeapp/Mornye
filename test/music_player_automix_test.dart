@@ -324,6 +324,20 @@ void main() {
     expect(native.resumedSources, ['/two.flac']);
   });
 
+  test('a song still preparing does not hold up the next one', () async {
+    // A server that never answers keeps the first song preparing.
+    final gate = Completer<void>();
+    native.sourceGates['/one.flac'] = gate;
+    final first = handler.setQueueAndPlay(_tracks);
+    await _until(() => native.calls.any((c) => c.$2 == 'setSourceUrl'));
+    await handler.skipToNext();
+    await first;
+    expect(handler.mediaItem.value?.id, 'two');
+    expect(native.sources['music-player'], '/two.flac');
+    expect(native.resumedSources, ['/two.flac']);
+    gate.complete();
+  });
+
   for (final stop in [false, true]) {
     test(
       'a pending prepare cannot resume after ${stop ? 'stop' : 'pause'}',

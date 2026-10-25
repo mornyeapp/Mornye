@@ -220,6 +220,7 @@ void main() {
     await pumpEventQueue();
     expect(harness.state.connection, LinkConnectionState.connected);
     expect(harness.browser.stopped, 1);
+    expect(harness.bridge.reachable[record.connectionId], isTrue);
 
     session.emit(
       LinkConnectionState.disconnected,
@@ -228,6 +229,8 @@ void main() {
     await pumpEventQueue();
     expect(harness.state.issue, LinkSessionIssue.unreachable);
     expect(harness.browser.started, 2);
+    // The desktop's songs fail quickly while it cannot be reached.
+    expect(harness.bridge.reachable[record.connectionId], isFalse);
 
     // Seen again at the same address: reconnect at once.
     harness.browser.resolve('a', '10.0.0.2');
