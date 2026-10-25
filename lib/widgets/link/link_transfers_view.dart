@@ -326,7 +326,10 @@ class _TransferGroup extends StatelessWidget {
     return SliverLayoutBuilder(
       builder: (context, constraints) => SliverPadding(
         padding: EdgeInsets.symmetric(
-          horizontal: settingsHorizontalInset(constraints.crossAxisExtent),
+          horizontal: settingsHorizontalInset(
+            context,
+            constraints.crossAxisExtent,
+          ),
           vertical: 4,
         ),
         sliver: group,
