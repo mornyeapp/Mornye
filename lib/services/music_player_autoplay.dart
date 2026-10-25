@@ -481,21 +481,27 @@ class _AutoplayRanking {
 List<PlayableMedia> _rankPersonalizedAutoplay(_AutoplayRanking input) {
   final model = input.model;
   final learningSeed = _learningTrack(input.seed);
+  final random = Random(input.randomSeed);
+  final exploration = model?.explore(Random(random.nextInt(1 << 31)));
   return selectAutoplayTracks(
     seed: input.seed,
     candidates: input.candidates,
     upcoming: input.upcoming,
     recent: input.recent,
     dismissedSources: input.dismissed,
-    random: Random(input.randomSeed),
+    random: random,
     limit: input.limit,
     preferenceAdjustment: model == null
         ? null
-        : (track) => model.rankAdjustment(
-            _learningTrack(track),
-            previous: learningSeed,
-            at: input.at,
-          ),
+        : (track) {
+            final learning = _learningTrack(track);
+            return model.rankAdjustment(
+                  learning,
+                  previous: learningSeed,
+                  at: input.at,
+                ) +
+                exploration!.adjustment(learning);
+          },
     signals: input.signals,
   );
 }

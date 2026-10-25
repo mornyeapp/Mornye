@@ -285,6 +285,78 @@ void main() {
     },
   );
 
+  test('Thompson sampling explores little-heard artists, not skipped ones', () {
+    final model = AutoplayPreferenceModel();
+    AutoplayLearningTrack song(String artist, int i) => AutoplayLearningTrack(
+      source: '/$artist$i',
+      title: '$i',
+      artist: artist,
+    );
+    for (var i = 0; i < 6; i++) {
+      model.learn(song('Skipped', i), at: _at, reward: 0, weight: 1.5);
+      model.learn(song('Liked', i), at: _at, reward: 1);
+    }
+    for (var i = 0; i < 8; i++) {
+      model.learn(song('Other $i', i), at: _at, reward: 0.75);
+    }
+    (double, double) spread(String artist) {
+      final draws = [
+        for (var i = 0; i < 400; i++)
+          model.explore(Random(i)).adjustment(song(artist, 99)),
+      ];
+      final mean = draws.reduce((a, b) => a + b) / draws.length;
+      final variance =
+          draws.map((d) => (d - mean) * (d - mean)).reduce((a, b) => a + b) /
+          draws.length;
+      return (mean, sqrt(variance));
+    }
+
+    final (skipped, _) = spread('Skipped');
+    final (liked, likedSpread) = spread('Liked');
+    final (unheard, unheardSpread) = spread('Unheard');
+    expect(skipped, lessThan(-1.5));
+    expect(liked, greaterThan(1.5));
+    expect(unheard.abs(), lessThan(0.3));
+    // An unheard artist sometimes outranks a liked one.
+    expect(unheardSpread, greaterThan(2 * likedSpread));
+    // One draw per artist and refill.
+    final exploration = model.explore(Random(1));
+    expect(
+      exploration.adjustment(song('Unheard', 1)),
+      exploration.adjustment(song('unheard ', 2)),
+    );
+  });
+
+  test('the arms are bounded, persisted and read from older models', () {
+    final model = AutoplayPreferenceModel();
+    for (var i = 0; i < AutoplayPreferenceModel.maxArms + 100; i++) {
+      model.learn(
+        AutoplayLearningTrack(source: '/$i', title: '$i', artist: 'Artist $i'),
+        at: _at,
+        reward: i.isEven ? 1 : 0,
+      );
+    }
+    expect(model.arms, AutoplayPreferenceModel.maxArms);
+    final raw = model.encode();
+    expect(raw.length, lessThan(140000));
+    final restored = AutoplayPreferenceModel.decode(raw);
+    expect(restored.arms, model.arms);
+    expect(restored.encode(), raw);
+    final older = jsonDecode(raw) as Map<String, dynamic>
+      ..['version'] = 1
+      ..remove('arms');
+    final upgraded = AutoplayPreferenceModel.decode(jsonEncode(older));
+    expect(upgraded.observations, model.observations);
+    expect(upgraded.arms, 0);
+    expect(
+      upgraded.preference(_jazz, previous: _rock, at: _at),
+      model.preference(_jazz, previous: _rock, at: _at),
+    );
+    final bad = jsonDecode(raw) as Map<String, dynamic>;
+    bad['arms'] = base64Encode(Uint8List(13));
+    expect(AutoplayPreferenceModel.decode(jsonEncode(bad)).observations, 0);
+  });
+
   test(
     'elapsed listening excludes pauses, loading, rapid taps and seeks',
     () async {

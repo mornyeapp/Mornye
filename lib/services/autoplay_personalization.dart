@@ -69,23 +69,75 @@ String _text(String value) {
   return normalized.length > 160 ? normalized.substring(0, 160) : normalized;
 }
 
+/// Stable FNV-1a, rather than String.hashCode (not stable across runtimes).
+int _hash(String token) {
+  var hash = 2166136261;
+  for (final unit in token.codeUnits) {
+    hash = ((hash ^ unit) * 16777619) & 0xffffffff;
+  }
+  return hash;
+}
+
+Set<String> _genres(String value) => value
+    .split(RegExp(r'[,;/]'))
+    .map(_text)
+    .where((value) => value.isNotEmpty)
+    .take(3)
+    .toSet();
+
 /// Online logistic regression with AdaGrad and hashed context interactions.
 /// Two fixed arrays occupy 64 KiB regardless of Library/listening-history size.
 /// The prior ranker supplies cold-start relevance; this model learns engagement.
+///
+/// Beside it, Thompson-sampling arms keep each artist's and genre's outcomes
+/// as a Beta distribution, keyed by a hash so no names are stored. They react
+/// within a few songs, and sampling them gives artists the listener has not
+/// heard much a fair chance while skipped ones rarely return.
 class AutoplayPreferenceModel {
   static const int dimensions = 4096;
+
+  /// The most artists and genres the arms remember; the least known go first.
+  static const int maxArms = 2048;
   final Float64List _weights = Float64List(dimensions);
   final Float64List _gradientSquares = Float64List(dimensions);
+  // Hash of an artist or genre to its weighted (hits, misses).
+  final Map<int, (double, double)> _arms = {};
   int _observations = 0;
   DateTime? _updatedAt;
 
   int get observations => _observations;
 
+  int get arms => _arms.length;
+
   AutoplayPreferenceModel snapshot() {
     final copy = AutoplayPreferenceModel();
     copy._weights.setAll(0, _weights);
+    copy._arms.addAll(_arms);
     copy._observations = _observations;
     return copy;
+  }
+
+  static int _artistArm(String artist) => _hash('arm:artist:$artist');
+  static int _genreArm(String genre) => _hash('arm:genre:$genre');
+
+  /// One Thompson sample of the arms, drawn for one refill.
+  AutoplayExploration explore(Random random) =>
+      AutoplayExploration._(this, random);
+
+  void _reward(int arm, double reward, double weight) {
+    final (hits, misses) = _arms.remove(arm) ?? (0.0, 0.0);
+    // Re-inserted last, so the map keeps the latest arms at its end.
+    _arms[arm] = (hits + weight * reward, misses + weight * (1 - reward));
+    if (_arms.length <= maxArms) return;
+    var least = _arms.keys.first;
+    var evidence = double.infinity;
+    for (final MapEntry(:key, value: (hits, misses)) in _arms.entries) {
+      if (hits + misses < evidence) {
+        least = key;
+        evidence = hits + misses;
+      }
+    }
+    _arms.remove(least);
   }
 
   Map<int, double> _features(
@@ -94,12 +146,7 @@ class AutoplayPreferenceModel {
     DateTime at,
   ) {
     final artist = _text(track.artist), album = _text(track.album);
-    final genres = track.genre
-        .split(RegExp(r'[,;/]'))
-        .map(_text)
-        .where((value) => value.isNotEmpty)
-        .take(3)
-        .toSet();
+    final genres = _genres(track.genre);
     final previousArtist = _text(previous?.artist ?? '');
     final previousGenre = _text(previous?.genre ?? '');
     final period = at.hour ~/ 6;
@@ -127,11 +174,7 @@ class AutoplayPreferenceModel {
     ];
     final features = <int, double>{};
     for (final token in tokens) {
-      // Stable FNV-1a, rather than String.hashCode (not stable across runtimes).
-      var hash = 2166136261;
-      for (final unit in token.codeUnits) {
-        hash = ((hash ^ unit) * 16777619) & 0xffffffff;
-      }
+      final hash = _hash(token);
       final index = hash & (dimensions - 1);
       final sign = (hash & 0x80000000) == 0 ? 1.0 : -1.0;
       features[index] = (features[index] ?? 0) + sign;
@@ -183,10 +226,18 @@ class AutoplayPreferenceModel {
           _weights[i] *= decay;
           _gradientSquares[i] *= decay;
         }
+        _arms.updateAll((_, arm) => (arm.$1 * decay, arm.$2 * decay));
+        _arms.removeWhere((_, arm) => arm.$1 + arm.$2 < 0.05);
       }
     }
-    final error =
-        (_probability(features) - reward.clamp(0.0, 1.0)) * min(weight, 4);
+    final target = reward.clamp(0.0, 1.0);
+    final strength = min(weight, 4.0);
+    final artist = _text(track.artist);
+    if (artist.isNotEmpty) _reward(_artistArm(artist), target, strength);
+    for (final genre in _genres(track.genre)) {
+      _reward(_genreArm(genre), target, strength);
+    }
+    final error = (_probability(features) - target) * strength;
     for (final entry in features.entries) {
       final i = entry.key;
       final gradient = error * entry.value + 0.001 * _weights[i];
@@ -205,28 +256,47 @@ class AutoplayPreferenceModel {
       data.setFloat64(i * 16, _weights[i], Endian.little);
       data.setFloat64(i * 16 + 8, _gradientSquares[i], Endian.little);
     }
+    // Each arm: its hash, then weighted hits and misses, oldest first.
+    final arms = ByteData(_arms.length * 12);
+    var offset = 0;
+    for (final MapEntry(:key, value: (hits, misses)) in _arms.entries) {
+      arms.setUint32(offset, key, Endian.little);
+      arms.setFloat32(offset + 4, hits, Endian.little);
+      arms.setFloat32(offset + 8, misses, Endian.little);
+      offset += 12;
+    }
     return jsonEncode({
-      'version': 1,
+      'version': 2,
       'observations': _observations,
       'updatedAt': _updatedAt?.millisecondsSinceEpoch,
       'parameters': base64Encode(data.buffer.asUint8List()),
+      'arms': base64Encode(arms.buffer.asUint8List()),
     });
   }
 
   static AutoplayPreferenceModel decode(String? raw) {
     final empty = AutoplayPreferenceModel();
-    if (raw == null || raw.length > 100000) return empty;
+    if (raw == null || raw.length > 140000) return empty;
     try {
       final decoded = jsonDecode(raw);
-      if (decoded is! Map || decoded['version'] != 1) return empty;
+      if (decoded is! Map) return empty;
+      // Version 1 predates the arms; its learning carries over.
+      final version = decoded['version'];
+      if (version != 1 && version != 2) return empty;
       final count = decoded['observations'];
       final parameters = decoded['parameters'];
       final updated = decoded['updatedAt'];
+      final arms = version == 2 ? decoded['arms'] : '';
       if (count is! int ||
           count < 0 ||
           count > 1000000 ||
           parameters is! String ||
+          arms is! String ||
           (updated != null && updated is! int)) {
+        return empty;
+      }
+      final armBytes = base64Decode(arms);
+      if (armBytes.length % 12 != 0 || armBytes.length > maxArms * 12) {
         return empty;
       }
       final bytes = base64Decode(parameters);
@@ -246,6 +316,19 @@ class AutoplayPreferenceModel {
         model._weights[i] = weight;
         model._gradientSquares[i] = square;
       }
+      final armData = ByteData.sublistView(armBytes);
+      for (var offset = 0; offset < armBytes.length; offset += 12) {
+        final hits = armData.getFloat32(offset + 4, Endian.little);
+        final misses = armData.getFloat32(offset + 8, Endian.little);
+        if (!hits.isFinite ||
+            !misses.isFinite ||
+            hits < 0 ||
+            misses < 0 ||
+            hits + misses > 1e6) {
+          return empty;
+        }
+        model._arms[armData.getUint32(offset, Endian.little)] = (hits, misses);
+      }
       model._observations = count;
       if (updated is int) {
         model._updatedAt = DateTime.fromMillisecondsSinceEpoch(updated);
@@ -256,6 +339,68 @@ class AutoplayPreferenceModel {
       return empty;
     }
   }
+}
+
+/// A Thompson sample of the model's arms for one refill: each artist and
+/// genre draws one plausible rate of being enjoyed from its Beta
+/// distribution, the same for all of its songs. Little-heard artists draw
+/// widely, so they sometimes rank high; often skipped ones rarely do.
+class AutoplayExploration {
+  AutoplayExploration._(this._model, this._random);
+
+  final AutoplayPreferenceModel _model;
+  final Random _random;
+  final _draws = <int, double>{};
+
+  /// Up to ±2.5 for the artist and ±1 for the genres, growing with the
+  /// model's observations as its learned preference does.
+  double adjustment(AutoplayLearningTrack track) {
+    final confidence = min(1.0, _model._observations / 20);
+    if (confidence == 0) return 0;
+    var total = 0.0;
+    final artist = _text(track.artist);
+    if (artist.isNotEmpty) {
+      total += 5 * (_draw(AutoplayPreferenceModel._artistArm(artist)) - 0.5);
+    }
+    final genres = _genres(track.genre);
+    if (genres.isNotEmpty) {
+      var sum = 0.0;
+      for (final genre in genres) {
+        sum += _draw(AutoplayPreferenceModel._genreArm(genre));
+      }
+      total += 2 * (sum / genres.length - 0.5);
+    }
+    return confidence * total;
+  }
+
+  double _draw(int arm) => _draws[arm] ??= () {
+    final (hits, misses) = _model._arms[arm] ?? (0.0, 0.0);
+    final a = _gamma(1 + hits), b = _gamma(1 + misses);
+    return a / (a + b);
+  }();
+
+  // Marsaglia and Tsang's method, for the shapes of at least 1 used here.
+  double _gamma(double shape) {
+    final d = shape - 1 / 3, c = 1 / sqrt(9 * d);
+    while (true) {
+      double x, v;
+      do {
+        x = _normal();
+        v = 1 + c * x;
+      } while (v <= 0);
+      v = v * v * v;
+      final u = _random.nextDouble();
+      if (u < 1 - 0.0331 * x * x * x * x ||
+          log(u) < 0.5 * x * x + d * (1 - v + log(v))) {
+        return d * v;
+      }
+    }
+  }
+
+  // Box-Muller.
+  double _normal() =>
+      sqrt(-2 * log(1 - _random.nextDouble())) *
+      cos(2 * pi * _random.nextDouble());
 }
 
 class _LearningSession {
