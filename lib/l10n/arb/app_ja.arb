@@ -201,7 +201,7 @@
   "usbBitPerfectNoDevice": "No USB DAC connected. Using normal audio output.",
   "usbBitPerfectFallback": "This device or audio format does not support bit-perfect output. Using normal playback.",
   "usbBitPerfectRouteChanged": "The USB audio route changed. Playback paused; select a track to reconnect.",
-  "upgradeIntroContinue": "Continue",
+  "upgradeIntroContinue": "続行",
   "cacheMotionArtwork": "Offline motion covers",
   "cacheMotionArtworkDesc": "Album videos saved with downloads. Removing them keeps your music files and static covers.",
   "nowPlayingVolume": "Volume",
@@ -221,7 +221,7 @@
   "appearanceGlassOutlinesSubtitle": "Show decorative edges around Mornye glass. Turning this off keeps blur and refraction.",
   "appearanceGlassClaritySubtitle": "Adjust transparency in Mornye menus and navigation. Text contrast is preserved.",
   "appearanceGlassTinted": "Tinted",
-  "appearanceGlassClear": "Clear",
+  "appearanceGlassClear": "消去",
   "appearanceGlassClearPerformance": "Very clear glass may use more power and feel less smooth on older devices. Lower clarity if needed.",
   "appearanceGlassClarityBlurOff": "Glass is opaque on this device. Turn on “{setting}” to adjust clarity.",
   "@appearanceGlassClarityBlurOff": {
@@ -565,7 +565,7 @@
   "metadataSeparatorSemicolon": "Semicolon (;)",
   "metadataSeparatorSlash": "Slash (/)",
   "metadataSeparatorCustom": "Custom separator",
-  "metadataSeparatorPreview": "Preview",
+  "metadataSeparatorPreview": "プレビュー",
   "metadataSeparatorInvalid": "Use 1–16 characters without line breaks or control characters.",
   "@optionsArtistTagMode": {
     "description": "Setting title for how artist metadata is written into files"
@@ -996,7 +996,7 @@
   "@setupLanguageDescription": {
     "description": "Description for the language selection step in setup"
   },
-  "setupLanguageSystemDefault": "System Default",
+  "setupLanguageSystemDefault": "システムのデフォルト",
   "@setupLanguageSystemDefault": {
     "description": "Option to use the system language"
   },
@@ -1028,7 +1028,7 @@
   "@dialogImport": {
     "description": "Dialog button - import data"
   },
-  "dialogDownload": "Download",
+  "dialogDownload": "ダウンロード",
   "@dialogDownload": {
     "description": "Confirm button in Download All dialog"
   },
@@ -2157,7 +2157,7 @@
   "@storeEmptyNoExtensions": {
     "description": "Message when store has no extensions"
   },
-  "storeEmptyNoResults": "No extensions found",
+  "storeEmptyNoResults": "拡張がありません",
   "@storeEmptyNoResults": {
     "description": "Message when search/filter returns no results"
   },
@@ -2756,7 +2756,7 @@
   "@discographyDownloadSelected": {
     "description": "Button - download selected albums"
   },
-  "discographyAddedToQueue": "Added {count} tracks to queue",
+  "discographyAddedToQueue": "{count} 個のトラックをキューに追加しました",
   "@discographyAddedToQueue": {
     "description": "Snackbar - tracks added from discography",
     "placeholders": {
@@ -2869,7 +2869,7 @@
   "@librarySourceOffline": {
     "description": "Library source is temporarily disconnected"
   },
-  "librarySourceDisabled": "Disabled",
+  "librarySourceDisabled": "無効",
   "@librarySourceDisabled": {
     "description": "Library source has been disabled by the user"
   },
@@ -3146,7 +3146,7 @@
   "@libraryFilterFormat": {
     "description": "Filter section - file format"
   },
-  "libraryFilterMetadata": "Metadata",
+  "libraryFilterMetadata": "メタデータ",
   "@libraryFilterMetadata": {
     "description": "Filter section - metadata completeness"
   },
@@ -3430,11 +3430,11 @@
   "@playbackNormalizationMode": {
     "description": "Label for choosing between track and album ReplayGain during playback"
   },
-  "playbackNormalizationModeTrack": "Track",
+  "playbackNormalizationModeTrack": "トラック",
   "@playbackNormalizationModeTrack": {
     "description": "Gain mode that levels every track on its own"
   },
-  "playbackNormalizationModeAlbum": "Album",
+  "playbackNormalizationModeAlbum": "アルバム",
   "@playbackNormalizationModeAlbum": {
     "description": "Gain mode that keeps the loudness differences inside an album"
   },
@@ -3604,7 +3604,7 @@
   "@trackReEnrichFieldCover": {
     "description": "Checkbox label for cover art field in re-enrich"
   },
-  "trackReEnrichFieldLyrics": "Lyrics",
+  "trackReEnrichFieldLyrics": "歌詞",
   "@trackReEnrichFieldLyrics": {
     "description": "Checkbox label for lyrics field in re-enrich"
   },
@@ -3624,7 +3624,7 @@
   "@trackReEnrichFieldExtra": {
     "description": "Checkbox label for extra metadata in re-enrich"
   },
-  "trackReEnrichSelectAll": "Select All",
+  "trackReEnrichSelectAll": "すべて選択",
   "@trackReEnrichSelectAll": {
     "description": "Select all fields checkbox in re-enrich"
   },
@@ -3902,7 +3902,7 @@
       }
     }
   },
-  "cueSplitTrackCount": "{count} tracks",
+  "cueSplitTrackCount": "{count} 個のトラック",
   "@cueSplitTrackCount": {
     "description": "Number of tracks in CUE sheet",
     "placeholders": {
@@ -3980,7 +3980,7 @@
   "@collectionFavoriteArtists": {
     "description": "Custom folder for favorite artists"
   },
-  "collectionPlaylist": "Playlist",
+  "collectionPlaylist": "プレイリスト",
   "@collectionPlaylist": {
     "description": "Single playlist label"
   },
@@ -3996,7 +3996,7 @@
   "@collectionNoPlaylistsYet": {
     "description": "Empty state title when user has no playlists"
   },
-  "collectionPlaylistTracks": "{count, plural, =1{1 track} other{{count} tracks}}",
+  "collectionPlaylistTracks": "{count, plural, =1{1 個のトラック} other{{count} 個のトラック}}",
   "@collectionPlaylistTracks": {
     "description": "Track count label for custom playlists",
     "placeholders": {
@@ -4553,7 +4553,7 @@
       }
     }
   },
-  "dialogDownloadAllTitle": "Download All",
+  "dialogDownloadAllTitle": "すべてダウンロード",
   "@dialogDownloadAllTitle": {
     "description": "Dialog title for bulk download confirmation"
   },
@@ -4594,7 +4594,7 @@
   "@snackbarFailedToWriteStorage": {
     "description": "Snackbar when writing metadata back to file fails"
   },
-  "snackbarError": "Error: {error}",
+  "snackbarError": "エラー: {error}",
   "@snackbarError": {
     "description": "Generic error snackbar with error detail",
     "placeholders": {
@@ -4967,11 +4967,11 @@
   "@editMetadataFieldTitle": {
     "description": "Chip label for title field in auto-fill selector"
   },
-  "editMetadataFieldArtist": "Artist",
+  "editMetadataFieldArtist": "アーティスト",
   "@editMetadataFieldArtist": {
     "description": "Chip label for artist field in auto-fill selector"
   },
-  "editMetadataFieldAlbum": "Album",
+  "editMetadataFieldAlbum": "アルバム",
   "@editMetadataFieldAlbum": {
     "description": "Chip label for album field in auto-fill selector"
   },
@@ -4983,7 +4983,7 @@
   "@editMetadataFieldDate": {
     "description": "Chip label for date field in auto-fill selector"
   },
-  "editMetadataFieldTrackNum": "Track #",
+  "editMetadataFieldTrackNum": "トラック #",
   "@editMetadataFieldTrackNum": {
     "description": "Chip label for track number field in auto-fill selector"
   },
@@ -4991,7 +4991,7 @@
   "@editMetadataFieldDiscNum": {
     "description": "Chip label for disc number field in auto-fill selector"
   },
-  "editMetadataFieldGenre": "Genre",
+  "editMetadataFieldGenre": "ジャンル",
   "@editMetadataFieldGenre": {
     "description": "Chip label for genre field in auto-fill selector"
   },
@@ -4999,11 +4999,11 @@
   "@editMetadataFieldIsrc": {
     "description": "Chip label for ISRC field in auto-fill selector"
   },
-  "editMetadataFieldLabel": "Label",
+  "editMetadataFieldLabel": "レーベル",
   "@editMetadataFieldLabel": {
     "description": "Chip label for label field in auto-fill selector"
   },
-  "editMetadataFieldCopyright": "Copyright",
+  "editMetadataFieldCopyright": "著作権",
   "@editMetadataFieldCopyright": {
     "description": "Chip label for copyright field in auto-fill selector"
   },
@@ -5011,7 +5011,7 @@
   "@editMetadataFieldCover": {
     "description": "Chip label for cover art field in auto-fill selector"
   },
-  "editMetadataSelectAll": "All",
+  "editMetadataSelectAll": "すべて",
   "@editMetadataSelectAll": {
     "description": "Button to select all fields for auto-fill"
   },
@@ -5019,7 +5019,7 @@
   "@editMetadataSelectEmpty": {
     "description": "Button to select only fields that are currently empty"
   },
-  "queueDownloadingCount": "Downloading ({count})",
+  "queueDownloadingCount": "ダウンロード中 ({count})",
   "@queueDownloadingCount": {
     "description": "Header for active downloads section with count",
     "placeholders": {
@@ -5032,7 +5032,7 @@
   "@queueFilteringIndicator": {
     "description": "Shown while filter results are being computed"
   },
-  "queueTrackCount": "{count, plural, =1{1 track} other{{count} tracks}}",
+  "queueTrackCount": "{count, plural, =1{1 個のトラック} other{{count} 個のトラック}}",
   "@queueTrackCount": {
     "description": "Track count label with plural support",
     "placeholders": {
@@ -5041,7 +5041,7 @@
       }
     }
   },
-  "queueAlbumCount": "{count, plural, =1{1 album} other{{count} albums}}",
+  "queueAlbumCount": "{count, plural, =1{1 個のアルバム} other{{count} 個のアルバム}}",
   "@queueAlbumCount": {
     "description": "Album count label with plural support",
     "placeholders": {
@@ -5050,7 +5050,7 @@
       }
     }
   },
-  "queueEmptyAlbums": "No album downloads",
+  "queueEmptyAlbums": "アルバムのダウンロードはありません",
   "@queueEmptyAlbums": {
     "description": "Empty state title when no album downloads exist"
   },
@@ -5058,7 +5058,7 @@
   "@queueEmptyAlbumsSubtitle": {
     "description": "Empty state subtitle for album downloads"
   },
-  "queueEmptySingles": "No single downloads",
+  "queueEmptySingles": "シングルのダウンロードはありません",
   "@queueEmptySingles": {
     "description": "Empty state title when no single track downloads exist"
   },
@@ -5087,11 +5087,11 @@
   "@libraryDefaultViewLastUsed": {
     "description": "Default view option - keep the last used library view"
   },
-  "queueEmptyHistory": "No download history",
+  "queueEmptyHistory": "ダウンロード履歴はありません",
   "@queueEmptyHistory": {
     "description": "Empty state title when download history is empty"
   },
-  "queueEmptyHistorySubtitle": "Downloaded tracks will appear here",
+  "queueEmptyHistorySubtitle": "ダウンロードしたトラックはここに表示されます",
   "@queueEmptyHistorySubtitle": {
     "description": "Empty state subtitle for download history"
   },
@@ -5143,7 +5143,7 @@
   "@audioAnalysisChannels": {
     "description": "Channels metric label"
   },
-  "audioAnalysisDuration": "Duration",
+  "audioAnalysisDuration": "再生時間",
   "@audioAnalysisDuration": {
     "description": "Duration metric label"
   },
@@ -5676,7 +5676,7 @@
   "@notifUpdateFailedBody": {
     "description": "Notification body when app update download fails"
   },
-  "searchTracks": "Tracks",
+  "searchTracks": "トラック",
   "@searchTracks": {
     "description": "Search filter label - tracks"
   },
@@ -5684,7 +5684,7 @@
   "@homeSearchHintDefault": {
     "description": "Default placeholder for the main search field on Home"
   },
-  "homeSearchHintProvider": "Search with {providerName}...",
+  "homeSearchHintProvider": "{providerName} で検索...",
   "@homeSearchHintProvider": {
     "description": "Placeholder for the main search field when a provider is selected",
     "placeholders": {
@@ -5701,7 +5701,7 @@
   "@homeChangeSearchProviderTooltip": {
     "description": "Tooltip for the Home search provider picker"
   },
-  "actionPaste": "Paste",
+  "actionPaste": "貼り付け",
   "@actionPaste": {
     "description": "Generic action - paste from clipboard"
   },
@@ -5773,7 +5773,7 @@
   "@trackCoverResizeFailed": {
     "description": "Error shown when resizing cover art before saving metadata fails"
   },
-  "actionStop": "Stop",
+  "actionStop": "停止",
   "@actionStop": {
     "description": "Generic action - stop"
   },
@@ -5875,23 +5875,23 @@
   "@logClearSearch": {
     "description": "Tooltip for clearing the log search field"
   },
-  "logIssueIspBlockingLabel": "ISP BLOCKING DETECTED",
+  "logIssueIspBlockingLabel": "ISP のブロックを検出しました",
   "@logIssueIspBlockingLabel": {
     "description": "Diagnostic badge label when ISP blocking is detected"
   },
-  "logIssueIspBlockingDescription": "Your ISP may be blocking access to download services",
+  "logIssueIspBlockingDescription": "ISP がダウンロードサービスのアクセスをブロックしている可能性があります",
   "@logIssueIspBlockingDescription": {
     "description": "Diagnostic badge description for ISP blocking"
   },
-  "logIssueIspBlockingSuggestion": "Try using a VPN or change DNS to 1.1.1.1 or 8.8.8.8",
+  "logIssueIspBlockingSuggestion": "VPN を使用するか DNS を 1.1.1.1 または 8.8.8.8 に変更をお試しください",
   "@logIssueIspBlockingSuggestion": {
     "description": "Diagnostic badge suggestion for ISP blocking"
   },
-  "logIssueRateLimitedLabel": "RATE LIMITED",
+  "logIssueRateLimitedLabel": "レート制限",
   "@logIssueRateLimitedLabel": {
     "description": "Diagnostic badge label when the service rate limits requests"
   },
-  "logIssueRateLimitedDescription": "Too many requests to the service",
+  "logIssueRateLimitedDescription": "サービスへのリクエストが多すぎます",
   "@logIssueRateLimitedDescription": {
     "description": "Diagnostic badge description for rate limiting"
   },
@@ -5899,19 +5899,19 @@
   "@logIssueRateLimitedSuggestion": {
     "description": "Diagnostic badge suggestion for rate limiting"
   },
-  "logIssueNetworkErrorLabel": "NETWORK ERROR",
+  "logIssueNetworkErrorLabel": "ネットワークエラー",
   "@logIssueNetworkErrorLabel": {
     "description": "Diagnostic badge label for generic network errors"
   },
-  "logIssueNetworkErrorDescription": "Connection issues detected",
+  "logIssueNetworkErrorDescription": "接続の問題が検出されました",
   "@logIssueNetworkErrorDescription": {
     "description": "Diagnostic badge description for generic network errors"
   },
-  "logIssueNetworkErrorSuggestion": "Check your internet connection",
+  "logIssueNetworkErrorSuggestion": "インターネット接続を確認してください",
   "@logIssueNetworkErrorSuggestion": {
     "description": "Diagnostic badge suggestion for generic network errors"
   },
-  "logIssueTrackNotFoundLabel": "TRACK NOT FOUND",
+  "logIssueTrackNotFoundLabel": "トラックがありません",
   "@logIssueTrackNotFoundLabel": {
     "description": "Diagnostic badge label when a track is unavailable"
   },
@@ -5944,7 +5944,7 @@
   "@extensionDetailsInformation": {
     "description": "Section title for extension metadata information"
   },
-  "extensionUtilityFunctions": "Utility Functions",
+  "extensionUtilityFunctions": "ユーティリティ機能",
   "@extensionUtilityFunctions": {
     "description": "Capability label for utility-only extensions"
   },
@@ -6045,7 +6045,7 @@
   "@settingsFilesSubtitle": {
     "description": "Subtitle for files & folders settings"
   },
-  "settingsMetadata": "Metadata",
+  "settingsMetadata": "メタデータ",
   "@settingsMetadata": {
     "description": "Settings menu item - metadata settings"
   },
@@ -6053,7 +6053,7 @@
   "@settingsMetadataSubtitle": {
     "description": "Subtitle for metadata settings"
   },
-  "settingsLyrics": "Lyrics",
+  "settingsLyrics": "歌詞",
   "@settingsLyrics": {
     "description": "Settings menu item - lyrics settings"
   },
@@ -6061,7 +6061,7 @@
   "@settingsLyricsSubtitle": {
     "description": "Subtitle for lyrics settings"
   },
-  "settingsApp": "App",
+  "settingsApp": "アプリ",
   "@settingsApp": {
     "description": "Settings menu item - app settings"
   },
@@ -6081,7 +6081,7 @@
   "@sectionLyricsProviderOptions": {
     "description": "Settings section header for per-provider lyrics options"
   },
-  "metadataProvidersTitle": "Metadata Provider Priority",
+  "metadataProvidersTitle": "メタデータプロバイダーの優先度",
   "@metadataProvidersTitle": {
     "description": "Settings item title for metadata provider order"
   },
@@ -6270,7 +6270,7 @@
       }
     }
   },
-  "selectionDeleteTracksCount": "Delete {count} {count, plural, =1{track} other{tracks}}",
+  "selectionDeleteTracksCount": "{count} {count, plural, =1{個のトラック} other{個のトラック}}を削除",
   "@selectionDeleteTracksCount": {
     "description": "Button label for deleting selected tracks",
     "placeholders": {
@@ -6338,11 +6338,11 @@
       }
     }
   },
-  "logIssueSummary": "Issue Summary",
+  "logIssueSummary": "問題の概要",
   "@logIssueSummary": {
     "description": "Header for log issue analysis summary"
   },
-  "logTotalErrors": "Total errors: {count}",
+  "logTotalErrors": "エラーの合計: {count}",
   "@logTotalErrors": {
     "description": "Total error count in log issue analysis",
     "placeholders": {
@@ -6351,7 +6351,7 @@
       }
     }
   },
-  "logAffectedDomains": "Affected: {domains}",
+  "logAffectedDomains": "影響: {domains}",
   "@logAffectedDomains": {
     "description": "Affected domains in log issue analysis",
     "placeholders": {
@@ -6525,11 +6525,11 @@
   "@permissionAudio": {
     "description": "Audio permission type label"
   },
-  "permissionStorage": "Storage",
+  "permissionStorage": "ストレージ",
   "@permissionStorage": {
     "description": "Storage permission type label"
   },
-  "permissionNotification": "Notification",
+  "permissionNotification": "通知",
   "@permissionNotification": {
     "description": "Notification permission type label"
   },
@@ -6541,23 +6541,23 @@
   "@storeAnyVersion": {
     "description": "Store detail value when any app version is accepted"
   },
-  "storeCategoryMetadata": "Metadata",
+  "storeCategoryMetadata": "メタデータ",
   "@storeCategoryMetadata": {
     "description": "Store extension category - metadata"
   },
-  "storeCategoryDownload": "Download",
+  "storeCategoryDownload": "ダウンロード",
   "@storeCategoryDownload": {
     "description": "Store extension category - download"
   },
-  "storeCategoryUtility": "Utility",
+  "storeCategoryUtility": "ユーティリティ",
   "@storeCategoryUtility": {
     "description": "Store extension category - utility"
   },
-  "storeCategoryLyrics": "Lyrics",
+  "storeCategoryLyrics": "歌詞",
   "@storeCategoryLyrics": {
     "description": "Store extension category - lyrics"
   },
-  "storeCategoryIntegration": "Integration",
+  "storeCategoryIntegration": "統合",
   "@storeCategoryIntegration": {
     "description": "Store extension category - integration"
   },
@@ -6565,7 +6565,7 @@
   "@artistReleases": {
     "description": "Section header for all artist releases"
   },
-  "editMetadataSelectNone": "None",
+  "editMetadataSelectNone": "なし",
   "@editMetadataSelectNone": {
     "description": "Button to clear selected fields for auto-fill"
   },
@@ -6741,7 +6741,7 @@
   "@nowPlayingTabPlayer": {
     "description": "Tab label for the player view"
   },
-  "nowPlayingTabLyrics": "Lyrics",
+  "nowPlayingTabLyrics": "歌詞",
   "@nowPlayingTabLyrics": {
     "description": "Tab label for the lyrics view"
   },
@@ -6936,7 +6936,7 @@
   "@trackConvertResampler": {
     "description": "Section label for lossless conversion resampler options"
   },
-  "trackConvertDitherNone": "None",
+  "trackConvertDitherNone": "なし",
   "@trackConvertDitherNone": {
     "description": "Lossless conversion dither option with no dithering applied"
   },
@@ -7128,7 +7128,7 @@
   "@extensionVerificationHelpMessageWaiting": {
     "description": "Dialog message when verification may need manual browser help"
   },
-  "extensionVerificationClose": "Close",
+  "extensionVerificationClose": "閉じる",
   "@extensionVerificationClose": {
     "description": "Button to dismiss the extension verification help dialog"
   },
@@ -7287,7 +7287,7 @@
   "autoplayResetLearning": "Reset recommendation learning",
   "autoplayResetLearningConfirmTitle": "Reset recommendation learning?",
   "autoplayResetLearningConfirmMessage": "Autoplay forgets what it learned from your listening and skips. This can't be undone.",
-  "autoplayResetLearningConfirm": "Reset",
+  "autoplayResetLearningConfirm": "リセット",
   "profileTitle": "Profile",
   "profileSetUp": "Set up your profile",
   "profileEdit": "Edit name and photo",
@@ -7540,9 +7540,9 @@
       }
     }
   },
-  "listeningRewindShare": "Share",
+  "listeningRewindShare": "共有",
   "listeningRewindShareError": "Could not share your Rewind",
-  "listeningRewindNext": "Next",
+  "listeningRewindNext": "次へ",
   "listeningRewindPrevious": "Previous",
   "listeningRewindMonthlyReady": "Your last 4 weeks are ready to replay",
   "listeningRewindYearTitle": "Your {year} in Music",
@@ -7557,9 +7557,9 @@
   "listeningRewindYearBanner": "Your top artists, songs and moments of the year",
   "listeningRewindYearIntroBody": "Everything you played this year, from your first song to your biggest month.",
   "listeningRewindNumbersTitle": "Your year in numbers",
-  "listeningRewindSongsLabel": "Songs",
-  "listeningRewindArtistsLabel": "Artists",
-  "listeningRewindAlbumsLabel": "Albums",
+  "listeningRewindSongsLabel": "曲",
+  "listeningRewindArtistsLabel": "アーティスト",
+  "listeningRewindAlbumsLabel": "アルバム",
   "listeningRewindDaysLabel": "Days with music",
   "listeningRewindDaysShare": "Music on {percent}% of your days",
   "@listeningRewindDaysShare": {
@@ -7616,7 +7616,7 @@
   "libraryLoading": "Loading Library…",
   "libraryLoadFailed": "Library could not be loaded. Retry to load the saved folders and track index.",
   "discordPresenceDescription": "Share the title, artist, album and progress of music played in the built-in player on your Discord profile. Local audio and artwork files are never uploaded. Clears when playback pauses or stops.",
-  "discordPresenceDisabled": "Disabled",
+  "discordPresenceDisabled": "無効",
   "discordPresenceLink": "Link Discord account",
   "discordPresenceConnecting": "Connecting to Discord…",
   "discordPresenceReady": "Ready when music plays",
@@ -7713,12 +7713,12 @@
       }
     }
   },
-  "lyricsShareAction": "Share",
+  "lyricsShareAction": "共有",
   "lyricsShareError": "Couldn't create the lyrics image",
   "lyricsShareBackgroundArtwork": "Artwork",
   "lyricsShareBackgroundColor": "Cover color",
-  "lyricsShareBackgroundDark": "Dark",
-  "lyricsShareBackgroundLight": "Light",
+  "lyricsShareBackgroundDark": "ダーク",
+  "lyricsShareBackgroundLight": "ライト",
   "audioInfoTitle": "Audio info",
   "@audioInfoTitle": {
     "description": "Sheet with technical details of the playing track, opened from the quality badge"
@@ -7729,11 +7729,11 @@
   "audioInfoProcessing": "Processing",
   "audioInfoOutput": "Output",
   "audioInfoAnalysis": "Spectrum and level analysis",
-  "audioInfoQuality": "Quality",
+  "audioInfoQuality": "品質",
   "audioInfoHiResLossless": "Hi-Res Lossless",
   "audioInfoLossless": "Lossless",
   "audioInfoLossy": "Lossy",
-  "audioInfoFormat": "Format",
+  "audioInfoFormat": "形式",
   "audioInfoCodec": "Codec",
   "audioInfoSampleRate": "Sample rate",
   "audioInfoBitDepth": "Bit depth",
@@ -7746,8 +7746,8 @@
       }
     }
   },
-  "audioInfoBitrate": "Bitrate",
-  "audioInfoDuration": "Duration",
+  "audioInfoBitrate": "ビットレート",
+  "audioInfoDuration": "再生時間",
   "audioInfoFileSize": "File size",
   "audioInfoCompression": "Compression",
   "audioInfoCompressionValue": "{percent}% of uncompressed size",

@@ -313,7 +313,7 @@
   "libraryNoActiveDownloads": "No active downloads",
   "librarySearchHint": "Search your library",
   "libraryEmptyCollection": "Your music will appear here",
-  "settingsTitle": "Settings",
+  "settingsTitle": "विकल्प",
   "@settingsTitle": {
     "description": "Settings screen title"
   },
@@ -321,7 +321,7 @@
   "@settingsDownload": {
     "description": "Settings section - download options"
   },
-  "settingsAppearance": "Appearance",
+  "settingsAppearance": "दिखावट",
   "@settingsAppearance": {
     "description": "Settings section - visual customization"
   },
@@ -333,7 +333,7 @@
   "@settingsAbout": {
     "description": "Settings section - app info"
   },
-  "downloadTitle": "Download",
+  "downloadTitle": "Omm",
   "@downloadTitle": {
     "description": "Download settings page title"
   },
@@ -1028,7 +1028,7 @@
   "@dialogImport": {
     "description": "Dialog button - import data"
   },
-  "dialogDownload": "Download",
+  "dialogDownload": "Omm",
   "@dialogDownload": {
     "description": "Confirm button in Download All dialog"
   },
@@ -1740,7 +1740,7 @@
   "@sectionSearchSource": {
     "description": "Settings section header"
   },
-  "sectionDownload": "Download",
+  "sectionDownload": "Omm",
   "@sectionDownload": {
     "description": "Settings section header"
   },
@@ -2093,7 +2093,7 @@
   "@storeFilterMetadata": {
     "description": "Repo filter - metadata providers"
   },
-  "storeFilterDownload": "Download",
+  "storeFilterDownload": "Omm",
   "@storeFilterDownload": {
     "description": "Repo filter - download providers"
   },
@@ -2201,7 +2201,7 @@
   "@extensionPermissions": {
     "description": "Section header - required permissions"
   },
-  "extensionSettings": "Settings",
+  "extensionSettings": "विकल्प",
   "@extensionSettings": {
     "description": "Section header - extension settings"
   },
@@ -6545,7 +6545,7 @@
   "@storeCategoryMetadata": {
     "description": "Store extension category - metadata"
   },
-  "storeCategoryDownload": "Download",
+  "storeCategoryDownload": "Omm",
   "@storeCategoryDownload": {
     "description": "Store extension category - download"
   },

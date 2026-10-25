@@ -221,7 +221,7 @@
   "appearanceGlassOutlinesSubtitle": "Show decorative edges around Mornye glass. Turning this off keeps blur and refraction.",
   "appearanceGlassClaritySubtitle": "Adjust transparency in Mornye menus and navigation. Text contrast is preserved.",
   "appearanceGlassTinted": "Tinted",
-  "appearanceGlassClear": "Clear",
+  "appearanceGlassClear": "محو",
   "appearanceGlassClearPerformance": "Very clear glass may use more power and feel less smooth on older devices. Lower clarity if needed.",
   "appearanceGlassClarityBlurOff": "Glass is opaque on this device. Turn on “{setting}” to adjust clarity.",
   "@appearanceGlassClarityBlurOff": {
@@ -377,7 +377,7 @@
   "@folderTemplatePreview": {
     "description": "Label for a sample expanded folder template"
   },
-  "folderTemplatePreviewFailed": "Preview unavailable",
+  "folderTemplatePreviewFailed": "المعاينة غير متوفرة",
   "@folderTemplatePreviewFailed": {
     "description": "Shown when the native folder preview could not be generated"
   },
@@ -565,7 +565,7 @@
   "metadataSeparatorSemicolon": "Semicolon (;)",
   "metadataSeparatorSlash": "Slash (/)",
   "metadataSeparatorCustom": "Custom separator",
-  "metadataSeparatorPreview": "Preview",
+  "metadataSeparatorPreview": "تجريبي",
   "metadataSeparatorInvalid": "Use 1–16 characters without line breaks or control characters.",
   "@optionsArtistTagMode": {
     "description": "Setting title for how artist metadata is written into files"
@@ -2593,7 +2593,7 @@
   "@downloadedAlbumDeleteSelected": {
     "description": "Button - delete selected tracks"
   },
-  "downloadedAlbumDeleteMessage": "Delete {count} {count, plural, =1{track} other{tracks}} from this album?\n\nThis will also delete the files from storage.",
+  "downloadedAlbumDeleteMessage": "حذف {count} {count, plural, zero {} one {المسارات} two {أغنيتين} few {أغانٍ} many {أغنية}=1{أغنية} other{الأغاني}} من التاريخ؟\n\nسيؤدي هذا أيضا إلى حذف الملفات من وحدة التخزين.",
   "@downloadedAlbumDeleteMessage": {
     "description": "Delete confirmation with count",
     "placeholders": {
@@ -2615,7 +2615,7 @@
   "@downloadedAlbumTapToSelect": {
     "description": "Selection hint"
   },
-  "downloadedAlbumDeleteCount": "Delete {count} {count, plural, =1{track} other{tracks}}",
+  "downloadedAlbumDeleteCount": "تم حذف {count} {count, plural, zero {} one {أغنيتين} two {أغنيتين} few {أغانٍ} many {أغنية}=1{أغنية} other{أغانٍ}}",
   "@downloadedAlbumDeleteCount": {
     "description": "Delete button text with count",
     "placeholders": {
@@ -2756,7 +2756,7 @@
   "@discographyDownloadSelected": {
     "description": "Button - download selected albums"
   },
-  "discographyAddedToQueue": "Added {count} tracks to queue",
+  "discographyAddedToQueue": "تم إضافة {count} أغانٍ إلى قائمة الانتظار",
   "@discographyAddedToQueue": {
     "description": "Snackbar - tracks added from discography",
     "placeholders": {
@@ -2869,7 +2869,7 @@
   "@librarySourceOffline": {
     "description": "Library source is temporarily disconnected"
   },
-  "librarySourceDisabled": "Disabled",
+  "librarySourceDisabled": "معطَّل",
   "@librarySourceDisabled": {
     "description": "Library source has been disabled by the user"
   },
@@ -3010,7 +3010,7 @@
   "@libraryAboutDescription": {
     "description": "Description of local library feature"
   },
-  "libraryTracksUnit": "{count, plural, =1{track} other{tracks}}",
+  "libraryTracksUnit": "{count, plural, zero {لا توجد أغاني محددة} one {{count} مسارات} two {أغنيتين} few {{count} أغانٍ} many {{count} أغانٍ}=1{أغنية واحدة} other{{count} أغانٍ}}",
   "@libraryTracksUnit": {
     "description": "Unit label for tracks count (without the number itself)",
     "placeholders": {
@@ -3019,7 +3019,7 @@
       }
     }
   },
-  "libraryFilesUnit": "{count, plural, =1{file} other{files}}",
+  "libraryFilesUnit": "{count, plural, zero {} one {ملفات} two {ملفات} few {ملفات} many {ملفات}=1{ملف} other{ملفات}}",
   "@libraryFilesUnit": {
     "description": "Unit label for files count during library scanning",
     "placeholders": {
@@ -3284,7 +3284,7 @@
   "@tutorialLibraryTip3": {
     "description": "Tutorial library tip 3"
   },
-  "tutorialExtensionsTitle": "Extensions",
+  "tutorialExtensionsTitle": "الإضافات",
   "@tutorialExtensionsTitle": {
     "description": "Tutorial extensions page title"
   },
@@ -3434,7 +3434,7 @@
   "@playbackNormalizationModeTrack": {
     "description": "Gain mode that levels every track on its own"
   },
-  "playbackNormalizationModeAlbum": "Album",
+  "playbackNormalizationModeAlbum": "الألبوم",
   "@playbackNormalizationModeAlbum": {
     "description": "Gain mode that keeps the loudness differences inside an album"
   },
@@ -3604,7 +3604,7 @@
   "@trackReEnrichFieldCover": {
     "description": "Checkbox label for cover art field in re-enrich"
   },
-  "trackReEnrichFieldLyrics": "Lyrics",
+  "trackReEnrichFieldLyrics": "كلمات الأغنية",
   "@trackReEnrichFieldLyrics": {
     "description": "Checkbox label for lyrics field in re-enrich"
   },
@@ -3624,7 +3624,7 @@
   "@trackReEnrichFieldExtra": {
     "description": "Checkbox label for extra metadata in re-enrich"
   },
-  "trackReEnrichSelectAll": "Select All",
+  "trackReEnrichSelectAll": "تحديد الكل",
   "@trackReEnrichSelectAll": {
     "description": "Select all fields checkbox in re-enrich"
   },
@@ -3996,7 +3996,7 @@
   "@collectionNoPlaylistsYet": {
     "description": "Empty state title when user has no playlists"
   },
-  "collectionPlaylistTracks": "{count, plural, =1{1 track} other{{count} tracks}}",
+  "collectionPlaylistTracks": "{count, plural, zero {لا توجد أغاني محددة} one {{count} مسارات} two {أغنيتين} few {{count} أغانٍ} many {{count} أغانٍ}=1{أغنية واحدة} other{{count} أغانٍ}}",
   "@collectionPlaylistTracks": {
     "description": "Track count label for custom playlists",
     "placeholders": {
@@ -4967,11 +4967,11 @@
   "@editMetadataFieldTitle": {
     "description": "Chip label for title field in auto-fill selector"
   },
-  "editMetadataFieldArtist": "Artist",
+  "editMetadataFieldArtist": "الفنان",
   "@editMetadataFieldArtist": {
     "description": "Chip label for artist field in auto-fill selector"
   },
-  "editMetadataFieldAlbum": "Album",
+  "editMetadataFieldAlbum": "الألبوم",
   "@editMetadataFieldAlbum": {
     "description": "Chip label for album field in auto-fill selector"
   },
@@ -4991,7 +4991,7 @@
   "@editMetadataFieldDiscNum": {
     "description": "Chip label for disc number field in auto-fill selector"
   },
-  "editMetadataFieldGenre": "Genre",
+  "editMetadataFieldGenre": "النوع",
   "@editMetadataFieldGenre": {
     "description": "Chip label for genre field in auto-fill selector"
   },
@@ -4999,11 +4999,11 @@
   "@editMetadataFieldIsrc": {
     "description": "Chip label for ISRC field in auto-fill selector"
   },
-  "editMetadataFieldLabel": "Label",
+  "editMetadataFieldLabel": "تصنيف",
   "@editMetadataFieldLabel": {
     "description": "Chip label for label field in auto-fill selector"
   },
-  "editMetadataFieldCopyright": "Copyright",
+  "editMetadataFieldCopyright": "حقوق الطبع و النشر",
   "@editMetadataFieldCopyright": {
     "description": "Chip label for copyright field in auto-fill selector"
   },
@@ -5011,7 +5011,7 @@
   "@editMetadataFieldCover": {
     "description": "Chip label for cover art field in auto-fill selector"
   },
-  "editMetadataSelectAll": "All",
+  "editMetadataSelectAll": "الكل",
   "@editMetadataSelectAll": {
     "description": "Button to select all fields for auto-fill"
   },
@@ -5032,7 +5032,7 @@
   "@queueFilteringIndicator": {
     "description": "Shown while filter results are being computed"
   },
-  "queueTrackCount": "{count, plural, =1{1 track} other{{count} tracks}}",
+  "queueTrackCount": "{count, plural, zero {لا توجد أغاني محددة} one {{count} مسارات} two {أغنيتين} few {{count} أغانٍ} many {{count} أغانٍ}=1{أغنية واحدة} other{{count} أغانٍ}}",
   "@queueTrackCount": {
     "description": "Track count label with plural support",
     "placeholders": {
@@ -5143,7 +5143,7 @@
   "@audioAnalysisChannels": {
     "description": "Channels metric label"
   },
-  "audioAnalysisDuration": "Duration",
+  "audioAnalysisDuration": "المدة",
   "@audioAnalysisDuration": {
     "description": "Duration metric label"
   },
@@ -5368,7 +5368,7 @@
   "@extensionsHomeFeedAutoSubtitle": {
     "description": "Extensions page - subtitle for auto home feed option"
   },
-  "extensionsHomeFeedOff": "Off",
+  "extensionsHomeFeedOff": "إيقاف",
   "@extensionsHomeFeedOff": {
     "description": "Extensions page - home feed provider option: off"
   },
@@ -6045,7 +6045,7 @@
   "@settingsFilesSubtitle": {
     "description": "Subtitle for files & folders settings"
   },
-  "settingsMetadata": "Metadata",
+  "settingsMetadata": "البيانات الوصفية (Metadata)",
   "@settingsMetadata": {
     "description": "Settings menu item - metadata settings"
   },
@@ -6053,7 +6053,7 @@
   "@settingsMetadataSubtitle": {
     "description": "Subtitle for metadata settings"
   },
-  "settingsLyrics": "Lyrics",
+  "settingsLyrics": "كلمات الأغنية",
   "@settingsLyrics": {
     "description": "Settings menu item - lyrics settings"
   },
@@ -6061,7 +6061,7 @@
   "@settingsLyricsSubtitle": {
     "description": "Subtitle for lyrics settings"
   },
-  "settingsApp": "App",
+  "settingsApp": "التطبيق",
   "@settingsApp": {
     "description": "Settings menu item - app settings"
   },
@@ -6073,7 +6073,7 @@
   "@sectionMetadataProviders": {
     "description": "Settings section header for metadata providers"
   },
-  "sectionDuplicates": "Duplicates",
+  "sectionDuplicates": "مكرر",
   "@sectionDuplicates": {
     "description": "Settings section header for deduplication"
   },
@@ -6117,7 +6117,7 @@
   "@trackOptionDownloadQualityVariant": {
     "description": "Track menu action to download another quality version"
   },
-  "downloadFallbackExtensions": "Fallback Extensions",
+  "downloadFallbackExtensions": "الإضافات الاحتياطية",
   "@downloadFallbackExtensions": {
     "description": "Settings item for configuring fallback extension providers"
   },
@@ -6270,7 +6270,7 @@
       }
     }
   },
-  "selectionDeleteTracksCount": "Delete {count} {count, plural, =1{track} other{tracks}}",
+  "selectionDeleteTracksCount": "تم حذف {count} {count, plural, zero {} one {أغنيتين} two {أغنيتين} few {أغانٍ} many {أغنية}=1{أغنية} other{أغانٍ}}",
   "@selectionDeleteTracksCount": {
     "description": "Button label for deleting selected tracks",
     "placeholders": {
@@ -6541,23 +6541,23 @@
   "@storeAnyVersion": {
     "description": "Store detail value when any app version is accepted"
   },
-  "storeCategoryMetadata": "Metadata",
+  "storeCategoryMetadata": "البيانات الوصفية (Metadata)",
   "@storeCategoryMetadata": {
     "description": "Store extension category - metadata"
   },
-  "storeCategoryDownload": "Download",
+  "storeCategoryDownload": "التحميل",
   "@storeCategoryDownload": {
     "description": "Store extension category - download"
   },
-  "storeCategoryUtility": "Utility",
+  "storeCategoryUtility": "الأدوات",
   "@storeCategoryUtility": {
     "description": "Store extension category - utility"
   },
-  "storeCategoryLyrics": "Lyrics",
+  "storeCategoryLyrics": "كلمات الأغنية",
   "@storeCategoryLyrics": {
     "description": "Store extension category - lyrics"
   },
-  "storeCategoryIntegration": "Integration",
+  "storeCategoryIntegration": "التكامل",
   "@storeCategoryIntegration": {
     "description": "Store extension category - integration"
   },
@@ -6741,7 +6741,7 @@
   "@nowPlayingTabPlayer": {
     "description": "Tab label for the player view"
   },
-  "nowPlayingTabLyrics": "Lyrics",
+  "nowPlayingTabLyrics": "كلمات الأغنية",
   "@nowPlayingTabLyrics": {
     "description": "Tab label for the lyrics view"
   },
@@ -7244,7 +7244,7 @@
   "@playerCoverStyle": {
     "description": "Settings section choosing how the player shows cover art"
   },
-  "playerCoverStyleDefault": "Default",
+  "playerCoverStyleDefault": "افتراضي",
   "@playerCoverStyleDefault": {
     "description": "Cover art style: artwork card above the controls"
   },
@@ -7287,7 +7287,7 @@
   "autoplayResetLearning": "Reset recommendation learning",
   "autoplayResetLearningConfirmTitle": "Reset recommendation learning?",
   "autoplayResetLearningConfirmMessage": "Autoplay forgets what it learned from your listening and skips. This can't be undone.",
-  "autoplayResetLearningConfirm": "Reset",
+  "autoplayResetLearningConfirm": "إعادة الضبط",
   "profileTitle": "Profile",
   "profileSetUp": "Set up your profile",
   "profileEdit": "Edit name and photo",
@@ -7540,9 +7540,9 @@
       }
     }
   },
-  "listeningRewindShare": "Share",
+  "listeningRewindShare": "مشاركة",
   "listeningRewindShareError": "Could not share your Rewind",
-  "listeningRewindNext": "Next",
+  "listeningRewindNext": "التالي",
   "listeningRewindPrevious": "Previous",
   "listeningRewindMonthlyReady": "Your last 4 weeks are ready to replay",
   "listeningRewindYearTitle": "Your {year} in Music",
@@ -7557,9 +7557,9 @@
   "listeningRewindYearBanner": "Your top artists, songs and moments of the year",
   "listeningRewindYearIntroBody": "Everything you played this year, from your first song to your biggest month.",
   "listeningRewindNumbersTitle": "Your year in numbers",
-  "listeningRewindSongsLabel": "Songs",
-  "listeningRewindArtistsLabel": "Artists",
-  "listeningRewindAlbumsLabel": "Albums",
+  "listeningRewindSongsLabel": "أغاني",
+  "listeningRewindArtistsLabel": "فنانون",
+  "listeningRewindAlbumsLabel": "ألبومات",
   "listeningRewindDaysLabel": "Days with music",
   "listeningRewindDaysShare": "Music on {percent}% of your days",
   "@listeningRewindDaysShare": {
@@ -7616,7 +7616,7 @@
   "libraryLoading": "Loading Library…",
   "libraryLoadFailed": "Library could not be loaded. Retry to load the saved folders and track index.",
   "discordPresenceDescription": "Share the title, artist, album and progress of music played in the built-in player on your Discord profile. Local audio and artwork files are never uploaded. Clears when playback pauses or stops.",
-  "discordPresenceDisabled": "Disabled",
+  "discordPresenceDisabled": "معطَّل",
   "discordPresenceLink": "Link Discord account",
   "discordPresenceConnecting": "Connecting to Discord…",
   "discordPresenceReady": "Ready when music plays",
@@ -7713,12 +7713,12 @@
       }
     }
   },
-  "lyricsShareAction": "Share",
+  "lyricsShareAction": "مشاركة",
   "lyricsShareError": "Couldn't create the lyrics image",
   "lyricsShareBackgroundArtwork": "Artwork",
   "lyricsShareBackgroundColor": "Cover color",
-  "lyricsShareBackgroundDark": "Dark",
-  "lyricsShareBackgroundLight": "Light",
+  "lyricsShareBackgroundDark": "مظلم",
+  "lyricsShareBackgroundLight": "فاتح",
   "audioInfoTitle": "Audio info",
   "@audioInfoTitle": {
     "description": "Sheet with technical details of the playing track, opened from the quality badge"
@@ -7729,11 +7729,11 @@
   "audioInfoProcessing": "Processing",
   "audioInfoOutput": "Output",
   "audioInfoAnalysis": "Spectrum and level analysis",
-  "audioInfoQuality": "Quality",
+  "audioInfoQuality": "الجودة",
   "audioInfoHiResLossless": "Hi-Res Lossless",
   "audioInfoLossless": "Lossless",
-  "audioInfoLossy": "Lossy",
-  "audioInfoFormat": "Format",
+  "audioInfoLossy": "فقدان",
+  "audioInfoFormat": "التنسيق",
   "audioInfoCodec": "Codec",
   "audioInfoSampleRate": "Sample rate",
   "audioInfoBitDepth": "Bit depth",
@@ -7747,7 +7747,7 @@
     }
   },
   "audioInfoBitrate": "Bitrate",
-  "audioInfoDuration": "Duration",
+  "audioInfoDuration": "المدة",
   "audioInfoFileSize": "File size",
   "audioInfoCompression": "Compression",
   "audioInfoCompressionValue": "{percent}% of uncompressed size",
@@ -7787,7 +7787,7 @@
     }
   },
   "audioInfoOn": "On",
-  "audioInfoOff": "Off",
+  "audioInfoOff": "إيقاف",
   "audioInfoBypassed": "Bypassed by direct output",
   "audioInfoPlayer": "Player",
   "audioInfoPlayerValue": "Mornye built-in player",
@@ -7822,7 +7822,7 @@
     }
   },
   "audioInfoOutputRate": "Output sample rate",
-  "audioInfoOutputFormat": "Output format",
+  "audioInfoOutputFormat": "تنسيق الإخراج",
   "audioInfoDeviceRates": "Device sample rates",
   "audioInfoDeviceFormats": "Device formats",
   "audioInfoAnyRate": "Any",

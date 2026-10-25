@@ -327,12 +327,6 @@
   "libraryNoActiveDownloads": "Tidak sedang download",
   "librarySearchHint": "Telusuri koleksimu",
   "libraryEmptyCollection": "Musik kamu akan muncul di sini",
-  "libraryFolders": "Folder",
-  "libraryFolderCount": "{count, plural, =1{1 folder} other{{count} folder}}",
-  "libraryFoldersEmptyTitle": "Belum ada folder",
-  "libraryFoldersEmptyMessage": "Unduh lagu atau tambahkan folder musik di setelan Koleksi Lokal untuk menjelajahinya per folder.",
-  "libraryFolderMissing": "Folder ini tidak ada lagi di Koleksi",
-  "libraryFoldersLoadFailed": "Tidak dapat membaca folder",
   "settingsTitle": "Setelan",
   "@settingsTitle": {
     "description": "Settings screen title"
@@ -470,11 +464,11 @@
   "@optionsAutoFallbackSubtitle": {
     "description": "Subtitle for auto fallback"
   },
-  "optionsEmbedLyrics": "Lirik Tersemat",
+  "optionsEmbedLyrics": "Penyematan Lirik",
   "@optionsEmbedLyrics": {
     "description": "Embed lyrics in audio files"
   },
-  "optionsEmbedLyricsSubtitle": "Simpan lirik berjalan dalam file lagu yang didownload",
+  "optionsEmbedLyricsSubtitle": "Simpan lirik berwaktu dalam file lagu yang didownload",
   "@optionsEmbedLyricsSubtitle": {
     "description": "Subtitle for embed lyrics"
   },
@@ -579,12 +573,12 @@
   },
   "optionsArtistTagMode": "Mode Tag Artis",
   "metadataSeparators": "Pemisah metadata",
-  "metadataSeparatorsDescription": "Pilih pemisah untuk daftar yang memakai koma atau titik koma pada unduhan berikutnya. Pemisah artis custom menggunakan satu tag gabungan; mode Artis utama saja tetap berlaku. Karakter & dan / pada nama dipertahankan.",
+  "metadataSeparatorsDescription": "Pilih cara metadata dipisah dengan koma atau titik koma di download berikutnya. Pemisah artis kustom menggunakan satu tag tergabung; termasuk Artis utama saja. Nama dengan & atau / tidak akan diubah.",
   "metadataSeparatorSource": "Ikuti format sumber",
   "metadataSeparatorComma": "Koma (,)",
   "metadataSeparatorSemicolon": "Titik koma (;)",
   "metadataSeparatorSlash": "Garis miring (/)",
-  "metadataSeparatorCustom": "Pemisah custom",
+  "metadataSeparatorCustom": "Pemisah kustom",
   "metadataSeparatorPreview": "Preview",
   "metadataSeparatorInvalid": "Gunakan 1–16 karakter tanpa baris baru atau karakter kontrol.",
   "@optionsArtistTagMode": {
@@ -719,7 +713,7 @@
   "@aboutContributors": {
     "description": "Section for contributors"
   },
-  "aboutMobileDeveloper": "Developer versi mobile",
+  "aboutMobileDeveloper": "Sang developer utama",
   "@aboutMobileDeveloper": {
     "description": "Role description for mobile dev"
   },
@@ -739,11 +733,11 @@
   "@aboutLinks": {
     "description": "Section for external links"
   },
-  "aboutMobileSource": "Source code versi mobile",
+  "aboutMobileSource": "Source code",
   "@aboutMobileSource": {
     "description": "Link to mobile GitHub repo"
   },
-  "aboutLyricsWebsite": "Situs lirik",
+  "aboutLyricsWebsite": "Website lirik",
   "@aboutLyricsWebsite": {
     "description": "Link to the Zarz-LRC website for searching and saving word-timed lyrics"
   },
@@ -755,15 +749,15 @@
   "@aboutReportIssue": {
     "description": "Link to report bugs"
   },
-  "aboutReportIssueSubtitle": "Laporkan masalah yang Anda temui",
+  "aboutReportIssueSubtitle": "Laporkan masalah yang kamu temui",
   "@aboutReportIssueSubtitle": {
     "description": "Subtitle for report issue"
   },
-  "aboutFeatureRequest": "Kirim masukan",
+  "aboutFeatureRequest": "Minta fitur baru",
   "@aboutFeatureRequest": {
     "description": "Link to suggest features"
   },
-  "aboutFeatureRequestSubtitle": "Berikan masukan untuk aplikasi",
+  "aboutFeatureRequestSubtitle": "Sarankan fitur baru untuk aplikasi",
   "@aboutFeatureRequestSubtitle": {
     "description": "Subtitle for feature request"
   },
@@ -815,7 +809,7 @@
   "@aboutSquiglyDesc": {
     "description": "Credit for the Squigly resolver"
   },
-  "aboutAppDescription": "Cari metadata musik, kelola ekstensi, dan atur Koleksi Anda.",
+  "aboutAppDescription": "Telusuri metadata musik, kelola ekstensi, dan atur Koleksimu.",
   "@aboutAppDescription": {
     "description": "App description in header card"
   },
@@ -873,7 +867,7 @@
   "@setupStorageAccessRequired": {
     "description": "Title when storage access needed"
   },
-  "setupStorageAccessMessageAndroid11": "Android 11+ butuh izin \"Akses semua file\" untuk menyimpan file ke folder download pilihan Anda.",
+  "setupStorageAccessMessageAndroid11": "Android 11+ butuh izin \"Akses semua file\" untuk menyimpan file ke folder download pilihanmu.",
   "@setupStorageAccessMessageAndroid11": {
     "description": "Android 11+ specific explanation"
   },
@@ -908,7 +902,7 @@
   "@setupUseDefaultFolder": {
     "description": "Dialog title for default folder"
   },
-  "setupNoFolderSelected": "Tidak ada folder dipilih. Apakah Anda ingin menggunakan folder Musik default?",
+  "setupNoFolderSelected": "Tidak ada folder dipilih. Apakah kamu ingin menggunakan folder Musik default?",
   "@setupNoFolderSelected": {
     "description": "Prompt when no folder selected"
   },
@@ -920,7 +914,7 @@
   "@setupDownloadLocationTitle": {
     "description": "Download location dialog title"
   },
-  "setupDownloadLocationIosMessage": "Di iOS, download disimpan ke folder Documents aplikasi. Anda dapat mengaksesnya melalui aplikasi Files.",
+  "setupDownloadLocationIosMessage": "Di iOS, download disimpan ke folder Documents. Kamu dapat mengaksesnya melalui aplikasi Files.",
   "@setupDownloadLocationIosMessage": {
     "description": "iOS-specific folder info"
   },
@@ -960,7 +954,7 @@
   "@setupStorageRequired": {
     "description": "Title when storage permission needed"
   },
-  "setupStorageDescription": "Mornye butuh akses penyimpanan untuk menyimpan hasil download Anda.",
+  "setupStorageDescription": "Mornye butuh akses penyimpanan untuk menyimpan hasil download.",
   "@setupStorageDescription": {
     "description": "Explanation for storage permission"
   },
@@ -988,7 +982,7 @@
   "@setupEnableNotifications": {
     "description": "Button to enable notifications"
   },
-  "setupNotificationBackgroundDescription": "Memberitahu progres download Anda. Akan membantu Anda mengetahui kondisi download Anda selama di luar aplikasi.",
+  "setupNotificationBackgroundDescription": "Dapatkan informasi progres download. Akan membantu mengetahui progres download lagumu selama di luar aplikasi.",
   "@setupNotificationBackgroundDescription": {
     "description": "Detailed notification explanation"
   },
@@ -1012,7 +1006,7 @@
   "@setupLanguageTitle": {
     "description": "Title for the language selection step in setup"
   },
-  "setupLanguageDescription": "Pilih bahasa pilihan Anda untuk aplikasi ini. Anda dapat mengubahnya nanti di Setelan.",
+  "setupLanguageDescription": "Pilih bahasa pilihan untuk aplikasi ini. Kamu dapat mengubahnya nanti di Setelan.",
   "@setupLanguageDescription": {
     "description": "Description for the language selection step in setup"
   },
@@ -1080,7 +1074,7 @@
   "@dialogDiscardChanges": {
     "description": "Dialog title - unsaved changes warning"
   },
-  "dialogUnsavedChanges": "Ada perubahan yang belum disimpan. Anda ingin membuangnya?",
+  "dialogUnsavedChanges": "Ada perubahan yang belum disimpan. Kamu ingin membuangnya?",
   "@dialogUnsavedChanges": {
     "description": "Dialog message - unsaved changes"
   },
@@ -1088,11 +1082,11 @@
   "@dialogClearAll": {
     "description": "Dialog title - clear all items"
   },
-  "dialogRemoveExtension": "Hapus Ekstensi",
+  "dialogRemoveExtension": "Uninstal Ekstensi",
   "@dialogRemoveExtension": {
     "description": "Dialog title - uninstall extension"
   },
-  "dialogRemoveExtensionMessage": "Apakah Anda yakin ingin menghapus ekstensi ini? Ini tidak dapat dibatalkan.",
+  "dialogRemoveExtensionMessage": "Kamu yakin ingin meng-uninstal ekstensi ini? Ini tidak dapat dibatalkan.",
   "@dialogRemoveExtensionMessage": {
     "description": "Dialog message - uninstall confirmation"
   },
@@ -1100,7 +1094,7 @@
   "@dialogUninstallExtension": {
     "description": "Dialog title - uninstall extension"
   },
-  "dialogUninstallExtensionMessage": "Apakah Anda yakin ingin menghapus {extensionName}?",
+  "dialogUninstallExtensionMessage": "Kamu yakin ingin meng-uninstal {extensionName}?",
   "@dialogUninstallExtensionMessage": {
     "description": "Dialog message - uninstall specific extension",
     "placeholders": {
@@ -1113,7 +1107,7 @@
   "@dialogClearHistoryTitle": {
     "description": "Dialog title - clear download history"
   },
-  "dialogClearHistoryMessage": "Apakah Anda yakin ingin menghapus semua histori download? Ini tidak dapat dibatalkan.",
+  "dialogClearHistoryMessage": "Apakah kamu yakin ingin menghapus semua histori download? Ini tidak dapat dibatalkan.",
   "@dialogClearHistoryMessage": {
     "description": "Dialog message - clear history confirmation"
   },
@@ -1268,7 +1262,7 @@
       }
     }
   },
-  "snackbarAlreadyInLibrary": "\"{trackName}\" sudah ada di Koleksi Anda",
+  "snackbarAlreadyInLibrary": "\"{trackName}\" sudah ada di Koleksi",
   "@snackbarAlreadyInLibrary": {
     "description": "Snackbar - track already exists in local library",
     "placeholders": {
@@ -1329,7 +1323,7 @@
   "@snackbarMetadataProviderSaved": {
     "description": "Snackbar - metadata provider order saved"
   },
-  "snackbarExtensionInstalled": "{extensionName} terinstal.",
+  "snackbarExtensionInstalled": "{extensionName} diinstal.",
   "@snackbarExtensionInstalled": {
     "description": "Snackbar - extension installed successfully",
     "placeholders": {
@@ -1375,7 +1369,7 @@
   "@errorUrlNotRecognized": {
     "description": "Error title - URL not handled by any extension or service"
   },
-  "errorUrlNotRecognizedMessage": "Link ini tidak didukung. Pastikan URL sudah benar dan ekstensi yang kompatibel telah terpasang.",
+  "errorUrlNotRecognizedMessage": "Link ini tidak didukung. Pastikan URL sudah benar dan ekstensi yang sesuai sudah diinstal.",
   "@errorUrlNotRecognizedMessage": {
     "description": "Error message - URL not recognized explanation"
   },
@@ -1539,7 +1533,7 @@
   "@folderOrganizationByPlaylist": {
     "description": "Folder option - playlist folders"
   },
-  "folderOrganizationByPlaylistSubtitle": "Pisahkan folder untuk setiap playlist ",
+  "folderOrganizationByPlaylistSubtitle": "Pisahkan folder untuk setiap playlist",
   "@folderOrganizationByPlaylistSubtitle": {
     "description": "Subtitle for playlist folder option"
   },
@@ -1728,7 +1722,7 @@
   "@logClearLogsTitle": {
     "description": "Clear logs dialog title"
   },
-  "logClearLogsMessage": "Apakah Anda yakin ingin menghapus semua log?",
+  "logClearLogsMessage": "Apakah kamu yakin ingin menghapus semua log?",
   "@logClearLogsMessage": {
     "description": "Clear logs confirmation message"
   },
@@ -1820,7 +1814,7 @@
   "@lyricsModeDescription": {
     "description": "Lyrics mode picker description"
   },
-  "lyricsModeEmbed": "Tersemat di file",
+  "lyricsModeEmbed": "Disematkan ke file",
   "@lyricsModeEmbed": {
     "description": "Lyrics mode option - embed in audio file"
   },
@@ -2039,11 +2033,11 @@
   "@trackLyricsNotInFile": {
     "description": "Message when no embedded lyrics in audio file"
   },
-  "trackFetchOnlineLyrics": "Ambil dari Online",
+  "trackFetchOnlineLyrics": "Ambil dari Internet",
   "@trackFetchOnlineLyrics": {
     "description": "Action - fetch lyrics from online providers"
   },
-  "trackLyricsTimeout": "Permintaan habis waktu. Coba lagi nanti.",
+  "trackLyricsTimeout": "Waktu permintaan habis. Coba lagi nanti.",
   "@trackLyricsTimeout": {
     "description": "Message when lyrics request times out"
   },
@@ -2071,7 +2065,7 @@
   "@trackDeleteConfirmTitle": {
     "description": "Delete confirmation title"
   },
-  "trackDeleteNetworkConfirmMessage": "Ini akan menghapus file secara permanen dari penyimpanan jaringan serta menghapusnya dari perpustakaan dan riwayat Anda.",
+  "trackDeleteNetworkConfirmMessage": "Ini akan menghapus file secara permanen dari penyimpanan jaringan, koleksi, dan histori kamu.",
   "snackbarDeleteTracksFailed": "Tak dapat hapus {count} {count, plural, =1{lagu} other{lagu}}. Periksa akses penyimpanan dan coba lagi.",
   "@snackbarDeleteTracksFailed": {
     "placeholders": {
@@ -2080,7 +2074,7 @@
       }
     }
   },
-  "trackDeleteConfirmMessage": "Ini akan menghapus file unduhan secara permanen dan menghapusnya dari riwayat Anda.",
+  "trackDeleteConfirmMessage": "Ini akan menghapus file hasil download dan historinya secara permanen.",
   "@trackDeleteConfirmMessage": {
     "description": "Delete confirmation message"
   },
@@ -2247,7 +2241,7 @@
   "@extensionUpdated": {
     "description": "Extension detail - last update"
   },
-  "extensionMinAppVersion": "Versi App Min",
+  "extensionMinAppVersion": "Versi Apl Min",
   "@extensionMinAppVersion": {
     "description": "Extension detail - minimum app version"
   },
@@ -2510,7 +2504,7 @@
   "@appearanceHeroAnimations": {
     "description": "Toggle for shared-element (Hero) transitions"
   },
-  "appearanceHeroAnimationsSubtitle": "Transisikan cover art antar layar, cont. membuka pemutar",
+  "appearanceHeroAnimationsSubtitle": "Transisikan foto cover antar layar, cont. membuka pemutar",
   "@appearanceHeroAnimationsSubtitle": {
     "description": "Subtitle for the Hero animations toggle"
   },
@@ -2526,7 +2520,7 @@
   "@queueClearAll": {
     "description": "Button - clear all queue items"
   },
-  "queueClearAllMessage": "Anda yakin ingin menghapus semua download?",
+  "queueClearAllMessage": "Kamu yakin ingin menghapus semua download?",
   "@queueClearAllMessage": {
     "description": "Clear queue confirmation"
   },
@@ -2875,7 +2869,7 @@
   "@libraryEnableLocalLibrary": {
     "description": "Toggle to enable library scanning"
   },
-  "libraryEnableLocalLibrarySubtitle": "Pindai seluruh musik di perangkat Anda",
+  "libraryEnableLocalLibrarySubtitle": "Pindai seluruh musik di perangkat",
   "@libraryEnableLocalLibrarySubtitle": {
     "description": "Subtitle for enable toggle"
   },
@@ -2934,7 +2928,7 @@
   "@libraryRemoveFolderMessage": {
     "description": "Confirmation shown before removing a library source"
   },
-  "libraryUnreadableFiles": "{count, plural, =1{1 file tidak dapat dibaca} other{{count} file tidak dapat dibaca}}",
+  "libraryUnreadableFiles": "{count, plural, =1{1 file tak terbaca} other{{count} file tak terbaca}}",
   "@libraryUnreadableFiles": {
     "description": "Count of files the last scan of a library folder skipped because it could not read them",
     "placeholders": {
@@ -2943,11 +2937,11 @@
       }
     }
   },
-  "libraryUnreadableFilesTitle": "File yang tidak terbaca",
+  "libraryUnreadableFilesTitle": "File tak terbaca",
   "@libraryUnreadableFilesTitle": {
     "description": "Title of the list of files a library scan could not read, and the action that opens it"
   },
-  "libraryUnreadableFilesSubtitle": "File ini tidak dimasukkan ke koleksi. Mungkin file rusak, masih diunduh, atau diblokir oleh aplikasi penyimpanan.",
+  "libraryUnreadableFilesSubtitle": "File ini tidak dimasukkan ke koleksi. Mungkin file rusak, masih didownload, atau diblokir oleh aplikasi penyimpanan.",
   "@libraryUnreadableFilesSubtitle": {
     "description": "Explanation above the list of files a library scan could not read"
   },
@@ -3032,7 +3026,7 @@
   "@libraryClearConfirmTitle": {
     "description": "Dialog title for clear confirmation"
   },
-  "libraryClearConfirmMessage": "Tindakan ini akan menghapus lagu terpindai dari Koleksi Anda. File asli akan tetap berada di ponsel Anda.",
+  "libraryClearConfirmMessage": "Tindakan ini akan menghapus lagu terpindai dari Koleksi. File asli akan tetap berada di perangkat.",
   "@libraryClearConfirmMessage": {
     "description": "Dialog message for clear confirmation"
   },
@@ -3071,7 +3065,7 @@
       }
     }
   },
-  "libraryLastScannedNever": "Belum",
+  "libraryLastScannedNever": "Tak pernah",
   "@libraryLastScannedNever": {
     "description": "Shown when library has never been scanned"
   },
@@ -3266,19 +3260,19 @@
   "@tutorialWelcomeTitle": {
     "description": "Tutorial welcome page title"
   },
-  "tutorialWelcomeDesc": "Pelajari cara menemukan musik dengan ekstensi, pilih kualitas yang Anda inginkan, dan atur download-nya di Mornye.",
+  "tutorialWelcomeDesc": "Pelajari cara menemukan musik dengan ekstensi, pilih kualitas yang kamu mau, dan atur downloadnya di Mornye.",
   "@tutorialWelcomeDesc": {
     "description": "Tutorial welcome page description"
   },
-  "tutorialWelcomeTip1": "Telusuri dengan ekstensi terinstal atau tempelkan link musik yang didukung.",
+  "tutorialWelcomeTip1": "Telusuri dengan ekstensi terinstal atau tempelkan link musik yang didukung",
   "@tutorialWelcomeTip1": {
     "description": "Tutorial welcome tip 1"
   },
-  "tutorialWelcomeTip2": "Pilih kualitas audio yang diberikan provider download Anda",
+  "tutorialWelcomeTip2": "Pilih kualitas audio yang diberikan provider downloadmu",
   "@tutorialWelcomeTip2": {
     "description": "Tutorial welcome tip 2"
   },
-  "tutorialWelcomeTip3": "Otomatis menyatukan metadata, cover art, lirik, dan informasi rilisan",
+  "tutorialWelcomeTip3": "Otomatis menyematkan metadata, foto cover, lirik, dan informasi rilisan",
   "@tutorialWelcomeTip3": {
     "description": "Tutorial welcome tip 3"
   },
@@ -3298,11 +3292,11 @@
   "@tutorialDownloadDesc": {
     "description": "Tutorial download page description"
   },
-  "tutorialLibraryTitle": "Koleksi Anda",
+  "tutorialLibraryTitle": "Koleksi Kamu",
   "@tutorialLibraryTitle": {
     "description": "Tutorial library page title"
   },
-  "tutorialLibraryDesc": "Hasil download dan musik terpindai akan muncul di Koleksi Anda.",
+  "tutorialLibraryDesc": "Hasil download dan musik terpindai akan muncul di Koleksi.",
   "@tutorialLibraryDesc": {
     "description": "Tutorial library page description"
   },
@@ -3326,7 +3320,7 @@
   "@tutorialExtensionsDesc": {
     "description": "Tutorial extensions page description"
   },
-  "tutorialExtensionsTip1": "Jelajahi menu Repo untuk menemukan berbagai ekstensi.",
+  "tutorialExtensionsTip1": "Jelajahi menu Repo untuk menemukan berbagai ekstensi",
   "@tutorialExtensionsTip1": {
     "description": "Tutorial extensions tip 1"
   },
@@ -3338,7 +3332,7 @@
   "@tutorialExtensionsTip3": {
     "description": "Tutorial extensions tip 3"
   },
-  "tutorialSettingsTitle": "Sesuaikan Selera Anda",
+  "tutorialSettingsTitle": "Atur Semua Sesuai Selera",
   "@tutorialSettingsTitle": {
     "description": "Tutorial settings page title"
   },
@@ -3358,7 +3352,7 @@
   "@tutorialSettingsTip3": {
     "description": "Tutorial settings tip 3"
   },
-  "tutorialReadyMessage": "Anda sudah siap, Pilih ekstensi Anda, lalu telusuri atau tempel link yang didukung.",
+  "tutorialReadyMessage": "Kamu sudah siap, Pilih ekstensi, lalu telusuri atau tempel link yang didukung.",
   "@tutorialReadyMessage": {
     "description": "Tutorial completion message"
   },
@@ -8036,6 +8030,40 @@
   "@desktopDownloadsCancel": {
     "description": "Tooltip of the button that cancels one download in the desktop downloads popover"
   },
+  "desktopScrollBack": "Gulir ke belakang",
+  "@desktopScrollBack": {
+    "description": "Tooltip of the desktop button that scrolls a horizontal shelf of albums or artists back"
+  },
+  "desktopScrollForward": "Gulir ke depan",
+  "@desktopScrollForward": {
+    "description": "Tooltip of the desktop button that scrolls a horizontal shelf of albums or artists forward"
+  },
+  "settingsKeyboardShortcuts": "Pintasan Keyboard",
+  "@settingsKeyboardShortcuts": {
+    "description": "Desktop Settings page that lists the app's keyboard shortcuts"
+  },
+  "settingsKeyboardShortcutsSubtitle": "Tombol untuk pemutaran, navigasi dan panel",
+  "@settingsKeyboardShortcutsSubtitle": {
+    "description": "Subtitle of the Keyboard Shortcuts entry in desktop Settings"
+  },
+  "desktopShortcutsNavigation": "Navigasi",
+  "@desktopShortcutsNavigation": {
+    "description": "Keyboard Shortcuts section for moving between pages"
+  },
+  "desktopShortcutDismiss": "Tutup dialog atau halaman",
+  "@desktopShortcutDismiss": {
+    "description": "Keyboard Shortcuts row for Escape, which leaves a text field or closes the top dialog or page"
+  },
+  "desktopShortcutToggleSidebar": "Tampilkan atau sembunyikan sidebar",
+  "@desktopShortcutToggleSidebar": {
+    "description": "Keyboard Shortcuts row for the shortcut that collapses or expands the desktop sidebar"
+  },
+  "libraryFolders": "Folder",
+  "libraryFolderCount": "{count, plural, =1{1 folder} other{{count} folder}}",
+  "libraryFoldersEmptyTitle": "Belum ada folder",
+  "libraryFoldersEmptyMessage": "Unduh lagu atau tambahkan folder musik di setelan Koleksi Lokal untuk menjelajahinya per folder.",
+  "libraryFolderMissing": "Folder ini tidak ada lagi di Koleksi",
+  "libraryFoldersLoadFailed": "Tidak dapat membaca folder",
   "linkDesktopSettingsTitle": "Mornye di ponsel",
   "linkDesktopSettingsSubtitle": "Putar Library dan kendalikan pemutaran dari ponsel",
   "linkDesktopEnableTitle": "Bagikan ke Mornye di ponsel",
@@ -8091,34 +8119,6 @@
   "linkDesktopSentToPhone": "Terkirim ke {name}",
   "linkDesktopNotDelivered": "Ponsel tidak menerimanya",
   "linkDesktopNothingToContinue": "Tidak ada yang diputar di komputer ini",
-  "desktopScrollBack": "Gulir ke belakang",
-  "@desktopScrollBack": {
-    "description": "Tooltip of the desktop button that scrolls a horizontal shelf of albums or artists back"
-  },
-  "desktopScrollForward": "Gulir ke depan",
-  "@desktopScrollForward": {
-    "description": "Tooltip of the desktop button that scrolls a horizontal shelf of albums or artists forward"
-  },
-  "settingsKeyboardShortcuts": "Pintasan Keyboard",
-  "@settingsKeyboardShortcuts": {
-    "description": "Desktop Settings page that lists the app's keyboard shortcuts"
-  },
-  "settingsKeyboardShortcutsSubtitle": "Tombol untuk pemutaran, navigasi dan panel",
-  "@settingsKeyboardShortcutsSubtitle": {
-    "description": "Subtitle of the Keyboard Shortcuts entry in desktop Settings"
-  },
-  "desktopShortcutsNavigation": "Navigasi",
-  "@desktopShortcutsNavigation": {
-    "description": "Keyboard Shortcuts section for moving between pages"
-  },
-  "desktopShortcutDismiss": "Tutup dialog atau halaman",
-  "@desktopShortcutDismiss": {
-    "description": "Keyboard Shortcuts row for Escape, which leaves a text field or closes the top dialog or page"
-  },
-  "desktopShortcutToggleSidebar": "Tampilkan atau sembunyikan sidebar",
-  "@desktopShortcutToggleSidebar": {
-    "description": "Keyboard Shortcuts row for the shortcut that collapses or expands the desktop sidebar"
-  },
   "linkSettingsTitle": "Mornye di komputer Anda",
   "linkSettingsSubtitle": "Putar dan kendalikan pustaka komputer Anda",
   "linkPageTitle": "Komputer",
@@ -8179,7 +8179,7 @@
   "playlistImportFileSubtitle": "M3U, M3U8, atau CSV, dicocokkan dengan file di perangkat ini",
   "playlistFolderPickerTitle": "Pilih folder",
   "playlistFolderPickerEmptyTitle": "Belum ada folder",
-  "playlistFolderPickerEmpty":"Belum ada lagu yang dipindai. Tambahkan folder Koleksi lalu pindai terlebih dahulu.",
+  "playlistFolderPickerEmpty": "Belum ada lagu yang dipindai. Tambahkan folder Koleksi lalu pindai terlebih dahulu.",
   "playlistCreatedWithTracks": "{name} dibuat dengan {count, plural, =1{1 lagu} other{{count} lagu}}",
   "playlistImportResult": "{count, plural, =1{1 lagu} other{{count} lagu}} diimpor ke {name}, {matched} cocok dengan file di perangkat ini",
   "playlistImportNoTracks": "Tidak ada lagu di file ini",

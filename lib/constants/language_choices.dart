@@ -21,6 +21,7 @@ const appLanguageChoices = [
   ('ru', 'Русский', Icons.language),
   ('tr', 'Türkçe', Icons.language),
   ('uk', 'Українська', Icons.language),
+  ('vi', 'Tiếng Việt', Icons.language),
   ('zh_CN', '简体中文', Icons.language),
   ('zh_TW', '繁體中文', Icons.language),
 ];

@@ -13,39 +13,39 @@
   "subsonicSearch": "Search server music...",
   "subsonicMoreAlbums": "More albums",
   "subsonicErrorApi": "The server does not support this API version or authentication method. Check the server settings and the selected sign-in method.",
-  "networkDownloadDestination": "Network download destination",
+  "networkDownloadDestination": "Destination du téléchargement réseau",
   "@networkDownloadDestination": {
     "description": "Files settings item that opens network storage to choose a folder for downloaded music"
   },
-  "networkUseForDownloads": "Download to this folder",
+  "networkUseForDownloads": "Télécharger dans ce dossier",
   "@networkUseForDownloads": {
     "description": "Action to select the current network folder as the download destination; also the settings subtitle when no network destination is selected"
   },
-  "networkDownloadSelected": "Selected download destination",
+  "networkDownloadSelected": "Destination de téléchargement sélectionnée",
   "@networkDownloadSelected": {
     "description": "Status label replacing the download destination action when the current network folder is already selected"
   },
-  "networkUseLocalDownloads": "Use local download folder",
+  "networkUseLocalDownloads": "Utiliser le dossier de téléchargement local",
   "@networkUseLocalDownloads": {
     "description": "Files settings action that clears the network download destination and returns downloads to the local folder"
   },
-  "networkDownloadAccessFailed": "Could not write to this folder.",
+  "networkDownloadAccessFailed": "Impossible d'écrire dans ce dossier.",
   "@networkDownloadAccessFailed": {
     "description": "Snackbar prefix when the write-access check fails while selecting a network download folder; followed by a specific network error message"
   },
-  "networkUploading": "Uploading to network storage",
+  "networkUploading": "Transfert vers un espace de stockage en réseau",
   "@networkUploading": {
     "description": "Download queue status during upload of prepared audio to the network destination; a progress percentage may follow"
   },
-  "networkDownloadDescription": "Prepare songs on this device, then upload them to your NAS. Keep the app open until the upload finishes. Retry reuses prepared audio. Existing files are kept; new downloads with the same name get a numbered suffix.",
+  "networkDownloadDescription": "Téléchargez les musiques sur votre serveur de stockage réseau (NAS) après les avoir préparées sur cet appareil. L'application doit rester ouverte jusqu'à la fin du téléchargement. Chaque essai réutilise les musiques préparées. Les fichiers déjà existants sont conservés tandis que les nouveaux téléchargements portant le même nom se voient attribuer un suffixe numéroté.",
   "@networkDownloadDescription": {
     "description": "Help below the network download destination action explaining local preparation, upload, retry behavior, and preservation of existing files; NAS means network-attached storage"
   },
-  "networkAddToLibrary": "Add folder to Library",
+  "networkAddToLibrary": "Ajouter un dossier à la bibliothèque",
   "@networkAddToLibrary": {
     "description": "Action that adds the current network folder as a Library source and starts scanning it"
   },
-  "networkLibraryAdded": "Folder added to Library",
+  "networkLibraryAdded": "Dossier ajouté à la bibliothèque",
   "@networkLibraryAdded": {
     "description": "Status label replacing the add-to-Library action after the network folder has been added as a source; does not mean scanning has finished"
   },
@@ -101,7 +101,7 @@
   "@networkCredentials": {
     "description": "Connection form section heading for optional server credentials"
   },
-  "networkRefresh": "Refresh",
+  "networkRefresh": "Actualiser",
   "@networkRefresh": {
     "description": "Toolbar tooltip for reloading saved connections or the current network folder listing"
   },
@@ -117,7 +117,7 @@
   "@networkEditConnection": {
     "description": "Edit button tooltip and form title for changing an existing network storage connection"
   },
-  "networkConnectionName": "Name",
+  "networkConnectionName": "Nom",
   "@networkConnectionName": {
     "description": "Required connection form field for a user-chosen display name identifying the saved connection"
   },
@@ -377,7 +377,7 @@
   "@folderTemplatePreview": {
     "description": "Label for a sample expanded folder template"
   },
-  "folderTemplatePreviewFailed": "Preview unavailable",
+  "folderTemplatePreviewFailed": "Aperçu indisponible",
   "@folderTemplatePreviewFailed": {
     "description": "Shown when the native folder preview could not be generated"
   },
@@ -565,7 +565,7 @@
   "metadataSeparatorSemicolon": "Semicolon (;)",
   "metadataSeparatorSlash": "Slash (/)",
   "metadataSeparatorCustom": "Custom separator",
-  "metadataSeparatorPreview": "Preview",
+  "metadataSeparatorPreview": "Aperçu",
   "metadataSeparatorInvalid": "Use 1–16 characters without line breaks or control characters.",
   "@optionsArtistTagMode": {
     "description": "Setting title for how artist metadata is written into files"
@@ -4456,7 +4456,7 @@
   "@backupContentsSettings": {
     "description": "Backup contents row label for settings"
   },
-  "backupContentsHistory": "{count} history {count, plural, =1{item} other{items}}",
+  "backupContentsHistory": "{count} historique {count, plural, one {}=1{élément} other{éléments}}",
   "@backupContentsHistory": {
     "description": "Backup contents row for history count",
     "placeholders": {
@@ -4465,7 +4465,7 @@
       }
     }
   },
-  "backupContentsLiked": "{count} liked {count, plural, =1{track} other{tracks}}",
+  "backupContentsLiked": "{count} favoris {count, plural, one {}=1{titre} other{titres}}",
   "@backupContentsLiked": {
     "description": "Backup contents row for liked tracks count",
     "placeholders": {
@@ -4474,7 +4474,7 @@
       }
     }
   },
-  "backupContentsWishlist": "{count} wishlist {count, plural, =1{track} other{tracks}}",
+  "backupContentsWishlist": "{count} liste de souhaits {count, plural, one {}=1{titre} other{titres}}",
   "@backupContentsWishlist": {
     "description": "Backup contents row for wishlist tracks count",
     "placeholders": {
@@ -4492,7 +4492,7 @@
       }
     }
   },
-  "backupContentsArtists": "{count, plural, =1{1 favorite artist} other{{count} favorite artists}}",
+  "backupContentsArtists": "{count, plural, one {}=1{1 artiste préféré} other{{count} artistes préférés}}",
   "@backupContentsArtists": {
     "description": "Backup contents row for favorite artists count",
     "placeholders": {
@@ -4848,7 +4848,7 @@
   "@snackbarSelectedPlaylistsEmpty": {
     "description": "Snackbar when selected playlists contain no tracks"
   },
-  "playlistsCount": "{count, plural, =1{1 playlist} other{{count} playlists}}",
+  "playlistsCount": "{count, plural, one {}=1{1 playlist} other{{count} playlists}}",
   "@playlistsCount": {
     "description": "Playlist count display",
     "placeholders": {
@@ -5041,7 +5041,7 @@
       }
     }
   },
-  "queueAlbumCount": "{count, plural, =1{1 album} other{{count} albums}}",
+  "queueAlbumCount": "{count, plural, one {}=1{1 album} other{{count} albums}}",
   "@queueAlbumCount": {
     "description": "Album count label with plural support",
     "placeholders": {
@@ -6320,7 +6320,7 @@
       }
     }
   },
-  "storeExtensionsCount": "{count} {count, plural, =1{extension} other{extensions}}",
+  "storeExtensionsCount": "{count} {count, plural, one {}=1{extension} other{extensions}}",
   "@storeExtensionsCount": {
     "description": "Store extension result count",
     "placeholders": {
@@ -6707,7 +6707,7 @@
       }
     }
   },
-  "nowPlayingSleepTimerMinutes": "{minutes, plural, =1{1 minute} other{{minutes} minutes}}",
+  "nowPlayingSleepTimerMinutes": "{minutes, plural, one {}=1{1 minute} other{{minutes} minutes}}",
   "@nowPlayingSleepTimerMinutes": {
     "description": "Duration choice for the playback sleep timer",
     "placeholders": {
@@ -6887,7 +6887,7 @@
   "@snackbarAddedToQueueGeneric": {
     "description": "Snackbar when a track is added to the playback queue without naming it"
   },
-  "selectionDeletePlaylistsCount": "Delete {count} {count, plural, =1{playlist} other{playlists}}",
+  "selectionDeletePlaylistsCount": "Supprimer {count} {count, plural, one {}=1{playlist} other{playlists}}",
   "@selectionDeletePlaylistsCount": {
     "description": "Button label for deleting multiple selected playlists",
     "placeholders": {
@@ -7244,7 +7244,7 @@
   "@playerCoverStyle": {
     "description": "Settings section choosing how the player shows cover art"
   },
-  "playerCoverStyleDefault": "Default",
+  "playerCoverStyleDefault": "Par défaut",
   "@playerCoverStyleDefault": {
     "description": "Cover art style: artwork card above the controls"
   },
@@ -7287,7 +7287,7 @@
   "autoplayResetLearning": "Reset recommendation learning",
   "autoplayResetLearningConfirmTitle": "Reset recommendation learning?",
   "autoplayResetLearningConfirmMessage": "Autoplay forgets what it learned from your listening and skips. This can't be undone.",
-  "autoplayResetLearningConfirm": "Reset",
+  "autoplayResetLearningConfirm": "Réinitialiser",
   "profileTitle": "Profil",
   "profileSetUp": "Configurez votre profil",
   "profileEdit": "Modifier le nom et la photo",
@@ -7540,9 +7540,9 @@
       }
     }
   },
-  "listeningRewindShare": "Share",
+  "listeningRewindShare": "Partager",
   "listeningRewindShareError": "Could not share your Rewind",
-  "listeningRewindNext": "Next",
+  "listeningRewindNext": "Suivant",
   "listeningRewindPrevious": "Previous",
   "listeningRewindMonthlyReady": "Your last 4 weeks are ready to replay",
   "listeningRewindYearTitle": "Your {year} in Music",
@@ -7557,8 +7557,8 @@
   "listeningRewindYearBanner": "Your top artists, songs and moments of the year",
   "listeningRewindYearIntroBody": "Everything you played this year, from your first song to your biggest month.",
   "listeningRewindNumbersTitle": "Your year in numbers",
-  "listeningRewindSongsLabel": "Songs",
-  "listeningRewindArtistsLabel": "Artists",
+  "listeningRewindSongsLabel": "Titres",
+  "listeningRewindArtistsLabel": "Artistes",
   "listeningRewindAlbumsLabel": "Albums",
   "listeningRewindDaysLabel": "Days with music",
   "listeningRewindDaysShare": "Music on {percent}% of your days",
@@ -7616,7 +7616,7 @@
   "libraryLoading": "Loading Library…",
   "libraryLoadFailed": "Library could not be loaded. Retry to load the saved folders and track index.",
   "discordPresenceDescription": "Share the title, artist, album and progress of music played in the built-in player on your Discord profile. Local audio and artwork files are never uploaded. Clears when playback pauses or stops.",
-  "discordPresenceDisabled": "Disabled",
+  "discordPresenceDisabled": "Désactivé",
   "discordPresenceLink": "Link Discord account",
   "discordPresenceConnecting": "Connecting to Discord…",
   "discordPresenceReady": "Ready when music plays",
@@ -7713,12 +7713,12 @@
       }
     }
   },
-  "lyricsShareAction": "Share",
+  "lyricsShareAction": "Partager",
   "lyricsShareError": "Couldn't create the lyrics image",
   "lyricsShareBackgroundArtwork": "Artwork",
   "lyricsShareBackgroundColor": "Cover color",
-  "lyricsShareBackgroundDark": "Dark",
-  "lyricsShareBackgroundLight": "Light",
+  "lyricsShareBackgroundDark": "Sombre",
+  "lyricsShareBackgroundLight": "Clair",
   "audioInfoTitle": "Audio info",
   "@audioInfoTitle": {
     "description": "Sheet with technical details of the playing track, opened from the quality badge"
@@ -7729,15 +7729,15 @@
   "audioInfoProcessing": "Processing",
   "audioInfoOutput": "Output",
   "audioInfoAnalysis": "Spectrum and level analysis",
-  "audioInfoQuality": "Quality",
+  "audioInfoQuality": "Qualité",
   "audioInfoHiResLossless": "Hi-Res Lossless",
-  "audioInfoLossless": "Lossless",
-  "audioInfoLossy": "Lossy",
+  "audioInfoLossless": "Sans perte",
+  "audioInfoLossy": "Avec perte",
   "audioInfoFormat": "Format",
   "audioInfoCodec": "Codec",
   "audioInfoSampleRate": "Sample rate",
   "audioInfoBitDepth": "Bit depth",
-  "audioInfoChannels": "Channels",
+  "audioInfoChannels": "Chaînes",
   "audioInfoChannelCount": "{count, plural, =1{Mono} =2{Stereo} other{{count} channels}}",
   "@audioInfoChannelCount": {
     "placeholders": {
@@ -7746,8 +7746,8 @@
       }
     }
   },
-  "audioInfoBitrate": "Bitrate",
-  "audioInfoDuration": "Duration",
+  "audioInfoBitrate": "Débit binaire",
+  "audioInfoDuration": "Durée",
   "audioInfoFileSize": "File size",
   "audioInfoCompression": "Compression",
   "audioInfoCompressionValue": "{percent}% of uncompressed size",
@@ -7787,9 +7787,9 @@
     }
   },
   "audioInfoOn": "On",
-  "audioInfoOff": "Off",
+  "audioInfoOff": "Désactivé",
   "audioInfoBypassed": "Bypassed by direct output",
-  "audioInfoPlayer": "Player",
+  "audioInfoPlayer": "Lecteur",
   "audioInfoPlayerValue": "Mornye built-in player",
   "audioInfoSignalPath": "Signal path",
   "audioInfoPathSystem": "System mixer",
@@ -7822,10 +7822,10 @@
     }
   },
   "audioInfoOutputRate": "Output sample rate",
-  "audioInfoOutputFormat": "Output format",
+  "audioInfoOutputFormat": "Format de sortie",
   "audioInfoDeviceRates": "Device sample rates",
   "audioInfoDeviceFormats": "Device formats",
-  "audioInfoAnyRate": "Any",
+  "audioInfoAnyRate": "N'importe lequel",
   "audioInfoBuffer": "Mixer buffer",
   "audioInfoLatency": "Output latency",
   "audioInfoLowLatency": "Low-latency audio",
@@ -7852,7 +7852,7 @@
   "appCrashMessage": "A crash report was saved. Copy it and send it to the developer to help investigate.",
   "appCrashDetails": "View error and log",
   "appCrashCopy": "Copy report for developer",
-  "appCrashDismiss": "Dismiss",
+  "appCrashDismiss": "Ignorer",
   "appCrashCopyFailed": "Could not copy the crash report. Please try again.",
   "appCrashDismissFailed": "Could not dismiss the crash report. Please try again.",
   "optionsEmbeddedCoverSizeOriginal": "Résolution originale",
@@ -7951,7 +7951,7 @@
   "@desktopMiniPlayerExpand": {
     "description": "Mini player button that returns the window to its full size"
   },
-  "desktopMenuRefresh": "Refresh",
+  "desktopMenuRefresh": "Actualiser",
   "@desktopMenuRefresh": {
     "description": "View menu item and Keyboard Shortcuts row that reloads the page on screen (Home, Repo, statistics)"
   },

@@ -13,63 +13,63 @@
   "subsonicSearch": "Search server music...",
   "subsonicMoreAlbums": "More albums",
   "subsonicErrorApi": "The server does not support this API version or authentication method. Check the server settings and the selected sign-in method.",
-  "networkDownloadDestination": "Network download destination",
+  "networkDownloadDestination": "Destino de descarga en red",
   "@networkDownloadDestination": {
     "description": "Files settings item that opens network storage to choose a folder for downloaded music"
   },
-  "networkUseForDownloads": "Download to this folder",
+  "networkUseForDownloads": "Descargar en esta carpeta",
   "@networkUseForDownloads": {
     "description": "Action to select the current network folder as the download destination; also the settings subtitle when no network destination is selected"
   },
-  "networkDownloadSelected": "Selected download destination",
+  "networkDownloadSelected": "Destino de descarga seleccionado",
   "@networkDownloadSelected": {
     "description": "Status label replacing the download destination action when the current network folder is already selected"
   },
-  "networkUseLocalDownloads": "Use local download folder",
+  "networkUseLocalDownloads": "Usar la carpeta de descargas local",
   "@networkUseLocalDownloads": {
     "description": "Files settings action that clears the network download destination and returns downloads to the local folder"
   },
-  "networkDownloadAccessFailed": "Could not write to this folder.",
+  "networkDownloadAccessFailed": "No se pudo escribir en esta carpeta.",
   "@networkDownloadAccessFailed": {
     "description": "Snackbar prefix when the write-access check fails while selecting a network download folder; followed by a specific network error message"
   },
-  "networkUploading": "Uploading to network storage",
+  "networkUploading": "Subir archivos al almacenamiento en red",
   "@networkUploading": {
     "description": "Download queue status during upload of prepared audio to the network destination; a progress percentage may follow"
   },
-  "networkDownloadDescription": "Prepare songs on this device, then upload them to your NAS. Keep the app open until the upload finishes. Retry reuses prepared audio. Existing files are kept; new downloads with the same name get a numbered suffix.",
+  "networkDownloadDescription": "Prepara las canciones en este dispositivo y luego súbelas a tu NAS. Mantén la aplicación abierta hasta que termine la subida. La opción «Reintentar» reutiliza el audio preparado. Los archivos existentes se conservan; las nuevas descargas con el mismo nombre reciben un sufijo numérico.",
   "@networkDownloadDescription": {
     "description": "Help below the network download destination action explaining local preparation, upload, retry behavior, and preservation of existing files; NAS means network-attached storage"
   },
-  "networkAddToLibrary": "Add folder to Library",
+  "networkAddToLibrary": "Agregar carpeta a la biblioteca",
   "@networkAddToLibrary": {
     "description": "Action that adds the current network folder as a Library source and starts scanning it"
   },
-  "networkLibraryAdded": "Folder added to Library",
+  "networkLibraryAdded": "Carpeta agregada a la biblioteca",
   "@networkLibraryAdded": {
     "description": "Status label replacing the add-to-Library action after the network folder has been added as a source; does not mean scanning has finished"
   },
-  "networkLibraryDescription": "Scan this folder and its subfolders. Music stays on your server; metadata and artwork are saved on this device. Manage or rescan it in Local Library settings.",
+  "networkLibraryDescription": "Escanea esta carpeta y sus subcarpetas. La música se queda en tu servidor; los metadatos y las carátulas se guardan en este dispositivo. Puedes administrarla o volver a escanearla en la configuración de la Biblioteca local.",
   "@networkLibraryDescription": {
     "description": "Help below the add-to-Library action explaining recursive scanning, local metadata and artwork storage, and management in Local Library settings"
   },
-  "networkStorage": "Network storage",
+  "networkStorage": "Almacenamiento en red",
   "@networkStorage": {
     "description": "Title and navigation label for the screen used to manage network connections and browse remote music folders"
   },
-  "networkErrorUnreachable": "The server could not be reached. Check that this phone can access its network and that the file-sharing service is running. For SMB, port 445 must be reachable.",
+  "networkErrorUnreachable": "No se pudo establecer conexión con el servidor. Verifica que este teléfono pueda acceder a su red y que el servicio para compartir archivos esté en funcionamiento. Para SMB, el puerto 445 debe estar accesible.",
   "@networkErrorUnreachable": {
     "description": "Network access error for an unreachable server, with connection troubleshooting and the SMB port requirement"
   },
-  "networkErrorTimeout": "The server did not respond in time. Check the connection and try again.",
+  "networkErrorTimeout": "El servidor no respondió a tiempo. Revisa la conexión e inténtalo de nuevo.",
   "@networkErrorTimeout": {
     "description": "Network access error when a server operation exceeds its time limit"
   },
-  "networkErrorAuthentication": "The server rejected the sign-in. Check the username, password and domain. Leave the domain blank unless your server requires one.",
+  "networkErrorAuthentication": "El servidor rechazó el inicio de sesión. Verifica el nombre de usuario, la contraseña y el dominio. Deja el campo del dominio en blanco, a menos que tu servidor lo requiera.",
   "@networkErrorAuthentication": {
     "description": "Network access error when the server rejects credentials; domain refers to the optional SMB authentication domain"
   },
-  "networkErrorPermission": "This account is not allowed to open this share or folder. Check its read permissions on the server.",
+  "networkErrorPermission": "Esta cuenta no tiene permiso para abrir este recurso compartido o esta carpeta. Verifica sus permisos de lectura en el servidor.",
   "@networkErrorPermission": {
     "description": "Network access error when the server denies account permissions for a shared folder; distinct from the device's local network permission"
   },
@@ -77,103 +77,103 @@
   "@networkErrorLocalPermission": {
     "description": "Network access error when Android denies local network permission; Nearby devices is the Android app permission setting"
   },
-  "networkErrorShare": "The share or folder was not found. For SMB, use the server's shared folder name after its address, such as smb://server/Music/.",
+  "networkErrorShare": "No se encontró el recurso compartido ni la carpeta. Para SMB, utiliza el nombre de la carpeta compartida del servidor después de su dirección, por ejemplo, smb://server/Music/.",
   "@networkErrorShare": {
     "description": "Network access error for a missing share or folder; share means an SMB shared folder and the example illustrates its URL path"
   },
-  "networkErrorProtocol": "The server and this SMB client could not agree on a supported protocol. Enable SMB2 or SMB3 on the server. SMB1 is not supported.",
+  "networkErrorProtocol": "El servidor y este cliente SMB no pudieron ponerse de acuerdo sobre un protocolo compatible. Habilita SMB2 o SMB3 en el servidor. SMB1 no es compatible.",
   "@networkErrorProtocol": {
     "description": "Network access error for incompatible SMB protocol versions; preserve the version names SMB1, SMB2, and SMB3"
   },
-  "networkErrorAddress": "Check the server address. Use smb://server/share/ for SMB, or an http:// or https:// address for WebDAV and HTTP.",
+  "networkErrorAddress": "Verifica la dirección del servidor. Usa smb://server/share/ para SMB, o una dirección del tipo http:// o https:// address for WebDAV and HTTP.",
   "@networkErrorAddress": {
     "description": "Network access error for an invalid address, with URL scheme examples for SMB, WebDAV, and HTTP connections"
   },
-  "networkConnections": "Saved connections",
+  "networkConnections": "Conexiones guardadas",
   "@networkConnections": {
     "description": "Section heading above the list of saved network storage connections"
   },
-  "networkServer": "Server",
+  "networkServer": "Servidor",
   "@networkServer": {
     "description": "Connection form section heading above the display name and server or audio URL fields"
   },
-  "networkCredentials": "Sign in (optional)",
+  "networkCredentials": "Iniciar sesión (opcional)",
   "@networkCredentials": {
     "description": "Connection form section heading for optional server credentials"
   },
-  "networkRefresh": "Refresh",
+  "networkRefresh": "Actualizar",
   "@networkRefresh": {
     "description": "Toolbar tooltip for reloading saved connections or the current network folder listing"
   },
-  "networkStorageDescription": "Connect to your NAS or music server and browse its folders. Your sign-in details are stored securely on this device.",
+  "networkStorageDescription": "Conéctate a tu NAS o servidor de música y explora sus carpetas. Tus datos de inicio de sesión se guardan de manera segura en este dispositivo.",
   "@networkStorageDescription": {
     "description": "Introduction shown in the empty connections screen and connection form, explaining remote folder browsing and secure local credential storage; NAS means network-attached storage"
   },
-  "networkAddConnection": "Add connection",
+  "networkAddConnection": "Agregar conexión",
   "@networkAddConnection": {
     "description": "Action label, toolbar tooltip, and form title for adding a network storage connection"
   },
-  "networkEditConnection": "Edit connection",
+  "networkEditConnection": "Editar conexión",
   "@networkEditConnection": {
     "description": "Edit button tooltip and form title for changing an existing network storage connection"
   },
-  "networkConnectionName": "Name",
+  "networkConnectionName": "Nombre",
   "@networkConnectionName": {
     "description": "Required connection form field for a user-chosen display name identifying the saved connection"
   },
-  "networkAddress": "Server or audio URL",
+  "networkAddress": "Servidor o URL de audio",
   "@networkAddress": {
     "description": "Required connection form field for the server or direct audio URL, using the scheme appropriate to the selected protocol"
   },
-  "networkProtocol": "Protocol",
+  "networkProtocol": "Protocolo",
   "@networkProtocol": {
     "description": "Connection form section heading for choosing SMB, WebDAV, or HTTP / HTTPS"
   },
-  "networkUsername": "Username (optional)",
+  "networkUsername": "Nombre de usuario (opcional)",
   "@networkUsername": {
     "description": "Optional connection form field for the server account username"
   },
-  "networkPassword": "Password (optional)",
+  "networkPassword": "Contraseña (opcional)",
   "@networkPassword": {
     "description": "Optional connection form field for the server account password, with input characters hidden"
   },
-  "networkDomain": "Domain (optional)",
+  "networkDomain": "Dominio (opcional)",
   "@networkDomain": {
     "description": "Optional connection form field shown only for SMB; refers to the authentication domain, not the server's internet domain name"
   },
-  "networkConnectSave": "Connect and save",
+  "networkConnectSave": "Conéctate y guarda",
   "@networkConnectSave": {
     "description": "Connection form action that checks access to the network source before saving the connection"
   },
-  "networkErrorCertificate": "The server's HTTPS certificate could not be verified. Edit this connection to review and trust its certificate, or check the server's HTTPS configuration.",
+  "networkErrorCertificate": "No se pudo verificar el certificado HTTPS del servidor. Edita esta conexión para revisar el certificado y marcarlo como confiable, o revisa la configuración HTTPS del servidor.",
   "@networkErrorCertificate": {
     "description": "Network access error for HTTPS certificate verification failure, directing the user to review the certificate in the connection form; unrelated to SMB authentication"
   },
-  "networkCertificatePrompt": "This server uses an untrusted HTTPS certificate. Routers and NAS devices often use self-signed certificates. Verify the server address and SHA-256 fingerprint before trusting it. Trust applies only to this certificate on this server; a changed certificate requires approval again.",
+  "networkCertificatePrompt": "Este servidor utiliza un certificado HTTPS no confiable. Los enrutadores y los dispositivos NAS suelen utilizar certificados autofirmados. Verifica la dirección del servidor y la huella digital SHA-256 antes de considerarlo confiable. La confianza se aplica únicamente a este certificado en este servidor; si se cambia el certificado, será necesario volver a aprobarlo.",
   "@networkCertificatePrompt": {
     "description": "Connection form warning shown above the HTTPS origin and certificate SHA-256 fingerprint; approval trusts only that fingerprint for this connection's HTTPS origin, not a global certificate authority or an SMB server"
   },
-  "networkTrustCertificate": "Trust certificate and retry",
+  "networkTrustCertificate": "Certificado de confianza y reintento",
   "@networkTrustCertificate": {
     "description": "Action approving the displayed certificate SHA-256 fingerprint for this connection's HTTPS origin and retrying connect-and-save; does not grant global certificate trust"
   },
-  "networkRemoveConnection": "Remove connection",
+  "networkRemoveConnection": "Desconectar",
   "@networkRemoveConnection": {
     "description": "Connection form action that removes the saved connection and its credentials, without deleting files on the server"
   },
-  "networkNoFiles": "No supported music files or folders found.",
+  "networkNoFiles": "No se encontraron archivos ni carpetas de música compatibles.",
   "@networkNoFiles": {
     "description": "Empty folder message when the network listing contains no directories or supported audio files"
   },
-  "networkConnectionError": "Could not access the network source. Check the server address, credentials, and connection, then retry.",
+  "networkConnectionError": "No se pudo acceder al origen de red. Revisa la dirección del servidor, las credenciales y la conexión, y vuelve a intentarlo.",
   "@networkConnectionError": {
     "description": "Fallback network access error when the failure has no more specific classification"
   },
-  "extensionAccountTitle": "Extension account",
-  "extensionAccountInvalidForm": "The extension returned an invalid account form.",
-  "extensionAccountRestartLogin": "Restart account login to continue.",
-  "extensionAccountRequiredValue": "Enter a value.",
-  "extensionAccountInvalidNumber": "Enter a valid number.",
+  "extensionAccountTitle": "Cuenta de extensión",
+  "extensionAccountInvalidForm": "La extensión devolvió un formulario de cuenta no válido.",
+  "extensionAccountRestartLogin": "Inicia sesión de nuevo en tu cuenta para continuar.",
+  "extensionAccountRequiredValue": "Ingresa un valor.",
+  "extensionAccountInvalidNumber": "Ingresa un número válido.",
   "settingsPlaybackSubtitle": "Reproductor, volumen, AutoMix y salida de audio",
   "sectionPlayer": "Reproductor",
   "sectionVolumeAndTransitions": "Volumen y transiciones",
@@ -217,12 +217,12 @@
   "appearanceAccentPurple": "Morado",
   "appearanceAccentPink": "Rosado",
   "appearanceGlassClarity": "Transparencia del vidrio",
-  "appearanceGlassOutlines": "Glass outlines",
-  "appearanceGlassOutlinesSubtitle": "Show decorative edges around Mornye glass. Turning this off keeps blur and refraction.",
+  "appearanceGlassOutlines": "Contornos de vidrio",
+  "appearanceGlassOutlinesSubtitle": "Mostrar bordes decorativos alrededor del cristal de Mornye. Si desactivas esta opción, se mantendrán el desenfoque y la refracción.",
   "appearanceGlassClaritySubtitle": "Ajusta la transparencia en los menús y la navegación de Mornye. Se conserva el contraste del texto.",
   "appearanceGlassTinted": "Tintado",
   "appearanceGlassClear": "Borrar",
-  "appearanceGlassClearPerformance": "Very clear glass may use more power and feel less smooth on older devices. Lower clarity if needed.",
+  "appearanceGlassClearPerformance": "El vidrio muy transparente puede consumir más energía y dar una sensación menos fluida en dispositivos más antiguos. Reduce la claridad si es necesario.",
   "appearanceGlassClarityBlurOff": "El vidrio se ve opaco en este dispositivo. Activa “{setting}” para ajustar la claridad.",
   "@appearanceGlassClarityBlurOff": {
     "description": "Shown under the disabled glass clarity slider when the device renders Mornye glass without blur. The placeholder is the name of the force-blur toggle.",
@@ -377,7 +377,7 @@
   "@folderTemplatePreview": {
     "description": "Label for a sample expanded folder template"
   },
-  "folderTemplatePreviewFailed": "Preview unavailable",
+  "folderTemplatePreviewFailed": "Vista previa no disponible",
   "@folderTemplatePreviewFailed": {
     "description": "Shown when the native folder preview could not be generated"
   },
@@ -565,7 +565,7 @@
   "metadataSeparatorSemicolon": "Semicolon (;)",
   "metadataSeparatorSlash": "Slash (/)",
   "metadataSeparatorCustom": "Custom separator",
-  "metadataSeparatorPreview": "Preview",
+  "metadataSeparatorPreview": "Vista previa",
   "metadataSeparatorInvalid": "Use 1–16 characters without line breaks or control characters.",
   "@optionsArtistTagMode": {
     "description": "Setting title for how artist metadata is written into files"
@@ -723,11 +723,11 @@
   "@aboutMobileSource": {
     "description": "Link to mobile GitHub repo"
   },
-  "aboutLyricsWebsite": "Lyrics website",
+  "aboutLyricsWebsite": "Sitio web de Letras",
   "@aboutLyricsWebsite": {
     "description": "Link to the Zarz-LRC website for searching and saving word-timed lyrics"
   },
-  "aboutServiceStatus": "Service status",
+  "aboutServiceStatus": "Estado del servicio",
   "@aboutServiceStatus": {
     "description": "Link to the status page of the Mornye online services"
   },
@@ -1900,7 +1900,7 @@
   "@trackFileNotFound": {
     "description": "Error - file doesn't exist"
   },
-  "trackFileUnavailable": "File is currently unavailable. Check storage access and try again.",
+  "trackFileUnavailable": "El archivo no está disponible en este momento. Verifica el acceso al almacenamiento e inténtalo de nuevo.",
   "@trackFileUnavailable": {
     "description": "File access failed; this does not mean the file was deleted"
   },
@@ -2037,8 +2037,8 @@
   "@trackDeleteConfirmTitle": {
     "description": "Delete confirmation title"
   },
-  "trackDeleteNetworkConfirmMessage": "This will permanently delete the file from your network storage and remove it from your library and history.",
-  "snackbarDeleteTracksFailed": "Could not delete {count} {count, plural, =1{track} other{tracks}}. Check storage access and try again.",
+  "trackDeleteNetworkConfirmMessage": "Esto eliminará de forma permanente el archivo de tu almacenamiento en red y lo borrará de tu biblioteca y de tu historial.",
+  "snackbarDeleteTracksFailed": "No se pudieron eliminar {count} {count, plural, =1{pista} other{pistas}}. Revisa el acceso al almacenamiento e inténtalo de nuevo.",
   "@snackbarDeleteTracksFailed": {
     "placeholders": {
       "count": {
@@ -2372,7 +2372,7 @@
   "@qualityHiResFlacSubtitle": {
     "description": "Technical spec for hi-res"
   },
-  "qualityHiResFlacMax": "Hi-Res FLAC Max",
+  "qualityHiResFlacMax": "Hi-Res (FLAC Max)",
   "@qualityHiResFlacMax": {
     "description": "Quality option - maximum resolution FLAC"
   },
@@ -3430,11 +3430,11 @@
   "@playbackNormalizationMode": {
     "description": "Label for choosing between track and album ReplayGain during playback"
   },
-  "playbackNormalizationModeTrack": "Track",
+  "playbackNormalizationModeTrack": "Pista",
   "@playbackNormalizationModeTrack": {
     "description": "Gain mode that levels every track on its own"
   },
-  "playbackNormalizationModeAlbum": "Album",
+  "playbackNormalizationModeAlbum": "Álbum",
   "@playbackNormalizationModeAlbum": {
     "description": "Gain mode that keeps the loudness differences inside an album"
   },
@@ -7169,19 +7169,19 @@
   "@libraryFilterMetadataMissingReplayGain": {
     "description": "Filter option for scanned tracks without ReplayGain gain tags"
   },
-  "libraryFilterMetadataHasReplayGain": "Has ReplayGain",
+  "libraryFilterMetadataHasReplayGain": "Tiene ReplayGain",
   "@libraryFilterMetadataHasReplayGain": {
     "description": "Filter option for tracks with indexed ReplayGain track or album gain tags"
   },
-  "libraryFilterIncompleteAlbums": "Incomplete albums",
+  "libraryFilterIncompleteAlbums": "Álbumes incompletos",
   "@libraryFilterIncompleteAlbums": {
     "description": "Library filter for albums with confirmed missing track positions"
   },
-  "libraryAlbumCompletenessUnknown": "Album completeness unknown",
+  "libraryAlbumCompletenessUnknown": "Se desconoce si el álbum está completo",
   "@libraryAlbumCompletenessUnknown": {
     "description": "Library filter and status for missing, conflicting or ambiguous album track counts"
   },
-  "libraryAlbumMissingTracks": "{present}/{expected} tracks · {missing} missing",
+  "libraryAlbumMissingTracks": "{present}/{expected} pistas · {missing} faltantes",
   "@libraryAlbumMissingTracks": {
     "description": "Album completeness badge tooltip",
     "placeholders": {
@@ -7244,7 +7244,7 @@
   "@playerCoverStyle": {
     "description": "Settings section choosing how the player shows cover art"
   },
-  "playerCoverStyleDefault": "Default",
+  "playerCoverStyleDefault": "Por defecto",
   "@playerCoverStyleDefault": {
     "description": "Cover art style: artwork card above the controls"
   },
@@ -7281,13 +7281,13 @@
   "autoplayOn": "Reproducción automática activada",
   "autoplayOff": "Reproducción automática desactivada",
   "autoplayFromLibrary": "Reproducción automática desde tu biblioteca",
-  "autoplayDescription": "Continue with related songs from your Library when the queue ends.",
-  "autoplayPersonalization": "Personalized autoplay",
-  "autoplayPersonalizationDescription": "Learn from songs you listen to and skip, privately on this device. Turning this off stops learning and restores ordinary autoplay.",
-  "autoplayResetLearning": "Reset recommendation learning",
-  "autoplayResetLearningConfirmTitle": "Reset recommendation learning?",
+  "autoplayDescription": "Sigue con canciones relacionadas de tu biblioteca cuando termine la fila.",
+  "autoplayPersonalization": "Reproducción automática personalizada",
+  "autoplayPersonalizationDescription": "Aprende de las canciones que escuchas y de las que te saltas, de manera privada en este dispositivo. Si desactivas esta función, se detendrá el aprendizaje y se restablecerá la reproducción automática habitual.",
+  "autoplayResetLearning": "Restablecer el aprendizaje de recomendaciones",
+  "autoplayResetLearningConfirmTitle": "Restablecer el aprendizaje de recomendaciones?",
   "autoplayResetLearningConfirmMessage": "Autoplay forgets what it learned from your listening and skips. This can't be undone.",
-  "autoplayResetLearningConfirm": "Reset",
+  "autoplayResetLearningConfirm": "Restablecer",
   "profileTitle": "Perfil",
   "profileSetUp": "Configura tu perfil",
   "profileEdit": "Editar nombre y foto",
@@ -7353,12 +7353,12 @@
   "artistUpcomingConcerts": "Próximos conciertos",
   "artistAllUpcomingConcerts": "Todos los próximos conciertos",
   "artistNoUpcomingConcerts": "No hay conciertos programados.",
-  "motionArtwork": "Animated artwork",
-  "listeningStats": "Listening statistics",
-  "listeningStatsRecord": "Record listening",
-  "listeningStatsDescription": "Stored only on this device, starting now. Records the built-in player only; pauses, buffering and seeking add no listening time. A play counts after 30 seconds.",
-  "listeningStatsEmpty": "Play music with the built-in player to start your listening recap. Earlier listening cannot be recovered.",
-  "listeningStatsDays": "{days} days",
+  "motionArtwork": "Ilustraciones animadas",
+  "listeningStats": "Estadísticas de escucha",
+  "listeningStatsRecord": "Escucha de grabaciones",
+  "listeningStatsDescription": "A partir de ahora, se guardará únicamente en este dispositivo. Solo se registran las reproducciones del reproductor integrado; las pausas, el almacenamiento en búfer y el avance rápido no se suman al tiempo de escucha. Una reproducción se cuenta a los 30 segundos.",
+  "listeningStatsEmpty": "Reproduce música con el reproductor integrado para comenzar tu resumen de escucha. No se puede recuperar lo que ya se ha escuchado.",
+  "listeningStatsDays": "{days} días",
   "@listeningStatsDays": {
     "placeholders": {
       "days": {
@@ -7374,7 +7374,7 @@
       }
     }
   },
-  "listeningStatsTotals": "{plays, plural, =1{1 play} other{{plays} plays}} · {tracks, plural, =1{1 track} other{{tracks} tracks}} · {days, plural, =1{1 active day} other{{days} active days}}",
+  "listeningStatsTotals": "{plays, plural, =1{1 reproducción} other{{plays} reproducciones}} · {tracks, plural, =1{1 pista} other{{tracks} pistas}} · {days, plural, =1{1 día activo} other{{days} días activos}}",
   "@listeningStatsTotals": {
     "placeholders": {
       "plays": {
@@ -7388,15 +7388,15 @@
       }
     }
   },
-  "listeningStatsPreviousYear": "Previous year",
-  "listeningStatsNextYear": "Next year",
-  "listeningStatsActivity": "Recent listening days · minutes",
-  "listeningStatsTopArtists": "Top artists",
-  "listeningStatsTopTracks": "Top tracks",
-  "listeningStatsLoadError": "Could not load listening statistics",
-  "listeningStatsClear": "Clear listening statistics",
-  "listeningStatsClearError": "Could not clear listening statistics. Please try again.",
-  "listeningStatsClearDescription": "Delete all listening statistics on this device? Your music and playlists will be kept.",
+  "listeningStatsPreviousYear": "Año anterior",
+  "listeningStatsNextYear": "El año que viene",
+  "listeningStatsActivity": "Días de escucha recientes · minutos",
+  "listeningStatsTopArtists": "Artistas destacados",
+  "listeningStatsTopTracks": "Canciones más populares",
+  "listeningStatsLoadError": "No se pudieron cargar las estadísticas de escucha",
+  "listeningStatsClear": "Estadísticas de escucha claras",
+  "listeningStatsClearError": "No se pudieron borrar las estadísticas de escucha. Inténtalo de nuevo.",
+  "listeningStatsClearDescription": "¿Deseas eliminar todas las estadísticas de escucha de este dispositivo? Tu música y tus listas de reproducción se conservarán.",
   "libraryArtistsEmpty": "Artists appear here once you download music or scan a local library.",
   "listeningRewind": "Rewind",
   "listeningRewindDescription": "Relive the highlights of your recent weeks and months",
@@ -7540,9 +7540,9 @@
       }
     }
   },
-  "listeningRewindShare": "Share",
+  "listeningRewindShare": "Compartir",
   "listeningRewindShareError": "Could not share your Rewind",
-  "listeningRewindNext": "Next",
+  "listeningRewindNext": "Siguiente",
   "listeningRewindPrevious": "Previous",
   "listeningRewindMonthlyReady": "Your last 4 weeks are ready to replay",
   "listeningRewindYearTitle": "Your {year} in Music",
@@ -7557,9 +7557,9 @@
   "listeningRewindYearBanner": "Your top artists, songs and moments of the year",
   "listeningRewindYearIntroBody": "Everything you played this year, from your first song to your biggest month.",
   "listeningRewindNumbersTitle": "Your year in numbers",
-  "listeningRewindSongsLabel": "Songs",
-  "listeningRewindArtistsLabel": "Artists",
-  "listeningRewindAlbumsLabel": "Albums",
+  "listeningRewindSongsLabel": "Canciones",
+  "listeningRewindArtistsLabel": "Artistas",
+  "listeningRewindAlbumsLabel": "Álbumes",
   "listeningRewindDaysLabel": "Days with music",
   "listeningRewindDaysShare": "Music on {percent}% of your days",
   "@listeningRewindDaysShare": {
@@ -7607,56 +7607,56 @@
     }
   },
   "listeningRewindYearOutroBody": "Here's to another year of great music.",
-  "weeklyReleases": "New releases",
-  "weeklyReleasesDescription": "Recent albums and singles from your favorite artists, supplied by installed metadata extensions.",
-  "weeklyReleasesEmpty": "No dated releases found in this period. Add favorite artists or try a longer period.",
-  "weeklyReleasesUnavailable": "Some artists could not be checked. Their saved results are kept. Providers may not supply artist catalogs or exact release dates.",
-  "weeklyReleasesLoadError": "Could not check new releases. Pull to refresh.",
-  "motionArtworkDescription": "Loop video covers supplied by metadata providers. Turn off to use still artwork and reduce battery use.",
-  "libraryLoading": "Loading Library…",
-  "libraryLoadFailed": "Library could not be loaded. Retry to load the saved folders and track index.",
-  "discordPresenceDescription": "Share the title, artist, album and progress of music played in the built-in player on your Discord profile. Local audio and artwork files are never uploaded. Clears when playback pauses or stops.",
-  "discordPresenceDisabled": "Disabled",
-  "discordPresenceLink": "Link Discord account",
-  "discordPresenceConnecting": "Connecting to Discord…",
-  "discordPresenceReady": "Ready when music plays",
-  "discordPresenceActive": "Sharing current track",
-  "discordPresenceUnavailable": "Discord is unavailable. Retrying during playback.",
-  "discordPresenceBuildUnavailable": "Discord SDK is not available in this build.",
-  "discordPresenceAndroidHelp": "Install Discord and sign in on this phone. Allow activity sharing in Discord. External players are not supported.",
-  "discordPresenceIosHelp": "Link your account through Discord and allow activity sharing. Tap to link again if authorization fails.",
+  "weeklyReleases": "Novedades",
+  "weeklyReleasesDescription": "Álbumes y sencillos recientes de tus artistas favoritos, proporcionados por las extensiones de metadatos instaladas.",
+  "weeklyReleasesEmpty": "No se encontraron lanzamientos con fecha en este período. Agrega tus artistas favoritos o prueba con un período más largo.",
+  "weeklyReleasesUnavailable": "No se pudo verificar a algunos artistas. Se conservan los resultados guardados. Es posible que los proveedores no proporcionen catálogos de artistas ni fechas exactas de lanzamiento.",
+  "weeklyReleasesLoadError": "No se pudieron verificar las nuevas publicaciones. Desliza hacia abajo para actualizar.",
+  "motionArtworkDescription": "Las portadas de video en bucle son proporcionadas por proveedores de metadatos. Desactívalas para usar imágenes fijas y reducir el consumo de batería.",
+  "libraryLoading": "Cargando la biblioteca…",
+  "libraryLoadFailed": "No se pudo cargar la biblioteca. Intenta volver a cargar las carpetas guardadas y el índice de pistas.",
+  "discordPresenceDescription": "Comparte el título, el artista, el álbum y el progreso de la música que se reproduce en el reproductor integrado en tu perfil de Discord. Los archivos de audio y las imágenes de portada locales nunca se suben. Se borra cuando se pausa o se detiene la reproducción.",
+  "discordPresenceDisabled": "Desactivado",
+  "discordPresenceLink": "Vincular cuenta de Discord",
+  "discordPresenceConnecting": "Conectándome a Discord…",
+  "discordPresenceReady": "Listo cuando suena la música",
+  "discordPresenceActive": "Compartir la canción que se está reproduciendo",
+  "discordPresenceUnavailable": "Discord no está disponible. Se volverá a intentar durante la reproducción.",
+  "discordPresenceBuildUnavailable": "El SDK de Discord no está disponible en esta versión.",
+  "discordPresenceAndroidHelp": "Instala Discord e inicia sesión en este teléfono. Permite compartir actividad en Discord. No se admiten reproductores externos.",
+  "discordPresenceIosHelp": "Vincula tu cuenta a través de Discord y permite compartir actividad. Toca aquí para volver a vincularla si falla la autorización.",
   "discordPresenceDesktopHelp": "Keep the Discord desktop app running and signed in on this computer, and allow activity sharing in Discord.",
-  "discordPresenceDisconnect": "Disconnect and forget account",
-  "autoMixSettingsTitle": "Mix transitions",
-  "autoMixAutomaticDuration": "Automatic duration",
-  "autoMixDuration": "Mix duration",
-  "autoMixEffect": "Transition effect",
+  "discordPresenceDisconnect": "Desconectar y olvidar la cuenta",
+  "autoMixSettingsTitle": "Transiciones de mezcla",
+  "autoMixAutomaticDuration": "Duración automática",
+  "autoMixDuration": "Duración de la mezcla",
+  "autoMixEffect": "Efecto de transición",
   "autoMixEffectAuto": "Auto",
-  "autoMixEffectCrossfade": "Crossfade",
-  "autoMixEffectMuffled": "Muffled",
-  "autoMixEffectEcho": "Echo",
-  "autoMixEffectPitch": "Pitch",
-  "autoMixEffectCustom": "Custom",
-  "autoMixEffectsHelp": "Effects apply to the end of the outgoing song during the mix. Short songs use a shorter overlap.",
-  "autoMixSpeed": "Speed",
-  "autoMixPitch": "Pitch (semitones)",
-  "autoMixEcho": "Echo",
-  "autoMixLowPass": "Muffled filter",
-  "autoMixMixing": "Mixing",
-  "autoMixCrossfading": "Crossfade",
-  "playbackAutomation": "Automatic playback",
-  "playbackPauseOnMute": "Pause when muted",
-  "snackbarPlaybackMuted": "Media volume is zero. Playback paused. Press play again to continue.",
+  "autoMixEffectCrossfade": "Fundido cruzado",
+  "autoMixEffectMuffled": "Amortiguado",
+  "autoMixEffectEcho": "Eco",
+  "autoMixEffectPitch": "Tono",
+  "autoMixEffectCustom": "Personalizado",
+  "autoMixEffectsHelp": "Los efectos se aplican hasta el final de la canción que está terminando durante la mezcla. Las canciones cortas utilizan un solapamiento más corto.",
+  "autoMixSpeed": "Velocidad",
+  "autoMixPitch": "Tono (semitonos)",
+  "autoMixEcho": "Eco",
+  "autoMixLowPass": "Filtro silenciador",
+  "autoMixMixing": "Mezcla",
+  "autoMixCrossfading": "Fundido cruzado",
+  "playbackAutomation": "Reproducción automática",
+  "playbackPauseOnMute": "Pausar cuando esté silenciado",
+  "snackbarPlaybackMuted": "El volumen del contenido multimedia es cero. La reproducción está en pausa. Presiona el botón de reproducción nuevamente para continuar.",
   "@snackbarPlaybackMuted": {
     "description": "Shown after mute automation pauses playback; another explicit play request can override the pause."
   },
-  "playbackPauseOnMuteDescription": "Pause at zero media volume and resume when raised. Manual pauses stay paused. Standard audio output only.",
-  "playbackOnHeadphonesConnected": "Play when headphones connect",
-  "playbackOnHeadphonesConnectedDescription": "Resume the current song when wired or Bluetooth headphones connect. Disconnecting pauses playback. Built-in player only.",
-  "appearanceCustomFont": "Custom font",
-  "appearanceCustomFontSubtitle": "Import a TTF or OTF file (up to 10 MB). Overrides the theme and system font.",
-  "appearanceCustomFontInvalid": "Could not load this font. Choose a valid TTF or OTF file up to 10 MB.",
-  "appearanceCustomFontReset": "Use theme font",
+  "playbackPauseOnMuteDescription": "Se pone en pausa cuando el volumen del audio está en cero y se reanuda cuando se sube. Las pausas manuales permanecen activas. Solo salida de audio estándar.",
+  "playbackOnHeadphonesConnected": "Reproducir cuando se conecten los audífonos",
+  "playbackOnHeadphonesConnectedDescription": "Reanuda la canción actual cuando se conecten audífonos con cable o Bluetooth. Al desconectarlos, se pausa la reproducción. Solo en el reproductor integrado.",
+  "appearanceCustomFont": "Fuente personalizada",
+  "appearanceCustomFontSubtitle": "Importa un archivo TTF u OTF (hasta 10 MB). Anula la fuente del tema y del sistema.",
+  "appearanceCustomFontInvalid": "No se pudo cargar esta fuente. Elige un archivo TTF u OTF válido de hasta 10 MB.",
+  "appearanceCustomFontReset": "Usar la fuente del tema",
   "equalizerTitle": "Equalizer",
   "equalizerDescription": "5–31 bands, tone controls, preamp and dynamics",
   "equalizerEnable": "Enable equalizer",
@@ -7691,7 +7691,7 @@
   "equalizerCurveDescription": "The curve shows band gains; the exact response depends on the output engine.",
   "equalizerEffectivePreamp": "Input gain after headroom",
   "equalizerDeletePreset": "Delete preset",
-  "equalizerCustom": "Custom",
+  "equalizerCustom": "Personalizado",
   "equalizerManagePresets": "Manage presets",
   "lyricsShareTitle": "Share lyrics",
   "@lyricsShareTitle": {
@@ -7713,12 +7713,12 @@
       }
     }
   },
-  "lyricsShareAction": "Share",
+  "lyricsShareAction": "Compartir",
   "lyricsShareError": "Couldn't create the lyrics image",
   "lyricsShareBackgroundArtwork": "Artwork",
   "lyricsShareBackgroundColor": "Cover color",
-  "lyricsShareBackgroundDark": "Dark",
-  "lyricsShareBackgroundLight": "Light",
+  "lyricsShareBackgroundDark": "Oscuro",
+  "lyricsShareBackgroundLight": "Claro",
   "audioInfoTitle": "Audio info",
   "@audioInfoTitle": {
     "description": "Sheet with technical details of the playing track, opened from the quality badge"
@@ -7729,15 +7729,15 @@
   "audioInfoProcessing": "Processing",
   "audioInfoOutput": "Output",
   "audioInfoAnalysis": "Spectrum and level analysis",
-  "audioInfoQuality": "Quality",
+  "audioInfoQuality": "Calidad",
   "audioInfoHiResLossless": "Hi-Res Lossless",
-  "audioInfoLossless": "Lossless",
-  "audioInfoLossy": "Lossy",
-  "audioInfoFormat": "Format",
-  "audioInfoCodec": "Codec",
+  "audioInfoLossless": "Sin pérdida de calidad",
+  "audioInfoLossy": "Con pérdida",
+  "audioInfoFormat": "Formato",
+  "audioInfoCodec": "Códec",
   "audioInfoSampleRate": "Sample rate",
   "audioInfoBitDepth": "Bit depth",
-  "audioInfoChannels": "Channels",
+  "audioInfoChannels": "Canales",
   "audioInfoChannelCount": "{count, plural, =1{Mono} =2{Stereo} other{{count} channels}}",
   "@audioInfoChannelCount": {
     "placeholders": {
@@ -7746,8 +7746,8 @@
       }
     }
   },
-  "audioInfoBitrate": "Bitrate",
-  "audioInfoDuration": "Duration",
+  "audioInfoBitrate": "Tasa de bits",
+  "audioInfoDuration": "Duración",
   "audioInfoFileSize": "File size",
   "audioInfoCompression": "Compression",
   "audioInfoCompressionValue": "{percent}% of uncompressed size",
@@ -7761,7 +7761,7 @@
   "audioInfoLocation": "Location",
   "audioInfoLocationLocal": "Device storage",
   "audioInfoLocationShared": "Shared folder",
-  "audioInfoLocationNetwork": "Network storage",
+  "audioInfoLocationNetwork": "Almacenamiento en red",
   "audioInfoPcmRate": "Uncompressed data rate",
   "audioInfoFrequencyRange": "Frequency range",
   "audioInfoFrequencyRangeValue": "Up to {frequency} (Nyquist)",
@@ -7787,9 +7787,9 @@
     }
   },
   "audioInfoOn": "On",
-  "audioInfoOff": "Off",
+  "audioInfoOff": "Desactivado",
   "audioInfoBypassed": "Bypassed by direct output",
-  "audioInfoPlayer": "Player",
+  "audioInfoPlayer": "Reproductor",
   "audioInfoPlayerValue": "Mornye built-in player",
   "audioInfoSignalPath": "Signal path",
   "audioInfoPathSystem": "System mixer",
@@ -7822,10 +7822,10 @@
     }
   },
   "audioInfoOutputRate": "Output sample rate",
-  "audioInfoOutputFormat": "Output format",
+  "audioInfoOutputFormat": "Formato de salida",
   "audioInfoDeviceRates": "Device sample rates",
   "audioInfoDeviceFormats": "Device formats",
-  "audioInfoAnyRate": "Any",
+  "audioInfoAnyRate": "Cualquier",
   "audioInfoBuffer": "Mixer buffer",
   "audioInfoLatency": "Output latency",
   "audioInfoLowLatency": "Low-latency audio",
@@ -7838,8 +7838,8 @@
   "audioInfoFixedVolume": "Controlled by the device",
   "audioInfoCopy": "Copy report",
   "audioInfoCopied": "Audio info copied",
-  "lyricsTextSize": "Lyrics text size",
-  "lyricsTextPreview": "Follow every line of your favorite song",
+  "lyricsTextSize": "Tamaño del texto de la letra",
+  "lyricsTextPreview": "Sigue cada verso de tu canción favorita",
   "appCrashTitle": "The app previously crashed",
   "appAnrTitle": "The app previously stopped responding",
   "@appAnrTitle": {
@@ -7852,7 +7852,7 @@
   "appCrashMessage": "A crash report was saved. Copy it and send it to the developer to help investigate.",
   "appCrashDetails": "View error and log",
   "appCrashCopy": "Copy report for developer",
-  "appCrashDismiss": "Dismiss",
+  "appCrashDismiss": "Descartar",
   "appCrashCopyFailed": "Could not copy the crash report. Please try again.",
   "appCrashDismissFailed": "Could not dismiss the crash report. Please try again.",
   "optionsEmbeddedCoverSizeOriginal": "Resolución original",
@@ -7951,7 +7951,7 @@
   "@desktopMiniPlayerExpand": {
     "description": "Mini player button that returns the window to its full size"
   },
-  "desktopMenuRefresh": "Refresh",
+  "desktopMenuRefresh": "Actualizar",
   "@desktopMenuRefresh": {
     "description": "View menu item and Keyboard Shortcuts row that reloads the page on screen (Home, Repo, statistics)"
   },

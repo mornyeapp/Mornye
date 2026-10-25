@@ -17,23 +17,23 @@
   "@networkDownloadDestination": {
     "description": "Files settings item that opens network storage to choose a folder for downloaded music"
   },
-  "networkUseForDownloads": "Download to this folder",
+  "networkUseForDownloads": "Сохранять в эту папку",
   "@networkUseForDownloads": {
     "description": "Action to select the current network folder as the download destination; also the settings subtitle when no network destination is selected"
   },
-  "networkDownloadSelected": "Selected download destination",
+  "networkDownloadSelected": "Выбранное место для загрузки",
   "@networkDownloadSelected": {
     "description": "Status label replacing the download destination action when the current network folder is already selected"
   },
-  "networkUseLocalDownloads": "Use local download folder",
+  "networkUseLocalDownloads": "Использовать локальную папку для загрузки",
   "@networkUseLocalDownloads": {
     "description": "Files settings action that clears the network download destination and returns downloads to the local folder"
   },
-  "networkDownloadAccessFailed": "Could not write to this folder.",
+  "networkDownloadAccessFailed": "Невозможно записать в эту папку.",
   "@networkDownloadAccessFailed": {
     "description": "Snackbar prefix when the write-access check fails while selecting a network download folder; followed by a specific network error message"
   },
-  "networkUploading": "Uploading to network storage",
+  "networkUploading": "Отправка в сетевое хранилище",
   "@networkUploading": {
     "description": "Download queue status during upload of prepared audio to the network destination; a progress percentage may follow"
   },
@@ -41,11 +41,11 @@
   "@networkDownloadDescription": {
     "description": "Help below the network download destination action explaining local preparation, upload, retry behavior, and preservation of existing files; NAS means network-attached storage"
   },
-  "networkAddToLibrary": "Add folder to Library",
+  "networkAddToLibrary": "Добавить папку в медиатеку",
   "@networkAddToLibrary": {
     "description": "Action that adds the current network folder as a Library source and starts scanning it"
   },
-  "networkLibraryAdded": "Folder added to Library",
+  "networkLibraryAdded": "Папка добавлена в Библиотеку",
   "@networkLibraryAdded": {
     "description": "Status label replacing the add-to-Library action after the network folder has been added as a source; does not mean scanning has finished"
   },
@@ -53,7 +53,7 @@
   "@networkLibraryDescription": {
     "description": "Help below the add-to-Library action explaining recursive scanning, local metadata and artwork storage, and management in Local Library settings"
   },
-  "networkStorage": "Network storage",
+  "networkStorage": "Сетевое хранилище",
   "@networkStorage": {
     "description": "Title and navigation label for the screen used to manage network connections and browse remote music folders"
   },
@@ -89,27 +89,27 @@
   "@networkErrorAddress": {
     "description": "Network access error for an invalid address, with URL scheme examples for SMB, WebDAV, and HTTP connections"
   },
-  "networkConnections": "Saved connections",
+  "networkConnections": "Сохранённые подключения",
   "@networkConnections": {
     "description": "Section heading above the list of saved network storage connections"
   },
-  "networkServer": "Server",
+  "networkServer": "Сервер",
   "@networkServer": {
     "description": "Connection form section heading above the display name and server or audio URL fields"
   },
-  "networkCredentials": "Sign in (optional)",
+  "networkCredentials": "Войти (необязательно)",
   "@networkCredentials": {
     "description": "Connection form section heading for optional server credentials"
   },
-  "networkRefresh": "Refresh",
+  "networkRefresh": "Обновить",
   "@networkRefresh": {
     "description": "Toolbar tooltip for reloading saved connections or the current network folder listing"
   },
-  "networkStorageDescription": "Connect to your NAS or music server and browse its folders. Your sign-in details are stored securely on this device.",
+  "networkStorageDescription": "Подключите ваш NAS или музыкальный сервер и просматривайте его папки. Ваши данные о входе безопасно хранятся на этом устройстве.",
   "@networkStorageDescription": {
     "description": "Introduction shown in the empty connections screen and connection form, explaining remote folder browsing and secure local credential storage; NAS means network-attached storage"
   },
-  "networkAddConnection": "Add connection",
+  "networkAddConnection": "Добавить соединение",
   "@networkAddConnection": {
     "description": "Action label, toolbar tooltip, and form title for adding a network storage connection"
   },
@@ -117,7 +117,7 @@
   "@networkEditConnection": {
     "description": "Edit button tooltip and form title for changing an existing network storage connection"
   },
-  "networkConnectionName": "Name",
+  "networkConnectionName": "Имя",
   "@networkConnectionName": {
     "description": "Required connection form field for a user-chosen display name identifying the saved connection"
   },
@@ -125,23 +125,23 @@
   "@networkAddress": {
     "description": "Required connection form field for the server or direct audio URL, using the scheme appropriate to the selected protocol"
   },
-  "networkProtocol": "Protocol",
+  "networkProtocol": "Протокол",
   "@networkProtocol": {
     "description": "Connection form section heading for choosing SMB, WebDAV, or HTTP / HTTPS"
   },
-  "networkUsername": "Username (optional)",
+  "networkUsername": "Имя пользователя (необязательно)",
   "@networkUsername": {
     "description": "Optional connection form field for the server account username"
   },
-  "networkPassword": "Password (optional)",
+  "networkPassword": "Пароль (необязательно)",
   "@networkPassword": {
     "description": "Optional connection form field for the server account password, with input characters hidden"
   },
-  "networkDomain": "Domain (optional)",
+  "networkDomain": "Домен (необязательно)",
   "@networkDomain": {
     "description": "Optional connection form field shown only for SMB; refers to the authentication domain, not the server's internet domain name"
   },
-  "networkConnectSave": "Connect and save",
+  "networkConnectSave": "Подключиться и сохранить",
   "@networkConnectSave": {
     "description": "Connection form action that checks access to the network source before saving the connection"
   },
@@ -172,8 +172,8 @@
   "extensionAccountTitle": "Extension account",
   "extensionAccountInvalidForm": "The extension returned an invalid account form.",
   "extensionAccountRestartLogin": "Restart account login to continue.",
-  "extensionAccountRequiredValue": "Enter a value.",
-  "extensionAccountInvalidNumber": "Enter a valid number.",
+  "extensionAccountRequiredValue": "Введите значение.",
+  "extensionAccountInvalidNumber": "Введите корректное значение.",
   "settingsPlaybackSubtitle": "Воспроизведение, громкость, автомикс и аудиовыход",
   "sectionPlayer": "Плеер",
   "sectionVolumeAndTransitions": "Громкость и переходы",
@@ -216,12 +216,12 @@
   "appearanceAccentBlue": "Синий",
   "appearanceAccentPurple": "Фиолетовый",
   "appearanceAccentPink": "Розовый",
-  "appearanceGlassClarity": "Glass clarity",
-  "appearanceGlassOutlines": "Glass outlines",
+  "appearanceGlassClarity": "Прозрачность стекла",
+  "appearanceGlassOutlines": "Контур стекла",
   "appearanceGlassOutlinesSubtitle": "Show decorative edges around Mornye glass. Turning this off keeps blur and refraction.",
   "appearanceGlassClaritySubtitle": "Adjust transparency in Mornye menus and navigation. Text contrast is preserved.",
   "appearanceGlassTinted": "Tinted",
-  "appearanceGlassClear": "Clear",
+  "appearanceGlassClear": "Очистить",
   "appearanceGlassClearPerformance": "Very clear glass may use more power and feel less smooth on older devices. Lower clarity if needed.",
   "appearanceGlassClarityBlurOff": "Glass is opaque on this device. Turn on “{setting}” to adjust clarity.",
   "@appearanceGlassClarityBlurOff": {
@@ -377,7 +377,7 @@
   "@folderTemplatePreview": {
     "description": "Label for a sample expanded folder template"
   },
-  "folderTemplatePreviewFailed": "Preview unavailable",
+  "folderTemplatePreviewFailed": "Предпросмотр недоступен",
   "@folderTemplatePreviewFailed": {
     "description": "Shown when the native folder preview could not be generated"
   },
@@ -561,11 +561,11 @@
   "metadataSeparators": "Metadata separators",
   "metadataSeparatorsDescription": "Choose how comma- or semicolon-separated values are joined in future downloads. Custom artist separators use a joined tag; Primary artist only still applies. Names containing & or / are preserved.",
   "metadataSeparatorSource": "Keep source formatting",
-  "metadataSeparatorComma": "Comma (,)",
+  "metadataSeparatorComma": "Запятая (,)",
   "metadataSeparatorSemicolon": "Semicolon (;)",
   "metadataSeparatorSlash": "Slash (/)",
-  "metadataSeparatorCustom": "Custom separator",
-  "metadataSeparatorPreview": "Preview",
+  "metadataSeparatorCustom": "Свой разделитель",
+  "metadataSeparatorPreview": "Предпросмотр",
   "metadataSeparatorInvalid": "Use 1–16 characters without line breaks or control characters.",
   "@optionsArtistTagMode": {
     "description": "Setting title for how artist metadata is written into files"
@@ -727,7 +727,7 @@
   "@aboutLyricsWebsite": {
     "description": "Link to the Zarz-LRC website for searching and saving word-timed lyrics"
   },
-  "aboutServiceStatus": "Service status",
+  "aboutServiceStatus": "Статус сервиса",
   "@aboutServiceStatus": {
     "description": "Link to the status page of the Mornye online services"
   },
@@ -3049,7 +3049,7 @@
   "@libraryScanFinalizing": {
     "description": "Status shown after file scanning finishes but library persistence is still running"
   },
-  "libraryScanPaused": "Scan paused",
+  "libraryScanPaused": "Сканирование приостановлено",
   "@libraryScanPaused": {
     "description": "Status shown while a library scan is paused by the user"
   },
@@ -3210,7 +3210,7 @@
   "@timeJustNow": {
     "description": "Relative time - less than a minute ago"
   },
-  "timeMinutesAgo": "{count, plural, =1{1 minute ago} other{{count} minutes ago}}",
+  "timeMinutesAgo": "{count, plural, =1{1 минуту назад} one{{count} минуту назад} few{{count} минуты назад} other{{count} минут назад}}",
   "@timeMinutesAgo": {
     "description": "Relative time - minutes ago",
     "placeholders": {
@@ -3219,7 +3219,7 @@
       }
     }
   },
-  "timeHoursAgo": "{count, plural, =1{1 hour ago} other{{count} hours ago}}",
+  "timeHoursAgo": "{count, plural, =1{1 час назад} one{{count} час назад} few{{count} часа назад} other{{count} часов назад}}",
   "@timeHoursAgo": {
     "description": "Relative time - hours ago",
     "placeholders": {
@@ -3430,11 +3430,11 @@
   "@playbackNormalizationMode": {
     "description": "Label for choosing between track and album ReplayGain during playback"
   },
-  "playbackNormalizationModeTrack": "Track",
+  "playbackNormalizationModeTrack": "Трек",
   "@playbackNormalizationModeTrack": {
     "description": "Gain mode that levels every track on its own"
   },
-  "playbackNormalizationModeAlbum": "Album",
+  "playbackNormalizationModeAlbum": "Альбом",
   "@playbackNormalizationModeAlbum": {
     "description": "Gain mode that keeps the loudness differences inside an album"
   },
@@ -3996,7 +3996,7 @@
   "@collectionNoPlaylistsYet": {
     "description": "Empty state title when user has no playlists"
   },
-  "collectionPlaylistTracks": "{count, plural, =1{1 track} other{{count} tracks}}",
+  "collectionPlaylistTracks": "{count, plural, =1{1 трек} one{{count} трек} few{{count} трека} other{{count} треков}}",
   "@collectionPlaylistTracks": {
     "description": "Track count label for custom playlists",
     "placeholders": {
@@ -4005,7 +4005,7 @@
       }
     }
   },
-  "collectionArtistCount": "{count, plural, =1{1 artist} other{{count} artists}}",
+  "collectionArtistCount": "{count, plural, =1{1 исполнитель} one{{count} исполнитель} few{{count} исполнителя} other{{count} исполнителей}}",
   "@collectionArtistCount": {
     "description": "Artist count label for favorite artists",
     "placeholders": {
@@ -4222,7 +4222,7 @@
       }
     }
   },
-  "selectionBatchConvertConfirmKeepOriginal": "Convert {count} {count, plural, =1{track} other{tracks}} to {format}?\n\nOriginal files will be kept and converted files will be added as separate library entries.",
+  "selectionBatchConvertConfirmKeepOriginal": "Конвертировать {count} {count, plural, one {трек} few {трека} many {треков} =1{трек} other{треков}} в {format}?\n\nОригинальные файлы будут храниться и преобразовываться как отдельные элементы медиатеки.",
   "@selectionBatchConvertConfirmKeepOriginal": {
     "description": "Batch conversion confirmation when source files will be preserved",
     "placeholders": {
@@ -4483,7 +4483,7 @@
       }
     }
   },
-  "backupContentsPlaylists": "{count, plural, =1{1 playlist} other{{count} playlists}}",
+  "backupContentsPlaylists": "{count, plural, =1{1 плейлист} one{{count} плейлист} few{{count} плейлиста} other{{count} плейлистов}}",
   "@backupContentsPlaylists": {
     "description": "Backup contents row for playlist count",
     "placeholders": {
@@ -4492,7 +4492,7 @@
       }
     }
   },
-  "backupContentsArtists": "{count, plural, =1{1 favorite artist} other{{count} favorite artists}}",
+  "backupContentsArtists": "{count, plural, =1{1 любимый исполнитель} one{{count} любимый исполнитель} few{{count} любимых исполнителя} other{{count} любимых исполнителей}}",
   "@backupContentsArtists": {
     "description": "Backup contents row for favorite artists count",
     "placeholders": {
@@ -4501,7 +4501,7 @@
       }
     }
   },
-  "backupContentsExtensions": "{count, plural, =1{1 extension} other{{count} extensions}}",
+  "backupContentsExtensions": "{count, plural, =1{1 расширение} one{{count} расширение} few{{count} расширения} other{{count} расширений}}",
   "@backupContentsExtensions": {
     "description": "Backup contents row for installed extensions count",
     "placeholders": {
@@ -4848,7 +4848,7 @@
   "@snackbarSelectedPlaylistsEmpty": {
     "description": "Snackbar when selected playlists contain no tracks"
   },
-  "playlistsCount": "{count, plural, =1{1 playlist} other{{count} playlists}}",
+  "playlistsCount": "{count, plural, =1{1 плейлист} one{{count} плейлист} few{{count} плейлиста} other{{count} плейлистов}}",
   "@playlistsCount": {
     "description": "Playlist count display",
     "placeholders": {
@@ -4946,7 +4946,7 @@
   "@lyricsPickerPlain": {
     "description": "Lyrics result without timing"
   },
-  "lyricsPickerInstrumental": "Instrumental",
+  "lyricsPickerInstrumental": "Инструментальный",
   "@lyricsPickerInstrumental": {
     "description": "Lyrics result that marks the track as instrumental"
   },
@@ -5032,7 +5032,7 @@
   "@queueFilteringIndicator": {
     "description": "Shown while filter results are being computed"
   },
-  "queueTrackCount": "{count, plural, =1{1 track} other{{count} tracks}}",
+  "queueTrackCount": "{count, plural, =1{1 трек} one{{count} трек} few{{count} трека} other{{count} треков}}",
   "@queueTrackCount": {
     "description": "Track count label with plural support",
     "placeholders": {
@@ -5041,7 +5041,7 @@
       }
     }
   },
-  "queueAlbumCount": "{count, plural, =1{1 album} other{{count} albums}}",
+  "queueAlbumCount": "{count, plural, =1{1 альбом} one{{count} альбом} few{{count} альбома} other{{count} альбомов}}",
   "@queueAlbumCount": {
     "description": "Album count label with plural support",
     "placeholders": {
@@ -5066,7 +5066,7 @@
   "@queueEmptySinglesSubtitle": {
     "description": "Empty state subtitle for single track downloads"
   },
-  "queuePlaylistCount": "{count, plural, =1{1 playlist} other{{count} playlists}}",
+  "queuePlaylistCount": "{count, plural, =1{1 плейлист} one{{count} плейлист} few{{count} плейлиста} other{{count} плейлистов}}",
   "@queuePlaylistCount": {
     "description": "Playlist count label with plural support",
     "placeholders": {
@@ -5509,7 +5509,7 @@
   "@notifAllDownloadsComplete": {
     "description": "Notification title when all downloads finish successfully"
   },
-  "notifTracksDownloadedSuccess": "{count, plural, =1{1 track downloaded successfully} other{{count} tracks downloaded successfully}}",
+  "notifTracksDownloadedSuccess": "{count, plural, =1{1 трек успешно скачан} one{{count} трек успешно скачан} few{{count} трека успешно скачано} other{{count} треков успешно скачано}}",
   "@notifTracksDownloadedSuccess": {
     "description": "Notification body for queue complete - how many tracks were downloaded",
     "placeholders": {
@@ -5518,7 +5518,7 @@
       }
     }
   },
-  "notifDownloadsFinishedBody": "{completed, plural, =1{1 track downloaded} other{{completed} tracks downloaded}}, {failed, plural, =1{1 failed} other{{failed} failed}}",
+  "notifDownloadsFinishedBody": "{completed, plural, =1{1 трек скачан} one{{completed} трек скачан} few{{completed} трека скачано} other{{completed} треков скачано}}, {failed, plural, =1{1 с ошибкой} one{{failed} с ошибкой} few{{failed} с ошибками} other{{failed} с ошибками}}",
   "@notifDownloadsFinishedBody": {
     "description": "Notification body when queue finishes with failures",
     "placeholders": {
@@ -5534,7 +5534,7 @@
   "@notifDownloadsCanceledTitle": {
     "description": "Notification title when downloads are canceled by the user"
   },
-  "notifDownloadsCanceledBody": "{count, plural, =1{1 download canceled by user} other{{count} downloads canceled by user}}",
+  "notifDownloadsCanceledBody": "{count, plural, =1{1 загрузка отменена пользователем} one{{count} загрузка отменена пользователем} few{{count} загрузки отменены пользователем} other{{count} загрузок отменены пользователем}}",
   "@notifDownloadsCanceledBody": {
     "description": "Notification body when downloads are canceled by the user",
     "placeholders": {
@@ -5618,7 +5618,7 @@
   "@notifLibraryScanStopped": {
     "description": "Notification body when library scan is cancelled"
   },
-  "notifLibraryScanPaused": "Library scan paused",
+  "notifLibraryScanPaused": "Сканирование библиотеки приостановлено",
   "@notifLibraryScanPaused": {
     "description": "Notification title when the user pauses a library scan"
   },
@@ -6707,7 +6707,7 @@
       }
     }
   },
-  "nowPlayingSleepTimerMinutes": "{minutes, plural, =1{1 minute} other{{minutes} minutes}}",
+  "nowPlayingSleepTimerMinutes": "{minutes, plural, =1{1 минута} one{{minutes} минута} few{{minutes} минуты} other{{minutes} минут}}",
   "@nowPlayingSleepTimerMinutes": {
     "description": "Duration choice for the playback sleep timer",
     "placeholders": {
@@ -6761,7 +6761,7 @@
   "@nowPlayingNoLyrics": {
     "description": "Empty state when the playing file has no embedded lyrics"
   },
-  "nowPlayingSearchLyricsOnline": "Search online",
+  "nowPlayingSearchLyricsOnline": "Искать в Интернете",
   "@nowPlayingSearchLyricsOnline": {
     "description": "Button in the player's empty lyrics state that looks up lyrics from the enabled lyrics providers"
   },
@@ -7027,11 +7027,11 @@
   "@regionCountryUS": {
     "description": "Country name for SongLink region picker"
   },
-  "regionCountryIT": "Italy",
+  "regionCountryIT": "Италия",
   "@regionCountryIT": {
     "description": "Country name for Italy"
   },
-  "regionCountryES": "Spain",
+  "regionCountryES": "Испания",
   "@regionCountryES": {
     "description": "Country name for Spain"
   },
@@ -7165,7 +7165,7 @@
   "@libraryFilterMetadataMissingLyrics": {
     "description": "Filter option for tracks without embedded or sidecar lyrics"
   },
-  "libraryFilterMetadataMissingReplayGain": "Missing ReplayGain",
+  "libraryFilterMetadataMissingReplayGain": "Отсутствует ReplayGain",
   "@libraryFilterMetadataMissingReplayGain": {
     "description": "Filter option for scanned tracks without ReplayGain gain tags"
   },
@@ -7240,11 +7240,11 @@
     "description": "Selected state of the compact favorite action"
   },
   "autoMixDescription": "Плавный переход с подгонкой темпа и сохранением тональности. При невозможности синхронизации битов применяется кроссфейд.",
-  "playerCoverStyle": "Cover art",
+  "playerCoverStyle": "Обложка",
   "@playerCoverStyle": {
     "description": "Settings section choosing how the player shows cover art"
   },
-  "playerCoverStyleDefault": "Default",
+  "playerCoverStyleDefault": "По умолчанию",
   "@playerCoverStyleDefault": {
     "description": "Cover art style: artwork card above the controls"
   },
@@ -7252,7 +7252,7 @@
   "@playerCoverStyleDefaultDescription": {
     "description": "Subtitle of the default cover art style"
   },
-  "playerCoverStyleFullScreen": "Full screen",
+  "playerCoverStyleFullScreen": "Полноэкранный",
   "@playerCoverStyleFullScreen": {
     "description": "Cover art style: artwork fills the top of the player"
   },
@@ -7264,7 +7264,7 @@
   "@musicHaptics": {
     "description": "Setting that vibrates the phone along with the music"
   },
-  "musicHapticsDescription": "Vibrate along with the beat of downloaded and local songs",
+  "musicHapticsDescription": "Вибрировать в ритм скачанных и локальных песен",
   "@musicHapticsDescription": {
     "description": "Subtitle of the music haptics setting"
   },
@@ -7282,12 +7282,12 @@
   "autoplayOff": "Автовоспроизведение выкл",
   "autoplayFromLibrary": "Автовоспроизведение из вашей медиатеки",
   "autoplayDescription": "Continue with related songs from your Library when the queue ends.",
-  "autoplayPersonalization": "Personalized autoplay",
-  "autoplayPersonalizationDescription": "Learn from songs you listen to and skip, privately on this device. Turning this off stops learning and restores ordinary autoplay.",
-  "autoplayResetLearning": "Reset recommendation learning",
-  "autoplayResetLearningConfirmTitle": "Reset recommendation learning?",
+  "autoplayPersonalization": "Умное автовоспроизведение",
+  "autoplayPersonalizationDescription": "Учится на песнях, которые вы слушаете и пропускаете, приватно на этом устройстве. При выключении перестаёт учиться и возвращает обычное автовоспроизведение.",
+  "autoplayResetLearning": "Сбросить обучение рекомендаций",
+  "autoplayResetLearningConfirmTitle": "Сбросить обучение рекомендаций?",
   "autoplayResetLearningConfirmMessage": "Autoplay forgets what it learned from your listening and skips. This can't be undone.",
-  "autoplayResetLearningConfirm": "Reset",
+  "autoplayResetLearningConfirm": "Сбросить",
   "profileTitle": "Профиль",
   "profileSetUp": "Настройте свой профиль",
   "profileEdit": "Изменить имя и фото",
@@ -7298,18 +7298,18 @@
   "profileRemovePhoto": "Удалить фото",
   "profilePhotoError": "Выберите изображение размером менее 20 МБ.",
   "profileSaveError": "Не удалось сохранить ваш профиль. Пожалуйста, попробуйте еще раз.",
-  "homeGreetingMorning1": "Good morning",
-  "homeGreetingMorning2": "Rise and shine",
-  "homeGreetingMorning3": "Fresh start",
-  "homeGreetingAfternoon1": "Good afternoon",
-  "homeGreetingAfternoon2": "Afternoon groove",
-  "homeGreetingAfternoon3": "Keep the vibe going",
-  "homeGreetingEvening1": "Good evening",
-  "homeGreetingEvening2": "Time to unwind",
-  "homeGreetingEvening3": "Golden hour",
-  "homeGreetingNight1": "Good night",
-  "homeGreetingNight2": "Late-night session",
-  "homeGreetingNight3": "Quiet hours",
+  "homeGreetingMorning1": "Доброе утро",
+  "homeGreetingMorning2": "Проснись и пой",
+  "homeGreetingMorning3": "Свежий старт",
+  "homeGreetingAfternoon1": "Добрый день",
+  "homeGreetingAfternoon2": "Дневной грув",
+  "homeGreetingAfternoon3": "Поддерживай вайб",
+  "homeGreetingEvening1": "Добрый вечер",
+  "homeGreetingEvening2": "Время отдохнуть",
+  "homeGreetingEvening3": "Золотой час",
+  "homeGreetingNight1": "Доброй ночи",
+  "homeGreetingNight2": "Ночная сессия",
+  "homeGreetingNight3": "Тихий час",
   "homeGreetingNamed": "{greeting}, {name}",
   "@homeGreetingNamed": {
     "description": "Home greeting followed by the first name from the user's profile",
@@ -7322,43 +7322,43 @@
       }
     }
   },
-  "homeTaglineListening": "What are we listening to?",
+  "homeTaglineListening": "Что слушаем?",
   "@homeTaglineListening": {
     "description": "Rotating Home prompt under the greeting"
   },
-  "homeTaglineLink": "Got a link? Drop it in the search",
+  "homeTaglineLink": "Есть ссылка? Закинь её в поиск",
   "@homeTaglineLink": {
     "description": "Rotating Home prompt explaining that links can be pasted into search"
   },
-  "homeTaglineDiscover": "Find your next favorite album",
+  "homeTaglineDiscover": "Найди свой новый любимый альбом",
   "@homeTaglineDiscover": {
     "description": "Rotating Home prompt under the greeting"
   },
-  "homeContinueListening": "Continue listening",
+  "homeContinueListening": "Продолжить слушать",
   "@homeContinueListening": {
     "description": "Home section header for the track currently loaded in the player"
   },
-  "homeRecentlyAdded": "Recently added",
+  "homeRecentlyAdded": "Недавно добавлено",
   "@homeRecentlyAdded": {
     "description": "Home section header for the newest downloaded and scanned tracks"
   },
-  "homeOnRepeat": "On repeat",
+  "homeOnRepeat": "На репите",
   "@homeOnRepeat": {
     "description": "Home section header for the most played tracks of the last four weeks"
   },
-  "homeShortcuts": "Shortcuts",
+  "homeShortcuts": "Ярлыки",
   "@homeShortcuts": {
     "description": "Home section header for quick links to player tools"
   },
   "artistUpcomingConcerts": "Предстоящие концерты",
   "artistAllUpcomingConcerts": "Все предстоящие концерты",
   "artistNoUpcomingConcerts": "Нет предстоящих концертов.",
-  "motionArtwork": "Animated artwork",
-  "listeningStats": "Listening statistics",
+  "motionArtwork": "Анимированная обложка",
+  "listeningStats": "Статистика прослушивания",
   "listeningStatsRecord": "Record listening",
   "listeningStatsDescription": "Stored only on this device, starting now. Records the built-in player only; pauses, buffering and seeking add no listening time. A play counts after 30 seconds.",
   "listeningStatsEmpty": "Play music with the built-in player to start your listening recap. Earlier listening cannot be recovered.",
-  "listeningStatsDays": "{days} days",
+  "listeningStatsDays": "{days} дней",
   "@listeningStatsDays": {
     "placeholders": {
       "days": {
@@ -7366,7 +7366,7 @@
       }
     }
   },
-  "listeningStatsMinutes": "{minutes} min",
+  "listeningStatsMinutes": "{minutes} минут",
   "@listeningStatsMinutes": {
     "placeholders": {
       "minutes": {
@@ -7388,20 +7388,20 @@
       }
     }
   },
-  "listeningStatsPreviousYear": "Previous year",
-  "listeningStatsNextYear": "Next year",
+  "listeningStatsPreviousYear": "Прошлый год",
+  "listeningStatsNextYear": "Следующий год",
   "listeningStatsActivity": "Recent listening days · minutes",
-  "listeningStatsTopArtists": "Top artists",
-  "listeningStatsTopTracks": "Top tracks",
+  "listeningStatsTopArtists": "Топ исполнителей",
+  "listeningStatsTopTracks": "Топ треки",
   "listeningStatsLoadError": "Could not load listening statistics",
-  "listeningStatsClear": "Clear listening statistics",
+  "listeningStatsClear": "Очистить статистику прослушивания",
   "listeningStatsClearError": "Could not clear listening statistics. Please try again.",
   "listeningStatsClearDescription": "Delete all listening statistics on this device? Your music and playlists will be kept.",
   "libraryArtistsEmpty": "Artists appear here once you download music or scan a local library.",
   "listeningRewind": "Rewind",
   "listeningRewindDescription": "Relive the highlights of your recent weeks and months",
-  "listeningRewindChoosePeriod": "Choose a period",
-  "listeningRewindLastWeeks": "Last {weeks} weeks",
+  "listeningRewindChoosePeriod": "Выберите период",
+  "listeningRewindLastWeeks": "Последние {weeks} недель(-и)",
   "@listeningRewindLastWeeks": {
     "placeholders": {
       "weeks": {
@@ -7409,7 +7409,7 @@
       }
     }
   },
-  "listeningRewindLastMonths": "Last {months} months",
+  "listeningRewindLastMonths": "Последние {months} месяца(-ев)",
   "@listeningRewindLastMonths": {
     "placeholders": {
       "months": {
@@ -7417,7 +7417,7 @@
       }
     }
   },
-  "listeningRewindThisYear": "{year} so far",
+  "listeningRewindThisYear": "Более {year}",
   "@listeningRewindThisYear": {
     "placeholders": {
       "year": {
@@ -7425,8 +7425,8 @@
       }
     }
   },
-  "listeningRewindIntroTitle": "Your Rewind",
-  "listeningRewindIntroBody": "A look back at what you played from {start} to {end}.",
+  "listeningRewindIntroTitle": "Ваш Rewind",
+  "listeningRewindIntroBody": "Взгляд на то, что вы слушали в период с {start} по {end}.",
   "@listeningRewindIntroBody": {
     "placeholders": {
       "start": {
@@ -7437,8 +7437,8 @@
       }
     }
   },
-  "listeningRewindMinutesTitle": "You listened for",
-  "listeningRewindMinutesUnit": "{minutes, plural, =1{minute} other{minutes}}",
+  "listeningRewindMinutesTitle": "Вы слушали",
+  "listeningRewindMinutesUnit": "{minutes, plural, =1{минута} other{минут(ы)}}",
   "@listeningRewindMinutesUnit": {
     "placeholders": {
       "minutes": {
@@ -7446,7 +7446,7 @@
       }
     }
   },
-  "listeningRewindHours": "{hours, plural, =1{That's about 1 hour of music} other{That's about {hours} hours of music}}",
+  "listeningRewindHours": "{hours, plural, =1{Это около часа музыки} other{Это около {hours} часов музыки}}",
   "@listeningRewindHours": {
     "placeholders": {
       "hours": {
@@ -7454,7 +7454,7 @@
       }
     }
   },
-  "listeningRewindMore": "{percent}% more than the period before",
+  "listeningRewindMore": "На {percent}% больше, чем раньше",
   "@listeningRewindMore": {
     "placeholders": {
       "percent": {
@@ -7462,7 +7462,7 @@
       }
     }
   },
-  "listeningRewindLess": "{percent}% less than the period before",
+  "listeningRewindLess": "На {percent}% меньше, чем раньше",
   "@listeningRewindLess": {
     "placeholders": {
       "percent": {
@@ -7470,9 +7470,9 @@
       }
     }
   },
-  "listeningRewindSame": "About the same as the period before",
-  "listeningRewindTopArtistTitle": "Your top artist",
-  "listeningRewindArtistShare": "{percent}% of your listening time",
+  "listeningRewindSame": "Примерно как раньше",
+  "listeningRewindTopArtistTitle": "Твой любимый артист",
+  "listeningRewindArtistShare": "{percent}% твоего времени прослушивания",
   "@listeningRewindArtistShare": {
     "placeholders": {
       "percent": {
@@ -7481,8 +7481,8 @@
     }
   },
   "listeningRewindArtistsTitle": "Artists on rotation",
-  "listeningRewindTopTrackTitle": "Your top song",
-  "listeningRewindPlays": "{plays, plural, =1{1 play} other{{plays} plays}}",
+  "listeningRewindTopTrackTitle": "Твоя любимая песня",
+  "listeningRewindPlays": "{plays, plural, =1{1 воспроизведение} other{{plays} воспроизведений}}",
   "@listeningRewindPlays": {
     "placeholders": {
       "plays": {
@@ -7490,10 +7490,10 @@
       }
     }
   },
-  "listeningRewindTracksTitle": "Songs on repeat",
-  "listeningRewindTopAlbumTitle": "The album you kept coming back to",
-  "listeningRewindNewArtistsTitle": "New discoveries",
-  "listeningRewindNewArtistsBody": "{count, plural, =1{You found 1 new artist} other{You found {count} new artists}}",
+  "listeningRewindTracksTitle": "Песни на репите",
+  "listeningRewindTopAlbumTitle": "Альбом, к которому ты всегда возвращался",
+  "listeningRewindNewArtistsTitle": "Новые открытия",
+  "listeningRewindNewArtistsBody": "{count, plural, =1{Вы нашли 1 нового артиста} other{Вы нашли {count} новых артистов}}",
   "@listeningRewindNewArtistsBody": {
     "placeholders": {
       "count": {
@@ -7501,10 +7501,10 @@
       }
     }
   },
-  "listeningRewindRhythmTitle": "Your listening rhythm",
-  "listeningRewindPeakDay": "Biggest day",
-  "listeningRewindFavoriteDay": "Favorite day",
-  "listeningRewindStreak": "Longest streak",
+  "listeningRewindRhythmTitle": "Ваш ритм прослушивания",
+  "listeningRewindPeakDay": "Наибольший день",
+  "listeningRewindFavoriteDay": "Любимый день",
+  "listeningRewindStreak": "Длиннейшая серия",
   "listeningRewindStreakDays": "{days, plural, =1{1 day} other{{days} days in a row}}",
   "@listeningRewindStreakDays": {
     "placeholders": {
@@ -7513,7 +7513,7 @@
       }
     }
   },
-  "listeningRewindReplayTitle": "Couldn't stop playing",
+  "listeningRewindReplayTitle": "Не можете остановиться",
   "listeningRewindReplayBody": "You played it {plays} times on {date}",
   "@listeningRewindReplayBody": {
     "placeholders": {
@@ -7525,7 +7525,7 @@
       }
     }
   },
-  "listeningRewindOutroTitle": "That's your Rewind",
+  "listeningRewindOutroTitle": "Это ваш Rewind",
   "listeningRewindOutroBody": "Keep listening. Your next Rewind is already taking shape.",
   "listeningRewindEmpty": "Not enough listening in this period yet. Play some music with the built-in player and come back later.",
   "listeningRewindLoadError": "Could not load your Rewind",
@@ -7540,9 +7540,9 @@
       }
     }
   },
-  "listeningRewindShare": "Share",
+  "listeningRewindShare": "Поделиться",
   "listeningRewindShareError": "Could not share your Rewind",
-  "listeningRewindNext": "Next",
+  "listeningRewindNext": "Далее",
   "listeningRewindPrevious": "Previous",
   "listeningRewindMonthlyReady": "Your last 4 weeks are ready to replay",
   "listeningRewindYearTitle": "Your {year} in Music",
@@ -7557,9 +7557,9 @@
   "listeningRewindYearBanner": "Your top artists, songs and moments of the year",
   "listeningRewindYearIntroBody": "Everything you played this year, from your first song to your biggest month.",
   "listeningRewindNumbersTitle": "Your year in numbers",
-  "listeningRewindSongsLabel": "Songs",
-  "listeningRewindArtistsLabel": "Artists",
-  "listeningRewindAlbumsLabel": "Albums",
+  "listeningRewindSongsLabel": "Песни",
+  "listeningRewindArtistsLabel": "Исполнители",
+  "listeningRewindAlbumsLabel": "Альбомы",
   "listeningRewindDaysLabel": "Days with music",
   "listeningRewindDaysShare": "Music on {percent}% of your days",
   "@listeningRewindDaysShare": {
@@ -7607,7 +7607,7 @@
     }
   },
   "listeningRewindYearOutroBody": "Here's to another year of great music.",
-  "weeklyReleases": "New releases",
+  "weeklyReleases": "Новые релизы",
   "weeklyReleasesDescription": "Recent albums and singles from your favorite artists, supplied by installed metadata extensions.",
   "weeklyReleasesEmpty": "No dated releases found in this period. Add favorite artists or try a longer period.",
   "weeklyReleasesUnavailable": "Some artists could not be checked. Their saved results are kept. Providers may not supply artist catalogs or exact release dates.",
@@ -7616,13 +7616,13 @@
   "libraryLoading": "Loading Library…",
   "libraryLoadFailed": "Library could not be loaded. Retry to load the saved folders and track index.",
   "discordPresenceDescription": "Share the title, artist, album and progress of music played in the built-in player on your Discord profile. Local audio and artwork files are never uploaded. Clears when playback pauses or stops.",
-  "discordPresenceDisabled": "Disabled",
-  "discordPresenceLink": "Link Discord account",
-  "discordPresenceConnecting": "Connecting to Discord…",
+  "discordPresenceDisabled": "Отключено",
+  "discordPresenceLink": "Подключить аккаунт Discord",
+  "discordPresenceConnecting": "Подключение к Discord…",
   "discordPresenceReady": "Ready when music plays",
   "discordPresenceActive": "Sharing current track",
-  "discordPresenceUnavailable": "Discord is unavailable. Retrying during playback.",
-  "discordPresenceBuildUnavailable": "Discord SDK is not available in this build.",
+  "discordPresenceUnavailable": "Discord недоступен. Повторите попытку во время воспроизведения.",
+  "discordPresenceBuildUnavailable": "Discord SDK недоступен в этой сборке.",
   "discordPresenceAndroidHelp": "Install Discord and sign in on this phone. Allow activity sharing in Discord. External players are not supported.",
   "discordPresenceIosHelp": "Link your account through Discord and allow activity sharing. Tap to link again if authorization fails.",
   "discordPresenceDesktopHelp": "Keep the Discord desktop app running and signed in on this computer, and allow activity sharing in Discord.",
@@ -7631,27 +7631,27 @@
   "autoMixAutomaticDuration": "Automatic duration",
   "autoMixDuration": "Mix duration",
   "autoMixEffect": "Transition effect",
-  "autoMixEffectAuto": "Auto",
-  "autoMixEffectCrossfade": "Crossfade",
+  "autoMixEffectAuto": "Авто",
+  "autoMixEffectCrossfade": "Плавный переход",
   "autoMixEffectMuffled": "Muffled",
-  "autoMixEffectEcho": "Echo",
-  "autoMixEffectPitch": "Pitch",
+  "autoMixEffectEcho": "Эхо",
+  "autoMixEffectPitch": "Тон",
   "autoMixEffectCustom": "Custom",
   "autoMixEffectsHelp": "Effects apply to the end of the outgoing song during the mix. Short songs use a shorter overlap.",
-  "autoMixSpeed": "Speed",
-  "autoMixPitch": "Pitch (semitones)",
-  "autoMixEcho": "Echo",
+  "autoMixSpeed": "Скорость",
+  "autoMixPitch": "Тон (полутона)",
+  "autoMixEcho": "Эхо",
   "autoMixLowPass": "Muffled filter",
-  "autoMixMixing": "Mixing",
-  "autoMixCrossfading": "Crossfade",
+  "autoMixMixing": "Микширование",
+  "autoMixCrossfading": "Плавный переход",
   "playbackAutomation": "Automatic playback",
-  "playbackPauseOnMute": "Pause when muted",
-  "snackbarPlaybackMuted": "Media volume is zero. Playback paused. Press play again to continue.",
+  "playbackPauseOnMute": "Пауза при отключении звука",
+  "snackbarPlaybackMuted": "Громкость равна нулю. Воспроизведение приостановлено. Нажмите ещё раз, чтобы продолжить.",
   "@snackbarPlaybackMuted": {
     "description": "Shown after mute automation pauses playback; another explicit play request can override the pause."
   },
   "playbackPauseOnMuteDescription": "Pause at zero media volume and resume when raised. Manual pauses stay paused. Standard audio output only.",
-  "playbackOnHeadphonesConnected": "Play when headphones connect",
+  "playbackOnHeadphonesConnected": "Играть при подключении наушников",
   "playbackOnHeadphonesConnectedDescription": "Resume the current song when wired or Bluetooth headphones connect. Disconnecting pauses playback. Built-in player only.",
   "appearanceCustomFont": "Custom font",
   "appearanceCustomFontSubtitle": "Import a TTF or OTF file (up to 10 MB). Overrides the theme and system font.",
@@ -7713,12 +7713,12 @@
       }
     }
   },
-  "lyricsShareAction": "Share",
+  "lyricsShareAction": "Поделиться",
   "lyricsShareError": "Couldn't create the lyrics image",
   "lyricsShareBackgroundArtwork": "Artwork",
   "lyricsShareBackgroundColor": "Cover color",
-  "lyricsShareBackgroundDark": "Dark",
-  "lyricsShareBackgroundLight": "Light",
+  "lyricsShareBackgroundDark": "Тёмная",
+  "lyricsShareBackgroundLight": "Светлая",
   "audioInfoTitle": "Audio info",
   "@audioInfoTitle": {
     "description": "Sheet with technical details of the playing track, opened from the quality badge"
@@ -7729,15 +7729,15 @@
   "audioInfoProcessing": "Processing",
   "audioInfoOutput": "Output",
   "audioInfoAnalysis": "Spectrum and level analysis",
-  "audioInfoQuality": "Quality",
+  "audioInfoQuality": "Качество",
   "audioInfoHiResLossless": "Hi-Res Lossless",
   "audioInfoLossless": "Lossless",
-  "audioInfoLossy": "Lossy",
-  "audioInfoFormat": "Format",
+  "audioInfoLossy": "С потерями",
+  "audioInfoFormat": "Формат",
   "audioInfoCodec": "Codec",
   "audioInfoSampleRate": "Sample rate",
   "audioInfoBitDepth": "Bit depth",
-  "audioInfoChannels": "Channels",
+  "audioInfoChannels": "Каналы",
   "audioInfoChannelCount": "{count, plural, =1{Mono} =2{Stereo} other{{count} channels}}",
   "@audioInfoChannelCount": {
     "placeholders": {
@@ -7746,8 +7746,8 @@
       }
     }
   },
-  "audioInfoBitrate": "Bitrate",
-  "audioInfoDuration": "Duration",
+  "audioInfoBitrate": "Битрейт",
+  "audioInfoDuration": "Продолжительность",
   "audioInfoFileSize": "File size",
   "audioInfoCompression": "Compression",
   "audioInfoCompressionValue": "{percent}% of uncompressed size",
@@ -7761,7 +7761,7 @@
   "audioInfoLocation": "Location",
   "audioInfoLocationLocal": "Device storage",
   "audioInfoLocationShared": "Shared folder",
-  "audioInfoLocationNetwork": "Network storage",
+  "audioInfoLocationNetwork": "Сетевое хранилище",
   "audioInfoPcmRate": "Uncompressed data rate",
   "audioInfoFrequencyRange": "Frequency range",
   "audioInfoFrequencyRangeValue": "Up to {frequency} (Nyquist)",
@@ -7787,9 +7787,9 @@
     }
   },
   "audioInfoOn": "On",
-  "audioInfoOff": "Off",
+  "audioInfoOff": "Выкл",
   "audioInfoBypassed": "Bypassed by direct output",
-  "audioInfoPlayer": "Player",
+  "audioInfoPlayer": "Плеер",
   "audioInfoPlayerValue": "Mornye built-in player",
   "audioInfoSignalPath": "Signal path",
   "audioInfoPathSystem": "System mixer",
@@ -7822,10 +7822,10 @@
     }
   },
   "audioInfoOutputRate": "Output sample rate",
-  "audioInfoOutputFormat": "Output format",
+  "audioInfoOutputFormat": "Выходной формат",
   "audioInfoDeviceRates": "Device sample rates",
   "audioInfoDeviceFormats": "Device formats",
-  "audioInfoAnyRate": "Any",
+  "audioInfoAnyRate": "Любая",
   "audioInfoBuffer": "Mixer buffer",
   "audioInfoLatency": "Output latency",
   "audioInfoLowLatency": "Low-latency audio",
@@ -7852,7 +7852,7 @@
   "appCrashMessage": "A crash report was saved. Copy it and send it to the developer to help investigate.",
   "appCrashDetails": "View error and log",
   "appCrashCopy": "Copy report for developer",
-  "appCrashDismiss": "Dismiss",
+  "appCrashDismiss": "Отклонить",
   "appCrashCopyFailed": "Could not copy the crash report. Please try again.",
   "appCrashDismissFailed": "Could not dismiss the crash report. Please try again.",
   "optionsEmbeddedCoverSizeOriginal": "Оригинальное разрешение",
@@ -7933,7 +7933,7 @@
   "desktopMenuView": "View",
   "desktopWindowMode": "Window mode",
   "desktopWindowed": "Windowed",
-  "desktopWindowFullscreen": "Full screen",
+  "desktopWindowFullscreen": "Полноэкранный",
   "desktopWindowBorderless": "Borderless",
   "desktopExitFullscreen": "Exit full screen",
   "desktopMinimizeWindow": "Minimize window",
@@ -7951,7 +7951,7 @@
   "@desktopMiniPlayerExpand": {
     "description": "Mini player button that returns the window to its full size"
   },
-  "desktopMenuRefresh": "Refresh",
+  "desktopMenuRefresh": "Обновить",
   "@desktopMenuRefresh": {
     "description": "View menu item and Keyboard Shortcuts row that reloads the page on screen (Home, Repo, statistics)"
   },
@@ -7967,7 +7967,7 @@
   "@desktopDownloadsQueued": {
     "description": "Status of a download in the desktop downloads popover that has not started yet"
   },
-  "desktopDownloadsCancel": "Cancel download",
+  "desktopDownloadsCancel": "Отменить скачивание",
   "@desktopDownloadsCancel": {
     "description": "Tooltip of the button that cancels one download in the desktop downloads popover"
   },

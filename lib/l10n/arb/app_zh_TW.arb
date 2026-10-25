@@ -972,7 +972,7 @@
   "@setupNotificationBackgroundDescription": {
     "description": "Detailed notification explanation"
   },
-  "setupSkipForNow": "Skip for now",
+  "setupSkipForNow": "現在略過",
   "@setupSkipForNow": {
     "description": "Skip button text"
   },
@@ -1008,7 +1008,7 @@
   "@dialogSave": {
     "description": "Dialog button - save changes"
   },
-  "dialogDelete": "Delete",
+  "dialogDelete": "刪除",
   "@dialogDelete": {
     "description": "Dialog button - delete item"
   },
@@ -1028,7 +1028,7 @@
   "@dialogImport": {
     "description": "Dialog button - import data"
   },
-  "dialogDownload": "Download",
+  "dialogDownload": "下載",
   "@dialogDownload": {
     "description": "Confirm button in Download All dialog"
   },
@@ -1052,7 +1052,7 @@
   "@dialogRemove": {
     "description": "Dialog button - remove item"
   },
-  "dialogUninstall": "Uninstall",
+  "dialogUninstall": "解除安裝",
   "@dialogUninstall": {
     "description": "Dialog button - uninstall extension"
   },
@@ -1433,7 +1433,7 @@
   "@searchArtists": {
     "description": "Search result category - artists"
   },
-  "searchAlbums": "Albums",
+  "searchAlbums": "專輯",
   "@searchAlbums": {
     "description": "Search result category - albums"
   },
@@ -1481,11 +1481,11 @@
   "@searchSortDateNewest": {
     "description": "Sort option - newest release first"
   },
-  "tooltipPlay": "Play",
+  "tooltipPlay": "播放",
   "@tooltipPlay": {
     "description": "Tooltip - play button"
   },
-  "filenameFormat": "Filename Format",
+  "filenameFormat": "音樂檔案名稱格式",
   "@filenameFormat": {
     "description": "Setting title - filename pattern"
   },
@@ -1740,7 +1740,7 @@
   "@sectionSearchSource": {
     "description": "Settings section header"
   },
-  "sectionDownload": "Download",
+  "sectionDownload": "下載",
   "@sectionDownload": {
     "description": "Settings section header"
   },
@@ -1748,7 +1748,7 @@
   "@sectionPerformance": {
     "description": "Settings section header"
   },
-  "sectionApp": "App",
+  "sectionApp": "應用程式",
   "@sectionApp": {
     "description": "Settings section header"
   },
@@ -1760,7 +1760,7 @@
   "@sectionDebug": {
     "description": "Settings section header"
   },
-  "sectionService": "Service",
+  "sectionService": "服務",
   "@sectionService": {
     "description": "Settings section header"
   },
@@ -2017,7 +2017,7 @@
   "@trackLyricsLoadFailed": {
     "description": "Message when lyrics loading fails"
   },
-  "trackEmbedLyrics": "Embed Lyrics",
+  "trackEmbedLyrics": "嵌入歌詞",
   "@trackEmbedLyrics": {
     "description": "Action - embed lyrics into audio file"
   },
@@ -2085,7 +2085,7 @@
       }
     }
   },
-  "storeFilterAll": "All",
+  "storeFilterAll": "全部",
   "@storeFilterAll": {
     "description": "Repo filter - all extensions"
   },
@@ -2093,7 +2093,7 @@
   "@storeFilterMetadata": {
     "description": "Repo filter - metadata providers"
   },
-  "storeFilterDownload": "Download",
+  "storeFilterDownload": "下載",
   "@storeFilterDownload": {
     "description": "Repo filter - download providers"
   },
@@ -2201,7 +2201,7 @@
   "@extensionPermissions": {
     "description": "Section header - required permissions"
   },
-  "extensionSettings": "Settings",
+  "extensionSettings": "設定",
   "@extensionSettings": {
     "description": "Section header - extension settings"
   },
@@ -2869,7 +2869,7 @@
   "@librarySourceOffline": {
     "description": "Library source is temporarily disconnected"
   },
-  "librarySourceDisabled": "Disabled",
+  "librarySourceDisabled": "已停用",
   "@librarySourceDisabled": {
     "description": "Library source has been disabled by the user"
   },
@@ -3082,7 +3082,7 @@
   "@libraryCleared": {
     "description": "Snackbar after clearing library"
   },
-  "libraryStorageAccessRequired": "Storage Access Required",
+  "libraryStorageAccessRequired": "需要存取儲存裝置權限",
   "@libraryStorageAccessRequired": {
     "description": "Dialog title for storage permission"
   },
@@ -3098,7 +3098,7 @@
   "@librarySourceLocal": {
     "description": "Badge for tracks from local library scan"
   },
-  "libraryFilterAll": "All",
+  "libraryFilterAll": "全部",
   "@libraryFilterAll": {
     "description": "Filter chip - show all library items"
   },
@@ -3284,7 +3284,7 @@
   "@tutorialLibraryTip3": {
     "description": "Tutorial library tip 3"
   },
-  "tutorialExtensionsTitle": "Extensions",
+  "tutorialExtensionsTitle": "擴充套件",
   "@tutorialExtensionsTitle": {
     "description": "Tutorial extensions page title"
   },
@@ -5011,7 +5011,7 @@
   "@editMetadataFieldCover": {
     "description": "Chip label for cover art field in auto-fill selector"
   },
-  "editMetadataSelectAll": "All",
+  "editMetadataSelectAll": "全部",
   "@editMetadataSelectAll": {
     "description": "Button to select all fields for auto-fill"
   },
@@ -6061,7 +6061,7 @@
   "@settingsLyricsSubtitle": {
     "description": "Subtitle for lyrics settings"
   },
-  "settingsApp": "App",
+  "settingsApp": "應用程式",
   "@settingsApp": {
     "description": "Settings menu item - app settings"
   },
@@ -6545,7 +6545,7 @@
   "@storeCategoryMetadata": {
     "description": "Store extension category - metadata"
   },
-  "storeCategoryDownload": "Download",
+  "storeCategoryDownload": "下載",
   "@storeCategoryDownload": {
     "description": "Store extension category - download"
   },
@@ -7540,7 +7540,7 @@
       }
     }
   },
-  "listeningRewindShare": "Share",
+  "listeningRewindShare": "分享",
   "listeningRewindShareError": "Could not share your Rewind",
   "listeningRewindNext": "Next",
   "listeningRewindPrevious": "Previous",
@@ -7559,7 +7559,7 @@
   "listeningRewindNumbersTitle": "Your year in numbers",
   "listeningRewindSongsLabel": "Songs",
   "listeningRewindArtistsLabel": "Artists",
-  "listeningRewindAlbumsLabel": "Albums",
+  "listeningRewindAlbumsLabel": "專輯",
   "listeningRewindDaysLabel": "Days with music",
   "listeningRewindDaysShare": "Music on {percent}% of your days",
   "@listeningRewindDaysShare": {
@@ -7616,7 +7616,7 @@
   "libraryLoading": "Loading Library…",
   "libraryLoadFailed": "Library could not be loaded. Retry to load the saved folders and track index.",
   "discordPresenceDescription": "Share the title, artist, album and progress of music played in the built-in player on your Discord profile. Local audio and artwork files are never uploaded. Clears when playback pauses or stops.",
-  "discordPresenceDisabled": "Disabled",
+  "discordPresenceDisabled": "已停用",
   "discordPresenceLink": "Link Discord account",
   "discordPresenceConnecting": "Connecting to Discord…",
   "discordPresenceReady": "Ready when music plays",
@@ -7713,12 +7713,12 @@
       }
     }
   },
-  "lyricsShareAction": "Share",
+  "lyricsShareAction": "分享",
   "lyricsShareError": "Couldn't create the lyrics image",
   "lyricsShareBackgroundArtwork": "Artwork",
   "lyricsShareBackgroundColor": "Cover color",
-  "lyricsShareBackgroundDark": "Dark",
-  "lyricsShareBackgroundLight": "Light",
+  "lyricsShareBackgroundDark": "深色模式",
+  "lyricsShareBackgroundLight": "明亮模式",
   "audioInfoTitle": "Audio info",
   "@audioInfoTitle": {
     "description": "Sheet with technical details of the playing track, opened from the quality badge"

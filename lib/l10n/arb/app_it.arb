@@ -221,7 +221,7 @@
   "appearanceGlassOutlinesSubtitle": "Show decorative edges around Mornye glass. Turning this off keeps blur and refraction.",
   "appearanceGlassClaritySubtitle": "Adjust transparency in Mornye menus and navigation. Text contrast is preserved.",
   "appearanceGlassTinted": "Tinted",
-  "appearanceGlassClear": "Clear",
+  "appearanceGlassClear": "Cancella",
   "appearanceGlassClearPerformance": "Very clear glass may use more power and feel less smooth on older devices. Lower clarity if needed.",
   "appearanceGlassClarityBlurOff": "Glass is opaque on this device. Turn on “{setting}” to adjust clarity.",
   "@appearanceGlassClarityBlurOff": {
@@ -377,7 +377,7 @@
   "@folderTemplatePreview": {
     "description": "Label for a sample expanded folder template"
   },
-  "folderTemplatePreviewFailed": "Preview unavailable",
+  "folderTemplatePreviewFailed": "Anteprima non disponibile",
   "@folderTemplatePreviewFailed": {
     "description": "Shown when the native folder preview could not be generated"
   },
@@ -565,7 +565,7 @@
   "metadataSeparatorSemicolon": "Semicolon (;)",
   "metadataSeparatorSlash": "Slash (/)",
   "metadataSeparatorCustom": "Custom separator",
-  "metadataSeparatorPreview": "Preview",
+  "metadataSeparatorPreview": "Anteprima",
   "metadataSeparatorInvalid": "Use 1–16 characters without line breaks or control characters.",
   "@optionsArtistTagMode": {
     "description": "Setting title for how artist metadata is written into files"
@@ -1481,11 +1481,11 @@
   "@searchSortDateNewest": {
     "description": "Sort option - newest release first"
   },
-  "tooltipPlay": "Play",
+  "tooltipPlay": "Riproduci",
   "@tooltipPlay": {
     "description": "Tooltip - play button"
   },
-  "filenameFormat": "Filename Format",
+  "filenameFormat": "Formato nome file",
   "@filenameFormat": {
     "description": "Setting title - filename pattern"
   },
@@ -2017,7 +2017,7 @@
   "@trackLyricsLoadFailed": {
     "description": "Message when lyrics loading fails"
   },
-  "trackEmbedLyrics": "Embed Lyrics",
+  "trackEmbedLyrics": "Incorpora Testo",
   "@trackEmbedLyrics": {
     "description": "Action - embed lyrics into audio file"
   },
@@ -2033,7 +2033,7 @@
   "@trackCopiedToClipboard": {
     "description": "Snackbar - content copied"
   },
-  "trackDeleteConfirmTitle": "Remove from device?",
+  "trackDeleteConfirmTitle": "Rimuovi dal dispositivo?",
   "@trackDeleteConfirmTitle": {
     "description": "Delete confirmation title"
   },
@@ -2085,11 +2085,11 @@
       }
     }
   },
-  "storeFilterAll": "All",
+  "storeFilterAll": "Tutti",
   "@storeFilterAll": {
     "description": "Repo filter - all extensions"
   },
-  "storeFilterMetadata": "Metadata",
+  "storeFilterMetadata": "Metadati",
   "@storeFilterMetadata": {
     "description": "Repo filter - metadata providers"
   },
@@ -2101,7 +2101,7 @@
   "@storeFilterUtility": {
     "description": "Repo filter - utility extensions"
   },
-  "storeFilterLyrics": "Lyrics",
+  "storeFilterLyrics": "Testi",
   "@storeFilterLyrics": {
     "description": "Repo filter - lyrics providers"
   },
@@ -2201,11 +2201,11 @@
   "@extensionPermissions": {
     "description": "Section header - required permissions"
   },
-  "extensionSettings": "Settings",
+  "extensionSettings": "Impostazioni",
   "@extensionSettings": {
     "description": "Section header - extension settings"
   },
-  "extensionRemoveButton": "Remove Extension",
+  "extensionRemoveButton": "Rimuovi estensione",
   "@extensionRemoveButton": {
     "description": "Button to uninstall extension"
   },
@@ -2488,7 +2488,7 @@
   "@appearanceForceBlurSubtitle": {
     "description": "Subtitle for the force-blur toggle"
   },
-  "queueClearAll": "Clear All",
+  "queueClearAll": "Pulisci tutto",
   "@queueClearAll": {
     "description": "Button - clear all queue items"
   },
@@ -2589,7 +2589,7 @@
   "@albumFolderArtistAlbumFlatSubtitle": {
     "description": "Folder structure example for flat singles"
   },
-  "downloadedAlbumDeleteSelected": "Delete Selected",
+  "downloadedAlbumDeleteSelected": "Elimina selezionato",
   "@downloadedAlbumDeleteSelected": {
     "description": "Button - delete selected tracks"
   },
@@ -2602,7 +2602,7 @@
       }
     }
   },
-  "downloadedAlbumSelectedCount": "{count} selected",
+  "downloadedAlbumSelectedCount": "{count} selezionati",
   "@downloadedAlbumSelectedCount": {
     "description": "Selection count indicator",
     "placeholders": {
@@ -2624,7 +2624,7 @@
       }
     }
   },
-  "downloadedAlbumSelectToDelete": "Select tracks to delete",
+  "downloadedAlbumSelectToDelete": "Seleziona tracce da eliminare",
   "@downloadedAlbumSelectToDelete": {
     "description": "Placeholder when nothing selected"
   },
@@ -2638,7 +2638,7 @@
       }
     }
   },
-  "recentTypeArtist": "Artist",
+  "recentTypeArtist": "Artista",
   "@recentTypeArtist": {
     "description": "Recent access item type - artist"
   },
@@ -2756,7 +2756,7 @@
   "@discographyDownloadSelected": {
     "description": "Button - download selected albums"
   },
-  "discographyAddedToQueue": "Added {count} tracks to queue",
+  "discographyAddedToQueue": "Aggiunte {count} tracce alla coda",
   "@discographyAddedToQueue": {
     "description": "Snackbar - tracks added from discography",
     "placeholders": {
@@ -2869,7 +2869,7 @@
   "@librarySourceOffline": {
     "description": "Library source is temporarily disconnected"
   },
-  "librarySourceDisabled": "Disabled",
+  "librarySourceDisabled": "Disabilitato",
   "@librarySourceDisabled": {
     "description": "Library source has been disabled by the user"
   },
@@ -3082,7 +3082,7 @@
   "@libraryCleared": {
     "description": "Snackbar after clearing library"
   },
-  "libraryStorageAccessRequired": "Storage Access Required",
+  "libraryStorageAccessRequired": "Accesso alla memoria richiesto",
   "@libraryStorageAccessRequired": {
     "description": "Dialog title for storage permission"
   },
@@ -3098,7 +3098,7 @@
   "@librarySourceLocal": {
     "description": "Badge for tracks from local library scan"
   },
-  "libraryFilterAll": "All",
+  "libraryFilterAll": "Tutti",
   "@libraryFilterAll": {
     "description": "Filter chip - show all library items"
   },
@@ -3146,7 +3146,7 @@
   "@libraryFilterFormat": {
     "description": "Filter section - file format"
   },
-  "libraryFilterMetadata": "Metadata",
+  "libraryFilterMetadata": "Metadati",
   "@libraryFilterMetadata": {
     "description": "Filter section - metadata completeness"
   },
@@ -3284,7 +3284,7 @@
   "@tutorialLibraryTip3": {
     "description": "Tutorial library tip 3"
   },
-  "tutorialExtensionsTitle": "Extensions",
+  "tutorialExtensionsTitle": "Estensioni",
   "@tutorialExtensionsTitle": {
     "description": "Tutorial extensions page title"
   },
@@ -3604,7 +3604,7 @@
   "@trackReEnrichFieldCover": {
     "description": "Checkbox label for cover art field in re-enrich"
   },
-  "trackReEnrichFieldLyrics": "Lyrics",
+  "trackReEnrichFieldLyrics": "Testi",
   "@trackReEnrichFieldLyrics": {
     "description": "Checkbox label for lyrics field in re-enrich"
   },
@@ -3624,7 +3624,7 @@
   "@trackReEnrichFieldExtra": {
     "description": "Checkbox label for extra metadata in re-enrich"
   },
-  "trackReEnrichSelectAll": "Select All",
+  "trackReEnrichSelectAll": "Seleziona tutto",
   "@trackReEnrichSelectAll": {
     "description": "Select all fields checkbox in re-enrich"
   },
@@ -3996,7 +3996,7 @@
   "@collectionNoPlaylistsYet": {
     "description": "Empty state title when user has no playlists"
   },
-  "collectionPlaylistTracks": "{count, plural, =1{1 track} other{{count} tracks}}",
+  "collectionPlaylistTracks": "{count, plural, one {}=1{1 traccia} other{{count} tracce}}",
   "@collectionPlaylistTracks": {
     "description": "Track count label for custom playlists",
     "placeholders": {
@@ -4967,7 +4967,7 @@
   "@editMetadataFieldTitle": {
     "description": "Chip label for title field in auto-fill selector"
   },
-  "editMetadataFieldArtist": "Artist",
+  "editMetadataFieldArtist": "Artista",
   "@editMetadataFieldArtist": {
     "description": "Chip label for artist field in auto-fill selector"
   },
@@ -5011,7 +5011,7 @@
   "@editMetadataFieldCover": {
     "description": "Chip label for cover art field in auto-fill selector"
   },
-  "editMetadataSelectAll": "All",
+  "editMetadataSelectAll": "Tutti",
   "@editMetadataSelectAll": {
     "description": "Button to select all fields for auto-fill"
   },
@@ -5032,7 +5032,7 @@
   "@queueFilteringIndicator": {
     "description": "Shown while filter results are being computed"
   },
-  "queueTrackCount": "{count, plural, =1{1 track} other{{count} tracks}}",
+  "queueTrackCount": "{count, plural, one {}=1{1 traccia} other{{count} tracce}}",
   "@queueTrackCount": {
     "description": "Track count label with plural support",
     "placeholders": {
@@ -6045,7 +6045,7 @@
   "@settingsFilesSubtitle": {
     "description": "Subtitle for files & folders settings"
   },
-  "settingsMetadata": "Metadata",
+  "settingsMetadata": "Metadati",
   "@settingsMetadata": {
     "description": "Settings menu item - metadata settings"
   },
@@ -6053,7 +6053,7 @@
   "@settingsMetadataSubtitle": {
     "description": "Subtitle for metadata settings"
   },
-  "settingsLyrics": "Lyrics",
+  "settingsLyrics": "Testi",
   "@settingsLyrics": {
     "description": "Settings menu item - lyrics settings"
   },
@@ -6073,7 +6073,7 @@
   "@sectionMetadataProviders": {
     "description": "Settings section header for metadata providers"
   },
-  "sectionDuplicates": "Duplicates",
+  "sectionDuplicates": "Duplicati",
   "@sectionDuplicates": {
     "description": "Settings section header for deduplication"
   },
@@ -6541,7 +6541,7 @@
   "@storeAnyVersion": {
     "description": "Store detail value when any app version is accepted"
   },
-  "storeCategoryMetadata": "Metadata",
+  "storeCategoryMetadata": "Metadati",
   "@storeCategoryMetadata": {
     "description": "Store extension category - metadata"
   },
@@ -6553,7 +6553,7 @@
   "@storeCategoryUtility": {
     "description": "Store extension category - utility"
   },
-  "storeCategoryLyrics": "Lyrics",
+  "storeCategoryLyrics": "Testi",
   "@storeCategoryLyrics": {
     "description": "Store extension category - lyrics"
   },
@@ -6741,7 +6741,7 @@
   "@nowPlayingTabPlayer": {
     "description": "Tab label for the player view"
   },
-  "nowPlayingTabLyrics": "Lyrics",
+  "nowPlayingTabLyrics": "Testi",
   "@nowPlayingTabLyrics": {
     "description": "Tab label for the lyrics view"
   },
@@ -7244,7 +7244,7 @@
   "@playerCoverStyle": {
     "description": "Settings section choosing how the player shows cover art"
   },
-  "playerCoverStyleDefault": "Default",
+  "playerCoverStyleDefault": "Predefinito",
   "@playerCoverStyleDefault": {
     "description": "Cover art style: artwork card above the controls"
   },
@@ -7540,9 +7540,9 @@
       }
     }
   },
-  "listeningRewindShare": "Share",
+  "listeningRewindShare": "Condividi",
   "listeningRewindShareError": "Could not share your Rewind",
-  "listeningRewindNext": "Next",
+  "listeningRewindNext": "Prossimo",
   "listeningRewindPrevious": "Previous",
   "listeningRewindMonthlyReady": "Your last 4 weeks are ready to replay",
   "listeningRewindYearTitle": "Your {year} in Music",
@@ -7557,9 +7557,9 @@
   "listeningRewindYearBanner": "Your top artists, songs and moments of the year",
   "listeningRewindYearIntroBody": "Everything you played this year, from your first song to your biggest month.",
   "listeningRewindNumbersTitle": "Your year in numbers",
-  "listeningRewindSongsLabel": "Songs",
-  "listeningRewindArtistsLabel": "Artists",
-  "listeningRewindAlbumsLabel": "Albums",
+  "listeningRewindSongsLabel": "Canzoni",
+  "listeningRewindArtistsLabel": "Artisti",
+  "listeningRewindAlbumsLabel": "Album",
   "listeningRewindDaysLabel": "Days with music",
   "listeningRewindDaysShare": "Music on {percent}% of your days",
   "@listeningRewindDaysShare": {
@@ -7616,7 +7616,7 @@
   "libraryLoading": "Loading Library…",
   "libraryLoadFailed": "Library could not be loaded. Retry to load the saved folders and track index.",
   "discordPresenceDescription": "Share the title, artist, album and progress of music played in the built-in player on your Discord profile. Local audio and artwork files are never uploaded. Clears when playback pauses or stops.",
-  "discordPresenceDisabled": "Disabled",
+  "discordPresenceDisabled": "Disabilitato",
   "discordPresenceLink": "Link Discord account",
   "discordPresenceConnecting": "Connecting to Discord…",
   "discordPresenceReady": "Ready when music plays",
@@ -7713,12 +7713,12 @@
       }
     }
   },
-  "lyricsShareAction": "Share",
+  "lyricsShareAction": "Condividi",
   "lyricsShareError": "Couldn't create the lyrics image",
   "lyricsShareBackgroundArtwork": "Artwork",
   "lyricsShareBackgroundColor": "Cover color",
-  "lyricsShareBackgroundDark": "Dark",
-  "lyricsShareBackgroundLight": "Light",
+  "lyricsShareBackgroundDark": "Scuro",
+  "lyricsShareBackgroundLight": "Chiaro",
   "audioInfoTitle": "Audio info",
   "@audioInfoTitle": {
     "description": "Sheet with technical details of the playing track, opened from the quality badge"

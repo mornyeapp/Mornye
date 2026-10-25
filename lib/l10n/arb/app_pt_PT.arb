@@ -13,63 +13,63 @@
   "subsonicSearch": "Search server music...",
   "subsonicMoreAlbums": "More albums",
   "subsonicErrorApi": "The server does not support this API version or authentication method. Check the server settings and the selected sign-in method.",
-  "networkDownloadDestination": "Network download destination",
+  "networkDownloadDestination": "Destino de download na rede",
   "@networkDownloadDestination": {
     "description": "Files settings item that opens network storage to choose a folder for downloaded music"
   },
-  "networkUseForDownloads": "Download to this folder",
+  "networkUseForDownloads": "Baixar para esta pasta",
   "@networkUseForDownloads": {
     "description": "Action to select the current network folder as the download destination; also the settings subtitle when no network destination is selected"
   },
-  "networkDownloadSelected": "Selected download destination",
+  "networkDownloadSelected": "Destino de download selecionado",
   "@networkDownloadSelected": {
     "description": "Status label replacing the download destination action when the current network folder is already selected"
   },
-  "networkUseLocalDownloads": "Use local download folder",
+  "networkUseLocalDownloads": "Usar pasta de download local",
   "@networkUseLocalDownloads": {
     "description": "Files settings action that clears the network download destination and returns downloads to the local folder"
   },
-  "networkDownloadAccessFailed": "Could not write to this folder.",
+  "networkDownloadAccessFailed": "Não foi possível gravar nesta pasta.",
   "@networkDownloadAccessFailed": {
     "description": "Snackbar prefix when the write-access check fails while selecting a network download folder; followed by a specific network error message"
   },
-  "networkUploading": "Uploading to network storage",
+  "networkUploading": "Enviando para armazenamento em rede",
   "@networkUploading": {
     "description": "Download queue status during upload of prepared audio to the network destination; a progress percentage may follow"
   },
-  "networkDownloadDescription": "Prepare songs on this device, then upload them to your NAS. Keep the app open until the upload finishes. Retry reuses prepared audio. Existing files are kept; new downloads with the same name get a numbered suffix.",
+  "networkDownloadDescription": "Prepare as músicas neste dispositivo e, em seguida, envie-as para o seu NAS. Mantenha o aplicativo aberto até que o envio seja concluído. A opção de tentar novamente utiliza os arquivos de áudio já preparados. Os arquivos existentes são preservados; novos downloads com o mesmo nome recebem um sufixo numérico.",
   "@networkDownloadDescription": {
     "description": "Help below the network download destination action explaining local preparation, upload, retry behavior, and preservation of existing files; NAS means network-attached storage"
   },
-  "networkAddToLibrary": "Add folder to Library",
+  "networkAddToLibrary": "Adicionar pasta à biblioteca",
   "@networkAddToLibrary": {
     "description": "Action that adds the current network folder as a Library source and starts scanning it"
   },
-  "networkLibraryAdded": "Folder added to Library",
+  "networkLibraryAdded": "Adicionar pasta à biblioteca",
   "@networkLibraryAdded": {
     "description": "Status label replacing the add-to-Library action after the network folder has been added as a source; does not mean scanning has finished"
   },
-  "networkLibraryDescription": "Scan this folder and its subfolders. Music stays on your server; metadata and artwork are saved on this device. Manage or rescan it in Local Library settings.",
+  "networkLibraryDescription": "Analise esta pasta e suas subpastas. As músicas permanecem no seu servidor; os metadados e as capas são salvos neste dispositivo. Configure ou reanalise o conteúdo nas configurações da Biblioteca Local.",
   "@networkLibraryDescription": {
     "description": "Help below the add-to-Library action explaining recursive scanning, local metadata and artwork storage, and management in Local Library settings"
   },
-  "networkStorage": "Network storage",
+  "networkStorage": "Armazenamento em rede",
   "@networkStorage": {
     "description": "Title and navigation label for the screen used to manage network connections and browse remote music folders"
   },
-  "networkErrorUnreachable": "The server could not be reached. Check that this phone can access its network and that the file-sharing service is running. For SMB, port 445 must be reachable.",
+  "networkErrorUnreachable": "Não foi possível contactar o servidor. Verifique se este aparelho consegue acessar a rede e se o serviço de compartilhante de arquivos está em execução. Para SMB, a porta 445 deve estar acessível.",
   "@networkErrorUnreachable": {
     "description": "Network access error for an unreachable server, with connection troubleshooting and the SMB port requirement"
   },
-  "networkErrorTimeout": "The server did not respond in time. Check the connection and try again.",
+  "networkErrorTimeout": "O servidor não respondeu a tempo. Verifique a conexão e tente novamente.",
   "@networkErrorTimeout": {
     "description": "Network access error when a server operation exceeds its time limit"
   },
-  "networkErrorAuthentication": "The server rejected the sign-in. Check the username, password and domain. Leave the domain blank unless your server requires one.",
+  "networkErrorAuthentication": "O servidor rejeitou o login. Verifique o nome de usuário, a senha e o domínio. Deixe o domínio em branco, a menos que o seu servidor exija um.",
   "@networkErrorAuthentication": {
     "description": "Network access error when the server rejects credentials; domain refers to the optional SMB authentication domain"
   },
-  "networkErrorPermission": "This account is not allowed to open this share or folder. Check its read permissions on the server.",
+  "networkErrorPermission": "Esta conta não tem permissão para abrir este compartilhamento ou pasta. Verifique as permissões de leitura dela no servidor.",
   "@networkErrorPermission": {
     "description": "Network access error when the server denies account permissions for a shared folder; distinct from the device's local network permission"
   },
@@ -77,131 +77,131 @@
   "@networkErrorLocalPermission": {
     "description": "Network access error when Android denies local network permission; Nearby devices is the Android app permission setting"
   },
-  "networkErrorShare": "The share or folder was not found. For SMB, use the server's shared folder name after its address, such as smb://server/Music/.",
+  "networkErrorShare": "O compartilhamento ou a pasta não foram encontrados. No caso de SMB, utilize o nome da pasta compartilhada do servidor após o endereço dele; por exemplo: smb://servidor/Musica/.",
   "@networkErrorShare": {
     "description": "Network access error for a missing share or folder; share means an SMB shared folder and the example illustrates its URL path"
   },
-  "networkErrorProtocol": "The server and this SMB client could not agree on a supported protocol. Enable SMB2 or SMB3 on the server. SMB1 is not supported.",
+  "networkErrorProtocol": "O servidor e este cliente SMB não conseguiram chegar a um acordo sobre um protocolo compatível. Habilite o SMB2 ou o SMB3 no servidor. O SMB1 não é compatível.",
   "@networkErrorProtocol": {
     "description": "Network access error for incompatible SMB protocol versions; preserve the version names SMB1, SMB2, and SMB3"
   },
-  "networkErrorAddress": "Check the server address. Use smb://server/share/ for SMB, or an http:// or https:// address for WebDAV and HTTP.",
+  "networkErrorAddress": "Verifique o endereço do servidor. Use smb://servidor/compartilhamento/ para SMB, ou um endereço http:// ou https:// para WebDAV e HTTP.",
   "@networkErrorAddress": {
     "description": "Network access error for an invalid address, with URL scheme examples for SMB, WebDAV, and HTTP connections"
   },
-  "networkConnections": "Saved connections",
+  "networkConnections": "Conexões salvas",
   "@networkConnections": {
     "description": "Section heading above the list of saved network storage connections"
   },
-  "networkServer": "Server",
+  "networkServer": "Servidor",
   "@networkServer": {
     "description": "Connection form section heading above the display name and server or audio URL fields"
   },
-  "networkCredentials": "Sign in (optional)",
+  "networkCredentials": "Entrar (Opcional)",
   "@networkCredentials": {
     "description": "Connection form section heading for optional server credentials"
   },
-  "networkRefresh": "Refresh",
+  "networkRefresh": "Atualizar",
   "@networkRefresh": {
     "description": "Toolbar tooltip for reloading saved connections or the current network folder listing"
   },
-  "networkStorageDescription": "Connect to your NAS or music server and browse its folders. Your sign-in details are stored securely on this device.",
+  "networkStorageDescription": "Conecte-se ao seu NAS ou servidor de música e navegue pelas pastas dele. Seus dados de acesso são armazenados de forma segura neste dispositivo.",
   "@networkStorageDescription": {
     "description": "Introduction shown in the empty connections screen and connection form, explaining remote folder browsing and secure local credential storage; NAS means network-attached storage"
   },
-  "networkAddConnection": "Add connection",
+  "networkAddConnection": "Adicionar conexão",
   "@networkAddConnection": {
     "description": "Action label, toolbar tooltip, and form title for adding a network storage connection"
   },
-  "networkEditConnection": "Edit connection",
+  "networkEditConnection": "Editar conexão",
   "@networkEditConnection": {
     "description": "Edit button tooltip and form title for changing an existing network storage connection"
   },
-  "networkConnectionName": "Name",
+  "networkConnectionName": "Nome",
   "@networkConnectionName": {
     "description": "Required connection form field for a user-chosen display name identifying the saved connection"
   },
-  "networkAddress": "Server or audio URL",
+  "networkAddress": "Servidor ou URL de áudio",
   "@networkAddress": {
     "description": "Required connection form field for the server or direct audio URL, using the scheme appropriate to the selected protocol"
   },
-  "networkProtocol": "Protocol",
+  "networkProtocol": "Protocolo",
   "@networkProtocol": {
     "description": "Connection form section heading for choosing SMB, WebDAV, or HTTP / HTTPS"
   },
-  "networkUsername": "Username (optional)",
+  "networkUsername": "Nome de usuário (Opcional)",
   "@networkUsername": {
     "description": "Optional connection form field for the server account username"
   },
-  "networkPassword": "Password (optional)",
+  "networkPassword": "Senha (Opcional)",
   "@networkPassword": {
     "description": "Optional connection form field for the server account password, with input characters hidden"
   },
-  "networkDomain": "Domain (optional)",
+  "networkDomain": "Domínio (Opcional)",
   "@networkDomain": {
     "description": "Optional connection form field shown only for SMB; refers to the authentication domain, not the server's internet domain name"
   },
-  "networkConnectSave": "Connect and save",
+  "networkConnectSave": "Conectar e salvar",
   "@networkConnectSave": {
     "description": "Connection form action that checks access to the network source before saving the connection"
   },
-  "networkErrorCertificate": "The server's HTTPS certificate could not be verified. Edit this connection to review and trust its certificate, or check the server's HTTPS configuration.",
+  "networkErrorCertificate": "Não foi possível verificar o certificado HTTPS do servidor. Edite esta conexão para revisar e confiar no certificado, ou verifique a configuração HTTPS do servidor.",
   "@networkErrorCertificate": {
     "description": "Network access error for HTTPS certificate verification failure, directing the user to review the certificate in the connection form; unrelated to SMB authentication"
   },
-  "networkCertificatePrompt": "This server uses an untrusted HTTPS certificate. Routers and NAS devices often use self-signed certificates. Verify the server address and SHA-256 fingerprint before trusting it. Trust applies only to this certificate on this server; a changed certificate requires approval again.",
+  "networkCertificatePrompt": "Este servidor utiliza um certificado HTTPS não confiável. Roteadores e dispositivos NAS frequentemente utilizam certificados autoassinados. Verifique o endereço do servidor e a impressão digital SHA-256 antes de confiar nele. A confiança aplica-se apenas a este certificado neste servidor; caso o certificado seja alterado, será necessária uma nova aprovação.",
   "@networkCertificatePrompt": {
     "description": "Connection form warning shown above the HTTPS origin and certificate SHA-256 fingerprint; approval trusts only that fingerprint for this connection's HTTPS origin, not a global certificate authority or an SMB server"
   },
-  "networkTrustCertificate": "Trust certificate and retry",
+  "networkTrustCertificate": "Confiar no certificado e tentar novamente",
   "@networkTrustCertificate": {
     "description": "Action approving the displayed certificate SHA-256 fingerprint for this connection's HTTPS origin and retrying connect-and-save; does not grant global certificate trust"
   },
-  "networkRemoveConnection": "Remove connection",
+  "networkRemoveConnection": "Remover conexão",
   "@networkRemoveConnection": {
     "description": "Connection form action that removes the saved connection and its credentials, without deleting files on the server"
   },
-  "networkNoFiles": "No supported music files or folders found.",
+  "networkNoFiles": "Não foram encontrados arquivos ou pastas de música compatíveis.",
   "@networkNoFiles": {
     "description": "Empty folder message when the network listing contains no directories or supported audio files"
   },
-  "networkConnectionError": "Could not access the network source. Check the server address, credentials, and connection, then retry.",
+  "networkConnectionError": "Não foi possível acessar a origem da rede. Verifique o endereço do servidor, as credenciais e a conexão e, em seguida, tente novamente.",
   "@networkConnectionError": {
     "description": "Fallback network access error when the failure has no more specific classification"
   },
-  "extensionAccountTitle": "Extension account",
-  "extensionAccountInvalidForm": "The extension returned an invalid account form.",
-  "extensionAccountRestartLogin": "Restart account login to continue.",
-  "extensionAccountRequiredValue": "Enter a value.",
-  "extensionAccountInvalidNumber": "Enter a valid number.",
-  "settingsPlaybackSubtitle": "Player, volume, AutoMix, and audio output",
+  "extensionAccountTitle": "Conta de extensão",
+  "extensionAccountInvalidForm": "A extensão retornou um formulário de conta inválido.",
+  "extensionAccountRestartLogin": "Reinicie o login da conta para continuar.",
+  "extensionAccountRequiredValue": "Insira um valor.",
+  "extensionAccountInvalidNumber": "Insira um número válido.",
+  "settingsPlaybackSubtitle": "Reprodutor, volume, AutoMix e saída de áudio",
   "sectionPlayer": "Player",
-  "sectionVolumeAndTransitions": "Volume and transitions",
-  "sectionAudioOutput": "Audio output",
-  "usbBitPerfect": "Hi-res and bit-perfect audio",
-  "usbBitPerfectDescription": "Preserve source precision on compatible outputs. Choose direct USB or AAudio exclusive below; otherwise Android USB output requires Android 14 or later. Applies from the next track, without AutoMix or normalization. System volume may not control direct USB.",
-  "usbHardwareVolume": "DAC hardware volume",
-  "usbVolumeWarningTitle": "Check your listening volume",
+  "sectionVolumeAndTransitions": "Volume e transições",
+  "sectionAudioOutput": "Saída de áudio",
+  "usbBitPerfect": "Áudio de alta resolução e bit-perfect",
+  "usbBitPerfectDescription": "Preserve a precisão da fonte em saídas compatíveis. Selecione \"USB direto\" ou \"AAudio exclusivo\" abaixo; caso contrário, a saída USB no Android exigirá a versão 14 ou superior do sistema. A configuração entra em vigor a partir da próxima faixa e não inclui AutoMix ou normalização. O controle de volume do sistema pode não funcionar com a opção \"USB direto\".",
+  "usbHardwareVolume": "Controle de volume via hardware no DAC",
+  "usbVolumeWarningTitle": "Verifique o volume de áudio",
   "usbVolumeWarning": "Direct USB audio can be much louder than normal playback, and phone volume buttons may not control it. Lower your DAC or amplifier volume before starting. When supported, Mornye sets the DAC to at most −40 dB on connection; this does not guarantee a safe listening level on every amplifier or headphone.",
-  "usbVolumeAccept": "I understand",
-  "usbVolumeUnavailable": "Playback is paused because this DAC has no verified hardware volume control. Lower the DAC or amplifier volume, then enable fixed-volume output if needed and select the track again.",
-  "usbFixedVolume": "Allow fixed-volume USB output",
-  "usbFixedVolumeDescription": "For DACs without a volume control accessible to the app. Keep off for USB headsets without their own volume control. Applies from the next track.",
-  "usbFixedVolumeWarning": "The app cannot lower the volume on this output. Audio may start at full level, and the phone volume slider will not help. Only continue after lowering the volume on your DAC or external amplifier. Do not enable this for a headset without its own volume control.",
-  "dapExclusive": "DAP hi-res (AAudio exclusive)",
-  "dapExclusiveDescription": "Use Oboe/AAudio at the track's original rate and precision for FLAC/WAV PCM. Requires Android 8.1 or later and compatible hardware. Exclusive access is checked; unavailable formats use normal playback. DSD requires the direct USB driver. Applies from the next track.",
-  "dapExclusiveUnavailable": "AAudio exclusive access is unavailable for this track and current output. Using normal playback. For a USB DAC, try the direct USB driver.",
-  "usbDirect": "Direct USB driver",
-  "usbDirectDescription": "Use exclusive USB audio for FLAC/WAV, DSF/DFF and WavPack DSD, with Android USB permission. Native DSD requires a recognized compatible DAC. Other PCM formats use normal playback. Applies from the next track.",
-  "usbDsdOverPcm": "DSD over PCM (DoP)",
-  "usbDsdOverPcmDescription": "Enable only if your DAC explicitly supports DoP. Sends DSF/DFF and WavPack DSD inside a PCM carrier when native DSD is unavailable. An incompatible device may play noise; leave off for ordinary USB headsets.",
-  "usbDsdUnsupported": "This DSD format or connected DAC is not supported. Playback stopped.",
-  "usbPermissionDenied": "USB permission was not granted. Using normal playback.",
-  "usbBitPerfectPending": "Waiting for the next track and a compatible USB output.",
-  "usbBitPerfectNoDevice": "No USB DAC connected. Using normal audio output.",
-  "usbBitPerfectFallback": "This device or audio format does not support bit-perfect output. Using normal playback.",
-  "usbBitPerfectRouteChanged": "The USB audio route changed. Playback paused; select a track to reconnect.",
-  "upgradeIntroContinue": "Continue",
+  "usbVolumeAccept": "Eu entendo",
+  "usbVolumeUnavailable": "A reprodução está pausada porque este DAC não possui controle de volume de hardware verificado. Reduza o volume no DAC ou no amplificador, ative a saída de volume fixo, se necessário, e selecione a faixa novamente.",
+  "usbFixedVolume": "Permitir saída USB de volume fixo",
+  "usbFixedVolumeDescription": "Para DACs sem controle de volume acessível ao aplicativo. Mantenha desativado para headsets USB que não possuam controle de volume próprio. A alteração entra em vigor a partir da próxima faixa.",
+  "usbFixedVolumeWarning": "O aplicativo não consegue reduzir o volume nesta saída. O áudio pode começar no nível máximo, e o controle deslizante de volume do celular não terá efeito. Prossiga apenas após reduzir o volume no seu DAC ou amplificador externo. Não ative esta opção ao usar um fone de ouvido que não possua controle de volume próprio.",
+  "dapExclusive": "DAP de alta resolução (Exclusivo AAudio)",
+  "dapExclusiveDescription": "Utilize o Oboe/AAudio com a taxa e a precisão originais da faixa para arquivos FLAC/WAV PCM. Requer Android 8.1 ou superior e hardware compatível. O acesso exclusivo é verificado; caso não esteja disponível, utiliza-se a reprodução normal. Para DSD, é necessário o driver USB direto. A configuração entra em vigor a partir da próxima faixa.",
+  "dapExclusiveUnavailable": "O acesso exclusivo via AAudio não está disponível para esta faixa e para a saída atual. A reprodução ocorrerá de modo normal. No caso de um DAC USB, tente utilizar o driver USB direto.",
+  "usbDirect": "Driver USB direto",
+  "usbDirectDescription": "Utilize áudio USB exclusivo para arquivos FLAC/WAV, DSF/DFF e WavPack DSD, mediante permissão de acesso USB no Android. O DSD nativo requer um DAC compatível reconhecido. Outros formatos PCM utilizam a reprodução padrão. A configuração entra em vigor a partir da próxima faixa.",
+  "usbDsdOverPcm": "DSD sobre PCM (DoP)",
+  "usbDsdOverPcmDescription": "Ative apenas se o seu DAC oferecer suporte explícito a DoP. Essa opção envia arquivos DSF/DFF e WavPack DSD dentro de um fluxo PCM quando o DSD nativo não está disponível. Um dispositivo incompatível pode reproduzir ruído; mantenha desativado ao usar headsets USB comuns.",
+  "usbDsdUnsupported": "Este formato DSD ou o DAC conectado não são suportados. A reprodução foi interrompida.",
+  "usbPermissionDenied": "A permissão USB não foi concedida. Utilizando a reprodução normal.",
+  "usbBitPerfectPending": "Aguardando a próxima faixa e uma saída USB compatível.",
+  "usbBitPerfectNoDevice": "Nenhum DAC USB conectado. Usando a saída de áudio normal.",
+  "usbBitPerfectFallback": "Este dispositivo ou formato de áudio não oferece suporte à saída bit-perfect. Usando reprodução normal.",
+  "usbBitPerfectRouteChanged": "A rota de áudio USB foi alterada. A reprodução foi pausada; selecione uma faixa para restabelecer a conexão.",
+  "upgradeIntroContinue": "Continuar",
   "cacheMotionArtwork": "Offline motion covers",
   "cacheMotionArtworkDesc": "Album videos saved with downloads. Removing them keeps your music files and static covers.",
   "nowPlayingVolume": "Volume",
@@ -221,7 +221,7 @@
   "appearanceGlassOutlinesSubtitle": "Show decorative edges around Mornye glass. Turning this off keeps blur and refraction.",
   "appearanceGlassClaritySubtitle": "Adjust transparency in Mornye menus and navigation. Text contrast is preserved.",
   "appearanceGlassTinted": "Tinted",
-  "appearanceGlassClear": "Clear",
+  "appearanceGlassClear": "Limpar",
   "appearanceGlassClearPerformance": "Very clear glass may use more power and feel less smooth on older devices. Lower clarity if needed.",
   "appearanceGlassClarityBlurOff": "Glass is opaque on this device. Turn on “{setting}” to adjust clarity.",
   "@appearanceGlassClarityBlurOff": {
@@ -377,7 +377,7 @@
   "@folderTemplatePreview": {
     "description": "Label for a sample expanded folder template"
   },
-  "folderTemplatePreviewFailed": "Preview unavailable",
+  "folderTemplatePreviewFailed": "Prévia indisponível",
   "@folderTemplatePreviewFailed": {
     "description": "Shown when the native folder preview could not be generated"
   },
@@ -565,7 +565,7 @@
   "metadataSeparatorSemicolon": "Semicolon (;)",
   "metadataSeparatorSlash": "Slash (/)",
   "metadataSeparatorCustom": "Custom separator",
-  "metadataSeparatorPreview": "Preview",
+  "metadataSeparatorPreview": "Prévia",
   "metadataSeparatorInvalid": "Use 1–16 characters without line breaks or control characters.",
   "@optionsArtistTagMode": {
     "description": "Setting title for how artist metadata is written into files"
@@ -2869,7 +2869,7 @@
   "@librarySourceOffline": {
     "description": "Library source is temporarily disconnected"
   },
-  "librarySourceDisabled": "Disabled",
+  "librarySourceDisabled": "Desabilitado",
   "@librarySourceDisabled": {
     "description": "Library source has been disabled by the user"
   },
@@ -3082,7 +3082,7 @@
   "@libraryCleared": {
     "description": "Snackbar after clearing library"
   },
-  "libraryStorageAccessRequired": "Storage Access Required",
+  "libraryStorageAccessRequired": "Acesso ao Armazenamento Necessário",
   "@libraryStorageAccessRequired": {
     "description": "Dialog title for storage permission"
   },
@@ -3090,7 +3090,7 @@
   "@libraryStorageAccessMessage": {
     "description": "Dialog message for storage permission"
   },
-  "librarySourceDownloaded": "Downloaded",
+  "librarySourceDownloaded": "Baixado",
   "@librarySourceDownloaded": {
     "description": "Badge for tracks downloaded via Mornye"
   },
@@ -3098,11 +3098,11 @@
   "@librarySourceLocal": {
     "description": "Badge for tracks from local library scan"
   },
-  "libraryFilterAll": "All",
+  "libraryFilterAll": "Tudo",
   "@libraryFilterAll": {
     "description": "Filter chip - show all library items"
   },
-  "libraryFilterDownloaded": "Downloaded",
+  "libraryFilterDownloaded": "Baixado",
   "@libraryFilterDownloaded": {
     "description": "Filter chip - show only downloaded items"
   },
@@ -3126,7 +3126,7 @@
   "@libraryFilterSource": {
     "description": "Filter section - source type"
   },
-  "libraryFilterQuality": "Quality",
+  "libraryFilterQuality": "Qualidade",
   "@libraryFilterQuality": {
     "description": "Filter section - audio quality"
   },
@@ -3146,7 +3146,7 @@
   "@libraryFilterFormat": {
     "description": "Filter section - file format"
   },
-  "libraryFilterMetadata": "Metadata",
+  "libraryFilterMetadata": "Metadados",
   "@libraryFilterMetadata": {
     "description": "Filter section - metadata completeness"
   },
@@ -3284,7 +3284,7 @@
   "@tutorialLibraryTip3": {
     "description": "Tutorial library tip 3"
   },
-  "tutorialExtensionsTitle": "Extensions",
+  "tutorialExtensionsTitle": "Extensões",
   "@tutorialExtensionsTitle": {
     "description": "Tutorial extensions page title"
   },
@@ -3430,11 +3430,11 @@
   "@playbackNormalizationMode": {
     "description": "Label for choosing between track and album ReplayGain during playback"
   },
-  "playbackNormalizationModeTrack": "Track",
+  "playbackNormalizationModeTrack": "Faixa",
   "@playbackNormalizationModeTrack": {
     "description": "Gain mode that levels every track on its own"
   },
-  "playbackNormalizationModeAlbum": "Album",
+  "playbackNormalizationModeAlbum": "Álbum",
   "@playbackNormalizationModeAlbum": {
     "description": "Gain mode that keeps the loudness differences inside an album"
   },
@@ -3604,7 +3604,7 @@
   "@trackReEnrichFieldCover": {
     "description": "Checkbox label for cover art field in re-enrich"
   },
-  "trackReEnrichFieldLyrics": "Lyrics",
+  "trackReEnrichFieldLyrics": "Letras",
   "@trackReEnrichFieldLyrics": {
     "description": "Checkbox label for lyrics field in re-enrich"
   },
@@ -3624,7 +3624,7 @@
   "@trackReEnrichFieldExtra": {
     "description": "Checkbox label for extra metadata in re-enrich"
   },
-  "trackReEnrichSelectAll": "Select All",
+  "trackReEnrichSelectAll": "Selecionar Tudo",
   "@trackReEnrichSelectAll": {
     "description": "Select all fields checkbox in re-enrich"
   },
@@ -3996,7 +3996,7 @@
   "@collectionNoPlaylistsYet": {
     "description": "Empty state title when user has no playlists"
   },
-  "collectionPlaylistTracks": "{count, plural, =1{1 track} other{{count} tracks}}",
+  "collectionPlaylistTracks": "{count, plural, =1{1 faixa} other{{count} faixas}}",
   "@collectionPlaylistTracks": {
     "description": "Track count label for custom playlists",
     "placeholders": {
@@ -4553,7 +4553,7 @@
       }
     }
   },
-  "dialogDownloadAllTitle": "Download All",
+  "dialogDownloadAllTitle": "Baixar Tudo",
   "@dialogDownloadAllTitle": {
     "description": "Dialog title for bulk download confirmation"
   },
@@ -4594,7 +4594,7 @@
   "@snackbarFailedToWriteStorage": {
     "description": "Snackbar when writing metadata back to file fails"
   },
-  "snackbarError": "Error: {error}",
+  "snackbarError": "Erro: {error}",
   "@snackbarError": {
     "description": "Generic error snackbar with error detail",
     "placeholders": {
@@ -4815,7 +4815,7 @@
   "@snackbarUnsupportedAudioFormat": {
     "description": "Snackbar when the audio format is not supported for the requested operation"
   },
-  "cacheRefresh": "Refresh",
+  "cacheRefresh": "Atualizar",
   "@cacheRefresh": {
     "description": "Tooltip for refresh button on cache management page"
   },
@@ -4967,11 +4967,11 @@
   "@editMetadataFieldTitle": {
     "description": "Chip label for title field in auto-fill selector"
   },
-  "editMetadataFieldArtist": "Artist",
+  "editMetadataFieldArtist": "Artista",
   "@editMetadataFieldArtist": {
     "description": "Chip label for artist field in auto-fill selector"
   },
-  "editMetadataFieldAlbum": "Album",
+  "editMetadataFieldAlbum": "Álbum",
   "@editMetadataFieldAlbum": {
     "description": "Chip label for album field in auto-fill selector"
   },
@@ -4983,7 +4983,7 @@
   "@editMetadataFieldDate": {
     "description": "Chip label for date field in auto-fill selector"
   },
-  "editMetadataFieldTrackNum": "Track #",
+  "editMetadataFieldTrackNum": "Faixa #",
   "@editMetadataFieldTrackNum": {
     "description": "Chip label for track number field in auto-fill selector"
   },
@@ -4991,7 +4991,7 @@
   "@editMetadataFieldDiscNum": {
     "description": "Chip label for disc number field in auto-fill selector"
   },
-  "editMetadataFieldGenre": "Genre",
+  "editMetadataFieldGenre": "Género",
   "@editMetadataFieldGenre": {
     "description": "Chip label for genre field in auto-fill selector"
   },
@@ -4999,11 +4999,11 @@
   "@editMetadataFieldIsrc": {
     "description": "Chip label for ISRC field in auto-fill selector"
   },
-  "editMetadataFieldLabel": "Label",
+  "editMetadataFieldLabel": "Gravadora",
   "@editMetadataFieldLabel": {
     "description": "Chip label for label field in auto-fill selector"
   },
-  "editMetadataFieldCopyright": "Copyright",
+  "editMetadataFieldCopyright": "Direitos Autorais",
   "@editMetadataFieldCopyright": {
     "description": "Chip label for copyright field in auto-fill selector"
   },
@@ -5011,7 +5011,7 @@
   "@editMetadataFieldCover": {
     "description": "Chip label for cover art field in auto-fill selector"
   },
-  "editMetadataSelectAll": "All",
+  "editMetadataSelectAll": "Tudo",
   "@editMetadataSelectAll": {
     "description": "Button to select all fields for auto-fill"
   },
@@ -5019,7 +5019,7 @@
   "@editMetadataSelectEmpty": {
     "description": "Button to select only fields that are currently empty"
   },
-  "queueDownloadingCount": "Downloading ({count})",
+  "queueDownloadingCount": "Baixando ({count})",
   "@queueDownloadingCount": {
     "description": "Header for active downloads section with count",
     "placeholders": {
@@ -5032,7 +5032,7 @@
   "@queueFilteringIndicator": {
     "description": "Shown while filter results are being computed"
   },
-  "queueTrackCount": "{count, plural, =1{1 track} other{{count} tracks}}",
+  "queueTrackCount": "{count, plural, =1{1 faixa} other{{count} faixas}}",
   "@queueTrackCount": {
     "description": "Track count label with plural support",
     "placeholders": {
@@ -5041,7 +5041,7 @@
       }
     }
   },
-  "queueAlbumCount": "{count, plural, =1{1 album} other{{count} albums}}",
+  "queueAlbumCount": "{count, plural, one {}=1{1 álbum} other{{count} álbuns}}",
   "@queueAlbumCount": {
     "description": "Album count label with plural support",
     "placeholders": {
@@ -5050,19 +5050,19 @@
       }
     }
   },
-  "queueEmptyAlbums": "No album downloads",
+  "queueEmptyAlbums": "Sem álbuns baixados",
   "@queueEmptyAlbums": {
     "description": "Empty state title when no album downloads exist"
   },
-  "queueEmptyAlbumsSubtitle": "Download multiple tracks from an album to see them here",
+  "queueEmptyAlbumsSubtitle": "Baixe várias faixas de um álbum para vê-las aqui",
   "@queueEmptyAlbumsSubtitle": {
     "description": "Empty state subtitle for album downloads"
   },
-  "queueEmptySingles": "No single downloads",
+  "queueEmptySingles": "Sem singles baixados",
   "@queueEmptySingles": {
     "description": "Empty state title when no single track downloads exist"
   },
-  "queueEmptySinglesSubtitle": "Single track downloads will appear here",
+  "queueEmptySinglesSubtitle": "Os downloads de faixa individuais aparecerão aqui",
   "@queueEmptySinglesSubtitle": {
     "description": "Empty state subtitle for single track downloads"
   },
@@ -5087,11 +5087,11 @@
   "@libraryDefaultViewLastUsed": {
     "description": "Default view option - keep the last used library view"
   },
-  "queueEmptyHistory": "No download history",
+  "queueEmptyHistory": "Nenhum histórico de downloads",
   "@queueEmptyHistory": {
     "description": "Empty state title when download history is empty"
   },
-  "queueEmptyHistorySubtitle": "Downloaded tracks will appear here",
+  "queueEmptyHistorySubtitle": "As faixas baixadas aparecerão aqui",
   "@queueEmptyHistorySubtitle": {
     "description": "Empty state subtitle for download history"
   },
@@ -5143,7 +5143,7 @@
   "@audioAnalysisChannels": {
     "description": "Channels metric label"
   },
-  "audioAnalysisDuration": "Duration",
+  "audioAnalysisDuration": "Duração",
   "@audioAnalysisDuration": {
     "description": "Duration metric label"
   },
@@ -5368,7 +5368,7 @@
   "@extensionsHomeFeedAutoSubtitle": {
     "description": "Extensions page - subtitle for auto home feed option"
   },
-  "extensionsHomeFeedOff": "Off",
+  "extensionsHomeFeedOff": "Desligar",
   "@extensionsHomeFeedOff": {
     "description": "Extensions page - home feed provider option: off"
   },
@@ -5676,7 +5676,7 @@
   "@notifUpdateFailedBody": {
     "description": "Notification body when app update download fails"
   },
-  "searchTracks": "Tracks",
+  "searchTracks": "Faixas",
   "@searchTracks": {
     "description": "Search filter label - tracks"
   },
@@ -5684,7 +5684,7 @@
   "@homeSearchHintDefault": {
     "description": "Default placeholder for the main search field on Home"
   },
-  "homeSearchHintProvider": "Search with {providerName}...",
+  "homeSearchHintProvider": "Pesquisar com {providerName}...",
   "@homeSearchHintProvider": {
     "description": "Placeholder for the main search field when a provider is selected",
     "placeholders": {
@@ -5701,7 +5701,7 @@
   "@homeChangeSearchProviderTooltip": {
     "description": "Tooltip for the Home search provider picker"
   },
-  "actionPaste": "Paste",
+  "actionPaste": "Colar",
   "@actionPaste": {
     "description": "Generic action - paste from clipboard"
   },
@@ -5773,7 +5773,7 @@
   "@trackCoverResizeFailed": {
     "description": "Error shown when resizing cover art before saving metadata fails"
   },
-  "actionStop": "Stop",
+  "actionStop": "Parar",
   "@actionStop": {
     "description": "Generic action - stop"
   },
@@ -5875,51 +5875,51 @@
   "@logClearSearch": {
     "description": "Tooltip for clearing the log search field"
   },
-  "logIssueIspBlockingLabel": "ISP BLOCKING DETECTED",
+  "logIssueIspBlockingLabel": "BLOQUEIO DE ISP DETECTADO",
   "@logIssueIspBlockingLabel": {
     "description": "Diagnostic badge label when ISP blocking is detected"
   },
-  "logIssueIspBlockingDescription": "Your ISP may be blocking access to download services",
+  "logIssueIspBlockingDescription": "O seu provedor pode estar bloqueando o acesso aos serviços de download",
   "@logIssueIspBlockingDescription": {
     "description": "Diagnostic badge description for ISP blocking"
   },
-  "logIssueIspBlockingSuggestion": "Try using a VPN or change DNS to 1.1.1.1 or 8.8.8.8",
+  "logIssueIspBlockingSuggestion": "Tente usar uma VPN ou altere o DNS para 1.1.1 ou 8.8.8.8",
   "@logIssueIspBlockingSuggestion": {
     "description": "Diagnostic badge suggestion for ISP blocking"
   },
-  "logIssueRateLimitedLabel": "RATE LIMITED",
+  "logIssueRateLimitedLabel": "TAXA LIMITADA (RATELIMITED)",
   "@logIssueRateLimitedLabel": {
     "description": "Diagnostic badge label when the service rate limits requests"
   },
-  "logIssueRateLimitedDescription": "Too many requests to the service",
+  "logIssueRateLimitedDescription": "Muitas solicitações ao serviço",
   "@logIssueRateLimitedDescription": {
     "description": "Diagnostic badge description for rate limiting"
   },
-  "logIssueRateLimitedSuggestion": "Wait a few minutes before trying again",
+  "logIssueRateLimitedSuggestion": "Aguarde alguns minutos antes de tentar novamente",
   "@logIssueRateLimitedSuggestion": {
     "description": "Diagnostic badge suggestion for rate limiting"
   },
-  "logIssueNetworkErrorLabel": "NETWORK ERROR",
+  "logIssueNetworkErrorLabel": "ERRO DE REDE",
   "@logIssueNetworkErrorLabel": {
     "description": "Diagnostic badge label for generic network errors"
   },
-  "logIssueNetworkErrorDescription": "Connection issues detected",
+  "logIssueNetworkErrorDescription": "Problemas de conexão detectados",
   "@logIssueNetworkErrorDescription": {
     "description": "Diagnostic badge description for generic network errors"
   },
-  "logIssueNetworkErrorSuggestion": "Check your internet connection",
+  "logIssueNetworkErrorSuggestion": "Verifique sua conexão de internet",
   "@logIssueNetworkErrorSuggestion": {
     "description": "Diagnostic badge suggestion for generic network errors"
   },
-  "logIssueTrackNotFoundLabel": "TRACK NOT FOUND",
+  "logIssueTrackNotFoundLabel": "FAIXA NÃO ENCONTRADA",
   "@logIssueTrackNotFoundLabel": {
     "description": "Diagnostic badge label when a track is unavailable"
   },
-  "logIssueTrackNotFoundDescription": "Some tracks could not be found on download services",
+  "logIssueTrackNotFoundDescription": "Algumas faixas não foram encontradas nos serviços de download",
   "@logIssueTrackNotFoundDescription": {
     "description": "Diagnostic badge description when a track is unavailable"
   },
-  "logIssueTrackNotFoundSuggestion": "The track may not be available in lossless quality",
+  "logIssueTrackNotFoundSuggestion": "A faixa pode não estar disponível em qualidade sem perdas",
   "@logIssueTrackNotFoundSuggestion": {
     "description": "Diagnostic badge suggestion when a track is unavailable"
   },
@@ -5944,7 +5944,7 @@
   "@extensionDetailsInformation": {
     "description": "Section title for extension metadata information"
   },
-  "extensionUtilityFunctions": "Utility Functions",
+  "extensionUtilityFunctions": "Funções Utilitárias",
   "@extensionUtilityFunctions": {
     "description": "Capability label for utility-only extensions"
   },
@@ -6045,7 +6045,7 @@
   "@settingsFilesSubtitle": {
     "description": "Subtitle for files & folders settings"
   },
-  "settingsMetadata": "Metadata",
+  "settingsMetadata": "Metadados",
   "@settingsMetadata": {
     "description": "Settings menu item - metadata settings"
   },
@@ -6053,7 +6053,7 @@
   "@settingsMetadataSubtitle": {
     "description": "Subtitle for metadata settings"
   },
-  "settingsLyrics": "Lyrics",
+  "settingsLyrics": "Letras",
   "@settingsLyrics": {
     "description": "Settings menu item - lyrics settings"
   },
@@ -6061,7 +6061,7 @@
   "@settingsLyricsSubtitle": {
     "description": "Subtitle for lyrics settings"
   },
-  "settingsApp": "App",
+  "settingsApp": "Aplicativo",
   "@settingsApp": {
     "description": "Settings menu item - app settings"
   },
@@ -6073,7 +6073,7 @@
   "@sectionMetadataProviders": {
     "description": "Settings section header for metadata providers"
   },
-  "sectionDuplicates": "Duplicates",
+  "sectionDuplicates": "Duplicados",
   "@sectionDuplicates": {
     "description": "Settings section header for deduplication"
   },
@@ -6081,7 +6081,7 @@
   "@sectionLyricsProviderOptions": {
     "description": "Settings section header for per-provider lyrics options"
   },
-  "metadataProvidersTitle": "Metadata Provider Priority",
+  "metadataProvidersTitle": "Prioridade de Provedor de Metadados",
   "@metadataProvidersTitle": {
     "description": "Settings item title for metadata provider order"
   },
@@ -6117,7 +6117,7 @@
   "@trackOptionDownloadQualityVariant": {
     "description": "Track menu action to download another quality version"
   },
-  "downloadFallbackExtensions": "Fallback Extensions",
+  "downloadFallbackExtensions": "Extensões alternativas",
   "@downloadFallbackExtensions": {
     "description": "Settings item for configuring fallback extension providers"
   },
@@ -6270,7 +6270,7 @@
       }
     }
   },
-  "selectionDeleteTracksCount": "Delete {count} {count, plural, =1{track} other{tracks}}",
+  "selectionDeleteTracksCount": "Apagar {count} {count, plural, =1{faixa} other{faixas}}",
   "@selectionDeleteTracksCount": {
     "description": "Button label for deleting selected tracks",
     "placeholders": {
@@ -6338,11 +6338,11 @@
       }
     }
   },
-  "logIssueSummary": "Issue Summary",
+  "logIssueSummary": "Resumo do Problemas",
   "@logIssueSummary": {
     "description": "Header for log issue analysis summary"
   },
-  "logTotalErrors": "Total errors: {count}",
+  "logTotalErrors": "Total de erros: {count}",
   "@logTotalErrors": {
     "description": "Total error count in log issue analysis",
     "placeholders": {
@@ -6351,7 +6351,7 @@
       }
     }
   },
-  "logAffectedDomains": "Affected: {domains}",
+  "logAffectedDomains": "Afetado(s): {domains}",
   "@logAffectedDomains": {
     "description": "Affected domains in log issue analysis",
     "placeholders": {
@@ -6525,11 +6525,11 @@
   "@permissionAudio": {
     "description": "Audio permission type label"
   },
-  "permissionStorage": "Storage",
+  "permissionStorage": "Armazenamento",
   "@permissionStorage": {
     "description": "Storage permission type label"
   },
-  "permissionNotification": "Notification",
+  "permissionNotification": "Notificação",
   "@permissionNotification": {
     "description": "Notification permission type label"
   },
@@ -6541,7 +6541,7 @@
   "@storeAnyVersion": {
     "description": "Store detail value when any app version is accepted"
   },
-  "storeCategoryMetadata": "Metadata",
+  "storeCategoryMetadata": "Metadados",
   "@storeCategoryMetadata": {
     "description": "Store extension category - metadata"
   },
@@ -6549,15 +6549,15 @@
   "@storeCategoryDownload": {
     "description": "Store extension category - download"
   },
-  "storeCategoryUtility": "Utility",
+  "storeCategoryUtility": "Utilidade",
   "@storeCategoryUtility": {
     "description": "Store extension category - utility"
   },
-  "storeCategoryLyrics": "Lyrics",
+  "storeCategoryLyrics": "Letras",
   "@storeCategoryLyrics": {
     "description": "Store extension category - lyrics"
   },
-  "storeCategoryIntegration": "Integration",
+  "storeCategoryIntegration": "Integração",
   "@storeCategoryIntegration": {
     "description": "Store extension category - integration"
   },
@@ -6565,7 +6565,7 @@
   "@artistReleases": {
     "description": "Section header for all artist releases"
   },
-  "editMetadataSelectNone": "None",
+  "editMetadataSelectNone": "Nenhuma",
   "@editMetadataSelectNone": {
     "description": "Button to clear selected fields for auto-fill"
   },
@@ -6633,7 +6633,7 @@
   "@libraryExternalPlayerSubtitle": {
     "description": "Subtitle for external player option"
   },
-  "libraryBuiltInPreviewPlayer": "Built-in player",
+  "libraryBuiltInPreviewPlayer": "Reprodutor integrado",
   "@libraryBuiltInPreviewPlayer": {
     "description": "Setting option to use the built-in preview player"
   },
@@ -6741,7 +6741,7 @@
   "@nowPlayingTabPlayer": {
     "description": "Tab label for the player view"
   },
-  "nowPlayingTabLyrics": "Lyrics",
+  "nowPlayingTabLyrics": "Letras",
   "@nowPlayingTabLyrics": {
     "description": "Tab label for the lyrics view"
   },
@@ -6936,7 +6936,7 @@
   "@trackConvertResampler": {
     "description": "Section label for lossless conversion resampler options"
   },
-  "trackConvertDitherNone": "None",
+  "trackConvertDitherNone": "Nenhuma",
   "@trackConvertDitherNone": {
     "description": "Lossless conversion dither option with no dithering applied"
   },
@@ -7128,7 +7128,7 @@
   "@extensionVerificationHelpMessageWaiting": {
     "description": "Dialog message when verification may need manual browser help"
   },
-  "extensionVerificationClose": "Close",
+  "extensionVerificationClose": "Fechar",
   "@extensionVerificationClose": {
     "description": "Button to dismiss the extension verification help dialog"
   },
@@ -7244,7 +7244,7 @@
   "@playerCoverStyle": {
     "description": "Settings section choosing how the player shows cover art"
   },
-  "playerCoverStyleDefault": "Default",
+  "playerCoverStyleDefault": "Padrão",
   "@playerCoverStyleDefault": {
     "description": "Cover art style: artwork card above the controls"
   },
@@ -7292,7 +7292,7 @@
   "profileSetUp": "Set up your profile",
   "profileEdit": "Edit name and photo",
   "backupIncludesProfile": "Includes your profile name and photo",
-  "profileName": "Name",
+  "profileName": "Nome",
   "profileNameHint": "Your name",
   "profileChangePhoto": "Choose photo",
   "profileRemovePhoto": "Remove photo",
@@ -7540,9 +7540,9 @@
       }
     }
   },
-  "listeningRewindShare": "Share",
+  "listeningRewindShare": "Compartilhar",
   "listeningRewindShareError": "Could not share your Rewind",
-  "listeningRewindNext": "Next",
+  "listeningRewindNext": "Próximo",
   "listeningRewindPrevious": "Previous",
   "listeningRewindMonthlyReady": "Your last 4 weeks are ready to replay",
   "listeningRewindYearTitle": "Your {year} in Music",
@@ -7557,9 +7557,9 @@
   "listeningRewindYearBanner": "Your top artists, songs and moments of the year",
   "listeningRewindYearIntroBody": "Everything you played this year, from your first song to your biggest month.",
   "listeningRewindNumbersTitle": "Your year in numbers",
-  "listeningRewindSongsLabel": "Songs",
-  "listeningRewindArtistsLabel": "Artists",
-  "listeningRewindAlbumsLabel": "Albums",
+  "listeningRewindSongsLabel": "Músicas",
+  "listeningRewindArtistsLabel": "Artistas",
+  "listeningRewindAlbumsLabel": "Álbuns",
   "listeningRewindDaysLabel": "Days with music",
   "listeningRewindDaysShare": "Music on {percent}% of your days",
   "@listeningRewindDaysShare": {
@@ -7616,7 +7616,7 @@
   "libraryLoading": "Loading Library…",
   "libraryLoadFailed": "Library could not be loaded. Retry to load the saved folders and track index.",
   "discordPresenceDescription": "Share the title, artist, album and progress of music played in the built-in player on your Discord profile. Local audio and artwork files are never uploaded. Clears when playback pauses or stops.",
-  "discordPresenceDisabled": "Disabled",
+  "discordPresenceDisabled": "Desabilitado",
   "discordPresenceLink": "Link Discord account",
   "discordPresenceConnecting": "Connecting to Discord…",
   "discordPresenceReady": "Ready when music plays",
@@ -7713,12 +7713,12 @@
       }
     }
   },
-  "lyricsShareAction": "Share",
+  "lyricsShareAction": "Compartilhar",
   "lyricsShareError": "Couldn't create the lyrics image",
   "lyricsShareBackgroundArtwork": "Artwork",
   "lyricsShareBackgroundColor": "Cover color",
-  "lyricsShareBackgroundDark": "Dark",
-  "lyricsShareBackgroundLight": "Light",
+  "lyricsShareBackgroundDark": "Escuro",
+  "lyricsShareBackgroundLight": "Claro",
   "audioInfoTitle": "Audio info",
   "@audioInfoTitle": {
     "description": "Sheet with technical details of the playing track, opened from the quality badge"
@@ -7729,7 +7729,7 @@
   "audioInfoProcessing": "Processing",
   "audioInfoOutput": "Output",
   "audioInfoAnalysis": "Spectrum and level analysis",
-  "audioInfoQuality": "Quality",
+  "audioInfoQuality": "Qualidade",
   "audioInfoHiResLossless": "Hi-Res Lossless",
   "audioInfoLossless": "Lossless",
   "audioInfoLossy": "Lossy",
@@ -7747,7 +7747,7 @@
     }
   },
   "audioInfoBitrate": "Bitrate",
-  "audioInfoDuration": "Duration",
+  "audioInfoDuration": "Duração",
   "audioInfoFileSize": "File size",
   "audioInfoCompression": "Compression",
   "audioInfoCompressionValue": "{percent}% of uncompressed size",
@@ -7761,7 +7761,7 @@
   "audioInfoLocation": "Location",
   "audioInfoLocationLocal": "Device storage",
   "audioInfoLocationShared": "Shared folder",
-  "audioInfoLocationNetwork": "Network storage",
+  "audioInfoLocationNetwork": "Armazenamento em rede",
   "audioInfoPcmRate": "Uncompressed data rate",
   "audioInfoFrequencyRange": "Frequency range",
   "audioInfoFrequencyRangeValue": "Up to {frequency} (Nyquist)",
@@ -7787,7 +7787,7 @@
     }
   },
   "audioInfoOn": "On",
-  "audioInfoOff": "Off",
+  "audioInfoOff": "Desligar",
   "audioInfoBypassed": "Bypassed by direct output",
   "audioInfoPlayer": "Player",
   "audioInfoPlayerValue": "Mornye built-in player",
@@ -7822,7 +7822,7 @@
     }
   },
   "audioInfoOutputRate": "Output sample rate",
-  "audioInfoOutputFormat": "Output format",
+  "audioInfoOutputFormat": "Formato de saída",
   "audioInfoDeviceRates": "Device sample rates",
   "audioInfoDeviceFormats": "Device formats",
   "audioInfoAnyRate": "Any",
@@ -7951,7 +7951,7 @@
   "@desktopMiniPlayerExpand": {
     "description": "Mini player button that returns the window to its full size"
   },
-  "desktopMenuRefresh": "Refresh",
+  "desktopMenuRefresh": "Atualizar",
   "@desktopMenuRefresh": {
     "description": "View menu item and Keyboard Shortcuts row that reloads the page on screen (Home, Repo, statistics)"
   },
