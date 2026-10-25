@@ -5,6 +5,7 @@ import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/screens/settings/link_pairing_dialogs.dart';
 import 'package:mornye/screens/settings/link_settings_page.dart';
 import 'package:mornye/services/link/client/link_client_pairing.dart';
+import 'package:mornye/services/link/features/link_phone_options.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/app_alert_dialog.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -289,6 +290,19 @@ void main() {
           expect(find.text(_l10n.linkPaired('Desktop b')), findsOneWidget);
           expect(find.text(_l10n.linkPairedSection), findsOneWidget);
           expect(harness.sessions.single.server.serverId, 'b');
+
+          // What this phone does with the computer shows once paired.
+          expect(find.text(_l10n.linkPhoneSection), findsOneWidget);
+          expect(find.text(_l10n.linkShareSongsTitle), findsOneWidget);
+          final follow = find.text(_l10n.linkFollowDesktopTitle);
+          await tester.ensureVisible(follow);
+          await tester.tap(follow);
+          await _settle(tester);
+          final prefs = await SharedPreferences.getInstance();
+          expect(
+            prefs.getBool(LinkPhoneOptionsNotifier.followDesktopKey),
+            isFalse,
+          );
 
           // Leaving the page stops discovery.
           await tester.pumpWidget(const SizedBox());

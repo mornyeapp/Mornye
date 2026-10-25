@@ -7,6 +7,7 @@ import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/services/link/features/link_desktop_remote.dart';
 import 'package:mornye/services/link/features/link_handoff.dart';
 import 'package:mornye/services/link/features/link_phone_features.dart';
+import 'package:mornye/services/link/features/link_phone_options.dart';
 import 'package:mornye/services/link/features/link_track_resolver.dart';
 import 'package:mornye/services/link/link_client_api.dart';
 import 'package:mornye/services/link/link_protocol.dart';
@@ -17,24 +18,62 @@ import 'package:mornye/utils/logger.dart';
 final _log = AppLogger('LinkRemotePlayback');
 
 /// Whether the paired desktop plays in this phone's place, as after Play on
-/// desktop. The phone takes over again after Continue on this phone, when
-/// the desktop is unpaired, and when the phone's own player starts, such as
-/// for a Library song picked in the car. It also takes over when the
-/// desktop cannot be reached, so songs picked then play here instead of
-/// waiting for it. The notification and headset drive the desktop
-/// meanwhile.
+/// desktop or, with [LinkPhoneOptions.followDesktop], when the desktop
+/// starts playing while this phone does not. The phone takes over again
+/// after Continue on this phone, when the desktop is unpaired, and when the
+/// phone's own player starts, such as for a Library song picked in the car.
+/// It also takes over when the desktop cannot be reached, so songs picked
+/// then play here instead of waiting for it. The notification and headset
+/// drive the desktop meanwhile.
 class LinkPlaysOnDesktop extends Notifier<bool> {
   @override
   bool build() {
     final client = ref.watch(linkPhoneClientProvider);
     if (client == null) return false;
+    bool? playing;
+    // Whether the desktop played when last heard from on this connection.
+    bool? desktopPlaying;
+    void heard(LinkPlayerState? desktop) {
+      final was = desktopPlaying;
+      final now = desktopPlaying =
+          desktop != null && desktop.playing && desktop.track != null;
+      // The desktop starting to play takes over the player screens, as
+      // choosing it in Devices does, unless this phone plays meanwhile.
+      if (was == true || !now || playing == true || state) return;
+      final options = ref.read(linkPhoneOptionsProvider);
+      if (options.loaded && options.followDesktop) state = true;
+    }
+
     // A failed attempt goes from connecting to disconnected. The session
     // pausing in the background disconnects a connected one instead, which
     // keeps the desktop.
     var connection = client.connectionState;
+    var connects = 0;
+    Future<void> readDesktop() async {
+      final attempt = ++connects;
+      try {
+        final desktop = LinkPlayerState.fromJson(
+          await client.get(LinkOps.state),
+        );
+        if (ref.mounted &&
+            attempt == connects &&
+            connection == LinkConnectionState.connected) {
+          heard(desktop);
+        }
+      } on Object {
+        // Its next push tells.
+      }
+    }
+
     final connections = client.connectionStates.listen((next) {
       final was = connection;
       connection = next;
+      if (next != LinkConnectionState.connected) {
+        connects++;
+        desktopPlaying = null;
+      } else if (was != next) {
+        unawaited(readDesktop());
+      }
       if (was == LinkConnectionState.connecting &&
           next == LinkConnectionState.disconnected &&
           state) {
@@ -42,7 +81,14 @@ class LinkPlaysOnDesktop extends Notifier<bool> {
       }
     });
     ref.onDispose(connections.cancel);
-    bool? playing;
+    final messages = client.messages.listen((message) {
+      if (message['type'] != LinkMessageTypes.playerState) return;
+      heard(LinkPlayerState.fromJson(message['state']));
+    });
+    ref.onDispose(messages.cancel);
+    if (connection == LinkConnectionState.connected) {
+      unawaited(readDesktop());
+    }
     final subscription = ref
         .watch(musicPlayerRuntimeProvider)
         .playbackStateEvents()

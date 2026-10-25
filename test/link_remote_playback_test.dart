@@ -9,6 +9,7 @@ import 'package:mornye/services/link/features/link_desktop_remote.dart';
 import 'package:mornye/services/link/features/link_handoff.dart';
 import 'package:mornye/services/link/features/link_phone_features.dart';
 import 'package:mornye/services/link/features/link_phone_files.dart';
+import 'package:mornye/services/link/features/link_phone_options.dart';
 import 'package:mornye/services/link/features/link_remote_playback.dart';
 import 'package:mornye/services/link/features/link_track_refs.dart';
 import 'package:mornye/services/link/features/link_track_resolver.dart';
@@ -365,6 +366,90 @@ void main() {
       client.setConnection(LinkConnectionState.connecting);
       client.setConnection(LinkConnectionState.disconnected);
       expect(phone.read(linkPlaysOnDesktopProvider), isFalse);
+    });
+
+    ProviderContainer phoneOf(FakeLinkClient desktop, {bool follow = true}) {
+      final container = ProviderContainer(
+        overrides: [
+          linkPhoneClientProvider.overrideWithValue(desktop),
+          musicPlayerRuntimeProvider.overrideWithValue(runtime),
+          linkPhoneOptionsProvider.overrideWith(
+            () => LinkPhoneOptionsNotifier(
+              initial: LinkPhoneOptions(loaded: true, followDesktop: follow),
+            ),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+      container.listen(linkPlaysOnDesktopProvider, (_, _) {});
+      return container;
+    }
+
+    test('the phone follows the desktop when it starts playing', () async {
+      final desktop = FakeLinkClient(
+        onGet: (op, query) => _state(playing: false)['state'],
+      );
+      final follower = phoneOf(desktop);
+      await settle();
+      expect(follower.read(linkPlaysOnDesktopProvider), isFalse);
+
+      desktop.push(_state());
+      expect(follower.read(linkPlaysOnDesktopProvider), isTrue);
+    });
+
+    test('the phone follows a desktop that plays when it connects', () async {
+      final desktop = FakeLinkClient(
+        connectionState: LinkConnectionState.disconnected,
+        onGet: (op, query) => _state()['state'],
+      );
+      final follower = phoneOf(desktop);
+      await settle();
+      expect(follower.read(linkPlaysOnDesktopProvider), isFalse);
+
+      desktop.setConnection(LinkConnectionState.connecting);
+      desktop.setConnection(LinkConnectionState.connected);
+      await settle();
+      expect(follower.read(linkPlaysOnDesktopProvider), isTrue);
+    });
+
+    test('the phone keeps its player when following is off', () async {
+      final desktop = FakeLinkClient(
+        onGet: (op, query) => _state(playing: false)['state'],
+      );
+      final follower = phoneOf(desktop, follow: false);
+      await settle();
+
+      desktop.push(_state());
+      expect(follower.read(linkPlaysOnDesktopProvider), isFalse);
+    });
+
+    test('a phone that plays keeps its own player', () async {
+      final desktop = FakeLinkClient(
+        onGet: (op, query) => _state(playing: false)['state'],
+      );
+      final follower = phoneOf(desktop);
+      runtime.states.add(PlaybackState(playing: true));
+      await settle();
+
+      desktop.push(_state());
+      expect(follower.read(linkPlaysOnDesktopProvider), isFalse);
+    });
+
+    test('a desktop that plays on does not take over again', () async {
+      final desktop = FakeLinkClient(onGet: (op, query) => _state()['state']);
+      final follower = phoneOf(desktop);
+      await settle();
+      expect(follower.read(linkPlaysOnDesktopProvider), isTrue);
+
+      // Picking this phone stays while the desktop moves to its next song.
+      follower.read(linkPlaysOnDesktopProvider.notifier).set(false);
+      desktop.push(_state(index: 1));
+      expect(follower.read(linkPlaysOnDesktopProvider), isFalse);
+
+      // Pausing, then playing again is a new start.
+      desktop.push(_state(playing: false, index: 1));
+      desktop.push(_state(index: 1));
+      expect(follower.read(linkPlaysOnDesktopProvider), isTrue);
     });
 
     test('the player screens follow the desktop only while it plays', () {

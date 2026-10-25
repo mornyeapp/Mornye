@@ -12,6 +12,7 @@ import 'package:mornye/services/link/features/link_phone_client.dart';
 import 'package:mornye/services/link/features/link_phone_files.dart';
 import 'package:mornye/services/link/features/link_phone_library.dart';
 import 'package:mornye/services/link/features/link_phone_library_sync.dart';
+import 'package:mornye/services/link/features/link_phone_options.dart';
 import 'package:mornye/services/link/features/link_phone_player.dart';
 import 'package:mornye/services/link/features/link_phone_session.dart';
 import 'package:mornye/services/link/features/link_save_offline.dart';
@@ -127,14 +128,18 @@ final linkPhoneLibraryRowsProvider = Provider<LinkPhoneRowLoader>(
 
 /// Puts this phone's songs in the paired desktop's Library: sends the list
 /// while connected and again after the Library changes, and uploads a song
-/// when the desktop plays it. Null while no desktop is paired.
+/// when the desktop plays it. With sharing off it sends an empty list, which
+/// takes them out. Null while no desktop is paired.
 final linkPhoneLibraryProvider = Provider<LinkPhoneLibraryPublisher?>((ref) {
   final client = ref.watch(linkPhoneClientProvider);
-  if (client == null) return null;
+  final options = ref.watch(linkPhoneOptionsProvider);
+  if (client == null || !options.loaded) return null;
   late LinkPhoneLibraryRevision revision;
   final library = LinkPhoneLibrary(
     revision: () => revision,
-    loadPage: ref.watch(linkPhoneLibraryRowsProvider),
+    loadPage: options.shareSongs
+        ? ref.watch(linkPhoneLibraryRowsProvider)
+        : (_) async => const QueueLibraryDbPage(rows: [], nextCursor: null),
   );
   final publisher = LinkPhoneLibraryPublisher(client: client, library: library);
   final requests = LinkPhoneFileRequests(

@@ -8381,6 +8381,26 @@
   "@linkPairedSection": {
     "description": "Section header for computers this phone is paired with"
   },
+  "linkPhoneSection": "This phone",
+  "@linkPhoneSection": {
+    "description": "Section header for what this phone shares with and how it follows its paired computer"
+  },
+  "linkShareSongsTitle": "Show songs on the computer",
+  "@linkShareSongsTitle": {
+    "description": "Switch title: this phone's songs appear in the paired computer's Library"
+  },
+  "linkShareSongsSubtitle": "Songs on this phone appear in the computer's Library and play there while this phone is connected",
+  "@linkShareSongsSubtitle": {
+    "description": "Switch subtitle for showing this phone's songs on the computer"
+  },
+  "linkFollowDesktopTitle": "Follow the computer's playback",
+  "@linkFollowDesktopTitle": {
+    "description": "Switch title: the phone's player shows the computer when the computer starts playing"
+  },
+  "linkFollowDesktopSubtitle": "When the computer starts playing, this phone shows and controls it",
+  "@linkFollowDesktopSubtitle": {
+    "description": "Switch subtitle for following the computer's playback"
+  },
   "linkNearbySection": "On this network",
   "@linkNearbySection": {
     "description": "Section header for computers running Mornye found on the local network"

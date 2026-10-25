@@ -7,6 +7,7 @@ import 'package:mornye/services/link/client/link_client_controller.dart';
 import 'package:mornye/services/link/client/link_client_discovery.dart';
 import 'package:mornye/services/link/client/link_client_pairing.dart';
 import 'package:mornye/services/link/client/link_client_session.dart';
+import 'package:mornye/services/link/features/link_phone_options.dart';
 import 'package:mornye/services/link/link_client_api.dart';
 import 'package:mornye/services/local_network_access.dart';
 import 'package:mornye/theme/mornye_theme.dart';
@@ -18,8 +19,9 @@ import 'package:mornye/widgets/app_sliver_header.dart';
 import 'package:mornye/widgets/expressive_icon_button.dart';
 import 'package:mornye/widgets/settings_group.dart';
 
-/// Mornye on your computer: paired computers with their connection, the
-/// computers found on the network, and pairing.
+/// Mornye on your computer: paired computers with their connection, what
+/// this phone shares with them, the computers found on the network, and
+/// pairing.
 class LinkSettingsPage extends ConsumerStatefulWidget {
   const LinkSettingsPage({super.key});
 
@@ -284,6 +286,8 @@ class _LinkSettingsPageState extends ConsumerState<LinkSettingsPage> {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final state = ref.watch(linkClientControllerProvider);
+    final options = ref.watch(linkPhoneOptionsProvider);
+    final optionsNotifier = ref.read(linkPhoneOptionsProvider.notifier);
     final unpaired = state.unpaired;
     final searching = state.discovery == LinkDiscoveryStatus.searching;
     final theme = Theme.of(context);
@@ -309,6 +313,31 @@ class _LinkSettingsPageState extends ConsumerState<LinkSettingsPage> {
               title: l10n.linkPairedSection,
               children: [
                 for (final record in state.servers) _pairedRow(state, record),
+              ],
+            ),
+          if (state.servers.isNotEmpty)
+            ...settingsSectionSlivers(
+              title: l10n.linkPhoneSection,
+              children: [
+                SettingsSwitchItem(
+                  icon: Icons.library_music_outlined,
+                  title: l10n.linkShareSongsTitle,
+                  subtitle: l10n.linkShareSongsSubtitle,
+                  value: options.shareSongs,
+                  onChanged: options.loaded
+                      ? optionsNotifier.setShareSongs
+                      : null,
+                ),
+                SettingsSwitchItem(
+                  icon: Icons.devices_outlined,
+                  title: l10n.linkFollowDesktopTitle,
+                  subtitle: l10n.linkFollowDesktopSubtitle,
+                  value: options.followDesktop,
+                  onChanged: options.loaded
+                      ? optionsNotifier.setFollowDesktop
+                      : null,
+                  showDivider: false,
+                ),
               ],
             ),
           ...settingsSectionSlivers(

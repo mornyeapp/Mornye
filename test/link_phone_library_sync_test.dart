@@ -8,6 +8,7 @@ import 'package:mornye/services/link/features/link_phone_features.dart';
 import 'package:mornye/services/link/features/link_phone_files.dart';
 import 'package:mornye/services/link/features/link_phone_library.dart';
 import 'package:mornye/services/link/features/link_phone_library_sync.dart';
+import 'package:mornye/services/link/features/link_phone_options.dart';
 import 'package:mornye/services/link/link_client_api.dart';
 import 'package:mornye/services/link/link_protocol.dart';
 import 'package:mornye/utils/desktop_platform.dart';
@@ -634,18 +635,47 @@ void main() {
   group('wiring', () {
     tearDown(() => debugDesktopPlatformOverride = null);
 
-    ProviderContainer container(FakeLibraryRows rows) {
+    ProviderContainer container(
+      FakeLibraryRows rows, {
+      LinkPhoneOptions options = const LinkPhoneOptions(loaded: true),
+    }) {
       final container = ProviderContainer(
         overrides: [
           linkPhoneLibraryRevisionProvider.overrideWith(
             (ref) => ref.watch(_revisionProvider),
           ),
           linkPhoneLibraryRowsProvider.overrideWithValue(rows.load),
+          linkPhoneOptionsProvider.overrideWith(
+            () => LinkPhoneOptionsNotifier(initial: options),
+          ),
         ],
       );
       addTearDown(container.dispose);
       return container;
     }
+
+    test('waits for the saved choices', () async {
+      final rows = FakeLibraryRows();
+      final phone = container(rows, options: const LinkPhoneOptions());
+      phone.read(linkActiveClientProvider.notifier).set(FakeLinkClient());
+      expect(phone.read(linkPhoneLibraryProvider), isNull);
+    });
+
+    test('sends an empty list while sharing is off', () async {
+      final rows = _uriRows(3);
+      final client = FakeLinkClient(onGet: (op, _) => {'version': null});
+      final phone = container(rows);
+      phone.read(linkActiveClientProvider.notifier).set(client);
+      phone.listen(linkPhoneLibraryProvider, (_, _) {});
+      await phone.read(linkPhoneLibraryProvider)!.idle;
+      expect(pages(client).single['total'], 3);
+
+      phone.read(linkPhoneOptionsProvider.notifier).setShareSongs(false);
+      final publisher = phone.read(linkPhoneLibraryProvider)!;
+      await publisher.idle;
+      expect(pages(client).last['total'], 0);
+      expect(pages(client).last['songs'], isEmpty);
+    });
 
     test('stays off without a paired desktop or on a desktop', () async {
       final rows = FakeLibraryRows();
