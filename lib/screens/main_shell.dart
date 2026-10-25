@@ -10,6 +10,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/services/saf_migration_prompt_store.dart';
 import 'package:mornye/providers/download_queue_provider.dart';
+import 'package:mornye/providers/extension_provider.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/providers/playback_notification_provider.dart';
@@ -268,7 +269,7 @@ class _MainShellState extends ConsumerState<MainShell>
       );
       _initialSafRepairComplete = true;
       if (!mounted) return;
-      unawaited(ref.read(musicPlayerRuntimeProvider).restoreSession());
+      unawaited(_restorePlayback());
       _setupShareListener();
       await _checkSafMigration();
       final updateDialogShown = await _checkForUpdates();
@@ -276,6 +277,20 @@ class _MainShellState extends ConsumerState<MainShell>
         await _checkAppAnnouncement();
       }
     });
+  }
+
+  /// Restores the last session, then its song's cover from the file once
+  /// extensions are ready; the desktop backend reads files only then.
+  Future<void> _restorePlayback() async {
+    final runtime = ref.read(musicPlayerRuntimeProvider);
+    try {
+      await runtime.restoreSession();
+      await ref.read(extensionProvider.notifier).ensureInitialized();
+      if (!mounted) return;
+      await runtime.recoverRestoredArtwork();
+    } on Object catch (error) {
+      _log.w('Could not restore the playing song\'s cover: $error');
+    }
   }
 
   void _onUsbAudioStatusChanged() {

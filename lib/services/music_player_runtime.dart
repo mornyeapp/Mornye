@@ -419,6 +419,12 @@ class MusicPlayerRuntime {
   Future<void> restoreSession() =>
       _restoreFuture ??= restorePlaybackSession(this);
 
+  /// [MusicPlayerHandler.recoverRestoredArtwork] after [restoreSession].
+  Future<void> recoverRestoredArtwork() async {
+    await restoreSession();
+    await handler?.recoverRestoredArtwork();
+  }
+
   /// Plays the local file [path], still being written (a song a paired
   /// phone is sending), from [url] until [done] completes, so it starts
   /// before the file is whole.

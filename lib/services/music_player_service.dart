@@ -1232,6 +1232,16 @@ class MusicPlayerHandler extends BaseAudioHandler
     _autoplay.updateMode();
   }
 
+  /// Shows the restored song's cover from its file when the saved session
+  /// kept none, as playing it would. The desktop backend reads files only
+  /// once extensions are ready, which may be after the restore.
+  Future<void> recoverRestoredArtwork() async {
+    if (_index < 0 || _index >= _media.length) return;
+    final media = _media[_index];
+    if (media.isNetwork) return;
+    await _recoverEmbeddedArtwork(media, _playRequestGeneration);
+  }
+
   bool _isCurrentPlayRequest(int generation, PlayableMedia media) {
     return !_disposed &&
         generation == _playRequestGeneration &&
