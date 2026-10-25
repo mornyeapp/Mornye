@@ -196,11 +196,31 @@ void main() {
     expect(lastCommand()['action'], 'play');
   });
 
+  testWidgets('no continue once the music plays on the phone', (tester) async {
+    // The desktop holds a paused song, as after Continue on phone.
+    await pumpButton(tester);
+    await connectPhone(tester);
+    await tester.tap(button());
+    await settle(tester);
+    expect(find.byKey(const ValueKey('link-phone-continue')), findsNothing);
+    expect(find.byKey(const ValueKey('link-phone-open')), findsOneWidget);
+
+    backend.message('p1', {
+      'type': LinkMessageTypes.playerState,
+      'state': LinkPlayerState(
+        playing: false,
+        updatedMs: DateTime.now().millisecondsSinceEpoch,
+      ).toJson(),
+    });
+    await settle(tester);
+    expect(find.byKey(const ValueKey('link-phone-continue')), findsOneWidget);
+  });
+
   testWidgets('continue on phone hands off the queue and pauses here', (
     tester,
   ) async {
     await pumpButton(tester);
-    await connectPhone(tester);
+    await connectPhone(tester, playing: false);
     await tester.tap(button());
     await settle(tester);
     await tester.tap(find.byKey(const ValueKey('link-phone-continue')));

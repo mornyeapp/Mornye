@@ -308,6 +308,10 @@ class _PhoneSectionState extends ConsumerState<_PhoneSection> {
     final duration = phone?.durationMs ?? track?.durationMs;
     final position = phone?.positionAt(DateTime.now().millisecondsSinceEpoch);
     final canSeek = phone != null && duration != null && duration > 0;
+    // Nothing to hand over once the music already plays on the phone, as
+    // after Continue on phone; the phone's state rebuilds this section.
+    final host = ref.read(linkDesktopHostProvider.notifier);
+    final canContinue = host.hasCurrentTrack && (host.isPlaying || !playing);
     final fraction = canSeek
         ? (_dragging ?? (position! / duration).clamp(0.0, 1.0))
         : 0.0;
@@ -444,11 +448,12 @@ class _PhoneSectionState extends ConsumerState<_PhoneSection> {
             runSpacing: tokens.gapXs,
             children: mornye
                 ? [
-                    TextButton(
-                      key: const ValueKey('link-phone-continue'),
-                      onPressed: () => unawaited(_continue()),
-                      child: Text(l10n.linkDesktopContinueOnPhone),
-                    ),
+                    if (canContinue)
+                      TextButton(
+                        key: const ValueKey('link-phone-continue'),
+                        onPressed: () => unawaited(_continue()),
+                        child: Text(l10n.linkDesktopContinueOnPhone),
+                      ),
                     TextButton(
                       key: const ValueKey('link-phone-open'),
                       onPressed: widget.onOpenLink,
@@ -456,12 +461,13 @@ class _PhoneSectionState extends ConsumerState<_PhoneSection> {
                     ),
                   ]
                 : [
-                    ExpressiveButton(
-                      key: const ValueKey('link-phone-continue'),
-                      tonal: true,
-                      onPressed: () => unawaited(_continue()),
-                      child: Text(l10n.linkDesktopContinueOnPhone),
-                    ),
+                    if (canContinue)
+                      ExpressiveButton(
+                        key: const ValueKey('link-phone-continue'),
+                        tonal: true,
+                        onPressed: () => unawaited(_continue()),
+                        child: Text(l10n.linkDesktopContinueOnPhone),
+                      ),
                     ExpressiveButton(
                       key: const ValueKey('link-phone-open'),
                       text: true,

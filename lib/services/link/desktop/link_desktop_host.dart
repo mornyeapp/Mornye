@@ -756,6 +756,9 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
   /// Whether the desktop has a current song to continue on a phone.
   bool get hasCurrentTrack => _player?.snapshot().current != null;
 
+  /// Whether the desktop's own player is playing.
+  bool get isPlaying => _player?.snapshot().playing ?? false;
+
   /// Hands the desktop queue around the current song, at its position, to
   /// the phone [deviceId] and pauses the desktop once the phone has it.
   Future<bool> continueOnPhone(String deviceId) async {
