@@ -161,6 +161,42 @@ void main() {
     );
   });
 
+  test('learns how much variety the listener plays through', () {
+    final model = AutoplayPreferenceModel();
+    AutoplayLearningTrack song(String artist, int i, {String genre = 'Pop'}) =>
+        AutoplayLearningTrack(
+          source: '/$artist$i',
+          title: '$artist $i',
+          artist: artist,
+          genre: genre,
+        );
+    // The listener skips a second song by the same artist and keeps
+    // listening when another artist follows.
+    for (var round = 0; round < 30; round++) {
+      for (var a = 0; a < 6; a++) {
+        final first = song('Artist $a', round);
+        model.learn(
+          song('Artist $a', round + 100),
+          previous: first,
+          at: _at,
+          reward: 0,
+        );
+        model.learn(
+          song('Artist ${a + 6}', round),
+          previous: first,
+          at: _at,
+          reward: 1,
+        );
+      }
+    }
+    // Artists it never heard follow the same habit.
+    final heard = song('Unheard', 0);
+    expect(
+      model.preference(song('Unheard', 1), previous: heard, at: _at),
+      lessThan(model.preference(song('Other', 0), previous: heard, at: _at)),
+    );
+  });
+
   test(
     'learned rank changes recommendations but preserves queue exclusions',
     () {

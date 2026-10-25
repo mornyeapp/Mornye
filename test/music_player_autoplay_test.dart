@@ -27,7 +27,8 @@ class _NoNoise implements Random {
 }
 
 void main() {
-  test('Autoplay prefers related unplayed Library tracks and deduplicates', () {
+  test('Autoplay prefers related unplayed Library tracks, after another '
+      'artist, and deduplicates', () {
     final seed = track('seed', genre: 'Rock');
     final related = track('related', genre: 'Rock');
     final recent = track('recent', genre: 'Rock');
@@ -49,7 +50,70 @@ void main() {
       dismissedSources: {'/dismissed.flac'},
       random: Random(1),
     );
-    expect(selected.map((item) => item.id), ['related', 'unrelated', 'recent']);
+    // The seed's artist plays now and next ('queued'), so another comes
+    // first.
+    expect(selected.map((item) => item.id), ['unrelated', 'related', 'recent']);
+  });
+
+  test('a favorite artist does not take over the queue', () {
+    final seed = track('seed', artist: 'Favorite', genre: 'Pop');
+    final selected = selectAutoplayTracks(
+      seed: seed,
+      candidates:
+          [
+                for (var i = 0; i < 10; i++) track('fav$i', artist: 'Favorite'),
+                for (var i = 0; i < 10; i++) track('pop$i', artist: 'Pop $i'),
+              ]
+              .map((item) => track(item.id, artist: item.artist, genre: 'Pop'))
+              .toList(),
+      upcoming: [],
+      recent: [seed],
+      dismissedSources: {},
+      random: Random(3),
+      // Even a strong learned preference.
+      preferenceAdjustment: (item) => item.artist == 'Favorite' ? 9 : 0,
+    );
+    final favorites = [
+      for (var i = 0; i < selected.length; i++)
+        if (selected[i].artist == 'Favorite') i,
+    ];
+    expect(selected, hasLength(6));
+    expect(favorites, hasLength(1));
+    // Three other artists play between the seed and its artist's return.
+    expect(favorites.single, greaterThanOrEqualTo(3));
+  });
+
+  test('the session sets the genres, not the seed alone', () {
+    final selected = selectAutoplayTracks(
+      seed: track('seed', artist: 'Untagged'),
+      candidates: [
+        for (var i = 0; i < 3; i++)
+          track('rock$i', artist: 'R$i', genre: 'Rock'),
+        for (var i = 0; i < 3; i++)
+          track('jazz$i', artist: 'J$i', genre: 'Jazz; Soul'),
+      ],
+      upcoming: [],
+      recent: [
+        track('heard1', artist: 'H1', genre: 'Jazz'),
+        track('heard2', artist: 'H2', genre: 'Soul'),
+      ],
+      dismissedSources: {},
+      random: Random(1),
+      limit: 3,
+    );
+    expect(selected.map((item) => item.genre), everyElement('Jazz; Soul'));
+  });
+
+  test('a one-artist Library still fills the queue', () {
+    final selected = selectAutoplayTracks(
+      seed: track('seed', artist: 'Solo'),
+      candidates: [for (var i = 0; i < 4; i++) track('solo$i', artist: 'Solo')],
+      upcoming: [],
+      recent: [],
+      dismissedSources: {},
+      random: Random(1),
+    );
+    expect(selected, hasLength(4));
   });
 
   test('a small Library never recommends the current song to itself', () {
@@ -106,13 +170,15 @@ void main() {
       random: Random(1),
     );
     expect(selected.map((item) => item.id), [
-      '160',
-      '40',
       '96',
       '80',
+      '81',
+      '25',
       '90',
-      '20',
+      '135',
     ]);
+    // Six artists, none heard in the last songs.
+    expect(selected.map((item) => item.artist).toSet(), hasLength(6));
   });
 
   test('Autoplay preference and recommendation provenance survive restore', () {

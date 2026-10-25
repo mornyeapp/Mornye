@@ -65,6 +65,10 @@ class AutoplayPreferenceModel {
     final previousArtist = _text(previous?.artist ?? '');
     final previousGenre = _text(previous?.genre ?? '');
     final period = at.hour ~/ 6;
+    // Whether a song continues the previous one's artist or genre, so the
+    // model learns how much variety the listener keeps playing through.
+    final sameArtist = artist.isNotEmpty && artist == previousArtist;
+    final sameGenre = genres.isNotEmpty && genres.contains(previousGenre);
     final tokens = <String>[
       if (artist.isNotEmpty) 'artist:$artist',
       if (artist.isNotEmpty && album.isNotEmpty) 'album:$artist|$album',
@@ -76,6 +80,10 @@ class AutoplayPreferenceModel {
         'transition:$previousArtist|$artist',
       for (final genre in genres)
         if (previousGenre.isNotEmpty) 'transition:$previousGenre|$genre',
+      if (previousArtist.isNotEmpty && artist.isNotEmpty)
+        sameArtist ? 'flow:same-artist' : 'flow:new-artist',
+      if (previousGenre.isNotEmpty && genres.isNotEmpty)
+        sameGenre ? 'flow:same-genre' : 'flow:new-genre',
       if (track.duration != null && track.duration! > Duration.zero)
         'duration:${min(5, track.duration!.inSeconds ~/ 90)}',
     ];

@@ -24,35 +24,49 @@ AutoplayLearningTrack _learningTrack(PlayableMedia media) =>
 
 /// Bounded database pages keep recommendation work independent of Library
 /// size. Both downloaded tracks and enabled scanned sources are local files.
+/// A few songs by the seed's artist join small pages spread across the
+/// Library: one large page in date-added order holds whole albums, so it
+/// offered mostly one artist.
 Future<List<PlayableMedia>> _loadAutoplayLibrary(
   PlayableMedia seed,
   MusicPlayerRuntime runtime,
 ) async {
+  const pages = 8, pageSize = 48;
   final database = runtime.dependencies.libraryDatabase;
   final includeLocal = runtime.settings.localLibraryEnabled;
   final query = QueueLibraryDbQuery(includeLocal: includeLocal);
   final count = (await database.getQueueCounts(query)).allTrackCount;
-  final offset = count > 256 ? Random().nextInt(count - 255) : 0;
+  final random = Random();
+  final whole = count <= pages * pageSize;
   final rows = [
     if (seed.artist.trim().isNotEmpty)
       ...await database.getQueueTrackPage(
         QueueLibraryDbQuery(
           includeLocal: includeLocal,
           searchQuery: seed.artist,
-          limit: 128,
+          limit: 32,
         ),
       ),
-    ...await database.getQueueTrackPage(
-      QueueLibraryDbQuery(
-        includeLocal: includeLocal,
-        offset: offset,
-        limit: 256,
+    for (var page = 0; page < (whole ? 1 : pages); page++)
+      ...await database.getQueueTrackPage(
+        QueueLibraryDbQuery(
+          includeLocal: includeLocal,
+          // One page from each eighth of the Library.
+          offset: whole
+              ? 0
+              : min(
+                  count - pageSize,
+                  count * page ~/ pages + random.nextInt(count ~/ pages),
+                ),
+          limit: whole ? pages * pageSize : pageSize,
+        ),
       ),
-    ),
   ];
   final result = <PlayableMedia>[];
+  final seen = <String>{};
   for (final row in rows) {
     final data = (row['item'] as Map).cast<String, dynamic>();
+    if (!seen.add(data['id'] as String)) continue;
     final source = data['filePath'] as String? ?? '';
     if (source.isEmpty) continue;
     // Do not interpret remote URLs as streamable Library items.
@@ -86,9 +100,25 @@ Future<List<PlayableMedia>> _loadAutoplayLibrary(
   return result;
 }
 
+/// The genres of a tag such as `Pop; Dance/Electronic`, normalized.
+Set<String> _autoplayGenres(String? value) => {
+  for (final part in (value ?? '').split(RegExp(r'[,;/|&]')))
+    if (normalizeLookupText(part) case final genre when genre.isNotEmpty) genre,
+};
+
+/// Songs that play between two by one artist, while other artists fit.
+const _autoplayArtistGap = 4;
+
+/// The latest songs, newest weighing most, that set the session's genres.
+const _autoplaySessionWindow = 12;
+
 /// Rank once per refill, so the visible queue is the actual playback order.
-/// Related songs score higher, while recent plays and repeated artists lose
-/// priority. Optional local learning adjusts this prior without audio analysis.
+/// Songs score by how well their genres fit the listening session (the
+/// seed, the songs before it and the queued ones, newest weighing most),
+/// with optional local learning on top. Artists heard or queued lately lose
+/// priority, an artist does not return within [_autoplayArtistGap] songs or
+/// twice in one refill while others fit, and songs of a picked album lose
+/// priority, so a favorite artist cannot take over the queue.
 List<PlayableMedia> selectAutoplayTracks({
   required PlayableMedia seed,
   required List<PlayableMedia> candidates,
@@ -110,14 +140,45 @@ List<PlayableMedia> selectAutoplayTracks({
   final songs = {songKey(seed), ...upcoming.map(songKey)};
   final seedArtist = normalized(seed.artist);
   final seedAlbum = normalized(seed.album);
-  final seedGenre = normalized(seed.genre);
   final recentSources = <String, int>{};
   final recentSongs = <String, int>{};
   for (var i = 0; i < recent.length; i++) {
     recentSources[recent[i].source] = i;
     recentSongs[songKey(recent[i])] = i;
   }
-  final scored = <(PlayableMedia, double, String)>[];
+
+  // The session in playback order: history, the seed (often its last entry
+  // already), then the queued songs the picks follow.
+  final session = <PlayableMedia>[];
+  for (final item in [...recent, seed, ...upcoming]) {
+    if (session.isEmpty || session.last.source != item.source) {
+      session.add(item);
+    }
+  }
+  final genreWeights = <String, double>{};
+  var genreTotal = 0.0;
+  // Songs back from the session's end, and plays, of each artist.
+  final artistDistance = <String, int>{};
+  final artistPlays = <String, int>{};
+  for (var back = 0; back < session.length; back++) {
+    final item = session[session.length - 1 - back];
+    final artist = normalized(item.artist);
+    if (artist.isNotEmpty) {
+      artistDistance.putIfAbsent(artist, () => back);
+      artistPlays[artist] = (artistPlays[artist] ?? 0) + 1;
+    }
+    if (back >= _autoplaySessionWindow) continue;
+    final genres = _autoplayGenres(item.genre);
+    if (genres.isEmpty) continue;
+    final weight = pow(0.75, back).toDouble();
+    genreTotal += weight;
+    for (final genre in genres) {
+      genreWeights[genre] = (genreWeights[genre] ?? 0) + weight / genres.length;
+    }
+  }
+
+  final scored =
+      <({PlayableMedia item, double score, String artist, String album})>[];
   for (final item in candidates) {
     final key = songKey(item);
     if (item.source.trim().isEmpty ||
@@ -130,16 +191,17 @@ List<PlayableMedia> selectAutoplayTracks({
     sources.add(item.source);
     songs.add(key);
     final artist = normalized(item.artist);
-    var score = random.nextDouble() * 2;
-    if (seedArtist.isNotEmpty && seedArtist == artist) {
-      score += 5;
+    final album = normalized(item.album);
+    var score = random.nextDouble() * 1.5;
+    if (genreTotal > 0) {
+      var fit = 0.0;
+      for (final genre in _autoplayGenres(item.genre)) {
+        fit += genreWeights[genre] ?? 0;
+      }
+      score += 6 * min(1.0, fit / genreTotal);
     }
-    if (seedAlbum.isNotEmpty && seedAlbum == normalized(item.album)) {
-      score += 3;
-    }
-    if (seedGenre.isNotEmpty && seedGenre == normalized(item.genre)) {
-      score += 4;
-    }
+    if (seedArtist.isNotEmpty && seedArtist == artist) score += 2;
+    if (seedAlbum.isNotEmpty && seedAlbum == album) score += 1;
     if (preferenceAdjustment != null) score += preferenceAdjustment(item);
     // Match the latest source OR normalized song occurrence without walking
     // the entire listening history again for every candidate.
@@ -147,18 +209,61 @@ List<PlayableMedia> selectAutoplayTracks({
       recentSources[item.source] ?? -1,
       recentSongs[key] ?? -1,
     );
-    if (played >= 0) score -= 20 + played.toDouble();
-    scored.add((item, score, artist));
+    if (played >= 0) {
+      // Heard already: recency alone orders these.
+      score -= 20 + played.toDouble();
+    } else if (artist.isNotEmpty) {
+      final distance = artistDistance[artist];
+      if (distance == null) {
+        // An artist the session has not reached yet.
+        score += 1;
+      } else {
+        score -= 6 * pow(0.7, distance) + 1.5 * min(4, artistPlays[artist]!);
+      }
+    }
+    scored.add((item: item, score: score, artist: artist, album: album));
   }
+
   final selected = <PlayableMedia>[];
+  // The artists that played last, newest at the end.
+  final latest = [for (final item in session) normalized(item.artist)];
+  final picked = <String>{};
   while (selected.length < limit && scored.isNotEmpty) {
-    scored.sort((a, b) => b.$2.compareTo(a.$2));
-    final next = scored.removeAt(0);
-    selected.add(next.$1);
+    final previous = latest.isEmpty ? '' : latest.last;
+    final spaced = {
+      ...latest.skip(max(0, latest.length - (_autoplayArtistGap - 1))),
+      ...picked,
+    };
+    int? best;
+    // Artists spaced apart first, then only not twice in a row, then the
+    // best of what is left.
+    for (final rule in [
+      spaced,
+      {previous},
+      const <String>{},
+    ]) {
+      for (var i = 0; i < scored.length; i++) {
+        final entry = scored[i];
+        if (entry.artist.isNotEmpty && rule.contains(entry.artist)) continue;
+        if (best == null || entry.score > scored[best].score) best = i;
+      }
+      if (best != null) break;
+    }
+    final next = scored.removeAt(best!);
+    selected.add(next.item);
+    latest.add(next.artist);
+    if (next.artist.isNotEmpty) picked.add(next.artist);
+    if (next.album.isEmpty) continue;
+    // Songs of one album, such as a compilation's, stay apart too.
     for (var i = 0; i < scored.length; i++) {
-      final (item, score, artist) = scored[i];
-      if (artist == next.$3) {
-        scored[i] = (item, score - 4, artist);
+      final entry = scored[i];
+      if (entry.album == next.album) {
+        scored[i] = (
+          item: entry.item,
+          score: entry.score - 3,
+          artist: entry.artist,
+          album: entry.album,
+        );
       }
     }
   }
