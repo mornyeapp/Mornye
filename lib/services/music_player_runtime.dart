@@ -56,6 +56,7 @@ class PlaybackDependencies {
     this.readNetworkMetadata = _readNetworkMetadata,
     this.resolveNetworkSource = _resolveNetworkSource,
     this.networkSourceReachable = _networkSourceReachable,
+    this.recoverMissingFile = _recoverMissingFile,
     this.initializeHandler = _initializeAudioHandler,
     this.synchronizePlaybackState = _synchronizePlaybackState,
     this.createPersonalization = AutoplayPersonalization.new,
@@ -97,6 +98,12 @@ class PlaybackDependencies {
   /// Whether a `network://` Library song can play now, as autoplay asks
   /// before queueing it.
   final Future<bool> Function(String) networkSourceReachable;
+
+  /// What plays in place of a local song file that is gone but can be
+  /// fetched again, such as a song a paired phone sent that the received
+  /// folder pruned: a path, or a URL streaming it as it arrives. Null for
+  /// any other path; throws when it cannot be fetched.
+  final Future<String?> Function(String) recoverMissingFile;
   final Future<MusicPlayerHandler> Function(MusicPlayerHandler Function())
   initializeHandler;
   final Future<void> Function() synchronizePlaybackState;
@@ -165,6 +172,11 @@ class PlaybackDependencies {
       NetworkStorageService.instance.resolve(source);
   static Future<bool> _networkSourceReachable(String source) =>
       NetworkStorageService.instance.reachable(source);
+  static Future<String?> _recoverMissingFile(String path) async {
+    final sources = NetworkStorageService.instance.virtualSources;
+    return sources is NetworkLocalCopies ? sources.recover(path) : null;
+  }
+
   static Future<void> _synchronizePlaybackState() async {
     // The session's switch takes each state from the player a microtask
     // later; let the one just published reach it first.

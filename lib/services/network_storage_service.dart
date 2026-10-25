@@ -257,6 +257,17 @@ abstract interface class NetworkVirtualSources {
   bool reachable(String id);
 }
 
+/// [NetworkVirtualSources] that keep local copies of the songs they play,
+/// such as the songs paired phones sent the Mornye Link desktop, and fetch
+/// one again once it is gone.
+abstract interface class NetworkLocalCopies implements NetworkVirtualSources {
+  /// What plays in place of the local file [path] when it is one of these
+  /// copies and gone: a path, or a URL streaming it as it arrives again.
+  /// Null for another path or a copy still there; throws when it cannot be
+  /// fetched.
+  Future<String?> recover(String path);
+}
+
 class NetworkStorageService {
   NetworkStorageService({
     Future<String?> Function()? read,

@@ -147,7 +147,12 @@ void main() {
       );
     }
 
-    LinkHandoff withFiles(FakeLinkClient client, FakePhonePlayer player) {
+    LinkHandoff withFiles(
+      FakeLinkClient client,
+      FakePhonePlayer player, {
+      int aheadSongs = linkHandoffAheadSongs,
+      int aheadBytes = linkHandoffAheadBytes,
+    }) {
       final records = FakeLibraryLookup();
       return LinkHandoff(
         client: client,
@@ -155,8 +160,20 @@ void main() {
         refs: LinkTrackRefCache(lookup: records, server: client.server),
         resolver: LinkTrackResolver(lookup: records, server: client.server),
         files: files,
+        aheadSongs: aheadSongs,
+        aheadBytes: aheadBytes,
       );
     }
+
+    /// The desktop pushes that it plays [title].
+    void plays(FakeLinkClient client, String title) => client.push({
+      'type': LinkMessageTypes.playerState,
+      'state': LinkPlayerState(
+        track: TrackRef(title: title, artist: 'Artist'),
+        playing: true,
+        updatedMs: 0,
+      ).toJson(),
+    });
 
     /// The desktop: `check` reports [missing], playing answers `h1`.
     FakeLinkClient desktop(List<int> missing) => FakeLinkClient(
@@ -354,6 +371,136 @@ void main() {
         expect(titles(client.posts.last.body), ['c']);
       },
     );
+
+    test(
+      'sends songs only so far ahead of the one the desktop plays',
+      () async {
+        final player = FakePhonePlayer(
+          LinkPhoneSnapshot(
+            queue: [
+              await song('a'),
+              await song('b', bytes: [1]),
+              await song('c'),
+              await song('d', bytes: [2]),
+              await song('e', bytes: [3]),
+            ],
+            index: 0,
+            playing: true,
+          ),
+        );
+        final client = desktop([1, 3, 4]);
+        await withFiles(client, player, aheadSongs: 1).playOnDesktop();
+
+        await until(() => client.posts.length == 3);
+        expect(titles(client.posts.last.body), ['b', 'c']);
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+        // 'b' waits on the desktop, so 'd' does not go yet.
+        expect(client.uploads, hasLength(1));
+
+        plays(client, 'b');
+        await until(() => client.posts.length == 4);
+        expect(client.uploads.last.bytes, [2]);
+        expect(titles(client.posts.last.body), ['d']);
+
+        // The desktop's own 'c' leaves 'd' ahead of it.
+        plays(client, 'c');
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+        expect(client.uploads, hasLength(2));
+
+        plays(client, 'd');
+        await until(() => client.posts.length == 5);
+        expect(client.uploads.last.bytes, [3]);
+        expect(titles(client.posts.last.body), ['e']);
+        expect([
+          for (final post in client.posts.skip(2)) post.op,
+        ], everyElement(LinkOps.handoffAppend));
+      },
+    );
+
+    test('keeps the songs sent ahead within the byte budget', () async {
+      final player = FakePhonePlayer(
+        LinkPhoneSnapshot(
+          queue: [
+            await song('a'),
+            await song('b', bytes: [1, 1]),
+            await song('c', bytes: [2, 2]),
+            await song('d', bytes: [3, 3]),
+          ],
+          index: 0,
+          playing: true,
+        ),
+      );
+      final client = desktop([1, 2, 3]);
+      await withFiles(client, player, aheadBytes: 3).playOnDesktop();
+
+      // 'c' passes the budget once 'b' is ahead; nothing more goes.
+      await until(() => client.uploads.length == 2);
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(client.uploads.last.bytes, [2, 2]);
+      expect(client.uploads, hasLength(2));
+
+      plays(client, 'b');
+      await until(() => client.uploads.length == 3);
+      expect(client.uploads.last.bytes, [3, 3]);
+    });
+
+    test('stops sending once another queue plays on the desktop', () async {
+      final player = FakePhonePlayer(
+        LinkPhoneSnapshot(
+          queue: [
+            await song('a'),
+            await song('b', bytes: [1]),
+            await song('c', bytes: [2]),
+          ],
+          index: 0,
+          playing: true,
+        ),
+      );
+      final client = desktop([1, 2]);
+      final answer = client.onPost!;
+      client.onPost = (op, body) =>
+          op == LinkOps.handoffAppend && (body['queue'] as List).isEmpty
+          ? const LinkException('invalid', 'Another queue plays')
+          : answer(op, body);
+      await withFiles(client, player, aheadSongs: 1).playOnDesktop();
+      await until(() => client.posts.length == 3);
+
+      // The desktop plays a song outside the queue: the phone asks whether
+      // the queue still plays there.
+      plays(client, 'Elsewhere');
+      await until(() => client.posts.length == 4);
+      expect(client.posts.last.op, LinkOps.handoffAppend);
+      expect(client.posts.last.body['handoffId'], 'h1');
+      expect(client.posts.last.body['queue'], isEmpty);
+
+      plays(client, 'b');
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(client.uploads, hasLength(1));
+      expect(client.posts, hasLength(4));
+    });
+
+    test('sending another queue stops songs waiting for the desktop', () async {
+      final player = FakePhonePlayer(
+        LinkPhoneSnapshot(
+          queue: [
+            await song('a'),
+            await song('b', bytes: [1]),
+            await song('c', bytes: [2]),
+          ],
+          index: 0,
+          playing: true,
+        ),
+      );
+      final client = desktop([1, 2]);
+      await withFiles(client, player, aheadSongs: 1).playOnDesktop();
+      await until(() => client.posts.length == 3);
+
+      files.begin();
+      plays(client, 'b');
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(client.uploads, hasLength(1));
+      expect(client.posts, hasLength(3));
+    });
 
     test('sending another queue stops the uploads of the one before', () async {
       final player = FakePhonePlayer(

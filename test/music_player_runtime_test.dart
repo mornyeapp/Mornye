@@ -359,6 +359,7 @@ MusicPlayerRuntime _runtime({
   LibraryDatabase? libraryDatabase,
   HistoryDatabase? historyDatabase,
   LibraryCollectionsDatabase? collectionsDatabase,
+  Future<String?> Function(String)? recoverMissingFile,
 }) {
   if (isAndroid) {
     const channel = MethodChannel(
@@ -391,6 +392,7 @@ MusicPlayerRuntime _runtime({
       readMetadata: (_, {displayName}) async => {
         'replaygain_track_gain': '-6 dB',
       },
+      recoverMissingFile: recoverMissingFile ?? (_) async => null,
       sessionDatabase: sessionDatabase ?? _SessionStore(),
       libraryDatabase: libraryDatabase,
       historyDatabase: historyDatabase,
@@ -931,6 +933,48 @@ void main() {
     expect(runtime.arrivingFile('/one.flac'), isNull);
     await handler.skipToQueueItem(0);
     expect(decks.single.sources.last, '/one.flac');
+  });
+
+  test(
+    'a received file that is gone plays as the phone sends it again',
+    () async {
+      final decks = <_Deck>[];
+      final arrived = Completer<void>();
+      late final MusicPlayerRuntime runtime;
+      runtime = _runtime(
+        decks: decks,
+        recoverMissingFile: (path) async {
+          // Fetching it again streams it as a phone song arriving does.
+          runtime.streamWhileArriving(
+            path,
+            url: 'http://127.0.0.1:1/one.flac',
+            done: arrived.future,
+          );
+          return 'http://127.0.0.1:1/one.flac';
+        },
+      );
+      final handler = await runtime.initialize();
+      await handler.setQueueAndPlay([_track]);
+      expect(decks.single.sources, ['arriving http://127.0.0.1:1/one.flac']);
+      expect(handler.playbackState.value.playing, isTrue);
+      arrived.complete();
+    },
+  );
+
+  test('a gone file no phone can send fails as unavailable', () async {
+    final decks = <_Deck>[];
+    final runtime = _runtime(
+      decks: decks,
+      recoverMissingFile: (_) async =>
+          throw const LinkException('unavailable', 'No phone is connected'),
+    );
+    final handler = await runtime.initialize();
+    await handler.setQueueAndPlay([_track]);
+    expect(decks.single.sources, isEmpty);
+    expect(
+      handler.playbackState.value.errorMessage,
+      contains('Audio file is unavailable'),
+    );
   });
 
   test('denied or failed audio focus cannot resume a paused source', () async {

@@ -67,6 +67,9 @@ class _MusicAutoMix {
       handler._repeatMode != AudioServiceRepeatMode.one &&
       handler._media.length > 1;
 
+  static bool _isUrl(String path) =>
+      const {'http', 'https'}.contains(Uri.tryParse(path)?.scheme);
+
   bool _current(int generation) =>
       generation == _generation &&
       _canMix &&
@@ -126,6 +129,10 @@ class _MusicAutoMix {
       pins.add(currentPath);
       final nextPath = await handler._resolveSource(next);
       if (nextPath == null || !_current(generation)) return;
+      // A song a paired phone is still sending (or sending again, its
+      // received copy gone) streams from a URL, which neither the mix deck
+      // nor the analysis opens.
+      if (_isUrl(currentPath) || _isUrl(nextPath)) return;
       pins.add(nextPath);
       deck = handler._dependencies.createDeck(
         'music-mix-$generation-${DateTime.now().microsecondsSinceEpoch}',

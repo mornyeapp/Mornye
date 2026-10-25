@@ -61,6 +61,7 @@ void main() {
     receivedDir: () => received.path,
     connectedDevice: (id) =>
         id == sourceId && connected.contains(_phone) ? _phone : null,
+    connectedDevices: () => [...connected],
     send: (message, deviceId) async {
       sent.add((message: message, deviceId: deviceId));
       return delivered;
@@ -323,6 +324,67 @@ void main() {
         sources().resolve(sourceId, '${_fileId(1)}.exe'),
         throwsFormatException,
       );
+    });
+  });
+
+  group('recover', () {
+    String receivedPath(String name) =>
+        '${received.path}${Platform.pathSeparator}$name';
+
+    test('asks a connected phone again for a pruned received song', () async {
+      final phone = sources();
+      final name = '${_fileId(1)}.flac';
+      final recovered = phone.recover(receivedPath(name));
+      await pumpEventQueue();
+      expect(sent.single.deviceId, _phone);
+      expect(sent.single.message, {
+        'type': LinkMessageTypes.filesRequest,
+        'name': name,
+      });
+
+      phone.onMessage(_phone, sendingMessage(name));
+      final url = await recovered;
+      expect(url, startsWith('http://127.0.0.1:'));
+      expect(url, endsWith('/$name'));
+      // The player streams the queued path from there until it is whole.
+      expect(registered, [receivedPath(name)]);
+    });
+
+    test('asks the next phone when one cannot send it', () async {
+      connected = {_phone, 'phone-2'};
+      final phone = sources();
+      final name = '${_fileId(1)}.flac';
+      final recovered = phone.recover(receivedPath(name));
+      await pumpEventQueue();
+      phone.onMessage(_phone, {
+        'type': LinkMessageTypes.filesFailed,
+        'name': name,
+        'reason': 'not_found',
+      });
+      await pumpEventQueue();
+      expect([for (final entry in sent) entry.deviceId], [_phone, 'phone-2']);
+
+      phone.onMessage('phone-2', sendingMessage(name));
+      expect(await recovered, endsWith('/$name'));
+    });
+
+    test('leaves other files and received files still there', () async {
+      final name = '${_fileId(1)}.flac';
+      File(receivedPath(name)).writeAsBytesSync([1, 2, 3]);
+      final phone = sources();
+      expect(await phone.recover(receivedPath(name)), isNull);
+      expect(await phone.recover('${root.path}/$name'), isNull);
+      expect(await phone.recover(receivedPath('cover.jpg')), isNull);
+      expect(sent, isEmpty);
+    });
+
+    test('fails while no phone is connected', () async {
+      connected = {};
+      await expectLater(
+        sources().recover(receivedPath('${_fileId(1)}.flac')),
+        throwsA(linkError('unavailable')),
+      );
+      expect(sent, isEmpty);
     });
   });
 

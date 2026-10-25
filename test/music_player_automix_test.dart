@@ -1326,6 +1326,23 @@ void main() {
     },
   );
 
+  fakeTimeTest('a next song still arriving is not mixed in', () async {
+    // A paired phone still sends it, or sends it again after the received
+    // folder pruned it.
+    final arrived = Completer<void>();
+    addTearDown(arrived.complete);
+    musicPlayerRuntime.streamWhileArriving(
+      '/two.flac',
+      url: 'http://127.0.0.1:1/two.flac',
+      done: arrived.future,
+    );
+    setAutoMixEnabled(true);
+    await handler.setQueueAndPlay(_tracks);
+    await Future<void>.delayed(const Duration(milliseconds: 400));
+    expect(native.live, {'music-player'});
+    expect(analyzer.calls, isEmpty);
+  });
+
   fakeTimeTest('repeat one never prepares another deck', () async {
     setAutoMixEnabled(true);
     await handler.setRepeatMode(AudioServiceRepeatMode.one);

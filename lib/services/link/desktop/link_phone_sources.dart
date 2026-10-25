@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:mornye/services/link/desktop/link_arriving_files.dart';
 import 'package:mornye/services/link/desktop/link_catalog_index.dart';
@@ -8,6 +9,7 @@ import 'package:mornye/services/link/link_protocol.dart';
 import 'package:mornye/services/network_storage_service.dart';
 import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/utils/logger.dart';
+import 'package:path/path.dart' as p;
 
 final _log = AppLogger('LinkPhoneSources');
 
@@ -69,8 +71,9 @@ typedef _Sending = ({
 /// the `network://<sourceId>/` hosts the Link desktop host installs as
 /// [NetworkStorageService.virtualSources]. Scans list the committed song
 /// list without the songs the desktop has; playback uses the received
-/// file, else asks the connected phone to send it.
-class LinkPhoneSources implements NetworkVirtualSources {
+/// file, else asks the connected phone to send it. A received file the
+/// player misses is asked of the connected phones again ([recover]).
+class LinkPhoneSources implements NetworkLocalCopies {
   LinkPhoneSources({
     required LinkPhoneCatalogs catalogs,
     required DesktopLinkCatalogIndex? Function() index,
@@ -79,6 +82,7 @@ class LinkPhoneSources implements NetworkVirtualSources {
     required Future<int> Function(Map<String, dynamic> message, String deviceId)
     send,
     required LinkArrivingFiles? Function() arriving,
+    List<String> Function()? connectedDevices,
     Future<Map<String, dynamic>> Function(String path)? readTags,
     this.answerTimeout = const Duration(seconds: 15),
     this.progressInterval = const Duration(milliseconds: 250),
@@ -86,6 +90,7 @@ class LinkPhoneSources implements NetworkVirtualSources {
        _index = index,
        _receivedDir = receivedDir,
        _connectedDevice = connectedDevice,
+       _connectedDevices = connectedDevices ?? (() => const []),
        _send = send,
        _arriving = arriving,
        _readTags = readTags ?? PlatformBridge.readFileMetadata;
@@ -100,6 +105,10 @@ class LinkPhoneSources implements NetworkVirtualSources {
   final DesktopLinkCatalogIndex? Function() _index;
   final String Function() _receivedDir;
   final String? Function(String sourceId) _connectedDevice;
+
+  /// The phones connected now, asked in turn for a received song that is
+  /// gone.
+  final List<String> Function() _connectedDevices;
   final Future<int> Function(Map<String, dynamic> message, String deviceId)
   _send;
   final LinkArrivingFiles? Function() _arriving;
@@ -159,6 +168,28 @@ class LinkPhoneSources implements NetworkVirtualSources {
   Future<String> resolve(String id, String path) async {
     final name = _songName(path);
     if (name == null) throw const FormatException('Invalid phone song');
+    return _play(name, () => [?_connectedDevice(id)]);
+  }
+
+  /// The received song file [path] once it is gone, as the received folder
+  /// keeps 4 GiB and removes the oldest files first: asked again of the
+  /// connected phones in turn and streamed as it arrives.
+  @override
+  Future<String?> recover(String path) async {
+    final dir = _receivedDir();
+    final name = p.basename(path);
+    if (dir.isEmpty ||
+        !p.equals(p.dirname(path), dir) ||
+        _songName(name) == null ||
+        await File(path).exists()) {
+      return null;
+    }
+    return _play(name, _connectedDevices);
+  }
+
+  /// What the player opens for the phone song [name]: its received file,
+  /// else its stream while on its way, else the song asked of [devices].
+  Future<String> _play(String name, List<String> Function() devices) async {
     final fileId = name.substring(0, name.indexOf('.'));
     final received = (await linkReceivedFiles(_receivedDir()))[fileId];
     if (received != null) return received;
@@ -173,24 +204,31 @@ class LinkPhoneSources implements NetworkVirtualSources {
     }
     // A block body: an arrow would hand whenComplete the removed future
     // itself to wait for.
-    return _requests[name] ??= _request(id, name).whenComplete(() {
+    return _requests[name] ??= _request(devices(), name).whenComplete(() {
       _requests.remove(name);
     });
   }
 
-  /// Asks the phone behind [id] for [name] and waits for it to start.
-  Future<String> _request(String id, String name) async {
-    final deviceId = _connectedDevice(id);
-    if (deviceId == null) {
+  /// Asks the phones [devices] in turn for [name] and waits for one to
+  /// start.
+  Future<String> _request(List<String> devices, String name) async {
+    if (devices.isEmpty) {
       throw const LinkException('unavailable', 'The phone is not connected');
     }
-    final sending = await _ask(deviceId, name);
-    // A file that plays only once whole (an MP4 with its index at the end).
-    if (!sending.streamable) {
-      await sending.arrival.done;
-      return sending.arrival.path;
+    for (var i = 0; ; i++) {
+      try {
+        final sending = await _ask(devices[i], name);
+        // A file that plays only once whole (an MP4 with its index at the
+        // end).
+        if (!sending.streamable) {
+          await sending.arrival.done;
+          return sending.arrival.path;
+        }
+        return sending.arrival.url;
+      } on Object {
+        if (i + 1 == devices.length) rethrow;
+      }
     }
-    return sending.arrival.url;
   }
 
   /// The whole file of the phone song [name] in the received folder: one

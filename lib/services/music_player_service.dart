@@ -1034,7 +1034,18 @@ class MusicPlayerHandler extends BaseAudioHandler
       }
     }
     if (!media.isContentUri) {
-      return _runtime.arrivingFile(media.source)?.url ?? media.source;
+      if (_runtime.arrivingFile(media.source) case final arriving?) {
+        return arriving.url;
+      }
+      // A song a paired phone sent whose received copy is gone: the phone
+      // sends it again, else it is unavailable.
+      try {
+        return await _dependencies.recoverMissingFile(media.source) ??
+            media.source;
+      } catch (error) {
+        _log.w('Song file is gone and could not be fetched again: $error');
+        return null;
+      }
     }
     return _sourceCache.resolve(media.source);
   }

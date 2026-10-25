@@ -131,6 +131,112 @@ List<int> _indexes(Object? reply, String key) {
       : const [];
 }
 
+/// Whether the desktop's [track] is the queue entry [ref] the phone sent.
+/// The desktop names a song it plays from the phone's file by the title and
+/// artist the phone sent, and a Library song by the Library's tags.
+bool _sameTrack(TrackRef ref, TrackRef track) =>
+    (ref.songId != null && ref.songId == track.songId) ||
+    (ref.isrc != null && ref.isrc == track.isrc) ||
+    (ref.matchKey != null && ref.matchKey == track.matchKey) ||
+    (ref.title == track.title && ref.artist == track.artist);
+
+/// Where the desktop plays in a queue the phone handed it, as its
+/// `player.state` pushes tell, and the songs sent that it has not reached.
+class _DesktopProgress {
+  _DesktopProgress(this.queue, {required this.at, required this.queued});
+
+  final List<TrackRef> queue;
+
+  /// The entry of [queue] the desktop plays, as last heard.
+  int at;
+
+  /// The entries of [queue] before this one are in the desktop's queue.
+  int queued;
+
+  final _sent = <({int at, int size})>[];
+  TrackRef? _track;
+  bool _strayed = false;
+  bool _closed = false;
+  Completer<bool>? _heard;
+
+  /// Takes a pushed `player.state`.
+  void hear(Map<String, dynamic> message) {
+    if (message['type'] != LinkMessageTypes.playerState) return;
+    final track = LinkPlayerState.fromJson(message['state'])?.track;
+    final found = track == null ? null : _find(track);
+    if (found != null) {
+      at = found;
+    } else if (track != _track) {
+      _strayed = true;
+    }
+    _track = track;
+    _wake(true);
+  }
+
+  /// The queued entry nearest [at] that is [track], looking ahead first.
+  int? _find(TrackRef track) {
+    for (var i = at; i < queued; i++) {
+      if (_sameTrack(queue[i], track)) return i;
+    }
+    for (var i = min(at, queued) - 1; i >= 0; i--) {
+      if (_sameTrack(queue[i], track)) return i;
+    }
+    return null;
+  }
+
+  /// Whether the desktop moved, since last asked, to a song that is none of
+  /// the queued entries.
+  bool takeStrayed() {
+    final strayed = _strayed;
+    _strayed = false;
+    return strayed;
+  }
+
+  /// Notes the entry [at] sent, of [size] bytes.
+  void sent(int at, int size) => _sent.add((at: at, size: size));
+
+  /// Whether another song may go: the songs sent that the desktop has not
+  /// reached are fewer than [songs] and under [bytes] together.
+  bool room({required int songs, required int bytes}) {
+    var count = 0;
+    var total = 0;
+    for (final sent in _sent) {
+      if (sent.at <= at) continue;
+      count++;
+      total += sent.size;
+    }
+    return count < songs && total < bytes;
+  }
+
+  /// Waits for the desktop's next state; false once the session ends.
+  Future<bool> heard() {
+    if (_closed) return Future.value(false);
+    return (_heard ??= Completer<bool>()).future;
+  }
+
+  void close() {
+    _closed = true;
+    _wake(false);
+  }
+
+  void _wake(bool value) {
+    final heard = _heard;
+    _heard = null;
+    heard?.complete(value);
+  }
+}
+
+/// How many bytes of songs the phone sends ahead of the one the desktop
+/// plays; one song may pass it. The desktop keeps 4 GiB of received songs
+/// and removes the oldest first, so a quarter of that ahead leaves room for
+/// the current song and the ones just played.
+const linkHandoffAheadBytes = 1 << 30;
+
+/// How many songs the phone sends ahead of the one the desktop plays: about
+/// 40 minutes of music, so it plays on a while after the phone leaves. A
+/// skip ahead refills at network speed.
+const linkHandoffAheadSongs = 10;
+
 /// Moves playback between the phone and the paired desktop.
 class LinkHandoff {
   const LinkHandoff({
@@ -139,6 +245,8 @@ class LinkHandoff {
     required this.refs,
     required this.resolver,
     this.files,
+    this.aheadBytes = linkHandoffAheadBytes,
+    this.aheadSongs = linkHandoffAheadSongs,
   });
 
   final LinkClientApi client;
@@ -150,6 +258,10 @@ class LinkHandoff {
   /// what its Library has.
   final LinkPhoneFiles? files;
 
+  /// [linkHandoffAheadBytes] and [linkHandoffAheadSongs]; tests lower them.
+  final int aheadBytes;
+  final int aheadSongs;
+
   /// Sends the phone's queue (at most 200 items around the current one) to
   /// the desktop and pauses the phone once the desktop plays. The desktop
   /// always starts playing, as "Continue on this phone" does. Null when the
@@ -157,8 +269,9 @@ class LinkHandoff {
   ///
   /// Songs only the phone has are uploaded. The current one goes first and
   /// [onSending] reports its progress. Later ones follow in the background,
-  /// each added to the desktop's queue in order once it arrives; ones before
-  /// the current song are not sent.
+  /// each added to the desktop's queue in order once it arrives, a few songs
+  /// ahead of the one the desktop plays; ones before the current song are
+  /// not sent.
   Future<LinkHandoffResult?> playOnDesktop({
     void Function(int sent, int total)? onSending,
   }) async {
@@ -327,7 +440,7 @@ class LinkHandoff {
           files,
           run!,
           handoffId,
-          queue,
+          _DesktopProgress(queue, at: current, queued: last + 1),
           phoneFiles,
           later,
           after: upload?.whole,
@@ -379,47 +492,73 @@ class LinkHandoff {
   }
 
   /// Uploads the songs at [later] (ascending) one by one, once the upload
-  /// [after] (the current song's) ends. After each, the desktop queues it
-  /// and the songs up to the next one to send, which it already has or
-  /// cannot get. Stops when another queue is sent or the desktop plays
-  /// something else.
+  /// [after] (the current song's) ends, at most [aheadSongs] and about
+  /// [aheadBytes] ahead of the one the desktop plays: the desktop prunes
+  /// its received songs oldest first, so sending a long queue at once
+  /// removed the songs it was about to play. [desktop] follows where it
+  /// plays. After each upload, the desktop queues the song and the songs up
+  /// to the next one to send, which it already has or cannot get. Stops
+  /// when another queue is sent or the desktop plays something else.
   Future<void> _sendLater(
     LinkPhoneFiles files,
     int run,
     String handoffId,
-    List<TrackRef> queue,
+    _DesktopProgress desktop,
     List<LinkPhoneFile?> phoneFiles,
     List<int> later, {
     Future<void>? after,
   }) async {
+    final queue = desktop.queue;
+    final states = client.messages.listen(desktop.hear, onDone: desktop.close);
     try {
-      await after;
-    } on Object {
-      // Reported where it was started.
-    }
-    try {
+      try {
+        await after;
+      } on Object {
+        // Reported where it was started.
+      }
       for (var k = 0; k < later.length; k++) {
         final at = later[k];
-        var sent = true;
-        try {
-          await files.upload(client, phoneFiles[at]!);
-        } on Object catch (error) {
-          _log.w('Could not send a song to the computer: $error');
-          sent = false;
+        while (!desktop.room(songs: aheadSongs, bytes: aheadBytes)) {
+          if (desktop.takeStrayed()) {
+            // An empty append fails once another queue plays there.
+            await _append(handoffId, const []);
+            continue;
+          }
+          if (!await desktop.heard() || !files.isCurrent(run)) return;
         }
         if (!files.isCurrent(run)) return;
+        int? size;
+        try {
+          await files.upload(
+            client,
+            phoneFiles[at]!,
+            onStart: (start) => size = start.size,
+          );
+        } on Object catch (error) {
+          _log.w('Could not send a song to the computer: $error');
+          size = null;
+        }
+        if (!files.isCurrent(run)) return;
+        if (size case final bytes?) desktop.sent(at, bytes);
         final end = k + 1 < later.length ? later[k + 1] : queue.length;
-        final added = queue.sublist(sent ? at : at + 1, end);
-        if (added.isEmpty) continue;
-        await client.post(LinkOps.handoffAppend, {
-          'handoffId': handoffId,
-          'queue': [for (final ref in added) ref.toJson()],
-        });
+        final added = queue.sublist(size != null ? at : at + 1, end);
+        if (added.isNotEmpty) await _append(handoffId, added);
+        desktop.queued = end;
       }
     } on Object catch (error) {
       _log.w('Stopped sending songs to the computer: $error');
+    } finally {
+      await states.cancel();
     }
   }
+
+  /// Adds [refs] to the end of the queue [handoffId] started on the
+  /// desktop; fails once another queue plays there.
+  Future<void> _append(String handoffId, List<TrackRef> refs) =>
+      client.post(LinkOps.handoffAppend, {
+        'handoffId': handoffId,
+        'queue': [for (final ref in refs) ref.toJson()],
+      });
 
   /// Takes over what the desktop plays (`GET handoff/current`), then pauses
   /// the desktop. The phone starts playing even when the desktop was paused:

@@ -206,6 +206,10 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
       index: () => _index,
       receivedDir: () => ref.mounted ? _receivedDir() : '',
       connectedDevice: _connectedPhone,
+      connectedDevices: () => [
+        if (ref.mounted)
+          for (final client in state.clients) client.deviceId,
+      ],
       send: (message, deviceId) => _send(message, deviceId: deviceId),
       arriving: () => ref.mounted ? _arrivingFiles() : null,
     );
