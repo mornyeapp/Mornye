@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -5,12 +6,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/controllers/clickable_metadata.dart';
 import 'package:mornye/l10n/l10n.dart';
+import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/services/alsa_output_devices.dart';
 import 'package:mornye/services/music_playback_deck.dart';
 import 'package:mornye/services/playback_deck.dart';
 import 'package:mornye/services/music_player_service.dart'
     show resetAutoplayLearning;
+import 'package:mornye/services/song_analysis.dart';
 import 'package:mornye/screens/listening_statistics_screen.dart';
 import 'package:mornye/screens/equalizer_screen.dart';
 import 'package:mornye/theme/mornye_theme.dart';
@@ -19,6 +22,7 @@ import 'package:mornye/utils/exclusive_output_labels.dart';
 import 'package:mornye/utils/nav_bar_inset.dart';
 import 'package:mornye/widgets/animation_utils.dart';
 import 'package:mornye/widgets/app_alert_dialog.dart';
+import 'package:mornye/widgets/app_progress_indicator.dart';
 import 'package:mornye/widgets/app_bottom_sheet.dart';
 import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/app_sliver_header.dart';
@@ -39,6 +43,10 @@ class PlaybackSettingsPage extends ConsumerStatefulWidget {
 }
 
 class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage> {
+  late final SongAnalysis _songAnalysis = ref
+      .read(musicPlayerRuntimeProvider)
+      .songAnalysis;
+
   Future<bool> _confirmAudioVolume(String message) => showAppConfirmDialog(
     context,
     title: context.l10n.usbVolumeWarningTitle,
@@ -60,6 +68,36 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage> {
     if (confirmed) await resetAutoplayLearning();
   }
 
+  /// Analysis cannot be restored without analyzing every song again.
+  Future<void> _confirmClearAnalysis() async {
+    final confirmed = await showAppConfirmDialog(
+      context,
+      title: context.l10n.songAnalysisClearConfirmTitle,
+      message: context.l10n.songAnalysisClearConfirmMessage,
+      confirmLabel: context.l10n.songAnalysisClearConfirm,
+      destructive: true,
+      filled: false,
+    );
+    if (confirmed) await _songAnalysis.clear();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _songAnalysis.progress.addListener(_onAnalysisProgress);
+    unawaited(_songAnalysis.refreshProgress());
+  }
+
+  @override
+  void dispose() {
+    _songAnalysis.progress.removeListener(_onAnalysisProgress);
+    super.dispose();
+  }
+
+  void _onAnalysisProgress() {
+    if (mounted) setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
     final settings = ref.watch(settingsProvider);
@@ -68,6 +106,15 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage> {
         settings.exclusiveOutput &&
         defaultTargetPlatform == TargetPlatform.linux;
     final colorScheme = Theme.of(context).colorScheme;
+    // The charging rule applies to Android's background sweep only.
+    final chargingOption = settings.songAnalysis && Platform.isAndroid;
+    final progress = _songAnalysis.progress.value;
+    final analysis =
+        progress != null &&
+            progress.total > 0 &&
+            (settings.songAnalysis || progress.analyzed > 0)
+        ? progress
+        : null;
     return Scaffold(
       body: CustomScrollView(
         slivers: [
@@ -184,13 +231,54 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage> {
                 onChanged: (value) => ref
                     .read(settingsProvider.notifier)
                     .setAutoplayPersonalization(value),
-                showDivider: settings.autoplayPersonalization,
               ),
               if (settings.autoplayPersonalization)
                 SettingsItem(
                   icon: Icons.restart_alt,
                   title: context.l10n.autoplayResetLearning,
                   onTap: _confirmResetLearning,
+                ),
+              SettingsSwitchItem(
+                icon: Icons.multitrack_audio,
+                title: context.l10n.songAnalysis,
+                subtitle: context.l10n.songAnalysisDescription,
+                value: settings.songAnalysis,
+                enabled: settings.playerMode == 'internal',
+                onChanged: (value) =>
+                    ref.read(settingsProvider.notifier).setSongAnalysis(value),
+                showDivider: chargingOption || analysis != null,
+              ),
+              if (chargingOption)
+                SettingsSwitchItem(
+                  icon: Icons.battery_charging_full,
+                  title: context.l10n.songAnalysisOnlyWhileCharging,
+                  subtitle:
+                      context.l10n.songAnalysisOnlyWhileChargingDescription,
+                  value: settings.songAnalysisOnlyWhileCharging,
+                  enabled: settings.playerMode == 'internal',
+                  onChanged: (value) => ref
+                      .read(settingsProvider.notifier)
+                      .setSongAnalysisOnlyWhileCharging(value),
+                  showDivider: analysis != null,
+                ),
+              if (analysis != null)
+                SettingsItem(
+                  icon: Icons.delete_outline,
+                  title: context.l10n.songAnalysisClear,
+                  subtitle: context.l10n.songAnalysisProgress(
+                    analysis.analyzed,
+                    analysis.total,
+                  ),
+                  footer:
+                      settings.songAnalysis &&
+                          analysis.analyzed < analysis.total
+                      ? AppProgressIndicator.linear(
+                          value: analysis.analyzed / analysis.total,
+                          trackColor: colorScheme.surfaceContainerHighest,
+                          wavy: false,
+                        )
+                      : null,
+                  onTap: analysis.analyzed > 0 ? _confirmClearAnalysis : null,
                   showDivider: false,
                 ),
             ],

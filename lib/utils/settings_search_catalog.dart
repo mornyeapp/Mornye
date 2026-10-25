@@ -267,6 +267,12 @@ class SettingsSearchCatalog {
           keywords: const ['machine learning', 'recommendation', 'personal'],
         ),
         SettingsSearchEntry(
+          icon: Icons.multitrack_audio,
+          title: l10n.songAnalysis,
+          subtitle: l10n.songAnalysisDescription,
+          keywords: const ['sound', 'tempo', 'bpm', 'key', 'recommendation'],
+        ),
+        SettingsSearchEntry(
           icon: Icons.insights_outlined,
           title: l10n.listeningStats,
           subtitle: l10n.listeningStatsDescription,

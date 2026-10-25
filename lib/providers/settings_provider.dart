@@ -661,6 +661,12 @@ class SettingsNotifier extends Notifier<AppSettings> {
   void setAutoplayPersonalization(bool enabled) =>
       _commit(state.copyWith(autoplayPersonalization: enabled));
 
+  void setSongAnalysis(bool enabled) =>
+      _commit(state.copyWith(songAnalysis: enabled));
+
+  void setSongAnalysisOnlyWhileCharging(bool enabled) =>
+      _commit(state.copyWith(songAnalysisOnlyWhileCharging: enabled));
+
   void setMusicHaptics(bool enabled) =>
       _commit(state.copyWith(musicHaptics: enabled));
 

@@ -7536,6 +7536,31 @@
   "autoplayResetLearningConfirmTitle": "Reset recommendation learning?",
   "autoplayResetLearningConfirmMessage": "Autoplay forgets what it learned from your listening and skips. This can't be undone.",
   "autoplayResetLearningConfirm": "Reset",
+  "songAnalysis": "Song analysis",
+  "@songAnalysis": {
+    "description": "Switch that analyzes how each Library song sounds, on the device, for Autoplay"
+  },
+  "songAnalysisDescription": "Learn how each Library song sounds, privately on this device, so Autoplay picks songs that sound like what you play and flow into each other.",
+  "songAnalysisOnlyWhileCharging": "Only while charging",
+  "songAnalysisOnlyWhileChargingDescription": "Analyze the Library only while this phone charges. The song playing is analyzed either way.",
+  "songAnalysisProgress": "{analyzed} of {total} songs analyzed",
+  "@songAnalysisProgress": {
+    "description": "How many Library songs song analysis has described so far",
+    "placeholders": {
+      "analyzed": {
+        "type": "int",
+        "format": "decimalPattern"
+      },
+      "total": {
+        "type": "int",
+        "format": "decimalPattern"
+      }
+    }
+  },
+  "songAnalysisClear": "Clear song analysis",
+  "songAnalysisClearConfirmTitle": "Clear song analysis?",
+  "songAnalysisClearConfirmMessage": "Autoplay forgets how your songs sound. While song analysis is on, your Library is analyzed again.",
+  "songAnalysisClearConfirm": "Clear",
   "profileTitle": "Profile",
   "profileSetUp": "Set up your profile",
   "profileEdit": "Edit name and photo",
