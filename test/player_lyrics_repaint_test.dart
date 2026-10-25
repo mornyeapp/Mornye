@@ -261,6 +261,80 @@ void main() {
     });
   }
 
+  for (final mornye in [false, true]) {
+    testWidgets(
+      'sung words rise in both styles, glow only in Mornye ($mornye)',
+      (tester) async {
+        final playback = StreamController<PlaybackState>.broadcast();
+        final preview = ValueNotifier<Duration?>(null);
+        addTearDown(playback.close);
+        addTearDown(preview.dispose);
+        final theme = mornye
+            ? MornyeTheme.build(Brightness.dark)
+            : ThemeData.dark();
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              playbackStateProvider.overrideWith((ref) => playback.stream),
+            ],
+            child: MaterialApp(
+              theme: theme,
+              home: Scaffold(
+                body: SyncedLyricsView(
+                  lyrics: _lyrics,
+                  seekPreview: preview,
+                  colorScheme: theme.colorScheme,
+                  isActive: true,
+                  showPronunciation: false,
+                  showTranslation: false,
+                ),
+              ),
+            ),
+          ),
+        );
+        // The first word is held, the second still waits.
+        playback.add(
+          PlaybackState(
+            processingState: AudioProcessingState.ready,
+            updatePosition: const Duration(seconds: 2),
+          ),
+        );
+        await tester.pumpAndSettle();
+        // Inspect the painter payload without adding production test hooks.
+        // ignore: avoid_dynamic_calls
+        final painter = tester.widget<CustomPaint>(_paint).painter! as dynamic;
+        // ignore: avoid_dynamic_calls
+        expect(painter.highlightLift as double, greaterThan(0));
+        // ignore: avoid_dynamic_calls
+        final glow = painter.glowSigma as double;
+        expect(glow, mornye ? greaterThan(0) : 0);
+
+        // The sung word stands above the waiting one.
+        final size = tester.getSize(_paint);
+        final pixels = await _pixels(tester);
+        final width = size.width.ceil();
+        double inkTop(int from, int to) {
+          for (var y = 0; y < size.height.ceil(); y++) {
+            for (var x = from; x < to; x++) {
+              if (pixels[(y * width + x) * 4 + 3] >= 16) return y.toDouble();
+            }
+          }
+          return double.infinity;
+        }
+
+        final boxes = _segmentBoxes(tester);
+        final first = boxes.first.first;
+        final second = boxes.last.first;
+        expect(
+          inkTop(first.left.ceil(), first.right.floor()),
+          lessThan(inkTop(second.left.ceil(), second.right.floor())),
+        );
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      },
+    );
+  }
+
   testWidgets('the word sweep keeps moving behind another app window', (
     tester,
   ) async {

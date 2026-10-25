@@ -371,7 +371,10 @@ class _WordHighlightedLyricLineState
       pendingColor: pendingColor,
       highlightedColor: highlightedColor,
       semanticsLabel: text,
-      liftEnabled: lift && mornye && !MediaQuery.disableAnimationsOf(context),
+      // Sung words rise in both styles; the glow behind held words belongs
+      // to Mornye's look.
+      liftEnabled: lift && !MediaQuery.disableAnimationsOf(context),
+      glowEnabled: mornye,
       maxLines: widget.maxLines,
     );
   }
@@ -389,6 +392,9 @@ class _SweepingTimedLyricText extends StatefulWidget {
   final Color highlightedColor;
   final String semanticsLabel;
   final bool liftEnabled;
+
+  /// Glows behind held words while [liftEnabled].
+  final bool glowEnabled;
   final int? maxLines;
 
   const _SweepingTimedLyricText({
@@ -403,6 +409,7 @@ class _SweepingTimedLyricText extends StatefulWidget {
     required this.highlightedColor,
     required this.semanticsLabel,
     required this.liftEnabled,
+    required this.glowEnabled,
     this.maxLines,
   });
 
@@ -567,7 +574,7 @@ class _SweepingTimedLyricTextState extends State<_SweepingTimedLyricText> {
                   ? (textScaler.scale(widget.style.fontSize ?? 24) * 0.05)
                         .clamp(0.0, 2.0)
                   : 0,
-              glowSigma: widget.liftEnabled
+              glowSigma: widget.liftEnabled && widget.glowEnabled
                   ? textScaler.scale(widget.style.fontSize ?? 24) * 0.2
                   : 0,
             ),
