@@ -1423,6 +1423,70 @@ void main() {
     );
   }
 
+  for (final landscape in [false, true]) {
+    testWidgets(
+      'Material lyrics fill the player while idle (landscape: $landscape)',
+      (tester) async {
+        metadataOverrides['lyrics'] =
+            '[00:00.00]First lyric\n[01:00.00]Second line';
+        await pumpNowPlaying(
+          tester,
+          theme: AppTheme.light(),
+          size: landscape ? const Size(852, 393) : const Size(393, 852),
+          playback: PlaybackState(playing: true),
+        );
+        mediaItems.add(item('many'));
+        await settlePlayer(tester);
+        final lyricsToggle = find.byKey(
+          const ValueKey('material-lyrics-toggle'),
+        );
+        final transport = find.byType(ExpressivePlaybackTransport);
+        final minimize = find.byKey(const ValueKey('now-playing-minimize'));
+        await tester.tap(lyricsToggle);
+        await tester.pump();
+        await completeLyrics(tester);
+        await tester.pump(const Duration(milliseconds: 4900));
+        expect(lyricsToggle.hitTestable(), findsOneWidget);
+        final list = find.byType(ListView);
+        final height = tester.getSize(list).height;
+        await tester.pump(const Duration(milliseconds: 100));
+        await settlePlayer(tester);
+        if (landscape) {
+          // Two panes keep the controls beside the lyrics.
+          expect(lyricsToggle.hitTestable(), findsOneWidget);
+          expect(tester.takeException(), isNull);
+          return;
+        }
+        expect(lyricsToggle.hitTestable(), findsNothing);
+        expect(transport.hitTestable(), findsNothing);
+        expect(minimize.hitTestable(), findsNothing);
+        // The controls fold away and the lyrics take their room.
+        expect(tester.getSize(list).height, greaterThan(height + 200));
+
+        final bounds = tester.getRect(list);
+        await tester.tapAt(Offset(bounds.right - 6, bounds.top + 10));
+        await settlePlayer(tester);
+        expect(lyricsToggle.hitTestable(), findsOneWidget);
+        expect(transport.hitTestable(), findsOneWidget);
+        expect(minimize.hitTestable(), findsOneWidget);
+        expect(tester.getSize(list).height, closeTo(height, 1));
+
+        // Leaving the lyrics shows the cover with its controls.
+        await tester.pump(const Duration(seconds: 6));
+        await settlePlayer(tester);
+        expect(lyricsToggle.hitTestable(), findsNothing);
+        await tester.tapAt(Offset(bounds.right - 6, bounds.top + 10));
+        await settlePlayer(tester);
+        await tester.tap(lyricsToggle);
+        await settlePlayer(tester);
+        expect(find.byType(ListView), findsNothing);
+        await tester.pump(const Duration(seconds: 6));
+        expect(transport.hitTestable(), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
   testWidgets(
     'accessible navigation keeps lyric controls available while idle',
     (tester) async {

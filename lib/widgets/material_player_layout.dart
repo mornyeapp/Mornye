@@ -12,6 +12,7 @@ import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/utils/playback_seek_preview.dart';
 import 'package:mornye/widgets/player_artwork.dart';
 import 'package:mornye/widgets/player_gesture_regions.dart';
+import 'package:mornye/widgets/player_lyrics_controls.dart';
 import 'package:mornye/widgets/player_metadata_title.dart';
 import 'package:mornye/widgets/player_playback_controls.dart';
 import 'package:mornye/widgets/player_volume_control.dart';
@@ -27,6 +28,7 @@ class MaterialPlayerLayout extends StatelessWidget {
     required this.lyricsBuilder,
     required this.onOpenQueue,
     this.fullScreenArtwork = false,
+    this.immersive = false,
   });
 
   final MediaItem mediaItem;
@@ -39,6 +41,10 @@ class MaterialPlayerLayout extends StatelessWidget {
 
   /// The page backdrop paints the cover; this area only keeps its gestures.
   final bool fullScreenArtwork;
+
+  /// Lyrics left idle while playing: the title and controls fold away so
+  /// the lyrics fill the column.
+  final bool immersive;
 
   @override
   Widget build(BuildContext context) {
@@ -180,16 +186,21 @@ class MaterialPlayerLayout extends StatelessWidget {
           child: Column(
             children: [
               Expanded(child: visual()),
-              const SizedBox(height: 12),
-              PlayerQueueSwipeRegion(
-                onOpenQueue: onOpenQueue,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  // Short phones keep the room for artwork and lyrics; the
-                  // hardware buttons still set the volume there.
-                  children: _metadataAndControls(
-                    context,
-                    showVolume: constraints.maxHeight >= 600,
+              PlayerLyricsControlsCollapse(
+                hidden: immersive && showLyrics,
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 12),
+                  child: PlayerQueueSwipeRegion(
+                    onOpenQueue: onOpenQueue,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      // Short phones keep the room for artwork and lyrics;
+                      // the hardware buttons still set the volume there.
+                      children: _metadataAndControls(
+                        context,
+                        showVolume: constraints.maxHeight >= 600,
+                      ),
+                    ),
                   ),
                 ),
               ),

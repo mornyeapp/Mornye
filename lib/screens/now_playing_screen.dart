@@ -65,14 +65,23 @@ class _FadingAppBar extends StatelessWidget implements PreferredSizeWidget {
   final Animation<double> opacity;
   final AppBar child;
 
-  const _FadingAppBar({required this.opacity, required this.child});
+  /// Material's immersive lyrics fade the bar's buttons away too.
+  final bool hidden;
+
+  const _FadingAppBar({
+    required this.opacity,
+    required this.child,
+    this.hidden = false,
+  });
 
   @override
   Size get preferredSize => child.preferredSize;
 
   @override
-  Widget build(BuildContext context) =>
-      FadeTransition(opacity: opacity, child: child);
+  Widget build(BuildContext context) => FadeTransition(
+    opacity: opacity,
+    child: PlayerLyricsControlsVisibility(hidden: hidden, child: child),
+  );
 }
 
 class NowPlayingScreen extends ConsumerStatefulWidget {
@@ -168,7 +177,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
     super.didChangeDependencies();
     final size = MediaQuery.sizeOf(context);
     _landscape = context.isMornye && size.width > size.height;
-    if (_landscape || MediaQuery.accessibleNavigationOf(context)) {
+    if (!_lyricsAutoHideLayout || MediaQuery.accessibleNavigationOf(context)) {
       _lyricsControlsHidden = false;
     }
     _scheduleLyricsControlsHide();
@@ -406,6 +415,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
           : colorScheme.surface,
       appBar: _FadingAppBar(
         opacity: contentOpacity,
+        hidden: !mornye && _lyricsImmersive,
         child: AppBar(
           backgroundColor: mornye || materialFullScreen
               ? Colors.transparent
@@ -532,6 +542,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                         seekPreview: _seekPreview,
                         colorScheme: colorScheme,
                         showLyrics: _currentPage == 1,
+                        immersive: _lyricsImmersive,
                         fullScreenArtwork: materialFullScreen,
                         lyricsBuilder: (_) =>
                             _lyricsSection(colorScheme, isActive: true),
@@ -631,6 +642,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                     ],
                   ),
                 ),
+                collapse: true,
               ),
             ],
           ),
@@ -638,7 +650,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
       ),
     );
     if (!mornye) {
-      if (!materialFullScreen) return player;
+      if (!materialFullScreen) return _lyricsPointerListener(player);
       return Stack(
         fit: StackFit.expand,
         children: [
@@ -647,7 +659,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
             colorScheme: colorScheme,
             showArtwork: _currentPage != 1,
           ),
-          player,
+          _lyricsPointerListener(player),
         ],
       );
     }
@@ -688,34 +700,42 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                     : null,
               ),
             ),
-            Listener(
-              behavior: HitTestBehavior.translucent,
-              onPointerDown: (event) {
-                if (!_canAutoHideLyricsControls) return;
-                if (_lyricsPointers.isEmpty) _lyricsPointerMoved = false;
-                _lyricsPointers[event.pointer] = event.position;
-                _lyricsIdleTimer?.cancel();
-              },
-              onPointerMove: (event) {
-                final origin = _lyricsPointers[event.pointer];
-                if (origin != null && (event.position - origin).distance > 12) {
-                  _lyricsPointerMoved = true;
-                }
-              },
-              onPointerUp: (event) => _endLyricsInteraction(event.pointer),
-              onPointerCancel: (event) =>
-                  _endLyricsInteraction(event.pointer, cancelled: true),
-              child: player,
-            ),
+            _lyricsPointerListener(player),
           ],
         ),
       ),
     );
   }
 
+  /// A touch on the lyrics page holds the controls; a tap brings hidden
+  /// ones back.
+  Widget _lyricsPointerListener(Widget child) => Listener(
+    behavior: HitTestBehavior.translucent,
+    onPointerDown: (event) {
+      if (!_canAutoHideLyricsControls) return;
+      if (_lyricsPointers.isEmpty) _lyricsPointerMoved = false;
+      _lyricsPointers[event.pointer] = event.position;
+      _lyricsIdleTimer?.cancel();
+    },
+    onPointerMove: (event) {
+      final origin = _lyricsPointers[event.pointer];
+      if (origin != null && (event.position - origin).distance > 12) {
+        _lyricsPointerMoved = true;
+      }
+    },
+    onPointerUp: (event) => _endLyricsInteraction(event.pointer),
+    onPointerCancel: (event) =>
+        _endLyricsInteraction(event.pointer, cancelled: true),
+    child: child,
+  );
+
   void _toggleMaterialLyrics() {
     if (_toggleInspector(1)) return;
-    setState(() => _currentPage = _currentPage == 1 ? 0 : 1);
+    setState(() {
+      _currentPage = _currentPage == 1 ? 0 : 1;
+      _lyricsControlsHidden = false;
+    });
+    _scheduleLyricsControlsHide();
     if (_currentPage == 1) {
       unawaited(
         _trackMetadata.load(
@@ -748,9 +768,16 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
     }
   }
 
+  /// Lyrics fill the column, so idle controls can hide: Mornye in portrait,
+  /// and Material's single portrait column (landscape keeps two panes, and
+  /// the desktop opens lyrics in the inspector).
+  bool get _lyricsAutoHideLayout => context.isMornye
+      ? !_landscape
+      : !widget.embedded &&
+            MediaQuery.orientationOf(context) == Orientation.portrait;
+
   bool get _canAutoHideLyricsControls =>
-      context.isMornye &&
-      !_landscape &&
+      _lyricsAutoHideLayout &&
       _currentPage == 1 &&
       ref.read(playbackPlayingProvider) &&
       !MediaQuery.accessibleNavigationOf(context);
@@ -804,12 +831,15 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
     return false;
   }
 
-  Widget _autoHidingLyricsControls(Widget child) => context.isMornye
-      ? PlayerLyricsControlsVisibility(
-          hidden: _currentPage == 1 && _lyricsControlsHidden && !_landscape,
-          child: child,
-        )
-      : child;
+  bool get _lyricsImmersive =>
+      _currentPage == 1 && _lyricsControlsHidden && _lyricsAutoHideLayout;
+
+  /// Mornye fades the controls in place; Material folds a [collapse] row
+  /// away so the lyrics take its room.
+  Widget _autoHidingLyricsControls(Widget child, {bool collapse = false}) =>
+      !context.isMornye && collapse
+      ? PlayerLyricsControlsCollapse(hidden: _lyricsImmersive, child: child)
+      : PlayerLyricsControlsVisibility(hidden: _lyricsImmersive, child: child);
 
   Widget _lyricsSection(
     ColorScheme colorScheme, {
