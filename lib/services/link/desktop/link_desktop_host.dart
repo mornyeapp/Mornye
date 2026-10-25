@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mornye/models/unified_library_item.dart';
 import 'package:mornye/providers/download_history_provider.dart';
 import 'package:mornye/providers/local_library_provider.dart';
 import 'package:mornye/providers/music_player_provider.dart';
@@ -13,13 +14,16 @@ import 'package:mornye/services/link/desktop/link_catalog_exporter.dart';
 import 'package:mornye/services/link/desktop/link_catalog_index.dart';
 import 'package:mornye/services/link/desktop/link_desktop_backend.dart';
 import 'package:mornye/services/link/desktop/link_desktop_ops.dart';
+import 'package:mornye/services/link/desktop/link_desktop_transfers.dart';
 import 'package:mornye/services/link/desktop/link_downloads.dart';
 import 'package:mornye/services/link/desktop/link_phone_catalogs.dart';
 import 'package:mornye/services/link/desktop/link_phone_library.dart';
 import 'package:mornye/services/link/desktop/link_phone_sources.dart';
 import 'package:mornye/services/link/desktop/link_player.dart';
+import 'package:mornye/services/link/desktop/link_transfer_songs.dart';
 import 'package:mornye/services/link/link_host_router.dart';
 import 'package:mornye/services/link/link_protocol.dart';
+import 'package:mornye/services/link/link_transfers.dart';
 import 'package:mornye/services/link/sync/link_sync_handlers.dart';
 import 'package:mornye/services/network_storage_service.dart';
 import 'package:mornye/utils/desktop_platform.dart';
@@ -161,7 +165,12 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
   LinkArrivingFiles? _arriving;
   LinkPhoneCatalogs? _phoneCatalogs;
   LinkPhoneSources? _phoneSources;
+  LinkDesktopTransfers? _transfers;
   DesktopLinkCatalogIndex? _index;
+
+  /// Phone sources to scan again after the next export, which knows the
+  /// songs transfers saved from them.
+  final _rescanAfterExport = <String>{};
   LinkPlayerState? _lastSentState;
   Timer? _exportTimer;
   Timer? _stateTimer;
@@ -192,23 +201,53 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
       paired: _isPairedPhone,
       onCommit: (deviceId) => unawaited(_onPhoneCommit(deviceId)),
     );
-    NetworkStorageService.instance.virtualSources = _phoneSources =
-        LinkPhoneSources(
-          catalogs: catalogs,
-          index: () => _index,
-          receivedDir: () => ref.mounted ? _receivedDir() : '',
-          connectedDevice: (sourceId) {
-            if (!ref.mounted) return null;
-            for (final client in state.clients) {
-              if (linkPhoneSourceId(client.deviceId) == sourceId) {
-                return client.deviceId;
-              }
-            }
-            return null;
-          },
-          send: (message, deviceId) => _send(message, deviceId: deviceId),
-          arriving: () => ref.mounted ? _arrivingFiles() : null,
-        );
+    final phoneSources = _phoneSources = LinkPhoneSources(
+      catalogs: catalogs,
+      index: () => _index,
+      receivedDir: () => ref.mounted ? _receivedDir() : '',
+      connectedDevice: _connectedPhone,
+      send: (message, deviceId) => _send(message, deviceId: deviceId),
+      arriving: () => ref.mounted ? _arrivingFiles() : null,
+    );
+    NetworkStorageService.instance.virtualSources = phoneSources;
+    _transfers = LinkDesktopTransfers(
+      store: () => ref.read(linkTransfersProvider.notifier),
+      send: (message, deviceId) => _send(message, deviceId: deviceId),
+      fetch: phoneSources.receive,
+      index: () => _index,
+      downloads: () => ref.read(linkTransferDownloadsProvider),
+      connected: (deviceId) =>
+          ref.mounted &&
+          state.clients.any((client) => client.deviceId == deviceId),
+      deviceName: _deviceName,
+      isPhone: _isPairedPhone,
+      covers: (deviceId) => catalogs.coverPaths(linkPhoneSourceId(deviceId)),
+      onSaved: _onTransferSaved,
+      onOffer: (transfer) {
+        if (ref.mounted) {
+          ref.read(linkTransferOfferNoticeProvider.notifier).show(transfer);
+        }
+      },
+    );
+  }
+
+  /// The connected phone whose songs are the Library source [sourceId].
+  String? _connectedPhone(String sourceId) {
+    if (!ref.mounted) return null;
+    for (final client in state.clients) {
+      if (linkPhoneSourceId(client.deviceId) == sourceId) {
+        return client.deviceId;
+      }
+    }
+    return null;
+  }
+
+  /// A transfer saved songs of the phone [deviceId]: once the catalog
+  /// knows them, its Library source leaves them out.
+  void _onTransferSaved(String deviceId) {
+    if (!ref.mounted) return;
+    _rescanAfterExport.add(linkPhoneSourceId(deviceId));
+    _scheduleExport();
   }
 
   /// The received folder of the running server, or of the last one.
@@ -361,6 +400,7 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
     if (!ref.mounted) return;
     ref.read(linkCatalogIndexProvider.notifier).set(null);
     _phoneSources?.keepConnected(const {});
+    _transfers?.keepConnected(const {});
     state = state.copyWith(
       phase: LinkHostPhase.stopped,
       server: null,
@@ -405,6 +445,7 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
   void _registerFeatures(LinkHostRouter router) {
     (_ops ??= _createOps()).register(router);
     _phoneCatalogs?.register(router);
+    _transfers?.register(router);
     registerLinkSyncHandlers(router, ref);
     ref.read(linkCollectionsChangedHookProvider.notifier).set(() {
       if (!ref.mounted || !state.running || state.clients.isEmpty) return;
@@ -555,6 +596,9 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
     if (_phoneSources?.onMessage(event.deviceId, event.message) ?? false) {
       return;
     }
+    if (_transfers?.onMessage(event.deviceId, event.message) ?? false) {
+      return;
+    }
     if (event.type != LinkMessageTypes.playerState) return;
     final phoneState = LinkPlayerState.fromJson(event.message['state']);
     if (phoneState == null || event.deviceId.isEmpty) return;
@@ -574,6 +618,7 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
       },
     );
     _phoneSources?.keepConnected(ids);
+    _transfers?.keepConnected(ids);
     _updateHeartbeat();
     // A phone that just connected gets the desktop's state right away.
     if (!known.containsAll(ids)) {
@@ -667,6 +712,9 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
     final server = state.server;
     if (!ref.mounted || !state.running || server == null) return;
     _exporting = true;
+    // Taken before the export reads the Library, which holds their songs.
+    final rescan = {..._rescanAfterExport};
+    _rescanAfterExport.clear();
     try {
       final export = await ref
           .read(linkCatalogExporterProvider)
@@ -680,9 +728,10 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
       _index = export.index;
       ref.read(linkCatalogIndexProvider.notifier).set(export.index);
       state = state.copyWith(catalogSongs: songs);
-      // Phone songs scanned before the index leave out the desktop's own.
+      // Phone songs scanned before the index, or saved here by a transfer,
+      // leave out the desktop's own.
       final library = ref.read(linkPhoneLibraryProvider);
-      for (final sourceId in _phoneSources?.takeUnindexed() ?? <String>[]) {
+      for (final sourceId in {...?_phoneSources?.takeUnindexed(), ...rescan}) {
         unawaited(
           library.rescan(sourceId).catchError((Object error) {
             _log.w('Could not rescan phone songs: $error');
@@ -694,6 +743,7 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
       _onPlayerChanged();
     } on Object catch (error, stack) {
       _log.e('Could not export the Mornye Link catalog', error, stack);
+      _rescanAfterExport.addAll(rescan);
     } finally {
       _exporting = false;
       if (_exportAgain && ref.mounted) {
@@ -789,9 +839,50 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
     return delivered;
   }
 
+  /// "Send to (phone)": offers the desktop's own songs of [items] to the
+  /// connected phone [deviceId]; returns the transfers started, none when
+  /// no song can be sent.
+  Future<List<LinkTransfer>> sendToPhone(
+    String deviceId,
+    List<UnifiedLibraryItem> items,
+  ) async {
+    final transfers = _transfers;
+    final index = _index;
+    if (transfers == null ||
+        index == null ||
+        !state.clients.any((client) => client.deviceId == deviceId)) {
+      return const [];
+    }
+    final songs = await linkOutgoingSongs(items, index);
+    if (songs.isEmpty || !ref.mounted) return const [];
+    return transfers.send(deviceId, songs);
+  }
+
+  /// "Save to this computer": copies the songs of [items] that a connected
+  /// phone has into the download folder; returns the transfers started.
+  Future<List<LinkTransfer>> saveToComputer(
+    List<UnifiedLibraryItem> items,
+  ) async {
+    final transfers = _transfers;
+    final catalogs = _phoneCatalogs;
+    if (transfers == null || catalogs == null) return const [];
+    final started = <LinkTransfer>[];
+    for (final MapEntry(key: sourceId, value: chosen) in linkPhoneSongsOf(
+      items,
+    ).entries) {
+      final deviceId = _connectedPhone(sourceId);
+      if (deviceId == null) continue;
+      final songs = await linkIncomingSongs(catalogs, sourceId, chosen);
+      if (!ref.mounted) break;
+      started.addAll(transfers.receive(deviceId, songs));
+    }
+    return started;
+  }
+
   void _dispose() {
     _cancelApp();
     _cancelBackend();
+    _transfers?.close();
     final phoneSources = _phoneSources;
     if (phoneSources != null) {
       phoneSources.close();

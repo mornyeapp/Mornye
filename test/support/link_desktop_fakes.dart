@@ -3,7 +3,9 @@ import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
+import 'package:mornye/models/download_history.dart';
 import 'package:mornye/models/download_item.dart';
+import 'package:mornye/models/settings.dart';
 import 'package:mornye/models/track.dart';
 import 'package:mornye/services/link/desktop/link_catalog_exporter.dart';
 import 'package:mornye/services/link/desktop/link_catalog_index.dart';
@@ -14,6 +16,8 @@ import 'package:mornye/services/link/desktop/link_downloads.dart';
 import 'package:mornye/services/link/desktop/link_phone_catalogs.dart';
 import 'package:mornye/services/link/desktop/link_phone_library.dart';
 import 'package:mornye/services/link/desktop/link_player.dart';
+import 'package:mornye/services/link/desktop/link_transfer_songs.dart';
+import 'package:mornye/services/link/features/link_save_offline.dart';
 import 'package:mornye/services/link/link_host_router.dart';
 import 'package:mornye/services/link/link_protocol.dart';
 import 'package:mornye/services/playable_media.dart';
@@ -35,6 +39,9 @@ class FakeLinkBackend implements LinkDesktopBackend {
   int catalogSongs = 0;
   bool running = false;
   String? runningName;
+
+  /// Where the server says phones' uploads land.
+  String receivedDir = '';
   LinkPairingWindow pairingWindow = LinkPairingWindow(
     pin: '123456',
     expiresMs: DateTime.now().millisecondsSinceEpoch + 300000,
@@ -53,6 +60,7 @@ class FakeLinkBackend implements LinkDesktopBackend {
     name: name,
     // As the Rust server sends them: full URLs, not bare IPs.
     addresses: const ['https://192.168.1.5:47710'],
+    receivedDir: receivedDir,
   );
 
   void request(
@@ -370,6 +378,33 @@ class FakeLinkPhoneLibrary implements LinkPhoneLibrary {
   Future<void> remove(String sourceId) async => calls.add('remove:$sourceId');
 }
 
+/// The desktop's download folder and history for received songs: copies
+/// land under [root], records in [records].
+class FakeTransferDownloads implements LinkTransferDownloads {
+  FakeTransferDownloads(this.root);
+
+  final Directory root;
+  final records = <DownloadHistoryItem>[];
+
+  /// History ids whose file is still there.
+  final held = <String>{};
+  Object? recordError;
+
+  @override
+  LinkOfflineDestination destination() =>
+      LinkDesktopDownloadFolder(AppSettings(downloadDirectory: root.path));
+
+  @override
+  Future<void> record(DownloadHistoryItem item) async {
+    final error = recordError;
+    if (error != null) throw error;
+    records.add(item);
+  }
+
+  @override
+  Future<bool> has(String id) async => held.contains(id);
+}
+
 /// Overrides that run the desktop link host entirely on the fakes. Phone
 /// songs are kept in [phoneFolder], by default a folder that does not
 /// exist until a phone sends its songs.
@@ -381,7 +416,10 @@ List<Override> linkHostOverrides({
   List<String>? openedUrls,
   FakeLinkPhoneLibrary? phoneLibrary,
   Directory? phoneFolder,
+  LinkTransferDownloads? transferDownloads,
 }) => [
+  if (transferDownloads != null)
+    linkTransferDownloadsProvider.overrideWithValue(transferDownloads),
   linkPhoneLibraryProvider.overrideWithValue(
     phoneLibrary ?? FakeLinkPhoneLibrary(),
   ),
