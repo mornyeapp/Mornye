@@ -44,6 +44,7 @@ import 'package:mornye/services/playback_notification.dart';
 import 'package:mornye/services/player_widget_service.dart';
 import 'package:mornye/screens/now_playing_screen.dart';
 import 'package:mornye/utils/desktop_platform.dart';
+import 'package:mornye/utils/android_tv.dart';
 import 'package:mornye/utils/local_library_scan_prefs.dart';
 import 'package:mornye/utils/logger.dart';
 import 'package:mornye/widgets/desktop/desktop_commands.dart'
@@ -79,6 +80,7 @@ void main() {
       // Desktop: log files and the unclean-exit marker, before the error
       // hooks below start writing to them.
       await DesktopDiagnostics.initialize();
+      await initializeAndroidTv();
       await setAppOrientation();
       LicenseRegistry.addLicense(() async* {
         yield LicenseEntryWithLineBreaks(

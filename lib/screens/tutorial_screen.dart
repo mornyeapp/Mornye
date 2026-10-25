@@ -13,6 +13,7 @@ import 'package:mornye/widgets/app_loading_indicator.dart';
 import 'package:mornye/widgets/app_progress_indicator.dart';
 import 'package:mornye/widgets/app_search_field.dart';
 import 'package:mornye/widgets/expressive_button.dart';
+import 'package:mornye/widgets/tv_navigation.dart';
 
 class TutorialScreen extends ConsumerStatefulWidget {
   const TutorialScreen({super.key});
@@ -626,7 +627,7 @@ class _InteractiveDownloadExampleState
                     : _isDownloading
                     ? context.l10n.tutorialDownloadInProgressSemantics
                     : context.l10n.tutorialStartDownloadSemantics,
-                child: GestureDetector(
+                child: TvTapTarget(
                   onTap: _startDownload,
                   // The visual can shrink on narrow screens; the hit box
                   // keeps the minimum touch target.

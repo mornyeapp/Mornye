@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:mornye/utils/android_tv.dart';
 
 /// An iOS-style slider: a thin rounded track and a white shadowed knob.
 ///
@@ -78,44 +79,70 @@ class MornyeLevelSlider extends StatelessWidget {
       onDecrease: enabled
           ? () => onChanged!((value - increment).clamp(min, max))
           : null,
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          // A 48 dp touch target across the track.
-          final size = Size(
-            vertical && !constraints.hasBoundedWidth
-                ? 48
-                : constraints.maxWidth,
-            vertical ? constraints.maxHeight : 48,
-          );
-          void update(Offset local) => _update(local, size);
-          return GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTapDown: enabled ? (d) => update(d.localPosition) : null,
-            onHorizontalDragStart: enabled && !vertical
-                ? (d) => update(d.localPosition)
-                : null,
-            onHorizontalDragUpdate: enabled && !vertical
-                ? (d) => update(d.localPosition)
-                : null,
-            onVerticalDragStart: enabled && vertical
-                ? (d) => update(d.localPosition)
-                : null,
-            onVerticalDragUpdate: enabled && vertical
-                ? (d) => update(d.localPosition)
-                : null,
-            child: CustomPaint(
-              size: size,
-              painter: _LevelPainter(
-                fraction: ((value - min) / (max - min)).clamp(0.0, 1.0),
-                origin: (_origin - min) / (max - min),
-                vertical: vertical,
-                active: active,
-                track: track,
-                knobRadius: knobRadius,
-              ),
-            ),
-          );
+      child: Focus(
+        canRequestFocus: isAndroidTv && enabled,
+        skipTraversal: !isAndroidTv,
+        onKeyEvent: (node, event) {
+          if (!isAndroidTv || !enabled || !node.hasPrimaryFocus) {
+            return KeyEventResult.ignored;
+          }
+          final increase =
+              event.logicalKey ==
+              (vertical
+                  ? LogicalKeyboardKey.arrowUp
+                  : LogicalKeyboardKey.arrowRight);
+          final decrease =
+              event.logicalKey ==
+              (vertical
+                  ? LogicalKeyboardKey.arrowDown
+                  : LogicalKeyboardKey.arrowLeft);
+          if (!increase && !decrease) return KeyEventResult.ignored;
+          if (event is KeyDownEvent || event is KeyRepeatEvent) {
+            onChanged!(
+              (value + (increase ? increment : -increment)).clamp(min, max),
+            );
+          }
+          return KeyEventResult.handled;
         },
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            // A 48 dp touch target across the track.
+            final size = Size(
+              vertical && !constraints.hasBoundedWidth
+                  ? 48
+                  : constraints.maxWidth,
+              vertical ? constraints.maxHeight : 48,
+            );
+            void update(Offset local) => _update(local, size);
+            return GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTapDown: enabled ? (d) => update(d.localPosition) : null,
+              onHorizontalDragStart: enabled && !vertical
+                  ? (d) => update(d.localPosition)
+                  : null,
+              onHorizontalDragUpdate: enabled && !vertical
+                  ? (d) => update(d.localPosition)
+                  : null,
+              onVerticalDragStart: enabled && vertical
+                  ? (d) => update(d.localPosition)
+                  : null,
+              onVerticalDragUpdate: enabled && vertical
+                  ? (d) => update(d.localPosition)
+                  : null,
+              child: CustomPaint(
+                size: size,
+                painter: _LevelPainter(
+                  fraction: ((value - min) / (max - min)).clamp(0.0, 1.0),
+                  origin: (_origin - min) / (max - min),
+                  vertical: vertical,
+                  active: active,
+                  track: track,
+                  knobRadius: knobRadius,
+                ),
+              ),
+            );
+          },
+        ),
       ),
     );
   }

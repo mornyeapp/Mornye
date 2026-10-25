@@ -17,6 +17,7 @@ import 'package:mornye/services/library_database.dart';
 import 'package:mornye/utils/adaptive_layout.dart';
 import 'package:mornye/utils/nav_bar_inset.dart';
 import 'package:mornye/widgets/app_bottom_sheet.dart';
+import 'package:mornye/widgets/tv_navigation.dart';
 import 'package:mornye/widgets/app_refresh_indicator.dart';
 import 'package:mornye/widgets/app_search_field.dart';
 import 'package:mornye/widgets/app_sliver_header.dart';
@@ -680,7 +681,7 @@ class _MornyeLibraryScreenState extends ConsumerState<MornyeLibraryScreen> {
   Widget _buildAlbumTile(LibraryBrowseEntry entry, ColorScheme colors) {
     return Semantics(
       button: true,
-      child: GestureDetector(
+      child: TvTapTarget(
         behavior: HitTestBehavior.opaque,
         onTap: () => _openAlbum(entry),
         child: Column(

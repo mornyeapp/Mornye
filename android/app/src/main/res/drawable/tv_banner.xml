@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:width="160dp" android:height="90dp">
+        <shape android:shape="rectangle">
+            <solid android:color="#1E4E4F" />
+        </shape>
+    </item>
+    <item android:width="126.54dp" android:height="36dp" android:gravity="center">
+        <bitmap android:src="@drawable/tv_wordmark" android:gravity="fill" />
+    </item>
+</layer-list>

@@ -4,6 +4,9 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.ActivityInfo
+import android.content.pm.PackageManager
+import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.OnBackPressedCallback
@@ -59,6 +62,7 @@ class MainActivity: FlutterFragmentActivity() {
     internal var concertCalendarChannel: MethodChannel? = null
     internal val coreBackend: CoreBackend by lazy { createCoreBackend(applicationContext) }
     private val nativeBackendMethods = setOf(
+        "isAndroidTv",
         "setScreenAwake",
         "getBackendImplementations",
         "ensureInstallMarker",
@@ -359,6 +363,11 @@ class MainActivity: FlutterFragmentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        requestedOrientation = if (isTelevisionDevice()) {
+            ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+        } else {
+            ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        }
         // Ensure the shared audio_service engine exists before the activity
         // delegate looks it up by cached id (see getCachedEngineId above).
         AudioServicePlugin.getFlutterEngine(this)
@@ -367,6 +376,11 @@ class MainActivity: FlutterFragmentActivity() {
         handleExtensionOAuthIntent(intent)
         PlayerWidgetBridge.handleIntent(intent)
     }
+
+    private fun isTelevisionDevice(): Boolean =
+        resources.configuration.uiMode and Configuration.UI_MODE_TYPE_MASK == Configuration.UI_MODE_TYPE_TELEVISION ||
+            packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK) ||
+            packageManager.hasSystemFeature(PackageManager.FEATURE_TELEVISION)
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
@@ -457,6 +471,7 @@ class MainActivity: FlutterFragmentActivity() {
                         return@launch
                     }
                     when (call.method) {
+                        "isAndroidTv" -> result.success(isTelevisionDevice())
                         "processPendingExtensionCallbacks" -> {
                             processPendingExtensionCallbacks()
                             result.success(null)

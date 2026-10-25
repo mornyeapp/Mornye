@@ -30,6 +30,7 @@ import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/utils/adaptive_layout.dart';
 import 'package:mornye/utils/desktop_folders.dart';
 import 'package:mornye/utils/desktop_platform.dart';
+import 'package:mornye/utils/android_tv.dart';
 import 'package:mornye/utils/file_access.dart';
 import 'package:mornye/widgets/scroll_edge_fade.dart';
 import 'package:mornye/utils/logger.dart';
@@ -74,7 +75,7 @@ class _SetupScreenState extends ConsumerState<SetupScreen>
   bool _isLoading = false;
   int _androidSdkVersion = 0;
 
-  int get _totalSteps => _isDesktop
+  int get _totalSteps => _isDesktop || isAndroidTv
       ? 3
       : _androidSdkVersion >= 33
       ? 5
@@ -122,6 +123,8 @@ class _SetupScreenState extends ConsumerState<SetupScreen>
       }
       if (_isDesktop) {
         _selectedDirectory ??= await resolveDesktopDefaultOutputDirectory();
+      } else if (isAndroidTv) {
+        _selectedDirectory ??= await _getDefaultDirectory();
       }
       await _checkInitialPermissions();
       if (_platform == TargetPlatform.android) await _restoreSelectedFolder();
@@ -185,6 +188,15 @@ class _SetupScreenState extends ConsumerState<SetupScreen>
   }
 
   Future<void> _checkInitialPermissions() async {
+    if (isAndroidTv) {
+      if (mounted) {
+        setState(() {
+          _storagePermissionGranted = true;
+          _notificationPermissionGranted = true;
+        });
+      }
+      return;
+    }
     if (_platform == TargetPlatform.iOS) {
       final notificationStatus = await Permission.notification.status;
       if (mounted) {
@@ -555,6 +567,10 @@ class _SetupScreenState extends ConsumerState<SetupScreen>
   }
 
   Future<String> _getDefaultDirectory() async {
+    if (isAndroidTv) {
+      final appDir = await getApplicationDocumentsDirectory();
+      return '${appDir.path}/Mornye';
+    }
     if (_platform == TargetPlatform.android) {
       final downloadDir = Directory('/storage/emulated/0/Download/Mornye');
       try {
@@ -664,7 +680,9 @@ class _SetupScreenState extends ConsumerState<SetupScreen>
 
     final logicStep = step - 2;
 
-    if (_isDesktop) return logicStep == 0 && _selectedDirectory != null;
+    if (_isDesktop || isAndroidTv) {
+      return logicStep == 0 && _selectedDirectory != null;
+    }
     if (_androidSdkVersion >= 33) {
       switch (logicStep) {
         case 0:
@@ -797,8 +815,9 @@ class _SetupScreenState extends ConsumerState<SetupScreen>
             children: [
               _buildWelcomeStep(colorScheme),
               _buildLanguageStep(colorScheme),
-              if (!_isDesktop) _buildStorageStep(colorScheme),
-              if (_androidSdkVersion >= 33) _buildNotificationStep(colorScheme),
+              if (!_isDesktop && !isAndroidTv) _buildStorageStep(colorScheme),
+              if (_androidSdkVersion >= 33 && !isAndroidTv)
+                _buildNotificationStep(colorScheme),
               _buildDirectoryStep(colorScheme),
             ],
           ),

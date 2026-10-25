@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -11,6 +12,7 @@ import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/models/settings.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/screens/setup_screen.dart';
+import 'package:mornye/utils/android_tv.dart';
 
 class _Settings extends SettingsNotifier {
   @override
@@ -150,6 +152,36 @@ void main() {
     }
     expect(find.text('5/5'), findsOneWidget);
   }
+
+  testWidgets(
+    'TV setup uses writable app storage without permission or picker',
+    (tester) async {
+      debugAndroidTvOverride = true;
+      addTearDown(() => debugAndroidTvOverride = null);
+      final directory = Directory.systemTemp.createTempSync('mornye-tv-setup-');
+      addTearDown(() => directory.deleteSync(recursive: true));
+      const paths = MethodChannel('plugins.flutter.io/path_provider');
+      messenger.setMockMethodCallHandler(paths, (_) async => directory.path);
+      addTearDown(() => messenger.setMockMethodCallHandler(paths, null));
+      audioGranted = notificationsGranted = false;
+      tester.view.physicalSize = const Size(960, 540);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(_setup());
+      await tester.pumpAndSettle();
+      expect(find.text('1/3'), findsOneWidget);
+      for (var step = 0; step < 2; step++) {
+        await tester.tap(find.text('Next'));
+        await tester.pumpAndSettle();
+      }
+      expect(find.text('3/3'), findsOneWidget);
+      expect(find.text('${directory.path}/Mornye'), findsOneWidget);
+      expect(find.text('Get Started'), findsOneWidget);
+      expect(permissionRequests, 0);
+      expect(pickerCalls, 0);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('normal picker return saves folder without restarting setup', (
     tester,

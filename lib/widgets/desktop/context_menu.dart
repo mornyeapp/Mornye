@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:mornye/theme/mornye_icons.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/desktop_platform.dart';
+import 'package:mornye/utils/android_tv.dart';
 import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/desktop/desktop_selection.dart';
 import 'package:mornye/widgets/mornye_context_menu.dart';
@@ -156,7 +157,9 @@ class _DesktopContextMenuRegionState extends State<DesktopContextMenuRegion>
   @override
   Widget build(BuildContext context) {
     final onContextMenu = widget.onContextMenu;
-    if (!isDesktopPlatform || onContextMenu == null) return widget.child;
+    if ((!isDesktopPlatform && !isAndroidTv) || onContextMenu == null) {
+      return widget.child;
+    }
     return Focus(
       canRequestFocus: false,
       skipTraversal: true,

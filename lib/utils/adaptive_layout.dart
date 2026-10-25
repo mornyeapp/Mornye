@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/desktop_platform.dart';
+import 'package:mornye/utils/android_tv.dart';
 
 /// Keeps touch-first tablets on the bottom navigation used by phones. A rail
 /// is reserved for genuinely desktop-width windows; the old 600dp threshold
@@ -63,7 +64,7 @@ class AdaptiveUiScaler extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final mediaQuery = MediaQuery.of(context);
-    final scale = adaptiveUiScaleForSize(mediaQuery.size);
+    final scale = isAndroidTv ? 1.15 : adaptiveUiScaleForSize(mediaQuery.size);
     if (scale == 1) return child;
 
     final scaledSize = Size(

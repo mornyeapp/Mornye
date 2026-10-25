@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/screens/now_playing_screen.dart';
 import 'package:mornye/services/app_orientation.dart';
+import 'package:mornye/utils/android_tv.dart';
 
 class _PlayerRoute extends NowPlayingRoute {
   _PlayerRoute() : super(child: const SizedBox());
@@ -57,6 +58,21 @@ void main() {
   test('startup requests portrait before the first route is built', () async {
     await setAppOrientation();
     expect(requests, [portrait]);
+  });
+
+  test('TV stays landscape in setup, library and full player', () async {
+    debugAndroidTvOverride = true;
+    addTearDown(() => debugAndroidTvOverride = null);
+    await setAppOrientation();
+    await setAppOrientation(playerVisible: true);
+    await setAppOrientation();
+    expect(
+      requests,
+      List.filled(3, [
+        'DeviceOrientation.landscapeLeft',
+        'DeviceOrientation.landscapeRight',
+      ]),
+    );
   });
 
   testWidgets('only the full player enables landscape; sheets inherit it', (

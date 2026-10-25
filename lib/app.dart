@@ -19,12 +19,14 @@ import 'package:mornye/theme/dynamic_color_wrapper.dart';
 import 'package:mornye/l10n/app_localizations.dart';
 import 'package:mornye/l10n/supported_locales.dart';
 import 'package:mornye/utils/adaptive_layout.dart';
+import 'package:mornye/utils/android_tv.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/widgets/app_snack_bar.dart';
 import 'package:mornye/widgets/desktop/desktop_shortcuts.dart';
 import 'package:mornye/widgets/desktop/library_drop_target.dart';
 import 'package:mornye/widgets/mornye_glass_preparation.dart';
 import 'package:mornye/widgets/playback_feedback.dart';
+import 'package:mornye/widgets/tv_navigation.dart';
 
 String initialLocationForAppState({
   required bool isFirstLaunch,
@@ -229,8 +231,25 @@ class MornyeApp extends ConsumerWidget {
             if (isDesktopPlatform) {
               appContent = DesktopShortcuts(child: appContent);
             }
+            if (isAndroidTv) {
+              appContent = ColoredBox(
+                color: Theme.of(context).scaffoldBackgroundColor,
+                child: SafeArea(
+                  minimum: const EdgeInsets.symmetric(
+                    horizontal: 40,
+                    vertical: 24,
+                  ),
+                  child: TvNavigation(child: appContent),
+                ),
+              );
+            }
             return MediaQuery(
-              data: mediaQuery.copyWith(displayFeatures: const []),
+              data: mediaQuery.copyWith(
+                displayFeatures: const [],
+                navigationMode: isAndroidTv
+                    ? NavigationMode.directional
+                    : mediaQuery.navigationMode,
+              ),
               child: MornyeGlassPreparation(
                 child: AdaptiveUiScaler(child: appContent),
               ),

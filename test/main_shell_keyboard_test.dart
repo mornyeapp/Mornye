@@ -13,6 +13,11 @@ import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/screens/home_tab.dart';
 import 'package:mornye/screens/main_shell.dart';
 import 'package:mornye/theme/mornye_theme.dart';
+import 'package:mornye/theme/app_theme.dart';
+import 'package:mornye/utils/android_tv.dart';
+import 'package:mornye/utils/adaptive_layout.dart';
+import 'package:mornye/widgets/tv_navigation.dart';
+import 'package:mornye/widgets/tv_shell.dart';
 import 'package:mornye/widgets/mornye_bottom_bar.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -35,8 +40,14 @@ void main() {
   });
   tearDown(() => messenger.setMockMethodCallHandler(backend, null));
 
-  Future<ValueNotifier<Locale>> pumpShell(WidgetTester tester) async {
-    tester.view.physicalSize = const Size(430, 932);
+  Future<ValueNotifier<Locale>> pumpShell(
+    WidgetTester tester, {
+    bool tv = false,
+    bool mornye = true,
+  }) async {
+    debugAndroidTvOverride = tv;
+    addTearDown(() => debugAndroidTvOverride = null);
+    tester.view.physicalSize = tv ? const Size(960, 540) : const Size(430, 932);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
     final locale = ValueNotifier(const Locale('en'));
@@ -57,7 +68,25 @@ void main() {
         child: ValueListenableBuilder(
           valueListenable: locale,
           builder: (context, value, _) => MaterialApp.router(
-            theme: MornyeTheme.build(Brightness.dark),
+            theme: mornye
+                ? MornyeTheme.build(Brightness.dark)
+                : AppTheme.dark(),
+            builder: tv
+                ? (context, child) => MediaQuery(
+                    data: MediaQuery.of(
+                      context,
+                    ).copyWith(navigationMode: NavigationMode.directional),
+                    child: AdaptiveUiScaler(
+                      child: SafeArea(
+                        minimum: const EdgeInsets.symmetric(
+                          horizontal: 40,
+                          vertical: 24,
+                        ),
+                        child: TvNavigation(child: child!),
+                      ),
+                    ),
+                  )
+                : null,
             locale: value,
             localizationsDelegates: AppLocalizations.localizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
@@ -150,6 +179,36 @@ void main() {
     expect(collapsed(tester), isTrue);
     expect(tester.takeException(), isNull);
   });
+
+  for (final mornye in [false, true]) {
+    testWidgets(
+      'TV remote opens Settings and Back returns Home, Mornye: $mornye',
+      (tester) async {
+        await pumpShell(tester, tv: true, mornye: mornye);
+        await tester.pump(const Duration(milliseconds: 200));
+        expect(find.byType(MornyeBottomBar), findsNothing);
+        final tvShell = tester.widget<TvShell>(find.byType(TvShell));
+        for (var i = 1; i < tvShell.destinations.length; i++) {
+          await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+          await tester.pump();
+        }
+        await tester.sendKeyEvent(LogicalKeyboardKey.select);
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+        expect(
+          tester.widget<TvShell>(find.byType(TvShell)).selectedIndex,
+          tvShell.destinations.length - 1,
+        );
+        final back = tester.binding.handlePopRoute();
+        await tester.pump();
+        await back;
+        await tester.pump();
+        expect(tester.widget<TvShell>(find.byType(TvShell)).selectedIndex, 0);
+        expect(tester.takeException(), isNull);
+        await tester.pump(const Duration(seconds: 1));
+      },
+    );
+  }
 }
 
 class _Settings extends SettingsNotifier {
