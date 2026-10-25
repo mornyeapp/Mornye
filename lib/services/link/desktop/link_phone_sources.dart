@@ -55,7 +55,15 @@ String? _songName(String path) {
 }
 
 typedef _Answer = ({String deviceId, Completer<Map<String, dynamic>> answer});
-typedef _Sending = ({String file, int size, Future<void> done});
+
+/// A song the phone is sending: the `file` it lands as, its `size`, whether
+/// it plays before it is whole, and its arrival.
+typedef _Sending = ({
+  String file,
+  int size,
+  bool streamable,
+  LinkArrival arrival,
+});
 
 /// Paired phones' songs in the desktop's Library (contract 12.3 and 12.4):
 /// the `network://<sourceId>/` hosts the Link desktop host installs as
@@ -73,6 +81,7 @@ class LinkPhoneSources implements NetworkVirtualSources {
     required LinkArrivingFiles? Function() arriving,
     Future<Map<String, dynamic>> Function(String path)? readTags,
     this.answerTimeout = const Duration(seconds: 15),
+    this.progressInterval = const Duration(milliseconds: 250),
   }) : _catalogs = catalogs,
        _index = index,
        _receivedDir = receivedDir,
@@ -83,6 +92,9 @@ class LinkPhoneSources implements NetworkVirtualSources {
 
   /// How long a phone has to start sending a song it was asked for.
   final Duration answerTimeout;
+
+  /// How often [receive] reports the bytes of a song on its way.
+  final Duration progressInterval;
 
   final LinkPhoneCatalogs _catalogs;
   final DesktopLinkCatalogIndex? Function() _index;
@@ -95,6 +107,10 @@ class LinkPhoneSources implements NetworkVirtualSources {
 
   /// Resolves under way by song name; one request serves them all.
   final _requests = <String, Future<String>>{};
+
+  /// Requests under way by song name, until the phone starts sending; plays
+  /// and transfers of the same song share one.
+  final _asks = <String, Future<_Sending>>{};
 
   /// Phones asked for a song, by song name, until they answer.
   final _answers = <String, _Answer>{};
@@ -164,6 +180,68 @@ class LinkPhoneSources implements NetworkVirtualSources {
     if (deviceId == null) {
       throw const LinkException('unavailable', 'The phone is not connected');
     }
+    final sending = await _ask(deviceId, name);
+    // A file that plays only once whole (an MP4 with its index at the end).
+    if (!sending.streamable) {
+      await sending.arrival.done;
+      return sending.arrival.path;
+    }
+    return sending.arrival.url;
+  }
+
+  /// The whole file of the phone song [name] in the received folder: one
+  /// received before, else asked of the phone [deviceId] and waited for
+  /// until it is whole, never streamed. [onProgress] hears the bytes written
+  /// so far every [progressInterval].
+  Future<String> receive(
+    String deviceId,
+    String name, {
+    void Function(int received, int size)? onProgress,
+  }) async {
+    if (_songName(name) == null) {
+      throw const FormatException('Invalid phone song');
+    }
+    var sending = _sending[name];
+    if (sending == null && !_asks.containsKey(name)) {
+      final fileId = name.substring(0, name.indexOf('.'));
+      final received = (await linkReceivedFiles(_receivedDir()))[fileId];
+      if (received != null) return received;
+      sending = _sending[name];
+    }
+    sending ??= await _ask(deviceId, name);
+    final arrival = sending.arrival;
+    if (onProgress != null) {
+      final file = sending.file;
+      final size = sending.size;
+      final timer = Timer.periodic(
+        progressInterval,
+        (_) => onProgress(_arriving()?.written(file) ?? 0, size),
+      );
+      try {
+        await arrival.done;
+      } finally {
+        timer.cancel();
+      }
+      onProgress(size, size);
+    } else {
+      await arrival.done;
+    }
+    return arrival.path;
+  }
+
+  /// Asks the phone [deviceId] for [name] and waits for it to start
+  /// sending; callers asking meanwhile share the request.
+  Future<_Sending> _ask(String deviceId, String name) {
+    // A block body: an arrow would hand whenComplete the removed future
+    // itself to wait for.
+    return _asks[name] ??= _askPhone(deviceId, name).whenComplete(() {
+      _asks.remove(name);
+    });
+  }
+
+  /// Sends `files.request` for [name] to [deviceId] and waits for its
+  /// answer.
+  Future<_Sending> _askPhone(String deviceId, String name) async {
     final answer = Completer<Map<String, dynamic>>();
     // A disconnect can fail it before the send returns.
     answer.future.ignore();
@@ -190,8 +268,8 @@ class LinkPhoneSources implements NetworkVirtualSources {
     }
   }
 
-  /// Streams the song the phone started to send, or fails as it answered.
-  Future<String> _arrive(String name, Map<String, dynamic> message) async {
+  /// Expects the song the phone started to send, or fails as it answered.
+  Future<_Sending> _arrive(String name, Map<String, dynamic> message) async {
     if (message['type'] == LinkMessageTypes.filesFailed) {
       final reason = message['reason'];
       throw LinkException(
@@ -211,19 +289,19 @@ class LinkPhoneSources implements NetworkVirtualSources {
     if (arrival == null) {
       throw const LinkException('unavailable', 'The song cannot be received');
     }
-    final sending = (file: file, size: size, done: arrival.done);
+    final _Sending sending = (
+      file: file,
+      size: size,
+      streamable: message['streamable'] != false,
+      arrival: arrival,
+    );
     _sending[name] = sending;
     unawaited(
       arrival.done.then<void>((_) {}, onError: (Object _) {}).whenComplete(() {
         if (identical(_sending[name], sending)) _sending.remove(name);
       }),
     );
-    // A file that plays only once whole (an MP4 with its index at the end).
-    if (message['streamable'] == false) {
-      await arrival.done;
-      return arrival.path;
-    }
-    return arrival.url;
+    return sending;
   }
 
   /// Takes `files.sending` and `files.failed` from the phone [deviceId];
@@ -262,13 +340,13 @@ class LinkPhoneSources implements NetworkVirtualSources {
     if (name == null) return const {};
     final fileId = name.substring(0, name.indexOf('.'));
     // A song still on its way is read once whole.
-    final request = _requests[name];
-    if (request != null) {
-      await request.then<void>((_) {}, onError: (Object _) {});
+    final asked = _asks[name];
+    if (asked != null) {
+      await asked.then<void>((_) {}, onError: (Object _) {});
     }
     final sending = _sending[name];
     if (sending != null) {
-      await sending.done.then<void>((_) {}, onError: (Object _) {});
+      await sending.arrival.done.then<void>((_) {}, onError: (Object _) {});
     }
     final song = await _catalogs.song(id, fileId);
     final coverKey = song?.coverKey;

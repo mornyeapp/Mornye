@@ -326,6 +326,74 @@ void main() {
     });
   });
 
+  group('receive', () {
+    test('waits for the whole song instead of streaming it', () async {
+      final phone = sources();
+      final name = '${_fileId(1)}.flac';
+      final progress = <(int, int)>[];
+      final whole = phone.receive(
+        _phone,
+        name,
+        onProgress: (received, size) => progress.add((received, size)),
+      );
+      await pumpEventQueue();
+      expect(sent.single.message, {
+        'type': LinkMessageTypes.filesRequest,
+        'name': name,
+      });
+      phone.onMessage(_phone, sendingMessage(name));
+      var done = false;
+      unawaited(whole.then((_) => done = true));
+      // The upload's part file grows as the phone sends it.
+      File('${received.path}/.$name.1.part').writeAsBytesSync([1, 2, 3]);
+      await Future<void>.delayed(const Duration(milliseconds: 400));
+      expect(done, isFalse);
+      expect(progress, contains((3, 6)));
+      File('${received.path}/.$name.1.part').deleteSync();
+      File('${received.path}/$name').writeAsBytesSync([1, 2, 3, 4, 5, 6]);
+      expect(await whole, '${received.path}${Platform.pathSeparator}$name');
+      expect(progress.last, (6, 6));
+    });
+
+    test('takes a received file without asking the phone', () async {
+      final file = File('${received.path}/${_fileId(1)}.flac')
+        ..writeAsBytesSync([1]);
+      expect(await sources().receive(_phone, '${_fileId(1)}.flac'), file.path);
+      expect(sent, isEmpty);
+    });
+
+    test('shares one request with a play of the same song', () async {
+      final phone = sources();
+      final name = '${_fileId(1)}.flac';
+      final playing = phone.resolve(sourceId, name);
+      final whole = phone.receive(_phone, name);
+      await pumpEventQueue();
+      expect(sent, hasLength(1));
+      phone.onMessage(_phone, sendingMessage(name));
+      expect(await playing, startsWith('http://127.0.0.1:'));
+      File('${received.path}/$name').writeAsBytesSync([1, 2, 3, 4, 5, 6]);
+      expect(await whole, endsWith(name));
+      expect(sent, hasLength(1));
+    });
+
+    test('fails as the phone answers', () async {
+      final phone = sources();
+      final name = '${_fileId(1)}.flac';
+      final whole = phone.receive(_phone, name);
+      await pumpEventQueue();
+      phone.onMessage(_phone, {
+        'type': LinkMessageTypes.filesFailed,
+        'name': name,
+        'reason': 'not_found',
+      });
+      await expectLater(whole, throwsA(linkError('unavailable')));
+      await expectLater(
+        phone.receive(_phone, '../secret.flac'),
+        throwsFormatException,
+      );
+    });
+  });
+
   group('metadata', () {
     test('answers the stored song while the phone has not sent it', () async {
       await commit([song(1, cover: coverId)]);

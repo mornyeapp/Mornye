@@ -75,6 +75,14 @@ class LinkArrivingFiles {
     return (path: arrival.path, url: url, done: arrival.done);
   }
 
+  /// The bytes of the expected file [name] written so far: its size once
+  /// whole, 0 when it is not expected.
+  int written(String name) {
+    final arrival = _arrivals[name];
+    if (arrival == null) return 0;
+    return arrival._whole ? arrival.size : arrival._written;
+  }
+
   Future<void> close() async {
     _closed = true;
     for (final arrival in _arrivals.values) {
