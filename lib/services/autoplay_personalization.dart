@@ -443,6 +443,9 @@ class AutoplayPersonalization {
 
   int get observations => _model.observations;
 
+  /// Whether learning is on, by its setting and the player mode.
+  bool get enabled => _enabled && !_disposed;
+
   /// Each observation as the model learns it, only while learning is on.
   Stream<AutoplayFeedback> get feedback => _feedback.stream;
 

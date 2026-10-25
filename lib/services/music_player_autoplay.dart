@@ -365,7 +365,7 @@ class _MusicAutoplay {
     List<PlayableMedia> candidates,
   ) async {
     // What the listener plays with the session's songs, while learning is on.
-    final taste = handler._settings.autoplayPersonalization
+    final taste = handler._runtime.personalization.enabled
         ? await handler._runtime.taste.signal([
             for (final i in handler._playHistory)
               if (i >= 0 && i < handler._media.length) handler._media[i],
