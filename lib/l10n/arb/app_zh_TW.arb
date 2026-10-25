@@ -1,4 +1,179 @@
 {
+  "trackBpm": "BPM",
+  "trackMood": "Mood",
+  "subsonicAddToLibrary": "Add server to Library",
+  "subsonicLibraryAdded": "Server added to Library",
+  "subsonicLibraryDescription": "Sync the server catalogue and artwork to Library. Music stays on your server. Rescan it in Local Library settings to update the catalogue.",
+  "subsonicAuthentication": "Authentication",
+  "subsonicToken": "Salted token",
+  "subsonicPasswordAuth": "Password",
+  "subsonicApiKey": "API key",
+  "subsonicUsername": "Username",
+  "subsonicPassword": "Password",
+  "subsonicSearch": "Search server music...",
+  "subsonicMoreAlbums": "More albums",
+  "subsonicErrorApi": "The server does not support this API version or authentication method. Check the server settings and the selected sign-in method.",
+  "networkDownloadDestination": "Network download destination",
+  "@networkDownloadDestination": {
+    "description": "Files settings item that opens network storage to choose a folder for downloaded music"
+  },
+  "networkUseForDownloads": "Download to this folder",
+  "@networkUseForDownloads": {
+    "description": "Action to select the current network folder as the download destination; also the settings subtitle when no network destination is selected"
+  },
+  "networkDownloadSelected": "Selected download destination",
+  "@networkDownloadSelected": {
+    "description": "Status label replacing the download destination action when the current network folder is already selected"
+  },
+  "networkUseLocalDownloads": "Use local download folder",
+  "@networkUseLocalDownloads": {
+    "description": "Files settings action that clears the network download destination and returns downloads to the local folder"
+  },
+  "networkDownloadAccessFailed": "Could not write to this folder.",
+  "@networkDownloadAccessFailed": {
+    "description": "Snackbar prefix when the write-access check fails while selecting a network download folder; followed by a specific network error message"
+  },
+  "networkUploading": "Uploading to network storage",
+  "@networkUploading": {
+    "description": "Download queue status during upload of prepared audio to the network destination; a progress percentage may follow"
+  },
+  "networkDownloadDescription": "Prepare songs on this device, then upload them to your NAS. Keep the app open until the upload finishes. Retry reuses prepared audio. Existing files are kept; new downloads with the same name get a numbered suffix.",
+  "@networkDownloadDescription": {
+    "description": "Help below the network download destination action explaining local preparation, upload, retry behavior, and preservation of existing files; NAS means network-attached storage"
+  },
+  "networkAddToLibrary": "Add folder to Library",
+  "@networkAddToLibrary": {
+    "description": "Action that adds the current network folder as a Library source and starts scanning it"
+  },
+  "networkLibraryAdded": "Folder added to Library",
+  "@networkLibraryAdded": {
+    "description": "Status label replacing the add-to-Library action after the network folder has been added as a source; does not mean scanning has finished"
+  },
+  "networkLibraryDescription": "Scan this folder and its subfolders. Music stays on your server; metadata and artwork are saved on this device. Manage or rescan it in Local Library settings.",
+  "@networkLibraryDescription": {
+    "description": "Help below the add-to-Library action explaining recursive scanning, local metadata and artwork storage, and management in Local Library settings"
+  },
+  "networkStorage": "Network storage",
+  "@networkStorage": {
+    "description": "Title and navigation label for the screen used to manage network connections and browse remote music folders"
+  },
+  "networkErrorUnreachable": "The server could not be reached. Check that this phone can access its network and that the file-sharing service is running. For SMB, port 445 must be reachable.",
+  "@networkErrorUnreachable": {
+    "description": "Network access error for an unreachable server, with connection troubleshooting and the SMB port requirement"
+  },
+  "networkErrorTimeout": "The server did not respond in time. Check the connection and try again.",
+  "@networkErrorTimeout": {
+    "description": "Network access error when a server operation exceeds its time limit"
+  },
+  "networkErrorAuthentication": "The server rejected the sign-in. Check the username, password and domain. Leave the domain blank unless your server requires one.",
+  "@networkErrorAuthentication": {
+    "description": "Network access error when the server rejects credentials; domain refers to the optional SMB authentication domain"
+  },
+  "networkErrorPermission": "This account is not allowed to open this share or folder. Check its read permissions on the server.",
+  "@networkErrorPermission": {
+    "description": "Network access error when the server denies account permissions for a shared folder; distinct from the device's local network permission"
+  },
+  "networkErrorLocalPermission": "Local network access is not allowed. Allow Nearby devices for Mornye in Android app settings, then try again.",
+  "@networkErrorLocalPermission": {
+    "description": "Network access error when Android denies local network permission; Nearby devices is the Android app permission setting"
+  },
+  "networkErrorShare": "The share or folder was not found. For SMB, use the server's shared folder name after its address, such as smb://server/Music/.",
+  "@networkErrorShare": {
+    "description": "Network access error for a missing share or folder; share means an SMB shared folder and the example illustrates its URL path"
+  },
+  "networkErrorProtocol": "The server and this SMB client could not agree on a supported protocol. Enable SMB2 or SMB3 on the server. SMB1 is not supported.",
+  "@networkErrorProtocol": {
+    "description": "Network access error for incompatible SMB protocol versions; preserve the version names SMB1, SMB2, and SMB3"
+  },
+  "networkErrorAddress": "Check the server address. Use smb://server/share/ for SMB, or an http:// or https:// address for WebDAV and HTTP.",
+  "@networkErrorAddress": {
+    "description": "Network access error for an invalid address, with URL scheme examples for SMB, WebDAV, and HTTP connections"
+  },
+  "networkConnections": "Saved connections",
+  "@networkConnections": {
+    "description": "Section heading above the list of saved network storage connections"
+  },
+  "networkServer": "Server",
+  "@networkServer": {
+    "description": "Connection form section heading above the display name and server or audio URL fields"
+  },
+  "networkCredentials": "Sign in (optional)",
+  "@networkCredentials": {
+    "description": "Connection form section heading for optional server credentials"
+  },
+  "networkRefresh": "Refresh",
+  "@networkRefresh": {
+    "description": "Toolbar tooltip for reloading saved connections or the current network folder listing"
+  },
+  "networkStorageDescription": "Connect to your NAS or music server and browse its folders. Your sign-in details are stored securely on this device.",
+  "@networkStorageDescription": {
+    "description": "Introduction shown in the empty connections screen and connection form, explaining remote folder browsing and secure local credential storage; NAS means network-attached storage"
+  },
+  "networkAddConnection": "Add connection",
+  "@networkAddConnection": {
+    "description": "Action label, toolbar tooltip, and form title for adding a network storage connection"
+  },
+  "networkEditConnection": "Edit connection",
+  "@networkEditConnection": {
+    "description": "Edit button tooltip and form title for changing an existing network storage connection"
+  },
+  "networkConnectionName": "Name",
+  "@networkConnectionName": {
+    "description": "Required connection form field for a user-chosen display name identifying the saved connection"
+  },
+  "networkAddress": "Server or audio URL",
+  "@networkAddress": {
+    "description": "Required connection form field for the server or direct audio URL, using the scheme appropriate to the selected protocol"
+  },
+  "networkProtocol": "Protocol",
+  "@networkProtocol": {
+    "description": "Connection form section heading for choosing SMB, WebDAV, or HTTP / HTTPS"
+  },
+  "networkUsername": "Username (optional)",
+  "@networkUsername": {
+    "description": "Optional connection form field for the server account username"
+  },
+  "networkPassword": "Password (optional)",
+  "@networkPassword": {
+    "description": "Optional connection form field for the server account password, with input characters hidden"
+  },
+  "networkDomain": "Domain (optional)",
+  "@networkDomain": {
+    "description": "Optional connection form field shown only for SMB; refers to the authentication domain, not the server's internet domain name"
+  },
+  "networkConnectSave": "Connect and save",
+  "@networkConnectSave": {
+    "description": "Connection form action that checks access to the network source before saving the connection"
+  },
+  "networkErrorCertificate": "The server's HTTPS certificate could not be verified. Edit this connection to review and trust its certificate, or check the server's HTTPS configuration.",
+  "@networkErrorCertificate": {
+    "description": "Network access error for HTTPS certificate verification failure, directing the user to review the certificate in the connection form; unrelated to SMB authentication"
+  },
+  "networkCertificatePrompt": "This server uses an untrusted HTTPS certificate. Routers and NAS devices often use self-signed certificates. Verify the server address and SHA-256 fingerprint before trusting it. Trust applies only to this certificate on this server; a changed certificate requires approval again.",
+  "@networkCertificatePrompt": {
+    "description": "Connection form warning shown above the HTTPS origin and certificate SHA-256 fingerprint; approval trusts only that fingerprint for this connection's HTTPS origin, not a global certificate authority or an SMB server"
+  },
+  "networkTrustCertificate": "Trust certificate and retry",
+  "@networkTrustCertificate": {
+    "description": "Action approving the displayed certificate SHA-256 fingerprint for this connection's HTTPS origin and retrying connect-and-save; does not grant global certificate trust"
+  },
+  "networkRemoveConnection": "Remove connection",
+  "@networkRemoveConnection": {
+    "description": "Connection form action that removes the saved connection and its credentials, without deleting files on the server"
+  },
+  "networkNoFiles": "No supported music files or folders found.",
+  "@networkNoFiles": {
+    "description": "Empty folder message when the network listing contains no directories or supported audio files"
+  },
+  "networkConnectionError": "Could not access the network source. Check the server address, credentials, and connection, then retry.",
+  "@networkConnectionError": {
+    "description": "Fallback network access error when the failure has no more specific classification"
+  },
+  "extensionAccountTitle": "Extension account",
+  "extensionAccountInvalidForm": "The extension returned an invalid account form.",
+  "extensionAccountRestartLogin": "Restart account login to continue.",
+  "extensionAccountRequiredValue": "Enter a value.",
+  "extensionAccountInvalidNumber": "Enter a valid number.",
   "settingsPlaybackSubtitle": "Player, volume, AutoMix, and audio output",
   "sectionPlayer": "Player",
   "sectionVolumeAndTransitions": "Volume and transitions",
@@ -42,9 +217,12 @@
   "appearanceAccentPurple": "Purple",
   "appearanceAccentPink": "Pink",
   "appearanceGlassClarity": "Glass clarity",
+  "appearanceGlassOutlines": "Glass outlines",
+  "appearanceGlassOutlinesSubtitle": "Show decorative edges around Mornye glass. Turning this off keeps blur and refraction.",
   "appearanceGlassClaritySubtitle": "Adjust transparency in Mornye menus and navigation. Text contrast is preserved.",
   "appearanceGlassTinted": "Tinted",
   "appearanceGlassClear": "Clear",
+  "appearanceGlassClearPerformance": "Very clear glass may use more power and feel less smooth on older devices. Lower clarity if needed.",
   "appearanceGlassClarityBlurOff": "Glass is opaque on this device. Turn on “{setting}” to adjust clarity.",
   "@appearanceGlassClarityBlurOff": {
     "description": "Shown under the disabled glass clarity slider when the device renders Mornye glass without blur. The placeholder is the name of the force-blur toggle.",
@@ -56,7 +234,12 @@
   },
   "appearanceGlassClarityHighContrast": "Your system requests increased contrast, so glass stays opaque. Turn on “{setting}” to use glass anyway; text contrast is preserved.",
   "@appearanceGlassClarityHighContrast": {
-    "description": "Explains the system contrast request and the explicit glass-only override."
+    "description": "Explains the system contrast request (which can include medium contrast) and the explicit glass-only override.",
+    "placeholders": {
+      "setting": {
+        "type": "String"
+      }
+    }
   },
   "appearanceUseSystemFont": "Use system font",
   "appearanceUseSystemFontSubtitle": "Use your device’s default typeface for app text.",
@@ -100,6 +283,18 @@
   "homeRecent": "最新的",
   "@homeRecent": {
     "description": "Section header for recent searches"
+  },
+  "searchRecentlySearched": "Recently Searched",
+  "@searchRecentlySearched": {
+    "description": "Section header for recent searches on the desktop Search page"
+  },
+  "searchLibraryPrompt": "Search Your Library",
+  "@searchLibraryPrompt": {
+    "description": "Shown on the desktop Search page when the Library scope has no search words yet"
+  },
+  "searchBrowse": "Browse",
+  "@searchBrowse": {
+    "description": "Section header for home feed tiles on the desktop Search page"
   },
   "historyFilterAll": "全部",
   "@historyFilterAll": {
@@ -161,6 +356,30 @@
   "downloadFolderOrganization": "資料夾歸類方式",
   "@downloadFolderOrganization": {
     "description": "Title of the folder organization picker bottom sheet"
+  },
+  "downloadFolderTemplate": "Custom Folder Structure",
+  "@downloadFolderTemplate": {
+    "description": "Setting for editing a relative download folder template"
+  },
+  "downloadFolderTemplateDescription": "Use naming tags and / for subfolders. Saving replaces the preset album and singles layout. Empty folder names use Unknown.",
+  "@downloadFolderTemplateDescription": {
+    "description": "Help for custom download folder templates"
+  },
+  "folderOrganizationCustom": "Custom template",
+  "@folderOrganizationCustom": {
+    "description": "Folder organization mode using a user-defined template"
+  },
+  "folderTemplateInvalid": "Enter a relative folder path with supported tags. Empty folders, . and .. are not allowed.",
+  "@folderTemplateInvalid": {
+    "description": "Validation error for an invalid folder template"
+  },
+  "folderTemplatePreview": "Example folder path",
+  "@folderTemplatePreview": {
+    "description": "Label for a sample expanded folder template"
+  },
+  "folderTemplatePreviewFailed": "Preview unavailable",
+  "@folderTemplatePreviewFailed": {
+    "description": "Shown when the native folder preview could not be generated"
   },
   "appearanceTitle": "外觀",
   "@appearanceTitle": {
@@ -339,6 +558,15 @@
     }
   },
   "optionsArtistTagMode": "演出者標籤模式",
+  "metadataSeparators": "Metadata separators",
+  "metadataSeparatorsDescription": "Choose how comma- or semicolon-separated values are joined in future downloads. Custom artist separators use a joined tag; Primary artist only still applies. Names containing & or / are preserved.",
+  "metadataSeparatorSource": "Keep source formatting",
+  "metadataSeparatorComma": "Comma (,)",
+  "metadataSeparatorSemicolon": "Semicolon (;)",
+  "metadataSeparatorSlash": "Slash (/)",
+  "metadataSeparatorCustom": "Custom separator",
+  "metadataSeparatorPreview": "Preview",
+  "metadataSeparatorInvalid": "Use 1–16 characters without line breaks or control characters.",
   "@optionsArtistTagMode": {
     "description": "Setting title for how artist metadata is written into files"
   },
@@ -494,6 +722,14 @@
   "aboutMobileSource": "行動裝置版本開源碼",
   "@aboutMobileSource": {
     "description": "Link to mobile GitHub repo"
+  },
+  "aboutLyricsWebsite": "Lyrics website",
+  "@aboutLyricsWebsite": {
+    "description": "Link to the Zarz-LRC website for searching and saving word-timed lyrics"
+  },
+  "aboutServiceStatus": "Service status",
+  "@aboutServiceStatus": {
+    "description": "Link to the status page of the Mornye online services"
   },
   "aboutReportIssue": "回報問題",
   "@aboutReportIssue": {
@@ -1366,6 +1602,30 @@
   "@updateDontRemind": {
     "description": "Update button - skip this version"
   },
+  "updateViewRelease": "View Release",
+  "@updateViewRelease": {
+    "description": "Update button - open the release page when this install cannot update itself (deb, Flatpak, no matching package)"
+  },
+  "updateStartingInstaller": "Starting the installer...",
+  "@updateStartingInstaller": {
+    "description": "Update status on Windows - the downloaded installer is starting and the app will close"
+  },
+  "updateMacInstallHint": "The disk image is open in Finder. Quit Mornye, then drag Mornye from the disk image to Applications and replace the old copy.",
+  "@updateMacInstallHint": {
+    "description": "Update instructions on macOS after the downloaded disk image opens"
+  },
+  "updateQuitApp": "Quit Mornye",
+  "@updateQuitApp": {
+    "description": "Update button on macOS - quit the app so the new version can replace it"
+  },
+  "updateReadyToRestart": "The update is installed. Restart Mornye to use it.",
+  "@updateReadyToRestart": {
+    "description": "Update status on Linux after the AppImage was replaced"
+  },
+  "updateRestartNow": "Restart Now",
+  "@updateRestartNow": {
+    "description": "Update button on Linux - restart the app after the AppImage was replaced"
+  },
   "providerPriorityTitle": "Provider Priority",
   "@providerPriorityTitle": {
     "description": "Provider priority page title"
@@ -1640,6 +1900,10 @@
   "@trackFileNotFound": {
     "description": "Error - file doesn't exist"
   },
+  "trackFileUnavailable": "File is currently unavailable. Check storage access and try again.",
+  "@trackFileUnavailable": {
+    "description": "File access failed; this does not mean the file was deleted"
+  },
   "trackOpenInDeezer": "Open in Deezer",
   "@trackOpenInDeezer": {
     "description": "Action - open track in Deezer app"
@@ -1772,6 +2036,15 @@
   "trackDeleteConfirmTitle": "Remove from device?",
   "@trackDeleteConfirmTitle": {
     "description": "Delete confirmation title"
+  },
+  "trackDeleteNetworkConfirmMessage": "This will permanently delete the file from your network storage and remove it from your library and history.",
+  "snackbarDeleteTracksFailed": "Could not delete {count} {count, plural, =1{track} other{tracks}}. Check storage access and try again.",
+  "@snackbarDeleteTracksFailed": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
   },
   "trackDeleteConfirmMessage": "This will permanently delete the downloaded file and remove it from your history.",
   "@trackDeleteConfirmMessage": {
@@ -2627,6 +2900,36 @@
   "@libraryRemoveFolderMessage": {
     "description": "Confirmation shown before removing a library source"
   },
+  "libraryUnreadableFiles": "{count, plural, =1{1 file couldn't be read} other{{count} files couldn't be read}}",
+  "@libraryUnreadableFiles": {
+    "description": "Count of files the last scan of a library folder skipped because it could not read them",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "libraryUnreadableFilesTitle": "Unreadable files",
+  "@libraryUnreadableFilesTitle": {
+    "description": "Title of the list of files a library scan could not read, and the action that opens it"
+  },
+  "libraryUnreadableFilesSubtitle": "These files were left out of your library. They may be damaged, still downloading, or blocked by the storage app.",
+  "@libraryUnreadableFilesSubtitle": {
+    "description": "Explanation above the list of files a library scan could not read"
+  },
+  "libraryUnreadableFilesAction": "See which files and why",
+  "@libraryUnreadableFilesAction": {
+    "description": "Subtitle of the library folder action that lists unreadable files"
+  },
+  "libraryUnreadableFilesMore": "{count, plural, =1{1 more file isn't listed} other{{count} more files aren't listed}}",
+  "@libraryUnreadableFilesMore": {
+    "description": "Note below the unreadable files list when the scan skipped more files than it lists",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "libraryShowDuplicateIndicator": "Show Duplicate Indicator",
   "@libraryShowDuplicateIndicator": {
     "description": "Toggle for duplicate indicator in search"
@@ -2879,6 +3182,14 @@
   "@libraryFilterSortOldest": {
     "description": "Sort option - oldest first"
   },
+  "libraryFilterSortSizeLargest": "Size (Largest first)",
+  "@libraryFilterSortSizeLargest": {
+    "description": "Library sort option - largest files first"
+  },
+  "libraryFilterSortSizeSmallest": "Size (Smallest first)",
+  "@libraryFilterSortSizeSmallest": {
+    "description": "Library sort option - smallest files first"
+  },
   "libraryFilterSortAlbumAsc": "Album (A-Z)",
   "@libraryFilterSortAlbumAsc": {
     "description": "Sort option - album ascending"
@@ -3114,6 +3425,40 @@
   "libraryPlaybackNormalizationSubtitle": "Even out loudness between tracks using their ReplayGain or R128 tags, when present",
   "@libraryPlaybackNormalizationSubtitle": {
     "description": "Subtitle explaining playback volume normalization"
+  },
+  "playbackNormalizationMode": "Gain mode",
+  "@playbackNormalizationMode": {
+    "description": "Label for choosing between track and album ReplayGain during playback"
+  },
+  "playbackNormalizationModeTrack": "Track",
+  "@playbackNormalizationModeTrack": {
+    "description": "Gain mode that levels every track on its own"
+  },
+  "playbackNormalizationModeAlbum": "Album",
+  "@playbackNormalizationModeAlbum": {
+    "description": "Gain mode that keeps the loudness differences inside an album"
+  },
+  "playbackNormalizationPreamp": "Pre-amp",
+  "@playbackNormalizationPreamp": {
+    "description": "Label for the dB offset applied on top of ReplayGain during playback"
+  },
+  "playbackNormalizationPreampValue": "{gain} dB (target {target} LUFS)",
+  "@playbackNormalizationPreampValue": {
+    "description": "Pre-amp value with the resulting target loudness",
+    "placeholders": {
+      "gain": {
+        "type": "String",
+        "example": "-7"
+      },
+      "target": {
+        "type": "String",
+        "example": "-25"
+      }
+    }
+  },
+  "playbackNormalizationPreampHint": "Lower values play quieter. Normalization only turns tracks down, so it never clips.",
+  "@playbackNormalizationPreampHint": {
+    "description": "Hint under the normalization pre-amp slider"
   },
   "cacheAudioAnalysis": "Audio analysis cache",
   "@cacheAudioAnalysis": {
@@ -3987,6 +4332,18 @@
   "@lyricsProviderLyricsPlusDesc": {
     "description": "Description for LyricsPlus provider"
   },
+  "lyricsProviderZarzLrcDesc": "Word-by-word Apple Music lyrics from Zarz-LRC",
+  "@lyricsProviderZarzLrcDesc": {
+    "description": "Description for the first-party Zarz-LRC provider"
+  },
+  "lyricsProviderLrcRedDesc": "Word-by-word Apple Music lyrics, matched by recording",
+  "@lyricsProviderLrcRedDesc": {
+    "description": "Description for lrc.red provider"
+  },
+  "lyricsProviderBetterLyricsDesc": "Word-by-word Apple Music lyrics for popular songs",
+  "@lyricsProviderBetterLyricsDesc": {
+    "description": "Description for BetterLyrics provider, which only answers songs it has already cached"
+  },
   "lyricsProviderExtensionDesc": "Extension provider",
   "@lyricsProviderExtensionDesc": {
     "description": "Generic description for extension-based lyrics providers"
@@ -4561,6 +4918,51 @@
   "@editMetadataAutoFillNoneSelected": {
     "description": "Snackbar when user taps Fetch without selecting any fields"
   },
+  "editMetadataLyricsSearch": "Find lyrics online",
+  "@editMetadataLyricsSearch": {
+    "description": "Button in the edit metadata lyrics section that searches every lyrics provider"
+  },
+  "lyricsPickerTitle": "Choose lyrics",
+  "@lyricsPickerTitle": {
+    "description": "Title of the sheet listing each lyrics provider's result"
+  },
+  "lyricsPickerNeedsTitle": "Enter a title and artist first",
+  "@lyricsPickerNeedsTitle": {
+    "description": "Snackbar when searching lyrics without a title or artist"
+  },
+  "lyricsPickerNoProviders": "No lyrics providers are enabled. Turn some on in Settings > Lyrics.",
+  "@lyricsPickerNoProviders": {
+    "description": "Shown in the lyrics picker when no provider is enabled"
+  },
+  "lyricsPickerWordSynced": "Word-synced",
+  "@lyricsPickerWordSynced": {
+    "description": "Lyrics result timed word by word"
+  },
+  "lyricsPickerSynced": "Synced",
+  "@lyricsPickerSynced": {
+    "description": "Lyrics result timed line by line"
+  },
+  "lyricsPickerPlain": "Plain text",
+  "@lyricsPickerPlain": {
+    "description": "Lyrics result without timing"
+  },
+  "lyricsPickerInstrumental": "Instrumental",
+  "@lyricsPickerInstrumental": {
+    "description": "Lyrics result that marks the track as instrumental"
+  },
+  "lyricsPickerNotFound": "No lyrics found",
+  "@lyricsPickerNotFound": {
+    "description": "A lyrics provider returned nothing for this track"
+  },
+  "lyricsPickerLineCount": "{count, plural, =1{1 line} other{{count} lines}}",
+  "@lyricsPickerLineCount": {
+    "description": "Number of lyric lines in a provider's result",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "editMetadataFieldTitle": "Title",
   "@editMetadataFieldTitle": {
     "description": "Chip label for title field in auto-fill selector"
@@ -4801,6 +5203,19 @@
   "@audioAnalysisRescan": {
     "description": "Tooltip/label for the button that re-runs the audio analysis, discarding cached results"
   },
+  "audioAnalysisSaveSpectrogram": "Save Spectrogram",
+  "@audioAnalysisSaveSpectrogram": {
+    "description": "Tooltip for the spectrogram button that saves the plot, with its axes and legend, as a PNG image the user places in storage"
+  },
+  "audioAnalysisSpectrogramSaved": "Spectrogram saved to {fileName}",
+  "@audioAnalysisSpectrogramSaved": {
+    "description": "Snackbar after the spectrogram image was saved",
+    "placeholders": {
+      "fileName": {
+        "type": "String"
+      }
+    }
+  },
   "downloadRedownloadFakeHiRes": "Re-download fake Hi-Res",
   "@downloadRedownloadFakeHiRes": {
     "description": "Setting title: automatically replace downloads that measure as fake Hi-Res"
@@ -4932,6 +5347,14 @@
   "extensionsHomeFeedProvider": "Home Feed Provider",
   "@extensionsHomeFeedProvider": {
     "description": "Extensions page - label for home feed provider selector"
+  },
+  "extensionsHomeFeedCountry": "Home feed country",
+  "@extensionsHomeFeedCountry": {
+    "description": "Country picker for the active Home feed extension"
+  },
+  "extensionsHomeFeedCountryDescription": "Choose a country's Home recommendations without a VPN.",
+  "@extensionsHomeFeedCountryDescription": {
+    "description": "Help for choosing regional Home recommendations"
   },
   "extensionsHomeFeedDescription": "Choose which extension provides the home feed on the main screen",
   "@extensionsHomeFeedDescription": {
@@ -5182,6 +5605,10 @@
   "notifLibraryScanFailed": "Library scan failed",
   "@notifLibraryScanFailed": {
     "description": "Notification title when library scan fails"
+  },
+  "notifLibraryScanInterruptedBody": "The previous library scan was interrupted. Scan the folder again to continue. Your indexed tracks are still available.",
+  "@notifLibraryScanInterruptedBody": {
+    "description": "Recovery notice after the app stops during a library scan"
   },
   "notifLibraryScanCancelled": "Library scan cancelled",
   "@notifLibraryScanCancelled": {
@@ -6334,6 +6761,14 @@
   "@nowPlayingNoLyrics": {
     "description": "Empty state when the playing file has no embedded lyrics"
   },
+  "nowPlayingSearchLyricsOnline": "Search online",
+  "@nowPlayingSearchLyricsOnline": {
+    "description": "Button in the player's empty lyrics state that looks up lyrics from the enabled lyrics providers"
+  },
+  "nowPlayingNoLyricsOnline": "No lyrics found online",
+  "@nowPlayingNoLyricsOnline": {
+    "description": "Empty state after an online lyrics search for the playing track found nothing"
+  },
   "nowPlayingLibraryEmpty": "Your library is empty",
   "@nowPlayingLibraryEmpty": {
     "description": "Snackbar when shuffle library is requested but library has no tracks"
@@ -6592,6 +7027,14 @@
   "@regionCountryUS": {
     "description": "Country name for SongLink region picker"
   },
+  "regionCountryIT": "Italy",
+  "@regionCountryIT": {
+    "description": "Country name for Italy"
+  },
+  "regionCountryES": "Spain",
+  "@regionCountryES": {
+    "description": "Country name for Spain"
+  },
   "regionCountryGB": "United Kingdom",
   "@regionCountryGB": {
     "description": "Country name for SongLink region picker"
@@ -6693,6 +7136,10 @@
   "@extensionVerificationCopyLink": {
     "description": "Button to copy the extension verification URL"
   },
+  "extensionVerificationPasteCallback": "Paste callback",
+  "@extensionVerificationPasteCallback": {
+    "description": "Button that completes extension verification from a callback URL in the clipboard"
+  },
   "extensionVerificationLinkCopied": "Verification link copied",
   "@extensionVerificationLinkCopied": {
     "description": "Snackbar after copying the extension verification URL"
@@ -6721,6 +7168,33 @@
   "libraryFilterMetadataMissingReplayGain": "Missing ReplayGain",
   "@libraryFilterMetadataMissingReplayGain": {
     "description": "Filter option for scanned tracks without ReplayGain gain tags"
+  },
+  "libraryFilterMetadataHasReplayGain": "Has ReplayGain",
+  "@libraryFilterMetadataHasReplayGain": {
+    "description": "Filter option for tracks with indexed ReplayGain track or album gain tags"
+  },
+  "libraryFilterIncompleteAlbums": "Incomplete albums",
+  "@libraryFilterIncompleteAlbums": {
+    "description": "Library filter for albums with confirmed missing track positions"
+  },
+  "libraryAlbumCompletenessUnknown": "Album completeness unknown",
+  "@libraryAlbumCompletenessUnknown": {
+    "description": "Library filter and status for missing, conflicting or ambiguous album track counts"
+  },
+  "libraryAlbumMissingTracks": "{present}/{expected} tracks · {missing} missing",
+  "@libraryAlbumMissingTracks": {
+    "description": "Album completeness badge tooltip",
+    "placeholders": {
+      "present": {
+        "type": "int"
+      },
+      "expected": {
+        "type": "int"
+      },
+      "missing": {
+        "type": "int"
+      }
+    }
   },
   "trackOptionCopyTrackName": "Copy track name",
   "@trackOptionCopyTrackName": {
@@ -6766,11 +7240,54 @@
     "description": "Selected state of the compact favorite action"
   },
   "autoMixDescription": "Blend songs with beat matching and pitch-preserving tempo adjustment. Uses crossfade when beats cannot be matched.",
+  "playerCoverStyle": "Cover art",
+  "@playerCoverStyle": {
+    "description": "Settings section choosing how the player shows cover art"
+  },
+  "playerCoverStyleDefault": "Default",
+  "@playerCoverStyleDefault": {
+    "description": "Cover art style: artwork card above the controls"
+  },
+  "playerCoverStyleDefaultDescription": "Artwork as a card above the controls",
+  "@playerCoverStyleDefaultDescription": {
+    "description": "Subtitle of the default cover art style"
+  },
+  "playerCoverStyleFullScreen": "Full screen",
+  "@playerCoverStyleFullScreen": {
+    "description": "Cover art style: artwork fills the top of the player"
+  },
+  "playerCoverStyleFullScreenDescription": "Artwork fills the top of the player and fades into a blur. Motion artwork is always full screen in Mornye",
+  "@playerCoverStyleFullScreenDescription": {
+    "description": "Subtitle of the full screen cover art style"
+  },
+  "musicHaptics": "Music haptics",
+  "@musicHaptics": {
+    "description": "Setting that vibrates the phone along with the music"
+  },
+  "musicHapticsDescription": "Vibrate along with the beat of downloaded and local songs",
+  "@musicHapticsDescription": {
+    "description": "Subtitle of the music haptics setting"
+  },
+  "musicHapticsSensitivity": "Sensitivity",
+  "@musicHapticsSensitivity": {
+    "description": "Slider for how many beats trigger music haptics; higher values vibrate on softer hits"
+  },
+  "musicHapticsStrength": "Strength",
+  "@musicHapticsStrength": {
+    "description": "Slider for how strongly the phone vibrates with music haptics"
+  },
   "autoMixOn": "AutoMix on",
   "autoMixOff": "AutoMix off",
   "autoplayOn": "Autoplay on",
   "autoplayOff": "Autoplay off",
   "autoplayFromLibrary": "Autoplay from your Library",
+  "autoplayDescription": "Continue with related songs from your Library when the queue ends.",
+  "autoplayPersonalization": "Personalized autoplay",
+  "autoplayPersonalizationDescription": "Learn from songs you listen to and skip, privately on this device. Turning this off stops learning and restores ordinary autoplay.",
+  "autoplayResetLearning": "Reset recommendation learning",
+  "autoplayResetLearningConfirmTitle": "Reset recommendation learning?",
+  "autoplayResetLearningConfirmMessage": "Autoplay forgets what it learned from your listening and skips. This can't be undone.",
+  "autoplayResetLearningConfirm": "Reset",
   "profileTitle": "Profile",
   "profileSetUp": "Set up your profile",
   "profileEdit": "Edit name and photo",
@@ -6781,11 +7298,705 @@
   "profileRemovePhoto": "Remove photo",
   "profilePhotoError": "Choose a valid image smaller than 20 MB.",
   "profileSaveError": "Could not save your profile. Please try again.",
+  "homeGreetingMorning1": "Good morning",
+  "homeGreetingMorning2": "Rise and shine",
+  "homeGreetingMorning3": "Fresh start",
+  "homeGreetingAfternoon1": "Good afternoon",
+  "homeGreetingAfternoon2": "Afternoon groove",
+  "homeGreetingAfternoon3": "Keep the vibe going",
+  "homeGreetingEvening1": "Good evening",
+  "homeGreetingEvening2": "Time to unwind",
+  "homeGreetingEvening3": "Golden hour",
+  "homeGreetingNight1": "Good night",
+  "homeGreetingNight2": "Late-night session",
+  "homeGreetingNight3": "Quiet hours",
+  "homeGreetingNamed": "{greeting}, {name}",
+  "@homeGreetingNamed": {
+    "description": "Home greeting followed by the first name from the user's profile",
+    "placeholders": {
+      "greeting": {
+        "type": "String"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "homeTaglineListening": "What are we listening to?",
+  "@homeTaglineListening": {
+    "description": "Rotating Home prompt under the greeting"
+  },
+  "homeTaglineLink": "Got a link? Drop it in the search",
+  "@homeTaglineLink": {
+    "description": "Rotating Home prompt explaining that links can be pasted into search"
+  },
+  "homeTaglineDiscover": "Find your next favorite album",
+  "@homeTaglineDiscover": {
+    "description": "Rotating Home prompt under the greeting"
+  },
+  "homeContinueListening": "Continue listening",
+  "@homeContinueListening": {
+    "description": "Home section header for the track currently loaded in the player"
+  },
+  "homeRecentlyAdded": "Recently added",
+  "@homeRecentlyAdded": {
+    "description": "Home section header for the newest downloaded and scanned tracks"
+  },
+  "homeOnRepeat": "On repeat",
+  "@homeOnRepeat": {
+    "description": "Home section header for the most played tracks of the last four weeks"
+  },
+  "homeShortcuts": "Shortcuts",
+  "@homeShortcuts": {
+    "description": "Home section header for quick links to player tools"
+  },
   "artistUpcomingConcerts": "Upcoming Concerts",
   "artistAllUpcomingConcerts": "All Upcoming Concerts",
   "artistNoUpcomingConcerts": "No upcoming concerts.",
+  "motionArtwork": "Animated artwork",
+  "listeningStats": "Listening statistics",
+  "listeningStatsRecord": "Record listening",
+  "listeningStatsDescription": "Stored only on this device, starting now. Records the built-in player only; pauses, buffering and seeking add no listening time. A play counts after 30 seconds.",
+  "listeningStatsEmpty": "Play music with the built-in player to start your listening recap. Earlier listening cannot be recovered.",
+  "listeningStatsDays": "{days} days",
+  "@listeningStatsDays": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "listeningStatsMinutes": "{minutes} min",
+  "@listeningStatsMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "listeningStatsTotals": "{plays, plural, =1{1 play} other{{plays} plays}} · {tracks, plural, =1{1 track} other{{tracks} tracks}} · {days, plural, =1{1 active day} other{{days} active days}}",
+  "@listeningStatsTotals": {
+    "placeholders": {
+      "plays": {
+        "type": "int"
+      },
+      "tracks": {
+        "type": "int"
+      },
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "listeningStatsPreviousYear": "Previous year",
+  "listeningStatsNextYear": "Next year",
+  "listeningStatsActivity": "Recent listening days · minutes",
+  "listeningStatsTopArtists": "Top artists",
+  "listeningStatsTopTracks": "Top tracks",
+  "listeningStatsLoadError": "Could not load listening statistics",
+  "listeningStatsClear": "Clear listening statistics",
+  "listeningStatsClearError": "Could not clear listening statistics. Please try again.",
+  "listeningStatsClearDescription": "Delete all listening statistics on this device? Your music and playlists will be kept.",
+  "libraryArtistsEmpty": "Artists appear here once you download music or scan a local library.",
+  "listeningRewind": "Rewind",
+  "listeningRewindDescription": "Relive the highlights of your recent weeks and months",
+  "listeningRewindChoosePeriod": "Choose a period",
+  "listeningRewindLastWeeks": "Last {weeks} weeks",
+  "@listeningRewindLastWeeks": {
+    "placeholders": {
+      "weeks": {
+        "type": "int"
+      }
+    }
+  },
+  "listeningRewindLastMonths": "Last {months} months",
+  "@listeningRewindLastMonths": {
+    "placeholders": {
+      "months": {
+        "type": "int"
+      }
+    }
+  },
+  "listeningRewindThisYear": "{year} so far",
+  "@listeningRewindThisYear": {
+    "placeholders": {
+      "year": {
+        "type": "int"
+      }
+    }
+  },
+  "listeningRewindIntroTitle": "Your Rewind",
+  "listeningRewindIntroBody": "A look back at what you played from {start} to {end}.",
+  "@listeningRewindIntroBody": {
+    "placeholders": {
+      "start": {
+        "type": "String"
+      },
+      "end": {
+        "type": "String"
+      }
+    }
+  },
+  "listeningRewindMinutesTitle": "You listened for",
+  "listeningRewindMinutesUnit": "{minutes, plural, =1{minute} other{minutes}}",
+  "@listeningRewindMinutesUnit": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "listeningRewindHours": "{hours, plural, =1{That's about 1 hour of music} other{That's about {hours} hours of music}}",
+  "@listeningRewindHours": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      }
+    }
+  },
+  "listeningRewindMore": "{percent}% more than the period before",
+  "@listeningRewindMore": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "listeningRewindLess": "{percent}% less than the period before",
+  "@listeningRewindLess": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "listeningRewindSame": "About the same as the period before",
+  "listeningRewindTopArtistTitle": "Your top artist",
+  "listeningRewindArtistShare": "{percent}% of your listening time",
+  "@listeningRewindArtistShare": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "listeningRewindArtistsTitle": "Artists on rotation",
+  "listeningRewindTopTrackTitle": "Your top song",
+  "listeningRewindPlays": "{plays, plural, =1{1 play} other{{plays} plays}}",
+  "@listeningRewindPlays": {
+    "placeholders": {
+      "plays": {
+        "type": "int"
+      }
+    }
+  },
+  "listeningRewindTracksTitle": "Songs on repeat",
+  "listeningRewindTopAlbumTitle": "The album you kept coming back to",
+  "listeningRewindNewArtistsTitle": "New discoveries",
+  "listeningRewindNewArtistsBody": "{count, plural, =1{You found 1 new artist} other{You found {count} new artists}}",
+  "@listeningRewindNewArtistsBody": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "listeningRewindRhythmTitle": "Your listening rhythm",
+  "listeningRewindPeakDay": "Biggest day",
+  "listeningRewindFavoriteDay": "Favorite day",
+  "listeningRewindStreak": "Longest streak",
+  "listeningRewindStreakDays": "{days, plural, =1{1 day} other{{days} days in a row}}",
+  "@listeningRewindStreakDays": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "listeningRewindReplayTitle": "Couldn't stop playing",
+  "listeningRewindReplayBody": "You played it {plays} times on {date}",
+  "@listeningRewindReplayBody": {
+    "placeholders": {
+      "plays": {
+        "type": "int"
+      },
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "listeningRewindOutroTitle": "That's your Rewind",
+  "listeningRewindOutroBody": "Keep listening. Your next Rewind is already taking shape.",
+  "listeningRewindEmpty": "Not enough listening in this period yet. Play some music with the built-in player and come back later.",
+  "listeningRewindLoadError": "Could not load your Rewind",
+  "listeningRewindSlide": "Slide {index} of {count}",
+  "@listeningRewindSlide": {
+    "placeholders": {
+      "index": {
+        "type": "int"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "listeningRewindShare": "Share",
+  "listeningRewindShareError": "Could not share your Rewind",
+  "listeningRewindNext": "Next",
+  "listeningRewindPrevious": "Previous",
+  "listeningRewindMonthlyReady": "Your last 4 weeks are ready to replay",
+  "listeningRewindYearTitle": "Your {year} in Music",
+  "@listeningRewindYearTitle": {
+    "placeholders": {
+      "year": {
+        "type": "String"
+      }
+    }
+  },
+  "listeningRewindYearEyebrow": "Year-end Rewind",
+  "listeningRewindYearBanner": "Your top artists, songs and moments of the year",
+  "listeningRewindYearIntroBody": "Everything you played this year, from your first song to your biggest month.",
+  "listeningRewindNumbersTitle": "Your year in numbers",
+  "listeningRewindSongsLabel": "Songs",
+  "listeningRewindArtistsLabel": "Artists",
+  "listeningRewindAlbumsLabel": "Albums",
+  "listeningRewindDaysLabel": "Days with music",
+  "listeningRewindDaysShare": "Music on {percent}% of your days",
+  "@listeningRewindDaysShare": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "listeningRewindMonthsTitle": "Month by month",
+  "listeningRewindBiggestMonthLabel": "Biggest month",
+  "listeningRewindBiggestMonth": "Your biggest month was {month}",
+  "@listeningRewindBiggestMonth": {
+    "placeholders": {
+      "month": {
+        "type": "String"
+      }
+    }
+  },
+  "listeningRewindMonthlyArtistsTitle": "Artist of the month",
+  "listeningRewindLoyalTitle": "Always by your side",
+  "listeningRewindLoyalBody": "{days, plural, =1{With you on 1 day} other{With you on {days} different days}}",
+  "@listeningRewindLoyalBody": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "listeningRewindFirstSongTitle": "Where your year began",
+  "listeningRewindFirstSongBody": "Your most-played song on your first listening day, {date}",
+  "@listeningRewindFirstSongBody": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "listeningRewindYearOutroTitle": "That was your {year}",
+  "@listeningRewindYearOutroTitle": {
+    "placeholders": {
+      "year": {
+        "type": "String"
+      }
+    }
+  },
+  "listeningRewindYearOutroBody": "Here's to another year of great music.",
+  "weeklyReleases": "New releases",
+  "weeklyReleasesDescription": "Recent albums and singles from your favorite artists, supplied by installed metadata extensions.",
+  "weeklyReleasesEmpty": "No dated releases found in this period. Add favorite artists or try a longer period.",
+  "weeklyReleasesUnavailable": "Some artists could not be checked. Their saved results are kept. Providers may not supply artist catalogs or exact release dates.",
+  "weeklyReleasesLoadError": "Could not check new releases. Pull to refresh.",
+  "motionArtworkDescription": "Loop video covers supplied by metadata providers. Turn off to use still artwork and reduce battery use.",
+  "libraryLoading": "Loading Library…",
+  "libraryLoadFailed": "Library could not be loaded. Retry to load the saved folders and track index.",
+  "discordPresenceDescription": "Share the title, artist, album and progress of music played in the built-in player on your Discord profile. Local audio and artwork files are never uploaded. Clears when playback pauses or stops.",
+  "discordPresenceDisabled": "Disabled",
+  "discordPresenceLink": "Link Discord account",
+  "discordPresenceConnecting": "Connecting to Discord…",
+  "discordPresenceReady": "Ready when music plays",
+  "discordPresenceActive": "Sharing current track",
+  "discordPresenceUnavailable": "Discord is unavailable. Retrying during playback.",
+  "discordPresenceBuildUnavailable": "Discord SDK is not available in this build.",
+  "discordPresenceAndroidHelp": "Install Discord and sign in on this phone. Allow activity sharing in Discord. External players are not supported.",
+  "discordPresenceIosHelp": "Link your account through Discord and allow activity sharing. Tap to link again if authorization fails.",
+  "discordPresenceDesktopHelp": "Keep the Discord desktop app running and signed in on this computer, and allow activity sharing in Discord.",
+  "discordPresenceDisconnect": "Disconnect and forget account",
+  "autoMixSettingsTitle": "Mix transitions",
+  "autoMixAutomaticDuration": "Automatic duration",
+  "autoMixDuration": "Mix duration",
+  "autoMixEffect": "Transition effect",
+  "autoMixEffectAuto": "Auto",
+  "autoMixEffectCrossfade": "Crossfade",
+  "autoMixEffectMuffled": "Muffled",
+  "autoMixEffectEcho": "Echo",
+  "autoMixEffectPitch": "Pitch",
+  "autoMixEffectCustom": "Custom",
+  "autoMixEffectsHelp": "Effects apply to the end of the outgoing song during the mix. Short songs use a shorter overlap.",
+  "autoMixSpeed": "Speed",
+  "autoMixPitch": "Pitch (semitones)",
+  "autoMixEcho": "Echo",
+  "autoMixLowPass": "Muffled filter",
+  "autoMixMixing": "Mixing",
+  "autoMixCrossfading": "Crossfade",
+  "playbackAutomation": "Automatic playback",
+  "playbackPauseOnMute": "Pause when muted",
+  "snackbarPlaybackMuted": "Media volume is zero. Playback paused. Press play again to continue.",
+  "@snackbarPlaybackMuted": {
+    "description": "Shown after mute automation pauses playback; another explicit play request can override the pause."
+  },
+  "playbackPauseOnMuteDescription": "Pause at zero media volume and resume when raised. Manual pauses stay paused. Standard audio output only.",
+  "playbackOnHeadphonesConnected": "Play when headphones connect",
+  "playbackOnHeadphonesConnectedDescription": "Resume the current song when wired or Bluetooth headphones connect. Disconnecting pauses playback. Built-in player only.",
+  "appearanceCustomFont": "Custom font",
+  "appearanceCustomFontSubtitle": "Import a TTF or OTF file (up to 10 MB). Overrides the theme and system font.",
+  "appearanceCustomFontInvalid": "Could not load this font. Choose a valid TTF or OTF file up to 10 MB.",
+  "appearanceCustomFontReset": "Use theme font",
+  "equalizerTitle": "Equalizer",
+  "equalizerDescription": "5–31 bands, tone controls, preamp and dynamics",
+  "equalizerEnable": "Enable equalizer",
+  "equalizerBands": "Bands",
+  "equalizerTone": "Tone & stereo",
+  "equalizerPreamp": "Preamp",
+  "equalizerBass": "Bass",
+  "equalizerTreble": "Treble",
+  "equalizerBalance": "Balance",
+  "equalizerDynamics": "Dynamics",
+  "equalizerHeadroom": "Automatic headroom",
+  "equalizerHeadroomDescription": "Reduce input gain to make room for boosted frequencies.",
+  "equalizerLimiter": "Peak limiter",
+  "equalizerLimiterDescription": "Keep peaks below −0.5 dBFS to reduce clipping.",
+  "equalizerCompressor": "Compressor",
+  "equalizerCompressorDescription": "Reduce the difference between quiet and loud passages.",
+  "equalizerThreshold": "Threshold",
+  "equalizerRatio": "Ratio",
+  "equalizerAttack": "Attack",
+  "equalizerRelease": "Release",
+  "equalizerPresets": "Presets",
+  "equalizerSavePreset": "Save preset",
+  "equalizerPresetName": "Preset name",
+  "equalizerImport": "Import preset",
+  "equalizerExport": "Share preset",
+  "equalizerImportInvalid": "Choose a valid Mornye equalizer preset (JSON, up to 64 KB).",
+  "equalizerSaved": "Preset saved",
+  "equalizerResetTitle": "Reset equalizer?",
+  "equalizerResetDescription": "Restore a flat curve, default tone and dynamics settings. Saved presets are kept.",
+  "equalizerBypass": "Bit-perfect, Direct USB and exclusive Hi-Res outputs bypass EQ. Disable bit-perfect output to use EQ. External players manage their own effects.",
+  "equalizerCurve": "EQ curve (estimated)",
+  "equalizerCurveDescription": "The curve shows band gains; the exact response depends on the output engine.",
+  "equalizerEffectivePreamp": "Input gain after headroom",
+  "equalizerDeletePreset": "Delete preset",
+  "equalizerCustom": "Custom",
+  "equalizerManagePresets": "Manage presets",
+  "lyricsShareTitle": "Share lyrics",
+  "@lyricsShareTitle": {
+    "description": "Screen that turns selected lyric lines into an image for stories"
+  },
+  "lyricsShareSelectHint": "Select up to {count} lines",
+  "@lyricsShareSelectHint": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "lyricsShareLimit": "You can share up to {count} lines",
+  "@lyricsShareLimit": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "lyricsShareAction": "Share",
+  "lyricsShareError": "Couldn't create the lyrics image",
+  "lyricsShareBackgroundArtwork": "Artwork",
+  "lyricsShareBackgroundColor": "Cover color",
+  "lyricsShareBackgroundDark": "Dark",
+  "lyricsShareBackgroundLight": "Light",
+  "audioInfoTitle": "Audio info",
+  "@audioInfoTitle": {
+    "description": "Sheet with technical details of the playing track, opened from the quality badge"
+  },
+  "audioInfoSource": "Source file",
+  "audioInfoSignal": "Signal",
+  "audioInfoLoudness": "Loudness",
+  "audioInfoProcessing": "Processing",
+  "audioInfoOutput": "Output",
+  "audioInfoAnalysis": "Spectrum and level analysis",
+  "audioInfoQuality": "Quality",
+  "audioInfoHiResLossless": "Hi-Res Lossless",
+  "audioInfoLossless": "Lossless",
+  "audioInfoLossy": "Lossy",
+  "audioInfoFormat": "Format",
+  "audioInfoCodec": "Codec",
+  "audioInfoSampleRate": "Sample rate",
+  "audioInfoBitDepth": "Bit depth",
+  "audioInfoChannels": "Channels",
+  "audioInfoChannelCount": "{count, plural, =1{Mono} =2{Stereo} other{{count} channels}}",
+  "@audioInfoChannelCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "audioInfoBitrate": "Bitrate",
+  "audioInfoDuration": "Duration",
+  "audioInfoFileSize": "File size",
+  "audioInfoCompression": "Compression",
+  "audioInfoCompressionValue": "{percent}% of uncompressed size",
+  "@audioInfoCompressionValue": {
+    "placeholders": {
+      "percent": {
+        "type": "String"
+      }
+    }
+  },
+  "audioInfoLocation": "Location",
+  "audioInfoLocationLocal": "Device storage",
+  "audioInfoLocationShared": "Shared folder",
+  "audioInfoLocationNetwork": "Network storage",
+  "audioInfoPcmRate": "Uncompressed data rate",
+  "audioInfoFrequencyRange": "Frequency range",
+  "audioInfoFrequencyRangeValue": "Up to {frequency} (Nyquist)",
+  "@audioInfoFrequencyRangeValue": {
+    "placeholders": {
+      "frequency": {
+        "type": "String"
+      }
+    }
+  },
+  "audioInfoDynamicRange": "Theoretical dynamic range",
+  "audioInfoTrackGain": "Track gain",
+  "audioInfoTrackPeak": "Track peak",
+  "audioInfoAlbumGain": "Album gain",
+  "audioInfoAlbumPeak": "Album peak",
+  "audioInfoNoGainTags": "No ReplayGain tags",
+  "audioInfoApplied": "Applied {gain}",
+  "@audioInfoApplied": {
+    "placeholders": {
+      "gain": {
+        "type": "String"
+      }
+    }
+  },
+  "audioInfoOn": "On",
+  "audioInfoOff": "Off",
+  "audioInfoBypassed": "Bypassed by direct output",
+  "audioInfoPlayer": "Player",
+  "audioInfoPlayerValue": "Mornye built-in player",
+  "audioInfoSignalPath": "Signal path",
+  "audioInfoPathSystem": "System mixer",
+  "audioInfoPathDirect": "Direct USB, bypasses the system mixer",
+  "audioInfoPathExclusive": "Exclusive output, bypasses the system mixer",
+  "audioInfoDecoder": "Decoder",
+  "audioInfoHardware": "Hardware",
+  "audioInfoSoftware": "Software",
+  "audioInfoBands": "{count} bands",
+  "@audioInfoBands": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "audioInfoTempo": "Tempo",
+  "audioInfoResampling": "Resampling",
+  "audioInfoResamplingNone": "None, rates match",
+  "audioInfoBitPerfect": "Bit-perfect",
+  "audioInfoBitPerfectActive": "Yes, unaltered samples",
+  "audioInfoBitPerfectNo": "No, mixed by the system",
+  "audioInfoDevice": "Device",
+  "audioInfoDeviceType": "{type, select, speaker{Phone speaker} earpiece{Earpiece} wired_headphones{Wired headphones} wired_headset{Wired headset} line{Line out} bluetooth{Bluetooth} bluetooth_le{Bluetooth LE Audio} usb{USB audio} usb_headset{USB headset} hdmi{HDMI} dock{Dock} cast{Cast} hearing_aid{Hearing aid} airplay{AirPlay} car{Car audio} other{Other}}",
+  "@audioInfoDeviceType": {
+    "placeholders": {
+      "type": {
+        "type": "String"
+      }
+    }
+  },
+  "audioInfoOutputRate": "Output sample rate",
+  "audioInfoOutputFormat": "Output format",
+  "audioInfoDeviceRates": "Device sample rates",
+  "audioInfoDeviceFormats": "Device formats",
+  "audioInfoAnyRate": "Any",
+  "audioInfoBuffer": "Mixer buffer",
+  "audioInfoLatency": "Output latency",
+  "audioInfoLowLatency": "Low-latency audio",
+  "audioInfoProAudio": "Pro audio",
+  "audioInfoSupported": "Supported",
+  "audioInfoNotSupported": "Not supported",
+  "audioInfoSpatial": "Spatial audio",
+  "audioInfoHeadTracking": "Head tracking",
+  "audioInfoUnavailable": "Unavailable",
+  "audioInfoFixedVolume": "Controlled by the device",
+  "audioInfoCopy": "Copy report",
+  "audioInfoCopied": "Audio info copied",
+  "lyricsTextSize": "Lyrics text size",
+  "lyricsTextPreview": "Follow every line of your favorite song",
+  "appCrashTitle": "The app previously crashed",
+  "appAnrTitle": "The app previously stopped responding",
+  "@appAnrTitle": {
+    "description": "Title for an Android ANR report, distinct from a crash."
+  },
+  "appAnrMessage": "A diagnostic report was saved. You can copy it and send it to the developer to help investigate.",
+  "@appAnrMessage": {
+    "description": "Message shown for an Android process exit due to an ANR."
+  },
+  "appCrashMessage": "A crash report was saved. Copy it and send it to the developer to help investigate.",
+  "appCrashDetails": "View error and log",
+  "appCrashCopy": "Copy report for developer",
+  "appCrashDismiss": "Dismiss",
+  "appCrashCopyFailed": "Could not copy the crash report. Please try again.",
+  "appCrashDismissFailed": "Could not dismiss the crash report. Please try again.",
   "optionsEmbeddedCoverSizeOriginal": "Original resolution",
   "@optionsEmbeddedCoverSizeOriginal": {
     "description": "Option that preserves the provider artwork at its original resolution"
+  },
+  "desktopShortcutTooltip": "{action} ({shortcut})",
+  "@desktopShortcutTooltip": {
+    "description": "Desktop tooltip that names an action and its keyboard shortcut, for example 'Next track (Ctrl+Right)'",
+    "placeholders": {
+      "action": {
+        "type": "String"
+      },
+      "shortcut": {
+        "type": "String"
+      }
+    }
+  },
+  "desktopPlayerIdle": "Not playing",
+  "@desktopPlayerIdle": {
+    "description": "Desktop player bar text when no track is loaded"
+  },
+  "desktopVolumeUp": "Increase volume",
+  "desktopVolumeDown": "Decrease volume",
+  "desktopTableSortedAscending": "{column}, sorted ascending",
+  "@desktopTableSortedAscending": {
+    "description": "Screen reader label of a song table column header that sorts the table A to Z",
+    "placeholders": {
+      "column": {
+        "type": "String"
+      }
+    }
+  },
+  "desktopTableSortedDescending": "{column}, sorted descending",
+  "@desktopTableSortedDescending": {
+    "description": "Screen reader label of a song table column header that sorts the table Z to A",
+    "placeholders": {
+      "column": {
+        "type": "String"
+      }
+    }
+  },
+  "desktopMenuOpen": "Open",
+  "@desktopMenuOpen": {
+    "description": "Context menu item that opens an album, artist, playlist or folder"
+  },
+  "desktopMenuShowDetails": "Show details",
+  "@desktopMenuShowDetails": {
+    "description": "Context menu item that opens a track's metadata page"
+  },
+  "desktopDropToImport": "Drop to add to your library",
+  "@desktopDropToImport": {
+    "description": "Overlay shown while music files or folders are dragged over the desktop window"
+  },
+  "desktopDropImported": "Adding {count} {count, plural, =1{folder} other{folders}} to your library",
+  "@desktopDropImported": {
+    "description": "Snackbar after dropping music onto the desktop window; the folders are scanned into the library",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "desktopDropNothingToImport": "Drop music files or folders to add them to your library",
+  "@desktopDropNothingToImport": {
+    "description": "Snackbar when the dropped items contain no folders or audio files"
+  },
+  "desktopAllPlaylists": "All Playlists",
+  "@desktopAllPlaylists": {
+    "description": "Desktop sidebar row that opens the list of every playlist"
+  },
+  "desktopMenuSettings": "Settings…",
+  "@desktopMenuSettings": {
+    "description": "macOS app menu item that opens Settings"
+  },
+  "desktopMenuFile": "File",
+  "desktopMenuEdit": "Edit",
+  "desktopMenuView": "View",
+  "desktopWindowMode": "Window mode",
+  "desktopWindowed": "Windowed",
+  "desktopWindowFullscreen": "Full screen",
+  "desktopWindowBorderless": "Borderless",
+  "desktopExitFullscreen": "Exit full screen",
+  "desktopMinimizeWindow": "Minimize window",
+  "desktopZoomWindow": "Maximize or restore window",
+  "desktopWindowModeUnavailable": "The window mode could not be changed. Try again after the current window transition finishes.",
+  "desktopMenuControls": "Controls",
+  "desktopMenuWindow": "Window",
+  "desktopMenuHelp": "Help",
+  "desktopMenuPlayPause": "Play/Pause",
+  "desktopMenuMiniPlayer": "Mini Player",
+  "@desktopMenuMiniPlayer": {
+    "description": "Window menu item, player bar button and Keyboard Shortcuts row that shrink the window into a small player floating above other windows"
+  },
+  "desktopMiniPlayerExpand": "Show Full Window",
+  "@desktopMiniPlayerExpand": {
+    "description": "Mini player button that returns the window to its full size"
+  },
+  "desktopMenuRefresh": "Refresh",
+  "@desktopMenuRefresh": {
+    "description": "View menu item and Keyboard Shortcuts row that reloads the page on screen (Home, Repo, statistics)"
+  },
+  "desktopMenuProjectPage": "Project page",
+  "@desktopMenuProjectPage": {
+    "description": "Help menu item that opens the app's source repository"
+  },
+  "desktopDownloadsShowAll": "Show all",
+  "@desktopDownloadsShowAll": {
+    "description": "Button in the desktop downloads popover that opens the full download queue"
+  },
+  "desktopDownloadsQueued": "Waiting",
+  "@desktopDownloadsQueued": {
+    "description": "Status of a download in the desktop downloads popover that has not started yet"
+  },
+  "desktopDownloadsCancel": "Cancel download",
+  "@desktopDownloadsCancel": {
+    "description": "Tooltip of the button that cancels one download in the desktop downloads popover"
+  },
+  "desktopScrollBack": "Scroll back",
+  "@desktopScrollBack": {
+    "description": "Tooltip of the desktop button that scrolls a horizontal shelf of albums or artists back"
+  },
+  "desktopScrollForward": "Scroll forward",
+  "@desktopScrollForward": {
+    "description": "Tooltip of the desktop button that scrolls a horizontal shelf of albums or artists forward"
+  },
+  "settingsKeyboardShortcuts": "Keyboard Shortcuts",
+  "@settingsKeyboardShortcuts": {
+    "description": "Desktop Settings page that lists the app's keyboard shortcuts"
+  },
+  "settingsKeyboardShortcutsSubtitle": "Keys for playback, navigation and panels",
+  "@settingsKeyboardShortcutsSubtitle": {
+    "description": "Subtitle of the Keyboard Shortcuts entry in desktop Settings"
+  },
+  "desktopShortcutsNavigation": "Navigation",
+  "@desktopShortcutsNavigation": {
+    "description": "Keyboard Shortcuts section for moving between pages"
+  },
+  "desktopShortcutDismiss": "Close dialog or page",
+  "@desktopShortcutDismiss": {
+    "description": "Keyboard Shortcuts row for Escape, which leaves a text field or closes the top dialog or page"
+  },
+  "desktopShortcutToggleSidebar": "Show or hide sidebar",
+  "@desktopShortcutToggleSidebar": {
+    "description": "Keyboard Shortcuts row for the shortcut that collapses or expands the desktop sidebar"
   }
 }

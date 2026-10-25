@@ -1,208 +1,179 @@
 {
   "trackBpm": "BPM",
-  "trackMood": "Suasana",
-  "subsonicAddToLibrary": "Tambahkan server ke Library",
-  "subsonicLibraryAdded": "Server ditambahkan ke Library",
-  "subsonicLibraryDescription": "Sinkronkan katalog dan sampul server ke Library. Musik tetap di server. Pindai ulang melalui pengaturan Local Library untuk memperbarui katalog.",
-  "subsonicAuthentication": "Autentikasi",
-  "subsonicToken": "Token bersalt",
-  "subsonicPasswordAuth": "Kata sandi",
-  "subsonicApiKey": "Kunci API",
+  "trackMood": "Mood",
+  "subsonicAddToLibrary": "Tambahkan server ke Koleksi",
+  "subsonicLibraryAdded": "Server ditambahkan ke Koleksi",
+  "subsonicLibraryDescription": "Sinkronkan katalog dan foto cover server ke Koleksi. Musik tetap di server. Pindai ulang lewat setelan Koleksi Lokal untuk mengupdate katalog.",
+  "subsonicAuthentication": "Otentikasi",
+  "subsonicToken": "Salted token",
+  "subsonicPasswordAuth": "Sandi",
+  "subsonicApiKey": "Key API",
   "subsonicUsername": "Nama pengguna",
-  "subsonicPassword": "Kata sandi",
-  "subsonicSearch": "Cari musik di server...",
+  "subsonicPassword": "Sandi",
+  "subsonicSearch": "Telusuri lagu server...",
   "subsonicMoreAlbums": "Album lainnya",
-  "subsonicErrorApi": "Server tidak mendukung versi API atau metode autentikasi ini. Periksa pengaturan server dan metode masuk yang dipilih.",
-  "trackFileUnavailable": "File saat ini tidak dapat diakses. Periksa akses penyimpanan dan coba lagi.",
-  "networkDownloadDestination": "Tujuan unduhan jaringan",
-  "networkUseForDownloads": "Unduh ke folder ini",
-  "networkDownloadSelected": "Tujuan unduhan terpilih",
-  "networkUseLocalDownloads": "Gunakan folder unduhan lokal",
-  "networkDownloadAccessFailed": "Tidak dapat menulis ke folder ini.",
-  "networkUploading": "Mengunggah ke penyimpanan jaringan",
-  "networkDownloadDescription": "Lagu diproses di perangkat, lalu diunggah ke NAS. Biarkan aplikasi terbuka sampai unggahan selesai. Coba lagi memakai audio yang sudah diproses. File lama tetap disimpan; unduhan baru dengan nama sama diberi akhiran nomor.",
-  "networkAddToLibrary": "Tambahkan folder ke Library",
-  "networkLibraryAdded": "Folder ditambahkan ke Library",
-  "networkLibraryDescription": "Pindai folder ini beserta subfoldernya. Musik tetap di server; metadata dan cover disimpan di perangkat ini. Kelola atau pindai ulang lewat pengaturan Local Library.",
+  "subsonicErrorApi": "Server tidak mendukung versi API atau metode autentikasi ini. Periksa setelan server dan metode masuk yang dipilih.",
+  "networkDownloadDestination": "Tujuan download jaringan",
+  "@networkDownloadDestination": {
+    "description": "Files settings item that opens network storage to choose a folder for downloaded music"
+  },
+  "networkUseForDownloads": "Download ke folder ini",
+  "@networkUseForDownloads": {
+    "description": "Action to select the current network folder as the download destination; also the settings subtitle when no network destination is selected"
+  },
+  "networkDownloadSelected": "Tujuan download terpilih",
+  "@networkDownloadSelected": {
+    "description": "Status label replacing the download destination action when the current network folder is already selected"
+  },
+  "networkUseLocalDownloads": "Gunakan folder download lokal",
+  "@networkUseLocalDownloads": {
+    "description": "Files settings action that clears the network download destination and returns downloads to the local folder"
+  },
+  "networkDownloadAccessFailed": "Tak dapat mengakses folder ini.",
+  "@networkDownloadAccessFailed": {
+    "description": "Snackbar prefix when the write-access check fails while selecting a network download folder; followed by a specific network error message"
+  },
+  "networkUploading": "Mengupload ke penyimpanan jaringan",
+  "@networkUploading": {
+    "description": "Download queue status during upload of prepared audio to the network destination; a progress percentage may follow"
+  },
+  "networkDownloadDescription": "Lagu disiapkan di perangkat, lalu diupload ke NAS. Biarkan aplikasi terbuka sampai upload selesai. Mencoba lagi akan gunakan audio yang disiapkan. File yang ada tetap disimpan; download baru dengan nama sama diberi akhiran nomor.",
+  "@networkDownloadDescription": {
+    "description": "Help below the network download destination action explaining local preparation, upload, retry behavior, and preservation of existing files; NAS means network-attached storage"
+  },
+  "networkAddToLibrary": "Tambahkan folder ke Koleksi",
+  "@networkAddToLibrary": {
+    "description": "Action that adds the current network folder as a Library source and starts scanning it"
+  },
+  "networkLibraryAdded": "Folder ditambahkan ke Koleksi",
+  "@networkLibraryAdded": {
+    "description": "Status label replacing the add-to-Library action after the network folder has been added as a source; does not mean scanning has finished"
+  },
+  "networkLibraryDescription": "Pindai folder ini beserta subfoldernya. Musik tetap di server; metadata dan cover disimpan di perangkat ini. Kelola atau pindai ulang lewat setelan Koleksi Lokal.",
+  "@networkLibraryDescription": {
+    "description": "Help below the add-to-Library action explaining recursive scanning, local metadata and artwork storage, and management in Local Library settings"
+  },
   "networkStorage": "Penyimpanan jaringan",
-  "networkErrorUnreachable": "Server tidak dapat dijangkau. Pastikan HP dapat mengakses jaringannya dan layanan berbagi file aktif. Untuk SMB, port 445 harus dapat diakses.",
+  "@networkStorage": {
+    "description": "Title and navigation label for the screen used to manage network connections and browse remote music folders"
+  },
+  "networkErrorUnreachable": "Server tidak dapat dijangkau. Pastikan ponsel ini dapat mengakses jaringannya dan layanan berbagi file sudah aktif. Untuk SMB, port 445 harus dapat diakses.",
+  "@networkErrorUnreachable": {
+    "description": "Network access error for an unreachable server, with connection troubleshooting and the SMB port requirement"
+  },
   "networkErrorTimeout": "Server tidak merespons tepat waktu. Periksa koneksi lalu coba lagi.",
-  "networkErrorAuthentication": "Server menolak login. Periksa nama pengguna, kata sandi, dan domain. Kosongkan domain kecuali server memerlukannya.",
-  "networkErrorPermission": "Akun ini tidak diizinkan membuka share atau folder tersebut. Periksa izin bacanya di server.",
-  "networkErrorLocalPermission": "Akses jaringan lokal belum diizinkan. Izinkan Perangkat di sekitar untuk Mornye di pengaturan aplikasi Android, lalu coba lagi.",
-  "networkErrorShare": "Share atau folder tidak ditemukan. Untuk SMB, gunakan nama folder yang dibagikan server setelah alamatnya, misalnya smb://server/Music/.",
+  "@networkErrorTimeout": {
+    "description": "Network access error when a server operation exceeds its time limit"
+  },
+  "networkErrorAuthentication": "Server menolak info login. Periksa nama pengguna, sandi, dan domain. Kosongkan domain kecuali server memerlukannya.",
+  "@networkErrorAuthentication": {
+    "description": "Network access error when the server rejects credentials; domain refers to the optional SMB authentication domain"
+  },
+  "networkErrorPermission": "Akun ini tidak diizinkan membuka file atau folder ini. Periksa izin aksesnya di server.",
+  "@networkErrorPermission": {
+    "description": "Network access error when the server denies account permissions for a shared folder; distinct from the device's local network permission"
+  },
+  "networkErrorLocalPermission": "Akses jaringan lokal tak diizinkan. Izinkan Perangkat di sekitar untuk Mornye di Setelan Android, lalu coba lagi.",
+  "@networkErrorLocalPermission": {
+    "description": "Network access error when Android denies local network permission; Nearby devices is the Android app permission setting"
+  },
+  "networkErrorShare": "File atau folder tidak ditemukan. Untuk SMB, tambah nama folder berbagi server setelah alamatnya, misalnya smb://server/Music/.",
+  "@networkErrorShare": {
+    "description": "Network access error for a missing share or folder; share means an SMB shared folder and the example illustrates its URL path"
+  },
   "networkErrorProtocol": "Server dan klien SMB ini tidak menemukan protokol yang cocok. Aktifkan SMB2 atau SMB3 di server. SMB1 tidak didukung.",
+  "@networkErrorProtocol": {
+    "description": "Network access error for incompatible SMB protocol versions; preserve the version names SMB1, SMB2, and SMB3"
+  },
   "networkErrorAddress": "Periksa alamat server. Gunakan smb://server/share/ untuk SMB, atau alamat http:// maupun https:// untuk WebDAV dan HTTP.",
+  "@networkErrorAddress": {
+    "description": "Network access error for an invalid address, with URL scheme examples for SMB, WebDAV, and HTTP connections"
+  },
   "networkConnections": "Koneksi tersimpan",
+  "@networkConnections": {
+    "description": "Section heading above the list of saved network storage connections"
+  },
   "networkServer": "Server",
-  "networkCredentials": "Masuk (opsional)",
-  "networkRefresh": "Muat ulang",
+  "@networkServer": {
+    "description": "Connection form section heading above the display name and server or audio URL fields"
+  },
+  "networkCredentials": "Login (opsional)",
+  "@networkCredentials": {
+    "description": "Connection form section heading for optional server credentials"
+  },
+  "networkRefresh": "Refresh",
+  "@networkRefresh": {
+    "description": "Toolbar tooltip for reloading saved connections or the current network folder listing"
+  },
   "networkStorageDescription": "Hubungkan NAS atau server musik dan jelajahi foldernya. Informasi akun disimpan dengan aman di perangkat ini.",
+  "@networkStorageDescription": {
+    "description": "Introduction shown in the empty connections screen and connection form, explaining remote folder browsing and secure local credential storage; NAS means network-attached storage"
+  },
   "networkAddConnection": "Tambah koneksi",
+  "@networkAddConnection": {
+    "description": "Action label, toolbar tooltip, and form title for adding a network storage connection"
+  },
   "networkEditConnection": "Edit koneksi",
+  "@networkEditConnection": {
+    "description": "Edit button tooltip and form title for changing an existing network storage connection"
+  },
   "networkConnectionName": "Nama",
+  "@networkConnectionName": {
+    "description": "Required connection form field for a user-chosen display name identifying the saved connection"
+  },
   "networkAddress": "URL server atau audio",
+  "@networkAddress": {
+    "description": "Required connection form field for the server or direct audio URL, using the scheme appropriate to the selected protocol"
+  },
   "networkProtocol": "Protokol",
+  "@networkProtocol": {
+    "description": "Connection form section heading for choosing SMB, WebDAV, or HTTP / HTTPS"
+  },
   "networkUsername": "Nama pengguna (opsional)",
-  "networkPassword": "Kata sandi (opsional)",
+  "@networkUsername": {
+    "description": "Optional connection form field for the server account username"
+  },
+  "networkPassword": "Sandi (opsional)",
+  "@networkPassword": {
+    "description": "Optional connection form field for the server account password, with input characters hidden"
+  },
   "networkDomain": "Domain (opsional)",
+  "@networkDomain": {
+    "description": "Optional connection form field shown only for SMB; refers to the authentication domain, not the server's internet domain name"
+  },
   "networkConnectSave": "Hubungkan dan simpan",
+  "@networkConnectSave": {
+    "description": "Connection form action that checks access to the network source before saving the connection"
+  },
   "networkErrorCertificate": "Sertifikat HTTPS server tidak dapat diverifikasi. Edit koneksi ini untuk memeriksa dan mempercayai sertifikatnya, atau periksa konfigurasi HTTPS server.",
-  "networkCertificatePrompt": "Server ini memakai sertifikat HTTPS yang belum dipercaya. Router dan NAS sering memakai sertifikat yang ditandatangani sendiri. Periksa alamat server dan sidik jari SHA-256 sebelum mempercayainya. Kepercayaan hanya berlaku untuk sertifikat ini pada server ini; perubahan sertifikat memerlukan persetujuan lagi.",
+  "@networkErrorCertificate": {
+    "description": "Network access error for HTTPS certificate verification failure, directing the user to review the certificate in the connection form; unrelated to SMB authentication"
+  },
+  "networkCertificatePrompt": "Server ini menggunakan sertifikat HTTPS yang tidak dipercaya. Biasanya router dan perangkat NAS menggunakan sertifikatnya sendiri. Periksa alamat server dan sidik jari SHA-256 sebelum mempercayainya. Hanya mempercayai sertifikat server ini; bila berubah harus disetujui lagi.",
+  "@networkCertificatePrompt": {
+    "description": "Connection form warning shown above the HTTPS origin and certificate SHA-256 fingerprint; approval trusts only that fingerprint for this connection's HTTPS origin, not a global certificate authority or an SMB server"
+  },
   "networkTrustCertificate": "Percayai sertifikat dan coba lagi",
+  "@networkTrustCertificate": {
+    "description": "Action approving the displayed certificate SHA-256 fingerprint for this connection's HTTPS origin and retrying connect-and-save; does not grant global certificate trust"
+  },
   "networkRemoveConnection": "Hapus koneksi",
-  "networkNoFiles": "Tidak ada file musik yang didukung atau folder.",
+  "@networkRemoveConnection": {
+    "description": "Connection form action that removes the saved connection and its credentials, without deleting files on the server"
+  },
+  "networkNoFiles": "Tak menemukan file lagu atau folder terdukung.",
+  "@networkNoFiles": {
+    "description": "Empty folder message when the network listing contains no directories or supported audio files"
+  },
   "networkConnectionError": "Tidak dapat mengakses sumber jaringan. Periksa alamat server, kredensial, dan koneksi, lalu coba lagi.",
-  "extensionAccountTitle": "Akun extension",
-  "extensionAccountInvalidForm": "Extension mengembalikan formulir akun yang tidak valid.",
-  "extensionAccountRestartLogin": "Mulai ulang login akun untuk melanjutkan.",
-  "extensionAccountRequiredValue": "Masukkan nilai.",
-  "extensionAccountInvalidNumber": "Masukkan angka yang valid.",
-  "appearanceGlassClearPerformance": "Kaca sangat bening dapat memakai lebih banyak daya dan terasa kurang lancar di perangkat lama. Kurangi kebeningan jika perlu.",
-  "libraryFilterIncompleteAlbums": "Album belum lengkap",
-  "@libraryFilterIncompleteAlbums": {
-    "description": "Library filter for albums with confirmed missing track positions"
+  "@networkConnectionError": {
+    "description": "Fallback network access error when the failure has no more specific classification"
   },
-  "libraryAlbumCompletenessUnknown": "Kelengkapan album belum diketahui",
-  "@libraryAlbumCompletenessUnknown": {
-    "description": "Library filter and status for missing, conflicting or ambiguous album track counts"
-  },
-  "libraryAlbumMissingTracks": "{present}/{expected} lagu · kurang {missing}",
-  "@libraryAlbumMissingTracks": {
-    "description": "Album completeness badge tooltip",
-    "placeholders": {
-      "present": {
-        "type": "int"
-      },
-      "expected": {
-        "type": "int"
-      },
-      "missing": {
-        "type": "int"
-      }
-    }
-  },
-  "autoMixSettingsTitle": "Transisi mix",
-  "autoMixAutomaticDuration": "Durasi otomatis",
-  "autoMixDuration": "Durasi mix",
-  "autoMixEffect": "Efek transisi",
-  "autoMixEffectAuto": "Otomatis",
-  "autoMixEffectCrossfade": "Crossfade",
-  "autoMixEffectMuffled": "Redam",
-  "autoMixEffectEcho": "Gema",
-  "autoMixEffectPitch": "Nada",
-  "autoMixEffectCustom": "Kustom",
-  "autoMixEffectsHelp": "Efek diterapkan pada akhir lagu yang keluar selama mix. Lagu pendek memakai overlap yang lebih singkat.",
-  "autoMixSpeed": "Kecepatan",
-  "autoMixPitch": "Nada (semitone)",
-  "autoMixEcho": "Gema",
-  "autoMixLowPass": "Filter redam",
-  "autoMixMixing": "Mixing",
-  "autoMixCrossfading": "Crossfade",
-  "motionArtwork": "Artwork bergerak",
-  "listeningStats": "Statistik mendengarkan",
-  "listeningStatsRecord": "Catat waktu mendengarkan",
-  "listeningStatsDescription": "Disimpan hanya di perangkat ini, mulai sekarang. Hanya mencatat player bawaan; pause, buffering, dan seek tidak menambah waktu dengar. Pemutaran dihitung setelah 30 detik.",
-  "listeningStatsEmpty": "Putar musik dengan player bawaan untuk memulai ringkasan mendengarkan. Riwayat sebelumnya tidak dapat dipulihkan.",
-  "listeningStatsDays": "{days} hari",
-  "listeningStatsMinutes": "{minutes} menit",
-  "listeningStatsTotals": "{plays} pemutaran · {tracks} lagu · {days} hari aktif",
-  "listeningStatsPreviousYear": "Tahun sebelumnya",
-  "listeningStatsNextYear": "Tahun berikutnya",
-  "listeningStatsActivity": "Hari mendengarkan terbaru · menit",
-  "listeningStatsTopArtists": "Artis teratas",
-  "listeningStatsTopTracks": "Lagu teratas",
-  "listeningStatsLoadError": "Statistik mendengarkan tidak dapat dimuat",
-  "listeningStatsClear": "Hapus statistik mendengarkan",
-  "listeningStatsClearError": "Statistik mendengarkan tidak dapat dihapus. Silakan coba lagi.",
-  "listeningStatsClearDescription": "Hapus semua statistik mendengarkan di perangkat ini? Musik dan playlist tetap tersimpan.",
-  "libraryArtistsEmpty": "Artis muncul di sini setelah kamu mengunduh musik atau memindai library lokal.",
-  "listeningRewind": "Rewind",
-  "listeningRewindDescription": "Lihat lagi momen menarik dari minggu dan bulan terakhir",
-  "listeningRewindChoosePeriod": "Pilih periode",
-  "listeningRewindLastWeeks": "{weeks} minggu terakhir",
-  "listeningRewindLastMonths": "{months} bulan terakhir",
-  "listeningRewindThisYear": "Sepanjang {year}",
-  "listeningRewindIntroTitle": "Rewind kamu",
-  "listeningRewindIntroBody": "Kilas balik musik yang kamu putar dari {start} sampai {end}.",
-  "listeningRewindMinutesTitle": "Kamu mendengarkan selama",
-  "listeningRewindMinutesUnit": "menit",
-  "listeningRewindHours": "Sekitar {hours} jam musik",
-  "listeningRewindMore": "{percent}% lebih banyak dari periode sebelumnya",
-  "listeningRewindLess": "{percent}% lebih sedikit dari periode sebelumnya",
-  "listeningRewindSame": "Kurang lebih sama dengan periode sebelumnya",
-  "listeningRewindTopArtistTitle": "Artis teratasmu",
-  "listeningRewindArtistShare": "{percent}% dari waktu mendengarkanmu",
-  "listeningRewindArtistsTitle": "Artis yang sering diputar",
-  "listeningRewindTopTrackTitle": "Lagu teratasmu",
-  "listeningRewindPlays": "{plays}x diputar",
-  "listeningRewindTracksTitle": "Lagu yang terus diulang",
-  "listeningRewindTopAlbumTitle": "Album yang terus kamu putar",
-  "listeningRewindNewArtistsTitle": "Temuan baru",
-  "listeningRewindNewArtistsBody": "Kamu menemukan {count} artis baru",
-  "listeningRewindRhythmTitle": "Ritme mendengarkanmu",
-  "listeningRewindPeakDay": "Hari tersibuk",
-  "listeningRewindFavoriteDay": "Hari favorit",
-  "listeningRewindStreak": "Streak terpanjang",
-  "listeningRewindStreakDays": "{days, plural, =1{1 hari} other{{days} hari berturut-turut}}",
-  "listeningRewindReplayTitle": "Tak bisa berhenti memutar",
-  "listeningRewindReplayBody": "Kamu memutarnya {plays} kali pada {date}",
-  "listeningRewindOutroTitle": "Itulah Rewind kamu",
-  "listeningRewindOutroBody": "Terus dengarkan. Rewind berikutnya sudah mulai terbentuk.",
-  "listeningRewindEmpty": "Belum cukup aktivitas mendengarkan di periode ini. Putar musik lewat pemutar bawaan, lalu kembali lagi nanti.",
-  "listeningRewindLoadError": "Gagal memuat Rewind",
-  "listeningRewindSlide": "Slide {index} dari {count}",
-  "listeningRewindShare": "Bagikan",
-  "listeningRewindShareError": "Gagal membagikan Rewind",
-  "listeningRewindNext": "Berikutnya",
-  "listeningRewindPrevious": "Sebelumnya",
-  "listeningRewindMonthlyReady": "4 minggu terakhirmu siap diputar ulang",
-  "listeningRewindYearTitle": "Musikmu di {year}",
-  "listeningRewindYearEyebrow": "Rewind akhir tahun",
-  "listeningRewindYearBanner": "Artis, lagu, dan momen terbaikmu tahun ini",
-  "listeningRewindYearIntroBody": "Semua yang kamu putar tahun ini, dari lagu pertama sampai bulan tersibukmu.",
-  "listeningRewindNumbersTitle": "Tahunmu dalam angka",
-  "listeningRewindSongsLabel": "Lagu",
-  "listeningRewindArtistsLabel": "Artis",
-  "listeningRewindAlbumsLabel": "Album",
-  "listeningRewindDaysLabel": "Hari bermusik",
-  "listeningRewindDaysShare": "Ada musik di {percent}% harimu",
-  "listeningRewindMonthsTitle": "Bulan demi bulan",
-  "listeningRewindBiggestMonthLabel": "Bulan tersibuk",
-  "listeningRewindBiggestMonth": "Bulan tersibukmu adalah {month}",
-  "listeningRewindMonthlyArtistsTitle": "Artis tiap bulan",
-  "listeningRewindLoyalTitle": "Selalu menemanimu",
-  "listeningRewindLoyalBody": "{days, plural, =1{Menemanimu di 1 hari} other{Menemanimu di {days} hari berbeda}}",
-  "listeningRewindFirstSongTitle": "Awal tahunmu",
-  "listeningRewindFirstSongBody": "Lagu yang paling sering diputar pada hari pertama kamu mendengarkan, {date}",
-  "listeningRewindYearOutroTitle": "Itulah {year}-mu",
-  "listeningRewindYearOutroBody": "Sampai jumpa di tahun penuh musik berikutnya.",
-  "weeklyReleases": "Rilis baru",
-  "weeklyReleasesDescription": "Album dan single terbaru dari artis favorit, melalui extension metadata yang terpasang.",
-  "weeklyReleasesEmpty": "Tidak ditemukan rilis dengan tanggal dalam periode ini. Tambahkan artis favorit atau coba periode lebih panjang.",
-  "weeklyReleasesUnavailable": "Beberapa artis tidak dapat diperiksa. Hasil tersimpan tetap dipertahankan. Penyedia mungkin tidak memberikan katalog artis atau tanggal rilis lengkap.",
-  "weeklyReleasesLoadError": "Rilis baru tidak dapat diperiksa. Tarik untuk memuat ulang.",
-  "motionArtworkDescription": "Putar berulang cover video dari penyedia metadata. Matikan untuk memakai cover diam dan menghemat baterai.",
-  "libraryLoading": "Memuat Library…",
-  "libraryLoadFailed": "Library tidak dapat dimuat. Coba lagi untuk memuat folder tersimpan dan indeks lagu.",
-  "discordPresenceDescription": "Tampilkan judul, artis, album, dan progres musik dari pemutar bawaan di profil Discord Anda. File audio dan cover lokal tidak diunggah. Status dihapus saat musik dijeda atau dihentikan.",
-  "discordPresenceDisabled": "Nonaktif",
-  "discordPresenceLink": "Hubungkan akun Discord",
-  "discordPresenceConnecting": "Menghubungkan ke Discord…",
-  "discordPresenceReady": "Siap saat musik diputar",
-  "discordPresenceActive": "Menampilkan lagu saat ini",
-  "discordPresenceUnavailable": "Discord tidak tersedia. Mencoba lagi saat musik diputar.",
-  "discordPresenceBuildUnavailable": "SDK Discord tidak tersedia di build ini.",
-  "discordPresenceAndroidHelp": "Pasang Discord dan masuk di ponsel ini. Izinkan berbagi aktivitas di Discord. Pemutar eksternal tidak didukung.",
-  "discordPresenceIosHelp": "Hubungkan akun melalui Discord dan izinkan berbagi aktivitas. Ketuk untuk menghubungkan ulang jika otorisasi gagal.",
-  "discordPresenceDesktopHelp": "Biarkan aplikasi desktop Discord berjalan dan masuk di komputer ini, lalu izinkan berbagi aktivitas di Discord.",
-  "discordPresenceDisconnect": "Putuskan dan lupakan akun",
-  "playbackAutomation": "Pemutaran otomatis",
-  "playbackPauseOnMute": "Jeda saat volume nol",
-  "snackbarPlaybackMuted": "Volume media nol. Lagu dijeda. Tekan play lagi untuk tetap memutar.",
-  "playbackPauseOnMuteDescription": "Jeda saat volume media nol dan lanjutkan saat dinaikkan. Jeda manual tetap dihormati. Hanya untuk keluaran audio standar.",
-  "playbackOnHeadphonesConnected": "Putar saat earphone terhubung",
-  "playbackOnHeadphonesConnectedDescription": "Lanjutkan lagu saat earphone kabel atau Bluetooth terhubung. Pemutaran dijeda saat dilepas. Hanya untuk pemutar bawaan.",
+  "extensionAccountTitle": "Akun ekstensi",
+  "extensionAccountInvalidForm": "Ekstensi mengembalikan bentuk akun yang tak valid.",
+  "extensionAccountRestartLogin": "Restart akun login untuk lanjut.",
+  "extensionAccountRequiredValue": "Harap diisi.",
+  "extensionAccountInvalidNumber": "Beri angka yang valid.",
   "settingsPlaybackSubtitle": "Pemutar, volume, AutoMix, dan output audio",
   "sectionPlayer": "Pemutar",
   "sectionVolumeAndTransitions": "Volume dan transisi",
@@ -265,6 +236,7 @@
   "appearanceGlassClaritySubtitle": "Atur kebeningan kaca menu dan navigasi Mornye. Kontras teks tetap terjaga.",
   "appearanceGlassTinted": "Berwarna",
   "appearanceGlassClear": "Bening",
+  "appearanceGlassClearPerformance": "Kaca yang terlalu bening dapat memperlambat performa perangkat lama. Kurangi kebeningan jika perlu.",
   "appearanceGlassClarityBlurOff": "Efek kaca mati di perangkat ini. Hidupkan \"{setting}\" untuk atur kebeningan kaca.",
   "@appearanceGlassClarityBlurOff": {
     "description": "Shown under the disabled glass clarity slider when the device renders Mornye glass without blur. The placeholder is the name of the force-blur toggle.",
@@ -276,7 +248,12 @@
   },
   "appearanceGlassClarityHighContrast": "Sistem meminta peningkatan kontras, sehingga kaca menjadi buram penuh. Aktifkan “{setting}” untuk tetap menggunakan efek kaca; kontras teks tetap dipertahankan.",
   "@appearanceGlassClarityHighContrast": {
-    "description": "Explains the system contrast request and the explicit glass-only override."
+    "description": "Explains the system contrast request (which can include medium contrast) and the explicit glass-only override.",
+    "placeholders": {
+      "setting": {
+        "type": "String"
+      }
+    }
   },
   "appearanceUseSystemFont": "Gunakan font sistem",
   "appearanceUseSystemFontSubtitle": "Menggunakan font default perangkat untuk aplikasi.",
@@ -321,6 +298,18 @@
   "@homeRecent": {
     "description": "Section header for recent searches"
   },
+  "searchRecentlySearched": "Baru Ditelusuri",
+  "@searchRecentlySearched": {
+    "description": "Section header for recent searches on the desktop Search page"
+  },
+  "searchLibraryPrompt": "Telusuri Koleksimu",
+  "@searchLibraryPrompt": {
+    "description": "Shown on the desktop Search page when the Library scope has no search words yet"
+  },
+  "searchBrowse": "Jelajahi",
+  "@searchBrowse": {
+    "description": "Section header for home feed tiles on the desktop Search page"
+  },
   "historyFilterAll": "Semua",
   "@historyFilterAll": {
     "description": "Filter chip - show all items"
@@ -336,8 +325,8 @@
   "libraryRecentlyAdded": "Baru Ditambahkan",
   "libraryDownloads": "Download",
   "libraryNoActiveDownloads": "Tidak sedang download",
-  "librarySearchHint": "Telusuri koleksi Anda",
-  "libraryEmptyCollection": "Musik Anda akan muncul di sini",
+  "librarySearchHint": "Telusuri koleksimu",
+  "libraryEmptyCollection": "Musik kamu akan muncul di sini",
   "libraryFolders": "Folder",
   "libraryFolderCount": "{count, plural, =1{1 folder} other{{count} folder}}",
   "libraryFoldersEmptyTitle": "Belum ada folder",
@@ -376,11 +365,11 @@
   "@downloadFilenameFormat": {
     "description": "Setting for output filename pattern"
   },
-  "downloadSingleFilenameFormat": "Format Nama FileTunggal",
+  "downloadSingleFilenameFormat": "Format Nama File Single",
   "@downloadSingleFilenameFormat": {
     "description": "Setting for output filename pattern for singles/EPs"
   },
-  "downloadSingleFilenameFormatDescription": "Pola nama file untuk single dan EP. Menggunakan tag yang sama dengan format album.",
+  "downloadSingleFilenameFormatDescription": "Atur nama file untuk single dan EP. Menggunakan tag yang sama dengan format album.",
   "@downloadSingleFilenameFormatDescription": {
     "description": "Subtitle description for single filename format setting"
   },
@@ -389,11 +378,29 @@
     "description": "Title of the folder organization picker bottom sheet"
   },
   "downloadFolderTemplate": "Struktur Folder Kustom",
+  "@downloadFolderTemplate": {
+    "description": "Setting for editing a relative download folder template"
+  },
   "downloadFolderTemplateDescription": "Gunakan tag penamaan dan / untuk subfolder. Menyimpan akan mengganti susunan album dan single bawaan. Nama folder kosong memakai Unknown.",
+  "@downloadFolderTemplateDescription": {
+    "description": "Help for custom download folder templates"
+  },
   "folderOrganizationCustom": "Template kustom",
+  "@folderOrganizationCustom": {
+    "description": "Folder organization mode using a user-defined template"
+  },
   "folderTemplateInvalid": "Masukkan path folder relatif dengan tag yang didukung. Folder kosong, . dan .. tidak diizinkan.",
+  "@folderTemplateInvalid": {
+    "description": "Validation error for an invalid folder template"
+  },
   "folderTemplatePreview": "Contoh path folder",
-  "folderTemplatePreviewFailed": "Pratinjau tidak tersedia",
+  "@folderTemplatePreview": {
+    "description": "Label for a sample expanded folder template"
+  },
+  "folderTemplatePreviewFailed": "Preview tidak tersedia",
+  "@folderTemplatePreviewFailed": {
+    "description": "Shown when the native folder preview could not be generated"
+  },
   "appearanceTitle": "Tampilan",
   "@appearanceTitle": {
     "description": "Appearance settings page title"
@@ -414,7 +421,7 @@
   "@appearanceDynamicColor": {
     "description": "Material You dynamic colors"
   },
-  "appearanceDynamicColorSubtitle": "Gunakan warna dari wallpaper Anda",
+  "appearanceDynamicColorSubtitle": "Gunakan warna dari wallpapermu",
   "@appearanceDynamicColorSubtitle": {
     "description": "Subtitle for dynamic color"
   },
@@ -451,7 +458,7 @@
   "@optionsDefaultSearchTab": {
     "description": "Title for the preferred default search tab setting"
   },
-  "optionsDefaultSearchTabSubtitle": "Pilih tab mana yang terbuka terlebih dahulu untuk hasil penelusuran baru.",
+  "optionsDefaultSearchTabSubtitle": "Pilih tab yang terbuka terlebih dahulu untuk hasil penelusuran baru.",
   "@optionsDefaultSearchTabSubtitle": {
     "description": "Subtitle for the preferred default search tab setting"
   },
@@ -737,7 +744,13 @@
     "description": "Link to mobile GitHub repo"
   },
   "aboutLyricsWebsite": "Situs lirik",
+  "@aboutLyricsWebsite": {
+    "description": "Link to the Zarz-LRC website for searching and saving word-timed lyrics"
+  },
   "aboutServiceStatus": "Status layanan",
+  "@aboutServiceStatus": {
+    "description": "Link to the status page of the Mornye online services"
+  },
   "aboutReportIssue": "Laporkan masalah",
   "@aboutReportIssue": {
     "description": "Link to report bugs"
@@ -1623,6 +1636,30 @@
   "@updateDontRemind": {
     "description": "Update button - skip this version"
   },
+  "updateViewRelease": "Lihat Rilisan",
+  "@updateViewRelease": {
+    "description": "Update button - open the release page when this install cannot update itself (deb, Flatpak, no matching package)"
+  },
+  "updateStartingInstaller": "Memulai instaler...",
+  "@updateStartingInstaller": {
+    "description": "Update status on Windows - the downloaded installer is starting and the app will close"
+  },
+  "updateMacInstallHint": "Image disk terbuka di Finder. Keluar dari Mornye, lalu tarik Mornye dari image disk ke Aplikasi dan ganti versi lamanya.",
+  "@updateMacInstallHint": {
+    "description": "Update instructions on macOS after the downloaded disk image opens"
+  },
+  "updateQuitApp": "Keluar Mornye",
+  "@updateQuitApp": {
+    "description": "Update button on macOS - quit the app so the new version can replace it"
+  },
+  "updateReadyToRestart": "Update diinstal. Restart Mornye untuk menggunakannya.",
+  "@updateReadyToRestart": {
+    "description": "Update status on Linux after the AppImage was replaced"
+  },
+  "updateRestartNow": "Restart Sekarang",
+  "@updateRestartNow": {
+    "description": "Update button on Linux - restart the app after the AppImage was replaced"
+  },
   "providerPriorityTitle": "Prioritas Provider",
   "@providerPriorityTitle": {
     "description": "Provider priority page title"
@@ -1897,6 +1934,10 @@
   "@trackFileNotFound": {
     "description": "Error - file doesn't exist"
   },
+  "trackFileUnavailable": "File saat ini tidak dapat diakses. Periksa akses penyimpanan dan coba lagi.",
+  "@trackFileUnavailable": {
+    "description": "File access failed; this does not mean the file was deleted"
+  },
   "trackOpenInDeezer": "Buka di Deezer",
   "@trackOpenInDeezer": {
     "description": "Action - open track in Deezer app"
@@ -2031,7 +2072,7 @@
     "description": "Delete confirmation title"
   },
   "trackDeleteNetworkConfirmMessage": "Ini akan menghapus file secara permanen dari penyimpanan jaringan serta menghapusnya dari perpustakaan dan riwayat Anda.",
-  "snackbarDeleteTracksFailed": "Gagal menghapus {count} lagu. Periksa izin akses penyimpanan dan coba lagi.",
+  "snackbarDeleteTracksFailed": "Tak dapat hapus {count} {count, plural, =1{lagu} other{lagu}}. Periksa akses penyimpanan dan coba lagi.",
   "@snackbarDeleteTracksFailed": {
     "placeholders": {
       "count": {
@@ -3593,7 +3634,7 @@
   "@trackReEnrichBatchSubtitle": {
     "description": "Subtitle for batch metadata update choices"
   },
-  "trackReEnrichFieldCover": "Cover Art",
+  "trackReEnrichFieldCover": "Foto Cover",
   "@trackReEnrichFieldCover": {
     "description": "Checkbox label for cover art field in re-enrich"
   },
@@ -4740,7 +4781,7 @@
   "@downloadAppleQqMultiPersonDisabled": {
     "description": "Subtitle when multi-person lyrics is off"
   },
-  "downloadAppleElrcWordSync": "Apple Music eLRC Word Sync",
+  "downloadAppleElrcWordSync": "eLRC Apple Music Per Kata",
   "@downloadAppleElrcWordSync": {
     "description": "Setting for preserving Apple Music word-by-word eLRC timestamps"
   },
@@ -4911,6 +4952,51 @@
   "@editMetadataAutoFillNoneSelected": {
     "description": "Snackbar when user taps Fetch without selecting any fields"
   },
+  "editMetadataLyricsSearch": "Telusuri lirik di internet",
+  "@editMetadataLyricsSearch": {
+    "description": "Button in the edit metadata lyrics section that searches every lyrics provider"
+  },
+  "lyricsPickerTitle": "Pilih lirik",
+  "@lyricsPickerTitle": {
+    "description": "Title of the sheet listing each lyrics provider's result"
+  },
+  "lyricsPickerNeedsTitle": "Masukkan judul dan artis dulu",
+  "@lyricsPickerNeedsTitle": {
+    "description": "Snackbar when searching lyrics without a title or artist"
+  },
+  "lyricsPickerNoProviders": "Tak ada provider lirik yang hidup. Hidupkan beberapa di Setelan > Lirik.",
+  "@lyricsPickerNoProviders": {
+    "description": "Shown in the lyrics picker when no provider is enabled"
+  },
+  "lyricsPickerWordSynced": "Per kata",
+  "@lyricsPickerWordSynced": {
+    "description": "Lyrics result timed word by word"
+  },
+  "lyricsPickerSynced": "Berwaktu",
+  "@lyricsPickerSynced": {
+    "description": "Lyrics result timed line by line"
+  },
+  "lyricsPickerPlain": "Lirik biasa",
+  "@lyricsPickerPlain": {
+    "description": "Lyrics result without timing"
+  },
+  "lyricsPickerInstrumental": "Instrumental",
+  "@lyricsPickerInstrumental": {
+    "description": "Lyrics result that marks the track as instrumental"
+  },
+  "lyricsPickerNotFound": "Tak menemukan lirik",
+  "@lyricsPickerNotFound": {
+    "description": "A lyrics provider returned nothing for this track"
+  },
+  "lyricsPickerLineCount": "{count, plural, =1{1 bait} other{{count} bait}}",
+  "@lyricsPickerLineCount": {
+    "description": "Number of lyric lines in a provider's result",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "editMetadataFieldTitle": "Judul",
   "@editMetadataFieldTitle": {
     "description": "Chip label for title field in auto-fill selector"
@@ -4955,7 +5041,7 @@
   "@editMetadataFieldCopyright": {
     "description": "Chip label for copyright field in auto-fill selector"
   },
-  "editMetadataFieldCover": "Cover Art",
+  "editMetadataFieldCover": "Foto Cover",
   "@editMetadataFieldCover": {
     "description": "Chip label for cover art field in auto-fill selector"
   },
@@ -5079,7 +5165,7 @@
   "@audioAnalysisContainer": {
     "description": "Audio container metric label"
   },
-  "audioAnalysisDecodedFormat": "Decoded Format",
+  "audioAnalysisDecodedFormat": "Format Terdekode",
   "@audioAnalysisDecodedFormat": {
     "description": "Decoded sample format metric label"
   },
@@ -5123,7 +5209,7 @@
   "@audioAnalysisTruePeak": {
     "description": "True peak metric label"
   },
-  "audioAnalysisClipping": "Clipping",
+  "audioAnalysisClipping": "Slipping",
   "@audioAnalysisClipping": {
     "description": "Clipping metric label"
   },
@@ -5297,7 +5383,13 @@
     "description": "Extensions page - label for home feed provider selector"
   },
   "extensionsHomeFeedCountry": "Negara beranda",
+  "@extensionsHomeFeedCountry": {
+    "description": "Country picker for the active Home feed extension"
+  },
   "extensionsHomeFeedCountryDescription": "Pilih rekomendasi beranda suatu negara tanpa VPN.",
+  "@extensionsHomeFeedCountryDescription": {
+    "description": "Help for choosing regional Home recommendations"
+  },
   "extensionsHomeFeedDescription": "Pilih ekstensi provider feed beranda di layar utama",
   "@extensionsHomeFeedDescription": {
     "description": "Extensions page - description for home feed provider picker"
@@ -7001,7 +7093,13 @@
     "description": "Country name for SongLink region picker"
   },
   "regionCountryIT": "Italia",
+  "@regionCountryIT": {
+    "description": "Country name for Italy"
+  },
   "regionCountryES": "Spanyol",
+  "@regionCountryES": {
+    "description": "Country name for Spain"
+  },
   "regionCountryGB": "Inggris Raya",
   "@regionCountryGB": {
     "description": "Country name for SongLink region picker"
@@ -7140,6 +7238,29 @@
   "@libraryFilterMetadataHasReplayGain": {
     "description": "Filter option for tracks with indexed ReplayGain track or album gain tags"
   },
+  "libraryFilterIncompleteAlbums": "Album belum lengkap",
+  "@libraryFilterIncompleteAlbums": {
+    "description": "Library filter for albums with confirmed missing track positions"
+  },
+  "libraryAlbumCompletenessUnknown": "Kelengkapan album belum diketahui",
+  "@libraryAlbumCompletenessUnknown": {
+    "description": "Library filter and status for missing, conflicting or ambiguous album track counts"
+  },
+  "libraryAlbumMissingTracks": "{present}/{expected} lagu · kurang {missing}",
+  "@libraryAlbumMissingTracks": {
+    "description": "Album completeness badge tooltip",
+    "placeholders": {
+      "present": {
+        "type": "int"
+      },
+      "expected": {
+        "type": "int"
+      },
+      "missing": {
+        "type": "int"
+      }
+    }
+  },
   "trackOptionCopyTrackName": "Salin nama lagu",
   "@trackOptionCopyTrackName": {
     "description": "Track menu action that copies the track title"
@@ -7184,7 +7305,7 @@
     "description": "Selected state of the compact favorite action"
   },
   "autoMixDescription": "Padukan musik dengan pencocokan bit dan penyesuaian tempo. Menggunakan crossfade bila beat tidak dapat dicocokkan.",
-  "playerCoverStyle": "Cover art",
+  "playerCoverStyle": "Foto cover",
   "@playerCoverStyle": {
     "description": "Settings section choosing how the player shows cover art"
   },
@@ -7255,16 +7376,348 @@
   "homeGreetingNight2": "Teman begadang",
   "homeGreetingNight3": "Malam yang tenang",
   "homeGreetingNamed": "{greeting}, {name}",
+  "@homeGreetingNamed": {
+    "description": "Home greeting followed by the first name from the user's profile",
+    "placeholders": {
+      "greeting": {
+        "type": "String"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "homeTaglineListening": "Mau dengar apa hari ini?",
+  "@homeTaglineListening": {
+    "description": "Rotating Home prompt under the greeting"
+  },
   "homeTaglineLink": "Punya link? Tempel saja di pencarian",
+  "@homeTaglineLink": {
+    "description": "Rotating Home prompt explaining that links can be pasted into search"
+  },
   "homeTaglineDiscover": "Temukan album favoritmu berikutnya",
+  "@homeTaglineDiscover": {
+    "description": "Rotating Home prompt under the greeting"
+  },
   "homeContinueListening": "Lanjutkan mendengarkan",
+  "@homeContinueListening": {
+    "description": "Home section header for the track currently loaded in the player"
+  },
   "homeRecentlyAdded": "Baru ditambahkan",
+  "@homeRecentlyAdded": {
+    "description": "Home section header for the newest downloaded and scanned tracks"
+  },
   "homeOnRepeat": "Sering diputar",
+  "@homeOnRepeat": {
+    "description": "Home section header for the most played tracks of the last four weeks"
+  },
   "homeShortcuts": "Pintasan",
+  "@homeShortcuts": {
+    "description": "Home section header for quick links to player tools"
+  },
   "artistUpcomingConcerts": "Konser Mendatang",
   "artistAllUpcomingConcerts": "Semua Konser Mendatang",
   "artistNoUpcomingConcerts": "Tiada konser mendatang.",
+  "motionArtwork": "Artwork bergerak",
+  "listeningStats": "Statistik mendengarkan",
+  "listeningStatsRecord": "Catat waktu mendengarkan",
+  "listeningStatsDescription": "Disimpan hanya di perangkat ini, mulai sekarang. Hanya mencatat player bawaan; pause, buffering, dan seek tidak menambah waktu dengar. Pemutaran dihitung setelah 30 detik.",
+  "listeningStatsEmpty": "Putar musik dengan player bawaan untuk memulai ringkasan mendengarkan. Riwayat sebelumnya tidak dapat dipulihkan.",
+  "listeningStatsDays": "{days} hari",
+  "@listeningStatsDays": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "listeningStatsMinutes": "{minutes} menit",
+  "@listeningStatsMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "listeningStatsTotals": "{plays, plural, =1{1 putar} other{{plays} putar}} · {tracks, plural, =1{1 lagu} other{{tracks} lagu}} · {days, plural, =1{1 hari aktif} other{{days} hari aktif}}",
+  "@listeningStatsTotals": {
+    "placeholders": {
+      "plays": {
+        "type": "int"
+      },
+      "tracks": {
+        "type": "int"
+      },
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "listeningStatsPreviousYear": "Tahun sebelumnya",
+  "listeningStatsNextYear": "Tahun berikutnya",
+  "listeningStatsActivity": "Hari mendengarkan terbaru · menit",
+  "listeningStatsTopArtists": "Artis teratas",
+  "listeningStatsTopTracks": "Lagu teratas",
+  "listeningStatsLoadError": "Statistik mendengarkan tidak dapat dimuat",
+  "listeningStatsClear": "Hapus statistik mendengarkan",
+  "listeningStatsClearError": "Statistik mendengarkan tidak dapat dihapus. Silakan coba lagi.",
+  "listeningStatsClearDescription": "Hapus semua statistik mendengarkan di perangkat ini? Musik dan playlist tetap tersimpan.",
+  "libraryArtistsEmpty": "Artis muncul di sini setelah kamu mengunduh musik atau memindai library lokal.",
+  "listeningRewind": "Rewind",
+  "listeningRewindDescription": "Lihat lagi momen menarik dari minggu dan bulan terakhir",
+  "listeningRewindChoosePeriod": "Pilih periode",
+  "listeningRewindLastWeeks": "{weeks} minggu terakhir",
+  "@listeningRewindLastWeeks": {
+    "placeholders": {
+      "weeks": {
+        "type": "int"
+      }
+    }
+  },
+  "listeningRewindLastMonths": "{months} bulan terakhir",
+  "@listeningRewindLastMonths": {
+    "placeholders": {
+      "months": {
+        "type": "int"
+      }
+    }
+  },
+  "listeningRewindThisYear": "Sepanjang {year}",
+  "@listeningRewindThisYear": {
+    "placeholders": {
+      "year": {
+        "type": "int"
+      }
+    }
+  },
+  "listeningRewindIntroTitle": "Rewind kamu",
+  "listeningRewindIntroBody": "Kilas balik musik yang kamu putar dari {start} sampai {end}.",
+  "@listeningRewindIntroBody": {
+    "placeholders": {
+      "start": {
+        "type": "String"
+      },
+      "end": {
+        "type": "String"
+      }
+    }
+  },
+  "listeningRewindMinutesTitle": "Kamu mendengarkan selama",
+  "listeningRewindMinutesUnit": "{minutes, plural, =1{menit} other{menit}}",
+  "@listeningRewindMinutesUnit": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "listeningRewindHours": "{hours, plural, =1{Itu sama dengan 1 jam mendengar} other{Itu sama dengan {hours} jam mendengar}}",
+  "@listeningRewindHours": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      }
+    }
+  },
+  "listeningRewindMore": "{percent}% lebih banyak dari periode sebelumnya",
+  "@listeningRewindMore": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "listeningRewindLess": "{percent}% lebih sedikit dari periode sebelumnya",
+  "@listeningRewindLess": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "listeningRewindSame": "Kurang lebih sama dengan periode sebelumnya",
+  "listeningRewindTopArtistTitle": "Artis teratasmu",
+  "listeningRewindArtistShare": "{percent}% dari waktu mendengarkanmu",
+  "@listeningRewindArtistShare": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "listeningRewindArtistsTitle": "Artis yang sering diputar",
+  "listeningRewindTopTrackTitle": "Lagu teratasmu",
+  "listeningRewindPlays": "{plays, plural, =1{1 putar} other{{plays} putar}}",
+  "@listeningRewindPlays": {
+    "placeholders": {
+      "plays": {
+        "type": "int"
+      }
+    }
+  },
+  "listeningRewindTracksTitle": "Lagu yang terus diulang",
+  "listeningRewindTopAlbumTitle": "Album yang terus kamu putar",
+  "listeningRewindNewArtistsTitle": "Temuan baru",
+  "listeningRewindNewArtistsBody": "{count, plural, =1{Kamu ketemu 1 artis baru} other{Kamu ketemu {count} artis baru}}",
+  "@listeningRewindNewArtistsBody": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "listeningRewindRhythmTitle": "Ritme mendengarkanmu",
+  "listeningRewindPeakDay": "Hari tersibuk",
+  "listeningRewindFavoriteDay": "Hari favorit",
+  "listeningRewindStreak": "Streak terpanjang",
+  "listeningRewindStreakDays": "{days, plural, =1{1 hari} other{{days} hari berturut-turut}}",
+  "@listeningRewindStreakDays": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "listeningRewindReplayTitle": "Tak bisa berhenti memutar",
+  "listeningRewindReplayBody": "Kamu memutarnya {plays} kali pada {date}",
+  "@listeningRewindReplayBody": {
+    "placeholders": {
+      "plays": {
+        "type": "int"
+      },
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "listeningRewindOutroTitle": "Itulah Rewind kamu",
+  "listeningRewindOutroBody": "Terus dengarkan. Rewind berikutnya sudah mulai terbentuk.",
+  "listeningRewindEmpty": "Belum cukup aktivitas mendengarkan di periode ini. Putar musik lewat pemutar bawaan, lalu kembali lagi nanti.",
+  "listeningRewindLoadError": "Gagal memuat Rewind",
+  "listeningRewindSlide": "Slide {index} dari {count}",
+  "@listeningRewindSlide": {
+    "placeholders": {
+      "index": {
+        "type": "int"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "listeningRewindShare": "Bagikan",
+  "listeningRewindShareError": "Gagal membagikan Rewind",
+  "listeningRewindNext": "Berikutnya",
+  "listeningRewindPrevious": "Sebelumnya",
+  "listeningRewindMonthlyReady": "4 minggu terakhirmu siap diputar ulang",
+  "listeningRewindYearTitle": "Musikmu di {year}",
+  "@listeningRewindYearTitle": {
+    "placeholders": {
+      "year": {
+        "type": "String"
+      }
+    }
+  },
+  "listeningRewindYearEyebrow": "Rewind akhir tahun",
+  "listeningRewindYearBanner": "Artis, lagu, dan momen terbaikmu tahun ini",
+  "listeningRewindYearIntroBody": "Semua yang kamu putar tahun ini, dari lagu pertama sampai bulan tersibukmu.",
+  "listeningRewindNumbersTitle": "Tahunmu dalam angka",
+  "listeningRewindSongsLabel": "Lagu",
+  "listeningRewindArtistsLabel": "Artis",
+  "listeningRewindAlbumsLabel": "Album",
+  "listeningRewindDaysLabel": "Hari bermusik",
+  "listeningRewindDaysShare": "Ada musik di {percent}% harimu",
+  "@listeningRewindDaysShare": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "listeningRewindMonthsTitle": "Bulan demi bulan",
+  "listeningRewindBiggestMonthLabel": "Bulan tersibuk",
+  "listeningRewindBiggestMonth": "Bulan tersibukmu adalah {month}",
+  "@listeningRewindBiggestMonth": {
+    "placeholders": {
+      "month": {
+        "type": "String"
+      }
+    }
+  },
+  "listeningRewindMonthlyArtistsTitle": "Artis tiap bulan",
+  "listeningRewindLoyalTitle": "Selalu menemanimu",
+  "listeningRewindLoyalBody": "{days, plural, =1{Menemanimu di 1 hari} other{Menemanimu di {days} hari berbeda}}",
+  "@listeningRewindLoyalBody": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "listeningRewindFirstSongTitle": "Awal tahunmu",
+  "listeningRewindFirstSongBody": "Lagu yang paling sering diputar pada hari pertama kamu mendengarkan, {date}",
+  "@listeningRewindFirstSongBody": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "listeningRewindYearOutroTitle": "Itulah {year}-mu",
+  "@listeningRewindYearOutroTitle": {
+    "placeholders": {
+      "year": {
+        "type": "String"
+      }
+    }
+  },
+  "listeningRewindYearOutroBody": "Sampai jumpa di tahun penuh musik berikutnya.",
+  "weeklyReleases": "Rilis baru",
+  "weeklyReleasesDescription": "Album dan single terbaru dari artis favorit, melalui extension metadata yang terpasang.",
+  "weeklyReleasesEmpty": "Tidak ditemukan rilis dengan tanggal dalam periode ini. Tambahkan artis favorit atau coba periode lebih panjang.",
+  "weeklyReleasesUnavailable": "Beberapa artis tidak dapat diperiksa. Hasil tersimpan tetap dipertahankan. Penyedia mungkin tidak memberikan katalog artis atau tanggal rilis lengkap.",
+  "weeklyReleasesLoadError": "Rilis baru tidak dapat diperiksa. Tarik untuk memuat ulang.",
+  "motionArtworkDescription": "Putar berulang cover video dari penyedia metadata. Matikan untuk memakai cover diam dan menghemat baterai.",
+  "libraryLoading": "Memuat Library…",
+  "libraryLoadFailed": "Library tidak dapat dimuat. Coba lagi untuk memuat folder tersimpan dan indeks lagu.",
+  "discordPresenceDescription": "Tampilkan judul, artis, album, dan progres musik dari pemutar bawaan di profil Discord Anda. File audio dan cover lokal tidak diunggah. Status dihapus saat musik dijeda atau dihentikan.",
+  "discordPresenceDisabled": "Nonaktif",
+  "discordPresenceLink": "Hubungkan akun Discord",
+  "discordPresenceConnecting": "Menghubungkan ke Discord…",
+  "discordPresenceReady": "Siap saat musik diputar",
+  "discordPresenceActive": "Menampilkan lagu saat ini",
+  "discordPresenceUnavailable": "Discord tidak tersedia. Mencoba lagi saat musik diputar.",
+  "discordPresenceBuildUnavailable": "SDK Discord tidak tersedia di build ini.",
+  "discordPresenceAndroidHelp": "Pasang Discord dan masuk di ponsel ini. Izinkan berbagi aktivitas di Discord. Pemutar eksternal tidak didukung.",
+  "discordPresenceIosHelp": "Hubungkan akun melalui Discord dan izinkan berbagi aktivitas. Ketuk untuk menghubungkan ulang jika otorisasi gagal.",
+  "discordPresenceDesktopHelp": "Biarkan aplikasi desktop Discord berjalan dan masuk di komputer ini, lalu izinkan berbagi aktivitas di Discord.",
+  "discordPresenceDisconnect": "Putuskan dan lupakan akun",
+  "autoMixSettingsTitle": "Transisi mix",
+  "autoMixAutomaticDuration": "Durasi otomatis",
+  "autoMixDuration": "Durasi mix",
+  "autoMixEffect": "Efek transisi",
+  "autoMixEffectAuto": "Otomatis",
+  "autoMixEffectCrossfade": "Crassfade",
+  "autoMixEffectMuffled": "Redam",
+  "autoMixEffectEcho": "Gema",
+  "autoMixEffectPitch": "Nada",
+  "autoMixEffectCustom": "Kustom",
+  "autoMixEffectsHelp": "Efek diterapkan pada akhir lagu yang keluar selama mix. Lagu pendek memakai overlap yang lebih singkat.",
+  "autoMixSpeed": "Kecepatan",
+  "autoMixPitch": "Nada (semitone)",
+  "autoMixEcho": "Gema",
+  "autoMixLowPass": "Filter redam",
+  "autoMixMixing": "Mixing",
+  "autoMixCrossfading": "Crossfade",
+  "playbackAutomation": "Pemutaran otomatis",
+  "playbackPauseOnMute": "Jeda saat volume nol",
+  "snackbarPlaybackMuted": "Volume media nol. Lagu dijeda. Tekan play lagi untuk tetap memutar.",
+  "@snackbarPlaybackMuted": {
+    "description": "Shown after mute automation pauses playback; another explicit play request can override the pause."
+  },
+  "playbackPauseOnMuteDescription": "Jeda saat volume media nol dan lanjutkan saat dinaikkan. Jeda manual tetap dihormati. Hanya untuk keluaran audio standar.",
+  "playbackOnHeadphonesConnected": "Putar saat earphone terhubung",
+  "playbackOnHeadphonesConnectedDescription": "Lanjutkan lagu saat earphone kabel atau Bluetooth terhubung. Pemutaran dijeda saat dilepas. Hanya untuk pemutar bawaan.",
   "appearanceCustomFont": "Font kustom",
   "appearanceCustomFontSubtitle": "Impor file TTF atau OTF (maksimal 10 MB). Menggantikan font tema dan sistem.",
   "appearanceCustomFontInvalid": "Font tidak dapat dimuat. Pilih file TTF atau OTF yang valid, maksimal 10 MB.",
@@ -7277,7 +7730,7 @@
   "equalizerPreamp": "Preamp",
   "equalizerBass": "Bass",
   "equalizerTreble": "Treble",
-  "equalizerBalance": "Balance",
+  "equalizerBalance": "Keseimbangan",
   "equalizerDynamics": "Dinamika",
   "equalizerHeadroom": "Headroom otomatis",
   "equalizerHeadroomDescription": "Kurangi penguatan input untuk memberi ruang pada frekuensi yang dinaikkan.",
@@ -7306,15 +7759,35 @@
   "equalizerCustom": "Kustom",
   "equalizerManagePresets": "Kelola preset",
   "lyricsShareTitle": "Bagikan lirik",
+  "@lyricsShareTitle": {
+    "description": "Screen that turns selected lyric lines into an image for stories"
+  },
   "lyricsShareSelectHint": "Pilih hingga {count} baris",
+  "@lyricsShareSelectHint": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "lyricsShareLimit": "Kamu bisa membagikan hingga {count} baris",
+  "@lyricsShareLimit": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "lyricsShareAction": "Bagikan",
   "lyricsShareError": "Gagal membuat gambar lirik",
-  "lyricsShareBackgroundArtwork": "Artwork",
+  "lyricsShareBackgroundArtwork": "Foto cover",
   "lyricsShareBackgroundColor": "Warna cover",
   "lyricsShareBackgroundDark": "Gelap",
   "lyricsShareBackgroundLight": "Terang",
   "audioInfoTitle": "Info audio",
+  "@audioInfoTitle": {
+    "description": "Sheet with technical details of the playing track, opened from the quality badge"
+  },
   "audioInfoSource": "File sumber",
   "audioInfoSignal": "Sinyal",
   "audioInfoLoudness": "Kenyaringan",
@@ -7331,11 +7804,25 @@
   "audioInfoBitDepth": "Bit depth",
   "audioInfoChannels": "Kanal",
   "audioInfoChannelCount": "{count, plural, =1{Mono} =2{Stereo} other{{count} kanal}}",
+  "@audioInfoChannelCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "audioInfoBitrate": "Bitrate",
   "audioInfoDuration": "Durasi",
   "audioInfoFileSize": "Ukuran file",
   "audioInfoCompression": "Kompresi",
   "audioInfoCompressionValue": "{percent}% dari ukuran tanpa kompresi",
+  "@audioInfoCompressionValue": {
+    "placeholders": {
+      "percent": {
+        "type": "String"
+      }
+    }
+  },
   "audioInfoLocation": "Lokasi",
   "audioInfoLocationLocal": "Penyimpanan perangkat",
   "audioInfoLocationShared": "Folder bersama",
@@ -7343,6 +7830,13 @@
   "audioInfoPcmRate": "Data rate tanpa kompresi",
   "audioInfoFrequencyRange": "Rentang frekuensi",
   "audioInfoFrequencyRangeValue": "Hingga {frequency} (Nyquist)",
+  "@audioInfoFrequencyRangeValue": {
+    "placeholders": {
+      "frequency": {
+        "type": "String"
+      }
+    }
+  },
   "audioInfoDynamicRange": "Rentang dinamis teoretis",
   "audioInfoTrackGain": "Gain lagu",
   "audioInfoTrackPeak": "Puncak lagu",
@@ -7350,6 +7844,13 @@
   "audioInfoAlbumPeak": "Puncak album",
   "audioInfoNoGainTags": "Tidak ada tag ReplayGain",
   "audioInfoApplied": "Diterapkan {gain}",
+  "@audioInfoApplied": {
+    "placeholders": {
+      "gain": {
+        "type": "String"
+      }
+    }
+  },
   "audioInfoOn": "Aktif",
   "audioInfoOff": "Nonaktif",
   "audioInfoBypassed": "Dilewati oleh output langsung",
@@ -7363,6 +7864,13 @@
   "audioInfoHardware": "Perangkat keras",
   "audioInfoSoftware": "Perangkat lunak",
   "audioInfoBands": "{count} band",
+  "@audioInfoBands": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "audioInfoTempo": "Tempo",
   "audioInfoResampling": "Resampling",
   "audioInfoResamplingNone": "Tidak ada, rate sama",
@@ -7371,6 +7879,13 @@
   "audioInfoBitPerfectNo": "Tidak, dicampur oleh sistem",
   "audioInfoDevice": "Perangkat",
   "audioInfoDeviceType": "{type, select, speaker{Speaker ponsel} earpiece{Speaker telepon} wired_headphones{Headphone kabel} wired_headset{Headset kabel} line{Line out} bluetooth{Bluetooth} bluetooth_le{Bluetooth LE Audio} usb{Audio USB} usb_headset{Headset USB} hdmi{HDMI} dock{Dock} cast{Cast} hearing_aid{Alat bantu dengar} airplay{AirPlay} car{Audio mobil} other{Lainnya}}",
+  "@audioInfoDeviceType": {
+    "placeholders": {
+      "type": {
+        "type": "String"
+      }
+    }
+  },
   "audioInfoOutputRate": "Sample rate output",
   "audioInfoOutputFormat": "Format output",
   "audioInfoDeviceRates": "Sample rate perangkat",
@@ -7379,11 +7894,11 @@
   "audioInfoBuffer": "Buffer mixer",
   "audioInfoLatency": "Latensi output",
   "audioInfoLowLatency": "Audio latensi rendah",
-  "audioInfoProAudio": "Pro audio",
+  "audioInfoProAudio": "Audio pro",
   "audioInfoSupported": "Didukung",
   "audioInfoNotSupported": "Tidak didukung",
-  "audioInfoSpatial": "Spatial audio",
-  "audioInfoHeadTracking": "Head tracking",
+  "audioInfoSpatial": "Audio spasial",
+  "audioInfoHeadTracking": "Pelacakan kepala",
   "audioInfoUnavailable": "Tidak tersedia",
   "audioInfoFixedVolume": "Diatur oleh perangkat",
   "audioInfoCopy": "Salin laporan",
@@ -7392,7 +7907,13 @@
   "lyricsTextPreview": "Ikuti setiap baris lagu favoritmu",
   "appCrashTitle": "Aplikasi sebelumnya mengalami crash",
   "appAnrTitle": "Aplikasi sebelumnya berhenti merespons",
+  "@appAnrTitle": {
+    "description": "Title for an Android ANR report, distinct from a crash."
+  },
   "appAnrMessage": "Laporan diagnostik telah disimpan. Anda dapat menyalin dan mengirimkannya ke developer untuk membantu pemeriksaan.",
+  "@appAnrMessage": {
+    "description": "Message shown for an Android process exit due to an ANR."
+  },
   "appCrashMessage": "Laporan crash telah disimpan. Salin dan kirimkan ke developer untuk membantu pemeriksaan.",
   "appCrashDetails": "Lihat error dan log",
   "appCrashCopy": "Salin laporan untuk developer",
@@ -7404,17 +7925,74 @@
     "description": "Option that preserves the provider artwork at its original resolution"
   },
   "desktopShortcutTooltip": "{action} ({shortcut})",
+  "@desktopShortcutTooltip": {
+    "description": "Desktop tooltip that names an action and its keyboard shortcut, for example 'Next track (Ctrl+Right)'",
+    "placeholders": {
+      "action": {
+        "type": "String"
+      },
+      "shortcut": {
+        "type": "String"
+      }
+    }
+  },
   "desktopPlayerIdle": "Tidak ada yang diputar",
+  "@desktopPlayerIdle": {
+    "description": "Desktop player bar text when no track is loaded"
+  },
   "desktopVolumeUp": "Naikkan volume",
   "desktopVolumeDown": "Turunkan volume",
   "desktopTableSortedAscending": "{column}, urut naik",
+  "@desktopTableSortedAscending": {
+    "description": "Screen reader label of a song table column header that sorts the table A to Z",
+    "placeholders": {
+      "column": {
+        "type": "String"
+      }
+    }
+  },
   "desktopTableSortedDescending": "{column}, urut turun",
+  "@desktopTableSortedDescending": {
+    "description": "Screen reader label of a song table column header that sorts the table Z to A",
+    "placeholders": {
+      "column": {
+        "type": "String"
+      }
+    }
+  },
   "desktopMenuOpen": "Buka",
+  "@desktopMenuOpen": {
+    "description": "Context menu item that opens an album, artist, playlist or folder"
+  },
   "desktopMenuShowDetails": "Lihat detail",
+  "@desktopMenuShowDetails": {
+    "description": "Context menu item that opens a track's metadata page"
+  },
   "desktopDropToImport": "Lepaskan untuk menambahkan ke perpustakaan",
-  "desktopDropImported": "Menambahkan {count} folder ke perpustakaan",
+  "@desktopDropToImport": {
+    "description": "Overlay shown while music files or folders are dragged over the desktop window"
+  },
+  "desktopDropImported": "Menambahkan {count} {count, plural, =1{folder} other{folder}} ke koleksi Anda",
+  "@desktopDropImported": {
+    "description": "Snackbar after dropping music onto the desktop window; the folders are scanned into the library",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "desktopDropNothingToImport": "Lepaskan berkas atau folder musik untuk menambahkannya ke perpustakaan",
+  "@desktopDropNothingToImport": {
+    "description": "Snackbar when the dropped items contain no folders or audio files"
+  },
+  "desktopAllPlaylists": "Semua Playlist",
+  "@desktopAllPlaylists": {
+    "description": "Desktop sidebar row that opens the list of every playlist"
+  },
   "desktopMenuSettings": "Pengaturan…",
+  "@desktopMenuSettings": {
+    "description": "macOS app menu item that opens Settings"
+  },
   "desktopMenuFile": "Berkas",
   "desktopMenuEdit": "Edit",
   "desktopMenuView": "Tampilan",
@@ -7430,10 +8008,34 @@
   "desktopMenuWindow": "Jendela",
   "desktopMenuHelp": "Bantuan",
   "desktopMenuPlayPause": "Putar/Jeda",
+  "desktopMenuMiniPlayer": "Mini Player",
+  "@desktopMenuMiniPlayer": {
+    "description": "Window menu item, player bar button and Keyboard Shortcuts row that shrink the window into a small player floating above other windows"
+  },
+  "desktopMiniPlayerExpand": "Tampilan Jendela Penuh",
+  "@desktopMiniPlayerExpand": {
+    "description": "Mini player button that returns the window to its full size"
+  },
+  "desktopMenuRefresh": "Refresh",
+  "@desktopMenuRefresh": {
+    "description": "View menu item and Keyboard Shortcuts row that reloads the page on screen (Home, Repo, statistics)"
+  },
   "desktopMenuProjectPage": "Halaman proyek",
+  "@desktopMenuProjectPage": {
+    "description": "Help menu item that opens the app's source repository"
+  },
   "desktopDownloadsShowAll": "Tampilkan semua",
+  "@desktopDownloadsShowAll": {
+    "description": "Button in the desktop downloads popover that opens the full download queue"
+  },
   "desktopDownloadsQueued": "Menunggu",
+  "@desktopDownloadsQueued": {
+    "description": "Status of a download in the desktop downloads popover that has not started yet"
+  },
   "desktopDownloadsCancel": "Batalkan download",
+  "@desktopDownloadsCancel": {
+    "description": "Tooltip of the button that cancels one download in the desktop downloads popover"
+  },
   "linkDesktopSettingsTitle": "Mornye di ponsel",
   "linkDesktopSettingsSubtitle": "Putar Library dan kendalikan pemutaran dari ponsel",
   "linkDesktopEnableTitle": "Bagikan ke Mornye di ponsel",
@@ -7490,12 +8092,33 @@
   "linkDesktopNotDelivered": "Ponsel tidak menerimanya",
   "linkDesktopNothingToContinue": "Tidak ada yang diputar di komputer ini",
   "desktopScrollBack": "Gulir ke belakang",
+  "@desktopScrollBack": {
+    "description": "Tooltip of the desktop button that scrolls a horizontal shelf of albums or artists back"
+  },
   "desktopScrollForward": "Gulir ke depan",
+  "@desktopScrollForward": {
+    "description": "Tooltip of the desktop button that scrolls a horizontal shelf of albums or artists forward"
+  },
   "settingsKeyboardShortcuts": "Pintasan Keyboard",
+  "@settingsKeyboardShortcuts": {
+    "description": "Desktop Settings page that lists the app's keyboard shortcuts"
+  },
   "settingsKeyboardShortcutsSubtitle": "Tombol untuk pemutaran, navigasi dan panel",
+  "@settingsKeyboardShortcutsSubtitle": {
+    "description": "Subtitle of the Keyboard Shortcuts entry in desktop Settings"
+  },
   "desktopShortcutsNavigation": "Navigasi",
+  "@desktopShortcutsNavigation": {
+    "description": "Keyboard Shortcuts section for moving between pages"
+  },
   "desktopShortcutDismiss": "Tutup dialog atau halaman",
+  "@desktopShortcutDismiss": {
+    "description": "Keyboard Shortcuts row for Escape, which leaves a text field or closes the top dialog or page"
+  },
   "desktopShortcutToggleSidebar": "Tampilkan atau sembunyikan sidebar",
+  "@desktopShortcutToggleSidebar": {
+    "description": "Keyboard Shortcuts row for the shortcut that collapses or expands the desktop sidebar"
+  },
   "linkSettingsTitle": "Mornye di komputer Anda",
   "linkSettingsSubtitle": "Putar dan kendalikan pustaka komputer Anda",
   "linkPageTitle": "Komputer",

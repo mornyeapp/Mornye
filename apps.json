@@ -7,12 +7,12 @@
       "name": "Mornye",
       "bundleIdentifier": "com.zarz.mornye",
       "developerName": "zarzet",
-      "version": "5.2.5",
-      "versionDate": "2026-10-22",
-      "downloadURL": "https://github.com/mornyeapp/Mornye/releases/download/v5.2.5/Mornye-v5.2.5-ios-unsigned.ipa",
+      "version": "5.2.6",
+      "versionDate": "2026-10-23",
+      "downloadURL": "https://github.com/mornyeapp/Mornye/releases/download/v5.2.6/Mornye-v5.2.6-ios-unsigned.ipa",
       "localizedDescription": "Mornye is written in Flutter and uses installable extensions for metadata and audio downloads.",
       "iconURL": "https://raw.githubusercontent.com/mornyeapp/Mornye/main/assets/images/logo.png",
-      "size": 35538708
+      "size": 35645397
     }
   ]
 }
