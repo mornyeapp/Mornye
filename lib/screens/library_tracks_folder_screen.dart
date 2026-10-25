@@ -1289,13 +1289,15 @@ Future<void> _openCollectionTrack(
     return;
   }
 
-  final localItem = await ref
-      .read(localLibraryProvider.notifier)
-      .findExistingAsync(
-        isrc: track.isrc,
-        trackName: track.name,
-        artistName: track.artistName,
-      );
+  final localItem = ref.read(settingsProvider).localLibraryEnabled
+      ? await ref
+            .read(localLibraryProvider.notifier)
+            .findExistingAsync(
+              isrc: track.isrc,
+              trackName: track.name,
+              artistName: track.artistName,
+            )
+      : null;
   if (!context.mounted) return;
 
   if (localItem != null) {

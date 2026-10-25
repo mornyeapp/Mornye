@@ -5,26 +5,32 @@ import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/utils/file_access.dart';
 
 /// The file each of [tracks] plays from, or null when it has none: a scanned
-/// Library file first, then a download. [missingHistoryIds] names downloads
-/// whose file is gone, which callers may remove from History.
+/// Library file first when [includeLocal] (Local Library is on), then a
+/// download. [missingHistoryIds] names downloads whose file is gone, which
+/// callers may remove from History.
 Future<({List<String?> paths, Set<String> missingHistoryIds})>
 resolveTrackFiles(
   List<Track> tracks, {
   required LibraryDatabase library,
   required HistoryDatabase history,
+  required bool includeLocal,
 }) async {
   if (tracks.isEmpty) {
     return (paths: const <String?>[], missingHistoryIds: const <String>{});
   }
-  final localFuture = library.findExistingBatch([
-    for (final track in tracks)
-      LocalLibraryBatchLookupRequest(
-        id: (track.source ?? '').toLowerCase() == 'local' ? track.id : null,
-        isrc: track.isrc,
-        trackName: track.name,
-        artistName: track.artistName,
-      ),
-  ]);
+  final localFuture = includeLocal
+      ? library.findExistingBatch([
+          for (final track in tracks)
+            LocalLibraryBatchLookupRequest(
+              id: (track.source ?? '').toLowerCase() == 'local'
+                  ? track.id
+                  : null,
+              isrc: track.isrc,
+              trackName: track.name,
+              artistName: track.artistName,
+            ),
+        ])
+      : Future.value(List<Map<String, dynamic>?>.filled(tracks.length, null));
   final historyFuture = history.findExistingTracks([
     for (final track in tracks)
       HistoryLookupRequest(

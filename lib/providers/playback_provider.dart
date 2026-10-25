@@ -255,6 +255,7 @@ class PlaybackController extends Notifier<PlaybackState> {
       tracks,
       library: _library,
       history: _history,
+      includeLocal: ref.read(settingsProvider).localLibraryEnabled,
     );
     final historyNotifier = ref.read(downloadHistoryProvider.notifier);
     await historyNotifier.removeManyFromHistory(missingHistoryIds);

@@ -4,6 +4,7 @@ import 'package:mornye/models/track.dart';
 import 'package:mornye/providers/download_queue_provider.dart';
 import 'package:mornye/providers/local_library_provider.dart';
 import 'package:mornye/providers/playback_provider.dart';
+import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/utils/file_access.dart';
 import 'package:mornye/widgets/app_snack_bar.dart';
 
@@ -50,6 +51,7 @@ Future<bool> playLocalIfAvailable(
       historyNotifier.removeFromHistory(historyItem.id);
     }
 
+    if (!ref.read(settingsProvider).localLibraryEnabled) return false;
     final localItem = await ref
         .read(localLibraryProvider.notifier)
         .findExistingAsync(

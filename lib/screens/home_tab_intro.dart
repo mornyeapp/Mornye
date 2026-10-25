@@ -55,6 +55,9 @@ final _homeOnRepeatProvider =
       // A deleted download or a rescan can remove a track from the shelf.
       ref.watch(downloadHistoryProvider.select((s) => s.items.length));
       ref.watch(localLibraryProvider.select((s) => s.loadedIndexVersion));
+      final includeLocal = ref.watch(
+        settingsProvider.select((s) => s.localLibraryEnabled),
+      );
       await listeningRecorder.flush();
       final now = DateTime.now();
       final summary = await ListeningStatisticsStore.instance.load(
@@ -82,6 +85,8 @@ final _homeOnRepeatProvider =
           continue;
         }
         final ids = await database.getPhysicalFileIds([key]);
+        // With Local Library off its songs stay off Home as well.
+        if (ids.isNotEmpty && !includeLocal) continue;
         final row = ids.isEmpty ? null : await database.getById(ids.first);
         if (row != null) {
           tracks.add((

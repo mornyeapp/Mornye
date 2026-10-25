@@ -187,11 +187,12 @@ MediaLibraryBrowser _browser({
   _Library? library,
   _History? history,
   _Collections? collections,
+  bool includeLocal = true,
 }) => MediaLibraryBrowser(
   library: library ?? _Library(),
   history: history ?? _History(),
   collections: collections ?? _Collections(),
-  includeLocal: () => true,
+  includeLocal: () => includeLocal,
   strings: () => lookupAppLocalizations(const Locale('en')),
 );
 
@@ -355,6 +356,19 @@ void main() {
       expect(queue.index, 1);
     },
   );
+
+  test('with Local Library off, Loved plays no scanned files', () async {
+    final directory = await Directory.systemTemp.createTemp('browser');
+    addTearDown(() => directory.delete(recursive: true));
+    final file = (await File('${directory.path}/loved.flac').create()).path;
+    final browser = _browser(
+      library: _Library(filesByTitle: {'Loved': file}),
+      collections: _Collections(loved: [_track('Loved')]),
+      includeLocal: false,
+    );
+
+    expect(await browser.children(MediaLibraryBrowser.lovedId), isEmpty);
+  });
 
   test('search groups its results by kind and plays found songs', () async {
     final browser = _browser(

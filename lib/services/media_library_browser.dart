@@ -341,6 +341,7 @@ class MediaLibraryBrowser {
       tracks,
       library: library,
       history: history,
+      includeLocal: includeLocal(),
     );
     return _playable([
       for (var i = 0; i < tracks.length; i++)
