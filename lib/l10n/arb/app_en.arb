@@ -8676,6 +8676,257 @@
   "@linkPairAgain": {
     "description": "Action that repeats pairing with a computer that no longer accepts this phone"
   },
+  "linkTransfersTitle": "Transfers",
+  "@linkTransfersTitle": {
+    "description": "Mornye Link: title of the list of songs copied between this device and a linked phone or computer, and of the rows that open it"
+  },
+  "linkTransfersInProgress": "In progress",
+  "@linkTransfersInProgress": {
+    "description": "Section of the Transfers list for transfers that are running or waiting their turn"
+  },
+  "linkTransfersFinished": "Finished",
+  "@linkTransfersFinished": {
+    "description": "Section of the Transfers list for transfers that stopped: done, stopped by someone or failed"
+  },
+  "linkTransfersClearFinished": "Clear finished",
+  "@linkTransfersClearFinished": {
+    "description": "Action that removes the finished transfers from the Transfers list; the copied songs stay"
+  },
+  "linkTransfersEmptyTitle": "No transfers yet",
+  "@linkTransfersEmptyTitle": {
+    "description": "Title of the empty Transfers list, also the status of the row that opens it while there is none"
+  },
+  "linkTransfersEmptyMessage": "Send or save songs from a song's menu, an album or a selection.",
+  "@linkTransfersEmptyMessage": {
+    "description": "Hint under the empty Transfers list naming where a transfer starts (the Send to and Save to this device actions)"
+  },
+  "linkTransfersSending": "Sending {count, plural, =1{1 song} other{{count} songs}} to {name}",
+  "@linkTransfersSending": {
+    "description": "Title of a running or waiting transfer that copies this device's songs to a linked device",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkTransfersReceiving": "Receiving {count, plural, =1{1 song} other{{count} songs}} from {name}",
+  "@linkTransfersReceiving": {
+    "description": "Title of a running or waiting transfer that copies a linked device's songs to this device",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkTransfersSendingSong": "Sending {title} to {name}",
+  "@linkTransfersSendingSong": {
+    "description": "Title of a running or waiting transfer of one song from this device; the placeholder is the song's title",
+    "placeholders": {
+      "title": {
+        "type": "String"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkTransfersReceivingSong": "Receiving {title} from {name}",
+  "@linkTransfersReceivingSong": {
+    "description": "Title of a running or waiting transfer of one song to this device; the placeholder is the song's title",
+    "placeholders": {
+      "title": {
+        "type": "String"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkTransfersSongsTo": "{count, plural, =1{1 song} other{{count} songs}} to {name}",
+  "@linkTransfersSongsTo": {
+    "description": "Title of a finished transfer from this device to a linked one; its outcome shows below",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkTransfersSongsFrom": "{count, plural, =1{1 song} other{{count} songs}} from {name}",
+  "@linkTransfersSongsFrom": {
+    "description": "Title of a finished transfer from a linked device to this one; its outcome shows below",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkTransfersSongTo": "{title} to {name}",
+  "@linkTransfersSongTo": {
+    "description": "Title of a finished transfer of one song from this device; the placeholder is the song's title",
+    "placeholders": {
+      "title": {
+        "type": "String"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkTransfersSongFrom": "{title} from {name}",
+  "@linkTransfersSongFrom": {
+    "description": "Title of a finished transfer of one song to this device; the placeholder is the song's title",
+    "placeholders": {
+      "title": {
+        "type": "String"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkTransfersPosition": "{position} of {total}",
+  "@linkTransfersPosition": {
+    "description": "Which song of a running transfer is being copied, for example '3 of 12'",
+    "placeholders": {
+      "position": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "linkTransfersPercent": "{percent}%",
+  "@linkTransfersPercent": {
+    "description": "How much of a transfer or song has been copied, as a percentage",
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "linkTransfersWaiting": "Waiting",
+  "@linkTransfersWaiting": {
+    "description": "Status of a transfer or song that waits for the ones before it"
+  },
+  "linkTransfersSavedCount": "{count, plural, other{{count} saved}}",
+  "@linkTransfersSavedCount": {
+    "description": "Outcome of a finished transfer: how many songs were copied",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "linkTransfersAlreadyThereCount": "{count, plural, other{{count} already there}}",
+  "@linkTransfersAlreadyThereCount": {
+    "description": "Outcome of a finished transfer: how many songs the receiving device already had, so they were not copied again",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "linkTransfersFailedCount": "{count, plural, other{{count} failed}}",
+  "@linkTransfersFailedCount": {
+    "description": "Outcome of a finished transfer: how many songs could not be copied",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "linkTransfersStopped": "{done, plural, =0{Stopped} other{Stopped after {done} of {total}}}",
+  "@linkTransfersStopped": {
+    "description": "Outcome of a transfer someone stopped, with how many of its songs were finished",
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "linkTransfersReasonDisconnected": "Connection lost",
+  "@linkTransfersReasonDisconnected": {
+    "description": "Why a transfer failed: the devices lost their connection"
+  },
+  "linkTransfersReasonNoFolder": "Choose a download folder first",
+  "@linkTransfersReasonNoFolder": {
+    "description": "Why a transfer to this device failed: no download folder is set"
+  },
+  "linkTransfersReasonNoFolderPeer": "{name} has no download folder",
+  "@linkTransfersReasonNoFolderPeer": {
+    "description": "Why a transfer to the linked device failed: that device has no download folder set",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkTransfersReasonBusy": "Busy, try again later",
+  "@linkTransfersReasonBusy": {
+    "description": "Why a transfer failed: the receiving device could not take it now"
+  },
+  "linkTransfersReasonError": "Something went wrong",
+  "@linkTransfersReasonError": {
+    "description": "Why a transfer failed, when there is no more specific reason"
+  },
+  "linkTransfersSongSaved": "Saved",
+  "@linkTransfersSongSaved": {
+    "description": "State of one song in a transfer: it was copied"
+  },
+  "linkTransfersSongAlreadyThere": "Already there",
+  "@linkTransfersSongAlreadyThere": {
+    "description": "State of one song in a transfer: the receiving device already had it"
+  },
+  "linkTransfersSongFailed": "Failed",
+  "@linkTransfersSongFailed": {
+    "description": "State of one song in a transfer: it could not be copied"
+  },
+  "linkTransfersSongCopying": "Copying",
+  "@linkTransfersSongCopying": {
+    "description": "State of the song a transfer copies right now"
+  },
+  "linkTransfersSongNotCopied": "Not copied",
+  "@linkTransfersSongNotCopied": {
+    "description": "State of a song a stopped or failed transfer did not reach"
+  },
+  "linkTransfersStop": "Stop transfer",
+  "@linkTransfersStop": {
+    "description": "Tooltip of the button that stops a running or waiting transfer; songs already copied stay"
+  },
+  "linkTransfersActiveCount": "{count, plural, =1{1 transfer} other{{count} transfers}}",
+  "@linkTransfersActiveCount": {
+    "description": "Status of the row that opens the Transfers list while several transfers run, followed by their progress",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "linkTransfersFinishedCount": "{count, plural, =1{1 transfer finished} other{{count} transfers finished}}",
+  "@linkTransfersFinishedCount": {
+    "description": "Status of the row that opens the Transfers list when none runs: how many finished since the app opened",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "linkErrorBadPin": "That PIN is not right. Check the PIN on your computer and try again.",
   "@linkErrorBadPin": {
     "description": "Pairing error when the PIN is wrong"
