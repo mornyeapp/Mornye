@@ -56,6 +56,19 @@ bool isLinkFileId(String? value) => value != null && _fileId.hasMatch(value);
 String linkFileIdFor(String source, int size) =>
     sha256.convert(utf8.encode('$source\n$size')).toString().substring(0, 32);
 
+/// Songs per `POST phone/catalog` page.
+const linkPhoneCatalogPage = 500;
+
+/// The `network://` host of a paired phone's songs in the desktop's
+/// Library: `link-phone-` and the first 16 hex characters of the SHA-256
+/// of its device id.
+String linkPhoneSourceId(String deviceId) =>
+    'link-phone-${sha256.convert(utf8.encode(deviceId)).toString().substring(0, 16)}';
+
+/// Whether [id] is a [linkPhoneSourceId].
+bool isLinkPhoneSourceId(String id) =>
+    RegExp(r'^link-phone-[0-9a-f]{16}$').hasMatch(id);
+
 /// Forwarded `/mornye/v1` operations (the path after [linkApiPath]).
 abstract final class LinkOps {
   static const state = 'state';
@@ -69,6 +82,13 @@ abstract final class LinkOps {
   static const resolve = 'resolve';
   static const collections = 'collections';
   static const history = 'history';
+
+  /// A phone's songs for the desktop's Library: GET `{"version"}` held,
+  /// POST one page of [LinkPhoneSong]s.
+  static const phoneCatalog = 'phone/catalog';
+
+  /// Covers of a phone's songs: GET `{"ids"}` held, POST `{"covers"}`.
+  static const phoneCovers = 'phone/covers';
 
   /// Subsonic calls the server forwards to the app (prefix + method name).
   static const subsonicPrefix = 'subsonic/';
@@ -86,6 +106,17 @@ abstract final class LinkMessageTypes {
   static const downloadsChanged = 'downloads.changed';
   static const collectionsChanged = 'collections.changed';
   static const catalogChanged = 'catalog.changed';
+
+  /// Desktop to phone: send the song `{"name"}` (`<fileId>.<suffix>` of a
+  /// [LinkPhoneSong]) to `PUT <linkFilesPath>`.
+  static const filesRequest = 'files.request';
+
+  /// Phone to desktop: the requested `name` is on its way as `file`, of
+  /// `size` bytes; `streamable` is false when it plays only once whole.
+  static const filesSending = 'files.sending';
+
+  /// Phone to desktop: the requested `name` cannot be sent (`reason`).
+  static const filesFailed = 'files.failed';
 }
 
 /// Player command `action` values (`POST command` and the `command`
@@ -235,6 +266,124 @@ class TrackRef {
     serverId,
     fileId,
   );
+}
+
+/// One song of a phone's Library as the desktop lists it (`phone/catalog`).
+/// The desktop asks for `<fileId>.<suffix>` when it plays the song.
+class LinkPhoneSong {
+  const LinkPhoneSong({
+    required this.fileId,
+    required this.suffix,
+    required this.title,
+    required this.artist,
+    this.size = 0,
+    this.album,
+    this.albumArtist,
+    this.track,
+    this.disc,
+    this.year,
+    this.genre,
+    this.durationMs,
+    this.isrc,
+    this.bitRate,
+    this.sampleRate,
+    this.bitDepth,
+    this.explicit = false,
+    this.coverId,
+    this.addedMs,
+  });
+
+  /// [linkFileIdFor] of the file, as Play on desktop names its upload.
+  final String fileId;
+
+  /// One of [linkUploadExtensions].
+  final String suffix;
+  final String title;
+  final String artist;
+
+  /// Bytes; 0 when the phone does not know before reading the file.
+  final int size;
+  final String? album;
+  final String? albumArtist;
+  final int? track;
+  final int? disc;
+  final int? year;
+  final String? genre;
+  final int? durationMs;
+  final String? isrc;
+
+  /// Kilobits per second.
+  final int? bitRate;
+  final int? sampleRate;
+  final int? bitDepth;
+  final bool explicit;
+
+  /// The cover sent with `phone/covers`: 32 lowercase hex characters.
+  final String? coverId;
+  final int? addedMs;
+
+  /// The upload name: `<fileId>.<suffix>`.
+  String get name => '$fileId.$suffix';
+
+  Map<String, dynamic> toJson() => {
+    'fileId': fileId,
+    'suffix': suffix,
+    'title': title,
+    'artist': artist,
+    if (size > 0) 'size': size,
+    if (album != null) 'album': album,
+    if (albumArtist != null) 'albumArtist': albumArtist,
+    if (track != null) 'track': track,
+    if (disc != null) 'disc': disc,
+    if (year != null) 'year': year,
+    if (genre != null) 'genre': genre,
+    if (durationMs != null) 'durationMs': durationMs,
+    if (isrc != null) 'isrc': isrc,
+    if (bitRate != null) 'bitRate': bitRate,
+    if (sampleRate != null) 'sampleRate': sampleRate,
+    if (bitDepth != null) 'bitDepth': bitDepth,
+    if (explicit) 'explicit': true,
+    if (coverId != null) 'coverId': coverId,
+    if (addedMs != null) 'addedMs': addedMs,
+  };
+
+  /// Null for a song without a valid [fileId], [suffix] or [title].
+  static LinkPhoneSong? fromJson(Object? json) {
+    if (json is! Map) return null;
+    final fileId = _string(json['fileId']);
+    final suffix = _string(json['suffix'])?.toLowerCase();
+    final title = _string(json['title']);
+    if (!isLinkFileId(fileId) ||
+        !linkUploadExtensions.contains(suffix) ||
+        title == null) {
+      return null;
+    }
+    final size = _int(json['size']) ?? 0;
+    return LinkPhoneSong(
+      fileId: fileId!,
+      suffix: suffix!,
+      title: title,
+      artist: _string(json['artist']) ?? '',
+      size: size > 0 ? size : 0,
+      album: _string(json['album']),
+      albumArtist: _string(json['albumArtist']),
+      track: _int(json['track']),
+      disc: _int(json['disc']),
+      year: _int(json['year']),
+      genre: _string(json['genre']),
+      durationMs: _int(json['durationMs']),
+      isrc: _string(json['isrc']),
+      bitRate: _int(json['bitRate']),
+      sampleRate: _int(json['sampleRate']),
+      bitDepth: _int(json['bitDepth']),
+      explicit: json['explicit'] == true,
+      coverId: switch (_string(json['coverId'])) {
+        final coverId? when isLinkFileId(coverId) => coverId,
+        _ => null,
+      },
+      addedMs: _int(json['addedMs']),
+    );
+  }
 }
 
 enum LinkRepeatMode { none, one, all }
