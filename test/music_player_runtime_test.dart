@@ -158,6 +158,8 @@ class _Session implements AudioSession {
 }
 
 class _SessionStore implements AppStateDatabase {
+  int clears = 0;
+
   @override
   Future<Map<String, dynamic>?> getPlaybackSession() async => null;
   @override
@@ -169,6 +171,9 @@ class _SessionStore implements AppStateDatabase {
     required bool shuffle,
     required String repeatMode,
   }) async => true;
+
+  @override
+  Future<void> clearPlaybackSession() async => clears++;
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
@@ -340,6 +345,7 @@ MusicPlayerRuntime _runtime({
   bool isAndroid = false,
   Future<void> Function()? synchronizePlaybackState,
   _Session? session,
+  AppStateDatabase? sessionDatabase,
   LibraryDatabase? libraryDatabase,
   HistoryDatabase? historyDatabase,
   LibraryCollectionsDatabase? collectionsDatabase,
@@ -373,7 +379,7 @@ MusicPlayerRuntime _runtime({
       readMetadata: (_, {displayName}) async => {
         'replaygain_track_gain': '-6 dB',
       },
-      sessionDatabase: _SessionStore(),
+      sessionDatabase: sessionDatabase ?? _SessionStore(),
       libraryDatabase: libraryDatabase,
       historyDatabase: historyDatabase,
       collectionsDatabase: collectionsDatabase,
@@ -407,6 +413,54 @@ const _track = PlayableMedia(
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  test('dismissing a paused player ends the saved session and permits new '
+      'playback', () async {
+    final store = _SessionStore();
+    final decks = <_Deck>[];
+    final runtime = _runtime(sessionDatabase: store, decks: decks);
+    final controller = MusicPlayerController(runtime: runtime);
+    final handler = await runtime.initialize();
+    await controller.playSingle(_track);
+    await handler.pause();
+
+    await controller.dismiss();
+
+    expect(decks.single.state, PlaybackDeckState.stopped);
+    expect(handler.mediaItem.value, isNull);
+    expect(handler.playbackState.value.playing, isFalse);
+    expect(
+      handler.playbackState.value.processingState,
+      AudioProcessingState.idle,
+    );
+    expect(store.clears, 1);
+    expect(handler.queue.value.map((item) => item.id), ['one']);
+
+    await controller.playSingle(_track);
+    expect(handler.mediaItem.value?.id, 'one');
+    expect(handler.playbackState.value.playing, isTrue);
+  });
+
+  for (final state in [
+    PlaybackState(playing: true, processingState: AudioProcessingState.ready),
+    PlaybackState(processingState: AudioProcessingState.loading),
+    PlaybackState(processingState: AudioProcessingState.buffering),
+  ]) {
+    test('dismiss ignores playing=${state.playing}, '
+        'processing=${state.processingState.name}', () async {
+      final store = _SessionStore();
+      final runtime = _runtime(sessionDatabase: store);
+      final handler = await runtime.initialize();
+      await handler.setQueueAndPlay([_track]);
+      handler.playbackState.add(state);
+
+      await MusicPlayerController(runtime: runtime).dismiss();
+
+      expect(handler.mediaItem.value?.id, 'one');
+      expect(handler.playbackState.value, state);
+      expect(store.clears, 0);
+    });
+  }
 
   test('a pending seek cannot move the next song', () async {
     final deck = _DelayedSeekDeck();

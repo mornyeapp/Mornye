@@ -47,13 +47,23 @@ class MiniPlayer extends ConsumerStatefulWidget {
 
 class _MiniPlayerState extends ConsumerState<MiniPlayer> {
   Uri? _warmedArtUri;
+  (Uri, int)? _warmedTransition;
 
   @override
   void initState() {
     super.initState();
     ref.listenManual(
       currentMediaItemProvider.select((item) => item.value?.artUri),
-      (_, artUri) => _warmCoverColour(artUri),
+      (_, artUri) {
+        _warmCoverColour(artUri);
+        _warmFullScreenArtwork(artUri);
+      },
+    );
+    ref.listenManual(
+      settingsProvider.select((settings) => settings.playerCoverStyle),
+      (_, _) => _warmFullScreenArtwork(
+        ref.read(currentMediaItemProvider).value?.artUri,
+      ),
     );
   }
 
@@ -61,6 +71,29 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     _warmCoverColour(ref.read(currentMediaItemProvider).value?.artUri);
+    _warmFullScreenArtwork(ref.read(currentMediaItemProvider).value?.artUri);
+  }
+
+  void _warmFullScreenArtwork(Uri? artUri) {
+    if (context.isMornye ||
+        isDesktopPlatform ||
+        artUri == null ||
+        ref.read(settingsProvider).playerCoverStyle != 'fullscreen' ||
+        MediaQuery.orientationOf(context) != Orientation.portrait) {
+      _warmedTransition = null;
+      return;
+    }
+    final width = PlayerArtwork.transitionCacheWidth(context);
+    final inputs = (artUri, width);
+    if (inputs == _warmedTransition) return;
+    final provider = PlayerArtwork.imageProvider(
+      artUri.toString(),
+      cacheWidth: width,
+    );
+    if (provider == null) return;
+    _warmedTransition = inputs;
+    // Failed warm-up uses the artwork widget's existing placeholder.
+    unawaited(precacheImage(provider, context, onError: (_, _) {}));
   }
 
   // The Mornye full player shades itself from the cover's source colour;
@@ -163,6 +196,12 @@ class _MiniPlayerBodyState extends ConsumerState<_MiniPlayerBody> {
     if (_dragCancelled || (travel.abs() < 48 && velocity.abs() < 550)) return;
     final direction = velocity.abs() >= 550 ? velocity : travel;
     final controller = ref.read(musicPlayerControllerProvider);
+    if (!context.isMornye &&
+        !ref.read(playbackPlayingProvider) &&
+        ref.read(activeRemotePlaybackProvider) == null) {
+      if (!ref.read(playbackLoadingProvider)) unawaited(controller.dismiss());
+      return;
+    }
     if (direction < 0) {
       controller.next();
     } else {
@@ -254,7 +293,7 @@ class _MiniPlayerBodyState extends ConsumerState<_MiniPlayerBody> {
                           child: PlayerArtwork(
                             artUri: mediaItem.artUri?.toString(),
                             colorScheme: colorScheme,
-                            cacheWidth: 132,
+                            cacheWidth: PlayerArtwork.miniCacheWidth,
                             iconSize: 22,
                           ),
                         ),
@@ -390,7 +429,8 @@ class _MiniPlayerBodyState extends ConsumerState<_MiniPlayerBody> {
         ),
       ),
     );
-    // Swiping up opens the full player; sideways swipes change tracks.
+    // Swiping up opens the full player. Sideways swipes dismiss a paused
+    // local Material player; otherwise they change tracks.
     // Desktop has no touch gestures: a click opens the player instead.
     final swipeable = isDesktopPlatform
         ? surface

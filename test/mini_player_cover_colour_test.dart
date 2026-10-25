@@ -8,41 +8,66 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/l10n/l10n.dart';
+import 'package:mornye/models/settings.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/runtime_profile_provider.dart';
+import 'package:mornye/providers/settings_provider.dart';
+import 'package:mornye/theme/app_theme.dart';
 import 'package:mornye/theme/cover_palette.dart';
 import 'package:mornye/theme/mornye_theme.dart';
+import 'package:mornye/theme/player_artwork_theme.dart';
 import 'package:mornye/widgets/mini_player.dart';
+import 'package:mornye/widgets/material_player_backdrop.dart';
 import 'package:mornye/widgets/mornye_player_background.dart';
+import 'package:mornye/widgets/player_artwork.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-Widget _player(Stream<MediaItem?> items, {ValueListenable<bool>? shown}) =>
-    ProviderScope(
-      overrides: [
-        currentMediaItemProvider.overrideWithBuild((ref, notifier) => items),
-        playbackStateProvider.overrideWith((ref) => const Stream.empty()),
-        mornyeLiquidGlassProvider.overrideWithValue(false),
-        backdropBlurEnabledProvider.overrideWithValue(false),
-      ],
-      child: MaterialApp(
-        theme: MornyeTheme.build(Brightness.dark),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        home: Scaffold(
-          bottomNavigationBar: ValueListenableBuilder(
-            valueListenable: shown ?? const AlwaysStoppedAnimation(true),
-            builder: (context, shown, _) => shown
-                ? const SizedBox(width: 360, child: MiniPlayer())
-                : Consumer(
-                    builder: (context, ref, _) {
-                      ref.watch(currentMediaItemProvider);
-                      return const SizedBox.shrink();
-                    },
-                  ),
-          ),
-        ),
+import 'support/fixed_settings.dart';
+
+class _StaticPalette extends PlayerArtworkPalette {
+  @override
+  ColorScheme peek(String source, Brightness brightness) =>
+      ColorScheme.fromSeed(seedColor: Colors.teal, brightness: brightness);
+
+  @override
+  Future<ColorScheme?> resolve(String source, Brightness brightness) async =>
+      peek(source, brightness);
+}
+
+Widget _player(
+  Stream<MediaItem?> items, {
+  ValueListenable<bool>? shown,
+  bool mornye = true,
+  String coverStyle = 'default',
+}) => ProviderScope(
+  overrides: [
+    currentMediaItemProvider.overrideWithBuild((ref, notifier) => items),
+    playbackStateProvider.overrideWith((ref) => const Stream.empty()),
+    mornyeLiquidGlassProvider.overrideWithValue(false),
+    backdropBlurEnabledProvider.overrideWithValue(false),
+    settingsProvider.overrideWith(
+      () => FixedSettingsNotifier(AppSettings(playerCoverStyle: coverStyle)),
+    ),
+  ],
+  child: MaterialApp(
+    theme: mornye ? MornyeTheme.build(Brightness.dark) : AppTheme.light(),
+    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    supportedLocales: AppLocalizations.supportedLocales,
+    home: Scaffold(
+      bottomNavigationBar: ValueListenableBuilder(
+        valueListenable: shown ?? const AlwaysStoppedAnimation(true),
+        builder: (context, shown, _) => shown
+            ? const SizedBox(width: 360, child: MiniPlayer())
+            : Consumer(
+                builder: (context, ref, _) {
+                  ref.watch(currentMediaItemProvider);
+                  return const SizedBox.shrink();
+                },
+              ),
       ),
-    );
+    ),
+  ),
+);
 
 Future<File> _writeCover(WidgetTester tester, Color color) async {
   final directory = Directory.systemTemp.createTempSync('mini-cover-');
@@ -76,6 +101,73 @@ Future<Color?> _settledColor(WidgetTester tester, File cover) async {
 
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
+
+  for (final coverStyle in ['default', 'fullscreen']) {
+    testWidgets('Material $coverStyle prepares only the needed artwork '
+        'before opening', (tester) async {
+      PlayerArtworkTheme.debugPalette = _StaticPalette();
+      addTearDown(() => PlayerArtworkTheme.debugPalette = null);
+      tester.view.physicalSize = const Size(720, 1600);
+      tester.view.devicePixelRatio = 2;
+      addTearDown(tester.view.reset);
+      final cover = await _writeCover(tester, Colors.teal);
+      final item = MediaItem(
+        id: 'track',
+        title: 'Track',
+        artUri: Uri.file(cover.path),
+      );
+      final fullProvider = PlayerArtwork.imageProvider(
+        item.artUri.toString(),
+        cacheWidth: 720,
+      )!;
+      final key = await fullProvider.obtainKey(ImageConfiguration.empty);
+      final miniKey = await PlayerArtwork.imageProvider(
+        item.artUri.toString(),
+        cacheWidth: PlayerArtwork.miniCacheWidth,
+      )!.obtainKey(ImageConfiguration.empty);
+      final cache = PaintingBinding.instance.imageCache;
+      await tester.pumpWidget(
+        _player(Stream.value(item), mornye: false, coverStyle: coverStyle),
+      );
+      for (
+        var i = 0;
+        i < 100 &&
+            (!cache.statusForKey(miniKey).keepAlive ||
+                (coverStyle == 'fullscreen' &&
+                    !cache.statusForKey(key).keepAlive));
+        i++
+      ) {
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 5)),
+        );
+        await tester.pump();
+      }
+      expect(cache.statusForKey(miniKey).keepAlive, isTrue);
+      expect(cache.statusForKey(key).keepAlive, coverStyle == 'fullscreen');
+      if (coverStyle == 'fullscreen') {
+        await tester.pumpWidget(
+          MaterialApp(
+            home: MaterialPlayerBackdrop(
+              mediaItem: item,
+              colorScheme: AppTheme.light().colorScheme,
+              showArtwork: true,
+            ),
+          ),
+        );
+        // Both the sharp cover and blur render on the first player frame.
+        expect(find.byType(ImageFiltered), findsNothing);
+        expect(find.byIcon(Icons.music_note), findsNothing);
+        expect(
+          find.byWidgetPredicate(
+            (widget) => widget is RawImage && widget.image != null,
+          ),
+          findsNWidgets(2),
+        );
+      }
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
 
   testWidgets('Mornye mini player resolves the cover colour on track change', (
     tester,

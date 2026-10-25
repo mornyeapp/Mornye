@@ -102,6 +102,7 @@ class AppSettings {
   final double musicHapticsStrength;
   @JsonKey(fromJson: playerCoverStyleFromJson)
   final String playerCoverStyle; // 'default' or 'fullscreen'
+  final bool landscapeLyricsArtwork;
   final bool isFirstLaunch;
   final bool checkForUpdates;
   final String updateChannel;
@@ -252,6 +253,7 @@ class AppSettings {
     this.musicHapticsSensitivity = 0.5,
     this.musicHapticsStrength = 0.5,
     this.playerCoverStyle = 'default',
+    this.landscapeLyricsArtwork = false,
     this.isFirstLaunch = true,
     this.checkForUpdates = true,
     this.updateChannel = 'stable',
@@ -378,6 +380,7 @@ class AppSettings {
     double? musicHapticsSensitivity,
     double? musicHapticsStrength,
     String? playerCoverStyle,
+    bool? landscapeLyricsArtwork,
     bool? isFirstLaunch,
     bool? checkForUpdates,
     String? updateChannel,
@@ -502,6 +505,8 @@ class AppSettings {
           musicHapticsSensitivity ?? this.musicHapticsSensitivity,
       musicHapticsStrength: musicHapticsStrength ?? this.musicHapticsStrength,
       playerCoverStyle: playerCoverStyle ?? this.playerCoverStyle,
+      landscapeLyricsArtwork:
+          landscapeLyricsArtwork ?? this.landscapeLyricsArtwork,
       isFirstLaunch: isFirstLaunch ?? this.isFirstLaunch,
       checkForUpdates: checkForUpdates ?? this.checkForUpdates,
       updateChannel: updateChannel ?? this.updateChannel,

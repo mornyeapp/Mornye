@@ -1,13 +1,9 @@
-import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:audio_service/audio_service.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:path/path.dart' as p;
 import 'package:mornye/routes/now_playing_route.dart';
-import 'package:mornye/services/cover_cache_manager.dart';
 import 'package:mornye/widgets/player_artwork.dart';
 
 /// Full-screen cover style for the Material player: the cover fills the top
@@ -60,16 +56,17 @@ class MaterialPlayerBackdrop extends StatelessWidget {
             opacity: showArtwork ? 1 : 0,
             duration: motion,
             curve: Curves.easeInOutCubic,
-            child: ShaderMask(
-              blendMode: BlendMode.dstIn,
-              shaderCallback: (bounds) => const LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                stops: [0, 0.72, 1],
-                colors: [Colors.white, Colors.white, Colors.transparent],
-              ).createShader(bounds),
-              child: Hero(
-                tag: kNowPlayingArtworkHeroTag,
+            child: Hero(
+              tag: kNowPlayingArtworkHeroTag,
+              // The flying cover must keep its fade in the route overlay.
+              child: ShaderMask(
+                blendMode: BlendMode.dstIn,
+                shaderCallback: (bounds) => const LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  stops: [0, 0.72, 1],
+                  colors: [Colors.white, Colors.white, Colors.transparent],
+                ).createShader(bounds),
                 child: PlayerArtwork(
                   artUri: artUri,
                   colorScheme: colorScheme,
@@ -125,7 +122,7 @@ class _BlurredCover extends StatefulWidget {
 
 class _BlurredCoverState extends State<_BlurredCover> {
   static const _sigma = 48.0;
-  static const _artWidth = 128;
+  static const _artWidth = PlayerArtwork.miniCacheWidth;
 
   late final _listener = ImageStreamListener(
     _setArt,
@@ -151,25 +148,14 @@ class _BlurredCoverState extends State<_BlurredCover> {
   /// Requests the same decode as [PlayerArtwork] so both share one cache
   /// entry. The previous cover stays until the next one decodes.
   void _resolve() {
-    final uri = widget.artUri ?? '';
-    final ImageProvider? provider = uri.startsWith('http')
-        ? CachedNetworkImageProvider(
-            uri,
-            cacheManager: CoverCacheManager.instance,
-          )
-        : uri.startsWith('file://') || p.isAbsolute(uri)
-        ? FileImage(
-            File(uri.startsWith('file://') ? Uri.parse(uri).toFilePath() : uri),
-          )
-        : null;
+    final provider = PlayerArtwork.imageProvider(
+      widget.artUri,
+      cacheWidth: _artWidth,
+    );
     _stream?.removeListener(_listener);
     _stream = provider == null
         ? null
-        : (ResizeImage.resizeIfNeeded(
-            _artWidth,
-            null,
-            provider,
-          ).resolve(ImageConfiguration.empty)..addListener(_listener));
+        : (provider.resolve(ImageConfiguration.empty)..addListener(_listener));
     if (provider == null) _setArt(null, false);
   }
 

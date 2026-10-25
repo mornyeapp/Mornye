@@ -7,6 +7,9 @@ import 'package:mornye/services/cover_cache_manager.dart';
 import 'package:mornye/widgets/app_icon.dart';
 
 class PlayerArtwork extends StatelessWidget {
+  /// Shared decode for the mini player and the full player's blurred cover.
+  static const miniCacheWidth = 132;
+
   /// An HTTP(S) URL, file URI, or absolute local artwork path.
   final String? artUri;
   final ColorScheme colorScheme;
@@ -26,6 +29,32 @@ class PlayerArtwork extends StatelessWidget {
       (MediaQuery.sizeOf(context).width *
               MediaQuery.devicePixelRatioOf(context))
           .round();
+
+  /// Resolves the same cache entry used by the artwork widgets.
+  static ImageProvider<Object>? imageProvider(
+    String? artUri, {
+    int? cacheWidth,
+  }) {
+    final ImageProvider<Object> provider;
+    if (artUri == null || artUri.isEmpty) return null;
+    if (artUri.startsWith('http')) {
+      provider = CachedNetworkImageProvider(
+        artUri,
+        cacheManager: CoverCacheManager.instance,
+      );
+    } else if (artUri.startsWith('file://') || p.isAbsolute(artUri)) {
+      provider = FileImage(
+        File(
+          artUri.startsWith('file://')
+              ? Uri.parse(artUri).toFilePath()
+              : artUri,
+        ),
+      );
+    } else {
+      return null;
+    }
+    return ResizeImage.resizeIfNeeded(cacheWidth, null, provider);
+  }
 
   @override
   Widget build(BuildContext context) {

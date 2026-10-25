@@ -7484,6 +7484,14 @@
   "@playerCoverStyle": {
     "description": "Settings section choosing how the player shows cover art"
   },
+  "landscapeLyricsArtwork": "Album art beside lyrics",
+  "@landscapeLyricsArtwork": {
+    "description": "Switch choosing album artwork instead of track details alongside lyrics in landscape"
+  },
+  "landscapeLyricsArtworkDescription": "Show album art instead of track details in the Material landscape player",
+  "@landscapeLyricsArtworkDescription": {
+    "description": "Subtitle explaining the Material landscape lyrics layout setting"
+  },
   "playerCoverStyleDefault": "Default",
   "@playerCoverStyleDefault": {
     "description": "Cover art style: artwork card above the controls"

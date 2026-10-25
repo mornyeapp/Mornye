@@ -370,6 +370,116 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  for (final (size, textScale) in [
+    (const Size(844, 390), 1.0),
+    (const Size(720, 320), 1.0),
+    (const Size(640, 360), 1.0),
+    (const Size(1280, 720), 1.6),
+  ]) {
+    testWidgets('Material landscape offers artwork beside lyrics at $size '
+        'with text scale $textScale', (tester) async {
+      await pumpNowPlaying(
+        tester,
+        theme: AppTheme.light(),
+        size: size,
+        wrapPlayer: (player) => Builder(
+          builder: (context) => MediaQuery(
+            data: MediaQuery.of(
+              context,
+            ).copyWith(textScaler: TextScaler.linear(textScale)),
+            child: player,
+          ),
+        ),
+      );
+      mediaItems.add(item('first'));
+      await settlePlayer(tester);
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(NowPlayingScreen)),
+      );
+      container.read(settingsProvider.notifier).setLandscapeLyricsArtwork(true);
+      await settlePlayer(tester);
+      final layout = find.byKey(
+        const ValueKey('material-landscape-artwork-lyrics'),
+      );
+      final artwork = find.descendant(
+        of: layout,
+        matching: find.byType(PlayerArtwork),
+      );
+      final coverHero = find.ancestor(of: artwork, matching: find.byType(Hero));
+      final artworkBounds = tester.getRect(coverHero);
+      final artworkState = tester.renderObject(artwork);
+      final lyricsToggle = find.byKey(const ValueKey('material-lyrics-toggle'));
+      await tester.tap(lyricsToggle);
+      await settlePlayer(tester);
+      expect(layout, findsOneWidget);
+      expect(find.byType(PlayerMetadataTitle), findsOneWidget);
+      expect(find.byType(PlayerPlaybackControls), findsNothing);
+      expect(artwork, findsOneWidget);
+      expect(tester.getRect(coverHero), artworkBounds);
+      expect(tester.renderObject(artwork), same(artworkState));
+      expect(artworkBounds.shortestSide, greaterThan(96));
+      expect(
+        tester.getRect(artwork).center.dx,
+        lessThan(tester.getRect(find.byType(SyncedLyricsView)).center.dx),
+      );
+      expect(
+        tester.getRect(find.byType(PlayerMetadataTitle)).center.dx,
+        greaterThan(artworkBounds.center.dx),
+      );
+      expect(tester.takeException(), isNull);
+
+      await tester.tap(lyricsToggle);
+      await settlePlayer(tester);
+      expect(find.byType(PlayerPlaybackControls), findsOneWidget);
+      expect(find.byType(SyncedLyricsView), findsNothing);
+      expect(tester.getRect(coverHero), artworkBounds);
+      expect(tester.renderObject(artwork), same(artworkState));
+      await tester.tap(lyricsToggle);
+      await settlePlayer(tester);
+
+      tester.view.physicalSize = Size(size.height, size.width);
+      await settlePlayer(tester);
+      expect(layout, findsNothing);
+      expect(find.byType(PlayerMetadataTitle), findsOneWidget);
+      tester.view.physicalSize = size;
+      await settlePlayer(tester);
+      expect(layout, findsOneWidget);
+
+      container
+          .read(settingsProvider.notifier)
+          .setLandscapeLyricsArtwork(false);
+      await settlePlayer(tester);
+      expect(layout, findsNothing);
+      expect(find.byType(PlayerMetadataTitle), findsOneWidget);
+      expect(find.byType(SyncedLyricsView), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('landscape artwork preference leaves a wide portrait player '
+      'unchanged', (tester) async {
+    await pumpNowPlaying(
+      tester,
+      theme: AppTheme.light(),
+      size: const Size(900, 1000),
+    );
+    mediaItems.add(item('first'));
+    await settlePlayer(tester);
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(NowPlayingScreen)),
+    );
+    container.read(settingsProvider.notifier).setLandscapeLyricsArtwork(true);
+    await tester.tap(find.byKey(const ValueKey('material-lyrics-toggle')));
+    await settlePlayer(tester);
+    expect(
+      find.byKey(const ValueKey('material-landscape-artwork-lyrics')),
+      findsNothing,
+    );
+    expect(find.byType(PlayerMetadataTitle), findsOneWidget);
+    expect(find.byType(SyncedLyricsView), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   for (final mornye in [false, true]) {
     testWidgets('cover style switches live and survives rotation ($mornye)', (
       tester,

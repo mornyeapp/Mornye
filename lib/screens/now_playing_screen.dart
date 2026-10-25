@@ -544,6 +544,11 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                         showLyrics: _currentPage == 1,
                         immersive: _lyricsImmersive,
                         fullScreenArtwork: materialFullScreen,
+                        landscapeLyricsArtwork: ref.watch(
+                          settingsProvider.select(
+                            (s) => s.landscapeLyricsArtwork,
+                          ),
+                        ),
                         lyricsBuilder: (_) =>
                             _lyricsSection(colorScheme, isActive: true),
                         onOpenQueue: () =>

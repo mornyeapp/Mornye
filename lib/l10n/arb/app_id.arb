@@ -7303,6 +7303,14 @@
   "@playerCoverStyle": {
     "description": "Settings section choosing how the player shows cover art"
   },
+  "landscapeLyricsArtwork": "Cover album di samping lirik",
+  "@landscapeLyricsArtwork": {
+    "description": "Switch choosing album artwork instead of track details alongside lyrics in landscape"
+  },
+  "landscapeLyricsArtworkDescription": "Tampilkan cover album menggantikan detail lagu pada player Material dalam posisi landscape",
+  "@landscapeLyricsArtworkDescription": {
+    "description": "Subtitle explaining the Material landscape lyrics layout setting"
+  },
   "playerCoverStyleDefault": "Default",
   "@playerCoverStyleDefault": {
     "description": "Cover art style: artwork card above the controls"

@@ -13,6 +13,7 @@ import 'package:mornye/services/music_player_service.dart'
     show resetAutoplayLearning;
 import 'package:mornye/screens/listening_statistics_screen.dart';
 import 'package:mornye/screens/equalizer_screen.dart';
+import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/utils/exclusive_output_labels.dart';
 import 'package:mornye/utils/nav_bar_inset.dart';
@@ -252,8 +253,19 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage> {
                   onTap: () => ref
                       .read(settingsProvider.notifier)
                       .setPlayerCoverStyle(style),
-                  showDivider: style != 'fullscreen',
+                  showDivider: true,
                 ),
+              SettingsSwitchItem(
+                icon: Icons.splitscreen_outlined,
+                title: context.l10n.landscapeLyricsArtwork,
+                subtitle: context.l10n.landscapeLyricsArtworkDescription,
+                value: settings.landscapeLyricsArtwork,
+                enabled: !context.isMornye,
+                onChanged: (value) => ref
+                    .read(settingsProvider.notifier)
+                    .setLandscapeLyricsArtwork(value),
+                showDivider: false,
+              ),
             ],
           ),
           ...settingsSectionSlivers(

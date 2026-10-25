@@ -310,6 +310,12 @@ class SettingsSearchCatalog {
           keywords: const ['artwork', 'cover', 'full screen', 'immersive'],
         ),
         SettingsSearchEntry(
+          icon: Icons.splitscreen_outlined,
+          title: l10n.landscapeLyricsArtwork,
+          subtitle: l10n.landscapeLyricsArtworkDescription,
+          keywords: const ['landscape', 'lyrics', 'album art', 'details'],
+        ),
+        SettingsSearchEntry(
           icon: Icons.vibration,
           title: l10n.musicHaptics,
           subtitle: l10n.musicHapticsDescription,

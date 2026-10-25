@@ -415,6 +415,20 @@ class MusicPlayerController {
   Future<void> previous() async =>
       remote?.previous() ?? _handler?.skipToPrevious();
 
+  /// Ends a paused local session, including its persisted playback state.
+  Future<void> dismiss() async {
+    if (remote != null) return;
+    final handler = _handler;
+    if (handler == null) return;
+    final state = handler.playbackState.value;
+    if (state.playing ||
+        state.processingState == AudioProcessingState.loading ||
+        state.processingState == AudioProcessingState.buffering) {
+      return;
+    }
+    await handler.stop();
+  }
+
   void setSleepTimer(Duration duration) => _handler?.setSleepTimer(duration);
 
   void cancelSleepTimer() => _handler?.cancelSleepTimer();
