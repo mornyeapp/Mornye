@@ -18,9 +18,9 @@ extension _HomeTabExploreUI on _HomeTabState {
           if (hasGreeting && index == 0) {
             return Padding(
               padding: EdgeInsets.fromLTRB(
-                16 + wideListInset(context),
+                16 + homeContentInset(context),
                 12,
-                16 + wideListInset(context),
+                16 + homeContentInset(context),
                 4,
               ),
               child: Text(
@@ -64,7 +64,7 @@ extension _HomeTabExploreUI on _HomeTabState {
 
     // Titles and the first card line up with the centered column on tablets;
     // the carousel itself still scrolls edge to edge.
-    final inset = wideListInset(context);
+    final inset = homeContentInset(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -113,7 +113,7 @@ extension _HomeTabExploreUI on _HomeTabState {
   Widget _buildExploreSectionSkeleton({required bool isArtist}) {
     final cardSize = _exploreCardSize(context);
     final coverSize = _exploreCoverSize(context);
-    final inset = wideListInset(context);
+    final inset = homeContentInset(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -587,7 +587,7 @@ extension _HomeTabExploreUI on _HomeTabState {
                 .where((url) => url.isNotEmpty)
                 .firstWhere(used.add, orElse: () => ''),
         ];
-        final inset = 16 + wideListInset(context);
+        final inset = 16 + homeContentInset(context);
         return SliverMainAxisGroup(
           slivers: [
             SliverPadding(

@@ -334,6 +334,81 @@ void main() {
     );
   }
 
+  testWidgets('Material desktop Home runs across a full screen window', (
+    tester,
+  ) async {
+    debugDesktopPlatformOverride = true;
+    addTearDown(() => debugDesktopPlatformOverride = null);
+    const size = Size(2000, 1200);
+    tester.view.physicalSize = size;
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    ExploreItem item(String section, int index) => ExploreItem(
+      id: '$section-$index',
+      uri: 'example:album:$section-$index',
+      type: 'album',
+      name: '$section album $index',
+      artists: 'Example artist',
+    );
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          settingsProvider.overrideWith(_Settings.new),
+          extensionProvider.overrideWith(_Extensions.new),
+          exploreProvider.overrideWith(
+            () => _Explore(
+              sections: [
+                ExploreSection(
+                  uri: 'example:new',
+                  title: 'New',
+                  isFeatured: true,
+                  items: [for (var i = 0; i < 6; i++) item('new', i)],
+                ),
+                ExploreSection(
+                  uri: 'example:songs',
+                  title: 'Best New Songs',
+                  items: [for (var i = 0; i < 20; i++) item('songs', i)],
+                ),
+              ],
+            ),
+          ),
+          downloadHistoryProvider.overrideWith(_History.new),
+          recentAccessProvider.overrideWith(_Recent.new),
+          trackProvider.overrideWith(_Search.new),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.dark(),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: const HomeTab(mode: HomeTabMode.combined),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // M3's 24dp window margin, not the centered reading column.
+    final search = tester.getRect(find.byType(AppSearchField));
+    expect(search.left, 24);
+    expect(search.width, lessThanOrEqualTo(720));
+    for (final title in ['New', 'Best New Songs']) {
+      expect(tester.getTopLeft(find.text(title)).dx, 24, reason: title);
+    }
+    expect(
+      tester.getTopLeft(find.text('new album 0')).dx,
+      24,
+      reason: 'the first featured card starts under its title',
+    );
+    // Both shelves still scroll to the window's edge.
+    for (final title in ['new album 0', 'songs album 0']) {
+      final shelf = find
+          .ancestor(of: find.text(title), matching: find.byType(ListView))
+          .first;
+      expect(tester.getRect(shelf).left, 0, reason: title);
+      expect(tester.getRect(shelf).right, size.width, reason: title);
+    }
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'Home keeps its feed while Search retains its query and results',
     (tester) async {

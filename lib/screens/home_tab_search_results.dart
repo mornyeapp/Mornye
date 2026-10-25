@@ -508,7 +508,7 @@ extension _HomeTabSearchResultsUI on _HomeTabState {
         viewToggle: viewToggle,
       ),
       SliverPadding(
-        padding: EdgeInsets.symmetric(horizontal: wideListInset(context)),
+        padding: EdgeInsets.symmetric(horizontal: homeContentInset(context)),
         sliver: SliverList(
           delegate: SliverChildBuilderDelegate((context, index) {
             final isFirst = index == 0;
@@ -574,7 +574,9 @@ extension _HomeTabSearchResultsUI on _HomeTabState {
             (mornye
                     ? const EdgeInsetsDirectional.fromSTEB(20, 16, 12, 10)
                     : const EdgeInsetsDirectional.fromSTEB(16, 8, 8, 8))
-                .add(EdgeInsets.symmetric(horizontal: wideListInset(context))),
+                .add(
+                  EdgeInsets.symmetric(horizontal: homeContentInset(context)),
+                ),
         child: Row(
           children: [
             Expanded(
@@ -822,7 +824,7 @@ extension _HomeTabSearchResultsUI on _HomeTabState {
         ),
     ];
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 16 + wideListInset(context)),
+      padding: EdgeInsets.symmetric(horizontal: 16 + homeContentInset(context)),
       // The chips never overlap, so their glass shares one backdrop read.
       child: LiquidGlassBatch(
         // A mouse cannot swipe a clipped row, so desktop windows wrap every

@@ -130,6 +130,16 @@ double wideListInset(BuildContext context, {double? contentMaxWidth}) =>
               : defaultWideContentMaxWidth),
     );
 
+/// The Home tab's extra side inset. Material desktop runs Home across the
+/// whole pane, as M3 panes do, with the 24dp margin of expanded and larger
+/// windows (the 16dp phone edge plus 8), so its cover shelves reach the
+/// edge; elsewhere Home centers with [wideListInset].
+double homeContentInset(BuildContext context) =>
+    isDesktopPlatform && !context.isMornye ? 8 : wideListInset(context);
+
+/// M3 search bars stop at 720dp.
+const double searchBarMaxWidth = 720;
+
 const double desktopContentMaxWidth = 1600;
 
 /// The M3 large window class starts at 1200dp; the extra 80dp leaves room
@@ -193,7 +203,7 @@ double searchCoverTextHeight(BuildContext context) {
 /// The side margin of search result grids and shelves: the section titles'
 /// inset, so covers line up under them.
 double searchCoverEdge(BuildContext context) =>
-    (context.isMornye ? 20 : 16) + wideListInset(context);
+    (context.isMornye ? 20 : 16) + homeContentInset(context);
 
 /// Scales fixed sizes with the shortest screen side, clamped to [min]..[max].
 double responsiveScale({

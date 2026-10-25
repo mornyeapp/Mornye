@@ -20,7 +20,7 @@ extension _HomeTabRecentUI on _HomeTabState {
           SliverPadding(
             padding:
                 const EdgeInsets.fromLTRB(16, 0, 16, 8) +
-                EdgeInsets.symmetric(horizontal: wideListInset(context)),
+                EdgeInsets.symmetric(horizontal: homeContentInset(context)),
             sliver: SliverList.builder(
               itemCount: view.uniqueItems.length,
               itemBuilder: (context, index) {
@@ -50,7 +50,7 @@ extension _HomeTabRecentUI on _HomeTabState {
     return Padding(
       padding:
           EdgeInsets.fromLTRB(16, 8, 16, uniqueItems.isEmpty ? 8 : 0) +
-          EdgeInsets.symmetric(horizontal: wideListInset(context)),
+          EdgeInsets.symmetric(horizontal: homeContentInset(context)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -232,7 +232,7 @@ extension _HomeTabRecentUI on _HomeTabState {
         2;
     final cardHeight =
         math.max(context.tokens.coverList, textHeight) + 2 * _recentCardPadding;
-    final inset = 16 + wideListInset(context);
+    final inset = 16 + homeContentInset(context);
     return SizedBox(
       height: cardHeight + 20,
       child: DesktopScrollArrows(

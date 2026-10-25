@@ -52,7 +52,9 @@ String _paintFingerprint(WidgetTester tester) {
 /// SHA-1 of each fingerprint, recorded on the base layout (commit 44cbb57b)
 /// before search results gained cover grids and shelves on wide screens, with
 /// the Material values re-recorded when sort and view became a grouped
-/// toolbar. A narrow layout must paint exactly these. A deliberate change to
+/// toolbar, and the Material desktop value when Home took M3's 24dp window
+/// margin and 720dp search width. A narrow layout must paint exactly these.
+/// A deliberate change to
 /// the phone rows records new values; the failure prints the fingerprint.
 const _baseFingerprints = {
   'phone Material': 'c975d61edc1fef90079a8ac06bf1a8c5307ac43b',
@@ -61,7 +63,7 @@ const _baseFingerprints = {
   'landscape phone Mornye': 'a52f2e86d51d48d56386bae6aed54e9964adb7f7',
   'portrait tablet Material': '94d41e2ff5146d50d53d7b50f33ec371b88fc11f',
   'portrait tablet Mornye': '4ed79340ac67aefb625dcb4418686de5458b0b79',
-  'narrow desktop window Material': '99f19818d1765351a8af44786efd41f5962231b3',
+  'narrow desktop window Material': 'b60f25b64b7171e20c34e3805d00ab3ea4971bf2',
   'narrow desktop window Mornye': 'b0e19d226ab2aa594ba4d4e1f41407841790dd4a',
 };
 
