@@ -7524,5 +7524,21 @@
   "linkWifiOffMessage": "Hubungkan ponsel ini ke jaringan Wi-Fi yang sama dengan komputer Anda.",
   "linkIssueUnauthorized": "{name} tidak lagi menerima ponsel ini. Pasangkan lagi untuk terhubung kembali.",
   "linkIssueCertificate": "{name} menampilkan sertifikat keamanan yang berbeda. Pasangkan lagi hanya jika Anda memasang ulang atau mengatur ulang Mornye di komputer tersebut.",
-  "linkIssueIncompatible": "Perbarui Mornye di ponsel ini dan di {name} untuk terhubung."
+  "linkIssueIncompatible": "Perbarui Mornye di ponsel ini dan di {name} untuk terhubung.",
+  "playlistEditOrder": "Ubah urutan",
+  "playlistEditOrderDescription": "Seret lagu lewat pegangannya, atau sentuh lama, untuk memindahkannya.",
+  "playlistEditOrderSaved": "Urutan playlist disimpan",
+  "playlistCreateEmpty": "Playlist kosong",
+  "playlistCreateEmptySubtitle": "Tambahkan lagu nanti dari daftar mana pun",
+  "playlistCreateFromFolder": "Dari folder",
+  "playlistCreateFromFolderSubtitle": "Semua lagu di satu folder Koleksi Anda",
+  "playlistImportFile": "Impor file playlist",
+  "playlistImportFileSubtitle": "M3U, M3U8, atau CSV, dicocokkan dengan file di perangkat ini",
+  "playlistFolderPickerTitle": "Pilih folder",
+  "playlistFolderPickerEmptyTitle": "Belum ada folder",
+  "playlistFolderPickerEmpty":"Belum ada lagu yang dipindai. Tambahkan folder Koleksi lalu pindai terlebih dahulu.",
+  "playlistCreatedWithTracks": "{name} dibuat dengan {count, plural, =1{1 lagu} other{{count} lagu}}",
+  "playlistImportResult": "{count, plural, =1{1 lagu} other{{count} lagu}} diimpor ke {name}, {matched} cocok dengan file di perangkat ini",
+  "playlistImportNoTracks": "Tidak ada lagu di file ini",
+  "playlistImportFailed": "File playlist ini tidak dapat dibaca"
 }

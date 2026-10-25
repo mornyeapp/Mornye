@@ -1030,6 +1030,41 @@ class LibraryCollectionsDatabase {
     });
   }
 
+  /// Playlist order is the `added_at` order, which Link sync also carries,
+  /// so a reorder rewrites those stamps instead of adding a position column.
+  Future<void> reorderPlaylistTracks({
+    required String playlistId,
+    required Map<String, String> addedAtByKey,
+    required String playlistUpdatedAt,
+  }) async {
+    if (addedAtByKey.isEmpty) return;
+    final db = await database;
+    await sqlite.transactionWithBusyRetry(db, (txn) async {
+      var batch = txn.batch();
+      var pending = 0;
+      for (final MapEntry(:key, :value) in addedAtByKey.entries) {
+        batch.update(
+          _tablePlaylistTracks,
+          {'added_at': value},
+          where: 'playlist_id = ? AND track_key = ?',
+          whereArgs: [playlistId, key],
+        );
+        if (++pending == 128) {
+          await batch.commit(noResult: true);
+          batch = txn.batch();
+          pending = 0;
+        }
+      }
+      batch.update(
+        _tablePlaylists,
+        {'updated_at': playlistUpdatedAt},
+        where: 'id = ?',
+        whereArgs: [playlistId],
+      );
+      await batch.commit(noResult: true);
+    });
+  }
+
   /// Wipes every collection table and rewrites them from a restored backup.
   ///
   /// [collectionsJson] must use the same shape as

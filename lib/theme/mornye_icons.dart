@@ -211,6 +211,9 @@ IconData _cupertinoFor(IconData icon) {
     Icons.computer => CupertinoIcons.desktopcomputer,
     Icons.hub_outlined => CupertinoIcons.link,
     Icons.campaign_outlined => CupertinoIcons.speaker_2,
+    Icons.drag_handle => CupertinoIcons.line_horizontal_3,
+    Icons.swap_vert => CupertinoIcons.arrow_up_arrow_down,
+    Icons.file_open_outlined => CupertinoIcons.doc,
     // Preserve meaning for symbols without a Cupertino counterpart, such as
     // numbered download limits. An unrelated gear hides the action's purpose.
     _ => icon,

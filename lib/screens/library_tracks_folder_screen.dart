@@ -39,6 +39,7 @@ import 'package:mornye/utils/cover_art_utils.dart';
 import 'package:mornye/controllers/collapsing_header_scroll_mixin.dart';
 import 'package:mornye/controllers/library_tracks_folder_data.dart';
 import 'package:mornye/controllers/selection_mode_mixin.dart';
+import 'package:mornye/screens/playlist_reorder_page.dart';
 import 'package:mornye/screens/track_metadata_screen.dart';
 import 'package:mornye/widgets/selection_action_button.dart';
 import 'package:mornye/widgets/in_library_badge.dart';
@@ -780,6 +781,23 @@ class _LibraryTracksFolderScreenState
             onPressed: () => _exportAsM3u8(context, title, entries),
           ),
         if (isPlaylistMode && !isSelectionMode) ...[
+          if (entries.length > 1) ...[
+            const SizedBox(width: 8),
+            HeaderCircleButton(
+              icon: Icons.swap_vert,
+              iconSize: 20,
+              tooltip: context.l10n.playlistEditOrder,
+              onPressed: () {
+                final id = widget.playlistId ?? playlist?.id;
+                if (id == null || id.isEmpty) return;
+                Navigator.of(context).push(
+                  slidePageRoute<void>(
+                    page: PlaylistReorderPage(playlistId: id),
+                  ),
+                );
+              },
+            ),
+          ],
           const SizedBox(width: 8),
           HeaderCircleButton(
             icon: Icons.edit_outlined,

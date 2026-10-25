@@ -586,6 +586,64 @@ class LibraryCollectionsNotifier extends Notifier<LibraryCollectionsState> {
     });
   }
 
+  /// Puts the playlist in [orderedKeys] order, which must name every track
+  /// once. Tracks are restamped one millisecond apart from the earliest
+  /// stamp, kept before now so later additions still append.
+  Future<bool> reorderPlaylistTracks(
+    String playlistId,
+    List<String> orderedKeys,
+  ) => _mutate(() async {
+    await ensurePlaylistLoaded(playlistId);
+    if (!ref.mounted) return false;
+    final playlist = state.playlistById(playlistId);
+    if (playlist == null) return false;
+    final byKey = {for (final entry in playlist.tracks) entry.key: entry};
+    if (orderedKeys.length != byKey.length ||
+        orderedKeys.toSet().length != orderedKeys.length ||
+        !orderedKeys.every(byKey.containsKey)) {
+      return false;
+    }
+    var unchanged = true;
+    for (var i = 0; i < orderedKeys.length; i++) {
+      if (playlist.tracks[i].key != orderedKeys[i]) {
+        unchanged = false;
+        break;
+      }
+    }
+    if (unchanged) return false;
+
+    final now = DateTime.now();
+    final earliest = playlist.tracks
+        .map((entry) => entry.addedAt.toLocal())
+        .reduce((a, b) => a.isBefore(b) ? a : b);
+    final latestStart = now.subtract(
+      Duration(milliseconds: orderedKeys.length),
+    );
+    final start = earliest.isBefore(latestStart) ? earliest : latestStart;
+    final reordered = [
+      for (var i = 0; i < orderedKeys.length; i++)
+        CollectionTrackEntry(
+          key: orderedKeys[i],
+          track: byKey[orderedKeys[i]]!.track,
+          addedAt: start.add(Duration(milliseconds: i)),
+        ),
+    ];
+    await _db.reorderPlaylistTracks(
+      playlistId: playlistId,
+      addedAtByKey: {
+        for (final entry in reordered)
+          entry.key: entry.addedAt.toIso8601String(),
+      },
+      playlistUpdatedAt: now.toIso8601String(),
+    );
+    final changed = _replacePlaylistById(
+      playlistId,
+      (current) => current.copyWith(tracks: reordered, updatedAt: now),
+    );
+    if (changed) _invalidatePlaylistPickerSummaries();
+    return changed;
+  });
+
   Future<void> setPlaylistCover(
     String playlistId,
     String sourceFilePath,

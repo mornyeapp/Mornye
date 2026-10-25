@@ -461,6 +461,40 @@ class LibraryDatabase {
     return rows.map(LibraryRowMapper.decode).toList(growable: false);
   }
 
+  /// The path of every visible file, for grouping by folder and matching
+  /// imported playlist entries without decoding whole rows.
+  Future<List<LibraryFilePathRow>> getFilePathRows() async {
+    final db = await database;
+    final rows = await db.query(
+      visibleLibraryView,
+      columns: const ['id', 'source_id', 'file_path'],
+    );
+    return [
+      for (final row in rows)
+        (
+          id: row['id'] as String,
+          sourceId: row['source_id'] as String? ?? '',
+          filePath: row['file_path'] as String? ?? '',
+        ),
+    ];
+  }
+
+  /// Decoded rows for [ids] in the same order; ids no longer visible are
+  /// left out.
+  Future<List<Map<String, dynamic>>> getByIds(List<String> ids) async {
+    if (ids.isEmpty) return const [];
+    final byId = <String, Map<String, dynamic>>{};
+    await sqlite.loadRowsByColumn(
+      await database,
+      table: visibleLibraryView,
+      column: 'id',
+      rawValues: ids,
+      destination: byId,
+      mapRow: LibraryRowMapper.decode,
+    );
+    return [for (final id in ids) ?byId[id]];
+  }
+
   Future<Map<String, dynamic>?> getById(String id) async {
     final db = await database;
     final rows = await db.query(

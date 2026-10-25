@@ -8548,5 +8548,88 @@
         "type": "String"
       }
     }
+  },
+  "playlistEditOrder": "Edit order",
+  "@playlistEditOrder": {
+    "description": "Playlist header action and page title for reordering the playlist's tracks"
+  },
+  "playlistEditOrderDescription": "Drag a track by its handle, or touch and hold it, to move it.",
+  "@playlistEditOrderDescription": {
+    "description": "Explanation at the top of the playlist reorder page"
+  },
+  "playlistEditOrderSaved": "Playlist order saved",
+  "@playlistEditOrderSaved": {
+    "description": "Snackbar after saving a new playlist track order"
+  },
+  "playlistCreateEmpty": "Empty playlist",
+  "@playlistCreateEmpty": {
+    "description": "Create playlist option that starts with no tracks"
+  },
+  "playlistCreateEmptySubtitle": "Add tracks later from any list",
+  "@playlistCreateEmptySubtitle": {
+    "description": "Subtitle of the empty playlist option"
+  },
+  "playlistCreateFromFolder": "From a folder",
+  "@playlistCreateFromFolder": {
+    "description": "Create playlist option that uses the tracks of one Library folder"
+  },
+  "playlistCreateFromFolderSubtitle": "Every track in one folder of your Library",
+  "@playlistCreateFromFolderSubtitle": {
+    "description": "Subtitle of the create playlist from folder option"
+  },
+  "playlistImportFile": "Import playlist file",
+  "@playlistImportFile": {
+    "description": "Create playlist option that imports an M3U or CSV file"
+  },
+  "playlistImportFileSubtitle": "M3U, M3U8 or CSV, matched to files on this device",
+  "@playlistImportFileSubtitle": {
+    "description": "Subtitle of the import playlist file option"
+  },
+  "playlistFolderPickerTitle": "Choose a folder",
+  "@playlistFolderPickerTitle": {
+    "description": "Title of the sheet listing Library folders to turn into a playlist"
+  },
+  "playlistFolderPickerEmptyTitle": "No folders yet",
+  "@playlistFolderPickerEmptyTitle": {
+    "description": "Title of the empty folder picker when no Library folder has tracks"
+  },
+  "playlistFolderPickerEmpty": "No scanned tracks yet. Add a Library folder and scan it first.",
+  "@playlistFolderPickerEmpty": {
+    "description": "Shown when no Library folder has tracks to create a playlist from"
+  },
+  "playlistCreatedWithTracks": "Created {name} with {count, plural, =1{1 track} other{{count} tracks}}",
+  "@playlistCreatedWithTracks": {
+    "description": "Snackbar after creating a playlist from a folder",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "playlistImportResult": "Imported {count, plural, =1{1 track} other{{count} tracks}} into {name}, {matched} matched to files on this device",
+  "@playlistImportResult": {
+    "description": "Snackbar after importing a playlist file; matched counts tracks linked to a local file",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "name": {
+        "type": "String"
+      },
+      "matched": {
+        "type": "int"
+      }
+    }
+  },
+  "playlistImportNoTracks": "No tracks found in this file",
+  "@playlistImportNoTracks": {
+    "description": "Snackbar when an imported playlist file has no entries"
+  },
+  "playlistImportFailed": "Could not read this playlist file",
+  "@playlistImportFailed": {
+    "description": "Snackbar when reading or parsing an imported playlist file fails"
   }
 }

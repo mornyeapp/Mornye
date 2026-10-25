@@ -337,18 +337,8 @@ extension _QueueTabNavigation on _QueueTabState {
     );
   }
 
-  Future<void> _showCreatePlaylistDialog(BuildContext context) async {
-    final playlistName = await promptPlaylistName(
-      context,
-      title: context.l10n.collectionCreatePlaylist,
-      confirmLabel: context.l10n.actionCreate,
-    );
-
-    if (playlistName == null || playlistName.isEmpty) return;
-    await ref
-        .read(libraryCollectionsProvider.notifier)
-        .createPlaylist(playlistName);
-  }
+  Future<void> _showCreatePlaylistDialog(BuildContext context) =>
+      showCreatePlaylistSheet(context, ref);
 
   /// Pass a finite [size] (e.g. 56) for list view, or `null` for grid view
   /// where the widget should expand to fill its parent.

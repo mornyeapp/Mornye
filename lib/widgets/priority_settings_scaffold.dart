@@ -10,7 +10,7 @@ class PrioritySettingsScaffold extends StatelessWidget {
   final bool hasChanges;
   final String title;
   final String description;
-  final String infoText;
+  final String? infoText;
   final EdgeInsetsGeometry descriptionPadding;
   final List<Widget> slivers;
   final Future<void> Function() onSave;
@@ -21,7 +21,7 @@ class PrioritySettingsScaffold extends StatelessWidget {
     required this.hasChanges,
     required this.title,
     required this.description,
-    required this.infoText,
+    this.infoText,
     required this.slivers,
     required this.onSave,
     required this.onConfirmDiscard,
@@ -86,21 +86,22 @@ class PrioritySettingsScaffold extends StatelessWidget {
               ),
             ),
             ...slivers,
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: EdgeInsets.fromLTRB(
-                  16 + wideInset,
-                  16,
-                  16 + wideInset,
-                  16,
-                ),
-                child: SettingsInfoCard(
-                  icon: Icons.info_outline,
-                  message: infoText,
-                  margin: EdgeInsets.zero,
+            if (infoText case final infoText?)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    16 + wideInset,
+                    16,
+                    16 + wideInset,
+                    16,
+                  ),
+                  child: SettingsInfoCard(
+                    icon: Icons.info_outline,
+                    message: infoText,
+                    margin: EdgeInsets.zero,
+                  ),
                 ),
               ),
-            ),
             const SliverToBoxAdapter(child: SizedBox(height: 32)),
           ],
         ),
