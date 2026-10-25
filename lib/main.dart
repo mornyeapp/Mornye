@@ -38,6 +38,7 @@ import 'package:mornye/services/desktop_diagnostics.dart';
 import 'package:mornye/services/desktop_library_watcher.dart';
 import 'package:mornye/services/link/desktop/link_desktop_host.dart';
 import 'package:mornye/services/link/features/link_remote_playback.dart';
+import 'package:mornye/services/link/link_client_api.dart';
 import 'package:mornye/services/music_player_service.dart';
 import 'package:mornye/services/playback_notification.dart';
 import 'package:mornye/services/player_widget_service.dart';
@@ -187,6 +188,9 @@ void main() {
             // player screens show and drive it.
             activeRemotePlaybackProvider.overrideWith(
               (ref) => ref.watch(linkRemotePlaybackProvider),
+            ),
+            linkKeepConnectedProvider.overrideWith(
+              (ref) => ref.watch(linkRemotePlaybackProvider) != null,
             ),
           ],
           child: EagerInitialization(

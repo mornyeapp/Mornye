@@ -226,6 +226,17 @@ class FakeLinkPairing implements LinkPairingApi {
   }
 }
 
+class _KeepConnected extends Notifier<bool> {
+  @override
+  bool build() => false;
+
+  void set(bool keep) => state = keep;
+}
+
+final _keepConnectedProvider = NotifierProvider<_KeepConnected, bool>(
+  _KeepConnected.new,
+);
+
 /// The client's providers wired to fakes. Tests set
 /// `SharedPreferences.setMockInitialValues` first.
 class LinkClientHarness {
@@ -263,9 +274,17 @@ class LinkClientHarness {
     linkClientStoreProvider.overrideWithValue(LinkClientStore()),
     linkPairingApiProvider.overrideWithValue(pairing),
     linkLibraryBridgeProvider.overrideWithValue(bridge),
+    linkKeepConnectedProvider.overrideWith(
+      (ref) => ref.watch(_keepConnectedProvider),
+    ),
   ];
 
   late final container = ProviderContainer(overrides: overrides);
+
+  /// Sets [linkKeepConnectedProvider], as the app root does while the
+  /// desktop plays for the phone.
+  void keepConnected(bool keep) =>
+      container.read(_keepConnectedProvider.notifier).set(keep);
 
   LinkClientController get controller =>
       container.read(linkClientControllerProvider.notifier);

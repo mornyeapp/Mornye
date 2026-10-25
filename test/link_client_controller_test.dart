@@ -289,6 +289,35 @@ void main() {
     expect(harness.browser.started, 2);
   });
 
+  test('the session stays connected in the background when asked', () async {
+    final harness = await _started();
+    await harness.controller.pair(linkTestTarget('a'), '123456');
+    await pumpEventQueue();
+    final session = harness.sessions.single;
+
+    harness.keepConnected(true);
+    await pumpEventQueue();
+    await _lifecycle([AppLifecycleState.hidden, AppLifecycleState.paused]);
+    expect(session.calls, ['start']);
+
+    harness.keepConnected(false);
+    await pumpEventQueue();
+    expect(session.calls, ['start', 'pause']);
+
+    harness.keepConnected(true);
+    await pumpEventQueue();
+    expect(session.calls, ['start', 'pause', 'resume']);
+
+    await _lifecycle([
+      AppLifecycleState.hidden,
+      AppLifecycleState.inactive,
+      AppLifecycleState.resumed,
+    ]);
+    harness.keepConnected(false);
+    await pumpEventQueue();
+    expect(session.calls, ['start', 'pause', 'resume']);
+  });
+
   test('catalog.changed rescans the desktop once bursts settle', () async {
     final harness = await _started();
     final record = await harness.controller.pair(linkTestTarget('a'), '123456');

@@ -211,6 +211,10 @@ class LinkClientController extends Notifier<LinkClientState> {
   Future<void>? _loading;
   LinkDeviceIdentity? _device;
   var _foreground = true;
+
+  /// [linkKeepConnectedProvider]: the session stays connected in the
+  /// background too.
+  var _keepConnected = false;
   var _discoveryHolds = 0;
   var _discoveryBlocked = false;
 
@@ -236,6 +240,11 @@ class LinkClientController extends Notifier<LinkClientState> {
     }
     _disposed = false;
     _lifecycle = AppLifecycleListener(onStateChange: _onLifecycle);
+    ref.listen(
+      linkKeepConnectedProvider,
+      (_, keep) => _updateConnected(() => _keepConnected = keep),
+      fireImmediately: true,
+    );
     ref.onDispose(_dispose);
     _loading = Future<void>.microtask(
       () => _serial(_load).catchError(
@@ -335,7 +344,7 @@ class LinkClientController extends Notifier<LinkClientState> {
     );
     await previous?.dispose();
     if (next != null) {
-      if (!_foreground) next.pause();
+      if (!_connected) next.pause();
       next.start();
     }
     _updateDiscovery();
@@ -378,14 +387,25 @@ class LinkClientController extends Notifier<LinkClientState> {
     if (lifecycle == AppLifecycleState.inactive) return;
     final foreground = lifecycle == AppLifecycleState.resumed;
     if (foreground == _foreground || _disposed) return;
-    _foreground = foreground;
-    if (foreground) {
+    _updateConnected(() => _foreground = foreground);
+    if (foreground) unawaited(refreshLocalNetwork());
+    _updateDiscovery();
+  }
+
+  /// Whether the session is connected rather than paused.
+  bool get _connected => _foreground || _keepConnected;
+
+  /// Applies [change], then pauses or resumes the session when that changed
+  /// [_connected].
+  void _updateConnected(void Function() change) {
+    final was = _connected;
+    change();
+    if (_connected == was || _disposed) return;
+    if (_connected) {
       _session?.resume();
-      unawaited(refreshLocalNetwork());
     } else {
       _session?.pause();
     }
-    _updateDiscovery();
   }
 
   /// Keeps discovery running while the returned callback is not called, for
