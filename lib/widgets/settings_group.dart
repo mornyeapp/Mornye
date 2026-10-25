@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
@@ -199,9 +200,15 @@ bool settingsRowsConnected(BuildContext context) =>
 
 /// Horizontal margin of settings content on a surface [maxWidth] wide: the
 /// 16dp edge plus the wide-layout centering inset. Groups, section headers,
-/// info cards and page-level buttons share it so their edges line up.
-double settingsHorizontalInset(double maxWidth) =>
-    16 + (maxWidth.isFinite ? wideInsetForWidth(maxWidth) : 0);
+/// info cards and page-level buttons share it so their edges line up, also
+/// with page titles and cards placed by [wideListInset]: desktop pages run
+/// across the pane until the desktop reading width, as their lists do, while
+/// a narrower box such as a sheet keeps its own centering.
+double settingsHorizontalInset(BuildContext context, double maxWidth) =>
+    16 +
+    (maxWidth.isFinite
+        ? min(wideInsetForWidth(maxWidth), wideListInset(context))
+        : 0);
 
 /// Corners of one row in an expressive connected list: the card radius at the
 /// [first] and [last] ends of the run, tight corners between rows.
@@ -271,7 +278,10 @@ class SettingsGroup extends StatelessWidget {
         : LayoutBuilder(
             builder: (context, constraints) => Padding(
               padding: EdgeInsets.symmetric(
-                horizontal: settingsHorizontalInset(constraints.maxWidth),
+                horizontal: settingsHorizontalInset(
+                  context,
+                  constraints.maxWidth,
+                ),
                 vertical: 4,
               ),
               child: child,
@@ -706,7 +716,8 @@ class SettingsSectionHeader extends StatelessWidget {
     // Aligned with the row content of the groups below at any width.
     final content = LayoutBuilder(
       builder: (context, constraints) {
-        final inset = settingsHorizontalInset(constraints.maxWidth) + 16;
+        final inset =
+            settingsHorizontalInset(context, constraints.maxWidth) + 16;
         return Padding(
           padding: EdgeInsets.fromLTRB(inset, 24, inset, 8),
           child: Semantics(header: true, child: label),
@@ -1086,7 +1097,8 @@ class SettingsInfoCard extends StatelessWidget {
     // Wide layouts center groups; the card keeps the same edges.
     return LayoutBuilder(
       builder: (context, constraints) {
-        final wide = settingsHorizontalInset(constraints.maxWidth) - 16;
+        final wide =
+            settingsHorizontalInset(context, constraints.maxWidth) - 16;
         return Padding(
           padding: resolved.copyWith(
             left: resolved.left + wide,

@@ -22,6 +22,7 @@ import 'package:mornye/models/settings.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/services/folder_path_template.dart';
+import 'package:mornye/utils/adaptive_layout.dart';
 import 'package:mornye/utils/desktop_folders.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/utils/nav_bar_inset.dart';
@@ -363,7 +364,12 @@ class _FilesSettingsPageState extends ConsumerState<FilesSettingsPage> {
               ),
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                  padding: EdgeInsets.fromLTRB(
+                    16 + wideListInset(context),
+                    8,
+                    16 + wideListInset(context),
+                    0,
+                  ),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [

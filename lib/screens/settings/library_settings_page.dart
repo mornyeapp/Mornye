@@ -642,7 +642,12 @@ class _LibrarySettingsPageState extends ConsumerState<LibrarySettingsPage> {
             ))
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                  padding: EdgeInsets.fromLTRB(
+                    16 + wideListInset(context),
+                    8,
+                    16 + wideListInset(context),
+                    4,
+                  ),
                   child: Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(

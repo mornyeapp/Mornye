@@ -399,7 +399,7 @@ class _LinkInset extends StatelessWidget {
   @override
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, constraints) {
-      final inset = settingsHorizontalInset(constraints.maxWidth);
+      final inset = settingsHorizontalInset(context, constraints.maxWidth);
       return Padding(
         padding: EdgeInsets.fromLTRB(inset + 8, 8, inset + 8, 8),
         child: child,

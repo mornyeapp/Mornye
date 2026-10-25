@@ -17,6 +17,7 @@ import 'package:mornye/screens/settings/extension_detail_page.dart';
 import 'package:mornye/screens/settings/metadata_provider_priority_page.dart';
 import 'package:mornye/screens/settings/provider_priority_page.dart';
 import 'package:mornye/theme/mornye_theme.dart';
+import 'package:mornye/utils/adaptive_layout.dart';
 import 'package:mornye/widgets/app_action_button.dart';
 import 'package:mornye/widgets/app_bottom_sheet.dart';
 import 'package:mornye/widgets/app_icon.dart';
@@ -146,7 +147,9 @@ class _ExtensionsPageState extends ConsumerState<ExtensionsPage> {
             if (extState.extensions.isEmpty && !extState.isLoading)
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 16 + wideListInset(context),
+                  ),
                   child: Container(
                     padding: const EdgeInsets.all(24),
                     decoration: BoxDecoration(
@@ -210,7 +213,10 @@ class _ExtensionsPageState extends ConsumerState<ExtensionsPage> {
                 child: LayoutBuilder(
                   builder: (context, constraints) {
                     // Same edges as the extension group above.
-                    final inset = settingsHorizontalInset(constraints.maxWidth);
+                    final inset = settingsHorizontalInset(
+                      context,
+                      constraints.maxWidth,
+                    );
                     return Padding(
                       padding: EdgeInsets.fromLTRB(inset, 16, inset, 16),
                       child: context.isMornye

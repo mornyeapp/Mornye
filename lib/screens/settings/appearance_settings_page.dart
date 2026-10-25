@@ -146,7 +146,12 @@ class AppearanceSettingsPage extends ConsumerWidget {
               if (!themeSettings.useDynamicColor)
                 SliverToBoxAdapter(
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                    padding: EdgeInsets.fromLTRB(
+                      16 + wideListInset(context),
+                      12,
+                      16 + wideListInset(context),
+                      0,
+                    ),
                     child: _ColorPalettePicker(
                       currentColor: themeSettings.seedColorValue,
                       onColorSelected: (color) =>

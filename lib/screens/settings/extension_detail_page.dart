@@ -109,13 +109,12 @@ class _ExtensionDetailPageState extends ConsumerState<ExtensionDetailPage> {
             AppSliverHeader.page(title: extension.displayName),
 
             SliverLayoutInfoBuilder(
-              select: (constraints) =>
-                  settingsHorizontalInset(constraints.crossAxisExtent),
-              builder: (context, inset) => SliverToBoxAdapter(
+              select: (constraints) => constraints.crossAxisExtent,
+              builder: (context, width) => SliverToBoxAdapter(
                 child: Padding(
                   // Same column as the settings groups below on wide panes.
                   padding: EdgeInsets.symmetric(
-                    horizontal: inset,
+                    horizontal: settingsHorizontalInset(context, width),
                     vertical: 16,
                   ),
                   child: _ExtensionOverviewSurface(
