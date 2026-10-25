@@ -228,6 +228,8 @@ class MusicPlayerHandler extends BaseAudioHandler
     MusicHapticsAnalyzer? hapticsAnalyzer,
     HapticPulse? hapticPulse,
   }) : _runtime = runtime ?? musicPlayerRuntime {
+    // Switching back from a remote session restores phone volume handling.
+    androidPlaybackInfo.add(LocalAndroidPlaybackInfo());
     _haptics = MusicHaptics(
       state: () => playbackState.value,
       analyzer: hapticsAnalyzer,

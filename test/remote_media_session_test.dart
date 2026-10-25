@@ -10,6 +10,9 @@ class _Remote implements RemotePlayback {
   final items = StreamController<MediaItem?>.broadcast(sync: true);
   final states = StreamController<PlaybackState>.broadcast(sync: true);
   final queue = StreamController<List<MediaItem>>.broadcast(sync: true);
+  final volume = StreamController<double>.broadcast(sync: true);
+  final volumeWrites = <double>[];
+  Completer<void>? volumeReply;
   final calls = <String>[];
 
   @override
@@ -23,6 +26,15 @@ class _Remote implements RemotePlayback {
 
   @override
   Stream<List<MediaItem>> get queues => queue.stream;
+
+  @override
+  Stream<double> get volumes => volume.stream;
+
+  @override
+  Future<void> setVolume(double value) async {
+    volumeWrites.add(value);
+    await volumeReply?.future;
+  }
 
   @override
   Future<void> play() async => calls.add('play');
@@ -50,11 +62,16 @@ class _Remote implements RemotePlayback {
     await items.close();
     await states.close();
     await queue.close();
+    await volume.close();
   }
 }
 
 /// This device's player, which keeps browsing and Library playback.
 class _Local extends BaseAudioHandler {
+  _Local() {
+    androidPlaybackInfo.add(LocalAndroidPlaybackInfo());
+  }
+
   final calls = <String>[];
 
   @override
@@ -160,6 +177,130 @@ void main() {
       'pause',
     ]);
     expect(local.calls, isEmpty);
+  });
+
+  test('Android volume follows the desktop player', () {
+    remote.volume.add(0.42);
+    final info = session.androidPlaybackInfo.value as RemoteAndroidPlaybackInfo;
+    expect(info.volumeControlType, AndroidVolumeControlType.absolute);
+    expect(info.maxVolume, 100);
+    expect(info.volume, 42);
+
+    remote.volume.add(0.8);
+    expect(
+      (session.androidPlaybackInfo.value as RemoteAndroidPlaybackInfo).volume,
+      80,
+    );
+    expect(remote.volumeWrites, isEmpty);
+  });
+
+  test('Android volume keys wait for a known desktop volume', () async {
+    expect(
+      (session.androidPlaybackInfo.value as RemoteAndroidPlaybackInfo)
+          .volumeControlType,
+      AndroidVolumeControlType.fixed,
+    );
+    await session.androidAdjustRemoteVolume(AndroidVolumeDirection.raise);
+    await session.androidSetRemoteVolume(50);
+    expect(remote.volumeWrites, isEmpty);
+  });
+
+  test(
+    'rapid Android volume keys accumulate before the desktop replies',
+    () async {
+      remote.volume.add(0.4);
+      remote.volumeReply = Completer<void>();
+      final first = session.androidAdjustRemoteVolume(
+        AndroidVolumeDirection.raise,
+      );
+      final second = session.androidAdjustRemoteVolume(
+        AndroidVolumeDirection.raise,
+      );
+      final third = session.androidAdjustRemoteVolume(
+        AndroidVolumeDirection.lower,
+      );
+      expect(remote.volumeWrites, [0.45, 0.5, 0.45]);
+      expect(
+        (session.androidPlaybackInfo.value as RemoteAndroidPlaybackInfo).volume,
+        45,
+      );
+      remote.volumeReply!.complete();
+      await Future.wait([first, second, third]);
+      expect(local.calls, isEmpty);
+    },
+  );
+
+  test('Android volume keys clamp at the desktop limits', () async {
+    remote.volume.add(0.98);
+    await session.androidAdjustRemoteVolume(AndroidVolumeDirection.raise);
+    await session.androidAdjustRemoteVolume(AndroidVolumeDirection.raise);
+    await session.androidAdjustRemoteVolume(AndroidVolumeDirection.same);
+    expect(remote.volumeWrites, [1.0]);
+
+    remote.volume.add(0.02);
+    await session.androidAdjustRemoteVolume(AndroidVolumeDirection.lower);
+    await session.androidAdjustRemoteVolume(AndroidVolumeDirection.lower);
+    expect(remote.volumeWrites, [1.0, 0.0]);
+  });
+
+  test('Android volume slider sets the desktop percentage', () async {
+    remote.volume.add(0.4);
+    await session.androidSetRemoteVolume(83);
+    await session.androidSetRemoteVolume(200);
+    await session.androidSetRemoteVolume(-10);
+    expect(remote.volumeWrites, [0.83, 1.0, 0.0]);
+  });
+
+  test('invalid remote volume cannot break Android volume handling', () {
+    remote.volume.add(0.4);
+    remote.volume.add(double.nan);
+    remote.volume.add(double.infinity);
+    expect(
+      (session.androidPlaybackInfo.value as RemoteAndroidPlaybackInfo).volume,
+      40,
+    );
+    remote.volume.add(1.5);
+    expect(
+      (session.androidPlaybackInfo.value as RemoteAndroidPlaybackInfo).volume,
+      100,
+    );
+    remote.volume.add(-1);
+    expect(
+      (session.androidPlaybackInfo.value as RemoteAndroidPlaybackInfo).volume,
+      0,
+    );
+  });
+
+  test('switching back restores local Android volume handling', () async {
+    final system = SwitchAudioHandler(local);
+    expect(
+      await system.androidPlaybackInfo.first,
+      isA<LocalAndroidPlaybackInfo>(),
+    );
+    remote.volume.add(0.4);
+    system.inner = session;
+    expect(
+      await system.androidPlaybackInfo.firstWhere(
+        (info) => info is RemoteAndroidPlaybackInfo,
+      ),
+      isA<RemoteAndroidPlaybackInfo>(),
+    );
+    await system.androidAdjustRemoteVolume(AndroidVolumeDirection.raise);
+    expect(remote.volumeWrites, [0.45]);
+
+    system.inner = local;
+    session.dispose();
+    expect(
+      await system.androidPlaybackInfo.firstWhere(
+        (info) => info is LocalAndroidPlaybackInfo,
+      ),
+      isA<LocalAndroidPlaybackInfo>(),
+    );
+    remote.volume.add(0.7);
+    await system.androidAdjustRemoteVolume(AndroidVolumeDirection.raise);
+    await session.androidAdjustRemoteVolume(AndroidVolumeDirection.raise);
+    expect(remote.volumeWrites, [0.45]);
+    expect(remote.volume.hasListener, isFalse);
   });
 
   test('the car browses and plays Library songs here', () async {

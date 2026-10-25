@@ -5,10 +5,9 @@ import 'package:mornye/services/remote_playback.dart';
 
 /// What the system media session (notification, lock screen, headset and
 /// car buttons) shows while [remote] plays in this device's place: its
-/// song, queue and state, with the session's buttons driving it. Browsing,
+/// song, queue, state and volume. The session's buttons drive it. Browsing,
 /// searching and playing a Library item go to [local], so a song picked in
-/// the car plays on this device; [onLocal] runs first to hand the session
-/// back.
+/// the car plays on this device; [onLocal] runs first to hand the session back.
 class RemoteMediaSession extends BaseAudioHandler {
   RemoteMediaSession(
     this.remote, {
@@ -16,18 +15,63 @@ class RemoteMediaSession extends BaseAudioHandler {
     required void Function() onLocal,
   }) : _local = local,
        _onLocal = onLocal {
+    // Keep Android's volume keys on the remote while its first value arrives.
+    androidPlaybackInfo.add(
+      RemoteAndroidPlaybackInfo(
+        volumeControlType: AndroidVolumeControlType.fixed,
+        maxVolume: _maxVolume,
+        volume: 0,
+      ),
+    );
     _subscriptions = [
       remote.mediaItems.listen(mediaItem.add),
       remote.queues.listen(queue.add),
       remote.playbackStates.listen(_showState),
+      remote.volumes.listen(_showVolume),
     ];
   }
+
+  static const _maxVolume = 100;
+  static const _volumeStep = 5;
 
   final RemotePlayback remote;
   final AudioHandler _local;
   final void Function() _onLocal;
   late final List<StreamSubscription<Object?>> _subscriptions;
   PlaybackState? _shown;
+  int? _volumeIndex;
+  bool _disposed = false;
+
+  void _showVolume(double volume) {
+    if (_disposed || !volume.isFinite) return;
+    final index = (volume.clamp(0.0, 1.0) * _maxVolume).round();
+    if (index == _volumeIndex) return;
+    _volumeIndex = index;
+    androidPlaybackInfo.add(
+      RemoteAndroidPlaybackInfo(
+        volumeControlType: AndroidVolumeControlType.absolute,
+        maxVolume: _maxVolume,
+        volume: index,
+      ),
+    );
+  }
+
+  @override
+  Future<void> androidSetRemoteVolume(int volumeIndex) async {
+    if (_disposed || _volumeIndex == null) return;
+    final index = volumeIndex.clamp(0, _maxVolume);
+    if (index == _volumeIndex) return;
+    final volume = index / _maxVolume;
+    // Accumulate held/repeated keys before the desktop replies.
+    _showVolume(volume);
+    await remote.setVolume(volume);
+  }
+
+  @override
+  Future<void> androidAdjustRemoteVolume(AndroidVolumeDirection direction) =>
+      androidSetRemoteVolume(
+        (_volumeIndex ?? 0) + direction.index * _volumeStep,
+      );
 
   /// The session moves the position on its own, so the remote's position
   /// ticks only pass when something else changed or the position jumped.
@@ -139,6 +183,8 @@ class RemoteMediaSession extends BaseAudioHandler {
   Future<void> onNotificationDeleted() => _local.onNotificationDeleted();
 
   void dispose() {
+    if (_disposed) return;
+    _disposed = true;
     for (final subscription in _subscriptions) {
       unawaited(subscription.cancel());
     }

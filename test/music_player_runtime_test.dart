@@ -425,6 +425,11 @@ const _track = PlayableMedia(
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  test('the local player publishes Android stream volume handling', () async {
+    final handler = await _runtime().initialize();
+    expect(handler.androidPlaybackInfo.value, isA<LocalAndroidPlaybackInfo>());
+  });
+
   test(
     'Link adopts repeat before either player has been initialized',
     () async {
