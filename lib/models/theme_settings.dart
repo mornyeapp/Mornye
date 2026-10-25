@@ -15,6 +15,12 @@ const String kLyricsTextScaleKey = 'lyrics_text_scale';
 
 double normalizeLyricsTextScale(num? value) =>
     value != null && value.isFinite ? value.toDouble().clamp(0.8, 1.4) : 1.0;
+const String kLyricsBlurKey = 'lyrics_blur';
+
+/// How strongly Mornye blurs the lyric lines around the current one: 0 turns
+/// it off, 1 is the default.
+double normalizeLyricsBlur(num? value) =>
+    value != null && value.isFinite ? value.toDouble().clamp(0.0, 1.5) : 1.0;
 const String kMornyeGlassClarityKey = 'mornye_glass_clarity';
 const String kMornyeGlassOutlinesKey = 'mornye_glass_outlines';
 const double kDefaultMornyeGlassClarity = 0.75;
@@ -58,6 +64,7 @@ class ThemeSettings {
   final String customFontId;
   final String customFontName;
   final double lyricsTextScale;
+  final double lyricsBlur;
   final double mornyeGlassClarity;
   final bool mornyeGlassOutlines;
 
@@ -72,6 +79,7 @@ class ThemeSettings {
     this.customFontId = '',
     this.customFontName = '',
     this.lyricsTextScale = 1,
+    this.lyricsBlur = 1,
     this.mornyeGlassClarity = kDefaultMornyeGlassClarity,
     this.mornyeGlassOutlines = true,
   });
@@ -89,6 +97,7 @@ class ThemeSettings {
     String? customFontId,
     String? customFontName,
     double? lyricsTextScale,
+    double? lyricsBlur,
     double? mornyeGlassClarity,
     bool? mornyeGlassOutlines,
   }) {
@@ -105,6 +114,7 @@ class ThemeSettings {
       lyricsTextScale: normalizeLyricsTextScale(
         lyricsTextScale ?? this.lyricsTextScale,
       ),
+      lyricsBlur: normalizeLyricsBlur(lyricsBlur ?? this.lyricsBlur),
       mornyeGlassClarity: normalizeMornyeGlassClarity(
         mornyeGlassClarity ?? this.mornyeGlassClarity,
       ),
@@ -123,6 +133,7 @@ class ThemeSettings {
     kCustomFontIdKey: customFontId,
     kCustomFontNameKey: customFontName,
     kLyricsTextScaleKey: lyricsTextScale,
+    kLyricsBlurKey: lyricsBlur,
     kMornyeGlassClarityKey: mornyeGlassClarity,
     kMornyeGlassOutlinesKey: mornyeGlassOutlines,
   };
@@ -141,6 +152,7 @@ class ThemeSettings {
       lyricsTextScale: normalizeLyricsTextScale(
         json[kLyricsTextScaleKey] as num?,
       ),
+      lyricsBlur: normalizeLyricsBlur(json[kLyricsBlurKey] as num?),
       mornyeGlassClarity: normalizeMornyeGlassClarity(
         json[kMornyeGlassClarityKey] as num?,
       ),
@@ -162,6 +174,7 @@ class ThemeSettings {
         other.customFontId == customFontId &&
         other.customFontName == customFontName &&
         other.lyricsTextScale == lyricsTextScale &&
+        other.lyricsBlur == lyricsBlur &&
         other.mornyeGlassClarity == mornyeGlassClarity &&
         other.mornyeGlassOutlines == mornyeGlassOutlines;
   }
@@ -178,6 +191,7 @@ class ThemeSettings {
       customFontId.hashCode ^
       customFontName.hashCode ^
       lyricsTextScale.hashCode ^
+      lyricsBlur.hashCode ^
       mornyeGlassClarity.hashCode ^
       mornyeGlassOutlines.hashCode;
 }

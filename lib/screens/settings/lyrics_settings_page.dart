@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/controllers/clickable_metadata.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/extension_provider.dart';
+import 'package:mornye/providers/runtime_profile_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/screens/settings/lyrics_provider_priority_page.dart';
 import 'package:mornye/widgets/settings_group.dart';
@@ -38,6 +39,9 @@ class LyricsSettingsPage extends ConsumerWidget {
               connected: true,
               children: [
                 const LyricsSizeSetting(),
+                // Lyrics blur only where the player draws it.
+                if (context.isMornye && ref.watch(mornyeLiquidGlassProvider))
+                  const LyricsBlurSetting(),
                 SettingsSwitchItem(
                   icon: Icons.light_mode_outlined,
                   title: context.l10n.lyricsKeepScreenOn,

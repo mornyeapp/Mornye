@@ -8078,6 +8078,15 @@
   "audioInfoCopied": "Audio info copied",
   "lyricsTextSize": "Lyrics text size",
   "lyricsTextPreview": "Follow every line of your favorite song",
+  "lyricsBlur": "Lyrics blur",
+  "@lyricsBlur": {
+    "description": "Mornye setting: how strongly lyric lines around the current one are blurred"
+  },
+  "lyricsBlurSubtitle": "How much the lines around the current one soften",
+  "lyricsBlurOff": "Off",
+  "@lyricsBlurOff": {
+    "description": "Value of the lyrics blur slider at zero"
+  },
   "appCrashTitle": "The app previously crashed",
   "appAnrTitle": "The app previously stopped responding",
   "@appAnrTitle": {

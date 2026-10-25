@@ -7927,6 +7927,9 @@
   "audioInfoCopied": "Info audio disalin",
   "lyricsTextSize": "Ukuran teks lirik",
   "lyricsTextPreview": "Ikuti setiap baris lagu favoritmu",
+  "lyricsBlur": "Blur lirik",
+  "lyricsBlurSubtitle": "Seberapa samar baris di sekitar baris yang sedang diputar",
+  "lyricsBlurOff": "Mati",
   "appCrashTitle": "Aplikasi sebelumnya mengalami crash",
   "appAnrTitle": "Aplikasi sebelumnya berhenti merespons",
   "@appAnrTitle": {

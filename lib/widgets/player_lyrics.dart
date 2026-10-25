@@ -12,6 +12,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/runtime_profile_provider.dart';
+import 'package:mornye/providers/theme_provider.dart';
 import 'package:mornye/theme/app_tokens.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/desktop_platform.dart';
@@ -864,9 +865,13 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
         : ref.read(playbackLoadingProvider);
     final mornye = context.isMornye;
     final highContrast = MediaQuery.highContrastOf(context);
+    final blurStrength = ref.watch(
+      themeProvider.select((theme) => theme.lyricsBlur),
+    );
     final blurLyrics =
         mornye &&
         !highContrast &&
+        blurStrength > 0 &&
         // Defocused lines are filtered on every frame while their focus eases.
         ref.watch(mornyeLiquidGlassProvider);
     // Line emphasis eases over most of the scroll, so the new line brightens
@@ -1144,13 +1149,14 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
                 // progressively soften lines further from the current one.
                 final sigma = !blurLyrics || isActive || leadIndex == activeLead
                     ? 0.0
-                    : active < 0
-                    ? 4.8
-                    : distance == 1
-                    ? 2.4
-                    : distance == 2
-                    ? 3.6
-                    : 4.8;
+                    : blurStrength *
+                          (active < 0
+                              ? 4.8
+                              : distance == 1
+                              ? 2.4
+                              : distance == 2
+                              ? 3.6
+                              : 4.8);
                 content = TweenAnimationBuilder<double>(
                   tween: Tween(end: sigma),
                   duration: motion,
