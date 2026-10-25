@@ -211,13 +211,13 @@ class AudioNative {
     );
   }
 
-  Future<void> error(String id) async {
+  Future<void> error(String id, {String details = 'MEDIA_ERROR_SYSTEM'}) async {
     await messenger.handlePlatformMessage(
       'xyz.luan/audioplayers/events/$id',
       const StandardMethodCodec().encodeErrorEnvelope(
         code: 'AndroidAudioError',
         message: 'Audio output failed',
-        details: 'MEDIA_ERROR_SYSTEM',
+        details: details,
       ),
       (_) {},
     );

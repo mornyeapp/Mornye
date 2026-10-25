@@ -138,6 +138,11 @@ class MusicPlayerHandler extends BaseAudioHandler
   bool _initialized = false;
   bool _sourceReady = false;
   Object? _playbackError;
+
+  /// Reloads of the current song after Android's media server died, and
+  /// whether the next [_playIndex] is one of them.
+  int _serverDiedReloads = 0;
+  bool _reloadingAfterServerDied = false;
   Future<void>? _activePlayOperation;
   Future<void> _sourceChangeTail = Future<void>.value();
   Timer? _sleepTimer;
@@ -494,6 +499,7 @@ class MusicPlayerHandler extends BaseAudioHandler
     if (_disposed || !identical(player, _player) || _playbackError != null) {
       return;
     }
+    if (_reloadAfterServerDied(error)) return;
     _sourceReady = false;
     _playbackError = error;
     _userPaused = true;
@@ -512,6 +518,34 @@ class MusicPlayerHandler extends BaseAudioHandler
         _log.w('Could not stop failed playback: $error');
       }),
     );
+  }
+
+  static const _serverDiedReloadLimit = 2;
+  static const _serverDiedReloadDelay = Duration(milliseconds: 500);
+
+  /// Android restarts its media server shortly after it dies, which fails
+  /// the playing song on every MediaPlayer. Plays the song again from where
+  /// it was, as pressing Play once or twice does, before reporting it.
+  bool _reloadAfterServerDied(Object error) {
+    if (!'$error'.contains('MEDIA_ERROR_SERVER_DIED') ||
+        _serverDiedReloads >= _serverDiedReloadLimit ||
+        _index < 0 ||
+        _index >= _media.length) {
+      return false;
+    }
+    _serverDiedReloads++;
+    final generation = _playRequestGeneration;
+    final index = _index;
+    final position = playbackState.value.position;
+    _log.w('The media server died; reloading ${mediaItem.value?.title}');
+    unawaited(
+      Future<void>.delayed(_serverDiedReloadDelay, () {
+        if (_disposed || generation != _playRequestGeneration) return null;
+        _reloadingAfterServerDied = true;
+        return _playIndex(index, recordHistory: false, startPosition: position);
+      }),
+    );
+    return true;
   }
 
   Future<void> _disposeDeck(PlaybackDeck player) async {
@@ -1343,6 +1377,11 @@ class MusicPlayerHandler extends BaseAudioHandler
     Duration startPosition = Duration.zero,
   }) async {
     if (_disposed || index < 0 || index >= _media.length) return;
+    if (_reloadingAfterServerDied) {
+      _reloadingAfterServerDied = false;
+    } else {
+      _serverDiedReloads = 0;
+    }
     _runtime.personalization.finish(
       skipped:
           userSkip &&
