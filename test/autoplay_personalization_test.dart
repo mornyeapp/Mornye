@@ -322,6 +322,85 @@ void main() {
     },
   );
 
+  test('each kind of feedback carries its reward and weight', () async {
+    var elapsed = Duration.zero;
+    final service = AutoplayPersonalization(
+      load: () async => null,
+      save: (_) async {},
+      elapsed: () => elapsed,
+      now: () => _at,
+    );
+    addTearDown(service.dispose);
+    final feedback = <AutoplayFeedback>[];
+    service.feedback.listen(feedback.add);
+    service.setEnabled(true);
+    await service.ensureLoaded();
+    void listen(int seconds, {bool skipped = false, bool replay = false}) {
+      service.begin(_rock);
+      service.updatePlayback(source: _rock.source, playing: true);
+      if (replay) service.replayed();
+      elapsed += Duration(seconds: seconds);
+      service.finish(skipped: skipped);
+    }
+
+    listen(5, skipped: true);
+    listen(20, skipped: true);
+    listen(45, skipped: true);
+    listen(115);
+    listen(70, skipped: true);
+    listen(40, skipped: true, replay: true);
+    listen(10, skipped: true, replay: true);
+    service.endorse(_jazz, AutoplayFeedbackKind.loved);
+    await pumpEventQueue();
+    expect(
+      [for (final item in feedback) (item.kind, item.reward, item.weight)],
+      [
+        (AutoplayFeedbackKind.skipped, 0, 1.5),
+        (AutoplayFeedbackKind.skipped, 0, 1),
+        (AutoplayFeedbackKind.skipped, 0.25, 0.5),
+        (AutoplayFeedbackKind.listened, 1, 1),
+        (AutoplayFeedbackKind.listened, 0.5 + 70 / 120 / 2, 1),
+        (AutoplayFeedbackKind.replayed, 1, 1.5),
+        // A replay left within seconds is a skip.
+        (AutoplayFeedbackKind.skipped, 0, 1),
+        (AutoplayFeedbackKind.loved, 1, 2),
+      ],
+    );
+    // A loved song that is not playing carries no transition.
+    expect(feedback.last.previous, isNull);
+    expect(service.observations, feedback.length);
+  });
+
+  test('loving the current song keeps its context, only while on', () async {
+    final service = AutoplayPersonalization(
+      load: () async => null,
+      save: (_) async {},
+      now: () => _at,
+    );
+    addTearDown(service.dispose);
+    final feedback = <AutoplayFeedback>[];
+    service.feedback.listen(feedback.add);
+    service.endorse(_rock, AutoplayFeedbackKind.loved);
+    service.setEnabled(true);
+    await service.ensureLoaded();
+    service.begin(_jazz);
+    service.begin(_rock);
+    service.endorse(
+      const AutoplayLearningTrack(
+        source: 'catalog-id',
+        title: ' ROCK ',
+        artist: 'rock artist',
+      ),
+      AutoplayFeedbackKind.playlisted,
+    );
+    await pumpEventQueue();
+    expect(feedback, hasLength(1));
+    expect(feedback.single.kind, AutoplayFeedbackKind.playlisted);
+    expect(feedback.single.track.source, _rock.source);
+    expect(feedback.single.previous?.source, _jazz.source);
+    expect(feedback.single.weight, 1.5);
+  });
+
   test('duration updates and long listening yield positive feedback', () async {
     var elapsed = Duration.zero;
     final service = AutoplayPersonalization(

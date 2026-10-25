@@ -6,6 +6,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/models/track.dart';
 import 'package:mornye/providers/library_collections_provider.dart';
+import 'package:mornye/providers/music_player_provider.dart';
+import 'package:mornye/services/autoplay_personalization.dart';
+import 'package:mornye/services/music_player_service.dart';
 import 'package:mornye/services/library_collections_database.dart';
 
 class _CollectionsDatabase implements LibraryCollectionsDatabase {
@@ -231,12 +234,23 @@ Track _track(String id) => Track(
   source: 'example',
 );
 
-ProviderContainer _container(_CollectionsDatabase db) {
+ProviderContainer _container(
+  _CollectionsDatabase db, {
+  AutoplayPersonalization? learning,
+}) {
   final container = ProviderContainer(
     overrides: [
       libraryCollectionsProvider.overrideWith(
         () => LibraryCollectionsNotifier(database: db),
       ),
+      if (learning != null)
+        musicPlayerRuntimeProvider.overrideWithValue(
+          MusicPlayerRuntime(
+            dependencies: PlaybackDependencies(
+              createPersonalization: () => learning,
+            ),
+          ),
+        ),
     ],
   );
   addTearDown(container.dispose);
@@ -244,6 +258,52 @@ ProviderContainer _container(_CollectionsDatabase db) {
 }
 
 void main() {
+  test('loving or playlisting a few songs teaches autoplay', () async {
+    final learning = AutoplayPersonalization(
+      load: () async => null,
+      save: (_) async {},
+    );
+    addTearDown(learning.dispose);
+    learning.setEnabled(true);
+    await learning.ensureLoaded();
+    final feedback = <AutoplayFeedback>[];
+    learning.feedback.listen(feedback.add);
+    final db = _CollectionsDatabase();
+    db.playlists['playlist'] = {
+      'id': 'playlist',
+      'name': 'Playlist',
+      'created_at': '2026-01-01T00:00:00Z',
+      'updated_at': '2026-01-01T00:00:00Z',
+    };
+    db.releasePlaylistRead.complete();
+    db.releaseWrite.complete();
+    final container = _container(db, learning: learning);
+    final notifier = container.read(libraryCollectionsProvider.notifier);
+    await notifier.ensurePlaylistsLoaded(const []);
+    expect(await notifier.toggleLoved(_track('loved')), isTrue);
+    // Removing a song from the loved ones says nothing.
+    expect(await notifier.toggleLoved(_track('loved')), isFalse);
+    await notifier.addTracksToPlaylist('playlist', [
+      _track('one'),
+      _track('two'),
+    ]);
+    // A whole album organizes more than it rates.
+    await notifier.addTracksToPlaylist('playlist', [
+      for (var i = 0; i < 4; i++) _track('album$i'),
+    ]);
+    await pumpEventQueue();
+    expect(
+      [for (final item in feedback) (item.kind, item.track.source)],
+      [
+        (AutoplayFeedbackKind.loved, 'loved'),
+        (AutoplayFeedbackKind.playlisted, 'one'),
+        (AutoplayFeedbackKind.playlisted, 'two'),
+      ],
+    );
+    expect(feedback.first.track.artist, 'Artist');
+    expect(feedback.first.track.duration, const Duration(seconds: 180));
+  });
+
   test(
     'playlist import retains all 202 positions and re-import is idempotent',
     () async {

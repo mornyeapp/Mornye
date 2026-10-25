@@ -4,6 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 import 'package:mornye/models/library_collections.dart';
 import 'package:mornye/models/track.dart';
+import 'package:mornye/providers/music_player_provider.dart'
+    show musicPlayerRuntimeProvider;
+import 'package:mornye/services/autoplay_personalization.dart'
+    show AutoplayFeedbackKind, AutoplayLearningTrack;
 import 'package:mornye/services/library_collections_database.dart';
 import 'package:mornye/services/library_collections_hydration.dart';
 import 'package:mornye/services/collection_track_batch.dart';
@@ -206,14 +210,40 @@ class LibraryCollectionsNotifier extends Notifier<LibraryCollectionsState> {
     dbUpsert: _db.upsertWishlistEntry,
   );
 
-  Future<bool> toggleLoved(Track track) => _toggleTrackEntry(
-    track,
-    contains: (key) => state.containsLovedKey(key),
-    select: (state) => state.loved,
-    withList: (list) => state.copyWith(loved: list),
-    dbDelete: _db.deleteLovedEntry,
-    dbUpsert: _db.upsertLovedEntry,
-  );
+  Future<bool> toggleLoved(Track track) async {
+    final loved = await _toggleTrackEntry(
+      track,
+      contains: (key) => state.containsLovedKey(key),
+      select: (state) => state.loved,
+      withList: (list) => state.copyWith(loved: list),
+      dbDelete: _db.deleteLovedEntry,
+      dbUpsert: _db.upsertLovedEntry,
+    );
+    if (loved) _endorse([track], AutoplayFeedbackKind.loved);
+    return loved;
+  }
+
+  /// Tells autoplay learning the listener chose these songs outright. Large
+  /// selections, such as a whole album, organize more than they rate.
+  void _endorse(List<Track> tracks, AutoplayFeedbackKind kind) {
+    if (!ref.mounted || tracks.length > 3) return;
+    final learning = ref.read(musicPlayerRuntimeProvider).personalization;
+    for (final track in tracks) {
+      learning.endorse(
+        AutoplayLearningTrack(
+          source: track.id,
+          title: track.name,
+          artist: track.artistName,
+          album: track.albumName,
+          genre: track.genre ?? '',
+          duration: track.duration > 0
+              ? Duration(seconds: track.duration)
+              : null,
+        ),
+        kind,
+      );
+    }
+  }
 
   /// One selection is one mutation: mixed selections add only missing tracks,
   /// fully loved selections remove them, and observers see one committed state.
@@ -479,6 +509,7 @@ class LibraryCollectionsNotifier extends Notifier<LibraryCollectionsState> {
       });
       if (!changed) return false;
       _invalidatePlaylistPickerSummaries();
+      _endorse([track], AutoplayFeedbackKind.playlisted);
       return true;
     },
   );
@@ -539,7 +570,12 @@ class LibraryCollectionsNotifier extends Notifier<LibraryCollectionsState> {
           updatedAt: now,
         );
       });
-      if (changed) _invalidatePlaylistPickerSummaries();
+      if (changed) {
+        _invalidatePlaylistPickerSummaries();
+        _endorse([
+          for (final entry in prepared.entries) entry.track,
+        ], AutoplayFeedbackKind.playlisted);
+      }
       return PlaylistAddBatchResult(
         addedCount: changed ? prepared.entries.length : 0,
         alreadyInPlaylistCount: prepared.duplicates,

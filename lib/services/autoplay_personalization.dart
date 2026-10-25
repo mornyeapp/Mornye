@@ -26,6 +26,44 @@ class AutoplayLearningTrack {
   final Duration? duration;
 }
 
+/// What a learning observation came from.
+enum AutoplayFeedbackKind {
+  /// Played on, through at least half of the song.
+  listened,
+
+  /// Skipped early, or after a short part of the song.
+  skipped,
+
+  /// Played again on purpose and kept playing.
+  replayed,
+
+  /// Added to the loved songs.
+  loved,
+
+  /// Added to a playlist.
+  playlisted,
+}
+
+/// One observation the model learns from. [weight] scales how far it moves
+/// the model: an explicit choice, such as loving a song, counts more than
+/// letting it play.
+class AutoplayFeedback {
+  const AutoplayFeedback({
+    required this.kind,
+    required this.track,
+    required this.previous,
+    required this.at,
+    required this.reward,
+    this.weight = 1,
+  });
+
+  final AutoplayFeedbackKind kind;
+  final AutoplayLearningTrack track;
+  final AutoplayLearningTrack? previous;
+  final DateTime at;
+  final double reward, weight;
+}
+
 String _text(String value) {
   final normalized = value.trim().toLowerCase();
   return normalized.length > 160 ? normalized.substring(0, 160) : normalized;
@@ -131,8 +169,9 @@ class AutoplayPreferenceModel {
     AutoplayLearningTrack? previous,
     required DateTime at,
     required double reward,
+    double weight = 1,
   }) {
-    if (!reward.isFinite) return;
+    if (!reward.isFinite || !weight.isFinite || weight <= 0) return;
     final features = _features(track, previous, at);
     if (features.isEmpty) return;
     final last = _updatedAt;
@@ -146,7 +185,8 @@ class AutoplayPreferenceModel {
         }
       }
     }
-    final error = _probability(features) - reward.clamp(0.0, 1.0);
+    final error =
+        (_probability(features) - reward.clamp(0.0, 1.0)) * min(weight, 4);
     for (final entry in features.entries) {
       final i = entry.key;
       final gradient = error * entry.value + 0.001 * _weights[i];
@@ -226,6 +266,7 @@ class _LearningSession {
   Duration listened = Duration.zero;
   Duration? lastElapsed;
   bool playing = false;
+  bool replayed = false;
 }
 
 /// Independent of listening-statistics opt-in. This explicitly enabled feature
@@ -252,9 +293,13 @@ class AutoplayPersonalization {
   Timer? _saveTimer;
   _LearningSession? _session;
   AutoplayLearningTrack? _previous;
-  final _pending = <(_LearningSession, double)>[];
+  final _pending = <AutoplayFeedback>[];
+  final _feedback = StreamController<AutoplayFeedback>.broadcast();
 
   int get observations => _model.observations;
+
+  /// Each observation as the model learns it, only while learning is on.
+  Stream<AutoplayFeedback> get feedback => _feedback.stream;
 
   AutoplayPreferenceModel? get rankingSnapshot =>
       _enabled && _loaded && !_disposed && _model.observations > 0
@@ -283,8 +328,8 @@ class AutoplayPersonalization {
     // Feedback completed before disposal still belongs in the saved model.
     // Opt-out clears this buffer and prevents its application.
     if (_enabled) {
-      for (final (session, reward) in _pending) {
-        _learn(session, reward);
+      for (final feedback in _pending) {
+        _learn(feedback);
       }
     }
     _pending.clear();
@@ -359,30 +404,93 @@ class AutoplayPersonalization {
     final fraction = duration != null && duration > 0
         ? session.listened.inMilliseconds / duration
         : null;
-    double? reward;
-    if (skipped && seconds < 30 && (fraction == null || fraction < 0.25)) {
+    final AutoplayFeedbackKind kind;
+    final double reward;
+    var weight = 1.0;
+    if (session.replayed && seconds >= 30) {
+      kind = AutoplayFeedbackKind.replayed;
+      reward = 1;
+      weight = 1.5;
+    } else if (skipped &&
+        seconds < 30 &&
+        (fraction == null || fraction < 0.25)) {
+      // Skipping a song in its first seconds says the most.
+      kind = AutoplayFeedbackKind.skipped;
       reward = 0;
+      weight = seconds < 10 ? 1.5 : 1;
+    } else if (skipped && fraction != null && fraction < 0.5) {
+      kind = AutoplayFeedbackKind.skipped;
+      reward = 0.25;
+      weight = 0.5;
     } else if (fraction != null && fraction >= 0.5) {
-      reward = (0.5 + fraction.clamp(0.0, 1.0) / 2).clamp(0.0, 1.0);
+      kind = AutoplayFeedbackKind.listened;
+      reward = !skipped && fraction >= 0.9
+          ? 1
+          : (0.5 + fraction.clamp(0.0, 1.0) / 2).clamp(0.0, 1.0);
     } else if (fraction == null && seconds >= 120) {
+      kind = AutoplayFeedbackKind.listened;
       reward = 0.75;
+    } else {
+      return;
     }
-    if (reward == null) return;
+    _record(
+      AutoplayFeedback(
+        kind: kind,
+        track: session.track,
+        previous: session.previous,
+        at: session.at,
+        reward: reward,
+        weight: weight,
+      ),
+    );
+  }
+
+  /// The listener went back to hear the current song again. It counts once
+  /// they keep listening to it.
+  void replayed() {
+    if (!_enabled || _disposed) return;
+    _session?.replayed = true;
+  }
+
+  /// The listener chose [track] outright, such as by loving it: a stronger
+  /// signal than letting it play. The current song keeps its context.
+  void endorse(AutoplayLearningTrack track, AutoplayFeedbackKind kind) {
+    if (!_enabled || _disposed) return;
+    final session = _session;
+    final current =
+        session != null &&
+        _text(session.track.artist) == _text(track.artist) &&
+        _text(session.track.title) == _text(track.title);
+    _record(
+      AutoplayFeedback(
+        kind: kind,
+        track: current ? session.track : track,
+        previous: current ? session.previous : null,
+        at: _now(),
+        reward: 1,
+        weight: kind == AutoplayFeedbackKind.loved ? 2 : 1.5,
+      ),
+    );
+  }
+
+  void _record(AutoplayFeedback feedback) {
     if (_loaded) {
-      _learn(session, reward);
+      _learn(feedback);
     } else {
       if (_pending.length == 32) _pending.removeAt(0);
-      _pending.add((session, reward));
+      _pending.add(feedback);
     }
   }
 
-  void _learn(_LearningSession session, double reward) {
+  void _learn(AutoplayFeedback feedback) {
     _model.learn(
-      session.track,
-      previous: session.previous,
-      at: session.at,
-      reward: reward,
+      feedback.track,
+      previous: feedback.previous,
+      at: feedback.at,
+      reward: feedback.reward,
+      weight: feedback.weight,
     );
+    if (!_feedback.isClosed) _feedback.add(feedback);
     _dirty = true;
     if (!_disposed) {
       _saveTimer ??= Timer(
@@ -432,6 +540,7 @@ class AutoplayPersonalization {
     _disposed = true;
     await _loading;
     await flush();
+    await _feedback.close();
   }
 }
 

@@ -28,6 +28,7 @@ import 'package:mornye/services/playback_deck.dart';
 import 'package:mornye/services/automix_analysis.dart';
 import 'package:mornye/services/automix_phase_lock.dart';
 import 'package:mornye/services/autoplay_personalization.dart';
+import 'package:mornye/services/autoplay_signal.dart';
 import 'package:mornye/services/automix_analyzer.dart';
 import 'package:mornye/models/settings.dart';
 import 'package:mornye/services/automix_effect_renderer.dart';
@@ -40,6 +41,7 @@ import 'package:mornye/services/downloaded_embedded_cover_resolver.dart';
 import 'package:mornye/utils/logger.dart';
 import 'package:mornye/services/playable_media.dart';
 
+export 'autoplay_signal.dart';
 export 'music_player_runtime.dart';
 export 'playable_media.dart';
 export 'playback_metadata.dart';
@@ -2070,6 +2072,7 @@ class MusicPlayerHandler extends BaseAudioHandler
     if (playbackState.value.position > const Duration(seconds: 3)) {
       await _player.seek(Duration.zero);
       _broadcastPosition(Duration.zero, force: true);
+      _runtime.personalization.replayed();
       return;
     }
     if (_shuffle) {
@@ -2081,9 +2084,13 @@ class MusicPlayerHandler extends BaseAudioHandler
         await _player.seek(Duration.zero);
         _broadcastPosition(Duration.zero, force: true);
       }
+      _runtime.personalization.replayed();
       return;
     }
-    if (_index > 0) await _playIndex(_index - 1, userSkip: true);
+    if (_index > 0) {
+      await _playIndex(_index - 1, userSkip: true);
+      _runtime.personalization.replayed();
+    }
   }
 
   @override

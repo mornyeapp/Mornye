@@ -17,6 +17,27 @@ PlayableMedia track(
   genre: genre,
 );
 
+/// Favors 'a', then each song after the one it names.
+class _ChainSignal extends AutoplaySignal {
+  _ChainSignal(this.after);
+
+  final Map<String, String> after;
+  List<PlayableMedia> session = const [], candidates = const [];
+
+  @override
+  void prepare(List<PlayableMedia> session, List<PlayableMedia> candidates) {
+    this.session = session;
+    this.candidates = candidates;
+  }
+
+  @override
+  double score(PlayableMedia candidate) => candidate.id == 'a' ? 5 : 0;
+
+  @override
+  double follow(PlayableMedia previous, PlayableMedia candidate) =>
+      after[candidate.id] == previous.id ? 10 : 0;
+}
+
 class _NoNoise implements Random {
   @override
   double nextDouble() => 0;
@@ -102,6 +123,25 @@ void main() {
       limit: 3,
     );
     expect(selected.map((item) => item.genre), everyElement('Jazz; Soul'));
+  });
+
+  test('signals score songs and how each follows the one before', () {
+    final signal = _ChainSignal({'b': 'a', 'c': 'b', 'd': 'c'});
+    final selected = selectAutoplayTracks(
+      seed: track('seed', artist: 'S'),
+      candidates: [
+        for (final id in ['d', 'c', 'b', 'a']) track(id, artist: id),
+      ],
+      upcoming: [],
+      recent: [],
+      dismissedSources: {},
+      random: _NoNoise(),
+      signals: [signal],
+    );
+    expect(signal.session.map((item) => item.id), ['seed']);
+    expect(signal.candidates, hasLength(4));
+    // 'a' scores most on its own; each other song follows only one.
+    expect(selected.map((item) => item.id), ['a', 'b', 'c', 'd']);
   });
 
   test('a one-artist Library still fills the queue', () {
