@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mornye/services/exclusive_output_deck.dart';
 import 'package:mornye/services/media_kit_playback_deck.dart';
 import 'package:mornye/services/music_playback_deck.dart';
 import 'package:mornye/services/music_player_runtime.dart';
@@ -86,9 +87,11 @@ void main() {
           everyElement(isA<MediaKitPlaybackDeck>()),
         );
       }
+      // macOS plays through AVPlayer and switches to libmpv only for
+      // exclusive output.
       select(TargetPlatform.macOS, desktop: true);
       created.add(dependencies.createDeck('main'));
-      expect(created.last, isA<AudioplayersPlaybackDeck>());
+      expect(created.last, isA<ExclusiveOutputDeck>());
       select(TargetPlatform.android, desktop: false);
       created
         ..add(dependencies.createDeck('main'))
