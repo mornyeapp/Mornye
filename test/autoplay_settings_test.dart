@@ -211,7 +211,9 @@ void main() {
       );
       final container = ProviderContainer(
         overrides: [
-          initialSettingsProvider.overrideWithValue(const AppSettings()),
+          initialSettingsProvider.overrideWithValue(
+            const AppSettings(songAnalysis: true),
+          ),
           musicPlayerRuntimeProvider.overrideWithValue(
             MusicPlayerRuntime(
               dependencies: PlaybackDependencies(

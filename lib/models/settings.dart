@@ -97,7 +97,8 @@ class AppSettings {
   final bool autoplayPersonalization;
 
   /// Analyze how each Library song sounds, on this device, so Autoplay picks
-  /// songs that sound like the session.
+  /// songs that sound like the session. Off until turned on: decoding songs
+  /// is heavy on low-end phones.
   final bool songAnalysis;
 
   /// Android: analyze the Library only while charging. The song playing is
@@ -257,7 +258,7 @@ class AppSettings {
     this.exclusiveOutputDevice = '',
     this.autoplay = false,
     this.autoplayPersonalization = true,
-    this.songAnalysis = true,
+    this.songAnalysis = false,
     this.songAnalysisOnlyWhileCharging = true,
     this.musicHaptics = false,
     this.musicHapticsSensitivity = 0.5,

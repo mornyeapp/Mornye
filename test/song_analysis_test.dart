@@ -126,7 +126,7 @@ void main() {
   (SongAnalysis, SongAnalysisStore) create({
     SongAnalysisSweep sweep = SongAnalysisSweep.whileCharging,
     bool isAndroid = true,
-    AppSettings settings = const AppSettings(),
+    AppSettings settings = const AppSettings(songAnalysis: true),
   }) {
     final store = openStore();
     final analysis = SongAnalysis(
@@ -179,9 +179,24 @@ void main() {
     expect(analyzer.calls, hasLength(3));
   });
 
+  test('analysis stays off until the listener turns it on', () async {
+    expect(const AppSettings().songAnalysis, isFalse);
+    expect(AppSettings.fromJson(const {}).songAnalysis, isFalse);
+    final (analysis, store) = create(settings: const AppSettings());
+    analysis.start(playing.stream);
+    playing.add(_playing('/a.flac'));
+    await pumpEventQueue();
+    expect(analyzer.calls, isEmpty);
+    expect(await store.records(), isEmpty);
+    expect(await analysis.loadSignal(session: [], candidates: []), isNull);
+  });
+
   test('without the charging rule Android sweeps on battery', () async {
     final (analysis, _) = create(
-      settings: const AppSettings(songAnalysisOnlyWhileCharging: false),
+      settings: const AppSettings(
+        songAnalysis: true,
+        songAnalysisOnlyWhileCharging: false,
+      ),
     );
     analysis.start(playing.stream);
     expect(await waits.next(), const Duration(seconds: 90));
@@ -191,7 +206,10 @@ void main() {
   });
 
   test('turning analysis off stops the sweep and the song playing', () async {
-    var settings = const AppSettings(songAnalysisOnlyWhileCharging: false);
+    var settings = const AppSettings(
+      songAnalysis: true,
+      songAnalysisOnlyWhileCharging: false,
+    );
     final (analysis, store) = create(settings: settings);
     analyzer.hold = '/a.flac';
     analysis.start(playing.stream);
