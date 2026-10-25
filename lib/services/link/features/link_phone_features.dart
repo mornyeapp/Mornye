@@ -1,13 +1,17 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:mornye/providers/download_history_provider.dart';
+import 'package:mornye/providers/local_library_provider.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/providers/system_volume_provider.dart';
+import 'package:mornye/services/library_database.dart';
 import 'package:mornye/services/link/features/link_handoff.dart';
 import 'package:mornye/services/link/features/link_library_lookup.dart';
 import 'package:mornye/services/link/features/link_phone_client.dart';
 import 'package:mornye/services/link/features/link_phone_files.dart';
+import 'package:mornye/services/link/features/link_phone_library.dart';
+import 'package:mornye/services/link/features/link_phone_library_sync.dart';
 import 'package:mornye/services/link/features/link_phone_player.dart';
 import 'package:mornye/services/link/features/link_phone_session.dart';
 import 'package:mornye/services/link/features/link_save_offline.dart';
@@ -98,11 +102,67 @@ final linkOfflineSaverProvider = Provider<LinkOfflineSaver?>((ref) {
   );
 });
 
+/// What this phone's song list for the paired desktop depends on: finished
+/// downloads, scans and whether scanned sources show in the Library. Tests
+/// override it.
+final linkPhoneLibraryRevisionProvider =
+    Provider<({int downloads, int library, bool includeLocal})>(
+      (ref) => (
+        downloads: ref.watch(
+          downloadHistoryProvider.select((state) => state.loadedIndexVersion),
+        ),
+        library: ref.watch(
+          localLibraryProvider.select((state) => state.loadedIndexVersion),
+        ),
+        includeLocal: ref.watch(
+          settingsProvider.select((settings) => settings.localLibraryEnabled),
+        ),
+      ),
+    );
+
+/// Pages the phone's Library Songs rows for the paired desktop. Tests
+/// override it.
+final linkPhoneLibraryRowsProvider = Provider<LinkPhoneRowLoader>(
+  (ref) => LibraryDatabase.instance.getQueueTrackPageResult,
+);
+
+/// Puts this phone's songs in the paired desktop's Library: sends the list
+/// while connected and again after the Library changes, and uploads a song
+/// when the desktop plays it. Null while no desktop is paired.
+final linkPhoneLibraryProvider = Provider<LinkPhoneLibraryPublisher?>((ref) {
+  final client = ref.watch(linkPhoneClientProvider);
+  if (client == null) return null;
+  var includeLocal = true;
+  final library = LinkPhoneLibrary(
+    includeLocal: () => includeLocal,
+    loadPage: ref.watch(linkPhoneLibraryRowsProvider),
+  );
+  final publisher = LinkPhoneLibraryPublisher(client: client, library: library);
+  final requests = LinkPhoneFileRequests(
+    client: client,
+    library: library,
+    files: ref.watch(linkPhoneFilesProvider),
+  );
+  ref.listen(linkPhoneLibraryRevisionProvider, (previous, next) {
+    includeLocal = next.includeLocal;
+    if (previous != null) publisher.libraryChanged();
+  }, fireImmediately: true);
+  publisher.start();
+  requests.start();
+  ref.onDispose(() {
+    publisher.dispose();
+    requests.dispose();
+  });
+  return publisher;
+});
+
 /// The phone's side of the paired desktop's session, for the app's
 /// lifetime: watched at the app root on phones, it reports this phone's
-/// player to the desktop and applies the desktop's `command` and `open`
-/// messages. Null while no desktop is paired.
+/// player to the desktop, applies the desktop's `command` and `open`
+/// messages and keeps [linkPhoneLibraryProvider] running. Null while no
+/// desktop is paired.
 final linkPhoneFeaturesProvider = Provider<LinkPhoneSession?>((ref) {
+  ref.listen(linkPhoneLibraryProvider, (_, _) {});
   final client = ref.watch(linkPhoneClientProvider);
   final handoff = ref.watch(linkHandoffProvider);
   if (client == null || handoff == null) return null;
