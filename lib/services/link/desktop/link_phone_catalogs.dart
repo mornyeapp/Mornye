@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
+import 'dart:ui' as ui;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/services/link/link_host_router.dart';
@@ -37,7 +38,10 @@ int? _intArg(Map<String, dynamic> args, String key) {
 /// Fetches a cover from its web address; null when it cannot.
 typedef LinkCoverFetcher = Future<Uint8List?> Function(Uri url);
 
-/// Fetches a cover of at most [LinkPhoneCatalogs.maxCoverBytes].
+/// A smaller copy of a cover's image; null when it cannot be made.
+typedef LinkCoverShrinker = Future<Uint8List?> Function(Uint8List image);
+
+/// Fetches a cover of at most [LinkPhoneCatalogs.maxFetchedCoverBytes].
 Future<Uint8List?> _fetchCover(Uri url) async {
   const timeout = Duration(seconds: 20);
   final client = HttpClient()..connectionTimeout = const Duration(seconds: 10);
@@ -47,11 +51,39 @@ Future<Uint8List?> _fetchCover(Uri url) async {
     final bytes = BytesBuilder(copy: false);
     await for (final chunk in response.timeout(timeout)) {
       bytes.add(chunk);
-      if (bytes.length > LinkPhoneCatalogs.maxCoverBytes) return null;
+      if (bytes.length > LinkPhoneCatalogs.maxFetchedCoverBytes) return null;
     }
     return bytes.takeBytes();
   } finally {
     client.close(force: true);
+  }
+}
+
+/// [image] as a PNG at most [LinkPhoneCatalogs.shrunkCoverSize] pixels on
+/// its longer side, keeping its shape.
+Future<Uint8List?> shrinkLinkCover(Uint8List image) async {
+  const size = LinkPhoneCatalogs.shrunkCoverSize;
+  ui.Codec? codec;
+  ui.Image? frame;
+  try {
+    // The codec takes the buffer and disposes of it.
+    codec = await ui.instantiateImageCodecWithSize(
+      await ui.ImmutableBuffer.fromUint8List(image),
+      getTargetSize: (width, height) {
+        if (width <= size && height <= size) return ui.TargetImageSize();
+        return width >= height
+            ? ui.TargetImageSize(width: size)
+            : ui.TargetImageSize(height: size);
+      },
+    );
+    frame = (await codec.getNextFrame()).image;
+    final png = await frame.toByteData(format: ui.ImageByteFormat.png);
+    return png?.buffer.asUint8List(png.offsetInBytes, png.lengthInBytes);
+  } on Object {
+    return null;
+  } finally {
+    frame?.dispose();
+    codec?.dispose();
   }
 }
 
@@ -83,16 +115,25 @@ class LinkPhoneCatalogs {
     required Future<bool> Function(String deviceId) paired,
     void Function(String deviceId)? onCommit,
     LinkCoverFetcher? fetchCover,
+    LinkCoverShrinker? shrinkCover,
   }) : _root = root,
        _paired = paired,
        _onCommit = onCommit,
-       _fetch = fetchCover ?? _fetchCover;
+       _fetch = fetchCover ?? _fetchCover,
+       _shrink = shrinkCover ?? shrinkLinkCover;
 
   /// The most songs a phone may list.
   static const maxSongs = 100000;
 
   /// The largest cover file.
   static const maxCoverBytes = 1024 * 1024;
+
+  /// The largest cover fetched from the web; one over [maxCoverBytes] is
+  /// kept shrunk to [shrunkCoverSize].
+  static const maxFetchedCoverBytes = 24 * 1024 * 1024;
+
+  /// The longer side of a shrunk cover, as the Library's own thumbnails.
+  static const shrunkCoverSize = 800;
 
   /// The most base64 characters of covers in one request.
   static const maxCoversRequest = 4 * 1024 * 1024;
@@ -107,10 +148,14 @@ class LinkPhoneCatalogs {
   final Future<bool> Function(String deviceId) _paired;
   final void Function(String deviceId)? _onCommit;
   final LinkCoverFetcher _fetch;
+  final LinkCoverShrinker _shrink;
   final _uploads = <String, _Upload>{};
   final _versions = <String, String?>{};
   final _coverBytes = <String, int>{};
   final _queues = <String, Future<void>>{};
+
+  /// The web covers fetched or tried for each phone while the app runs.
+  final _triedCovers = <String, Set<String>>{};
 
   /// Registers `phone/catalog` and `phone/covers` on [router].
   void register(LinkHostRouter router) {
@@ -146,6 +191,14 @@ class LinkPhoneCatalogs {
   Future<Object?> _catalog(LinkRequest request) async {
     if (request.method == 'GET') {
       final sourceId = await _sourceFor(request, write: false);
+      final deviceId = request.deviceId;
+      if (await _paired(deviceId)) {
+        // A phone asks on each connect; covers a failed fetch left out of
+        // its list get another try.
+        unawaited(
+          _serial(sourceId, () => _fetchListedCovers(deviceId, sourceId)),
+        );
+      }
       return {'version': await version(sourceId)};
     }
     final sourceId = await _sourceFor(request, write: true);
@@ -216,17 +269,30 @@ class LinkPhoneCatalogs {
     return const {'ok': true};
   }
 
-  /// Fetches the covers of [urls] (by cover key) not held yet, then shows
-  /// the phone's songs again when any arrived.
+  /// Fetches the web covers of the phone's committed songs.
+  Future<void> _fetchListedCovers(String deviceId, String sourceId) async {
+    final urls = <String, String>{};
+    await for (final song in songs(sourceId)) {
+      if (song.coverId == null && song.coverUrl != null) {
+        urls[song.coverKey!] = song.coverUrl!;
+      }
+    }
+    if (urls.isNotEmpty) await _fetchCovers(deviceId, sourceId, urls);
+  }
+
+  /// Fetches the covers of [urls] (by cover key) not held or tried yet,
+  /// then shows the phone's songs again when any arrived.
   Future<void> _fetchCovers(
     String deviceId,
     String sourceId,
     Map<String, String> urls,
   ) async {
     final held = await coverPaths(sourceId);
+    final tried = _triedCovers.putIfAbsent(sourceId, () => <String>{});
     final missing = [
       for (final MapEntry(:key, :value) in urls.entries)
-        if (!held.containsKey(key)) (id: key, url: Uri.parse(value)),
+        if (!held.containsKey(key) && tried.add(key))
+          (id: key, url: Uri.parse(value)),
     ];
     if (missing.isEmpty) return;
     final folder = '${await _folder(sourceId)}/covers';
@@ -245,10 +311,12 @@ class LinkPhoneCatalogs {
             ).then<Uint8List?>((bytes) => bytes, onError: (Object _) => null),
         ]);
         for (var i = 0; i < batch.length; i++) {
-          final bytes = fetched[i];
-          final ext = bytes == null || bytes.length > maxCoverBytes
-              ? null
-              : _imageExtension(bytes);
+          var bytes = fetched[i];
+          // Stores often serve covers at full size, several megabytes.
+          if (bytes != null && bytes.length > maxCoverBytes) {
+            bytes = await _shrink(bytes);
+          }
+          final ext = bytes == null ? null : _imageExtension(bytes);
           if (ext == null) continue;
           if (stored + bytes!.length > maxCoverStore) {
             _log.w('Phone covers are over their limit; leaving the rest out');
@@ -522,6 +590,7 @@ class LinkPhoneCatalogs {
     await _uploads.remove(sourceId)?.discard();
     _versions.remove(sourceId);
     _coverBytes.remove(sourceId);
+    _triedCovers.remove(sourceId);
     try {
       await Directory(await _folder(sourceId)).delete(recursive: true);
     } on FileSystemException {

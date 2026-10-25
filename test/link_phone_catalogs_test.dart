@@ -1,5 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
+import 'dart:ui' as ui;
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/services/link/desktop/link_phone_catalogs.dart';
@@ -325,6 +327,98 @@ void main() {
       expect(fetched, isEmpty);
       expect(await catalogs.coverPath(sourceId, key), isNotNull);
       expect(commits, [_phone, _phone, _phone]);
+    });
+
+    test('a large cover is kept shrunk and a failed one is tried again '
+        'on the next run', () async {
+      const largeUrl = 'https://images.example.com/large.jpg';
+      const flakyUrl = 'https://images.example.com/flaky.jpg';
+      final png = Uint8List.fromList([0x89, 0x50, 0x4E, 0x47, 1, 2, 3]);
+      final fetched = <String>[];
+      var reachable = false;
+      LinkPhoneCatalogs open() => LinkPhoneCatalogs(
+        root: () async => root,
+        paired: (deviceId) async => paired.contains(deviceId),
+        onCommit: commits.add,
+        fetchCover: (url) async {
+          fetched.add(url.toString());
+          if (url.toString() == largeUrl) {
+            return Uint8List(LinkPhoneCatalogs.maxCoverBytes + 1)
+              ..setAll(0, base64Decode(jpeg));
+          }
+          if (!reachable) throw const SocketException('unreachable');
+          return base64Decode(jpeg);
+        },
+        shrinkCover: (image) async =>
+            image.length > LinkPhoneCatalogs.maxCoverBytes ? png : null,
+      )..register(router = LinkHostRouter());
+      catalogs = open();
+
+      await page(0, 2, [
+        {..._song(1), 'coverUrl': largeUrl},
+        {..._song(2), 'coverUrl': flakyUrl},
+      ]);
+      await pumpEventQueue();
+      final large = linkCoverUrlId(largeUrl);
+      final flaky = linkCoverUrlId(flakyUrl);
+      expect(await catalogs.coverPaths(sourceId), {
+        large: '${root.path}/$sourceId/covers/$large.png',
+      });
+      expect(
+        await File('${root.path}/$sourceId/covers/$large.png').readAsBytes(),
+        png,
+      );
+
+      // A connect in the same run does not try it again.
+      fetched.clear();
+      reachable = true;
+      await call(LinkOps.phoneCatalog, 'GET');
+      await pumpEventQueue();
+      expect(fetched, isEmpty);
+
+      // After a restart, the phone's next connect fetches it.
+      catalogs = open();
+      await call(LinkOps.phoneCatalog, 'GET');
+      await pumpEventQueue();
+      expect(fetched, [flakyUrl]);
+      expect(await catalogs.coverPath(sourceId, flaky), isNotNull);
+    });
+  });
+
+  testWidgets('shrinks a cover to its longer side, keeping its shape', (
+    tester,
+  ) async {
+    Future<Uint8List> image(int width, int height) async {
+      final recorder = ui.PictureRecorder();
+      ui.Canvas(recorder).drawRect(
+        ui.Rect.fromLTWH(0, 0, width.toDouble(), height.toDouble()),
+        ui.Paint()..color = const ui.Color(0xFF3366CC),
+      );
+      final picture = recorder.endRecording();
+      final drawn = await picture.toImage(width, height);
+      final png = await drawn.toByteData(format: ui.ImageByteFormat.png);
+      drawn.dispose();
+      picture.dispose();
+      return png!.buffer.asUint8List();
+    }
+
+    Future<(int, int)> size(Uint8List bytes) async {
+      final codec = await ui.instantiateImageCodec(bytes);
+      final frame = (await codec.getNextFrame()).image;
+      final result = (frame.width, frame.height);
+      frame.dispose();
+      codec.dispose();
+      return result;
+    }
+
+    await tester.runAsync(() async {
+      final wide = await shrinkLinkCover(await image(1600, 1200));
+      expect(await size(wide!), (800, 600));
+      final tall = await shrinkLinkCover(await image(900, 1800));
+      expect(await size(tall!), (400, 800));
+      final small = await shrinkLinkCover(await image(300, 200));
+      expect(await size(small!), (300, 200));
+      expect(await shrinkLinkCover(utf8.encode('<html>')), isNull);
     });
   });
 
