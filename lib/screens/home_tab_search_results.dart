@@ -931,10 +931,33 @@ extension _HomeTabSearchResultsUI on _HomeTabState {
               tooltip: context.l10n.actionPaste,
             ),
           ],
+          if (!hasText)
+            AppIconButton(
+              icon: const AppIcon.adaptive(Icons.mic),
+              onPressed: _openMusicRecognition,
+              tooltip: context.l10n.recognizeSearchTooltip,
+            ),
         ],
       ),
       onSubmitted: (_) => _onSearchSubmitted(),
     );
+  }
+
+  /// Identifies a song nearby; searches for it when it is not in Mornye.
+  Future<void> _openMusicRecognition() async {
+    _searchFocusNode.unfocus();
+    final query = await pushPage<String>(
+      context,
+      (_) => const MusicRecognitionScreen(),
+    );
+    if (!mounted || query == null || query.trim().isEmpty) return;
+    _urlController.text = query;
+    // The song is not in the library, so the search goes online.
+    if (_searchesLibrary) {
+      _setSearchScope(library: false);
+    } else {
+      _onSearchSubmitted();
+    }
   }
 
   void _onSearchSubmitted() {

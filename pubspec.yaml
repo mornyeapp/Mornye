@@ -66,6 +66,8 @@ dependencies:
 
   # Permissions
   permission_handler: ^13.0.1
+  # Microphone PCM stream for song recognition on all five platforms.
+  record: ^7.1.2
 
   # File Picker
   file_picker: ^13.1.0

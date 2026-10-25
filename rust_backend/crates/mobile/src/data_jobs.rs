@@ -113,6 +113,7 @@ fn execute(
                 "features": described.map(|value| value.to_vector()),
             }))
         }
+        "recognize_song" => crate::native_recognition::execute(request, bytes, check),
         "spectral_cutoff" => {
             let width = request
                 .get("width")

@@ -18,6 +18,7 @@ pub mod lyrics;
 pub mod matching;
 pub mod media;
 pub mod metadata;
+pub mod music_signature;
 pub mod native_audio_analysis;
 pub mod native_audio_features;
 pub mod native_palette;

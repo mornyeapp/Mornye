@@ -183,6 +183,7 @@ IconData _cupertinoFor(IconData icon) {
     Icons.bug_report || Icons.bug_report_outlined => CupertinoIcons.ant,
     Icons.timer_outlined => CupertinoIcons.timer,
     Icons.timer_off_outlined => CupertinoIcons.timer,
+    Icons.mic => CupertinoIcons.mic_fill,
     Icons.bedtime_outlined => CupertinoIcons.moon_zzz,
     Icons.explore_outlined => CupertinoIcons.compass,
     Icons.vpn_key_outlined => CupertinoIcons.lock,

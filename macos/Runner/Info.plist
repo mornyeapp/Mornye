@@ -57,6 +57,8 @@
 	<string>Let Mornye on your phone find this computer and play your library over your local network.</string>
 	<key>NSMainNibFile</key>
 	<string>MainMenu</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Listen to music playing nearby to identify the song. Only a sound fingerprint leaves your Mac.</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
 </dict>

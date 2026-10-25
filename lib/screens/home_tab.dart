@@ -51,6 +51,7 @@ import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/models/unified_library_item.dart';
 import 'package:mornye/screens/equalizer_screen.dart';
 import 'package:mornye/screens/listening_statistics_screen.dart';
+import 'package:mornye/screens/music_recognition_screen.dart';
 import 'package:mornye/screens/network_storage_screen.dart';
 import 'package:mornye/screens/now_playing_screen.dart';
 import 'package:mornye/services/library_database.dart';

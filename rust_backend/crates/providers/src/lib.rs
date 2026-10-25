@@ -8,4 +8,5 @@ mod coalescer;
 pub mod deezer;
 pub mod lyrics;
 pub mod musicbrainz;
+pub mod recognition;
 pub mod resolver;

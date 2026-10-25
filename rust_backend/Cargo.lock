@@ -1794,6 +1794,7 @@ dependencies = [
  "mornye-core",
  "mornye-extensions",
  "mornye-network",
+ "mornye-providers",
  "regex",
  "roxmltree",
  "rusqlite",
@@ -1840,6 +1841,7 @@ name = "mornye-providers"
 version = "0.1.0"
 dependencies = [
  "base64",
+ "getrandom 0.4.3",
  "html5ever",
  "httpdate",
  "mornye-core",
