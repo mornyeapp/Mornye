@@ -51,6 +51,14 @@ class NetworkMetadataService {
     if (_stopped) {
       return Future.error(StateError('Network metadata reader stopped'));
     }
+    final uri = Uri.tryParse(source);
+    if (uri != null && uri.scheme == 'network') {
+      // Their owner answers its own reads, which may wait for a file to
+      // arrive; they must not hold up the lanes.
+      if (_storage.virtualFor(uri.host) case final virtual?) {
+        return virtual.metadata(uri.host, uri.pathSegments.join('/'));
+      }
+    }
     if (forceRefresh) _cache.remove(source);
     final cached = _cache[source];
     if (cached != null &&

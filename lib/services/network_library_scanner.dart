@@ -14,6 +14,7 @@ import 'package:mornye/utils/lyrics_metadata_helper.dart';
 import 'package:mornye/utils/logger.dart';
 
 part 'network_library_scanner_subsonic.dart';
+part 'network_library_scanner_virtual.dart';
 
 final _log = AppLogger('LocalLibrary');
 
@@ -100,6 +101,17 @@ class NetworkLibraryScanner {
         uri.hasFragment ||
         uri.userInfo.isNotEmpty) {
       throw const FormatException('Invalid network library source');
+    }
+    if (_storage.virtualFor(uri.host) case final virtual?) {
+      if (uri.pathSegments.any((segment) => segment.isNotEmpty)) {
+        throw const FormatException('Expected a library root');
+      }
+      return _scanVirtual(
+        virtual,
+        uri.host,
+        checkpoint: checkpoint,
+        onProgress: onProgress,
+      );
     }
     final connection = await _storage.connection(uri.host);
     if (connection.protocol == NetworkProtocol.subsonic) {

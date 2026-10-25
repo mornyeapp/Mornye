@@ -7,6 +7,26 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/services/network_storage_service.dart';
 import 'package:mornye/services/network_metadata_service.dart';
 
+class _VirtualSources implements NetworkVirtualSources {
+  _VirtualSources(this.tags);
+
+  final Future<Map<String, dynamic>> Function(String id, String path) tags;
+
+  @override
+  bool owns(String id) => id == 'phone';
+
+  @override
+  Stream<NetworkVirtualSong> songs(String id) => const Stream.empty();
+
+  @override
+  Future<String> resolve(String id, String path) async =>
+      throw StateError('unexpected resolve');
+
+  @override
+  Future<Map<String, dynamic>> metadata(String id, String path) =>
+      tags(id, path);
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   late NetworkStorageService storage;
@@ -211,6 +231,37 @@ void main() {
       expect(calls, 2);
     },
   );
+
+  test('virtual hosts answer their own tags outside the read lanes', () async {
+    final pending = Completer<Map<String, dynamic>>();
+    storage.virtualSources = _VirtualSources(
+      (id, path) => path == 'slow.flac'
+          ? pending.future
+          : Future.value({'title': '$id $path'}),
+    );
+    var nasReads = 0;
+    final reader = NetworkMetadataService(
+      storage: storage,
+      reader: (_, _) async {
+        nasReads++;
+        return {'title': 'NAS'};
+      },
+    );
+    // A read waiting for its file does not hold up the others.
+    final slow = reader.read('network://phone/slow.flac');
+    expect(await reader.read('network://phone/fast.flac'), {
+      'title': 'phone fast.flac',
+    });
+    expect(
+      (await reader.read(
+        NetworkStorageService.source('nas', 'a.flac'),
+      ))['title'],
+      'NAS',
+    );
+    pending.complete({'title': 'Slow'});
+    expect(await slow, {'title': 'Slow'});
+    expect(nasReads, 1);
+  });
 
   test(
     'direct HTTP connection supplies the real filename as a native hint',

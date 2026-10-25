@@ -28,6 +28,20 @@ NetworkConnection connection(
   password: password,
 );
 
+class _VirtualSources implements NetworkVirtualSources {
+  @override
+  bool owns(String id) => id == 'phone';
+
+  @override
+  Stream<NetworkVirtualSong> songs(String id) => const Stream.empty();
+
+  @override
+  Future<String> resolve(String id, String path) async => '/received/$id/$path';
+
+  @override
+  Future<Map<String, dynamic>> metadata(String id, String path) async => {};
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   // Listing now crosses a method channel before the isolated host fallback.
@@ -216,6 +230,34 @@ void main() {
       expect(() => removed.clear(), throwsUnsupportedError);
     },
   );
+
+  test('virtual hosts resolve through their owner, not a connection', () async {
+    String? stored;
+    final service = NetworkStorageService(
+      read: () async => stored,
+      write: (value) async => stored = value,
+    );
+    expect(service.virtualFor('phone'), isNull);
+    final sources = _VirtualSources();
+    service.virtualSources = sources;
+    expect(service.virtualFor('phone'), same(sources));
+    expect(service.virtualFor('nas'), isNull);
+    expect(
+      await service.resolve('network://phone/song.flac'),
+      '/received/phone/song.flac',
+    );
+    await expectLater(
+      service.resolve('network://phone/song.flac?x=1'),
+      throwsFormatException,
+    );
+    await expectLater(
+      service.resolve('network://nas/song.flac'),
+      throwsStateError,
+    );
+    // Saved connections never list them.
+    expect(await service.connections(), isEmpty);
+    expect(stored, isNull);
+  });
 
   group('real HTTP transport', () {
     late HttpServer server;

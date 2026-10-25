@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:crypto/crypto.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/services/network_library_scanner.dart';
@@ -35,6 +36,35 @@ class _Storage extends NetworkStorageService {
     if (path == failedFolder) throw const SocketException('offline');
     return tree[path] ?? [];
   }
+}
+
+/// A storage without saved connections whose `virtual` host lists songs.
+class _VirtualStorage extends NetworkStorageService {
+  _VirtualStorage(List<NetworkVirtualSong> songs) {
+    virtualSources = _VirtualSources(songs);
+  }
+
+  @override
+  Future<NetworkConnection> connection(String id) async =>
+      throw StateError('Network connection unavailable');
+}
+
+class _VirtualSources implements NetworkVirtualSources {
+  _VirtualSources(this.songList);
+
+  final List<NetworkVirtualSong> songList;
+
+  @override
+  bool owns(String id) => id == 'virtual';
+
+  @override
+  Stream<NetworkVirtualSong> songs(String id) => Stream.fromIterable(songList);
+
+  @override
+  Future<String> resolve(String id, String path) async => '/received/$path';
+
+  @override
+  Future<Map<String, dynamic>> metadata(String id, String path) async => {};
 }
 
 void main() {
@@ -914,6 +944,73 @@ void main() {
       );
     },
   );
+
+  test('a virtual host lists its songs without a connection', () async {
+    final progress = <String>[];
+    final storage = _VirtualStorage([
+      (
+        path: 'a.flac',
+        tags: const {
+          'title': 'First',
+          'artist': 'Artist',
+          'duration': 200,
+          'format': 'flac',
+        },
+        coverPath: '/covers/a.jpg',
+        size: 1000,
+        modifiedTime: 1700000000000,
+      ),
+      (
+        path: 'b.mp3',
+        tags: const {'title': 'Second'},
+        coverPath: null,
+        size: null,
+        modifiedTime: null,
+      ),
+    ]);
+    final scan =
+        await scanner(
+          storage,
+          (_) async => throw StateError('unexpected read'),
+        ).scan(
+          NetworkStorageService.source('virtual', ''),
+          checkpoint: () async {},
+          onProgress: (_, _, name) => progress.add(name),
+        );
+    expect(scan.expectedCount, 2);
+    expect(scan.preserveMissingPaths, isEmpty);
+    final rows = await scan.rows().toList();
+    final source = NetworkStorageService.source('virtual', 'a.flac');
+    expect(rows.first['filePath'], source);
+    expect(rows.first['id'], 'network_${sha256.convert(utf8.encode(source))}');
+    expect(rows.first['coverPath'], '/covers/a.jpg');
+    expect(rows.first['trackName'], 'First');
+    expect(rows.first['duration'], 200);
+    expect(rows.first['format'], 'flac');
+    expect(rows.first['fileModTime'], 1700000000000);
+    expect(rows.last['filePath'], 'network://virtual/b.mp3');
+    expect(rows.last['artistName'], 'Unknown Artist');
+    expect(rows.last.containsKey('coverPath'), isFalse);
+    expect(progress, ['First', 'Second']);
+
+    await expectLater(
+      scanner(storage, (_) async => {}).scan(
+        NetworkStorageService.source('virtual', 'folder/'),
+        checkpoint: () async {},
+        onProgress: (_, _, _) {},
+      ),
+      throwsFormatException,
+    );
+    // Hosts it does not own still need a saved connection.
+    await expectLater(
+      scanner(storage, (_) async => {}).scan(
+        NetworkStorageService.source('nas', ''),
+        checkpoint: () async {},
+        onProgress: (_, _, _) {},
+      ),
+      throwsStateError,
+    );
+  });
 
   test(
     'local file checks never delete or classify NAS files as missing',

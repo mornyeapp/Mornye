@@ -222,6 +222,38 @@ Uri networkTarget(NetworkConnection connection, String path) {
   return (start: start, end: end);
 }
 
+/// One song of a [NetworkVirtualSources] host for a Library scan: its
+/// `path` under the host, its `tags` (the keys
+/// [NetworkVirtualSources.metadata] answers), its local cover file and file
+/// details when known.
+typedef NetworkVirtualSong = ({
+  String path,
+  Map<String, dynamic> tags,
+  String? coverPath,
+  int? size,
+  int? modifiedTime,
+});
+
+/// `network://` hosts that are not saved connections, such as a paired
+/// phone's songs on the Mornye Link desktop. Their owner installs them as
+/// [NetworkStorageService.virtualSources]; Library scans, playback and tag
+/// reads of a host they own go to them. Saved connection lists never show
+/// them.
+abstract interface class NetworkVirtualSources {
+  /// Whether the `network://` host [id] is one of these sources.
+  bool owns(String id);
+
+  /// The songs a Library scan of the host [id] lists.
+  Stream<NetworkVirtualSong> songs(String id);
+
+  /// A local path or URL the player opens for [path] under [id].
+  Future<String> resolve(String id, String path);
+
+  /// The tags of [path] under [id], with the keys a network tag read
+  /// answers. Answers what it knows while the song cannot be reached.
+  Future<Map<String, dynamic>> metadata(String id, String path);
+}
+
 class NetworkStorageService {
   NetworkStorageService({
     Future<String?> Function()? read,
@@ -242,6 +274,9 @@ class NetworkStorageService {
   static const timeout = Duration(seconds: 20);
   static const _probeTimeout = Duration(seconds: 3);
   static const _probeReuse = Duration(seconds: 10);
+
+  /// Hosts that are not saved connections; set by their owner.
+  NetworkVirtualSources? virtualSources;
 
   /// Connections known to be out of reach, with when a probe last failed.
   final _unreachable = <String, DateTime?>{};
@@ -323,6 +358,12 @@ class NetworkStorageService {
         orElse: () => throw StateError('Network connection unavailable'),
       );
 
+  /// The [virtualSources] when they own the host [id], else null.
+  NetworkVirtualSources? virtualFor(String id) {
+    final sources = virtualSources;
+    return sources != null && sources.owns(id) ? sources : null;
+  }
+
   Future<void> checkUploadAccess(String folder) => _checkUploadAccess(folder);
 
   static String source(String id, String path) => Uri(
@@ -383,6 +424,9 @@ class NetworkStorageService {
       throw const FormatException('Invalid network source');
     }
     final path = networkPath(uri.pathSegments.join('/'));
+    if (virtualFor(uri.host) case final virtual?) {
+      return virtual.resolve(uri.host, path);
+    }
     final c = await connection(uri.host);
     final target = networkTarget(c, path);
     await _ensureAccess(target);
