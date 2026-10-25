@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:crypto/crypto.dart';
 
@@ -103,6 +104,10 @@ abstract final class LinkOps {
   /// Covers of a phone's songs: GET `{"ids"}` held, POST `{"covers"}`.
   static const phoneCovers = 'phone/covers';
 
+  /// Phone to desktop: copy phone songs into the desktop's Library, POST
+  /// `{"transferId","songs":[LinkPhoneSong]}`, reply `{"accepted":int}`.
+  static const transfersOffer = 'transfers/offer';
+
   /// Subsonic calls the server forwards to the app (prefix + method name).
   static const subsonicPrefix = 'subsonic/';
   static const getPlayQueue = 'subsonic/getPlayQueue';
@@ -130,6 +135,271 @@ abstract final class LinkMessageTypes {
 
   /// Phone to desktop: the requested `name` cannot be sent (`reason`).
   static const filesFailed = 'files.failed';
+
+  /// Desktop to phone: copy desktop songs to the phone,
+  /// `{"transferId","songs":[LinkTransferSong]}`.
+  static const transfersOffer = 'transfers.offer';
+
+  /// Either way, from the device receiving a transfer to the one sending
+  /// it: a [LinkTransferStatus].
+  static const transfersStatus = 'transfers.status';
+
+  /// Either way: stop the transfer `{"transferId"}`.
+  static const transfersCancel = 'transfers.cancel';
+}
+
+/// The most songs one transfer offer carries; a larger choice is sent as
+/// several transfers.
+const linkTransferOfferLimit = 1000;
+
+final _transferId = RegExp(r'^[0-9a-f]{32}$');
+
+/// Whether [value] is a transfer id: 32 lowercase hex characters.
+bool isLinkTransferId(String? value) =>
+    value != null && _transferId.hasMatch(value);
+
+/// A new random transfer id.
+String newLinkTransferId([Random? random]) {
+  final source = random ?? Random.secure();
+  return [
+    for (var i = 0; i < 16; i++)
+      source.nextInt(256).toRadixString(16).padLeft(2, '0'),
+  ].join();
+}
+
+/// A desktop song offered to the phone (`transfers.offer`): its catalog id,
+/// which the phone downloads over Subsonic, and the tags the phone names
+/// and records the copy with.
+class LinkTransferSong {
+  const LinkTransferSong({
+    required this.songId,
+    required this.suffix,
+    required this.title,
+    required this.artist,
+    this.size = 0,
+    this.album,
+    this.albumArtist,
+    this.track,
+    this.disc,
+    this.year,
+    this.genre,
+    this.durationMs,
+    this.isrc,
+    this.bitRate,
+    this.sampleRate,
+    this.bitDepth,
+    this.explicit = false,
+  });
+
+  /// The desktop catalog id (`l:<library id>` or `d:<history id>`).
+  final String songId;
+
+  /// The original file's lowercase extension.
+  final String suffix;
+  final String title;
+  final String artist;
+
+  /// Bytes; 0 when unknown.
+  final int size;
+  final String? album;
+  final String? albumArtist;
+  final int? track;
+  final int? disc;
+  final int? year;
+  final String? genre;
+  final int? durationMs;
+  final String? isrc;
+
+  /// Kilobits per second.
+  final int? bitRate;
+  final int? sampleRate;
+  final int? bitDepth;
+  final bool explicit;
+
+  Map<String, dynamic> toJson() => {
+    'songId': songId,
+    'suffix': suffix,
+    'title': title,
+    'artist': artist,
+    if (size > 0) 'size': size,
+    if (album != null) 'album': album,
+    if (albumArtist != null) 'albumArtist': albumArtist,
+    if (track != null) 'track': track,
+    if (disc != null) 'disc': disc,
+    if (year != null) 'year': year,
+    if (genre != null) 'genre': genre,
+    if (durationMs != null) 'durationMs': durationMs,
+    if (isrc != null) 'isrc': isrc,
+    if (bitRate != null) 'bitRate': bitRate,
+    if (sampleRate != null) 'sampleRate': sampleRate,
+    if (bitDepth != null) 'bitDepth': bitDepth,
+    if (explicit) 'explicit': true,
+  };
+
+  /// Null for a song without a [songId], [title] or a short alphanumeric
+  /// [suffix].
+  static LinkTransferSong? fromJson(Object? json) {
+    if (json is! Map) return null;
+    final songId = _string(json['songId']);
+    final suffix = _string(json['suffix'])?.toLowerCase();
+    final title = _string(json['title']);
+    if (songId == null ||
+        suffix == null ||
+        !RegExp(r'^[a-z0-9]{1,10}$').hasMatch(suffix) ||
+        title == null) {
+      return null;
+    }
+    final size = _int(json['size']) ?? 0;
+    return LinkTransferSong(
+      songId: songId,
+      suffix: suffix,
+      title: title,
+      artist: _string(json['artist']) ?? '',
+      size: size > 0 ? size : 0,
+      album: _string(json['album']),
+      albumArtist: _string(json['albumArtist']),
+      track: _int(json['track']),
+      disc: _int(json['disc']),
+      year: _int(json['year']),
+      genre: _string(json['genre']),
+      durationMs: _int(json['durationMs']),
+      isrc: _string(json['isrc']),
+      bitRate: _int(json['bitRate']),
+      sampleRate: _int(json['sampleRate']),
+      bitDepth: _int(json['bitDepth']),
+      explicit: json['explicit'] == true,
+    );
+  }
+}
+
+/// Where a transfer stands.
+enum LinkTransferState {
+  /// Accepted, waiting for transfers before it.
+  queued,
+  running,
+
+  /// Every song was saved, skipped or failed.
+  done,
+  cancelled,
+
+  /// The transfer could not run at all (no connection, no download folder).
+  failed;
+
+  bool get active => this == queued || this == running;
+
+  static LinkTransferState? fromName(Object? name) {
+    for (final state in values) {
+      if (state.name == name) return state;
+    }
+    return null;
+  }
+}
+
+/// How a transfer stands on the device receiving it (`transfers.status`).
+/// Songs before [index] are finished: saved unless listed in [skipped] (the
+/// receiver already had it) or [failed]; [received] of [size] bytes of the
+/// song at [index] have arrived.
+class LinkTransferStatus {
+  const LinkTransferStatus({
+    required this.transferId,
+    required this.state,
+    required this.total,
+    this.index = 0,
+    this.received = 0,
+    this.size,
+    this.skipped = const [],
+    this.failed = const [],
+    this.reason,
+  });
+
+  final String transferId;
+  final LinkTransferState state;
+  final int total;
+  final int index;
+  final int received;
+  final int? size;
+
+  /// Indexes of songs the receiver already had, in order.
+  final List<int> skipped;
+
+  /// Indexes of songs that could not be copied, in order.
+  final List<int> failed;
+
+  /// Why the whole transfer failed, a short code.
+  final String? reason;
+
+  int get saved => index - skipped.length - failed.length;
+
+  /// The whole transfer, 0 to 1; a stopped one keeps the songs it finished.
+  double get fraction {
+    if (total <= 0 || state == LinkTransferState.done) return 1;
+    final size = this.size;
+    final part = !state.active || size == null || size <= 0
+        ? 0.0
+        : (received / size).clamp(0.0, 1.0);
+    return ((index + part) / total).clamp(0.0, 1.0);
+  }
+
+  LinkTransferStatus copyWith({
+    LinkTransferState? state,
+    int? index,
+    int? received,
+    int? size,
+    List<int>? skipped,
+    List<int>? failed,
+    String? reason,
+  }) => LinkTransferStatus(
+    transferId: transferId,
+    state: state ?? this.state,
+    total: total,
+    index: index ?? this.index,
+    received: received ?? this.received,
+    size: size ?? this.size,
+    skipped: skipped ?? this.skipped,
+    failed: failed ?? this.failed,
+    reason: reason ?? this.reason,
+  );
+
+  Map<String, dynamic> toJson() => {
+    'transferId': transferId,
+    'state': state.name,
+    'total': total,
+    'index': index,
+    if (received > 0) 'received': received,
+    if (size != null) 'size': size,
+    if (skipped.isNotEmpty) 'skipped': skipped,
+    if (failed.isNotEmpty) 'failed': failed,
+    if (reason != null) 'reason': reason,
+  };
+
+  /// Null without a valid [transferId], [state] and [total].
+  static LinkTransferStatus? fromJson(Object? json) {
+    if (json is! Map) return null;
+    final transferId = _string(json['transferId']);
+    final state = LinkTransferState.fromName(json['state']);
+    final total = _int(json['total']);
+    if (!isLinkTransferId(transferId) || state == null || total == null) {
+      return null;
+    }
+    List<int> indexes(Object? raw) => raw is List
+        ? [
+            for (final value in raw)
+              if (value is num) value.toInt(),
+          ]
+        : const [];
+    final size = _int(json['size']);
+    return LinkTransferStatus(
+      transferId: transferId!,
+      state: state,
+      total: max(0, total),
+      index: (_int(json['index']) ?? 0).clamp(0, max(0, total)),
+      received: max(0, _int(json['received']) ?? 0),
+      size: size == null || size <= 0 ? null : size,
+      skipped: indexes(json['skipped']),
+      failed: indexes(json['failed']),
+      reason: _string(json['reason']),
+    );
+  }
 }
 
 /// Player command `action` values (`POST command` and the `command`
