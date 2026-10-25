@@ -27,9 +27,8 @@ class KeyboardShortcutsPage extends ConsumerWidget {
       showStore: showStore,
     );
 
-    List<SingleActivator> keys(DesktopCommand command) => [
-      ?desktopCommandShortcut(command, platform),
-    ];
+    List<SingleActivator> keys(DesktopCommand command) =>
+        desktopCommandShortcuts(command, platform);
     // Search and Settings also have their own command, listed in one row
     // with the destination's number.
     List<SingleActivator> tabKeys(ShellTab tab) => [

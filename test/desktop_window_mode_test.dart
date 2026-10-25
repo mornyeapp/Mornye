@@ -209,6 +209,12 @@ void main() {
       (mac.trigger, mac.control, mac.meta),
       (LogicalKeyboardKey.keyF, true, true),
     );
+    final macF11 =
+        desktopShortcutBindings(TargetPlatform.macOS)[const SingleActivator(
+              LogicalKeyboardKey.f11,
+            )]
+            as DesktopCommandIntent;
+    expect(macF11.command, DesktopCommand.fullScreen);
   });
 
   Future<void> pumpApp(
@@ -309,11 +315,12 @@ void main() {
     );
 
     testWidgets(
-      'appearance choice applies fullscreen and offers an exit (Mornye: $mornye)',
+      'fullscreen fills the window and exits with F11 or Escape (Mornye: $mornye)',
       (tester) async {
         await pumpApp(
           tester,
           mornye: mornye,
+          shortcuts: true,
           home: const Scaffold(body: DesktopWindowModeSetting()),
         );
         await tester.tap(find.text('Window mode'));
@@ -321,9 +328,17 @@ void main() {
         await tester.tap(find.text('Full screen'));
         await tester.pumpAndSettle();
         expect(desktopWindowFullScreen.value, isTrue);
-        final exit = find.byTooltip(RegExp(r'^Exit full screen'));
-        expect(exit, findsOneWidget);
-        await tester.tap(exit);
+        expect(find.byTooltip(RegExp(r'^Exit full screen')), findsNothing);
+        expect(find.byTooltip('Window mode'), findsNothing);
+        expect(tester.getTopLeft(find.byType(Scaffold)), Offset.zero);
+        expect(tester.getSize(find.byType(Scaffold)), const Size(1000, 800));
+        await tester.sendKeyEvent(LogicalKeyboardKey.f11);
+        await tester.pumpAndSettle();
+        expect(desktopWindowMode.value, DesktopWindowMode.windowed);
+        await tester.sendKeyEvent(LogicalKeyboardKey.f11);
+        await tester.pumpAndSettle();
+        expect(desktopWindowFullScreen.value, isTrue);
+        await tester.sendKeyEvent(LogicalKeyboardKey.escape);
         await tester.pumpAndSettle();
         expect(desktopWindowMode.value, DesktopWindowMode.windowed);
       },
@@ -358,6 +373,35 @@ void main() {
     await tester.pumpAndSettle();
     expect(desktopWindowMode.value, DesktopWindowMode.windowed);
   });
+
+  testWidgets('macOS accepts F11 and Escape without fullscreen chrome', (
+    tester,
+  ) async {
+    messenger.setMockMethodCallHandler(SystemChannels.menu, (_) async => null);
+    addTearDown(
+      () => messenger.setMockMethodCallHandler(SystemChannels.menu, null),
+    );
+    await pumpApp(
+      tester,
+      mornye: true,
+      shortcuts: true,
+      home: const Scaffold(body: Text('content')),
+    );
+    await tester.sendKeyEvent(LogicalKeyboardKey.f11);
+    await tester.pumpAndSettle();
+    expect(desktopWindowFullScreen.value, isTrue);
+    expect(find.text('Full screen'), findsNothing);
+    expect(tester.getTopLeft(find.byType(Scaffold)), Offset.zero);
+    await tester.sendKeyEvent(LogicalKeyboardKey.f11);
+    await tester.pumpAndSettle();
+    expect(desktopWindowMode.value, DesktopWindowMode.windowed);
+    await tester.sendKeyEvent(LogicalKeyboardKey.f11);
+    await tester.pumpAndSettle();
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+    expect(desktopWindowMode.value, DesktopWindowMode.windowed);
+    expect(tester.takeException(), isNull);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
 
   testWidgets('fullscreen closes the mini player before changing mode', (
     tester,

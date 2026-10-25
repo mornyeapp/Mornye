@@ -144,6 +144,19 @@ const _destinationKeys = [
   LogicalKeyboardKey.digit5,
 ];
 
+/// Includes the native menu shortcut and any additional keyboard bindings.
+List<SingleActivator> desktopCommandShortcuts(
+  DesktopCommand command, [
+  TargetPlatform? platform,
+]) {
+  final target = platform ?? defaultTargetPlatform;
+  return [
+    ?desktopCommandShortcut(command, target),
+    if (command == DesktopCommand.fullScreen && _usesCommandKey(target))
+      const SingleActivator(LogicalKeyboardKey.f11),
+  ];
+}
+
 /// The shortcut that selects the [position]th (1-based) destination.
 SingleActivator desktopDestinationShortcut(
   int position, [
@@ -158,7 +171,8 @@ Map<ShortcutActivator, Intent> desktopShortcutBindings([
   final target = platform ?? defaultTargetPlatform;
   return {
     for (final command in DesktopCommand.values)
-      ?desktopCommandShortcut(command, target): DesktopCommandIntent(command),
+      for (final shortcut in desktopCommandShortcuts(command, target))
+        shortcut: DesktopCommandIntent(command),
     for (var position = 1; position <= _destinationKeys.length; position++)
       desktopDestinationShortcut(position, target): DesktopDestinationIntent(
         position,
