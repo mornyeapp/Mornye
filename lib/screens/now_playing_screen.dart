@@ -641,9 +641,13 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                             ],
                           ),
                         ),
-                      if (!_landscape)
+                      // Landscape has no row to spare; the toolbar's devices
+                      // button shows the device there.
+                      if (MediaQuery.orientationOf(context) ==
+                          Orientation.portrait) ...[
                         LinkPlayingOnLabel(color: mornye ? Colors.white : null),
-                      if (!_landscape) const SizedBox(height: 8),
+                        const SizedBox(height: 8),
+                      ],
                     ],
                   ),
                 ),
@@ -773,13 +777,16 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
     }
   }
 
-  /// Lyrics fill the column, so idle controls can hide: Mornye in portrait,
-  /// and Material's single portrait column (landscape keeps two panes, and
-  /// the desktop opens lyrics in the inspector).
+  /// Lyrics fill the column, so idle controls can hide: Mornye in portrait
+  /// (its landscape player hides its own actions), and Material's portrait
+  /// column or its landscape artwork beside lyrics, which shows no transport
+  /// either, like Mornye's. Two plain panes keep the transport beside the
+  /// lyrics, and the desktop opens lyrics in the inspector.
   bool get _lyricsAutoHideLayout => context.isMornye
       ? !_landscape
       : !widget.embedded &&
-            MediaQuery.orientationOf(context) == Orientation.portrait;
+            (MediaQuery.orientationOf(context) == Orientation.portrait ||
+                ref.read(settingsProvider).landscapeLyricsArtwork);
 
   bool get _canAutoHideLyricsControls =>
       _lyricsAutoHideLayout &&

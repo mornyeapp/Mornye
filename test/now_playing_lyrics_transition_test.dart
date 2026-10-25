@@ -1628,6 +1628,45 @@ void main() {
     );
   }
 
+  testWidgets('Material landscape artwork beside lyrics hides idle controls', (
+    tester,
+  ) async {
+    metadataOverrides['lyrics'] =
+        '[00:00.00]First lyric\n[01:00.00]Second line';
+    await pumpNowPlaying(
+      tester,
+      theme: AppTheme.light(),
+      size: const Size(852, 393),
+      playback: PlaybackState(playing: true),
+    );
+    mediaItems.add(item('many'));
+    await settlePlayer(tester);
+    ProviderScope.containerOf(
+      tester.element(find.byType(NowPlayingScreen)),
+    ).read(settingsProvider.notifier).setLandscapeLyricsArtwork(true);
+    await settlePlayer(tester);
+    final lyricsToggle = find.byKey(const ValueKey('material-lyrics-toggle'));
+    final minimize = find.byKey(const ValueKey('now-playing-minimize'));
+    await tester.tap(lyricsToggle);
+    await tester.pump();
+    await completeLyrics(tester);
+    final list = find.byType(ListView);
+    final height = tester.getSize(list).height;
+    await tester.pump(const Duration(seconds: 5));
+    await settlePlayer(tester);
+    expect(lyricsToggle.hitTestable(), findsNothing);
+    expect(minimize.hitTestable(), findsNothing);
+    // The toolbar fades and the actions row folds away for the lyrics.
+    expect(tester.getSize(list).height, greaterThan(height + 40));
+
+    final bounds = tester.getRect(list);
+    await tester.tapAt(Offset(bounds.right - 6, bounds.top + 10));
+    await settlePlayer(tester);
+    expect(lyricsToggle.hitTestable(), findsOneWidget);
+    expect(minimize.hitTestable(), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'accessible navigation keeps lyric controls available while idle',
     (tester) async {
