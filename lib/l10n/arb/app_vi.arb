@@ -365,7 +365,7 @@
   "@downloadFolderTemplate": {
     "description": "Setting for editing a relative download folder template"
   },
-  "downloadFolderTemplateDescription": "Use naming tags and / for subfolders. Saving replaces the preset album and singles layout. Empty folder names use Unknown.",
+  "downloadFolderTemplateDescription": "Người dùng tự đặt các thẻ và/hoặc các thư mục con. Lưu sẽ ghi đè tùy chỉnh gốc của các album và nghệ sĩ. Thư mục trống sẽ được đặt là \"Unknown\".",
   "@downloadFolderTemplateDescription": {
     "description": "Help for custom download folder templates"
   },
