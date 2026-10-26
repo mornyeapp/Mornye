@@ -150,6 +150,34 @@ class LibraryQueueStore {
     WHERE COALESCE(l.file_path, '') != '' AND ${_notShadowedByHistory('l')}
   ''');
 
+  /// One page of the metadata Home mixes group songs by, over the same set
+  /// as [directoryEntries]: only the columns ranking reads, so a large
+  /// Library arrives in small rows.
+  Future<List<Map<String, Object?>>> mixSongs({
+    required bool includeLocal,
+    required int limit,
+    required int offset,
+  }) => _db.rawQuery(
+    '''
+    SELECT * FROM (
+      SELECT 'downloaded' AS source, h.id, h.file_path, h.track_name,
+        h.artist_name, h.album_name, h.genre, h.duration
+      FROM history_db.history h
+      WHERE COALESCE(h.file_path, '') != ''
+      ${includeLocal ? '''
+      UNION ALL
+      SELECT 'local' AS source, l.id, l.file_path, l.track_name,
+        l.artist_name, l.album_name, l.genre, l.duration
+      FROM ${LibrarySchema.visibleView} l
+      WHERE COALESCE(l.file_path, '') != '' AND ${_notShadowedByHistory('l')}
+      ''' : ''}
+    )
+    ORDER BY source, id
+    LIMIT ? OFFSET ?
+  ''',
+    [limit, offset],
+  );
+
   Future<QueueLibraryCounts> counts(QueueLibraryDbQuery request) async {
     final fastCounts = await _getUnfilteredQueueCounts(request);
     if (fastCounts != null) return fastCounts;

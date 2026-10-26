@@ -425,6 +425,18 @@ class LibraryDatabase {
   Future<List<Map<String, Object?>>> getSongFiles() async =>
       (await _queueStore()).songFiles();
 
+  /// One page of every downloaded and scanned song's metadata, for the
+  /// Home mixes.
+  Future<List<Map<String, Object?>>> getMixSongPage({
+    required bool includeLocal,
+    required int limit,
+    required int offset,
+  }) async => (await _queueStore()).mixSongs(
+    includeLocal: includeLocal,
+    limit: limit,
+    offset: offset,
+  );
+
   @visibleForTesting
   Future<List<Map<String, dynamic>>> getQueueAlbumPage(
     QueueLibraryDbQuery request,

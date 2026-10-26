@@ -2,6 +2,7 @@ part of 'home_tab.dart';
 
 const _homeShelfLimit = 10;
 const _homeShelfCoverSize = 120.0;
+const _homeMixCoverSize = 152.0;
 
 /// The newest downloaded and scanned tracks, with the Library's track count
 /// for the shortcut at the end of the shelf.
@@ -134,6 +135,7 @@ class _HomeSections extends ConsumerWidget {
     );
     final recentlyAdded = ref.watch(_homeRecentlyAddedProvider).value;
     final onRepeat = ref.watch(_homeOnRepeatProvider).value ?? const [];
+    final mixes = ref.watch(libraryMixesProvider).value ?? const [];
 
     final sections = <Widget>[
       if (hasMediaItem)
@@ -147,6 +149,15 @@ class _HomeSections extends ConsumerWidget {
         inset: inset,
         child: const _HomeShortcuts(),
       ),
+      // Built after startup settles when nothing is cached: the sections'
+      // size animation opens its space rather than letting it jump in.
+      if (mixes.isNotEmpty)
+        _HomeSection(
+          title: l10n.homeMixesForYou,
+          inset: inset,
+          shelf: true,
+          child: _HomeMixesShelf(mixes: mixes, inset: inset),
+        ),
       if (recentlyAdded != null && recentlyAdded.items.isNotEmpty)
         _HomeSection(
           title: l10n.homeRecentlyAdded,
@@ -388,17 +399,19 @@ class _HomeShelf extends StatelessWidget {
     required this.inset,
     required this.itemCount,
     required this.itemBuilder,
+    this.coverSize = _homeShelfCoverSize,
   });
 
   final double inset;
   final int itemCount;
   final IndexedWidgetBuilder itemBuilder;
+  final double coverSize;
 
   @override
   Widget build(BuildContext context) {
     final textScale = MediaQuery.textScalerOf(context).scale(1);
     return SizedBox(
-      height: _homeShelfCoverSize + 52 * textScale,
+      height: coverSize + 52 * textScale,
       child: DesktopScrollArrows(
         builder: (context, controller) => ListView.separated(
           controller: controller,
@@ -420,6 +433,7 @@ class _HomeShelfTile extends StatelessWidget {
     required this.subtitle,
     required this.semanticLabel,
     required this.onTap,
+    this.size = _homeShelfCoverSize,
   });
 
   final Widget cover;
@@ -427,6 +441,7 @@ class _HomeShelfTile extends StatelessWidget {
   final String subtitle;
   final String semanticLabel;
   final VoidCallback onTap;
+  final double size;
 
   @override
   Widget build(BuildContext context) {
@@ -440,16 +455,13 @@ class _HomeShelfTile extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(20),
         child: SizedBox(
-          width: _homeShelfCoverSize,
+          width: size,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(20),
-                child: SizedBox.square(
-                  dimension: _homeShelfCoverSize,
-                  child: cover,
-                ),
+                child: SizedBox.square(dimension: size, child: cover),
               ),
               const SizedBox(height: 8),
               Text(
@@ -674,6 +686,38 @@ class _HomeOnRepeatShelf extends ConsumerWidget {
                     artUri: track.artwork,
                   ),
           ], initialIndex: index),
+        );
+      },
+    );
+  }
+}
+
+/// The day's mixes of the Library's own songs, larger than the other
+/// shelves' covers so the four-album collages stay legible.
+class _HomeMixesShelf extends StatelessWidget {
+  const _HomeMixesShelf({required this.mixes, required this.inset});
+
+  final List<LibraryMixView> mixes;
+  final double inset;
+
+  @override
+  Widget build(BuildContext context) {
+    return _HomeShelf(
+      inset: inset,
+      coverSize: _homeMixCoverSize,
+      itemCount: mixes.length,
+      itemBuilder: (context, index) {
+        final view = mixes[index];
+        final title = libraryMixTitle(context.l10n, view.mix);
+        final subtitle = libraryMixSubtitle(context.l10n, view.mix);
+        return _HomeShelfTile(
+          size: _homeMixCoverSize,
+          title: title,
+          subtitle: subtitle,
+          semanticLabel: subtitle.isEmpty ? title : '$title, $subtitle',
+          cover: LibraryMixCover(items: view.items, size: _homeMixCoverSize),
+          onTap: () =>
+              pushPage<void>(context, (_) => LibraryMixScreen(view: view)),
         );
       },
     );
