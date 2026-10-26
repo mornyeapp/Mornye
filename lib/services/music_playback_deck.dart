@@ -111,6 +111,10 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
            (Platform.isAndroid ||
                Platform.isIOS ||
                (isDesktopPlatform && Platform.isMacOS)),
+       _platformChainsPlayers =
+           Platform.isAndroid ||
+           Platform.isIOS ||
+           (isDesktopPlatform && Platform.isMacOS),
        _nativeAvailable = nativeAvailable ?? Platform.isAndroid {
     playbackEqualizer.addListener(_equalizerChanged);
     playbackOutputVolume.addListener(_outputVolumeChanged);
@@ -139,12 +143,18 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
     ]);
   }
 
+  /// Forces [setNextDeck] support, for tests on any host.
+  @visibleForTesting
+  static bool? debugChainsPlayers;
+
   static const _channel = MethodChannel('com.zarz.mornye/usb_pcm');
   static const _events = EventChannel('com.zarz.mornye/usb_pcm/events');
   static Stream<dynamic>? _nativeEvents;
   static int _nextToken = 0;
   final AudioPlayer _ordinary;
   final bool _equalizerAvailable;
+  final bool _platformChainsPlayers;
+  bool get _chainsPlayers => debugChainsPlayers ?? _platformChainsPlayers;
   bool _equalizerDisposed = false;
   static const _effects = MethodChannel('xyz.luan/audioplayers');
   bool _equalizerSent = false;
@@ -548,6 +558,29 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
       'position': position.inMilliseconds,
     });
     if (!_disposed && token == _token && _direct) _positions.add(position);
+  }
+
+  @override
+  Future<bool> setNextDeck(PlaybackDeck? next) async {
+    // The forks chain their own players: Android with
+    // MediaPlayer.setNextMediaPlayer, Darwin from the end notification.
+    if (_direct || !_chainsPlayers) return false;
+    final player = next is AudioplayersPlaybackDeck && !next._direct
+        ? next._ordinary
+        : null;
+    if (next != null && player == null) return false;
+    try {
+      await _effects.invokeMethod<void>('setNextPlayer', {
+        'playerId': _ordinary.playerId,
+        'nextPlayerId': ?player?.playerId,
+      });
+      return player != null;
+    } on PlatformException catch (error) {
+      _log.w('Next player link unavailable: $error');
+      return false;
+    } on MissingPluginException {
+      return false;
+    }
   }
 
   @override

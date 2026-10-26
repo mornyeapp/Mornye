@@ -543,6 +543,11 @@ class MediaKitPlaybackDeck implements PlaybackDeck {
     _setState(PlaybackDeckState.stopped);
   }
 
+  /// Each deck owns its own libmpv instance, which cannot hand its output to
+  /// another; the next deck starts on the completion event instead.
+  @override
+  Future<bool> setNextDeck(PlaybackDeck? next) async => false;
+
   @override
   Future<Duration?> getCurrentPosition() async {
     // Asked directly: media_kit's cached position trails a pause or seek.

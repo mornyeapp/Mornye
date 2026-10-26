@@ -60,6 +60,8 @@ class AppSettings {
   final String playbackNormalizationMode; // 'track' or 'album'
   final bool pauseOnMute;
   final bool playOnHeadphonesConnected;
+  // Start the next song the moment one ends; AutoMix replaces it while on.
+  final bool gaplessPlayback;
   final bool autoMix;
   @JsonKey(fromJson: autoMixDurationFromJson)
   final int autoMixDuration;
@@ -261,6 +263,7 @@ class AppSettings {
     this.playbackNormalizationMode = 'track',
     this.pauseOnMute = true,
     this.playOnHeadphonesConnected = false,
+    this.gaplessPlayback = true,
     this.autoMix = false,
     this.autoMixDuration = 0,
     this.autoMixEffect = AutoMixEffect.auto,
@@ -405,6 +408,7 @@ class AppSettings {
     String? playbackNormalizationMode,
     bool? pauseOnMute,
     bool? playOnHeadphonesConnected,
+    bool? gaplessPlayback,
     bool? autoMix,
     int? autoMixDuration,
     AutoMixEffect? autoMixEffect,
@@ -534,6 +538,7 @@ class AppSettings {
       pauseOnMute: pauseOnMute ?? this.pauseOnMute,
       playOnHeadphonesConnected:
           playOnHeadphonesConnected ?? this.playOnHeadphonesConnected,
+      gaplessPlayback: gaplessPlayback ?? this.gaplessPlayback,
       autoMix: autoMix ?? this.autoMix,
       autoMixDuration: autoMixDuration ?? this.autoMixDuration,
       autoMixEffect: autoMixEffect ?? this.autoMixEffect,

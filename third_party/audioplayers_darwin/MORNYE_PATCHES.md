@@ -74,6 +74,15 @@ cancelled preparation as a completed method call without a playback error.
 The `getDuration` branch returns after delivering its duration so the same
 method call cannot receive the default result a second time.
 
+### Next player
+
+A `setNextPlayer` method with an optional `nextPlayerId` sets
+`WrappedMediaPlayer.next` (weak) for gapless playback. Linking prerolls the
+next player's loaded item. When the current item ends, the completion
+handler resumes the next player before anything else, then reports
+completion. Replacing or releasing the current item clears the link; no
+`nextPlayerId` unlinks it.
+
 ## Tests
 
 `tests/EqualizerDSPTests.swift` is a standalone `@main` program for the DSP.
@@ -105,8 +114,9 @@ The same sources can be compiled with the iOS simulator SDK and run with
 `simctl spawn` to check the shared iOS implementation.
 
 `tests/SourceLifecycleTests.swift` uses a deferred AVPlayer for cancellation and
-real generated WAV files for successful preparation, failed preparation and
-stale completion delivery. It does not need an external music fixture:
+real generated WAV files for successful preparation, failed preparation,
+stale completion delivery and a linked next player starting on completion.
+It does not need an external music fixture:
 
 ```bash
 cd third_party/audioplayers_darwin

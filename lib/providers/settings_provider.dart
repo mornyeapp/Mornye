@@ -626,6 +626,9 @@ class SettingsNotifier extends Notifier<AppSettings> {
   void setPlayOnHeadphonesConnected(bool enabled) =>
       _commit(state.copyWith(playOnHeadphonesConnected: enabled));
 
+  void setGaplessPlayback(bool enabled) =>
+      _commit(state.copyWith(gaplessPlayback: enabled));
+
   void setAutoMix(bool enabled) => _commit(state.copyWith(autoMix: enabled));
 
   void setAutoMixDuration(int seconds) => _commit(

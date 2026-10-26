@@ -42,6 +42,16 @@ Dart caller is `lib/services/music_playback_deck.dart` in the app.
   relying on `setPlaybackParams` (or, before API 23, `setRate(1.0)`) to start
   output.
 
+### Next player
+
+A `setNextPlayer` method with an optional `nextPlayerId` links two players
+for gapless playback. `WrappedPlayer.setNext` requires both to hold a
+prepared source and calls `MediaPlayer.setNextMediaPlayer`, so the platform
+starts the next player as the current one completes. `onCompletion` then
+marks the next player as playing before reporting completion, so a later
+`resume` from Dart confirms its state without restarting it. A new source
+or a release drops the link; no `nextPlayerId` unlinks it.
+
 ### Error state
 
 `WrappedPlayer.onError` now marks the player as not prepared and not playing,

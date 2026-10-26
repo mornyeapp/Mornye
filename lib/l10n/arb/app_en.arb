@@ -7821,6 +7821,14 @@
     "description": "Selected state of the compact favorite action"
   },
   "autoMixDescription": "Blend songs with beat matching and pitch-preserving tempo adjustment. Uses crossfade when beats cannot be matched.",
+  "gaplessPlayback": "Gapless playback",
+  "@gaplessPlayback": {
+    "description": "Playback settings switch that starts the next song the moment one ends"
+  },
+  "gaplessPlaybackDescription": "Start the next song the moment one ends, without silence between them. AutoMix replaces it while on.",
+  "@gaplessPlaybackDescription": {
+    "description": "Subtitle of the Gapless playback switch"
+  },
   "playerCoverStyle": "Cover art",
   "@playerCoverStyle": {
     "description": "Settings section choosing how the player shows cover art"

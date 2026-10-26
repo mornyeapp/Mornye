@@ -103,7 +103,19 @@ class AudioNative {
   final rates = <String, double>{};
   final ignoredSeeks = <String>{};
   final missingPositions = <String>{};
+  final nextPlayers = <String, String>{};
   bool emitsDuration = true;
+
+  /// Ends [id]'s song the way the forks do: a chained next player starts
+  /// first, then completion is reported.
+  Future<void> complete(String id) async {
+    final next = nextPlayers.remove(id);
+    if (next != null) {
+      playing.add(next);
+      resumedSources.add(sources[next]!);
+    }
+    await event(id, 'audio.onComplete');
+  }
 
   int currentPosition(String id) =>
       (positions[id] ?? 0) +
@@ -159,6 +171,13 @@ class AudioNative {
               clocks[id]?.reset();
             }
             unawaited(event(id, 'audio.onSeekComplete'));
+          case 'setNextPlayer':
+            final next = args['nextPlayerId'] as String?;
+            if (next == null) {
+              nextPlayers.remove(id);
+            } else {
+              nextPlayers[id] = next;
+            }
           case 'setPlaybackRate':
             positions[id] = currentPosition(id);
             clocks[id]?.reset();
@@ -182,6 +201,7 @@ class AudioNative {
             playing.remove(id);
             clocks[id]?.stop();
           case 'release':
+            nextPlayers.remove(id);
             releases[id] = (releases[id] ?? 0) + 1;
             playing.remove(id);
             sources.remove(id);
@@ -287,6 +307,10 @@ void setAutoMixOptions(AutoMixOptions options) => musicPlayerRuntime.configure(
   ),
 );
 
+void setGaplessEnabled(bool enabled) => musicPlayerRuntime.configure(
+  musicPlayerRuntime.settings.copyWith(gaplessPlayback: enabled),
+);
+
 void setUsbBitPerfectEnabled(bool enabled) => musicPlayerRuntime.configure(
   musicPlayerRuntime.settings.copyWith(usbBitPerfect: enabled),
 );
@@ -321,6 +345,8 @@ void _setUpPlayer() {
   );
   setAutoMixEnabled(false);
   setAutoMixOptions(const AutoMixOptions());
+  // Gapless tests opt in; others keep the ordinary transition.
+  setGaplessEnabled(false);
   setUsbBitPerfectEnabled(false);
   setAutoplayEnabled(false);
   native = AudioNative(time.stopwatch)..install();

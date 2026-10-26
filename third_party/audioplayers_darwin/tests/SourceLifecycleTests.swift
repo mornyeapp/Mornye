@@ -116,6 +116,53 @@ final class DeferredPlayer: AVPlayer {
     await wrapper.dispose()
   }
 
+  @MainActor static func testNextPlayerStartsOnCompletion() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let firstURL = root.appendingPathComponent("first.wav")
+    let secondURL = root.appendingPathComponent("second.wav")
+    try writeSilence(to: firstURL)
+    try writeSilence(to: secondURL)
+
+    let plugin = AudioplayersDarwinPlugin()
+    func makePlayer() -> (WrappedMediaPlayer, AudioPlayersStreamHandler, AVPlayer) {
+      let native = AVPlayer()
+      native.isMuted = true
+      let events = AudioPlayersStreamHandler()
+      return (
+        WrappedMediaPlayer(reference: plugin, eventHandler: events, player: native), events, native
+      )
+    }
+    let (current, currentEvents, currentNative) = makePlayer()
+    let (following, followingEvents, _) = makePlayer()
+    try await current.setSourceUrl(url: firstURL.path, isLocal: true)
+    try await following.setSourceUrl(url: secondURL.path, isLocal: true)
+    current.next = following
+    guard current.next === following, !following.isPlaying else {
+      throw Failure.message("Linking started the next player")
+    }
+
+    // A new source drops the link.
+    try await current.setSourceUrl(url: secondURL.path, isLocal: true)
+    guard current.next == nil else {
+      throw Failure.message("A new source kept the link to the next player")
+    }
+    try await current.setSourceUrl(url: firstURL.path, isLocal: true)
+    current.next = following
+    current.resume()
+    NotificationCenter.default.post(
+      name: .AVPlayerItemDidPlayToEndTime, object: currentNative.currentItem)
+    try await waitFor("The next player did not start as the current one completed") {
+      following.isPlaying && currentEvents.completedCount == 1
+    }
+    guard current.next == nil, followingEvents.completedCount == 0 else {
+      throw Failure.message("Completion kept the link or completed the next player")
+    }
+    await current.dispose()
+    await following.dispose()
+  }
+
   @MainActor static func main() async {
     do {
       let native = DeferredPlayer()
@@ -144,6 +191,8 @@ final class DeferredPlayer: AVPlayer {
       print("PASS: replacing and disposing loading sources completes cancelled preparation")
       try await testNativePreparationAndStaleCompletion()
       print("PASS: native preparation succeeds or fails once, and ignores old completion events")
+      try await testNextPlayerStartsOnCompletion()
+      print("PASS: a linked next player starts as the current one completes")
     } catch {
       print("FAIL: \(error)")
       exit(1)

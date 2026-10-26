@@ -25,6 +25,12 @@ enum ReleaseMode: String {
   private(set) var isPlaying: Bool
   var releaseMode: ReleaseMode
 
+  /// Started the moment this player's item ends, without a gap. Cleared
+  /// with the item.
+  weak var next: WrappedMediaPlayer? {
+    didSet { next?.prerollForStart() }
+  }
+
   private var reference: AudioplayersDarwinPlugin
   private var player: AVPlayer
   private var equalizer = EqualizerAudioTap()
@@ -132,6 +138,18 @@ enum ReleaseMode: String {
       player.play()
     }
     updateDuration()
+  }
+
+  /// Fills the render pipeline of a paused, loaded item so a later
+  /// [resume] starts at once.
+  func prerollForStart() {
+    // preroll raises an exception unless the player itself is ready.
+    guard !isPlaying, player.rate == 0, player.status == .readyToPlay,
+      player.currentItem?.status == .readyToPlay
+    else {
+      return
+    }
+    player.preroll(atRate: Float(playbackRate)) { _ in }
   }
 
   func setVolume(volume: Double) {
@@ -291,6 +309,7 @@ enum ReleaseMode: String {
   }
 
   private func reset() {
+    next = nil
     finishPlayerItemPreparation(.failure(CancellationError()))
     if let cObserver = completionObserver {
       NotificationCenter.default.removeObserver(cObserver.observer)
@@ -313,6 +332,11 @@ enum ReleaseMode: String {
   private func onSoundComplete(_ playerItem: AVPlayerItem) async {
     guard isPlaying, player.currentItem === playerItem else { return }
 
+    // Start the next song before anything else, so it follows without a gap.
+    if let following = next {
+      next = nil
+      if !following.isPlaying { following.resume() }
+    }
     reference.controlAudioSession()
     eventHandler.onComplete()
 

@@ -24,14 +24,46 @@ class WrappedPlayer internal constructor(
 ) {
     private var player: PlayerWrapper? = null
 
+    /** The player MediaPlayer starts the moment this one completes. */
+    private var next: WrappedPlayer? = null
+
     fun setEqualizer(configuration: Map<String, Any?>) {
         val output = player as? MediaPlayerWrapper
         if (output != null) output.setEqualizer(configuration)
     }
 
+    /**
+     * Chains [player], prepared and paused, to start as this source ends,
+     * without a gap. Null unlinks it.
+     */
+    fun setNext(player: WrappedPlayer?) {
+        val current = this.player as? MediaPlayerWrapper
+        if (player == null) {
+            next = null
+            if (!released && current != null) current.setNext(null)
+            return
+        }
+        check(!released && prepared && current != null) { "This player has no prepared source" }
+        val following = player.player as? MediaPlayerWrapper
+        check(!player.released && player.prepared && following != null) {
+            "The next player has no prepared source"
+        }
+        current.setNext(following)
+        next = player
+    }
+
+    /** MediaPlayer started this player as the previous one completed. */
+    private fun continueAfterPrevious() {
+        if (released || !prepared || playing) return
+        playing = true
+        requestFocusAndStart()
+    }
+
     var source: Source? = null
         set(value) {
             if (field != value) {
+                // Resetting MediaPlayer drops its link to the next player.
+                next = null
                 if (value != null) {
                     val player = getOrCreatePlayer()
                     player.setSource(value)
@@ -304,6 +336,9 @@ class WrappedPlayer internal constructor(
     }
 
     fun onCompletion() {
+        val following = next
+        next = null
+        following?.continueAfterPrevious()
         if (releaseMode != ReleaseMode.LOOP) {
             stop()
         }

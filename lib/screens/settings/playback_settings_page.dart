@@ -222,6 +222,20 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage> {
                   ),
               ],
               SettingsSwitchItem(
+                icon: Icons.linear_scale,
+                title: context.l10n.gaplessPlayback,
+                subtitle: context.l10n.gaplessPlaybackDescription,
+                value: settings.gaplessPlayback && !settings.autoMix,
+                enabled:
+                    settings.playerMode == 'internal' &&
+                    !settings.autoMix &&
+                    !settings.usbBitPerfect &&
+                    !(isDesktopPlatform && settings.exclusiveOutput),
+                onChanged: (value) => ref
+                    .read(settingsProvider.notifier)
+                    .setGaplessPlayback(value),
+              ),
+              SettingsSwitchItem(
                 icon: Icons.compare_arrows,
                 title: 'AutoMix',
                 subtitle: context.l10n.autoMixDescription,

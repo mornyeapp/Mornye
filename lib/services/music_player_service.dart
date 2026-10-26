@@ -49,6 +49,7 @@ export 'playback_session_restore.dart';
 
 part 'music_player_automix.dart';
 part 'music_player_autoplay.dart';
+part 'music_player_gapless.dart';
 
 final _log = AppLogger('MusicPlayer');
 
@@ -116,6 +117,7 @@ class MusicPlayerHandler extends BaseAudioHandler
   AppSettings get _settings => _runtime.settings;
   late PlaybackDeck _player;
   late final _MusicAutoMix _autoMix;
+  late final _MusicGapless _gapless = _MusicGapless(this);
   late final _MusicAutoplay _autoplay;
   late final MusicHaptics _haptics;
   bool _completing = false;
@@ -198,6 +200,12 @@ class MusicPlayerHandler extends BaseAudioHandler
         previous.exclusiveOutput != settings.exclusiveOutput) {
       unawaited(_autoMix.cancel());
     }
+    if (previous.gaplessPlayback != settings.gaplessPlayback ||
+        previous.autoMix != settings.autoMix ||
+        previous.usbBitPerfect != settings.usbBitPerfect ||
+        previous.exclusiveOutput != settings.exclusiveOutput) {
+      unawaited(_gapless.cancel());
+    }
     // USB changes apply at the next source boundary, without raising volume.
     if ((previous.playerMode == 'internal') !=
             (settings.playerMode == 'internal') ||
@@ -239,7 +247,9 @@ class MusicPlayerHandler extends BaseAudioHandler
       copy: PlatformBridge.copyContentUriToTemp,
       isDisposed: () => _disposed,
       isPinned: (path) =>
-          path == _activeResolvedPath || _autoMix.pinnedPaths.contains(path),
+          path == _activeResolvedPath ||
+          _autoMix.pinnedPaths.contains(path) ||
+          _gapless.pinnedPaths.contains(path),
       onResolveError: (error) =>
           _log.e('Failed to resolve content URI for playback: $error'),
       onDeleteError: (error) =>
@@ -518,7 +528,7 @@ class MusicPlayerHandler extends BaseAudioHandler
     unawaited(
       _serializeSourceChange(() async {
         if (_disposed || generation != _playRequestGeneration) return;
-        await _autoMix.cancel();
+        await _cancelTransitions();
         if (_disposed || generation != _playRequestGeneration) return;
         await player.stop();
       }).catchError((Object error) {
@@ -553,6 +563,12 @@ class MusicPlayerHandler extends BaseAudioHandler
       }),
     );
     return true;
+  }
+
+  /// Drops a prepared AutoMix or gapless transition.
+  Future<void> _cancelTransitions() async {
+    await _autoMix.cancel();
+    await _gapless.cancel();
   }
 
   Future<void> _disposeDeck(PlaybackDeck player) async {
@@ -907,6 +923,7 @@ class MusicPlayerHandler extends BaseAudioHandler
     if (!_sourceReady || _switchingGeneration != 0) return;
     _broadcastPosition(position);
     _autoMix.onPosition(position);
+    _gapless.onPosition(position);
     unawaited(_autoplay.fill());
     if (_restoringSession ||
         _player.state != PlaybackDeckState.playing ||
@@ -980,7 +997,7 @@ class MusicPlayerHandler extends BaseAudioHandler
     final normalizationGeneration = ++_normalizationGeneration;
     if (index < 0 || index >= _media.length) return;
     unawaited(() async {
-      await _autoMix.cancel();
+      await _cancelTransitions();
       if (generation != _playRequestGeneration ||
           index != _index ||
           index >= _media.length ||
@@ -1396,7 +1413,7 @@ class MusicPlayerHandler extends BaseAudioHandler
       ..clear()
       ..addAll(history);
     _markSessionQueueChanged();
-    unawaited(_autoMix.cancel());
+    unawaited(_cancelTransitions());
     queue.add(List<MediaItem>.unmodifiable(_queueItems));
     _broadcastState();
     unawaited(_persistSession(position: playbackState.value.position));
@@ -1439,7 +1456,7 @@ class MusicPlayerHandler extends BaseAudioHandler
     await _serializeSourceChange(() async {
       try {
         if (!_isCurrentPlayRequest(generation, media)) return;
-        await _autoMix.cancel();
+        await _cancelTransitions();
         if (!_isCurrentPlayRequest(generation, media)) return;
         // Retire the audible source before publishing another song's title.
         await _player.stop();
@@ -1462,6 +1479,12 @@ class MusicPlayerHandler extends BaseAudioHandler
     _sourceChangeTail = operation.catchError((Object _) {});
     return operation;
   }
+
+  static bool _requiresDsd(PlayableMedia media) =>
+      media.bitDepth == 1 ||
+      const ['dsf', 'dff'].contains(media.format?.toLowerCase()) ||
+      media.source.toLowerCase().endsWith('.dsf') ||
+      media.source.toLowerCase().endsWith('.dff');
 
   Future<void> _startResolvedSource(
     String path,
@@ -1487,11 +1510,7 @@ class MusicPlayerHandler extends BaseAudioHandler
         allowFixedVolume: _settings.usbAllowFixedVolume,
         dapExclusive: _settings.dapExclusive,
         allowDop: _settings.usbDsdOverPcm,
-        requiresDsd:
-            media.bitDepth == 1 ||
-            const ['dsf', 'dff'].contains(media.format?.toLowerCase()) ||
-            media.source.toLowerCase().endsWith('.dsf') ||
-            media.source.toLowerCase().endsWith('.dff'),
+        requiresDsd: _requiresDsd(media),
       );
     }
     if (!_isCurrentPlayRequest(generation, media)) return;
@@ -1839,6 +1858,8 @@ class MusicPlayerHandler extends BaseAudioHandler
   Future<void> _handlePlayerComplete() async {
     if (_completing) return;
     if (_shouldIgnoreComplete) {
+      // A natively chained next song must not keep playing unseen.
+      unawaited(_gapless.cancel());
       if (_userPaused || _interruptionActive) {
         _broadcastState(playerState: PlaybackDeckState.paused);
       }
@@ -1848,6 +1869,7 @@ class MusicPlayerHandler extends BaseAudioHandler
     _completing = true;
     try {
       _runtime.personalization.finish();
+      if (await _gapless.handoff()) return;
       await _onComplete();
     } finally {
       _completing = false;
@@ -1973,7 +1995,7 @@ class MusicPlayerHandler extends BaseAudioHandler
     _switchingGeneration = 0;
     _userPaused = true;
     await _player.cancelPreparation();
-    await _autoMix.cancel();
+    await _cancelTransitions();
     await _serializeSourceChange(() async {
       if (generation != _playRequestGeneration || _disposed) return;
       await _player.pause();
@@ -1999,7 +2021,7 @@ class MusicPlayerHandler extends BaseAudioHandler
   Future<void> setShuffleMode(AudioServiceShuffleMode shuffleMode) async {
     final generation = ++_shuffleRequestGeneration;
     final enabled = shuffleMode == AudioServiceShuffleMode.all;
-    await _autoMix.cancel();
+    await _cancelTransitions();
     if (generation != _shuffleRequestGeneration ||
         _disposed ||
         enabled == _shuffle) {
@@ -2023,7 +2045,7 @@ class MusicPlayerHandler extends BaseAudioHandler
 
   @override
   Future<void> setRepeatMode(AudioServiceRepeatMode repeatMode) async {
-    await _autoMix.cancel();
+    await _cancelTransitions();
     // Group repeat has no meaning for a flat queue; treat it as all.
     _repeatMode = repeatMode == AudioServiceRepeatMode.group
         ? AudioServiceRepeatMode.all
@@ -2048,7 +2070,7 @@ class MusicPlayerHandler extends BaseAudioHandler
     _switchingGeneration = 0;
     _userPaused = true;
     await _player.cancelPreparation();
-    await _autoMix.cancel();
+    await _cancelTransitions();
     await _serializeSourceChange(() => _stopSession(generation));
   }
 
@@ -2090,7 +2112,7 @@ class MusicPlayerHandler extends BaseAudioHandler
 
   @override
   Future<void> skipToPrevious() async {
-    await _autoMix.cancel();
+    await _cancelTransitions();
     if (playbackState.value.position > const Duration(seconds: 3)) {
       await _player.seek(Duration.zero);
       _broadcastPosition(Duration.zero, force: true);
@@ -2272,6 +2294,7 @@ class MusicPlayerHandler extends BaseAudioHandler
     await _player.cancelPreparation();
     await _sourceChangeTail;
     await _autoMix.dispose();
+    await _gapless.dispose();
     _haptics.dispose();
     for (final sub in _subscriptions) {
       await sub.cancel();

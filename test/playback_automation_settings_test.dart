@@ -102,5 +102,67 @@ void main() {
         isTrue,
       );
     });
+
+    testWidgets('Gapless playback yields to AutoMix ($mornye)', (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final container = ProviderContainer(
+        overrides: [
+          initialSettingsProvider.overrideWithValue(const AppSettings()),
+        ],
+      );
+      addTearDown(container.dispose);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            theme: mornye
+                ? MornyeTheme.build(Brightness.dark, accent: MornyeAccent.blue)
+                : AppTheme.light(),
+            locale: const Locale('en'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: const PlaybackSettingsPage(),
+          ),
+        ),
+      );
+      final gapless = find.text('Gapless playback');
+      await tester.scrollUntilVisible(
+        gapless,
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+      SettingsSwitchItem item() => tester.widget<SettingsSwitchItem>(
+        find.byWidgetPredicate(
+          (widget) =>
+              widget is SettingsSwitchItem &&
+              widget.title == 'Gapless playback',
+        ),
+      );
+      expect(item().value, isTrue);
+      await tester.tap(gapless);
+      await tester.pumpAndSettle();
+      expect(container.read(settingsProvider).gaplessPlayback, isFalse);
+
+      container.read(settingsProvider.notifier).setGaplessPlayback(true);
+      container.read(settingsProvider.notifier).setAutoMix(true);
+      await tester.pumpAndSettle();
+      expect(item().enabled, isFalse);
+      expect(item().value, isFalse);
+      expect(tester.takeException(), isNull);
+
+      final catalog = SettingsSearchCatalog(
+        AppLocalizations.of(tester.element(gapless)),
+      );
+      expect(
+        catalog.playback.any(
+          (entry) => entry.matches(SettingsSearchQuery('gapless')),
+        ),
+        isTrue,
+      );
+    });
   }
 }

@@ -139,6 +139,11 @@ class AudioplayersPlugin : FlutterPlugin {
                     player.source = BytesSource(bytes)
                 }
 
+                "setNextPlayer" -> {
+                    val nextId = call.argument<String>("nextPlayerId")
+                    player.setNext(nextId?.let { getPlayer(it) })
+                }
+
                 "resume" -> player.play()
                 "pause" -> player.pause()
                 "stop" -> player.stop()

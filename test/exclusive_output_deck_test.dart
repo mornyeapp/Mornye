@@ -77,6 +77,8 @@ class _Deck implements PlaybackDeck {
   }
 
   @override
+  Future<bool> setNextDeck(PlaybackDeck? next) async => false;
+  @override
   Future<Duration?> getCurrentPosition() async => position;
   @override
   Future<Duration?> getDuration() async => const Duration(minutes: 3);

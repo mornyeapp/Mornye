@@ -221,6 +221,9 @@ public class AudioplayersDarwinPlugin: NSObject, FlutterPlugin {
         result(FlutterError(code: "DarwinAudioError", message: "Equalizer is unavailable for this source", details: error.localizedDescription))
         return
       }
+    } else if method == "setNextPlayer" {
+      let nextId = args["nextPlayerId"] as? String
+      player.next = nextId.flatMap { self.getPlayer(playerId: $0) }
     } else if method == "pause" {
       player.pause()
     } else if method == "resume" {

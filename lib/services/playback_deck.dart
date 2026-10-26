@@ -135,6 +135,13 @@ abstract interface class PlaybackDeck {
   Future<void> seek(Duration position);
   Future<void> stop();
 
+  /// Has the engine start [next], a paused deck holding a loaded source, the
+  /// moment this deck's source ends, so the two songs join without a gap.
+  /// [resume] on [next] afterwards only confirms the state. Returns false
+  /// when the engine cannot chain these decks; [next] then waits for
+  /// [resume]. Null unlinks a deck set earlier.
+  Future<bool> setNextDeck(PlaybackDeck? next);
+
   Future<Duration?> getCurrentPosition();
   Future<Duration?> getDuration();
 

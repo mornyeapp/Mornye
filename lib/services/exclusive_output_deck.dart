@@ -205,6 +205,9 @@ class ExclusiveOutputDeck implements PlaybackDeck {
   @override
   Future<void> stop() => _active.stop();
   @override
+  Future<bool> setNextDeck(PlaybackDeck? next) =>
+      _active.setNextDeck(next is ExclusiveOutputDeck ? next._active : next);
+  @override
   Future<Duration?> getCurrentPosition() => _active.getCurrentPosition();
   @override
   Future<Duration?> getDuration() => _active.getDuration();

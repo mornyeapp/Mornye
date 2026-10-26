@@ -219,6 +219,8 @@ class _PreviewDeck implements PlaybackDeck {
   @override
   Future<void> stop() async => calls.add('stop');
   @override
+  Future<bool> setNextDeck(PlaybackDeck? next) async => false;
+  @override
   Future<Duration?> getCurrentPosition() async => Duration.zero;
   @override
   Future<Duration?> getDuration() async => null;

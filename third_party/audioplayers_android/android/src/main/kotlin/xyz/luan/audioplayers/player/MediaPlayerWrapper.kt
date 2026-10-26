@@ -30,6 +30,11 @@ class MediaPlayerWrapper(
         }
     }
 
+    /** MediaPlayer starts [next] the moment this player completes; null unlinks. */
+    fun setNext(next: MediaPlayerWrapper?) {
+        mediaPlayer.setNextMediaPlayer(next?.mediaPlayer)
+    }
+
     private fun createMediaPlayer(wrappedPlayer: WrappedPlayer): MediaPlayer {
         val mediaPlayer = MediaPlayer().apply {
             setOnPreparedListener { wrappedPlayer.onPrepared() }
