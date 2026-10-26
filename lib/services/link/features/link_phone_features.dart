@@ -26,6 +26,7 @@ import 'package:mornye/services/link/features/link_phone_session.dart';
 import 'package:mornye/services/link/features/link_save_offline.dart';
 import 'package:mornye/services/link/features/link_track_resolver.dart';
 import 'package:mornye/services/link/link_transfers.dart';
+import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/services/share_intent_service.dart';
 import 'package:mornye/services/system_volume_service.dart';
 import 'package:mornye/utils/file_access.dart';
@@ -98,6 +99,7 @@ final linkHandoffProvider = Provider<LinkHandoff?>((ref) {
     refs: ref.watch(linkTrackRefCacheProvider),
     resolver: ref.watch(linkTrackResolverProvider),
     files: ref.watch(linkPhoneFilesProvider),
+    isCharging: PlatformBridge.isCharging,
   );
 });
 

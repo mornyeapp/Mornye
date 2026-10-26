@@ -151,7 +151,9 @@ void main() {
       FakeLinkClient client,
       FakePhonePlayer player, {
       int aheadSongs = linkHandoffAheadSongs,
+      int aheadSongsCharging = linkHandoffAheadSongsCharging,
       int aheadBytes = linkHandoffAheadBytes,
+      Future<bool> Function()? isCharging,
     }) {
       final records = FakeLibraryLookup();
       return LinkHandoff(
@@ -161,7 +163,9 @@ void main() {
         resolver: LinkTrackResolver(lookup: records, server: client.server),
         files: files,
         aheadSongs: aheadSongs,
+        aheadSongsCharging: aheadSongsCharging,
         aheadBytes: aheadBytes,
+        isCharging: isCharging,
       );
     }
 
@@ -371,6 +375,46 @@ void main() {
         expect(titles(client.posts.last.body), ['c']);
       },
     );
+
+    test('sends more songs ahead while the phone charges', () async {
+      final player = FakePhonePlayer(
+        LinkPhoneSnapshot(
+          queue: [
+            await song('a'),
+            await song('b', bytes: [1]),
+            await song('c'),
+            await song('d', bytes: [2]),
+            await song('e', bytes: [3]),
+          ],
+          index: 0,
+          playing: true,
+        ),
+      );
+      final client = desktop([1, 3, 4]);
+      await withFiles(
+        client,
+        player,
+        aheadSongs: 1,
+        aheadSongsCharging: 2,
+        isCharging: () async => true,
+      ).playOnDesktop();
+
+      await until(() => client.uploads.length == 2);
+      expect(
+        [for (final upload in client.uploads) upload.bytes],
+        [
+          [1],
+          [2],
+        ],
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      // Two songs wait on the desktop, so 'e' does not go yet.
+      expect(client.uploads, hasLength(2));
+
+      plays(client, 'b');
+      await until(() => client.uploads.length == 3);
+      expect(client.uploads.last.bytes, [3]);
+    });
 
     test(
       'sends songs only so far ahead of the one the desktop plays',

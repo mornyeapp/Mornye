@@ -232,10 +232,15 @@ class _DesktopProgress {
 /// the current song and the ones just played.
 const linkHandoffAheadBytes = 1 << 30;
 
-/// How many songs the phone sends ahead of the one the desktop plays: about
-/// 40 minutes of music, so it plays on a while after the phone leaves. A
-/// skip ahead refills at network speed.
-const linkHandoffAheadSongs = 10;
+/// How many songs the phone sends ahead of the one the desktop plays on
+/// battery: each one the desktop reaches is replaced, so a few keep the
+/// queue playing for a while after the phone leaves without spending its
+/// battery and network on songs that may be skipped. A skip ahead refills
+/// at network speed, and a song not sent yet streams as it arrives.
+const linkHandoffAheadSongs = 3;
+
+/// [linkHandoffAheadSongs] while the phone charges.
+const linkHandoffAheadSongsCharging = 5;
 
 /// Moves playback between the phone and the paired desktop.
 class LinkHandoff {
@@ -247,6 +252,8 @@ class LinkHandoff {
     this.files,
     this.aheadBytes = linkHandoffAheadBytes,
     this.aheadSongs = linkHandoffAheadSongs,
+    this.aheadSongsCharging = linkHandoffAheadSongsCharging,
+    this.isCharging,
   });
 
   final LinkClientApi client;
@@ -258,9 +265,25 @@ class LinkHandoff {
   /// what its Library has.
   final LinkPhoneFiles? files;
 
-  /// [linkHandoffAheadBytes] and [linkHandoffAheadSongs]; tests lower them.
+  /// [linkHandoffAheadBytes], [linkHandoffAheadSongs] and
+  /// [linkHandoffAheadSongsCharging]; tests lower them.
   final int aheadBytes;
   final int aheadSongs;
+  final int aheadSongsCharging;
+
+  /// Whether the phone is on external power, asked before each song sent
+  /// ahead; null counts as on battery.
+  final Future<bool> Function()? isCharging;
+
+  Future<int> _aheadSongs() async {
+    final charging = isCharging;
+    if (charging == null) return aheadSongs;
+    try {
+      return await charging() ? aheadSongsCharging : aheadSongs;
+    } on Object {
+      return aheadSongs;
+    }
+  }
 
   /// Sends the phone's queue (at most 200 items around the current one) to
   /// the desktop and pauses the phone once the desktop plays. The desktop
@@ -518,7 +541,7 @@ class LinkHandoff {
       }
       for (var k = 0; k < later.length; k++) {
         final at = later[k];
-        while (!desktop.room(songs: aheadSongs, bytes: aheadBytes)) {
+        while (!desktop.room(songs: await _aheadSongs(), bytes: aheadBytes)) {
           if (desktop.takeStrayed()) {
             // An empty append fails once another queue plays there.
             await _append(handoffId, const []);
