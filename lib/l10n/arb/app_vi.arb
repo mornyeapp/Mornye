@@ -182,7 +182,7 @@
   "usbBitPerfectDescription": "Giữ nguyên độ chính xác gốc của nguồn nhạc trên các đầu ra tương thích. Hãy chọn Direct USB hoặc AAudio độc quyền bên dưới; nếu không, đầu ra USB chuẩn của Android yêu cầu Android 14 trở lên. Áp dụng từ bài tiếp theo, không dùng AutoMix hay chuẩn hóa âm lượng. Phím âm lượng hệ thống có thể không điều chỉnh được Direct USB.",
   "usbHardwareVolume": "Âm lượng phần cứng DAC",
   "usbVolumeWarningTitle": "Kiểm tra âm lượng nghe của bạn",
-  "usbVolumeWarning": "Direct USB audio can be much louder than normal playback, and phone volume buttons may not control it. Lower your DAC or amplifier volume before starting. When supported, Mornye sets the DAC to at most −40 dB on connection; this does not guarantee a safe listening level on every amplifier or headphone.",
+  "usbVolumeWarning": "Âm thanh truyền trực tiếp qua USB có thể lớn hơn nhiều so với trình phát thông thường, các nút âm lượng trên điện thoại có thể không điều chỉnh được mức âm thanh này. Hãy giảm âm lượng trên DAC hoặc bộ khuếch đại ​​trước khi bắt đầu. Khi tương thíc, SpotiFLAC sẽ tự động thiết lập mức âm lượng của DAC về tối đa là −40 dB ngay khi kết nối; tuy nhiên, điều này không đảm bảo mức âm lượng sẽ an toàn cho mọi loại thiết bị, bộ khuếch đại hoặc tai nghe.",
   "usbVolumeAccept": "Tôi đã hiểu",
   "usbVolumeUnavailable": "Đã tạm dừng phát vì DAC này không có bộ chỉnh âm lượng phần cứng được xác nhận. Hãy giảm âm lượng trên DAC hoặc ampli trước, sau đó bật đầu ra âm lượng cố định nếu cần rồi chọn phát lại bài hát.",
   "usbFixedVolume": "Cho phép đầu ra USB âm lượng cố định",
@@ -361,7 +361,7 @@
   "@downloadFolderOrganization": {
     "description": "Title of the folder organization picker bottom sheet"
   },
-  "downloadFolderTemplate": "Custom Folder Structure",
+  "downloadFolderTemplate": "Cấu trúc thư mục tải về tùy chỉnh",
   "@downloadFolderTemplate": {
     "description": "Setting for editing a relative download folder template"
   },
