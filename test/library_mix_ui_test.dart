@@ -241,6 +241,22 @@ void main() {
       'Sundanese Mix',
     );
     expect(
+      libraryMixTitle(l10n, mix(LibraryMixKind.decade, '1990', label: '1990')),
+      '1990s Mix',
+    );
+    expect(
+      libraryMixTitle(l10n, mix(LibraryMixKind.fresh, 'fresh')),
+      'New Additions Mix',
+    );
+    expect(
+      libraryMixTitle(l10n, mix(LibraryMixKind.rediscover, 'rediscover')),
+      'Rediscover Mix',
+    );
+    expect(
+      libraryMixTitle(l10n, mix(LibraryMixKind.discover, 'discover')),
+      'Discover Mix',
+    );
+    expect(
       libraryMixTitle(
         l10n,
         mix(LibraryMixKind.artist, 'frank ocean', label: 'Frank Ocean'),

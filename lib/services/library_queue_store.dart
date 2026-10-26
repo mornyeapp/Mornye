@@ -151,8 +151,8 @@ class LibraryQueueStore {
   ''');
 
   /// One page of the metadata Home mixes group songs by, over the same set
-  /// as [directoryEntries]: only the columns ranking reads, so a large
-  /// Library arrives in small rows.
+  /// as [directoryEntries]: only the columns ranking, decades and the New
+  /// Additions mix read, so a large Library arrives in small rows.
   Future<List<Map<String, Object?>>> mixSongs({
     required bool includeLocal,
     required int limit,
@@ -161,13 +161,15 @@ class LibraryQueueStore {
     '''
     SELECT * FROM (
       SELECT 'downloaded' AS source, h.id, h.file_path, h.track_name,
-        h.artist_name, h.album_name, h.genre, h.duration
+        h.artist_name, h.album_name, h.genre, h.duration, h.release_date,
+        h.downloaded_at AS added_at, NULL AS file_mod_time
       FROM history_db.history h
       WHERE COALESCE(h.file_path, '') != ''
       ${includeLocal ? '''
       UNION ALL
       SELECT 'local' AS source, l.id, l.file_path, l.track_name,
-        l.artist_name, l.album_name, l.genre, l.duration
+        l.artist_name, l.album_name, l.genre, l.duration, l.release_date,
+        l.scanned_at AS added_at, l.file_mod_time
       FROM ${LibrarySchema.visibleView} l
       WHERE COALESCE(l.file_path, '') != '' AND ${_notShadowedByHistory('l')}
       ''' : ''}

@@ -8044,6 +8044,27 @@
       }
     }
   },
+  "homeMixDecadeTitle": "{decade}s Mix",
+  "@homeMixDecadeTitle": {
+    "description": "Title of a daily mix of songs released in one decade, e.g. '2010s Mix'; decade is the decade's first year",
+    "placeholders": {
+      "decade": {
+        "type": "String"
+      }
+    }
+  },
+  "homeMixFreshTitle": "New Additions Mix",
+  "@homeMixFreshTitle": {
+    "description": "Title of the daily mix of songs added to the user's Library in the last month"
+  },
+  "homeMixRediscoverTitle": "Rediscover Mix",
+  "@homeMixRediscoverTitle": {
+    "description": "Title of the daily mix of songs the user played often months ago but not lately"
+  },
+  "homeMixDiscoverTitle": "Discover Mix",
+  "@homeMixDiscoverTitle": {
+    "description": "Title of the daily mix of Library songs the user has never played, from their favorite genres"
+  },
   "homeMixArtistsOne": "{first}",
   "@homeMixArtistsOne": {
     "description": "Subtitle of a daily mix with one main artist, naming that artist",

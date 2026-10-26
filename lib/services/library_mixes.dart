@@ -16,7 +16,19 @@ import 'package:mornye/utils/file_access.dart'
 const libraryMixMinLibrary = 30;
 
 /// The most mixes Home shows.
-const libraryMixMaxCount = 6;
+const libraryMixMaxCount = 10;
+
+/// The most genre mixes, leaving room for the other kinds.
+const _maxGenreMixes = 5;
+
+/// The most decade mixes.
+const _maxDecadeMixes = 2;
+
+/// Songs added within this many days make the New Additions mix.
+const libraryMixFreshDays = 30;
+
+/// Songs a decade needs, in its two main genres, before it can be a mix.
+const _minDecadeCore = 25;
 
 /// A mix shorter than this is left out.
 const libraryMixMinSongs = 20;
@@ -44,7 +56,31 @@ const _lovedPlays = 3.0, _queuedPlays = 1.0, _albumPlays = 0.5;
 /// Mixes sharing more of their songs than this are one mix twice.
 const _maxOverlap = 0.6;
 
-enum LibraryMixKind { favorites, genre, artist }
+/// Mixes made from what was added or played when, not from what songs
+/// sound like.
+const _discoveries = {
+  LibraryMixKind.fresh,
+  LibraryMixKind.rediscover,
+  LibraryMixKind.discover,
+};
+
+enum LibraryMixKind {
+  favorites,
+  genre,
+  artist,
+
+  /// Songs released in one decade, in its main genres.
+  decade,
+
+  /// Songs added to the Library lately.
+  fresh,
+
+  /// Songs played often before the last 90 days and not since.
+  rediscover,
+
+  /// Songs never played, from the genres played most.
+  discover,
+}
 
 /// One generated mix: what it is named after and its songs in play order.
 class LibraryMix {
@@ -58,10 +94,12 @@ class LibraryMix {
 
   final LibraryMixKind kind;
 
-  /// Stable identity: the genre family, or the anchor artist's lookup key.
+  /// Stable identity: the genre family, the anchor artist's lookup key, the
+  /// decade's first year, or the kind's name.
   final String key;
 
-  /// The genre or artist the title names; empty for the favorites mix.
+  /// The genre, artist or decade the title names; empty for the other
+  /// kinds.
   final String label;
 
   /// The artists heard most in the mix, most first, for its subtitle.
@@ -109,6 +147,9 @@ class LibraryMixRequest {
     required this.songs,
     required this.at,
     this.plays = const {},
+    this.pastPlays = const {},
+    this.years = const {},
+    this.added = const {},
     this.signals = const [],
     this.preference,
     this.weights = const {},
@@ -124,6 +165,15 @@ class LibraryMixRequest {
   /// How much the listener plays each song, by id, recent plays counting
   /// more. Absent songs count as unplayed.
   final Map<String, double> plays;
+
+  /// Plays from a year ago up to where [plays] begins, by id.
+  final Map<String, double> pastPlays;
+
+  /// Release years by id, where the tags give one.
+  final Map<String, int> years;
+
+  /// When each song came into the Library, by id.
+  final Map<String, DateTime> added;
 
   /// What Autoplay knows beyond metadata, such as how songs sound.
   final List<AutoplaySignal> signals;
@@ -581,8 +631,10 @@ class _MixSignal extends AutoplaySignal {
 }
 
 /// Builds the day's mixes from [request]: a favorites mix of the most
-/// played songs and songs like them, then one mix per genre family the
-/// listener plays most, and artist mixes where genre tags are missing.
+/// played songs and songs like them, one mix per genre family the listener
+/// plays most, the songs added lately, songs played before and not since,
+/// unplayed songs of the favorite genres, decades, and artist mixes where
+/// genre tags are missing.
 /// Songs are picked with Autoplay's ranking, as if Autoplay continued from
 /// the mix's best known songs, so the mix keeps its genre and spaces its
 /// artists. The same request on the same day gives the same mixes.
@@ -613,7 +665,9 @@ class _MixBuilder {
 
   /// Families of each artist's tagged songs, with their counts.
   final artistFamilies = <String, Map<String, int>>{};
-  final adjacency = <String, Map<String, int>>{};
+
+  /// Songs by the first year of their release decade.
+  final decadeSongs = <int, List<PlayableMedia>>{};
   final used = <String>{};
   double maxPlays = 0;
 
@@ -654,9 +708,23 @@ class _MixBuilder {
           final order = _familyScore(b).compareTo(_familyScore(a));
           return order != 0 ? order : a.compareTo(b);
         });
+    var genres = 0;
     for (final family in ranked) {
+      if (mixes.length >= libraryMixMaxCount || genres == _maxGenreMixes) {
+        break;
+      }
+      if (_add(mixes, _genreMix(family))) genres++;
+    }
+    for (final mix in [_fresh(), _rediscover(), _discover()]) {
       if (mixes.length >= libraryMixMaxCount) break;
-      _add(mixes, _genreMix(family));
+      _add(mixes, mix);
+    }
+    var decades = 0;
+    for (final decade in _decades()) {
+      if (mixes.length >= libraryMixMaxCount || decades == _maxDecadeMixes) {
+        break;
+      }
+      if (_add(mixes, _decadeMix(decade))) decades++;
     }
     // Where tags are missing, the artists played most anchor mixes of
     // their own.
@@ -669,14 +737,16 @@ class _MixBuilder {
         if (_add(mixes, _artistMix(artist))) added++;
       }
     }
-    // Favorites lead; the other mixes follow how much they are played, in
-    // the order they were made when equal.
+    // Favorites lead and the two mixes played most follow; then the
+    // discoveries, which no play count would bring forward, and the rest
+    // by how much they are played, in the order they were made when equal.
     double weight(LibraryMix mix) =>
         mix.songIds.fold(0.0, (sum, id) => sum + (request.plays[id] ?? 0));
     final rest =
         [
           for (final (index, mix) in mixes.indexed)
-            if (mix.kind != LibraryMixKind.favorites)
+            if (mix.kind != LibraryMixKind.favorites &&
+                !_discoveries.contains(mix.kind))
               (mix: mix, index: index, weight: weight(mix)),
         ]..sort((a, b) {
           final order = b.weight.compareTo(a.weight);
@@ -684,7 +754,9 @@ class _MixBuilder {
         });
     return [
       ...mixes.where((mix) => mix.kind == LibraryMixKind.favorites),
-      for (final entry in rest) entry.mix,
+      for (final entry in rest.take(2)) entry.mix,
+      ...mixes.where((mix) => _discoveries.contains(mix.kind)),
+      for (final entry in rest.skip(2)) entry.mix,
     ];
   }
 
@@ -708,20 +780,7 @@ class _MixBuilder {
       for (final family in families) {
         counts[family] = (counts[family] ?? 0) + 1;
       }
-      for (var i = 0; i < families.length; i++) {
-        for (var j = i + 1; j < families.length; j++) {
-          _link(families[i], families[j]);
-        }
-      }
       raw.add(song);
-    }
-    for (final counts in artistFamilies.values) {
-      final families = counts.keys.toList();
-      for (var i = 0; i < families.length; i++) {
-        for (var j = i + 1; j < families.length; j++) {
-          _link(families[i], families[j]);
-        }
-      }
     }
     for (final song in raw) {
       var families = familiesById[song.id]!;
@@ -758,23 +817,26 @@ class _MixBuilder {
         familyPlays[family] =
             (familyPlays[family] ?? 0) + heard / families.length;
       }
+      final year = request.years[song.id];
+      if (year != null && year >= 1900 && year <= request.at.year) {
+        (decadeSongs[year ~/ 10 * 10] ??= []).add(ranked);
+      }
     }
-  }
-
-  void _link(String a, String b) {
-    final ab = adjacency[a] ??= {}, ba = adjacency[b] ??= {};
-    ab[b] = (ab[b] ?? 0) + 1;
-    ba[a] = (ba[a] ?? 0) + 1;
   }
 
   /// Plays first; among unplayed genres the larger one leads.
   double _familyScore(String family) =>
       (familyPlays[family] ?? 0) + 0.01 * familySongs[family]!.length;
 
+  /// Adds [mix] unless it repeats one already made. Discoveries are told
+  /// apart from each other only: forgotten or unplayed songs naturally sit
+  /// in the genre mixes too, and still make a mix of their own.
   bool _add(List<LibraryMix> mixes, LibraryMix? mix) {
     if (mix == null) return false;
     final songs = mix.songIds.toSet();
+    final discovery = _discoveries.contains(mix.kind);
     for (final other in mixes) {
+      if (_discoveries.contains(other.kind) != discovery) continue;
       final shared = other.songIds.where(songs.contains).length;
       if (shared > _maxOverlap * min(songs.length, other.songIds.length)) {
         return false;
@@ -820,16 +882,13 @@ class _MixBuilder {
   LibraryMix? _genreMix(String family) {
     final core = familySongs[family]!;
     final pool = <PlayableMedia>{...core};
-    if (core.length < libraryMixTargetSongs) {
-      // A small genre borrows from the genres its songs and artists share.
-      final neighbors =
-          (adjacency[family] ?? const <String, int>{}).entries.toList()
-            ..sort((a, b) {
-              final order = b.value.compareTo(a.value);
-              return order != 0 ? order : a.key.compareTo(b.key);
-            });
-      for (final neighbor in neighbors.take(2)) {
-        pool.addAll(familySongs[neighbor.key] ?? const []);
+    if (core.length < libraryMixMinSongs) {
+      // A small genre adds its own artists' other songs, never whole
+      // neighboring genres: one J-Rock band must not open a J-Pop mix to
+      // every rock song in the Library. Too few even then, it is no mix.
+      for (final song in core) {
+        final artist = _artistKey(song.artist);
+        if (artist.isNotEmpty) pool.addAll(artistSongs[artist]!);
       }
     }
     return _mix(
@@ -879,6 +938,139 @@ class _MixBuilder {
       credits: {
         for (final credit in splitArtistTagValues(name)) _artistKey(credit),
       },
+    );
+  }
+
+  /// Songs added within [libraryMixFreshDays], newest first as the seeds.
+  /// A Library mostly added lately has nothing to set them apart from.
+  LibraryMix? _fresh() {
+    final since = request.at.subtract(
+      const Duration(days: libraryMixFreshDays),
+    );
+    final fresh = [
+      for (final song in songs)
+        if (request.added[song.id]?.isAfter(since) ?? false) song,
+    ];
+    if (fresh.length < libraryMixMinSongs || fresh.length * 2 > songs.length) {
+      return null;
+    }
+    final newest = fresh.toList()
+      ..sort((a, b) {
+        final order = request.added[b.id]!.compareTo(request.added[a.id]!);
+        return order != 0 ? order : a.id.compareTo(b.id);
+      });
+    return _mix(
+      kind: LibraryMixKind.fresh,
+      key: LibraryMixKind.fresh.name,
+      label: '',
+      pool: fresh,
+      seeds: newest,
+    );
+  }
+
+  /// Songs played before the last 90 days and not since, the ones played
+  /// most then first.
+  LibraryMix? _rediscover() {
+    final past = request.pastPlays;
+    final forgotten = [
+      for (final song in songs)
+        if ((past[song.id] ?? 0) > 0 && plays(song) <= 0) song,
+    ];
+    if (forgotten.length < libraryMixMinSongs) return null;
+    forgotten.sort((a, b) {
+      final order = past[b.id]!.compareTo(past[a.id]!);
+      return order != 0 ? order : a.id.compareTo(b.id);
+    });
+    return _mix(
+      kind: LibraryMixKind.rediscover,
+      key: LibraryMixKind.rediscover.name,
+      label: '',
+      pool: forgotten,
+      seeds: forgotten,
+    );
+  }
+
+  /// Songs never played, from the three genres played most. Without plays
+  /// there is no taste to discover from.
+  LibraryMix? _discover() {
+    final past = request.pastPlays;
+    bool unheard(PlayableMedia song) =>
+        plays(song) <= 0 && (past[song.id] ?? 0) <= 0;
+    final families =
+        [
+          for (final MapEntry(:key, :value) in familyPlays.entries)
+            if (value > 0) key,
+        ]..sort((a, b) {
+          final order = familyPlays[b]!.compareTo(familyPlays[a]!);
+          return order != 0 ? order : a.compareTo(b);
+        });
+    final pool = <PlayableMedia>{
+      for (final family in families.take(3))
+        ...familySongs[family]!.where(unheard),
+    }.toList();
+    if (pool.length < libraryMixMinSongs) return null;
+    final key = LibraryMixKind.discover.name;
+    return _mix(
+      kind: LibraryMixKind.discover,
+      key: key,
+      label: '',
+      pool: pool,
+      seeds: _byPlays(pool, _random(LibraryMixKind.discover, key)),
+    );
+  }
+
+  /// Decades by plays, then by songs, newest first when equal, with enough
+  /// songs in their main genres.
+  List<int> _decades() {
+    final heard = {
+      for (final MapEntry(:key, :value) in decadeSongs.entries)
+        key: value.fold(0.0, (sum, song) => sum + plays(song)),
+    };
+    return [
+      for (final decade in decadeSongs.keys)
+        if (_decadeCore(decade).length >= _minDecadeCore) decade,
+    ]..sort((a, b) {
+      final order = heard[b]!.compareTo(heard[a]!);
+      if (order != 0) return order;
+      final size = decadeSongs[b]!.length.compareTo(decadeSongs[a]!.length);
+      return size != 0 ? size : b.compareTo(a);
+    });
+  }
+
+  /// The decade's songs in its two genres played most, or largest when
+  /// unplayed, so an era mix keeps one sound instead of every genre of its
+  /// years. Untagged songs stay out.
+  List<PlayableMedia> _decadeCore(int decade) {
+    final weights = <String, double>{};
+    for (final song in decadeSongs[decade]!) {
+      final families = familiesById[song.id]!;
+      for (final family in families) {
+        weights[family] =
+            (weights[family] ?? 0) + (1 + plays(song)) / families.length;
+      }
+    }
+    final top =
+        (weights.keys.toList()..sort((a, b) {
+              final order = weights[b]!.compareTo(weights[a]!);
+              return order != 0 ? order : a.compareTo(b);
+            }))
+            .take(2)
+            .toSet();
+    return [
+      for (final song in decadeSongs[decade]!)
+        if (familiesById[song.id]!.any(top.contains)) song,
+    ];
+  }
+
+  LibraryMix? _decadeMix(int decade) {
+    final core = _decadeCore(decade);
+    final key = '$decade';
+    return _mix(
+      kind: LibraryMixKind.decade,
+      key: key,
+      label: key,
+      pool: core,
+      seeds: _seeds(core, _random(LibraryMixKind.decade, key)),
     );
   }
 

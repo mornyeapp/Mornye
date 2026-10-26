@@ -28,7 +28,29 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 final _log = AppLogger('LibraryMixes');
 
-const _cacheKey = 'home_library_mixes';
+// Versioned so new kinds of mixes replace a cache made before them the
+// same day.
+const _cacheKey = 'home_library_mixes_v2';
+
+/// The year a release date such as `2019-05-10` or `2019` names, or null.
+int? libraryMixReleaseYear(Object? releaseDate) {
+  if (releaseDate is! String) return null;
+  final match = RegExp(r'^\s*(\d{4})').firstMatch(releaseDate);
+  final year = match == null ? null : int.parse(match.group(1)!);
+  return year != null && year > 0 ? year : null;
+}
+
+/// When a mix song came into the Library: a download's time, or a scanned
+/// file's modification time, falling back to when it was scanned, as the
+/// Library's Recently Added does.
+DateTime? libraryMixAddedAt(Map<String, Object?> row) {
+  final modified = row['file_mod_time'];
+  if (modified is num && modified > 0) {
+    return DateTime.fromMillisecondsSinceEpoch(modified.toInt());
+  }
+  final added = row['added_at'];
+  return added is String ? DateTime.tryParse(added) : null;
+}
 
 /// Songs a kept mix still needs once deleted songs drop out.
 const _minVisibleSongs = 10;
@@ -275,8 +297,8 @@ class _LibraryMixes {
     DateTime now,
     MusicPlayerRuntime runtime,
   ) async {
-    final songs = await _songs(includeLocal);
-    final plays = await _plays(songs, now);
+    final (:songs, :years, :added) = await _songs(includeLocal);
+    final (plays, pastPlays) = await _plays(songs, now);
     if (plays.length < libraryMixFavoritesMinPlayed) {
       // Statistics are off or new: what else the app keeps of the
       // listener's taste stands in, so favorites still have a mix.
@@ -303,6 +325,9 @@ class _LibraryMixes {
         songs: songs,
         at: now,
         plays: plays,
+        pastPlays: pastPlays,
+        years: years,
+        added: added,
         signals: [?sound, ?taste],
         preference: runtime.personalization.rankingSnapshot,
         weights: learning ? runtime.ranker.weights : const {},
@@ -311,9 +336,19 @@ class _LibraryMixes {
     );
   }
 
-  /// Every downloaded and scanned song, by its Library id.
-  static Future<List<PlayableMedia>> _songs(bool includeLocal) async {
+  /// Every downloaded and scanned song, by its Library id, with release
+  /// years and when each came into the Library.
+  static Future<
+    ({
+      List<PlayableMedia> songs,
+      Map<String, int> years,
+      Map<String, DateTime> added,
+    })
+  >
+  _songs(bool includeLocal) async {
     final songs = <PlayableMedia>[];
+    final years = <String, int>{};
+    final added = <String, DateTime>{};
     for (var offset = 0; ; offset += _pageSize) {
       final rows = await LibraryDatabase.instance.getMixSongPage(
         includeLocal: includeLocal,
@@ -322,9 +357,14 @@ class _LibraryMixes {
       );
       for (final row in rows) {
         final seconds = readPositiveInt(row['duration']);
+        final id = '${row['source'] == 'local' ? 'local' : 'dl'}_${row['id']}';
+        if (libraryMixReleaseYear(row['release_date']) case final year?) {
+          years[id] = year;
+        }
+        if (libraryMixAddedAt(row) case final at?) added[id] = at;
         songs.add(
           PlayableMedia(
-            id: '${row['source'] == 'local' ? 'local' : 'dl'}_${row['id']}',
+            id: id,
             source: row['file_path'] as String? ?? '',
             title: row['track_name'] as String? ?? '',
             artist: row['artist_name'] as String? ?? '',
@@ -334,7 +374,9 @@ class _LibraryMixes {
           ),
         );
       }
-      if (rows.length < _pageSize) return songs;
+      if (rows.length < _pageSize) {
+        return (songs: songs, years: years, added: added);
+      }
     }
   }
 
@@ -409,37 +451,44 @@ class _LibraryMixes {
   }
 
   /// Plays of the last 90 days by song id, those of the last 14 counting
-  /// twice. A song matches its played file, or its title and artist when
-  /// it was played from another copy.
-  static Future<Map<String, double>> _plays(
+  /// twice, and plays of the year before those 90 days. A song matches its
+  /// played file, or its title and artist when it was played from another
+  /// copy.
+  static Future<(Map<String, double>, Map<String, double>)> _plays(
     List<PlayableMedia> songs,
     DateTime now,
   ) async {
     await listeningRecorder.flush();
     final store = ListeningStatisticsStore.instance;
     final end = DateTime(now.year, now.month, now.day + 1);
-    final (season, recent) = await (
-      store.load(DateTime(now.year, now.month, now.day - 89), end),
+    final seasonStart = DateTime(now.year, now.month, now.day - 89);
+    final (season, recent, past) = await (
+      store.load(seasonStart, end),
       store.load(DateTime(now.year, now.month, now.day - 13), end),
+      store.load(DateTime(now.year, now.month, now.day - 364), seasonStart),
     ).wait;
     String songKey(String artist, String title) =>
         '${normalizeLookupText(artist)}|${normalizeLookupText(title)}';
-    final bySource = <String, double>{}, bySong = <String, double>{};
-    for (final summary in [season, recent]) {
-      for (final total in summary.tracks) {
-        if (total.plays <= 0) continue;
-        final track = total.track;
-        bySource[track.key] = (bySource[track.key] ?? 0) + total.plays;
-        final key = songKey(track.artist, track.title);
-        bySong[key] = (bySong[key] ?? 0) + total.plays;
+    Map<String, double> byId(List<ListeningSummary> summaries) {
+      final bySource = <String, double>{}, bySong = <String, double>{};
+      for (final summary in summaries) {
+        for (final total in summary.tracks) {
+          if (total.plays <= 0) continue;
+          final track = total.track;
+          bySource[track.key] = (bySource[track.key] ?? 0) + total.plays;
+          final key = songKey(track.artist, track.title);
+          bySong[key] = (bySong[key] ?? 0) + total.plays;
+        }
       }
+      return {
+        for (final song in songs)
+          song.id:
+              ?(bySource[song.source] ??
+              bySong[songKey(song.artist, song.title)]),
+      };
     }
-    return {
-      for (final song in songs)
-        song.id:
-            ?(bySource[song.source] ??
-            bySong[songKey(song.artist, song.title)]),
-    };
+
+    return (byId([season, recent]), byId([past]));
   }
 }
 

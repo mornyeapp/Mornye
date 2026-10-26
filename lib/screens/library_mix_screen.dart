@@ -43,6 +43,10 @@ String libraryMixTitle(AppLocalizations l10n, LibraryMix mix) =>
         libraryGenreFamilyName(l10n, mix.key) ?? mix.label,
       ),
       LibraryMixKind.artist => l10n.homeMixArtistTitle(mix.label),
+      LibraryMixKind.decade => l10n.homeMixDecadeTitle(mix.label),
+      LibraryMixKind.fresh => l10n.homeMixFreshTitle,
+      LibraryMixKind.rediscover => l10n.homeMixRediscoverTitle,
+      LibraryMixKind.discover => l10n.homeMixDiscoverTitle,
     };
 
 /// The translated name of a genre family; null for a tag outside the

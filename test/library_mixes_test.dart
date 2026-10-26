@@ -322,6 +322,189 @@ void main() {
       );
     });
 
+    test('a small genre never borrows whole neighboring genres', () {
+      // A J-Rock band also tagged Rock linked J-Pop to every rock song,
+      // and pop with it, before.
+      final songs = [
+        for (var a = 0; a < 6; a++)
+          for (var s = 0; s < 3; s++) _song('jp$a-$s', 'Idol $a', 'J-Pop'),
+        for (var s = 0; s < 3; s++) _song('jr$s', 'J Band', 'J-Rock'),
+        for (var s = 0; s < 6; s++) _song('jbr$s', 'J Band', 'Rock'),
+        for (var a = 0; a < 8; a++)
+          for (var s = 0; s < 6; s++) _song('rock$a-$s', 'Band $a', 'Rock'),
+        for (var a = 0; a < 8; a++)
+          for (var s = 0; s < 6; s++) _song('pop$a-$s', 'Singer $a', 'Pop'),
+      ];
+      final byId = {for (final song in songs) song.id: song};
+      final mixes = buildLibraryMixes(
+        LibraryMixRequest(
+          songs: songs,
+          at: day,
+          exists: exists,
+          plays: {'local_jp0-0': 5, 'local_rock0-0': 1},
+        ),
+      );
+      final jpop = mixes.singleWhere((mix) => mix.key == 'jpop');
+      for (final id in jpop.songIds) {
+        expect(byId[id]!.genre, anyOf('J-Pop', 'J-Rock'), reason: id);
+      }
+    });
+
+    test('the New Additions mix holds the songs added lately', () {
+      final songs = _library();
+      final fresh = {
+        for (var a = 0; a < 5; a++)
+          for (var s = 0; s < 2; s++) ...['local_hh$a-$s', 'local_rock$a-$s'],
+        for (var a = 0; a < 5; a++) 'local_jazz$a-0',
+      };
+      final mixes = buildLibraryMixes(
+        LibraryMixRequest(
+          songs: songs,
+          at: day,
+          exists: exists,
+          added: {
+            for (final song in songs)
+              song.id: day.subtract(
+                Duration(days: fresh.contains(song.id) ? 3 : 200),
+              ),
+          },
+        ),
+      );
+      final mix = mixes.singleWhere((mix) => mix.kind == LibraryMixKind.fresh);
+      expect(mix.songIds.length, greaterThanOrEqualTo(libraryMixMinSongs));
+      expect(fresh, containsAll(mix.songIds));
+    });
+
+    test('a Library added all at once has no New Additions mix', () {
+      final songs = _library();
+      final mixes = buildLibraryMixes(
+        LibraryMixRequest(
+          songs: songs,
+          at: day,
+          exists: exists,
+          added: {for (final song in songs) song.id: day},
+        ),
+      );
+      expect(
+        mixes.map((mix) => mix.kind),
+        isNot(contains(LibraryMixKind.fresh)),
+      );
+    });
+
+    test('Rediscover holds songs played before and not since', () {
+      final songs = _library();
+      final past = {
+        for (var a = 0; a < 5; a++)
+          for (var s = 0; s < 2; s++) ...['local_hh$a-$s', 'local_rock$a-$s'],
+        for (var a = 0; a < 7; a++) 'local_jazz$a-0',
+      };
+      final mixes = buildLibraryMixes(
+        LibraryMixRequest(
+          songs: songs,
+          at: day,
+          exists: exists,
+          pastPlays: {for (final id in past) id: 4},
+          // Played again lately: no longer forgotten.
+          plays: {'local_hh0-0': 2, 'local_rock0-0': 1},
+        ),
+      );
+      final mix = mixes.singleWhere(
+        (mix) => mix.kind == LibraryMixKind.rediscover,
+      );
+      expect(past, containsAll(mix.songIds));
+      expect(mix.songIds, isNot(contains('local_hh0-0')));
+      expect(mix.songIds, isNot(contains('local_rock0-0')));
+    });
+
+    test('Discover holds unplayed songs of the genres played most', () {
+      final songs = [
+        for (var a = 0; a < 8; a++)
+          for (var s = 0; s < 15; s++) _song('hh$a-$s', 'Rapper $a', 'Rap'),
+        for (var a = 0; a < 6; a++)
+          for (var s = 0; s < 6; s++) _song('jazz$a-$s', 'Trio $a', 'Jazz'),
+      ];
+      final played = {for (var a = 0; a < 8; a++) 'local_hh$a-0': 3.0};
+      final mixes = buildLibraryMixes(
+        LibraryMixRequest(
+          songs: songs,
+          at: day,
+          exists: exists,
+          plays: played,
+          pastPlays: {'local_hh0-1': 2},
+        ),
+      );
+      final mix = mixes.singleWhere(
+        (mix) => mix.kind == LibraryMixKind.discover,
+      );
+      for (final id in mix.songIds) {
+        expect(id, startsWith('local_hh'));
+        expect(played, isNot(contains(id)));
+        expect(id, isNot('local_hh0-1'));
+      }
+      // Without plays there is no taste to discover from.
+      expect(
+        buildLibraryMixes(
+          LibraryMixRequest(songs: songs, at: day, exists: exists),
+        ).map((mix) => mix.kind),
+        isNot(contains(LibraryMixKind.discover)),
+      );
+    });
+
+    test('a decade with enough songs in its main genres is a mix', () {
+      final songs = _library();
+      final mixes = buildLibraryMixes(
+        LibraryMixRequest(
+          songs: songs,
+          at: day,
+          exists: exists,
+          years: {
+            // The 1990s: rock and hip-hop lead, so its few jazz songs stay
+            // out of its mix.
+            for (var a = 0; a < 3; a++)
+              for (var s = 0; s < 6; s++) ...{
+                'local_rock$a-$s': 1994,
+                'local_hh$a-$s': 1997,
+              },
+            for (var a = 0; a < 4; a++) 'local_jazz$a-0': 1991,
+            // Too few to make the 2000s a mix.
+            for (var a = 4; a < 7; a++) 'local_jazz$a-0': 2004,
+          },
+        ),
+      );
+      final decades = [
+        for (final mix in mixes)
+          if (mix.kind == LibraryMixKind.decade) mix,
+      ];
+      expect(decades.map((mix) => mix.label), ['1990']);
+      for (final id in decades.single.songIds) {
+        expect(id, matches(RegExp(r'^local_(rock|hh)[0-2]-')));
+      }
+    });
+
+    test('discoveries follow the favorites and the two mixes played most', () {
+      final songs = _library();
+      final mixes = buildLibraryMixes(
+        LibraryMixRequest(
+          songs: songs,
+          at: day,
+          exists: exists,
+          plays: {
+            for (var s = 0; s < 6; s++) 'local_hh0-$s': 10.0 + s,
+            for (var s = 0; s < 3; s++) 'local_rock0-$s': 2.0,
+            'local_jazz0-0': 1,
+          },
+          pastPlays: {
+            for (var a = 1; a < 6; a++)
+              for (var s = 0; s < 4; s++) 'local_hh$a-$s': 3,
+          },
+        ),
+      );
+      final kinds = mixes.map((mix) => mix.kind).toList();
+      expect(kinds.first, LibraryMixKind.favorites);
+      expect(kinds.indexOf(LibraryMixKind.rediscover), 3);
+      expect(mixes.length, lessThanOrEqualTo(libraryMixMaxCount));
+    });
+
     test('a mix survives a JSON round trip', () {
       const mix = LibraryMix(
         kind: LibraryMixKind.genre,
@@ -347,7 +530,8 @@ void main() {
       await db.execute('''
         CREATE TABLE history_db.history (
           id TEXT PRIMARY KEY, file_path TEXT, track_name TEXT,
-          artist_name TEXT, album_name TEXT, genre TEXT, duration INTEGER
+          artist_name TEXT, album_name TEXT, genre TEXT, duration INTEGER,
+          release_date TEXT, downloaded_at TEXT
         )
       ''');
       await db.execute('''
@@ -364,6 +548,8 @@ void main() {
         'album_name': 'Album',
         'genre': 'Rap',
         'duration': 200,
+        'release_date': '2019-05-10',
+        'downloaded_at': '2026-10-20T10:00:00.000',
       });
       await db.insert('history_db.history', {'id': 'pending', 'file_path': ''});
       await db.insert('history_db.history_path_keys', {
@@ -382,6 +568,8 @@ void main() {
           'scanned_at': '2026-10-27T00:00:00Z',
           'genre': 'Jazz',
           'duration': 180,
+          'release_date': '1959',
+          'file_mod_time': 1700000000000,
         });
         await db.insert('library_path_keys', {'item_id': id, 'path_key': key});
       }
@@ -414,6 +602,9 @@ void main() {
               'album_name': 'Album',
               'genre': 'Rap',
               'duration': 200,
+              'release_date': '2019-05-10',
+              'added_at': '2026-10-20T10:00:00.000',
+              'file_mod_time': null,
             },
             {
               'source': 'local',
@@ -424,8 +615,21 @@ void main() {
               'album_name': 'Album',
               'genre': 'Jazz',
               'duration': 180,
+              'release_date': '1959',
+              'added_at': '2026-10-27T00:00:00Z',
+              'file_mod_time': 1700000000000,
             },
           ],
+        );
+        expect(libraryMixReleaseYear(first.single['release_date']), 2019);
+        expect(libraryMixReleaseYear(second.single['release_date']), 1959);
+        expect(libraryMixReleaseYear(''), isNull);
+        expect(libraryMixReleaseYear(null), isNull);
+        expect(libraryMixAddedAt(first.single), DateTime(2026, 10, 20, 10));
+        // A scanned file counts from when it was modified, not scanned.
+        expect(
+          libraryMixAddedAt(second.single),
+          DateTime.fromMillisecondsSinceEpoch(1700000000000),
         );
         final off = await store.mixSongs(
           includeLocal: false,
