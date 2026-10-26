@@ -429,6 +429,8 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
       desktopName: () => state.name,
       deviceName: _deviceName,
       receivedDir: () => state.server?.receivedDir ?? '',
+      phoneCovers: (fileIds) async =>
+          await _phoneCatalogs?.coversFor(fileIds) ?? const {},
       arriving: _arrivingFiles(),
       autoplay: () => ref.read(settingsProvider).autoplay,
       autoMix: () => ref.read(settingsProvider).autoMix,

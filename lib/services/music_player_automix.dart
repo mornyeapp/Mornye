@@ -379,6 +379,11 @@ class _MusicAutoMix {
             )
             .copyWith(duration: _nextDuration),
       );
+      // A song without a listed cover shows its embedded one, as when it
+      // starts without a mix.
+      unawaited(
+        handler._recoverEmbeddedArtwork(next, handler._playRequestGeneration),
+      );
       handler._broadcastPosition(audiblePosition, force: true);
       handler._broadcastState(playerState: PlaybackDeckState.playing);
       unawaited(handler._persistSession(position: audiblePosition));

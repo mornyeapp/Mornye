@@ -60,14 +60,20 @@ PlayableMedia linkPlayableFor(LinkCatalogSong song, {String? cover}) =>
           : Duration(milliseconds: song.durationMs!),
     );
 
-/// The song file a phone uploaded to [path], with the details [ref] gives.
-/// The player shows the cover embedded in the file.
-PlayableMedia linkPlayableForUpload(TrackRef ref, String path) => PlayableMedia(
+/// The song file a phone uploaded to [path], with the details [ref] gives and
+/// [cover], the phone's cover file or web URL. Without one the player shows
+/// the cover embedded in the file once the song plays.
+PlayableMedia linkPlayableForUpload(
+  TrackRef ref,
+  String path, {
+  String? cover,
+}) => PlayableMedia(
   id: path,
   source: path,
   title: ref.title,
   artist: ref.artist,
   album: ref.album ?? '',
+  artUri: cover == null ? null : normalizeArtUri(cover),
   duration: ref.durationMs == null
       ? null
       : Duration(milliseconds: ref.durationMs!),
@@ -148,6 +154,7 @@ class LinkDesktopOps {
     required String Function() desktopName,
     String Function(String deviceId)? deviceName,
     String Function()? receivedDir,
+    Future<Map<String, String>> Function(Set<String> fileIds)? phoneCovers,
     LinkArrivingFiles? arriving,
     bool Function()? autoplay,
     bool Function()? autoMix,
@@ -162,6 +169,7 @@ class LinkDesktopOps {
        _desktopName = desktopName,
        _deviceName = deviceName ?? ((deviceId) => deviceId),
        _receivedDir = receivedDir ?? (() => ''),
+       _phoneCovers = phoneCovers,
        _arriving = arriving,
        _autoplay = autoplay,
        _autoMix = autoMix,
@@ -180,6 +188,9 @@ class LinkDesktopOps {
   final String Function() _desktopName;
   final String Function(String deviceId) _deviceName;
   final String Function() _receivedDir;
+
+  /// The covers paired phones listed for songs they uploaded, by file id.
+  final Future<Map<String, String>> Function(Set<String> fileIds)? _phoneCovers;
 
   /// Streams song files a phone is still sending; without it a song plays
   /// once its upload is whole.
@@ -440,6 +451,16 @@ class LinkDesktopOps {
     final received = refs.any((ref) => ref?.fileId != null)
         ? await linkReceivedFiles(_receivedDir())
         : const <String, String>{};
+    final phoneCovers = _phoneCovers;
+    final covers = phoneCovers == null
+        ? const <String, String>{}
+        : await phoneCovers({
+            for (final ref in refs)
+              if (ref?.fileId case final fileId?
+                  when received.containsKey(fileId) ||
+                      arriving.containsKey(fileId))
+                fileId,
+          });
     PlayableMedia? resolve(TrackRef? ref) {
       if (ref == null) return null;
       final songId = index.songIdForRef(ref);
@@ -448,7 +469,9 @@ class LinkDesktopOps {
         return linkPlayableFor(song, cover: index.coverFor(song.id));
       }
       final path = received[ref.fileId] ?? arriving[ref.fileId];
-      return path == null ? null : linkPlayableForUpload(ref, path);
+      return path == null
+          ? null
+          : linkPlayableForUpload(ref, path, cover: covers[ref.fileId]);
     }
 
     return [for (final ref in refs) resolve(ref)];

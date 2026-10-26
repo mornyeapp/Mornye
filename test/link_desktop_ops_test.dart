@@ -421,6 +421,40 @@ void main() {
       expect(player.playedPosition, const Duration(seconds: 5));
     });
 
+    test('uploaded songs carry the cover their phone listed', () async {
+      const other = 'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee';
+      await File('${dir.path}/$other.flac').writeAsBytes([1]);
+      final asked = <Set<String>>[];
+      LinkDesktopOps(
+        player: player,
+        downloads: downloads,
+        downloadItems: () => items,
+        openUrl: (url) async {},
+        index: () => index,
+        desktopName: () => 'Studio',
+        receivedDir: () => received,
+        phoneCovers: (fileIds) async {
+          asked.add(fileIds);
+          return {fileId: '/phones/covers/cover.jpg'};
+        },
+      ).register(router);
+
+      await call(LinkOps.handoffPlay, {
+        'queue': [
+          phoneSong('With a cover'),
+          phoneSong('Without one', id: other),
+          {'title': 'Title b', 'artist': 'Artist b'},
+        ],
+      });
+      final queue = player.playedQueue!;
+      expect(queue[0].artUri, 'file:///phones/covers/cover.jpg');
+      expect(queue[1].artUri, isNull);
+      // Library songs keep their own covers; only uploads are looked up.
+      expect(asked, [
+        {fileId, other},
+      ]);
+    });
+
     test('plays a song still arriving through its stream', () async {
       const sending = 'ffffffffffffffffffffffffffffffff';
       final streams = <String, String>{};

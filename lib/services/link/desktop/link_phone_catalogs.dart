@@ -528,6 +528,24 @@ class LinkPhoneCatalogs {
     return null;
   }
 
+  /// The covers of the songs [fileIds] across the phones here: the cover
+  /// file held, else the web address the phone listed.
+  Future<Map<String, String>> coversFor(Set<String> fileIds) async {
+    final covers = <String, String>{};
+    if (fileIds.isEmpty) return covers;
+    for (final sourceId in await sourceIds()) {
+      final held = await coverPaths(sourceId);
+      await for (final song in songs(sourceId)) {
+        if (!fileIds.contains(song.fileId) || covers.containsKey(song.fileId)) {
+          continue;
+        }
+        final cover = held[song.coverKey] ?? song.coverUrl;
+        if (cover != null) covers[song.fileId] = cover;
+      }
+    }
+    return covers;
+  }
+
   /// The phones with a folder here, by source id.
   Future<List<String>> sourceIds() async {
     final ids = <String>[];

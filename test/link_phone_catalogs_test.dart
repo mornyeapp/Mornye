@@ -281,6 +281,29 @@ void main() {
       });
     });
 
+    test('finds the covers of uploaded songs by file id', () async {
+      const url = 'https://images.example.com/b.jpg';
+      await call(
+        LinkOps.phoneCovers,
+        'POST',
+        args: {
+          'covers': [
+            {'id': coverA, 'ext': 'jpg', 'data': jpeg},
+          ],
+        },
+      );
+      await page(0, 3, [
+        _song(1, coverId: coverA),
+        {..._song(2), 'coverUrl': url},
+        _song(3),
+      ]);
+      expect(await catalogs.coversFor({_fileId(1), _fileId(2), _fileId(3)}), {
+        _fileId(1): '${root.path}/$sourceId/covers/$coverA.jpg',
+        _fileId(2): url,
+      });
+      expect(await catalogs.coversFor(const {}), isEmpty);
+    });
+
     test('covers named by address are fetched after the commit', () async {
       const fetchedUrl = 'https://images.example.com/a.jpg';
       const missingUrl = 'https://images.example.com/gone.jpg';
