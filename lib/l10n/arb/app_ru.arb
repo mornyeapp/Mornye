@@ -1,8 +1,8 @@
 {
   "trackBpm": "BPM",
-  "trackMood": "Mood",
-  "subsonicAddToLibrary": "Add server to Library",
-  "subsonicLibraryAdded": "Server added to Library",
+  "trackMood": "Настроение",
+  "subsonicAddToLibrary": "Добавить сервер в Библиотеку",
+  "subsonicLibraryAdded": "Сервер добавлен в Библиотеку",
   "subsonicLibraryDescription": "Sync the server catalogue and artwork to Library. Music stays on your server. Rescan it in Local Library settings to update the catalogue.",
   "subsonicAuthentication": "Аутентификация",
   "subsonicToken": "Salted token",
@@ -10,7 +10,7 @@
   "subsonicApiKey": "API ключ",
   "subsonicUsername": "Имя пользователя",
   "subsonicPassword": "Пароль",
-  "subsonicSearch": "Search server music...",
+  "subsonicSearch": "Найти музыку с сервера...",
   "subsonicMoreAlbums": "Больше альбомов",
   "subsonicErrorApi": "The server does not support this API version or authentication method. Check the server settings and the selected sign-in method.",
   "networkDownloadDestination": "Network download destination",
@@ -157,7 +157,7 @@
   "@networkTrustCertificate": {
     "description": "Action approving the displayed certificate SHA-256 fingerprint for this connection's HTTPS origin and retrying connect-and-save; does not grant global certificate trust"
   },
-  "networkRemoveConnection": "Remove connection",
+  "networkRemoveConnection": "Удалить подключение",
   "@networkRemoveConnection": {
     "description": "Connection form action that removes the saved connection and its credentials, without deleting files on the server"
   },
@@ -220,9 +220,9 @@
   "appearanceGlassOutlines": "Контур стекла",
   "appearanceGlassOutlinesSubtitle": "Show decorative edges around Mornye glass. Turning this off keeps blur and refraction.",
   "appearanceGlassClaritySubtitle": "Adjust transparency in Mornye menus and navigation. Text contrast is preserved.",
-  "appearanceGlassTinted": "Tinted",
+  "appearanceGlassTinted": "Тонированное",
   "appearanceGlassClear": "Очистить",
-  "appearanceGlassClearPerformance": "Very clear glass may use more power and feel less smooth on older devices. Lower clarity if needed.",
+  "appearanceGlassClearPerformance": "Очень чистое стекло может использовать больше энергии и может работать менее гладко на старых устройствах. Уменьшите прозрачность при необходимости.",
   "appearanceGlassClarityBlurOff": "Glass is opaque on this device. Turn on “{setting}” to adjust clarity.",
   "@appearanceGlassClarityBlurOff": {
     "description": "Shown under the disabled glass clarity slider when the device renders Mornye glass without blur. The placeholder is the name of the force-blur toggle.",
@@ -296,7 +296,7 @@
   "@searchLibraryPrompt": {
     "description": "Shown on the desktop Search page when the Library scope has no search words yet"
   },
-  "searchBrowse": "Browse",
+  "searchBrowse": "Искать",
   "@searchBrowse": {
     "description": "Section header for home feed tiles on the desktop Search page"
   },
@@ -562,7 +562,7 @@
     }
   },
   "optionsArtistTagMode": "Режим тега исполнителя",
-  "metadataSeparators": "Metadata separators",
+  "metadataSeparators": "Разделители метаданных",
   "metadataSeparatorsDescription": "Choose how comma- or semicolon-separated values are joined in future downloads. Custom artist separators use a joined tag; Primary artist only still applies. Names containing & or / are preserved.",
   "metadataSeparatorSource": "Keep source formatting",
   "metadataSeparatorComma": "Запятая (,)",
@@ -1781,7 +1781,7 @@
     "description": "Settings section header"
   },
   "lyricsKeepScreenOn": "Keep screen on while viewing lyrics",
-  "lyricsKeepScreenOnSubtitle": "Prevent screen timeout while lyrics are open, including when playback is paused.",
+  "lyricsKeepScreenOnSubtitle": "Запретить отключение экрана при открытом тексте песни, даже когда воспроизведение на паузе.",
   "lyricsMode": "Режим текстов песен",
   "@lyricsMode": {
     "description": "Setting - how to save lyrics"
@@ -2041,8 +2041,8 @@
   "@trackDeleteConfirmTitle": {
     "description": "Delete confirmation title"
   },
-  "trackDeleteNetworkConfirmMessage": "This will permanently delete the file from your network storage and remove it from your library and history.",
-  "snackbarDeleteTracksFailed": "Could not delete {count} {count, plural, =1{track} other{tracks}}. Check storage access and try again.",
+  "trackDeleteNetworkConfirmMessage": "Это навсегда удалит файл из Вашего сетевого хранилища и удалит его из библиотеки и истории.",
+  "snackbarDeleteTracksFailed": "Не удалось удалить {count} {count, plural, =1{трек} other{трека(-ов)}}. Проверьте доступ к хранилищу и попробуйте снова.",
   "@snackbarDeleteTracksFailed": {
     "placeholders": {
       "count": {
@@ -3430,7 +3430,7 @@
   "@libraryPlaybackNormalizationSubtitle": {
     "description": "Subtitle explaining playback volume normalization"
   },
-  "playbackNormalizationMode": "Gain mode",
+  "playbackNormalizationMode": "Режим усиления",
   "@playbackNormalizationMode": {
     "description": "Label for choosing between track and album ReplayGain during playback"
   },
@@ -3442,7 +3442,7 @@
   "@playbackNormalizationModeAlbum": {
     "description": "Gain mode that keeps the loudness differences inside an album"
   },
-  "playbackNormalizationPreamp": "Pre-amp",
+  "playbackNormalizationPreamp": "Предусиление",
   "@playbackNormalizationPreamp": {
     "description": "Label for the dB offset applied on top of ReplayGain during playback"
   },
@@ -3460,7 +3460,7 @@
       }
     }
   },
-  "playbackNormalizationPreampHint": "Lower values play quieter. Normalization only turns tracks down, so it never clips.",
+  "playbackNormalizationPreampHint": "Ниже значение — тише звук. Нормализация только понижает громкость треков, из-за чего искажения исключаются.",
   "@playbackNormalizationPreampHint": {
     "description": "Hint under the normalization pre-amp slider"
   },
@@ -4963,7 +4963,7 @@
   "@lyricsPickerInstrumental": {
     "description": "Lyrics result that marks the track as instrumental"
   },
-  "lyricsPickerNotFound": "No lyrics found",
+  "lyricsPickerNotFound": "Текст песни не найден",
   "@lyricsPickerNotFound": {
     "description": "A lyrics provider returned nothing for this track"
   },
@@ -7161,7 +7161,7 @@
   "@extensionVerificationOpenBrowser": {
     "description": "Button to open the extension verification URL in a browser"
   },
-  "settingsSearchHint": "Настройки поиска",
+  "settingsSearchHint": "Найти настройки",
   "@settingsSearchHint": {
     "description": "Placeholder of the search field on the Settings tab"
   },
@@ -7657,13 +7657,13 @@
   "autoMixLowPass": "Muffled filter",
   "autoMixMixing": "Микширование",
   "autoMixCrossfading": "Плавный переход",
-  "playbackAutomation": "Automatic playback",
+  "playbackAutomation": "Автовоспроизведение",
   "playbackPauseOnMute": "Пауза при отключении звука",
   "snackbarPlaybackMuted": "Громкость равна нулю. Воспроизведение приостановлено. Нажмите ещё раз, чтобы продолжить.",
   "@snackbarPlaybackMuted": {
     "description": "Shown after mute automation pauses playback; another explicit play request can override the pause."
   },
-  "playbackPauseOnMuteDescription": "Pause at zero media volume and resume when raised. Manual pauses stay paused. Standard audio output only.",
+  "playbackPauseOnMuteDescription": "Пауза на нулевой громкости и продолжение при её повышении. Ручные паузы остаются нетронутыми. Только для стандартного аудиовыхода.",
   "playbackOnHeadphonesConnected": "Играть при подключении наушников",
   "playbackOnHeadphonesConnectedDescription": "Resume the current song when wired or Bluetooth headphones connect. Disconnecting pauses playback. Built-in player only.",
   "appearanceCustomFont": "Пользовательский шрифт",
@@ -7996,7 +7996,7 @@
   "@settingsKeyboardShortcuts": {
     "description": "Desktop Settings page that lists the app's keyboard shortcuts"
   },
-  "settingsKeyboardShortcutsSubtitle": "Keys for playback, navigation and panels",
+  "settingsKeyboardShortcutsSubtitle": "Кнопки для воспроизведения, навигации и панелей",
   "@settingsKeyboardShortcutsSubtitle": {
     "description": "Subtitle of the Keyboard Shortcuts entry in desktop Settings"
   },
