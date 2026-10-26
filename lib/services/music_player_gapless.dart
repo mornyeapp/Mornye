@@ -120,8 +120,7 @@ class _MusicGapless {
       await deck.configureOutput();
       await deck.setVolume(volume);
       if (!_current(generation)) return;
-      if (next.isNetwork ||
-          const {'http', 'https'}.contains(Uri.tryParse(path)?.scheme)) {
+      if (const {'http', 'https'}.contains(Uri.tryParse(path)?.scheme)) {
         await deck.setNetworkSource(
           path,
           arriving: handler._runtime.streamsArrivingFile(path),

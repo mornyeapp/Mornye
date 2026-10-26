@@ -1495,9 +1495,9 @@ class MusicPlayerHandler extends BaseAudioHandler
     // AudioPlayer.play combines prepare/seek/resume without a cancellation
     // boundary. A late prepare from an old request could resume the wrong
     // source. Serialize preparation and recheck before making it audible.
-    // A file still arriving resolves to its stream.
-    if (media.isNetwork ||
-        const {'http', 'https'}.contains(Uri.tryParse(path)?.scheme)) {
+    // Link may resolve a network song to its completed local copy.
+    // A file still arriving resolves to its HTTP stream instead.
+    if (const {'http', 'https'}.contains(Uri.tryParse(path)?.scheme)) {
       await _player.setNetworkSource(
         path,
         arriving: _runtime.streamsArrivingFile(path),

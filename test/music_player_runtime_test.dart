@@ -26,6 +26,7 @@ import 'package:mornye/services/link/features/link_phone_player.dart';
 import 'package:mornye/services/link/link_protocol.dart';
 import 'package:mornye/services/media_library_browser.dart';
 import 'package:mornye/services/music_player_service.dart';
+import 'package:mornye/services/network_storage_service.dart';
 import 'package:mornye/services/playback_deck.dart';
 import 'package:mornye/services/playback_notification.dart';
 import 'package:mornye/services/source_deletion_events.dart';
@@ -360,6 +361,7 @@ MusicPlayerRuntime _runtime({
   HistoryDatabase? historyDatabase,
   LibraryCollectionsDatabase? collectionsDatabase,
   Future<String?> Function(String)? recoverMissingFile,
+  Future<String> Function(String)? resolveNetworkSource,
 }) {
   if (isAndroid) {
     const channel = MethodChannel(
@@ -393,6 +395,8 @@ MusicPlayerRuntime _runtime({
         'replaygain_track_gain': '-6 dB',
       },
       recoverMissingFile: recoverMissingFile ?? (_) async => null,
+      resolveNetworkSource:
+          resolveNetworkSource ?? NetworkStorageService.instance.resolve,
       sessionDatabase: sessionDatabase ?? _SessionStore(),
       libraryDatabase: libraryDatabase,
       historyDatabase: historyDatabase,
@@ -913,6 +917,31 @@ void main() {
       expect(handler.mediaItem.value?.id, _track.id);
     },
   );
+
+  for (final resolved in [
+    '/received/Phone song.flac',
+    'http://127.0.0.1:1/song.flac',
+    'https://example.invalid/song.flac',
+  ]) {
+    test('a phone song opens its resolved source: $resolved', () async {
+      final decks = <_Deck>[];
+      final handler = await _runtime(
+        decks: decks,
+        resolveNetworkSource: (_) async => resolved,
+      ).initialize();
+      await handler.setQueueAndPlay([
+        const PlayableMedia(
+          id: 'phone-song',
+          source: 'network://example-phone/song.flac',
+          title: 'Phone song',
+          artist: 'Artist',
+        ),
+      ]);
+      final isStream = resolved.startsWith('http');
+      expect(decks.single.sources, [isStream ? 'stream $resolved' : resolved]);
+      expect(handler.playbackState.value.playing, isTrue);
+    });
+  }
 
   test('a file still arriving plays from its stream until whole', () async {
     final decks = <_Deck>[];

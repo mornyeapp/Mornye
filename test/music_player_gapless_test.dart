@@ -2,6 +2,8 @@ import 'package:audio_service/audio_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/models/settings.dart';
 import 'package:mornye/services/music_playback_deck.dart';
+import 'package:mornye/services/music_player_service.dart';
+import 'package:mornye/services/network_storage_service.dart';
 
 import 'support/music_player_automix_harness.dart';
 
@@ -10,6 +12,19 @@ const _until = waitUntil;
 
 Iterable<String> get _gaplessDecks =>
     native.live.where((id) => id.startsWith('music-gapless-'));
+
+class _CachedPhoneSongs implements NetworkVirtualSources {
+  @override
+  bool owns(String id) => id == 'example-phone';
+  @override
+  bool reachable(String id) => true;
+  @override
+  Stream<NetworkVirtualSong> songs(String id) => const Stream.empty();
+  @override
+  Future<String> resolve(String id, String path) async => '/received/two.flac';
+  @override
+  Future<Map<String, dynamic>> metadata(String id, String path) async => {};
+}
 
 /// Plays [_tracks] from 45 of 60 seconds, inside the preparation lead.
 Future<void> _playNearTheEnd() async {
@@ -46,6 +61,38 @@ void main() {
     expect(handler.playbackState.value.playing, isTrue);
     expect(handler.queue.value.map((item) => item.id), ['one', 'two', 'three']);
   });
+
+  test(
+    'a cached phone song prepares as a local file for gapless playback',
+    () async {
+      final storage = NetworkStorageService.instance;
+      final previous = storage.virtualSources;
+      storage.virtualSources = _CachedPhoneSongs();
+      addTearDown(() => storage.virtualSources = previous);
+      setGaplessEnabled(true);
+      await handler.setQueueAndPlay([
+        _tracks.first,
+        const PlayableMedia(
+          id: 'two',
+          source: 'network://example-phone/two.flac',
+          title: 'Two',
+          artist: 'Artist',
+        ),
+      ]);
+      await _until(() => handler.mediaItem.value?.duration != null);
+      await handler.seek(const Duration(seconds: 45));
+      await _until(() => _gaplessDecks.length == 1);
+      final next = _gaplessDecks.single;
+      await _until(() => native.sources[next] == '/received/two.flac');
+      final prepare = native.calls.singleWhere(
+        (call) => call.$1 == next && call.$2 == 'setSourceUrl',
+      );
+      expect(prepare.$3['isLocal'], isTrue);
+      await native.complete('music-player');
+      await _until(() => handler.mediaItem.value?.id == 'two');
+      expect(native.playing, {next});
+    },
+  );
 
   test('chained players hand over natively', () async {
     AudioplayersPlaybackDeck.debugChainsPlayers = true;
