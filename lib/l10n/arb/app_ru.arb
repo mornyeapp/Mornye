@@ -3,7 +3,7 @@
   "trackMood": "Настроение",
   "subsonicAddToLibrary": "Добавить сервер в Библиотеку",
   "subsonicLibraryAdded": "Сервер добавлен в Библиотеку",
-  "subsonicLibraryDescription": "Sync the server catalogue and artwork to Library. Music stays on your server. Rescan it in Local Library settings to update the catalogue.",
+  "subsonicLibraryDescription": "Синхронизировать серверный каталог и обложки в Библиотеке. Музыка остаётся на Вашем сервере. Пересканируйте его в настройках Локальной Библиотеки для обновления каталога.",
   "subsonicAuthentication": "Аутентификация",
   "subsonicToken": "Salted token",
   "subsonicPasswordAuth": "Пароль",
@@ -12,7 +12,7 @@
   "subsonicPassword": "Пароль",
   "subsonicSearch": "Найти музыку с сервера...",
   "subsonicMoreAlbums": "Больше альбомов",
-  "subsonicErrorApi": "The server does not support this API version or authentication method. Check the server settings and the selected sign-in method.",
+  "subsonicErrorApi": "Сервер не поддерживает эту версию API или метод аутентификации. Проверьте настройки сервера и выбранный метод входа.",
   "networkDownloadDestination": "Network download destination",
   "@networkDownloadDestination": {
     "description": "Files settings item that opens network storage to choose a folder for downloaded music"
@@ -288,7 +288,7 @@
   "@homeRecent": {
     "description": "Section header for recent searches"
   },
-  "searchRecentlySearched": "Recently Searched",
+  "searchRecentlySearched": "История поиска",
   "@searchRecentlySearched": {
     "description": "Section header for recent searches on the desktop Search page"
   },
@@ -563,14 +563,14 @@
   },
   "optionsArtistTagMode": "Режим тега исполнителя",
   "metadataSeparators": "Разделители метаданных",
-  "metadataSeparatorsDescription": "Choose how comma- or semicolon-separated values are joined in future downloads. Custom artist separators use a joined tag; Primary artist only still applies. Names containing & or / are preserved.",
-  "metadataSeparatorSource": "Keep source formatting",
+  "metadataSeparatorsDescription": "Выберите способ объединения значений, разделённых запятыми или точкой с запятой, при последующих загрузках. Для пользовательских разделителей исполнителей используется объединённый тег; по-прежнему применяется только основной исполнитель. Имена с & или / сохраняются.",
+  "metadataSeparatorSource": "Сохранить исходное форматирование",
   "metadataSeparatorComma": "Запятая (,)",
   "metadataSeparatorSemicolon": "Точка с запятой (;)",
-  "metadataSeparatorSlash": "Slash (/)",
+  "metadataSeparatorSlash": "Слэш (/)",
   "metadataSeparatorCustom": "Свой разделитель",
   "metadataSeparatorPreview": "Предпросмотр",
-  "metadataSeparatorInvalid": "Use 1–16 characters without line breaks or control characters.",
+  "metadataSeparatorInvalid": "Используйте 1-16 символов без управляющих символов и разделителей строк.",
   "@optionsArtistTagMode": {
     "description": "Setting title for how artist metadata is written into files"
   },
@@ -1610,7 +1610,7 @@
   "@updateViewRelease": {
     "description": "Update button - open the release page when this install cannot update itself (deb, Flatpak, no matching package)"
   },
-  "updateStartingInstaller": "Starting the installer...",
+  "updateStartingInstaller": "Запуск установщика...",
   "@updateStartingInstaller": {
     "description": "Update status on Windows - the downloaded installer is starting and the app will close"
   },
@@ -1622,7 +1622,7 @@
   "@updateQuitApp": {
     "description": "Update button on macOS - quit the app so the new version can replace it"
   },
-  "updateReadyToRestart": "The update is installed. Restart Mornye to use it.",
+  "updateReadyToRestart": "Обновление установлено. Перезапустите Mornye чтобы им воспользоваться.",
   "@updateReadyToRestart": {
     "description": "Update status on Linux after the AppImage was replaced"
   },
@@ -4931,15 +4931,15 @@
   "@editMetadataAutoFillNoneSelected": {
     "description": "Snackbar when user taps Fetch without selecting any fields"
   },
-  "editMetadataLyricsSearch": "Find lyrics online",
+  "editMetadataLyricsSearch": "Найти текст в Интернете",
   "@editMetadataLyricsSearch": {
     "description": "Button in the edit metadata lyrics section that searches every lyrics provider"
   },
-  "lyricsPickerTitle": "Choose lyrics",
+  "lyricsPickerTitle": "Выберите текст",
   "@lyricsPickerTitle": {
     "description": "Title of the sheet listing each lyrics provider's result"
   },
-  "lyricsPickerNeedsTitle": "Enter a title and artist first",
+  "lyricsPickerNeedsTitle": "Сперва введите название и артиста",
   "@lyricsPickerNeedsTitle": {
     "description": "Snackbar when searching lyrics without a title or artist"
   },
