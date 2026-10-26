@@ -2925,7 +2925,7 @@
   "@libraryUnreadableFilesAction": {
     "description": "Subtitle of the library folder action that lists unreadable files"
   },
-  "libraryUnreadableFilesMore": "{count, plural, =1{ще 1 файл не вказано у списку} other{{count} решту файлів не відображено}}",
+  "libraryUnreadableFilesMore": "{count, plural, =1{+1 файл не додано до списку} other{{count} файлів не вказано у списку}}",
   "@libraryUnreadableFilesMore": {
     "description": "Note below the unreadable files list when the scan skipped more files than it lists",
     "placeholders": {
@@ -3186,11 +3186,11 @@
   "@libraryFilterSortOldest": {
     "description": "Sort option - oldest first"
   },
-  "libraryFilterSortSizeLargest": "Size (Largest first)",
+  "libraryFilterSortSizeLargest": "Розмір (спочатку більші)",
   "@libraryFilterSortSizeLargest": {
     "description": "Library sort option - largest files first"
   },
-  "libraryFilterSortSizeSmallest": "Size (Smallest first)",
+  "libraryFilterSortSizeSmallest": "Розмір (спочатку менші)",
   "@libraryFilterSortSizeSmallest": {
     "description": "Library sort option - smallest files first"
   },
@@ -3430,11 +3430,11 @@
   "@libraryPlaybackNormalizationSubtitle": {
     "description": "Subtitle explaining playback volume normalization"
   },
-  "playbackNormalizationMode": "Gain mode",
+  "playbackNormalizationMode": "Режим підсилення",
   "@playbackNormalizationMode": {
     "description": "Label for choosing between track and album ReplayGain during playback"
   },
-  "playbackNormalizationModeTrack": "Track",
+  "playbackNormalizationModeTrack": "Трек",
   "@playbackNormalizationModeTrack": {
     "description": "Gain mode that levels every track on its own"
   },
@@ -3442,11 +3442,11 @@
   "@playbackNormalizationModeAlbum": {
     "description": "Gain mode that keeps the loudness differences inside an album"
   },
-  "playbackNormalizationPreamp": "Pre-amp",
+  "playbackNormalizationPreamp": "Попереднє підсилення",
   "@playbackNormalizationPreamp": {
     "description": "Label for the dB offset applied on top of ReplayGain during playback"
   },
-  "playbackNormalizationPreampValue": "{gain} dB (target {target} LUFS)",
+  "playbackNormalizationPreampValue": "{gain} DB (Ціль {target} LUFS)",
   "@playbackNormalizationPreampValue": {
     "description": "Pre-amp value with the resulting target loudness",
     "placeholders": {
@@ -3460,7 +3460,7 @@
       }
     }
   },
-  "playbackNormalizationPreampHint": "Lower values play quieter. Normalization only turns tracks down, so it never clips.",
+  "playbackNormalizationPreampHint": "Нижчі значення звучать тихіше. Нормалізація лише збавляє гучність треків, що запобігає перевантаженню звуку.",
   "@playbackNormalizationPreampHint": {
     "description": "Hint under the normalization pre-amp slider"
   },
@@ -4931,31 +4931,31 @@
   "@editMetadataAutoFillNoneSelected": {
     "description": "Snackbar when user taps Fetch without selecting any fields"
   },
-  "editMetadataLyricsSearch": "Find lyrics online",
+  "editMetadataLyricsSearch": "Пошук текстів в інтернеті",
   "@editMetadataLyricsSearch": {
     "description": "Button in the edit metadata lyrics section that searches every lyrics provider"
   },
-  "lyricsPickerTitle": "Choose lyrics",
+  "lyricsPickerTitle": "Виберіть текст пісні",
   "@lyricsPickerTitle": {
     "description": "Title of the sheet listing each lyrics provider's result"
   },
-  "lyricsPickerNeedsTitle": "Enter a title and artist first",
+  "lyricsPickerNeedsTitle": "Спершу введіть назву треку та виконавця",
   "@lyricsPickerNeedsTitle": {
     "description": "Snackbar when searching lyrics without a title or artist"
   },
-  "lyricsPickerNoProviders": "No lyrics providers are enabled. Turn some on in Settings > Lyrics.",
+  "lyricsPickerNoProviders": "Жоден сервіс текстів пісень не увімкнено. Активуйте їх у розділі Налаштування > Тексти пісень.",
   "@lyricsPickerNoProviders": {
     "description": "Shown in the lyrics picker when no provider is enabled"
   },
-  "lyricsPickerWordSynced": "Word-synced",
+  "lyricsPickerWordSynced": "Синхронізовано за словами",
   "@lyricsPickerWordSynced": {
     "description": "Lyrics result timed word by word"
   },
-  "lyricsPickerSynced": "Synced",
+  "lyricsPickerSynced": "Синхронізовано",
   "@lyricsPickerSynced": {
     "description": "Lyrics result timed line by line"
   },
-  "lyricsPickerPlain": "Plain text",
+  "lyricsPickerPlain": "Звичайний текст",
   "@lyricsPickerPlain": {
     "description": "Lyrics result without timing"
   },
@@ -4963,11 +4963,11 @@
   "@lyricsPickerInstrumental": {
     "description": "Lyrics result that marks the track as instrumental"
   },
-  "lyricsPickerNotFound": "No lyrics found",
+  "lyricsPickerNotFound": "Текстів пісень не знайдено",
   "@lyricsPickerNotFound": {
     "description": "A lyrics provider returned nothing for this track"
   },
-  "lyricsPickerLineCount": "{count, plural, =1{1 line} other{{count} lines}}",
+  "lyricsPickerLineCount": "{count, plural, =1{1 рядок} other{{count} рядки}}",
   "@lyricsPickerLineCount": {
     "description": "Number of lyric lines in a provider's result",
     "placeholders": {
@@ -5216,11 +5216,11 @@
   "@audioAnalysisRescan": {
     "description": "Tooltip/label for the button that re-runs the audio analysis, discarding cached results"
   },
-  "audioAnalysisSaveSpectrogram": "Save Spectrogram",
+  "audioAnalysisSaveSpectrogram": "Збереження спектрограми",
   "@audioAnalysisSaveSpectrogram": {
     "description": "Tooltip for the spectrogram button that saves the plot, with its axes and legend, as a PNG image the user places in storage"
   },
-  "audioAnalysisSpectrogramSaved": "Spectrogram saved to {fileName}",
+  "audioAnalysisSpectrogramSaved": "Спектрограму збережено до {fileName}",
   "@audioAnalysisSpectrogramSaved": {
     "description": "Snackbar after the spectrogram image was saved",
     "placeholders": {
@@ -6650,7 +6650,7 @@
   "@libraryBuiltInPreviewPlayer": {
     "description": "Setting option to use the built-in preview player"
   },
-  "libraryBuiltInPreviewPlayerSubtitle": "Play your music right inside Mornye",
+  "libraryBuiltInPreviewPlayerSubtitle": "Відтворюйте свою музику прямо в Mornye",
   "@libraryBuiltInPreviewPlayerSubtitle": {
     "description": "Subtitle for built-in preview player option"
   },
@@ -7149,7 +7149,7 @@
   "@extensionVerificationCopyLink": {
     "description": "Button to copy the extension verification URL"
   },
-  "extensionVerificationPasteCallback": "Paste callback",
+  "extensionVerificationPasteCallback": "Вставити callback",
   "@extensionVerificationPasteCallback": {
     "description": "Button that completes extension verification from a callback URL in the clipboard"
   },
@@ -7281,11 +7281,11 @@
   "@musicHapticsDescription": {
     "description": "Subtitle of the music haptics setting"
   },
-  "musicHapticsSensitivity": "Sensitivity",
+  "musicHapticsSensitivity": "Рівень чутливості",
   "@musicHapticsSensitivity": {
     "description": "Slider for how many beats trigger music haptics; higher values vibrate on softer hits"
   },
-  "musicHapticsStrength": "Strength",
+  "musicHapticsStrength": "Рівень потужності",
   "@musicHapticsStrength": {
     "description": "Slider for how strongly the phone vibrates with music haptics"
   },
@@ -7638,7 +7638,7 @@
   "discordPresenceBuildUnavailable": "Discord SDK недоступний у цій версії програми.",
   "discordPresenceAndroidHelp": "Встановіть Discord і увійдіть у свій обліковий запис на цьому телефоні. Дозвольте поширення статусу активності в Discord. Зовнішні програвачі не підтримуються.",
   "discordPresenceIosHelp": "Прив’яжіть свій обліковий запис через Discord і дозвольте поширення статусів активності. Якщо не вдалося пройти авторизацію, торкніться, щоб спробувати знову.",
-  "discordPresenceDesktopHelp": "Keep the Discord desktop app running and signed in on this computer, and allow activity sharing in Discord.",
+  "discordPresenceDesktopHelp": "Переконайтеся, що додаток Discord запущено й виконано вхід на цьому комп’ютері, а в налаштуваннях Discord дозволено показувати статус активності.",
   "discordPresenceDisconnect": "Від’єднати та видалити обліковий запис",
   "autoMixSettingsTitle": "Поєднання переходів",
   "autoMixAutomaticDuration": "Автоматична тривалість",
@@ -7695,7 +7695,7 @@
   "equalizerPresetName": "Назва шаблону",
   "equalizerImport": "Імпортувати шаблон",
   "equalizerExport": "Поділитися шаблоном",
-  "equalizerImportInvalid": "Choose a valid Mornye equalizer preset (JSON, up to 64 KB).",
+  "equalizerImportInvalid": "Виберіть коректний файл шаблона еквалайзера Mornye (JSON, до 64 KB).",
   "equalizerSaved": "Шаблон збережено",
   "equalizerResetTitle": "Скинути еквалайзер?",
   "equalizerResetDescription": "Повернення до плоскої кривої, стандартного тембру та динаміки. Збережені шаблони залишаться.",
@@ -7803,7 +7803,7 @@
   "audioInfoOff": "Вимкнути",
   "audioInfoBypassed": "В обхід через прямий вивід",
   "audioInfoPlayer": "Програвач",
-  "audioInfoPlayerValue": "Mornye built-in player",
+  "audioInfoPlayerValue": "Вбудований програвач Mornye",
   "audioInfoSignalPath": "Шлях сигналу",
   "audioInfoPathSystem": "Системний мікшер",
   "audioInfoPathDirect": "Direct USB, в обхід системного мікшера",
@@ -7854,11 +7854,11 @@
   "lyricsTextSize": "Розмір тексту пісні",
   "lyricsTextPreview": "Слідкуйте за кожним рядком своєї улюбленої пісні",
   "appCrashTitle": "Застосунок завершив роботу з помилкою",
-  "appAnrTitle": "The app previously stopped responding",
+  "appAnrTitle": "Попередній запуск програми завершився збоєм",
   "@appAnrTitle": {
     "description": "Title for an Android ANR report, distinct from a crash."
   },
-  "appAnrMessage": "A diagnostic report was saved. You can copy it and send it to the developer to help investigate.",
+  "appAnrMessage": "Створено діагностичний звіт. Ви можете скопіювати його та надіслати розробнику, щоб допомогти в усуненні помилки.",
   "@appAnrMessage": {
     "description": "Message shown for an Android process exit due to an ANR."
   },
@@ -7884,13 +7884,13 @@
       }
     }
   },
-  "desktopPlayerIdle": "Not playing",
+  "desktopPlayerIdle": "Не відтворюється",
   "@desktopPlayerIdle": {
     "description": "Desktop player bar text when no track is loaded"
   },
-  "desktopVolumeUp": "Increase volume",
-  "desktopVolumeDown": "Decrease volume",
-  "desktopTableSortedAscending": "{column}, sorted ascending",
+  "desktopVolumeUp": "Збільшити гучність",
+  "desktopVolumeDown": "Зменшити гучність",
+  "desktopTableSortedAscending": "{column} Від найдавніших",
   "@desktopTableSortedAscending": {
     "description": "Screen reader label of a song table column header that sorts the table A to Z",
     "placeholders": {
@@ -7899,7 +7899,7 @@
       }
     }
   },
-  "desktopTableSortedDescending": "{column}, sorted descending",
+  "desktopTableSortedDescending": "{column} Від найновіших",
   "@desktopTableSortedDescending": {
     "description": "Screen reader label of a song table column header that sorts the table Z to A",
     "placeholders": {
@@ -7908,19 +7908,19 @@
       }
     }
   },
-  "desktopMenuOpen": "Open",
+  "desktopMenuOpen": "Відкрити",
   "@desktopMenuOpen": {
     "description": "Context menu item that opens an album, artist, playlist or folder"
   },
-  "desktopMenuShowDetails": "Show details",
+  "desktopMenuShowDetails": "Показати деталі",
   "@desktopMenuShowDetails": {
     "description": "Context menu item that opens a track's metadata page"
   },
-  "desktopDropToImport": "Drop to add to your library",
+  "desktopDropToImport": "Перетягніть сюди, щоб додати до бібліотеки",
   "@desktopDropToImport": {
     "description": "Overlay shown while music files or folders are dragged over the desktop window"
   },
-  "desktopDropImported": "Adding {count} {count, plural, =1{folder} other{folders}} to your library",
+  "desktopDropImported": "Додати {count} {count, plural, =1{теку} other{тек}} до вашої бібліотеки",
   "@desktopDropImported": {
     "description": "Snackbar after dropping music onto the desktop window; the folders are scanned into the library",
     "placeholders": {
@@ -7929,38 +7929,38 @@
       }
     }
   },
-  "desktopDropNothingToImport": "Drop music files or folders to add them to your library",
+  "desktopDropNothingToImport": "Перетягніть сюди музичні файли або теки, щоб додати їх до бібліотеки",
   "@desktopDropNothingToImport": {
     "description": "Snackbar when the dropped items contain no folders or audio files"
   },
-  "desktopAllPlaylists": "All Playlists",
+  "desktopAllPlaylists": "Усі списки відтворення",
   "@desktopAllPlaylists": {
     "description": "Desktop sidebar row that opens the list of every playlist"
   },
-  "desktopMenuSettings": "Settings…",
+  "desktopMenuSettings": "Налаштування…",
   "@desktopMenuSettings": {
     "description": "macOS app menu item that opens Settings"
   },
-  "desktopMenuFile": "File",
-  "desktopMenuEdit": "Edit",
-  "desktopMenuView": "View",
-  "desktopWindowMode": "Window mode",
-  "desktopWindowed": "Windowed",
+  "desktopMenuFile": "Файл",
+  "desktopMenuEdit": "Редагувати",
+  "desktopMenuView": "Перегляд",
+  "desktopWindowMode": "Віконний режим",
+  "desktopWindowed": "Віконний",
   "desktopWindowFullscreen": "На весь екран",
-  "desktopWindowBorderless": "Borderless",
-  "desktopExitFullscreen": "Exit full screen",
-  "desktopMinimizeWindow": "Minimize window",
-  "desktopZoomWindow": "Maximize or restore window",
-  "desktopWindowModeUnavailable": "The window mode could not be changed. Try again after the current window transition finishes.",
-  "desktopMenuControls": "Controls",
-  "desktopMenuWindow": "Window",
-  "desktopMenuHelp": "Help",
-  "desktopMenuPlayPause": "Play/Pause",
-  "desktopMenuMiniPlayer": "Mini Player",
+  "desktopWindowBorderless": "Без рамок",
+  "desktopExitFullscreen": "Вийти з повноекранного режиму",
+  "desktopMinimizeWindow": "Згорнути вікно",
+  "desktopZoomWindow": "Розгорнути вікно",
+  "desktopWindowModeUnavailable": "Не вдалося змінити віконний режим. Зачекайте, поки завершиться анімація вікна, і спробуйте ще раз.",
+  "desktopMenuControls": "Керування",
+  "desktopMenuWindow": "У вікні",
+  "desktopMenuHelp": "Допомога",
+  "desktopMenuPlayPause": "Відтворення/Пауза",
+  "desktopMenuMiniPlayer": "Міні програвач",
   "@desktopMenuMiniPlayer": {
     "description": "Window menu item, player bar button and Keyboard Shortcuts row that shrink the window into a small player floating above other windows"
   },
-  "desktopMiniPlayerExpand": "Show Full Window",
+  "desktopMiniPlayerExpand": "Показати у повному вікні",
   "@desktopMiniPlayerExpand": {
     "description": "Mini player button that returns the window to its full size"
   },
@@ -7968,15 +7968,15 @@
   "@desktopMenuRefresh": {
     "description": "View menu item and Keyboard Shortcuts row that reloads the page on screen (Home, Repo, statistics)"
   },
-  "desktopMenuProjectPage": "Project page",
+  "desktopMenuProjectPage": "Сторінка проєкту",
   "@desktopMenuProjectPage": {
     "description": "Help menu item that opens the app's source repository"
   },
-  "desktopDownloadsShowAll": "Show all",
+  "desktopDownloadsShowAll": "Показати все",
   "@desktopDownloadsShowAll": {
     "description": "Button in the desktop downloads popover that opens the full download queue"
   },
-  "desktopDownloadsQueued": "Waiting",
+  "desktopDownloadsQueued": "Очікування",
   "@desktopDownloadsQueued": {
     "description": "Status of a download in the desktop downloads popover that has not started yet"
   },
@@ -7984,27 +7984,27 @@
   "@desktopDownloadsCancel": {
     "description": "Tooltip of the button that cancels one download in the desktop downloads popover"
   },
-  "desktopScrollBack": "Scroll back",
+  "desktopScrollBack": "Прокрутити назад",
   "@desktopScrollBack": {
     "description": "Tooltip of the desktop button that scrolls a horizontal shelf of albums or artists back"
   },
-  "desktopScrollForward": "Scroll forward",
+  "desktopScrollForward": "Прокрутити вперед",
   "@desktopScrollForward": {
     "description": "Tooltip of the desktop button that scrolls a horizontal shelf of albums or artists forward"
   },
-  "settingsKeyboardShortcuts": "Keyboard Shortcuts",
+  "settingsKeyboardShortcuts": "Комбінації клавіш",
   "@settingsKeyboardShortcuts": {
     "description": "Desktop Settings page that lists the app's keyboard shortcuts"
   },
-  "settingsKeyboardShortcutsSubtitle": "Keys for playback, navigation and panels",
+  "settingsKeyboardShortcutsSubtitle": "Клавіші для відтворення, навігації та панелей",
   "@settingsKeyboardShortcutsSubtitle": {
     "description": "Subtitle of the Keyboard Shortcuts entry in desktop Settings"
   },
-  "desktopShortcutsNavigation": "Navigation",
+  "desktopShortcutsNavigation": "Навігація",
   "@desktopShortcutsNavigation": {
     "description": "Keyboard Shortcuts section for moving between pages"
   },
-  "desktopShortcutDismiss": "Close dialog or page",
+  "desktopShortcutDismiss": "Закрити діалогове вікно або сторінку",
   "@desktopShortcutDismiss": {
     "description": "Keyboard Shortcuts row for Escape, which leaves a text field or closes the top dialog or page"
   },
