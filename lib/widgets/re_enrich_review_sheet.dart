@@ -148,10 +148,13 @@ class _ReEnrichReviewContent extends StatelessWidget {
                   ),
                   for (final change in preview.changes) ...[
                     const Divider(height: 1, indent: 56),
+                    // Full width: a connected group centers rows narrower
+                    // than itself.
                     Semantics(
                       label:
                           '${_fieldLabel(context, change.field)}: ${_oldValue(context, change)}, ${_newValue(context, change)}',
-                      child: Padding(
+                      child: Container(
+                        width: double.infinity,
                         padding: const EdgeInsetsDirectional.fromSTEB(
                           56,
                           10,
