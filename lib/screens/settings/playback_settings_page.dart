@@ -400,6 +400,15 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage> {
                 onChanged: (value) => ref
                     .read(settingsProvider.notifier)
                     .setLandscapeLyricsArtwork(value),
+              ),
+              SettingsSwitchItem(
+                icon: Icons.short_text,
+                title: context.l10n.compactPlayer,
+                subtitle: context.l10n.compactPlayerDescription,
+                value: settings.compactPlayer,
+                enabled: !context.isMornye,
+                onChanged: (value) =>
+                    ref.read(settingsProvider.notifier).setCompactPlayer(value),
                 showDivider: false,
               ),
             ],

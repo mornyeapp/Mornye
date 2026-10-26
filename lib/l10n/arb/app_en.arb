@@ -7841,6 +7841,14 @@
   "@landscapeLyricsArtworkDescription": {
     "description": "Subtitle explaining the Material landscape lyrics layout setting"
   },
+  "compactPlayer": "Compact player",
+  "@compactPlayer": {
+    "description": "Material player setting: idle lyrics shrink the player to a slim bar instead of hiding it"
+  },
+  "compactPlayerDescription": "When lyrics are left alone, shrink the player to a slim bar so the lyrics get more room. A tap brings the full player back",
+  "@compactPlayerDescription": {
+    "description": "Subtitle of the compact player setting"
+  },
   "playerCoverStyleDefault": "Default",
   "@playerCoverStyleDefault": {
     "description": "Cover art style: artwork card above the controls"

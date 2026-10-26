@@ -129,6 +129,9 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
   Timer? _lyricsIdleTimer;
   final _lyricsPointers = <int, Offset>{};
   bool _lyricsPointerMoved = false;
+  // Skipping, seeking or opening the queue from the compact player keeps it
+  // compact; only a touch elsewhere restores the full player.
+  bool _compactPlayerTouched = false;
   final _artworkHeaderKey = GlobalKey();
   final _artworkControlsKey = GlobalKey();
   final _artworkVolumeKey = GlobalKey();
@@ -551,6 +554,11 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                         colorScheme: colorScheme,
                         showLyrics: _currentPage == 1,
                         immersive: _lyricsImmersive,
+                        compactPlayer: ref.watch(
+                          settingsProvider.select((s) => s.compactPlayer),
+                        ),
+                        onCompactPlayerTouch: () =>
+                            _compactPlayerTouched = true,
                         fullScreenArtwork: materialFullScreen,
                         landscapeLyricsArtwork: ref.watch(
                           settingsProvider.select(
@@ -825,7 +833,12 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
     if (_lyricsPointers.remove(pointer) == null || _lyricsPointers.isNotEmpty) {
       return;
     }
-    if (!cancelled && !_lyricsPointerMoved && _lyricsControlsHidden) {
+    final compactTouch = _compactPlayerTouched;
+    _compactPlayerTouched = false;
+    if (!cancelled &&
+        !_lyricsPointerMoved &&
+        !compactTouch &&
+        _lyricsControlsHidden) {
       setState(() => _lyricsControlsHidden = false);
     }
     _scheduleLyricsControlsHide();

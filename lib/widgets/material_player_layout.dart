@@ -11,6 +11,7 @@ import 'package:mornye/routes/now_playing_route.dart';
 import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/utils/playback_seek_preview.dart';
 import 'package:mornye/widgets/player_artwork.dart';
+import 'package:mornye/widgets/player_compact_bar.dart';
 import 'package:mornye/widgets/player_gesture_regions.dart';
 import 'package:mornye/widgets/player_lyrics_controls.dart';
 import 'package:mornye/widgets/player_metadata_title.dart';
@@ -30,6 +31,8 @@ class MaterialPlayerLayout extends StatelessWidget {
     this.fullScreenArtwork = false,
     this.landscapeLyricsArtwork = false,
     this.immersive = false,
+    this.compactPlayer = false,
+    this.onCompactPlayerTouch,
   });
 
   final MediaItem mediaItem;
@@ -49,6 +52,14 @@ class MaterialPlayerLayout extends StatelessWidget {
   /// Lyrics left idle while playing: the title and controls fold away so
   /// the lyrics fill the column.
   final bool immersive;
+
+  /// Immersive portrait lyrics shrink the title and controls to a smaller
+  /// player instead of folding them away entirely.
+  final bool compactPlayer;
+
+  /// A touch landed on the compact player, before the page's own listener
+  /// sees it.
+  final VoidCallback? onCompactPlayerTouch;
 
   @override
   Widget build(BuildContext context) {
@@ -268,6 +279,28 @@ class MaterialPlayerLayout extends StatelessWidget {
                   ),
                 ),
               ),
+              // Unfolds as the full controls fold, in the same motion. Its
+              // timeline rests while folded, and touches on it keep it
+              // compact instead of restoring the full player.
+              if (compactPlayer)
+                PlayerLyricsControlsCollapse(
+                  hidden: !(immersive && showLyrics),
+                  child: TickerMode(
+                    enabled: immersive && showLyrics,
+                    child: Listener(
+                      onPointerDown: (_) => onCompactPlayerTouch?.call(),
+                      child: PlayerQueueSwipeRegion(
+                        onOpenQueue: onOpenQueue,
+                        child: PlayerCompactBar(
+                          mediaItem: mediaItem,
+                          seekPreview: seekPreview,
+                          colorScheme: colorScheme,
+                          onOpenQueue: onOpenQueue,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
             ],
           ),
         );

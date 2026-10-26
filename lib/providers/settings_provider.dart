@@ -688,6 +688,9 @@ class SettingsNotifier extends Notifier<AppSettings> {
   void setLandscapeLyricsArtwork(bool enabled) =>
       _commit(state.copyWith(landscapeLyricsArtwork: enabled));
 
+  void setCompactPlayer(bool enabled) =>
+      _commit(state.copyWith(compactPlayer: enabled));
+
   void setUsbBitPerfect(bool enabled) =>
       _commit(state.copyWith(usbBitPerfect: enabled));
 

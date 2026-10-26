@@ -322,6 +322,12 @@ class SettingsSearchCatalog {
           keywords: const ['landscape', 'lyrics', 'album art', 'details'],
         ),
         SettingsSearchEntry(
+          icon: Icons.short_text,
+          title: l10n.compactPlayer,
+          subtitle: l10n.compactPlayerDescription,
+          keywords: const ['lyrics', 'compact', 'controls', 'mini', 'larger'],
+        ),
+        SettingsSearchEntry(
           icon: Icons.vibration,
           title: l10n.musicHaptics,
           subtitle: l10n.musicHapticsDescription,

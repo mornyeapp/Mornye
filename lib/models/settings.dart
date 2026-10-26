@@ -116,6 +116,8 @@ class AppSettings {
   @JsonKey(fromJson: playerCoverStyleFromJson)
   final String playerCoverStyle; // 'default' (card), 'fullscreen' or ''
   final bool landscapeLyricsArtwork;
+  // Material: idle lyrics shrink the player to a slim bar, not hide it.
+  final bool compactPlayer;
   final bool isFirstLaunch;
   final bool checkForUpdates;
   final String updateChannel;
@@ -288,6 +290,7 @@ class AppSettings {
     this.musicHapticsStrength = 0.5,
     this.playerCoverStyle = '',
     this.landscapeLyricsArtwork = false,
+    this.compactPlayer = false,
     this.isFirstLaunch = true,
     this.checkForUpdates = true,
     this.updateChannel = 'stable',
@@ -433,6 +436,7 @@ class AppSettings {
     double? musicHapticsStrength,
     String? playerCoverStyle,
     bool? landscapeLyricsArtwork,
+    bool? compactPlayer,
     bool? isFirstLaunch,
     bool? checkForUpdates,
     String? updateChannel,
@@ -569,6 +573,7 @@ class AppSettings {
       playerCoverStyle: playerCoverStyle ?? this.playerCoverStyle,
       landscapeLyricsArtwork:
           landscapeLyricsArtwork ?? this.landscapeLyricsArtwork,
+      compactPlayer: compactPlayer ?? this.compactPlayer,
       isFirstLaunch: isFirstLaunch ?? this.isFirstLaunch,
       checkForUpdates: checkForUpdates ?? this.checkForUpdates,
       updateChannel: updateChannel ?? this.updateChannel,
