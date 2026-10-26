@@ -118,8 +118,9 @@ class _SettingsTabState extends ConsumerState<SettingsTab> {
   /// Desktop list-detail: the selected category ([_profileSelection] for the
   /// profile), the setting a search result points at, and the detail pane's
   /// navigator. Each selection gets a fresh navigator, so the pages pushed
-  /// for the previous category close.
-  int _selected = 0;
+  /// for the previous category close. Opens on Appearance, the first page
+  /// after the donation card.
+  int _selected = 1;
   String? _selectedTarget;
   var _detailNavigatorKey = GlobalKey<NavigatorState>();
   static const int _profileSelection = -1;
@@ -187,17 +188,9 @@ class _SettingsTabState extends ConsumerState<SettingsTab> {
       androidAudio: Platform.isAndroid,
     );
     final groups = [
+      // On its own at the top, so its progress reads as the app's status.
       _Group(
         destinations: [
-          _Destination(
-            icon: Icons.extension_outlined,
-            iconColor: Colors.teal,
-            title: l10n.settingsExtensions,
-            subtitle: l10n.settingsExtensionsSubtitle,
-            keywords: const ['plugin', 'provider', 'priority', 'store'],
-            searchEntries: searchCatalog.extensions,
-            pageBuilder: () => const ExtensionsPage(),
-          ),
           _Destination(
             icon: Icons.favorite_outline,
             iconColor: Colors.pink,
@@ -208,6 +201,10 @@ class _SettingsTabState extends ConsumerState<SettingsTab> {
                 DonatePage(remoteConfigService: _remoteConfigService),
             showDonationProgress: true,
           ),
+        ],
+      ),
+      _Group(
+        destinations: [
           _Destination(
             icon: Icons.palette_outlined,
             iconColor: Colors.purple,
@@ -226,6 +223,24 @@ class _SettingsTabState extends ConsumerState<SettingsTab> {
             ],
             searchEntries: searchCatalog.appearance,
             pageBuilder: () => const AppearanceSettingsPage(),
+          ),
+          _Destination(
+            icon: Icons.play_circle_outline,
+            iconColor: Colors.indigo,
+            title: l10n.libraryPlayback,
+            subtitle: l10n.settingsPlaybackSubtitle,
+            keywords: const ['player', 'audio', 'playback', 'pemutaran'],
+            searchEntries: searchCatalog.playback,
+            pageBuilder: () => const PlaybackSettingsPage(),
+          ),
+          _Destination(
+            icon: Icons.lyrics_outlined,
+            iconColor: Colors.cyan,
+            title: l10n.settingsLyrics,
+            subtitle: l10n.settingsLyricsSubtitle,
+            keywords: const ['lrc', 'synced', 'provider'],
+            searchEntries: searchCatalog.lyrics,
+            pageBuilder: () => const LyricsSettingsPage(),
           ),
         ],
       ),
@@ -290,33 +305,6 @@ class _SettingsTabState extends ConsumerState<SettingsTab> {
               ],
               pageBuilder: () => const LinkDesktopSettingsPage(),
             ),
-          _Destination(
-            icon: Icons.sell_outlined,
-            iconColor: Colors.amber,
-            title: l10n.settingsMetadata,
-            subtitle: l10n.settingsMetadataSubtitle,
-            keywords: const ['tag', 'cover', 'artwork', 'isrc', 'provider'],
-            searchEntries: searchCatalog.metadata,
-            pageBuilder: () => const MetadataSettingsPage(),
-          ),
-          _Destination(
-            icon: Icons.lyrics_outlined,
-            iconColor: Colors.cyan,
-            title: l10n.settingsLyrics,
-            subtitle: l10n.settingsLyricsSubtitle,
-            keywords: const ['lrc', 'synced', 'provider'],
-            searchEntries: searchCatalog.lyrics,
-            pageBuilder: () => const LyricsSettingsPage(),
-          ),
-          _Destination(
-            icon: Icons.play_circle_outline,
-            iconColor: Colors.indigo,
-            title: l10n.libraryPlayback,
-            subtitle: l10n.settingsPlaybackSubtitle,
-            keywords: const ['player', 'audio', 'playback', 'pemutaran'],
-            searchEntries: searchCatalog.playback,
-            pageBuilder: () => const PlaybackSettingsPage(),
-          ),
         ],
       ),
       _Group(
@@ -339,6 +327,15 @@ class _SettingsTabState extends ConsumerState<SettingsTab> {
             pageBuilder: () => const DownloadSettingsPage(),
           ),
           _Destination(
+            icon: Icons.extension_outlined,
+            iconColor: Colors.teal,
+            title: l10n.settingsExtensions,
+            subtitle: l10n.settingsExtensionsSubtitle,
+            keywords: const ['plugin', 'provider', 'priority', 'store'],
+            searchEntries: searchCatalog.extensions,
+            pageBuilder: () => const ExtensionsPage(),
+          ),
+          _Destination(
             icon: Icons.folder_outlined,
             iconColor: Colors.orange,
             title: l10n.settingsFiles,
@@ -353,6 +350,15 @@ class _SettingsTabState extends ConsumerState<SettingsTab> {
             ],
             searchEntries: searchCatalog.files,
             pageBuilder: () => const FilesSettingsPage(),
+          ),
+          _Destination(
+            icon: Icons.sell_outlined,
+            iconColor: Colors.amber,
+            title: l10n.settingsMetadata,
+            subtitle: l10n.settingsMetadataSubtitle,
+            keywords: const ['tag', 'cover', 'artwork', 'isrc', 'provider'],
+            searchEntries: searchCatalog.metadata,
+            pageBuilder: () => const MetadataSettingsPage(),
           ),
         ],
       ),
