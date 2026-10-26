@@ -1622,11 +1622,11 @@
   "@updateQuitApp": {
     "description": "Update button on macOS - quit the app so the new version can replace it"
   },
-  "updateReadyToRestart": "The update is installed. Restart Mornye to use it.",
+  "updateReadyToRestart": "La actualización está instalada. Reinicia Mornye para usarla.",
   "@updateReadyToRestart": {
     "description": "Update status on Linux after the AppImage was replaced"
   },
-  "updateRestartNow": "Restart Now",
+  "updateRestartNow": "Reiniciar ahora",
   "@updateRestartNow": {
     "description": "Update button on Linux - restart the app after the AppImage was replaced"
   },
@@ -2904,7 +2904,7 @@
   "@libraryRemoveFolderMessage": {
     "description": "Confirmation shown before removing a library source"
   },
-  "libraryUnreadableFiles": "{count, plural, =1{1 file couldn't be read} other{{count} files couldn't be read}}",
+  "libraryUnreadableFiles": "{count, plural, =1{1 archivo no se pudo leer} other{{count} archivos no se pudieron leer}}",
   "@libraryUnreadableFiles": {
     "description": "Count of files the last scan of a library folder skipped because it could not read them",
     "placeholders": {
@@ -2913,19 +2913,19 @@
       }
     }
   },
-  "libraryUnreadableFilesTitle": "Unreadable files",
+  "libraryUnreadableFilesTitle": "Archivos ilegibles",
   "@libraryUnreadableFilesTitle": {
     "description": "Title of the list of files a library scan could not read, and the action that opens it"
   },
-  "libraryUnreadableFilesSubtitle": "These files were left out of your library. They may be damaged, still downloading, or blocked by the storage app.",
+  "libraryUnreadableFilesSubtitle": "Estos archivos se dejaron fuera de tu biblioteca. Pueden estar dañados, seguir descargándose o estar bloqueados por la aplicación de almacenamiento.",
   "@libraryUnreadableFilesSubtitle": {
     "description": "Explanation above the list of files a library scan could not read"
   },
-  "libraryUnreadableFilesAction": "See which files and why",
+  "libraryUnreadableFilesAction": "Ver qué archivos y por qué",
   "@libraryUnreadableFilesAction": {
     "description": "Subtitle of the library folder action that lists unreadable files"
   },
-  "libraryUnreadableFilesMore": "{count, plural, =1{1 more file isn't listed} other{{count} more files aren't listed}}",
+  "libraryUnreadableFilesMore": "{count, plural, =1{1 archivo más no está en la lista} other{{count} archivos más no están en la lista}}",
   "@libraryUnreadableFilesMore": {
     "description": "Note below the unreadable files list when the scan skipped more files than it lists",
     "placeholders": {
@@ -3186,11 +3186,11 @@
   "@libraryFilterSortOldest": {
     "description": "Sort option - oldest first"
   },
-  "libraryFilterSortSizeLargest": "Size (Largest first)",
+  "libraryFilterSortSizeLargest": "Tamaño (de mayor a menor)",
   "@libraryFilterSortSizeLargest": {
     "description": "Library sort option - largest files first"
   },
-  "libraryFilterSortSizeSmallest": "Size (Smallest first)",
+  "libraryFilterSortSizeSmallest": "Tamaño (de menor a mayor)",
   "@libraryFilterSortSizeSmallest": {
     "description": "Library sort option - smallest files first"
   },
@@ -3430,7 +3430,7 @@
   "@libraryPlaybackNormalizationSubtitle": {
     "description": "Subtitle explaining playback volume normalization"
   },
-  "playbackNormalizationMode": "Gain mode",
+  "playbackNormalizationMode": "Modo de ganancia",
   "@playbackNormalizationMode": {
     "description": "Label for choosing between track and album ReplayGain during playback"
   },
@@ -3446,7 +3446,7 @@
   "@playbackNormalizationPreamp": {
     "description": "Label for the dB offset applied on top of ReplayGain during playback"
   },
-  "playbackNormalizationPreampValue": "{gain} dB (target {target} LUFS)",
+  "playbackNormalizationPreampValue": "{gain} dB (objetivo {target} LUFS)",
   "@playbackNormalizationPreampValue": {
     "description": "Pre-amp value with the resulting target loudness",
     "placeholders": {
@@ -3460,7 +3460,7 @@
       }
     }
   },
-  "playbackNormalizationPreampHint": "Lower values play quieter. Normalization only turns tracks down, so it never clips.",
+  "playbackNormalizationPreampHint": "Los valores más bajos suenan más bajo. La normalización solo reduce el volumen de las pistas, por lo que nunca provoca saturación.",
   "@playbackNormalizationPreampHint": {
     "description": "Hint under the normalization pre-amp slider"
   },
@@ -4345,15 +4345,15 @@
   "@lyricsProviderLyricsPlusDesc": {
     "description": "Description for LyricsPlus provider"
   },
-  "lyricsProviderZarzLrcDesc": "Word-by-word Apple Music lyrics from Zarz-LRC",
+  "lyricsProviderZarzLrcDesc": "Letras de Apple Music palabra por palabra de Zarz-LRC",
   "@lyricsProviderZarzLrcDesc": {
     "description": "Description for the first-party Zarz-LRC provider"
   },
-  "lyricsProviderLrcRedDesc": "Word-by-word Apple Music lyrics, matched by recording",
+  "lyricsProviderLrcRedDesc": "Letras de Apple Music palabra por palabra, emparejadas por grabación",
   "@lyricsProviderLrcRedDesc": {
     "description": "Description for lrc.red provider"
   },
-  "lyricsProviderBetterLyricsDesc": "Word-by-word Apple Music lyrics for popular songs",
+  "lyricsProviderBetterLyricsDesc": "Letras de Apple Music palabra por palabra para canciones populares",
   "@lyricsProviderBetterLyricsDesc": {
     "description": "Description for BetterLyrics provider, which only answers songs it has already cached"
   },
@@ -4931,31 +4931,31 @@
   "@editMetadataAutoFillNoneSelected": {
     "description": "Snackbar when user taps Fetch without selecting any fields"
   },
-  "editMetadataLyricsSearch": "Find lyrics online",
+  "editMetadataLyricsSearch": "Buscar letras en línea",
   "@editMetadataLyricsSearch": {
     "description": "Button in the edit metadata lyrics section that searches every lyrics provider"
   },
-  "lyricsPickerTitle": "Choose lyrics",
+  "lyricsPickerTitle": "Elegir letras",
   "@lyricsPickerTitle": {
     "description": "Title of the sheet listing each lyrics provider's result"
   },
-  "lyricsPickerNeedsTitle": "Enter a title and artist first",
+  "lyricsPickerNeedsTitle": "Introduce primero un título y un artista",
   "@lyricsPickerNeedsTitle": {
     "description": "Snackbar when searching lyrics without a title or artist"
   },
-  "lyricsPickerNoProviders": "No lyrics providers are enabled. Turn some on in Settings > Lyrics.",
+  "lyricsPickerNoProviders": "No hay proveedores de letras activados. Activa alguno en Ajustes > Letras.",
   "@lyricsPickerNoProviders": {
     "description": "Shown in the lyrics picker when no provider is enabled"
   },
-  "lyricsPickerWordSynced": "Word-synced",
+  "lyricsPickerWordSynced": "Sincronizadas por palabra",
   "@lyricsPickerWordSynced": {
     "description": "Lyrics result timed word by word"
   },
-  "lyricsPickerSynced": "Synced",
+  "lyricsPickerSynced": "Sincronizadas",
   "@lyricsPickerSynced": {
     "description": "Lyrics result timed line by line"
   },
-  "lyricsPickerPlain": "Plain text",
+  "lyricsPickerPlain": "Texto sin formato",
   "@lyricsPickerPlain": {
     "description": "Lyrics result without timing"
   },
@@ -4963,11 +4963,11 @@
   "@lyricsPickerInstrumental": {
     "description": "Lyrics result that marks the track as instrumental"
   },
-  "lyricsPickerNotFound": "No lyrics found",
+  "lyricsPickerNotFound": "No se encontraron letras",
   "@lyricsPickerNotFound": {
     "description": "A lyrics provider returned nothing for this track"
   },
-  "lyricsPickerLineCount": "{count, plural, =1{1 line} other{{count} lines}}",
+  "lyricsPickerLineCount": "{count, plural, =1{1 línea} other{{count} líneas}}",
   "@lyricsPickerLineCount": {
     "description": "Number of lyric lines in a provider's result",
     "placeholders": {
@@ -5216,11 +5216,11 @@
   "@audioAnalysisRescan": {
     "description": "Tooltip/label for the button that re-runs the audio analysis, discarding cached results"
   },
-  "audioAnalysisSaveSpectrogram": "Save Spectrogram",
+  "audioAnalysisSaveSpectrogram": "Guardar espectrograma",
   "@audioAnalysisSaveSpectrogram": {
     "description": "Tooltip for the spectrogram button that saves the plot, with its axes and legend, as a PNG image the user places in storage"
   },
-  "audioAnalysisSpectrogramSaved": "Spectrogram saved to {fileName}",
+  "audioAnalysisSpectrogramSaved": "Espectrograma guardado en {fileName}",
   "@audioAnalysisSpectrogramSaved": {
     "description": "Snackbar after the spectrogram image was saved",
     "placeholders": {
@@ -5361,11 +5361,11 @@
   "@extensionsHomeFeedProvider": {
     "description": "Extensions page - label for home feed provider selector"
   },
-  "extensionsHomeFeedCountry": "Home feed country",
+  "extensionsHomeFeedCountry": "País del feed de inicio",
   "@extensionsHomeFeedCountry": {
     "description": "Country picker for the active Home feed extension"
   },
-  "extensionsHomeFeedCountryDescription": "Choose a country's Home recommendations without a VPN.",
+  "extensionsHomeFeedCountryDescription": "Elige las recomendaciones de Inicio de un país sin necesidad de VPN.",
   "@extensionsHomeFeedCountryDescription": {
     "description": "Help for choosing regional Home recommendations"
   },
@@ -5619,7 +5619,7 @@
   "@notifLibraryScanFailed": {
     "description": "Notification title when library scan fails"
   },
-  "notifLibraryScanInterruptedBody": "The previous library scan was interrupted. Scan the folder again to continue. Your indexed tracks are still available.",
+  "notifLibraryScanInterruptedBody": "El análisis anterior de la biblioteca se interrumpió. Vuelve a analizar la carpeta para continuar. Tus pistas indexadas siguen disponibles.",
   "@notifLibraryScanInterruptedBody": {
     "description": "Recovery notice after the app stops during a library scan"
   },
@@ -6774,11 +6774,11 @@
   "@nowPlayingNoLyrics": {
     "description": "Empty state when the playing file has no embedded lyrics"
   },
-  "nowPlayingSearchLyricsOnline": "Search online",
+  "nowPlayingSearchLyricsOnline": "Buscar en línea",
   "@nowPlayingSearchLyricsOnline": {
     "description": "Button in the player's empty lyrics state that looks up lyrics from the enabled lyrics providers"
   },
-  "nowPlayingNoLyricsOnline": "No lyrics found online",
+  "nowPlayingNoLyricsOnline": "No se encontraron letras en línea",
   "@nowPlayingNoLyricsOnline": {
     "description": "Empty state after an online lyrics search for the playing track found nothing"
   },
@@ -7040,11 +7040,11 @@
   "@regionCountryUS": {
     "description": "Country name for SongLink region picker"
   },
-  "regionCountryIT": "Italy",
+  "regionCountryIT": "Italia",
   "@regionCountryIT": {
     "description": "Country name for Italy"
   },
-  "regionCountryES": "Spain",
+  "regionCountryES": "España",
   "@regionCountryES": {
     "description": "Country name for Spain"
   },
@@ -7149,7 +7149,7 @@
   "@extensionVerificationCopyLink": {
     "description": "Button to copy the extension verification URL"
   },
-  "extensionVerificationPasteCallback": "Paste callback",
+  "extensionVerificationPasteCallback": "Pegar callback",
   "@extensionVerificationPasteCallback": {
     "description": "Button that completes extension verification from a callback URL in the clipboard"
   },
@@ -7253,7 +7253,7 @@
     "description": "Selected state of the compact favorite action"
   },
   "autoMixDescription": "Mezcla canciones con sincronización de ritmos y ajuste de tempo que conserva el tono. Utiliza fundido cruzado cuando no es posible sincronizar los ritmos.",
-  "playerCoverStyle": "Cover art",
+  "playerCoverStyle": "Carátula",
   "@playerCoverStyle": {
     "description": "Settings section choosing how the player shows cover art"
   },
@@ -7261,31 +7261,31 @@
   "@playerCoverStyleDefault": {
     "description": "Cover art style: artwork card above the controls"
   },
-  "playerCoverStyleDefaultDescription": "Artwork as a card above the controls",
+  "playerCoverStyleDefaultDescription": "La carátula como tarjeta sobre los controles",
   "@playerCoverStyleDefaultDescription": {
     "description": "Subtitle of the default cover art style"
   },
-  "playerCoverStyleFullScreen": "Full screen",
+  "playerCoverStyleFullScreen": "Pantalla completa",
   "@playerCoverStyleFullScreen": {
     "description": "Cover art style: artwork fills the top of the player"
   },
-  "playerCoverStyleFullScreenDescription": "Artwork fills the top of the player and fades into a blur. Motion artwork is always full screen in Mornye",
+  "playerCoverStyleFullScreenDescription": "La carátula ocupa la parte superior del reproductor y se desvanece en un desenfoque. La carátula animada siempre se muestra a pantalla completa en Mornye",
   "@playerCoverStyleFullScreenDescription": {
     "description": "Subtitle of the full screen cover art style"
   },
-  "musicHaptics": "Music haptics",
+  "musicHaptics": "Háptica musical",
   "@musicHaptics": {
     "description": "Setting that vibrates the phone along with the music"
   },
-  "musicHapticsDescription": "Vibrate along with the beat of downloaded and local songs",
+  "musicHapticsDescription": "Vibra al ritmo de las canciones descargadas y locales",
   "@musicHapticsDescription": {
     "description": "Subtitle of the music haptics setting"
   },
-  "musicHapticsSensitivity": "Sensitivity",
+  "musicHapticsSensitivity": "Sensibilidad",
   "@musicHapticsSensitivity": {
     "description": "Slider for how many beats trigger music haptics; higher values vibrate on softer hits"
   },
-  "musicHapticsStrength": "Strength",
+  "musicHapticsStrength": "Intensidad",
   "@musicHapticsStrength": {
     "description": "Slider for how strongly the phone vibrates with music haptics"
   },
@@ -7299,7 +7299,7 @@
   "autoplayPersonalizationDescription": "Aprende de las canciones que escuchas y de las que te saltas, de manera privada en este dispositivo. Si desactivas esta función, se detendrá el aprendizaje y se restablecerá la reproducción automática habitual.",
   "autoplayResetLearning": "Restablecer el aprendizaje de recomendaciones",
   "autoplayResetLearningConfirmTitle": "Restablecer el aprendizaje de recomendaciones?",
-  "autoplayResetLearningConfirmMessage": "Autoplay forgets what it learned from your listening and skips. This can't be undone.",
+  "autoplayResetLearningConfirmMessage": "La reproducción automática olvida lo que aprendió de tus escuchas y de las canciones que omites. Esto no se puede deshacer.",
   "autoplayResetLearningConfirm": "Restablecer",
   "profileTitle": "Perfil",
   "profileSetUp": "Configura tu perfil",
@@ -7311,18 +7311,18 @@
   "profileRemovePhoto": "Eliminar foto",
   "profilePhotoError": "Elige una imagen válida que no supere los 20 MB.",
   "profileSaveError": "No se pudo guardar tu perfil. Inténtalo de nuevo.",
-  "homeGreetingMorning1": "Good morning",
-  "homeGreetingMorning2": "Rise and shine",
-  "homeGreetingMorning3": "Fresh start",
-  "homeGreetingAfternoon1": "Good afternoon",
-  "homeGreetingAfternoon2": "Afternoon groove",
-  "homeGreetingAfternoon3": "Keep the vibe going",
-  "homeGreetingEvening1": "Good evening",
-  "homeGreetingEvening2": "Time to unwind",
-  "homeGreetingEvening3": "Golden hour",
-  "homeGreetingNight1": "Good night",
-  "homeGreetingNight2": "Late-night session",
-  "homeGreetingNight3": "Quiet hours",
+  "homeGreetingMorning1": "Buenos días",
+  "homeGreetingMorning2": "Arriba, a brillar",
+  "homeGreetingMorning3": "Un nuevo comienzo",
+  "homeGreetingAfternoon1": "Buenas tardes",
+  "homeGreetingAfternoon2": "Ritmo de tarde",
+  "homeGreetingAfternoon3": "Mantén el ambiente",
+  "homeGreetingEvening1": "Buenas noches",
+  "homeGreetingEvening2": "Hora de relajarse",
+  "homeGreetingEvening3": "Hora dorada",
+  "homeGreetingNight1": "Buenas noches",
+  "homeGreetingNight2": "Sesión de madrugada",
+  "homeGreetingNight3": "Horas tranquilas",
   "homeGreetingNamed": "{greeting}, {name}",
   "@homeGreetingNamed": {
     "description": "Home greeting followed by the first name from the user's profile",
@@ -7335,31 +7335,31 @@
       }
     }
   },
-  "homeTaglineListening": "What are we listening to?",
+  "homeTaglineListening": "¿Qué escuchamos?",
   "@homeTaglineListening": {
     "description": "Rotating Home prompt under the greeting"
   },
-  "homeTaglineLink": "Got a link? Drop it in the search",
+  "homeTaglineLink": "¿Tienes un enlace? Pégalo en la búsqueda",
   "@homeTaglineLink": {
     "description": "Rotating Home prompt explaining that links can be pasted into search"
   },
-  "homeTaglineDiscover": "Find your next favorite album",
+  "homeTaglineDiscover": "Encuentra tu próximo álbum favorito",
   "@homeTaglineDiscover": {
     "description": "Rotating Home prompt under the greeting"
   },
-  "homeContinueListening": "Continue listening",
+  "homeContinueListening": "Seguir escuchando",
   "@homeContinueListening": {
     "description": "Home section header for the track currently loaded in the player"
   },
-  "homeRecentlyAdded": "Recently added",
+  "homeRecentlyAdded": "Añadidos recientemente",
   "@homeRecentlyAdded": {
     "description": "Home section header for the newest downloaded and scanned tracks"
   },
-  "homeOnRepeat": "On repeat",
+  "homeOnRepeat": "En repetición",
   "@homeOnRepeat": {
     "description": "Home section header for the most played tracks of the last four weeks"
   },
-  "homeShortcuts": "Shortcuts",
+  "homeShortcuts": "Accesos directos",
   "@homeShortcuts": {
     "description": "Home section header for quick links to player tools"
   },
@@ -7410,11 +7410,11 @@
   "listeningStatsClear": "Estadísticas de escucha claras",
   "listeningStatsClearError": "No se pudieron borrar las estadísticas de escucha. Inténtalo de nuevo.",
   "listeningStatsClearDescription": "¿Deseas eliminar todas las estadísticas de escucha de este dispositivo? Tu música y tus listas de reproducción se conservarán.",
-  "libraryArtistsEmpty": "Artists appear here once you download music or scan a local library.",
+  "libraryArtistsEmpty": "Los artistas aparecerán aquí cuando descargues música o analices una biblioteca local.",
   "listeningRewind": "Rewind",
-  "listeningRewindDescription": "Relive the highlights of your recent weeks and months",
-  "listeningRewindChoosePeriod": "Choose a period",
-  "listeningRewindLastWeeks": "Last {weeks} weeks",
+  "listeningRewindDescription": "Revive lo más destacado de tus últimas semanas y meses",
+  "listeningRewindChoosePeriod": "Elige un periodo",
+  "listeningRewindLastWeeks": "Últimas {weeks} semanas",
   "@listeningRewindLastWeeks": {
     "placeholders": {
       "weeks": {
@@ -7422,7 +7422,7 @@
       }
     }
   },
-  "listeningRewindLastMonths": "Last {months} months",
+  "listeningRewindLastMonths": "Últimos {months} meses",
   "@listeningRewindLastMonths": {
     "placeholders": {
       "months": {
@@ -7430,7 +7430,7 @@
       }
     }
   },
-  "listeningRewindThisYear": "{year} so far",
+  "listeningRewindThisYear": "{year} hasta ahora",
   "@listeningRewindThisYear": {
     "placeholders": {
       "year": {
@@ -7438,8 +7438,8 @@
       }
     }
   },
-  "listeningRewindIntroTitle": "Your Rewind",
-  "listeningRewindIntroBody": "A look back at what you played from {start} to {end}.",
+  "listeningRewindIntroTitle": "Tu Rewind",
+  "listeningRewindIntroBody": "Un repaso de lo que reprodujiste del {start} al {end}.",
   "@listeningRewindIntroBody": {
     "placeholders": {
       "start": {
@@ -7450,8 +7450,8 @@
       }
     }
   },
-  "listeningRewindMinutesTitle": "You listened for",
-  "listeningRewindMinutesUnit": "{minutes, plural, =1{minute} other{minutes}}",
+  "listeningRewindMinutesTitle": "Escuchaste durante",
+  "listeningRewindMinutesUnit": "{minutes, plural, =1{minuto} other{minutos}}",
   "@listeningRewindMinutesUnit": {
     "placeholders": {
       "minutes": {
@@ -7459,7 +7459,7 @@
       }
     }
   },
-  "listeningRewindHours": "{hours, plural, =1{That's about 1 hour of music} other{That's about {hours} hours of music}}",
+  "listeningRewindHours": "{hours, plural, =1{Eso son aproximadamente 1 hora de música} other{Eso son aproximadamente {hours} horas de música}}",
   "@listeningRewindHours": {
     "placeholders": {
       "hours": {
@@ -7467,7 +7467,7 @@
       }
     }
   },
-  "listeningRewindMore": "{percent}% more than the period before",
+  "listeningRewindMore": "{percent}% más que el periodo anterior",
   "@listeningRewindMore": {
     "placeholders": {
       "percent": {
@@ -7475,7 +7475,7 @@
       }
     }
   },
-  "listeningRewindLess": "{percent}% less than the period before",
+  "listeningRewindLess": "{percent}% menos que el periodo anterior",
   "@listeningRewindLess": {
     "placeholders": {
       "percent": {
@@ -7483,9 +7483,9 @@
       }
     }
   },
-  "listeningRewindSame": "About the same as the period before",
-  "listeningRewindTopArtistTitle": "Your top artist",
-  "listeningRewindArtistShare": "{percent}% of your listening time",
+  "listeningRewindSame": "Aproximadamente igual que el periodo anterior",
+  "listeningRewindTopArtistTitle": "Tu artista más escuchado",
+  "listeningRewindArtistShare": "{percent}% de tu tiempo de escucha",
   "@listeningRewindArtistShare": {
     "placeholders": {
       "percent": {
@@ -7493,9 +7493,9 @@
       }
     }
   },
-  "listeningRewindArtistsTitle": "Artists on rotation",
-  "listeningRewindTopTrackTitle": "Your top song",
-  "listeningRewindPlays": "{plays, plural, =1{1 play} other{{plays} plays}}",
+  "listeningRewindArtistsTitle": "Artistas en rotación",
+  "listeningRewindTopTrackTitle": "Tu canción más escuchada",
+  "listeningRewindPlays": "{plays, plural, =1{1 reproducción} other{{plays} reproducciones}}",
   "@listeningRewindPlays": {
     "placeholders": {
       "plays": {
@@ -7503,10 +7503,10 @@
       }
     }
   },
-  "listeningRewindTracksTitle": "Songs on repeat",
-  "listeningRewindTopAlbumTitle": "The album you kept coming back to",
-  "listeningRewindNewArtistsTitle": "New discoveries",
-  "listeningRewindNewArtistsBody": "{count, plural, =1{You found 1 new artist} other{You found {count} new artists}}",
+  "listeningRewindTracksTitle": "Canciones en repetición",
+  "listeningRewindTopAlbumTitle": "El álbum al que seguías volviendo",
+  "listeningRewindNewArtistsTitle": "Nuevos descubrimientos",
+  "listeningRewindNewArtistsBody": "{count, plural, =1{Descubriste 1 artista nuevo} other{Descubriste {count} artistas nuevos}}",
   "@listeningRewindNewArtistsBody": {
     "placeholders": {
       "count": {
@@ -7514,11 +7514,11 @@
       }
     }
   },
-  "listeningRewindRhythmTitle": "Your listening rhythm",
-  "listeningRewindPeakDay": "Biggest day",
-  "listeningRewindFavoriteDay": "Favorite day",
-  "listeningRewindStreak": "Longest streak",
-  "listeningRewindStreakDays": "{days, plural, =1{1 day} other{{days} days in a row}}",
+  "listeningRewindRhythmTitle": "Tu ritmo de escucha",
+  "listeningRewindPeakDay": "Tu día más intenso",
+  "listeningRewindFavoriteDay": "Día favorito",
+  "listeningRewindStreak": "Racha más larga",
+  "listeningRewindStreakDays": "{days, plural, =1{1 día} other{{days}días seguidos}}",
   "@listeningRewindStreakDays": {
     "placeholders": {
       "days": {
@@ -7526,8 +7526,8 @@
       }
     }
   },
-  "listeningRewindReplayTitle": "Couldn't stop playing",
-  "listeningRewindReplayBody": "You played it {plays} times on {date}",
+  "listeningRewindReplayTitle": "No podías dejar de escuchar",
+  "listeningRewindReplayBody": "La reprodujiste {plays} veces el {date}",
   "@listeningRewindReplayBody": {
     "placeholders": {
       "plays": {
@@ -7538,11 +7538,11 @@
       }
     }
   },
-  "listeningRewindOutroTitle": "That's your Rewind",
-  "listeningRewindOutroBody": "Keep listening. Your next Rewind is already taking shape.",
-  "listeningRewindEmpty": "Not enough listening in this period yet. Play some music with the built-in player and come back later.",
-  "listeningRewindLoadError": "Could not load your Rewind",
-  "listeningRewindSlide": "Slide {index} of {count}",
+  "listeningRewindOutroTitle": "Este es tu Rewind",
+  "listeningRewindOutroBody": "Sigue escuchando. Tu próximo Rewind ya se está formando.",
+  "listeningRewindEmpty": "Aún no has escuchado suficiente música en este periodo. Reproduce algo de música con el reproductor integrado y vuelve más tarde.",
+  "listeningRewindLoadError": "No se pudo cargar tu Rewind",
+  "listeningRewindSlide": "Diapositiva {index} de {count}",
   "@listeningRewindSlide": {
     "placeholders": {
       "index": {
@@ -7554,11 +7554,11 @@
     }
   },
   "listeningRewindShare": "Compartir",
-  "listeningRewindShareError": "Could not share your Rewind",
+  "listeningRewindShareError": "No se pudo compartir tu Rewind",
   "listeningRewindNext": "Siguiente",
-  "listeningRewindPrevious": "Previous",
-  "listeningRewindMonthlyReady": "Your last 4 weeks are ready to replay",
-  "listeningRewindYearTitle": "Your {year} in Music",
+  "listeningRewindPrevious": "Anterior",
+  "listeningRewindMonthlyReady": "Tus últimas 4 semanas están listas para revivir",
+  "listeningRewindYearTitle": "Tu {year} en música",
   "@listeningRewindYearTitle": {
     "placeholders": {
       "year": {
@@ -7566,15 +7566,15 @@
       }
     }
   },
-  "listeningRewindYearEyebrow": "Year-end Rewind",
-  "listeningRewindYearBanner": "Your top artists, songs and moments of the year",
-  "listeningRewindYearIntroBody": "Everything you played this year, from your first song to your biggest month.",
-  "listeningRewindNumbersTitle": "Your year in numbers",
+  "listeningRewindYearEyebrow": "Rewind de fin de año",
+  "listeningRewindYearBanner": "Tus artistas, canciones y momentos principales del año",
+  "listeningRewindYearIntroBody": "Todo lo que reprodujiste este año, desde tu primera canción hasta tu mes más intenso.",
+  "listeningRewindNumbersTitle": "Tu año en cifras",
   "listeningRewindSongsLabel": "Canciones",
   "listeningRewindArtistsLabel": "Artistas",
   "listeningRewindAlbumsLabel": "Álbumes",
-  "listeningRewindDaysLabel": "Days with music",
-  "listeningRewindDaysShare": "Music on {percent}% of your days",
+  "listeningRewindDaysLabel": "Días con música",
+  "listeningRewindDaysShare": "Música en el {percent} % de tus días",
   "@listeningRewindDaysShare": {
     "placeholders": {
       "percent": {
@@ -7582,9 +7582,9 @@
       }
     }
   },
-  "listeningRewindMonthsTitle": "Month by month",
-  "listeningRewindBiggestMonthLabel": "Biggest month",
-  "listeningRewindBiggestMonth": "Your biggest month was {month}",
+  "listeningRewindMonthsTitle": "Mes a mes",
+  "listeningRewindBiggestMonthLabel": "Mes más intenso",
+  "listeningRewindBiggestMonth": "Tu mes más intenso fue {month}",
   "@listeningRewindBiggestMonth": {
     "placeholders": {
       "month": {
@@ -7592,8 +7592,8 @@
       }
     }
   },
-  "listeningRewindMonthlyArtistsTitle": "Artist of the month",
-  "listeningRewindLoyalTitle": "Always by your side",
+  "listeningRewindMonthlyArtistsTitle": "Artista del mes",
+  "listeningRewindLoyalTitle": "Siempre a tu lado",
   "listeningRewindLoyalBody": "{days, plural, =1{With you on 1 day} other{With you on {days} different days}}",
   "@listeningRewindLoyalBody": {
     "placeholders": {
@@ -7838,7 +7838,7 @@
   "audioInfoOutputFormat": "Formato de salida",
   "audioInfoDeviceRates": "Device sample rates",
   "audioInfoDeviceFormats": "Device formats",
-  "audioInfoAnyRate": "Cualquier",
+  "audioInfoAnyRate": "Cualquiera",
   "audioInfoBuffer": "Mixer buffer",
   "audioInfoLatency": "Output latency",
   "audioInfoLowLatency": "Low-latency audio",
