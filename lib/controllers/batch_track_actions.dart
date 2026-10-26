@@ -378,8 +378,28 @@ Future<LibraryTrackConversionResult> convertLibraryTrack({
   }
 
   try {
+    String workingPath = filePath;
+    final isSaf = isContentUri(filePath);
+    if (isSaf) {
+      failureStage = 'read SAF source';
+      safTempPath = await ConversionLibraryService.copySafSourceToTemp(
+        filePath,
+      );
+      if (safTempPath == null ||
+          (treatEmptySafTempPathAsFailure && safTempPath.isEmpty)) {
+        throw const _BatchConversionFailure(
+          'read SAF source',
+          'temporary copy was not created',
+        );
+      }
+      workingPath = safTempPath;
+    }
+
+    // Reuse the conversion copy for tags and artwork. Pipe-backed SAF
+    // providers otherwise download the whole source again for each read.
+    failureStage = 'metadata';
     try {
-      final result = await PlatformBridge.readFileMetadata(filePath);
+      final result = await PlatformBridge.readFileMetadata(workingPath);
       if (result['error'] == null) {
         mergePlatformMetadataForTagEmbed(target: metadata, source: result);
       } else {
@@ -405,31 +425,13 @@ Future<LibraryTrackConversionResult> convertLibraryTrack({
       final coverOutput =
           '${tempDir.path}${Platform.pathSeparator}$coverTempPrefix${DateTime.now().millisecondsSinceEpoch}.jpg';
       final coverResult = await PlatformBridge.extractCoverToFile(
-        filePath,
+        workingPath,
         coverOutput,
       );
       if (coverResult['error'] == null) {
         coverPath = coverOutput;
       }
     } catch (_) {}
-
-    String workingPath = filePath;
-    final isSaf = isContentUri(filePath);
-
-    if (isSaf) {
-      failureStage = 'read SAF source';
-      safTempPath = await ConversionLibraryService.copySafSourceToTemp(
-        filePath,
-      );
-      if (safTempPath == null ||
-          (treatEmptySafTempPathAsFailure && safTempPath.isEmpty)) {
-        throw const _BatchConversionFailure(
-          'read SAF source',
-          'temporary copy was not created',
-        );
-      }
-      workingPath = safTempPath;
-    }
 
     failureStage = 'FFmpeg conversion';
     final newPath = await FFmpegConversion.convertAudioFormat(

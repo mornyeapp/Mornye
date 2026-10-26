@@ -22,6 +22,9 @@ class _ResolvedLosslessQuality {
 /// Encoding and track splitting depend on inspection, tagging and output
 /// publication directly, without routing through the compatibility facade.
 abstract final class FFmpegConversion {
+  // FFmpeg's balanced FLAC preset keeps PCM unchanged with less encoder work.
+  static const _flacCompressionLevel = '5';
+
   static Future<_ResolvedLosslessQuality> _resolveLosslessQuality({
     required String inputPath,
     required LosslessConversionQuality quality,
@@ -381,7 +384,9 @@ abstract final class FFmpegConversion {
     arguments.addAll(['-map', '0:a']);
     if (hasCover) FFmpegMetadata.appendCoverInputArguments(arguments);
     arguments.addAll(['-c:a', codec]);
-    if (!isAlac) arguments.addAll(['-compression_level', '8']);
+    if (!isAlac) {
+      arguments.addAll(['-compression_level', _flacCompressionLevel]);
+    }
     _appendLosslessQuality(
       arguments,
       codec: codec,
@@ -557,7 +562,7 @@ abstract final class FFmpegConversion {
       }
       arguments.addAll(
         outputExt == 'flac'
-            ? ['-c:a', 'flac', '-compression_level', '8']
+            ? ['-c:a', 'flac', '-compression_level', _flacCompressionLevel]
             : ['-c:a', 'copy'],
       );
       final metadata = <String, String>{
