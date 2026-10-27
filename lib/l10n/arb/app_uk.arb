@@ -175,7 +175,7 @@
   "extensionAccountRequiredValue": "Введіть значення.",
   "extensionAccountInvalidNumber": "Введіть коректний номер.",
   "settingsPlaybackSubtitle": "Плеєр, гучність, автомікшування та аудіовихід",
-  "sectionPlayer": "Плеєр",
+  "sectionPlayer": "Програвач",
   "sectionVolumeAndTransitions": "Гучність та переходи",
   "sectionAudioOutput": "Аудіо вихід",
   "usbBitPerfect": "Hi-res та якісне аудіо",
@@ -272,7 +272,7 @@
   "@homeTitle": {
     "description": "Home screen title"
   },
-  "homeEmptyTitle": "Поки що немає постачальників послуг пошуку",
+  "homeEmptyTitle": "Поки що немає провайдерів послуг пошуку",
   "@homeEmptyTitle": {
     "description": "Title shown on home when no providers are available yet"
   },
@@ -389,15 +389,15 @@
   "@appearanceTitle": {
     "description": "Appearance settings page title"
   },
-  "appearanceThemeSystem": "Системний",
+  "appearanceThemeSystem": "Системна",
   "@appearanceThemeSystem": {
     "description": "Follow system theme"
   },
-  "appearanceThemeLight": "Світлий",
+  "appearanceThemeLight": "Світла",
   "@appearanceThemeLight": {
     "description": "Light theme"
   },
-  "appearanceThemeDark": "Темний",
+  "appearanceThemeDark": "Темна",
   "@appearanceThemeDark": {
     "description": "Dark theme"
   },
@@ -421,7 +421,7 @@
   "@appearanceHistoryViewGrid": {
     "description": "Grid layout option"
   },
-  "optionsPrimaryProvider": "Основний постачальник",
+  "optionsPrimaryProvider": "Основний провайдер",
   "@optionsPrimaryProvider": {
     "description": "Main search provider setting"
   },
@@ -1305,7 +1305,7 @@
   "@snackbarSelectExtFile": {
     "description": "Snackbar - wrong file type selected"
   },
-  "snackbarProviderPrioritySaved": "Пріоритет постачальника збережено",
+  "snackbarProviderPrioritySaved": "Пріоритет провайдера збережено",
   "@snackbarProviderPrioritySaved": {
     "description": "Snackbar - provider order saved"
   },
@@ -1630,11 +1630,11 @@
   "@updateRestartNow": {
     "description": "Update button on Linux - restart the app after the AppImage was replaced"
   },
-  "providerPriorityTitle": "Пріоритет постачальника",
+  "providerPriorityTitle": "Пріоритет провайдера",
   "@providerPriorityTitle": {
     "description": "Provider priority page title"
   },
-  "providerPriorityDescription": "Перетягніть, щоб змінити порядок постачальників завантажень. Під час завантаження треків програма використовуватиме постачальників зверху вниз.",
+  "providerPriorityDescription": "Перетягніть, щоб змінити порядок провайдерів завантажень. Під час завантаження треків програма використовуватиме провайдерів зверху вниз.",
   "@providerPriorityDescription": {
     "description": "Provider priority page description"
   },
@@ -1646,7 +1646,7 @@
   "@providerPriorityFallbackExtensionsDescription": {
     "description": "Section description for extension fallback selection"
   },
-  "providerPriorityFallbackExtensionsHint": "Тут перелічені лише ввімкнені розширення з можливістю завантаження через постачальника послуг.",
+  "providerPriorityFallbackExtensionsHint": "Тут перелічені лише ввімкнені розширення з можливістю завантаження через провайдера послуг.",
   "@providerPriorityFallbackExtensionsHint": {
     "description": "Hint below the extension fallback selection list"
   },
@@ -1658,7 +1658,7 @@
   "@metadataProviderPriorityTitle": {
     "description": "Metadata priority page title"
   },
-  "metadataProviderPriorityDescription": "Перетягніть, щоб змінити порядок постачальників метаданих. Додаток шукатиме постачальників зверху вниз під час пошуку треків та отримання метаданих.",
+  "metadataProviderPriorityDescription": "Перетягніть, щоб змінити порядок провайдерів метаданих. Додаток шукатиме провайдерів зверху вниз під час пошуку треків та отримання метаданих.",
   "@metadataProviderPriorityDescription": {
     "description": "Metadata priority page description"
   },
@@ -2177,7 +2177,7 @@
   "@extensionCapabilities": {
     "description": "Section header - extension features"
   },
-  "extensionMetadataProvider": "Постачальник метаданих",
+  "extensionMetadataProvider": "Провайдер метаданих",
   "@extensionMetadataProvider": {
     "description": "Capability - provides metadata"
   },
@@ -2185,7 +2185,7 @@
   "@extensionDownloadProvider": {
     "description": "Capability - provides downloads"
   },
-  "extensionLyricsProvider": "Постачальник текстів пісень",
+  "extensionLyricsProvider": "Провайдер текстів пісень",
   "@extensionLyricsProvider": {
     "description": "Capability - provides lyrics"
   },
@@ -2256,7 +2256,7 @@
       }
     }
   },
-  "extensionsProviderPrioritySection": "Пріоритет постачальника",
+  "extensionsProviderPrioritySection": "Пріоритет провайдера",
   "@extensionsProviderPrioritySection": {
     "description": "Section header - provider priority"
   },
@@ -2276,7 +2276,7 @@
   "@extensionsInstallButton": {
     "description": "Button to install extension from file"
   },
-  "extensionsInfoTip": "Розширення можуть додавати нові метадані та завантажувати постачальників. Встановлюйте розширення лише з перевірених джерел.",
+  "extensionsInfoTip": "Розширення можуть додавати нові метадані та завантажувати провайдерів. Встановлюйте розширення лише з перевірених джерел.",
   "@extensionsInfoTip": {
     "description": "Security warning about extensions"
   },
@@ -2324,7 +2324,7 @@
   "@extensionsFallbackSubtitle": {
     "description": "Subtitle for download fallback extensions menu"
   },
-  "extensionsNoDownloadProvider": "Без розширень із постачальником завантажень",
+  "extensionsNoDownloadProvider": "Без розширень із провайдером завантажень",
   "@extensionsNoDownloadProvider": {
     "description": "Empty state - no download providers"
   },
@@ -2336,11 +2336,11 @@
   "@extensionsMetadataPrioritySubtitle": {
     "description": "Subtitle for metadata priority"
   },
-  "extensionsNoMetadataProvider": "Без розширень із постачальником метаданих",
+  "extensionsNoMetadataProvider": "Без розширень із провайдером метаданих",
   "@extensionsNoMetadataProvider": {
     "description": "Empty state - no metadata providers"
   },
-  "extensionsSearchProvider": "Постачальник пошуку",
+  "extensionsSearchProvider": "Провайдер пошуку",
   "@extensionsSearchProvider": {
     "description": "Setting - search provider selection"
   },
@@ -3244,7 +3244,7 @@
   "@tutorialWelcomeTip1": {
     "description": "Tutorial welcome tip 1"
   },
-  "tutorialWelcomeTip2": "Оберіть один із варіантів якості аудіо, запропонованих вашим постачальником послуг завантаження",
+  "tutorialWelcomeTip2": "Оберіть один із варіантів якості аудіо, запропонованих вашим провайдером послуг завантаження",
   "@tutorialWelcomeTip2": {
     "description": "Tutorial welcome tip 2"
   },
@@ -4283,11 +4283,11 @@
   "@lyricsProvidersTitle": {
     "description": "Settings item title for lyrics provider order"
   },
-  "lyricsProvidersDescription": "Увімкнення, вимкнення та зміна порядку джерел текстів пісень. Постачальники перевірятимуть зверху вниз, доки не буде знайдено текст пісні.",
+  "lyricsProvidersDescription": "Увімкнення, вимкнення та зміна порядку джерел текстів пісень. Провайдери перевірятимуть зверху вниз, доки не буде знайдено текст пісні.",
   "@lyricsProvidersDescription": {
     "description": "Description on the lyrics provider priority page"
   },
-  "lyricsProvidersInfoText": "Постачальники текстів пісень із розширень працюють перед вбудованими постачальниками. Принаймні один постачальник має залишатися ввімкненим.",
+  "lyricsProvidersInfoText": "Провайдери текстів пісень із розширень працюють перед вбудованими провайдерами. Принаймні один провайдер має залишатися ввімкненим.",
   "@lyricsProvidersInfoText": {
     "description": "Info tip on lyrics provider priority page"
   },
@@ -4309,11 +4309,11 @@
       }
     }
   },
-  "lyricsProvidersAtLeastOne": "Принаймні один постачальник має залишатися ввімкненим",
+  "lyricsProvidersAtLeastOne": "Принаймні один провайдер має залишатися ввімкненим",
   "@lyricsProvidersAtLeastOne": {
     "description": "Snackbar when user tries to disable the last enabled provider"
   },
-  "lyricsProvidersSaved": "Пріоритет постачальника текстів пісень збережено",
+  "lyricsProvidersSaved": "Пріоритет провайдера текстів пісень збережено",
   "@lyricsProvidersSaved": {
     "description": "Snackbar after saving lyrics provider priority"
   },
@@ -4357,7 +4357,7 @@
   "@lyricsProviderBetterLyricsDesc": {
     "description": "Description for BetterLyrics provider, which only answers songs it has already cached"
   },
-  "lyricsProviderExtensionDesc": "Постачальник розширень",
+  "lyricsProviderExtensionDesc": "Провайдер розширень",
   "@lyricsProviderExtensionDesc": {
     "description": "Generic description for extension-based lyrics providers"
   },
@@ -5357,7 +5357,7 @@
   "@audioAnalysisRescanning": {
     "description": "Loading text while audio is being re-analyzed after an explicit refresh"
   },
-  "extensionsHomeFeedProvider": "Постачальник оновлень домашньої стрічки",
+  "extensionsHomeFeedProvider": "Провайдер оновлень домашньої стрічки",
   "@extensionsHomeFeedProvider": {
     "description": "Extensions page - label for home feed provider selector"
   },
