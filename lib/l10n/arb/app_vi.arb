@@ -1,18 +1,18 @@
 {
   "trackBpm": "BPM",
   "trackMood": "Sắc thái",
-  "subsonicAddToLibrary": "Add server to Library",
-  "subsonicLibraryAdded": "Server added to Library",
-  "subsonicLibraryDescription": "Sync the server catalogue and artwork to Library. Music stays on your server. Rescan it in Local Library settings to update the catalogue.",
-  "subsonicAuthentication": "Authentication",
-  "subsonicToken": "Salted token",
-  "subsonicPasswordAuth": "Password",
-  "subsonicApiKey": "API key",
-  "subsonicUsername": "Username",
-  "subsonicPassword": "Password",
-  "subsonicSearch": "Search server music...",
-  "subsonicMoreAlbums": "More albums",
-  "subsonicErrorApi": "The server does not support this API version or authentication method. Check the server settings and the selected sign-in method.",
+  "subsonicAddToLibrary": "Thêm máy chủ vào Thư viện",
+  "subsonicLibraryAdded": "Đã thêm máy chủ vào Thư viện",
+  "subsonicLibraryDescription": "Đồng bộ danh mục và ảnh bìa từ máy chủ vào Thư viện. Nhạc vẫn được lưu trên máy chủ của bạn. Quét lại trong cài đặt Thư viện cục bộ để cập nhật danh mục.",
+  "subsonicAuthentication": "Xác thực",
+  "subsonicToken": "Token có salt",
+  "subsonicPasswordAuth": "Mật khẩu",
+  "subsonicApiKey": "Khóa API",
+  "subsonicUsername": "Tên người dùng",
+  "subsonicPassword": "Mật khẩu",
+  "subsonicSearch": "Tìm kiếm nhạc trên máy chủ...",
+  "subsonicMoreAlbums": "Xem thêm album",
+  "subsonicErrorApi": "Máy chủ không hỗ trợ phiên bản API hoặc phương thức xác thực này. Hãy kiểm tra lại cài đặt máy chủ và phương thức đăng nhập đã chọn.",
   "networkDownloadDestination": "Điểm đến tải xuống từ mạng",
   "@networkDownloadDestination": {
     "description": "Files settings item that opens network storage to choose a folder for downloaded music"
@@ -73,7 +73,7 @@
   "@networkErrorPermission": {
     "description": "Network access error when the server denies account permissions for a shared folder; distinct from the device's local network permission"
   },
-  "networkErrorLocalPermission": "Local network access is not allowed. Allow Nearby devices for Mornye in Android app settings, then try again.",
+  "networkErrorLocalPermission": "Không được phép truy cập mạng cục bộ. Vui lòng cấp quyền \"Thiết bị ở gần\" cho Mornye trong cài đặt ứng dụng Android, sau đó thử lại.",
   "@networkErrorLocalPermission": {
     "description": "Network access error when Android denies local network permission; Nearby devices is the Android app permission setting"
   },
@@ -288,11 +288,11 @@
   "@homeRecent": {
     "description": "Section header for recent searches"
   },
-  "searchRecentlySearched": "Recently Searched",
+  "searchRecentlySearched": "Đã tìm kiếm gần đây",
   "@searchRecentlySearched": {
     "description": "Section header for recent searches on the desktop Search page"
   },
-  "searchLibraryPrompt": "Search Your Library",
+  "searchLibraryPrompt": "Tìm trong Thư viện của bạn",
   "@searchLibraryPrompt": {
     "description": "Shown on the desktop Search page when the Library scope has no search words yet"
   },
@@ -369,15 +369,15 @@
   "@downloadFolderTemplateDescription": {
     "description": "Help for custom download folder templates"
   },
-  "folderOrganizationCustom": "Custom template",
+  "folderOrganizationCustom": "Mẫu tùy chỉnh",
   "@folderOrganizationCustom": {
     "description": "Folder organization mode using a user-defined template"
   },
-  "folderTemplateInvalid": "Enter a relative folder path with supported tags. Empty folders, . and .. are not allowed.",
+  "folderTemplateInvalid": "Nhập đường dẫn thư mục tương đối kèm theo các thẻ được hỗ trợ. Không được phép sử dụng các thư mục trống, ký hiệu . hoặc .",
   "@folderTemplateInvalid": {
     "description": "Validation error for an invalid folder template"
   },
-  "folderTemplatePreview": "Example folder path",
+  "folderTemplatePreview": "Đường dẫn thư mục ví dụ",
   "@folderTemplatePreview": {
     "description": "Label for a sample expanded folder template"
   },
@@ -622,7 +622,7 @@
   "@optionsUpdateChannel": {
     "description": "Stable vs preview releases"
   },
-  "optionsUpdateChannelStable": "Chỉ nhận bản phát hành ổn định (Stable)",
+  "optionsUpdateChannelStable": "Chỉ nhận bản phát hành ổn định",
   "@optionsUpdateChannelStable": {
     "description": "Only stable updates"
   },
@@ -944,7 +944,7 @@
   "@setupStorageRequired": {
     "description": "Title when storage permission needed"
   },
-  "setupStorageDescription": "Mornye needs storage permission to save your downloaded music files.",
+  "setupStorageDescription": "Mornye cần quyền truy cập bộ nhớ để lưu các tệp nhạc đã tải về.",
   "@setupStorageDescription": {
     "description": "Explanation for storage permission"
   },
@@ -1301,7 +1301,7 @@
   "@snackbarFileNotFound": {
     "description": "Snackbar - file doesn't exist"
   },
-  "snackbarSelectExtFile": "Please select a .mornye-ext file",
+  "snackbarSelectExtFile": "Vui lòng chọn một tệp .mornye-ext",
   "@snackbarSelectExtFile": {
     "description": "Snackbar - wrong file type selected"
   },
@@ -1606,27 +1606,27 @@
   "@updateDontRemind": {
     "description": "Update button - skip this version"
   },
-  "updateViewRelease": "View Release",
+  "updateViewRelease": "Xem bản phát hành",
   "@updateViewRelease": {
     "description": "Update button - open the release page when this install cannot update itself (deb, Flatpak, no matching package)"
   },
-  "updateStartingInstaller": "Starting the installer...",
+  "updateStartingInstaller": "Đang khởi chạy trình cài đặt...",
   "@updateStartingInstaller": {
     "description": "Update status on Windows - the downloaded installer is starting and the app will close"
   },
-  "updateMacInstallHint": "The disk image is open in Finder. Quit Mornye, then drag Mornye from the disk image to Applications and replace the old copy.",
+  "updateMacInstallHint": "Tệp ảnh đĩa (disk image) đã mở trong Finder. Hãy thoát Mornye, sau đó kéo Mornye từ ảnh đĩa vào Applications và thay thế bản cũ.",
   "@updateMacInstallHint": {
     "description": "Update instructions on macOS after the downloaded disk image opens"
   },
-  "updateQuitApp": "Quit Mornye",
+  "updateQuitApp": "Thoát Mornye",
   "@updateQuitApp": {
     "description": "Update button on macOS - quit the app so the new version can replace it"
   },
-  "updateReadyToRestart": "The update is installed. Restart Mornye to use it.",
+  "updateReadyToRestart": "Bản cập nhật đã được cài đặt. Hãy khởi động lại Mornye để sử dụng.",
   "@updateReadyToRestart": {
     "description": "Update status on Linux after the AppImage was replaced"
   },
-  "updateRestartNow": "Restart Now",
+  "updateRestartNow": "Khởi động lại ngay",
   "@updateRestartNow": {
     "description": "Update button on Linux - restart the app after the AppImage was replaced"
   },
@@ -1732,7 +1732,7 @@
       }
     }
   },
-  "channelStable": "Ổn định (Stable)",
+  "channelStable": "Ổn định",
   "@channelStable": {
     "description": "Update channel - stable releases"
   },
@@ -1888,7 +1888,7 @@
   "@trackLoadLyrics": {
     "description": "Action - fetch lyrics"
   },
-  "trackMetadata": "Metadata",
+  "trackMetadata": "Siêu dữ liệu",
   "@trackMetadata": {
     "description": "Tab title - track metadata"
   },
@@ -1976,7 +1976,7 @@
   "@trackGenre": {
     "description": "Metadata label - music genre"
   },
-  "trackLabel": "Hãng đĩa (Label)",
+  "trackLabel": "Hãng đĩa",
   "@trackLabel": {
     "description": "Metadata label - record label"
   },
@@ -2268,7 +2268,7 @@
   "@extensionsNoExtensions": {
     "description": "Empty state - no extensions"
   },
-  "extensionsNoExtensionsSubtitle": "Install .mornye-ext files to add new providers",
+  "extensionsNoExtensionsSubtitle": "Cài đặt các tệp .mornye-ext để thêm nhà cung cấp nguồn mới",
   "@extensionsNoExtensionsSubtitle": {
     "description": "Empty state subtitle"
   },
@@ -2900,11 +2900,11 @@
   "@libraryRemoveFolder": {
     "description": "Action to remove one indexed library source"
   },
-  "libraryRemoveFolderMessage": "Remove this folder and its indexed tracks from Mornye? Audio files on the storage will not be deleted.",
+  "libraryRemoveFolderMessage": "Xóa thư mục này và các bài hát đã lập chỉ mục khỏi Mornye? Các tệp âm thanh trong bộ nhớ sẽ không bị xóa.",
   "@libraryRemoveFolderMessage": {
     "description": "Confirmation shown before removing a library source"
   },
-  "libraryUnreadableFiles": "{count, plural, =1{1 file couldn't be read} other{{count} files couldn't be read}}",
+  "libraryUnreadableFiles": "{count, plural, =1{Không thể đọc 1 tệp} other{Không thể đọc {count} tệp}}",
   "@libraryUnreadableFiles": {
     "description": "Count of files the last scan of a library folder skipped because it could not read them",
     "placeholders": {
@@ -2913,19 +2913,19 @@
       }
     }
   },
-  "libraryUnreadableFilesTitle": "Unreadable files",
+  "libraryUnreadableFilesTitle": "Tệp không đọc được",
   "@libraryUnreadableFilesTitle": {
     "description": "Title of the list of files a library scan could not read, and the action that opens it"
   },
-  "libraryUnreadableFilesSubtitle": "These files were left out of your library. They may be damaged, still downloading, or blocked by the storage app.",
+  "libraryUnreadableFilesSubtitle": "Các tệp này đã bị bỏ qua khỏi thư viện của bạn. Chúng có thể bị hỏng, đang trong quá trình tải xuống hoặc bị ứng dụng lưu trữ chặn.",
   "@libraryUnreadableFilesSubtitle": {
     "description": "Explanation above the list of files a library scan could not read"
   },
-  "libraryUnreadableFilesAction": "See which files and why",
+  "libraryUnreadableFilesAction": "Xem danh sách tệp và lý do",
   "@libraryUnreadableFilesAction": {
     "description": "Subtitle of the library folder action that lists unreadable files"
   },
-  "libraryUnreadableFilesMore": "{count, plural, =1{1 more file isn't listed} other{{count} more files aren't listed}}",
+  "libraryUnreadableFilesMore": "{count, plural, =1{Còn 1 tệp khác chưa được liệt kê} other{Còn {count} tệp khác chưa được liệt kê}}",
   "@libraryUnreadableFilesMore": {
     "description": "Note below the unreadable files list when the scan skipped more files than it lists",
     "placeholders": {
@@ -3090,7 +3090,7 @@
   "@libraryStorageAccessRequired": {
     "description": "Dialog title for storage permission"
   },
-  "libraryStorageAccessMessage": "Mornye needs storage access to scan your music library. Please grant permission in settings.",
+  "libraryStorageAccessMessage": "Mornye cần quyền truy cập bộ nhớ để quét thư viện nhạc của bạn. Vui lòng cấp quyền trong phần cài đặt.",
   "@libraryStorageAccessMessage": {
     "description": "Dialog message for storage permission"
   },
@@ -3186,11 +3186,11 @@
   "@libraryFilterSortOldest": {
     "description": "Sort option - oldest first"
   },
-  "libraryFilterSortSizeLargest": "Size (Largest first)",
+  "libraryFilterSortSizeLargest": "Dung lượng (Lớn nhất trước)",
   "@libraryFilterSortSizeLargest": {
     "description": "Library sort option - largest files first"
   },
-  "libraryFilterSortSizeSmallest": "Size (Smallest first)",
+  "libraryFilterSortSizeSmallest": "Dung lượng (Nhỏ nhất trước)",
   "@libraryFilterSortSizeSmallest": {
     "description": "Library sort option - smallest files first"
   },
@@ -3232,11 +3232,11 @@
       }
     }
   },
-  "tutorialWelcomeTitle": "Welcome to Mornye!",
+  "tutorialWelcomeTitle": "Chào mừng bạn đến với Mornye!",
   "@tutorialWelcomeTitle": {
     "description": "Tutorial welcome page title"
   },
-  "tutorialWelcomeDesc": "Learn how to find music with extensions, choose the quality you want, and manage downloads in Mornye.",
+  "tutorialWelcomeDesc": "Tìm hiểu cách tìm nhạc bằng các tiện ích mở rộng, chọn chất lượng mong muốn và quản lý tải xuống trong Mornye.",
   "@tutorialWelcomeDesc": {
     "description": "Tutorial welcome page description"
   },
@@ -3430,7 +3430,7 @@
   "@libraryPlaybackNormalizationSubtitle": {
     "description": "Subtitle explaining playback volume normalization"
   },
-  "playbackNormalizationMode": "Gain mode",
+  "playbackNormalizationMode": "Chế độ khuếch đại",
   "@playbackNormalizationMode": {
     "description": "Label for choosing between track and album ReplayGain during playback"
   },
@@ -3442,11 +3442,11 @@
   "@playbackNormalizationModeAlbum": {
     "description": "Gain mode that keeps the loudness differences inside an album"
   },
-  "playbackNormalizationPreamp": "Pre-amp",
+  "playbackNormalizationPreamp": "Tiền khuếch đại",
   "@playbackNormalizationPreamp": {
     "description": "Label for the dB offset applied on top of ReplayGain during playback"
   },
-  "playbackNormalizationPreampValue": "{gain} dB (target {target} LUFS)",
+  "playbackNormalizationPreampValue": "{gain} dB (mục tiêu {target} LUFS)",
   "@playbackNormalizationPreampValue": {
     "description": "Pre-amp value with the resulting target loudness",
     "placeholders": {
@@ -3460,7 +3460,7 @@
       }
     }
   },
-  "playbackNormalizationPreampHint": "Lower values play quieter. Normalization only turns tracks down, so it never clips.",
+  "playbackNormalizationPreampHint": "Giá trị thấp hơn sẽ phát nhỏ hơn. Tính năng chuẩn hóa âm lượng chỉ giảm mức âm của bài hát nên sẽ không bao giờ bị vỡ tiếng.",
   "@playbackNormalizationPreampHint": {
     "description": "Hint under the normalization pre-amp slider"
   },
@@ -3808,7 +3808,7 @@
   "@trackConvertTargetFormat": {
     "description": "Label for format selection"
   },
-  "trackConvertBitrate": "Bitrate",
+  "trackConvertBitrate": "Tốc độ bit",
   "@trackConvertBitrate": {
     "description": "Label for bitrate selection"
   },
@@ -4365,7 +4365,7 @@
   "@safMigrationTitle": {
     "description": "Title of SAF migration dialog"
   },
-  "safMigrationMessage1": "Mornye now uses Android Storage Access Framework (SAF) for downloads. This fixes \"permission denied\" errors on Android 10+.",
+  "safMigrationMessage1": "Mornye hiện sử dụng Android Storage Access Framework (SAF) cho các lượt tải xuống. Điều này giúp khắc phục lỗi \"permission denied\" trên Android 10 trở lên.",
   "@safMigrationMessage1": {
     "description": "First paragraph of SAF migration dialog"
   },
@@ -4445,7 +4445,7 @@
   "@backupRestoreFailed": {
     "description": "Snackbar when restore fails"
   },
-  "backupInvalidFile": "This file is not a valid Mornye backup",
+  "backupInvalidFile": "Tệp này không phải là bản sao lưu Mornye hợp lệ",
   "@backupInvalidFile": {
     "description": "Snackbar when the chosen file is not a valid backup"
   },
@@ -4629,9 +4629,9 @@
     "description": "Subtitle shown in the download location picker sheet"
   },
   "storageAutomaticFolder": "Thư mục tự động",
-  "storageAutomaticDownloadFolder": "Uses Download/Mornye when writable, otherwise app storage",
+  "storageAutomaticDownloadFolder": "Sử dụng thư mục Download/Mornye khi có quyền ghi, nếu không sẽ dùng bộ nhớ của ứng dụng",
   "storageSafRecommended": "Tự chọn thư mục (Khuyên dùng)",
-  "storageDownloadFolderHint": "In the Android folder picker, open Download and select Mornye. If it does not exist, create it using New folder, then tap Use this folder to grant access.",
+  "storageDownloadFolderHint": "Trong trình chọn thư mục của Android, hãy mở thư mục Download và chọn Mornye. Nếu chưa có, hãy tạo mới bằng nút \"Thư mục mới\", sau đó nhấn \"Dùng thư mục này\" để cấp quyền truy cập.",
   "downloadFolderAccessLostTitle": "Mất quyền truy cập thư mục tải xuống",
   "@downloadFolderAccessLostTitle": {
     "description": "Title of the warning banner shown in Files settings when the saved SAF folder grant is no longer valid"
@@ -4931,31 +4931,31 @@
   "@editMetadataAutoFillNoneSelected": {
     "description": "Snackbar when user taps Fetch without selecting any fields"
   },
-  "editMetadataLyricsSearch": "Find lyrics online",
+  "editMetadataLyricsSearch": "Tìm lời bài hát trực tuyến",
   "@editMetadataLyricsSearch": {
     "description": "Button in the edit metadata lyrics section that searches every lyrics provider"
   },
-  "lyricsPickerTitle": "Choose lyrics",
+  "lyricsPickerTitle": "Chọn lời bài hát",
   "@lyricsPickerTitle": {
     "description": "Title of the sheet listing each lyrics provider's result"
   },
-  "lyricsPickerNeedsTitle": "Enter a title and artist first",
+  "lyricsPickerNeedsTitle": "Vui lòng nhập tên bài hát và nghệ sĩ trước",
   "@lyricsPickerNeedsTitle": {
     "description": "Snackbar when searching lyrics without a title or artist"
   },
-  "lyricsPickerNoProviders": "No lyrics providers are enabled. Turn some on in Settings > Lyrics.",
+  "lyricsPickerNoProviders": "Chưa bật nguồn cung cấp lời bài hát nào. Hãy bật trong Cài đặt > Lời bài hát.",
   "@lyricsPickerNoProviders": {
     "description": "Shown in the lyrics picker when no provider is enabled"
   },
-  "lyricsPickerWordSynced": "Word-synced",
+  "lyricsPickerWordSynced": "Đồng bộ từng từ",
   "@lyricsPickerWordSynced": {
     "description": "Lyrics result timed word by word"
   },
-  "lyricsPickerSynced": "Synced",
+  "lyricsPickerSynced": "Đồng bộ",
   "@lyricsPickerSynced": {
     "description": "Lyrics result timed line by line"
   },
-  "lyricsPickerPlain": "Plain text",
+  "lyricsPickerPlain": "Văn bản thuần tuý",
   "@lyricsPickerPlain": {
     "description": "Lyrics result without timing"
   },
@@ -4963,11 +4963,11 @@
   "@lyricsPickerInstrumental": {
     "description": "Lyrics result that marks the track as instrumental"
   },
-  "lyricsPickerNotFound": "No lyrics found",
+  "lyricsPickerNotFound": "Không tìm thấy lời bài hát",
   "@lyricsPickerNotFound": {
     "description": "A lyrics provider returned nothing for this track"
   },
-  "lyricsPickerLineCount": "{count, plural, =1{1 line} other{{count} lines}}",
+  "lyricsPickerLineCount": "{count, plural, =1{1 dòng} other{{count} dòng}}",
   "@lyricsPickerLineCount": {
     "description": "Number of lyric lines in a provider's result",
     "placeholders": {
@@ -5132,7 +5132,7 @@
   "@audioAnalysisAnalyzing": {
     "description": "Loading text while analyzing audio"
   },
-  "audioAnalysisSampleRate": "Sample Rate (Tần số lấy mẫu)",
+  "audioAnalysisSampleRate": "Tần số lấy mẫu",
   "@audioAnalysisSampleRate": {
     "description": "Sample rate metric label"
   },
@@ -5148,11 +5148,11 @@
   "@audioAnalysisDecodedFormat": {
     "description": "Decoded sample format metric label"
   },
-  "audioAnalysisBitDepth": "Bit Depth",
+  "audioAnalysisBitDepth": "Độ sâu bit",
   "@audioAnalysisBitDepth": {
     "description": "Bit depth metric label"
   },
-  "audioAnalysisChannels": "Bit Depth",
+  "audioAnalysisChannels": "Kênh",
   "@audioAnalysisChannels": {
     "description": "Channels metric label"
   },
@@ -5160,7 +5160,7 @@
   "@audioAnalysisDuration": {
     "description": "Duration metric label"
   },
-  "audioAnalysisNyquist": "Nyquist",
+  "audioAnalysisNyquist": "Tần số Nyquist",
   "@audioAnalysisNyquist": {
     "description": "Nyquist frequency metric label"
   },
@@ -5168,11 +5168,11 @@
   "@audioAnalysisFileSize": {
     "description": "File size metric label"
   },
-  "audioAnalysisDynamicRange": "Dải động (Dynamic Range)",
+  "audioAnalysisDynamicRange": "Dải động",
   "@audioAnalysisDynamicRange": {
     "description": "Dynamic range metric label"
   },
-  "audioAnalysisPeak": "Peak (Đỉnh)",
+  "audioAnalysisPeak": "Đỉnh",
   "@audioAnalysisPeak": {
     "description": "Peak amplitude metric label"
   },
@@ -5184,7 +5184,7 @@
   "@audioAnalysisLufs": {
     "description": "Integrated loudness metric label"
   },
-  "audioAnalysisTruePeak": "True Peak (Đỉnh thực)",
+  "audioAnalysisTruePeak": "Đỉnh thực",
   "@audioAnalysisTruePeak": {
     "description": "True peak metric label"
   },
@@ -5192,11 +5192,11 @@
   "@audioAnalysisClipping": {
     "description": "Clipping metric label"
   },
-  "audioAnalysisNoClipping": "Không bị vỡ tiếng (No clipping)",
+  "audioAnalysisNoClipping": "Không bị vỡ tiếng",
   "@audioAnalysisNoClipping": {
     "description": "Displayed when no clipped samples were detected"
   },
-  "audioAnalysisSpectralCutoff": "Tần số cắt phổ (Spectral Cutoff)",
+  "audioAnalysisSpectralCutoff": "Ngưỡng cắt tần số ước tính",
   "@audioAnalysisSpectralCutoff": {
     "description": "Estimated spectral cutoff metric label"
   },
@@ -5208,7 +5208,7 @@
   "@audioAnalysisChannelStats": {
     "description": "Per-channel audio analysis section label"
   },
-  "audioAnalysisSamples": "Mẫu (Samples)",
+  "audioAnalysisSamples": "Số lượng mẫu",
   "@audioAnalysisSamples": {
     "description": "Total samples metric label"
   },
@@ -5216,11 +5216,11 @@
   "@audioAnalysisRescan": {
     "description": "Tooltip/label for the button that re-runs the audio analysis, discarding cached results"
   },
-  "audioAnalysisSaveSpectrogram": "Save Spectrogram",
+  "audioAnalysisSaveSpectrogram": "Lưu phổ âm thanh",
   "@audioAnalysisSaveSpectrogram": {
     "description": "Tooltip for the spectrogram button that saves the plot, with its axes and legend, as a PNG image the user places in storage"
   },
-  "audioAnalysisSpectrogramSaved": "Spectrogram saved to {fileName}",
+  "audioAnalysisSpectrogramSaved": "Đã lưu phổ vào {fileName}",
   "@audioAnalysisSpectrogramSaved": {
     "description": "Snackbar after the spectrogram image was saved",
     "placeholders": {
@@ -5249,11 +5249,11 @@
   "@hiResCheckReasonInterpolation": {
     "description": "Reason: linear-interpolation upsampling detected"
   },
-  "hiResCheckTitle": "Kiểm định chuẩn Hi-Res",
+  "hiResCheckTitle": "Xác thực chất lượng Hi-Res",
   "@hiResCheckTitle": {
     "description": "Title of the fake Hi-Res check card"
   },
-  "hiResCheckSummary": "Kiểm tra phổ tần số và độ sâu bit (Bit depth) thực tế để phát hiện nhạc nâng tần số giả (upsample) hoặc độn bit (padding).",
+  "hiResCheckSummary": "Kiểm tra phổ tần số và độ sâu bit thực tế để phát hiện nhạc nâng tần số giả hoặc độn bit.",
   "@hiResCheckSummary": {
     "description": "Introductory text for the sampled Hi-Res analysis"
   },
@@ -5265,11 +5265,11 @@
   "@hiResCheckNoEvidence": {
     "description": "No evidence was detected; this does not certify the master"
   },
-  "hiResCheckEstimatedCutoff": "Tần số cắt (Cutoff) ước tính",
+  "hiResCheckEstimatedCutoff": "Tần số cắt ước tính",
   "@hiResCheckEstimatedCutoff": {
     "description": "Estimated upper spectral edge at the analysis threshold"
   },
-  "hiResCheckActiveBits": "Số bit thực tế / lưu trữ",
+  "hiResCheckActiveBits": "Bit thực tế / bit lưu trữ",
   "@hiResCheckActiveBits": {
     "description": "Active integer bit depth versus the container depth in the sampled segment"
   },
@@ -5644,7 +5644,7 @@
       }
     }
   },
-  "notifDownloadingUpdate": "Downloading Mornye v{version}",
+  "notifDownloadingUpdate": "Đang tải xuống Mornye v{version}",
   "@notifDownloadingUpdate": {
     "description": "Notification title while downloading an app update",
     "placeholders": {
@@ -5672,7 +5672,7 @@
   "@notifUpdateReady": {
     "description": "Notification title when app update download is complete"
   },
-  "notifUpdateReadyBody": "Mornye v{version} downloaded. Tap to install.",
+  "notifUpdateReadyBody": "Đã tải xuống Mornye v{version}. Nhấn để cài đặt.",
   "@notifUpdateReadyBody": {
     "description": "Notification body when app update is ready to install",
     "placeholders": {
@@ -5693,7 +5693,7 @@
   "@searchTracks": {
     "description": "Search filter label - tracks"
   },
-  "homeSearchHintDefault": "Search or paste a supported URL...",
+  "homeSearchHintDefault": "Tìm kiếm hoặc dán URL được hỗ trợ...",
   "@homeSearchHintDefault": {
     "description": "Default placeholder for the main search field on Home"
   },
@@ -6440,7 +6440,7 @@
   "@extensionCustomUrlHandlingSubtitle": {
     "description": "Extension detail subtitle for custom URL handling"
   },
-  "extensionCustomUrlHandlingShareHint": "Share links from these sites to Mornye and this extension will handle them.",
+  "extensionCustomUrlHandlingShareHint": "Chia sẻ liên kết từ các trang này tới Mornye và tiện ích mở rộng này sẽ xử lý chúng.",
   "@extensionCustomUrlHandlingShareHint": {
     "description": "Extension detail hint explaining share-to-app URL handling"
   },
@@ -6650,7 +6650,7 @@
   "@libraryBuiltInPreviewPlayer": {
     "description": "Setting option to use the built-in preview player"
   },
-  "libraryBuiltInPreviewPlayerSubtitle": "Play your music right inside Mornye",
+  "libraryBuiltInPreviewPlayerSubtitle": "Phát nhạc của bạn ngay trong Mornye",
   "@libraryBuiltInPreviewPlayerSubtitle": {
     "description": "Subtitle for built-in preview player option"
   },
@@ -7133,11 +7133,11 @@
   "@extensionVerificationHelpTitleWaiting": {
     "description": "Dialog title when verification is taking longer than expected"
   },
-  "extensionVerificationHelpMessageManual": "Mornye could not open the browser automatically. Open this link in your browser, or copy it manually.",
+  "extensionVerificationHelpMessageManual": "Mornye không thể tự động mở trình duyệt. Hãy mở liên kết này trong trình duyệt của bạn hoặc sao chép thủ công.",
   "@extensionVerificationHelpMessageManual": {
     "description": "Dialog message when automatic browser launch for verification fails"
   },
-  "extensionVerificationHelpMessageWaiting": "If the browser did not open, or verification finished but did not return to Mornye, open this link again or copy it manually.",
+  "extensionVerificationHelpMessageWaiting": "Nếu trình duyệt không mở hoặc quá trình xác minh đã xong nhưng không tự quay lại Mornye, hãy mở lại liên kết này hoặc sao chép thủ công.",
   "@extensionVerificationHelpMessageWaiting": {
     "description": "Dialog message when verification may need manual browser help"
   },
@@ -7149,7 +7149,7 @@
   "@extensionVerificationCopyLink": {
     "description": "Button to copy the extension verification URL"
   },
-  "extensionVerificationPasteCallback": "Paste callback",
+  "extensionVerificationPasteCallback": "Dán liên kết callback",
   "@extensionVerificationPasteCallback": {
     "description": "Button that completes extension verification from a callback URL in the clipboard"
   },
@@ -7281,11 +7281,11 @@
   "@musicHapticsDescription": {
     "description": "Subtitle of the music haptics setting"
   },
-  "musicHapticsSensitivity": "Sensitivity",
+  "musicHapticsSensitivity": "Độ nhạy",
   "@musicHapticsSensitivity": {
     "description": "Slider for how many beats trigger music haptics; higher values vibrate on softer hits"
   },
-  "musicHapticsStrength": "Strength",
+  "musicHapticsStrength": "Cường độ",
   "@musicHapticsStrength": {
     "description": "Slider for how strongly the phone vibrates with music haptics"
   },
@@ -7638,7 +7638,7 @@
   "discordPresenceBuildUnavailable": "Bản dựng ứng dụng này không tích hợp sẵn Discord SDK.",
   "discordPresenceAndroidHelp": "Cài đặt ứng dụng Discord và đăng nhập trên điện thoại này. Hãy bật chia sẻ trạng thái hoạt động trong Discord. Không hỗ trợ khi dùng trình phát bên ngoài.",
   "discordPresenceIosHelp": "Hãy liên kết tài khoản của bạn thông qua Discord và cho phép chia sẻ hoạt động. Nếu quá trình cấp quyền không thành công, hãy nhấn để thực hiện liên kết lại.",
-  "discordPresenceDesktopHelp": "Keep the Discord desktop app running and signed in on this computer, and allow activity sharing in Discord.",
+  "discordPresenceDesktopHelp": "Duy trì ứng dụng Discord trên máy tính đang chạy và đã đăng nhập, đồng thời cho phép chia sẻ hoạt động trong Discord.",
   "discordPresenceDisconnect": "Ngắt kết nối và quên tài khoản",
   "autoMixSettingsTitle": "Hiệu ứng chuyển bài",
   "autoMixAutomaticDuration": "Thời lượng tự động",
@@ -7682,7 +7682,7 @@
   "equalizerDynamics": "Dải động (Dynamics)",
   "equalizerHeadroom": "Headroom tự động",
   "equalizerHeadroomDescription": "Giảm mức khuếch đại đầu vào (Input gain) để tạo khoảng trống (headroom) cho các dải tần được đẩy lên, tránh bị vỡ tiếng.",
-  "equalizerLimiter": "Bộ giới hạn đỉnh (Peak limiter)",
+  "equalizerLimiter": "Bộ giới hạn đỉnh",
   "equalizerLimiterDescription": "Giữ mức đỉnh (Peak) dưới −0.5 dBFS để hạn chế hiện tượng vỡ tiếng (clipping).",
   "equalizerCompressor": "Compressor (Bộ nén dải động)",
   "equalizerCompressorDescription": "Giảm sự chênh lệch âm lượng giữa những đoạn nhạc nhỏ và đoạn cao trào.",
@@ -7695,7 +7695,7 @@
   "equalizerPresetName": "Tên cấu hình (Preset)",
   "equalizerImport": "Nhập cấu hình (Preset)",
   "equalizerExport": "Chia sẻ cấu hình (Preset)",
-  "equalizerImportInvalid": "Choose a valid Mornye equalizer preset (JSON, up to 64 KB).",
+  "equalizerImportInvalid": "Chọn một tệp cấu hình bộ chỉnh âm Mornye hợp lệ (JSON, tối đa 64 KB).",
   "equalizerSaved": "Đã lưu cấu hình (Preset)",
   "equalizerResetTitle": "Đặt lại Equalizer về mặc định?",
   "equalizerResetDescription": "Đặt lại đường cong EQ phẳng cùng cài đặt âm sắc và dải động mặc định. Các cấu hình (Preset) bạn đã lưu vẫn được giữ nguyên.",
@@ -7748,9 +7748,9 @@
   "audioInfoLossy": "Lossy",
   "audioInfoFormat": "Định dạng",
   "audioInfoCodec": "Codec",
-  "audioInfoSampleRate": "Tốc độ lấy mẫu",
-  "audioInfoBitDepth": "Bit depth",
-  "audioInfoChannels": "Số kênh (Channels)",
+  "audioInfoSampleRate": "Tần số lấy mẫu",
+  "audioInfoBitDepth": "Độ sâu Bit",
+  "audioInfoChannels": "Số kênh",
   "audioInfoChannelCount": "{count, plural, =1{Mono} =2{Stereo} other{{count} kênh}}",
   "@audioInfoChannelCount": {
     "placeholders": {
@@ -7759,7 +7759,7 @@
       }
     }
   },
-  "audioInfoBitrate": "Bitrate",
+  "audioInfoBitrate": "Tốc độ bit",
   "audioInfoDuration": "Thời lượng",
   "audioInfoFileSize": "Dung lượng tệp",
   "audioInfoCompression": "Độ nén (Compression)",
@@ -7803,7 +7803,7 @@
   "audioInfoOff": "Tắt",
   "audioInfoBypassed": "Đã bỏ qua do dùng đầu ra trực tiếp (Direct output)",
   "audioInfoPlayer": "Trình phát nhạc",
-  "audioInfoPlayerValue": "Mornye built-in player",
+  "audioInfoPlayerValue": "Trình phát tích hợp của Mornye",
   "audioInfoSignalPath": "Chia sẻ",
   "audioInfoPathSystem": "Bộ trộn âm hệ thống (System mixer)",
   "audioInfoPathDirect": "Direct USB, bỏ qua bộ trộn âm hệ thống (System mixer)",
@@ -7834,7 +7834,7 @@
       }
     }
   },
-  "audioInfoOutputRate": "Tần số lấy mẫu đầu ra (Output sample rate)",
+  "audioInfoOutputRate": "Tần số lấy mẫu đầu ra",
   "audioInfoOutputFormat": "Định dạng đầu ra",
   "audioInfoDeviceRates": "Tần số lấy mẫu thiết bị hỗ trợ",
   "audioInfoDeviceFormats": "Định dạng thiết bị hỗ trợ",
@@ -7854,11 +7854,11 @@
   "lyricsTextSize": "Cỡ chữ lời bài hát",
   "lyricsTextPreview": "Theo dõi từng câu hát trong bản nhạc yêu thích của bạn",
   "appCrashTitle": "Ứng dụng đã gặp sự cố dừng đột ngột ở lần chạy trước",
-  "appAnrTitle": "The app previously stopped responding",
+  "appAnrTitle": "Ứng dụng đã bị treo trước đó",
   "@appAnrTitle": {
     "description": "Title for an Android ANR report, distinct from a crash."
   },
-  "appAnrMessage": "A diagnostic report was saved. You can copy it and send it to the developer to help investigate.",
+  "appAnrMessage": "Báo cáo chẩn đoán đã được lưu. Bạn có thể sao chép và gửi cho nhà phát triển để hỗ trợ kiểm tra lỗi.",
   "@appAnrMessage": {
     "description": "Message shown for an Android process exit due to an ANR."
   },
@@ -7884,13 +7884,13 @@
       }
     }
   },
-  "desktopPlayerIdle": "Not playing",
+  "desktopPlayerIdle": "Không phát nhạc",
   "@desktopPlayerIdle": {
     "description": "Desktop player bar text when no track is loaded"
   },
-  "desktopVolumeUp": "Increase volume",
-  "desktopVolumeDown": "Decrease volume",
-  "desktopTableSortedAscending": "{column}, sorted ascending",
+  "desktopVolumeUp": "Tăng âm lượng",
+  "desktopVolumeDown": "Giảm âm lượng",
+  "desktopTableSortedAscending": "{column}, sắp xếp tăng dần",
   "@desktopTableSortedAscending": {
     "description": "Screen reader label of a song table column header that sorts the table A to Z",
     "placeholders": {
@@ -7899,7 +7899,7 @@
       }
     }
   },
-  "desktopTableSortedDescending": "{column}, sorted descending",
+  "desktopTableSortedDescending": "{column}, sắp xếp tăng dần",
   "@desktopTableSortedDescending": {
     "description": "Screen reader label of a song table column header that sorts the table Z to A",
     "placeholders": {
@@ -7908,19 +7908,19 @@
       }
     }
   },
-  "desktopMenuOpen": "Open",
+  "desktopMenuOpen": "Mở",
   "@desktopMenuOpen": {
     "description": "Context menu item that opens an album, artist, playlist or folder"
   },
-  "desktopMenuShowDetails": "Show details",
+  "desktopMenuShowDetails": "Xem chi tiết",
   "@desktopMenuShowDetails": {
     "description": "Context menu item that opens a track's metadata page"
   },
-  "desktopDropToImport": "Drop to add to your library",
+  "desktopDropToImport": "Thả để thêm vào thư viện",
   "@desktopDropToImport": {
     "description": "Overlay shown while music files or folders are dragged over the desktop window"
   },
-  "desktopDropImported": "Adding {count} {count, plural, =1{folder} other{folders}} to your library",
+  "desktopDropImported": "Đang thêm {count} {count, plural, =1{thư mục} other{thư mục}} vào thư viện của bạn",
   "@desktopDropImported": {
     "description": "Snackbar after dropping music onto the desktop window; the folders are scanned into the library",
     "placeholders": {
@@ -7929,38 +7929,38 @@
       }
     }
   },
-  "desktopDropNothingToImport": "Drop music files or folders to add them to your library",
+  "desktopDropNothingToImport": "Kéo thả tệp nhạc hoặc thư mục để thêm vào thư viện của bạn",
   "@desktopDropNothingToImport": {
     "description": "Snackbar when the dropped items contain no folders or audio files"
   },
-  "desktopAllPlaylists": "All Playlists",
+  "desktopAllPlaylists": "Tất cả danh sách phát",
   "@desktopAllPlaylists": {
     "description": "Desktop sidebar row that opens the list of every playlist"
   },
-  "desktopMenuSettings": "Settings…",
+  "desktopMenuSettings": "Cài đặt...",
   "@desktopMenuSettings": {
     "description": "macOS app menu item that opens Settings"
   },
-  "desktopMenuFile": "File",
-  "desktopMenuEdit": "Edit",
-  "desktopMenuView": "View",
-  "desktopWindowMode": "Window mode",
-  "desktopWindowed": "Windowed",
+  "desktopMenuFile": "Tệp",
+  "desktopMenuEdit": "Chỉnh sửa",
+  "desktopMenuView": "Xem",
+  "desktopWindowMode": "Chế độ cửa sổ",
+  "desktopWindowed": "Cửa sổ",
   "desktopWindowFullscreen": "Toàn màn hình",
-  "desktopWindowBorderless": "Borderless",
-  "desktopExitFullscreen": "Exit full screen",
-  "desktopMinimizeWindow": "Minimize window",
-  "desktopZoomWindow": "Maximize or restore window",
-  "desktopWindowModeUnavailable": "The window mode could not be changed. Try again after the current window transition finishes.",
-  "desktopMenuControls": "Controls",
-  "desktopMenuWindow": "Window",
-  "desktopMenuHelp": "Help",
-  "desktopMenuPlayPause": "Play/Pause",
-  "desktopMenuMiniPlayer": "Mini Player",
+  "desktopWindowBorderless": "Không viền",
+  "desktopExitFullscreen": "Thoát toàn màn hình",
+  "desktopMinimizeWindow": "Thu nhỏ cửa sổ",
+  "desktopZoomWindow": "Phóng to hoặc khôi phục cửa sổ",
+  "desktopWindowModeUnavailable": "Không thể thay đổi chế độ cửa sổ. Vui lòng thử lại sau khi hiệu ứng chuyển cửa sổ kết thúc.",
+  "desktopMenuControls": "Điều khiển",
+  "desktopMenuWindow": "Cửa sổ",
+  "desktopMenuHelp": "Trợ giúp",
+  "desktopMenuPlayPause": "Phát/Dừng",
+  "desktopMenuMiniPlayer": "Trình phát thu nhỏ",
   "@desktopMenuMiniPlayer": {
     "description": "Window menu item, player bar button and Keyboard Shortcuts row that shrink the window into a small player floating above other windows"
   },
-  "desktopMiniPlayerExpand": "Show Full Window",
+  "desktopMiniPlayerExpand": "Hiện thị toàn bộ cửa sổ",
   "@desktopMiniPlayerExpand": {
     "description": "Mini player button that returns the window to its full size"
   },
@@ -7968,15 +7968,15 @@
   "@desktopMenuRefresh": {
     "description": "View menu item and Keyboard Shortcuts row that reloads the page on screen (Home, Repo, statistics)"
   },
-  "desktopMenuProjectPage": "Project page",
+  "desktopMenuProjectPage": "Trang dự án",
   "@desktopMenuProjectPage": {
     "description": "Help menu item that opens the app's source repository"
   },
-  "desktopDownloadsShowAll": "Show all",
+  "desktopDownloadsShowAll": "Hiện thị tất cả",
   "@desktopDownloadsShowAll": {
     "description": "Button in the desktop downloads popover that opens the full download queue"
   },
-  "desktopDownloadsQueued": "Waiting",
+  "desktopDownloadsQueued": "Chờ",
   "@desktopDownloadsQueued": {
     "description": "Status of a download in the desktop downloads popover that has not started yet"
   },
@@ -7984,31 +7984,31 @@
   "@desktopDownloadsCancel": {
     "description": "Tooltip of the button that cancels one download in the desktop downloads popover"
   },
-  "desktopScrollBack": "Scroll back",
+  "desktopScrollBack": "Cuộn trở lại",
   "@desktopScrollBack": {
     "description": "Tooltip of the desktop button that scrolls a horizontal shelf of albums or artists back"
   },
-  "desktopScrollForward": "Scroll forward",
+  "desktopScrollForward": "Cuộn lên trước",
   "@desktopScrollForward": {
     "description": "Tooltip of the desktop button that scrolls a horizontal shelf of albums or artists forward"
   },
-  "settingsKeyboardShortcuts": "Keyboard Shortcuts",
+  "settingsKeyboardShortcuts": "Phím tắt",
   "@settingsKeyboardShortcuts": {
     "description": "Desktop Settings page that lists the app's keyboard shortcuts"
   },
-  "settingsKeyboardShortcutsSubtitle": "Keys for playback, navigation and panels",
+  "settingsKeyboardShortcutsSubtitle": "Các phím dùng cho phát lại, điều hướng và bảng điều khiển",
   "@settingsKeyboardShortcutsSubtitle": {
     "description": "Subtitle of the Keyboard Shortcuts entry in desktop Settings"
   },
-  "desktopShortcutsNavigation": "Navigation",
+  "desktopShortcutsNavigation": "Điều hướng",
   "@desktopShortcutsNavigation": {
     "description": "Keyboard Shortcuts section for moving between pages"
   },
-  "desktopShortcutDismiss": "Close dialog or page",
+  "desktopShortcutDismiss": "Đóng hộp thoại hoặc trang",
   "@desktopShortcutDismiss": {
     "description": "Keyboard Shortcuts row for Escape, which leaves a text field or closes the top dialog or page"
   },
-  "desktopShortcutToggleSidebar": "Show or hide sidebar",
+  "desktopShortcutToggleSidebar": "Hiển thị hoặc ẩn thanh bên",
   "@desktopShortcutToggleSidebar": {
     "description": "Keyboard Shortcuts row for the shortcut that collapses or expands the desktop sidebar"
   }
