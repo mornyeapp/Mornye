@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/models/download_history.dart';
 import 'package:mornye/models/library_database_models.dart';
@@ -7,6 +9,7 @@ import 'package:mornye/services/link/features/link_track_resolver.dart';
 import 'package:mornye/services/link/link_client_api.dart';
 import 'package:mornye/services/link/link_protocol.dart';
 import 'package:mornye/services/network_storage_service.dart';
+import 'package:mornye/services/playable_media.dart';
 
 import 'support/link_fakes.dart';
 
@@ -286,5 +289,32 @@ void main() {
       expect(cache.refFor(desktop).songId, 's1');
       expect(lookup.queries, hasLength(1));
     });
+
+    test(
+      'local player refs use the same file identity as the phone catalog',
+      () async {
+        final directory = await Directory.systemTemp.createTemp('phone-ref-');
+        addTearDown(() => directory.delete(recursive: true));
+        final file = await File(
+          '${directory.path}/song.flac',
+        ).writeAsBytes([1, 2, 3]);
+        for (final (source, size) in [
+          (file.path, 3),
+          ('content://test.documents/music/song.flac', 0),
+        ]) {
+          final media = PlayableMedia(
+            id: source,
+            source: source,
+            title: 'Song',
+            artist: 'Band',
+          );
+          final cache = LinkTrackRefCache(lookup: FakeLibraryLookup());
+          final item = linkMediaItem(media);
+          expect(await cache.resolveAll([item]), isTrue);
+          expect(cache.refFor(item).fileId, linkFileIdFor(source, size));
+          expect(await cache.resolveAll([item]), isFalse);
+        }
+      },
+    );
   });
 }

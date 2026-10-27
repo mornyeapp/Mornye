@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:audio_service/audio_service.dart' show MediaItem;
 import 'package:crypto/crypto.dart';
@@ -154,24 +155,34 @@ class LinkTrackRefCache {
   TrackRef refFor(MediaItem item) =>
       _refs[_key(item)] ?? linkTrackRefFromMediaItem(item, server: server);
 
-  /// The ref for [item] with the ISRC of its record.
+  /// The ref for [item] with its record's ISRC and its phone catalog file id.
   Future<TrackRef> resolve(MediaItem item) async {
     final key = _key(item);
     final known = _refs[key];
     if (known != null) return known;
     var ref = linkTrackRefFromMediaItem(item, server: server);
+    final source = item.extras?['source']?.toString() ?? '';
     // A desktop song id already names the track on the desktop.
     if (ref.songId == null) {
       try {
-        final record = await lookup.recordFor(
-          id: item.id,
-          source: item.extras?['source']?.toString() ?? '',
-        );
+        final record = await lookup.recordFor(id: item.id, source: source);
         if (record?.isrc case final isrc?) {
           ref = linkTrackRefFromMediaItem(item, server: server, isrc: isrc);
         }
       } on Object {
         // A failed lookup leaves the ref without an ISRC.
+      }
+      if (source.startsWith('content://')) {
+        ref = ref.withFileId(linkFileIdFor(source, 0));
+      } else if (source.startsWith('/')) {
+        try {
+          final stat = await File(source).stat();
+          if (stat.type == FileSystemEntityType.file) {
+            ref = ref.withFileId(linkFileIdFor(source, stat.size));
+          }
+        } on FileSystemException {
+          // Missing local files do not name a catalog upload.
+        }
       }
     }
     if (_refs.length >= _limit) _refs.remove(_refs.keys.first);

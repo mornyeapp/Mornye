@@ -79,6 +79,53 @@ void main() {
   Matcher linkError(String code) =>
       isA<LinkException>().having((error) => error.code, 'code', code);
 
+  test(
+    'matches player states without file ids within one phone catalog',
+    () async {
+      await page(0, 3, [
+        {..._song(1), 'title': 'Same Song', 'durationMs': 150000},
+        {..._song(2), 'title': 'Same Song', 'durationMs': 180000},
+        {..._song(3), 'isrc': 'USABC2400001'},
+      ]);
+      final matched = await catalogs.songForRef(
+        sourceId,
+        const TrackRef(
+          title: 'same song',
+          artist: 'ARTIST',
+          durationMs: 180500,
+        ),
+      );
+      expect(matched!.fileId, _fileId(2));
+      final isrc = await catalogs.songForRef(
+        sourceId,
+        const TrackRef(
+          title: 'Different spelling',
+          artist: 'Different artist',
+          isrc: 'US-ABC-24-00001',
+        ),
+      );
+      expect(isrc!.fileId, _fileId(3));
+      expect(
+        await catalogs.songForRef(
+          sourceId,
+          const TrackRef(
+            title: 'Same Song',
+            artist: 'Artist',
+            durationMs: 210000,
+          ),
+        ),
+        isNull,
+      );
+      expect(
+        await catalogs.songForRef(
+          linkPhoneSourceId('another-phone'),
+          const TrackRef(title: 'Same Song', artist: 'Artist'),
+        ),
+        isNull,
+      );
+    },
+  );
+
   test('commits the pages in order and reports the version', () async {
     expect(await call(LinkOps.phoneCatalog, 'GET'), {'version': null});
 

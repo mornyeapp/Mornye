@@ -91,6 +91,7 @@ class LinkDesktopHostState {
     this.clients = const [],
     this.devices = const [],
     this.phoneStates = const {},
+    this.phoneCatalogRevisions = const {},
     this.catalogSongs,
     this.followedPhone,
   });
@@ -116,6 +117,9 @@ class LinkDesktopHostState {
   /// The latest `player.state` of each connected phone.
   final Map<String, LinkPlayerState> phoneStates;
 
+  /// Catalog or cover updates that can complete after a phone's player state.
+  final Map<String, int> phoneCatalogRevisions;
+
   /// Songs in the last catalog the server loaded.
   final int? catalogSongs;
 
@@ -137,6 +141,7 @@ class LinkDesktopHostState {
     List<LinkClientInfo>? clients,
     List<LinkPairedDevice>? devices,
     Map<String, LinkPlayerState>? phoneStates,
+    Map<String, int>? phoneCatalogRevisions,
     Object? catalogSongs = _keep,
     Object? followedPhone = _keep,
   }) => LinkDesktopHostState(
@@ -149,6 +154,7 @@ class LinkDesktopHostState {
     clients: clients ?? this.clients,
     devices: devices ?? this.devices,
     phoneStates: phoneStates ?? this.phoneStates,
+    phoneCatalogRevisions: phoneCatalogRevisions ?? this.phoneCatalogRevisions,
     catalogSongs: identical(catalogSongs, _keep)
         ? this.catalogSongs
         : catalogSongs as int?,
@@ -424,6 +430,7 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
       error: null,
       clients: const [],
       phoneStates: const {},
+      phoneCatalogRevisions: const {},
       catalogSongs: null,
       followedPhone: null,
     );
@@ -510,6 +517,12 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
   Future<void> _onPhoneCommit(String deviceId) async {
     final catalogs = _phoneCatalogs;
     if (catalogs == null || !ref.mounted) return;
+    state = state.copyWith(
+      phoneCatalogRevisions: {
+        ...state.phoneCatalogRevisions,
+        deviceId: (state.phoneCatalogRevisions[deviceId] ?? 0) + 1,
+      },
+    );
     final sourceId = linkPhoneSourceId(deviceId);
     final library = ref.read(linkPhoneLibraryProvider);
     try {
@@ -685,19 +698,27 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
 
   /// [ref], a track a phone plays, as the desktop shows it: its Library
   /// song or the file the phone sent, else the phone's song with its cover.
-  Future<PlayableMedia?> phoneTrackMedia(TrackRef ref) async {
+  Future<PlayableMedia?> phoneTrackMedia(String deviceId, TrackRef ref) async {
     try {
       final media = await _ops?.resolveRef(ref);
       if (media != null) return media;
     } on LinkException {
       // The catalog is not ready; the phone's own details still show.
     }
-    final fileId = ref.fileId;
-    if (fileId == null) return null;
-    final cover = (await _phoneCatalogs?.coversFor({fileId}))?[fileId];
+    final catalogs = _phoneCatalogs;
+    if (catalogs == null) return null;
+    final sourceId = linkPhoneSourceId(deviceId);
+    final song = await catalogs.songForRef(sourceId, ref);
+    if (song == null) return null;
+    final coverKey = song.coverKey;
+    final cover =
+        (coverKey == null
+            ? null
+            : await catalogs.coverPath(sourceId, coverKey)) ??
+        song.coverUrl;
     if (cover == null) return null;
     return PlayableMedia(
-      id: 'link:$fileId',
+      id: 'link:${song.fileId}',
       source: '',
       title: ref.title,
       artist: ref.artist,
@@ -716,6 +737,10 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
       clients: List.unmodifiable(clients),
       phoneStates: {
         for (final entry in state.phoneStates.entries)
+          if (ids.contains(entry.key)) entry.key: entry.value,
+      },
+      phoneCatalogRevisions: {
+        for (final entry in state.phoneCatalogRevisions.entries)
           if (ids.contains(entry.key)) entry.key: entry.value,
       },
       followedPhone: ids.contains(state.followedPhone)

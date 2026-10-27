@@ -5,9 +5,12 @@ import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mornye/services/link/desktop/link_catalog_index.dart'
+    show linkDurationToleranceMs, linkMatchKey;
 import 'package:mornye/services/link/link_cover_shrink.dart';
 import 'package:mornye/services/link/link_host_router.dart';
 import 'package:mornye/services/link/link_protocol.dart';
+import 'package:mornye/utils/isrc_utils.dart';
 import 'package:mornye/utils/logger.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -498,6 +501,38 @@ class LinkPhoneCatalogs {
     } on FormatException {
       return null;
     }
+  }
+
+  /// A playing track in one phone's catalog. Older phones send no file id,
+  /// so use the same recording identity as the desktop's own catalog.
+  Future<LinkPhoneSong?> songForRef(String sourceId, TrackRef ref) async {
+    if (ref.fileId case final fileId?) return song(sourceId, fileId);
+    final isrc = normalizeIsrc(ref.isrc ?? '');
+    final key = ref.matchKey ?? linkMatchKey(ref.title, ref.artist);
+    final titleKey = linkMatchKey(ref.title, ref.artist);
+    LinkPhoneSong? fallback;
+    var bestDifference = 1 << 62;
+    await for (final candidate in songs(sourceId)) {
+      if (isrc.isNotEmpty && normalizeIsrc(candidate.isrc ?? '') == isrc) {
+        return candidate;
+      }
+      final candidateKey = linkMatchKey(candidate.title, candidate.artist);
+      if (candidateKey.isEmpty ||
+          (candidateKey != key && candidateKey != titleKey)) {
+        continue;
+      }
+      final duration = ref.durationMs;
+      final actual = candidate.durationMs;
+      final difference = duration == null || actual == null
+          ? linkDurationToleranceMs
+          : (duration - actual).abs();
+      if (difference <= linkDurationToleranceMs &&
+          difference < bestDifference) {
+        fallback = candidate;
+        bestDifference = difference;
+      }
+    }
+    return fallback;
   }
 
   /// The covers held for the phone [sourceId] by cover id.

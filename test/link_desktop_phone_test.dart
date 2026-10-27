@@ -1,9 +1,11 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/services/link/desktop/link_desktop_backend.dart';
 import 'package:mornye/services/link/desktop/link_desktop_host.dart';
+import 'package:mornye/services/link/desktop/link_phone_playback.dart';
 import 'package:mornye/services/link/link_protocol.dart';
 import 'package:mornye/services/network_storage_service.dart';
 import 'package:mornye/utils/desktop_platform.dart';
@@ -94,7 +96,7 @@ void main() {
     return (result: reply.result, error: reply.error);
   }
 
-  Future<void> commit(String version) async {
+  Future<void> commit(String version, {String? coverId}) async {
     final reply = await request(LinkOps.phoneCatalog, {
       '_method': 'POST',
       'version': version,
@@ -106,6 +108,7 @@ void main() {
           suffix: 'flac',
           title: 'Song',
           artist: 'Artist',
+          coverId: coverId,
         ).toJson(),
       ],
     });
@@ -141,6 +144,63 @@ void main() {
     container = null;
     expect(NetworkStorageService.instance.virtualSources, isNull);
   });
+
+  test(
+    'a followed phone receives covers after its first player state',
+    () async {
+      await boot();
+      backend.connect([_phone]);
+      container!.listen(linkFollowedPhonePlaybackProvider, (_, _) {});
+      const track = TrackRef(
+        title: 'Song',
+        artist: 'Artist',
+        durationMs: 200000,
+      );
+      backend.message('p1', {
+        'type': LinkMessageTypes.playerState,
+        'state': LinkPlayerState(
+          track: track,
+          queue: const [track],
+          index: 0,
+          playing: true,
+          positionMs: 0,
+          updatedMs: 0,
+        ).toJson(),
+      });
+      await until(() => hostState().followedPhone == 'p1');
+      final playback = container!.read(linkFollowedPhonePlaybackProvider)!;
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect((await playback.mediaItems.first)!.artUri, isNull);
+
+      final coverId = 'c' * 32;
+      final cover = await request(LinkOps.phoneCovers, {
+        '_method': 'POST',
+        'covers': [
+          {
+            'id': coverId,
+            'ext': 'jpg',
+            'data': base64Encode([0xff, 0xd8, 0xff]),
+          },
+        ],
+      });
+      expect(cover.error, isNull);
+      await commit('with-cover', coverId: coverId);
+      final item = await playback.mediaItems
+          .firstWhere((item) => item?.artUri != null)
+          .timeout(const Duration(seconds: 2));
+      expect(item!.title, 'Song');
+      expect(
+        item.artUri!.toFilePath(),
+        endsWith('/$sourceId/covers/$coverId.jpg'),
+      );
+      expect((await playback.queues.first).single.artUri, item.artUri);
+      expect(hostState().phoneCatalogRevisions['p1'], 1);
+      expect(
+        identical(playback, container!.read(linkFollowedPhonePlaybackProvider)),
+        isTrue,
+      );
+    },
+  );
 
   test('a device that is not a paired phone cannot send songs', () async {
     backend.deviceList = [

@@ -476,9 +476,9 @@ class TrackRef {
   final String? songId;
   final String? serverId;
 
-  /// The phone's file for this track, once uploaded to the desktop
-  /// ([linkFileIdFor]). The desktop plays it when its Library lacks the
-  /// track.
+  /// The phone catalog file for this track ([linkFileIdFor]), which also
+  /// identifies its cover before the audio is sent. The desktop plays the
+  /// received copy when its own Library lacks the track.
   final String? fileId;
 
   Map<String, dynamic> toJson() => {

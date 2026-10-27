@@ -69,6 +69,7 @@ abstract class LinkMirroredPlayback implements RemotePlayback {
   List<TrackRef> _queueRefs = const [];
   Timer? _ticker;
   bool _disposed = false;
+  int _lookupGeneration = 0;
 
   /// Sends [command] to the device shown.
   @protected
@@ -111,6 +112,16 @@ abstract class LinkMirroredPlayback implements RemotePlayback {
   void retryFailed() {
     _resolved.removeAll(_failed);
     _failed.clear();
+  }
+
+  /// A catalog or its covers arrived after the player state. Keep the shown
+  /// items while resolving them again, including earlier coverless matches.
+  void refreshTracks() {
+    if (_disposed) return;
+    _lookupGeneration++;
+    _resolved.clear();
+    _failed.clear();
+    _showTracks(force: false);
   }
 
   /// Shows the device's [player].
@@ -236,9 +247,11 @@ abstract class LinkMirroredPlayback implements RemotePlayback {
   /// Looks [ref] up once, with its cover: the one embedded in a local file,
   /// else the network cover its item, or the device's own song, names.
   Future<void> _resolve(TrackRef ref) async {
+    final generation = _lookupGeneration;
+    bool current() => !_disposed && generation == _lookupGeneration;
     try {
       final media = _playable(ref, await resolvePlayable(ref));
-      if (_disposed) return;
+      if (!current()) return;
       var artwork = media.artUri;
       if (!media.isNetwork) {
         artwork =
@@ -249,7 +262,7 @@ abstract class LinkMirroredPlayback implements RemotePlayback {
             ) ??
             artwork;
       }
-      if (_disposed) return;
+      if (!current()) return;
       // A matched local file may have no thumbnail, or one its scan removed.
       // Keep its identity for lyrics and favorites, but borrow the device's
       // cover.
@@ -273,7 +286,7 @@ abstract class LinkMirroredPlayback implements RemotePlayback {
           }
         }
       }
-      if (_disposed) return;
+      if (!current()) return;
       if (_items.length >= _itemLimit) {
         _items.removeWhere((key, _) => !_queueRefs.contains(key));
         _resolved.removeWhere((key) => !_queueRefs.contains(key));
@@ -285,12 +298,17 @@ abstract class LinkMirroredPlayback implements RemotePlayback {
         _showTracks(force: true);
       }
     } on Object catch (error) {
+      if (!current()) return;
       _resolved.add(ref);
       _failed.add(ref);
       _log.w('Could not look up a song $name plays: $error');
     } finally {
       _resolving.remove(ref);
-      _drainResolutions();
+      if (generation != _lookupGeneration && !_disposed) {
+        _showTracks(force: false);
+      } else {
+        _drainResolutions();
+      }
     }
   }
 

@@ -67,7 +67,7 @@ final linkFollowedPhonePlaybackProvider = Provider<RemotePlayback?>((ref) {
   final playback = LinkPhonePlayback(
     name: host.deviceName(deviceId),
     send: (command) => host.sendCommand(deviceId, command),
-    resolve: host.phoneTrackMedia,
+    resolve: (track) => host.phoneTrackMedia(deviceId, track),
     playHere: (items, index) async {
       host.stopFollowingPhone();
       await local.playAll(items, initialIndex: index);
@@ -85,6 +85,12 @@ final linkFollowedPhonePlaybackProvider = Provider<RemotePlayback?>((ref) {
   ref.listen(
     linkDesktopHostProvider.select((state) => state.phoneStates[deviceId]),
     (_, next) => playback.show(next),
+  );
+  ref.listen(
+    linkDesktopHostProvider.select(
+      (state) => state.phoneCatalogRevisions[deviceId],
+    ),
+    (_, _) => playback.refreshTracks(),
   );
   ref.onDispose(playback.dispose);
   return playback;
