@@ -14,6 +14,7 @@ class ExpressiveIconButton extends StatelessWidget {
     required this.onPressed,
     this.selected,
     this.size = 48,
+    this.width,
     this.iconSize = 24,
     this.foregroundColor,
     this.backgroundColor,
@@ -24,6 +25,10 @@ class ExpressiveIconButton extends StatelessWidget {
   final VoidCallback? onPressed;
   final bool? selected;
   final double size;
+
+  /// Wider than [size] tall for a pill, as a button group's segments are;
+  /// square by default.
+  final double? width;
   final double iconSize;
   final Color? foregroundColor;
   final Color? backgroundColor;
@@ -44,7 +49,7 @@ class ExpressiveIconButton extends StatelessWidget {
         onPressed: onPressed,
         isSelected: selected,
         style: ButtonStyle(
-          minimumSize: WidgetStatePropertyAll(Size.square(size)),
+          minimumSize: WidgetStatePropertyAll(Size(width ?? size, size)),
           foregroundColor: fill.foregroundColor,
           backgroundColor: fill.backgroundColor,
         ),
@@ -66,7 +71,7 @@ class ExpressiveIconButton extends StatelessWidget {
             isSelected: selected,
             // Widens with an expressive button group's squish.
             visualSize: Size(
-              ExpressiveButtonGroupSlot.widthOf(context) ?? size,
+              ExpressiveButtonGroupSlot.widthOf(context) ?? width ?? size,
               size,
             ),
             variant: backgroundColor == null

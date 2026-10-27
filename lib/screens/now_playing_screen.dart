@@ -633,18 +633,21 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
+                              // Filled pills like the shuffle and repeat
+                              // segments between them.
                               ExpressiveIconButton(
                                 key: const ValueKey('material-lyrics-toggle'),
                                 tooltip: _currentPage == 1
                                     ? context.l10n.nowPlayingTabPlayer
                                     : context.l10n.nowPlayingTabLyrics,
                                 selected: _showsPage(1),
+                                width: PlayerPlaybackModeToolbar.segmentWidth,
                                 foregroundColor: _showsPage(1)
                                     ? colorScheme.onPrimaryContainer
                                     : colorScheme.onSurfaceVariant,
                                 backgroundColor: _showsPage(1)
                                     ? colorScheme.primaryContainer
-                                    : null,
+                                    : colorScheme.surfaceContainerHigh,
                                 icon: const AppIcon(Icons.lyrics_outlined),
                                 onPressed: _toggleMaterialLyrics,
                               ),
@@ -653,6 +656,9 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                               ),
                               AudioOutputButton(
                                 color: colorScheme.onSurfaceVariant,
+                                backgroundColor:
+                                    colorScheme.surfaceContainerHigh,
+                                width: PlayerPlaybackModeToolbar.segmentWidth,
                               ),
                             ],
                           ),

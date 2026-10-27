@@ -428,6 +428,9 @@ class PlayerPlaybackModeButton extends ConsumerWidget {
 class PlayerPlaybackModeToolbar extends StatefulWidget {
   const PlayerPlaybackModeToolbar({super.key, required this.colorScheme});
 
+  /// Width of each segment at rest; the footer's lone buttons match it.
+  static const segmentWidth = 56.0;
+
   final ColorScheme colorScheme;
 
   @override
@@ -437,7 +440,7 @@ class PlayerPlaybackModeToolbar extends StatefulWidget {
 
 class _PlayerPlaybackModeToolbarState extends State<PlayerPlaybackModeToolbar>
     with ExpressivePressSquish {
-  static const _segmentWidth = 56.0;
+  static const _segmentWidth = PlayerPlaybackModeToolbar.segmentWidth;
 
   @override
   Widget build(BuildContext context) {

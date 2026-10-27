@@ -5,12 +5,24 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/widgets/app_icon_button.dart';
+import 'package:mornye/widgets/expressive_icon_button.dart';
 
 /// Uses the system's real audio routes and keeps native discovery in native UI.
 class AudioOutputButton extends StatefulWidget {
-  const AudioOutputButton({super.key, this.color, this.onPickerChanged});
+  const AudioOutputButton({
+    super.key,
+    this.color,
+    this.backgroundColor,
+    this.width = 48,
+    this.onPickerChanged,
+  });
 
   final Color? color;
+
+  /// Fills a pill [width] wide behind the icon, as Material's player footer
+  /// does beside its shuffle and repeat group; transparent when null.
+  final Color? backgroundColor;
+  final double width;
   final ValueChanged<bool>? onPickerChanged;
 
   @override
@@ -91,7 +103,7 @@ class _AudioOutputButtonState extends State<AudioOutputButton> {
     if (kIsWeb) return const SizedBox.shrink();
     switch (defaultTargetPlatform) {
       case TargetPlatform.iOS:
-        return SizedBox.square(
+        final picker = SizedBox.square(
           dimension: 48,
           child: UiKitView(
             viewType: 'com.zarz.mornye/audio_output',
@@ -100,7 +112,30 @@ class _AudioOutputButtonState extends State<AudioOutputButton> {
             onPlatformViewCreated: _attachView,
           ),
         );
+        final background = widget.backgroundColor;
+        if (background == null) return picker;
+        return DecoratedBox(
+          decoration: ShapeDecoration(
+            color: background,
+            shape: const StadiumBorder(),
+          ),
+          child: SizedBox(
+            width: widget.width,
+            height: 48,
+            child: Center(child: picker),
+          ),
+        );
       case TargetPlatform.android:
+        if (widget.backgroundColor case final background?) {
+          return ExpressiveIconButton(
+            tooltip: context.l10n.nowPlayingAudioOutput,
+            width: widget.width,
+            foregroundColor: widget.color,
+            backgroundColor: background,
+            icon: const Icon(Icons.speaker_group_outlined),
+            onPressed: _showAndroidPicker,
+          );
+        }
         return AppIconButton(
           tooltip: context.l10n.nowPlayingAudioOutput,
           color: widget.color,
