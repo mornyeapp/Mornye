@@ -316,7 +316,11 @@ internal suspend fun MainActivity.handleReadAudioMetadata(call: MethodCall, resu
         try {
             if (filePath.startsWith("content://")) {
                 val uri = Uri.parse(filePath)
-                val metadata = readAudioMetadataFromUri(coreBackend, uri)
+                val metadata = readAudioMetadataFromUri(
+                    coreBackend,
+                    uri,
+                    coverCacheKey = buildLibraryCoverCacheKey(filePath, 0),
+                )
                     ?: return@withContext """{"error":"Failed to read SAF audio metadata"}"""
                 metadata.put("filePath", filePath)
                 metadata.toString()

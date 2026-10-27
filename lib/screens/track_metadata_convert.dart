@@ -422,6 +422,7 @@ extension _TrackMetadataConvertAndCueSplit on _TrackMetadataScreenState {
                         Navigator.pop(sheetContext);
                         _confirmAndSplitCue(
                           context: this.context,
+                          cuePath: cuePath,
                           audioPath: audioPath,
                           album: album,
                           artist: artist,
@@ -457,6 +458,7 @@ extension _TrackMetadataConvertAndCueSplit on _TrackMetadataScreenState {
 
   void _confirmAndSplitCue({
     required BuildContext context,
+    required String cuePath,
     required String audioPath,
     required String album,
     required String artist,
@@ -482,6 +484,7 @@ extension _TrackMetadataConvertAndCueSplit on _TrackMetadataScreenState {
               onPressed: () {
                 Navigator.pop(dialogContext);
                 _performCueSplit(
+                  cuePath: cuePath,
                   audioPath: audioPath,
                   album: album,
                   artist: artist,
@@ -554,6 +557,7 @@ extension _TrackMetadataConvertAndCueSplit on _TrackMetadataScreenState {
   }
 
   Future<void> _performCueSplit({
+    required String cuePath,
     required String audioPath,
     required String album,
     required String artist,
@@ -679,9 +683,26 @@ extension _TrackMetadataConvertAndCueSplit on _TrackMetadataScreenState {
         } catch (_) {}
       }
 
+      final complete =
+          finalOutputPaths != null && finalOutputPaths.length == tracks.length;
+      if (complete) {
+        await CueSplitLibraryService().publish(
+          cuePath: cuePath,
+          audioPath: audioPath,
+          tracks: tracks,
+          outputPaths: finalOutputPaths,
+          sourceId: _isLocalItem && (!isSafSource || writeBackToSaf)
+              ? _localLibraryItem?.sourceId ?? LocalLibraryItem.legacySourceId
+              : LocalLibraryItem.legacySourceId,
+        );
+        if (mounted) {
+          await ref.read(localLibraryProvider.notifier).reloadFromStorage();
+        }
+      }
+
       if (mounted) {
         ScaffoldMessenger.of(context).hideCurrentSnackBar();
-        if (finalOutputPaths != null && finalOutputPaths.isNotEmpty) {
+        if (complete) {
           _showSnackBarMessage(
             context.l10n.cueSplitSuccess(finalOutputPaths.length),
           );

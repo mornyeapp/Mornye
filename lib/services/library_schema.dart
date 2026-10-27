@@ -12,7 +12,7 @@ final _log = AppLogger('LibraryDatabase');
 
 /// Schema lifecycle is independent of collection reads and scan transactions.
 abstract final class LibrarySchema {
-  static const version = 18;
+  static const version = 19;
   static const visibleView = 'library_visible';
   static const searchFtsTable = 'library_search_fts';
   static const lookupSummaryTable = 'library_lookup_summary';
@@ -166,6 +166,10 @@ abstract final class LibrarySchema {
     if (oldVersion < 18) {
       await addColumn('network_file_version', 'TEXT');
     }
+    if (oldVersion < 19) {
+      await _createCueSplits(db);
+      await _createVisibleView(db);
+    }
   }
 
   static Future<bool> createSearchFts(DatabaseExecutor db) =>
@@ -202,12 +206,48 @@ abstract final class LibrarySchema {
       'enabled': 1,
       'available': 1,
     }, conflictAlgorithm: ConflictAlgorithm.ignore);
+    await _createCueSplits(db);
+    await _createVisibleView(db);
+  }
+
+  static Future<void> _createCueSplits(DatabaseExecutor db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS library_cue_split_sources (
+        file_path TEXT NOT NULL PRIMARY KEY,
+        cue_path TEXT NOT NULL
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS library_cue_split_outputs (
+        cue_path TEXT NOT NULL,
+        file_path TEXT NOT NULL,
+        PRIMARY KEY(cue_path, file_path)
+      )
+    ''');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_cue_split_sources_cue '
+      'ON library_cue_split_sources(cue_path)',
+    );
+  }
+
+  static Future<void> _createVisibleView(DatabaseExecutor db) async {
     await db.execute('DROP VIEW IF EXISTS $visibleView');
     await db.execute('''
       CREATE VIEW $visibleView AS
       SELECT l.* FROM library l
       JOIN library_sources s ON s.id = l.source_id
       WHERE s.enabled = 1 AND s.available = 1
+        AND l.file_path NOT IN (
+          SELECT c.file_path FROM library_cue_split_sources c
+          JOIN (
+            SELECT o.cue_path FROM library_cue_split_outputs o
+            LEFT JOIN library t ON t.file_path = o.file_path
+            LEFT JOIN library_sources ts ON ts.id = t.source_id
+              AND ts.enabled = 1 AND ts.available = 1
+            GROUP BY o.cue_path
+            HAVING COUNT(*) = COUNT(ts.id)
+          ) complete ON complete.cue_path = c.cue_path
+        )
     ''');
   }
 
@@ -413,6 +453,24 @@ abstract final class LibrarySchema {
           where: 'id = ?',
           whereArgs: [source['id']],
         );
+      }
+      for (final table in const [
+        'library_cue_split_sources',
+        'library_cue_split_outputs',
+      ]) {
+        for (final row in await txn.query(table)) {
+          final previousPath = row['file_path'] as String;
+          final previousCue = row['cue_path'] as String;
+          final path = rebaseIosSandboxPath(previousPath, documents.path);
+          final cue = rebaseIosSandboxPath(previousCue, documents.path);
+          if (path == previousPath && cue == previousCue) continue;
+          batch.update(
+            table,
+            {'file_path': path, 'cue_path': cue},
+            where: 'file_path = ? AND cue_path = ?',
+            whereArgs: [previousPath, previousCue],
+          );
+        }
       }
       await batch.commit(noResult: true);
     });

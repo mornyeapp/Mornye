@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/services/ffmpeg_conversion.dart';
+import 'package:mornye/models/ffmpeg_models.dart';
 import 'package:mornye/services/ffmpeg_desktop.dart';
 import 'package:mornye/services/ffmpeg_probe.dart';
 import 'package:mornye/utils/audio_conversion_utils.dart';
@@ -77,6 +78,60 @@ void main() {
     'sha256',
     '-',
   ]);
+
+  test('CUE split keeps the original and preserves every PCM sample', () async {
+    if (!haveTools()) return;
+    final wav = await source(24, 48000);
+    final input = '${directory.path}/Album.flac';
+    await ffmpeg(['-i', wav, '-c:a', 'flac', input]);
+    final originalHash = await pcmHash(input, 24);
+    final folder = await Directory('${directory.path}/split').create();
+    final paths = await FFmpegConversion.splitCueToTracks(
+      audioPath: input,
+      outputDir: folder.path,
+      tracks: [
+        CueSplitTrackInfo(
+          number: 1,
+          title: 'First',
+          artist: 'Artist',
+          startSec: 0,
+          endSec: 0.15,
+        ),
+        CueSplitTrackInfo(
+          number: 2,
+          title: 'Second',
+          artist: 'Artist',
+          startSec: 0.15,
+          endSec: -1,
+        ),
+      ],
+      albumMetadata: {'album': 'Album', 'artist': 'Artist'},
+    );
+    expect(paths, hasLength(2));
+    expect(await File(input).exists(), isTrue);
+    expect(await pcmHash(input, 24), originalHash);
+    final combinedHash = await ffmpeg([
+      '-i',
+      paths![0],
+      '-i',
+      paths[1],
+      '-filter_complex',
+      '[0:a:0][1:a:0]concat=n=2:v=0:a=1[a]',
+      '-map',
+      '[a]',
+      '-c:a',
+      'pcm_s24le',
+      '-f',
+      'hash',
+      '-hash',
+      'sha256',
+      '-',
+    ]);
+    expect(combinedHash, originalHash);
+    for (final path in paths) {
+      expect((await FFmpegProbe.audioProperties(path)).bitDepth, 24);
+    }
+  });
 
   for (final (depth, rate) in [(16, 44100), (24, 96000)]) {
     test('WAV to FLAC preserves $depth-bit PCM, tags and artwork', () async {

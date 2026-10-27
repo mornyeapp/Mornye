@@ -3,9 +3,19 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/services/library_row_mapper.dart';
+import 'package:mornye/services/library_schema.dart';
 import 'package:mornye/utils/path_match_keys.dart';
 
 void main() {
+  test('mobile native ingestion accepts the current Dart Library schema', () {
+    final source = File(
+      'rust_backend/crates/mobile/src/native_library.rs',
+    ).readAsStringSync();
+    final version = RegExp(
+      r'const SCHEMA_VERSION: i64 = (\d+);',
+    ).firstMatch(source);
+    expect(int.parse(version!.group(1)!), LibrarySchema.version);
+  });
   test(
     'native library fixtures preserve production Dart row and path codecs',
     () {
