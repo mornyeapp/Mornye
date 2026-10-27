@@ -1,18 +1,18 @@
 {
   "trackBpm": "BPM",
-  "trackMood": "Mood",
-  "subsonicAddToLibrary": "Add server to Library",
-  "subsonicLibraryAdded": "Server added to Library",
+  "trackMood": "Humeur",
+  "subsonicAddToLibrary": "Connecte un serveur à ta bibliothèque",
+  "subsonicLibraryAdded": "Serveur connecté à la bibliothèque",
   "subsonicLibraryDescription": "Sync the server catalogue and artwork to Library. Music stays on your server. Rescan it in Local Library settings to update the catalogue.",
-  "subsonicAuthentication": "Authentication",
+  "subsonicAuthentication": "Authentification",
   "subsonicToken": "Salted token",
-  "subsonicPasswordAuth": "Password",
-  "subsonicApiKey": "API key",
-  "subsonicUsername": "Username",
-  "subsonicPassword": "Password",
-  "subsonicSearch": "Search server music...",
-  "subsonicMoreAlbums": "More albums",
-  "subsonicErrorApi": "The server does not support this API version or authentication method. Check the server settings and the selected sign-in method.",
+  "subsonicPasswordAuth": "Mot de passe",
+  "subsonicApiKey": "Clé API",
+  "subsonicUsername": "Nom d'utilisateur",
+  "subsonicPassword": "Mot de passe",
+  "subsonicSearch": "Rechercher parmi les musiques du serveur...",
+  "subsonicMoreAlbums": "Plus d'albums",
+  "subsonicErrorApi": "Ce serveur ne supporte pas cette version de l'API ou ce moyen d'authentification. Vérifiez les paramètres du serveur et sélectionnez comment vous voulez connecter.",
   "networkDownloadDestination": "Destination du téléchargement réseau",
   "@networkDownloadDestination": {
     "description": "Files settings item that opens network storage to choose a folder for downloaded music"
@@ -7186,7 +7186,7 @@
   "@libraryFilterMetadataHasReplayGain": {
     "description": "Filter option for tracks with indexed ReplayGain track or album gain tags"
   },
-  "libraryFilterIncompleteAlbums": "Incomplete albums",
+  "libraryFilterIncompleteAlbums": "Album incomplet",
   "@libraryFilterIncompleteAlbums": {
     "description": "Library filter for albums with confirmed missing track positions"
   },
@@ -7265,7 +7265,7 @@
   "@playerCoverStyleDefaultDescription": {
     "description": "Subtitle of the default cover art style"
   },
-  "playerCoverStyleFullScreen": "Full screen",
+  "playerCoverStyleFullScreen": "Plein écran",
   "@playerCoverStyleFullScreen": {
     "description": "Cover art style: artwork fills the top of the player"
   },
