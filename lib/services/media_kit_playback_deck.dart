@@ -59,6 +59,9 @@ class MediaKitEngine implements MpvEngine {
       // media_kit caches streams on disk, which fails where the cache folder
       // is not writable and reports a load error. Memory is enough for audio.
       setProperty('cache-on-disk', 'no'),
+      // Mornye reads sidecar lyrics itself. A failed mpv subtitle autoload
+      // must not turn an otherwise playable song into a source error.
+      setProperty('sub-auto', 'no'),
       // Each deck has one source. mpv's playlist gapless mode reports EOF
       // before its output drains, so handing off then cuts the queued tail.
       setProperty('gapless-audio', 'no'),
@@ -294,9 +297,11 @@ class MediaKitPlaybackDeck implements PlaybackDeck {
   // Errors that stop the current source. Decoder errors are often a single
   // damaged frame and playback continues.
   static bool _isSourceError(MpvLogError error) =>
-      const {'file', 'stream', 'ao', 'cplayer'}.contains(error.prefix) ||
-      error.prefix.startsWith('demux') ||
-      error.prefix.startsWith('stream');
+      !(error.prefix == 'cplayer' &&
+          error.text.trimLeft().startsWith('Can not open external file ')) &&
+      (const {'file', 'stream', 'ao', 'cplayer'}.contains(error.prefix) ||
+          error.prefix.startsWith('demux') ||
+          error.prefix.startsWith('stream'));
 
   // "Could not open/initialize audio device -> no sound.": every audio
   // driver failed, so mpv dropped the audio of the current source.

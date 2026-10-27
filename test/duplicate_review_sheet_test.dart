@@ -64,7 +64,7 @@ void main() {
     for (final mornye in [false, true]) {
       for (final brightness in Brightness.values) {
         testWidgets(
-          'duplicate rows render on $platform ($mornye, $brightness)',
+          'duplicate rows with percent paths render on $platform ($mornye, $brightness)',
           (tester) async {
             debugDesktopPlatformOverride = true;
             addTearDown(() => debugDesktopPlatformOverride = null);
@@ -148,9 +148,9 @@ List<IsrcDuplicateGroup> _groups(TargetPlatform platform, {int count = 10}) => [
             trackName: 'Track $group',
             artistName: 'Artist',
             filePath: platform == TargetPlatform.windows
-                ? r'C:\Music\Albums\Artist\Album'
+                ? r'C:\Music\Albums\Artist\100% Hits'
                       '\\$copy\\Track $group.flac'
-                : '/music/Albums/Artist/Album/$copy/Track $group.flac',
+                : '/music/Albums/Artist/100% Hits/$copy/Track $group.flac',
             bitDepth: 16,
             sampleRate: 44100,
             format: 'flac',

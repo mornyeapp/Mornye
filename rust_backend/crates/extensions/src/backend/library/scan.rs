@@ -703,6 +703,8 @@ mod tests {
         fs::write(library.join("A/B/song.flac"), b"flac bytes").unwrap();
         fs::write(library.join("A/c.mp3"), b"mp3").unwrap();
         fs::write(library.join("notes.txt"), b"ignored").unwrap();
+        fs::write(library.join("A/B/song.lrc"), b"[00:01.00]Lyrics").unwrap();
+        fs::write(library.join("A/c.LRC"), b"[00:01.00]Lyrics").unwrap();
         fs::write(library.join("x.partial.flac"), b"staging").unwrap();
         let backend = backend(root.path(), &library);
 

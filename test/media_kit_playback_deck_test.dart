@@ -118,6 +118,10 @@ void main() {
     (prefix: 'ffmpeg', text: 'Incorrect BOM value'),
     (prefix: 'ffmpeg/demuxer', text: 'Error reading frame TIT2, skipped'),
     (prefix: 'ad', text: 'Error decoding frame'),
+    (
+      prefix: 'cplayer',
+      text: r'Can not open external file \\?\D:\Music\100% Hits\Song.lrc.',
+    ),
   ]) {
     test(
       'recoverable ${diagnostic.prefix} error does not abort opening',

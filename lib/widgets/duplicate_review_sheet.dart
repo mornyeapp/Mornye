@@ -117,6 +117,8 @@ class _DuplicateReviewSheetState extends ConsumerState<DuplicateReviewSheet> {
       return Uri.decodeFull(cleaned);
     } on FormatException {
       return cleaned;
+    } on ArgumentError {
+      return cleaned;
     }
   }
 

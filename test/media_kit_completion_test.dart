@@ -121,4 +121,50 @@ void main() {
           : false,
     );
   }
+
+  test(
+    'unreadable LRC sidecars cannot prevent their audio from playing',
+    () async {
+      final directory = await Directory.systemTemp.createTemp('mpv-sidecar-');
+      final engine = MediaKitEngine();
+      final deck = MediaKitPlaybackDeck(
+        playerId: 'sidecar-test',
+        engine: engine,
+      );
+      final diagnostics = <MpvLogError>[];
+      final subscription = engine.errors.listen(diagnostics.add);
+      try {
+        expect(await engine.setProperty('ao', 'null'), greaterThanOrEqualTo(0));
+        for (final name in ['Song', '100% Song']) {
+          final source = File('${directory.path}/$name.wav');
+          final lyrics = File('${directory.path}/$name.lrc');
+          await source.writeAsBytes(_toneWav());
+          await lyrics.writeAsString('This is not a supported subtitle stream');
+          await deck.setFileSource(source.path);
+          await deck.resume();
+          await Future<void>.delayed(const Duration(milliseconds: 350));
+          expect(
+            (await deck.getCurrentPosition())!.inMilliseconds,
+            greaterThan(100),
+          );
+          await deck.pause();
+          expect(
+            await lyrics.readAsString(),
+            'This is not a supported subtitle stream',
+          );
+        }
+        expect(
+          diagnostics.where((error) => error.text.contains('.lrc')),
+          isEmpty,
+        );
+      } finally {
+        await subscription.cancel();
+        await deck.dispose();
+        await directory.delete(recursive: true);
+      }
+    },
+    skip: _libmpvFolder.isEmpty || !Platform.isMacOS
+        ? 'Requires MORNYE_TEST_LIBMPV with the signed macOS audio frameworks'
+        : false,
+  );
 }
