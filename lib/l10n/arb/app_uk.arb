@@ -462,11 +462,11 @@
   "@optionsEmbedLyricsSubtitle": {
     "description": "Subtitle for embed lyrics"
   },
-  "optionsReplayGain": "Нормалізація звуку",
+  "optionsReplayGain": "ReplayGain",
   "@optionsReplayGain": {
     "description": "Title for ReplayGain setting toggle"
   },
-  "optionsReplayGainSubtitleOn": "Сканування гучності та вбудовування тегів нормалізації звуку (EBU R128)",
+  "optionsReplayGainSubtitleOn": "Аналізувати гучність та вбудувати теги ReplayGain (EBU R128)",
   "@optionsReplayGainSubtitleOn": {
     "description": "Subtitle when ReplayGain is enabled"
   },
@@ -565,7 +565,7 @@
   "metadataSeparators": "Розділювачі метаданих",
   "metadataSeparatorsDescription": "Виберіть, як об’єднувати значення, розділені комою або крапкою з комою, у майбутніх завантаженнях. Для власних роздільників виконавців використовується об’єднаний тег; правило «Тільки головний виконавець» залишається в силі. Імена, що містять & або /, зберігаються.",
   "metadataSeparatorSource": "Зберегти формат оригіналу",
-  "metadataSeparatorComma": "Кома()",
+  "metadataSeparatorComma": "Кома ()",
   "metadataSeparatorSemicolon": "Крапка з комою (;)",
   "metadataSeparatorSlash": "Слеш (/)",
   "metadataSeparatorCustom": "Користувацький розділювач",
@@ -811,7 +811,7 @@
   "@artistSingles": {
     "description": "Section header for singles/EPs"
   },
-  "artistCompilations": "Збірники",
+  "artistCompilations": "Збірки",
   "@artistCompilations": {
     "description": "Section header for compilations"
   },
@@ -6062,7 +6062,7 @@
   "@settingsMetadata": {
     "description": "Settings menu item - metadata settings"
   },
-  "settingsMetadataSubtitle": "Обкладинка, теги, вирівнювання гучності, провайдери",
+  "settingsMetadataSubtitle": "Обкладинки, теги, ReplayGain, провайдери",
   "@settingsMetadataSubtitle": {
     "description": "Subtitle for metadata settings"
   },
