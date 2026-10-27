@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:ui' as ui;
 
 import 'package:audio_service/audio_service.dart';
+import 'package:clock/clock.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart'
@@ -270,6 +271,42 @@ void main() {
     } while (tester.binding.hasScheduledFrame || lyricsRequests.isNotEmpty);
     return frames;
   }
+
+  testWidgets('Mornye timestamps advance between native position reports', (
+    tester,
+  ) async {
+    final states = StreamController<PlaybackState>();
+    addTearDown(states.close);
+    await withClock(Clock(tester.binding.clock.now), () async {
+      await pumpNowPlaying(
+        tester,
+        theme: MornyeTheme.build(Brightness.dark),
+        playbackEvents: states.stream,
+      );
+      mediaItems.add(item('first'));
+      states.add(
+        PlaybackState(
+          processingState: AudioProcessingState.ready,
+          updatePosition: const Duration(seconds: 10),
+        ),
+      );
+      await settlePlayer(tester);
+      states.add(
+        PlaybackState(
+          playing: true,
+          processingState: AudioProcessingState.ready,
+          updatePosition: const Duration(milliseconds: 10200),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 900));
+      final elapsed = find.byKey(const ValueKey('elapsed:first'));
+      expect(tester.widget<MornyePlaybackTime>(elapsed).seconds, 11);
+      await tester.pump(const Duration(seconds: 1));
+      expect(tester.widget<MornyePlaybackTime>(elapsed).seconds, 12);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  });
 
   for (final mornye in [false, true]) {
     testWidgets(

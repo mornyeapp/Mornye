@@ -25,6 +25,7 @@ import 'package:mornye/widgets/mornye_playback_button.dart';
 import 'package:mornye/widgets/mornye_playback_time.dart';
 import 'package:mornye/widgets/mornye_player_slider.dart';
 import 'package:mornye/widgets/playback_seek_slider.dart';
+import 'package:mornye/widgets/playback_time_builder.dart';
 
 const _mornyeTimelinePadding = 28.0;
 
@@ -85,7 +86,7 @@ class PlayerPlaybackControls extends ConsumerWidget {
               builder: (context, preview, _) => Consumer(
                 builder: (context, ref, quality) {
                   final position = ref.watch(playbackPositionProvider);
-                  final elapsedSeconds = (preview ?? position).inSeconds;
+                  final playback = ref.watch(playbackStateProvider).value;
                   return Padding(
                     padding: EdgeInsets.symmetric(
                       horizontal: edgeAligned
@@ -138,36 +139,44 @@ class PlayerPlaybackControls extends ConsumerWidget {
                                 ? MornyePlayerSlider.horizontalInset
                                 : 12,
                           ),
-                          child: Row(
-                            children: [
-                              if (mornye)
-                                MornyePlaybackTime(
-                                  key: ValueKey('elapsed:$mediaId'),
-                                  seconds: elapsedSeconds,
-                                  style: timeStyle,
-                                )
-                              else
-                                Text(
-                                  formatClock(elapsedSeconds),
-                                  style: timeStyle,
-                                ),
-                              Expanded(child: Center(child: quality)),
-                              if (mornye)
-                                MornyePlaybackTime(
-                                  key: ValueKey('remaining:$mediaId'),
-                                  // Subtract whole seconds so both labels roll together,
-                                  // even when the track duration includes milliseconds.
-                                  seconds: (duration.inSeconds - elapsedSeconds)
-                                      .clamp(0, duration.inSeconds),
-                                  remaining: true,
-                                  style: timeStyle,
-                                )
-                              else
-                                Text(
-                                  formatClock(duration.inSeconds),
-                                  style: timeStyle,
-                                ),
-                            ],
+                          child: PlaybackTimeBuilder(
+                            key: ValueKey(mediaId),
+                            position: position,
+                            duration: duration,
+                            playback: playback,
+                            preview: preview,
+                            builder: (context, elapsedSeconds) => Row(
+                              children: [
+                                if (mornye)
+                                  MornyePlaybackTime(
+                                    key: ValueKey('elapsed:$mediaId'),
+                                    seconds: elapsedSeconds,
+                                    style: timeStyle,
+                                  )
+                                else
+                                  Text(
+                                    formatClock(elapsedSeconds),
+                                    style: timeStyle,
+                                  ),
+                                Expanded(child: Center(child: quality)),
+                                if (mornye)
+                                  MornyePlaybackTime(
+                                    key: ValueKey('remaining:$mediaId'),
+                                    // Subtract whole seconds so both labels roll together,
+                                    // even when the track duration includes milliseconds.
+                                    seconds:
+                                        (duration.inSeconds - elapsedSeconds)
+                                            .clamp(0, duration.inSeconds),
+                                    remaining: true,
+                                    style: timeStyle,
+                                  )
+                                else
+                                  Text(
+                                    formatClock(duration.inSeconds),
+                                    style: timeStyle,
+                                  ),
+                              ],
+                            ),
                           ),
                         ),
                       ],

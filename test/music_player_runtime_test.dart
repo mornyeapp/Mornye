@@ -168,18 +168,25 @@ class _Session implements AudioSession {
 
 class _SessionStore implements AppStateDatabase {
   int clears = 0;
+  int? persistedPositionMs;
 
   @override
   Future<Map<String, dynamic>?> getPlaybackSession() async => null;
   @override
-  Future<void> savePlaybackSession(Map<String, dynamic> session) async {}
+  Future<void> savePlaybackSession(Map<String, dynamic> session) async {
+    persistedPositionMs = session['positionMs'] as int?;
+  }
+
   @override
   Future<bool> updatePlaybackSessionState({
     required int index,
     required int positionMs,
     required bool shuffle,
     required String repeatMode,
-  }) async => true;
+  }) async {
+    persistedPositionMs = positionMs;
+    return true;
+  }
 
   @override
   Future<void> clearPlaybackSession() async => clears++;
@@ -896,6 +903,34 @@ void main() {
       expect(decks.single.state, PlaybackDeckState.stopped);
     },
   );
+
+  for (final target in [Duration.zero, const Duration(seconds: 7)]) {
+    test('seek after restore replaces the saved start with $target', () async {
+      final decks = <_Deck>[];
+      final store = _SessionStore();
+      final handler = await _runtime(
+        decks: decks,
+        sessionDatabase: store,
+      ).initialize();
+      await handler.restoreSession(
+        items: [_track],
+        index: 0,
+        position: const Duration(seconds: 30),
+        shuffle: false,
+      );
+
+      await handler.seek(target);
+      expect(handler.playbackState.value.updatePosition, target);
+      expect(decks.single.sources, isEmpty);
+      expect(decks.single.position, Duration.zero);
+      expect(handler.playbackState.value.playing, isFalse);
+      expect(store.persistedPositionMs, target.inMilliseconds);
+
+      await handler.play();
+      expect(decks.single.position, target);
+      expect(handler.playbackState.value.playing, isTrue);
+    });
+  }
 
   test(
     'denied audio focus leaves a new source paused and allows retry',

@@ -2011,6 +2011,14 @@ class MusicPlayerHandler extends BaseAudioHandler
     await _autoMix.cancel();
     await _serializeSourceChange(() async {
       if (generation != _playRequestGeneration || _disposed) return;
+      if (!_sourceReady) {
+        // Restored sessions have no engine source yet. Retain the requested
+        // position, including zero, for the first play instead of the old save.
+        _pendingRestorePosition = position;
+        _broadcastPosition(position, force: true);
+        await _persistSession(position: position);
+        return;
+      }
       await _player.seek(position);
       if (generation != _playRequestGeneration || _disposed) return;
       _broadcastPosition(position, force: true);
