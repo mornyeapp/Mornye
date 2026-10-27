@@ -19,6 +19,8 @@ class PlaybackFeedback extends ConsumerStatefulWidget {
 class _PlaybackFeedbackState extends ConsumerState<PlaybackFeedback> {
   StreamSubscription<void>? _subscription;
   int _subscriptionRevision = 0;
+  Timer? _errorTimer;
+  ScaffoldFeatureController<SnackBar, SnackBarClosedReason>? _errorNotice;
 
   @override
   void initState() {
@@ -26,19 +28,34 @@ class _PlaybackFeedbackState extends ConsumerState<PlaybackFeedback> {
     ref.listenManual(
       playbackStateProvider.select((state) => state.value?.errorMessage),
       (previous, message) {
-        if (message == null ||
-            message == previous ||
-            !mounted ||
-            WidgetsBinding.instance.lifecycleState !=
-                AppLifecycleState.resumed) {
-          return;
-        }
-        showAppSnackBar(
-          context,
-          content: Text(
-            context.l10n.snackbarCannotOpenFile(context.friendlyError(message)),
-          ),
-        );
+        if (message == previous || !mounted) return;
+        _errorTimer?.cancel();
+        _errorNotice?.close();
+        _errorNotice = null;
+        if (message == null) return;
+        // A quick track change can replace a failed preparation immediately.
+        // Report only an error that still belongs to the current playback.
+        _errorTimer = Timer(const Duration(milliseconds: 350), () {
+          if (!mounted ||
+              WidgetsBinding.instance.lifecycleState !=
+                  AppLifecycleState.resumed ||
+              ref.read(playbackStateProvider).value?.errorMessage != message) {
+            return;
+          }
+          final notice = _errorNotice = showAppSnackBar(
+            context,
+            content: Text(
+              context.l10n.snackbarCannotOpenFile(
+                context.friendlyError(message),
+              ),
+            ),
+          );
+          unawaited(
+            notice.closed.then((_) {
+              if (identical(_errorNotice, notice)) _errorNotice = null;
+            }),
+          );
+        });
       },
     );
     ref.listenManual(musicPlayerRuntimeProvider, (_, runtime) {
@@ -62,6 +79,7 @@ class _PlaybackFeedbackState extends ConsumerState<PlaybackFeedback> {
   @override
   void dispose() {
     _subscriptionRevision++;
+    _errorTimer?.cancel();
     unawaited(_subscription?.cancel());
     super.dispose();
   }

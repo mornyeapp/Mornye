@@ -45,6 +45,8 @@ void main() {
         errorMessage: 'Audio output failed',
       );
       states.add(failed);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 350));
       await tester.pumpAndSettle();
       expect(
         find.text('Cannot open file: Audio output failed'),
@@ -61,6 +63,63 @@ void main() {
       expect(find.text('Cannot open file: Audio output failed'), findsNothing);
       expect(tester.takeException(), isNull);
     });
+
+    testWidgets(
+      'superseded errors do not linger after playback recovers ($mornye)',
+      (tester) async {
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.resumed,
+        );
+        final runtime = MusicPlayerRuntime();
+        addTearDown(runtime.dispose);
+        final states = StreamController<PlaybackState>();
+        addTearDown(states.close);
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              musicPlayerRuntimeProvider.overrideWithValue(runtime),
+              playbackStateProvider.overrideWith((_) => states.stream),
+            ],
+            child: MaterialApp(
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              theme: mornye ? MornyeTheme.build(Brightness.dark) : ThemeData(),
+              builder: (_, child) =>
+                  AppScaffoldMessenger(child: PlaybackFeedback(child: child!)),
+              home: const Scaffold(body: SizedBox.expand()),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final failed = PlaybackState(
+          processingState: AudioProcessingState.error,
+          errorCode: 1,
+          errorMessage: 'Cancelled source',
+        );
+        final ready = PlaybackState(
+          processingState: AudioProcessingState.ready,
+          playing: true,
+        );
+        states.add(failed);
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 100));
+        states.add(ready);
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 400));
+        expect(find.text('Cannot open file: Cancelled source'), findsNothing);
+
+        // A lasting failure is still visible, then clears when playback works.
+        states.add(failed);
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 350));
+        await tester.pumpAndSettle();
+        expect(find.text('Cannot open file: Cancelled source'), findsOneWidget);
+        states.add(ready);
+        await tester.pumpAndSettle();
+        expect(find.text('Cannot open file: Cancelled source'), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
 
     testWidgets('muted feedback is transient and themed (Mornye: $mornye)', (
       tester,

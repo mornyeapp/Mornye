@@ -8,10 +8,15 @@ import xyz.luan.audioplayers.source.Source
 
 class MediaPlayerWrapper(
     private val wrappedPlayer: WrappedPlayer,
+    private val mediaPlayer: MediaPlayer = MediaPlayer(),
 ) : PlayerWrapper {
-    private val mediaPlayer = createMediaPlayer(wrappedPlayer)
+    private var released = false
     private var equalizer: PlaybackEqualizer? = null
     private var playbackParamsApplied = false
+
+    init {
+        configureMediaPlayer()
+    }
 
     fun setEqualizer(configuration: Map<String, Any?>) {
         if (Build.VERSION.SDK_INT < 28) {
@@ -35,19 +40,22 @@ class MediaPlayerWrapper(
         mediaPlayer.setNextMediaPlayer(next?.mediaPlayer)
     }
 
-    private fun createMediaPlayer(wrappedPlayer: WrappedPlayer): MediaPlayer {
-        val mediaPlayer = MediaPlayer().apply {
-            setOnPreparedListener { wrappedPlayer.onPrepared() }
-            setOnCompletionListener { wrappedPlayer.onCompletion() }
-            setOnSeekCompleteListener { wrappedPlayer.onSeekComplete() }
-            setOnErrorListener { _, what, extra -> wrappedPlayer.onError(what, extra) }
-            setOnBufferingUpdateListener { _, percent -> wrappedPlayer.onBuffering(percent) }
+    private fun configureMediaPlayer() {
+        mediaPlayer.apply {
+            setOnPreparedListener { if (!released) wrappedPlayer.onPrepared() }
+            setOnCompletionListener { if (!released) wrappedPlayer.onCompletion() }
+            setOnSeekCompleteListener { if (!released) wrappedPlayer.onSeekComplete() }
+            setOnErrorListener { _, what, extra ->
+                if (released) true else wrappedPlayer.onError(what, extra)
+            }
+            setOnBufferingUpdateListener { _, percent ->
+                if (!released) wrappedPlayer.onBuffering(percent)
+            }
         }
         wrappedPlayer.context.setAttributesOnPlayer(mediaPlayer)
         if (wrappedPlayer.context.stayAwake) {
             mediaPlayer.setWakeMode(wrappedPlayer.applicationContext, PowerManager.PARTIAL_WAKE_LOCK)
         }
-        return mediaPlayer
     }
 
     override fun getDuration(): Int? {
@@ -99,6 +107,9 @@ class MediaPlayerWrapper(
     }
 
     override fun release() {
+        // Retiring a preparing network source may still deliver queued callbacks.
+        // They belong to this output, not the next one on the WrappedPlayer.
+        released = true
         if (Build.VERSION.SDK_INT >= 28) equalizer?.close()
         equalizer = null
         mediaPlayer.reset()

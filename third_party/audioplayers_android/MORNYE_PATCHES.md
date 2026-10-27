@@ -61,6 +61,11 @@ prepared) with the `what` and `extra` codes as details, and returns `true`.
 Upstream returns `false`, which makes MediaPlayer also call the completion
 listener, so the app's queue advanced after a playback failure.
 
+`MediaPlayerWrapper` retires its callbacks before resetting and releasing the
+native player. A late error, prepared, seek or completion callback from a
+cancelled network source cannot change the replacement source's shared
+`WrappedPlayer` state or report its error as a failure of the new song.
+
 ### Build
 
 `android/build.gradle`: Kotlin 1.7.10 to 2.4.21, coroutines 1.6.4 to 1.11.0,

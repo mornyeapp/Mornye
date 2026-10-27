@@ -1,10 +1,12 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
+import 'package:mornye/services/downloaded_embedded_cover_resolver.dart';
 import 'package:mornye/services/link/features/link_desktop_remote.dart';
 import 'package:mornye/services/link/features/link_handoff.dart';
 import 'package:mornye/services/link/features/link_phone_features.dart';
@@ -16,6 +18,7 @@ import 'package:mornye/services/link/link_protocol.dart';
 import 'package:mornye/services/playable_media.dart';
 import 'package:mornye/services/remote_playback.dart';
 import 'package:mornye/utils/logger.dart';
+import 'package:mornye/utils/playback_artwork.dart';
 
 final _log = AppLogger('LinkRemotePlayback');
 
@@ -177,12 +180,17 @@ class LinkRemotePlayback implements RemotePlayback {
     required LinkDesktopRemote remote,
     required LinkHandoff handoff,
     required Future<String> Function(String source) resolveArtwork,
+    Future<String?> Function(String source)? extractArtwork,
     MediaItem? initialItem,
     Duration tick = const Duration(milliseconds: 500),
     int Function()? nowMs,
   }) : _remote = remote,
        _handoff = handoff,
        _resolveArtwork = resolveArtwork,
+       _extractArtwork =
+           extractArtwork ??
+           ((source) =>
+               DownloadedEmbeddedCoverResolver.resolveOrExtract(source)),
        _mediaItem = _Latest(initialItem),
        _tick = tick,
        _nowMs = nowMs ?? (() => DateTime.now().millisecondsSinceEpoch);
@@ -193,11 +201,13 @@ class LinkRemotePlayback implements RemotePlayback {
   final LinkDesktopRemote _remote;
   final LinkHandoff _handoff;
   final Future<String> Function(String source) _resolveArtwork;
+  final Future<String?> Function(String source) _extractArtwork;
   final Duration _tick;
   final int Function() _nowMs;
 
-  /// How many queue entries from the current one get their full item.
+  /// How many entries after the current song take priority over earlier ones.
   static const _resolveAhead = 20;
+  static const _maxResolutions = 4;
   static const _itemLimit = 500;
 
   /// Starts with [LinkRemotePlayback.new]'s `initialItem`, the song just
@@ -217,8 +227,11 @@ class LinkRemotePlayback implements RemotePlayback {
   final _items = <TrackRef, MediaItem>{};
   final _resolved = <TrackRef>{};
   final _resolving = <TrackRef>{};
+  final _pending = <TrackRef>{};
+  final _failed = <TrackRef>{};
 
   LinkPlayerState? _player;
+  LinkConnectionState? _connection;
   List<TrackRef> _queueRefs = const [];
   Timer? _ticker;
   bool _disposed = false;
@@ -241,6 +254,12 @@ class LinkRemotePlayback implements RemotePlayback {
   /// Shows the desktop's [state].
   void update(LinkRemoteState state) {
     if (_disposed || (state.loading && state.player == null)) return;
+    if (state.connection == LinkConnectionState.connected &&
+        _connection != LinkConnectionState.connected) {
+      _resolved.removeAll(_failed);
+      _failed.clear();
+    }
+    _connection = state.connection;
     final player = _player = state.player;
     if (player != null) _volume.add(player.volume.clamp(0.0, 1.0));
     _showTracks(force: false);
@@ -262,9 +281,33 @@ class LinkRemotePlayback implements RemotePlayback {
       _queueRefs = refs;
       _showQueue([for (final ref in refs) _itemFor(ref)]);
     }
-    if (track != null) unawaited(_resolve(track));
+    // Prioritize the playing song and those next, then fill the rest of the
+    // bounded queue window, including entries before the playing song.
+    _pending.clear();
+    void schedule(TrackRef ref) {
+      if (!_resolved.contains(ref) && !_resolving.contains(ref)) {
+        _pending.add(ref);
+      }
+    }
+
+    if (track != null) schedule(track);
     final start = player?.index ?? 0;
     for (final ref in refs.skip(start < 0 ? 0 : start).take(_resolveAhead)) {
+      schedule(ref);
+    }
+    for (final ref in refs) {
+      schedule(ref);
+    }
+    _drainResolutions();
+  }
+
+  void _drainResolutions() {
+    while (!_disposed &&
+        _resolving.length < _maxResolutions &&
+        _pending.isNotEmpty) {
+      final ref = _pending.first;
+      _pending.remove(ref);
+      _resolving.add(ref);
       unawaited(_resolve(ref));
     }
   }
@@ -339,21 +382,50 @@ class LinkRemotePlayback implements RemotePlayback {
   /// Looks [ref] up once: the phone's file for it, else the desktop's song
   /// with its cover.
   Future<void> _resolve(TrackRef ref) async {
-    if (_resolved.contains(ref) || !_resolving.add(ref)) return;
     try {
       final media = _playable(ref, await _handoff.resolver.resolve(ref));
-      String? artwork;
-      if (media.networkArtworkSource case final source?) {
-        try {
-          artwork = await _resolveArtwork(source);
-        } on Object {
-          // The song shows without a cover.
+      if (_disposed) return;
+      var artwork = media.artUri;
+      if (!media.isNetwork) {
+        artwork =
+            await resolveEmbeddedArtworkUri(
+              media.source,
+              artwork,
+              extract: _extractArtwork,
+            ) ??
+            artwork;
+      }
+      if (_disposed) return;
+      // A matched phone file may have no thumbnail, or one its scan removed.
+      // Keep its identity for lyrics and favorites, but borrow the PC cover.
+      final uri = Uri.tryParse(artwork ?? '');
+      final local = uri != null && (!uri.hasScheme || uri.scheme == 'file');
+      if (artwork == null ||
+          artwork.isEmpty ||
+          (local &&
+              !await File(
+                uri.scheme == 'file' ? uri.toFilePath() : artwork,
+              ).exists())) {
+        artwork = null;
+        final source =
+            media.networkArtworkSource ??
+            linkDesktopPlayable(
+              ref,
+              _handoff.resolver.server,
+            )?.networkArtworkSource;
+        if (source != null) {
+          try {
+            artwork = await _resolveArtwork(source);
+          } on Object {
+            _failed.add(ref);
+          }
         }
       }
       if (_disposed) return;
       if (_items.length >= _itemLimit) {
         _items.removeWhere((key, _) => !_queueRefs.contains(key));
         _resolved.removeWhere((key) => !_queueRefs.contains(key));
+        _failed.removeWhere((key) => !_queueRefs.contains(key));
       }
       _items[ref] = media.toMediaItem(resolvedArtwork: artwork);
       _resolved.add(ref);
@@ -361,9 +433,12 @@ class LinkRemotePlayback implements RemotePlayback {
         _showTracks(force: true);
       }
     } on Object catch (error) {
+      _resolved.add(ref);
+      _failed.add(ref);
       _log.w('Could not look up a song the computer plays: $error');
     } finally {
       _resolving.remove(ref);
+      _drainResolutions();
     }
   }
 
@@ -460,6 +535,7 @@ class LinkRemotePlayback implements RemotePlayback {
 
   void dispose() {
     _disposed = true;
+    _pending.clear();
     _ticker?.cancel();
     _mediaItem.close();
     _playbackState.close();
