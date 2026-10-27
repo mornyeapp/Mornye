@@ -11,6 +11,7 @@ import 'package:mornye/services/link/features/link_remote_playback.dart';
 import 'package:mornye/services/link/link_client_api.dart';
 import 'package:mornye/theme/app_tokens.dart';
 import 'package:mornye/theme/mornye_theme.dart';
+import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/widgets/app_bottom_sheet.dart';
 import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/app_icon_button.dart';
@@ -272,7 +273,13 @@ class LinkPlayingOnText extends ConsumerWidget {
       children: [
         if (transfer == null)
           AppIcon(
-            context.isMornye ? CupertinoIcons.desktopcomputer : Icons.computer,
+            // The computer follows a phone; a phone, the computer.
+            switch ((isDesktopPlatform, context.isMornye)) {
+              (true, true) => CupertinoIcons.device_phone_portrait,
+              (true, false) => Icons.phone_android,
+              (false, true) => CupertinoIcons.desktopcomputer,
+              (false, false) => Icons.computer,
+            },
             size: glyphSize,
             color: color,
           )

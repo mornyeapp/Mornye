@@ -437,6 +437,11 @@ class LinkDesktopOps {
     return paths;
   }
 
+  /// [ref] as the desktop plays it: the Library's song, else the file a
+  /// phone uploaded for it, else null.
+  Future<PlayableMedia?> resolveRef(TrackRef ref) async =>
+      (await _resolveQueue([ref.toJson()])).single;
+
   /// Each entry of [queue] as the desktop plays it: the Library's song, else
   /// the file a phone uploaded or is sending ([arriving]) for it, else null.
   Future<List<PlayableMedia?>> _resolveQueue(

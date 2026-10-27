@@ -23,6 +23,7 @@ import 'package:mornye/widgets/desktop/desktop_inspector.dart';
 import 'package:mornye/widgets/desktop/desktop_link_devices_button.dart';
 import 'package:mornye/widgets/desktop/desktop_window.dart';
 import 'package:mornye/widgets/desktop/desktop_volume_scroll.dart';
+import 'package:mornye/widgets/link/link_devices_sheet.dart';
 import 'package:mornye/widgets/mornye_chrome.dart';
 import 'package:mornye/widgets/mornye_playback_button.dart';
 import 'package:mornye/widgets/mornye_player_background.dart';
@@ -336,6 +337,12 @@ class _TitleAndArtist extends StatelessWidget {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
+        // While the desktop follows a phone, the bar shows and drives it.
+        LinkPlayingOnText(
+          color: colorScheme.primary,
+          style: textTheme.labelSmall,
+          glyphSize: 14,
+        ),
       ],
     );
   }
@@ -631,13 +638,13 @@ class _MornyeLcd extends StatelessWidget {
 }
 
 /// The LCD's title and "artist · album" line, left-aligned like Music's.
-class _MornyeLcdLines extends StatelessWidget {
+class _MornyeLcdLines extends ConsumerWidget {
   const _MornyeLcdLines({required this.mediaItem});
 
   final MediaItem mediaItem;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final textTheme = Theme.of(context).textTheme;
     final colorScheme = Theme.of(context).colorScheme;
     final subtitle = [
@@ -656,7 +663,17 @@ class _MornyeLcdLines extends StatelessWidget {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
-        if (subtitle.isNotEmpty)
+        // The capsule has two lines: while the desktop follows a phone,
+        // the second names it instead.
+        if (ref.watch(
+          activeRemotePlaybackProvider.select((remote) => remote != null),
+        ))
+          LinkPlayingOnText(
+            color: colorScheme.primary,
+            style: style?.copyWith(fontWeight: FontWeight.w600),
+            glyphSize: 12,
+          )
+        else if (subtitle.isNotEmpty)
           Text(
             subtitle,
             style: style?.copyWith(color: colorScheme.onSurfaceVariant),

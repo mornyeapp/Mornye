@@ -37,6 +37,7 @@ import 'package:mornye/services/desktop_deep_links.dart';
 import 'package:mornye/services/desktop_diagnostics.dart';
 import 'package:mornye/services/desktop_library_watcher.dart';
 import 'package:mornye/services/link/desktop/link_desktop_host.dart';
+import 'package:mornye/services/link/desktop/link_phone_playback.dart';
 import 'package:mornye/services/link/features/link_phone_features.dart';
 import 'package:mornye/services/link/features/link_remote_playback.dart';
 import 'package:mornye/services/link/link_client_api.dart';
@@ -188,9 +189,12 @@ void main() {
             ),
             initialThemeSettingsProvider.overrideWithValue(bootstrapTheme),
             // While the paired desktop plays in the phone's place, the
-            // player screens show and drive it.
+            // player screens show and drive it; on the desktop, the phone
+            // it follows.
             activeRemotePlaybackProvider.overrideWith(
-              (ref) => ref.watch(linkRemotePlaybackProvider),
+              (ref) =>
+                  ref.watch(linkRemotePlaybackProvider) ??
+                  ref.watch(linkFollowedPhonePlaybackProvider),
             ),
             // Also while songs transfer, so the computer can still ask for
             // this phone's files and hear how a transfer stands.

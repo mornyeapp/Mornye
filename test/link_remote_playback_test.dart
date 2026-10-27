@@ -716,6 +716,36 @@ void main() {
       expect(follower.read(linkPlaysOnDesktopProvider), isFalse);
     });
 
+    test('the phone starting pauses a desktop that plays', () async {
+      final desktop = FakeLinkClient(onGet: (op, query) => _state()['state']);
+      final follower = phoneOf(desktop);
+      runtime.states.add(PlaybackState());
+      await settle();
+      expect(follower.read(linkPlaysOnDesktopProvider), isTrue);
+
+      runtime.states.add(PlaybackState(playing: true));
+      await settle();
+      expect(follower.read(linkPlaysOnDesktopProvider), isFalse);
+      expect(desktop.posts.single.op, LinkOps.command);
+      expect(desktop.posts.single.body['action'], LinkActions.pause);
+    });
+
+    test('a phone the desktop pauses follows it', () async {
+      final desktop = FakeLinkClient(
+        onGet: (op, query) => _state(playing: false)['state'],
+      );
+      final follower = phoneOf(desktop);
+      runtime.states.add(PlaybackState(playing: true));
+      await settle();
+      desktop.push(_state());
+      expect(follower.read(linkPlaysOnDesktopProvider), isFalse);
+
+      runtime.states.add(PlaybackState());
+      await settle();
+      expect(follower.read(linkPlaysOnDesktopProvider), isTrue);
+      expect(desktop.posts, isEmpty);
+    });
+
     test('a desktop that plays on does not take over again', () async {
       final desktop = FakeLinkClient(onGet: (op, query) => _state()['state']);
       final follower = phoneOf(desktop);

@@ -26,6 +26,7 @@ import 'package:mornye/services/link/link_protocol.dart';
 import 'package:mornye/services/link/link_transfers.dart';
 import 'package:mornye/services/link/sync/link_sync_handlers.dart';
 import 'package:mornye/services/network_storage_service.dart';
+import 'package:mornye/services/playable_media.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/utils/logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -91,6 +92,7 @@ class LinkDesktopHostState {
     this.devices = const [],
     this.phoneStates = const {},
     this.catalogSongs,
+    this.followedPhone,
   });
 
   /// Whether the saved settings were read.
@@ -117,6 +119,12 @@ class LinkDesktopHostState {
   /// Songs in the last catalog the server loaded.
   final int? catalogSongs;
 
+  /// The connected phone whose player the desktop's player screens show and
+  /// drive, as the phone shows the desktop after Play on desktop: one that
+  /// started playing while the desktop did not. Null while the desktop
+  /// shows its own player.
+  final String? followedPhone;
+
   bool get running => phase == LinkHostPhase.running && server != null;
 
   LinkDesktopHostState copyWith({
@@ -130,6 +138,7 @@ class LinkDesktopHostState {
     List<LinkPairedDevice>? devices,
     Map<String, LinkPlayerState>? phoneStates,
     Object? catalogSongs = _keep,
+    Object? followedPhone = _keep,
   }) => LinkDesktopHostState(
     loaded: loaded ?? this.loaded,
     enabled: enabled ?? this.enabled,
@@ -143,6 +152,9 @@ class LinkDesktopHostState {
     catalogSongs: identical(catalogSongs, _keep)
         ? this.catalogSongs
         : catalogSongs as int?,
+    followedPhone: identical(followedPhone, _keep)
+        ? this.followedPhone
+        : followedPhone as String?,
   );
 }
 
@@ -401,6 +413,7 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
     }
     _index = null;
     _lastSentState = null;
+    _localPlaying = false;
     if (!ref.mounted) return;
     ref.read(linkCatalogIndexProvider.notifier).set(null);
     _phoneSources?.keepConnected(const {});
@@ -412,6 +425,7 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
       clients: const [],
       phoneStates: const {},
       catalogSongs: null,
+      followedPhone: null,
     );
     // Nothing is connected any more.
     unawaited(refreshDevices());
@@ -458,6 +472,9 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
       unawaited(_send({'type': LinkMessageTypes.collectionsChanged}));
     });
   }
+
+  /// The name [deviceId] gave when it paired, else its id.
+  String deviceName(String deviceId) => _deviceName(deviceId);
 
   String _deviceName(String deviceId) {
     for (final client in state.clients) {
@@ -608,8 +625,87 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
     if (event.type != LinkMessageTypes.playerState) return;
     final phoneState = LinkPlayerState.fromJson(event.message['state']);
     if (phoneState == null || event.deviceId.isEmpty) return;
+    final was = state.phoneStates[event.deviceId];
     state = state.copyWith(
       phoneStates: {...state.phoneStates, event.deviceId: phoneState},
+    );
+    // A phone starting to play takes over the player screens, as the
+    // desktop starting does on the phone, unless the desktop plays.
+    if (!_localPlaying &&
+        _plays(phoneState) &&
+        !_plays(was) &&
+        state.followedPhone != event.deviceId) {
+      state = state.copyWith(followedPhone: event.deviceId);
+    }
+  }
+
+  static bool _plays(LinkPlayerState? player) =>
+      player != null && player.playing && player.track != null;
+
+  /// Whether the desktop's own player played when last heard from.
+  bool _localPlaying = false;
+
+  /// One player at a time: the desktop starting pauses the phones that play
+  /// and shows its own player again; the desktop stopping, as when a phone
+  /// paused it, follows a phone that plays.
+  void _onLocalPlaying(bool playing) {
+    if (playing == _localPlaying) return;
+    _localPlaying = playing;
+    if (playing) {
+      if (state.followedPhone != null) {
+        state = state.copyWith(followedPhone: null);
+      }
+      for (final MapEntry(key: deviceId, value: phone)
+          in state.phoneStates.entries) {
+        if (phone.playing) {
+          unawaited(
+            sendCommand(deviceId, const LinkCommand(LinkActions.pause)),
+          );
+        }
+      }
+      return;
+    }
+    if (state.followedPhone != null) return;
+    for (final MapEntry(key: deviceId, value: phone)
+        in state.phoneStates.entries) {
+      if (_plays(phone)) {
+        state = state.copyWith(followedPhone: deviceId);
+        return;
+      }
+    }
+  }
+
+  /// Shows the desktop's own player again, as playing one of its songs
+  /// does.
+  void stopFollowingPhone() {
+    if (state.followedPhone != null) {
+      state = state.copyWith(followedPhone: null);
+    }
+  }
+
+  /// [ref], a track a phone plays, as the desktop shows it: its Library
+  /// song or the file the phone sent, else the phone's song with its cover.
+  Future<PlayableMedia?> phoneTrackMedia(TrackRef ref) async {
+    try {
+      final media = await _ops?.resolveRef(ref);
+      if (media != null) return media;
+    } on LinkException {
+      // The catalog is not ready; the phone's own details still show.
+    }
+    final fileId = ref.fileId;
+    if (fileId == null) return null;
+    final cover = (await _phoneCatalogs?.coversFor({fileId}))?[fileId];
+    if (cover == null) return null;
+    return PlayableMedia(
+      id: 'link:$fileId',
+      source: '',
+      title: ref.title,
+      artist: ref.artist,
+      album: ref.album ?? '',
+      artUri: normalizeArtUri(cover),
+      duration: ref.durationMs == null
+          ? null
+          : Duration(milliseconds: ref.durationMs!),
     );
   }
 
@@ -622,6 +718,9 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
         for (final entry in state.phoneStates.entries)
           if (ids.contains(entry.key)) entry.key: entry.value,
       },
+      followedPhone: ids.contains(state.followedPhone)
+          ? state.followedPhone
+          : null,
     );
     _phoneSources?.keepConnected(ids);
     _transfers?.keepConnected(ids);
@@ -645,6 +744,7 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
     if (player == null || ops == null || !state.running) return;
     final snapshot = player.snapshot();
     ops.observe(snapshot);
+    _onLocalPlaying(snapshot.playing);
     if (state.clients.isEmpty) return;
     final next = ops.state();
     final last = _lastSentState;

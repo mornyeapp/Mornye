@@ -350,6 +350,69 @@ void main() {
     await shutdown(tester);
   });
 
+  testWidgets('one player at a time: follows a phone, pauses it to play', (
+    tester,
+  ) async {
+    await boot(tester);
+    player.emit(snapshot(playing: false));
+    backend.connect([_phone, _tablet]);
+    await flush(tester);
+    void phonePlays(String deviceId, {required bool playing}) =>
+        backend.message(deviceId, {
+          'type': LinkMessageTypes.playerState,
+          'state': LinkPlayerState(
+            track: const TrackRef(title: 'On the phone', artist: 'Band'),
+            playing: playing,
+            updatedMs: 1,
+          ).toJson(),
+        });
+    List<String?> pausedPhones() => [
+      for (final sent in backend.sent)
+        if (sent.message['type'] == LinkMessageTypes.command &&
+            sent.message['action'] == LinkActions.pause)
+          sent.deviceId,
+    ];
+
+    // A paused phone is not followed; one that starts playing is.
+    phonePlays('p1', playing: false);
+    await flush(tester);
+    expect(hostState().followedPhone, isNull);
+    phonePlays('p1', playing: true);
+    await flush(tester);
+    expect(hostState().followedPhone, 'p1');
+    expect(host().deviceName('p1'), 'Pixel');
+
+    // The desktop starting shows its own player and pauses the phone.
+    backend.sent.clear();
+    player.emit(snapshot());
+    await flush(tester);
+    expect(hostState().followedPhone, isNull);
+    expect(pausedPhones(), ['p1']);
+
+    // A phone starting while the desktop plays is left to pause it.
+    phonePlays('p2', playing: true);
+    await flush(tester);
+    expect(hostState().followedPhone, isNull);
+
+    // Once paused, the desktop follows the phone that plays.
+    phonePlays('p1', playing: false);
+    player.emit(snapshot(playing: false));
+    await flush(tester);
+    expect(hostState().followedPhone, 'p2');
+
+    // Picking a song here, or the phone leaving, ends following.
+    host().stopFollowingPhone();
+    expect(hostState().followedPhone, isNull);
+    phonePlays('p2', playing: false);
+    phonePlays('p2', playing: true);
+    await flush(tester);
+    expect(hostState().followedPhone, 'p2');
+    backend.connect([_phone]);
+    await flush(tester);
+    expect(hostState().followedPhone, isNull);
+    await shutdown(tester);
+  });
+
   testWidgets('re-exports 10 s after a Library change, only while running', (
     tester,
   ) async {
