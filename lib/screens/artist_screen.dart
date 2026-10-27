@@ -30,6 +30,7 @@ import 'package:mornye/providers/recent_access_provider.dart';
 import 'package:mornye/providers/local_library_provider.dart';
 import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/utils/string_utils.dart';
+import 'package:mornye/utils/artist_album_sort.dart';
 import 'package:mornye/utils/adaptive_layout.dart';
 import 'package:mornye/utils/nav_bar_inset.dart';
 import 'package:mornye/utils/provider_resource_ids.dart';
@@ -237,7 +238,9 @@ class _ArtistScreenState extends ConsumerState<ArtistScreen>
     });
 
     if (widget.extensionId != null) {
-      _albums = widget.albums;
+      _albums = widget.albums == null
+          ? null
+          : sortArtistAlbumsNewestFirst(widget.albums!);
       _topTracks = widget.topTracks;
       _headerImageUrl = widget.headerImageUrl;
       _headerVideoUrl = widget.headerVideoUrl;
@@ -255,7 +258,7 @@ class _ArtistScreenState extends ConsumerState<ArtistScreen>
     final cached = _ArtistCache.get(widget.artistId);
 
     if (widget.albums != null) {
-      _albums = widget.albums;
+      _albums = sortArtistAlbumsNewestFirst(widget.albums!);
       _topTracks = widget.topTracks;
       _headerImageUrl = widget.headerImageUrl;
       _headerVideoUrl = widget.headerVideoUrl;
@@ -267,8 +270,10 @@ class _ArtistScreenState extends ConsumerState<ArtistScreen>
         _fetchDiscography();
       }
     } else if (cached != null) {
-      _albums = cached.albums;
-      _releases = cached.releases;
+      _albums = sortArtistAlbumsNewestFirst(cached.albums);
+      _releases = cached.releases == null
+          ? null
+          : sortArtistAlbumsNewestFirst(cached.releases!);
       _topTracks = cached.topTracks;
       _concerts = cached.concerts;
       _headerImageUrl = cached.headerImageUrl;
@@ -393,6 +398,11 @@ class _ArtistScreenState extends ConsumerState<ArtistScreen>
         }
       }
 
+      albums = sortArtistAlbumsNewestFirst(albums);
+      if (releases != null) {
+        releases = sortArtistAlbumsNewestFirst(releases);
+      }
+
       final finalHeaderImage =
           headerImage ?? _headerImageUrl ?? widget.headerImageUrl;
       final finalHeaderVideo =
@@ -491,7 +501,7 @@ class _ArtistScreenState extends ConsumerState<ArtistScreen>
       }
       final following = info['albums_next'] as String?;
       setState(() {
-        _albums = merged.values.toList();
+        _albums = sortArtistAlbumsNewestFirst(merged.values);
         _albumsNext = following == next ? null : following;
       });
       _ArtistCache.set(
