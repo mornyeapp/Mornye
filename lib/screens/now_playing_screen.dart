@@ -61,6 +61,9 @@ export 'package:mornye/routes/now_playing_route.dart';
 
 final _log = AppLogger('NowPlaying');
 
+/// Material portrait's "Playing on" row, kept while empty.
+const _playingOnRowHeight = 36.0;
+
 /// AppBar wrapper that fades with the route transition (see contentOpacity
 /// in [_NowPlayingScreenState.build]).
 class _FadingAppBar extends StatelessWidget implements PreferredSizeWidget {
@@ -664,11 +667,30 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                           ),
                         ),
                       // Landscape has no row to spare; the toolbar's devices
-                      // button shows the device there.
+                      // button shows the device there. Material's portrait
+                      // keeps the row while empty, so the controls stay put
+                      // when a computer takes over playback; Mornye's larger
+                      // cover and short phones' lyrics keep that room.
                       if (MediaQuery.orientationOf(context) ==
                           Orientation.portrait) ...[
-                        LinkPlayingOnLabel(color: mornye ? Colors.white : null),
-                        const SizedBox(height: 8),
+                        if (mornye ||
+                            MediaQuery.sizeOf(context).height < 640) ...[
+                          LinkPlayingOnLabel(
+                            color: mornye ? Colors.white : null,
+                          ),
+                          const SizedBox(height: 8),
+                        ] else
+                          // As tall as the one-line label needs, so the
+                          // empty row is no taller than a filled one looks.
+                          const SizedBox(
+                            key: ValueKey('link-playing-on-row'),
+                            height: _playingOnRowHeight,
+                            child: Center(
+                              child: LinkPlayingOnLabel(
+                                height: _playingOnRowHeight,
+                              ),
+                            ),
+                          ),
                       ],
                     ],
                   ),

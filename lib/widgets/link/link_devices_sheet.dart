@@ -199,10 +199,14 @@ class LinkDevicesSheet extends ConsumerWidget {
 /// "Playing on (desktop)" in the player while the paired desktop plays in
 /// the phone's place; tapping it opens the Devices sheet. Empty otherwise.
 class LinkPlayingOnLabel extends ConsumerWidget {
-  const LinkPlayingOnLabel({super.key, this.color});
+  const LinkPlayingOnLabel({super.key, this.color, this.height});
 
   /// The label's color; Material defaults to `primary`.
   final Color? color;
+
+  /// Material's tap height where a row reserves less than a touch target;
+  /// the touch target by default.
+  final double? height;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -235,7 +239,9 @@ class LinkPlayingOnLabel extends ConsumerWidget {
       customBorder: const StadiumBorder(),
       onTap: () => showLinkDevicesSheet(context),
       child: ConstrainedBox(
-        constraints: BoxConstraints(minHeight: context.tokens.minTouchTarget),
+        constraints: BoxConstraints(
+          minHeight: height ?? context.tokens.minTouchTarget,
+        ),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12),
           child: Center(widthFactor: 1, child: label),

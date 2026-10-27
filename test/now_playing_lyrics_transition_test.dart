@@ -456,6 +456,27 @@ void main() {
     });
   }
 
+  for (final (size, kept) in [
+    (const Size(430, 932), true),
+    (const Size(320, 568), false),
+  ]) {
+    testWidgets('Material portrait keeps an empty Playing on row ($size)', (
+      tester,
+    ) async {
+      await pumpNowPlaying(tester, theme: AppTheme.light(), size: size);
+      mediaItems.add(item('first'));
+      await settlePlayer(tester);
+      expect(find.byKey(const ValueKey('link-playing-on')), findsNothing);
+      final row = find.byKey(const ValueKey('link-playing-on-row'));
+      if (kept) {
+        expect(tester.getSize(row).height, 36);
+      } else {
+        expect(row, findsNothing);
+      }
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets('landscape artwork preference leaves a wide portrait player '
       'unchanged', (tester) async {
     await pumpNowPlaying(
