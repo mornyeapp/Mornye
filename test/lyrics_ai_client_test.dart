@@ -168,6 +168,22 @@ void main() {
         ),
         contains('The song is "Night Drive" by Some Band.'),
       );
+      expect(prompt, contains('do not add notes, quotes, romanization'));
+      expect(prompt, isNot(contains('"romanization"')));
+    });
+
+    test('a romanizing prompt asks for each language\'s usual system', () {
+      final prompt = lyricsTranslationSystemPrompt(
+        languageName: 'English',
+        languageCode: 'en',
+        romanize: true,
+      );
+      expect(prompt, contains('"romanization":"<romanization>"'));
+      expect(prompt, contains('Hepburn'));
+      expect(prompt, contains('Revised Romanization'));
+      expect(prompt, contains('Pinyin'));
+      expect(prompt, isNot(contains('quotes, romanization')));
+      expect(prompt, isNot(contains(String.fromCharCode(0x2014))));
     });
 
     test('model list requests per provider', () {
@@ -194,28 +210,43 @@ void main() {
   group('reply parsing', () {
     const ids = {0, 1, 2};
 
+    Map<int, String> texts(String reply) => parseLyricsTranslationReply(
+      reply,
+      ids,
+    ).map((id, line) => MapEntry(id, line.text));
+
     test('reads the requested object', () {
+      expect(texts('{"lines":[{"id":0,"text":"Uno"},{"id":1,"text":"Dos"}]}'), {
+        0: 'Uno',
+        1: 'Dos',
+      });
+    });
+
+    test('reads romanizations and drops blank ones', () {
       expect(
         parseLyricsTranslationReply(
-          '{"lines":[{"id":0,"text":"Uno"},{"id":1,"text":"Dos"}]}',
+          '{"lines":[{"id":0,"text":"Love","romanization":" ai "},'
+          '{"id":1,"text":"Hi","romanization":""},{"id":2,"text":"Yes"}]}',
           ids,
         ),
-        {0: 'Uno', 1: 'Dos'},
+        {
+          0: (text: 'Love', romanization: 'ai'),
+          1: (text: 'Hi', romanization: null),
+          2: (text: 'Yes', romanization: null),
+        },
       );
     });
 
     test('accepts fences, bare arrays, prose and string ids', () {
       expect(
-        parseLyricsTranslationReply(
+        texts(
           '```json\n[{"id":"0","text":"Uno"},{"id":2,"translation":"Tres"}]\n```',
-          ids,
         ),
         {0: 'Uno', 2: 'Tres'},
       );
       expect(
-        parseLyricsTranslationReply(
+        texts(
           '<think>hmm</think>Here you go: {"translations":[{"id":1,"text":"Dos"}]}',
-          ids,
         ),
         {1: 'Dos'},
       );
@@ -223,10 +254,9 @@ void main() {
 
     test('drops unknown, duplicate and blank entries', () {
       expect(
-        parseLyricsTranslationReply(
+        texts(
           '{"lines":[{"id":0,"text":"Uno"},{"id":0,"text":"Otra"},'
           '{"id":9,"text":"Nueve"},{"id":1,"text":"  "},{"text":"x"}]}',
-          ids,
         ),
         {0: 'Uno'},
       );
@@ -450,7 +480,9 @@ void main() {
         }),
         delay: (wait) async => waits.add(wait),
       );
-      expect(await client.translate(_items, systemPrompt: 's'), {0: 'Uno'});
+      expect(await client.translate(_items, systemPrompt: 's'), {
+        0: (text: 'Uno', romanization: null),
+      });
       expect(waits, [const Duration(seconds: 2)]);
     });
 
@@ -490,7 +522,9 @@ void main() {
           return http.Response(_openAiReply('[{"id":1,"text":"Dos"}]'), 200);
         }),
       );
-      expect(await client.translate(_items, systemPrompt: 's'), {1: 'Dos'});
+      expect(await client.translate(_items, systemPrompt: 's'), {
+        1: (text: 'Dos', romanization: null),
+      });
       expect(bodies, hasLength(2));
       expect(bodies.last.containsKey('max_completion_tokens'), isTrue);
     });

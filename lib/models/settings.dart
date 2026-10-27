@@ -229,6 +229,10 @@ class AppSettings {
   /// Translate lyrics without a translation as they open.
   final bool lyricsAutoTranslate;
 
+  /// Ask the translation for a romanization of lines written outside the
+  /// Latin alphabet.
+  final bool lyricsAiRomanize;
+
   final String
   lastSeenVersion; // Last app version the user has acknowledged (e.g. '3.7.0')
 
@@ -361,6 +365,7 @@ class AppSettings {
     this.lyricsTranslationLanguage = '',
     this.lyricsAiInstruction = '',
     this.lyricsAutoTranslate = false,
+    this.lyricsAiRomanize = true,
     this.lastSeenVersion = '',
     this.deduplicateDownloads = true,
     this.allowQualityVariants = false,
@@ -504,6 +509,7 @@ class AppSettings {
     String? lyricsTranslationLanguage,
     String? lyricsAiInstruction,
     bool? lyricsAutoTranslate,
+    bool? lyricsAiRomanize,
     String? lastSeenVersion,
     bool? deduplicateDownloads,
     bool? allowQualityVariants,
@@ -665,6 +671,7 @@ class AppSettings {
           lyricsTranslationLanguage ?? this.lyricsTranslationLanguage,
       lyricsAiInstruction: lyricsAiInstruction ?? this.lyricsAiInstruction,
       lyricsAutoTranslate: lyricsAutoTranslate ?? this.lyricsAutoTranslate,
+      lyricsAiRomanize: lyricsAiRomanize ?? this.lyricsAiRomanize,
       lastSeenVersion: lastSeenVersion ?? this.lastSeenVersion,
       deduplicateDownloads: deduplicateDownloads ?? this.deduplicateDownloads,
       allowQualityVariants: allowQualityVariants ?? this.allowQualityVariants,

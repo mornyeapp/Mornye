@@ -126,7 +126,7 @@ class LyricsTranslationState {
   const LyricsTranslationState({this.results = const {}, this.job});
 
   /// Translations read or made this session, by cache key.
-  final Map<String, List<String?>> results;
+  final Map<String, LyricsTranslationResult> results;
   final LyricsTranslationJob? job;
 }
 
@@ -181,7 +181,7 @@ final lyricsTranslationProvider =
 class LyricsTranslationController extends Notifier<LyricsTranslationState> {
   final _lookedUp = <String>{};
   final _autoAttempted = <String>{};
-  final _merged = Expando<(List<String?>, ParsedLyrics)>();
+  final _merged = Expando<(LyricsTranslationResult, ParsedLyrics)>();
   LyricsTranslationCancelToken? _cancel;
   Object? _owner;
   int _jobIds = 0;
@@ -215,17 +215,22 @@ class LyricsTranslationController extends Notifier<LyricsTranslationState> {
     final source = LyricsTranslationSource.cached(lyrics);
     final key = _cacheKey(source, settings);
     if (key == null) return lyrics;
-    final translations = state.results[key];
-    if (translations == null) {
+    final result = state.results[key];
+    if (result == null) {
       if (_lookedUp.add(key)) {
         scheduleMicrotask(() => _lookUp(key, lyrics, settings));
       }
       return lyrics;
     }
     final memo = _merged[lyrics];
-    if (memo != null && identical(memo.$1, translations)) return memo.$2;
-    final merged = applyLyricsTranslation(lyrics, source, translations);
-    _merged[lyrics] = (translations, merged);
+    if (memo != null && identical(memo.$1, result)) return memo.$2;
+    final merged = applyLyricsTranslation(
+      lyrics,
+      source,
+      result.translations,
+      romanizations: result.romanizations,
+    );
+    _merged[lyrics] = (result, merged);
     return merged;
   }
 
@@ -322,7 +327,10 @@ class LyricsTranslationController extends Notifier<LyricsTranslationState> {
       final cache = ref.read(lyricsTranslationCacheProvider);
       final cached = await cache.read(key);
       cancel.throwIfCancelled();
-      if (cached != null) {
+      // One saved before romanizations were asked for is made again.
+      final romanize =
+          settings.lyricsAiRomanize && lyricsNeedRomanization(lyrics);
+      if (cached != null && (!romanize || cached.romanized)) {
         _finish(id, key, cached);
         return const LyricsTranslationOutcome.success();
       }
@@ -349,6 +357,7 @@ class LyricsTranslationController extends Notifier<LyricsTranslationState> {
           title: song?.title ?? '',
           artist: song?.artist ?? '',
           instruction: settings.lyricsAiInstruction,
+          romanize: romanize,
         ),
         cancel: cancel,
         onProgress: (done, total) {
@@ -366,8 +375,8 @@ class LyricsTranslationController extends Notifier<LyricsTranslationState> {
         },
       );
       cancel.throwIfCancelled();
-      await cache.write(key, result.translations);
-      _finish(id, key, result.translations);
+      await cache.write(key, result);
+      _finish(id, key, result);
       return LyricsTranslationOutcome.success(
         missing: result.missing,
         unchanged: lyricsTranslationUnchanged(source, result.translations),
@@ -390,13 +399,11 @@ class LyricsTranslationController extends Notifier<LyricsTranslationState> {
     }
   }
 
-  void _finish(int id, String? key, List<String?>? translations) {
+  void _finish(int id, String? key, LyricsTranslationResult? result) {
     if (!ref.mounted) return;
     final current = state.job?.id == id ? null : state.job;
     state = LyricsTranslationState(
-      results: key == null
-          ? state.results
-          : {...state.results, key: translations!},
+      results: key == null ? state.results : {...state.results, key: result!},
       job: current,
     );
   }

@@ -167,6 +167,13 @@ class _LyricsAiTranslationPageState
                 value: settings.lyricsAutoTranslate,
                 onChanged: notifier.setLyricsAutoTranslate,
               ),
+              SettingsSwitchItem(
+                icon: Icons.record_voice_over_outlined,
+                title: l10n.lyricsAiRomanize,
+                subtitle: l10n.lyricsAiRomanizeSubtitle,
+                value: settings.lyricsAiRomanize,
+                onChanged: notifier.setLyricsAiRomanize,
+              ),
               SettingsItem(
                 icon: Icons.delete_outline,
                 title: l10n.lyricsAiClearCache,

@@ -226,6 +226,46 @@ void main() {
       );
       expect(lyricsTranslationUnchanged(source, [null, null]), isFalse);
     });
+
+    test('romanizes only lines outside the Latin alphabet without one', () {
+      final lyrics = ParsedLyrics(
+        synced: true,
+        wordSynced: false,
+        lines: const [
+          LyricLine(time: Duration.zero, text: '愛してる'),
+          LyricLine(time: Duration(seconds: 1), text: 'Baby'),
+          LyricLine(
+            time: Duration(seconds: 2),
+            text: '사랑해',
+            romanization: 'saranghae',
+          ),
+          LyricLine(time: Duration(seconds: 3), text: '愛してる'),
+        ],
+        plainText: '',
+      );
+      expect(lyricsNeedRomanization(lyrics), isTrue);
+      final source = LyricsTranslationSource.of(lyrics);
+      final merged = applyLyricsTranslation(
+        lyrics,
+        source,
+        [null, null, 'I love you'],
+        romanizations: ['aishiteru', 'beibii', 'salanghae'],
+      );
+      expect(merged.lines.map((line) => line.romanization), [
+        'aishiteru',
+        null,
+        'saranghae',
+        'aishiteru',
+      ]);
+      expect(merged.lines.map((line) => line.translation), [
+        null,
+        null,
+        'I love you',
+        null,
+      ]);
+      expect(lyricsNeedRomanization(merged), isFalse);
+      expect(lyricsNeedRomanization(_lyrics(['Hello', 'Hola'])), isFalse);
+    });
   });
 
   group('batching', () {
@@ -281,6 +321,31 @@ void main() {
       ).translate(texts, systemPrompt: 's');
       expect(result.translations.first, 'only');
       expect(result.missing, 4);
+    });
+
+    test('keeps the romanizations the model returns', () async {
+      final result = await LyricsTranslator(
+        _client(
+          [],
+          reply: (items, _) => jsonEncode({
+            'lines': [
+              for (final item in items)
+                {
+                  'id': item['id'],
+                  'text': 'T${item['id']}',
+                  if (item['id'] == 1) 'romanization': ' r1 ',
+                },
+            ],
+          }),
+        ),
+      ).translate(texts, systemPrompt: 's');
+      expect(result.romanizations, [null, 'r1', null, null, null]);
+      expect(result.romanized, isTrue);
+      final plain = await LyricsTranslator(
+        _client([]),
+      ).translate(texts, systemPrompt: 's');
+      expect(plain.romanizations, isEmpty);
+      expect(plain.romanized, isFalse);
     });
 
     test('a malformed batch is retried once, then split', () async {
@@ -415,11 +480,23 @@ void main() {
 
     test('persists across instances and clears', () async {
       final cache = LyricsTranslationCache(directory: () async => directory);
-      await cache.write('a', ['Uno', null]);
+      await cache.write('a', const LyricsTranslationResult(['Uno', null]));
+      await cache.write(
+        'ja',
+        const LyricsTranslationResult(
+          ['Love', 'Hi'],
+          romanizations: ['ai', null],
+        ),
+      );
       final reopened = LyricsTranslationCache(directory: () async => directory);
-      expect(await reopened.read('a'), ['Uno', null]);
+      final plain = await reopened.read('a');
+      expect(plain!.translations, ['Uno', null]);
+      expect(plain.romanized, isFalse);
+      final romanized = await reopened.read('ja');
+      expect(romanized!.translations, ['Love', 'Hi']);
+      expect(romanized.romanizations, ['ai', null]);
       expect(await reopened.read('b'), isNull);
-      expect(await reopened.count(), 1);
+      expect(await reopened.count(), 2);
       await reopened.clear();
       expect(
         await LyricsTranslationCache(directory: () async => directory).count(),
@@ -432,16 +509,16 @@ void main() {
         directory: () async => directory,
         maxEntries: 2,
       );
-      await cache.write('a', ['a']);
+      await cache.write('a', const LyricsTranslationResult(['a']));
       await Future<void>.delayed(const Duration(milliseconds: 2));
-      await cache.write('b', ['b']);
+      await cache.write('b', const LyricsTranslationResult(['b']));
       await Future<void>.delayed(const Duration(milliseconds: 2));
       await cache.read('a');
       await Future<void>.delayed(const Duration(milliseconds: 2));
-      await cache.write('c', ['c']);
+      await cache.write('c', const LyricsTranslationResult(['c']));
       expect(await cache.read('b'), isNull);
-      expect(await cache.read('a'), ['a']);
-      expect(await cache.read('c'), ['c']);
+      expect((await cache.read('a'))!.translations, ['a']);
+      expect((await cache.read('c'))!.translations, ['c']);
     });
 
     test('an unreadable file starts empty', () async {
@@ -450,8 +527,8 @@ void main() {
       ).writeAsString('{broken');
       final cache = LyricsTranslationCache(directory: () async => directory);
       expect(await cache.count(), 0);
-      await cache.write('a', ['a']);
-      expect(await cache.read('a'), ['a']);
+      await cache.write('a', const LyricsTranslationResult(['a']));
+      expect((await cache.read('a'))!.translations, ['a']);
     });
   });
 }

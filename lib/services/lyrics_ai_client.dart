@@ -146,6 +146,10 @@ class LyricsAiItem {
   Map<String, Object> toJson() => {'id': id, 'text': text};
 }
 
+/// What the model returned for one line: its translation and, when asked
+/// for, how the original is pronounced in the Latin alphabet.
+typedef LyricsAiLine = ({String text, String? romanization});
+
 /// An HTTP request before it is sent, so tests can inspect each provider's
 /// wire format without a server.
 class LyricsAiRequest {
@@ -180,13 +184,15 @@ const _anthropicBase = 'https://api.anthropic.com/v1';
 
 /// System prompt for one translation request. [title] and [artist] name
 /// the song, when known, so the model reads its lines in context.
-/// [instruction] is the user's optional extra guidance.
+/// [instruction] is the user's optional extra guidance. With [romanize],
+/// each line not written in the Latin alphabet also comes back romanized.
 String lyricsTranslationSystemPrompt({
   required String languageName,
   required String languageCode,
   String title = '',
   String artist = '',
   String instruction = '',
+  bool romanize = false,
 }) {
   final song = title.trim();
   final by = artist.trim();
@@ -208,11 +214,28 @@ String lyricsTranslationSystemPrompt({
         'Keep names, places and titles as they are, and vocal sounds such as '
         '"oh", "yeah" or "la la" too. Return a line unchanged when it is '
         'already in the target language.',
-    'Do not merge, split, reorder or skip lines, and do not add notes, '
-        'quotes, romanization or explanations.',
-    'Reply with only a JSON object of the form '
-        '{"lines":[{"id":<the same id>,"text":"<translation>"}]} with every '
-        'id exactly once.',
+    if (romanize) ...[
+      'Do not merge, split, reorder or skip lines, and do not add notes, '
+          'quotes or explanations.',
+      'For each line written in a script other than the Latin alphabet, '
+          'also give its romanization: how the original line is sung, '
+          'written in the Latin alphabet with the usual system for its '
+          'language, such as Hepburn romaji for Japanese, Revised '
+          'Romanization for Korean, Hanyu Pinyin with tone marks for '
+          'Chinese, and the common transliteration for Arabic, Cyrillic, '
+          'Thai or Indic scripts. Romanize the original words, never the '
+          'translation, and leave it out for lines already in the Latin '
+          'alphabet.',
+      'Reply with only a JSON object of the form '
+          '{"lines":[{"id":<the same id>,"text":"<translation>",'
+          '"romanization":"<romanization>"}]} with every id exactly once.',
+    ] else ...[
+      'Do not merge, split, reorder or skip lines, and do not add notes, '
+          'quotes, romanization or explanations.',
+      'Reply with only a JSON object of the form '
+          '{"lines":[{"id":<the same id>,"text":"<translation>"}]} with every '
+          'id exactly once.',
+    ],
     if (extra.isNotEmpty) 'Additional preference from the listener: $extra',
   ].join('\n');
 }
@@ -440,11 +463,11 @@ String extractLyricsAiText(LyricsAiProvider provider, Map<String, Object?> j) {
 
 final _fence = RegExp(r'^```[a-zA-Z0-9_-]*\s*\n?([\s\S]*?)\n?```\s*$');
 
-/// Reads `{id: translation}` from a model reply. Accepts the requested
+/// Reads `{id: line}` from a model reply. Accepts the requested
 /// `{"lines": [...]}` object, a bare array, code fences and leading prose.
 /// Unknown ids, duplicates and blank texts are dropped; a reply that is
 /// not JSON at all is a [LyricsAiErrorKind.badResponse].
-Map<int, String> parseLyricsTranslationReply(String reply, Set<int> ids) {
+Map<int, LyricsAiLine> parseLyricsTranslationReply(String reply, Set<int> ids) {
   var text = reply.trim();
   // Some local reasoning models inline their thoughts.
   text = text.replaceAll(RegExp(r'<think>[\s\S]*?</think>'), '').trim();
@@ -470,7 +493,7 @@ Map<int, String> parseLyricsTranslationReply(String reply, Set<int> ids) {
       detail: 'reply is not a JSON list',
     );
   }
-  final result = <int, String>{};
+  final result = <int, LyricsAiLine>{};
   for (final entry in json) {
     if (entry is! Map) continue;
     final rawId = entry['id'];
@@ -479,7 +502,12 @@ Map<int, String> parseLyricsTranslationReply(String reply, Set<int> ids) {
     if (id == null || !ids.contains(id) || value is! String) continue;
     final translation = value.trim();
     if (translation.isEmpty || result.containsKey(id)) continue;
-    result[id] = translation;
+    final romanization = entry['romanization'];
+    final romanized = romanization is String ? romanization.trim() : '';
+    result[id] = (
+      text: translation,
+      romanization: romanized.isEmpty ? null : romanized,
+    );
   }
   return result;
 }
@@ -589,7 +617,7 @@ class LyricsAiClient {
   void close() => _client.close();
 
   /// Translates one batch. Missing ids are left out of the result.
-  Future<Map<int, String>> translate(
+  Future<Map<int, LyricsAiLine>> translate(
     List<LyricsAiItem> items, {
     required String systemPrompt,
   }) async {

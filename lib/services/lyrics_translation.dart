@@ -99,6 +99,20 @@ String lyricsTranslationCacheKey({
 bool lyricsHaveTranslation(ParsedLyrics lyrics) =>
     lyrics.lines.any((line) => line.translation?.trim().isNotEmpty == true);
 
+final _nonLatinLetter = RegExp(r'(?!\p{Script=Latin})\p{L}', unicode: true);
+
+/// Whether [text] has letters outside the Latin alphabet, so reading it
+/// along needs a romanization.
+bool lyricNeedsRomanization(String text) => _nonLatinLetter.hasMatch(text);
+
+/// Whether a line written outside the Latin alphabet has no provider
+/// romanization, so a translation asks the model for one.
+bool lyricsNeedRomanization(ParsedLyrics lyrics) => lyrics.lines.any(
+  (line) =>
+      line.romanization?.trim().isNotEmpty != true &&
+      lyricNeedsRomanization(translatableLyricText(line.text)),
+);
+
 final _notWord = RegExp(r'[^\p{L}\p{N}]', unicode: true);
 
 /// Whether [translation] only repeats [text], as the model does for a line
@@ -127,11 +141,16 @@ bool lyricsTranslationUnchanged(
 /// the lines' translations. An AI translation exists only because the user
 /// asked for it, or because the lyrics had none, so it replaces a provider
 /// translation on the lines it covers; other lines keep theirs.
+/// [romanizations] fill in only lines outside the Latin alphabet that have
+/// no provider romanization, which may be timed word by word.
 ParsedLyrics applyLyricsTranslation(
   ParsedLyrics lyrics,
   LyricsTranslationSource source,
-  List<String?> translations,
-) {
+  List<String?> translations, {
+  List<String?> romanizations = const [],
+}) {
+  String? at(List<String?> values, int? segment) =>
+      segment != null && segment < values.length ? values[segment] : null;
   var changed = false;
   final lines = <LyricLine>[];
   for (var i = 0; i < lyrics.lines.length; i++) {
@@ -139,18 +158,32 @@ ParsedLyrics applyLyricsTranslation(
     final segment = i < source.lineSegments.length
         ? source.lineSegments[i]
         : null;
-    final translation = segment != null && segment < translations.length
-        ? translations[segment]
-        : null;
+    var translation = at(translations, segment);
     if (translation == null ||
         translation.isEmpty ||
         translation == line.translation ||
         lyricsTranslationRepeats(source.texts[segment!], translation)) {
+      translation = null;
+    }
+    var romanization = at(romanizations, segment);
+    if (romanization == null ||
+        romanization.isEmpty ||
+        line.romanization?.trim().isNotEmpty == true ||
+        !lyricNeedsRomanization(source.texts[segment!]) ||
+        lyricsTranslationRepeats(source.texts[segment], romanization)) {
+      romanization = null;
+    }
+    if (translation == null && romanization == null) {
       lines.add(line);
       continue;
     }
     changed = true;
-    lines.add(line.withTranslation(translation));
+    lines.add(
+      line.withTranslation(
+        translation ?? line.translation,
+        romanization: romanization,
+      ),
+    );
   }
   if (!changed) return lyrics;
   return ParsedLyrics(
@@ -237,11 +270,19 @@ class LyricsTranslationCancelToken {
 /// The outcome of a translation: one entry per source text, null where the
 /// model returned nothing usable.
 class LyricsTranslationResult {
-  const LyricsTranslationResult(this.translations);
+  const LyricsTranslationResult(
+    this.translations, {
+    this.romanizations = const [],
+  });
 
   final List<String?> translations;
 
+  /// Indexed like [translations]; empty when none was asked for.
+  final List<String?> romanizations;
+
   int get missing => translations.where((value) => value == null).length;
+
+  bool get romanized => romanizations.any((value) => value != null);
 }
 
 /// Sends a song's lines in sequential batches. A malformed batch is retried
@@ -264,6 +305,7 @@ class LyricsTranslator {
       throw const LyricsAiException(LyricsAiErrorKind.noLyrics);
     }
     final translations = List<String?>.filled(texts.length, null);
+    final romanizations = List<String?>.filled(texts.length, null);
     final items = [
       for (var i = 0; i < texts.length; i++) LyricsAiItem(i, texts[i]),
     ];
@@ -277,7 +319,10 @@ class LyricsTranslator {
         final request = _client.translate(batch, systemPrompt: systemPrompt);
         final result = await (cancel?.race(request) ?? request);
         cancel?.throwIfCancelled();
-        result.forEach((id, text) => translations[id] = text);
+        result.forEach((id, line) {
+          translations[id] = line.text;
+          romanizations[id] = line.romanization;
+        });
         done += batch.length;
         onProgress?.call(done, texts.length);
       } on LyricsAiException catch (error) {
@@ -308,7 +353,12 @@ class LyricsTranslator {
     if (translations.every((value) => value == null)) {
       throw softError ?? const LyricsAiException(LyricsAiErrorKind.badResponse);
     }
-    return LyricsTranslationResult(translations);
+    return LyricsTranslationResult(
+      translations,
+      romanizations: romanizations.any((value) => value != null)
+          ? romanizations
+          : const [],
+    );
   }
 }
 
@@ -355,17 +405,20 @@ class LyricsTranslationCache {
     }();
   }
 
-  Future<List<String?>?> read(String key) async {
+  Future<LyricsTranslationResult?> read(String key) async {
     final entry = (await _load())[key];
     if (entry == null) return null;
     entry.usedAt = DateTime.now().millisecondsSinceEpoch;
-    return entry.translations;
+    return entry.result;
   }
 
-  Future<void> write(String key, List<String?> translations) async {
+  Future<void> write(String key, LyricsTranslationResult result) async {
     final entries = await _load();
     entries[key] = _CacheEntry(
-      List.unmodifiable(translations),
+      LyricsTranslationResult(
+        List.unmodifiable(result.translations),
+        romanizations: List.unmodifiable(result.romanizations),
+      ),
       DateTime.now().millisecondsSinceEpoch,
     );
     if (entries.length > maxEntries) {
@@ -407,22 +460,28 @@ class LyricsTranslationCache {
 }
 
 class _CacheEntry {
-  _CacheEntry(this.translations, this.usedAt);
+  _CacheEntry(this.result, this.usedAt);
 
-  final List<String?> translations;
+  final LyricsTranslationResult result;
   int usedAt;
 
   static _CacheEntry? fromJson(Object? json) {
     if (json is! Map) return null;
     final list = json['t'];
     if (list is! List) return null;
-    return _CacheEntry(
-      List.unmodifiable([
+    List<String?> strings(Object? list) => List.unmodifiable([
+      if (list is List)
         for (final value in list) value is String ? value : null,
-      ]),
+    ]);
+    return _CacheEntry(
+      LyricsTranslationResult(strings(list), romanizations: strings(json['r'])),
       (json['at'] as num?)?.toInt() ?? 0,
     );
   }
 
-  Map<String, Object> toJson() => {'t': translations, 'at': usedAt};
+  Map<String, Object> toJson() => {
+    't': result.translations,
+    if (result.romanized) 'r': result.romanizations,
+    'at': usedAt,
+  };
 }

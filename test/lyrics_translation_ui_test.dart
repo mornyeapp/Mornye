@@ -40,14 +40,14 @@ class _Lyrics extends PlayerMetadataController {
 }
 
 class _MemoryCache extends LyricsTranslationCache {
-  final entries = <String, List<String?>>{};
+  final entries = <String, LyricsTranslationResult>{};
 
   @override
-  Future<List<String?>?> read(String key) async => entries[key];
+  Future<LyricsTranslationResult?> read(String key) async => entries[key];
 
   @override
-  Future<void> write(String key, List<String?> translations) async =>
-      entries[key] = translations;
+  Future<void> write(String key, LyricsTranslationResult result) async =>
+      entries[key] = result;
 
   @override
   Future<int> count() async => entries.length;

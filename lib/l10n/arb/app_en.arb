@@ -7004,6 +7004,14 @@
   "@lyricsAiAutoTranslateSubtitle": {
     "description": "Subtitle of the automatic AI translation switch"
   },
+  "lyricsAiRomanize": "Add Romanization",
+  "@lyricsAiRomanize": {
+    "description": "AI translation switch that also asks for romanized lyrics"
+  },
+  "lyricsAiRomanizeSubtitle": "Shows how lyrics in other alphabets are sung, such as romaji for Japanese or pinyin for Chinese",
+  "@lyricsAiRomanizeSubtitle": {
+    "description": "Subtitle of the AI romanization switch"
+  },
   "lyricsAiClearCache": "Clear Saved Translations",
   "@lyricsAiClearCache": {
     "description": "AI translation settings action that deletes saved translations"

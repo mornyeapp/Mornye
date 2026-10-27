@@ -57,27 +57,36 @@ final _lyrics = ParsedLyrics(
   plainText: 'Hello\nWorld\nHello',
 );
 
-/// A chat completion that puts "es:" before each text.
+/// A chat completion that puts "es:" before each text, and "r:" for its
+/// romanization when the prompt asks for one.
 http.Response _reply(http.Request request) {
   final body = jsonDecode(request.body) as Map<String, dynamic>;
+  final system = (body['messages'] as List).first as Map;
+  final romanize = (system['content'] as String).contains('"romanization"');
   final user = (body['messages'] as List).last as Map;
   final items = jsonDecode(user['content'] as String) as List;
-  return http.Response(
-    jsonEncode({
-      'choices': [
-        {
-          'message': {
-            'content': jsonEncode({
-              'lines': [
-                for (final item in items.cast<Map<String, dynamic>>())
-                  {'id': item['id'], 'text': 'es:${item['text']}'},
-              ],
-            }),
+  return http.Response.bytes(
+    utf8.encode(
+      jsonEncode({
+        'choices': [
+          {
+            'message': {
+              'content': jsonEncode({
+                'lines': [
+                  for (final item in items.cast<Map<String, dynamic>>())
+                    {
+                      'id': item['id'],
+                      'text': 'es:${item['text']}',
+                      if (romanize) 'romanization': 'r:${item['text']}',
+                    },
+                ],
+              }),
+            },
+            'finish_reason': 'stop',
           },
-          'finish_reason': 'stop',
-        },
-      ],
-    }),
+        ],
+      }),
+    ),
     200,
   );
 }
@@ -189,6 +198,83 @@ void main() {
         .read(settingsProvider.notifier)
         .setLyricsTranslationLanguage('ja');
     expect(later.display(_lyrics).lines.first.translation, isNull);
+  });
+
+  test(
+    'romanizes lyrics outside the Latin alphabet with the translation',
+    () async {
+      final lyrics = ParsedLyrics(
+        synced: true,
+        wordSynced: false,
+        lines: const [
+          LyricLine(time: Duration.zero, text: '愛してる'),
+          LyricLine(time: Duration(seconds: 1), text: 'Baby'),
+        ],
+        plainText: '愛してる\nBaby',
+      );
+      // A translation saved before romanizations were asked for.
+      final cache = LyricsTranslationCache(directory: () async => directory);
+      await cache.write(
+        lyricsTranslationCacheKey(
+          sourceHash: LyricsTranslationSource.of(lyrics).hash,
+          language: 'es',
+          config: lyricsAiConfigFor(_settings),
+        ),
+        const LyricsTranslationResult(['te amo', 'nene']),
+      );
+      final container = await containerFor();
+      final controller = container.read(lyricsTranslationProvider.notifier);
+
+      expect((await controller.translate(lyrics)).error, isNull);
+      expect(requests, hasLength(1));
+      final system =
+          ((jsonDecode(requests.single.body) as Map)['messages'] as List).first
+              as Map;
+      expect(system['content'], contains('"romanization"'));
+      final shown = controller.display(lyrics);
+      expect(shown.lines.map((line) => line.romanization), ['r:愛してる', null]);
+      expect(shown.lines.map((line) => line.translation), [
+        'es:愛してる',
+        'es:Baby',
+      ]);
+
+      // Now that it is saved with its romanizations, nothing is sent again.
+      expect((await controller.translate(lyrics)).error, isNull);
+      expect(requests, hasLength(1));
+
+      // Latin lyrics keep the plain prompt.
+      await controller.translate(_lyrics);
+      final plain =
+          ((jsonDecode(requests.last.body) as Map)['messages'] as List).first
+              as Map;
+      expect(plain['content'], isNot(contains('"romanization"')));
+      expect(
+        controller.display(_lyrics).lines.map((line) => line.romanization),
+        everyElement(isNull),
+      );
+    },
+  );
+
+  test('romanization can be turned off', () async {
+    final container = await containerFor(
+      settings: _settings.copyWith(lyricsAiRomanize: false),
+    );
+    final lyrics = ParsedLyrics(
+      synced: true,
+      wordSynced: false,
+      lines: const [LyricLine(time: Duration.zero, text: '사랑해')],
+      plainText: '사랑해',
+    );
+    final controller = container.read(lyricsTranslationProvider.notifier);
+    expect((await controller.translate(lyrics)).error, isNull);
+    final system =
+        ((jsonDecode(requests.single.body) as Map)['messages'] as List).first
+            as Map;
+    expect(system['content'], isNot(contains('"romanization"')));
+    expect(controller.display(lyrics).lines.single.romanization, isNull);
+    // A saved translation without one is enough while it is off.
+    expect((await controller.translate(lyrics)).error, isNull);
+    expect(requests, hasLength(1));
   });
 
   test('cancelling and changing tracks stop the job', () async {
