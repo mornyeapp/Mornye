@@ -10,7 +10,10 @@ import 'package:mornye/widgets/desktop/track_table.dart';
 /// Wraps a child in a staggered fade-in + slide-up animation.
 ///
 /// [index] controls the stagger delay (each item delayed by [staggerDelay]).
-/// Set [animate] to false to skip the animation (e.g. when scrolling back).
+/// Set [animate] to false to skip the animation. Only the list's first
+/// reveal animates: a lazy list builds rows again as they scroll into view,
+/// and those appear at once, so no row replays it or animates while others
+/// do not.
 class StaggeredListItem extends StatelessWidget {
   static const int _maxAnimatedItems = 10;
 
@@ -31,7 +34,13 @@ class StaggeredListItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final position = Scrollable.maybeOf(context)?.position;
+    final scrolled =
+        position != null &&
+        position.hasContentDimensions &&
+        position.pixels > position.minScrollExtent;
     if (!animate ||
+        scrolled ||
         index >= _maxAnimatedItems ||
         MediaQuery.disableAnimationsOf(context)) {
       return child;
