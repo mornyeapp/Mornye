@@ -59,6 +59,9 @@ class MediaKitEngine implements MpvEngine {
       // media_kit caches streams on disk, which fails where the cache folder
       // is not writable and reports a load error. Memory is enough for audio.
       setProperty('cache-on-disk', 'no'),
+      // Each deck has one source. mpv's playlist gapless mode reports EOF
+      // before its output drains, so handing off then cuts the queued tail.
+      setProperty('gapless-audio', 'no'),
       // Room for an equalizer preamp of +12 dB applied through the volume
       // when the libmpv build has no volume filter.
       setProperty('volume-max', '200'),
