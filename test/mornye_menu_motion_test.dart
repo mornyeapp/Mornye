@@ -1,4 +1,7 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -15,6 +18,7 @@ void main() {
     WidgetTester tester,
     Rect anchor, {
     bool reduced = false,
+    GlobalKey? capture,
   }) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
@@ -27,14 +31,18 @@ void main() {
         ],
         child: MaterialApp(
           theme: MornyeTheme.build(Brightness.dark, glassClarity: 1),
-          builder: (context, child) => MediaQuery(
-            data: MediaQuery.of(context).copyWith(
-              disableAnimations: reduced,
-              padding: const EdgeInsets.symmetric(vertical: 24),
+          builder: (context, child) => RepaintBoundary(
+            key: capture,
+            child: MediaQuery(
+              data: MediaQuery.of(context).copyWith(
+                disableAnimations: reduced,
+                padding: const EdgeInsets.symmetric(vertical: 24),
+              ),
+              child: child!,
             ),
-            child: child!,
           ),
           home: Scaffold(
+            backgroundColor: const Color(0xff366a77),
             body: Builder(
               builder: (context) => Center(
                 child: TextButton(
@@ -86,33 +94,70 @@ void main() {
   MornyeGlassPanel panel(WidgetTester tester) =>
       tester.widget<MornyeGlassPanel>(find.byType(MornyeGlassPanel));
 
+  Future<Color> surfaceColor(WidgetTester tester, GlobalKey capture) async =>
+      (await tester.runAsync(() async {
+        final boundary = tester.renderObject<RenderRepaintBoundary>(
+          find.byKey(capture),
+        );
+        final menu = tester.renderObject<RenderBox>(
+          find.byType(MornyeContextMenu),
+        );
+        final point = boundary.globalToLocal(
+          menu.localToGlobal(Offset(12, menu.size.height / 2)),
+        );
+        final image = await boundary.toImage(pixelRatio: 1);
+        try {
+          final pixels = (await image.toByteData(
+            format: ui.ImageByteFormat.rawRgba,
+          ))!;
+          final index = (point.dy.floor() * image.width + point.dx.floor()) * 4;
+          return Color.fromARGB(
+            pixels.getUint8(index + 3),
+            pixels.getUint8(index),
+            pixels.getUint8(index + 1),
+            pixels.getUint8(index + 2),
+          );
+        } finally {
+          image.dispose();
+        }
+      }))!;
+
   for (final anchor in [
     const Rect.fromLTWH(325, 100, 44, 44),
     const Rect.fromLTWH(16, 720, 44, 44),
   ]) {
-    testWidgets('menu flies from $anchor while opaque, then reveals glass', (
+    testWidgets('menu carries glass throughout its flight from $anchor', (
       tester,
     ) async {
-      await open(tester, anchor);
+      final capture = GlobalKey();
+      await open(tester, anchor, capture: capture);
       final first = visibleBounds(tester);
       expect(first.center.dx, closeTo(anchor.center.dx, 0.01));
       expect(first.center.dy, closeTo(anchor.center.dy, 0.01));
       expect(first.width, closeTo(320 * 0.16, 0.01));
-      expect(find.byType(BackdropFilter), findsNothing);
+      expect(find.byType(BackdropFilter), findsOneWidget);
+      final backdrop = tester.element(find.byType(BackdropFilter));
       await tester.pump(const Duration(milliseconds: 100));
       final flying = visibleBounds(tester);
       expect(flying.width, greaterThan(first.width));
       expect(flying.width, lessThan(320));
-      expect(panel(tester).glassProgress, 0);
-      expect(find.byType(BackdropFilter), findsNothing);
+      expect(panel(tester).glassProgress, 1);
+      expect(tester.element(find.byType(BackdropFilter)), same(backdrop));
+      final openingColor = await surfaceColor(tester, capture);
       await tester.pump(const Duration(milliseconds: 140));
       final resting = visibleBounds(tester);
       expect(resting.width, closeTo(320, 0.01));
-      expect(panel(tester).glassProgress, inExclusiveRange(0, 1));
-      expect(find.byType(BackdropFilter), findsOneWidget);
+      expect(panel(tester).glassProgress, 1);
+      expect(tester.element(find.byType(BackdropFilter)), same(backdrop));
       await tester.pumpAndSettle();
       expect(visibleBounds(tester), resting);
       expect(panel(tester).glassProgress, 1);
+      final settledColor = await surfaceColor(tester, capture);
+      // The material keeps its tint while it grows. Only the modal barrier
+      // darkens the backdrop slightly as the route finishes opening.
+      expect(openingColor.r, closeTo(settledColor.r, 0.02));
+      expect(openingColor.g, closeTo(settledColor.g, 0.02));
+      expect(openingColor.b, closeTo(settledColor.b, 0.02));
       expect(resting.left, greaterThanOrEqualTo(16));
       expect(resting.right, lessThanOrEqualTo(374));
       expect(resting.top, greaterThanOrEqualTo(40));
@@ -128,8 +173,8 @@ void main() {
       await tester.tap(find.text('Play'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 160));
-      expect(panel(tester).glassProgress, 0);
-      expect(find.byType(BackdropFilter), findsNothing);
+      expect(panel(tester).glassProgress, 1);
+      expect(tester.element(find.byType(BackdropFilter)), same(backdrop));
       await tester.pumpAndSettle();
       expect(find.byType(MornyeContextMenu), findsNothing);
       expect(tester.takeException(), isNull);
