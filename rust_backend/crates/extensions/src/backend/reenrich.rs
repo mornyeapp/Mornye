@@ -4,13 +4,16 @@ use super::{Backend, LyricsRequest};
 use cap_std::fs::OpenOptions;
 use mornye_core::lyrics::{file, lrc};
 use mornye_core::metadata::TrackMetadata;
-use mornye_core::metadata::reenrich::{self, Request};
+use mornye_core::metadata::reenrich::{self, Request, text};
 use mornye_core::tags::{embed_flac_metadata, extract_cover};
 use mornye_providers::deezer::MetadataLookup;
 use mornye_providers::resolver::{Check, availability};
-use serde_json::json;
+use serde_json::{Value, json};
 use std::io::Write;
 use std::sync::Mutex;
+
+#[cfg(test)]
+mod tests;
 
 impl Backend {
     /// Execute FLAC enrichment or return the existing native FFmpeg plan.
@@ -244,7 +247,15 @@ impl Backend {
                     && let Some(tracks) = tracks.as_array()
                     && let Some(track) = request.select(tracks)
                 {
-                    request.apply(track);
+                    let mut track = track.clone();
+                    if request.selected("cover", "cover") && request.same_release(&track) {
+                        if let Some(video) = self.reenrich_motion_artwork(&request, &track, &check)
+                        {
+                            track["header_video"] = video.into();
+                        }
+                        check()?;
+                    }
+                    request.apply(&track);
                     found = true;
                 }
             }
@@ -309,6 +320,55 @@ impl Backend {
         }
         check()?;
         Ok(request)
+    }
+
+    /// Album editorial video is optional and never becomes an embedded cover.
+    fn reenrich_motion_artwork(
+        &self,
+        request: &Request,
+        track: &Value,
+        check: &Check<'_>,
+    ) -> Option<String> {
+        if !text(track, "header_video").trim().is_empty() {
+            return Some(text(track, "header_video").trim().into());
+        }
+        let provider = text(track, "provider_id").trim();
+        if provider.is_empty() {
+            return None;
+        }
+        let mut album_id = text(track, "album_id").trim().to_owned();
+        if album_id.is_empty() {
+            let id = text(track, "id").trim();
+            if id.is_empty() {
+                return None;
+            }
+            let raw = self
+                .get_provider_metadata_json(provider, "track", id, check)
+                .ok()?;
+            let details: Value = serde_json::from_str(&raw).ok()?;
+            let track = details.get("track")?;
+            if !request.verified(track) || !request.same_release(track) {
+                return None;
+            }
+            if !text(track, "header_video").trim().is_empty() {
+                return Some(text(track, "header_video").trim().into());
+            }
+            album_id = text(track, "album_id").trim().into();
+        }
+        if album_id.is_empty() {
+            return None;
+        }
+        let raw = self
+            .get_provider_metadata_json(provider, "album", &album_id, check)
+            .ok()?;
+        let details: Value = serde_json::from_str(&raw).ok()?;
+        let album = details.get("album_info").or_else(|| details.get("album"))?;
+        let identity = json!({"album_name": text(album, "name")});
+        if !request.same_release(&identity) {
+            return None;
+        }
+        let video = text(album, "header_video").trim();
+        (!video.is_empty()).then(|| video.into())
     }
 
     fn reenrich_identifiers(&self, request: &Request, check: &Check<'_>) -> Option<TrackMetadata> {

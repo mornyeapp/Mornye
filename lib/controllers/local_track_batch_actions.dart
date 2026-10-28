@@ -11,6 +11,7 @@ import 'package:mornye/providers/deleted_library_files.dart';
 import 'package:mornye/providers/download_queue_provider.dart';
 import 'package:mornye/providers/extension_provider.dart';
 import 'package:mornye/providers/local_library_provider.dart';
+import 'package:mornye/providers/player_motion_artwork_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/services/batch_metadata_re_enrich.dart';
 import 'package:mornye/services/downloaded_embedded_cover_resolver.dart';
@@ -261,8 +262,15 @@ Future<void> reEnrichLocalTracks(
     return;
   }
 
+  final artworkContainer = ProviderScope.containerOf(context, listen: false);
   final runner = BatchReEnrichRunner(
     sourceTrackIds: sourceTrackIds,
+    saveMotionArtwork: (item, metadata) => saveReEnrichedMotionArtwork(
+      artworkContainer,
+      metadata: metadata,
+      albumName: item.albumName,
+      artistName: item.artistName,
+    ),
     beginPhase: () async {
       final settings = ref.read(settingsProvider);
       await ref
@@ -381,6 +389,11 @@ class BatchReEnrichRunner {
     required String artistTagMode,
   })
   applyFfmpeg;
+  final Future<void> Function(
+    LocalLibraryItem item,
+    Map<String, dynamic> metadata,
+  )?
+  saveMotionArtwork;
 
   BatchReEnrichRunner({
     required this.beginPhase,
@@ -388,6 +401,7 @@ class BatchReEnrichRunner {
     this.reEnrich = PlatformBridge.reEnrichFile,
     this.writeSidecar = writeReEnrichSidecarLrc,
     this.applyFfmpeg = applyFfmpegReEnrichResult,
+    this.saveMotionArtwork,
   });
 
   Future<List<BatchReEnrichPreview>> preview(
@@ -480,6 +494,7 @@ class BatchReEnrichRunner {
               reEnrichResult: result,
             );
             successes++;
+            await _saveMotionArtwork(preview, result);
             onResult?.call(result);
           case 'ffmpeg':
             if (await applyFfmpeg(
@@ -488,6 +503,7 @@ class BatchReEnrichRunner {
               artistTagMode: settings.artistTagMode,
             )) {
               successes++;
+              await _saveMotionArtwork(preview, result);
               onResult?.call(result);
             } else {
               _reEnrichLog.w('Metadata write failed for ${preview.item.id}');
@@ -504,6 +520,24 @@ class BatchReEnrichRunner {
       }
     }
     return successes;
+  }
+
+  Future<void> _saveMotionArtwork(
+    BatchReEnrichPreview preview,
+    Map<String, dynamic> result,
+  ) async {
+    if (!preview.updateFields.contains(ReEnrichFields.cover)) return;
+    final applied = result['enriched_metadata'];
+    try {
+      await saveMotionArtwork?.call(preview.item, {
+        ...preview.enrichedMetadata,
+        if (applied is Map<String, dynamic>) ...applied,
+      });
+    } catch (error) {
+      _reEnrichLog.w(
+        'Optional artwork save failed for ${preview.item.id}: $error',
+      );
+    }
   }
 }
 

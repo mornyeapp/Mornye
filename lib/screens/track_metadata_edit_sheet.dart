@@ -11,6 +11,7 @@ import 'package:mornye/controllers/extension_auth_launcher.dart';
 import 'package:mornye/controllers/metadata_editor_controller.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/extension_provider.dart';
+import 'package:mornye/providers/player_motion_artwork_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/services/metadata_cover_resources.dart';
 import 'package:mornye/services/metadata_autofill_service.dart';
@@ -74,6 +75,7 @@ class _EditMetadataSheetState extends State<EditMetadataSheet> {
   String? _selectedCoverPath;
   String? _selectedCoverTempDir;
   String? _selectedCoverName;
+  String? _selectedMotionArtworkUrl;
   String? _currentCoverPath;
   String? _currentCoverTempDir;
   bool _loadingCurrentCover = false;
@@ -282,6 +284,10 @@ class _EditMetadataSheetState extends State<EditMetadataSheet> {
 
   Future<void> _save() async {
     if (_saving || _fetching || _fetchingMusicBrainz) return;
+    final container = ProviderScope.containerOf(context, listen: false);
+    final artworkUrl = _selectedMotionArtworkUrl;
+    final artworkAlbum = _form['album']!.text.trim();
+    final artworkArtist = _form['artist']!.text.trim();
     setState(() => _saving = true);
     try {
       final result = await _persistence.save(
@@ -294,11 +300,18 @@ class _EditMetadataSheetState extends State<EditMetadataSheet> {
           coverMaxDimension: _coverMaxDimension,
         ),
       );
-      if (!mounted) return;
       if (result.failure == null) {
+        await saveReEnrichedMotionArtwork(
+          container,
+          metadata: {'header_video': artworkUrl},
+          albumName: artworkAlbum,
+          artistName: artworkArtist,
+        );
+        if (!mounted) return;
         Navigator.pop(context, true);
         return;
       }
+      if (!mounted) return;
       final l10n = context.l10n;
       _showSheetSnackBar(switch (result.failure!) {
         MetadataSaveFailure.backend => context.friendlyError(

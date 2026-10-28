@@ -89,6 +89,8 @@ class _ReEnrichReviewContent extends StatelessWidget {
         return context.l10n.editMetadataFieldCopyright;
       case 'cover_url':
         return context.l10n.editMetadataFieldCover;
+      case 'header_video':
+        return context.l10n.motionArtwork;
       case 'lyrics':
         return context.l10n.trackReEnrichFieldLyrics;
       default:
@@ -100,7 +102,7 @@ class _ReEnrichReviewContent extends StatelessWidget {
     if (change.field == 'cover_url' && change.oldValue.isNotEmpty) {
       return context.l10n.trackCoverCurrent;
     }
-    return change.oldValue.isEmpty ? '—' : change.oldValue;
+    return change.oldValue.isEmpty ? '-' : change.oldValue;
   }
 
   String _newValue(BuildContext context, ReEnrichMetadataChange change) {

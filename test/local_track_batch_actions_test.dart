@@ -49,6 +49,70 @@ class _BatchLibrary extends LocalLibraryNotifier {
 
 void main() {
   test(
+    'motion is saved only after successful native or FFmpeg writes',
+    () async {
+      final events = <String>[];
+      final runner = BatchReEnrichRunner(
+        beginPhase: () async => const AppSettings(),
+        reEnrich: (request) async {
+          if (request['preview_only'] == true) {
+            return {
+              'method': 'preview',
+              'enriched_metadata': {
+                'header_video': 'https://example.invalid/motion.m3u8',
+              },
+            };
+          }
+          events.add('write:${request['file_path']}');
+          return {
+            'method': request['file_path'] == '/music/1.flac'
+                ? 'native'
+                : 'ffmpeg',
+          };
+        },
+        writeSidecar:
+            ({required audioFilePath, required reEnrichResult}) async {},
+        applyFfmpeg:
+            ({required item, required result, required artistTagMode}) async {
+              events.add('ffmpeg:${item.id}');
+              return item.id == '2';
+            },
+        saveMotionArtwork: (item, metadata) async {
+          expect(
+            metadata['header_video'],
+            'https://example.invalid/motion.m3u8',
+          );
+          events.add('motion:${item.id}');
+          if (item.id == '1') throw StateError('optional video unavailable');
+        },
+      );
+      final previews = await runner.preview(
+        [item('1'), item('2'), item('3')],
+        const ReEnrichFieldSelection(
+          mode: ReEnrichBatchMode.selectedFields,
+          fields: [ReEnrichFields.cover],
+        ),
+        shouldStop: running,
+        onProgress: progress,
+      );
+      expect(previews, hasLength(3));
+      expect(events, isEmpty);
+      expect(
+        await runner.apply(previews, shouldStop: running, onProgress: progress),
+        2,
+      );
+      expect(events, [
+        'write:/music/1.flac',
+        'motion:1',
+        'write:/music/2.flac',
+        'ffmpeg:2',
+        'motion:2',
+        'write:/music/3.flac',
+        'ffmpeg:3',
+      ]);
+    },
+  );
+  test(
     'lyrics-only batch retains provider identity without metadata lookups',
     () async {
       final requests = <Map<String, dynamic>>[];

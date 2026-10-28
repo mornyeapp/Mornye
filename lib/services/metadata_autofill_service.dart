@@ -1,16 +1,19 @@
 import 'package:mornye/models/extension.dart';
 import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/utils/logger.dart';
+import 'package:mornye/utils/string_utils.dart';
 
 class MetadataAutofillResult {
   final Map<String, String> values;
   final String? coverUrl;
+  final String? headerVideoUrl;
   final String sourceId;
   final String? lyricsSource;
 
   const MetadataAutofillResult({
     required this.values,
     required this.coverUrl,
+    this.headerVideoUrl,
     required this.sourceId,
     required this.lyricsSource,
   });
@@ -77,7 +80,10 @@ class MetadataAutofillService {
         );
       }
     }
-    if (includeCover && coverUrl(resolved) == null) {
+    if (includeCover &&
+        (coverUrl(resolved) == null ||
+            normalizeRemoteHttpUrl(resolved['header_video']?.toString()) ==
+                null)) {
       final albumId = resolved['album_id']?.toString().trim() ?? '';
       if (albumId.isNotEmpty) {
         try {
@@ -87,8 +93,16 @@ class MetadataAutofillService {
             albumId,
           );
           final album = details['album_info'] ?? details['album'];
-          final url = coverUrl(album is Map<String, dynamic> ? album : details);
-          if (url != null) resolved = {...resolved, 'cover_url': url};
+          final artwork = album is Map<String, dynamic> ? album : details;
+          final url = coverUrl(artwork);
+          final video = normalizeRemoteHttpUrl(
+            artwork['header_video']?.toString(),
+          );
+          resolved = {
+            ...resolved,
+            if (coverUrl(resolved) == null && url != null) 'cover_url': url,
+            'header_video': ?video,
+          };
         } catch (error) {
           _log.w(
             'Album artwork lookup failed for $providerId/$albumId: $error',
@@ -260,6 +274,9 @@ class MetadataAutofillService {
     return MetadataAutofillResult(
       values: availableValues,
       coverUrl: artworkUrl,
+      headerVideoUrl: fields.contains('cover')
+          ? normalizeRemoteHttpUrl(selectedBest?['header_video']?.toString())
+          : null,
       sourceId: providerId?.isNotEmpty == true
           ? providerId!
           : selectedBest?['provider_id']?.toString().trim() ?? '',

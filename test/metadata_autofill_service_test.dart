@@ -9,6 +9,61 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   final service = MetadataAutofillService();
 
+  test(
+    'album video is resolved even when the track has a still cover',
+    () async {
+      const channel = MethodChannel('com.zarz.mornye/backend');
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      final resources = <String>[];
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        expect(call.method, 'getProviderMetadata');
+        final arguments = call.arguments as Map;
+        resources.add(arguments['resource_type'] as String);
+        return jsonEncode(
+          arguments['resource_type'] == 'track'
+              ? {
+                  'track': {
+                    'id': 'motion-track',
+                    'album_id': 'motion-album',
+                    'cover_url': 'https://example.invalid/track.jpg',
+                  },
+                }
+              : {
+                  'album_info': {
+                    'cover_url': 'https://example.invalid/album.jpg',
+                    'header_video': 'https://example.invalid/motion.m3u8',
+                  },
+                },
+        );
+      });
+      addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+      final details = await service.resolveDetails(
+        {'id': 'motion-track'},
+        providerId: 'motion-provider',
+        includeCover: true,
+      );
+      expect(resources, ['track', 'album']);
+      expect(details['cover_url'], 'https://example.invalid/track.jpg');
+      for (final includeCover in [true, false]) {
+        final result = await service.enrich(
+          details,
+          currentValues: const {},
+          fields: includeCover ? {'cover'} : {},
+          providerId: 'motion-provider',
+          sourceTrackId: null,
+          durationMs: 0,
+          syncLyricsSettings: () async {},
+          isCurrent: () => true,
+        );
+        expect(
+          result!.headerVideoUrl,
+          includeCover ? 'https://example.invalid/motion.m3u8' : null,
+        );
+      }
+    },
+  );
+
   Extension provider(String id, String name, {bool enabled = true}) =>
       Extension(
         id: id,

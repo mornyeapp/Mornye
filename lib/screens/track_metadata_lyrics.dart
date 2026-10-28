@@ -815,6 +815,7 @@ extension _TrackMetadataLyricsAndSaving on _TrackMetadataScreenState {
     if (!_fileExists) return;
 
     try {
+      final container = ProviderScope.containerOf(context, listen: false);
       final settings = ref.read(settingsProvider);
       final artistTagMode = settings.artistTagMode;
       final messenger = ScaffoldMessenger.of(context);
@@ -887,6 +888,12 @@ extension _TrackMetadataLyricsAndSaving on _TrackMetadataScreenState {
         await writeReEnrichSidecarLrc(
           audioFilePath: cleanFilePath,
           reEnrichResult: result,
+        );
+        await saveReEnrichedMotionArtwork(
+          container,
+          metadata: enriched ?? const {},
+          albumName: albumName,
+          artistName: artistName,
         );
         await _refreshEmbeddedCoverPreview(force: true);
         _markMetadataChanged();
@@ -991,6 +998,12 @@ extension _TrackMetadataLyricsAndSaving on _TrackMetadataScreenState {
             await writeReEnrichSidecarLrc(
               audioFilePath: cleanFilePath,
               reEnrichResult: result,
+            );
+            await saveReEnrichedMotionArtwork(
+              container,
+              metadata: enriched ?? const {},
+              albumName: albumName,
+              artistName: artistName,
             );
             await _refreshEmbeddedCoverPreview(force: true);
             _markMetadataChanged();
