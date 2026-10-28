@@ -15,6 +15,7 @@ import 'package:mornye/utils/image_cache_utils.dart';
 import 'package:mornye/services/library_database.dart';
 import 'package:mornye/services/batch_track_actions.dart';
 import 'package:mornye/models/album_track_order.dart';
+import 'package:mornye/models/track.dart';
 import 'package:mornye/models/unified_library_item.dart';
 import 'package:mornye/services/local_track_redownload_service.dart';
 import 'package:mornye/providers/deleted_library_files.dart';
@@ -28,6 +29,7 @@ import 'package:mornye/controllers/local_track_batch_actions.dart';
 import 'package:mornye/controllers/selection_mode_mixin.dart';
 import 'package:mornye/screens/track_metadata_screen.dart';
 import 'package:mornye/widgets/collection_scaffold.dart';
+import 'package:mornye/widgets/collection_suggestions_section.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/widgets/desktop/context_menu.dart';
 import 'package:mornye/widgets/desktop/desktop_selection.dart';
@@ -305,8 +307,25 @@ class _LocalAlbumScreenState extends ConsumerState<LocalAlbumScreen>
               child: AlbumTrackListSkeleton(itemCount: 8, showQuality: true),
             ),
           )
-        else
+        else ...[
           _buildTrackList(context, colorScheme, tracks),
+          if (!showsSelectionBar)
+            CollectionSuggestionsSliver(
+              collectionKey:
+                  'local-album:${widget.artistName}:${widget.albumName}',
+              tracks: [
+                for (final item in tracks)
+                  Track(
+                    id: item.id,
+                    name: item.trackName,
+                    artistName: item.artistName,
+                    albumName: item.albumName,
+                    duration: item.duration ?? 0,
+                    isrc: item.isrc,
+                  ),
+              ],
+            ),
+        ],
       ],
       selectionBar: _buildSelectionBottomBar(tracks, bottomPadding),
     );

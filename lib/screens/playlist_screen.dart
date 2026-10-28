@@ -27,6 +27,7 @@ import 'package:mornye/widgets/desktop/track_list_table.dart';
 import 'package:mornye/widgets/track_detail_actions.dart';
 import 'package:mornye/controllers/collapsing_header_scroll_mixin.dart';
 import 'package:mornye/widgets/error_card.dart';
+import 'package:mornye/widgets/collection_suggestions_section.dart';
 import 'package:mornye/widgets/downloadable_cover.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/mornye_artist_header.dart';
@@ -287,6 +288,13 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen>
         slivers: [
           _buildTrackList(context, colorScheme),
           _buildPlaylistFooter(context, colorScheme),
+          if (!_isLoading && _tracks.isNotEmpty && !isSelectionMode)
+            CollectionSuggestionsSliver(
+              collectionKey:
+                  'playlist:${widget.metadataProviderId}:'
+                  '${widget.playlistId ?? widget.playlistName}',
+              tracks: _tracks,
+            ),
         ],
       ),
     );

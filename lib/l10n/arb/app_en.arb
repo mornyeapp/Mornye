@@ -9823,5 +9823,25 @@
   "recognizeClearHistoryMessage": "Remove every song from this list?",
   "@recognizeClearHistoryMessage": {
     "description": "Confirmation message before clearing the identification history"
+  },
+  "collectionSuggestionsTitle": "Suggested songs",
+  "@collectionSuggestionsTitle": {
+    "description": "Heading of the songs suggested below an album, single or playlist"
+  },
+  "collectionSuggestionsRelated": "Based on the songs above",
+  "@collectionSuggestionsRelated": {
+    "description": "Line under the suggestions heading when an extension suggested songs like the album's or playlist's"
+  },
+  "collectionSuggestionsByArtists": "More from these artists",
+  "@collectionSuggestionsByArtists": {
+    "description": "Line under the suggestions heading when the songs were found by searching the album's or playlist's artists"
+  },
+  "collectionSuggestionsRefresh": "Suggest other songs",
+  "@collectionSuggestionsRefresh": {
+    "description": "Tooltip of the button that loads other suggestions"
+  },
+  "collectionSuggestionsAddHere": "Add to this playlist",
+  "@collectionSuggestionsAddHere": {
+    "description": "Tooltip of the button that adds a suggested song to the user's playlist shown above"
   }
 }

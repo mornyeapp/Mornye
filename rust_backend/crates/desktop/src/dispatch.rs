@@ -103,6 +103,7 @@ pub(crate) static METHODS: &[Entry] = &[
     }),
     pool("customSearchWithExtension", extension_request),
     pool("getExtensionHomeFeed", extension_request),
+    pool("getExtensionRelatedTracks", extension_request),
     pool("initExtensionSystem", |c, a| {
         null(c.rt.backend.initialize_owner(a))
     }),
@@ -812,6 +813,14 @@ fn extension_request(c: &Ctx<'_>, a: &Args) -> CallResult {
         return text(manager.custom_search_json(
             extension_id,
             a.string("query", ""),
+            a.string("options", ""),
+            Some(lease),
+        ));
+    }
+    if c.method == "getExtensionRelatedTracks" {
+        return text(manager.get_extension_related_tracks_json(
+            extension_id,
+            a.string("seeds", "[]"),
             a.string("options", ""),
             Some(lease),
         ));

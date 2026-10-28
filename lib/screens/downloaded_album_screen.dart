@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:mornye/services/cover_cache_manager.dart';
 import 'package:mornye/services/batch_track_actions.dart';
+import 'package:mornye/models/track.dart';
 import 'package:mornye/models/unified_library_item.dart';
 import 'package:mornye/models/album_track_order.dart';
 import 'package:mornye/l10n/l10n.dart';
@@ -29,6 +30,7 @@ import 'package:mornye/controllers/selection_mode_mixin.dart';
 import 'package:mornye/screens/track_metadata_screen.dart';
 import 'package:mornye/services/downloaded_embedded_cover_resolver.dart';
 import 'package:mornye/widgets/collection_scaffold.dart';
+import 'package:mornye/widgets/collection_suggestions_section.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/widgets/desktop/context_menu.dart';
 import 'package:mornye/widgets/desktop/desktop_selection.dart';
@@ -301,7 +303,27 @@ class _DownloadedAlbumScreenState extends ConsumerState<DownloadedAlbumScreen>
         isSelectionMode: showsSelectionBar,
         onExitSelectionMode: exitSelectionMode,
         appBar: _buildAppBar(context, colorScheme, tracks, qualityLabelMode),
-        slivers: [_buildTrackList(context, colorScheme, order)],
+        slivers: [
+          _buildTrackList(context, colorScheme, order),
+          if (!showsSelectionBar)
+            CollectionSuggestionsSliver(
+              collectionKey:
+                  'downloaded-album:${widget.artistName}:${widget.albumName}',
+              tracks: [
+                for (final item in tracks)
+                  // No source: history IDs are not provider IDs, so the
+                  // extension looks the songs up.
+                  Track(
+                    id: item.spotifyId ?? item.id,
+                    name: item.trackName,
+                    artistName: item.artistName,
+                    albumName: item.albumName,
+                    duration: item.duration ?? 0,
+                    isrc: item.isrc,
+                  ),
+              ],
+            ),
+        ],
         selectionBar: _buildSelectionBottomBar(tracks, bottomPadding),
       ),
     );

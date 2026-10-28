@@ -235,6 +235,8 @@ impl ExtensionManager {
                     .is_some_and(|config| config.enabled && !config.patterns.is_empty()))
                 .then_some("does not support URL handling"),
                 "getHomeFeed" => None,
+                "getRelatedTracks" => (!manifest.has_capability("relatedTracks"))
+                    .then_some("does not suggest related tracks"),
                 _ => return Err(error(format!("unsupported provider method: {method}"))),
             };
         if let Some(requirement) = requirement {
@@ -312,6 +314,7 @@ impl ExtensionManager {
             }
             let kind = match method {
                 "searchTracks" | "customSearch" => "search result",
+                "getRelatedTracks" => "related tracks",
                 "getAlbum" => "album",
                 "getPlaylist" => "playlist",
                 "getArtist" => "artist",
@@ -333,7 +336,7 @@ impl ExtensionManager {
             }
         }
         if value.is_null() {
-            return if method == "customSearch" {
+            return if method == "customSearch" || method == "getRelatedTracks" {
                 Ok(json!([]))
             } else if method == "handleUrl" {
                 Err(error("handleUrl returned null - URL not recognized"))
@@ -345,7 +348,7 @@ impl ExtensionManager {
             "getTrack" => stamp(&mut value, id),
             "getAlbum" | "getPlaylist" => stamp_album(&mut value, id),
             "searchTracks" => stamp_tracks(&mut value["tracks"], id),
-            "customSearch" => stamp_tracks(&mut value, id),
+            "customSearch" | "getRelatedTracks" => stamp_tracks(&mut value, id),
             "getArtist" => {
                 // Go stamps releases here; albums/top tracks keep their supplied
                 // provider fields until URL handling performs recursive stamping.

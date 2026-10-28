@@ -659,11 +659,14 @@ final class RustCoreBackend: CoreBackend {
             defer { ownerLock.unlock() }
             try requestRegistryLocked().cancel(id: string("request_id"))
             return nil
-        case "customSearchWithExtension", "getExtensionHomeFeed":
+        case "customSearchWithExtension", "getExtensionHomeFeed", "getExtensionRelatedTracks":
             let (current, lease) = try acquireRequest(string("request_id"))
             defer { lease.release() }
             if method == "customSearchWithExtension" {
                 return try current.customSearchJson(extensionId: string("extension_id"), query: string("query"), optionsJson: string("options"), lease: lease)
+            }
+            if method == "getExtensionRelatedTracks" {
+                return try current.getExtensionRelatedTracksJson(extensionId: string("extension_id"), seedsJson: string("seeds"), optionsJson: string("options"), lease: lease)
             }
             return try current.getExtensionHomeFeedJson(extensionId: string("extension_id"), lease: lease)
         case "initExtensionSystem": try initializeOwner(args); return nil

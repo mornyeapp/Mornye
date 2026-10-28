@@ -242,6 +242,9 @@ class Extension {
   bool get hasServiceHealth => serviceHealth.isNotEmpty;
   bool get hasHomeFeed => capabilities['homeFeed'] == true;
 
+  /// Suggests songs like given ones (`getRelatedTracks`).
+  bool get hasRelatedTracks => capabilities['relatedTracks'] == true;
+
   /// The extension owns its country choices and the setting sent to its API.
   ExtensionSetting? get homeFeedRegionSetting {
     if (!hasHomeFeed) return null;

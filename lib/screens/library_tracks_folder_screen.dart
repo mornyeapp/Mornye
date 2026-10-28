@@ -46,6 +46,7 @@ import 'package:mornye/widgets/selection_action_button.dart';
 import 'package:mornye/widgets/in_library_badge.dart';
 import 'package:mornye/widgets/link/link_actions.dart';
 import 'package:mornye/widgets/playlist_picker_sheet.dart';
+import 'package:mornye/widgets/collection_suggestions_section.dart';
 import 'package:mornye/widgets/animation_utils.dart';
 import 'package:mornye/widgets/track_detail_actions.dart';
 
@@ -403,6 +404,19 @@ class _LibraryTracksFolderScreenState
                 );
               }, childCount: entries.length),
             ),
+          ),
+        if (playlist case final playlist?
+            when playlist.tracks.isNotEmpty && !showsSelectionBar)
+          CollectionSuggestionsSliver(
+            collectionKey: 'playlist:${playlist.id}',
+            // The newest additions say most about where the playlist goes.
+            tracks: [
+              for (final entry in [
+                ...playlist.tracks,
+              ]..sort((a, b) => b.addedAt.compareTo(a.addedAt)))
+                entry.track,
+            ],
+            playlistId: playlist.id,
           ),
       ],
     );

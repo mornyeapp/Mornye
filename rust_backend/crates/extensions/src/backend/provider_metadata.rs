@@ -150,6 +150,49 @@ impl Backend {
         serde_json::to_string(&normalized).map_err(|error| error.to_string())
     }
 
+    /// Songs like the tracks in [seeds_json] (most important first) from an
+    /// extension with the `relatedTracks` capability; [options_json] holds
+    /// `limit` (1 to 50, 25 by default).
+    pub fn get_extension_related_tracks_json(
+        &self,
+        id: &str,
+        seeds_json: &str,
+        options_json: &str,
+        lease: Option<Arc<RequestLease>>,
+    ) -> Result<String, String> {
+        let _operation = self.enter()?;
+        let seeds = serde_json::from_str::<Vec<Value>>(seeds_json)
+            .map_err(|error| format!("invalid related track seeds: {error}"))?;
+        let options = serde_json::from_str::<Map<String, Value>>(options_json).unwrap_or_default();
+        let limit = options
+            .get("limit")
+            .and_then(Value::as_u64)
+            .unwrap_or(25)
+            .clamp(1, 50);
+        let values = self
+            .manager
+            .provider_call_value(
+                id,
+                "getRelatedTracks",
+                &json!([seeds, {"limit": limit}]).to_string(),
+                lease.clone(),
+                30_000,
+            )
+            .map_err(|error| error.to_string())?;
+        let values = values.as_array().expect("validated related tracks array");
+        let normalized = values
+            .iter()
+            .map(|value| {
+                self.check()?;
+                if let Some(lease) = &lease {
+                    lease.check_active().map_err(|error| error.to_string())?;
+                }
+                Ok(track(value, "", 0))
+            })
+            .collect::<Result<Vec<_>, String>>()?;
+        serde_json::to_string(&normalized).map_err(|error| error.to_string())
+    }
+
     pub fn get_extension_home_feed_json(
         &self,
         id: &str,

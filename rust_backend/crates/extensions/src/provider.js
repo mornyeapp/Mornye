@@ -288,6 +288,7 @@
         getTrack: track, enrichTrack: track, getAlbum: album, getPlaylist: album, getArtist: artist,
         getConcert: concertDetail,
         searchTracks: search, customSearch: value => array(value, track), handleUrl: url,
+        getRelatedTracks: value => array(value, track),
         checkAvailability: value => fields(value, [["available","b"],["reason","s"],["track_id","s","trackId"],
             ["skip_fallback","b","skipFallback"],["prepared_context","m","preparedContext"]], ["available"]),
         download, fetchLyrics: lyrics,

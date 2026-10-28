@@ -25,14 +25,16 @@ internal fun RustCoreBackend.dispatchApplication(method: String, arguments: Any?
             requestRegistry().cancel(string("request_id"))
             return null
         }
-        "customSearchWithExtension", "getExtensionHomeFeed" -> {
+        "customSearchWithExtension", "getExtensionHomeFeed", "getExtensionRelatedTracks" -> {
             val (current, lease) = acquireRequest(string("request_id"))
             return lease.use {
                 try {
-                    if (method == "customSearchWithExtension") {
-                        current.customSearchJson(string("extension_id"), string("query"), string("options"), it)
-                    } else {
-                        current.getExtensionHomeFeedJson(string("extension_id"), it)
+                    when (method) {
+                        "customSearchWithExtension" ->
+                            current.customSearchJson(string("extension_id"), string("query"), string("options"), it)
+                        "getExtensionRelatedTracks" ->
+                            current.getExtensionRelatedTracksJson(string("extension_id"), string("seeds"), string("options"), it)
+                        else -> current.getExtensionHomeFeedJson(string("extension_id"), it)
                     }
                 } finally {
                     it.release()

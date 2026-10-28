@@ -2207,6 +2207,23 @@ class PlatformBridge {
     }
   }
 
+  /// Songs like [seeds] (track maps, most important first) from an extension
+  /// with the `relatedTracks` capability, normalized like search results.
+  static Future<List<Map<String, dynamic>>> getExtensionRelatedTracks(
+    String extensionId,
+    List<Map<String, dynamic>> seeds, {
+    int limit = 25,
+  }) async {
+    final requestId = _nextExtensionRequestId('relatedTracks', extensionId);
+    final result = await _channel.invokeMethod('getExtensionRelatedTracks', {
+      'extension_id': extensionId,
+      'seeds': jsonEncode(seeds),
+      'options': jsonEncode({'limit': limit}),
+      'request_id': requestId,
+    });
+    return _decodeMapListResultAsync(result, 'getExtensionRelatedTracks');
+  }
+
   static Future<Map<String, dynamic>?> handleURLWithExtension(
     String url,
   ) async {

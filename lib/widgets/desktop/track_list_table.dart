@@ -34,6 +34,7 @@ class TrackListTable extends ConsumerStatefulWidget {
     this.albumArtist,
     this.showPreview = false,
     this.onSaveCover,
+    this.rowAction,
   });
 
   /// See [SliverTrackTable.albumLayout] and [SliverTrackTable.albumArtist].
@@ -70,6 +71,10 @@ class TrackListTable extends ConsumerStatefulWidget {
   /// artwork, as the phone search rows do.
   final ValueChanged<int>? onSaveCover;
 
+  /// A button before the More button of the row at this index, such as the
+  /// add button of playlist suggestions.
+  final Widget Function(int index)? rowAction;
+
   @override
   ConsumerState<TrackListTable> createState() => _TrackListTableState();
 }
@@ -85,6 +90,7 @@ class _TrackListTableState extends ConsumerState<TrackListTable> {
     if (widget.showArtwork != oldWidget.showArtwork ||
         widget.showPreview != oldWidget.showPreview ||
         (widget.onSaveCover == null) != (oldWidget.onSaveCover == null) ||
+        (widget.rowAction == null) != (oldWidget.rowAction == null) ||
         !listEquals(widget.tracks, oldWidget.tracks) ||
         !listEquals(widget.ids, oldWidget.ids) ||
         !listEquals(widget.isInHistory, oldWidget.isInHistory)) {
@@ -134,10 +140,17 @@ class _TrackListTableState extends ConsumerState<TrackListTable> {
                   ],
                 )
               : badges(i),
-          trailing: TrackCollectionQuickActions(
-            track: tracks[i],
-            hasLocalPlaybackCandidate: isInHistory[i],
-            dense: true,
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Reads the current callback, as the rows outlive it.
+              ?widget.rowAction?.call(i),
+              TrackCollectionQuickActions(
+                track: tracks[i],
+                hasLocalPlaybackCandidate: isInHistory[i],
+                dense: true,
+              ),
+            ],
           ),
           playback: catalogTrackPlaybackUiProvider(catalogTrackKey(tracks[i])),
         ),

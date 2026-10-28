@@ -40,6 +40,7 @@ import 'package:mornye/widgets/audio_quality_badges.dart';
 import 'package:mornye/widgets/motion_header_banner.dart';
 import 'package:mornye/widgets/track_detail_actions.dart';
 import 'package:mornye/widgets/selection_action_button.dart';
+import 'package:mornye/widgets/collection_suggestions_section.dart';
 import 'package:mornye/widgets/downloadable_cover.dart';
 import 'package:mornye/widgets/disc_separator_chip.dart';
 import 'package:mornye/widgets/mornye_artist_header.dart';
@@ -502,6 +503,11 @@ class _AlbumScreenState extends ConsumerState<AlbumScreen>
         if (!_isLoading && _error == null && tracks.isNotEmpty) ...[
           _buildTrackList(context, colorScheme, tracks, commonQualityTrack),
           _buildAlbumFooter(context, colorScheme, tracks),
+          if (!isSelectionMode)
+            CollectionSuggestionsSliver(
+              collectionKey: 'album:${widget.extensionId}:${widget.albumId}',
+              tracks: tracks,
+            ),
         ],
       ],
     );
