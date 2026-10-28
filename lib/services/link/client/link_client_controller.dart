@@ -36,6 +36,7 @@ class LinkClientEnvironment {
     required this.createSession,
     required this.ensureLocalNetwork,
     required this.onLocalNetwork,
+    this.networkChanges = const Stream<void>.empty(),
   });
 
   /// The name desktops list this phone under.
@@ -59,6 +60,9 @@ class LinkClientEnvironment {
   /// Whether Wi-Fi or Ethernet is connected.
   final Future<bool> Function() onLocalNetwork;
 
+  /// Interface changes can invalidate discovery even when Wi-Fi stays on.
+  final Stream<void> networkChanges;
+
   factory LinkClientEnvironment.device() => LinkClientEnvironment(
     deviceName: _deviceName,
     platform: Platform.isIOS ? 'ios' : 'android',
@@ -68,6 +72,7 @@ class LinkClientEnvironment {
         LinkClientSession(server: server, apiKey: apiKey, device: device),
     ensureLocalNetwork: LocalNetworkAccess.instance.ensureGranted,
     onLocalNetwork: _onLocalNetwork,
+    networkChanges: Connectivity().onConnectivityChanged.map((_) {}),
   );
 
   static Future<String> _deviceName() async {
@@ -200,12 +205,17 @@ class LinkClientState {
 class LinkClientController extends Notifier<LinkClientState> {
   /// How long `catalog.changed` bursts settle before a rescan.
   static const rescanDelay = Duration(seconds: 2);
+  static const discoveryRetryDelay = Duration(seconds: 2);
 
   LinkSession? _session;
   StreamSubscription<LinkConnectionState>? _stateSubscription;
   StreamSubscription<Map<String, dynamic>>? _messageSubscription;
   LinkDiscovery? _discovery;
   AppLifecycleListener? _lifecycle;
+  StreamSubscription<void>? _networkSubscription;
+  Timer? _discoveryRetry;
+  var _discoveryFailures = 0;
+  var _restartingDiscovery = false;
   Timer? _rescan;
   Future<void> _mutation = Future.value();
   Future<void>? _loading;
@@ -240,6 +250,11 @@ class LinkClientController extends Notifier<LinkClientState> {
     }
     _disposed = false;
     _lifecycle = AppLifecycleListener(onStateChange: _onLifecycle);
+    _networkSubscription = _environment.networkChanges.listen(
+      (_) => unawaited(_refreshNetworkConnection()),
+      onError: (Object error) =>
+          _log.w('Watching local network failed: $error'),
+    );
     ref.listen(
       linkKeepConnectedProvider,
       (_, keep) => _updateConnected(() => _keepConnected = keep),
@@ -384,12 +399,17 @@ class LinkClientController extends Notifier<LinkClientState> {
 
   void _onLifecycle(AppLifecycleState lifecycle) {
     // Inactive covers the iOS control centre and app switcher; keep going.
-    if (lifecycle == AppLifecycleState.inactive) return;
+    if (lifecycle == AppLifecycleState.inactive || _disposed) return;
     final foreground = lifecycle == AppLifecycleState.resumed;
-    if (foreground == _foreground || _disposed) return;
+    if (foreground == _foreground && !foreground) return;
     _updateConnected(() => _foreground = foreground);
-    if (foreground) unawaited(refreshLocalNetwork());
-    _updateDiscovery();
+    if (foreground) {
+      // Control Centre and permission dialogs can change the network without
+      // ever putting the app into the paused lifecycle state.
+      unawaited(_refreshNetworkConnection());
+    } else {
+      _updateDiscovery();
+    }
   }
 
   /// Whether the session is connected rather than paused.
@@ -429,9 +449,10 @@ class LinkClientController extends Notifier<LinkClientState> {
   }
 
   void _updateDiscovery() {
-    if (_disposed) return;
+    if (_disposed || _restartingDiscovery) return;
     final wanted =
         _foreground &&
+        state.localNetworkAvailable &&
         !_discoveryBlocked &&
         (_discoveryHolds > 0 ||
             (_session != null &&
@@ -441,7 +462,14 @@ class LinkClientController extends Notifier<LinkClientState> {
       ensureAccess: _environment.ensureLocalNetwork,
       onChanged: _onDiscoveryChanged,
     );
-    if (wanted && discovery.status != LinkDiscoveryStatus.searching) {
+    if (!wanted) {
+      _discoveryRetry?.cancel();
+      _discoveryRetry = null;
+      _discoveryFailures = 0;
+    }
+    if (wanted &&
+        _discoveryRetry == null &&
+        discovery.status != LinkDiscoveryStatus.searching) {
       unawaited(discovery.start());
     } else if (!wanted && discovery.status == LinkDiscoveryStatus.searching) {
       unawaited(discovery.stop());
@@ -458,6 +486,20 @@ class LinkClientController extends Notifier<LinkClientState> {
       _discoveryBlocked = true;
     }
     state = state.copyWith(discovered: found, discovery: discovery.status);
+    if (discovery.status == LinkDiscoveryStatus.failed &&
+        _foreground &&
+        state.localNetworkAvailable &&
+        !_discoveryBlocked &&
+        _discoveryRetry == null) {
+      final delay = discoveryRetryDelay * (1 << _discoveryFailures.clamp(0, 4));
+      _discoveryFailures++;
+      _discoveryRetry = Timer(delay, () {
+        _discoveryRetry = null;
+        _updateDiscovery();
+      });
+    } else if (found.isNotEmpty) {
+      _discoveryFailures = 0;
+    }
     for (final server in found) {
       final record = state.servers
           .where((s) => s.serverId == server.serverId)
@@ -498,6 +540,33 @@ class LinkClientController extends Notifier<LinkClientState> {
     final available = await _environment.onLocalNetwork();
     if (_disposed || available == state.localNetworkAvailable) return;
     state = state.copyWith(localNetworkAvailable: available);
+    _updateDiscovery();
+  }
+
+  Future<void> _refreshNetworkConnection() async {
+    await refreshLocalNetwork();
+    if (_disposed) return;
+    await _restartDiscovery();
+    if (!_disposed &&
+        _connected &&
+        state.localNetworkAvailable &&
+        state.connection != LinkConnectionState.connected) {
+      _session?.reconnectNow();
+    }
+  }
+
+  Future<void> _restartDiscovery() async {
+    if (_disposed || _restartingDiscovery) return;
+    _restartingDiscovery = true;
+    _discoveryRetry?.cancel();
+    _discoveryRetry = null;
+    _discoveryFailures = 0;
+    try {
+      await _discovery?.stop();
+    } finally {
+      _restartingDiscovery = false;
+      _updateDiscovery();
+    }
   }
 
   /// Asks for local network access again, then retries discovery and the
@@ -507,12 +576,15 @@ class LinkClientController extends Notifier<LinkClientState> {
     await _environment.ensureLocalNetwork();
     if (_disposed) return;
     _discoveryBlocked = false;
-    _updateDiscovery();
+    await _restartDiscovery();
     _session?.reconnectNow();
   }
 
   /// Retries the active desktop now.
-  void retry() => _session?.reconnectNow();
+  void retry() {
+    unawaited(_restartDiscovery());
+    _session?.reconnectNow();
+  }
 
   /// Reads a desktop's `info` before asking for its PIN.
   Future<LinkPairingTarget> probe(
@@ -626,6 +698,9 @@ class LinkClientController extends Notifier<LinkClientState> {
     _disposed = true;
     _lifecycle?.dispose();
     _lifecycle = null;
+    unawaited(_networkSubscription?.cancel());
+    _networkSubscription = null;
+    _discoveryRetry?.cancel();
     _rescan?.cancel();
     unawaited(_stateSubscription?.cancel());
     unawaited(_messageSubscription?.cancel());

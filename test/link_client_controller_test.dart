@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/widgets.dart';
@@ -19,10 +20,12 @@ Future<LinkClientHarness> _started({
   bool supported = true,
   bool localNetworkAllowed = true,
   bool onWifi = true,
+  Stream<void> networkChanges = const Stream<void>.empty(),
 }) async {
-  final harness = LinkClientHarness(supported: supported)
-    ..localNetworkAllowed = localNetworkAllowed
-    ..onWifi = onWifi;
+  final harness =
+      LinkClientHarness(supported: supported, networkChanges: networkChanges)
+        ..localNetworkAllowed = localNetworkAllowed
+        ..onWifi = onWifi;
   addTearDown(harness.container.dispose);
   await harness.start();
   await pumpEventQueue();
@@ -285,7 +288,7 @@ void main() {
       AppLifecycleState.inactive,
       AppLifecycleState.resumed,
     ]);
-    expect(session.calls, ['start', 'pause', 'resume']);
+    expect(session.calls, ['start', 'pause', 'resume', 'reconnect']);
     expect(harness.browser.started, 2);
   });
 
@@ -315,7 +318,7 @@ void main() {
     ]);
     harness.keepConnected(false);
     await pumpEventQueue();
-    expect(session.calls, ['start', 'pause', 'resume']);
+    expect(session.calls, ['start', 'pause', 'resume', 'reconnect']);
   });
 
   test('catalog.changed rescans the desktop once bursts settle', () async {
@@ -370,6 +373,90 @@ void main() {
     await pumpEventQueue();
     expect(harness.state.localNetworkAvailable, isFalse);
   });
+
+  test('joining Wi-Fi restarts discovery without restarting the app', () async {
+    final changes = StreamController<void>.broadcast();
+    addTearDown(changes.close);
+    final harness = await _started(
+      onWifi: false,
+      networkChanges: changes.stream,
+    );
+    final release = harness.controller.acquireDiscovery();
+    addTearDown(release);
+    await pumpEventQueue();
+    expect(harness.state.localNetworkAvailable, isFalse);
+
+    harness.onWifi = true;
+    changes.add(null);
+    await pumpEventQueue();
+    expect(harness.state.localNetworkAvailable, isTrue);
+    expect(harness.state.discovery, LinkDiscoveryStatus.searching);
+    harness.browser.resolve('b', '192.168.18.5');
+    await pumpEventQueue();
+    expect(harness.state.unpaired.single.host, '192.168.18.5');
+  });
+
+  test(
+    'a new network refreshes a stale browser and disconnected session',
+    () async {
+      final changes = StreamController<void>.broadcast();
+      addTearDown(changes.close);
+      final harness = await _started(networkChanges: changes.stream);
+      await harness.controller.pair(linkTestTarget('a'), '123456');
+      await pumpEventQueue();
+      final started = harness.browser.started;
+      changes.add(null);
+      await pumpEventQueue();
+      expect(harness.browser.started, started + 1);
+      expect(harness.sessions.single.calls.last, 'reconnect');
+    },
+  );
+
+  test('returning from Control Centre refreshes discovery', () async {
+    final harness = await _started();
+    final release = harness.controller.acquireDiscovery();
+    addTearDown(release);
+    await pumpEventQueue();
+    final started = harness.browser.started;
+    await _lifecycle([AppLifecycleState.inactive, AppLifecycleState.resumed]);
+    expect(harness.browser.started, started + 1);
+  });
+
+  test('network changes keep an already connected session open', () async {
+    final changes = StreamController<void>.broadcast();
+    addTearDown(changes.close);
+    final harness = await _started(networkChanges: changes.stream);
+    await harness.controller.pair(linkTestTarget('a'), '123456');
+    await pumpEventQueue();
+    final session = harness.sessions.single;
+    session.emit(LinkConnectionState.connected);
+    await pumpEventQueue();
+    changes.add(null);
+    await pumpEventQueue();
+    expect(session.calls, ['start']);
+    expect(harness.state.connection, LinkConnectionState.connected);
+  });
+
+  test(
+    'a failed browser is recreated while the Link page stays open',
+    () async {
+      final harness = await _started();
+      final release = harness.controller.acquireDiscovery();
+      addTearDown(release);
+      await pumpEventQueue();
+      harness.browser.events!.addError(StateError('Bonjour failed'));
+      await pumpEventQueue();
+      expect(harness.state.discovery, LinkDiscoveryStatus.failed);
+      await Future<void>.delayed(
+        LinkClientController.discoveryRetryDelay +
+            const Duration(milliseconds: 50),
+      );
+      expect(harness.browser.started, 2);
+      harness.browser.resolve('b', '192.168.18.5');
+      await pumpEventQueue();
+      expect(harness.state.unpaired.single.host, '192.168.18.5');
+    },
+  );
 
   test('disposing closes the session and discovery', () async {
     final harness = LinkClientHarness();

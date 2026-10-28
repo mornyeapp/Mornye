@@ -240,9 +240,13 @@ final _keepConnectedProvider = NotifierProvider<_KeepConnected, bool>(
 /// The client's providers wired to fakes. Tests set
 /// `SharedPreferences.setMockInitialValues` first.
 class LinkClientHarness {
-  LinkClientHarness({this.supported = true});
+  LinkClientHarness({
+    this.supported = true,
+    this.networkChanges = const Stream<void>.empty(),
+  });
 
   final bool supported;
+  final Stream<void> networkChanges;
   final browser = FakeLinkBrowser();
   final bridge = FakeLinkBridge();
   final pairing = FakeLinkPairing();
@@ -269,6 +273,7 @@ class LinkClientHarness {
           }
         },
         onLocalNetwork: () async => onWifi,
+        networkChanges: networkChanges,
       ),
     ),
     linkClientStoreProvider.overrideWithValue(LinkClientStore()),

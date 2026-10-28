@@ -94,6 +94,21 @@ void main() {
   });
 
   group('LinkDiscovery', () {
+    test('an unexpectedly closed browser can be retried', () async {
+      final browser = _FakeBrowser();
+      final discovery = LinkDiscovery(
+        createBrowser: () => browser,
+        ensureAccess: () async {},
+        onChanged: () {},
+      );
+      await discovery.start();
+      await browser.events.close();
+      await pumpEventQueue();
+      expect(discovery.running, isFalse);
+      expect(discovery.status, LinkDiscoveryStatus.failed);
+      expect(browser.stopped, 1);
+    });
+
     test('tracks resolved and lost desktops', () async {
       final browser = _FakeBrowser();
       var changes = 0;

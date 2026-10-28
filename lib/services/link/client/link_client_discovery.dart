@@ -201,6 +201,7 @@ class LinkDiscovery {
       _subscription = events.listen(
         (event) => _handle(generation, event),
         onError: (Object error) => _fail(generation, error),
+        onDone: () => _fail(generation, StateError('Discovery stream ended')),
       );
     } catch (error) {
       _fail(generation, error);
