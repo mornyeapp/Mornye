@@ -157,7 +157,7 @@
   "@networkTrustCertificate": {
     "description": "Action approving the displayed certificate SHA-256 fingerprint for this connection's HTTPS origin and retrying connect-and-save; does not grant global certificate trust"
   },
-  "networkRemoveConnection": "Видалити підключення",
+  "networkRemoveConnection": "Скасувати підключення",
   "@networkRemoveConnection": {
     "description": "Connection form action that removes the saved connection and its credentials, without deleting files on the server"
   },
@@ -490,7 +490,7 @@
   "@trackReplayGainFailed": {
     "description": "Snackbar message when ReplayGain scan/write fails"
   },
-  "trackRemoveReplayGain": "Видалити ReplayGain",
+  "trackRemoveReplayGain": "Скинути ReplayGain",
   "trackRemoveReplayGainSuccess": "Теги ReplayGain видалено",
   "trackRemoveReplayGainFailed": "Не вдалося видалити теги ReplayGain",
   "replayGainRemoving": "Видалення ReplayGain...",
@@ -502,7 +502,7 @@
       }
     }
   },
-  "selectionRemoveReplayGainCount": "Видалити RG ({count})",
+  "selectionRemoveReplayGainCount": "Скинути RG ({count})",
   "@selectionRemoveReplayGainCount": {
     "description": "Compact selection action label. RG abbreviates ReplayGain; keep this short for a two-column toolbar.",
     "placeholders": {
@@ -1072,7 +1072,7 @@
   "@dialogClearAll": {
     "description": "Dialog title - clear all items"
   },
-  "dialogRemoveExtension": "Видалити розширення",
+  "dialogRemoveExtension": "Вилучити розширення",
   "@dialogRemoveExtension": {
     "description": "Dialog title - uninstall extension"
   },
@@ -1080,7 +1080,7 @@
   "@dialogRemoveExtensionMessage": {
     "description": "Dialog message - uninstall confirmation"
   },
-  "dialogUninstallExtension": "Видалити розширення?",
+  "dialogUninstallExtension": "Вилучити розширення?",
   "@dialogUninstallExtension": {
     "description": "Dialog title - uninstall extension"
   },
@@ -3596,7 +3596,7 @@
   "@trackSaveLyricsProgress": {
     "description": "Snackbar while saving lyrics to file"
   },
-  "trackReEnrich": "Поліпшувати",
+  "trackReEnrich": "Оновити інформацію",
   "@trackReEnrich": {
     "description": "Menu action - re-embed metadata into audio file"
   },
@@ -3746,7 +3746,7 @@
   "@trackReEnrichPreparing": {
     "description": "Progress message while preparing manual batch metadata changes"
   },
-  "trackReEnrichSuccess": "Метадані повторно збагачені успішно",
+  "trackReEnrichSuccess": "Метадані успішно оновлено",
   "trackReEnrichMetadataSaved": "Метадані збережені",
   "trackReEnrichLyricsUpdated": "Текст оновлено",
   "trackReEnrichLyricsPreserved": "Нові тексти пісень не знайдено; наявні тексти пісень зберігаються",
@@ -6268,7 +6268,7 @@
       }
     }
   },
-  "trackReEnrichSuccessWithFailures": "Метадані успішно збагачені ({successCount}/{total}) - Помилка: {failedCount}",
+  "trackReEnrichSuccessWithFailures": "Метадані успішно оновлено ({successCount}/{total}) - Помилок: {failedCount}",
   "@trackReEnrichSuccessWithFailures": {
     "description": "Snackbar summary after batch metadata re-enrichment finishes with failures",
     "placeholders": {
