@@ -82,7 +82,10 @@ Map<String, dynamic> _downloads() => {
 };
 
 void main() {
-  final phoneItem = linkMediaItem(linkLocalMedia('a', title: 'Phone Song'));
+  // Device controls use a SAF source, avoiding filesystem I/O in widget tests.
+  final phoneItem = linkMediaItem(
+    linkLocalMedia('a', title: 'Phone Song'),
+  ).copyWith(extras: const {'source': 'content://audio/document/a.flac'});
 
   Widget host({
     required ThemeData theme,

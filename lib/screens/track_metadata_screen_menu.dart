@@ -18,6 +18,14 @@ extension _TrackMetadataMenu on _TrackMetadataScreenState {
         ? const <LinkOfflineSong>[]
         : linkDesktopSongsOf(ref, [localItem]);
     final linkClient = ref.read(linkPhoneClientProvider);
+    final remoteItem = localItem == null
+        ? null
+        : UnifiedLibraryItem.fromLocalLibrary(localItem);
+    final remoteFile =
+        remoteItem != null &&
+        linkClient != null &&
+        linkDesktopSongId(remoteItem.filePath, linkClient.server) != null;
+    final container = ProviderScope.containerOf(screenContext, listen: false);
     final phoneSongs = !linkTransfers || !_fileExists
         ? const <UnifiedLibraryItem>[]
         : linkPhoneSongItemsOf([
@@ -51,6 +59,28 @@ extension _TrackMetadataMenu on _TrackMetadataScreenState {
           label: l10n.linkSendToDesktop(linkDesktopName(linkClient)),
           onTap: () => linkSendSongsToDesktop(screenContext, ref, phoneSongs),
         ),
+      if (remoteFile)
+        for (final action in [
+          LinkLibraryAction.editMetadata,
+          LinkLibraryAction.reEnrich,
+          LinkLibraryAction.convert,
+          LinkLibraryAction.replayGain,
+          LinkLibraryAction.removeReplayGain,
+          LinkLibraryAction.saveCover,
+          LinkLibraryAction.saveLyrics,
+          LinkLibraryAction.delete,
+        ])
+          _MetadataOption(
+            icon: linkLibraryActionIcon(action),
+            label: l10n.linkFileActionOn(
+              linkLibraryActionLabel(screenContext, action),
+              linkDesktopName(linkClient),
+            ),
+            destructive: action == LinkLibraryAction.delete,
+            onTap: () => runLinkLibraryAction(screenContext, container, [
+              remoteItem,
+            ], action),
+          ),
       if (albumName.trim().isNotEmpty)
         _MetadataOption(
           icon: Icons.album_outlined,

@@ -14,6 +14,8 @@ import 'package:mornye/services/link/desktop/link_catalog_exporter.dart';
 import 'package:mornye/services/link/desktop/link_catalog_index.dart';
 import 'package:mornye/services/link/desktop/link_desktop_backend.dart';
 import 'package:mornye/services/link/desktop/link_desktop_ops.dart';
+import 'package:mornye/services/link/desktop/link_library_executor.dart';
+import 'package:mornye/services/link/desktop/link_library_jobs_host.dart';
 import 'package:mornye/services/link/desktop/link_desktop_transfers.dart';
 import 'package:mornye/services/link/desktop/link_downloads.dart';
 import 'package:mornye/services/link/desktop/link_phone_catalogs.dart';
@@ -180,6 +182,7 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
   StreamSubscription<void>? _playerSubscription;
   LinkPlayerPort? _player;
   LinkDesktopOps? _ops;
+  LinkLibraryJobsHost? _libraryJobs;
   LinkArrivingFiles? _arriving;
   LinkPhoneCatalogs? _phoneCatalogs;
   LinkPhoneSources? _phoneSources;
@@ -471,6 +474,32 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
   /// and the Subsonic playlist, star and scrobble ops.
   void _registerFeatures(LinkHostRouter router) {
     (_ops ??= _createOps()).register(router);
+    if (_libraryJobs == null) {
+      final executor = LinkLibraryExecutor(
+        container: ref.container,
+        index: () => _index,
+      );
+      _libraryJobs = LinkLibraryJobsHost(
+        isPaired: (deviceId) async => (await _backend.devices()).any(
+          (device) => device.deviceId == deviceId && !device.isSubsonicApp,
+        ),
+        execute: executor.call,
+        titleFor: (id) => _index?.songById(id)?.title ?? id,
+        notify: (deviceId, job) => unawaited(
+          _send({
+            'type': 'library.job',
+            'job': job.toJson(),
+          }, deviceId: deviceId),
+        ),
+        onChanged: () async {
+          if (!ref.mounted) return;
+          await ref.read(downloadHistoryProvider.notifier).reloadFromStorage();
+          await ref.read(localLibraryProvider.notifier).reloadFromStorage();
+          await exportCatalog();
+        },
+      );
+    }
+    _libraryJobs!.register(router);
     _phoneCatalogs?.register(router);
     _transfers?.register(router);
     registerLinkSyncHandlers(router, ref);
@@ -1011,6 +1040,7 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
   }
 
   void _dispose() {
+    _libraryJobs?.close();
     _cancelApp();
     _cancelBackend();
     _transfers?.close();

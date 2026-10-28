@@ -36,6 +36,54 @@ void main() {
     await directory.delete(recursive: true);
   });
 
+  test(
+    'forced artwork refresh changes the decoded image key and survives reconnect',
+    () async {
+      final client = storage.openSubsonic(server.connection());
+      final song = SubsonicSong(server.song);
+      final before = await client.cachedCover(song, directory);
+      final refreshed = await client.cachedCover(
+        song,
+        directory,
+        refresh: true,
+      );
+      expect(refreshed, isNot(before));
+      expect(await File(before!).exists(), isTrue);
+      expect(await File(refreshed!).exists(), isTrue);
+      expect(await client.cachedCover(song, directory), refreshed);
+      client.close();
+      final next = storage.openSubsonic(server.connection());
+      addTearDown(next.close);
+      final requests = server.requests.length;
+      expect(await next.cachedCover(song, directory), refreshed);
+      expect(server.requests.length, requests);
+    },
+  );
+
+  test(
+    'failed artwork refresh preserves the previously published image',
+    () async {
+      final client = storage.openSubsonic(server.connection());
+      addTearDown(client.close);
+      final song = SubsonicSong(server.song);
+      final before = await client.cachedCover(song, directory);
+      server.mediaError = true;
+      await expectLater(
+        client.cachedCover(song, directory, refresh: true),
+        throwsA(isA<HttpException>()),
+      );
+      server.mediaError = false;
+      expect(await client.cachedCover(song, directory), before);
+      expect(
+        await directory
+            .list()
+            .where((file) => file.path.endsWith('.tmp'))
+            .toList(),
+        isEmpty,
+      );
+    },
+  );
+
   for (final auth in SubsonicAuth.values) {
     test(
       'auth $auth preserves the base path and sends no Basic credentials',

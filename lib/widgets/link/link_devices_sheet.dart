@@ -18,6 +18,7 @@ import 'package:mornye/widgets/app_icon_button.dart';
 import 'package:mornye/widgets/app_progress_indicator.dart';
 import 'package:mornye/widgets/expressive_icon_button.dart';
 import 'package:mornye/widgets/link/link_actions.dart';
+import 'package:mornye/widgets/link/link_library_actions.dart';
 import 'package:mornye/widgets/settings_group.dart';
 
 /// Opens the Devices sheet: where the music plays, this phone or the paired
@@ -174,6 +175,15 @@ class LinkDevicesSheet extends ConsumerWidget {
                     ? () => choose(playOnDesktop)
                     : null,
                 showDivider: false,
+              ),
+            ],
+          ),
+          SettingsGroup(
+            children: [
+              SettingsItem(
+                icon: Icons.task_alt,
+                title: l10n.linkFileJobs,
+                onTap: () => choose(showLinkLibraryJobs),
               ),
             ],
           ),

@@ -494,7 +494,22 @@ class SubsonicClient {
     final hash = sha256.convert(
       utf8.encode('${connection.id}/${song.coverId}'),
     );
-    final target = File('${directory.path}/subsonic_$hash.image');
+    final base = File('${directory.path}/subsonic_$hash.image');
+    final current = File('${base.path}.current');
+    var target = base;
+    try {
+      final name = await current.readAsString();
+      final prefix = 'subsonic_${hash}_';
+      if (name.startsWith(prefix) &&
+          name.endsWith('.image') &&
+          RegExp(
+            r'^[a-f0-9]{48}$',
+          ).hasMatch(name.substring(prefix.length, name.length - 6))) {
+        target = File('${directory.path}/$name');
+      }
+    } on FileSystemException {
+      // Older caches have only the original image path.
+    }
     final stat = await target.stat();
     if (!refresh &&
         stat.type == FileSystemEntityType.file &&
@@ -502,13 +517,26 @@ class SubsonicClient {
         DateTime.now().difference(stat.modified) < const Duration(days: 1)) {
       return target.path;
     }
-    final staged = File('${target.path}.${NetworkStorageService.newId()}.tmp');
+    final staged = File('${base.path}.${NetworkStorageService.newId()}.tmp');
+    File? pointer;
     try {
       await saveCover(song, staged);
-      await staged.rename(target.path);
+      if (refresh || target.path != base.path) {
+        // A new path invalidates every decoded size of the old artwork.
+        // Existing Library rows keep their old image until the scan commits.
+        final name = 'subsonic_${hash}_${NetworkStorageService.newId()}.image';
+        target = File('${directory.path}/$name');
+        await staged.rename(target.path);
+        pointer = File('${current.path}.${NetworkStorageService.newId()}.tmp');
+        await pointer.writeAsString(name, flush: true);
+        await pointer.rename(current.path);
+      } else {
+        await staged.rename(target.path);
+      }
       return target.path;
     } finally {
       if (await staged.exists()) await staged.delete();
+      if (pointer != null && await pointer.exists()) await pointer.delete();
     }
   }
 

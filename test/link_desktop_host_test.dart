@@ -220,6 +220,45 @@ void main() {
     await shutdown(tester);
   });
 
+  testWidgets(
+    'file operations are registered for paired phones and reject app keys',
+    (tester) async {
+      backend.deviceList = const [
+        LinkPairedDevice(deviceId: 'phone', name: 'Phone', platform: 'android'),
+        LinkPairedDevice(deviceId: 'app', name: 'Player', platform: 'subsonic'),
+      ];
+      await boot(tester);
+      backend.request(
+        LinkOps.libraryJobs,
+        requestId: 'phone-work',
+        deviceId: 'phone',
+        args: const {'_method': 'GET'},
+      );
+      backend.request(
+        LinkOps.libraryJobs,
+        requestId: 'app-work',
+        deviceId: 'app',
+        args: const {'_method': 'GET'},
+      );
+      await flush(tester);
+      final own = backend.replies.singleWhere(
+        (reply) => reply.requestId == 'phone-work',
+      );
+      expect(
+        (own.result as Map)['actions'],
+        containsAll(['delete', 'convert', 'reEnrich', 'replayGain']),
+      );
+      expect(
+        backend.replies
+            .singleWhere((reply) => reply.requestId == 'app-work')
+            .error
+            ?.code,
+        'forbidden',
+      );
+      await shutdown(tester);
+    },
+  );
+
   testWidgets('pushes player.state debounced and on a heartbeat', (
     tester,
   ) async {

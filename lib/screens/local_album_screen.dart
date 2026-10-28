@@ -33,6 +33,8 @@ import 'package:mornye/widgets/desktop/context_menu.dart';
 import 'package:mornye/widgets/desktop/desktop_selection.dart';
 import 'package:mornye/widgets/desktop/detail_header.dart';
 import 'package:mornye/widgets/desktop/library_track_menu.dart';
+import 'package:mornye/widgets/link/link_library_actions.dart';
+import 'package:mornye/services/link/link_library_jobs.dart';
 import 'package:mornye/widgets/playlist_picker_sheet.dart';
 import 'package:mornye/widgets/desktop/track_table.dart';
 import 'package:mornye/widgets/expressive_button.dart';
@@ -145,6 +147,19 @@ class _LocalAlbumScreenState extends ConsumerState<LocalAlbumScreen>
 
   Future<void> _deleteSelected(List<LocalLibraryItem> currentTracks) async {
     final container = ProviderScope.containerOf(context, listen: false);
+    final selected = _selectedUnifiedItems(currentTracks);
+    if (hasLinkLibrarySongs(container, selected)) {
+      await runLinkLibraryAction(
+        context,
+        container,
+        selected,
+        LinkLibraryAction.delete,
+        onAccepted: () {
+          if (mounted) exitSelectionMode();
+        },
+      );
+      return;
+    }
     final libraryNotifier = ref.read(localLibraryProvider.notifier);
     final tracksById = {for (final track in currentTracks) track.id: track};
 

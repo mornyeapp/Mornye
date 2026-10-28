@@ -19,6 +19,8 @@ import 'package:mornye/utils/int_utils.dart';
 import 'package:mornye/utils/lyrics_metadata_helper.dart';
 import 'package:mornye/utils/logger.dart';
 import 'package:mornye/widgets/batch_convert_sheet.dart';
+import 'package:mornye/widgets/link/link_library_actions.dart';
+import 'package:mornye/services/link/link_library_jobs.dart';
 import 'package:mornye/widgets/app_alert_dialog.dart';
 import 'package:mornye/widgets/app_bottom_sheet.dart';
 import 'package:mornye/widgets/batch_progress_dialog.dart';
@@ -77,6 +79,26 @@ Future<void> showBatchConvertSheet(
   VoidCallback? onSheetOpen,
   Future<void> Function(bool didStartConversion)? onSheetClosed,
 }) async {
+  final container = ProviderScope.containerOf(context, listen: false);
+  if (hasLinkLibrarySongs(container, selectedItems)) {
+    final root = Navigator.of(context, rootNavigator: true).context;
+    onSheetOpen?.call();
+    var accepted = false;
+    await runLinkLibraryAction(
+      root,
+      container,
+      selectedItems,
+      LinkLibraryAction.convert,
+      onAccepted: () {
+        accepted = true;
+        if (ref.context.mounted) onExitSelectionMode();
+      },
+    );
+    if (root.mounted && ref.context.mounted) {
+      await onSheetClosed?.call(accepted);
+    }
+    return;
+  }
   final sourceFormats = <String>{};
   final sourceBitDepths = <int?>[];
   final sourceSampleRates = <int?>[];
@@ -658,6 +680,25 @@ Future<void> runBatchReplayGain(
   final container = ProviderScope.containerOf(sourceContext, listen: false);
   // The selection overlay can disappear when opening the confirmation dialog.
   final context = Navigator.of(sourceContext, rootNavigator: true).context;
+
+  if (hasLinkLibrarySongs(container, selectedItems)) {
+    onConfirmOpen?.call();
+    var accepted = false;
+    await runLinkLibraryAction(
+      context,
+      container,
+      selectedItems,
+      remove
+          ? LinkLibraryAction.removeReplayGain
+          : LinkLibraryAction.replayGain,
+      onAccepted: () {
+        accepted = true;
+        if (sourceContext.mounted) onExitSelectionMode();
+      },
+    );
+    if (context.mounted) await onConfirmClosed?.call(accepted);
+    return;
+  }
 
   onConfirmOpen?.call();
 

@@ -14,6 +14,7 @@ import 'package:mornye/services/library_database.dart';
 import 'package:mornye/services/notification_service.dart';
 import 'package:mornye/services/link/features/link_handoff.dart';
 import 'package:mornye/services/link/features/link_library_lookup.dart';
+import 'package:mornye/services/link/features/link_library_jobs_client.dart';
 import 'package:mornye/services/link/features/link_phone_client.dart';
 import 'package:mornye/services/link/features/link_phone_files.dart';
 import 'package:mornye/services/link/features/link_phone_library.dart';
@@ -265,6 +266,7 @@ final linkPhoneLibraryProvider = Provider<LinkPhoneLibraryPublisher?>((ref) {
 /// messages and keeps [linkPhoneLibraryProvider] and the song transfers
 /// running. Null while no desktop is paired.
 final linkPhoneFeaturesProvider = Provider<LinkPhoneSession?>((ref) {
+  ref.listen(linkLibraryJobsProvider, (_, _) {});
   ref.listen(linkPhoneLibraryProvider, (_, _) {});
   ref.listen(linkPhoneReceiverProvider, (_, _) {});
   ref.listen(linkPhoneSenderProvider, (_, _) {});

@@ -94,6 +94,7 @@ abstract final class LinkOps {
   static const downloads = 'downloads';
   static const open = 'open';
   static const resolve = 'resolve';
+  static const libraryJobs = 'library/jobs';
   static const collections = 'collections';
   static const history = 'history';
 

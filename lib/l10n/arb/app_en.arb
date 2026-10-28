@@ -1,4 +1,43 @@
 {
+  "linkFileActionOn": "{action} on {name}",
+  "@linkFileActionOn": {
+    "description": "File operation on a named linked computer",
+    "placeholders": {
+      "action": {"type": "String"},
+      "name": {"type": "String"}
+    }
+  },
+  "linkFileActionsDescription": "Changes apply to music files on {name}. Accepted work continues if this phone disconnects.",
+  "@linkFileActionsDescription": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "linkFileDeleteConfirm": "Delete {count} {count, plural, =1{music file} other{music files}} from {name}? This removes the files from that computer's storage.",
+  "@linkFileDeleteConfirm": {
+    "placeholders": {
+      "count": {"type": "int"},
+      "name": {"type": "String"}
+    }
+  },
+  "linkFileJobs": "Desktop work",
+  "linkFileJobsEmpty": "No file operations yet",
+  "linkFileJobsUnsupported": "Update Mornye on your computer to manage its music files from this phone.",
+  "linkFileSelectionOneDevice": "Select songs from one linked computer at a time (up to 100 songs).",
+  "linkFileJobSummary": "{finished}/{total} processed, {failed} failed",
+  "@linkFileJobSummary": {
+    "placeholders": {
+      "finished": {"type": "int"},
+      "total": {"type": "int"},
+      "failed": {"type": "int"}
+    }
+  },
+  "linkFileCancelHint": "Stop after the current song",
+  "linkFileJobCancelled": "Stopped",
+  "linkFileJobQueued": "Queued",
+  "linkFileJobCompleted": "Finished",
+  "linkFileChanged": "The file changed since the preview. Preview it again before saving.",
+  "linkFileOperationFailed": "The operation could not be completed. Check the computer's logs for details.",
   "trackBpm": "BPM",
   "trackMood": "Mood",
   "subsonicAddToLibrary": "Add server to Library",

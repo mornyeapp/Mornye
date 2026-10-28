@@ -28,6 +28,8 @@ import 'package:mornye/widgets/batch_progress_dialog.dart';
 import 'package:mornye/widgets/app_snack_bar.dart';
 import 'package:mornye/widgets/re_enrich_field_dialog.dart';
 import 'package:mornye/widgets/re_enrich_review_sheet.dart';
+import 'package:mornye/widgets/link/link_library_actions.dart';
+import 'package:mornye/services/link/link_library_jobs.dart';
 
 final _reEnrichLog = AppLogger('BatchReEnrich');
 
@@ -147,6 +149,25 @@ Future<void> reEnrichLibraryTracks(
   required VoidCallback onComplete,
 }) async {
   if (selected.isEmpty) return;
+  final container = ProviderScope.containerOf(context, listen: false);
+  if (hasLinkLibrarySongs(container, selected)) {
+    final root = Navigator.of(context, rootNavigator: true).context;
+    await onSelectionHide();
+    if (!root.mounted || !isActive()) return;
+    var accepted = false;
+    await runLinkLibraryAction(
+      root,
+      container,
+      selected,
+      LinkLibraryAction.reEnrich,
+      onAccepted: () {
+        accepted = true;
+        if (isActive()) onComplete();
+      },
+    );
+    if (!accepted && root.mounted && isActive()) onSelectionRestore();
+    return;
+  }
   final downloads = selected
       .map((item) => item.historyItem)
       .whereType<DownloadHistoryItem>()
@@ -248,6 +269,28 @@ Future<void> reEnrichLocalTracks(
   Map<String, String> sourceTrackIds = const {},
 }) async {
   if (selected.isEmpty) return;
+  final container = ProviderScope.containerOf(context, listen: false);
+  final items = [
+    for (final item in selected) UnifiedLibraryItem.fromLocalLibrary(item),
+  ];
+  if (hasLinkLibrarySongs(container, items)) {
+    final root = Navigator.of(context, rootNavigator: true).context;
+    await onSelectionHide();
+    if (!root.mounted || !isActive()) return;
+    var accepted = false;
+    await runLinkLibraryAction(
+      root,
+      container,
+      items,
+      LinkLibraryAction.reEnrich,
+      onAccepted: () {
+        accepted = true;
+        if (isActive()) onComplete();
+      },
+    );
+    if (!accepted && root.mounted && isActive()) onSelectionRestore();
+    return;
+  }
   // Capture a stable route context before a caller removes its overlay.
   context = Navigator.of(context, rootNavigator: true).context;
   await onSelectionHide();
@@ -579,6 +622,19 @@ Future<void> deleteLibraryTracks(
   required VoidCallback onComplete,
 }) async {
   if (selected.isEmpty) return;
+  final actionContainer = ProviderScope.containerOf(context, listen: false);
+  if (hasLinkLibrarySongs(actionContainer, selected)) {
+    await runLinkLibraryAction(
+      context,
+      actionContainer,
+      selected,
+      LinkLibraryAction.delete,
+      onAccepted: () {
+        if (isActive()) onComplete();
+      },
+    );
+    return;
+  }
   final confirmed = await showAppConfirmDialog(
     context,
     title: context.l10n.dialogDeleteSelectedTitle,
