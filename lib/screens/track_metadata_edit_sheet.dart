@@ -48,6 +48,11 @@ class EditMetadataSheet extends StatefulWidget {
   final int durationMs;
   final String artistTagMode;
 
+  /// Saves the tags somewhere other than [filePath], such as the copy on a
+  /// linked computer: null once saved, else why it failed. The cover editor
+  /// and the online autofill, which work on the local file, are left out.
+  final Future<String?> Function(Map<String, String> metadata)? saveTags;
+
   const EditMetadataSheet({
     super.key,
     required this.colorScheme,
@@ -56,6 +61,7 @@ class EditMetadataSheet extends StatefulWidget {
     this.sourceTrackId,
     required this.durationMs,
     required this.artistTagMode,
+    this.saveTags,
   });
 
   @override
@@ -272,7 +278,7 @@ class _EditMetadataSheetState extends State<EditMetadataSheet> {
   void initState() {
     super.initState();
     _form = MetadataEditorController(widget.initialValues);
-    unawaited(_loadCurrentCoverPreview());
+    if (widget.saveTags == null) unawaited(_loadCurrentCoverPreview());
   }
 
   @override
@@ -284,6 +290,21 @@ class _EditMetadataSheetState extends State<EditMetadataSheet> {
 
   Future<void> _save() async {
     if (_saving || _fetching || _fetchingMusicBrainz) return;
+    if (widget.saveTags case final saveTags?) {
+      setState(() => _saving = true);
+      final error = await saveTags(
+        _form.saveMetadata(artistTagMode: widget.artistTagMode)
+          ..remove('artist_tag_mode'),
+      );
+      if (!mounted) return;
+      if (error == null) {
+        Navigator.pop(context, true);
+        return;
+      }
+      setState(() => _saving = false);
+      if (error.isNotEmpty) _showSheetSnackBar(error);
+      return;
+    }
     final container = ProviderScope.containerOf(context, listen: false);
     final artworkUrl = _selectedMotionArtworkUrl;
     final artworkAlbum = _form['album']!.text.trim();
@@ -411,8 +432,10 @@ class _EditMetadataSheetState extends State<EditMetadataSheet> {
                     controller: scrollController,
                     padding: const EdgeInsets.fromLTRB(20, 6, 20, 24),
                     children: [
-                      _buildCoverEditor(cs),
-                      _buildAutoFillSection(cs),
+                      if (widget.saveTags == null) ...[
+                        _buildCoverEditor(cs),
+                        _buildAutoFillSection(cs),
+                      ],
                       MetadataEditorSectionCard(
                         colorScheme: widget.colorScheme,
                         icon: Icons.info_outline,

@@ -20,18 +20,47 @@
       "name": {"type": "String"}
     }
   },
-  "linkFileJobs": "Desktop work",
-  "linkFileJobsEmpty": "No file operations yet",
-  "linkFileJobsUnsupported": "Update Mornye on your computer to manage its music files from this phone.",
-  "linkFileSelectionOneDevice": "Select songs from one linked computer at a time (up to 100 songs).",
-  "linkFileJobSummary": "{finished}/{total} processed, {failed} failed",
-  "@linkFileJobSummary": {
+  "linkFileJobs": "File changes",
+  "@linkFileJobs": {
+    "description": "Title of the list of edits, conversions and deletions the phone started on the linked computer's music files"
+  },
+  "linkFileJobsSubtitle": "Edits, conversions and deletions on {name}",
+  "@linkFileJobsSubtitle": {
     "placeholders": {
-      "finished": {"type": "int"},
-      "total": {"type": "int"},
-      "failed": {"type": "int"}
+      "name": {"type": "String"}
     }
   },
+  "linkFileJobsEmpty": "No file changes yet",
+  "linkFileJobsEmptyMessage": "Edits, conversions and deletions you start on the computer's songs from this phone appear here.",
+  "linkFileJobsView": "View",
+  "@linkFileJobsView": {
+    "description": "Snackbar action that opens the file changes list to see which songs failed"
+  },
+  "linkFileJobsUnsupported": "Update Mornye on your computer to manage its music files from this phone.",
+  "linkFileSelectionOneDevice": "Select songs from one linked computer at a time (up to 100 songs).",
+  "linkFileJobProgress": "{finished} of {total} {total, plural, =1{song} other{songs}}",
+  "@linkFileJobProgress": {
+    "placeholders": {
+      "finished": {"type": "int"},
+      "total": {"type": "int"}
+    }
+  },
+  "linkFileJobFailedCount": "{count} failed",
+  "@linkFileJobFailedCount": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "linkFileJobFinished": "{action} finished on {name}",
+  "@linkFileJobFinished": {
+    "placeholders": {
+      "action": {"type": "String"},
+      "name": {"type": "String"}
+    }
+  },
+  "linkFileDeleting": "Deleting...",
+  "linkFileReading": "Reading tags...",
+  "linkFileSavingCover": "Saving cover art...",
   "linkFileCancelHint": "Stop after the current song",
   "linkFileJobCancelled": "Stopped",
   "linkFileJobQueued": "Queued",

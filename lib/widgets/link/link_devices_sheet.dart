@@ -181,8 +181,9 @@ class LinkDevicesSheet extends ConsumerWidget {
           SettingsGroup(
             children: [
               SettingsItem(
-                icon: Icons.task_alt,
+                icon: Icons.history,
                 title: l10n.linkFileJobs,
+                subtitle: l10n.linkFileJobsSubtitle(name),
                 onTap: () => choose(showLinkLibraryJobs),
               ),
             ],

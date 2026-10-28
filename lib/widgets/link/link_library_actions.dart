@@ -1,10 +1,11 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:mornye/controllers/metadata_editor_controller.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/models/unified_library_item.dart';
+import 'package:mornye/screens/track_metadata_edit_sheet.dart';
 import 'package:mornye/services/batch_metadata_re_enrich.dart';
 import 'package:mornye/services/link/features/link_library_jobs_client.dart';
 import 'package:mornye/services/link/features/link_phone_client.dart';
@@ -14,13 +15,15 @@ import 'package:mornye/services/link/link_client_api.dart';
 import 'package:mornye/services/link/link_protocol.dart';
 import 'package:mornye/theme/app_tokens.dart';
 import 'package:mornye/utils/audio_conversion_utils.dart';
-import 'package:mornye/widgets/app_action_button.dart';
 import 'package:mornye/widgets/app_alert_dialog.dart';
 import 'package:mornye/widgets/app_bottom_sheet.dart';
 import 'package:mornye/widgets/app_icon.dart';
+import 'package:mornye/widgets/app_icon_button.dart';
+import 'package:mornye/widgets/app_loading_indicator.dart';
 import 'package:mornye/widgets/app_progress_indicator.dart';
-import 'package:mornye/widgets/app_text_field.dart';
 import 'package:mornye/widgets/batch_convert_sheet.dart';
+import 'package:mornye/widgets/batch_progress_dialog.dart';
+import 'package:mornye/widgets/error_card.dart';
 import 'package:mornye/widgets/re_enrich_field_dialog.dart';
 import 'package:mornye/widgets/re_enrich_review_sheet.dart';
 import 'package:mornye/widgets/settings_group.dart';
@@ -63,6 +66,10 @@ bool hasLinkLibrarySongs(
       );
 }
 
+/// Runs [action] on the linked computer's copies of [items] the way the
+/// same action runs on this phone's files: the same sheets and confirmation,
+/// the batch progress dialog while it works, then a snackbar with the
+/// result.
 Future<void> runLinkLibraryAction(
   BuildContext context,
   ProviderContainer container,
@@ -76,11 +83,11 @@ Future<void> runLinkLibraryAction(
   final ids = [
     for (final item in items) linkDesktopSongId(item.filePath, client.server),
   ];
-  void notify(String message) {
+  void notify(String message, {SnackBarAction? action}) {
     if (context.mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(message)));
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(SnackBar(content: Text(message), action: action));
     }
   }
 
@@ -92,6 +99,16 @@ Future<void> runLinkLibraryAction(
   final controller = container.read(linkLibraryJobsProvider.notifier);
   final songIds = ids.cast<String>();
   final options = <String, dynamic>{};
+  var manualReEnrich = false;
+  Future<LinkLibraryJob?> follow(LinkLibraryJob job) => _followJob(
+    context,
+    container,
+    job,
+    title: _progressTitle(context, job.action, manual: manualReEnrich),
+    icon: _progressIcon(job.action, manual: manualReEnrich),
+    onLost: () => notify(context.l10n.linkFileActionsDescription(name)),
+  );
+
   try {
     if (action == LinkLibraryAction.convert) {
       final formats = audioConversionTargetFormats
@@ -186,23 +203,22 @@ Future<void> runLinkLibraryAction(
         selectedCount: items.length,
       );
       if (selection == null || !context.mounted) return;
-      final preview = await controller
-          .start(LinkLibraryAction.reEnrichPreview, songIds, {
-            'mode': selection.mode.name,
-            'fields': selection.fields,
-            'manualValues': selection.manualValues,
-          });
-      if (!context.mounted) return;
-      final completed = await _showJob(context, preview.id);
-      if (completed == null ||
-          completed.active ||
-          completed.status == LinkLibraryJobStatus.cancelled ||
+      manualReEnrich = selection.usesManualValues;
+      final preview = await follow(
+        await controller.start(LinkLibraryAction.reEnrichPreview, songIds, {
+          'mode': selection.mode.name,
+          'fields': selection.fields,
+          'manualValues': selection.manualValues,
+        }),
+      );
+      if (preview == null ||
+          preview.status == LinkLibraryJobStatus.cancelled ||
           !context.mounted) {
         return;
       }
       final previews = <BatchReEnrichPreview>[];
       final approved = <String>[];
-      for (final result in completed.results) {
+      for (final result in preview.results) {
         final changes = result['changes'];
         final at = songIds.indexOf(result['songId'] as String);
         if (at < 0 || changes is! List || changes.isEmpty) continue;
@@ -227,8 +243,8 @@ Future<void> runLinkLibraryAction(
       }
       if (previews.isEmpty) {
         notify(
-          completed.failed > 0
-              ? context.l10n.linkRequestFailed(name)
+          preview.failed > 0
+              ? _resultError(context, preview.results.first['error'])
               : context.l10n.trackReEnrichNoChanges,
         );
         return;
@@ -246,33 +262,61 @@ Future<void> runLinkLibraryAction(
         notify(context.l10n.linkFileSelectionOneDevice);
         return;
       }
-      final read = await controller.start(
-        LinkLibraryAction.readMetadata,
-        songIds,
-        {},
+      final read = await follow(
+        await controller.start(LinkLibraryAction.readMetadata, songIds, {}),
       );
-      if (!context.mounted) return;
-      final completed = await _showJob(context, read.id);
-      if (!context.mounted ||
-          completed == null ||
-          completed.results.isEmpty ||
-          completed.failed > 0) {
+      if (read == null || read.results.isEmpty || !context.mounted) return;
+      if (read.failed > 0) {
+        notify(_resultError(context, read.results.single['error']));
         return;
       }
       final initial = linkLibraryMap(
-        completed.results.single['metadata'],
+        read.results.single['metadata'],
       ).map((key, value) => MapEntry(key, value.toString()));
-      final metadata = await showAppScrollableBottomSheet<Map<String, String>>(
+      final saved = await showAppModalBottomSheet<bool>(
         context: context,
-        title: context.l10n.linkFileActionOn(
-          context.l10n.trackEditMetadata,
-          name,
+        useRootNavigator: true,
+        isScrollControlled: true,
+        dialogSize: AppDialogSize.wide,
+        builder: (sheetContext) => EditMetadataSheet(
+          colorScheme: Theme.of(sheetContext).colorScheme,
+          initialValues: initial,
+          filePath: items.single.filePath,
+          durationMs: (items.single.localItem?.duration ?? 0) * 1000,
+          artistTagMode: 'all',
+          saveTags: (metadata) async {
+            final l10n = sheetContext.l10n;
+            // A pairing change while editing must not redirect the save.
+            if (container.read(linkPhoneClientProvider) != client) {
+              return l10n.linkRequestFailed(name);
+            }
+            try {
+              final job = await controller.start(
+                LinkLibraryAction.editMetadata,
+                songIds,
+                {'metadata': metadata},
+              );
+              onAccepted?.call();
+              final done = await _awaitJob(container, job.id);
+              if (done == null) return l10n.linkRequestFailed(name);
+              return done.failed > 0
+                  ? (sheetContext.mounted
+                        ? _resultError(
+                            sheetContext,
+                            done.results.first['error'],
+                          )
+                        : '')
+                  : null;
+            } on Object {
+              return l10n.linkRequestFailed(name);
+            }
+          },
         ),
-        builder: (context, scroll) =>
-            _RemoteMetadataForm(initial: initial, scroll: scroll),
       );
-      if (metadata == null || !context.mounted) return;
-      options['metadata'] = metadata;
+      if (saved == true && context.mounted) {
+        notify(context.l10n.snackbarMetadataSaved);
+      }
+      return;
     } else {
       final confirmed = await showAppConfirmDialog(
         context,
@@ -293,7 +337,18 @@ Future<void> runLinkLibraryAction(
     if (container.read(linkPhoneClientProvider) != client) return;
     final job = await controller.start(action, songIds, options);
     onAccepted?.call();
-    if (context.mounted) await _showJob(context, job.id);
+    if (!context.mounted) return;
+    final finished = await follow(job);
+    if (finished == null || !context.mounted) return;
+    notify(
+      _finishedMessage(context, finished, name, options),
+      action: finished.failed > 0 && finished.total > 1
+          ? SnackBarAction(
+              label: context.l10n.linkFileJobsView,
+              onPressed: () => unawaited(showLinkLibraryJobs(context)),
+            )
+          : null,
+    );
   } on LinkException catch (error) {
     if (context.mounted) {
       notify(
@@ -307,13 +362,182 @@ Future<void> runLinkLibraryAction(
   }
 }
 
-Future<LinkLibraryJob?> _showJob(BuildContext context, String id) =>
-    showAppScrollableBottomSheet<LinkLibraryJob>(
-      context: context,
-      title: context.l10n.linkFileJobs,
-      builder: (context, scroll) =>
-          LinkLibraryJobsView(scrollController: scroll, jobId: id),
-    );
+/// The finished job [id], or null when it is [stop]ped or the phone loses
+/// the computer first (the work goes on there). [onProgress] sees every
+/// update before that.
+Future<LinkLibraryJob?> _awaitJob(
+  ProviderContainer container,
+  String id, {
+  void Function(LinkLibraryJob job)? onProgress,
+  Future<void>? stop,
+}) {
+  final done = Completer<LinkLibraryJob?>();
+  final jobs = container.listen(
+    linkLibraryJobsProvider.select(
+      (state) => state.jobs.where((job) => job.id == id).firstOrNull,
+    ),
+    (_, job) {
+      if (job == null || done.isCompleted) return;
+      onProgress?.call(job);
+      if (!job.active) done.complete(job);
+    },
+    fireImmediately: true,
+  );
+  final connection = container.listen(linkConnectionStateProvider, (_, next) {
+    if (next.value == LinkConnectionState.disconnected && !done.isCompleted) {
+      done.complete(null);
+    }
+  });
+  unawaited(
+    stop?.then((_) {
+      if (!done.isCompleted) done.complete(null);
+    }),
+  );
+  return done.future.whenComplete(() {
+    jobs.close();
+    connection.close();
+  });
+}
+
+/// Shows [job] in the batch progress dialog local batches use until it
+/// ends. Cancel stops the computer after the current song. [onLost] runs
+/// when the phone loses the computer while it still works.
+Future<LinkLibraryJob?> _followJob(
+  BuildContext context,
+  ProviderContainer container,
+  LinkLibraryJob job, {
+  required String title,
+  required IconData icon,
+  required VoidCallback onLost,
+}) async {
+  final stopped = Completer<void>();
+  var open = true;
+  BatchProgressDialog.show(
+    context: context,
+    title: title,
+    total: job.total,
+    icon: icon,
+    onCancel: () {
+      unawaited(
+        container
+            .read(linkLibraryJobsProvider.notifier)
+            .cancel(job.id)
+            .catchError((Object _) {}),
+      );
+      open = false;
+      BatchProgressDialog.dismiss(context);
+      if (!stopped.isCompleted) stopped.complete();
+    },
+  );
+  final finished = await _awaitJob(
+    container,
+    job.id,
+    stop: stopped.future,
+    onProgress: (job) => BatchProgressDialog.update(
+      current: math.min(job.finished + 1, job.total),
+      detail: job.currentTitle,
+    ),
+  );
+  if (open && context.mounted) BatchProgressDialog.dismiss(context);
+  if (finished == null && !stopped.isCompleted) onLost();
+  return finished;
+}
+
+String _progressTitle(
+  BuildContext context,
+  LinkLibraryAction action, {
+  required bool manual,
+}) => switch (action) {
+  LinkLibraryAction.delete => context.l10n.linkFileDeleting,
+  LinkLibraryAction.readMetadata => context.l10n.linkFileReading,
+  LinkLibraryAction.reEnrichPreview =>
+    manual
+        ? context.l10n.trackReEnrichPreparing
+        : context.l10n.trackReEnrichSearching,
+  LinkLibraryAction.reEnrich => context.l10n.trackReEnrichProgress,
+  LinkLibraryAction.convert => context.l10n.trackConvertConverting,
+  LinkLibraryAction.replayGain => context.l10n.replayGainBatchAnalyzing,
+  LinkLibraryAction.removeReplayGain => context.l10n.replayGainRemoving,
+  LinkLibraryAction.editMetadata => context.l10n.linkFileReading,
+  LinkLibraryAction.saveCover => context.l10n.linkFileSavingCover,
+  LinkLibraryAction.saveLyrics => context.l10n.trackSaveLyricsProgress,
+};
+
+IconData _progressIcon(LinkLibraryAction action, {required bool manual}) =>
+    switch (action) {
+      LinkLibraryAction.reEnrichPreview =>
+        manual ? Icons.edit_note : Icons.manage_search,
+      LinkLibraryAction.reEnrich => Icons.auto_fix_high,
+      LinkLibraryAction.convert => Icons.transform,
+      LinkLibraryAction.readMetadata => Icons.info_outline,
+      _ => linkLibraryActionIcon(action),
+    };
+
+/// What the snackbar says once [job] ends, in the words of the same action
+/// on this phone's files.
+String _finishedMessage(
+  BuildContext context,
+  LinkLibraryJob job,
+  String name,
+  Map<String, dynamic> options,
+) {
+  final l10n = context.l10n;
+  if (job.total == 1 && job.failed == 1) {
+    return _resultError(context, job.results.single['error']);
+  }
+  final ok = job.succeeded;
+  final total = job.total;
+  final fileName = job.results.length == 1
+      ? job.results.single['fileName']
+      : null;
+  final message = switch (job.action) {
+    LinkLibraryAction.delete => l10n.snackbarDeletedTracks(ok),
+    LinkLibraryAction.reEnrich =>
+      job.failed > 0
+          ? l10n.trackReEnrichSuccessWithFailures(ok, total, job.failed)
+          : l10n.trackReEnrichSuccess,
+    LinkLibraryAction.convert => l10n.selectionBatchConvertSuccess(
+      ok,
+      total,
+      options['format'] as String? ?? '',
+    ),
+    LinkLibraryAction.replayGain => l10n.replayGainBatchSuccess(ok, total),
+    LinkLibraryAction.removeReplayGain => l10n.replayGainRemoveBatchSuccess(
+      ok,
+      total,
+    ),
+    LinkLibraryAction.saveCover when fileName is String => l10n.trackCoverSaved(
+      fileName,
+    ),
+    LinkLibraryAction.saveLyrics when fileName is String =>
+      l10n.trackLyricsSaved(fileName),
+    _ => l10n.linkFileJobFinished(
+      linkLibraryActionLabel(context, job.action),
+      name,
+    ),
+  };
+  final counted =
+      job.action == LinkLibraryAction.reEnrich ||
+      job.action == LinkLibraryAction.convert ||
+      job.action == LinkLibraryAction.replayGain ||
+      job.action == LinkLibraryAction.removeReplayGain;
+  return job.failed > 0 && !counted
+      ? '$message. ${l10n.linkFileJobFailedCount(job.failed)}'
+      : message;
+}
+
+String _resultError(BuildContext context, Object? code) => switch (code) {
+  'file_changed' || 'preview_expired' => context.l10n.linkFileChanged,
+  'not_found' => context.l10n.trackFileNotFound,
+  'read_failed' => context.l10n.trackFileUnavailable,
+  'delete_failed' => context.l10n.snackbarDeleteTracksFailed(1),
+  'cover_missing' => context.l10n.trackCoverNoEmbeddedArt,
+  'lyrics_missing' => context.l10n.trackLyricsNotAvailable,
+  'conversion_failed' ||
+  'unsupported_format' => context.l10n.trackConvertFailed,
+  'replaygain_failed' => context.l10n.trackReplayGainFailed,
+  _ => context.l10n.linkFileOperationFailed,
+};
 
 Future<void> showLinkLibraryJobs(BuildContext context) =>
     showAppScrollableBottomSheet<void>(
@@ -323,11 +547,13 @@ Future<void> showLinkLibraryJobs(BuildContext context) =>
           LinkLibraryJobsView(scrollController: scroll),
     );
 
+/// The file changes started from this phone on the linked computer, newest
+/// first, in one grouped list. Running changes show their progress and a
+/// stop button; finished ones list the songs that failed.
 class LinkLibraryJobsView extends ConsumerWidget {
-  const LinkLibraryJobsView({super.key, this.scrollController, this.jobId});
+  const LinkLibraryJobsView({super.key, this.scrollController});
 
   final ScrollController? scrollController;
-  final String? jobId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -335,189 +561,164 @@ class LinkLibraryJobsView extends ConsumerWidget {
     final client = ref.watch(linkPhoneClientProvider);
     final connection =
         ref.watch(linkConnectionStateProvider).value ?? client?.connectionState;
+    // Reading tags and previewing a re-enrich are steps of another change.
     final jobs = state.jobs.reversed
-        .where((job) => jobId == null || job.id == jobId)
+        .where(
+          (job) =>
+              job.action != LinkLibraryAction.readMetadata &&
+              job.action != LinkLibraryAction.reEnrichPreview,
+        )
         .toList();
     final l10n = context.l10n;
+    final tokens = context.tokens;
+    final theme = Theme.of(context);
     return ListView(
       controller: scrollController,
       shrinkWrap: true,
-      padding: EdgeInsets.all(context.tokens.gapMd),
+      padding: EdgeInsets.fromLTRB(tokens.gapMd, 0, tokens.gapMd, tokens.gapLg),
       children: [
-        if (client != null)
+        if (!state.loaded)
           Padding(
-            padding: EdgeInsets.only(bottom: context.tokens.gapMd),
-            child: Text(
-              l10n.linkFileActionsDescription(linkDesktopName(client)),
+            padding: EdgeInsets.all(tokens.gapXl),
+            child: const Center(child: AppLoadingIndicator()),
+          )
+        else if (jobs.isEmpty)
+          state.supported
+              ? EmptyState(
+                  icon: Icons.history,
+                  title: l10n.linkFileJobsEmpty,
+                  message: l10n.linkFileJobsEmptyMessage,
+                )
+              : connection == LinkConnectionState.connected
+              ? EmptyState(
+                  icon: Icons.system_update_alt,
+                  title: l10n.linkFileJobs,
+                  message: l10n.linkFileJobsUnsupported,
+                )
+              : EmptyState(
+                  icon: Icons.link_off,
+                  title: l10n.linkConnectionDisconnected,
+                )
+        else ...[
+          if (client != null)
+            Padding(
+              padding: EdgeInsetsDirectional.fromSTEB(
+                tokens.gapSm,
+                0,
+                tokens.gapSm,
+                tokens.gapMd,
+              ),
+              child: Text(
+                l10n.linkFileActionsDescription(linkDesktopName(client)),
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
             ),
-          ),
-        if (!state.loaded) const AppProgressIndicator.circular(),
-        if (jobs.isEmpty && state.loaded)
-          Text(
-            state.supported
-                ? l10n.linkFileJobsEmpty
-                : connection == LinkConnectionState.connected
-                ? l10n.linkFileJobsUnsupported
-                : l10n.linkConnectionDisconnected,
-          ),
-        for (final job in jobs) ...[
           SettingsGroup(
             children: [
-              SettingsItem(
-                icon: linkLibraryActionIcon(job.action),
-                title: linkLibraryActionLabel(context, job.action),
-                subtitle:
-                    '${job.currentTitle}\n${l10n.linkFileJobSummary(job.finished, job.total, job.failed)}',
-                trailing: Text(switch (job.status) {
-                  LinkLibraryJobStatus.queued => l10n.linkFileJobQueued,
-                  LinkLibraryJobStatus.running => '',
-                  LinkLibraryJobStatus.completed => l10n.linkFileJobCompleted,
-                  LinkLibraryJobStatus.cancelled => l10n.linkFileJobCancelled,
-                }),
-              ),
+              for (final (i, job) in jobs.indexed)
+                _JobRow(job: job, showDivider: i < jobs.length - 1),
             ],
           ),
-          if (job.active) ...[
-            AppProgressIndicator.linear(
-              value: job.total == 0 ? null : job.finished / job.total,
-            ),
-            AppActionButton(
+        ],
+      ],
+    );
+  }
+}
+
+class _JobRow extends ConsumerWidget {
+  const _JobRow({required this.job, required this.showDivider});
+
+  final LinkLibraryJob job;
+  final bool showDivider;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = context.l10n;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final tokens = context.tokens;
+    final progress = l10n.linkFileJobProgress(job.finished, job.total);
+    final failures = [
+      for (final result in job.results)
+        if (result['error'] != null)
+          '${result['title']}: ${_resultError(context, result['error'])}',
+    ];
+    final saved = [
+      if (job.action == LinkLibraryAction.saveCover ||
+          job.action == LinkLibraryAction.saveLyrics)
+        for (final result in job.results)
+          if (result['fileName'] case final String fileName)
+            job.action == LinkLibraryAction.saveCover
+                ? l10n.trackCoverSaved(fileName)
+                : l10n.trackLyricsSaved(fileName),
+    ];
+    final detailStyle = theme.textTheme.bodySmall;
+    return SettingsItem(
+      icon: linkLibraryActionIcon(job.action),
+      title: linkLibraryActionLabel(context, job.action),
+      subtitle: [
+        if (job.status == LinkLibraryJobStatus.queued)
+          l10n.linkFileJobQueued
+        else if (job.active && job.currentTitle.isNotEmpty)
+          job.currentTitle,
+        progress,
+        if (job.failed > 0) l10n.linkFileJobFailedCount(job.failed),
+      ].join(' · '),
+      showDivider: showDivider,
+      trailing: job.active
+          ? AppIconButton(
+              icon: const AppIcon.adaptive(Icons.stop_circle_outlined),
+              tooltip: l10n.linkFileCancelHint,
               onPressed: () => unawaited(
                 ref
                     .read(linkLibraryJobsProvider.notifier)
                     .cancel(job.id)
                     .catchError((Object _) {}),
               ),
-              icon: const AppIcon(Icons.stop),
-              label: Text(l10n.linkFileCancelHint),
-              outlined: true,
-            ),
-          ],
-          for (final result in job.results.where(
-            (result) => result['error'] != null,
-          ))
-            Padding(
-              padding: EdgeInsets.symmetric(vertical: context.tokens.gapSm),
-              child: Text(
-                '${result['title']}: ${_error(context, result['error'])}',
+            )
+          : Text(
+              switch (job.status) {
+                LinkLibraryJobStatus.cancelled => l10n.linkFileJobCancelled,
+                _ => l10n.linkFileJobCompleted,
+              },
+              style: theme.textTheme.labelLarge?.copyWith(
+                color: colorScheme.onSurfaceVariant,
               ),
             ),
-          for (final result in job.results.where(
-            (result) => result['fileName'] is String,
-          ))
-            Padding(
-              padding: EdgeInsets.symmetric(vertical: context.tokens.gapSm),
-              child: Text(
-                job.action == LinkLibraryAction.saveCover
-                    ? l10n.trackCoverSaved(result['fileName'] as String)
-                    : l10n.trackLyricsSaved(result['fileName'] as String),
+      footer: job.active
+          ? Padding(
+              padding: EdgeInsets.only(top: tokens.gapSm),
+              child: AppProgressIndicator.linear(
+                value:
+                    job.total == 0 || job.status == LinkLibraryJobStatus.queued
+                    ? null
+                    : job.finished / job.total,
+              ),
+            )
+          : failures.isEmpty && saved.isEmpty
+          ? null
+          : Padding(
+              padding: EdgeInsets.only(top: tokens.gapXs),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (final line in failures)
+                    Text(
+                      line,
+                      style: detailStyle?.copyWith(color: colorScheme.error),
+                    ),
+                  for (final line in saved)
+                    Text(
+                      line,
+                      style: detailStyle?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                ],
               ),
             ),
-          if (jobId != null && !job.active)
-            AppActionButton(
-              onPressed: () => Navigator.pop(context, job),
-              icon: const AppIcon(Icons.check),
-              label: Text(l10n.dialogDone),
-            ),
-          SizedBox(height: context.tokens.gapMd),
-        ],
-      ],
-    );
-  }
-
-  String _error(BuildContext context, Object? code) => switch (code) {
-    'file_changed' || 'preview_expired' => context.l10n.linkFileChanged,
-    'not_found' => context.l10n.trackFileNotFound,
-    'read_failed' => context.l10n.trackFileUnavailable,
-    'delete_failed' => context.l10n.snackbarDeleteTracksFailed(1),
-    'cover_missing' => context.l10n.trackCoverNoEmbeddedArt,
-    'lyrics_missing' => context.l10n.trackLyricsNotAvailable,
-    'conversion_failed' ||
-    'unsupported_format' => context.l10n.trackConvertFailed,
-    'replaygain_failed' => context.l10n.trackReplayGainFailed,
-    _ => context.l10n.linkFileOperationFailed,
-  };
-}
-
-class _RemoteMetadataForm extends StatefulWidget {
-  const _RemoteMetadataForm({required this.initial, required this.scroll});
-  final Map<String, String> initial;
-  final ScrollController scroll;
-
-  @override
-  State<_RemoteMetadataForm> createState() => _RemoteMetadataFormState();
-}
-
-class _RemoteMetadataFormState extends State<_RemoteMetadataForm> {
-  late final form = MetadataEditorController(widget.initial);
-
-  @override
-  void dispose() {
-    form.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = context.l10n;
-    final labels = {
-      'title': l10n.editMetadataFieldTitle,
-      'artist': l10n.editMetadataFieldArtist,
-      'album': l10n.editMetadataFieldAlbum,
-      'album_artist': l10n.editMetadataFieldAlbumArtist,
-      'date': l10n.editMetadataFieldDate,
-      'track_number': l10n.editMetadataFieldTrackNum,
-      'total_tracks': l10n.editMetadataFieldTrackTotal,
-      'disc_number': l10n.editMetadataFieldDiscNum,
-      'total_discs': l10n.editMetadataFieldDiscTotal,
-      'genre': l10n.editMetadataFieldGenre,
-      'isrc': l10n.editMetadataFieldIsrc,
-      'composer': l10n.editMetadataFieldComposer,
-      'label': l10n.editMetadataFieldLabel,
-      'copyright': l10n.editMetadataFieldCopyright,
-      'comment': l10n.editMetadataFieldComment,
-      'album_type': l10n.trackAlbumType,
-      'upc': l10n.editMetadataFieldUpc,
-      'lyrics': l10n.trackSaveLyrics,
-    };
-    return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
-      child: ListView(
-        controller: widget.scroll,
-        shrinkWrap: true,
-        padding: EdgeInsets.all(context.tokens.gapMd),
-        children: [
-          for (final entry in labels.entries)
-            Padding(
-              padding: EdgeInsets.only(bottom: context.tokens.gapMd),
-              child: AppTextField(
-                controller: form[entry.key],
-                label: entry.value,
-                maxLines: entry.key == 'lyrics' ? 5 : 1,
-              ),
-            ),
-          SettingsGroup(
-            children: [
-              SettingsSwitchItem(
-                title: l10n.editMetadataFieldExplicit,
-                subtitle: l10n.editMetadataFieldExplicitHint,
-                value: form.explicit,
-                onChanged: (value) => setState(() => form.explicit = value),
-              ),
-            ],
-          ),
-          SizedBox(height: context.tokens.gapMd),
-          AppActionButton(
-            onPressed: () => Navigator.pop(
-              context,
-              form.saveMetadata(artistTagMode: 'all')
-                ..remove('artist_tag_mode'),
-            ),
-            icon: const AppIcon(Icons.save_outlined),
-            label: Text(l10n.dialogSave),
-          ),
-        ],
-      ),
     );
   }
 }

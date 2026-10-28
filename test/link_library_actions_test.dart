@@ -23,6 +23,8 @@ import 'package:mornye/theme/app_theme.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/link/link_library_actions.dart';
 import 'package:mornye/widgets/batch_convert_sheet.dart';
+import 'package:mornye/widgets/batch_progress_dialog.dart';
+import 'package:mornye/widgets/settings_group.dart';
 import 'package:mornye/utils/audio_conversion_utils.dart';
 
 import 'support/link_fakes.dart';
@@ -144,6 +146,9 @@ void main() {
           'resampler': 'soxr',
         });
         expect(accepted, 1);
+        // Ends like a conversion on this phone: progress, then the result.
+        expect(find.byType(BatchProgressDialog), findsNothing);
+        expect(find.text('Converted 1 of 1 tracks to FLAC'), findsOneWidget);
         await tester.pumpWidget(const SizedBox.shrink());
       },
     );
@@ -187,8 +192,10 @@ void main() {
         'Save Lyrics (.lrc)',
         'Delete',
       ]) {
-        expect(find.text('$label on Studio PC'), findsOneWidget);
+        // The same words as the actions on this phone's songs.
+        expect(find.text(label), findsOneWidget);
       }
+      expect(find.textContaining('on Studio PC'), findsNothing);
       expect(client.posts, isEmpty);
       await tester.pumpWidget(const SizedBox.shrink());
     });
@@ -275,7 +282,7 @@ void main() {
         expect(executed, ['l:desktop_song']);
         expect(client.posts.single.op, LinkOps.libraryJobs);
         expect(client.posts.single.body['songIds'], ['l:desktop_song']);
-        expect(find.textContaining('1/1 processed, 0 failed'), findsOneWidget);
+        expect(find.text('Deleted 1 track'), findsOneWidget);
         expect(
           container.read(linkLibraryJobsProvider).jobs.single.active,
           isFalse,
@@ -330,6 +337,83 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.textContaining('one linked computer'), findsOneWidget);
     expect(client.posts, isEmpty);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  Future<void> pumpJobs(WidgetTester tester, List<LinkLibraryJob> jobs) async {
+    final client = FakeLinkClient(
+      onGet: (_, _) => {
+        'actions': ['convert'],
+        'jobs': [for (final job in jobs) job.toJson()],
+      },
+    );
+    addTearDown(client.close);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [linkPhoneClientProvider.overrideWithValue(client)],
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: const Scaffold(body: LinkLibraryJobsView()),
+        ),
+      ),
+    );
+    // A running job's progress bar never settles.
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+  }
+
+  testWidgets('file changes list jobs in one group with their failures', (
+    tester,
+  ) async {
+    await pumpJobs(tester, const [
+      LinkLibraryJob(
+        id: 'read',
+        action: LinkLibraryAction.readMetadata,
+        status: LinkLibraryJobStatus.completed,
+        total: 1,
+        finished: 1,
+        succeeded: 1,
+      ),
+      LinkLibraryJob(
+        id: 'convert',
+        action: LinkLibraryAction.convert,
+        status: LinkLibraryJobStatus.completed,
+        total: 2,
+        finished: 2,
+        succeeded: 1,
+        results: [
+          {'songId': 'a', 'title': 'Good'},
+          {'songId': 'b', 'title': 'Broken', 'error': 'conversion_failed'},
+        ],
+      ),
+      LinkLibraryJob(
+        id: 'gain',
+        action: LinkLibraryAction.replayGain,
+        status: LinkLibraryJobStatus.running,
+        total: 3,
+        finished: 1,
+        currentTitle: 'Next Song',
+      ),
+    ]);
+    expect(find.byType(SettingsGroup), findsOneWidget);
+    expect(find.text('Convert Format'), findsOneWidget);
+    expect(find.text('2 of 2 songs · 1 failed'), findsOneWidget);
+    expect(find.text('Broken: Conversion failed'), findsOneWidget);
+    expect(find.text('Next Song · 1 of 3 songs'), findsOneWidget);
+    expect(find.byTooltip('Stop after the current song'), findsOneWidget);
+    // Reading tags is a step of an edit, not a change of its own.
+    expect(find.text('Show details'), findsNothing);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('file changes without any job show the empty state', (
+    tester,
+  ) async {
+    await pumpJobs(tester, const []);
+    expect(find.text('No file changes yet'), findsOneWidget);
+    expect(find.byType(SettingsGroup), findsNothing);
     await tester.pumpWidget(const SizedBox.shrink());
   });
 }
