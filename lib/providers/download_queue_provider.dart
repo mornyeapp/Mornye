@@ -200,6 +200,7 @@ class DownloadQueueNotifier extends Notifier<DownloadQueueState> {
   bool _networkPausedByWifiOnly = false;
   final Set<String> _locallyCancelledItemIds = {};
   final Set<String> _pausePendingItemIds = {};
+  final Map<String, Future<void>> _nativeCancelRequests = {};
   final DownloadVerificationRetryGuard _verificationRetryGuard =
       DownloadVerificationRetryGuard();
   final DownloadVerificationWaitCoordinator _verificationWaitCoordinator =
@@ -1010,8 +1011,36 @@ class DownloadQueueNotifier extends Notifier<DownloadQueueState> {
 
   void _requestNativeCancel(String id) {
     _verificationWaitCoordinator.cancelItem(id);
-    PlatformBridge.cancelDownload(id).catchError((_) {});
+    final previous = _nativeCancelRequests[id] ?? Future<void>.value();
+    final request = previous
+        .then((_) => PlatformBridge.cancelDownload(id))
+        .catchError((Object error) => _log.w('Could not cancel $id: $error'));
+    _nativeCancelRequests[id] = request;
+    unawaited(
+      request.whenComplete(() {
+        if (identical(_nativeCancelRequests[id], request)) {
+          _nativeCancelRequests.remove(id);
+        }
+      }),
+    );
     PlatformBridge.clearItemProgress(id).catchError((_) {});
+  }
+
+  Future<void> _finishPausedDownload(String id) async {
+    try {
+      final cancellation = _nativeCancelRequests[id];
+      if (cancellation != null) await cancellation;
+      // Pausing before the backend acquires a lease, or after it releases
+      // one, leaves an idle cancel flag. Reset it only after this attempt and
+      // its cancellation have finished, before the scheduler can restart it.
+      if (_findItemById(id) != null && !_isLocallyCancelled(id)) {
+        await PlatformBridge.resetDownloadCancel(id);
+      }
+    } catch (error) {
+      _log.w('Could not reset paused download $id: $error');
+    } finally {
+      _pausePendingItemIds.remove(id);
+    }
   }
 
   void cancelItem(String id) {

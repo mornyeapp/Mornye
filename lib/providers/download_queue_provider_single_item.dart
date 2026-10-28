@@ -163,6 +163,7 @@ class _DownloadRun {
       pausedDuringThisRun = true;
       n._requeueItemForPause(item.id);
       _log.i('Download is pause-pending before start, skipping');
+      await n._finishPausedDownload(item.id);
       return;
     }
 
@@ -289,7 +290,7 @@ class _DownloadRun {
       }
       _directoryScopes.clear();
       if (pausedDuringThisRun) {
-        n._pausePendingItemIds.remove(item.id);
+        await n._finishPausedDownload(item.id);
       }
     }
   }
