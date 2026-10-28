@@ -2005,7 +2005,7 @@
   "@trackLyricsNotAvailable": {
     "description": "Message when lyrics not found"
   },
-  "trackLyricsNotInFile": "У цьому файлі не знайдено текстів пісень",
+  "trackLyricsNotInFile": "У цьому файлі не знайдено тексту пісні",
   "@trackLyricsNotInFile": {
     "description": "Message when no embedded lyrics in audio file"
   },
@@ -2360,7 +2360,7 @@
   "@extensionsErrorLoading": {
     "description": "Error message when extension fails to load"
   },
-  "qualityFlacLossless": "FLAC без втрат",
+  "qualityFlacLossless": "FLAC Lossless",
   "@qualityFlacLossless": {
     "description": "Quality option - CD quality FLAC"
   },
@@ -3134,15 +3134,15 @@
   "@libraryFilterQuality": {
     "description": "Filter section - audio quality"
   },
-  "libraryFilterQualityHiRes": "Висока роздільна здатність (24 біти)",
+  "libraryFilterQualityHiRes": "Hi-Res (24bit)",
   "@libraryFilterQualityHiRes": {
     "description": "Filter option - high resolution audio"
   },
-  "libraryFilterQualityCD": "CD (16-бітний)",
+  "libraryFilterQualityCD": "CD (16bit)",
   "@libraryFilterQualityCD": {
     "description": "Filter option - CD quality audio"
   },
-  "libraryFilterQualityLossy": "Із втратами (lossy)",
+  "libraryFilterQualityLossy": "Lossy",
   "@libraryFilterQualityLossy": {
     "description": "Filter option - lossy compressed audio"
   },
@@ -5320,7 +5320,7 @@
   "@hiResCheckVerdictFake": {
     "description": "Verdict: the file claims Hi-Res but does not measure as it"
   },
-  "hiResCheckVerdictStandard": "Стандартне визначення, немає підстав для позначення",
+  "hiResCheckVerdictStandard": "Стандартна якість, зауважень немає",
   "@hiResCheckVerdictStandard": {
     "description": "Verdict: neither sample rate nor bit depth claims Hi-Res"
   },
@@ -6758,7 +6758,7 @@
   "@nowPlayingTabLyrics": {
     "description": "Tab label for the lyrics view"
   },
-  "nowPlayingNoLyrics": "У цьому файлі не знайдено текстів пісень",
+  "nowPlayingNoLyrics": "У цьому файлі не знайдено тексту пісні",
   "nowPlayingInstrumental": "Інструментальний",
   "@nowPlayingInstrumental": {
     "description": "Accessibility label for the three-dot countdown during an instrumental break before lyrics resume"
@@ -7190,7 +7190,7 @@
   "@libraryFilterIncompleteAlbums": {
     "description": "Library filter for albums with confirmed missing track positions"
   },
-  "libraryAlbumCompletenessUnknown": "Невідомо, чи альбом повний",
+  "libraryAlbumCompletenessUnknown": "Повнота альбому: невідомо",
   "@libraryAlbumCompletenessUnknown": {
     "description": "Library filter and status for missing, conflicting or ambiguous album track counts"
   },
