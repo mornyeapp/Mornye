@@ -7190,7 +7190,7 @@
   "@libraryFilterIncompleteAlbums": {
     "description": "Library filter for albums with confirmed missing track positions"
   },
-  "libraryAlbumCompletenessUnknown": "Album completeness unknown",
+  "libraryAlbumCompletenessUnknown": "Complétude de l'album inconnue",
   "@libraryAlbumCompletenessUnknown": {
     "description": "Library filter and status for missing, conflicting or ambiguous album track counts"
   },
@@ -7867,7 +7867,7 @@
   "appCrashCopy": "Copy report for developer",
   "appCrashDismiss": "Ignorer",
   "appCrashCopyFailed": "Could not copy the crash report. Please try again.",
-  "appCrashDismissFailed": "Could not dismiss the crash report. Please try again.",
+  "appCrashDismissFailed": "Impossible de fermer le rapport d'erreur. Veuillez réessayer.",
   "optionsEmbeddedCoverSizeOriginal": "Résolution originale",
   "@optionsEmbeddedCoverSizeOriginal": {
     "description": "Option that preserves the provider artwork at its original resolution"
@@ -7888,9 +7888,9 @@
   "@desktopPlayerIdle": {
     "description": "Desktop player bar text when no track is loaded"
   },
-  "desktopVolumeUp": "Increase volume",
-  "desktopVolumeDown": "Decrease volume",
-  "desktopTableSortedAscending": "{column}, sorted ascending",
+  "desktopVolumeUp": "Augmenter le volume",
+  "desktopVolumeDown": "Baisser le volume",
+  "desktopTableSortedAscending": "{column}, triée par ordre croissant",
   "@desktopTableSortedAscending": {
     "description": "Screen reader label of a song table column header that sorts the table A to Z",
     "placeholders": {
@@ -7908,15 +7908,15 @@
       }
     }
   },
-  "desktopMenuOpen": "Open",
+  "desktopMenuOpen": "Ouvrir",
   "@desktopMenuOpen": {
     "description": "Context menu item that opens an album, artist, playlist or folder"
   },
-  "desktopMenuShowDetails": "Show details",
+  "desktopMenuShowDetails": "Afficher les détails",
   "@desktopMenuShowDetails": {
     "description": "Context menu item that opens a track's metadata page"
   },
-  "desktopDropToImport": "Drop to add to your library",
+  "desktopDropToImport": "Faites-y glisser pour l'ajouter à votre bibliothèque",
   "@desktopDropToImport": {
     "description": "Overlay shown while music files or folders are dragged over the desktop window"
   },
@@ -7929,7 +7929,7 @@
       }
     }
   },
-  "desktopDropNothingToImport": "Drop music files or folders to add them to your library",
+  "desktopDropNothingToImport": "Faites glisser des fichiers ou des dossiers musicaux pour les ajouter à votre bibliothèque",
   "@desktopDropNothingToImport": {
     "description": "Snackbar when the dropped items contain no folders or audio files"
   },
@@ -7954,7 +7954,7 @@
   "desktopWindowModeUnavailable": "The window mode could not be changed. Try again after the current window transition finishes.",
   "desktopMenuControls": "Controls",
   "desktopMenuWindow": "Window",
-  "desktopMenuHelp": "Help",
+  "desktopMenuHelp": "Aide",
   "desktopMenuPlayPause": "Play/Pause",
   "desktopMenuMiniPlayer": "Mini Player",
   "@desktopMenuMiniPlayer": {
@@ -7992,11 +7992,11 @@
   "@desktopScrollForward": {
     "description": "Tooltip of the desktop button that scrolls a horizontal shelf of albums or artists forward"
   },
-  "settingsKeyboardShortcuts": "Keyboard Shortcuts",
+  "settingsKeyboardShortcuts": "Raccourcis clavier",
   "@settingsKeyboardShortcuts": {
     "description": "Desktop Settings page that lists the app's keyboard shortcuts"
   },
-  "settingsKeyboardShortcutsSubtitle": "Keys for playback, navigation and panels",
+  "settingsKeyboardShortcutsSubtitle": "Touches de lecture, de navigation et des panneaux",
   "@settingsKeyboardShortcutsSubtitle": {
     "description": "Subtitle of the Keyboard Shortcuts entry in desktop Settings"
   },
@@ -8004,11 +8004,11 @@
   "@desktopShortcutsNavigation": {
     "description": "Keyboard Shortcuts section for moving between pages"
   },
-  "desktopShortcutDismiss": "Close dialog or page",
+  "desktopShortcutDismiss": "Fermer la boîte de dialogue ou la page",
   "@desktopShortcutDismiss": {
     "description": "Keyboard Shortcuts row for Escape, which leaves a text field or closes the top dialog or page"
   },
-  "desktopShortcutToggleSidebar": "Show or hide sidebar",
+  "desktopShortcutToggleSidebar": "Afficher ou masquer la barre latérale",
   "@desktopShortcutToggleSidebar": {
     "description": "Keyboard Shortcuts row for the shortcut that collapses or expands the desktop sidebar"
   }
