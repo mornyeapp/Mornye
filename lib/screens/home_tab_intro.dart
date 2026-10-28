@@ -133,12 +133,13 @@ class _HomeSections extends ConsumerWidget {
     final hasMediaItem = ref.watch(
       currentMediaItemProvider.select((s) => s.value != null),
     );
+    final hasResume = ref.watch(playbackResumeProvider).value != null;
     final recentlyAdded = ref.watch(_homeRecentlyAddedProvider).value;
     final onRepeat = ref.watch(_homeOnRepeatProvider).value ?? const [];
     final mixes = ref.watch(libraryMixesProvider).value ?? const [];
 
     final sections = <Widget>[
-      if (hasMediaItem)
+      if (hasMediaItem || hasResume)
         _HomeSection(
           title: l10n.homeContinueListening,
           inset: inset,
@@ -239,20 +240,56 @@ class _HomeSection extends StatelessWidget {
   }
 }
 
-/// The track loaded in the player, with its progress and a play-pause
-/// button.
-class _HomeContinueListeningCard extends ConsumerWidget {
+/// The active track or the last dismissed session, with its saved progress.
+class _HomeContinueListeningCard extends ConsumerStatefulWidget {
   const _HomeContinueListeningCard();
 
+  @override
+  ConsumerState<_HomeContinueListeningCard> createState() =>
+      _HomeContinueListeningCardState();
+}
+
+class _HomeContinueListeningCardState
+    extends ConsumerState<_HomeContinueListeningCard> {
   static const _coverSize = 96.0;
+  bool _resuming = false;
+
+  void _openPlayer() {
+    if (isDesktopPlatform) {
+      openDesktopNowPlaying();
+    } else {
+      Navigator.of(
+        context,
+        rootNavigator: true,
+      ).push(NowPlayingRoute(child: const NowPlayingScreen()));
+    }
+  }
+
+  Future<void> _resume({bool openPlayer = false}) async {
+    if (_resuming) return;
+    setState(() => _resuming = true);
+    try {
+      final resumed = await ref
+          .read(musicPlayerControllerProvider)
+          .resumeSavedSession();
+      if (!mounted) return;
+      ref.invalidate(playbackResumeProvider);
+      if (resumed && openPlayer) _openPlayer();
+    } finally {
+      if (mounted) setState(() => _resuming = false);
+    }
+  }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final mediaItem = ref.watch(currentMediaItemProvider).value;
+  Widget build(BuildContext context) {
+    final current = ref.watch(currentMediaItemProvider).value;
+    final resume = ref.watch(playbackResumeProvider).value;
+    final mediaItem = current ?? resume?.media.toMediaItem();
     if (mediaItem == null) return const SizedBox.shrink();
 
-    final isPlaying = ref.watch(playbackPlayingProvider);
-    final isLoading = ref.watch(playbackLoadingProvider);
+    final isPlaying = current != null && ref.watch(playbackPlayingProvider);
+    final isLoading =
+        _resuming || (current != null && ref.watch(playbackLoadingProvider));
     final controller = ref.read(musicPlayerControllerProvider);
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
@@ -263,12 +300,11 @@ class _HomeContinueListeningCard extends ConsumerWidget {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: isDesktopPlatform
-            ? openDesktopNowPlaying
-            : () => Navigator.of(
-                context,
-                rootNavigator: true,
-              ).push(NowPlayingRoute(child: const NowPlayingScreen())),
+        onTap: isLoading
+            ? null
+            : current == null
+            ? () => _resume(openPlayer: true)
+            : _openPlayer,
         child: Padding(
           padding: const EdgeInsetsDirectional.fromSTEB(12, 12, 16, 12),
           child: Row(
@@ -314,6 +350,7 @@ class _HomeContinueListeningCard extends ConsumerWidget {
                     const SizedBox(height: 12),
                     _HomeContinueListeningProgress(
                       duration: mediaItem.duration ?? Duration.zero,
+                      savedPosition: current == null ? resume?.position : null,
                     ),
                   ],
                 ),
@@ -331,6 +368,8 @@ class _HomeContinueListeningCard extends ConsumerWidget {
                       customBorder: const CircleBorder(),
                       onTap: isLoading
                           ? null
+                          : current == null
+                          ? _resume
                           : () => controller.togglePlayPause(isPlaying),
                       // Round like the mini player's play button, so the
                       // same action keeps the same shape across screens.
@@ -369,15 +408,21 @@ class _HomeContinueListeningCard extends ConsumerWidget {
 /// Follows position ticks on its own so the card above does not rebuild on
 /// every one.
 class _HomeContinueListeningProgress extends ConsumerWidget {
-  const _HomeContinueListeningProgress({required this.duration});
+  const _HomeContinueListeningProgress({
+    required this.duration,
+    this.savedPosition,
+  });
 
   final Duration duration;
+  final Duration? savedPosition;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final colorScheme = Theme.of(context).colorScheme;
     final durationMs = duration.inMilliseconds;
-    final positionMs = ref.watch(playbackPositionProvider).inMilliseconds;
+    final Duration position =
+        savedPosition ?? ref.watch(playbackPositionProvider);
+    final positionMs = position.inMilliseconds;
     final progress = durationMs > 0
         ? (positionMs / durationMs).clamp(0.0, 1.0)
         : 0.0;

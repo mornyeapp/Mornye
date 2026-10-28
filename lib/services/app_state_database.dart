@@ -4,13 +4,14 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:mornye/services/download_queue_codec.dart';
+import 'package:mornye/services/playback_resume_store.dart';
 import 'package:mornye/services/sqlite_helpers.dart' as sqlite;
 import 'package:mornye/utils/logger.dart';
 
 final _log = AppLogger('AppStateDb');
 
 const _dbFileName = 'app_state.db';
-const _dbVersion = 4;
+const _dbVersion = 5;
 
 const _queueTable = 'download_queue_items';
 const _recentTable = 'recent_access_items';
@@ -85,6 +86,7 @@ class AppStateDatabase {
 
     await _createRecentStateTable(db);
     await _createPlaybackSessionTable(db);
+    await PlaybackResumeStore.createSchema(db);
   }
 
   Future<void> _upgradeDb(Database db, int oldVersion, int newVersion) async {
@@ -94,6 +96,9 @@ class AppStateDatabase {
     }
     if (oldVersion < 4) {
       await _migratePlaybackSessionToV4(db);
+    }
+    if (oldVersion < 5) {
+      await PlaybackResumeStore.createSchema(db);
     }
   }
 
@@ -393,6 +398,7 @@ class AppStateDatabase {
   Future<void> clearPendingQueueAfterInstallationRestore() async {
     await replacePendingDownloadQueueRows(const []);
     await clearPlaybackSession();
+    await clearPlaybackResume();
     final prefs = await _prefs;
     await prefs.remove(_legacyQueueKey);
     await prefs.setBool(_queueMigrationKey, true);
@@ -452,6 +458,18 @@ class AppStateDatabase {
     final db = await database;
     await db.delete(_playbackSessionTable);
   }
+
+  Future<void> archivePlaybackSession(Map<String, dynamic> media) async =>
+      PlaybackResumeStore(await database).archive(media);
+
+  Future<Map<String, dynamic>?> getPlaybackResumePreview() async =>
+      PlaybackResumeStore(await database).preview();
+
+  Future<Map<String, dynamic>?> getPlaybackResumeSession() async =>
+      PlaybackResumeStore(await database).session();
+
+  Future<void> clearPlaybackResume() async =>
+      PlaybackResumeStore(await database).clear();
 
   Future<void> applyPendingDownloadQueueChanges({
     required List<Map<String, dynamic>> upserts,

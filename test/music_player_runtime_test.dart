@@ -192,7 +192,74 @@ class _SessionStore implements AppStateDatabase {
   Future<void> clearPlaybackSession() async => clears++;
 
   @override
+  Future<void> archivePlaybackSession(Map<String, dynamic> media) async =>
+      clears++;
+
+  @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _ResumeSessionStore extends _SessionStore {
+  Map<String, dynamic>? active;
+  Map<String, dynamic>? archived;
+  Map<String, dynamic>? preview;
+  Future<void> Function()? beforeResumeLoad;
+  int resumeReads = 0;
+
+  @override
+  Future<Map<String, dynamic>?> getPlaybackSession() async => active;
+
+  @override
+  Future<void> savePlaybackSession(Map<String, dynamic> session) async {
+    await super.savePlaybackSession(session);
+    active = session;
+  }
+
+  @override
+  Future<bool> updatePlaybackSessionState({
+    required int index,
+    required int positionMs,
+    required bool shuffle,
+    required String repeatMode,
+  }) async {
+    if (active == null) return false;
+    active = {
+      ...active!,
+      'index': index,
+      'positionMs': positionMs,
+      'shuffle': shuffle,
+      'repeat': repeatMode,
+    };
+    return super.updatePlaybackSessionState(
+      index: index,
+      positionMs: positionMs,
+      shuffle: shuffle,
+      repeatMode: repeatMode,
+    );
+  }
+
+  @override
+  Future<void> archivePlaybackSession(Map<String, dynamic> media) async {
+    archived = active;
+    preview = {'media': media, 'positionMs': active?['positionMs']};
+    active = null;
+    clears++;
+  }
+
+  @override
+  Future<Map<String, dynamic>?> getPlaybackResumePreview() async => preview;
+
+  @override
+  Future<Map<String, dynamic>?> getPlaybackResumeSession() async {
+    resumeReads++;
+    await beforeResumeLoad?.call();
+    return archived;
+  }
+
+  @override
+  Future<void> clearPlaybackResume() async {
+    archived = preview = null;
+  }
 }
 
 class _DeletionHandler extends MusicPlayerHandler {
@@ -528,6 +595,163 @@ void main() {
     expect(handler.mediaItem.value?.id, 'one');
     expect(handler.playbackState.value.playing, isTrue);
   });
+
+  test(
+    'Home resumes a dismissed queue at its position after a fresh runtime',
+    () async {
+      final directory = await Directory.systemTemp.createTemp(
+        'resume-runtime-',
+      );
+      addTearDown(() => directory.delete(recursive: true));
+      final tracks = [
+        for (var i = 0; i < 3; i++)
+          PlayableMedia(
+            id: '$i',
+            source: (await File(
+              '${directory.path}/$i.flac',
+            ).writeAsString('audio')).path,
+            title: 'Track $i',
+            artist: 'Artist',
+            artUri: 'https://example.com/cover.jpg',
+            duration: const Duration(minutes: 3),
+          ),
+      ];
+      final store = _ResumeSessionStore();
+      final decks = <_Deck>[];
+      final runtime = _runtime(sessionDatabase: store, decks: decks);
+      final handler = await runtime.initialize();
+      await handler.setQueueAndPlay(tracks, initialIndex: 1, shuffle: true);
+      await handler.setRepeatMode(AudioServiceRepeatMode.all);
+      decks.single.position = const Duration(seconds: 23);
+      await handler.pause();
+      final order = handler.queue.value.map((item) => item.id).toList();
+      await MusicPlayerController(runtime: runtime).dismiss();
+      expect(handler.mediaItem.value, isNull);
+      expect(store.active, isNull);
+      expect(store.archived?['positionMs'], 23000);
+
+      final resumedDecks = <_Deck>[];
+      final fresh = _runtime(sessionDatabase: store, decks: resumedDecks);
+      await fresh.restoreSession();
+      expect(fresh.handler, isNull);
+      final container = ProviderContainer(
+        overrides: [musicPlayerRuntimeProvider.overrideWithValue(fresh)],
+      );
+      addTearDown(container.dispose);
+      final preview = await container.read(playbackResumeProvider.future);
+      expect(preview?.media.id, '1');
+      expect(preview?.position, const Duration(seconds: 23));
+      expect(fresh.handler, isNull);
+
+      expect(
+        await MusicPlayerController(runtime: fresh).resumeSavedSession(),
+        isTrue,
+      );
+      expect(fresh.handler!.queue.value.map((item) => item.id), order);
+      expect(fresh.handler!.mediaItem.value?.id, '1');
+      expect(resumedDecks.single.position, const Duration(seconds: 23));
+      expect(fresh.handler!.playbackState.value.playing, isTrue);
+      expect(
+        fresh.handler!.playbackState.value.shuffleMode,
+        AudioServiceShuffleMode.all,
+      );
+      expect(
+        fresh.handler!.playbackState.value.repeatMode,
+        AudioServiceRepeatMode.all,
+      );
+    },
+  );
+
+  test('a repeated Resume request cannot replace newer playback', () async {
+    final entered = Completer<void>();
+    final release = Completer<void>();
+    final store = _ResumeSessionStore()
+      ..archived = {
+        'media': [
+          const PlayableMedia(
+            id: 'saved',
+            source: 'network://fixture/saved.flac',
+            title: 'Saved',
+            artist: 'Artist',
+            artUri: 'https://example.com/cover.jpg',
+          ).toJson(),
+        ],
+        'index': 0,
+        'positionMs': 23000,
+      }
+      ..beforeResumeLoad = () {
+        entered.complete();
+        return release.future;
+      };
+    final runtime = _runtime(sessionDatabase: store);
+    final controller = MusicPlayerController(runtime: runtime);
+    final pending = controller.resumeSavedSession();
+    expect(identical(pending, controller.resumeSavedSession()), isTrue);
+    await entered.future;
+    await controller.playSingle(_track);
+    release.complete();
+    expect(await pending, isFalse);
+    expect(store.resumeReads, 1);
+    expect(runtime.handler!.mediaItem.value?.id, _track.id);
+    expect(runtime.handler!.playbackState.value.playing, isTrue);
+  });
+
+  test(
+    'a removed saved file leaves Home without a stale Resume card',
+    () async {
+      final directory = await Directory.systemTemp.createTemp(
+        'resume-missing-',
+      );
+      addTearDown(() => directory.delete(recursive: true));
+      final store = _ResumeSessionStore()
+        ..preview = {
+          'media': PlayableMedia(
+            id: 'missing',
+            source: '${directory.path}/missing.flac',
+            title: 'Missing',
+            artist: 'Artist',
+          ).toJson(),
+          'positionMs': 23000,
+        };
+      final runtime = _runtime(sessionDatabase: store);
+      expect(await loadPlaybackResumePreview(runtime), isNull);
+      expect(runtime.handler, isNull);
+    },
+  );
+
+  test(
+    'deleting a saved source refreshes an already loaded Resume card',
+    () async {
+      final directory = await Directory.systemTemp.createTemp('resume-delete-');
+      addTearDown(() => directory.delete(recursive: true));
+      final file = await File(
+        '${directory.path}/saved.flac',
+      ).writeAsString('audio');
+      final events = SourceDeletionEvents();
+      final store = _ResumeSessionStore()
+        ..preview = {
+          'media': PlayableMedia(
+            id: 'saved',
+            source: file.path,
+            title: 'Saved',
+            artist: 'Artist',
+          ).toJson(),
+          'positionMs': 23000,
+        };
+      final runtime = _runtime(
+        sessionDatabase: store,
+        sourceDeletionEvents: events,
+      );
+      final container = ProviderContainer(
+        overrides: [musicPlayerRuntimeProvider.overrideWithValue(runtime)],
+      );
+      addTearDown(container.dispose);
+      expect(await container.read(playbackResumeProvider.future), isNotNull);
+      expect(await deleteFile(file.path, deletionEvents: events), isTrue);
+      expect(await container.read(playbackResumeProvider.future), isNull);
+      expect(runtime.handler, isNull);
+    },
+  );
 
   for (final state in [
     PlaybackState(playing: true, processingState: AudioProcessingState.ready),

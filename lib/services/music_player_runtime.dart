@@ -471,7 +471,7 @@ class MusicPlayerRuntime {
   }
 
   Future<void> restoreSession() =>
-      _restoreFuture ??= restorePlaybackSession(this);
+      _restoreFuture ??= restorePlaybackSession(this).then<void>((_) {});
 
   /// [MusicPlayerHandler.recoverRestoredArtwork] after [restoreSession].
   Future<void> recoverRestoredArtwork() async {

@@ -78,6 +78,23 @@ class LocalMediaItemNotifier extends CurrentMediaItemNotifier {
       ref.watch(musicPlayerRuntimeProvider).mediaItemEvents();
 }
 
+/// A dismissed session stays available on Home without restoring the player.
+final playbackResumeProvider = FutureProvider<PlaybackResumePreview?>((ref) {
+  final hasCurrent = ref.watch(
+    currentMediaItemProvider.select((state) => state.value != null),
+  );
+  if (hasCurrent || ref.watch(activeRemotePlaybackProvider) != null) {
+    return null;
+  }
+  final runtime = ref.watch(musicPlayerRuntimeProvider);
+  ref.onDispose(
+    runtime.dependencies.sourceDeletionEvents.subscribe((_) async {
+      ref.invalidateSelf();
+    }),
+  );
+  return loadPlaybackResumePreview(runtime);
+});
+
 /// [libraryItemForMedia] with the download History the app has loaded.
 Future<UnifiedLibraryItem?> _libraryItemForMedia(
   Ref ref, {
@@ -415,7 +432,7 @@ class MusicPlayerController {
   Future<void> previous() async =>
       remote?.previous() ?? _handler?.skipToPrevious();
 
-  /// Ends a paused local session, including its persisted playback state.
+  /// Hides a paused player, retaining its queue and position for Home's Resume.
   Future<void> dismiss() async {
     if (remote != null) return;
     final handler = _handler;
@@ -426,7 +443,38 @@ class MusicPlayerController {
         state.processingState == AudioProcessingState.buffering) {
       return;
     }
-    await handler.stop();
+    await handler.stop(keepResume: true);
+  }
+
+  Future<bool>? _resumeFuture;
+
+  Future<bool> resumeSavedSession() {
+    final pending = _resumeFuture;
+    if (pending != null) return pending;
+    return _resumeFuture = _resumeSavedSession().whenComplete(() {
+      _resumeFuture = null;
+    });
+  }
+
+  Future<bool> _resumeSavedSession() async {
+    if (remote != null) return false;
+    final handler = await ensureInitialized();
+    if (handler == null) return false;
+    final generation = handler.playbackRequestGeneration;
+    if (handler.mediaItem.value == null) {
+      final restored = await restorePlaybackSession(
+        _runtime,
+        fromResume: true,
+        expectedPlaybackGeneration: generation,
+      );
+      if (!restored ||
+          handler.isDisposed ||
+          handler.playbackRequestGeneration != generation) {
+        return false;
+      }
+    }
+    await handler.play();
+    return true;
   }
 
   void setSleepTimer(Duration duration) => _handler?.setSleepTimer(duration);

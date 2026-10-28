@@ -179,6 +179,7 @@ class MusicPlayerHandler extends BaseAudioHandler
 
   DateTime? get sleepTimerEndsAt => _sleepTimerEndsAt;
   bool get isDisposed => _disposed;
+  int get playbackRequestGeneration => _playRequestGeneration;
 
   /// Reconcile only the playback fields affected by the new settings snapshot.
   void applySettings(AppSettings previous) {
@@ -1222,11 +1223,12 @@ class MusicPlayerHandler extends BaseAudioHandler
     required bool shuffle,
     List<int>? originalOrder,
     bool queueNeedsRewrite = false,
+    bool replaceStoppedQueue = false,
     AudioServiceRepeatMode repeatMode = AudioServiceRepeatMode.none,
   }) async {
     if (items.isEmpty) return;
     // Never clobber a session the user already started this launch.
-    if (_media.isNotEmpty || _index >= 0) return;
+    if (_index >= 0 || (_media.isNotEmpty && !replaceStoppedQueue)) return;
     _restoringSession = true;
     try {
       _media
@@ -1237,6 +1239,7 @@ class MusicPlayerHandler extends BaseAudioHandler
         ..addAll(items.map(_toMediaItem));
       _index = index.clamp(0, items.length - 1);
       _shuffle = shuffle;
+      _originalQueueOrder = null;
       if (shuffle) {
         final order = [for (var i = 0; i < items.length; i++) i];
         if (originalOrder?.length == items.length) {
@@ -2066,7 +2069,7 @@ class MusicPlayerHandler extends BaseAudioHandler
   }
 
   @override
-  Future<void> stop() async {
+  Future<void> stop({bool keepResume = false}) async {
     _runtime.personalization.finish();
     unawaited(_runtime.personalization.flush());
     unawaited(_runtime.taste.flush());
@@ -2079,11 +2082,21 @@ class MusicPlayerHandler extends BaseAudioHandler
     _userPaused = true;
     await _player.cancelPreparation();
     await _cancelTransitions();
-    await _serializeSourceChange(() => _stopSession(generation));
+    await _serializeSourceChange(
+      () => _stopSession(generation, keepResume: keepResume),
+    );
   }
 
-  Future<void> _stopSession(int generation) async {
+  Future<void> _stopSession(int generation, {bool keepResume = false}) async {
     if (generation != _playRequestGeneration || _disposed) return;
+    Map<String, dynamic>? resumeMedia;
+    if (keepResume && _index >= 0 && _index < _media.length) {
+      final position = await _currentPositionForPersist();
+      if (generation != _playRequestGeneration || _disposed) return;
+      await _persistSession(position: position);
+      if (generation != _playRequestGeneration || _disposed) return;
+      resumeMedia = _media[_index].toJson();
+    }
     await _player.stop();
     if (generation != _playRequestGeneration || _disposed) return;
     _sourceReady = false;
@@ -2097,8 +2110,7 @@ class MusicPlayerHandler extends BaseAudioHandler
     _userPaused = false;
     _playHistory.clear();
     _pendingRestorePosition = null;
-    // An explicit stop ends the session for good; nothing to restore later.
-    await _sessionWriter.clear();
+    await _sessionWriter.clear(resumeMedia: resumeMedia);
     if (generation != _playRequestGeneration || _disposed) return;
     // A stopped session has no current item; this also hides the mini player.
     mediaItem.add(null);

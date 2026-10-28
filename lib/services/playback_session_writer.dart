@@ -28,9 +28,13 @@ class PlaybackSessionWriter {
         : _queueRevision;
   }
 
-  Future<void> clear() {
+  Future<void> clear({Map<String, dynamic>? resumeMedia}) {
     _scheduledRevision = _persistedRevision = -1;
-    return _enqueue(_database.clearPlaybackSession);
+    return _enqueue(
+      resumeMedia == null
+          ? _database.clearPlaybackSession
+          : () => _database.archivePlaybackSession(resumeMedia),
+    );
   }
 
   Future<void> persist({

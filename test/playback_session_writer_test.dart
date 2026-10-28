@@ -49,6 +49,17 @@ class _Database extends Fake implements AppStateDatabase {
     operations.add('clear');
     row = null;
   }
+
+  Map<String, dynamic>? archived;
+  Map<String, dynamic>? preview;
+
+  @override
+  Future<void> archivePlaybackSession(Map<String, dynamic> media) async {
+    operations.add('archive');
+    archived = row;
+    preview = media;
+    row = null;
+  }
 }
 
 Future<void> _persist(
@@ -108,6 +119,37 @@ void main() {
     expect(database.operations, ['save', 'save']);
     expect(database.row?['positionMs'], 3000);
   });
+
+  test(
+    'dismiss archives after pending writes and recreates active state on resume',
+    () async {
+      final ready = Completer<void>();
+      database.beforeSave = () => ready.future;
+      final save = _persist(
+        writer,
+        () => [
+          {'id': 'track'},
+        ],
+        seconds: 23,
+      );
+      final dismiss = writer.clear(resumeMedia: {'id': 'track'});
+      ready.complete();
+      await Future.wait([save, dismiss]);
+      expect(database.operations, ['save', 'archive']);
+      expect(database.row, isNull);
+      expect(database.archived?['positionMs'], 23000);
+      expect(database.preview?['id'], 'track');
+      await _persist(
+        writer,
+        () => [
+          {'id': 'track'},
+        ],
+        seconds: 24,
+      );
+      expect(database.operations, ['save', 'archive', 'save']);
+      expect(database.row?['positionMs'], 24000);
+    },
+  );
 
   test('missing row is recreated from the matching live queue', () async {
     var serialized = 0;

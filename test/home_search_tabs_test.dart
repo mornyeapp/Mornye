@@ -14,6 +14,8 @@ import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/providers/track_provider.dart';
 import 'package:mornye/screens/home_tab.dart';
 import 'package:mornye/services/library_search.dart';
+import 'package:mornye/services/music_player_service.dart'
+    show PlayableMedia, PlaybackResumePreview;
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/theme/app_theme.dart';
@@ -24,6 +26,63 @@ import 'package:mornye/widgets/mornye_chrome.dart';
 import 'package:mornye/widgets/mornye_context_menu.dart';
 
 void main() {
+  for (final desktop in [false, true]) {
+    for (final mornye in [false, true]) {
+      testWidgets('Home keeps Resume without a player '
+          '(desktop: $desktop, Mornye: $mornye)', (tester) async {
+        debugDesktopPlatformOverride = desktop;
+        addTearDown(() => debugDesktopPlatformOverride = null);
+        tester.platformDispatcher.accessibilityFeaturesTestValue =
+            const FakeAccessibilityFeatures(disableAnimations: true);
+        addTearDown(
+          tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
+        );
+        tester.view.physicalSize = desktop
+            ? const Size(1280, 800)
+            : const Size(430, 932);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        final controller = _ResumeController();
+        await _pumpStartupHome(
+          tester,
+          _StartupExtensions(),
+          _StartupExplore(),
+          mornye: mornye,
+          feedDisabled: true,
+          resume: const (
+            media: PlayableMedia(
+              id: 'saved-song',
+              source: '/saved.flac',
+              title: 'Last session',
+              artist: 'Saved artist',
+              duration: Duration(minutes: 3),
+            ),
+            position: Duration(seconds: 23),
+          ),
+          controller: controller,
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('Continue listening'), findsOneWidget);
+        expect(find.text('Last session'), findsOneWidget);
+        expect(find.text('Saved artist'), findsOneWidget);
+        expect(
+          tester
+              .widget<LinearProgressIndicator>(
+                find.byType(LinearProgressIndicator),
+              )
+              .value,
+          closeTo(23 / 180, 0.001),
+        );
+        await tester.tap(find.byTooltip('Play'));
+        await tester.pumpAndSettle();
+        expect(controller.resumes, 1);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox());
+        await tester.pumpAndSettle();
+      });
+    }
+  }
+
   for (final desktop in [false, true]) {
     for (final mornye in [false, true]) {
       testWidgets('Home keeps its feed layout through slow startup '
@@ -915,6 +974,8 @@ Future<void> _pumpStartupHome(
   bool feedDisabled = false,
   ValueNotifier<bool>? homeVisible,
   PageController? pages,
+  PlaybackResumePreview? resume,
+  MusicPlayerController? controller,
 }) => tester.pumpWidget(
   ProviderScope(
     overrides: [
@@ -924,6 +985,14 @@ Future<void> _pumpStartupHome(
       downloadHistoryProvider.overrideWith(_History.new),
       recentAccessProvider.overrideWith(_Recent.new),
       trackProvider.overrideWith(_Search.new),
+      if (resume != null) ...[
+        currentMediaItemProvider.overrideWithBuild(
+          (ref, notifier) => Stream.value(null),
+        ),
+        playbackResumeProvider.overrideWith((ref) async => resume),
+      ],
+      if (controller != null)
+        musicPlayerControllerProvider.overrideWithValue(controller),
     ],
     child: MaterialApp(
       theme: mornye ? MornyeTheme.build(Brightness.dark) : AppTheme.dark(),
@@ -960,6 +1029,16 @@ class _StartupSettings extends _Settings {
   AppSettings build() => super.build().copyWith(
     homeFeedProvider: feedDisabled ? AppSettings.homeFeedProviderOff : null,
   );
+}
+
+class _ResumeController extends MusicPlayerController {
+  int resumes = 0;
+
+  @override
+  Future<bool> resumeSavedSession() async {
+    resumes++;
+    return true;
+  }
 }
 
 class _StartupExtensions extends ExtensionNotifier {
