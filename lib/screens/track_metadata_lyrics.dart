@@ -607,7 +607,8 @@ extension _TrackMetadataLyricsAndSaving on _TrackMetadataScreenState {
   /// `writeTo` renders the file at the given path and returns the bridge
   /// result, or null when it has already told the user why nothing was
   /// written. SAF tracks are rendered into a temp directory and published to
-  /// the download tree; local tracks are written next to the audio file.
+  /// the download tree or the scanned audio document's parent; filesystem
+  /// tracks are written next to the audio file.
   /// Exceptions propagate to the caller.
   Future<void> _publishSidecarFile({
     required String baseName,
@@ -629,57 +630,49 @@ extension _TrackMetadataLyricsAndSaving on _TrackMetadataScreenState {
     final fileName = '$baseName.$extension';
 
     if (_isSafFile) {
-      final tempDir = await Directory.systemTemp.createTemp(tempDirPrefix);
-      final tempOutput = '${tempDir.path}${Platform.pathSeparator}$fileName';
-
-      final result = await writeTo(tempOutput);
-      if (result == null) {
-        return;
-      }
-
-      if (result['error'] != null) {
-        if (mounted) {
-          showMessage(
-            context.l10n.trackSaveFailed(
-              context.friendlyError(result['error']),
-            ),
-          );
-        }
-        try {
-          await Directory(tempDir.path).delete(recursive: true);
-        } catch (_) {}
-        return;
-      }
-
+      final audioUri = cleanFilePath;
       final treeUri = _downloadItem?.downloadTreeUri;
       final relativeDir = _downloadItem?.safRelativeDir ?? '';
-      if (treeUri != null && treeUri.isNotEmpty) {
-        final safUri = await PlatformBridge.createSafFileFromPath(
-          treeUri: treeUri,
-          relativeDir: relativeDir,
-          fileName: fileName,
-          mimeType: mimeType,
-          srcPath: tempOutput,
-        );
-        try {
-          await Directory(tempDir.path).delete(recursive: true);
-        } catch (_) {}
-        if (mounted) {
-          if (safUri != null) {
-            showMessage(successMessage());
-          } else {
+      final tempDir = await Directory.systemTemp.createTemp(tempDirPrefix);
+      final tempOutput = '${tempDir.path}${Platform.pathSeparator}$fileName';
+      try {
+        final result = await writeTo(tempOutput);
+        if (result == null) return;
+        if (result['error'] != null) {
+          if (mounted) {
             showMessage(
-              context.l10n.trackSaveFailed('Failed to write to storage'),
+              context.l10n.trackSaveFailed(
+                context.friendlyError(result['error']),
+              ),
             );
           }
+          return;
         }
-      } else {
-        try {
-          await Directory(tempDir.path).delete(recursive: true);
-        } catch (_) {}
+        final safUri = treeUri != null && treeUri.isNotEmpty
+            ? await PlatformBridge.createSafFileFromPath(
+                treeUri: treeUri,
+                relativeDir: relativeDir,
+                fileName: fileName,
+                mimeType: mimeType,
+                srcPath: tempOutput,
+              )
+            : await PlatformBridge.writeSafSidecarFromPath(
+                audioUri: audioUri,
+                fileName: fileName,
+                mimeType: mimeType,
+                srcPath: tempOutput,
+              );
         if (mounted) {
-          showMessage(context.l10n.trackSaveFailed('No storage access'));
+          showMessage(
+            safUri != null && safUri.isNotEmpty
+                ? successMessage()
+                : context.l10n.trackSaveFailed('No storage access'),
+          );
         }
+      } finally {
+        try {
+          await tempDir.delete(recursive: true);
+        } catch (_) {}
       }
       return;
     }
@@ -706,6 +699,10 @@ extension _TrackMetadataLyricsAndSaving on _TrackMetadataScreenState {
   Future<void> _saveCoverArt() async {
     try {
       final baseName = _buildSaveBaseName();
+      final audioPath = cleanFilePath;
+      final coverUrl = _coverUrl;
+      final cachedCover = _embeddedCoverPreviewPath ?? _localCoverPath;
+      final hasFile = _fileExists;
 
       await _publishSidecarFile(
         baseName: baseName,
@@ -716,24 +713,23 @@ extension _TrackMetadataLyricsAndSaving on _TrackMetadataScreenState {
         hideCurrentSnackBar: false,
         writeTo: (outputPath) async {
           Map<String, dynamic> result;
-          if (_fileExists) {
-            // Prefer extracting cover from the already-downloaded file to
-            // avoid a redundant network request.
+          if (hasFile) {
+            // Imported files carry their own embedded artwork as well.
             result = await PlatformBridge.extractCoverToFile(
-              cleanFilePath,
+              audioPath,
               outputPath,
             );
             if (result['error'] != null &&
-                _coverUrl != null &&
-                _coverUrl!.isNotEmpty) {
+                coverUrl != null &&
+                coverUrl.isNotEmpty) {
               result = await PlatformBridge.downloadCoverToFile(
-                _coverUrl!,
+                coverUrl,
                 outputPath,
               );
             }
-          } else if (_coverUrl != null && _coverUrl!.isNotEmpty) {
+          } else if (coverUrl != null && coverUrl.isNotEmpty) {
             result = await PlatformBridge.downloadCoverToFile(
-              _coverUrl!,
+              coverUrl,
               outputPath,
             );
           } else {
@@ -743,6 +739,18 @@ extension _TrackMetadataLyricsAndSaving on _TrackMetadataScreenState {
               );
             }
             return null;
+          }
+          if (result['error'] != null && cachedCover != null) {
+            final uri = Uri.tryParse(cachedCover);
+            final file = uri?.scheme == 'file'
+                ? File.fromUri(uri!)
+                : File(cachedCover);
+            if (await file.exists() && await file.length() > 0) {
+              if (file.absolute.path != File(outputPath).absolute.path) {
+                await file.copy(outputPath);
+              }
+              return {'success': true};
+            }
           }
           return result;
         },

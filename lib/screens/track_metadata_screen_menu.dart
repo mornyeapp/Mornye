@@ -80,13 +80,13 @@ extension _TrackMetadataMenu on _TrackMetadataScreenState {
           label: l10n.trackEditMetadata,
           onTap: () => _showEditMetadataSheet(screenContext, ref, colorScheme),
         ),
-      if (!_isLocalItem && (_coverUrl != null || _fileExists))
+      if (!_isNetworkItem && (_coverUrl != null || _fileExists))
         _MetadataOption(
           icon: Icons.image_outlined,
           label: l10n.trackSaveCoverArt,
           onTap: _saveCoverArt,
         ),
-      if (!_isLocalItem)
+      if (!_isNetworkItem && (_fileExists || !_isLocalItem))
         _MetadataOption(
           icon: Icons.lyrics_outlined,
           label: l10n.trackSaveLyrics,

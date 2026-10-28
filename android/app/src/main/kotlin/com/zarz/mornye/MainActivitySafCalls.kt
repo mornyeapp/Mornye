@@ -164,6 +164,17 @@ internal fun handleSafClosePlaybackLease(call: MethodCall, result: MethodChannel
     result.success(null)
 }
 
+internal suspend fun Context.handleSafWriteSidecarFromPath(call: MethodCall, result: MethodChannel.Result) {
+    val audioUri = call.argument<String>("audio_uri") ?: ""
+    val fileName = call.argument<String>("file_name") ?: ""
+    val mimeType = call.argument<String>("mime_type") ?: "application/octet-stream"
+    val srcPath = call.argument<String>("src_path") ?: ""
+    val uri = withContext(Dispatchers.IO) {
+        writeSafSidecarFromPath(Uri.parse(audioUri), fileName, mimeType, srcPath)
+    }
+    result.success(uri)
+}
+
 internal suspend fun MainActivity.handleSafCreateFromPath(call: MethodCall, result: MethodChannel.Result) {
     val treeUriStr = call.argument<String>("tree_uri") ?: ""
     val relativeDir = call.argument<String>("relative_dir") ?: ""

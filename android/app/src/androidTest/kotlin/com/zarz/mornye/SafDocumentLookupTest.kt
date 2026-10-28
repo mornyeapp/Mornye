@@ -149,6 +149,34 @@ class SafDocumentLookupTest {
     }
 
     @Test
+    fun importedDocumentsExportCoverAndLyricsBesideTheAudio() {
+        val root = reset()
+        val nested = requireNotNull(findSafChild(context, root, "音楽 🎵"))
+        val staged = File(context.cacheDir, "sidecar-export-${System.nanoTime()}")
+        try {
+            for ((parent, name) in listOf(root to "Song.flac", nested to "歌 🎵.flac")) {
+                val audio = requireNotNull(findSafChild(context, parent, name))
+                context.contentResolver.openOutputStream(audio.uri, "wt")!!.use {
+                    it.write("unchanged audio".toByteArray())
+                }
+                for ((extension, mime) in listOf("jpg" to "image/jpeg", "lrc" to "application/octet-stream")) {
+                    val bytes = "exported $extension bytes".toByteArray()
+                    staged.writeBytes(bytes)
+                    val outputName = "Artist - $name.$extension"
+                    val result = context.writeSafSidecarFromPath(audio.uri, outputName, mime, staged.path)
+                    val output = requireNotNull(findSafChild(context, parent, outputName))
+                    assertEquals(output.uri.toString(), result)
+                    assertArrayEquals(bytes, context.contentResolver.openInputStream(output.uri)!!.use { it.readBytes() })
+                    if (parent == nested) assertNull(findSafChild(context, root, outputName))
+                }
+                assertNull(context.writeSafSidecarFromPath(audio.uri, name, "image/jpeg", staged.path))
+                assertNull(context.writeSafSidecarFromPath(audio.uri, "../escape.jpg", "image/jpeg", staged.path))
+                assertEquals("unchanged audio", context.contentResolver.openInputStream(audio.uri)!!.bufferedReader().use { it.readText() })
+            }
+        } finally { staged.delete() }
+    }
+
+    @Test
     fun unsupportedProjectionNullCursorAndMissingColumnUseLegacyLookup() {
         for (mode in listOf("throw", "null", "missing")) {
             val parent = reset(count = 3, mode = mode)

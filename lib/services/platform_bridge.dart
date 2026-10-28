@@ -1244,6 +1244,18 @@ class PlatformBridge {
     'src_path': srcPath,
   });
 
+  static Future<String?> writeSafSidecarFromPath({
+    required String audioUri,
+    required String fileName,
+    required String mimeType,
+    required String srcPath,
+  }) => _invokeAs('safWriteSidecarFromPath', {
+    'audio_uri': audioUri,
+    'file_name': fileName,
+    'mime_type': mimeType,
+    'src_path': srcPath,
+  });
+
   static Future<Map<String, dynamic>> createSafFileIfAbsentFromPath({
     required String treeUri,
     required String relativeDir,

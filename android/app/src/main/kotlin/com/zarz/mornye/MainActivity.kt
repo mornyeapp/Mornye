@@ -110,6 +110,7 @@ class MainActivity: FlutterFragmentActivity() {
         "shareContentUri",
         "getSafFileModTimes",
         "safCreateFromPath",
+        "safWriteSidecarFromPath",
         "safCreateIfAbsentFromPath",
         "safCreateUniqueFromPath",
         "safCreateCollisionAwareFromPath",
@@ -507,6 +508,7 @@ class MainActivity: FlutterFragmentActivity() {
                         "safOpenPlaybackLease" -> handleSafOpenPlaybackLease(call, result)
                         "safClosePlaybackLease" -> handleSafClosePlaybackLease(call, result)
                         "safCreateFromPath" -> handleSafCreateFromPath(call, result)
+                        "safWriteSidecarFromPath" -> handleSafWriteSidecarFromPath(call, result)
                         "safCreateIfAbsentFromPath" -> handleSafCreateIfAbsentFromPath(call, result)
                         "safCreateUniqueFromPath" -> handleSafCreateUniqueFromPath(call, result)
                         "safCreateCollisionAwareFromPath" -> handleSafCreateCollisionAwareFromPath(call, result)
