@@ -5063,7 +5063,7 @@
       }
     }
   },
-  "queueEmptyAlbums": "Немає завантажень альбомів",
+  "queueEmptyAlbums": "Немає завантажених альбомів",
   "@queueEmptyAlbums": {
     "description": "Empty state title when no album downloads exist"
   },
