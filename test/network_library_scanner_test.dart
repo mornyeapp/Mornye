@@ -38,6 +38,23 @@ class _Storage extends NetworkStorageService {
   }
 }
 
+class _BlockedFolderStorage extends _Storage {
+  _BlockedFolderStorage()
+    : super({
+        '': [const NetworkEntry('Album/', 'Album', directory: true)],
+      });
+
+  final started = Completer<void>();
+  final listing = Completer<List<NetworkEntry>>();
+
+  @override
+  Future<List<NetworkEntry>> list(NetworkConnection c, [String path = '']) {
+    if (path != 'Album/') return super.list(c, path);
+    started.complete();
+    return listing.future;
+  }
+}
+
 /// A storage without saved connections whose `virtual` host lists songs.
 class _VirtualStorage extends NetworkStorageService {
   _VirtualStorage(List<NetworkVirtualSong> songs) {
@@ -171,6 +188,29 @@ void main() {
       );
       expect(retry.expectedCount, 20);
       expect(retry.errorCount, 0);
+    },
+  );
+
+  test(
+    'cancelling a blocked child listing discards staging and its late error',
+    () async {
+      final storage = _BlockedFolderStorage();
+      addTearDown(storage.dispose);
+      final reader = scanner(storage, (_) async => {});
+      final scan = reader.scan(
+        'network://nas/',
+        checkpoint: () async {},
+        onProgress: (_, _, _) {},
+      );
+      final stopped = expectLater(scan, throwsStateError);
+      await storage.started.future;
+      await reader.cancelPending();
+      await stopped.timeout(const Duration(seconds: 1));
+      await expectNoOutput();
+      storage.listing.completeError(
+        const SocketException('Late listing failure'),
+      );
+      await pumpEventQueue();
     },
   );
 

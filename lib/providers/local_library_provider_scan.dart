@@ -56,6 +56,7 @@ extension _LocalLibraryScan on LocalLibraryNotifier {
     required void Function(int processed, int errors, String name) onProgress,
   }) async {
     final scanner = NetworkLibraryScanner(
+      storage: _networkStorage,
       readCachedRows: (paths) => _db.readNetworkScanRows(sourceId, paths),
     );
     _networkScanner = scanner;
@@ -181,6 +182,7 @@ extension _LocalLibraryScan on LocalLibraryNotifier {
         }
       }
 
+      _activeScanSourceId = activeSourceId;
       final available = await _isPathAvailable(
         folderPath,
         bookmark: iosBookmark,

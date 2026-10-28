@@ -16,6 +16,7 @@ import 'package:mornye/services/network_certificate.dart';
 import 'package:mornye/services/network_smb_client.dart';
 import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/services/secure_storage_options.dart';
+import 'package:mornye/services/source_deletion_events.dart';
 import 'package:xml/xml.dart';
 
 part 'network_storage_upload.dart';
@@ -285,6 +286,9 @@ class NetworkStorageService {
   final Future<String?> Function() _read;
   final Future<void> Function(String) _write;
   final Future<void> Function(Uri) _ensureAccess;
+
+  /// Owners stop scans before removing the connection finishes.
+  final connectionRemovals = SourceDeletionEvents();
   static const timeout = Duration(seconds: 20);
   static const _probeTimeout = Duration(seconds: 3);
   static const _probeReuse = Duration(seconds: 10);
@@ -363,7 +367,8 @@ class NetworkStorageService {
     await _write(jsonEncode(next.map((c) => c.toJson()).toList()));
     _connections = List.unmodifiable(next);
     _routes.removeWhere((_, route) => route.id == id);
-    _closeReadClients(id);
+    _closeReadClients(id, force: true);
+    await connectionRemovals.publish(id);
   });
 
   Future<NetworkConnection> connection(String id) async =>
@@ -563,10 +568,10 @@ class NetworkStorageService {
     return client;
   }
 
-  void _closeReadClients(String id) {
+  void _closeReadClients(String id, {bool force = false}) {
     for (final key in _readClients.keys.where((key) => key.id == id).toList()) {
-      // Let in-flight reads finish; new requests use the updated configuration.
-      _readClients.remove(key)!.close();
+      // Edits let existing reads finish; removal aborts the old connection.
+      _readClients.remove(key)!.close(force: force);
     }
   }
 
