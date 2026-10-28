@@ -12,6 +12,38 @@ import 'package:mornye/utils/playback_artwork.dart';
 
 final _log = AppLogger('LinkMirroredPlayback');
 
+class _LinkSeek {
+  _LinkSeek({
+    required this.track,
+    required this.index,
+    required this.targetMs,
+    required this.startedMs,
+    required int previousMs,
+  }) : toleranceMs = ((targetMs - previousMs).abs() ~/ 2).clamp(50, 500);
+
+  final TrackRef track;
+  final int index;
+  final int targetMs;
+  final int startedMs;
+  final int toleranceMs;
+  final done = Completer<void>();
+
+  bool matches(LinkPlayerState player) {
+    final other = player.track;
+    if (player.index != index || other == null) return false;
+    if (track.fileId != null && other.fileId != null) {
+      return track.fileId == other.fileId;
+    }
+    if (track.songId != null && other.songId != null) {
+      return track.songId == other.songId && track.serverId == other.serverId;
+    }
+    // The phone may resolve file ids and ISRCs after its first state push.
+    return track.title == other.title &&
+        track.artist == other.artist &&
+        track.album == other.album;
+  }
+}
+
 /// Another Mornye Link device's player, from the `player.state` it pushes,
 /// as this device's player screens show and drive it. Each track shows as
 /// [resolvePlayable] finds it on this device, else as its ref describes it.
@@ -23,6 +55,7 @@ abstract class LinkMirroredPlayback implements RemotePlayback {
     Future<String?> Function(String source)? extractArtwork,
     MediaItem? initialItem,
     Duration tick = const Duration(milliseconds: 500),
+    Duration seekTimeout = const Duration(seconds: 3),
     int Function()? nowMs,
   }) : _resolveArtwork = resolveArtwork,
        _extractArtwork =
@@ -31,6 +64,7 @@ abstract class LinkMirroredPlayback implements RemotePlayback {
                DownloadedEmbeddedCoverResolver.resolveOrExtract(source)),
        _mediaItem = _Latest(initialItem),
        _tick = tick,
+       _seekTimeout = seekTimeout,
        _nowMs = nowMs ?? (() => DateTime.now().millisecondsSinceEpoch);
 
   @override
@@ -39,6 +73,7 @@ abstract class LinkMirroredPlayback implements RemotePlayback {
   final Future<String> Function(String source) _resolveArtwork;
   final Future<String?> Function(String source) _extractArtwork;
   final Duration _tick;
+  final Duration _seekTimeout;
   final int Function() _nowMs;
 
   /// How many entries after the current song take priority over earlier ones.
@@ -68,6 +103,8 @@ abstract class LinkMirroredPlayback implements RemotePlayback {
   LinkPlayerState? _player;
   List<TrackRef> _queueRefs = const [];
   Timer? _ticker;
+  Timer? _seekTimer;
+  _LinkSeek? _seek;
   bool _disposed = false;
   int _lookupGeneration = 0;
 
@@ -127,6 +164,18 @@ abstract class LinkMirroredPlayback implements RemotePlayback {
   /// Shows the device's [player].
   void show(LinkPlayerState? player) {
     if (_disposed) return;
+    final seek = _seek;
+    if (seek != null) {
+      final elapsed = (_nowMs() - seek.startedMs).clamp(0, 1 << 31);
+      final advanced = player?.playing == true ? elapsed : 0;
+      if (player == null ||
+          !seek.matches(player) ||
+          (player.positionMs >= seek.targetMs - seek.toleranceMs &&
+              player.positionMs <=
+                  seek.targetMs + advanced + seek.toleranceMs)) {
+        _endSeek();
+      }
+    }
     _player = player;
     if (player != null) _volume.add(player.volume.clamp(0.0, 1.0));
     _showTracks(force: false);
@@ -212,7 +261,10 @@ abstract class LinkMirroredPlayback implements RemotePlayback {
       PlaybackState(
         processingState: AudioProcessingState.ready,
         playing: player.playing,
-        updatePosition: Duration(milliseconds: player.positionAt(now)),
+        speed: _seek == null ? 1 : 0,
+        updatePosition: Duration(
+          milliseconds: _seek?.targetMs ?? player.positionAt(now),
+        ),
         updateTime: DateTime.fromMillisecondsSinceEpoch(now),
         queueIndex: index >= 0 && index < player.queue.length ? index : null,
         shuffleMode: player.shuffle
@@ -327,9 +379,60 @@ abstract class LinkMirroredPlayback implements RemotePlayback {
   Future<void> pause() => _send(const LinkCommand(LinkActions.pause));
 
   @override
-  Future<void> seek(Duration position) => _send(
-    LinkCommand(LinkActions.seek, {'positionMs': position.inMilliseconds}),
-  );
+  Future<void> seek(Duration position) {
+    if (_disposed) return Future.value();
+    final player = _player;
+    final track = player?.track;
+    if (player == null || track == null) {
+      return _send(
+        LinkCommand(LinkActions.seek, {'positionMs': position.inMilliseconds}),
+      );
+    }
+    final reportedDuration = player.durationMs;
+    final duration = reportedDuration != null && reportedDuration > 0
+        ? reportedDuration
+        : track.durationMs;
+    final target = position.inMilliseconds.clamp(
+      0,
+      duration != null && duration > 0 ? duration : (1 << 62),
+    );
+    _endSeek();
+    final seek = _seek = _LinkSeek(
+      track: track,
+      index: player.index,
+      targetMs: target,
+      previousMs: player.positionAt(_nowMs()),
+      startedMs: _nowMs(),
+    );
+    // Sending a command only confirms delivery. Keep the timeline at the
+    // requested position until the peer reports it, or the request expires.
+    _seekTimer = Timer(_seekTimeout, () {
+      if (!identical(_seek, seek)) return;
+      _endSeek();
+      _showPlayback();
+    });
+    _showPlayback();
+    unawaited(
+      Future<void>.sync(
+        () => send(LinkCommand(LinkActions.seek, {'positionMs': target})),
+      ).catchError((Object error) {
+        _log.w('$name did not take a seek: $error');
+        if (identical(_seek, seek)) {
+          _endSeek();
+          _showPlayback();
+        }
+      }),
+    );
+    return seek.done.future;
+  }
+
+  void _endSeek() {
+    final seek = _seek;
+    _seek = null;
+    _seekTimer?.cancel();
+    _seekTimer = null;
+    if (seek != null) seek.done.complete();
+  }
 
   @override
   Future<void> next() => _send(const LinkCommand(LinkActions.next));
@@ -394,6 +497,7 @@ abstract class LinkMirroredPlayback implements RemotePlayback {
 
   void dispose() {
     _disposed = true;
+    _endSeek();
     _pending.clear();
     _ticker?.cancel();
     _mediaItem.close();

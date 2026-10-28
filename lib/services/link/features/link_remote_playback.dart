@@ -200,6 +200,7 @@ class LinkRemotePlayback extends LinkMirroredPlayback {
     super.extractArtwork,
     super.initialItem,
     super.tick,
+    super.seekTimeout,
     super.nowMs,
   }) : _remote = remote,
        _handoff = handoff;

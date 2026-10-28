@@ -21,6 +21,7 @@ class LinkPhonePlayback extends LinkMirroredPlayback {
     enqueueHere,
     required super.resolveArtwork,
     super.tick,
+    super.seekTimeout,
     super.nowMs,
   }) : _send = send,
        _resolve = resolve,
