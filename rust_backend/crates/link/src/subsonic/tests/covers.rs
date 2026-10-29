@@ -330,6 +330,46 @@ async fn a_missing_song_cover_file_falls_back_to_the_album_cover_file() {
     assert_eq!(album.header("etag"), reply.header("etag"), "one image");
 }
 
+#[tokio::test]
+async fn an_extracted_picture_keeps_its_etag_and_resized_copy_once_trimmed() {
+    let original = png(40, 20);
+    let fixture = Fixture::new(|dir| {
+        let (with, _) = flac_pair(&original);
+        let embedded = write_file(dir, "1.flac", &with);
+        vec![json!({ "id": "s1", "title": "One", "artist": "A", "album": "X", "path": embedded })]
+    });
+    let album = fixture.album_id("s1");
+    let first = small_cover(&fixture, &album, HeaderMap::new()).await;
+    assert_eq!(first.status, 200);
+    let etag = first.header("etag").expect("etag").to_owned();
+    let song = small_cover(&fixture, "s1", HeaderMap::new()).await;
+    assert_eq!(
+        song.header("etag"),
+        Some(etag.as_str()),
+        "both ids, one image"
+    );
+    assert_eq!(song.body, first.body);
+    let cached = cached_files(&fixture);
+    assert_eq!(
+        cached.len(),
+        2,
+        "the extracted picture and one resized copy"
+    );
+
+    // The cache trims the extracted picture (it is the oldest).
+    let extracted = cached
+        .iter()
+        .find(|path| path.extension().and_then(|e| e.to_str()) == Some("png"))
+        .expect("extracted picture");
+    std::fs::remove_file(extracted).expect("trim");
+    let revalidated = small_cover(&fixture, &album, headers(&[("if-none-match", &etag)])).await;
+    assert_eq!(revalidated.status, 304, "the same image keeps its tag");
+    let again = small_cover(&fixture, "s1", HeaderMap::new()).await;
+    assert_eq!(again.header("etag"), Some(etag.as_str()));
+    assert_eq!(again.body, first.body);
+    assert_eq!(cached_files(&fixture).len(), 2, "no second resized copy");
+}
+
 /// `getCoverArt` of `id` at size 10.
 async fn small_cover(fixture: &Fixture, id: &str, headers: HeaderMap) -> Reply {
     fixture

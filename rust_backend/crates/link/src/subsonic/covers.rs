@@ -2,7 +2,9 @@
 //! kept, never upscaled) cached under `<temp_dir>/link-covers/`. A picture
 //! embedded in an audio file is first extracted into that cache, then
 //! served like a cover file. A listed cover file that is gone falls back to
-//! the next source.
+//! the next source. The ETag and the resized copy follow the image, not the
+//! id asking for it: a cover file's path, mtime and length, or those of the
+//! audio file embedding the picture.
 
 use super::media::file_response;
 use super::{Failure, number, required};
@@ -108,8 +110,8 @@ struct Image {
     path: PathBuf,
     /// The length of `path`.
     len: u64,
-    /// Identifies this version of the image: the [`version_stamp`] of
-    /// `path`.
+    /// Identifies this version of the image: the [`version_stamp`] of the
+    /// cover file, or of the audio file embedding the picture.
     stamp: String,
 }
 
@@ -132,15 +134,9 @@ fn find_image(
             })
         })
         .or_else(|| {
-            let path = candidates
+            candidates
                 .iter()
-                .find_map(|(audio, format)| extract_cached(dir, audio, format))?;
-            let metadata = fs::metadata(&path).ok().filter(fs::Metadata::is_file)?;
-            Some(Image {
-                len: metadata.len(),
-                stamp: version_stamp(&path, &metadata),
-                path,
-            })
+                .find_map(|(audio, format)| extract_cached(dir, audio, format))
         })
 }
 
@@ -164,9 +160,11 @@ fn digest(stamp: &str) -> [u8; 16] {
 /// The cached picture of `audio`, extracted when missing. `None` when the
 /// file is unreadable or embeds no picture (remembered), or the cache is
 /// unwritable.
-fn extract_cached(dir: &Path, audio: &Path, format: &str) -> Option<PathBuf> {
+fn extract_cached(dir: &Path, audio: &Path, format: &str) -> Option<Image> {
     let metadata = fs::metadata(audio).ok().filter(fs::Metadata::is_file)?;
-    let key = digest(&format!("embedded\0{}", version_stamp(audio, &metadata)));
+    // The picture is a version of the audio file, whatever its cached copy.
+    let stamp = format!("embedded\0{}", version_stamp(audio, &metadata));
+    let key = digest(&stamp);
     let without_picture = || {
         WITHOUT_PICTURE
             .lock()
@@ -176,12 +174,18 @@ fn extract_cached(dir: &Path, audio: &Path, format: &str) -> Option<PathBuf> {
         return None;
     }
     let name = hex(&key);
-    if let Some(cached) = CACHED_EXTENSIONS
+    if let Some((path, len)) = CACHED_EXTENSIONS
         .iter()
         .map(|extension| dir.join(format!("{name}.{extension}")))
-        .find(|path| fs::metadata(path).is_ok_and(|cached| cached.is_file() && cached.len() > 0))
+        .find_map(|path| {
+            let len = fs::metadata(&path)
+                .ok()
+                .filter(|cached| cached.is_file() && cached.len() > 0)?
+                .len();
+            Some((path, len))
+        })
     {
-        return Some(cached);
+        return Some(Image { path, len, stamp });
     }
     let mut file = fs::File::open(audio).ok()?;
     let cover = match mornye_core::tags::extract_cover(&mut file, format, &|| Ok(())) {
@@ -195,9 +199,13 @@ fn extract_cached(dir: &Path, audio: &Path, format: &str) -> Option<PathBuf> {
             return None;
         }
     };
-    let target = dir.join(format!("{name}.{}", image_extension(&cover.mime)));
-    store(dir, &target, &cover.data)?;
-    Some(target)
+    let path = dir.join(format!("{name}.{}", image_extension(&cover.mime)));
+    store(dir, &path, &cover.data)?;
+    Some(Image {
+        path,
+        len: cover.data.len() as u64,
+        stamp,
+    })
 }
 
 /// The cache file extension for an embedded picture's MIME type.
