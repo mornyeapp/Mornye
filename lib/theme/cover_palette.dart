@@ -87,18 +87,19 @@ class CoverPalette {
   /// scheme so both leave the cache together.
   static final Expando<ColorScheme> _neutralSchemes = Expando();
 
-  static bool _isNetworkSource(String source) =>
-      source.startsWith('http://') || source.startsWith('https://');
+  /// Every form of one cover, such as a path and its `file://` URI, shares
+  /// the entries of its [coverImageSource].
+  static String _source(String source) => coverImageSource(source) ?? source;
 
   /// Includes the local file version so replacing artwork at the same path
   /// cannot reuse a palette derived from the previous image.
   static Future<String> cacheKeyFor(
     String source,
     Brightness brightness,
-  ) async => '${await _versionedSource(source)}|${brightness.name}';
+  ) async => '${await _versionedSource(_source(source))}|${brightness.name}';
 
   static Future<String> _versionedSource(String source) async {
-    if (!_isNetworkSource(source)) {
+    if (!isHttpCoverUrl(source)) {
       try {
         final stat = await File(source).stat();
         if (stat.type != FileSystemEntityType.notFound) {
@@ -121,7 +122,7 @@ class CoverPalette {
     Brightness brightness, {
     bool neutralGrayscale = false,
   }) {
-    final scheme = _cache[_sourceKeys['$source|${brightness.name}']];
+    final scheme = _cache[_sourceKeys['${_source(source)}|${brightness.name}']];
     return neutralGrayscale ? _neutralFor(scheme) : scheme;
   }
 
@@ -131,22 +132,23 @@ class CoverPalette {
   /// Average cover colour before Material's accent selection or tonal mapping.
   /// Near-monochrome covers stay neutral instead of acquiring a seed hue.
   static Color? sourceColor(String source, Brightness brightness) =>
-      _sourceColors[_sourceKeys['$source|${brightness.name}']];
+      _sourceColors[_sourceKeys['${_source(source)}|${brightness.name}']];
 
   /// [sourceColor] of the last resolved version of [source], from either
   /// [resolve] or [resolveSourceColor], whatever the brightness.
   static Color? peekSourceColor(String source) =>
-      _coverColors[_coverVersions[source]];
+      _coverColors[_coverVersions[_source(source)]];
 
-  /// Resolves the scheme for [source] (a network URL or a local file path).
-  /// Returns null when the image cannot be decoded. [neutralGrayscale] works
-  /// as in [peek] and shares the same palette job.
+  /// Resolves the scheme for [source], a cover string in any form
+  /// [coverImageSource] reads. Returns null when the image cannot be
+  /// decoded. [neutralGrayscale] works as in [peek] and shares the same
+  /// palette job.
   static Future<ColorScheme?> resolve(
     String source,
     Brightness brightness, {
     bool neutralGrayscale = false,
   }) {
-    final scheme = _resolveTonal(source, brightness);
+    final scheme = _resolveTonal(_source(source), brightness);
     return neutralGrayscale ? scheme.then(_neutralFor) : scheme;
   }
 
@@ -182,6 +184,9 @@ class CoverPalette {
   /// surfaces that shade themselves from the cover. Shares the decoded sample
   /// and the colour cache with [resolve].
   static Future<Color?> resolveSourceColor(String source) =>
+      _resolveSourceColor(_source(source));
+
+  static Future<Color?> _resolveSourceColor(String source) =>
       _pendingCoverColors.putIfAbsent(
         source,
         () =>
@@ -239,7 +244,7 @@ class CoverPalette {
     String source, {
     required bool replaced,
   }) async {
-    if (_isNetworkSource(source)) return;
+    if (isHttpCoverUrl(source)) return;
     if (replaced) await _evictDecodedImage(FileImage(File(source)));
     await _evictDecodedImage(_sample(FileImage(File(source))));
   }
@@ -324,7 +329,7 @@ class CoverPalette {
   );
 
   static Future<ImageProvider?> _coverSample(String source) async {
-    if (_isNetworkSource(source)) {
+    if (isHttpCoverUrl(source)) {
       return _sample(cachedCoverImageProvider(source));
     }
     final file = File(source);

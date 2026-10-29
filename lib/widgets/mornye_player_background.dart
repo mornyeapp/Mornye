@@ -26,9 +26,6 @@ class MornyePlayerBackground extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final source = artUri?.scheme == 'file'
-        ? artUri!.toFilePath()
-        : artUri?.toString();
 
     return Theme(
       // Missing or unreadable covers use neutral gray, not the app's accent.
@@ -39,7 +36,7 @@ class MornyePlayerBackground extends StatelessWidget {
         ),
       ),
       child: CoverSourceColorBuilder(
-        imageSource: source,
+        imageSource: artUri?.toString(),
         builder: (context, sourceColor) {
           final dominant = HSLColor.fromColor(
             sourceColor ?? const Color(0xff808080),

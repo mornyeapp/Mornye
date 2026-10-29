@@ -16,6 +16,7 @@ import 'package:mornye/theme/app_theme.dart';
 import 'package:mornye/theme/cover_palette.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/theme/player_artwork_theme.dart';
+import 'package:mornye/widgets/cached_cover_image.dart';
 import 'package:mornye/widgets/mini_player.dart';
 import 'package:mornye/widgets/material_player_backdrop.dart';
 import 'package:mornye/widgets/mornye_player_background.dart';
@@ -116,12 +117,12 @@ void main() {
         title: 'Track',
         artUri: Uri.file(cover.path),
       );
-      final fullProvider = PlayerArtwork.imageProvider(
+      final fullProvider = coverImageProvider(
         item.artUri.toString(),
         cacheWidth: 720,
       )!;
       final key = await fullProvider.obtainKey(ImageConfiguration.empty);
-      final miniKey = await PlayerArtwork.imageProvider(
+      final miniKey = await coverImageProvider(
         item.artUri.toString(),
         cacheWidth: PlayerArtwork.miniCacheWidth,
       )!.obtainKey(ImageConfiguration.empty);

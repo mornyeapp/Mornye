@@ -162,6 +162,47 @@ void main() {
     });
   });
 
+  testWidgets('a file URI and its path share one palette entry', (
+    tester,
+  ) async {
+    await tester.runAsync(() async {
+      final directory = await Directory.systemTemp.createTemp('palette-uri-');
+      final cache = PaintingBinding.instance.imageCache;
+      try {
+        final recorder = ui.PictureRecorder();
+        Canvas(recorder).drawColor(Colors.teal, BlendMode.src);
+        final picture = recorder.endRecording();
+        final image = await picture.toImage(32, 32);
+        final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+        image.dispose();
+        picture.dispose();
+        final file = File('${directory.path}/cover.png');
+        await file.writeAsBytes(bytes!.buffer.asUint8List());
+        final uri = Uri.file(file.path).toString();
+
+        expect(
+          await CoverPalette.cacheKeyFor(uri, Brightness.light),
+          await CoverPalette.cacheKeyFor(file.path, Brightness.light),
+        );
+        final scheme = await CoverPalette.resolve(uri, Brightness.light);
+        expect(scheme, isNotNull);
+        expect(CoverPalette.peek(file.path, Brightness.light), same(scheme));
+        expect(
+          (await CoverPalette.resolveSourceColor(uri))?.toARGB32(),
+          Colors.teal.toARGB32(),
+        );
+        expect(
+          CoverPalette.peekSourceColor(file.path)?.toARGB32(),
+          Colors.teal.toARGB32(),
+        );
+      } finally {
+        cache.clear();
+        cache.clearLiveImages();
+        await directory.delete(recursive: true);
+      }
+    });
+  });
+
   testWidgets('source colour path matches the full palette bit for bit', (
     tester,
   ) async {

@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/widgets.dart';
 import 'package:mornye/services/downloaded_embedded_cover_resolver.dart';
+import 'package:mornye/widgets/cached_cover_image.dart';
 
 /// Keeps a scanned thumbnail when available, recovering missing artwork from
 /// the audio through the same bounded extraction cache used by the player.
@@ -45,14 +46,12 @@ class _LocalLibraryArtworkBuilderState
   Future<void> _checkCover() async {
     final generation = ++_generation;
     final candidate = widget.coverPath?.trim();
-    _coverPath = candidate == null || candidate.isEmpty ? null : candidate;
+    _coverPath = candidate == null || candidate.isEmpty
+        ? null
+        : coverFilePath(candidate) ?? candidate;
     if (_coverPath == null) return;
     var available = false;
     try {
-      final path = _coverPath!;
-      if (path.startsWith('file://')) {
-        _coverPath = Uri.parse(path).toFilePath();
-      }
       final stat = await File(_coverPath!).stat();
       available = stat.type == FileSystemEntityType.file && stat.size > 0;
     } catch (_) {

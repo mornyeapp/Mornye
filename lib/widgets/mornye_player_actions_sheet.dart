@@ -213,10 +213,8 @@ class _MornyePlayerMenuSurface extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final art = mediaItem.artUri;
-    final source = art?.scheme == 'file' ? art!.toFilePath() : art?.toString();
     return CoverSourceColorBuilder(
-      imageSource: source,
+      imageSource: mediaItem.artUri?.toString(),
       builder: (context, sourceColor) {
         final dominant = HSLColor.fromColor(sourceColor ?? Colors.grey);
         final surface = dominant

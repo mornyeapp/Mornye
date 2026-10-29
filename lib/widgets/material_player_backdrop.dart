@@ -4,6 +4,7 @@ import 'dart:ui' as ui;
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:mornye/routes/now_playing_route.dart';
+import 'package:mornye/widgets/cached_cover_image.dart';
 import 'package:mornye/widgets/player_artwork.dart';
 
 /// Full-screen cover style for the Material player: the cover fills the top
@@ -148,10 +149,7 @@ class _BlurredCoverState extends State<_BlurredCover> {
   /// Requests the same decode as [PlayerArtwork] so both share one cache
   /// entry. The previous cover stays until the next one decodes.
   void _resolve() {
-    final provider = PlayerArtwork.imageProvider(
-      widget.artUri,
-      cacheWidth: _artWidth,
-    );
+    final provider = coverImageProvider(widget.artUri, cacheWidth: _artWidth);
     _stream?.removeListener(_listener);
     _stream = provider == null
         ? null

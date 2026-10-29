@@ -1,10 +1,8 @@
-import 'dart:io';
-
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:path/path.dart' as p;
 import 'package:mornye/services/cover_cache_manager.dart';
 import 'package:mornye/widgets/app_icon.dart';
+import 'package:mornye/widgets/cached_cover_image.dart';
 
 class PlayerArtwork extends StatelessWidget {
   /// Shared decode for the mini player and the full player's blurred cover.
@@ -30,32 +28,6 @@ class PlayerArtwork extends StatelessWidget {
               MediaQuery.devicePixelRatioOf(context))
           .round();
 
-  /// Resolves the same cache entry used by the artwork widgets.
-  static ImageProvider<Object>? imageProvider(
-    String? artUri, {
-    int? cacheWidth,
-  }) {
-    final ImageProvider<Object> provider;
-    if (artUri == null || artUri.isEmpty) return null;
-    if (artUri.startsWith('http')) {
-      provider = CachedNetworkImageProvider(
-        artUri,
-        cacheManager: CoverCacheManager.instance,
-      );
-    } else if (artUri.startsWith('file://') || p.isAbsolute(artUri)) {
-      provider = FileImage(
-        File(
-          artUri.startsWith('file://')
-              ? Uri.parse(artUri).toFilePath()
-              : artUri,
-        ),
-      );
-    } else {
-      return null;
-    }
-    return ResizeImage.resizeIfNeeded(cacheWidth, null, provider);
-  }
-
   @override
   Widget build(BuildContext context) {
     final placeholder = Container(
@@ -68,11 +40,9 @@ class PlayerArtwork extends StatelessWidget {
     );
 
     final uri = artUri;
-    if (uri == null || uri.isEmpty) return placeholder;
-
-    if (uri.startsWith('http')) {
+    if (isHttpCoverUrl(uri)) {
       return CachedNetworkImage(
-        imageUrl: uri,
+        imageUrl: uri!,
         fit: BoxFit.cover,
         cacheManager: CoverCacheManager.instance,
         memCacheWidth: cacheWidth,
@@ -83,18 +53,13 @@ class PlayerArtwork extends StatelessWidget {
         errorWidget: (_, _, _) => placeholder,
       );
     }
-    if (uri.startsWith('file://') || p.isAbsolute(uri)) {
-      final path = uri.startsWith('file://')
-          ? Uri.parse(uri).toFilePath()
-          : uri;
-      return Image.file(
-        File(path),
-        fit: BoxFit.cover,
-        cacheWidth: cacheWidth,
-        gaplessPlayback: true,
-        errorBuilder: (_, _, _) => placeholder,
-      );
-    }
-    return placeholder;
+    final image = coverImageProvider(uri, cacheWidth: cacheWidth);
+    if (image == null) return placeholder;
+    return Image(
+      image: image,
+      fit: BoxFit.cover,
+      gaplessPlayback: true,
+      errorBuilder: (_, _, _) => placeholder,
+    );
   }
 }

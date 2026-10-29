@@ -28,6 +28,7 @@ import 'package:mornye/services/link/features/link_phone_client.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/utils/string_utils.dart';
 import 'package:mornye/widgets/audio_quality_badges.dart';
+import 'package:mornye/widgets/cached_cover_image.dart';
 import 'package:mornye/widgets/decorative_phase.dart';
 import 'package:mornye/widgets/link/link_devices_sheet.dart';
 import 'package:mornye/widgets/overflow_marquee.dart';
@@ -87,10 +88,7 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer> {
     final width = PlayerArtwork.transitionCacheWidth(context);
     final inputs = (artUri, width);
     if (inputs == _warmedTransition) return;
-    final provider = PlayerArtwork.imageProvider(
-      artUri.toString(),
-      cacheWidth: width,
-    );
+    final provider = coverImageProvider(artUri.toString(), cacheWidth: width);
     if (provider == null) return;
     _warmedTransition = inputs;
     // Failed warm-up uses the artwork widget's existing placeholder.
@@ -102,14 +100,7 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer> {
   void _warmCoverColour(Uri? artUri) {
     if (!context.isMornye || artUri == _warmedArtUri) return;
     _warmedArtUri = artUri;
-    final String? source;
-    try {
-      source = artUri?.scheme == 'file'
-          ? artUri!.toFilePath()
-          : artUri?.toString();
-    } catch (_) {
-      return;
-    }
+    final source = artUri?.toString();
     if (source != null && source.isNotEmpty) {
       unawaited(CoverPalette.resolveSourceColor(source));
     }

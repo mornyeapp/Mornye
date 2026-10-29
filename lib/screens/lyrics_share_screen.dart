@@ -104,12 +104,6 @@ class _LyricsShareScreenState extends State<LyricsShareScreen> {
   LyricsCardBackground _background = LyricsCardBackground.artwork;
   bool _sharing = false;
 
-  String? get _artSource {
-    final art = widget.mediaItem.artUri;
-    if (art == null) return null;
-    return art.scheme == 'file' ? art.toFilePath() : art.toString();
-  }
-
   @override
   void dispose() {
     _list.dispose();
@@ -184,7 +178,6 @@ class _LyricsShareScreenState extends State<LyricsShareScreen> {
     final colors = theme.colorScheme;
     final tokens = context.tokens;
     final l10n = context.l10n;
-    final source = _artSource;
     return Scaffold(
       appBar: AppBar(
         leading: AppIconButton(
@@ -221,7 +214,7 @@ class _LyricsShareScreenState extends State<LyricsShareScreen> {
                         borderRadius: BorderRadius.circular(28),
                         child: FittedBox(
                           child: CoverSourceColorBuilder(
-                            imageSource: source,
+                            imageSource: widget.mediaItem.artUri?.toString(),
                             builder: (context, coverColor) => RepaintBoundary(
                               key: _cardKey,
                               child: LyricsShareCard(

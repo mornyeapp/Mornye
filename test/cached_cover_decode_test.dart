@@ -532,6 +532,125 @@ void main() {
       await tester.runAsync(() => directory!.delete(recursive: true));
     }
   });
+
+  for (final override in [false, true]) {
+    testWidgets('a file URI cover decodes the file it names ($override)', (
+      tester,
+    ) async {
+      final directory = await tester.runAsync(() async {
+        final directory = await Directory.systemTemp.createTemp('cover-uri-');
+        await _writeCover(directory, const Size(128, 128));
+        return directory;
+      });
+      final path = '${directory!.path}/cover.png';
+      try {
+        await tester.runAsync(() async {
+          await tester.pumpWidget(
+            MaterialApp(
+              home: Center(
+                child: LocalOrNetworkCoverImage(
+                  url: Uri.file(path).toString(),
+                  width: 56,
+                  height: 56,
+                  localCacheWidth: override ? 112 : null,
+                  placeholder: (_) => const SizedBox.square(dimension: 56),
+                ),
+              ),
+            ),
+          );
+          final provider = tester.widget<Image>(find.byType(Image)).image;
+          final file = provider is ResizeImage
+              ? provider.imageProvider
+              : provider;
+          expect((file as FileImage).file.path, path);
+          await _decodedImageSize(provider);
+        });
+      } finally {
+        await tester.pumpWidget(const SizedBox());
+        PaintingBinding.instance.imageCache.clear();
+        PaintingBinding.instance.imageCache.clearLiveImages();
+        await tester.runAsync(() => directory.delete(recursive: true));
+      }
+    });
+  }
+
+  for (final form in ['path', 'file URI']) {
+    testWidgets('metadata cover prewarm decodes a local $form', (tester) async {
+      final cache = PaintingBinding.instance.imageCache;
+      cache.clear();
+      cache.clearLiveImages();
+      late BuildContext context;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (value) {
+              context = value;
+              return const SizedBox();
+            },
+          ),
+        ),
+      );
+      final directory = await tester.runAsync(() async {
+        final directory = await Directory.systemTemp.createTemp(
+          'cover-prewarm-',
+        );
+        await _writeCover(directory, const Size(64, 64));
+        return directory;
+      });
+      final path = '${directory!.path}/cover.png';
+      // The Track Metadata hero decodes a local cover with this key.
+      final key = await ResizeImage(
+        FileImage(File(path)),
+        width: coverCacheWidthForViewport(context),
+      ).obtainKey(ImageConfiguration.empty);
+      try {
+        await tester.runAsync(() async {
+          precacheCoverImage(
+            context,
+            form == 'path' ? path : Uri.file(path).toString(),
+          );
+          for (var i = 0; i < 200 && !cache.statusForKey(key).keepAlive; i++) {
+            await Future<void>.delayed(const Duration(milliseconds: 5));
+          }
+        });
+        expect(cache.statusForKey(key).keepAlive, isTrue);
+      } finally {
+        await tester.pumpWidget(const SizedBox());
+        cache.clear();
+        cache.clearLiveImages();
+        await tester.runAsync(() => directory.delete(recursive: true));
+      }
+    });
+  }
+
+  testWidgets('covers in other forms show the placeholder', (tester) async {
+    for (final url in ['content://media/cover', 'network://nas/cover.jpg']) {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Center(
+            child: LocalOrNetworkCoverImage(
+              url: url,
+              width: 56,
+              height: 56,
+              borderRadius: BorderRadius.circular(8),
+              placeholder: (_) => const SizedBox.square(
+                key: ValueKey('placeholder'),
+                dimension: 56,
+              ),
+            ),
+          ),
+        ),
+      );
+      final placeholder = find.byKey(const ValueKey('placeholder'));
+      expect(placeholder, findsOneWidget);
+      expect(
+        find.ancestor(of: placeholder, matching: find.byType(ClipRRect)),
+        findsOneWidget,
+      );
+      expect(find.byType(Image), findsNothing);
+    }
+    await tester.pumpWidget(const SizedBox());
+  });
 }
 
 Future<void> _writeCover(Directory directory, Size size) async {

@@ -17,6 +17,7 @@ import 'package:mornye/theme/app_theme.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/theme/player_artwork_theme.dart';
 import 'package:mornye/widgets/app_icon_button.dart';
+import 'package:mornye/widgets/cached_cover_image.dart';
 import 'package:mornye/widgets/desktop/desktop_downloads_button.dart';
 import 'package:mornye/widgets/desktop/desktop_player_bar.dart';
 import 'package:mornye/widgets/mini_player.dart';
@@ -75,16 +76,16 @@ void main() {
 
   test('palette sources follow the artwork forms the player shows', () {
     expect(
-      PlayerArtworkTheme.paletteSource('https://example.test/a.jpg'),
+      coverImageSource('https://example.test/a.jpg'),
       'https://example.test/a.jpg',
     );
-    expect(
-      PlayerArtworkTheme.paletteSource(Uri.file(_coverA).toString()),
-      _coverA,
-    );
-    expect(PlayerArtworkTheme.paletteSource(_coverA), _coverA);
-    expect(PlayerArtworkTheme.paletteSource('content://media/cover'), isNull);
-    expect(PlayerArtworkTheme.paletteSource(null), isNull);
+    expect(coverImageSource(Uri.file(_coverA).toString()), _coverA);
+    expect(coverImageSource(_coverA), _coverA);
+    expect(coverImageSource('content://media/cover'), isNull);
+    expect(coverImageSource('network://connection/cover.jpg'), isNull);
+    expect(coverImageSource('file://host/covers/a.jpg'), isNull);
+    expect(coverImageSource('covers/a.jpg'), isNull);
+    expect(coverImageSource(null), isNull);
   });
 
   group('PlayerArtworkTheme', () {
