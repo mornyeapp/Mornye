@@ -625,7 +625,7 @@ class SubsonicClient {
         NetworkStorageService.timeout,
       )) {
         size += chunk.length;
-        if (size > 16 * 1024 * 1024) {
+        if (size > NetworkStorageService.maxCoverBytes) {
           throw const HttpException('Subsonic artwork is too large');
         }
         writer.add(chunk);

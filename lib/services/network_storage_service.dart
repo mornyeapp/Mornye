@@ -27,6 +27,17 @@ typedef _SmbListingInput = ({
   String path,
 });
 
+/// A file under a connection opened for one read: the status and headers a
+/// proxy answers with and the `bytes` of a GET. Read `bytes` or call
+/// `discard`, then `close`.
+typedef _NetworkRead = ({
+  int status,
+  Map<String, String> headers,
+  Stream<List<int>> bytes,
+  Future<void> Function() discard,
+  Future<void> Function() close,
+});
+
 List<NetworkEntry> _prepareSmbListingInBackground(_SmbListingInput input) =>
     NetworkStorageService._sorted([
       for (final file in input.files)
@@ -292,6 +303,9 @@ class NetworkStorageService {
   static const _probeTimeout = Duration(seconds: 3);
   static const _probeReuse = Duration(seconds: 10);
 
+  /// The largest cover image [downloadCover] saves.
+  static const maxCoverBytes = 16 * 1024 * 1024;
+
   /// Hosts that are not saved connections; set by their owner.
   NetworkVirtualSources? virtualSources;
 
@@ -444,7 +458,9 @@ class NetworkStorageService {
     }
   }
 
-  Future<String> resolve(String source) async {
+  /// The host and path of the `network://` [source]; throws a
+  /// [FormatException] for any other source.
+  static ({String host, String path}) _sourceParts(String source) {
     final uri = Uri.parse(source);
     if (uri.scheme != 'network' ||
         uri.userInfo.isNotEmpty ||
@@ -452,14 +468,112 @@ class NetworkStorageService {
         uri.hasFragment) {
       throw const FormatException('Invalid network source');
     }
-    final path = networkPath(uri.pathSegments.join('/'));
-    if (virtualFor(uri.host) case final virtual?) {
-      return virtual.resolve(uri.host, path);
-    }
-    final c = await connection(uri.host);
+    return (host: uri.host, path: networkPath(uri.pathSegments.join('/')));
+  }
+
+  /// The saved connection [id] for a read of [path], once local network
+  /// access allows its server and, when it is marked out of reach, the
+  /// server answers again.
+  Future<NetworkConnection> _readyConnection(String id, String path) async {
+    final c = await connection(id);
     final target = networkTarget(c, path);
     await _ensureAccess(target);
     await _checkReachable(c.id, target);
+    return c;
+  }
+
+  /// Saves the cover image at the `network://` [source] to [output], read
+  /// over its connection directly instead of through a loopback route:
+  /// Subsonic cover art, a WebDAV, HTTP or SMB file, or the local file a
+  /// virtual source answers with. Throws when the cover is unavailable,
+  /// empty, a text document (such as a Subsonic error) or larger than
+  /// [maxCoverBytes]; [output] may then hold part of it, so callers write to
+  /// a staged file and rename it once this returns.
+  Future<void> downloadCover(String source, File output) async {
+    final (:host, :path) = _sourceParts(source);
+    if (virtualFor(host) case final virtual?) {
+      // Virtual sources answer URLs only for songs on their way.
+      final file = _localFile(await virtual.resolve(host, path));
+      if (file == null) throw const HttpException('Network cover unavailable');
+      return _writeCover(file.openRead(), output);
+    }
+    final c = await _readyConnection(host, path);
+    if (c.protocol == NetworkProtocol.subsonic &&
+        !path.startsWith('subsonic/cover/')) {
+      throw const FormatException('Expected a Subsonic cover');
+    }
+    _NetworkRead? read;
+    try {
+      read = await _openRead(c, path);
+      final type = read.headers[HttpHeaders.contentTypeHeader];
+      final mime = type == null ? null : ContentType.parse(type).mimeType;
+      final size = int.tryParse(
+        read.headers[HttpHeaders.contentLengthHeader] ?? '',
+      );
+      final problem = read.status != HttpStatus.ok
+          ? 'Server returned ${read.status}'
+          : mime != null &&
+                (mime.startsWith('text/') ||
+                    mime == 'application/json' ||
+                    mime == 'application/xml')
+          ? 'Network cover unavailable'
+          : size != null && size > maxCoverBytes
+          ? 'Network cover is too large'
+          : null;
+      if (problem != null) {
+        await read.discard();
+        throw HttpException(problem);
+      }
+      await _writeCover(read.bytes, output);
+    } on HttpException catch (error) {
+      // HttpClient exceptions can carry the credential-bearing request URI.
+      if (error.uri == null) rethrow;
+      throw HttpException(error.message);
+    } finally {
+      try {
+        await read?.close();
+      } catch (_) {}
+    }
+  }
+
+  /// The local file a virtual source answers with: an absolute path or a
+  /// `file://` URI. Null for a URL.
+  static File? _localFile(String location) {
+    final file = File(location);
+    if (file.isAbsolute) return file;
+    final uri = Uri.tryParse(location);
+    if (uri == null || !uri.isScheme('file')) return null;
+    try {
+      return File(uri.toFilePath());
+    } on UnsupportedError {
+      return null;
+    }
+  }
+
+  static Future<void> _writeCover(Stream<List<int>> bytes, File output) async {
+    final writer = output.openWrite();
+    var size = 0;
+    try {
+      await for (final chunk in bytes) {
+        size += chunk.length;
+        if (size > maxCoverBytes) {
+          throw const HttpException('Network cover is too large');
+        }
+        writer.add(chunk);
+        await writer.flush();
+      }
+      if (size == 0) throw const HttpException('Network cover is empty');
+    } finally {
+      await writer.close();
+    }
+  }
+
+  Future<String> resolve(String source) async {
+    final (:host, :path) = _sourceParts(source);
+    if (virtualFor(host) case final virtual?) {
+      return virtual.resolve(host, path);
+    }
+    await _readyConnection(host, path);
     _server ??= HttpServer.bind(InternetAddress.loopbackIPv4, 0).then((server) {
       server.listen((request) => unawaited(_serve(request)));
       return server;
@@ -475,7 +589,7 @@ class NetworkStorageService {
     while (_routes.length >= 256) {
       _routes.remove(_routes.keys.first);
     }
-    _routes[token] = (id: uri.host, path: path);
+    _routes[token] = (id: host, path: path);
     return 'http://127.0.0.1:${server.port}/$token';
   }
 
@@ -995,21 +1109,21 @@ class NetworkStorageService {
     return compute(_hydrateNetworkEntriesInBackground, entries);
   }
 
-  Future<void> _serve(HttpRequest request) async {
-    NetworkSmbClient? smb;
-    try {
-      final route = _routes[request.uri.path.replaceFirst('/', '')];
-      if (route == null || !['GET', 'HEAD'].contains(request.method)) {
-        request.response.statusCode = HttpStatus.notFound;
-        return;
-      }
-      final c = await connection(route.id);
-      final target = c.protocol == NetworkProtocol.subsonic
-          ? _subsonicMediaTarget(c, route.path)
-          : networkTarget(c, route.path);
-      final range = request.headers.value(HttpHeaders.rangeHeader);
-      if (c.protocol == NetworkProtocol.smb) {
-        smb = await _smb(c, target);
+  /// Opens [path] under [c] for one [method] read over the connection's own
+  /// client, limited to the HTTP [range] when one is given. Subsonic error
+  /// documents (JSON or XML) throw instead of passing as media.
+  Future<_NetworkRead> _openRead(
+    NetworkConnection c,
+    String path, {
+    String method = 'GET',
+    String? range,
+  }) async {
+    final target = c.protocol == NetworkProtocol.subsonic
+        ? _subsonicMediaTarget(c, path)
+        : networkTarget(c, path);
+    if (c.protocol == NetworkProtocol.smb) {
+      final smb = await _smb(c, target);
+      try {
         final file = await smb.stat().timeout(timeout);
         if (!file.isFile) {
           throw const HttpException('File unavailable');
@@ -1018,68 +1132,97 @@ class NetworkStorageService {
         try {
           part = networkByteRange(range, file.size);
         } on FormatException {
-          request.response.statusCode = HttpStatus.requestedRangeNotSatisfiable;
-          request.response.headers.set(
-            HttpHeaders.contentRangeHeader,
-            'bytes */${file.size}',
+          return (
+            status: HttpStatus.requestedRangeNotSatisfiable,
+            headers: {HttpHeaders.contentRangeHeader: 'bytes */${file.size}'},
+            bytes: const Stream<List<int>>.empty(),
+            discard: () async {},
+            close: smb.close,
           );
-          return;
         }
-        request.response.statusCode = range == null ? 200 : 206;
-        request.response.headers.set(HttpHeaders.acceptRangesHeader, 'bytes');
-        request.response.headers.contentType = ContentType.parse(
-          networkContentType(target.pathSegments.last),
+        return (
+          status: range == null ? HttpStatus.ok : HttpStatus.partialContent,
+          headers: {
+            HttpHeaders.acceptRangesHeader: 'bytes',
+            HttpHeaders.contentTypeHeader: networkContentType(
+              target.pathSegments.last,
+            ),
+            HttpHeaders.contentLengthHeader: '${part.end - part.start + 1}',
+            if (range != null)
+              HttpHeaders.contentRangeHeader:
+                  'bytes ${part.start}-${part.end}/${file.size}',
+          },
+          bytes: file.size > 0
+              ? smb.read(part.start, part.end + 1).timeout(timeout)
+              : const Stream<List<int>>.empty(),
+          discard: () async {},
+          close: smb.close,
         );
-        request.response.contentLength = part.end - part.start + 1;
-        if (range != null) {
-          request.response.headers.set(
-            HttpHeaders.contentRangeHeader,
-            'bytes ${part.start}-${part.end}/${file.size}',
-          );
-        }
-        if (request.method == 'GET' && file.size > 0) {
-          await request.response.addStream(
-            smb.read(part.start, part.end + 1).timeout(timeout),
-          );
-        }
-      } else {
-        final client = _readClient(c);
-        final response = await _request(
-          client,
-          c,
-          c.protocol == NetworkProtocol.subsonic ? 'GET' : request.method,
-          target,
-          range: range,
-        );
-        if (c.protocol == NetworkProtocol.subsonic &&
-            const {
-              'application/json',
-              'application/xml',
-              'text/xml',
-            }.contains(response.headers.contentType?.mimeType)) {
-          await _discardResponse(response);
-          throw const HttpException('Subsonic media unavailable');
-        }
-        request.response.statusCode =
-            response.statusCode >= 300 && response.statusCode < 400
-            ? HttpStatus.badGateway
-            : response.statusCode;
-        for (final header in [
+      } catch (_) {
+        try {
+          await smb.close();
+        } catch (_) {}
+        rethrow;
+      }
+    }
+    final subsonic = c.protocol == NetworkProtocol.subsonic;
+    final response = await _request(
+      _readClient(c),
+      c,
+      subsonic ? 'GET' : method,
+      target,
+      range: range,
+    );
+    if (subsonic &&
+        const {
+          'application/json',
+          'application/xml',
+          'text/xml',
+        }.contains(response.headers.contentType?.mimeType)) {
+      await _discardResponse(response);
+      throw const HttpException('Subsonic media unavailable');
+    }
+    return (
+      status: response.statusCode,
+      headers: {
+        for (final header in const [
           HttpHeaders.contentTypeHeader,
           HttpHeaders.contentLengthHeader,
           HttpHeaders.contentRangeHeader,
           HttpHeaders.acceptRangesHeader,
-        ]) {
-          final value = response.headers.value(header);
-          if (value != null) request.response.headers.set(header, value);
-        }
-        if (request.method == 'GET') {
-          await request.response.addStream(response.timeout(timeout));
-        } else if (c.protocol == NetworkProtocol.subsonic) {
-          await _discardResponse(response);
-        } else {
-          await response.drain<void>().timeout(timeout);
-        }
+        ])
+          header: ?response.headers.value(header),
+      },
+      bytes: response.timeout(timeout),
+      discard: subsonic || method == 'GET'
+          ? () => _discardResponse(response)
+          : () => response.drain<void>().timeout(timeout),
+      close: () async {},
+    );
+  }
+
+  Future<void> _serve(HttpRequest request) async {
+    _NetworkRead? read;
+    try {
+      final route = _routes[request.uri.path.replaceFirst('/', '')];
+      if (route == null || !['GET', 'HEAD'].contains(request.method)) {
+        request.response.statusCode = HttpStatus.notFound;
+        return;
+      }
+      read = await _openRead(
+        await connection(route.id),
+        route.path,
+        method: request.method,
+        range: request.headers.value(HttpHeaders.rangeHeader),
+      );
+      request.response.statusCode = read.status >= 300 && read.status < 400
+          ? HttpStatus.badGateway
+          : read.status;
+      read.headers.forEach(request.response.headers.set);
+      if (request.method == 'GET') {
+        await request.response.addStream(read.bytes);
+      } else {
+        await read.discard();
       }
     } catch (_) {
       try {
@@ -1087,7 +1230,7 @@ class NetworkStorageService {
       } catch (_) {}
     } finally {
       try {
-        await smb?.close();
+        await read?.close();
       } catch (_) {}
       try {
         await request.response.close();

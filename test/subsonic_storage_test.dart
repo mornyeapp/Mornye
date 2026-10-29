@@ -243,6 +243,97 @@ void main() {
     },
   );
 
+  test(
+    'covers are read through getCoverArt; error documents are rejected',
+    () async {
+      final song = SubsonicSong(server.song);
+      final source = NetworkStorageService.source('fixture', song.coverPath!);
+      final output = File('${directory.path}/cover.image');
+      await storage.downloadCover(source, output);
+      expect(await output.readAsBytes(), [0, 1, 2, 3]);
+      expect(server.requests.last.path, endsWith('/rest/getCoverArt.view'));
+      expect(server.requests.last.queryParameters['id'], song.coverId);
+
+      server.mediaError = true;
+      final rejected = File('${directory.path}/rejected.image');
+      await expectLater(
+        storage.downloadCover(source, rejected),
+        throwsA(
+          isA<HttpException>().having(
+            (error) => error.toString(),
+            'safe error',
+            allOf(
+              contains('Subsonic media unavailable'),
+              isNot(contains('private')),
+            ),
+          ),
+        ),
+      );
+      expect(await rejected.exists(), isFalse);
+      server.mediaError = false;
+
+      // A song path is not a cover; its audio is never read.
+      await expectLater(
+        storage.downloadCover(
+          NetworkStorageService.source('fixture', song.path),
+          rejected,
+        ),
+        throwsFormatException,
+      );
+      expect(
+        server.requests.where((uri) => uri.path.contains('stream')),
+        isEmpty,
+      );
+    },
+  );
+
+  test('a broken cover transfer does not expose the request URL', () async {
+    final broken = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(broken.close);
+    broken.listen((socket) {
+      var answered = false;
+      socket.listen((_) {
+        if (answered) return;
+        answered = true;
+        socket.add(
+          utf8.encode(
+            'HTTP/1.1 200 OK\r\ncontent-type: image/png\r\n'
+            'content-length: 100\r\n\r\n',
+          ),
+        );
+        socket.add([0x89, 0x50, 0x4E, 0x47]);
+        socket.flush().whenComplete(socket.destroy).ignore();
+      }, onError: (Object _) {});
+    });
+    await storage.save(
+      NetworkConnection(
+        id: 'broken',
+        name: 'Music server',
+        protocol: NetworkProtocol.subsonic,
+        address: 'http://127.0.0.1:${broken.port}/',
+        subsonicAuth: SubsonicAuth.apiKey,
+        apiKey: 'private-api-key',
+      ),
+    );
+    await expectLater(
+      storage.downloadCover(
+        NetworkStorageService.source('broken', subsonicCoverPath('cover')),
+        File('${directory.path}/broken.image'),
+      ),
+      throwsA(
+        isA<HttpException>().having(
+          (error) => error.toString(),
+          'safe error',
+          allOf(
+            contains('Connection closed'),
+            isNot(contains('private-api-key')),
+            isNot(contains('getCoverArt')),
+          ),
+        ),
+      ),
+    );
+  });
+
   test('transport failures do not expose authenticated request URLs', () async {
     server.disconnect = true;
     await expectLater(

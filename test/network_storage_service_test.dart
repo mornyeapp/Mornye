@@ -23,6 +23,7 @@ NetworkConnection connection(
 
 class _VirtualSources implements NetworkVirtualSources {
   bool connected = true;
+  String? location;
 
   @override
   bool owns(String id) => id == 'phone';
@@ -34,7 +35,8 @@ class _VirtualSources implements NetworkVirtualSources {
   Stream<NetworkVirtualSong> songs(String id) => const Stream.empty();
 
   @override
-  Future<String> resolve(String id, String path) async => '/received/$id/$path';
+  Future<String> resolve(String id, String path) async =>
+      location ?? '/received/$id/$path';
 
   @override
   Future<Map<String, dynamic>> metadata(String id, String path) async => {};
@@ -257,6 +259,37 @@ void main() {
     expect(stored, isNull);
   });
 
+  test('virtual hosts answer covers with their local files only', () async {
+    final service = NetworkStorageService(
+      read: () async => null,
+      write: (_) async {},
+    );
+    final sources = _VirtualSources();
+    service.virtualSources = sources;
+    final temp = await Directory.systemTemp.createTemp('virtual-cover-');
+    addTearDown(() => temp.delete(recursive: true));
+    const png = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+    final cover = File('${temp.path}/cover.png')..writeAsBytesSync(png);
+    for (final location in [cover.path, cover.uri.toString()]) {
+      sources.location = location;
+      final output = File('${temp.path}/copy.image');
+      await service.downloadCover('network://phone/cover.png', output);
+      expect(await output.readAsBytes(), png);
+    }
+    // A URL from a virtual source streams a song on its way.
+    sources.location = 'http://127.0.0.1:9/stream';
+    final output = File('${temp.path}/url.image');
+    await expectLater(
+      service.downloadCover('network://phone/cover.png', output),
+      throwsA(isA<HttpException>()),
+    );
+    expect(await output.exists(), isFalse);
+    await expectLater(
+      service.downloadCover('network://phone/cover.png?size=1', output),
+      throwsFormatException,
+    );
+  });
+
   test('a network song can play while its host is reachable', () async {
     final service = NetworkStorageService(
       read: () async => null,
@@ -289,6 +322,7 @@ void main() {
     late String origin;
     final requests = <String>[];
     List<List<int>>? listingChunks;
+    const cover = [0xFF, 0xD8, 0xFF, 0xE0, 1, 2, 3, 4];
     setUp(() async {
       requests.clear();
       listingChunks = null;
@@ -320,6 +354,33 @@ void main() {
             // The client closes the response when it exceeds the size limit.
           } on HttpException {
             // A rejected response can also fail an in-flight flush.
+          }
+          return;
+        } else if (r.uri.path.startsWith('/art/')) {
+          try {
+            final name = r.uri.pathSegments.last;
+            r.response.headers.contentType = ContentType('image', 'jpeg');
+            if (name == 'cover.jpg') {
+              r.response.add(cover);
+            } else if (name == 'page.jpg') {
+              r.response.headers.contentType = ContentType.html;
+              r.response.write('<html>Sign in</html>');
+            } else if (name == 'large.jpg' || name == 'unsized.jpg') {
+              if (name == 'large.jpg') {
+                r.response.contentLength =
+                    NetworkStorageService.maxCoverBytes + 1;
+              }
+              for (var mebibyte = 0; mebibyte < 16; mebibyte++) {
+                r.response.add(Uint8List(1024 * 1024));
+                await r.response.flush();
+              }
+              r.response.add([0]);
+            } else {
+              r.response.statusCode = 404;
+            }
+            await r.response.close();
+          } on IOException {
+            // The client stops reading a cover it rejects.
           }
           return;
         } else if (r.method == 'PROPFIND') {
@@ -420,6 +481,66 @@ void main() {
       // A server that answers again plays as usual.
       service.setReachable('server', reachable: false);
       expect(await service.resolve(back), startsWith('http://127.0.0.1:'));
+    });
+
+    test('covers are read over the connection, up to 16 MiB', () async {
+      final c = connection('$origin/art/', user: 'test', password: 'secret');
+      await service.save(c);
+      final temp = await Directory.systemTemp.createTemp('network-cover-');
+      addTearDown(() => temp.delete(recursive: true));
+      final output = File('${temp.path}/cover.image');
+      await service.downloadCover(
+        NetworkStorageService.source(c.id, 'cover.jpg'),
+        output,
+      );
+      expect(await output.readAsBytes(), cover);
+      expect(requests, ['GET /art/cover.jpg']);
+      for (final (name, message) in [
+        ('page.jpg', 'Network cover unavailable'),
+        ('large.jpg', 'Network cover is too large'),
+        ('unsized.jpg', 'Network cover is too large'),
+        ('missing.jpg', 'Server returned 404'),
+      ]) {
+        await expectLater(
+          service.downloadCover(
+            NetworkStorageService.source(c.id, name),
+            File('${temp.path}/$name'),
+          ),
+          throwsA(
+            isA<HttpException>().having(
+              (error) => error.message,
+              'message',
+              message,
+            ),
+          ),
+          reason: name,
+        );
+      }
+    });
+
+    test('a cover of a server marked out of reach fails fast', () async {
+      final closed = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+      final port = closed.port;
+      await closed.close();
+      await service.save(connection('http://127.0.0.1:$port/', id: 'gone'));
+      service.setReachable('gone', reachable: false);
+      final temp = await Directory.systemTemp.createTemp('network-cover-');
+      addTearDown(() => temp.delete(recursive: true));
+      final output = File('${temp.path}/cover.image');
+      await expectLater(
+        service.downloadCover(
+          NetworkStorageService.source('gone', 'cover.jpg'),
+          output,
+        ),
+        throwsA(
+          isA<SocketException>().having(
+            (error) => error.message,
+            'message',
+            'The server cannot be reached',
+          ),
+        ),
+      );
+      expect(await output.exists(), isFalse);
     });
 
     test(
