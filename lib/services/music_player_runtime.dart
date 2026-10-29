@@ -199,6 +199,8 @@ class PlaybackDependencies {
         // System UI draws only the small icon's alpha. The opaque launcher
         // default became a blank dot in the status bar and output switcher.
         androidNotificationIcon: 'drawable/ic_launcher_monochrome',
+        artDownscaleWidth: 512,
+        artDownscaleHeight: 512,
         // Keep background resume eligible for audio focus. The Android fork
         // releases the CPU wake lock on pause and demotes the service on stop.
         androidStopForegroundOnPause: false,

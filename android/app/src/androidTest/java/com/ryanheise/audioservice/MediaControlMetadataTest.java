@@ -1,24 +1,33 @@
 package com.ryanheise.audioservice;
 
 import android.app.Instrumentation;
+import android.graphics.Bitmap;
+import android.graphics.Color;
 import android.os.SystemClock;
 import android.support.v4.media.MediaMetadataCompat;
 import android.support.v4.media.session.MediaControllerCompat;
 import android.support.v4.media.session.MediaSessionCompat;
 import android.support.v4.media.session.PlaybackStateCompat;
+import android.util.LruCache;
 
 import androidx.media.utils.MediaConstants;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.platform.app.InstrumentationRegistry;
 
+import java.io.File;
+import java.io.FileOutputStream;
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.util.Collections;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNotSame;
+import static org.junit.Assert.assertNull;
 
 /** Exercises real platform session publication when artwork/metadata arrives after state. */
 @RunWith(AndroidJUnit4.class)
@@ -31,6 +40,191 @@ public class MediaControlMetadataTest {
     @Test
     public void lateMetadataPreservesPausedPositionAndControls() throws Exception {
         verifyMetadataPublication(false);
+    }
+
+    @Test
+    public void recycledCachedArtworkIsDecodedAgain() throws Exception {
+        Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
+        File file = File.createTempFile("session-cover", ".png",
+                instrumentation.getTargetContext().getCacheDir());
+        Bitmap original = Bitmap.createBitmap(32, 32, Bitmap.Config.ARGB_8888);
+        try {
+            try (FileOutputStream output = new FileOutputStream(file)) {
+                original.compress(Bitmap.CompressFormat.PNG, 100, output);
+            }
+            AudioService service = createService(instrumentation);
+            LruCache<String, Bitmap> cache = new LruCache<>(4);
+            String uri = file.toURI().toString();
+            cache.put(uri, original);
+            original.recycle();
+            setField(service, "artBitmapCache", cache);
+            AudioServiceConfig config = new AudioServiceConfig(instrumentation.getTargetContext());
+            config.artDownscaleWidth = config.artDownscaleHeight = 64;
+            setField(service, "config", config);
+
+            Bitmap decoded = service.loadArtBitmap(uri, null);
+            assertNotNull(decoded);
+            assertFalse(decoded.isRecycled());
+            assertNotSame(original, decoded);
+            assertEquals(32, decoded.getWidth());
+            decoded.recycle();
+        } finally {
+            if (!original.isRecycled()) original.recycle();
+            file.delete();
+        }
+    }
+
+    @Test
+    public void recycledArtworkDoesNotInterruptMetadataPublication() throws Exception {
+        Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
+        AudioService service = createService(instrumentation);
+        MediaSessionCompat[] sessions = new MediaSessionCompat[1];
+        instrumentation.runOnMainSync(() -> sessions[0] = new MediaSessionCompat(
+                instrumentation.getTargetContext(), "recycled-artwork-test"));
+        MediaSessionCompat session = sessions[0];
+        setField(service, "mediaSession", session);
+        Bitmap recycled = Bitmap.createBitmap(1024, 1024, Bitmap.Config.ARGB_8888);
+        MediaMetadataCompat metadata = new MediaMetadataCompat.Builder(metadata("recycled", "Song with bad cover"))
+                .putBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART, recycled)
+                .putBitmap(MediaMetadataCompat.METADATA_KEY_DISPLAY_ICON, recycled)
+                .build();
+        recycled.recycle();
+        try {
+            instrumentation.runOnMainSync(() -> {
+                setState(service, 0, false);
+                publish(service, metadata, recycled);
+            });
+            assertEquals("Song with bad cover", session.getController().getMetadata()
+                    .getString(MediaMetadataCompat.METADATA_KEY_TITLE));
+            assertNull(session.getController().getMetadata().getBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART));
+            PlaybackStateCompat state = session.getController().getPlaybackState();
+            assertEquals(PlaybackStateCompat.STATE_PAUSED, state.getState());
+            assertEquals(2345L, state.getPosition());
+            assertEquals("recycled", state.getExtras().getString(MediaConstants.PLAYBACK_STATE_EXTRAS_KEY_MEDIA_ID));
+        } finally {
+            instrumentation.runOnMainSync(session::release);
+        }
+    }
+
+    @Test
+    public void sessionAndNotificationCopiesStayIndependentAndBounded() {
+        Bitmap source = Bitmap.createBitmap(1024, 512, Bitmap.Config.ARGB_8888);
+        source.eraseColor(Color.BLUE);
+        MediaMetadataCompat original = new MediaMetadataCompat.Builder(metadata("cover", "Song"))
+                .putBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART, source)
+                .putBitmap(MediaMetadataCompat.METADATA_KEY_DISPLAY_ICON, source)
+                .build();
+        MediaMetadataCompat session = MediaArtwork.forSession(original);
+        Bitmap album = session.getBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART);
+        Bitmap icon = session.getBitmap(MediaMetadataCompat.METADATA_KEY_DISPLAY_ICON);
+        Bitmap notification = MediaArtwork.copy(source, 256);
+        try {
+            assertNotNull(album);
+            assertNotNull(icon);
+            assertNotNull(notification);
+            assertNotSame(source, album);
+            assertNotSame(album, icon);
+            assertEquals(512, album.getWidth());
+            assertEquals(256, album.getHeight());
+            assertEquals(256, notification.getWidth());
+            assertEquals(128, notification.getHeight());
+            album.recycle();
+            notification.recycle();
+            assertFalse(source.isRecycled());
+            assertFalse(icon.isRecycled());
+            assertEquals(Color.BLUE, icon.getPixel(0, 0));
+            assertEquals(Color.BLUE, source.getPixel(0, 0));
+            assertEquals("Song", session.getString(MediaMetadataCompat.METADATA_KEY_TITLE));
+        } finally {
+            source.recycle();
+            if (album != null && !album.isRecycled()) album.recycle();
+            if (icon != null) icon.recycle();
+            if (notification != null && !notification.isRecycled()) notification.recycle();
+        }
+    }
+
+    @Test
+    public void frameworkArtworkRejectionRetriesTextWithoutStoppingControls() throws Exception {
+        Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
+        AudioService service = createService(instrumentation);
+        int[] calls = {0};
+        MediaSessionCompat[] sessions = new MediaSessionCompat[1];
+        instrumentation.runOnMainSync(() -> sessions[0] = new MediaSessionCompat(
+                instrumentation.getTargetContext(), "artwork-fallback-test") {
+            @Override
+            public void setMetadata(MediaMetadataCompat metadata) {
+                if (++calls[0] == 1) {
+                    throw new IllegalArgumentException("cannot use a recycled source in createBitmap");
+                }
+                assertNull(metadata.getBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART));
+                super.setMetadata(metadata);
+            }
+        });
+        MediaSessionCompat session = sessions[0];
+        setField(service, "mediaSession", session);
+        Bitmap bitmap = Bitmap.createBitmap(32, 32, Bitmap.Config.ARGB_8888);
+        MediaMetadataCompat metadata = new MediaMetadataCompat.Builder(metadata("fallback", "Still playing"))
+                .putBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART, bitmap)
+                .build();
+        try {
+            instrumentation.runOnMainSync(() -> {
+                setState(service, 0, false);
+                publish(service, metadata, bitmap);
+            });
+            assertEquals(2, calls[0]);
+            assertEquals("Still playing", session.getController().getMetadata()
+                    .getString(MediaMetadataCompat.METADATA_KEY_TITLE));
+            assertFalse(bitmap.isRecycled());
+            assertEquals(PlaybackStateCompat.STATE_PAUSED, session.getController().getPlaybackState().getState());
+            assertEquals("fallback", session.getController().getPlaybackState().getExtras()
+                    .getString(MediaConstants.PLAYBACK_STATE_EXTRAS_KEY_MEDIA_ID));
+        } finally {
+            bitmap.recycle();
+            instrumentation.runOnMainSync(session::release);
+        }
+    }
+
+    @Test
+    public void playbackErrorsKeepTheirMessageAndUseAStandardFallbackCode() throws Exception {
+        Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
+        AudioService service = createService(instrumentation);
+        MediaSessionCompat[] sessions = new MediaSessionCompat[1];
+        instrumentation.runOnMainSync(() -> sessions[0] = new MediaSessionCompat(
+                instrumentation.getTargetContext(), "playback-error-code-test"));
+        MediaSessionCompat session = sessions[0];
+        setField(service, "mediaSession", session);
+        try {
+            for (Integer code : new Integer[] {null, PlaybackStateCompat.ERROR_CODE_NOT_SUPPORTED}) {
+                instrumentation.runOnMainSync(() -> service.setState(Collections.emptyList(), 0,
+                        new int[0], AudioProcessingState.error, false, 2345, 6000, 1f,
+                        SystemClock.elapsedRealtime(), code, "Playback failed", 0, 0, false, 3L));
+                PlaybackStateCompat state = session.getController().getPlaybackState();
+                assertEquals(PlaybackStateCompat.STATE_ERROR, state.getState());
+                assertEquals(code == null ? PlaybackStateCompat.ERROR_CODE_UNKNOWN_ERROR : code,
+                        state.getErrorCode());
+                assertEquals("Playback failed", state.getErrorMessage().toString());
+                assertEquals(2345L, state.getPosition());
+                assertEquals(3L, state.getActiveQueueItemId());
+            }
+        } finally {
+            instrumentation.runOnMainSync(session::release);
+        }
+    }
+
+    private static AudioService createService(Instrumentation instrumentation) {
+        AudioService[] services = new AudioService[1];
+        instrumentation.runOnMainSync(() -> services[0] = new AudioService());
+        return services[0];
+    }
+
+    private static void publish(AudioService service, MediaMetadataCompat metadata, Bitmap bitmap) {
+        try {
+            Method method = AudioService.class.getDeclaredMethod("publishMetadata", MediaMetadataCompat.class, Bitmap.class);
+            method.setAccessible(true);
+            method.invoke(service, metadata, bitmap);
+        } catch (ReflectiveOperationException error) {
+            throw new AssertionError("Metadata publication failed", error);
+        }
     }
 
     private static void verifyMetadataPublication(boolean playing) throws Exception {

@@ -24,6 +24,7 @@ import android.support.v4.media.RatingCompat;
 import android.support.v4.media.session.MediaControllerCompat;
 import android.support.v4.media.session.MediaSessionCompat;
 import android.support.v4.media.session.PlaybackStateCompat;
+import android.util.Log;
 import android.util.LruCache;
 import android.util.Size;
 import android.view.KeyEvent;
@@ -177,7 +178,11 @@ public class AudioService extends MediaBrowserServiceCompat {
 
     Bitmap loadArtBitmap(String artUriString, String loadThumbnailUri) {
         Bitmap bitmap = artBitmapCache.get(artUriString);
-        if (bitmap != null) return bitmap;
+        if (bitmap != null) {
+            if (!bitmap.isRecycled()) return bitmap;
+            artBitmapCache.remove(artUriString);
+            bitmap = null;
+        }
         ParcelFileDescriptor parcelFileDescriptor = null;
         try {
             // There are 3 cases handled by this function:
@@ -243,7 +248,7 @@ public class AudioService extends MediaBrowserServiceCompat {
                     }
                 }
             }
-            artBitmapCache.put(artUriString, bitmap);
+            if (bitmap != null) artBitmapCache.put(artUriString, bitmap);
             return bitmap;
         } catch (Exception e) {
             e.printStackTrace();
@@ -387,7 +392,8 @@ public class AudioService extends MediaBrowserServiceCompat {
         artBitmapCache.evictAll();
         compactActionIndices = null;
         releaseMediaSession();
-        ServiceCompat.stopForeground(this, config.androidResumeOnClick ? STOP_FOREGROUND_DETACH : STOP_FOREGROUND_REMOVE);
+        ServiceCompat.stopForeground(this, config.androidResumeOnClick
+                ? ServiceCompat.STOP_FOREGROUND_DETACH : ServiceCompat.STOP_FOREGROUND_REMOVE);
         // This still does not solve the Android 11 problem.
         // if (notificationCreated) {
         //     NotificationManager notificationManager = getNotificationManager();
@@ -594,7 +600,7 @@ public class AudioService extends MediaBrowserServiceCompat {
         if (errorCode != null && errorMessage != null)
             stateBuilder.setErrorMessage(errorCode, errorMessage);
         else if (errorMessage != null)
-            stateBuilder.setErrorMessage(-987654, errorMessage);
+            stateBuilder.setErrorMessage(PlaybackStateCompat.ERROR_CODE_UNKNOWN_ERROR, errorMessage);
 
         if (mediaMetadata != null) {
             // Update the progress bar in the browse view as content is playing as explained
@@ -679,7 +685,7 @@ public class AudioService extends MediaBrowserServiceCompat {
             if (description.getDescription() != null)
                 builder.setSubText(description.getDescription());
             if (artBitmap != null)
-                builder.setLargeIcon(artBitmap);
+                builder.setLargeIcon(MediaArtwork.copy(artBitmap, 256));
         }
         if (config.androidNotificationClickStartsActivity)
             builder.setContentIntent(mediaSession.getController().getSessionActivity());
@@ -772,7 +778,7 @@ public class AudioService extends MediaBrowserServiceCompat {
     }
 
     private void exitForegroundState() {
-        ServiceCompat.stopForeground(this, STOP_FOREGROUND_DETACH);
+        ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_DETACH);
         releaseWakeLock();
     }
 
@@ -868,12 +874,19 @@ public class AudioService extends MediaBrowserServiceCompat {
         // after the new track is already playing, so refresh the latest state
         // with its new media ID without changing playback or its position clock.
         if (destroyed || mediaSession == null) return;
+        mediaMetadata = MediaArtwork.sanitize(mediaMetadata);
+        try {
+            mediaSession.setMetadata(MediaArtwork.forSession(mediaMetadata));
+        } catch (IllegalArgumentException | IllegalStateException error) {
+            Log.w("AudioService", "Artwork rejected by media session; publishing text metadata", error);
+            mediaMetadata = MediaArtwork.withoutArtwork(mediaMetadata);
+            mediaSession.setMetadata(mediaMetadata);
+        }
         synchronized (mediaMetadataCache) {
             mediaMetadataCache.setCurrent(mediaMetadata.getString(MediaMetadataCompat.METADATA_KEY_MEDIA_ID), mediaMetadata);
         }
         this.mediaMetadata = mediaMetadata;
-        artBitmap = bitmap;
-        mediaSession.setMetadata(mediaMetadata);
+        artBitmap = bitmap != null && !bitmap.isRecycled() ? bitmap : null;
         PlaybackStateCompat state = mediaSession.getController().getPlaybackState();
         if (state != null) {
             Bundle extras = state.getExtras() == null ? new Bundle() : new Bundle(state.getExtras());
