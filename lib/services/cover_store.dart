@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:collection';
 import 'dart:convert';
 import 'dart:io';
 
@@ -27,6 +28,7 @@ class CoverStore {
     Future<void> Function(String ref, File output)? fetch,
     this.maxFiles = 2000,
     this.maxBytes = 200 * 1024 * 1024,
+    this.maxFetches = 4,
     this.retryDelay = const Duration(minutes: 1),
   }) : _directory = directory ?? defaultDirectory,
        _fetcher = fetch ?? NetworkStorageService.instance.downloadCover;
@@ -40,7 +42,12 @@ class CoverStore {
   /// How many stored covers, and how many bytes of them, [trim] keeps.
   final int maxFiles, maxBytes;
 
-  /// How long a reference whose fetch failed waits before fetching again.
+  /// How many covers are fetched at once; more fetches wait their turn.
+  final int maxFetches;
+
+  /// How long a reference whose fetch failed waits before fetching again;
+  /// an hour when the server answered that the cover is missing or not an
+  /// image.
   final Duration retryDelay;
 
   final Future<Directory> Function() _directory;
@@ -49,6 +56,7 @@ class CoverStore {
   static final _storedName = RegExp(r'^([0-9a-f]{32})_[0-9a-f]{16}\.image$');
   static const _refreshAge = Duration(days: 1);
   static const _stagingAge = Duration(hours: 1);
+  static const _missingRetryDelay = Duration(hours: 1);
   static const _heifBrands = {
     'avif',
     'avis',
@@ -69,7 +77,11 @@ class CoverStore {
 
   /// Fetches under way and when fetches last failed, by reference key.
   final _fetches = <String, Future<String?>>{};
-  final _failures = <String, DateTime>{};
+  final _failures = <String, ({DateTime at, Duration wait})>{};
+
+  /// Fetches holding a turn, and fetches waiting for one.
+  var _fetching = 0;
+  final _turns = Queue<Completer<void>>();
 
   /// Names being written or touched now, which [trim] leaves alone.
   final _busy = <String>{};
@@ -112,10 +124,11 @@ class CoverStore {
   /// The durable local file for [ref], fetching a `network://` cover once.
   /// Null for references the store does not materialize (`https`, which
   /// stays with CoverCacheManager) or when the cover is unavailable.
-  /// Concurrent calls for one reference share one fetch, and a failed
-  /// fetch waits [retryDelay] before the next. A cover stored more than a
-  /// day ago is answered at once and fetched again in the background:
-  /// [changes] reports when its bytes changed.
+  /// Concurrent calls for one reference share one fetch, at most
+  /// [maxFetches] references are fetched at once, and a failed fetch waits
+  /// [retryDelay] before the next. A cover stored more than a day ago (or
+  /// dated more than a day ahead) is answered at once and fetched again in
+  /// the background: [changes] reports when its bytes changed.
   Future<String?> file(String? ref) async {
     if (ref == null || ref.isEmpty) return null;
     if (!fetches(ref)) {
@@ -130,7 +143,8 @@ class CoverStore {
       final path = p.join(root, name);
       final stat = await FileStat.stat(path);
       if (stat.type == FileSystemEntityType.file) {
-        if (DateTime.now().difference(stat.modified) >= _refreshAge &&
+        // A date ahead of the clock means the clock was wrong when saved.
+        if (DateTime.now().difference(stat.modified).abs() >= _refreshAge &&
             !_failedRecently(key)) {
           unawaited(_fetch(ref, root, key));
         }
@@ -156,9 +170,11 @@ class CoverStore {
     await for (final entry in directory.list(followLinks: false)) {
       if (entry is! File) continue;
       final name = p.basename(entry.path);
-      if (_busy.contains(name)) continue;
       final stat = await entry.stat();
-      if (stat.type != FileSystemEntityType.file) continue;
+      // A fetch can take up the name while the stat is under way.
+      if (_busy.contains(name) || stat.type != FileSystemEntityType.file) {
+        continue;
+      }
       if (name.endsWith('.tmp')) {
         if (now.difference(stat.modified) > _stagingAge) {
           await deleteFileQuietly(entry);
@@ -224,7 +240,12 @@ class CoverStore {
         try {
           return await _save(ref, root, key);
         } catch (error) {
-          _failures[key] = DateTime.now();
+          _failures[key] = (
+            at: DateTime.now(),
+            wait: error is NetworkMediaUnavailable || error is FormatException
+                ? _missingRetryDelay
+                : retryDelay,
+          );
           _log.d('Could not fetch a network cover: ${error.runtimeType}');
           return null;
         } finally {
@@ -239,7 +260,12 @@ class CoverStore {
     String? name;
     _busy.add(stagedName);
     try {
-      await _fetcher(ref, staged);
+      await _takeTurn();
+      try {
+        await _fetcher(ref, staged);
+      } finally {
+        _endTurn();
+      }
       name = '${key}_${await _contentKey(staged)}.image';
       _busy.add(name);
       final target = File(p.join(root, name));
@@ -295,10 +321,29 @@ class CoverStore {
   static String _key(String ref) =>
       sha256.convert(utf8.encode(ref)).toString().substring(0, 32);
 
+  Future<void> _takeTurn() async {
+    if (_fetching < maxFetches) {
+      _fetching++;
+      return;
+    }
+    final turn = Completer<void>();
+    _turns.add(turn);
+    await turn.future;
+  }
+
+  /// Hands the turn to the next waiting fetch, if any.
+  void _endTurn() {
+    if (_turns.isNotEmpty) {
+      _turns.removeFirst().complete();
+    } else {
+      _fetching--;
+    }
+  }
+
   bool _failedRecently(String key) {
     final failed = _failures[key];
     if (failed == null) return false;
-    if (DateTime.now().difference(failed) < retryDelay) return true;
+    if (DateTime.now().difference(failed.at) < failed.wait) return true;
     _failures.remove(key);
     return false;
   }

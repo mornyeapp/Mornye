@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -31,6 +32,7 @@ void main() {
     required Future<void> Function(String ref, File output) fetch,
     int maxFiles = 2000,
     int maxBytes = 200 * 1024 * 1024,
+    int maxFetches = 4,
     Duration retryDelay = const Duration(minutes: 1),
   }) {
     final covers = CoverStore(
@@ -38,6 +40,7 @@ void main() {
       fetch: fetch,
       maxFiles: maxFiles,
       maxBytes: maxBytes,
+      maxFetches: maxFetches,
       retryDelay: retryDelay,
     );
     addTearDown(covers.dispose);
@@ -118,34 +121,91 @@ void main() {
     expect(fetches, 1);
   });
 
+  test('at most maxFetches covers are fetched at once', () async {
+    final release = Completer<void>();
+    var started = 0;
+    var running = 0;
+    var peak = 0;
+    final covers = store(
+      maxFetches: 4,
+      fetch: (ref, output) async {
+        started++;
+        peak = max(peak, ++running);
+        await release.future;
+        running--;
+        await output.writeAsBytes(_jpeg(started));
+      },
+    );
+    final calls = [
+      for (var row = 0; row < 10; row++)
+        covers.file('network://desktop/subsonic/cover/$row.image'),
+    ];
+    await pumpEventQueue();
+    expect(started, 4);
+    release.complete();
+    final paths = await Future.wait(calls);
+    expect(paths, everyElement(isNotNull));
+    expect(started, 10);
+    expect(peak, 4);
+  });
+
   test(
     'a failed fetch leaves no file and waits before fetching again',
     () async {
       var fetches = 0;
-      final covers = store(
-        fetch: (ref, output) async {
-          fetches++;
-          await output.writeAsBytes(_jpeg(1).sublist(0, 8));
-          throw const HttpException('Connection closed');
-        },
-      );
+      Future<void> broken(String ref, File output) async {
+        fetches++;
+        await output.writeAsBytes(_jpeg(1).sublist(0, 8));
+        throw const HttpException('Connection closed');
+      }
+
+      final covers = store(fetch: broken);
       const ref = 'network://desktop/subsonic/cover/YQ.image';
       expect(await covers.file(ref), isNull);
       expect(await covers.file(ref), isNull);
       expect(fetches, 1);
       expect(names(), isEmpty);
 
-      // Bytes that are not an image never become a cover either.
-      final invalid = store(
+      final retrying = store(retryDelay: Duration.zero, fetch: broken);
+      expect(await retrying.file(ref), isNull);
+      expect(await retrying.file(ref), isNull);
+      expect(fetches, 3);
+      expect(names(), isEmpty);
+    },
+  );
+
+  test(
+    'a cover the server does not have is not asked for again soon',
+    () async {
+      final fetches = <String, int>{};
+      final covers = store(
         retryDelay: Duration.zero,
         fetch: (ref, output) async {
-          fetches++;
-          await output.writeAsString('{"subsonic-response":{}}');
+          fetches.update(ref, (count) => count + 1, ifAbsent: () => 1);
+          switch (ref) {
+            case 'network://desktop/missing':
+              throw const NetworkMediaUnavailable('Server returned 404');
+            case 'network://desktop/document':
+              await output.writeAsString('{"subsonic-response":{}}');
+            default:
+              throw const HttpException('Connection closed');
+          }
         },
       );
-      expect(await invalid.file(ref), isNull);
-      expect(await invalid.file(ref), isNull);
-      expect(fetches, 3);
+      for (final ref in [
+        'network://desktop/missing',
+        'network://desktop/document',
+        'network://desktop/offline',
+      ]) {
+        expect(await covers.file(ref), isNull);
+        expect(await covers.file(ref), isNull);
+      }
+      // Only the transfer failure is tried again after retryDelay.
+      expect(fetches, {
+        'network://desktop/missing': 1,
+        'network://desktop/document': 1,
+        'network://desktop/offline': 2,
+      });
       expect(names(), isEmpty);
     },
   );
@@ -291,6 +351,42 @@ void main() {
       expect(names(), [p.basename(pathB), 'fresh.tmp', 'notes.txt']..sort());
     },
   );
+
+  test('a deleted store folder is filled again on demand', () async {
+    var fetches = 0;
+    final covers = store(
+      fetch: (ref, output) async {
+        fetches++;
+        await output.writeAsBytes(_jpeg(1));
+      },
+    );
+    const ref = 'network://desktop/subsonic/cover/YQ.image';
+    final path = (await covers.file(ref))!;
+    await directory.delete(recursive: true);
+    expect(covers.cachedFile(ref), isNull);
+    expect(await covers.file(ref), path);
+    expect(await File(path).readAsBytes(), _jpeg(1));
+    expect(fetches, 2);
+  });
+
+  test('a cover dated ahead of the clock is checked again', () async {
+    var fetches = 0;
+    final covers = store(
+      fetch: (ref, output) async {
+        fetches++;
+        await output.writeAsBytes(_jpeg(1));
+      },
+    );
+    const ref = 'network://desktop/subsonic/cover/YQ.image';
+    final path = (await covers.file(ref))!;
+    final ahead = DateTime.now().add(const Duration(days: 400));
+    await File(path).setLastModified(ahead);
+    expect(await covers.file(ref), path);
+    // Waits for the background fetch.
+    await covers.dispose();
+    expect(fetches, 2);
+    expect((await File(path).stat()).modified.isBefore(ahead), isTrue);
+  });
 
   test('file references pass through while their file exists', () async {
     final covers = store(
