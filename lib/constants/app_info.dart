@@ -1,5 +1,4 @@
 import 'package:flutter/foundation.dart';
-import 'package:mornye/utils/desktop_platform.dart';
 
 class AppInfo {
   static const String version = '5.3.0';
@@ -9,14 +8,12 @@ class AppInfo {
   static String get shortGitCommit =>
       gitCommit.length > 8 ? gitCommit.substring(0, 8) : gitCommit;
 
-  /// The version shown to people; desktop builds are still in beta.
+  /// The version shown to people; debug builds stay internal.
   static String get displayVersion => versionLabel();
 
   @visibleForTesting
-  static String versionLabel({bool debug = kDebugMode, bool? desktop}) {
-    if (debug) return 'Internal';
-    return desktop ?? isDesktopPlatform ? '$version (beta)' : version;
-  }
+  static String versionLabel({bool debug = kDebugMode}) =>
+      debug ? 'Internal' : version;
 
   static const String appName = 'Mornye';
   static const String license = 'LGPL-3.0-only';
