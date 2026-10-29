@@ -8633,6 +8633,35 @@
   "@lyricsBlurOff": {
     "description": "Value of the lyrics blur slider at zero"
   },
+  "lyricsOffset": "Lyrics timing",
+  "@lyricsOffset": {
+    "description": "Setting: move synced lyrics earlier or later than playback"
+  },
+  "lyricsOffsetSubtitle": "Show synced lyrics later or earlier, for example when Bluetooth audio arrives late",
+  "lyricsOffsetNone": "In sync",
+  "@lyricsOffsetNone": {
+    "description": "Value of the lyrics timing slider at zero"
+  },
+  "lyricsOffsetLater": "{seconds} s later",
+  "@lyricsOffsetLater": {
+    "description": "Value of the lyrics timing slider when lyrics follow playback late",
+    "placeholders": {
+      "seconds": {
+        "type": "String",
+        "example": "0.3"
+      }
+    }
+  },
+  "lyricsOffsetEarlier": "{seconds} s earlier",
+  "@lyricsOffsetEarlier": {
+    "description": "Value of the lyrics timing slider when lyrics run ahead of playback",
+    "placeholders": {
+      "seconds": {
+        "type": "String",
+        "example": "0.3"
+      }
+    }
+  },
   "appCrashTitle": "The app previously crashed",
   "appAnrTitle": "The app previously stopped responding",
   "@appAnrTitle": {

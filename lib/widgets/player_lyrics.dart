@@ -101,6 +101,10 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
   ProviderSubscription<Duration>? _positionSubscription;
   ProviderSubscription<bool>? _playingSubscription;
   ProviderSubscription<bool>? _loadingSubscription;
+  ProviderSubscription<int>? _offsetSubscription;
+
+  /// The listener's lyrics timing setting, already applied to [_lines].
+  Duration _offset = Duration.zero;
   Timer? _lineBoundaryTimer;
   Timer? _userScrollIdleTimer;
   late List<LyricLine> _lines;
@@ -223,6 +227,17 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _offsetSubscription = ref.listenManual<int>(
+      themeProvider.select((theme) => theme.lyricsOffsetMs),
+      (previous, next) {
+        setState(() {
+          _offset = Duration(milliseconds: next);
+          _resetLineKeys();
+        });
+        _syncPositionSubscription(resetUserScroll: false);
+      },
+    );
+    _offset = Duration(milliseconds: _offsetSubscription!.read());
     _resetLineKeys();
     widget.seekPreview.addListener(_previewChanged);
   }
@@ -286,7 +301,9 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
     _hasStarted = false;
     _lineExtents = null;
     _lineLayoutKey = null;
-    _lines = lyricsWithDisplayEnds(lyricsTimelineWithGaps(widget.lyrics.lines));
+    _lines = lyricsWithDisplayEnds(
+      lyricsTimelineWithGaps(lyricsShiftedBy(widget.lyrics.lines, _offset)),
+    );
     _timeline = LyricTimelineIndex(_lines);
     _rowReveal.stop();
     _revealFrom = _revealTo = [
@@ -376,6 +393,13 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
   void _endFirstScroll() {
     if (!mounted || !_awaitingFirstScroll) return;
     setState(() => _awaitingFirstScroll = false);
+  }
+
+  /// Where a line shown at [shown] is sung in the track, before the lyrics
+  /// timing setting moved it, for seeking to it and sharing it.
+  Duration _sungTime(Duration shown) {
+    final time = shown - _offset;
+    return time < Duration.zero ? Duration.zero : time;
   }
 
   Duration get _displayPosition =>
@@ -528,6 +552,7 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
     _positionSubscription?.close();
     _playingSubscription?.close();
     _loadingSubscription?.close();
+    _offsetSubscription?.close();
     _lineBoundaryTimer?.cancel();
     _userScrollIdleTimer?.cancel();
     _measurementTimer?.cancel();
@@ -1189,13 +1214,19 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
                 Padding(
                   padding: _linePadding(index),
                   child: TvTapTarget(
-                    onTap: () =>
-                        ref.read(musicPlayerControllerProvider).seek(line.time),
+                    onTap: () => ref
+                        .read(musicPlayerControllerProvider)
+                        .seek(_sungTime(line.time)),
                     onLongPress: widget.onLongPressLine == null
                         ? null
                         : () {
                             HapticFeedback.mediumImpact();
-                            widget.onLongPressLine!(line);
+                            widget.onLongPressLine!(
+                              LyricLine(
+                                time: _sungTime(line.time),
+                                text: line.text,
+                              ),
+                            );
                           },
                     child: AnimatedScale(
                       // Focus changes paint scale, never font metrics or

@@ -273,3 +273,38 @@ Duration _estimatedFinalWordEnd(
   if (next - start <= nearGap) return next;
   return estimate;
 }
+
+/// Moves every line and word [offset] later (earlier when negative), for the
+/// listener's lyrics timing setting. Times stop at the start of the track.
+List<LyricLine> lyricsShiftedBy(List<LyricLine> lines, Duration offset) {
+  if (offset == Duration.zero) return lines;
+  Duration shift(Duration time) {
+    final shifted = time + offset;
+    return shifted < Duration.zero ? Duration.zero : shifted;
+  }
+
+  List<LyricWord> shiftWords(List<LyricWord> words) => [
+    for (final word in words)
+      LyricWord(
+        time: shift(word.time),
+        end: word.end == null ? null : shift(word.end!),
+        text: word.text,
+      ),
+  ];
+
+  return List.unmodifiable([
+    for (final line in lines)
+      LyricLine(
+        time: shift(line.time),
+        end: line.end == null ? null : shift(line.end!),
+        text: line.text,
+        words: shiftWords(line.words),
+        romanization: line.romanization,
+        romanizationWords: shiftWords(line.romanizationWords),
+        translation: line.translation,
+        voice: line.voice,
+        isBackground: line.isBackground,
+        vocalGroup: line.vocalGroup,
+      ),
+  ]);
+}

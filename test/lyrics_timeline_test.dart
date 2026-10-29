@@ -376,4 +376,34 @@ void main() {
       isEmpty,
     );
   });
+
+  test('lyrics timing moves lines and words, stopping at the start', () {
+    const lines = [
+      LyricLine(
+        time: Duration(milliseconds: 200),
+        end: Duration(seconds: 2),
+        text: 'First',
+        words: [
+          LyricWord(
+            time: Duration(milliseconds: 200),
+            end: Duration(seconds: 1),
+            text: 'First',
+          ),
+        ],
+      ),
+      LyricLine(time: Duration(seconds: 3), text: 'Second'),
+    ];
+    expect(identical(lyricsShiftedBy(lines, Duration.zero), lines), isTrue);
+
+    final later = lyricsShiftedBy(lines, const Duration(milliseconds: 300));
+    expect(later.map((line) => line.time.inMilliseconds), [500, 3300]);
+    expect(later.first.end, const Duration(milliseconds: 2300));
+    expect(later.first.words.single.time, const Duration(milliseconds: 500));
+    expect(later.first.words.single.end, const Duration(milliseconds: 1300));
+
+    final earlier = lyricsShiftedBy(lines, const Duration(milliseconds: -500));
+    expect(earlier.map((line) => line.time.inMilliseconds), [0, 2500]);
+    expect(earlier.first.words.single.time, Duration.zero);
+    expect(earlier.map((line) => line.text), ['First', 'Second']);
+  });
 }

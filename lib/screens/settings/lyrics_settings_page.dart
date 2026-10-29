@@ -51,6 +51,7 @@ class LyricsSettingsPage extends ConsumerWidget {
                 // Lyrics blur only where the player draws it.
                 if (context.isMornye && ref.watch(mornyeLiquidGlassProvider))
                   const LyricsBlurSetting(),
+                const LyricsOffsetSetting(),
                 SettingsSwitchItem(
                   icon: Icons.light_mode_outlined,
                   title: context.l10n.lyricsKeepScreenOn,

@@ -98,6 +98,102 @@ void main() {
     expect(loadBootstrapThemeSettings(prefs).lyricsBlur, 1);
   });
 
+  test('lyrics timing validates stored bounds', () {
+    expect(normalizeLyricsOffsetMs(null), 0);
+    expect(normalizeLyricsOffsetMs(double.nan), 0);
+    expect(normalizeLyricsOffsetMs(250.4), 250);
+    expect(normalizeLyricsOffsetMs(9000), kMaxLyricsOffsetMs);
+    expect(normalizeLyricsOffsetMs(-9000), -kMaxLyricsOffsetMs);
+    final settings = const ThemeSettings().copyWith(lyricsOffsetMs: -300);
+    expect(ThemeSettings.fromJson(settings.toJson()), settings);
+  });
+
+  testWidgets('timing slider previews, persists on release and resets', (
+    tester,
+  ) async {
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: const Scaffold(body: LyricsOffsetSetting()),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('In sync'), findsOneWidget);
+    final slider = tester.widget<AppSlider>(find.byType(AppSlider));
+    slider.onChanged!(300);
+    await tester.pump();
+    expect(find.text('0.3 s later'), findsOneWidget);
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getInt(kLyricsOffsetKey), isNull);
+    slider.onChangeEnd!(-500);
+    await tester.pumpAndSettle();
+    expect(find.text('0.5 s earlier'), findsOneWidget);
+    expect(loadBootstrapThemeSettings(prefs).lyricsOffsetMs, -500);
+    await tester.tap(find.byTooltip('Reset'));
+    await tester.pumpAndSettle();
+    expect(loadBootstrapThemeSettings(prefs).lyricsOffsetMs, 0);
+  });
+
+  testWidgets('lyrics timing decides which line is current', (tester) async {
+    final preview = ValueNotifier<Duration?>(const Duration(seconds: 3));
+    addTearDown(preview.dispose);
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+    final theme = MornyeTheme.build(Brightness.dark);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          theme: theme,
+          home: Scaffold(
+            body: SyncedLyricsView(
+              lyrics: const ParsedLyrics(
+                synced: true,
+                wordSynced: false,
+                plainText: '',
+                lines: [
+                  LyricLine(time: Duration.zero, text: 'First line'),
+                  LyricLine(time: Duration(seconds: 2), text: 'Second line'),
+                ],
+              ),
+              seekPreview: preview,
+              colorScheme: theme.colorScheme,
+              isActive: true,
+              showPronunciation: false,
+              showTranslation: false,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    double scaleOf(String text) => tester
+        .widget<AnimatedScale>(
+          find
+              .ancestor(
+                of: find.text(text),
+                matching: find.byType(AnimatedScale),
+              )
+              .first,
+        )
+        .scale;
+    expect(scaleOf('Second line'), 1.0);
+
+    // Two seconds later: at 3 s the second line, now at 4 s, has not begun.
+    await container.read(themeProvider.notifier).setLyricsOffsetMs(2000);
+    await tester.pumpAndSettle();
+    expect(scaleOf('First line'), 1.0);
+    expect(scaleOf('Second line'), 0.96);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+  });
+
   for (final strength in [0.0, 0.5, 1.5]) {
     testWidgets('Mornye lyrics blur nearby lines at strength $strength', (
       tester,

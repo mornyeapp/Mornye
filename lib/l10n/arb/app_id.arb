@@ -7956,6 +7956,11 @@
   "lyricsBlur": "Blur lirik",
   "lyricsBlurSubtitle": "Seberapa samar baris di sekitar baris yang sedang diputar",
   "lyricsBlurOff": "Mati",
+  "lyricsOffset": "Waktu lirik",
+  "lyricsOffsetSubtitle": "Tampilkan lirik tersinkron lebih lambat atau lebih cepat, misalnya saat audio Bluetooth tertunda",
+  "lyricsOffsetNone": "Sinkron",
+  "lyricsOffsetLater": "{seconds} dtk lebih lambat",
+  "lyricsOffsetEarlier": "{seconds} dtk lebih cepat",
   "appCrashTitle": "Aplikasi sebelumnya mengalami crash",
   "appAnrTitle": "Aplikasi sebelumnya berhenti merespons",
   "@appAnrTitle": {

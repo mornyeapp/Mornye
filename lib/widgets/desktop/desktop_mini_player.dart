@@ -291,6 +291,21 @@ class _MiniPlayerLyricsState extends ConsumerState<_MiniPlayerLyrics>
 
   PlayerMetadataController get metadata => widget.metadata;
 
+  List<LyricLine>? _shiftedSource;
+  int _shiftedOffsetMs = 0;
+  List<LyricLine> _shifted = const [];
+
+  /// [lines] with the lyrics timing setting applied, kept while neither
+  /// changes so word-timed lines keep their sweep across rebuilds.
+  List<LyricLine> _withOffset(List<LyricLine> lines, int offsetMs) {
+    if (!identical(lines, _shiftedSource) || offsetMs != _shiftedOffsetMs) {
+      _shiftedSource = lines;
+      _shiftedOffsetMs = offsetMs;
+      _shifted = lyricsShiftedBy(lines, Duration(milliseconds: offsetMs));
+    }
+    return _shifted;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -381,7 +396,10 @@ class _MiniPlayerLyricsState extends ConsumerState<_MiniPlayerLyrics>
       }
       return Consumer(
         builder: (context, ref, _) {
-          final lines = lyrics.lines;
+          final lines = _withOffset(
+            lyrics.lines,
+            ref.watch(themeProvider.select((theme) => theme.lyricsOffsetMs)),
+          );
           final current = _followPlayback(ref, lines);
           final next = _leadLineAfter(lines, current);
           return Padding(
