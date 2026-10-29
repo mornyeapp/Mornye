@@ -279,6 +279,13 @@ abstract interface class NetworkLocalCopies implements NetworkVirtualSources {
   Future<String?> recover(String path);
 }
 
+/// A server's answer that the media at a network source is missing or not
+/// what was asked for, such as a 404 or a song where a cover was asked.
+/// Asking again soon gets the same answer.
+class NetworkMediaUnavailable extends HttpException {
+  const NetworkMediaUnavailable(super.message);
+}
+
 class NetworkStorageService {
   NetworkStorageService({
     Future<String?> Function()? read,
@@ -486,9 +493,10 @@ class NetworkStorageService {
   /// over its connection directly instead of through a loopback route:
   /// Subsonic cover art, a WebDAV, HTTP or SMB file, or the local file a
   /// virtual source answers with. Throws when the cover is unavailable,
-  /// empty, a text document (such as a Subsonic error) or larger than
-  /// [maxCoverBytes]; [output] may then hold part of it, so callers write to
-  /// a staged file and rename it once this returns.
+  /// empty, a text document (such as a Subsonic error), audio or video, or
+  /// larger than [maxCoverBytes], with a [NetworkMediaUnavailable] when the
+  /// answer will not change soon; [output] may then hold part of it, so
+  /// callers write to a staged file and rename it once this returns.
   Future<void> downloadCover(String source, File output) async {
     final (:host, :path) = _sourceParts(source);
     if (virtualFor(host) case final virtual?) {
@@ -503,37 +511,60 @@ class NetworkStorageService {
       throw const FormatException('Expected a Subsonic cover');
     }
     _NetworkRead? read;
+    var consumed = false;
     try {
       read = await _openRead(c, path);
-      final type = read.headers[HttpHeaders.contentTypeHeader];
-      final mime = type == null ? null : ContentType.parse(type).mimeType;
-      final size = int.tryParse(
-        read.headers[HttpHeaders.contentLengthHeader] ?? '',
+      final problem = _coverProblem(
+        read.status,
+        read.headers[HttpHeaders.contentTypeHeader]
+            ?.split(';')
+            .first
+            .trim()
+            .toLowerCase(),
+        int.tryParse(read.headers[HttpHeaders.contentLengthHeader] ?? ''),
       );
-      final problem = read.status != HttpStatus.ok
-          ? 'Server returned ${read.status}'
-          : mime != null &&
-                (mime.startsWith('text/') ||
-                    mime == 'application/json' ||
-                    mime == 'application/xml')
-          ? 'Network cover unavailable'
-          : size != null && size > maxCoverBytes
-          ? 'Network cover is too large'
-          : null;
-      if (problem != null) {
-        await read.discard();
-        throw HttpException(problem);
-      }
+      if (problem != null) throw problem;
+      consumed = true;
       await _writeCover(read.bytes, output);
     } on HttpException catch (error) {
       // HttpClient exceptions can carry the credential-bearing request URI.
       if (error.uri == null) rethrow;
       throw HttpException(error.message);
     } finally {
+      // An unread response would hold its pooled connection.
+      if (!consumed) {
+        try {
+          await read?.discard();
+        } catch (_) {}
+      }
       try {
         await read?.close();
       } catch (_) {}
     }
+  }
+
+  /// Why a cover answer of [status], [mime] type and declared [size]
+  /// cannot be saved; null when it can.
+  static HttpException? _coverProblem(int status, String? mime, int? size) {
+    if (status != HttpStatus.ok) {
+      return status == HttpStatus.notFound || status == HttpStatus.gone
+          ? NetworkMediaUnavailable('Server returned $status')
+          : HttpException('Server returned $status');
+    }
+    if (mime != null &&
+        (mime.startsWith('audio/') || mime.startsWith('video/'))) {
+      return const NetworkMediaUnavailable('Network cover is not an image');
+    }
+    if (mime != null &&
+        (mime.startsWith('text/') ||
+            mime == 'application/json' ||
+            mime == 'application/xml')) {
+      return const HttpException('Network cover unavailable');
+    }
+    if (size != null && size > maxCoverBytes) {
+      return const NetworkMediaUnavailable('Network cover is too large');
+    }
+    return null;
   }
 
   /// The local file a virtual source answers with: an absolute path or a
@@ -557,12 +588,14 @@ class NetworkStorageService {
       await for (final chunk in bytes) {
         size += chunk.length;
         if (size > maxCoverBytes) {
-          throw const HttpException('Network cover is too large');
+          throw const NetworkMediaUnavailable('Network cover is too large');
         }
         writer.add(chunk);
         await writer.flush();
       }
-      if (size == 0) throw const HttpException('Network cover is empty');
+      if (size == 0) {
+        throw const NetworkMediaUnavailable('Network cover is empty');
+      }
     } finally {
       await writer.close();
     }
@@ -1134,7 +1167,10 @@ class NetworkStorageService {
         } on FormatException {
           return (
             status: HttpStatus.requestedRangeNotSatisfiable,
-            headers: {HttpHeaders.contentRangeHeader: 'bytes */${file.size}'},
+            headers: {
+              HttpHeaders.contentLengthHeader: '0',
+              HttpHeaders.contentRangeHeader: 'bytes */${file.size}',
+            },
             bytes: const Stream<List<int>>.empty(),
             discard: () async {},
             close: smb.close,
@@ -1173,36 +1209,47 @@ class NetworkStorageService {
       target,
       range: range,
     );
-    if (subsonic &&
-        const {
-          'application/json',
-          'application/xml',
-          'text/xml',
-        }.contains(response.headers.contentType?.mimeType)) {
-      await _discardResponse(response);
-      throw const HttpException('Subsonic media unavailable');
+    try {
+      if (subsonic &&
+          const {
+            'application/json',
+            'application/xml',
+            'text/xml',
+          }.contains(response.headers.contentType?.mimeType)) {
+        throw response.statusCode == HttpStatus.notFound ||
+                response.statusCode == HttpStatus.gone
+            ? const NetworkMediaUnavailable('Subsonic media unavailable')
+            : const HttpException('Subsonic media unavailable');
+      }
+      return (
+        status: response.statusCode,
+        headers: {
+          for (final header in const [
+            HttpHeaders.contentTypeHeader,
+            HttpHeaders.contentLengthHeader,
+            HttpHeaders.contentRangeHeader,
+            HttpHeaders.acceptRangesHeader,
+          ])
+            header: ?response.headers.value(header),
+        },
+        bytes: response.timeout(timeout),
+        discard: subsonic || method == 'GET'
+            ? () => _discardResponse(response)
+            : () => response.drain<void>().timeout(timeout),
+        close: () async {},
+      );
+    } catch (_) {
+      // Malformed headers throw here; release the connection all the same.
+      try {
+        await _discardResponse(response);
+      } catch (_) {}
+      rethrow;
     }
-    return (
-      status: response.statusCode,
-      headers: {
-        for (final header in const [
-          HttpHeaders.contentTypeHeader,
-          HttpHeaders.contentLengthHeader,
-          HttpHeaders.contentRangeHeader,
-          HttpHeaders.acceptRangesHeader,
-        ])
-          header: ?response.headers.value(header),
-      },
-      bytes: response.timeout(timeout),
-      discard: subsonic || method == 'GET'
-          ? () => _discardResponse(response)
-          : () => response.drain<void>().timeout(timeout),
-      close: () async {},
-    );
   }
 
   Future<void> _serve(HttpRequest request) async {
     _NetworkRead? read;
+    var consumed = false;
     try {
       final route = _routes[request.uri.path.replaceFirst('/', '')];
       if (route == null || !['GET', 'HEAD'].contains(request.method)) {
@@ -1219,6 +1266,7 @@ class NetworkStorageService {
           ? HttpStatus.badGateway
           : read.status;
       read.headers.forEach(request.response.headers.set);
+      consumed = true;
       if (request.method == 'GET') {
         await request.response.addStream(read.bytes);
       } else {
@@ -1229,6 +1277,11 @@ class NetworkStorageService {
         request.response.statusCode = HttpStatus.badGateway;
       } catch (_) {}
     } finally {
+      if (!consumed) {
+        try {
+          await read?.discard();
+        } catch (_) {}
+      }
       try {
         await read?.close();
       } catch (_) {}

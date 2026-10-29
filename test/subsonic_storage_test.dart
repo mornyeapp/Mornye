@@ -616,6 +616,15 @@ void main() {
       final trusted = secure.connection(fingerprint: pin);
       await storage.list(trusted);
       await storage.save(trusted);
+      final pinned = File('${directory.path}/pinned.image');
+      await storage.downloadCover(
+        NetworkStorageService.source(
+          'fixture',
+          SubsonicSong(secure.song).coverPath!,
+        ),
+        pinned,
+      );
+      expect(await pinned.readAsBytes(), [0, 1, 2, 3]);
       final client = storage.openSubsonic(trusted);
       try {
         expect(

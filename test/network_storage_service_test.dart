@@ -290,6 +290,107 @@ void main() {
     );
   });
 
+  test('a malformed Content-Type never holds a pooled connection', () async {
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(() => server.close(force: true));
+    const jpeg = [0xFF, 0xD8, 0xFF, 0xE0];
+    server.listen((request) async {
+      request.response.headers.set(
+        HttpHeaders.contentTypeHeader,
+        'image/jpeg; name="x',
+      );
+      request.response.add(jpeg);
+      await request.response.close();
+    });
+    final service = NetworkStorageService(
+      read: () async => null,
+      write: (_) async {},
+      ensureAccess: (_) async {},
+    );
+    addTearDown(service.dispose);
+    final origin = 'http://127.0.0.1:${server.port}';
+    await service.save(connection('$origin/art/', id: 'web'));
+    await service.save(
+      connection('$origin/', id: 'sub', protocol: NetworkProtocol.subsonic),
+    );
+    final temp = await Directory.systemTemp.createTemp('network-cover-');
+    addTearDown(() => temp.delete(recursive: true));
+    final web = NetworkStorageService.source('web', 'cover.jpg');
+    final sub = NetworkStorageService.source('sub', subsonicCoverPath('art'));
+    // A server gets six pooled connections; a response left unread holds
+    // one for good, so the seventh request would never start.
+    for (var attempt = 0; attempt < 8; attempt++) {
+      final output = File('${temp.path}/$attempt.image');
+      await service
+          .downloadCover(web, output)
+          .timeout(const Duration(seconds: 5));
+      expect(await output.readAsBytes(), jpeg);
+      await expectLater(
+        service
+            .downloadCover(sub, File('${temp.path}/subsonic.image'))
+            .timeout(const Duration(seconds: 5)),
+        throwsA(isA<HttpException>()),
+      );
+    }
+  });
+
+  test('a Subsonic 404 document reports the cover missing', () async {
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(() => server.close(force: true));
+    server.listen((request) async {
+      final missing = request.uri.queryParameters['id'] == 'missing';
+      request.response
+        ..statusCode = missing ? 404 : 200
+        ..headers.contentType = ContentType.json
+        ..write(
+          jsonEncode({
+            'subsonic-response': {
+              'status': 'failed',
+              'error': {'code': missing ? 70 : 0},
+            },
+          }),
+        );
+      await request.response.close();
+    });
+    final service = NetworkStorageService(
+      read: () async => null,
+      write: (_) async {},
+      ensureAccess: (_) async {},
+    );
+    addTearDown(service.dispose);
+    await service.save(
+      connection(
+        'http://127.0.0.1:${server.port}/',
+        id: 'sub',
+        protocol: NetworkProtocol.subsonic,
+      ),
+    );
+    final temp = await Directory.systemTemp.createTemp('network-cover-');
+    addTearDown(() => temp.delete(recursive: true));
+    for (final (id, missing) in [('missing', true), ('failed', false)]) {
+      await expectLater(
+        service.downloadCover(
+          NetworkStorageService.source('sub', subsonicCoverPath(id)),
+          File('${temp.path}/$id.image'),
+        ),
+        throwsA(
+          isA<HttpException>()
+              .having(
+                (error) => error.message,
+                'message',
+                'Subsonic media unavailable',
+              )
+              .having(
+                (error) => error is NetworkMediaUnavailable,
+                'missing',
+                missing,
+              ),
+        ),
+        reason: id,
+      );
+    }
+  });
+
   test('a network song can play while its host is reachable', () async {
     final service = NetworkStorageService(
       read: () async => null,
@@ -365,6 +466,9 @@ void main() {
             } else if (name == 'page.jpg') {
               r.response.headers.contentType = ContentType.html;
               r.response.write('<html>Sign in</html>');
+            } else if (name == 'song.flac') {
+              r.response.headers.contentType = ContentType('audio', 'flac');
+              r.response.add(List.filled(10, 0));
             } else if (name == 'large.jpg' || name == 'unsized.jpg') {
               if (name == 'large.jpg') {
                 r.response.contentLength =
@@ -495,11 +599,13 @@ void main() {
       );
       expect(await output.readAsBytes(), cover);
       expect(requests, ['GET /art/cover.jpg']);
-      for (final (name, message) in [
-        ('page.jpg', 'Network cover unavailable'),
-        ('large.jpg', 'Network cover is too large'),
-        ('unsized.jpg', 'Network cover is too large'),
-        ('missing.jpg', 'Server returned 404'),
+      // Only answers that will not change soon report the cover missing.
+      for (final (name, message, missing) in [
+        ('page.jpg', 'Network cover unavailable', false),
+        ('song.flac', 'Network cover is not an image', true),
+        ('large.jpg', 'Network cover is too large', true),
+        ('unsized.jpg', 'Network cover is too large', true),
+        ('missing.jpg', 'Server returned 404', true),
       ]) {
         await expectLater(
           service.downloadCover(
@@ -507,11 +613,13 @@ void main() {
             File('${temp.path}/$name'),
           ),
           throwsA(
-            isA<HttpException>().having(
-              (error) => error.message,
-              'message',
-              message,
-            ),
+            isA<HttpException>()
+                .having((error) => error.message, 'message', message)
+                .having(
+                  (error) => error is NetworkMediaUnavailable,
+                  'missing',
+                  missing,
+                ),
           ),
           reason: name,
         );
