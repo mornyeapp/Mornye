@@ -350,6 +350,62 @@ void main() {
     },
   );
 
+  testWidgets('an outgoing cover leaves the shared video playing', (
+    tester,
+  ) async {
+    final previous = VideoPlayerPlatform.instance;
+    final platform = _VideoPlatform();
+    VideoPlayerPlatform.instance = platform;
+    addTearDown(() => VideoPlayerPlatform.instance = previous);
+    // Rotating the player fades the portrait cover out while the landscape
+    // cover borrows the same video.
+    final covers = ValueNotifier({'portrait'});
+    addTearDown(covers.dispose);
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          home: Consumer(
+            builder: (context, ref, _) {
+              ref.watch(playerArtworkVideoProvider('file:///cover.mp4'));
+              return ValueListenableBuilder(
+                valueListenable: covers,
+                builder: (_, shown, _) => Column(
+                  children: [
+                    for (final cover in shown)
+                      SizedBox(
+                        key: ValueKey(cover),
+                        height: 100,
+                        child: const MornyePlayerArtwork(
+                          mediaItem: MediaItem(id: 'song', title: 'Song'),
+                          videoUrl: 'file:///cover.mp4',
+                        ),
+                      ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+    expect(platform.playing, isTrue);
+    covers.value = {'portrait', 'landscape'};
+    await tester.pump();
+    expect(platform.playing, isTrue);
+    covers.value = {'landscape'};
+    await tester.pump();
+    expect(platform.playing, isTrue);
+    covers.value = {};
+    await tester.pump();
+    expect(platform.playing, isFalse);
+    expect(platform.disposals, 0);
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump();
+    await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+  });
+
   testWidgets('changing tracks retains video until the new frame is ready', (
     tester,
   ) async {
