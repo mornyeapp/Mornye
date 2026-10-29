@@ -54,6 +54,7 @@ void main() {
   }
 
   Future<FFmpegResult> execute(List<String> arguments) async {
+    expect(arguments.join(' ').length, lessThan(32767));
     final result = await Process.run('ffmpeg', arguments);
     return FFmpegResult(
       success: result.exitCode == 0,
@@ -117,17 +118,44 @@ void main() {
         final audioBytes = [0x4f, 0x67, 0x67, 0x53];
         await File(opusPath).writeAsBytes(audioBytes);
         List<int>? pictureBytes;
+        String? pictureMetadataPath;
 
         expect(
           await FFmpegMetadata.embedMetadataToOpus(
             opusPath: opusPath,
             coverPath: coverFile.path,
+            metadata: const {'METADATA_BLOCK_PICTURE': 'obsolete cover'},
             execute: (arguments) async {
-              const prefix = 'METADATA_BLOCK_PICTURE=';
-              final argument = arguments.singleWhere(
-                (argument) => argument.startsWith(prefix),
+              expect(
+                arguments.join(' ').length,
+                lessThan(32767),
+                reason: 'Cover bytes must not exceed the Windows command limit',
               );
-              pictureBytes = base64Decode(argument.substring(prefix.length));
+              const prefix = 'METADATA_BLOCK_PICTURE=';
+              final format = arguments.indexOf('ffmetadata');
+              if (cover.length > 32767) {
+                expect(format, greaterThan(0));
+                expect(
+                  arguments.any((argument) => argument.startsWith(prefix)),
+                  isFalse,
+                );
+              }
+              if (format >= 0) {
+                pictureMetadataPath = arguments[format + 2];
+                final lines = await File(pictureMetadataPath!).readAsLines();
+                expect(lines.first, ';FFMETADATA1');
+                final picture = lines.singleWhere(
+                  (argument) => argument.startsWith(prefix),
+                );
+                pictureBytes = base64Decode(
+                  picture.substring(prefix.length).replaceAll(r'\=', '='),
+                );
+              } else {
+                final picture = arguments.lastWhere(
+                  (argument) => argument.startsWith(prefix),
+                );
+                pictureBytes = base64Decode(picture.substring(prefix.length));
+              }
               await File(
                 arguments[arguments.length - 2],
               ).writeAsBytes(audioBytes);
@@ -150,6 +178,54 @@ void main() {
           ...imageBytes,
         ]);
         expect(await File(opusPath).readAsBytes(), audioBytes);
+        if (pictureMetadataPath != null) {
+          expect(await File(pictureMetadataPath!).exists(), isFalse);
+        }
+      },
+    );
+  }
+
+  for (final throws in [false, true]) {
+    test(
+      'failed Opus embedding cleans temporary files (throws=$throws)',
+      () async {
+        final source = File('${directory.path}/track.opus');
+        final original = [0x4f, 0x67, 0x67, 0x53];
+        await source.writeAsBytes(original);
+        final cover = File('${directory.path}/cover.png');
+        await cover.writeAsBytes([0x89, 0x50, 0x4e, 0x47]);
+        String? pictureMetadataPath;
+        String? output;
+        final embedding = FFmpegMetadata.embedMetadataToOpus(
+          opusPath: source.path,
+          coverPath: cover.path,
+          metadata: {'lyrics': List.filled(4000, 'Lyrics line\n').join()},
+          execute: (arguments) async {
+            pictureMetadataPath =
+                arguments[arguments.indexOf('ffmetadata') + 2];
+            output = arguments[arguments.length - 2];
+            expect(await File(pictureMetadataPath!).exists(), isTrue);
+            await File(output!).writeAsString('partial output');
+            if (throws) throw StateError('FFmpeg could not start');
+            return FFmpegResult(
+              success: false,
+              returnCode: 1,
+              output: 'failed',
+            );
+          },
+        );
+        if (throws) {
+          await expectLater(embedding, throwsStateError);
+        } else {
+          expect(await embedding, isNull);
+        }
+        expect(await source.readAsBytes(), original);
+        expect(await File(pictureMetadataPath!).exists(), isFalse);
+        expect(await File(output!).exists(), isFalse);
+        expect(
+          await directory.list().where((entry) => entry is Directory).length,
+          0,
+        );
       },
     );
   }
@@ -184,6 +260,16 @@ void main() {
       cover: false,
       preserve: false,
     ),
+    (
+      name: 'full replacement with a large cover',
+      metadata: {
+        'title': 'Song 音楽',
+        'artist': 'Артист',
+        'lyrics': List.filled(4000, 'Line = #; \\ \r\n音楽 😀\n').join(),
+      },
+      cover: true,
+      preserve: false,
+    ),
   ]) {
     test('Opus ${scenario.name} survives a metadata reread', () async {
       if (!toolsAvailable) {
@@ -212,10 +298,20 @@ void main() {
       String? coverPath;
       if (scenario.cover) {
         coverPath = '${directory.path}/cover.png';
-        await File(coverPath).writeAsBytes(
-          base64Decode(
-            'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aB1sAAAAASUVORK5CYII=',
-          ),
+        await run('ffmpeg', [
+          '-v',
+          'error',
+          '-f',
+          'lavfi',
+          '-i',
+          'testsrc=size=1024x1024,noise=alls=20:allf=t',
+          '-frames:v',
+          '1',
+          coverPath,
+        ]);
+        expect(
+          base64Encode(await File(coverPath).readAsBytes()).length,
+          greaterThan(32767),
         );
       }
       expect(
@@ -284,6 +380,27 @@ void main() {
                     1,
           ),
           isTrue,
+        );
+        final picture = streams.singleWhere(
+          (stream) => stream['codec_type'] == 'video',
+        );
+        expect(picture['width'], 1024);
+        expect(picture['height'], 1024);
+        final extracted = '${directory.path}/extracted.png';
+        await run('ffmpeg', [
+          '-v',
+          'error',
+          '-i',
+          path,
+          '-map',
+          '0:v:0',
+          '-c:v',
+          'copy',
+          extracted,
+        ]);
+        expect(
+          await File(extracted).readAsBytes(),
+          await File(coverPath!).readAsBytes(),
         );
       }
       expect(

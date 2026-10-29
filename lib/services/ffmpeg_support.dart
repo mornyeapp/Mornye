@@ -8,6 +8,7 @@ import 'package:ffmpeg_kit_flutter_new_audio/media_information.dart';
 import 'package:ffmpeg_kit_flutter_new_audio/return_code.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:mornye/services/ffmpeg_desktop.dart';
+import 'package:mornye/services/ffmpeg_metadata_input.dart';
 import 'package:mornye/services/ffmpeg_models.dart';
 import 'package:mornye/services/ffmpeg_probe.dart';
 import 'package:mornye/utils/desktop_platform.dart';
@@ -43,7 +44,29 @@ abstract final class FFmpegExecution {
     }
   }
 
-  static Future<FFmpegResult> arguments(List<String> arguments) async {
+  static Future<FFmpegResult> arguments(
+    List<String> arguments, {
+    Future<FFmpegResult> Function(List<String>)? execute,
+  }) async {
+    final FFmpegMetadataInput prepared;
+    try {
+      prepared = await FFmpegMetadataInput.prepare(arguments);
+    } catch (error) {
+      _log.e('Failed to prepare FFmpeg metadata input: $error');
+      return FFmpegResult(
+        success: false,
+        returnCode: -1,
+        output: error.toString(),
+      );
+    }
+    try {
+      return await (execute ?? _executeArguments)(prepared.arguments);
+    } finally {
+      await prepared.dispose();
+    }
+  }
+
+  static Future<FFmpegResult> _executeArguments(List<String> arguments) async {
     if (isDesktopPlatform) return DesktopFFmpegRunner.shared.run(arguments);
     try {
       final session = await FFmpegKit.executeWithArguments(arguments);
