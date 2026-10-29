@@ -154,10 +154,7 @@ extension _QueueTabFilterWidgets on _QueueTabState {
               if (coverUrl != null && coverUrl.isNotEmpty) {
                 precacheImage(
                   ResizeImage(
-                    CachedNetworkImageProvider(
-                      coverUrl,
-                      cacheManager: CoverCacheManager.instance,
-                    ),
+                    cachedCoverImageProvider(coverUrl),
                     width: targetSize,
                     height: targetSize,
                   ),

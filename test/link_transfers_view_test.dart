@@ -445,6 +445,30 @@ void main() {
     expect(find.text('Song 12'), findsOneWidget);
   });
 
+  testWidgets('shows a song cover stored as a file URI', (tester) async {
+    final transfer = LinkTransfer(
+      direction: LinkTransferDirection.outgoing,
+      peerId: 'desktop',
+      peerName: 'Studio',
+      entries: _songs(
+        12,
+        cover: Uri.file('/music/covers/song-1.jpg').toString(),
+      ),
+      status: _done.status,
+      startedAt: _done.startedAt,
+      finishedAt: _done.finishedAt,
+    );
+    await _pump(
+      tester,
+      mornye: false,
+      transfers: [transfer],
+      reduceMotion: true,
+    );
+    await tester.tap(find.text('12 songs to Studio'));
+    await tester.pump();
+    expect(find.byType(LocalOrNetworkCoverImage), findsOneWidget);
+  });
+
   testWidgets('pushes the Transfers page on phones', (tester) async {
     await _pump(
       tester,

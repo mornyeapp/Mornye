@@ -706,19 +706,11 @@ class _LibraryTracksFolderScreenState
     );
 
     final Widget background = hasCustomCover
-        ? Image.file(
-            File(customCoverPath),
-            fit: BoxFit.cover,
-            cacheWidth: cacheWidth,
-            filterQuality: FilterQuality.low,
-            gaplessPlayback: true,
-            frameBuilder: (_, child, frame, wasSynchronouslyLoaded) {
-              if (wasSynchronouslyLoaded || frame != null) {
-                return child;
-              }
-              return coverFallback;
-            },
-            errorBuilder: (_, _, _) => coverFallback,
+        ? LocalOrNetworkCoverImage(
+            url: customCoverPath,
+            localCacheWidth: cacheWidth,
+            fadeInDuration: Duration.zero,
+            placeholder: (_) => coverFallback,
           )
         : hasCoverUrl
         ? LocalOrNetworkCoverImage(

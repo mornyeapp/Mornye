@@ -28,6 +28,7 @@ import 'package:mornye/controllers/confirm_and_delete_tracks.dart';
 import 'package:mornye/controllers/local_track_batch_actions.dart';
 import 'package:mornye/controllers/selection_mode_mixin.dart';
 import 'package:mornye/screens/track_metadata_screen.dart';
+import 'package:mornye/widgets/cached_cover_image.dart';
 import 'package:mornye/widgets/collection_scaffold.dart';
 import 'package:mornye/widgets/collection_suggestions_section.dart';
 import 'package:mornye/utils/desktop_platform.dart';
@@ -367,13 +368,10 @@ class _LocalAlbumScreenState extends ConsumerState<LocalAlbumScreen>
 
     final cacheWidth = coverCacheWidthForViewport(context);
     final Widget background = coverPath != null
-        ? Image.file(
-            File(coverPath),
-            fit: BoxFit.cover,
-            cacheWidth: cacheWidth,
-            gaplessPlayback: true,
-            filterQuality: FilterQuality.low,
-            errorBuilder: (_, _, _) => Container(color: colorScheme.surface),
+        ? LocalOrNetworkCoverImage(
+            url: coverPath,
+            localCacheWidth: cacheWidth,
+            placeholder: (_) => Container(color: colorScheme.surface),
           )
         : Container(
             color: colorScheme.surfaceContainerHighest,

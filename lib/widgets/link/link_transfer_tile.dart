@@ -1,4 +1,3 @@
-import 'dart:io' show File;
 import 'dart:math' as math;
 
 import 'package:flutter/cupertino.dart'
@@ -760,20 +759,14 @@ class _TransferCover extends StatelessWidget {
   final String? path;
   final double size;
 
-  static bool _usable(String path) =>
-      path.startsWith('http://') ||
-      path.startsWith('https://') ||
-      File(path).isAbsolute;
-
   @override
   Widget build(BuildContext context) {
-    final path = this.path;
     final placeholder = TrackCoverPlaceholder(size: size);
-    if (path == null || path.isEmpty || !_usable(path)) return placeholder;
+    if (coverImageSource(path) == null) return placeholder;
     return ClipRRect(
       borderRadius: context.tokens.borderRadiusThumb,
       child: LocalOrNetworkCoverImage(
-        url: path,
+        url: path!,
         width: size,
         height: size,
         networkCacheWidth: (size * 2).toInt(),

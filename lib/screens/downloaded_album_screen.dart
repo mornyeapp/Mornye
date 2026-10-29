@@ -374,13 +374,10 @@ class _DownloadedAlbumScreenState extends ConsumerState<DownloadedAlbumScreen>
 
     final cacheWidth = coverCacheWidthForViewport(context);
     final Widget background = embeddedCoverPath != null
-        ? Image.file(
-            File(embeddedCoverPath),
-            fit: BoxFit.cover,
-            cacheWidth: cacheWidth,
-            gaplessPlayback: true,
-            filterQuality: FilterQuality.low,
-            errorBuilder: (_, _, _) => Container(color: colorScheme.surface),
+        ? LocalOrNetworkCoverImage(
+            url: embeddedCoverPath,
+            localCacheWidth: cacheWidth,
+            placeholder: (_) => Container(color: colorScheme.surface),
           )
         : widget.coverUrl != null
         ? CachedNetworkImage(
