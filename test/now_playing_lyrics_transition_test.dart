@@ -506,7 +506,8 @@ void main() {
       expect(find.byKey(const ValueKey('link-playing-on')), findsNothing);
       final row = find.byKey(const ValueKey('link-playing-on-row'));
       if (kept) {
-        expect(tester.getSize(row).height, 36);
+        // One line of the label, not a full touch target.
+        expect(tester.getSize(row).height, 24);
       } else {
         expect(row, findsNothing);
       }

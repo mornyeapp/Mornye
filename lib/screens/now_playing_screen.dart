@@ -61,8 +61,14 @@ export 'package:mornye/routes/now_playing_route.dart';
 
 final _log = AppLogger('NowPlaying');
 
-/// Material portrait's "Playing on" row, kept while empty.
-const _playingOnRowHeight = 36.0;
+/// Material portrait's "Playing on" row, kept while empty: one line of the
+/// label with a little room, so the empty row takes as little from the cover
+/// as it can.
+double _playingOnRowHeight(BuildContext context) {
+  final style = Theme.of(context).textTheme.labelLarge;
+  final line = (style?.fontSize ?? 14) * (style?.height ?? 20 / 14);
+  return (MediaQuery.textScalerOf(context).scale(line) + 4).roundToDouble();
+}
 
 /// AppBar wrapper that fades with the route transition (see contentOpacity
 /// in [_NowPlayingScreenState.build]).
@@ -690,12 +696,12 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                         ] else
                           // As tall as the one-line label needs, so the
                           // empty row is no taller than a filled one looks.
-                          const SizedBox(
-                            key: ValueKey('link-playing-on-row'),
-                            height: _playingOnRowHeight,
+                          SizedBox(
+                            key: const ValueKey('link-playing-on-row'),
+                            height: _playingOnRowHeight(context),
                             child: Center(
                               child: LinkPlayingOnLabel(
-                                height: _playingOnRowHeight,
+                                height: _playingOnRowHeight(context),
                               ),
                             ),
                           ),
