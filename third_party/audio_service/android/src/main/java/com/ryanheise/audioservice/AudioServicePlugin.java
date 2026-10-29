@@ -1,6 +1,7 @@
 package com.ryanheise.audioservice;
 
 import android.app.Activity;
+import android.app.Application;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
@@ -27,6 +28,7 @@ import android.support.v4.media.session.MediaControllerCompat;
 import android.support.v4.media.session.MediaSessionCompat;
 import android.support.v4.media.session.PlaybackStateCompat;
 
+import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -77,6 +79,36 @@ public class AudioServicePlugin implements FlutterPlugin, ActivityAware {
     }
 
     private static FlutterEngineConfigurator flutterEngineConfigurator;
+
+    /** Maps the host's notification icon names to resource IDs kept by its shrinker. */
+    public interface ResourceResolver {
+        int resolve(String resource);
+    }
+
+    private static ResourceResolver resourceResolver;
+
+    public static void setResourceResolver(ResourceResolver resolver) {
+        resourceResolver = resolver;
+    }
+
+    static int resolveResourceId(Context context, String resource) {
+        if (resource == null) return 0;
+        if (resourceResolver != null) {
+            int id = resourceResolver.resolve(resource);
+            if (id != 0) return id;
+        }
+        switch (resource) {
+        case "drawable/audio_service_stop": return R.drawable.audio_service_stop;
+        case "drawable/audio_service_pause": return R.drawable.audio_service_pause;
+        case "drawable/audio_service_play_arrow": return R.drawable.audio_service_play_arrow;
+        case "drawable/audio_service_fast_rewind": return R.drawable.audio_service_fast_rewind;
+        case "drawable/audio_service_skip_next": return R.drawable.audio_service_skip_next;
+        case "drawable/audio_service_skip_previous": return R.drawable.audio_service_skip_previous;
+        case "drawable/audio_service_fast_forward": return R.drawable.audio_service_fast_forward;
+        case "mipmap/ic_launcher": return context.getApplicationInfo().icon;
+        default: return 0;
+        }
+    }
 
     /**
      * Registers app channels on the shared engine whichever component creates
@@ -147,7 +179,7 @@ public class AudioServicePlugin implements FlutterPlugin, ActivityAware {
 
     public static synchronized void disposeFlutterEngine() {
         for (ClientInterface clientInterface : clientInterfaces) {
-            if (clientInterface.activity != null) {
+            if (clientInterface.getActivity() != null) {
                 // Don't destroy the engine if a new activity started and
                 // bound to the service in the time since the previous activity
                 // unbound from it.
@@ -249,7 +281,7 @@ public class AudioServicePlugin implements FlutterPlugin, ActivityAware {
             try {
                 MediaSessionCompat.Token token = mediaBrowser.getSessionToken();
                 mediaController = new MediaControllerCompat(applicationContext, token);
-                Activity activity = mainClientInterface != null ? mainClientInterface.activity : null;
+                Activity activity = mainClientInterface != null ? mainClientInterface.getActivity() : null;
                 if (activity != null) {
                     MediaControllerCompat.setMediaController(activity, mediaController);
                 }
@@ -322,6 +354,8 @@ public class AudioServicePlugin implements FlutterPlugin, ActivityAware {
             disconnect();
         }
         clientInterfaces.remove(clientInterface);
+        if (mainClientInterface == clientInterface) mainClientInterface = null;
+        clientInterface.setActivity(null);
         clientInterface.setContext(null);
         clientInterface = null;
         applicationContext = null;
@@ -352,13 +386,13 @@ public class AudioServicePlugin implements FlutterPlugin, ActivityAware {
         mainClientInterface = clientInterface;
         registerOnNewIntentListener();
         if (mediaController != null) {
-            MediaControllerCompat.setMediaController(mainClientInterface.activity, mediaController);
+            MediaControllerCompat.setMediaController(binding.getActivity(), mediaController);
         }
         if (mediaBrowser == null) {
             connect();
         }
 
-        Activity activity = mainClientInterface.activity;
+        Activity activity = binding.getActivity();
         if (clientInterface.wasLaunchedFromRecents()) {
             // We do this to avoid using the old intent.
             activity.setIntent(new Intent(Intent.ACTION_MAIN));
@@ -410,7 +444,7 @@ public class AudioServicePlugin implements FlutterPlugin, ActivityAware {
     }
 
     private void disconnect() {
-        Activity activity = mainClientInterface != null ? mainClientInterface.activity : null;
+        Activity activity = mainClientInterface != null ? mainClientInterface.getActivity() : null;
         if (activity != null) {
             // Since the activity enters paused state, we set the intent with ACTION_MAIN.
             activity.setIntent(new Intent(Intent.ACTION_MAIN));
@@ -428,23 +462,25 @@ public class AudioServicePlugin implements FlutterPlugin, ActivityAware {
 
     private void registerOnNewIntentListener() {
         activityPluginBinding.addOnNewIntentListener(newIntentListener = (intent) -> {
-            clientInterface.activity.setIntent(intent);
+            Activity activity = clientInterface.getActivity();
+            if (activity == null) return false;
+            activity.setIntent(intent);
             sendNotificationClicked();
             return true;
         });
     }
 
     private void sendNotificationClicked() {
-        Activity activity = clientInterface.activity;
-        if (audioHandlerInterface != null && activity.getIntent().getAction() != null) {
+        Activity activity = clientInterface.getActivity();
+        if (activity != null && audioHandlerInterface != null && activity.getIntent().getAction() != null) {
             boolean clicked = activity.getIntent().getAction().equals(AudioService.NOTIFICATION_CLICK_ACTION);
             audioHandlerInterface.invokeMethod("onNotificationClicked", mapOf("clicked", clicked));
         }
     }
 
     private static class ClientInterface implements MethodCallHandler {
-        private Context context;
-        private Activity activity;
+        private Application context;
+        private WeakReference<Activity> activity = new WeakReference<>(null);
         public final BinaryMessenger messenger;
         private final MethodChannel channel;
         private boolean wrongEngineDetected;
@@ -469,11 +505,15 @@ public class AudioServicePlugin implements FlutterPlugin, ActivityAware {
         }
 
         private void setContext(Context context) {
-            this.context = context;
+            this.context = context == null ? null : (Application) context.getApplicationContext();
         }
 
         private void setActivity(Activity activity) {
-            this.activity = activity;
+            this.activity = new WeakReference<>(activity);
+        }
+
+        private Activity getActivity() {
+            return activity.get();
         }
 
         public void setWrongEngineDetected(boolean value) {
@@ -486,7 +526,8 @@ public class AudioServicePlugin implements FlutterPlugin, ActivityAware {
 
         // See: https://stackoverflow.com/questions/13135545/android-activity-is-using-old-intent-if-launching-app-from-recent-task
         protected boolean wasLaunchedFromRecents() {
-            return (activity.getIntent().getFlags() & Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY) == Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY;
+            Activity activity = getActivity();
+            return activity != null && (activity.getIntent().getFlags() & Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY) == Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY;
         }
 
         @Override
@@ -517,6 +558,7 @@ public class AudioServicePlugin implements FlutterPlugin, ActivityAware {
                     config.artDownscaleWidth = configMap.get("artDownscaleWidth") != null ? (Integer)configMap.get("artDownscaleWidth") : -1;
                     config.artDownscaleHeight = configMap.get("artDownscaleHeight") != null ? (Integer)configMap.get("artDownscaleHeight") : -1;
                     config.setBrowsableRootExtras((Map<?,?>)configMap.get("androidBrowsableRootExtras"));
+                    Activity activity = getActivity();
                     if (activity != null) {
                         config.activityClassName = activity.getClass().getName();
                     }

@@ -283,7 +283,7 @@ public class AudioService extends MediaBrowserServiceCompat {
 
     private FlutterEngine flutterEngine;
     private AudioServiceConfig config;
-    private PowerManager.WakeLock wakeLock;
+    private PlaybackWakeLock wakeLock;
     private MediaSessionCompat mediaSession;
     private MediaSessionCallback mediaSessionCallback;
     private List<MediaControl> controls = new ArrayList<>();
@@ -340,7 +340,8 @@ public class AudioService extends MediaBrowserServiceCompat {
         mediaSession.setQueue(queue);
 
         PowerManager pm = (PowerManager)getSystemService(Context.POWER_SERVICE);
-        wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, AudioService.class.getName());
+        wakeLock = new PlaybackWakeLock(
+                pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, AudioService.class.getName()), handler);
 
         // Get max available VM memory, exceeding this amount will throw an
         // OutOfMemory exception. Stored in kilobytes as LruCache takes an
@@ -434,10 +435,7 @@ public class AudioService extends MediaBrowserServiceCompat {
     }
 
     int getResourceId(String resource) {
-        String[] parts = resource.split("/");
-        String resourceType = parts[0];
-        String resourceName = parts[1];
-        return getResources().getIdentifier(resourceName, resourceType, getApplicationContext().getPackageName());
+        return AudioServicePlugin.resolveResourceId(getApplicationContext(), resource);
     }
 
     NotificationCompat.Action createAction(String resource, String label, long actionCode) {
@@ -788,13 +786,11 @@ public class AudioService extends MediaBrowserServiceCompat {
     }
 
     private void acquireWakeLock() {
-        if (!wakeLock.isHeld())
-            wakeLock.acquire();
+        if (wakeLock != null) wakeLock.acquire();
     }
 
     private void releaseWakeLock() {
-        if (wakeLock.isHeld())
-            wakeLock.release();
+        if (wakeLock != null) wakeLock.release();
     }
 
     private void activateMediaSession() {

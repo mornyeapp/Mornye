@@ -1,11 +1,13 @@
 package com.ryanheise.audioservice;
 
 import android.content.Context;
+import android.content.pm.PackageManager;
 
 import android.os.Bundle;
 import androidx.annotation.NonNull;
 
 import androidx.annotation.Nullable;
+import io.flutter.embedding.android.FlutterActivityLaunchConfigs;
 import io.flutter.embedding.android.FlutterFragmentActivity;
 import io.flutter.embedding.engine.FlutterEngine;
 
@@ -43,6 +45,10 @@ public class AudioServiceFragmentActivity extends FlutterFragmentActivity {
     // Make this protected method public
     @Override
     public boolean shouldHandleDeeplinking() {
-        return super.shouldHandleDeeplinking();
+        try {
+            return FlutterActivityLaunchConfigs.deepLinkEnabled(getMetaData());
+        } catch (PackageManager.NameNotFoundException error) {
+            return false;
+        }
     }
 }
