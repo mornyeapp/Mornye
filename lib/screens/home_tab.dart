@@ -1292,6 +1292,10 @@ class _HomeTabState extends ConsumerState<HomeTab>
   }) {
     return SliverToBoxAdapter(
       child: AnimatedSize(
+        // Sections stay where they are while the space below them opens or
+        // closes; centered, they would sink and rise as a section comes or
+        // goes (such as Continue listening when the player hides).
+        alignment: AlignmentDirectional.topStart,
         duration: sectionMotion.duration,
         curve: sectionMotion.curve,
         child:

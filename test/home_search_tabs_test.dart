@@ -83,6 +83,51 @@ void main() {
     }
   }
 
+  testWidgets('Home sections stay in place while Continue listening leaves', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(430, 932);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final showPlayer = ValueNotifier(true);
+    addTearDown(showPlayer.dispose);
+    await _pumpStartupHome(
+      tester,
+      _StartupExtensions(),
+      _StartupExplore(),
+      mornye: false,
+      feedDisabled: true,
+      resume: const (
+        media: PlayableMedia(
+          id: 'saved-song',
+          source: '/saved.flac',
+          title: 'Last session',
+          artist: 'Saved artist',
+          duration: Duration(minutes: 3),
+        ),
+        position: Duration(seconds: 23),
+      ),
+      showPlayer: showPlayer,
+    );
+    // Home keeps looping animations, so time passes in fixed steps.
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pump(const Duration(seconds: 1));
+    expect(find.text('Continue listening'), findsOneWidget);
+
+    showPlayer.value = false;
+    await tester.pump();
+    final resting = tester.getTopLeft(find.text('Shortcuts')).dy;
+    // Midway through the space closing, the sections must not sink.
+    await tester.pump(const Duration(milliseconds: 120));
+    expect(tester.getTopLeft(find.text('Shortcuts')).dy, resting);
+    await tester.pump(const Duration(seconds: 1));
+    expect(find.text('Continue listening'), findsNothing);
+    expect(tester.getTopLeft(find.text('Shortcuts')).dy, resting);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump(const Duration(seconds: 1));
+  });
+
   for (final desktop in [false, true]) {
     for (final mornye in [false, true]) {
       testWidgets('Home keeps its feed layout through slow startup '
@@ -976,6 +1021,7 @@ Future<void> _pumpStartupHome(
   PageController? pages,
   PlaybackResumePreview? resume,
   MusicPlayerController? controller,
+  ValueNotifier<bool>? showPlayer,
 }) => tester.pumpWidget(
   ProviderScope(
     overrides: [
@@ -993,6 +1039,13 @@ Future<void> _pumpStartupHome(
       ],
       if (controller != null)
         musicPlayerControllerProvider.overrideWithValue(controller),
+      if (showPlayer != null)
+        playerUiEnabledProvider.overrideWith((ref) {
+          void changed() => ref.invalidateSelf();
+          showPlayer.addListener(changed);
+          ref.onDispose(() => showPlayer.removeListener(changed));
+          return showPlayer.value;
+        }),
     ],
     child: MaterialApp(
       theme: mornye ? MornyeTheme.build(Brightness.dark) : AppTheme.dark(),
