@@ -466,7 +466,7 @@
   "@optionsReplayGain": {
     "description": "Title for ReplayGain setting toggle"
   },
-  "optionsReplayGainSubtitleOn": "음량 스캔 및 리플레이게인 태그 삽입 (EBU R128)",
+  "optionsReplayGainSubtitleOn": "음량 및 삽입된 리플레이게인 태그 스캔 (EBU R128)",
   "@optionsReplayGainSubtitleOn": {
     "description": "Subtitle when ReplayGain is enabled"
   },
@@ -574,7 +574,7 @@
   "@optionsArtistTagMode": {
     "description": "Setting title for how artist metadata is written into files"
   },
-  "optionsArtistTagModeDescription": "여러 아티스트를 내장 태그에 작성하는 방법을 선택하세요",
+  "optionsArtistTagModeDescription": "여러 아티스트를 삽입된 태그에 작성하는 방법을 선택하세요",
   "@optionsArtistTagModeDescription": {
     "description": "Bottom-sheet description for artist tag mode setting"
   },
@@ -1790,7 +1790,7 @@
   "@lyricsModeDescription": {
     "description": "Lyrics mode picker description"
   },
-  "lyricsModeEmbed": "파일에 포함",
+  "lyricsModeEmbed": "파일에 삽입",
   "@lyricsModeEmbed": {
     "description": "Lyrics mode option - embed in audio file"
   },
@@ -5738,7 +5738,7 @@
   "@optionsEmbedMetadata": {
     "description": "Settings toggle title for writing metadata into downloaded files"
   },
-  "optionsEmbedMetadataSubtitleOn": "메타데이터, 앨범 커버 및 내장된 가사를 파일에 기록",
+  "optionsEmbedMetadataSubtitleOn": "메타데이터, 앨범 커버 및 삽입된 가사를 파일에 기록",
   "@optionsEmbedMetadataSubtitleOn": {
     "description": "Subtitle when metadata embedding is enabled"
   },
@@ -5746,7 +5746,7 @@
   "@optionsEmbedMetadataSubtitleOff": {
     "description": "Subtitle when metadata embedding is disabled"
   },
-  "trackCoverNoEmbeddedArt": "내장된 앨범 커버가 없음",
+  "trackCoverNoEmbeddedArt": "삽입된 앨범 커버가 없음",
   "@trackCoverNoEmbeddedArt": {
     "description": "Message shown when a track file has no embedded cover art"
   },
@@ -5770,7 +5770,7 @@
   "@trackCoverSelected": {
     "description": "Label for the newly selected cover preview"
   },
-  "trackCoverReplaceNotice": "저장을 탭하면 선택한 표지가 현재 내장된 표지를 대체합니다",
+  "trackCoverReplaceNotice": "저장을 탭하면 선택한 표지가 현재 삽입된 표지를 대체합니다",
   "@trackCoverReplaceNotice": {
     "description": "Notice shown when a new cover has been selected but not saved yet"
   },
@@ -6522,7 +6522,7 @@
       }
     }
   },
-  "trackLyricsEmbeddedSource": "내장",
+  "trackLyricsEmbeddedSource": "삽입",
   "@trackLyricsEmbeddedSource": {
     "description": "Lyrics source label for embedded lyrics"
   },
@@ -6646,7 +6646,7 @@
   "@libraryExternalPlayerSubtitle": {
     "description": "Subtitle for external player option"
   },
-  "libraryBuiltInPreviewPlayer": "내장 플레이어",
+  "libraryBuiltInPreviewPlayer": "내부 플레이어",
   "@libraryBuiltInPreviewPlayer": {
     "description": "Setting option to use the built-in preview player"
   },
@@ -7239,7 +7239,7 @@
   "@optionsEmbeddedCoverSize": {
     "description": "Metadata setting that limits downloaded artwork resolution before it is embedded"
   },
-  "optionsEmbeddedCoverSizeDescription": "원격으로 다운로드된 앨범 커버를 내장하기 전에 크기를 줄입니다. 이미 제한 내에 있는 이미지는 변경되지 않습니다",
+  "optionsEmbeddedCoverSizeDescription": "원격으로 다운로드된 앨범 커버를 삽입하기 전에 크기를 줄입니다. 이미 제한 내에 있는 이미지는 변경되지 않습니다",
   "@optionsEmbeddedCoverSizeDescription": {
     "description": "Description shown in the embedded cover size picker"
   },
