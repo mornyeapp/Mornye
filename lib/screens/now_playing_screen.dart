@@ -250,6 +250,14 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (!ref.watch(playerUiEnabledProvider)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && ModalRoute.of(context)?.isCurrent == true) {
+          Navigator.of(context).maybePop();
+        }
+      });
+      return const SizedBox.shrink();
+    }
     final mediaItem = ref.watch(currentMediaItemProvider).value;
     final mornye = context.isMornye;
     final fullScreenCover = ref.watch(

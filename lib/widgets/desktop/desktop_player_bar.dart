@@ -71,6 +71,7 @@ class DesktopPlayerBar extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    if (!ref.watch(playerUiEnabledProvider)) return const SizedBox.shrink();
     final mediaItem = ref.watch(currentMediaItemProvider).value;
     return context.isMornye
         ? _MornyePlayerBar(mediaItem: mediaItem)

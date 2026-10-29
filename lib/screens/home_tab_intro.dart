@@ -130,10 +130,12 @@ class _HomeSections extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = context.l10n;
-    final hasMediaItem = ref.watch(
-      currentMediaItemProvider.select((s) => s.value != null),
-    );
-    final hasResume = ref.watch(playbackResumeProvider).value != null;
+    final showPlayer = ref.watch(playerUiEnabledProvider);
+    final hasMediaItem =
+        showPlayer &&
+        ref.watch(currentMediaItemProvider.select((s) => s.value != null));
+    final hasResume =
+        showPlayer && ref.watch(playbackResumeProvider).value != null;
     final recentlyAdded = ref.watch(_homeRecentlyAddedProvider).value;
     final onRepeat = ref.watch(_homeOnRepeatProvider).value ?? const [];
     final mixes = ref.watch(libraryMixesProvider).value ?? const [];

@@ -11,6 +11,7 @@ extension _TrackMetadataMenu on _TrackMetadataScreenState {
     AppLocalizations l10n,
   ) {
     final canEditFile = _fileExists && !_isNetworkItem;
+    final showPlayer = ref.read(playerUiEnabledProvider);
     final localItem = _localLibraryItem;
     final downloadItem = _downloadItem;
     final linkTransfers = linkTransfersAvailable(ref);
@@ -44,13 +45,13 @@ extension _TrackMetadataMenu on _TrackMetadataScreenState {
               UnifiedLibraryItem.fromDownloadHistory(downloadItem),
           ]);
     return <_MetadataOption>[
-      if (_fileExists)
+      if (_fileExists && showPlayer)
         _MetadataOption(
           icon: Icons.playlist_play,
           label: l10n.trackPlayNext,
           onTap: () => _enqueueThis(ref, playNext: true),
         ),
-      if (_fileExists)
+      if (_fileExists && showPlayer)
         _MetadataOption(
           icon: Icons.queue_music,
           label: l10n.trackAddToQueue,

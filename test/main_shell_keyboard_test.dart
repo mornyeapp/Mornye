@@ -1,3 +1,4 @@
+import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,10 +9,12 @@ import 'package:mornye/models/settings.dart';
 import 'package:mornye/providers/download_queue_provider.dart';
 import 'package:mornye/providers/explore_provider.dart';
 import 'package:mornye/providers/extension_provider.dart';
+import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/recent_access_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/screens/home_tab.dart';
 import 'package:mornye/screens/main_shell.dart';
+import 'package:mornye/services/playable_media.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/theme/app_theme.dart';
 import 'package:mornye/utils/android_tv.dart';
@@ -19,6 +22,7 @@ import 'package:mornye/utils/adaptive_layout.dart';
 import 'package:mornye/widgets/tv_navigation.dart';
 import 'package:mornye/widgets/tv_shell.dart';
 import 'package:mornye/widgets/mornye_bottom_bar.dart';
+import 'package:mornye/widgets/mini_player.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -44,6 +48,7 @@ void main() {
     WidgetTester tester, {
     bool tv = false,
     bool mornye = true,
+    bool externalPlayer = false,
   }) async {
     debugAndroidTvOverride = tv;
     addTearDown(() => debugAndroidTvOverride = null);
@@ -59,7 +64,27 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          settingsProvider.overrideWith(_Settings.new),
+          settingsProvider.overrideWith(
+            () => _Settings(externalPlayer: externalPlayer),
+          ),
+          if (externalPlayer) ...[
+            currentMediaItemProvider.overrideWithBuild(
+              (ref, notifier) => Stream.value(
+                const MediaItem(id: 'old', title: 'Old internal song'),
+              ),
+            ),
+            playbackResumeProvider.overrideWith(
+              (ref) async => (
+                media: const PlayableMedia(
+                  id: 'saved',
+                  source: '/music/saved.flac',
+                  title: 'Saved song',
+                  artist: 'Artist',
+                ),
+                position: const Duration(seconds: 23),
+              ),
+            ),
+          ],
           extensionProvider.overrideWith(_Extensions.new),
           exploreProvider.overrideWith(_Explore.new),
           downloadHistoryProvider.overrideWith(_History.new),
@@ -102,6 +127,22 @@ void main() {
 
   bool collapsed(WidgetTester tester) =>
       tester.widget<MornyeBottomBar>(find.byType(MornyeBottomBar)).collapsed;
+
+  for (final mornye in [false, true]) {
+    testWidgets('external mode hides Home playback and mini player ($mornye)', (
+      tester,
+    ) async {
+      await pumpShell(tester, mornye: mornye, externalPlayer: true);
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(find.text('Continue Listening'), findsNothing);
+      expect(find.text('Old internal song'), findsNothing);
+      expect(find.text('Saved song'), findsNothing);
+      for (final player in find.byType(MiniPlayer).evaluate()) {
+        expect(tester.getSize(find.byWidget(player.widget)).height, 0);
+      }
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   void scrollHome(WidgetTester tester, {required double pixels}) {
     ScrollUpdateNotification(
@@ -212,9 +253,16 @@ void main() {
 }
 
 class _Settings extends SettingsNotifier {
+  _Settings({this.externalPlayer = false});
+
+  final bool externalPlayer;
+
   @override
-  AppSettings build() =>
-      const AppSettings(searchProvider: 'example', hasSearchedBefore: true);
+  AppSettings build() => AppSettings(
+    searchProvider: 'example',
+    hasSearchedBefore: true,
+    playerMode: externalPlayer ? 'external' : 'internal',
+  );
 }
 
 class _Extensions extends ExtensionNotifier {

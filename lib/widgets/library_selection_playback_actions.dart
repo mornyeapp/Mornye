@@ -22,6 +22,7 @@ class LibrarySelectionPlaybackActions extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final colors = Theme.of(context).colorScheme;
+    final showPlayer = ref.watch(playerUiEnabledProvider);
     final actions = <Widget>[
       SelectionActionButton(
         icon: Icons.playlist_add,
@@ -39,7 +40,7 @@ class LibrarySelectionPlaybackActions extends ConsumerWidget {
                 showAddTracksToPlaylistSheet(navigatorContext, ref, tracks);
               },
       ),
-      for (final next in [true, false])
+      for (final next in showPlayer ? [true, false] : const <bool>[])
         SelectionActionButton(
           icon: next ? Icons.playlist_play : Icons.queue_music,
           label: next

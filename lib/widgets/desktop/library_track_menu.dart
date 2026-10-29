@@ -31,6 +31,7 @@ List<List<ContextMenuAction>> libraryTrackMenuGroups(
   final l10n = context.l10n;
   final root = Navigator.of(context, rootNavigator: true).context;
   final count = items.length;
+  final showPlayer = ref.read(playerUiEnabledProvider);
 
   Future<void> enqueue({required bool playNext}) async {
     await ref
@@ -50,16 +51,18 @@ List<List<ContextMenuAction>> libraryTrackMenuGroups(
             onPlay();
           },
         ),
-      ContextMenuAction(
-        icon: Icons.playlist_play,
-        label: l10n.trackPlayNext,
-        onSelected: () => enqueue(playNext: true),
-      ),
-      ContextMenuAction(
-        icon: Icons.queue_music,
-        label: l10n.trackAddToQueue,
-        onSelected: () => enqueue(playNext: false),
-      ),
+      if (showPlayer)
+        ContextMenuAction(
+          icon: Icons.playlist_play,
+          label: l10n.trackPlayNext,
+          onSelected: () => enqueue(playNext: true),
+        ),
+      if (showPlayer)
+        ContextMenuAction(
+          icon: Icons.queue_music,
+          label: l10n.trackAddToQueue,
+          onSelected: () => enqueue(playNext: false),
+        ),
     ],
     [
       ContextMenuAction(

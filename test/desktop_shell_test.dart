@@ -10,7 +10,9 @@ import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/l10n/app_localizations.dart';
 import 'package:mornye/models/library_collections.dart';
+import 'package:mornye/models/settings.dart';
 import 'package:mornye/providers/music_player_provider.dart';
+import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/providers/system_volume_provider.dart';
 import 'package:mornye/services/playback_deck.dart';
 import 'package:mornye/services/shell_navigation_service.dart';
@@ -21,6 +23,7 @@ import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/desktop/desktop_commands.dart';
 import 'package:mornye/widgets/desktop/desktop_downloads_button.dart';
+import 'package:mornye/widgets/desktop/desktop_inspector.dart';
 import 'package:mornye/widgets/desktop/desktop_navigation.dart';
 import 'package:mornye/widgets/desktop/desktop_player_bar.dart';
 import 'package:mornye/widgets/desktop/desktop_shortcuts.dart';
@@ -29,6 +32,8 @@ import 'package:mornye/widgets/expressive_navigation_bar.dart';
 import 'package:mornye/widgets/mini_player.dart';
 import 'package:mornye/widgets/mornye_bottom_bar.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import 'support/fixed_settings.dart';
 
 class _FakeController implements MusicPlayerController {
   final calls = <String>[];
@@ -112,8 +117,12 @@ void main() {
   List<Override> overrides({
     MediaItem? item = _track,
     bool playing = false,
+    String playerMode = 'internal',
     UserProfile profile = const UserProfile(name: 'Ada Lovelace'),
   }) => [
+    settingsProvider.overrideWith(
+      () => FixedSettingsNotifier(AppSettings(playerMode: playerMode)),
+    ),
     currentMediaItemProvider.overrideWithBuild(
       (ref, notifier) => Stream.value(item),
     ),
@@ -135,6 +144,7 @@ void main() {
     required double width,
     ShellTab selected = ShellTab.home,
     MediaItem? item = _track,
+    String playerMode = 'internal',
     List<DesktopSidebarLink> libraryLinks = const [],
     ValueChanged<String>? onOpenLibraryLink,
     VoidCallback? onOpenProfile,
@@ -146,7 +156,11 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpWidget(
       ProviderScope(
-        overrides: overrides(item: item, profile: profile),
+        overrides: overrides(
+          item: item,
+          profile: profile,
+          playerMode: playerMode,
+        ),
         child: MaterialApp(
           theme: mornye
               ? MornyeTheme.build(Brightness.light)
@@ -180,6 +194,35 @@ void main() {
     expect(find.byType(ExpressiveNavigationBar), findsNothing);
     expect(find.byType(MornyeBottomBar), findsNothing);
     expect(find.byType(MiniPlayer), findsNothing);
+  }
+
+  for (final mornye in [false, true]) {
+    testWidgets('external mode removes desktop player surfaces ($mornye)', (
+      tester,
+    ) async {
+      desktopNowPlayingOpen.value = true;
+      desktopInspectorPanel.value = DesktopInspectorPanel.lyrics;
+      addTearDown(() {
+        desktopNowPlayingOpen.value = false;
+        desktopInspectorPanel.value = null;
+      });
+      await pumpShell(
+        tester,
+        mornye: mornye,
+        width: 1400,
+        playerMode: 'external',
+      );
+      expect(find.byType(DesktopPlayerBar), findsNothing);
+      expect(find.byKey(const ValueKey('desktop-now-playing')), findsNothing);
+      expect(find.byType(DesktopInspector), findsNothing);
+      expect(find.text('A song'), findsNothing);
+      expect(tester.getSize(contentPage()).height, 800);
+      expect(
+        MediaQuery.paddingOf(tester.element(find.text('content'))).bottom,
+        0,
+      );
+      expect(tester.takeException(), isNull);
+    });
   }
 
   group('Material shell', () {
@@ -663,10 +706,14 @@ void main() {
 
     tearDown(() => ShellNavigationService.unregisterTabSelectionHandler(owner));
 
-    Future<void> pumpApp(WidgetTester tester, {bool playing = false}) async {
+    Future<void> pumpApp(
+      WidgetTester tester, {
+      bool playing = false,
+      String playerMode = 'internal',
+    }) async {
       await tester.pumpWidget(
         ProviderScope(
-          overrides: overrides(playing: playing),
+          overrides: overrides(playing: playing, playerMode: playerMode),
           child: MaterialApp(
             navigatorKey: navigatorKey,
             theme: AppTheme.light(),
@@ -706,6 +753,32 @@ void main() {
       await press(tester, LogicalKeyboardKey.arrowDown, control: true);
       expect(volumeWrites, [closeTo(0.55, 1e-9), closeTo(0.45, 1e-9)]);
     });
+
+    testWidgets(
+      'external mode ignores player shortcuts while navigation still works',
+      (tester) async {
+        await pumpApp(tester, playerMode: 'external');
+        await press(tester, LogicalKeyboardKey.space);
+        await press(tester, LogicalKeyboardKey.arrowRight, control: true);
+        await press(tester, LogicalKeyboardKey.arrowUp, control: true);
+        final context = tester.element(find.text('home'));
+        for (final command in [
+          DesktopCommand.lyrics,
+          DesktopCommand.upNext,
+          DesktopCommand.miniPlayer,
+        ]) {
+          Actions.maybeInvoke(context, DesktopCommandIntent(command));
+        }
+        await tester.pump();
+        expect(controller.calls, isEmpty);
+        expect(volumeWrites, isEmpty);
+        expect(desktopNowPlayingOpen.value, isFalse);
+        expect(desktopInspectorPanel.value, isNull);
+        expect(desktopMiniPlayerOpen.value, isFalse);
+        await press(tester, LogicalKeyboardKey.comma, control: true);
+        expect(requested, [ShellTab.settings]);
+      },
+    );
 
     testWidgets('leave Space and arrows to a focused text field', (
       tester,

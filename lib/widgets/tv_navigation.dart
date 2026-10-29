@@ -167,6 +167,7 @@ class _TvNavigationState extends ConsumerState<TvNavigation> {
         key == LogicalKeyboardKey.mediaTrackNext ||
         key == LogicalKeyboardKey.mediaTrackPrevious;
     if (mediaKey) {
+      if (!ref.read(playerUiEnabledProvider)) return KeyEventResult.ignored;
       if (event is KeyDownEvent) {
         final controller = ref.read(musicPlayerControllerProvider);
         final playing = ref.read(playbackPlayingProvider);

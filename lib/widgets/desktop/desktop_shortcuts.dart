@@ -77,22 +77,40 @@ class _DesktopShortcutsState extends ConsumerState<DesktopShortcuts> {
     return focus == null || focus is FocusScopeNode || focus == _idleFocus;
   }
 
-  bool _canRun(DesktopCommand command) => switch (command) {
-    DesktopCommand.playPause => !_editingText && _nothingFocused,
-    // Text fields use these keys for caret movement.
+  bool _playerCommand(DesktopCommand command) => switch (command) {
+    DesktopCommand.playPause ||
     DesktopCommand.next ||
     DesktopCommand.previous ||
     DesktopCommand.volumeUp ||
-    DesktopCommand.volumeDown => !_editingText,
-    DesktopCommand.back => _canCloseTopLayer,
-    DesktopCommand.dismiss =>
-      _editingText ||
-          _canCloseTopLayer ||
-          desktopWindowMode.value != DesktopWindowMode.windowed,
-    _ => true,
+    DesktopCommand.volumeDown ||
+    DesktopCommand.lyrics ||
+    DesktopCommand.upNext ||
+    DesktopCommand.miniPlayer => true,
+    _ => false,
   };
 
+  bool _canRun(DesktopCommand command) {
+    if (_playerCommand(command) && !ref.read(playerUiEnabledProvider)) {
+      return false;
+    }
+    return switch (command) {
+      DesktopCommand.playPause => !_editingText && _nothingFocused,
+      // Text fields use these keys for caret movement.
+      DesktopCommand.next ||
+      DesktopCommand.previous ||
+      DesktopCommand.volumeUp ||
+      DesktopCommand.volumeDown => !_editingText,
+      DesktopCommand.back => _canCloseTopLayer,
+      DesktopCommand.dismiss =>
+        _editingText ||
+            _canCloseTopLayer ||
+            desktopWindowMode.value != DesktopWindowMode.windowed,
+      _ => true,
+    };
+  }
+
   void _run(DesktopCommand command) {
+    if (_playerCommand(command) && !ref.read(playerUiEnabledProvider)) return;
     final controller = ref.read(musicPlayerControllerProvider);
     switch (command) {
       case DesktopCommand.playPause:
@@ -208,6 +226,14 @@ class _DesktopShortcutsState extends ConsumerState<DesktopShortcuts> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen(playerUiEnabledProvider, (_, enabled) {
+      if (enabled) return;
+      desktopNowPlayingOpen.value = false;
+      desktopInspectorPanel.value = null;
+      if (desktopMiniPlayerOpen.value) {
+        unawaited(setDesktopMiniPlayer(open: false));
+      }
+    });
     // Keeps the playback and volume streams alive so the shortcuts read
     // current values even while no player surface is visible.
     ref.listen(playbackPlayingProvider, (_, _) {});
@@ -302,6 +328,7 @@ class _DesktopMenuBar extends StatelessWidget {
     final mornye = context.isMornye;
     return Consumer(
       builder: (context, ref, child) {
+        final showPlayer = ref.watch(playerUiEnabledProvider);
         final showStore = ref.watch(
           settingsProvider.select((s) => s.showExtensionStore),
         );
@@ -398,8 +425,10 @@ class _DesktopMenuBar extends StatelessWidget {
                   members: [
                     _command(material.backButtonTooltip, DesktopCommand.back),
                     _command(l10n.desktopMenuRefresh, DesktopCommand.refresh),
-                    _command(l10n.nowPlayingTabLyrics, DesktopCommand.lyrics),
-                    _command(l10n.nowPlayingUpNext, DesktopCommand.upNext),
+                    if (showPlayer)
+                      _command(l10n.nowPlayingTabLyrics, DesktopCommand.lyrics),
+                    if (showPlayer)
+                      _command(l10n.nowPlayingUpNext, DesktopCommand.upNext),
                   ],
                 ),
                 PlatformMenuItemGroup(
@@ -420,30 +449,34 @@ class _DesktopMenuBar extends StatelessWidget {
                 ),
               ],
             ),
-            PlatformMenu(
-              label: l10n.desktopMenuControls,
-              menus: [
-                PlatformMenuItemGroup(
-                  members: [
-                    _command(
-                      l10n.desktopMenuPlayPause,
-                      DesktopCommand.playPause,
-                    ),
-                    _command(l10n.nowPlayingNextTrack, DesktopCommand.next),
-                    _command(
-                      l10n.nowPlayingPreviousTrack,
-                      DesktopCommand.previous,
-                    ),
-                  ],
-                ),
-                PlatformMenuItemGroup(
-                  members: [
-                    _command(l10n.desktopVolumeUp, DesktopCommand.volumeUp),
-                    _command(l10n.desktopVolumeDown, DesktopCommand.volumeDown),
-                  ],
-                ),
-              ],
-            ),
+            if (showPlayer)
+              PlatformMenu(
+                label: l10n.desktopMenuControls,
+                menus: [
+                  PlatformMenuItemGroup(
+                    members: [
+                      _command(
+                        l10n.desktopMenuPlayPause,
+                        DesktopCommand.playPause,
+                      ),
+                      _command(l10n.nowPlayingNextTrack, DesktopCommand.next),
+                      _command(
+                        l10n.nowPlayingPreviousTrack,
+                        DesktopCommand.previous,
+                      ),
+                    ],
+                  ),
+                  PlatformMenuItemGroup(
+                    members: [
+                      _command(l10n.desktopVolumeUp, DesktopCommand.volumeUp),
+                      _command(
+                        l10n.desktopVolumeDown,
+                        DesktopCommand.volumeDown,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             PlatformMenu(
               label: l10n.desktopMenuWindow,
               menus: [
@@ -451,7 +484,7 @@ class _DesktopMenuBar extends StatelessWidget {
                   PlatformProvidedMenuItemType.minimizeWindow,
                   PlatformProvidedMenuItemType.zoomWindow,
                 ]),
-                if (desktopMiniPlayerSupported)
+                if (showPlayer && desktopMiniPlayerSupported)
                   PlatformMenuItemGroup(
                     members: [
                       _command(

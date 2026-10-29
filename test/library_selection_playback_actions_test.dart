@@ -24,6 +24,31 @@ class _Controller extends MusicPlayerController {
 }
 
 void main() {
+  testWidgets(
+    'external playback keeps playlist actions without queue controls',
+    (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [playerUiEnabledProvider.overrideWithValue(false)],
+          child: MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Scaffold(
+              body: LibrarySelectionPlaybackActions(
+                items: const [],
+                onClose: () {},
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Play next'), findsNothing);
+      expect(find.text('Add to queue'), findsNothing);
+      expect(find.text('Add to playlist'), findsOneWidget);
+    },
+  );
+
   for (final mornye in [false, true]) {
     for (final size in [const Size(390, 844), const Size(844, 390)]) {
       testWidgets('batch playback preserves selection order ($mornye, $size)', (

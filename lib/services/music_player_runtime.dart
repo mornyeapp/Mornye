@@ -311,6 +311,21 @@ class MusicPlayerRuntime {
     _configureExclusiveOutput(settings);
     _songAnalysis?.configure(settings);
     _handler?.applySettings(previous);
+    if (previous.playerMode == 'internal' &&
+        settings.playerMode != 'internal') {
+      _restoreFuture = null;
+      final handler = _handler;
+      if (handler != null) {
+        unawaited(
+          handler.stop(keepResume: true).catchError((
+            Object error,
+            StackTrace stack,
+          ) {
+            _log.e('Failed to stop the internal player', error, stack);
+          }),
+        );
+      }
+    }
   }
 
   /// Starts analyzing Library songs in the background, and the song playing
@@ -470,8 +485,10 @@ class MusicPlayerRuntime {
     }
   }
 
-  Future<void> restoreSession() =>
-      _restoreFuture ??= restorePlaybackSession(this).then<void>((_) {});
+  Future<void> restoreSession() {
+    if (_settings.playerMode != 'internal') return Future.value();
+    return _restoreFuture ??= restorePlaybackSession(this).then<void>((_) {});
+  }
 
   /// [MusicPlayerHandler.recoverRestoredArtwork] after [restoreSession].
   Future<void> recoverRestoredArtwork() async {

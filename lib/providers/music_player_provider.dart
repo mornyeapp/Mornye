@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/models/track.dart';
 import 'package:mornye/models/unified_library_item.dart';
 import 'package:mornye/providers/download_queue_provider.dart';
+import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/services/history_database.dart';
 import 'package:mornye/services/history_row_mapper.dart';
 import 'package:mornye/services/library_database.dart';
@@ -24,6 +25,22 @@ final musicPlayerRuntimeProvider = Provider<MusicPlayerRuntime>(
 /// The device that plays in this one's place, or null while this one plays.
 /// The app root overrides it with Mornye Link's paired desktop.
 final activeRemotePlaybackProvider = Provider<RemotePlayback?>((ref) => null);
+
+/// External apps own local-file playback. Link and network files still need
+/// the in-app controls when they use a Mornye player.
+final playerUiEnabledProvider = Provider<bool>((ref) {
+  if (ref.watch(settingsProvider.select((s) => s.playerMode == 'internal')) ||
+      ref.watch(activeRemotePlaybackProvider) != null) {
+    return true;
+  }
+  return ref.watch(
+    localMediaItemProvider.select(
+      (state) =>
+          state.value?.extras?['source']?.toString().startsWith('network://') ??
+          false,
+    ),
+  );
+});
 
 /// The active remote device's volume, 0 to 1; no value while this device
 /// plays.
@@ -47,9 +64,11 @@ final currentMediaItemProvider =
 
 class CurrentMediaItemNotifier extends StreamNotifier<MediaItem?> {
   @override
-  Stream<MediaItem?> build() =>
-      ref.watch(activeRemotePlaybackProvider)?.mediaItems ??
-      ref.watch(musicPlayerRuntimeProvider).mediaItemEvents();
+  Stream<MediaItem?> build() {
+    if (!ref.watch(playerUiEnabledProvider)) return Stream.value(null);
+    return ref.watch(activeRemotePlaybackProvider)?.mediaItems ??
+        ref.watch(musicPlayerRuntimeProvider).mediaItemEvents();
+  }
 
   @override
   bool updateShouldNotify(
@@ -80,6 +99,9 @@ class LocalMediaItemNotifier extends CurrentMediaItemNotifier {
 
 /// A dismissed session stays available on Home without restoring the player.
 final playbackResumeProvider = FutureProvider<PlaybackResumePreview?>((ref) {
+  if (!ref.watch(settingsProvider.select((s) => s.playerMode == 'internal'))) {
+    return null;
+  }
   final hasCurrent = ref.watch(
     currentMediaItemProvider.select((state) => state.value != null),
   );
@@ -126,6 +148,7 @@ final playerCollectionTrackProvider = FutureProvider.autoDispose
     });
 
 final playbackStateProvider = StreamProvider<PlaybackState>((ref) {
+  if (!ref.watch(playerUiEnabledProvider)) return Stream.value(PlaybackState());
   return ref.watch(activeRemotePlaybackProvider)?.playbackStates ??
       ref.watch(musicPlayerRuntimeProvider).playbackStateEvents();
 });
@@ -335,6 +358,7 @@ final catalogTrackPlaybackUiProvider = Provider.autoDispose
     });
 
 final playQueueProvider = StreamProvider<List<MediaItem>>((ref) {
+  if (!ref.watch(playerUiEnabledProvider)) return Stream.value(const []);
   return ref.watch(activeRemotePlaybackProvider)?.queues ??
       ref.watch(musicPlayerRuntimeProvider).queueEvents();
 });
@@ -457,7 +481,9 @@ class MusicPlayerController {
   }
 
   Future<bool> _resumeSavedSession() async {
-    if (remote != null) return false;
+    if (remote != null || _runtime.settings.playerMode != 'internal') {
+      return false;
+    }
     final handler = await ensureInitialized();
     if (handler == null) return false;
     final generation = handler.playbackRequestGeneration;

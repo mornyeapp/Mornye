@@ -139,9 +139,11 @@ class _MornyeBottomBarState extends ConsumerState<MornyeBottomBar>
     final onHome = widget.onHome;
     final onSearch = widget.onSearch;
     final blurEnabled = widget.blurEnabled;
-    final hasPlayer = ref.watch(
-      currentMediaItemProvider.select((item) => item.value != null),
-    );
+    final hasPlayer =
+        ref.watch(playerUiEnabledProvider) &&
+        ref.watch(
+          currentMediaItemProvider.select((item) => item.value != null),
+        );
     final liquidGlass = ref.watch(mornyeLiquidGlassProvider);
     // Animated glass tabs already reserve 8px above their visible capsule.
     final glassTabs = MornyeTabBar.usesLiquidGlass(

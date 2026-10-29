@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/library_collections_provider.dart';
+import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/user_profile_provider.dart';
 import 'package:mornye/services/shell_navigation_service.dart';
 import 'package:mornye/services/user_profile_store.dart';
@@ -108,7 +109,7 @@ class DesktopDestination {
 /// Now Playing covers the whole window while [desktopNowPlayingOpen] is
 /// set. Lyrics and Up Next ([desktopInspectorPanel]) sit beside the content
 /// from [desktopInspectorBesideBreakpoint] and float over it below that.
-class DesktopShellLayout extends StatelessWidget {
+class DesktopShellLayout extends ConsumerWidget {
   const DesktopShellLayout({
     super.key,
     required this.destinations,
@@ -146,9 +147,13 @@ class DesktopShellLayout extends StatelessWidget {
   /// the last full window size, so its pages keep their layout and state
   /// while the window is small.
   @override
-  Widget build(BuildContext context) => ValueListenableBuilder<bool>(
+  Widget build(BuildContext context, WidgetRef ref) =>
+      _window(ref.watch(playerUiEnabledProvider));
+
+  Widget _window(bool show) => ValueListenableBuilder<bool>(
     valueListenable: desktopMiniPlayerOpen,
     builder: (context, mini, window) {
+      mini = mini && show;
       final mediaQuery = MediaQuery.of(context);
       if (!mini) _fullWindowSize = mediaQuery.size;
       final full = mini ? _fullWindowSize : null;
@@ -218,7 +223,7 @@ class DesktopShellLayout extends StatelessWidget {
         ),
       );
     },
-    child: Builder(builder: _nowPlayingOrShell),
+    child: Builder(builder: (context) => _nowPlayingOrShell(context, show)),
   );
 
   /// The window's size before the mini player shrank it.
@@ -227,28 +232,31 @@ class DesktopShellLayout extends StatelessWidget {
   /// Now Playing covers the whole window, as Music's player does. The
   /// destinations keep their state underneath, but stop painting and
   /// ticking.
-  Widget _nowPlayingOrShell(BuildContext context) =>
+  Widget _nowPlayingOrShell(BuildContext context, bool showPlayer) =>
       ValueListenableBuilder<bool>(
         valueListenable: desktopNowPlayingOpen,
-        builder: (context, nowPlayingOpen, shell) => Stack(
-          fit: StackFit.expand,
-          children: [
-            Visibility(
-              visible: !nowPlayingOpen,
-              maintainState: true,
-              child: shell!,
-            ),
-            if (nowPlayingOpen)
-              KeyedSubtree(
-                key: const ValueKey('desktop-now-playing'),
-                child: nowPlaying,
+        builder: (context, nowPlayingOpen, shell) {
+          nowPlayingOpen = nowPlayingOpen && showPlayer;
+          return Stack(
+            fit: StackFit.expand,
+            children: [
+              Visibility(
+                visible: !nowPlayingOpen,
+                maintainState: true,
+                child: shell!,
               ),
-          ],
-        ),
-        child: Builder(builder: _shell),
+              if (nowPlayingOpen)
+                KeyedSubtree(
+                  key: const ValueKey('desktop-now-playing'),
+                  child: nowPlaying,
+                ),
+            ],
+          );
+        },
+        child: Builder(builder: (context) => _shell(context, showPlayer)),
       );
 
-  Widget _shell(BuildContext context) {
+  Widget _shell(BuildContext context, bool showPlayer) {
     final width = MediaQuery.sizeOf(context).width;
     if (context.isMornye) {
       // The sidebar always shows; the page background shows around the
@@ -271,7 +279,8 @@ class DesktopShellLayout extends StatelessWidget {
               child: _DesktopContentArea(
                 overlayInspector: desktopInspectorOverlays(width),
                 body: body,
-                floatingPlayer: playerBar,
+                floatingPlayer: showPlayer ? playerBar : null,
+                showPlayer: showPlayer,
                 titleBarDrag: true,
               ),
             ),
@@ -326,13 +335,14 @@ class DesktopShellLayout extends StatelessWidget {
                 child: _DesktopContentArea(
                   overlayInspector: desktopInspectorOverlays(width),
                   body: body,
+                  showPlayer: showPlayer,
                   titleBarDrag: true,
                 ),
               ),
             ],
           ),
         ),
-        playerBar,
+        if (showPlayer) playerBar,
       ],
     );
   }
@@ -374,6 +384,7 @@ class _DesktopContentArea extends StatelessWidget {
     required this.overlayInspector,
     required this.body,
     this.floatingPlayer,
+    this.showPlayer = true,
     this.titleBarDrag = false,
   });
 
@@ -382,6 +393,7 @@ class _DesktopContentArea extends StatelessWidget {
 
   /// The Mornye player capsule, floating over the bottom of the pane.
   final Widget? floatingPlayer;
+  final bool showPlayer;
 
   /// Whether the top of the pane is the window's title bar row, where a
   /// drag moves the window.
@@ -394,6 +406,7 @@ class _DesktopContentArea extends StatelessWidget {
     return ValueListenableBuilder<DesktopInspectorPanel?>(
       valueListenable: desktopInspectorPanel,
       builder: (context, panel, _) {
+        if (!showPlayer) panel = null;
         final content = Stack(
           fit: StackFit.expand,
           children: [
