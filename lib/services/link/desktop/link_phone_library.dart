@@ -21,6 +21,9 @@ abstract interface class LinkPhoneLibrary {
 
   /// Removes the source and its songs.
   Future<void> remove(String sourceId);
+
+  /// The cover files the rows of [sourceId] name now.
+  Future<Set<String>> coverPaths(String sourceId);
 }
 
 class LinkPhoneLibraryBridge implements LinkPhoneLibrary {
@@ -93,6 +96,21 @@ class LinkPhoneLibraryBridge implements LinkPhoneLibrary {
     if (source == null) return;
     _pendingScans.remove(source.id);
     await _ref.read(localLibraryProvider.notifier).removeSource(source.id);
+  }
+
+  @override
+  Future<Set<String>> coverPaths(String sourceId) async {
+    final source = await _database.getSourceByPath(_rootSource(sourceId));
+    if (source == null) return const {};
+    final rows = await (await _database.database).rawQuery(
+      'SELECT DISTINCT cover_path FROM library '
+      "WHERE source_id = ? AND COALESCE(cover_path, '') != ''",
+      [source.id],
+    );
+    return {
+      for (final row in rows)
+        if (row['cover_path'] case final String path) path,
+    };
   }
 }
 

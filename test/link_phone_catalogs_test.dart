@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -323,8 +324,176 @@ void main() {
         },
       );
       await page(0, 1, [_song(1, coverId: coverB)]);
+      // The removal runs after the reply.
+      await catalogs.idle(sourceId);
       expect(await catalogs.coverPaths(sourceId), {
         coverB: '${root.path}/$sourceId/covers/$coverB.png',
+      });
+    });
+
+    test('a cover Library rows still show waits for their rescan', () async {
+      var shown = <String>{};
+      Object? unreadable;
+      catalogs = LinkPhoneCatalogs(
+        root: () async => root,
+        paired: (deviceId) async => paired.contains(deviceId),
+        onCommit: commits.add,
+        libraryCovers: (id) async {
+          if (unreadable case final error?) throw error;
+          return id == sourceId ? shown : const {};
+        },
+      )..register(router = LinkHostRouter());
+      Future<void> post(String id) => call(
+        LinkOps.phoneCovers,
+        'POST',
+        args: {
+          'covers': [
+            {'id': id, 'ext': 'jpg', 'data': jpeg},
+          ],
+        },
+      );
+      final pathA = '${root.path}/$sourceId/covers/$coverA.jpg';
+      final pathB = '${root.path}/$sourceId/covers/$coverB.jpg';
+
+      await post(coverA);
+      await page(0, 1, [_song(1, coverId: coverA)]);
+      // The rescan after the commit points the song's row at cover A.
+      shown = {pathA};
+
+      // The phone's cover changes: the rows name cover A until the rescan.
+      await post(coverB);
+      await page(0, 1, [_song(1, coverId: coverB)], version: 'v2');
+      await catalogs.idle(sourceId);
+      expect(await catalogs.coverPaths(sourceId), {
+        coverA: pathA,
+        coverB: pathB,
+      });
+
+      // Once the rescan moved the rows, the next sync removes cover A (set
+      // older than the v2 list, as coarse file times can give both the
+      // same time).
+      shown = {pathB};
+      File(pathA).setLastModifiedSync(DateTime(2000));
+      expect(await call(LinkOps.phoneCatalog, 'GET'), {'version': 'v2'});
+      await catalogs.idle(sourceId);
+      expect(await catalogs.coverPaths(sourceId), {coverB: pathB});
+
+      // Unknown rows keep every cover.
+      unreadable = const FileSystemException('locked');
+      await page(0, 1, [_song(1)], version: 'v3');
+      await catalogs.idle(sourceId);
+      expect(await catalogs.coverPaths(sourceId), {coverB: pathB});
+      unreadable = null;
+      shown = {};
+      await page(0, 1, [_song(1)], version: 'v4');
+      await catalogs.idle(sourceId);
+      expect(await catalogs.coverPaths(sourceId), isEmpty);
+    });
+
+    group('in the order a phone syncs', () {
+      var shown = <String>{};
+      late List<String> posted;
+
+      setUp(() {
+        shown = {};
+        posted = [];
+        catalogs = LinkPhoneCatalogs(
+          root: () async => root,
+          paired: (deviceId) async => paired.contains(deviceId),
+          onCommit: commits.add,
+          libraryCovers: (_) async => shown,
+        )..register(router = LinkHostRouter());
+      });
+
+      /// One sync: the version, then the covers the desktop lacks, then
+      /// the songs (fileId to coverId), unless [interrupted] first.
+      Future<void> sync(
+        String version,
+        Map<int, String?> songs, {
+        bool interrupted = false,
+      }) async {
+        await call(LinkOps.phoneCatalog, 'GET');
+        final reply = await call(LinkOps.phoneCovers, 'GET');
+        final held = {...((reply! as Map)['ids'] as List).cast<String>()};
+        final missing = {
+          for (final id in songs.values)
+            if (id != null && !held.contains(id)) id,
+        };
+        posted.addAll(missing);
+        if (missing.isNotEmpty) {
+          await call(
+            LinkOps.phoneCovers,
+            'POST',
+            args: {
+              'covers': [
+                for (final id in missing)
+                  {'id': id, 'ext': 'jpg', 'data': jpeg},
+              ],
+            },
+          );
+        }
+        if (!interrupted) {
+          await page(0, songs.length, [
+            for (final MapEntry(:key, :value) in songs.entries)
+              _song(key, coverId: value),
+          ], version: version);
+        }
+        await catalogs.idle(sourceId);
+      }
+
+      test('a sync that stopped keeps the covers it sent', () async {
+        await sync('v1', {1: coverA}, interrupted: true);
+        await sync('v1', {1: coverA});
+        expect((await catalogs.coverPaths(sourceId)).keys, [coverA]);
+
+        await sync('v2', {1: coverA, 2: coverB}, interrupted: true);
+        await sync('v2', {1: coverA, 2: coverB});
+        expect(posted, [coverA, coverB], reason: 'each cover is sent once');
+        expect(
+          (await catalogs.coverPaths(sourceId)).keys,
+          unorderedEquals([coverA, coverB]),
+        );
+      });
+
+      test('a cover kept for Library rows can be named again', () async {
+        final pathA = '${root.path}/$sourceId/covers/$coverA.jpg';
+        final pathB = '${root.path}/$sourceId/covers/$coverB.jpg';
+        await sync('v1', {1: coverA});
+        shown = {pathA};
+        await sync('v2', {1: coverB});
+        expect(
+          (await catalogs.coverPaths(sourceId)).keys,
+          unorderedEquals([coverA, coverB]),
+        );
+
+        // The rescan moved the rows to B; the next sync drops A first, so
+        // the phone sends it again. A is set older than the v2 list, as
+        // coarse file times can give both the same time.
+        shown = {pathB};
+        File(pathA).setLastModifiedSync(DateTime(2000));
+        await sync('v3', {1: coverA});
+        expect(posted, [coverA, coverB, coverA]);
+        expect(await catalogs.coverPath(sourceId, coverA), pathA);
+      });
+
+      test('a commit removes covers before the next request', () async {
+        await sync('v1', {1: coverA});
+        // A phone that reconnected sends its next covers while the last
+        // page is still being written.
+        await Future.wait([
+          page(0, 1, [_song(1)], version: 'v2'),
+          call(
+            LinkOps.phoneCovers,
+            'POST',
+            args: {
+              'covers': [
+                {'id': coverB, 'ext': 'jpg', 'data': jpeg},
+              ],
+            },
+          ),
+        ]);
+        await catalogs.idle(sourceId);
+        expect((await catalogs.coverPaths(sourceId)).keys, [coverB]);
       });
     });
 
@@ -396,6 +565,45 @@ void main() {
       expect(fetched, isEmpty);
       expect(await catalogs.coverPath(sourceId, key), isNotNull);
       expect(commits, [_phone, _phone, _phone]);
+    });
+
+    test('cover lookups do not wait for a web cover download', () async {
+      final download = Completer<Uint8List?>();
+      catalogs = LinkPhoneCatalogs(
+        root: () async => root,
+        paired: (deviceId) async => paired.contains(deviceId),
+        fetchCover: (_) => download.future,
+      )..register(router = LinkHostRouter());
+      addTearDown(() async {
+        download.complete(null);
+        await catalogs.idle(sourceId);
+      });
+      await call(
+        LinkOps.phoneCovers,
+        'POST',
+        args: {
+          'covers': [
+            {'id': coverA, 'ext': 'jpg', 'data': jpeg},
+          ],
+        },
+      );
+      await page(0, 2, [
+        _song(1, coverId: coverA),
+        {..._song(2), 'coverUrl': 'https://images.example.com/slow.jpg'},
+      ]);
+      // The commit queued the download, which never ends; then the phone
+      // starts its next sync.
+      await call(LinkOps.phoneCatalog, 'GET');
+
+      final pathA = '${root.path}/$sourceId/covers/$coverA.jpg';
+      const soon = Duration(seconds: 1);
+      expect(await catalogs.coverPath(sourceId, coverA).timeout(soon), pathA);
+      expect(await catalogs.coverPaths(sourceId).timeout(soon), {
+        coverA: pathA,
+      });
+      expect(await catalogs.coversFor({_fileId(1)}).timeout(soon), {
+        _fileId(1): pathA,
+      });
     });
 
     test('a large cover is kept shrunk and a failed one is tried again '

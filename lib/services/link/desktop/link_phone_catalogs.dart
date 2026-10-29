@@ -12,6 +12,7 @@ import 'package:mornye/services/link/link_host_router.dart';
 import 'package:mornye/services/link/link_protocol.dart';
 import 'package:mornye/utils/isrc_utils.dart';
 import 'package:mornye/utils/logger.dart';
+import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 final _log = AppLogger('LinkPhoneCatalogs');
@@ -41,6 +42,10 @@ int? _intArg(Map<String, dynamic> args, String key) {
 
 /// Fetches a cover from its web address; null when it cannot.
 typedef LinkCoverFetcher = Future<Uint8List?> Function(Uri url);
+
+/// The cover files the desktop's Library rows of the phone [sourceId] name
+/// now; throws when they cannot be read.
+typedef LinkLibraryCovers = Future<Set<String>> Function(String sourceId);
 
 /// Fetches a cover of at most [LinkPhoneCatalogs.maxFetchedCoverBytes].
 Future<Uint8List?> _fetchCover(Uri url) async {
@@ -89,11 +94,13 @@ class LinkPhoneCatalogs {
     void Function(String deviceId)? onCommit,
     LinkCoverFetcher? fetchCover,
     LinkCoverShrinker? shrinkCover,
+    LinkLibraryCovers? libraryCovers,
   }) : _root = root,
        _paired = paired,
        _onCommit = onCommit,
        _fetch = fetchCover ?? _fetchCover,
-       _shrink = shrinkCover ?? shrinkLinkCover;
+       _shrink = shrinkCover ?? shrinkLinkCover,
+       _libraryCovers = libraryCovers ?? ((_) async => const {});
 
   /// The most songs a phone may list.
   static const maxSongs = 100000;
@@ -119,10 +126,20 @@ class LinkPhoneCatalogs {
   final void Function(String deviceId)? _onCommit;
   final LinkCoverFetcher _fetch;
   final LinkCoverShrinker _shrink;
+  final LinkLibraryCovers _libraryCovers;
   final _uploads = <String, _Upload>{};
   final _versions = <String, String?>{};
   final _coverBytes = <String, int>{};
   final _queues = <String, Future<void>>{};
+
+  /// The last cover removal queued for each phone. `GET phone/covers` waits
+  /// for it; the other readers look up covers of committed songs, which no
+  /// removal takes away.
+  final _pruning = <String, Future<void>>{};
+
+  /// The cover ids of a list just committed, for the removal queued right
+  /// behind its last page.
+  final _committedCovers = <String, Set<String>>{};
 
   /// The web covers fetched or tried for each phone while the app runs.
   final _triedCovers = <String, Set<String>>{};
@@ -151,6 +168,14 @@ class LinkPhoneCatalogs {
     return result;
   }
 
+  /// Queues [prune] among the writes of the phone [sourceId].
+  void _queuePrune(String sourceId, Future<void> Function() prune) {
+    _pruning[sourceId] = _serial(
+      sourceId,
+      prune,
+    ).then<void>((_) {}, onError: (Object _, StackTrace _) {});
+  }
+
   Future<String> _sourceFor(LinkRequest request, {required bool write}) async {
     final deviceId = request.deviceId;
     if (deviceId.isEmpty) throw _invalid('Missing device');
@@ -168,8 +193,10 @@ class LinkPhoneCatalogs {
       final sourceId = await _sourceFor(request, write: false);
       final deviceId = request.deviceId;
       if (await _paired(deviceId)) {
-        // A phone asks on each connect; covers a failed fetch left out of
-        // its list get another try.
+        // A phone asks at the start of each sync: covers a commit kept only
+        // for Library rows go once a rescan moved the rows, and covers a
+        // failed fetch left out of its list get another try.
+        _queuePrune(sourceId, () => _pruneDropped(sourceId));
         unawaited(
           _serial(sourceId, () => _fetchListedCovers(deviceId, sourceId)),
         );
@@ -177,10 +204,18 @@ class LinkPhoneCatalogs {
       return {'version': await version(sourceId)};
     }
     final sourceId = await _sourceFor(request, write: true);
-    return _serial(
+    final reply = _serial(
       sourceId,
       () => _page(request.deviceId, sourceId, request.args),
     );
+    // Right behind the page, so a commit's removal runs after its reply and
+    // before anything the phone sends next.
+    _queuePrune(sourceId, () async {
+      if (_committedCovers.remove(sourceId) case final keep?) {
+        await _pruneCovers(sourceId, keep);
+      }
+    });
+    return reply;
   }
 
   /// One `POST phone/catalog` page; the last one commits the list.
@@ -232,7 +267,7 @@ class LinkPhoneCatalogs {
     _uploads.remove(sourceId);
     await upload.commit(File('$folder/$_catalogName'));
     _versions[sourceId] = version;
-    await _pruneCovers(sourceId, upload.coverIds);
+    _committedCovers[sourceId] = upload.coverIds;
     _onCommit?.call(deviceId);
     final coverUrls = upload.coverUrls;
     if (coverUrls.isNotEmpty) {
@@ -253,6 +288,26 @@ class LinkPhoneCatalogs {
       }
     }
     if (urls.isNotEmpty) await _fetchCovers(deviceId, sourceId, urls);
+  }
+
+  /// Removes the covers an earlier commit left out but kept while Library
+  /// rows named them. Covers written since the commit wait for the commit
+  /// they were sent for.
+  Future<void> _pruneDropped(String sourceId) async {
+    final DateTime committed;
+    try {
+      committed = await File(
+        '${await _folder(sourceId)}/$_catalogName',
+      ).lastModified();
+    } on FileSystemException {
+      // Nothing committed yet.
+      return;
+    }
+    final keys = <String>{};
+    await for (final song in songs(sourceId)) {
+      if (song.coverKey case final key?) keys.add(key);
+    }
+    await _pruneCovers(sourceId, keys, writtenBefore: committed);
   }
 
   /// Fetches the covers of [urls] (by cover key) not held or tried yet,
@@ -338,6 +393,9 @@ class LinkPhoneCatalogs {
   Future<Object?> _covers(LinkRequest request) async {
     if (request.method == 'GET') {
       final sourceId = await _sourceFor(request, write: false);
+      // The phone sends the covers left out, so the list must not name one
+      // a queued removal takes away.
+      await _pruning[sourceId];
       return {
         'ids': [...(await coverPaths(sourceId)).keys],
       };
@@ -396,13 +454,35 @@ class LinkPhoneCatalogs {
     return const {'ok': true};
   }
 
-  /// Removes covers the committed list no longer names.
-  Future<void> _pruneCovers(String sourceId, Set<String> keep) async {
-    _coverBytes.remove(sourceId);
-    for (final MapEntry(:key, :value) in (await coverPaths(sourceId)).entries) {
-      if (keep.contains(key)) continue;
+  /// Removes covers neither the committed list ([keep]) nor the Library
+  /// names, with [writtenBefore] only those written before it. Library rows
+  /// name the old covers until the rescan after a commit moves them, so
+  /// those go at a later prune.
+  Future<void> _pruneCovers(
+    String sourceId,
+    Set<String> keep, {
+    DateTime? writtenBefore,
+  }) async {
+    final Set<String> shown;
+    try {
+      shown = {
+        for (final path in await _libraryCovers(sourceId)) p.basename(path),
+      };
+    } on Object catch (error) {
+      _log.w('Could not read which phone covers Library shows: $error');
+      return;
+    }
+    final held = await coverPaths(sourceId);
+    for (final MapEntry(:key, :value) in held.entries) {
+      if (keep.contains(key) || shown.contains(p.basename(value))) continue;
       try {
-        await File(value).delete();
+        final file = File(value);
+        if (writtenBefore != null &&
+            !(await file.lastModified()).isBefore(writtenBefore)) {
+          continue;
+        }
+        _coverBytes.remove(sourceId);
+        await file.delete();
       } on FileSystemException {
         // Already gone.
       }

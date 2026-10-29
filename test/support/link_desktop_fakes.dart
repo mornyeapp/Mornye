@@ -365,6 +365,9 @@ class FakeLinkPhoneLibrary implements LinkPhoneLibrary {
   /// Sources the owner removed or turned off; rescans skip them.
   final hidden = <String>{};
 
+  /// The cover files each source's rows name.
+  final covers = <String, Set<String>>{};
+
   @override
   Future<void> add(String sourceId, String name) async =>
       calls.add('add:$sourceId:$name');
@@ -376,6 +379,10 @@ class FakeLinkPhoneLibrary implements LinkPhoneLibrary {
 
   @override
   Future<void> remove(String sourceId) async => calls.add('remove:$sourceId');
+
+  @override
+  Future<Set<String>> coverPaths(String sourceId) async =>
+      covers[sourceId] ?? const {};
 }
 
 /// The desktop's download folder and history for received songs: copies

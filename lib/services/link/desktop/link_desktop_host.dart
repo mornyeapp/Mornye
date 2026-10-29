@@ -217,10 +217,12 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
   /// Keeps paired phones' songs and shows them in Library; they play while
   /// the phone is connected or once received.
   void _installPhoneSongs() {
+    final library = ref.read(linkPhoneLibraryProvider);
     final catalogs = _phoneCatalogs = LinkPhoneCatalogs(
       root: ref.read(linkPhoneFolderProvider),
       paired: _isPairedPhone,
       onCommit: (deviceId) => unawaited(_onPhoneCommit(deviceId)),
+      libraryCovers: library.coverPaths,
     );
     final phoneSources = _phoneSources = LinkPhoneSources(
       catalogs: catalogs,

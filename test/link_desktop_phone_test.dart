@@ -145,6 +145,41 @@ void main() {
     expect(NetworkStorageService.instance.virtualSources, isNull);
   });
 
+  test('a cover Library still shows outlives the commit dropping it', () async {
+    await boot();
+    final coverId = 'c' * 32;
+    await request(LinkOps.phoneCovers, {
+      '_method': 'POST',
+      'covers': [
+        {
+          'id': coverId,
+          'ext': 'jpg',
+          'data': base64Encode([0xff, 0xd8, 0xff]),
+        },
+      ],
+    });
+    await commit('v1', coverId: coverId);
+    final cover = File('${folder.path}/$sourceId/covers/$coverId.jpg');
+    library.covers[sourceId] = {cover.path};
+    // The covers list answers once the queued removals are done.
+    Future<Object?> held() async =>
+        (await request(LinkOps.phoneCovers, {'_method': 'GET'})).result;
+
+    await commit('v2');
+    expect(await held(), {
+      'ids': [coverId],
+    }, reason: 'rows still name it');
+    expect(cover.existsSync(), isTrue);
+
+    // Older than the v2 list, as coarse file times can give both the same
+    // time.
+    library.covers.remove(sourceId);
+    cover.setLastModifiedSync(DateTime(2000));
+    await request(LinkOps.phoneCatalog, {'_method': 'GET'});
+    expect(await held(), {'ids': <String>[]});
+    expect(cover.existsSync(), isFalse);
+  });
+
   test(
     'a followed phone receives covers after its first player state',
     () async {
