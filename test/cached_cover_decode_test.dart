@@ -621,6 +621,49 @@ void main() {
         await tester.runAsync(() => directory.delete(recursive: true));
       }
     });
+
+    testWidgets('a missing local $form prewarms without an error report', (
+      tester,
+    ) async {
+      final cache = PaintingBinding.instance.imageCache;
+      late BuildContext context;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (value) {
+              context = value;
+              return const SizedBox();
+            },
+          ),
+        ),
+      );
+      final directory = await tester.runAsync(
+        () => Directory.systemTemp.createTemp('cover-missing-'),
+      );
+      final missing = '${directory!.path}/missing.png';
+      final control = '${directory.path}/control.png';
+      final reports = <FlutterErrorDetails>[];
+      final onError = FlutterError.onError;
+      FlutterError.onError = reports.add;
+      try {
+        await tester.runAsync(() async {
+          precacheCoverImage(
+            context,
+            form == 'path' ? missing : Uri.file(missing).toString(),
+          );
+          // A prewarm without an error listener shows reports are captured.
+          await precacheImage(FileImage(File(control)), context);
+          await Future<void>.delayed(const Duration(milliseconds: 100));
+        });
+      } finally {
+        FlutterError.onError = onError;
+        cache.clear();
+        cache.clearLiveImages();
+        await tester.runAsync(() => directory.delete(recursive: true));
+      }
+      expect(reports, hasLength(1));
+      expect(reports.single.exception.toString(), contains('control.png'));
+    });
   }
 
   testWidgets('covers in other forms show the placeholder', (tester) async {

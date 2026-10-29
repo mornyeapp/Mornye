@@ -338,6 +338,8 @@ String? coverFilePath(String? source) {
     }
   }
   // The cover store's saved file for a `network://` cover plugs in here.
+  // Widgets and palettes call this during build, so that lookup must read
+  // only the store's in-memory index, without file IO.
   if (source.startsWith('network://')) return null;
   return p.isAbsolute(source) ? source : null;
 }
@@ -399,16 +401,18 @@ Future<void> precacheMetadataBackdrop(
   String? source,
 ) async {
   final normalized = source?.trim();
-  if (coverImageSource(normalized) == null) return;
+  if (normalized == null || normalized.isEmpty) return;
 
   final extent = metadataBackdropCacheExtent(context);
+  final provider = coverImageProvider(
+    normalized,
+    cacheWidth: extent,
+    cacheHeight: isHttpCoverUrl(normalized) ? null : extent,
+  );
+  if (provider == null) return;
   try {
     await precacheImage(
-      coverImageProvider(
-        normalized,
-        cacheWidth: extent,
-        cacheHeight: isHttpCoverUrl(normalized) ? null : extent,
-      )!,
+      provider,
       context,
       onError: (_, _) {},
     ).timeout(const Duration(milliseconds: 200));
@@ -418,9 +422,17 @@ Future<void> precacheMetadataBackdrop(
 /// Pre-warms the cover cache at the metadata-screen display size so the hero
 /// transition doesn't pop in a low-res frame.
 void precacheCoverImage(BuildContext context, String? url) {
-  if (coverImageSource(url) == null) return;
+  if (url == null || url.isEmpty) return;
+  final provider = coverImageProvider(
+    url,
+    cacheWidth: coverCacheWidthForViewport(context),
+  );
+  if (provider == null) return;
+  // A stale local path is common and its placeholder already covers it; only
+  // a failed download still reaches the app's error handler.
   precacheImage(
-    coverImageProvider(url, cacheWidth: coverCacheWidthForViewport(context))!,
+    provider,
     context,
+    onError: isHttpCoverUrl(url) ? null : (_, _) {},
   );
 }

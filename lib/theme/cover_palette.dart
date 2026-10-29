@@ -530,7 +530,8 @@ class CoverPaletteBuilder extends StatefulWidget {
     required this.builder,
   });
 
-  /// Cover URL or local path. Null disables palette extraction.
+  /// A cover string in any form [coverImageSource] reads. Null disables
+  /// palette extraction.
   final String? imageSource;
 
   final Widget Function(BuildContext context, ColorScheme scheme) builder;
@@ -621,7 +622,8 @@ class CoverSourceColorBuilder extends StatefulWidget {
     required this.builder,
   });
 
-  /// Cover URL or local path. Null disables extraction.
+  /// A cover string in any form [coverImageSource] reads. Null disables
+  /// extraction.
   final String? imageSource;
 
   /// Receives null until the colour is known, or when there is none.

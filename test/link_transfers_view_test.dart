@@ -466,7 +466,13 @@ void main() {
     );
     await tester.tap(find.text('12 songs to Studio'));
     await tester.pump();
-    expect(find.byType(LocalOrNetworkCoverImage), findsOneWidget);
+    final image = tester.widget<Image>(
+      find.descendant(
+        of: find.byType(LocalOrNetworkCoverImage),
+        matching: find.byType(Image),
+      ),
+    );
+    expect((image.image as FileImage).file.path, '/music/covers/song-1.jpg');
   });
 
   testWidgets('pushes the Transfers page on phones', (tester) async {
