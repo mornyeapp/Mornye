@@ -100,6 +100,13 @@ class PlayerMetadataController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Reads deferred file tags when opening technical details. Already loaded
+  /// metadata, including online lyrics, stays cached for the current item.
+  Future<void> ensureFileMetadata() async {
+    if (_disposed || _item == null || _loadedPath != null) return;
+    await load(_item, inspectUnresolvedContentUri: true);
+  }
+
   Future<void> load(
     MediaItem? item, {
     bool inspectUnresolvedContentUri = false,

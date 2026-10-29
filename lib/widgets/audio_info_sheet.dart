@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
 
@@ -33,16 +34,19 @@ Future<void> showAudioInfoSheet(
   BuildContext context, {
   required PlayerMetadataController metadata,
   Map<String, String> linkSources = const {},
-}) => showAppScrollableBottomSheet<void>(
-  context: context,
-  title: context.l10n.audioInfoTitle,
-  subtitle: metadata.qualityLabel,
-  builder: (context, controller) => _AudioInfoSheet(
-    metadata: metadata,
-    controller: controller,
-    linkSources: linkSources,
-  ),
-);
+}) {
+  unawaited(metadata.ensureFileMetadata());
+  return showAppScrollableBottomSheet<void>(
+    context: context,
+    title: context.l10n.audioInfoTitle,
+    subtitle: metadata.qualityLabel,
+    builder: (context, controller) => _AudioInfoSheet(
+      metadata: metadata,
+      controller: controller,
+      linkSources: linkSources,
+    ),
+  );
+}
 
 class _AudioInfoSheet extends StatefulWidget {
   const _AudioInfoSheet({
@@ -124,6 +128,7 @@ class _AudioInfoSheetState extends State<_AudioInfoSheet> {
       final facts = _AudioFacts(
         l10n: context.l10n,
         metadata: widget.metadata.metadata ?? const {},
+        loading: widget.metadata.loading,
         path: widget.metadata.filePath,
         fileSize: _fileSize,
         route: _route,
@@ -344,6 +349,7 @@ class _AudioFacts {
   _AudioFacts({
     required this.l10n,
     required this.metadata,
+    required this.loading,
     required this.path,
     required this.fileSize,
     required this.route,
@@ -356,6 +362,7 @@ class _AudioFacts {
 
   final AppLocalizations l10n;
   final Map<String, dynamic> metadata;
+  final bool loading;
   final String? path;
   final int? fileSize;
   final AudioRouteInfo? route;
@@ -499,7 +506,10 @@ class _AudioFacts {
     }
     return [
       if (facts.isEmpty)
-        _Fact(l10n.audioInfoTrackGain, l10n.audioInfoNoGainTags),
+        _Fact(
+          l10n.audioInfoTrackGain,
+          loading ? l10n.linkFileReading : l10n.audioInfoNoGainTags,
+        ),
       ...facts,
       _Fact(l10n.libraryPlaybackNormalization, normalization),
     ];

@@ -3,10 +3,12 @@ import 'dart:async';
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/controllers/player_metadata_controller.dart';
 import 'package:mornye/l10n/app_localizations.dart';
 import 'package:mornye/services/audio_route_info.dart';
+import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/audio_info_sheet.dart';
 
 const _route = MethodChannel('com.zarz.mornye/audio_route');
@@ -140,6 +142,81 @@ void main() {
     expect(find.text('Studio Mac via Mornye Link'), findsOneWidget);
     expect(find.text('Network storage'), findsNothing);
   });
+
+  for (final mornye in [false, true]) {
+    testWidgets(
+      'SAF ReplayGain is loaded on opening Audio info (Mornye=$mornye)',
+      (tester) async {
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(_route, (call) async => null);
+        final tags = Completer<Map<String, dynamic>>();
+        var reads = 0;
+        final metadata = PlayerMetadataController(
+          readMetadata: (path) {
+            expect(path, 'content://library/Song.opus');
+            reads++;
+            return tags.future;
+          },
+        );
+        addTearDown(metadata.dispose);
+        await metadata.load(
+          const MediaItem(
+            id: 'song',
+            title: 'Song',
+            extras: {
+              'source': 'content://library/Song.opus',
+              'format': 'opus',
+              'bitrate': 380,
+            },
+          ),
+        );
+        expect(reads, 0, reason: 'Now Playing keeps SAF tag reads on demand');
+
+        await tester.pumpWidget(
+          ProviderScope(
+            child: MaterialApp(
+              theme: mornye ? MornyeTheme.build(Brightness.dark) : ThemeData(),
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              home: Builder(
+                builder: (context) => TextButton(
+                  onPressed: () =>
+                      showAudioInfoSheet(context, metadata: metadata),
+                  child: const Text('open'),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.tap(find.text('open'));
+        await tester.pumpAndSettle();
+        expect(reads, 1);
+        expect(find.text('Reading tags...'), findsOneWidget);
+        expect(find.text('No ReplayGain tags'), findsNothing);
+
+        tags.complete({
+          'format': 'opus',
+          'bitrate': 380,
+          'replaygain_track_gain': '5.00 dB',
+          'replaygain_track_peak': '0.326353',
+          'replaygain_album_gain': '5.00 dB',
+          'replaygain_album_peak': '0.326353',
+        });
+        await tester.pumpAndSettle();
+        expect(find.text('No ReplayGain tags'), findsNothing);
+        expect(find.text('Reading tags...'), findsNothing);
+        expect(find.text('+5.00 dB'), findsNWidgets(2));
+        expect(find.textContaining('0.326353'), findsNWidgets(2));
+
+        Navigator.of(tester.element(find.text('Audio info'))).pop();
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('open'));
+        await tester.pumpAndSettle();
+        expect(reads, 1, reason: 'Reopening the sheet reuses the loaded tags');
+        expect(find.text('+5.00 dB'), findsNWidgets(2));
+      },
+    );
+  }
 
   testWidgets('late route replies cannot replace the latest track snapshot', (
     tester,
