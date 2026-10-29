@@ -1,11 +1,6 @@
-// Host-only injection of the same native library used by the SMB plugin.
-// ignore_for_file: invalid_use_of_internal_member
-
 import 'dart:developer' as developer;
 import 'dart:io';
 
-// ignore: implementation_imports
-import 'package:dart_smb2/src/ffi/native_lib.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/services/network_library_scanner.dart';
 import 'package:mornye/services/network_smb_client.dart';
@@ -16,14 +11,13 @@ import 'support/vm_service_probe.dart';
 Future<int> _smbWorkers(Uri service) async {
   final vm = await callTestVmService(service, 'getVM');
   return (vm['isolates'] as List)
-      .where((isolate) => (isolate as Map)['name'] == 'workerMain')
+      .where((isolate) => (isolate as Map)['name'] == 'dart_smb2 worker')
       .length;
 }
 
 Future<void> main() async {
   TestWidgetsFlutterBinding.ensureInitialized();
   final service = (await developer.Service.getInfo()).serverUri;
-  final library = Platform.environment['TEST_SMB_LIBRARY'];
   final address = Platform.environment['TEST_SMB_ADDRESS'];
   test(
     '12 native SMB scans release workers, handles and range streams',
@@ -31,8 +25,6 @@ Future<void> main() async {
       final overrides = HttpOverrides.current;
       HttpOverrides.global = null;
       addTearDown(() => HttpOverrides.global = overrides);
-      debugLibSmb2PathOverride = library;
-      addTearDown(() => debugLibSmb2PathOverride = null);
       final directory = await Directory.systemTemp.createTemp('smb-memory-');
       addTearDown(() => directory.delete(recursive: true));
       final storage = NetworkStorageService(
@@ -101,8 +93,8 @@ Future<void> main() async {
       );
     },
     timeout: const Timeout(Duration(minutes: 2)),
-    skip: library == null || address == null || service == null
-        ? 'Requires TEST_SMB_LIBRARY, TEST_SMB_ADDRESS and --enable-vmservice'
+    skip: address == null || service == null
+        ? 'Requires TEST_SMB_ADDRESS and --enable-vmservice'
         : false,
   );
 }

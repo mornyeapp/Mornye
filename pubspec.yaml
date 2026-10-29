@@ -20,7 +20,7 @@ dependencies:
   flutter_riverpod: ^3.4.2
 
   # Navigation
-  go_router: ^18.1.1
+  go_router: ^18.1.2
 
 # Storage & Persistence
   shared_preferences: ^2.5.6
@@ -43,7 +43,7 @@ dependencies:
   http: ^1.6.0
   # 7.3.2 requires dbus 0.8, while desktop_drop 0.8.4 still requires 0.7.
   connectivity_plus: ^7.3.1
-  crypto: ^3.0.7
+  crypto: ^3.0.8
   # Mornye Link: finds the desktop app on the local network (mDNS).
   bonsoir: ^7.1.5
 
@@ -51,16 +51,16 @@ dependencies:
   archive: ^4.5.2
 
   # UI Components
-  cached_network_image: ^4.0.5
-  flutter_cache_manager: ^3.4.5
-  liquid_glass_easy: 5.0.0
+  cached_network_image: ^4.0.6
+  flutter_cache_manager: ^3.4.6
+  liquid_glass_easy: 5.1.0
   cupertino_icons: ^2.0.0
   material_symbols_icons: ^4.2960.0
   volume_controller: ^3.7.1
 
   # Material Expressive 3 / Dynamic Color
   dynamic_color: ^2.1.0
-  material_ui: ^1.8.0
+  material_ui: ^1.9.0
   material_3_expressive: ^1.2.0
   material_color_utilities: 0.13.0
 
@@ -70,9 +70,9 @@ dependencies:
   record: ^7.1.2
 
   # File Picker
-  file_picker: ^13.1.0
+  file_picker: ^13.3.0
   # Desktop: drop music files and folders onto the window to add them.
-  # Pinned below 0.9, which moves to cross_file 0.4 (the tree resolves 0.3).
+  # 0.9 needs cross_file 0.4; file_picker and share_plus still require 0.3.
   desktop_drop: 0.8.4
 
   # JSON Serialization
@@ -93,11 +93,11 @@ dependencies:
 
   xml: ^7.1.0
   html: ^0.15.7
-  dart_smb2: 0.1.3
+  dart_smb2: 0.2.3
   synchronized: ^3.5.0
 
   # Notifications
-  flutter_local_notifications: ^22.3.2
+  flutter_local_notifications: ^22.3.3
   audioplayers: ^6.8.1
   audio_service:
     path: third_party/audio_service

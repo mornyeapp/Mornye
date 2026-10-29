@@ -15,16 +15,22 @@ void main() {
       TimeoutException('private host'): NetworkStorageError.timeout,
       const Smb2Exception('STATUS_LOGON_FAILURE'):
           NetworkStorageError.authentication,
-      const Smb2Exception('private share', 13, Smb2ErrorType.accessDenied):
-          NetworkStorageError.permission,
+      const Smb2Exception(
+        'private share',
+        errno: 13,
+        type: Smb2ErrorType.accessDenied,
+      ): NetworkStorageError.permission,
       const Smb2Exception('STATUS_BAD_NETWORK_NAME'):
           NetworkStorageError.missingShare,
       const Smb2Exception('Server does not support SMB2'):
           NetworkStorageError.incompatible,
-      const Smb2Exception('private host', 0, Smb2ErrorType.connection):
+      const Smb2Exception('private host', type: Smb2ErrorType.connection):
           NetworkStorageError.unreachable,
-      const Smb2Exception('private host', 60, Smb2ErrorType.timeout):
-          NetworkStorageError.timeout,
+      const Smb2Exception(
+        'private host',
+        errno: 60,
+        type: Smb2ErrorType.timeout,
+      ): NetworkStorageError.timeout,
       const FormatException('private URL'): NetworkStorageError.invalidAddress,
       const HttpException('Server returned 401'):
           NetworkStorageError.authentication,

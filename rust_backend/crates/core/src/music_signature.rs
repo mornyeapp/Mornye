@@ -179,7 +179,7 @@ pub fn signature_from_pcm16(
 ) -> Result<Signature, String> {
     let samples = &samples[..samples.len().min(MAX_SAMPLES)];
     let mut generator = Generator::new();
-    for (index, hop) in samples.chunks_exact(HOP).enumerate() {
+    for (index, hop) in samples.as_chunks::<HOP>().0.iter().enumerate() {
         if index % 64 == 0 {
             check()?;
         }

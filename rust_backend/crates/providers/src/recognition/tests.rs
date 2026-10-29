@@ -35,7 +35,7 @@ fn english_match() -> Value {
 
 fn song(value: &Value) -> RecognizedSong {
     match parse_response(200, value.to_string().as_bytes()) {
-        Ok(RecognitionOutcome::Match(song)) => song,
+        Ok(RecognitionOutcome::Match(song)) => *song,
         other => panic!("expected a match, got {other:?}"),
     }
 }
@@ -241,14 +241,16 @@ fn statuses_and_bodies_map_to_outcomes() {
     assert_eq!(RecognitionError::Network(String::new()).kind(), "network");
 }
 
+type ScriptedReply = Result<(u16, Vec<u8>), String>;
+
 /// Answers each POST from a script and records what was sent.
 struct Scripted {
-    replies: RefCell<Vec<Result<(u16, Vec<u8>), String>>>,
+    replies: RefCell<Vec<ScriptedReply>>,
     urls: RefCell<Vec<String>>,
 }
 
 impl Scripted {
-    fn new(replies: Vec<Result<(u16, Vec<u8>), String>>) -> Self {
+    fn new(replies: Vec<ScriptedReply>) -> Self {
         Self {
             replies: RefCell::new(replies.into_iter().rev().collect()),
             urls: RefCell::default(),
@@ -270,9 +272,7 @@ impl Transport for Scripted {
     }
 }
 
-fn run(
-    replies: Vec<Result<(u16, Vec<u8>), String>>,
-) -> (Result<RecognitionOutcome, RecognitionError>, usize) {
+fn run(replies: Vec<ScriptedReply>) -> (Result<RecognitionOutcome, RecognitionError>, usize) {
     let transport = Scripted::new(replies);
     let mut recognizer = Recognizer::new(&transport);
     recognizer.policy = RetryPolicy {
@@ -297,7 +297,7 @@ fn run(
 #[test]
 fn rate_limits_server_errors_and_quick_failures_retry_once() {
     let matched = english_match().to_string().into_bytes();
-    let found = Ok(RecognitionOutcome::Match(song(&english_match())));
+    let found = Ok(RecognitionOutcome::Match(Box::new(song(&english_match()))));
     assert_eq!(
         run(vec![Ok((429, vec![])), Ok((200, matched.clone()))]),
         (found.clone(), 2)

@@ -4,8 +4,7 @@ import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
-import 'package:dart_smb2/dart_smb2.dart'
-    show Smb2DirEntry, Smb2Exception, Smb2ErrorType;
+import 'package:dart_smb2/dart_smb2.dart' show Smb2DirEntry, Smb2Exception;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';

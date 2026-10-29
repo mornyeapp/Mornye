@@ -1,13 +1,6 @@
-// Host-only native library injection into the SMB worker isolates.
-// ignore_for_file: invalid_use_of_internal_member
-
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
-
-// Host tests load the pinned native library used by the mobile plugin.
-// ignore: implementation_imports
-import 'package:dart_smb2/src/ffi/native_lib.dart';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/services/network_storage_service.dart';
@@ -505,9 +498,7 @@ void main() {
   });
 
   test('SMB server browsing and byte-range streaming', () async {
-    debugLibSmb2PathOverride = Platform.environment['TEST_SMB_LIBRARY'];
     final port = Platform.environment['TEST_SMB_PORT'] ?? '1445';
-    addTearDown(() => debugLibSmb2PathOverride = null);
     final service = NetworkStorageService(
       read: () async => null,
       write: (_) async {},
@@ -612,7 +603,6 @@ void main() {
     expect((await service.list(c)).any((e) => e.name == 'A B.wav'), true);
   }, skip: Platform.environment['TEST_SMB'] != '1');
   test('SMB guest works when credentials are explicitly blank', () async {
-    debugLibSmb2PathOverride = Platform.environment['TEST_SMB_LIBRARY'];
     final port = Platform.environment['TEST_SMB_GUEST_PORT']!;
     final service = NetworkStorageService(
       read: () async => null,
@@ -625,7 +615,6 @@ void main() {
       );
       expect((await service.list(guest)).any((e) => e.name == 'A B.wav'), true);
     } finally {
-      debugLibSmb2PathOverride = null;
       await service.dispose();
     }
   }, skip: Platform.environment['TEST_SMB_GUEST_PORT'] == null);

@@ -37,7 +37,7 @@ class NetworkSmbClient {
         password: password,
         domain: domain,
         workers: 1,
-        timeoutSeconds: timeout.inSeconds,
+        timeout: timeout,
         version: Smb2Version.any,
       ),
     );
@@ -59,7 +59,7 @@ class NetworkSmbClient {
       user: username,
       password: password,
       domain: domain,
-      timeoutSeconds: timeout.inSeconds,
+      timeout: timeout,
     ),
   );
 

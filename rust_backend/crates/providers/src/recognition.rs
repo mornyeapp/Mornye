@@ -92,7 +92,7 @@ pub struct RecognizedSong {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum RecognitionOutcome {
-    Match(RecognizedSong),
+    Match(Box<RecognizedSong>),
     NoMatch,
 }
 
@@ -189,7 +189,7 @@ pub fn parse_response(status: u16, body: &[u8]) -> Result<RecognitionOutcome, Re
         return Ok(RecognitionOutcome::NoMatch);
     };
     let details = SongDetails::read(track);
-    Ok(RecognitionOutcome::Match(RecognizedSong {
+    Ok(RecognitionOutcome::Match(Box::new(RecognizedSong {
         key: text(track, &["key"]).unwrap_or_default(),
         title,
         artist,
@@ -201,7 +201,7 @@ pub fn parse_response(status: u16, body: &[u8]) -> Result<RecognitionOutcome, Re
         label: details.label,
         isrc: text(track, &["isrc"]).map(|isrc| isrc.to_ascii_uppercase()),
         web_url: web_link(track, &["url"]).or_else(|| web_link(track, &["share", "href"])),
-    }))
+    })))
 }
 
 /// Album, label and release from the song section. Its titles follow the

@@ -80,7 +80,7 @@ NetworkStorageError classifyNetworkStorageError(Object error) {
       Smb2ErrorType.timeout => NetworkStorageError.timeout,
       Smb2ErrorType.auth => NetworkStorageError.authentication,
       Smb2ErrorType.accessDenied => NetworkStorageError.permission,
-      Smb2ErrorType.fileNotFound ||
+      Smb2ErrorType.notFound ||
       Smb2ErrorType.notADirectory => NetworkStorageError.missingShare,
       Smb2ErrorType.invalidParam => NetworkStorageError.invalidAddress,
       _ => NetworkStorageError.unknown,

@@ -17,12 +17,14 @@ pub(crate) fn execute(
     bytes: &[u8],
     check: &(dyn Fn() -> Result<(), String> + Sync),
 ) -> Result<Value, String> {
-    if bytes.len() % 2 != 0 || bytes.len() > MAX_BYTES {
+    if !bytes.len().is_multiple_of(2) || bytes.len() > MAX_BYTES {
         return Err("Recognition audio must be at most 20 s of 16-bit PCM".into());
     }
     let samples: Vec<i16> = bytes
-        .chunks_exact(2)
-        .map(|pair| i16::from_le_bytes([pair[0], pair[1]]))
+        .as_chunks::<2>()
+        .0
+        .iter()
+        .map(|pair| i16::from_le_bytes(*pair))
         .collect();
     let signature = match prepare(&samples, check)? {
         Prepared::Ready(signature) => signature,

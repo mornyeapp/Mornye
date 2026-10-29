@@ -51,7 +51,7 @@ extension NetworkStorageDelete on NetworkStorageService {
         await smb.delete(smb.path).timeout(NetworkStorageService.timeout);
         return true;
       } on Smb2Exception catch (error) {
-        if (error.type == Smb2ErrorType.fileNotFound) return true;
+        if (error.isNotFound) return true;
         rethrow;
       } finally {
         try {

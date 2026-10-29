@@ -55,8 +55,7 @@ fn write_rows(
     let mut statement = transaction.prepare(query).map_err(|e| e.to_string())?;
     let columns = statement
         .column_names()
-        .iter()
-        .map(|name| (*name).to_owned())
+        .map(str::to_owned)
         .collect::<Vec<_>>();
     let mut rows = if let Some(id) = playlist_id {
         statement.query([id])

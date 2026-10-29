@@ -34,6 +34,7 @@ class _History extends DownloadHistoryNotifier {
     required String artistName,
     required String albumName,
     String? albumArtist,
+    String? coverUrl,
     String? isrc,
     int? trackNumber,
     int? totalTracks,

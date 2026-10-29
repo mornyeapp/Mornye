@@ -192,7 +192,7 @@ void main() {
         await tester.tap(find.widgetWithText(ListTile, title));
       }
       await _settleFileIo(tester);
-      expect(lookups, albumLookup ? ['track', 'album'] : ['track']);
+      expect(lookups, ['track', 'album']);
       expect(downloadedUrls, contains(coverUrl));
       expect(find.text('No matching metadata found online'), findsNothing);
       expect(find.text('Apply selected data'), findsOneWidget);

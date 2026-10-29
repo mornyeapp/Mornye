@@ -53,6 +53,14 @@ SmbListingInput smbListingFixture(int count) {
           1600000000000 + index,
           isUtc: true,
         ),
+        accessed: DateTime.fromMillisecondsSinceEpoch(
+          1700000000000 + index,
+          isUtc: true,
+        ),
+        changed: DateTime.fromMillisecondsSinceEpoch(
+          1700000000000 + index,
+          isUtc: true,
+        ),
       ),
     );
   })..shuffle(random);

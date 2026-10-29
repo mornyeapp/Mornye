@@ -5,7 +5,7 @@ buildscript {
     }
 
     dependencies {
-        classpath("com.android.tools.build:gradle:8.12.3")
+        classpath("com.android.tools.build:gradle:9.5.0")
     }
 }
 
@@ -21,7 +21,7 @@ apply plugin: "com.android.library"
 android {
     namespace = "com.antonkarpenko.ffmpegkit"
 
-    compileSdk = 35
+    compileSdk = 37
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -42,7 +42,7 @@ android {
     }
 
     dependencies {
-        implementation("androidx.annotation:annotation:1.9.1")
+        implementation("androidx.annotation:annotation:1.11.0")
         implementation("com.antonkarpenko:ffmpeg-kit-audio:2.2.3")
     }
 }
