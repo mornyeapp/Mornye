@@ -257,7 +257,7 @@ jobs:
             build/app/outputs/flutter-apk/SHA256SUMS.txt
 
   build-ios:
-    runs-on: macos-15
+    runs-on: xcode-27
     needs: get-version # Only depends on version, NOT android build!
     env:
       MORNYE_DISCORD_SDK: "1"
@@ -271,9 +271,9 @@ jobs:
         with:
           passphrase: ${{ secrets.DISCORD_MOBILE_SDK_PASSPHRASE }}
 
-      - name: Select Xcode 26.1.1
+      - name: Select Xcode 27.1
         run: |
-          sudo xcode-select -s /Applications/Xcode_26.1.1.app
+          sudo xcode-select -s /Applications/Xcode_27.1.app
           xcodebuild -version
 
       - name: Build Rust backend for iOS
@@ -350,6 +350,7 @@ jobs:
         run: |
           app="ios/build/Runner.xcarchive/Products/Applications/Runner.app"
           for required in \
+            Extensions/LinkNowPlaying.appex/LinkNowPlaying \
             Frameworks/discord_partner_sdk.framework/discord_partner_sdk \
             Frameworks/mornye_discord.framework/Discord-License-Notices.txt; do
             test -s "$app/$required" || {

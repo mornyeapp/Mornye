@@ -1,10 +1,13 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
+import 'package:mornye/services/link/client/link_client_controller.dart';
 import 'package:mornye/services/link/features/link_desktop_remote.dart';
 import 'package:mornye/services/link/features/link_handoff.dart';
+import 'package:mornye/services/link/features/link_ios_now_playing.dart';
 import 'package:mornye/services/link/features/link_phone_features.dart';
 import 'package:mornye/services/link/features/link_phone_options.dart';
 import 'package:mornye/services/link/features/link_playback_preferences.dart';
@@ -183,6 +186,19 @@ final linkRemotePlaybackProvider = Provider<LinkRemotePlayback?>((ref) {
     initialItem: ref.read(localMediaItemProvider).value,
   );
   update(ref.read(linkDesktopRemoteProvider));
+  if (Platform.isIOS) {
+    final nowPlaying = IosLinkNowPlaying(
+      remote: playback,
+      server: client.server,
+      apiKey: () async =>
+          (await ref
+                  .read(linkLibraryBridgeProvider)
+                  .connection(client.server.connectionId))
+              ?.apiKey,
+      track: () => ref.read(linkDesktopRemoteProvider).player?.track,
+    )..start();
+    ref.onDispose(nowPlaying.dispose);
+  }
   ref.onDispose(playback.dispose);
   return playback;
 });

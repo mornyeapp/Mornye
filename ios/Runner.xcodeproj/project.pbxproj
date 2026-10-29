@@ -7,6 +7,12 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A02700000000000000000011 /* LinkNowPlayingState.swift in Sources */ = {isa = PBXBuildFile; fileRef = A02700000000000000000001 /* LinkNowPlayingState.swift */; };
+		A02700000000000000000012 /* LinkNowPlayingBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = A02700000000000000000004 /* LinkNowPlayingBridge.swift */; };
+		A02700000000000000000013 /* LinkNowPlayingState.swift in Sources */ = {isa = PBXBuildFile; fileRef = A02700000000000000000001 /* LinkNowPlayingState.swift */; };
+		A02700000000000000000014 /* LinkNowPlayingClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A02700000000000000000002 /* LinkNowPlayingClient.swift */; };
+		A02700000000000000000015 /* LinkNowPlayingExtension.swift in Sources */ = {isa = PBXBuildFile; fileRef = A02700000000000000000003 /* LinkNowPlayingExtension.swift */; };
+		A02700000000000000000016 /* LinkNowPlaying.appex in Embed Now Playing Extension */ = {isa = PBXBuildFile; fileRef = A02700000000000000000007 /* LinkNowPlaying.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		C0CE00000000000000000001 /* ConcertCalendarBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0CE00000000000000000002 /* ConcertCalendarBridge.swift */; };
 		A0D100000000000000000001 /* AudioOutputView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0D100000000000000000002 /* AudioOutputView.swift */; };
 		A0D100000000000000000003 /* MusicHaptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0D100000000000000000004 /* MusicHaptics.swift */; };
@@ -33,6 +39,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		A02700000000000000000032 /* PBXContainerItemProxy */ = {isa = PBXContainerItemProxy; containerPortal = 97C146E61CF9000F007C117D /* Project object */; proxyType = 1; remoteGlobalIDString = A02700000000000000000030; remoteInfo = LinkNowPlaying; };
 		F59500000000000000000052 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 97C146E61CF9000F007C117D /* Project object */;
@@ -50,6 +57,15 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
+		A02700000000000000000024 /* Embed Now Playing Extension */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = Extensions;
+			dstSubfolderSpec = 1;
+			files = (A02700000000000000000016 /* LinkNowPlaying.appex in Embed Now Playing Extension */, );
+			name = "Embed Now Playing Extension";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		F59500000000000000000024 /* Embed App Extensions */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
@@ -72,6 +88,13 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		A02700000000000000000001 /* LinkNowPlayingState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LinkNowPlayingState.swift; sourceTree = "<group>"; };
+		A02700000000000000000002 /* LinkNowPlayingClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LinkNowPlayingClient.swift; sourceTree = "<group>"; };
+		A02700000000000000000003 /* LinkNowPlayingExtension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LinkNowPlayingExtension.swift; sourceTree = "<group>"; };
+		A02700000000000000000004 /* LinkNowPlayingBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LinkNowPlayingBridge.swift; sourceTree = "<group>"; };
+		A02700000000000000000005 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A02700000000000000000006 /* LinkNowPlaying.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = LinkNowPlaying.xcconfig; sourceTree = "<group>"; };
+		A02700000000000000000007 /* LinkNowPlaying.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; path = LinkNowPlaying.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		C0CE00000000000000000002 /* ConcertCalendarBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConcertCalendarBridge.swift; sourceTree = "<group>"; };
 		A0D100000000000000000002 /* AudioOutputView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioOutputView.swift; sourceTree = "<group>"; };
 		A0D100000000000000000004 /* MusicHaptics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicHaptics.swift; sourceTree = "<group>"; };
@@ -114,6 +137,7 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		A02700000000000000000022 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
 		F59500000000000000000022 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
 		97C146EB1CF9000F007C117D /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
@@ -135,6 +159,12 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		A02700000000000000000020 /* LinkNowPlaying */ = {
+			isa = PBXGroup;
+			children = (A02700000000000000000001 /* LinkNowPlayingState.swift */, A02700000000000000000002 /* LinkNowPlayingClient.swift */, A02700000000000000000003 /* LinkNowPlayingExtension.swift */, A02700000000000000000005 /* Info.plist */, A02700000000000000000006 /* LinkNowPlaying.xcconfig */, );
+			path = LinkNowPlaying;
+			sourceTree = "<group>";
+		};
 		F59500000000000000000061 /* PlayerWidget */ = {
 			isa = PBXGroup;
 			children = (
@@ -188,6 +218,7 @@
 				9740EEB11CF90186004384FC /* Flutter */,
 				97C146F01CF9000F007C117D /* Runner */,
 				F59500000000000000000061 /* PlayerWidget */,
+				A02700000000000000000020 /* LinkNowPlaying */,
 				97C146EF1CF9000F007C117D /* Products */,
 				331C8082294A63A400263BE5 /* RunnerTests */,
 				3824DF5478555AFB009D7C8C /* Pods */,
@@ -200,6 +231,7 @@
 			children = (
 				97C146EE1CF9000F007C117D /* Runner.app */,
 				F59500000000000000000008 /* PlayerWidget.appex */,
+				A02700000000000000000007 /* LinkNowPlaying.appex */,
 				331C8081294A63A400263BE5 /* RunnerTests.xctest */,
 			);
 			name = Products;
@@ -215,6 +247,7 @@
 				1498D2321E8E86230040F4C2 /* GeneratedPluginRegistrant.h */,
 				1498D2331E8E89220040F4C2 /* GeneratedPluginRegistrant.m */,
 				74858FAE1ED2DC5600515810 /* AppDelegate.swift */,
+				A02700000000000000000004 /* LinkNowPlayingBridge.swift */,
 				F59500000000000000000004 /* PlayerWidgetBridge.swift */,
 				A0D100000000000000000002 /* AudioOutputView.swift */,
 				A0D100000000000000000004 /* MusicHaptics.swift */,
@@ -240,6 +273,17 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		A02700000000000000000030 /* LinkNowPlaying */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A02700000000000000000040 /* Build configuration list for PBXNativeTarget "LinkNowPlaying" */;
+			buildPhases = (A02700000000000000000021 /* Sources */, A02700000000000000000022 /* Frameworks */, A02700000000000000000023 /* Resources */, );
+			buildRules = ();
+			dependencies = ();
+			name = LinkNowPlaying;
+			productName = LinkNowPlaying;
+			productReference = A02700000000000000000007 /* LinkNowPlaying.appex */;
+			productType = "com.apple.product-type.extensionkit-extension";
+		};
 		F59500000000000000000031 /* PlayerWidget */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = F59500000000000000000044 /* Build configuration list for PBXNativeTarget "PlayerWidget" */;
@@ -281,6 +325,7 @@
 				97C146EC1CF9000F007C117D /* Resources */,
 				9705A1C41CF9048500538489 /* Embed Frameworks */,
 				F59500000000000000000024 /* Embed App Extensions */,
+				A02700000000000000000024 /* Embed Now Playing Extension */,
 				3B06AD1E1E4923F5004D2608 /* Thin Binary */,
 				936893445B11DF44026A1E38 /* [CP] Embed Pods Frameworks */,
 			);
@@ -288,6 +333,7 @@
 			);
 			dependencies = (
 				F59500000000000000000051 /* PBXTargetDependency */,
+				A02700000000000000000031 /* PBXTargetDependency */,
 			);
 			name = Runner;
 			packageProductDependencies = (
@@ -336,11 +382,13 @@
 				97C146ED1CF9000F007C117D /* Runner */,
 				331C8080294A63A400263BE5 /* RunnerTests */,
 				F59500000000000000000031 /* PlayerWidget */,
+				A02700000000000000000030 /* LinkNowPlaying */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		A02700000000000000000023 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
 		F59500000000000000000023 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
 		331C807F294A63A400263BE5 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
@@ -458,6 +506,7 @@
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		A02700000000000000000021 /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (A02700000000000000000013 /* LinkNowPlayingState.swift in Sources */, A02700000000000000000014 /* LinkNowPlayingClient.swift in Sources */, A02700000000000000000015 /* LinkNowPlayingExtension.swift in Sources */, ); runOnlyForDeploymentPostprocessing = 0; };
 		F59500000000000000000021 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -477,6 +526,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				74858FAF1ED2DC5600515810 /* AppDelegate.swift in Sources */,
+				A02700000000000000000011 /* LinkNowPlayingState.swift in Sources */,
+				A02700000000000000000012 /* LinkNowPlayingBridge.swift in Sources */,
 				F59500000000000000000011 /* PlayerWidgetState.swift in Sources */,
 				F59500000000000000000012 /* PlayerControlIntent.swift in Sources */,
 				F59500000000000000000013 /* PlayerWidgetBridge.swift in Sources */,
@@ -493,6 +544,7 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		A02700000000000000000031 /* PBXTargetDependency */ = {isa = PBXTargetDependency; target = A02700000000000000000030 /* LinkNowPlaying */; targetProxy = A02700000000000000000032 /* PBXContainerItemProxy */; };
 		F59500000000000000000051 /* PBXTargetDependency */ = {isa = PBXTargetDependency; target = F59500000000000000000031 /* PlayerWidget */; targetProxy = F59500000000000000000052 /* PBXContainerItemProxy */; };
 		331C8086294A63A400263BE5 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
@@ -521,6 +573,9 @@
 /* End PBXVariantGroup section */
 
 /* Begin XCBuildConfiguration section */
+		A02700000000000000000041 /* Debug */ = {isa = XCBuildConfiguration; baseConfigurationReference = A02700000000000000000006 /* LinkNowPlaying.xcconfig */; buildSettings = {SWIFT_OPTIMIZATION_LEVEL = "-Onone"; }; name = Debug; };
+		A02700000000000000000042 /* Release */ = {isa = XCBuildConfiguration; baseConfigurationReference = A02700000000000000000006 /* LinkNowPlaying.xcconfig */; buildSettings = {}; name = Release; };
+		A02700000000000000000043 /* Profile */ = {isa = XCBuildConfiguration; baseConfigurationReference = A02700000000000000000006 /* LinkNowPlaying.xcconfig */; buildSettings = {}; name = Profile; };
 		F59500000000000000000041 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = F59500000000000000000009 /* PlayerWidget.xcconfig */;
@@ -825,6 +880,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		A02700000000000000000040 /* Build configuration list for PBXNativeTarget "LinkNowPlaying" */ = {isa = XCConfigurationList; buildConfigurations = (A02700000000000000000041 /* Debug */, A02700000000000000000042 /* Release */, A02700000000000000000043 /* Profile */, ); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
 		F59500000000000000000044 /* Build configuration list for PBXNativeTarget "PlayerWidget" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (F59500000000000000000041 /* Debug */, F59500000000000000000042 /* Release */, F59500000000000000000043 /* Profile */, );

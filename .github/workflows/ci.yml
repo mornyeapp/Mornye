@@ -185,7 +185,7 @@ jobs:
 
   rust-ios:
     name: Rust iOS libraries & release application
-    runs-on: macos-latest
+    runs-on: xcode-27
     needs: changes
     if: needs.changes.outputs.rust == 'true' || needs.changes.outputs.ios == 'true'
     env:
@@ -239,6 +239,7 @@ jobs:
         run: |
           python3 -m unittest discover -s scripts -p 'test_check_backend_ios.py'
           flutter build ios --release --no-codesign --target lib/main.dart
+          test -s build/ios/iphoneos/Runner.app/Extensions/LinkNowPlaying.appex/LinkNowPlaying
           if [[ "$MORNYE_DISCORD_SDK" == "1" ]]; then
             test -f build/ios/iphoneos/Runner.app/Frameworks/discord_partner_sdk.framework/discord_partner_sdk
             test -f build/ios/iphoneos/Runner.app/Frameworks/mornye_discord.framework/Discord-License-Notices.txt

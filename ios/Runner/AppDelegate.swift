@@ -25,6 +25,7 @@ import UniformTypeIdentifiers
     private var backendChannel: FlutterMethodChannel?
     private var concertCalendar: ConcertCalendarBridge?
     private var playbackNotification: PlaybackNotificationBridge?
+    private var linkNowPlaying: LinkNowPlayingBridge?
     private var audioRouteInfo: AudioRouteInfoBridge?
     private var musicHaptics: MusicHapticsBridge?
     private let coreBackend: CoreBackend = createCoreBackend()
@@ -116,6 +117,7 @@ import UniformTypeIdentifiers
 
         GeneratedPluginRegistrant.register(with: registry)
         playbackNotification = PlaybackNotificationBridge(messenger: messenger)
+        linkNowPlaying = LinkNowPlayingBridge(messenger: messenger)
         audioRouteInfo = AudioRouteInfoBridge(messenger: messenger)
         musicHaptics = MusicHapticsBridge(messenger: messenger)
         registry.registrar(forPlugin: "AudioOutputView")?.register(
