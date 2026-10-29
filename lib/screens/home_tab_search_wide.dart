@@ -79,8 +79,6 @@ extension _HomeTabSearchWideUI on _HomeTabState {
       showEmptyResult: showEmptySearchResult && !hasActualData,
       colorScheme: colorScheme,
     );
-    var sortButtonShown = false;
-    final viewToggle = _buildSearchViewToggle(grid: true);
 
     // Songs are covers too, as the other kinds are.
     void addSongs() {
@@ -105,8 +103,8 @@ extension _HomeTabSearchWideUI on _HomeTabState {
           _buildResultSectionHeader(
             title: context.l10n.searchSongs,
             colorScheme: colorScheme,
-            showSortButton: !sortButtonShown,
-            viewToggle: sortButtonShown ? null : viewToggle,
+            // Sort and the view button sit beside the filters.
+            showSortButton: false,
             onShowAll: songFilter == null
                 ? null
                 : () => _selectSearchFilter(songFilter),
@@ -117,7 +115,6 @@ extension _HomeTabSearchWideUI on _HomeTabState {
               ? _buildSearchCoverShelf(songs.length, 'track', cell)
               : _buildSearchCoverGrid(songs.length, cell),
         );
-      sortButtonShown = true;
     }
 
     if (overview && songs.isNotEmpty) addSongs();
@@ -158,8 +155,7 @@ extension _HomeTabSearchWideUI on _HomeTabState {
           _buildResultSectionHeader(
             title: title,
             colorScheme: colorScheme,
-            showSortButton: !sortButtonShown,
-            viewToggle: sortButtonShown ? null : viewToggle,
+            showSortButton: false,
             onShowAll: filter == null
                 ? null
                 : () => _selectSearchFilter(filter),
@@ -170,7 +166,6 @@ extension _HomeTabSearchWideUI on _HomeTabState {
               ? _buildSearchCoverShelf(sorted.length, kind, cell)
               : _buildSearchCoverGrid(sorted.length, cell),
         );
-      sortButtonShown = true;
     }
 
     if (!overview && songs.isNotEmpty) addSongs();

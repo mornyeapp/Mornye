@@ -1219,38 +1219,58 @@ class _HomeTabState extends ConsumerState<HomeTab>
     required ColorScheme colorScheme,
     required String defaultSearchTab,
   }) {
-    return Consumer(
-      builder: (context, ref, _) {
-        final currentSearchProvider = ref.watch(
-          settingsProvider.select((s) => s.searchProvider),
-        );
-        final extensions = ref.watch(
-          extensionProvider.select((s) => s.extensions),
-        );
-        final selectedSearchFilter = ref.watch(
-          trackProvider.select((s) => s.selectedSearchFilter),
-        );
-        final searchFilters = _resolveSearchFilters(
-          context,
-          currentSearchProvider,
-          extensions,
-        );
-        if (searchFilters.isEmpty) {
-          return const SliverToBoxAdapter(child: SizedBox.shrink());
-        }
-        return SliverToBoxAdapter(
-          child: _buildSearchFilterBar(
-            searchFilters,
-            HomeSearchProviderPolicy.displayFilterSelection(
-              selectedSearchFilter,
-              defaultSearchTab,
-              currentSearchProvider,
-              extensions,
+    return _buildSearchWidthSliver(
+      (context, wide) => Consumer(
+        builder: (context, ref, _) {
+          final currentSearchProvider = ref.watch(
+            settingsProvider.select((s) => s.searchProvider),
+          );
+          final extensions = ref.watch(
+            extensionProvider.select((s) => s.extensions),
+          );
+          final selectedSearchFilter = ref.watch(
+            trackProvider.select((s) => s.selectedSearchFilter),
+          );
+          // Wide results keep Sort and the view button here, clear of each
+          // section's Show all.
+          final showTools =
+              wide &&
+              ref.watch(trackProvider.select((s) => s.tracks.isNotEmpty));
+          final grid =
+              ref.watch(settingsProvider.select((s) => s.searchViewMode)) ==
+              'grid';
+          final searchFilters = _resolveSearchFilters(
+            context,
+            currentSearchProvider,
+            extensions,
+          );
+          if (searchFilters.isEmpty && !showTools) {
+            return const SliverToBoxAdapter(child: SizedBox.shrink());
+          }
+          return SliverToBoxAdapter(
+            child: _buildSearchFilterBar(
+              searchFilters,
+              HomeSearchProviderPolicy.displayFilterSelection(
+                selectedSearchFilter,
+                defaultSearchTab,
+                currentSearchProvider,
+                extensions,
+              ),
+              colorScheme,
+              tools: showTools
+                  ? Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: _buildSearchResultTools(
+                        colorScheme,
+                        showSortButton: true,
+                        viewToggle: _buildSearchViewToggle(grid: grid),
+                      ),
+                    )
+                  : null,
             ),
-            colorScheme,
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 
@@ -1329,6 +1349,21 @@ class _HomeTabState extends ConsumerState<HomeTab>
     required bool hasActiveSearchSurface,
     required bool showEmptySearchResult,
   }) {
+    return _buildSearchWidthSliver(
+      (context, wide) => _buildSearchResultsConsumer(
+        colorScheme: colorScheme,
+        hasActiveSearchSurface: hasActiveSearchSurface,
+        showEmptySearchResult: showEmptySearchResult,
+        wide: wide,
+      ),
+    );
+  }
+
+  /// Builds a search sliver with whether the results are wide enough for
+  /// covers, where Sort and the view button sit beside the filters.
+  Widget _buildSearchWidthSliver(
+    Widget Function(BuildContext context, bool wide) builder,
+  ) {
     // Phones keep their rows in landscape too. Read here, since the select
     // below runs during layout.
     final coverLayoutAllowed =
@@ -1340,12 +1375,7 @@ class _HomeTabState extends ConsumerState<HomeTab>
       select: (constraints) =>
           coverLayoutAllowed &&
           constraints.crossAxisExtent - 2 * inset >= searchCoverLayoutMinWidth,
-      builder: (context, wide) => _buildSearchResultsConsumer(
-        colorScheme: colorScheme,
-        hasActiveSearchSurface: hasActiveSearchSurface,
-        showEmptySearchResult: showEmptySearchResult,
-        wide: wide,
-      ),
+      builder: builder,
     );
   }
 
@@ -1411,7 +1441,7 @@ class _HomeTabState extends ConsumerState<HomeTab>
                   searchExtensionId: searchExtensionId,
                   showLocalLibraryIndicator: showLocalLibraryIndicator,
                   thumbnailSizesByExtensionId: thumbnailSizesByExtensionId,
-                  showViewToggle: wide,
+                  toolsBesideFilters: wide,
                 ),
         );
       },

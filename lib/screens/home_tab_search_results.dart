@@ -305,7 +305,7 @@ extension _HomeTabSearchResultsUI on _HomeTabState {
     required String? searchExtensionId,
     required bool showLocalLibraryIndicator,
     required Map<String, (double, double)> thumbnailSizesByExtensionId,
-    bool showViewToggle = false,
+    bool toolsBesideFilters = false,
   }) {
     final hasActualData = tracks.isNotEmpty;
 
@@ -334,10 +334,8 @@ extension _HomeTabSearchResultsUI on _HomeTabState {
       colorScheme: colorScheme,
     );
 
-    bool sortButtonShown = false;
-    final viewToggle = showViewToggle
-        ? _buildSearchViewToggle(grid: false)
-        : null;
+    // Phone results sort from the first section.
+    bool sortButtonShown = toolsBesideFilters;
 
     for (final (items, kind, title, open) in [
       (
@@ -366,7 +364,6 @@ extension _HomeTabSearchResultsUI on _HomeTabState {
           itemCount: items.length,
           colorScheme: colorScheme,
           showSortButton: !sortButtonShown,
-          viewToggle: sortButtonShown ? null : viewToggle,
           itemBuilder: (index, showDivider) => _CollectionItemWidget(
             key: ValueKey('$kind-${items[index].id}'),
             item: items[index],
@@ -387,7 +384,6 @@ extension _HomeTabSearchResultsUI on _HomeTabState {
           indexes: sortedTrackIndexes,
           colorScheme: colorScheme,
           showSortButton: !sortButtonShown,
-          viewToggle: sortButtonShown ? null : viewToggle,
           searchExtensionId: searchExtensionId,
           showLocalLibraryIndicator: showLocalLibraryIndicator,
           thumbnailSizesByExtensionId: thumbnailSizesByExtensionId,
@@ -462,7 +458,6 @@ extension _HomeTabSearchResultsUI on _HomeTabState {
     required bool showLocalLibraryIndicator,
     required Map<String, (double, double)> thumbnailSizesByExtensionId,
     int? itemCount,
-    ToolButton? viewToggle,
   }) {
     final isInHistory = _watchSearchHistory(resultsRef, tracks);
     return _buildVirtualizedResultSection(
@@ -470,7 +465,6 @@ extension _HomeTabSearchResultsUI on _HomeTabState {
       itemCount: itemCount ?? tracks.length,
       colorScheme: colorScheme,
       showSortButton: showSortButton,
-      viewToggle: viewToggle,
       itemBuilder: (index, showDivider) => _TrackItemWithStatus(
         key: ValueKey(tracks[index].id),
         track: tracks[index],
@@ -494,7 +488,6 @@ extension _HomeTabSearchResultsUI on _HomeTabState {
     required ColorScheme colorScheme,
     required Widget Function(int index, bool showDivider) itemBuilder,
     bool showSortButton = false,
-    ToolButton? viewToggle,
   }) {
     // Material result groups are grouped rows, on the settings group tier.
     final sectionColor = colorScheme.surfaceContainer;
@@ -505,7 +498,6 @@ extension _HomeTabSearchResultsUI on _HomeTabState {
         title: title,
         colorScheme: colorScheme,
         showSortButton: showSortButton,
-        viewToggle: viewToggle,
       ),
       SliverPadding(
         padding: EdgeInsets.symmetric(horizontal: homeContentInset(context)),
@@ -552,21 +544,70 @@ extension _HomeTabSearchResultsUI on _HomeTabState {
     ];
   }
 
-  /// A result section's title, with Sort on the first section and, on wide
-  /// screens, the [onShowAll] that switches to the section's own filter and
-  /// the [viewToggle] after Sort.
-  Widget _buildResultSectionHeader({
-    required String title,
-    required ColorScheme colorScheme,
+  /// Sort, then the [viewToggle] when given. Material groups them as Library
+  /// pages do; Mornye keeps a text Sort and an icon button.
+  List<Widget> _buildSearchResultTools(
+    ColorScheme colorScheme, {
     required bool showSortButton,
     ToolButton? viewToggle,
-    VoidCallback? onShowAll,
   }) {
     final mornye = context.isMornye;
     final sorted = _searchSortOption != HomeSearchSortOption.defaultOrder;
     final sortLabel = sorted
         ? _sortOptionLabel(_searchSortOption)
         : context.l10n.libraryFilterSort;
+    return [
+      if (!mornye && (showSortButton || viewToggle != null))
+        ToolButtonGroup(
+          tools: [
+            if (showSortButton)
+              ToolButton(
+                icon: const AppIcon(Icons.sort),
+                label: sortLabel,
+                onPressed: (_) => _showSortOptions(colorScheme),
+              ),
+            ?viewToggle,
+          ],
+        ),
+      // Keeps ExpressiveButton's 48dp minimum touch target.
+      if (mornye && showSortButton)
+        ExpressiveButton(
+          text: true,
+          onPressed: () => _showSortOptions(colorScheme),
+          style: TextButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+          ),
+          child: Text(
+            sortLabel,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: sorted
+                  ? colorScheme.primary
+                  : colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+      if (mornye && viewToggle != null)
+        AppIconButton(
+          tooltip: viewToggle.tooltip,
+          icon: IconTheme(
+            data: IconThemeData(size: 20, color: colorScheme.onSurfaceVariant),
+            child: viewToggle.icon,
+          ),
+          onPressed: () => viewToggle.onPressed(context),
+        ),
+    ];
+  }
+
+  /// A result section's title, with Sort on the first section of phone
+  /// results and, on wide screens, the [onShowAll] that switches to the
+  /// section's own filter.
+  Widget _buildResultSectionHeader({
+    required String title,
+    required ColorScheme colorScheme,
+    required bool showSortButton,
+    VoidCallback? onShowAll,
+  }) {
+    final mornye = context.isMornye;
     return SliverToBoxAdapter(
       child: Padding(
         // Aligned with the clamped result list below on wide screens.
@@ -594,48 +635,10 @@ extension _HomeTabSearchResultsUI on _HomeTabState {
               ),
             ),
             if (onShowAll != null) _buildShowAllButton(title, onShowAll),
-            // Material groups sort and view as Library pages do.
-            if (!mornye && (showSortButton || viewToggle != null))
-              ToolButtonGroup(
-                tools: [
-                  if (showSortButton)
-                    ToolButton(
-                      icon: const AppIcon(Icons.sort),
-                      label: sortLabel,
-                      onPressed: (_) => _showSortOptions(colorScheme),
-                    ),
-                  ?viewToggle,
-                ],
-              ),
-            // Keeps ExpressiveButton's 48dp minimum touch target.
-            if (mornye && showSortButton)
-              ExpressiveButton(
-                text: true,
-                onPressed: () => _showSortOptions(colorScheme),
-                style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                ),
-                child: Text(
-                  sortLabel,
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: sorted
-                        ? colorScheme.primary
-                        : colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ),
-            if (mornye && viewToggle != null)
-              AppIconButton(
-                tooltip: viewToggle.tooltip,
-                icon: IconTheme(
-                  data: IconThemeData(
-                    size: 20,
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                  child: viewToggle.icon,
-                ),
-                onPressed: () => viewToggle.onPressed(context),
-              ),
+            ..._buildSearchResultTools(
+              colorScheme,
+              showSortButton: showSortButton,
+            ),
           ],
         ),
       ),
@@ -786,11 +789,14 @@ extension _HomeTabSearchResultsUI on _HomeTabState {
     return context.l10n.homeSearchHintDefault;
   }
 
+  /// The filter chips, with [tools] at the end of the row. Without
+  /// [filters] only the tools show.
   Widget _buildSearchFilterBar(
     List<SearchFilter> filters,
     String? selectedFilter,
-    ColorScheme colorScheme,
-  ) {
+    ColorScheme colorScheme, {
+    Widget? tools,
+  }) {
     Widget filterChip(String id, String label, {IconData? icon}) {
       void select() => _selectSearchFilter(id);
 
@@ -815,7 +821,7 @@ extension _HomeTabSearchResultsUI on _HomeTabState {
     }
 
     final chips = [
-      filterChip('all', context.l10n.historyFilterAll),
+      if (filters.isNotEmpty) filterChip('all', context.l10n.historyFilterAll),
       for (final filter in filters)
         filterChip(
           filter.id,
@@ -823,19 +829,28 @@ extension _HomeTabSearchResultsUI on _HomeTabState {
           icon: filter.icon == null ? null : _getFilterIcon(filter.icon!),
         ),
     ];
+    // The chips never overlap, so their glass shares one backdrop read.
+    final chipRow = LiquidGlassBatch(
+      // A mouse cannot swipe a clipped row, so desktop windows wrap every
+      // filter onto view.
+      child: isDesktopPlatform
+          ? Wrap(spacing: 8, runSpacing: 8, children: chips)
+          : SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(spacing: 8, children: chips),
+            ),
+    );
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 16 + homeContentInset(context)),
-      // The chips never overlap, so their glass shares one backdrop read.
-      child: LiquidGlassBatch(
-        // A mouse cannot swipe a clipped row, so desktop windows wrap every
-        // filter onto view.
-        child: isDesktopPlatform
-            ? Wrap(spacing: 8, runSpacing: 8, children: chips)
-            : SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(spacing: 8, children: chips),
-              ),
-      ),
+      child: tools == null
+          ? chipRow
+          : Row(
+              spacing: 8,
+              children: [
+                Expanded(child: chipRow),
+                tools,
+              ],
+            ),
     );
   }
 

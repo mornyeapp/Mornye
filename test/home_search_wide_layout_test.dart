@@ -235,6 +235,13 @@ void main() {
           tester.getTopLeft(find.text(title)).dy,
       ];
       expect(headers, orderedEquals([...headers]..sort()));
+      // Sort ends the filter row, so each Show all ends its own header.
+      final sortTop = tester.getCenter(find.text('Sort').hitTestable()).dy;
+      expect(sortTop, lessThan(headers.first));
+      expect(
+        tester.getCenter(find.text('All')).dy,
+        moreOrLessEquals(sortTop, epsilon: 12),
+      );
       final songShelf = find.byKey(const ValueKey('search-shelf-track'));
       expect(songShelf, findsOneWidget);
       expect(
