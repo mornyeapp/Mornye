@@ -31,20 +31,25 @@ fn album_of<'a>(catalog: &'a Catalog, song_id: &str) -> &'a Album {
     &catalog.albums()[catalog.song(song_id).expect("song").album]
 }
 
-/// The cover file behind `id`, when it is a file.
+/// The cover files tried first for `id`.
+fn cover_files<'a>(catalog: &'a Catalog, id: &str) -> Vec<&'a Path> {
+    catalog
+        .cover_source(id)
+        .map(|source| source.files)
+        .unwrap_or_default()
+}
+
+/// The first cover file behind `id`.
 fn cover_file<'a>(catalog: &'a Catalog, id: &str) -> Option<&'a Path> {
-    match catalog.cover_source(id)? {
-        CoverSource::File(path) => Some(path),
-        CoverSource::Embedded(_) => None,
-    }
+    cover_files(catalog, id).first().copied()
 }
 
 /// The audio files tried for an embedded cover behind `id`.
 fn embedded<'a>(catalog: &'a Catalog, id: &str) -> Vec<(&'a Path, &'static str)> {
-    match catalog.cover_source(id) {
-        Some(CoverSource::Embedded(candidates)) => candidates,
-        _ => Vec::new(),
-    }
+    catalog
+        .cover_source(id)
+        .map(|source| source.embedded)
+        .unwrap_or_default()
 }
 
 #[test]
@@ -448,6 +453,51 @@ fn covers_fall_back_to_songs_that_can_embed_one() {
         None
     );
     assert!(catalog.cover_source("f:1").is_none());
+}
+
+#[test]
+fn a_cover_source_lists_every_fallback_in_order() {
+    let catalog = catalog(&[
+        row(
+            "g:1",
+            "One",
+            "Band",
+            json!({ "album": "G", "track": 1, "coverPath": "/c/g1.jpg" }),
+        ),
+        row("g:2", "Two", "Band", json!({ "album": "G", "track": 2 })),
+        row(
+            "g:3",
+            "Three",
+            "Band",
+            json!({ "album": "G", "track": 3, "coverPath": "/c/g3.jpg" }),
+        ),
+    ]);
+    let album = album_of(&catalog, "g:1").id.clone();
+    assert_eq!(
+        cover_files(&catalog, "g:3"),
+        [Path::new("/c/g3.jpg"), Path::new("/c/g1.jpg")],
+        "its own file, then its album's"
+    );
+    assert_eq!(cover_files(&catalog, "g:1"), [Path::new("/c/g1.jpg")]);
+    assert_eq!(cover_files(&catalog, "g:2"), [Path::new("/c/g1.jpg")]);
+    assert_eq!(cover_files(&catalog, &album), [Path::new("/c/g1.jpg")]);
+    assert_eq!(
+        embedded(&catalog, "g:3"),
+        [
+            (Path::new("/music/g:3.flac"), "flac"),
+            (Path::new("/music/g:1.flac"), "flac"),
+            (Path::new("/music/g:2.flac"), "flac"),
+        ],
+        "pictures embedded in the song, then its album's, when no file is left"
+    );
+    assert_eq!(
+        embedded(&catalog, &album),
+        [
+            (Path::new("/music/g:1.flac"), "flac"),
+            (Path::new("/music/g:2.flac"), "flac"),
+            (Path::new("/music/g:3.flac"), "flac"),
+        ]
+    );
 }
 
 /// Run with `cargo test --release -p mornye-link -- --ignored --nocapture`.

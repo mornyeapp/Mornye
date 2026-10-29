@@ -1,11 +1,12 @@
 //! `getCoverArt`: the cover file, or a JPEG resized to `size` (aspect ratio
 //! kept, never upscaled) cached under `<temp_dir>/link-covers/`. A picture
 //! embedded in an audio file is first extracted into that cache, then
-//! served like a cover file.
+//! served like a cover file. A listed cover file that is gone falls back to
+//! the next source.
 
 use super::media::file_response;
 use super::{Failure, number, required};
-use crate::catalog::{Catalog, CoverSource, hex};
+use crate::catalog::{Catalog, hex};
 use crate::types::{HttpResponse, Shared, SubsonicRequest, full};
 use http::header::{CACHE_CONTROL, ETAG, IF_NONE_MATCH};
 use http::{HeaderMap, Response};
@@ -35,8 +36,9 @@ const CACHED_EXTENSIONS: &[&str] = &["jpg", "png", "gif", "webp", "bmp"];
 /// Audio files remembered without a picture before the memory starts over.
 const MAX_WITHOUT_PICTURE: usize = 50_000;
 
-/// Audio files known to embed no picture, by [`embedded_key`], so repeated
-/// requests do not read them again. A changed file has a new key.
+/// Audio files known to embed no picture, by the [`digest`] of their
+/// version stamp, so repeated requests do not read them again. A changed
+/// file has a new key.
 static WITHOUT_PICTURE: LazyLock<Mutex<HashSet<[u8; 16]>>> = LazyLock::new(Mutex::default);
 
 pub(super) async fn cover_art(
@@ -46,37 +48,24 @@ pub(super) async fn cover_art(
 ) -> Result<HttpResponse, Failure> {
     let id = required(request, "id")?;
     let not_found = || Failure::not_found("Cover art").with_status(404);
-    let source = match catalog.cover_source(id).ok_or_else(not_found)? {
-        CoverSource::File(path) => path.to_owned(),
-        CoverSource::Embedded(candidates) => {
-            let candidates: Vec<(PathBuf, &'static str)> = candidates
-                .into_iter()
-                .map(|(path, format)| (path.to_owned(), format))
-                .collect();
-            let dir = shared.config.temp_dir.join(CACHE_DIR);
-            tokio::task::spawn_blocking(move || embedded_cover(&dir, &candidates))
-                .await
-                .ok()
-                .flatten()
-                .ok_or_else(not_found)?
-        }
-    };
-    let metadata = tokio::fs::metadata(&source)
+    let source = catalog.cover_source(id).ok_or_else(not_found)?;
+    let files: Vec<PathBuf> = source.files.into_iter().map(Path::to_owned).collect();
+    let candidates: Vec<(PathBuf, &'static str)> = source
+        .embedded
+        .into_iter()
+        .map(|(path, format)| (path.to_owned(), format))
+        .collect();
+    let dir = shared.config.temp_dir.join(CACHE_DIR);
+    let cache = dir.clone();
+    let image = tokio::task::spawn_blocking(move || find_image(&cache, &files, &candidates))
         .await
         .ok()
-        .filter(fs::Metadata::is_file)
+        .flatten()
         .ok_or_else(not_found)?;
     let size = number::<i64>(request, "size")
         .filter(|size| *size > 0)
         .map(|size| u32::try_from(size.min(i64::from(MAX_EDGE))).unwrap_or(MAX_EDGE));
-    let stamp = format!(
-        "{}\0{}\0{}\0{}",
-        source.to_string_lossy(),
-        modified_nanos(&metadata),
-        metadata.len(),
-        size.unwrap_or(0)
-    );
-    let key = hex(&Sha256::digest(stamp.as_bytes())[..16]);
+    let key = hex(&digest(&format!("{}\0{}", image.stamp, size.unwrap_or(0))));
     let etag = format!("\"{key}\"");
     let cache_headers = vec![
         (ETAG, etag.clone()),
@@ -91,14 +80,12 @@ pub(super) async fn cover_art(
             .body(full(bytes::Bytes::new()))
             .map_err(|error| Failure::new(super::code::GENERIC, error.to_string()));
     }
-    let mut target = source.clone();
+    let mut target = image.path.clone();
     if let Some(size) = size
-        && metadata.len() <= MAX_DECODE_BYTES
+        && image.len <= MAX_DECODE_BYTES
+        && let Some(resized) = resized(dir, image.path, key, size).await
     {
-        let dir = shared.config.temp_dir.join(CACHE_DIR);
-        if let Some(resized) = resized(dir, source.clone(), key, size).await {
-            target = resized;
-        }
+        target = resized;
     }
     let content_type = sniff(&target);
     file_response(&target, content_type, &request.headers, cache_headers)
@@ -115,22 +102,60 @@ fn modified_nanos(metadata: &fs::Metadata) -> u128 {
         .map_or(0, |elapsed| elapsed.as_nanos())
 }
 
-/// The first picture embedded in `candidates` (audio file and extraction
-/// format), extracted into `dir` on first use. Blocking.
-fn embedded_cover(dir: &Path, candidates: &[(PathBuf, &'static str)]) -> Option<PathBuf> {
-    candidates
-        .iter()
-        .find_map(|(audio, format)| extract_cached(dir, audio, format))
+/// The image a cover request serves.
+struct Image {
+    /// A cover file, or a picture extracted into the cache.
+    path: PathBuf,
+    /// The length of `path`.
+    len: u64,
+    /// Identifies this version of the image: the [`version_stamp`] of
+    /// `path`.
+    stamp: String,
 }
 
-/// Identifies one version of an audio file: its path, size and mtime.
-fn embedded_key(audio: &Path, metadata: &fs::Metadata) -> [u8; 16] {
-    let stamp = format!(
-        "embedded\0{}\0{}\0{}",
-        audio.to_string_lossy(),
+/// The first of `files` on disk, else the first picture embedded in
+/// `candidates` (audio file and extraction format), extracted into `dir` on
+/// first use. Blocking.
+fn find_image(
+    dir: &Path,
+    files: &[PathBuf],
+    candidates: &[(PathBuf, &'static str)],
+) -> Option<Image> {
+    files
+        .iter()
+        .find_map(|path| {
+            let metadata = fs::metadata(path).ok().filter(fs::Metadata::is_file)?;
+            Some(Image {
+                path: path.clone(),
+                len: metadata.len(),
+                stamp: version_stamp(path, &metadata),
+            })
+        })
+        .or_else(|| {
+            let path = candidates
+                .iter()
+                .find_map(|(audio, format)| extract_cached(dir, audio, format))?;
+            let metadata = fs::metadata(&path).ok().filter(fs::Metadata::is_file)?;
+            Some(Image {
+                len: metadata.len(),
+                stamp: version_stamp(&path, &metadata),
+                path,
+            })
+        })
+}
+
+/// Identifies one version of a file: its path, mtime and length.
+fn version_stamp(path: &Path, metadata: &fs::Metadata) -> String {
+    format!(
+        "{}\0{}\0{}",
+        path.to_string_lossy(),
         modified_nanos(metadata),
         metadata.len()
-    );
+    )
+}
+
+/// The first 16 bytes of the SHA-256 of `stamp`.
+fn digest(stamp: &str) -> [u8; 16] {
     let mut key = [0u8; 16];
     key.copy_from_slice(&Sha256::digest(stamp.as_bytes())[..16]);
     key
@@ -141,7 +166,7 @@ fn embedded_key(audio: &Path, metadata: &fs::Metadata) -> [u8; 16] {
 /// unwritable.
 fn extract_cached(dir: &Path, audio: &Path, format: &str) -> Option<PathBuf> {
     let metadata = fs::metadata(audio).ok().filter(fs::Metadata::is_file)?;
-    let key = embedded_key(audio, &metadata);
+    let key = digest(&format!("embedded\0{}", version_stamp(audio, &metadata)));
     let without_picture = || {
         WITHOUT_PICTURE
             .lock()

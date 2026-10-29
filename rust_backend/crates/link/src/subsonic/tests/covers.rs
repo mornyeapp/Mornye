@@ -285,6 +285,58 @@ async fn cover_art_without_any_picture_is_404_and_remembered() {
     assert_eq!(cached_files(&fixture).len(), 1);
 }
 
+#[tokio::test]
+async fn a_missing_cover_file_falls_back_to_the_embedded_picture() {
+    let original = png(40, 20);
+    let fixture = Fixture::new(|dir| {
+        let (with, _) = flac_pair(&original);
+        let embedded = write_file(dir, "1.flac", &with);
+        vec![json!({
+            "id": "s1", "title": "One", "artist": "A", "album": "X", "path": embedded,
+            "coverPath": dir.join("pruned.jpg").to_string_lossy(),
+        })]
+    });
+    let album = fixture.album_id("s1");
+    for id in ["s1", album.as_str()] {
+        let reply = json_cover(&fixture, id).await;
+        assert_eq!(reply.status, 200, "{id}");
+        assert_eq!(reply.header("content-type"), Some("image/png"));
+        assert_eq!(reply.body.as_ref(), original.as_slice(), "{id}");
+    }
+    let resized = small_cover(&fixture, "s1", HeaderMap::new()).await;
+    assert_eq!(resized.status, 200);
+    let image = image::load_from_memory(&resized.body).expect("decodes");
+    assert_eq!((image.width(), image.height()), (10, 5));
+}
+
+#[tokio::test]
+async fn a_missing_song_cover_file_falls_back_to_the_album_cover_file() {
+    let original = png(24, 24);
+    let fixture = Fixture::new(|dir| {
+        let (_, without) = flac_pair(&original);
+        let bare = write_file(dir, "bare.flac", &without);
+        let cover = write_file(dir, "album.png", &original);
+        vec![
+            json!({ "id": "s1", "title": "One", "artist": "A", "album": "X", "track": 1,
+                    "path": bare, "coverPath": cover }),
+            json!({ "id": "s2", "title": "Two", "artist": "A", "album": "X", "track": 2,
+                    "path": bare, "coverPath": dir.join("pruned.jpg").to_string_lossy() }),
+        ]
+    });
+    let reply = json_cover(&fixture, "s2").await;
+    assert_eq!(reply.status, 200);
+    assert_eq!(reply.body.as_ref(), original.as_slice());
+    let album = json_cover(&fixture, &fixture.album_id("s1")).await;
+    assert_eq!(album.header("etag"), reply.header("etag"), "one image");
+}
+
+/// `getCoverArt` of `id` at size 10.
+async fn small_cover(fixture: &Fixture, id: &str, headers: HeaderMap) -> Reply {
+    fixture
+        .raw("getCoverArt", &[("id", id), ("size", "10")], headers)
+        .await
+}
+
 async fn json_cover(fixture: &Fixture, id: &str) -> Reply {
     fixture
         .raw(

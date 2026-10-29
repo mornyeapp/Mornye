@@ -131,14 +131,15 @@ impl Song {
     }
 }
 
-/// Where the image behind a `coverArt` id comes from.
+/// Where the image behind a `coverArt` id comes from: the first of `files`
+/// still on disk, else the first picture embedded in `embedded`.
 #[derive(Debug)]
-pub(crate) enum CoverSource<'a> {
-    /// A separate image file.
-    File(&'a Path),
+pub(crate) struct CoverSource<'a> {
+    /// Separate image files, tried in order.
+    pub(crate) files: Vec<&'a Path>,
     /// Pictures embedded in these audio files (path and
     /// [`Song::embedded_cover_format`]), tried in order.
-    Embedded(Vec<(&'a Path, &'static str)>),
+    pub(crate) embedded: Vec<(&'a Path, &'static str)>,
 }
 
 /// Songs grouped by album key.
@@ -346,7 +347,7 @@ impl Catalog {
     /// The image behind a `coverArt` id (album, artist or song id): a song's
     /// own cover file, else its album's cover file, else the pictures
     /// embedded in the song itself and then in its album's songs, in album
-    /// order.
+    /// order. A listed file that is gone falls through to the next.
     pub(crate) fn cover_source(&self, id: &str) -> Option<CoverSource<'_>> {
         let (album, own) = if let Some(index) = self.album_index(id) {
             (index, None)
@@ -354,17 +355,21 @@ impl Catalog {
             (self.artists[index].cover_album?, None)
         } else {
             let index = self.song_index(id)?;
-            let song = &self.songs[index];
-            if let Some(path) = &song.cover_path {
-                return Some(CoverSource::File(path));
-            }
-            (song.album, Some(index))
+            (self.songs[index].album, Some(index))
         };
         let album = &self.albums[album];
-        if let Some(path) = &self.songs[album.cover?].cover_path {
-            return Some(CoverSource::File(path));
+        let mut files: Vec<&Path> = own
+            .and_then(|index| self.songs[index].cover_path.as_deref())
+            .into_iter()
+            .collect();
+        if let Some(path) = album
+            .cover
+            .and_then(|index| self.songs[index].cover_path.as_deref())
+            && !files.contains(&path)
+        {
+            files.push(path);
         }
-        let embedded = own
+        let embedded: Vec<(&Path, &'static str)> = own
             .into_iter()
             .chain(
                 album
@@ -379,7 +384,7 @@ impl Catalog {
             })
             .take(EMBEDDED_COVER_TRIES)
             .collect();
-        Some(CoverSource::Embedded(embedded))
+        (!files.is_empty() || !embedded.is_empty()).then_some(CoverSource { files, embedded })
     }
 
     /// Songs matching every term (title, artist or album), export order.
