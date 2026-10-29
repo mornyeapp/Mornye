@@ -1,6 +1,6 @@
 //! Container readers for FLAC and Ogg streams, including Ogg page and packet parsing.
 
-use super::{AudioMetadata, CoverArt, bytes, comments, exact, id3, seek, utf8};
+use super::{AudioMetadata, CoverArt, MAX_TAG_BYTES, bytes, comments, exact, id3, seek, utf8};
 use base64::Engine;
 use std::collections::BTreeMap;
 use std::io::{Cursor, Read, Seek, SeekFrom};
@@ -124,7 +124,7 @@ fn picture_block(data: &[u8], ogg_limits: bool) -> Option<(u32, CoverArt)> {
         let length = u32::from_be_bytes(bytes(&mut input, 4)?.try_into().unwrap()) as usize;
         if length == 0
             || length > data.len().saturating_sub(input.position() as usize)
-            || ogg_limits && length > 10_000_000
+            || ogg_limits && length > MAX_TAG_BYTES
         {
             return Err("invalid picture data length".into());
         }
@@ -206,26 +206,37 @@ impl OggPage {
     }
 }
 
-/// Reading for the comment header stops at this many bytes instead of a page
-/// count. Taggers such as mutagen write pages of about 4 KiB, so a cover in
-/// the comments can span hundreds of pages; a comment packet over 10 MiB is
-/// skipped anyway.
-const OGG_COMMENT_BYTES: usize = 16 * 1024 * 1024;
+/// Bound the header read by bytes, allowing page framing around the same
+/// comment payload size our tag writer accepts. Artwork grows by one third
+/// in Base64, so the old 10 MiB packet limit rejected valid converted songs.
+const OGG_COMMENT_BYTES: usize = MAX_TAG_BYTES + 1024 * 1024;
 
 pub(crate) fn ogg_packets(
     reader: &mut impl Read,
     max_packets: usize,
     max_pages: usize,
 ) -> Result<Vec<Vec<u8>>, String> {
-    ogg_packets_until(reader, max_packets, max_pages, usize::MAX, |_| false)
+    ogg_packets_until(
+        reader,
+        max_packets,
+        max_pages,
+        usize::MAX,
+        10 * 1024 * 1024,
+        |_| false,
+    )
 }
 
 /// Packets up to and including the comment header (`OpusTags` or the Vorbis
 /// comment packet), which follows the identification header.
 fn ogg_comment_packets(reader: &mut impl Read) -> Result<Vec<Vec<u8>>, String> {
-    ogg_packets_until(reader, 30, usize::MAX, OGG_COMMENT_BYTES, |packet| {
-        packet.starts_with(b"OpusTags") || packet.starts_with(b"\x03vorbis")
-    })
+    ogg_packets_until(
+        reader,
+        30,
+        usize::MAX,
+        OGG_COMMENT_BYTES,
+        MAX_TAG_BYTES,
+        |packet| packet.starts_with(b"OpusTags") || packet.starts_with(b"\x03vorbis"),
+    )
 }
 
 fn ogg_packets_until(
@@ -233,6 +244,7 @@ fn ogg_packets_until(
     max_packets: usize,
     max_pages: usize,
     max_bytes: usize,
+    max_packet_bytes: usize,
     done: impl Fn(&[u8]) -> bool,
 ) -> Result<Vec<Vec<u8>>, String> {
     let mut packets = Vec::new();
@@ -261,7 +273,7 @@ fn ogg_packets_until(
         let mut offset = 0;
         for length in segments {
             let length = length as usize;
-            if !skip_packet && current.len() + length > 10 * 1024 * 1024 {
+            if !skip_packet && current.len() + length > max_packet_bytes {
                 current.clear();
                 skip_packet = true;
             }
@@ -333,7 +345,7 @@ pub(super) fn ogg_cover(reader: &mut impl Read) -> Result<CoverArt, String> {
         } else {
             continue;
         };
-        for (key, value) in comments::parse(comments, 10_000_000) {
+        for (key, value) in comments::parse(comments, MAX_TAG_BYTES) {
             if !key.eq_ignore_ascii_case("METADATA_BLOCK_PICTURE") {
                 continue;
             }

@@ -25,6 +25,9 @@ pub use write::{
     rewrite_flac_tags_if_changed, rewrite_m4a_freeform,
 };
 
+// Readers must accept the tag blocks our native writers can produce.
+const MAX_TAG_BYTES: usize = 64 * 1024 * 1024;
+
 #[derive(Clone, Debug)]
 pub struct CoverArt {
     pub data: Vec<u8>,

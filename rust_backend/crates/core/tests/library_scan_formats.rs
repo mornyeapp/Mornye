@@ -1,6 +1,8 @@
 //! Real-world file shapes that Library scans used to drop as unreadable.
 
-use mornye_core::tags::{extract_cover, read_file_metadata, read_library_metadata};
+use mornye_core::tags::{
+    extract_cover, read_file_metadata, read_library_metadata, rewrite_audio_tags,
+};
 use serde_json::Value;
 use std::io::{self, Cursor, Read, Seek, SeekFrom};
 
@@ -209,6 +211,91 @@ fn opus_comments_after_a_large_cover_on_small_pages_are_read() {
     assert_eq!(metadata["duration"], 10);
     let cover = extract_cover(&mut Cursor::new(data), "opus", &|| Ok(())).unwrap();
     assert_eq!(cover.data.len(), 400 * 1024);
+}
+
+#[test]
+fn opus_with_high_resolution_artwork_remains_readable() {
+    // Base64 expands an 8 MiB picture past the old 10 MiB packet limit;
+    // a 13 MiB picture also exceeds the old 16 MiB header read window.
+    for size in [8 * 1024 * 1024, 13 * 1024 * 1024] {
+        let data = opus(
+            Some(&[
+                picture_comment(size),
+                "TITLE=Converted song".into(),
+                "ARTIST=Example artist".into(),
+            ]),
+            255,
+        );
+        let metadata = scan(&data, "Converted.opus");
+        assert_readable(&metadata);
+        assert_eq!(metadata["trackName"], "Converted song");
+        assert_eq!(metadata["artistName"], "Example artist");
+        assert_eq!(metadata["duration"], 10);
+        let cover = extract_cover(&mut Cursor::new(&data), "opus", &|| Ok(())).unwrap();
+        assert_eq!(cover.data.len(), size);
+
+        // Automatic download conversion uses the native tag writer. Its
+        // completed output must be readable by the scanner too.
+        let mut rewritten = Vec::new();
+        rewrite_audio_tags(
+            &mut Cursor::new(&data),
+            &mut rewritten,
+            "opus",
+            &[("title".into(), "Retagged song".into())].into(),
+            Some(&cover.data),
+            &|| Ok(()),
+        )
+        .unwrap();
+        let metadata = scan(&rewritten, "Retagged.opus");
+        assert_readable(&metadata);
+        assert_eq!(metadata["trackName"], "Retagged song");
+        assert_eq!(metadata["artistName"], "Example artist");
+        assert_eq!(metadata["duration"], 10);
+        let details = read_file_metadata(
+            &mut Cursor::new(&rewritten),
+            "/proc/self/fd/42",
+            "Retagged.opus",
+            &|| Ok(()),
+        )
+        .unwrap();
+        assert_eq!(details["title"], "Retagged song");
+        assert_eq!(details["audio_codec"], "opus");
+    }
+}
+
+#[test]
+fn manual_opus_cover_replacement_remains_readable() {
+    let source = opus(
+        Some(&["TITLE=Original song".into(), "ARTIST=Example artist".into()]),
+        255,
+    );
+    assert_readable(&scan(&source, "Manual.opus"));
+    let mut cover = vec![0x42; 8 * 1024 * 1024];
+    cover[..2].copy_from_slice(&[0xff, 0xd8]);
+    let mut edited = Vec::new();
+    rewrite_audio_tags(
+        &mut Cursor::new(&source),
+        &mut edited,
+        "ogg",
+        &[("title".into(), "Manually edited song".into())].into(),
+        Some(&cover),
+        &|| Ok(()),
+    )
+    .unwrap();
+    let metadata = scan(&edited, "Manual.opus");
+    assert_readable(&metadata);
+    assert_eq!(metadata["trackName"], "Manually edited song");
+    assert_eq!(metadata["artistName"], "Example artist");
+    let metadata = read_file_metadata(
+        &mut Cursor::new(&edited),
+        "/proc/self/fd/42",
+        "Manual.opus",
+        &|| Ok(()),
+    )
+    .unwrap();
+    assert_eq!(metadata["title"], "Manually edited song");
+    let artwork = extract_cover(&mut Cursor::new(&edited), "opus", &|| Ok(())).unwrap();
+    assert_eq!(artwork.data, cover);
 }
 
 #[test]

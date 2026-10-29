@@ -10,7 +10,7 @@ mod riff;
 
 pub(super) use id3::cover as embedded_cover;
 
-use super::{CheckedReader, bytes, exact, pair, seek};
+use super::{CheckedReader, MAX_TAG_BYTES, bytes, exact, pair, seek};
 use crate::matching::uppercase;
 use artists::{
     artist_mode_fields, primary_artist, primary_artist_mode, split_artists, tag_separator,
@@ -21,7 +21,6 @@ use std::io::{BufReader, Cursor, Read, Seek, SeekFrom, Write};
 use std::sync::LazyLock;
 
 type Fields = BTreeMap<String, String>;
-const MAX_TAG_BYTES: usize = 64 * 1024 * 1024;
 
 fn clears_replay_gain(fields: &Fields) -> bool {
     [
