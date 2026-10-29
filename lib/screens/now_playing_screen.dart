@@ -61,14 +61,13 @@ export 'package:mornye/routes/now_playing_route.dart';
 
 final _log = AppLogger('NowPlaying');
 
-/// Material portrait's "Playing on" row, kept while empty: one line of the
-/// label with a little room, so the empty row takes as little from the cover
-/// as it can.
-double _playingOnRowHeight(BuildContext context) {
-  final style = Theme.of(context).textTheme.labelLarge;
-  final line = (style?.fontSize ?? 14) * (style?.height ?? 20 / 14);
-  return (MediaQuery.textScalerOf(context).scale(line) + 4).roundToDouble();
-}
+/// Material portrait's "Playing on" row, kept while empty.
+const _playingOnRowHeight = 36.0;
+
+/// How much of an iPhone's home indicator inset stays under that row. The
+/// indicator sits in the screen's bottom 13pt, and the label's text ends 8pt
+/// above the row's bottom, so it still clears the indicator.
+const _homeIndicatorBelowRow = 12.0;
 
 /// AppBar wrapper that fades with the route transition (see contentOpacity
 /// in [_NowPlayingScreenState.build]).
@@ -357,6 +356,19 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
         materialBackdrop &&
         MediaQuery.orientationOf(context) == Orientation.portrait;
     final overCover = materialFullScreen && _currentPage != 1;
+    // Material's portrait keeps the "Playing on" row while empty, so the
+    // controls stay put when a computer takes over playback. On an iPhone
+    // the row reaches into the home indicator's inset rather than stacking
+    // a second empty band on top of it.
+    final reservesPlayingOnRow =
+        !mornye &&
+        MediaQuery.orientationOf(context) == Orientation.portrait &&
+        screen.height >= 640;
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
+    final homeIndicatorBelowRow =
+        reservesPlayingOnRow && Theme.of(context).platform == TargetPlatform.iOS
+        ? bottomInset.clamp(0.0, _homeIndicatorBelowRow)
+        : null;
     if (!fullBleed && _artworkForeground.value.isNotEmpty) {
       _artworkForeground.value = {};
     }
@@ -517,6 +529,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
       body: FadeTransition(
         opacity: contentOpacity,
         child: SafeArea(
+          bottom: homeIndicatorBelowRow == null,
           child: Column(
             children: [
               Expanded(
@@ -681,27 +694,23 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                           ),
                         ),
                       // Landscape has no row to spare; the toolbar's devices
-                      // button shows the device there. Material's portrait
-                      // keeps the row while empty, so the controls stay put
-                      // when a computer takes over playback; Mornye's larger
-                      // cover and short phones' lyrics keep that room.
+                      // button shows the device there. Mornye's larger cover
+                      // and short phones' lyrics keep the room an empty row
+                      // would take.
                       if (MediaQuery.orientationOf(context) ==
                           Orientation.portrait) ...[
-                        if (mornye ||
-                            MediaQuery.sizeOf(context).height < 640) ...[
+                        if (!reservesPlayingOnRow) ...[
                           LinkPlayingOnLabel(
                             color: mornye ? Colors.white : null,
                           ),
                           const SizedBox(height: 8),
                         ] else
-                          // As tall as the one-line label needs, so the
-                          // empty row is no taller than a filled one looks.
-                          SizedBox(
-                            key: const ValueKey('link-playing-on-row'),
-                            height: _playingOnRowHeight(context),
+                          const SizedBox(
+                            key: ValueKey('link-playing-on-row'),
+                            height: _playingOnRowHeight,
                             child: Center(
                               child: LinkPlayingOnLabel(
-                                height: _playingOnRowHeight(context),
+                                height: _playingOnRowHeight,
                               ),
                             ),
                           ),
@@ -711,6 +720,8 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                 ),
                 collapse: true,
               ),
+              if (homeIndicatorBelowRow != null)
+                SizedBox(height: homeIndicatorBelowRow),
             ],
           ),
         ),

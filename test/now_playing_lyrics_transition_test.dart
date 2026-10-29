@@ -5,6 +5,7 @@ import 'dart:ui' as ui;
 import 'package:audio_service/audio_service.dart';
 import 'package:clock/clock.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart'
     show RenderParagraph, RenderRepaintBoundary, debugOnProfilePaint;
@@ -506,14 +507,45 @@ void main() {
       expect(find.byKey(const ValueKey('link-playing-on')), findsNothing);
       final row = find.byKey(const ValueKey('link-playing-on-row'));
       if (kept) {
-        // One line of the label, not a full touch target.
-        expect(tester.getSize(row).height, 24);
+        expect(tester.getSize(row).height, 36);
       } else {
         expect(row, findsNothing);
       }
       expect(tester.takeException(), isNull);
     });
   }
+
+  testWidgets(
+    'Material portrait Playing on row reaches into the home indicator inset',
+    (tester) async {
+      tester.view.padding = FakeViewPadding(top: 59, bottom: 34);
+      tester.view.viewPadding = FakeViewPadding(top: 59, bottom: 34);
+      addTearDown(tester.view.resetPadding);
+      addTearDown(tester.view.resetViewPadding);
+      await pumpNowPlaying(
+        tester,
+        theme: AppTheme.light(),
+        size: const Size(393, 852),
+      );
+      mediaItems.add(item('first'));
+      await settlePlayer(tester);
+      final row = tester.getRect(
+        find.byKey(const ValueKey('link-playing-on-row')),
+      );
+      expect(row.height, 36);
+      // An iPhone keeps only the indicator's strip under the empty row;
+      // Android's navigation inset stays clear of it.
+      expect(
+        852 - row.bottom,
+        defaultTargetPlatform == TargetPlatform.iOS ? 12 : 34,
+      );
+      expect(tester.takeException(), isNull);
+    },
+    variant: const TargetPlatformVariant({
+      TargetPlatform.android,
+      TargetPlatform.iOS,
+    }),
+  );
 
   testWidgets('landscape artwork preference leaves a wide portrait player '
       'unchanged', (tester) async {
