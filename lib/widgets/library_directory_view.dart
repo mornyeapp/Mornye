@@ -85,6 +85,18 @@ class _LibraryDirectoryViewState extends ConsumerState<LibraryDirectoryView>
   /// The folder's own songs as last built, for the selection and the bar.
   List<UnifiedLibraryItem> _items = const [];
 
+  /// The ids and the desktop table rows of the last song list, kept while
+  /// the list (and for the rows the quality label mode) stays the same, so
+  /// a click does not walk every song again.
+  (List<UnifiedLibraryItem>, Set<String>)? _itemIds;
+  (
+    List<UnifiedLibraryItem>,
+    String,
+    List<TrackTableRow>,
+    Map<String, UnifiedLibraryItem>,
+  )?
+  _table;
+
   bool _starting = false;
 
   @override
@@ -561,7 +573,7 @@ class _LibraryDirectoryViewState extends ConsumerState<LibraryDirectoryView>
     final items = songsValue?.value ?? const <UnifiedLibraryItem>[];
     if (songsValue == null || songsValue.hasValue) {
       _items = items;
-      pruneSelection(items.map((item) => item.id).toSet());
+      pruneSelection(_idsOf(items));
     }
     final details = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -860,31 +872,55 @@ class _LibraryDirectoryViewState extends ConsumerState<LibraryDirectoryView>
     );
   }
 
+  Set<String> _idsOf(List<UnifiedLibraryItem> items) {
+    final cached = _itemIds;
+    if (cached != null && identical(cached.$1, items)) return cached.$2;
+    final ids = {for (final item in items) item.id};
+    _itemIds = (items, ids);
+    return ids;
+  }
+
+  (List<TrackTableRow>, Map<String, UnifiedLibraryItem>) _tableRows(
+    List<UnifiedLibraryItem> items,
+    String qualityMode,
+  ) {
+    final cached = _table;
+    if (cached != null &&
+        identical(cached.$1, items) &&
+        cached.$2 == qualityMode) {
+      return (cached.$3, cached.$4);
+    }
+    final rows = [
+      for (final item in items)
+        TrackTableRow(
+          id: item.id,
+          title: item.trackName,
+          artist: item.artistName,
+          album: item.albumName,
+          quality: item.qualityForMode(qualityMode),
+          duration: switch (item.historyItem?.duration ??
+              item.localItem?.duration) {
+            final seconds? when seconds > 0 => Duration(seconds: seconds),
+            _ => null,
+          },
+          leading: _SongArtwork(item: item, size: 32),
+          playback: mediaItemPlaybackUiProvider(_playbackKey(item)),
+        ),
+    ];
+    final byId = {for (final item in items) item.id: item};
+    _table = (items, qualityMode, rows, byId);
+    return (rows, byId);
+  }
+
   Widget _songTable(BuildContext context, List<UnifiedLibraryItem> items) {
     final qualityMode = ref.watch(
       settingsProvider.select((s) => s.libraryQualityLabelMode),
     );
-    final byId = {for (final item in items) item.id: item};
+    final (rows, byId) = _tableRows(items, qualityMode);
     return SliverPadding(
       padding: EdgeInsets.symmetric(horizontal: wideListInset(context)),
       sliver: SliverTrackTable(
-        rows: [
-          for (final item in items)
-            TrackTableRow(
-              id: item.id,
-              title: item.trackName,
-              artist: item.artistName,
-              album: item.albumName,
-              quality: item.qualityForMode(qualityMode),
-              duration: switch (item.historyItem?.duration ??
-                  item.localItem?.duration) {
-                final seconds? when seconds > 0 => Duration(seconds: seconds),
-                _ => null,
-              },
-              leading: _SongArtwork(item: item, size: 32),
-              playback: mediaItemPlaybackUiProvider(_playbackKey(item)),
-            ),
-        ],
+        rows: rows,
         columns: const [
           TrackTableColumn.title,
           TrackTableColumn.artist,
