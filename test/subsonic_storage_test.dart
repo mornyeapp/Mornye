@@ -615,7 +615,12 @@ void main() {
       expect(requested('getAlbumList2'), hasLength(1));
       expect(requested('getAlbum'), isEmpty);
       final pages = requested('search3');
-      expect(pages.map((page) => page['songOffset']), ['0', '500', '1000']);
+      expect(pages.map((page) => page['songOffset']), [
+        '0',
+        '500',
+        '1000',
+        '1201',
+      ]);
       for (final page in pages) {
         expect(page, containsPair('query', ''));
         expect(page, containsPair('songCount', '500'));
@@ -643,12 +648,37 @@ void main() {
     },
   );
 
+  test('a Mornye desktop with smaller song pages syncs every song', () async {
+    server.type = 'mornye';
+    // The last page holds only the video.
+    server.library = library();
+    server.searchPage = 120;
+    final scan = await scanner().scan(
+      'network://fixture/',
+      checkpoint: () async {},
+      onProgress: (_, _, _) {},
+    );
+    expect(scan.expectedCount, 1200);
+    final paths = {
+      for (final row in await scan.rows().toList()) row['filePath'],
+    };
+    expect(paths, {
+      for (final song in library().take(1200))
+        NetworkStorageService.source('fixture', SubsonicSong(song).path),
+    });
+    expect(requested('search3').map((page) => page['songOffset']), [
+      for (var offset = 0; offset <= 1201; offset += 120) '$offset',
+      '1201',
+    ]);
+  });
+
   test(
     'a Mornye desktop that repeats full song pages cannot publish a truncated catalogue',
     () async {
       server.type = 'mornye';
       server.library = library();
       server.repeatPage = true;
+      server.searchPage = 120;
       await expectLater(
         scanner().scan(
           'network://fixture/',

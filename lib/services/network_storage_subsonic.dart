@@ -503,7 +503,9 @@ class SubsonicClient {
     Future<void> Function() checkpoint,
   ) async* {
     final songs = <String>{};
-    for (var offset = 0; offset <= 1000000; offset += 500) {
+    final videos = <String>{};
+    var offset = 0;
+    while (offset <= 1000000) {
       await checkpoint();
       final page = _subsonicList(
         _subsonicMap(
@@ -517,21 +519,27 @@ class SubsonicClient {
         )['song'],
       );
       await checkpoint();
-      var newSongs = 0;
-      for (final value in page.where((song) => song['isVideo'] != true)) {
+      // A server may cap pages below songCount, so only an empty page ends.
+      if (page.isEmpty) return;
+      var advanced = false;
+      for (final value in page) {
         await checkpoint();
+        if (value['isVideo'] == true) {
+          advanced |= videos.add(_subsonicText(value, 'id'));
+          continue;
+        }
         final song = SubsonicSong(value);
         if (!songs.add(song.id)) continue;
-        newSongs++;
+        advanced = true;
         yield song;
         if (songs.length > 500000) {
           throw const HttpException('Subsonic library is too large');
         }
       }
-      if (page.length < 500) return;
-      if (newSongs == 0) {
+      if (!advanced) {
         throw const HttpException('Subsonic pagination did not advance');
       }
+      offset += page.length;
     }
     throw const HttpException('Subsonic library is too large');
   }
