@@ -1,5 +1,4 @@
-import 'package:mornye/services/sqlite_helpers.dart'
-    show libraryNotShadowedSql, libraryShadowTable;
+import 'package:mornye/services/library_shadow_sql.dart';
 
 const incompleteAlbumFilter = 'incomplete-album';
 const unknownAlbumCompletenessFilter = 'unknown-album-completeness';

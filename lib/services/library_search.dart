@@ -1,6 +1,5 @@
 import 'package:sqflite/sqflite.dart';
-import 'package:mornye/services/sqlite_helpers.dart'
-    show libraryNotShadowedSql, libraryShadowTable;
+import 'package:mornye/services/library_shadow_sql.dart';
 
 enum LibrarySearchKind { songs, albums, artists, playlists }
 

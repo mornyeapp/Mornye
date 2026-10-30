@@ -3,11 +3,14 @@ import 'dart:io';
 import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:mornye/services/library_shadow_sql.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/utils/logger.dart';
 import 'package:mornye/utils/path_match_keys.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart' show databaseFactoryFfi;
+
+export 'package:mornye/services/library_shadow_sql.dart';
 
 final _log = AppLogger('AppSqlite');
 
@@ -537,27 +540,6 @@ String? _writeStamp(List<Object?> results, List<int> indexes) {
   }
   return values.join(':');
 }
-
-/// TEMP pairs of a Library row and the History row whose path keys match it:
-/// the scanned files a download already holds. [LibraryShadowSnapshot]
-/// keeps it on the Library connection.
-const libraryShadowTable = 'temp.library_shadowed';
-
-/// The Library row [alias] is not shadowed by a downloaded History file.
-/// [snapshot] reads [libraryShadowTable] instead of probing every path key
-/// of the row; both select the same rows.
-String libraryNotShadowedSql(String alias, {bool snapshot = false}) => snapshot
-    ? '''
-  NOT EXISTS (
-    SELECT 1 FROM $libraryShadowTable shadow WHERE shadow.item_id = $alias.id
-  )'''
-    : '''
-  NOT EXISTS (
-    SELECT 1
-    FROM library_path_keys lpk
-    JOIN history_db.history_path_keys hpk ON hpk.path_key = lpk.path_key
-    WHERE lpk.item_id = $alias.id
-  )''';
 
 /// Keeps [libraryShadowTable] on one Library connection with history_db
 /// attached, rebuilt only after a write that could change it. The stamp sees
