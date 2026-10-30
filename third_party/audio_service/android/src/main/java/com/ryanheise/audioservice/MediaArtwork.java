@@ -14,20 +14,39 @@ final class MediaArtwork {
         if (source == null || source.isRecycled()) return null;
         Bitmap scaled = source;
         try {
-            int width = source.getWidth();
-            int height = source.getHeight();
-            if (width > maxDimension || height > maxDimension) {
-                float scale = (float) maxDimension / Math.max(width, height);
-                scaled = Bitmap.createScaledBitmap(source,
-                        Math.max(1, Math.round(width * scale)),
-                        Math.max(1, Math.round(height * scale)), true);
-            }
+            scaled = scale(source, maxDimension);
             return scaled.copy(Bitmap.Config.ARGB_8888, false);
         } catch (IllegalArgumentException | IllegalStateException error) {
             return null;
         } finally {
             if (scaled != source && !scaled.isRecycled()) scaled.recycle();
         }
+    }
+
+    /**
+     * Scales a freshly decoded cover down to the largest copy the session
+     * takes, recycling the decoded one. Session copies are then the same
+     * pixels as copies scaled from the decoded bitmap.
+     */
+    static Bitmap bound(Bitmap decoded) {
+        Bitmap scaled;
+        try {
+            scaled = scale(decoded, MAX_DIMENSION);
+        } catch (IllegalArgumentException | IllegalStateException error) {
+            return decoded;
+        }
+        if (scaled != decoded) decoded.recycle();
+        return scaled;
+    }
+
+    private static Bitmap scale(Bitmap source, int maxDimension) {
+        int width = source.getWidth();
+        int height = source.getHeight();
+        if (width <= maxDimension && height <= maxDimension) return source;
+        float scale = (float) maxDimension / Math.max(width, height);
+        return Bitmap.createScaledBitmap(source,
+                Math.max(1, Math.round(width * scale)),
+                Math.max(1, Math.round(height * scale)), true);
     }
 
     static MediaMetadataCompat sanitize(MediaMetadataCompat metadata) {

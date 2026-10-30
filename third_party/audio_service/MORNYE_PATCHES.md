@@ -72,6 +72,22 @@ from the upstream package are not vendored.
   notification and the lock screen keep the original artwork. A null
   answer, a resolver that throws, or no resolver keeps the description as
   it was.
+- Android: bound the decoded notification art. Upstream keeps every decoded
+  cover in an `LruCache` of one eighth of the Java heap (16 to 64 MB) that
+  only `onDestroy` empties. `AudioService` now keeps the current cover and
+  the two before it in `RecentArtCache` (new, covered by
+  `RecentArtCacheTest.java` under `android/src/test`), and `onTrimMemory` at
+  `TRIM_MEMORY_RUNNING_LOW` or above (on Android 14 and later the only levels
+  sent are `TRIM_MEMORY_UI_HIDDEN` and `TRIM_MEMORY_BACKGROUND`) drops all
+  but the entry holding the current `artBitmap`. Eviction never recycles: the
+  notification and session keep what they show, and a replay of an evicted
+  cover decodes it again on the media worker. `loadArtBitmap` also scales each
+  decoded cover down to `MediaArtwork.MAX_DIMENSION` (512 px) with
+  `MediaArtwork.bound`, the same `createScaledBitmap` call `MediaArtwork.copy`
+  makes, and recycles the decoded bitmap. The session's 512 px copies keep
+  their pixels; the notification's 256 px large icon is now scaled from the
+  512 px bitmap instead of from up to 1023 px (owner-approved). The app's
+  instrumented `MediaControlMetadataTest` covers the 512 px bound.
 - Android build (`android/build.gradle.kts`): AGP 9.0.1 to 9.4.1, compileSdk
   35 to 37, `androidx.media:media` 1.7.0 to 1.8.0, `androidx.core:core`
   1.13.1 to 1.19.1, a `junit:junit:4.13.2` test dependency, and
@@ -111,9 +127,12 @@ Compared against the pub.dev 0.18.19 package in the local pub cache:
 - `android/build.gradle.kts`, `android/gradle/wrapper/gradle-wrapper.properties`
 - `android/src/main/java/com/ryanheise/audioservice/AudioService.java`
 - `android/src/main/java/com/ryanheise/audioservice/AudioServicePlugin.java`
+- `android/src/main/java/com/ryanheise/audioservice/MediaArtwork.java` (new)
 - `android/src/main/java/com/ryanheise/audioservice/MediaButtonReceiver.java`
 - `android/src/main/java/com/ryanheise/audioservice/PinnedMetadataCache.java` (new)
+- `android/src/main/java/com/ryanheise/audioservice/RecentArtCache.java` (new)
 - `android/src/test/java/com/ryanheise/audioservice/PinnedMetadataCacheTest.java` (new)
+- `android/src/test/java/com/ryanheise/audioservice/RecentArtCacheTest.java` (new)
 - `darwin/audio_service/Sources/audio_service/AudioServicePlugin.m`
 - `lib/audio_service.dart`
 
@@ -126,8 +145,8 @@ Compared against the pub.dev 0.18.19 package in the local pub cache:
 3. Replace the runtime sources with the new upstream files, then re-apply
    each patch above by hand. Check first whether upstream now configures
    engines it creates, shows custom
-   actions on Android 12 and older, bounds its metadata cache, or reuses its
-   media executor.
+   actions on Android 12 and older, bounds its metadata cache or art cache,
+   or reuses its media executor.
 4. Keep the Gradle values in step with the app's `android/app/build.gradle.kts`.
 5. Test notification controls on Android 12 or older and on Android 13+,
    Android Auto browsing, and iOS lock screen controls after a video plays.

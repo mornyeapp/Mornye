@@ -8,7 +8,6 @@ import android.support.v4.media.MediaMetadataCompat;
 import android.support.v4.media.session.MediaControllerCompat;
 import android.support.v4.media.session.MediaSessionCompat;
 import android.support.v4.media.session.PlaybackStateCompat;
-import android.util.LruCache;
 
 import androidx.media.utils.MediaConstants;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
@@ -28,6 +27,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNotSame;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertSame;
 
 /** Exercises real platform session publication when artwork/metadata arrives after state. */
 @RunWith(AndroidJUnit4.class)
@@ -53,7 +53,7 @@ public class MediaControlMetadataTest {
                 original.compress(Bitmap.CompressFormat.PNG, 100, output);
             }
             AudioService service = createService(instrumentation);
-            LruCache<String, Bitmap> cache = new LruCache<>(4);
+            RecentArtCache<Bitmap> cache = new RecentArtCache<>(4);
             String uri = file.toURI().toString();
             cache.put(uri, original);
             original.recycle();
@@ -70,6 +70,55 @@ public class MediaControlMetadataTest {
             decoded.recycle();
         } finally {
             if (!original.isRecycled()) original.recycle();
+            file.delete();
+        }
+    }
+
+    @Test
+    public void largeArtworkIsKeptAtTheSessionSize() throws Exception {
+        Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
+        File file = File.createTempFile("large-cover", ".png",
+                instrumentation.getTargetContext().getCacheDir());
+        // A 1000 px cover decodes at full size with a power-of-two sample size.
+        Bitmap original = Bitmap.createBitmap(1000, 800, Bitmap.Config.ARGB_8888);
+        original.eraseColor(Color.BLUE);
+        Bitmap decoded = null;
+        Bitmap album = null;
+        Bitmap notification = null;
+        try {
+            try (FileOutputStream output = new FileOutputStream(file)) {
+                original.compress(Bitmap.CompressFormat.PNG, 100, output);
+            }
+            AudioService service = createService(instrumentation);
+            setField(service, "artBitmapCache", new RecentArtCache<Bitmap>(3));
+            AudioServiceConfig config = new AudioServiceConfig(instrumentation.getTargetContext());
+            config.artDownscaleWidth = config.artDownscaleHeight = 512;
+            setField(service, "config", config);
+
+            decoded = service.loadArtBitmap(file.getPath(), null);
+            assertNotNull(decoded);
+            assertEquals(512, decoded.getWidth());
+            assertEquals(410, decoded.getHeight());
+            assertEquals(Color.BLUE, decoded.getPixel(0, 0));
+            assertSame(decoded, service.loadArtBitmap(file.getPath(), null));
+
+            MediaMetadataCompat session = MediaArtwork.forSession(new MediaMetadataCompat.Builder(metadata("large", "Song"))
+                    .putBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART, decoded)
+                    .build());
+            album = session.getBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART);
+            notification = MediaArtwork.copy(decoded, 256);
+            assertNotNull(album);
+            assertNotSame(decoded, album);
+            assertEquals(512, album.getWidth());
+            assertEquals(410, album.getHeight());
+            assertNotNull(notification);
+            assertEquals(256, notification.getWidth());
+            assertFalse(decoded.isRecycled());
+        } finally {
+            original.recycle();
+            if (decoded != null) decoded.recycle();
+            if (album != null) album.recycle();
+            if (notification != null) notification.recycle();
             file.delete();
         }
     }

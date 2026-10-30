@@ -25,7 +25,6 @@ import android.support.v4.media.session.MediaControllerCompat;
 import android.support.v4.media.session.MediaSessionCompat;
 import android.support.v4.media.session.PlaybackStateCompat;
 import android.util.Log;
-import android.util.LruCache;
 import android.util.Size;
 import android.view.KeyEvent;
 
@@ -73,6 +72,7 @@ public class AudioService extends MediaBrowserServiceCompat {
     public static final int KEYCODE_BYPASS_PLAY = KeyEvent.KEYCODE_MUTE;
     public static final int KEYCODE_BYPASS_PAUSE = KeyEvent.KEYCODE_MEDIA_RECORD;
     public static final int MAX_COMPACT_ACTIONS = 3;
+    private static final int ART_CACHE_ENTRIES = 3;
     private static final long AUTO_ENABLED_ACTIONS = PlaybackStateCompat.ACTION_STOP
             | PlaybackStateCompat.ACTION_PAUSE
             | PlaybackStateCompat.ACTION_PLAY
@@ -248,7 +248,10 @@ public class AudioService extends MediaBrowserServiceCompat {
                     }
                 }
             }
-            if (bitmap != null) artBitmapCache.put(artUriString, bitmap);
+            if (bitmap != null) {
+                bitmap = MediaArtwork.bound(bitmap);
+                artBitmapCache.put(artUriString, bitmap);
+            }
             return bitmap;
         } catch (Exception e) {
             e.printStackTrace();
@@ -293,7 +296,7 @@ public class AudioService extends MediaBrowserServiceCompat {
     private MediaMetadataCompat mediaMetadata;
     private Bitmap artBitmap;
     private String notificationChannelId;
-    private LruCache<String, Bitmap> artBitmapCache;
+    private RecentArtCache<Bitmap> artBitmapCache;
     private boolean playing = false;
     private AudioProcessingState processingState = AudioProcessingState.idle;
     private int repeatMode;
@@ -343,22 +346,9 @@ public class AudioService extends MediaBrowserServiceCompat {
         wakeLock = new PlaybackWakeLock(
                 pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, AudioService.class.getName()), handler);
 
-        // Get max available VM memory, exceeding this amount will throw an
-        // OutOfMemory exception. Stored in kilobytes as LruCache takes an
-        // int in its constructor.
-        final int maxMemory = (int)(Runtime.getRuntime().maxMemory() / 1024);
-
-        // Use 1/8th of the available memory for this memory cache.
-        final int cacheSize = maxMemory / 8;
-
-        artBitmapCache = new LruCache<String, Bitmap>(cacheSize) {
-            @Override
-            protected int sizeOf(String key, Bitmap bitmap) {
-                // The cache size will be measured in kilobytes rather than
-                // number of items.
-                return bitmap.getByteCount() / 1024;
-            }
-        };
+        // The current cover and the two before it, so skipping back reuses
+        // them. Each is decoded at most MediaArtwork.MAX_DIMENSION square.
+        artBitmapCache = new RecentArtCache<>(ART_CACHE_ENTRIES);
 
         flutterEngine = AudioServicePlugin.getFlutterEngine(this);
         System.out.println("flutterEngine warmed up");
@@ -374,6 +364,16 @@ public class AudioService extends MediaBrowserServiceCompat {
         exitForegroundState();
         deactivateMediaSession();
         stopSelf();
+    }
+
+    @Override
+    public void onTrimMemory(int level) {
+        super.onTrimMemory(level);
+        // Earlier covers serve only a replay. The current one stays: the
+        // notification shows it and the item's next metadata update reuses it.
+        // Android 14 and later report only TRIM_MEMORY_UI_HIDDEN and
+        // TRIM_MEMORY_BACKGROUND, both above this level.
+        if (level >= TRIM_MEMORY_RUNNING_LOW) artBitmapCache.evictAllExcept(artBitmap);
     }
 
     @Override
