@@ -68,6 +68,9 @@ void main() {
   runZonedGuarded(
     () async {
       final binding = WidgetsFlutterBinding.ensureInitialized();
+      // The preferences plugin answers without an Activity, so on Android
+      // the load overlaps the Activity's creation.
+      final preferences = SharedPreferences.getInstance();
       if (Platform.isAndroid) {
         // A media service can start the engine before MainActivity registers
         // the backend and platform channels. Calls made earlier would fail or
@@ -79,11 +82,10 @@ void main() {
         }
         await waitForActivityAttachment(binding);
       }
+      final orientation = _initializeOrientation();
       // Desktop: log files and the unclean-exit marker, before the error
       // hooks below start writing to them.
       await DesktopDiagnostics.initialize();
-      await initializeAndroidTv();
-      await setAppOrientation();
       LicenseRegistry.addLicense(() async* {
         yield LicenseEntryWithLineBreaks(
           const [AppInfo.appName],
@@ -151,7 +153,7 @@ void main() {
         return true;
       };
 
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = await preferences;
       var bootstrapSettings = loadBootstrapSettings(prefs);
       // The SAF check overlaps the install marker read. An installation
       // reset rewrites the settings, so its result is then replaced.
@@ -168,6 +170,7 @@ void main() {
       );
       final runtimeProfile = await _resolveRuntimeProfile(prefs);
       _configureImageCache(runtimeProfile);
+      await orientation;
 
       runApp(
         ProviderScope(
@@ -356,6 +359,17 @@ Future<void> _startBackgroundPlayback() async {
   } catch (error, stack) {
     _log.e('Failed to start playback without the app open', error, stack);
   }
+}
+
+/// Resolves Android TV, then the orientation, alongside the other startup
+/// calls.
+Future<void> _initializeOrientation() async {
+  await initializeAndroidTv();
+  // MainActivity.onCreate already asks phones for portrait, the request
+  // below, and the router observer repeats it on the first page. TV gets
+  // fixed landscape there and the user landscape here.
+  if (Platform.isAndroid && !isAndroidTv) return;
+  await setAppOrientation();
 }
 
 const _runtimeProfileTierKey = 'runtime_profile_tier_v1';
