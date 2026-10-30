@@ -169,6 +169,24 @@ void main() {
     await tester.pump();
   }
 
+  testWidgets('window resizes and the mini player keep the macOS menu bar', (
+    tester,
+  ) async {
+    await pumpApp(tester);
+    expect(sent, isNotEmpty);
+    final mounted = sent.length;
+    // Escape reads the window width to decide whether a layer can close.
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pump();
+    final layer = shortcutLayer(tester);
+
+    await resize(tester);
+
+    expect(sent, hasLength(mounted));
+    expect(shortcutLayer(tester), same(layer));
+    expect(tester.takeException(), isNull);
+  }, variant: _macOS);
+
   testWidgets('a theme change keeps the menu items and key bindings', (
     tester,
   ) async {
@@ -242,5 +260,39 @@ void main() {
       expect(tester.takeException(), isNull);
     },
     variant: _macOS,
+  );
+
+  testWidgets(
+    'Windows and Linux keep their key bindings across resizes',
+    (tester) async {
+      final requested = <ShellTab>[];
+      final owner = Object();
+      ShellNavigationService.registerTabSelectionHandler(
+        owner: owner,
+        handler: requested.add,
+      );
+      addTearDown(
+        () => ShellNavigationService.unregisterTabSelectionHandler(owner),
+      );
+      await pumpApp(tester);
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pump();
+      final layer = shortcutLayer(tester);
+
+      await resize(tester);
+
+      expect(shortcutLayer(tester), same(layer));
+      expect(find.byType(PlatformMenuBar), findsNothing);
+      expect(sent, isEmpty);
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.control);
+      await tester.sendKeyEvent(LogicalKeyboardKey.comma);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.control);
+      await tester.pump();
+      expect(requested, [ShellTab.settings]);
+    },
+    variant: TargetPlatformVariant({
+      TargetPlatform.windows,
+      TargetPlatform.linux,
+    }),
   );
 }

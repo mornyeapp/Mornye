@@ -175,7 +175,6 @@ Widget buildAppContent(
   Widget? child, {
   required bool heroAnimationsEnabled,
 }) {
-  final mediaQuery = MediaQuery.of(context);
   Widget appContent = _OrientationFade(
     child: AppScaffoldMessenger(
       child: PlaybackFeedback(
@@ -208,17 +207,31 @@ Widget buildAppContent(
       ),
     );
   }
-  // Treat the display as one continuous surface so bottom sheets and dialogs
-  // stay centered on large/foldable devices.
-  return MediaQuery(
-    data: mediaQuery.copyWith(
-      displayFeatures: const [],
-      navigationMode: isAndroidTv
-          ? NavigationMode.directional
-          : mediaQuery.navigationMode,
-    ),
-    child: MornyeGlassPreparation(child: AdaptiveUiScaler(child: appContent)),
-  );
+  return _AppMediaQuery(child: appContent);
+}
+
+/// Treats the display as one continuous surface so bottom sheets and dialogs
+/// stay centered on large/foldable devices. The window metrics are read here
+/// rather than in [buildAppContent], so a resize rebuilds only these layers
+/// and passes the app content through unchanged.
+class _AppMediaQuery extends StatelessWidget {
+  final Widget child;
+
+  const _AppMediaQuery({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    final mediaQuery = MediaQuery.of(context);
+    return MediaQuery(
+      data: mediaQuery.copyWith(
+        displayFeatures: const [],
+        navigationMode: isAndroidTv
+            ? NavigationMode.directional
+            : mediaQuery.navigationMode,
+      ),
+      child: MornyeGlassPreparation(child: AdaptiveUiScaler(child: child)),
+    );
+  }
 }
 
 class MornyeApp extends ConsumerWidget {

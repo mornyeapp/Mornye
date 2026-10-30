@@ -190,7 +190,10 @@ class _DesktopShortcutsState extends ConsumerState<DesktopShortcuts> {
     );
   }
 
-  double get _windowWidth => MediaQuery.sizeOf(context).width;
+  /// Reads the window width without depending on it: commands run outside
+  /// build, and a dependency would rebuild this layer on every resize.
+  double get _windowWidth =>
+      context.getInheritedWidgetOfExactType<MediaQuery>()!.data.size.width;
 
   bool get _canCloseTopLayer =>
       _rootNavigator?.canPop() == true ||
