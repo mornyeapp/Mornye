@@ -736,7 +736,7 @@ class DownloadQueueNotifier extends Notifier<DownloadQueueState> {
     final id = _newQueueItemId(track, takenIds: takenIds);
     final item = DownloadItem(
       id: id,
-      track: track,
+      track: queuedDownloadTrack(track),
       service: _normalizeQueuedService(service),
       createdAt: DateTime.now(),
       qualityOverride: qualityOverride,
@@ -770,7 +770,7 @@ class DownloadQueueNotifier extends Notifier<DownloadQueueState> {
       newItems.add(
         DownloadItem(
           id: id,
-          track: track,
+          track: queuedDownloadTrack(track),
           service: normalizedService,
           createdAt: DateTime.now(),
           preserveQualityVariant: settings.allowQualityVariants,
@@ -837,7 +837,7 @@ class DownloadQueueNotifier extends Notifier<DownloadQueueState> {
         newItems.add(
           DownloadItem(
             id: id,
-            track: track,
+            track: queuedDownloadTrack(track),
             service: normalizedService ??= _normalizeQueuedService(service),
             createdAt: DateTime.now(),
             qualityOverride: qualityOverride,

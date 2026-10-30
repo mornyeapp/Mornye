@@ -382,4 +382,47 @@ void main() {
       }
     },
   );
+
+  test('queued tracks leave a network cover behind', () {
+    // A Loved entry of a network song, and a catalog track.
+    const network = Track(
+      id: 'network://nas/Album/song.flac',
+      name: 'Song',
+      artistName: 'Artist',
+      albumName: 'Album',
+      coverUrl: 'network://nas/Album/cover.jpg',
+      duration: 180,
+      source: 'local',
+      availability: ServiceAvailability(tidal: true, tidalUrl: 'https://t'),
+    );
+    const web = Track(
+      id: 'example:web',
+      name: 'Web',
+      artistName: 'Other',
+      albumName: 'Other album',
+      coverUrl: 'https://example.com/cover.jpg',
+      duration: 200,
+    );
+    final container = scope(const DownloadQueueState(isPaused: true));
+    try {
+      final queue = container.read(downloadQueueProvider.notifier);
+      queue.addToQueue(network, 'example');
+      queue.addIndividualTracksToQueue([network, web], 'example');
+      queue.addMultipleToQueue([network, web], 'example');
+      final items = container.read(downloadQueueProvider).items;
+      expect(items, hasLength(5));
+      Map<String, dynamic> json(Track track) =>
+          jsonDecode(jsonEncode(track.toJson())) as Map<String, dynamic>;
+      for (final item in items) {
+        if (item.track.id == web.id) {
+          expect(item.track.coverUrl, web.coverUrl);
+        } else {
+          expect(json(item.track), {...json(network), 'coverUrl': null});
+        }
+      }
+      expect(items[2].track, same(web));
+    } finally {
+      container.dispose();
+    }
+  });
 }
