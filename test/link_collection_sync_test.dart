@@ -575,4 +575,65 @@ void main() {
     expect(await _keys(peer, 'playlist_tracks'), ['example:member']);
     expect((await peer.query('playlists')).single['cover_image_path'], isNull);
   });
+
+  test('a network cover of a loved song stays on its device', () async {
+    final directory = await linkSyncTempDirectory();
+    final db = await openLinkCollectionsDatabase(directory, 'phone');
+    final store = LinkCollectionSyncStore(() async => db);
+    final collections = LibraryCollectionsDatabase.withDatabase(db);
+    const network = 'network://nas/Album/cover.jpg';
+    const web = 'https://example.com/cover.jpg';
+    String json(String id, String cover) =>
+        jsonEncode({...linkTestTrack(id).toJson(), 'coverUrl': cover});
+    final now = DateTime.now().toIso8601String();
+    await collections.upsertLovedEntry(
+      trackKey: 'example:network',
+      trackJson: json('network', network),
+      addedAt: now,
+    );
+    await collections.upsertLovedEntry(
+      trackKey: 'example:web',
+      trackJson: json('web', web),
+      addedAt: now,
+    );
+    await collections.upsertPlaylist(
+      id: 'pl_1',
+      name: 'Mix',
+      createdAt: now,
+      updatedAt: now,
+    );
+    await collections.upsertPlaylistTrack(
+      playlistId: 'pl_1',
+      trackKey: 'example:member',
+      trackJson: json('member', network),
+      addedAt: now,
+      playlistUpdatedAt: now,
+    );
+
+    final page = await store.changesSince(0);
+    final sent = {
+      for (final change in page.items)
+        if (change.data?['track'] case final Map<String, dynamic> track)
+          change.key: track['coverUrl'],
+    };
+    expect(sent, {
+      'example:network': null,
+      'example:web': web,
+      'example:member': null,
+    });
+    // The device itself keeps the reference.
+    expect(
+      (await collections.loadLovedTracks()).map((track) => track.coverUrl),
+      containsAll([network, web]),
+    );
+
+    final peer = await openLinkCollectionsDatabase(directory, 'desk');
+    await LinkCollectionSyncStore(() async => peer).apply(page.items);
+    expect(
+      (await LibraryCollectionsDatabase.withDatabase(
+        peer,
+      ).loadLovedTracks()).map((track) => track.coverUrl),
+      containsAll([null, web]),
+    );
+  });
 }

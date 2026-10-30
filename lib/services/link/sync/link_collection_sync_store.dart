@@ -210,7 +210,7 @@ class LinkCollectionSyncStore {
           final track = _decodeMap(row['track_json']);
           if (track == null) continue;
           data[(kind, '', row['track_key']! as String)] = {
-            'track': track,
+            'track': linkSyncTrack(track),
             'addedMs': ?linkSyncIsoToMs(row['added_at']),
           };
         }
@@ -271,7 +271,7 @@ class LinkCollectionSyncStore {
             playlistId,
             row['track_key']! as String,
           )] = {
-            'track': track,
+            'track': linkSyncTrack(track),
             'addedMs': ?linkSyncIsoToMs(row['added_at']),
           };
         }

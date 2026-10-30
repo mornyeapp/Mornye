@@ -33,7 +33,8 @@ import 'package:mornye/utils/cover_art_utils.dart';
 ///   `key` is the track key (`loved`, `wishlist`, `playlistTrack`), the
 ///   playlist id (`playlist`) or the artist key (`favoriteArtist`).
 ///   `data`: `loved`, `wishlist`, `playlistTrack`:
-///   `{"track": Track JSON, "addedMs": int}`; `playlist`:
+///   `{"track": Track JSON, "addedMs": int}` (no `network://` `coverUrl`,
+///   which names a connection of the author only); `playlist`:
 ///   `{"name", "createdMs", "updatedMs"}` (cover images are device-local and
 ///   never sync); `favoriteArtist`: `{"artist": artist entry JSON,
 ///   "addedMs": int}`.
@@ -238,6 +239,13 @@ String? linkSyncRemoteArtwork(Object? value) {
       ? artwork
       : null;
 }
+
+/// A collection [track] (Track JSON) as another device reads it: without a
+/// `network://` cover, which names a connection of this device only.
+Map<String, dynamic> linkSyncTrack(Map<String, dynamic> track) =>
+    _string(track['coverUrl'])?.startsWith('network://') == true
+    ? {...track, 'coverUrl': null}
+    : track;
 
 /// A page of changes or events (`GET collections`, `GET history`).
 class LinkSyncPage<T> {
