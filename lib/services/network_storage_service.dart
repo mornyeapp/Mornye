@@ -291,9 +291,11 @@ class NetworkStorageService {
     Future<String?> Function()? read,
     Future<void> Function(String)? write,
     Future<void> Function(Uri)? ensureAccess,
+    NetworkSmbSessions? smbSessions,
   }) : _read = read ?? (() => _storage.read(key: _key)),
        _write = write ?? ((value) => _storage.write(key: _key, value: value)),
-       _ensureAccess = ensureAccess ?? LocalNetworkAccess.instance.ensureAccess;
+       _ensureAccess = ensureAccess ?? LocalNetworkAccess.instance.ensureAccess,
+       _smbSessions = smbSessions ?? NetworkSmbSessions(idle: timeout);
   static final instance = NetworkStorageService();
   static const _storage = FlutterSecureStorage(
     aOptions: secureStorageAndroidOptions,
@@ -303,6 +305,7 @@ class NetworkStorageService {
   final Future<String?> Function() _read;
   final Future<void> Function(String) _write;
   final Future<void> Function(Uri) _ensureAccess;
+  final NetworkSmbSessions _smbSessions;
 
   /// Owners stop scans before removing the connection finishes.
   final connectionRemovals = SourceDeletionEvents();
@@ -662,16 +665,31 @@ class NetworkStorageService {
     throw const SocketException('The server cannot be reached');
   }
 
-  Future<NetworkSmbClient> _smb(NetworkConnection c, Uri target) async {
+  /// An SMB client for [target]: a lease on the connection's shared session
+  /// for reads ([shared]), else a session of its own.
+  Future<NetworkSmbClient> _smb(
+    NetworkConnection c,
+    Uri target, {
+    bool shared = false,
+  }) async {
     await _ensureAccess(target);
     var expired = false;
-    final pending = NetworkSmbClient.connect(
-      target,
-      username: c.username,
-      password: c.password,
-      domain: c.domain,
-      timeout: timeout,
-    );
+    final pending = shared
+        ? _smbSessions.lease(
+            c.id,
+            target,
+            username: c.username,
+            password: c.password,
+            domain: c.domain,
+            timeout: timeout,
+          )
+        : NetworkSmbClient.connect(
+            target,
+            username: c.username,
+            password: c.password,
+            domain: c.domain,
+            timeout: timeout,
+          );
     unawaited(
       pending
           .then((smb) async {
@@ -719,6 +737,7 @@ class NetworkStorageService {
       // Edits let existing reads finish; removal aborts the old connection.
       _readClients.remove(key)!.close(force: force);
     }
+    _smbSessions.retire(id);
   }
 
   Future<void> _discardResponse(HttpClientResponse response) =>
@@ -893,7 +912,7 @@ class NetworkStorageService {
               NetworkEntry('$path${share.name}/', share.name, directory: true),
         ]);
       }
-      final smb = await _smb(c, target);
+      final smb = await _smb(c, target, shared: true);
       final List<Smb2DirEntry> files;
       try {
         files = await smb.list().timeout(timeout);
@@ -1155,7 +1174,7 @@ class NetworkStorageService {
         ? _subsonicMediaTarget(c, path)
         : networkTarget(c, path);
     if (c.protocol == NetworkProtocol.smb) {
-      final smb = await _smb(c, target);
+      final smb = await _smb(c, target, shared: true);
       try {
         final file = await smb.stat().timeout(timeout);
         if (!file.isFile) {
@@ -1300,6 +1319,7 @@ class NetworkStorageService {
     }
     _readClients.clear();
     if (server != null) await (await server).close(force: true);
+    await _smbSessions.close();
   }
 }
 

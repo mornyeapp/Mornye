@@ -20,7 +20,7 @@ Future<void> main() async {
   final service = (await developer.Service.getInfo()).serverUri;
   final address = Platform.environment['TEST_SMB_ADDRESS'];
   test(
-    '12 native SMB scans release workers, handles and range streams',
+    '12 native SMB scans share one worker and release handles and streams',
     () async {
       final overrides = HttpOverrides.current;
       HttpOverrides.global = null;
@@ -85,8 +85,13 @@ Future<void> main() async {
         expect(result.errorCount, 0);
         await result.delete();
         await collectTestGarbage(service);
-        expect(await _smbWorkers(service), workersBefore);
+        // The read session stays for the next scan instead of a worker per
+        // listing and byte range.
+        expect(await _smbWorkers(service), workersBefore + 1);
       }
+      await storage.dispose();
+      await collectTestGarbage(service);
+      expect(await _smbWorkers(service), workersBefore);
       expect(
         await Directory('${directory.path}/network_scans').list().toList(),
         isEmpty,
