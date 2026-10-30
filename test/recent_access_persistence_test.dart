@@ -255,6 +255,43 @@ void main() {
     );
   });
 
+  test(
+    'albums and artists opened from the player store no temporary cover',
+    () async {
+      final database = _Database();
+      final container = _container(database);
+      addTearDown(container.dispose);
+      final notifier = container.read(recentAccessProvider.notifier);
+      database.releaseRead.complete();
+      await _waitUntilLoaded(container);
+      const kept = 'https://example.com/album.jpg';
+      for (final (id, cover) in [
+        ('temporary', '/data/user/0/app/cache/network_metadata/a1.jpg'),
+        ('loopback', 'http://127.0.0.1:41234/7f3a'),
+        ('kept', kept),
+      ]) {
+        notifier
+          ..recordAlbumAccess(id: id, name: id, imageUrl: cover)
+          ..recordArtistAccess(id: id, name: id, imageUrl: cover);
+      }
+      await database.whenCompleted('record:artist:default:kept');
+      expect(
+        {
+          for (final item in database.items.values)
+            '${item.type.name}:${item.id}': item.imageUrl,
+        },
+        {
+          'album:temporary': null,
+          'artist:temporary': null,
+          'album:loopback': null,
+          'artist:loopback': null,
+          'album:kept': kept,
+          'artist:kept': kept,
+        },
+      );
+    },
+  );
+
   test('failed load preserves early state and still owns its writes', () async {
     final database = _Database()..failRead = true;
     final container = _container(database);

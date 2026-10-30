@@ -2,6 +2,7 @@ import 'package:audio_service/audio_service.dart' show MediaItem;
 import 'package:mornye/models/download_history.dart';
 import 'package:mornye/models/track.dart';
 import 'package:mornye/models/unified_library_item.dart';
+import 'package:mornye/services/cover_store.dart';
 import 'package:mornye/services/library_database.dart';
 
 /// The download or Library record of the file a media item plays: by its
@@ -36,7 +37,8 @@ Future<UnifiedLibraryItem?> libraryItemForMedia({
 }
 
 /// The collection track that loves [item]: its Library record's identity
-/// when it has one ([match]), otherwise the media item's own fields.
+/// when it has one ([match]), otherwise the media item's own fields, with
+/// no cover when the item shows one that does not outlast this run.
 Track collectionTrackForMedia(MediaItem item, UnifiedLibraryItem? match) =>
     match?.toTrack() ??
     Track(
@@ -44,7 +46,7 @@ Track collectionTrackForMedia(MediaItem item, UnifiedLibraryItem? match) =>
       name: item.title,
       artistName: item.artist ?? '',
       albumName: item.album ?? '',
-      coverUrl: item.artUri?.toString(),
+      coverUrl: durableCoverReference(item.artUri?.toString()),
       duration: item.duration?.inSeconds ?? 0,
       source: 'local',
     );
