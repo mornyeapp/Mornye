@@ -332,6 +332,10 @@ class FakeLinkCatalogExporter extends LinkCatalogExporter {
 
   /// The songs with a web cover each export reports.
   List<LinkWebCoverSong> webCoverSongs = const [];
+
+  /// The digest each export reports; while null, a new one each time, as a
+  /// changed Library gives.
+  String? digest;
   final exports = <({bool includeLocal, String serverId})>[];
 
   @override
@@ -344,6 +348,7 @@ class FakeLinkCatalogExporter extends LinkCatalogExporter {
       path: '${Directory.systemTemp.path}/fake-catalog.ndjson',
       count: songs.length,
       index: DesktopLinkCatalogIndex(serverId: serverId, songs: songs),
+      digest: digest ?? 'export-${exports.length}',
       webCoverSongs: webCoverSongs,
     );
   }

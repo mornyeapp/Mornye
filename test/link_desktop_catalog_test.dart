@@ -317,6 +317,60 @@ void main() {
       expect(export.webCoverSongs.map((song) => song.path), [download, song]);
       expect(export.index.coverFor('d:a'), webUrl);
     });
+
+    test('the digest follows every song field, not the header or where '
+        'pages start', () async {
+      var now = 1;
+      var library = <Map<String, dynamic>>[];
+      var copies = <String, String>{};
+      final exporter = LinkCatalogExporter(
+        directory: () async => Directory('${temp.path}/out'),
+        nowMs: () => now++,
+        mapPage: (rows, webCovers, pictures) async =>
+            mapLinkCatalogRows(rows, webCovers: webCovers, pictures: pictures),
+        webCovers: () async => copies,
+        pictures: () async => {stamp(download): false},
+        pageSize: 2,
+        loadPage: (query) async => QueueLibraryDbPage(
+          rows: library.skip(query.offset).take(query.limit).toList(),
+          nextCursor: null,
+        ),
+      );
+      Future<(String, String)> export() async {
+        final export = await exporter.export(includeLocal: true, serverId: 's');
+        return (export.digest, File(export.path).readAsLinesSync().first);
+      }
+
+      library = [
+        local('1', song, {'coverPath': cover}),
+        downloaded('2', coverUrl: webUrl),
+        local('3', unknown),
+      ];
+      final (first, header) = await export();
+      final (again, nextHeader) = await export();
+      expect(again, first);
+      expect(nextHeader, isNot(header), reason: 'generatedMs is new');
+
+      // A row the exporter leaves out moves where the pages start.
+      library = [local('phone', 'network://phone/a.flac'), ...library];
+      expect((await export()).$1, first);
+
+      // A web cover copy arrived: the song names it as webCoverPath.
+      copies = {linkCoverUrlId(webUrl): held};
+      final (named, _) = await export();
+      expect(named, isNot(first));
+
+      // The local cover file went: coverPath is null now.
+      File(cover).deleteSync();
+      final (uncovered, _) = await export();
+      expect(uncovered, isNot(named));
+
+      library = [
+        ...library.take(3),
+        local('3', unknown, {'trackName': 'Renamed'}),
+      ];
+      expect((await export()).$1, isNot(uncovered));
+    });
   });
 
   test('writes the header with the final count and pages by cursor', () async {

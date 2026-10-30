@@ -206,6 +206,12 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
   bool _serverStarted = false;
   String _lastReceivedDir = '';
 
+  /// Counts the servers started or adopted; a new one has no catalog yet.
+  int _serverRun = 0;
+
+  /// The digest of the catalog the server of [_serverRun] read last.
+  ({int run, String digest})? _pushedCatalog;
+
   @override
   LinkDesktopHostState build() {
     _backend = ref.watch(linkDesktopBackendProvider);
@@ -390,6 +396,7 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
       }
       server ??= await _backend.start(name: state.name);
       _serverStarted = true;
+      _serverRun++;
       if (!ref.mounted) return;
       state = state.copyWith(phase: LinkHostPhase.running, server: server);
     } on Object catch (error, stack) {
@@ -881,7 +888,9 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
   }
 
   /// Writes the catalog and hands it to the server; runs on start and after
-  /// Library changes. A request during an export runs once it finishes.
+  /// Library changes. A catalog equal to the one the server has is not
+  /// handed again, so phones do not rescan it. A request during an export
+  /// runs once it finishes.
   Future<void> exportCatalog() async {
     if (_exporting) {
       _exportAgain = true;
@@ -901,8 +910,15 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
             serverId: server.serverId,
           );
       if (!ref.mounted || !state.running) return;
-      final songs = await _backend.setCatalog(export.path);
-      if (!ref.mounted || !state.running) return;
+      final pushed = (run: _serverRun, digest: export.digest);
+      final changed = pushed != _pushedCatalog;
+      int? songs;
+      if (changed) {
+        _pushedCatalog = null;
+        songs = await _backend.setCatalog(export.path);
+        if (!ref.mounted || !state.running) return;
+        _pushedCatalog = pushed;
+      }
       // The server reads this catalog now, so the covers it does not want
       // can go. The fetch runs in the background.
       if (_webCovers case final webCovers?) {
@@ -911,7 +927,7 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
       }
       _index = export.index;
       ref.read(linkCatalogIndexProvider.notifier).set(export.index);
-      state = state.copyWith(catalogSongs: songs);
+      if (changed) state = state.copyWith(catalogSongs: songs);
       // Phone songs scanned before the index, or saved here by a transfer,
       // leave out the desktop's own.
       final library = ref.read(linkPhoneLibraryProvider);
@@ -923,7 +939,7 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
         );
       }
       // Song ids in the player state may have changed.
-      _lastSentState = null;
+      if (changed) _lastSentState = null;
       _onPlayerChanged();
     } on Object catch (error, stack) {
       _log.e('Could not export the Mornye Link catalog', error, stack);

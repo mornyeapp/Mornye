@@ -479,6 +479,81 @@ void main() {
     await shutdown(tester);
   });
 
+  testWidgets('an unchanged catalog is not pushed again, a changed one and '
+      'a new server get it', (tester) async {
+    const url = 'https://example.com/a.jpg';
+    exporter
+      ..digest = 'same'
+      ..webCoverSongs = const [(path: '/a.flac', stamp: 'a', url: url)];
+    await boot(tester);
+    // As the app root watches it, so its own listeners stay active.
+    container.listen(linkDesktopHostProvider, (_, _) {});
+    expect(backend.catalogs, hasLength(1));
+    player.current = snapshot();
+    backend.connect([_phone]);
+    await tester.pump(const Duration(seconds: 1));
+    List<Map<String, dynamic>> pushed() =>
+        backend.sentOfType(LinkMessageTypes.playerState);
+    expect(pushed(), hasLength(1));
+    final index = container.read(linkCatalogIndexProvider);
+
+    final revision = container.read(fakeLibraryRevisionProvider.notifier);
+    revision.bump();
+    await tester.pump(const Duration(seconds: 11));
+    await flush(tester);
+    expect(exporter.exports, hasLength(2));
+    expect(backend.catalogs, hasLength(1));
+    expect(hostState().catalogSongs, 2);
+    // The rest of the export still runs.
+    expect(container.read(linkCatalogIndexProvider), isNot(same(index)));
+    expect(webCovers.calls.sublist(2), ['prune:1:$url', 'fetch:1:$url']);
+    await tester.pump(const Duration(seconds: 1));
+    expect(pushed(), hasLength(1), reason: 'the song ids are the same');
+
+    exporter.digest = 'changed';
+    revision.bump();
+    await tester.pump(const Duration(seconds: 9));
+    final sent = pushed().length;
+    await tester.pump(const Duration(seconds: 2));
+    await flush(tester);
+    expect(backend.catalogs, hasLength(2));
+    await tester.pump(const Duration(seconds: 1));
+    expect(pushed(), hasLength(sent + 1));
+
+    await host().setName('Den');
+    await flush(tester);
+    expect(backend.calls, containsAllInOrder(['start:Den', 'setCatalog']));
+    expect(backend.catalogs, hasLength(3));
+    await host().setEnabled(false);
+    await host().setEnabled(true);
+    await flush(tester);
+    expect(backend.catalogs, hasLength(4));
+    await shutdown(tester);
+  });
+
+  testWidgets('a server started while the last one takes a catalog gets it', (
+    tester,
+  ) async {
+    exporter.digest = 'first';
+    await boot(tester);
+    exporter.digest = 'second';
+    backend.catalogGate = Completer();
+    unawaited(host().exportCatalog());
+    await flush(tester);
+    expect(backend.calls.last, 'setCatalog');
+
+    unawaited(host().setName('Den'));
+    await flush(tester);
+    expect(backend.calls, contains('start:Den'));
+    backend.catalogGate!.complete();
+    await flush(tester);
+
+    final started = backend.calls.indexOf('start:Den');
+    expect(backend.calls.sublist(started), contains('setCatalog'));
+    expect(backend.catalogs, hasLength(3));
+    await shutdown(tester);
+  });
+
   testWidgets('keeps the web covers the served catalog wants and exports '
       'again once they arrive', (tester) async {
     const url = 'https://example.com/a.jpg';

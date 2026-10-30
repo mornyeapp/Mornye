@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/services/library_database.dart';
@@ -39,6 +40,7 @@ typedef LinkCatalogPageMapper =
 class LinkCatalogPage {
   const LinkCatalogPage({
     required this.bytes,
+    required this.digests,
     required this.songs,
     required this.covers,
     this.webCoverSongs = const [],
@@ -46,6 +48,11 @@ class LinkCatalogPage {
 
   /// UTF-8 NDJSON, one line per song.
   final Uint8List bytes;
+
+  /// The SHA-256 of each line of [bytes], 32 bytes each, so an export's
+  /// digest does not depend on where its pages start (rows left out move
+  /// them).
+  final Uint8List digests;
   final List<LinkCatalogSong> songs;
 
   /// The cover the desktop player shows for each song in [songs]: its
@@ -62,12 +69,17 @@ class LinkCatalogExport {
     required this.path,
     required this.count,
     required this.index,
+    required this.digest,
     this.webCoverSongs = const [],
   });
 
   final String path;
   final int count;
   final DesktopLinkCatalogIndex index;
+
+  /// The SHA-256 of the song lines, without the header (its `generatedMs`
+  /// is new each time): an equal digest is an equal catalog.
+  final String digest;
 
   /// The exported songs without a local cover file but with a web cover,
   /// for [LinkWebCovers].
@@ -152,6 +164,7 @@ LinkCatalogPage mapLinkCatalogRows(
   Map<String, bool> pictures = const {},
 }) {
   final bytes = BytesBuilder(copy: false);
+  final digests = BytesBuilder(copy: false);
   final songs = <LinkCatalogSong>[];
   final covers = <String?>[];
   final webCoverSongs = <LinkWebCoverSong>[];
@@ -261,15 +274,18 @@ LinkCatalogPage mapLinkCatalogRows(
       'albumPeak': null,
       'explicit': item['explicit'] == true || item['explicit'] == 1,
     };
+    final encoded = utf8.encode(jsonEncode(line));
     bytes
-      ..add(utf8.encode(jsonEncode(line)))
+      ..add(encoded)
       ..addByte(0x0A);
+    digests.add(sha256.convert(encoded).bytes);
     songs.add(song);
     // The desktop player shows the web cover itself, not the Link copy.
     covers.add(coverPath ?? _webUrl(item['coverUrl']));
   }
   return LinkCatalogPage(
     bytes: bytes.takeBytes(),
+    digests: digests.takeBytes(),
     songs: songs,
     covers: covers,
     webCoverSongs: webCoverSongs,
@@ -345,6 +361,12 @@ class LinkCatalogExporter {
     final webCovers = await _webCovers();
     final pictures = await _pictures();
     final webCoverSongs = <LinkWebCoverSong>[];
+    late final Digest digest;
+    final hash = sha256.startChunkedConversion(
+      ChunkedConversionSink<Digest>.withCallback(
+        (digests) => digest = digests.single,
+      ),
+    );
     final file = await part.open(mode: FileMode.write);
     try {
       await file.writeFrom(_header(generatedMs, 0));
@@ -361,6 +383,7 @@ class LinkCatalogExporter {
         if (page.rows.isNotEmpty) {
           final mapped = await _mapPage(page.rows, webCovers, pictures);
           if (mapped.bytes.isNotEmpty) await file.writeFrom(mapped.bytes);
+          hash.add(mapped.digests);
           for (var i = 0; i < mapped.songs.length; i++) {
             builder.add(mapped.songs[i], cover: mapped.covers[i]);
           }
@@ -375,10 +398,12 @@ class LinkCatalogExporter {
       await file.close();
     }
     await part.rename(target.path);
+    hash.close();
     return LinkCatalogExport(
       path: target.path,
       count: builder.length,
       index: builder.build(serverId),
+      digest: '$digest',
       webCoverSongs: webCoverSongs,
     );
   }
