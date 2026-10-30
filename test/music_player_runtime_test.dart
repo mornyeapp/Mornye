@@ -46,6 +46,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart'
     show databaseFactoryFfi, sqfliteFfiInit;
 
 import 'support/link_fakes.dart';
+import 'support/virtual_time.dart';
 
 class _Deck implements PlaybackDeck {
   @override
@@ -337,7 +338,14 @@ class _Recorder extends ListeningRecorder {
   _Recorder({required super.write, required super.elapsed, required super.now});
 
   int updates = 0;
+  int flushes = 0;
   ListeningTrack? latestTrack;
+
+  @override
+  Future<void> flush() {
+    flushes++;
+    return super.flush();
+  }
 
   @override
   void update(
@@ -1839,6 +1847,74 @@ void main() {
       expect(writes.last.plays, 0);
     },
   );
+
+  test('listening flushes run only while there is time to write', () async {
+    final time = VirtualTime();
+    final writes = <int>[];
+    var failNext = false;
+    final recorder = _Recorder(
+      write: (batch) async {
+        if (failNext) {
+          failNext = false;
+          throw StateError('database is locked');
+        }
+        writes.add(batch.fold(0, (sum, delta) => sum + delta.milliseconds));
+      },
+      elapsed: () => time.now,
+      now: () => DateTime(2026, 10, 1, 12).add(time.now),
+    );
+    await time.run(() async {
+      final handler = await _runtime(recorder: recorder).initialize();
+      Future<void> wait(int seconds) =>
+          Future<void>.delayed(Duration(seconds: seconds));
+      Future<void> playing(bool value) async {
+        handler.playbackState.add(
+          handler.playbackState.value.copyWith(
+            playing: value,
+            processingState: AudioProcessingState.ready,
+          ),
+        );
+        await _settle();
+      }
+
+      int written() => writes.fold(0, (sum, value) => sum + value);
+      // The real time the test itself takes is played time as well.
+      Matcher about(int seconds) => closeTo(seconds * 1000, 2000);
+
+      handler.mediaItem.add(_item);
+      await _settle();
+      await wait(60);
+      expect(recorder.flushes, 0);
+
+      await playing(true);
+      await wait(35);
+      expect(writes, hasLength(3));
+      await playing(false);
+      // The next tick writes the last five seconds, then the timer stops.
+      await wait(30);
+      expect(written(), about(35));
+      expect(writes, hasLength(4));
+      final flushes = recorder.flushes;
+      await wait(60);
+      expect(recorder.flushes, flushes);
+
+      // A failed write keeps the timer until a retry lands.
+      await playing(true);
+      await wait(5);
+      failNext = true;
+      await playing(false);
+      await wait(10);
+      expect(writes, hasLength(4));
+      await wait(10);
+      expect(writes, hasLength(5));
+      expect(written(), about(40));
+      final retried = recorder.flushes;
+      await wait(60);
+      expect(recorder.flushes, retried);
+      await handler.dispose();
+      expect(written(), about(40));
+    });
+  });
 
   /// Plays [_track] on a [_TickingDeck] and sends [ticks] engine ticks on
   /// its interval, each reading the time played. [deliver] decides whether

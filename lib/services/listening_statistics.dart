@@ -163,6 +163,9 @@ class ListeningRecorder {
   int _sessionMilliseconds = 0;
   bool _counted = false;
 
+  /// Nothing plays and nothing waits to be written: [flush] has no work.
+  bool get idle => !_playing && _pending.isEmpty;
+
   void update(
     ListeningTrack? track, {
     required bool playing,

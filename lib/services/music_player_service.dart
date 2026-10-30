@@ -359,6 +359,7 @@ class MusicPlayerHandler extends BaseAudioHandler
             state.processingState == AudioProcessingState.completed ||
             state.processingState == AudioProcessingState.idle,
       );
+      _scheduleListeningFlushes();
     }
 
     _subscriptions.add(mediaItem.listen((_) => recordListening()));
@@ -385,15 +386,30 @@ class MusicPlayerHandler extends BaseAudioHandler
     _subscriptions.add(
       _dependencies.coverStore.changes.listen(_covers.changed),
     );
-    _listeningTimer = Timer.periodic(const Duration(seconds: 10), (_) {
-      unawaited(_dependencies.recorder.flush());
-    });
     unawaited(_player.configureOutput());
     unawaited(_configureAudioSession());
     _refreshPlaybackAutomation();
 
     _listenToPlayer(_player);
     if (_dependencies.isIOS) WidgetsBinding.instance.addObserver(this);
+  }
+
+  /// Writes listening time every 10 s from the start of playback until a
+  /// flush finds nothing playing and nothing waiting, including a write
+  /// that failed and is retried.
+  void _scheduleListeningFlushes() {
+    if (_disposed || _dependencies.recorder.idle) return;
+    _listeningTimer ??= Timer.periodic(const Duration(seconds: 10), (_) {
+      unawaited(_flushListening());
+    });
+  }
+
+  Future<void> _flushListening() async {
+    final recorder = _dependencies.recorder;
+    await recorder.flush();
+    if (_disposed || !recorder.idle) return;
+    _listeningTimer?.cancel();
+    _listeningTimer = null;
   }
 
   @override
