@@ -220,10 +220,10 @@
   "appearanceGlassOutlines": "Glass outlines",
   "appearanceGlassOutlinesSubtitle": "Show decorative edges around Mornye glass. Turning this off keeps blur and refraction.",
   "appearanceGlassClaritySubtitle": "Adjust transparency in Mornye menus and navigation. Text contrast is preserved.",
-  "appearanceGlassTinted": "Tinted",
+  "appearanceGlassTinted": "Colorato",
   "appearanceGlassClear": "Cancella",
-  "appearanceGlassClearPerformance": "Very clear glass may use more power and feel less smooth on older devices. Lower clarity if needed.",
-  "appearanceGlassClarityBlurOff": "Glass is opaque on this device. Turn on “{setting}” to adjust clarity.",
+  "appearanceGlassClearPerformance": "Il vetro molto trasparente potrebbe consumare più energia e risultare meno fluido sui dispositivi più vecchi. Ridurre la chiarezza se necessario.",
+  "appearanceGlassClarityBlurOff": "Il vetro è opaco su questo dispositivo. Attiva '{setting}' per regolare la chiarezza.",
   "@appearanceGlassClarityBlurOff": {
     "description": "Shown under the disabled glass clarity slider when the device renders Mornye glass without blur. The placeholder is the name of the force-blur toggle.",
     "placeholders": {
@@ -232,7 +232,7 @@
       }
     }
   },
-  "appearanceGlassClarityHighContrast": "Your system requests increased contrast, so glass stays opaque. Turn on “{setting}” to use glass anyway; text contrast is preserved.",
+  "appearanceGlassClarityHighContrast": "Il tuo sistema richiede un contrasto maggiore, quindi il vetro rimane opaco. Attiva '{setting}' per utilizzare comunque il vetro; il contrasto del testo viene preservato.",
   "@appearanceGlassClarityHighContrast": {
     "description": "Explains the system contrast request (which can include medium contrast) and the explicit glass-only override.",
     "placeholders": {
@@ -241,8 +241,8 @@
       }
     }
   },
-  "appearanceUseSystemFont": "Use system font",
-  "appearanceUseSystemFontSubtitle": "Use your device’s default typeface for app text.",
+  "appearanceUseSystemFont": "Usa font di sistema",
+  "appearanceUseSystemFontSubtitle": "Utilizza il carattere predefinito del tuo dispositivo per il testo dell'app.",
   "@appearanceStyle": {
     "description": "Appearance section for choosing the app visual style"
   },
@@ -292,11 +292,11 @@
   "@searchRecentlySearched": {
     "description": "Section header for recent searches on the desktop Search page"
   },
-  "searchLibraryPrompt": "Search Your Library",
+  "searchLibraryPrompt": "Cerca Nella Tua Libreria",
   "@searchLibraryPrompt": {
     "description": "Shown on the desktop Search page when the Library scope has no search words yet"
   },
-  "searchBrowse": "Browse",
+  "searchBrowse": "Esplora",
   "@searchBrowse": {
     "description": "Section header for home feed tiles on the desktop Search page"
   },
@@ -312,11 +312,11 @@
   "@historyFilterSingles": {
     "description": "Filter chip - show singles only"
   },
-  "libraryRecentlyAdded": "Recently Added",
-  "libraryDownloads": "Downloads",
-  "libraryNoActiveDownloads": "No active downloads",
-  "librarySearchHint": "Search your library",
-  "libraryEmptyCollection": "Your music will appear here",
+  "libraryRecentlyAdded": "Aggiunto di Recente",
+  "libraryDownloads": "Scaricati",
+  "libraryNoActiveDownloads": "Nessun download attivo",
+  "librarySearchHint": "Cerca nella tua libreria",
+  "libraryEmptyCollection": "La tua musica apparirà qui",
   "settingsTitle": "Impostazioni",
   "@settingsTitle": {
     "description": "Settings screen title"
@@ -361,23 +361,23 @@
   "@downloadFolderOrganization": {
     "description": "Title of the folder organization picker bottom sheet"
   },
-  "downloadFolderTemplate": "Custom Folder Structure",
+  "downloadFolderTemplate": "Struttura Cartelle Personalizzata",
   "@downloadFolderTemplate": {
     "description": "Setting for editing a relative download folder template"
   },
-  "downloadFolderTemplateDescription": "Use naming tags and / for subfolders. Saving replaces the preset album and singles layout. Empty folder names use Unknown.",
+  "downloadFolderTemplateDescription": "Utilizzare tag di denominazione e / per le sottocartelle. Il salvataggio sostituisce il layout preimpostato dell'album e dei singoli. I nomi delle cartelle vuote utilizzano Sconosciuto.",
   "@downloadFolderTemplateDescription": {
     "description": "Help for custom download folder templates"
   },
-  "folderOrganizationCustom": "Custom template",
+  "folderOrganizationCustom": "Modello personalizzato",
   "@folderOrganizationCustom": {
     "description": "Folder organization mode using a user-defined template"
   },
-  "folderTemplateInvalid": "Enter a relative folder path with supported tags. Empty folders, . and .. are not allowed.",
+  "folderTemplateInvalid": "Inserisci un percorso di cartella relativo con tag supportati. Le cartelle vuote, . e .. non sono permesse.",
   "@folderTemplateInvalid": {
     "description": "Validation error for an invalid folder template"
   },
-  "folderTemplatePreview": "Example folder path",
+  "folderTemplatePreview": "Esempio percorso della cartella",
   "@folderTemplatePreview": {
     "description": "Label for a sample expanded folder template"
   },
@@ -466,35 +466,35 @@
   "@optionsReplayGain": {
     "description": "Title for ReplayGain setting toggle"
   },
-  "optionsReplayGainSubtitleOn": "Scan loudness and embed ReplayGain tags (EBU R128)",
+  "optionsReplayGainSubtitleOn": "Esegui la scansione del volume e incorpora i tag ReplayGain (EBU R128)",
   "@optionsReplayGainSubtitleOn": {
     "description": "Subtitle when ReplayGain is enabled"
   },
-  "optionsReplayGainSubtitleOff": "Disabled: no loudness normalization tags",
+  "optionsReplayGainSubtitleOff": "Disabilitato: nessun tag di normalizzazione del volume",
   "@optionsReplayGainSubtitleOff": {
     "description": "Subtitle when ReplayGain is disabled"
   },
-  "trackReplayGain": "Rescan ReplayGain",
+  "trackReplayGain": "Riscansiona ReplayGain",
   "@trackReplayGain": {
     "description": "Three-dot menu option to scan loudness and write ReplayGain tags"
   },
-  "trackReplayGainScanning": "Analyzing loudness...",
+  "trackReplayGainScanning": "Analisi del volume...",
   "@trackReplayGainScanning": {
     "description": "Snackbar/progress message while scanning ReplayGain for a single track"
   },
-  "trackReplayGainSuccess": "ReplayGain tags added",
+  "trackReplayGainSuccess": "Tag ReplayGain aggiunti",
   "@trackReplayGainSuccess": {
     "description": "Snackbar message after ReplayGain tags written for a single track"
   },
-  "trackReplayGainFailed": "Failed to add ReplayGain tags",
+  "trackReplayGainFailed": "Impossibile aggiungere i tag ReplayGain",
   "@trackReplayGainFailed": {
     "description": "Snackbar message when ReplayGain scan/write fails"
   },
-  "trackRemoveReplayGain": "Remove ReplayGain",
-  "trackRemoveReplayGainSuccess": "ReplayGain tags removed",
-  "trackRemoveReplayGainFailed": "Failed to remove ReplayGain tags",
-  "replayGainRemoving": "Removing ReplayGain...",
-  "replayGainRemoveConfirmMessage": "Remove track and album ReplayGain tags from {count} track(s)? Audio, artwork, and other metadata will be preserved.",
+  "trackRemoveReplayGain": "Rimuovi ReplayGain",
+  "trackRemoveReplayGainSuccess": "Tag ReplayGain rimossi",
+  "trackRemoveReplayGainFailed": "Impossibile rimuovere i tag ReplayGain",
+  "replayGainRemoving": "Rimuovi ReplayGain...",
+  "replayGainRemoveConfirmMessage": "Rimuovere i tag ReplayGain di traccia e album da {count} traccia(e)? Audio, grafica e altri metadati verranno conservati.",
   "@replayGainRemoveConfirmMessage": {
     "placeholders": {
       "count": {
@@ -502,7 +502,7 @@
       }
     }
   },
-  "selectionRemoveReplayGainCount": "Remove RG ({count})",
+  "selectionRemoveReplayGainCount": "Rimuovi RG ({count})",
   "@selectionRemoveReplayGainCount": {
     "description": "Compact selection action label. RG abbreviates ReplayGain; keep this short for a two-column toolbar.",
     "placeholders": {
@@ -511,7 +511,7 @@
       }
     }
   },
-  "replayGainRemoveBatchSuccess": "ReplayGain removed from {success} of {total} tracks",
+  "replayGainRemoveBatchSuccess": "ReplayGain rimosso da {success} di {total} brani",
   "@replayGainRemoveBatchSuccess": {
     "placeholders": {
       "success": {
@@ -531,11 +531,11 @@
       }
     }
   },
-  "replayGainBatchConfirmTitle": "Add ReplayGain",
+  "replayGainBatchConfirmTitle": "Aggiungi ReplayGain",
   "@replayGainBatchConfirmTitle": {
     "description": "Title of the batch ReplayGain confirmation dialog"
   },
-  "replayGainBatchConfirmMessage": "Analyze loudness and write ReplayGain tags to {count} track(s)?",
+  "replayGainBatchConfirmMessage": "Analizzare il volume e scrivere tag ReplayGain su {count} traccia(e)?",
   "@replayGainBatchConfirmMessage": {
     "description": "Message of the batch ReplayGain confirmation dialog",
     "placeholders": {
@@ -544,12 +544,12 @@
       }
     }
   },
-  "replayGainBatchAnalyzing": "Analyzing ReplayGain...",
+  "replayGainBatchAnalyzing": "Analisi di ReplayGain in corso...",
   "@replayGainBatchAnalyzing": {
     "description": "Progress dialog title while batch scanning ReplayGain"
   },
-  "replayGainBatchSuccess": "ReplayGain added to {success} of {total} tracks",
-  "replayGainUnsupportedDecoder": "Some tracks could not be analyzed because their audio codec is not supported by the ReplayGain decoder. Their files were not changed.",
+  "replayGainBatchSuccess": "ReplayGain aggiunto a {success} di {total} tracce",
+  "replayGainUnsupportedDecoder": "Non è stato possibile analizzare alcune tracce perché il loro codec audio non è supportato dal decoder ReplayGain. I loro file non sono stati modificati.",
   "@replayGainBatchSuccess": {
     "description": "Snackbar after batch ReplayGain completes",
     "placeholders": {
@@ -561,20 +561,20 @@
       }
     }
   },
-  "optionsArtistTagMode": "Artist Tag Mode",
-  "metadataSeparators": "Metadata separators",
-  "metadataSeparatorsDescription": "Choose how comma- or semicolon-separated values are joined in future downloads. Custom artist separators use a joined tag; Primary artist only still applies. Names containing & or / are preserved.",
-  "metadataSeparatorSource": "Keep source formatting",
-  "metadataSeparatorComma": "Comma (,)",
-  "metadataSeparatorSemicolon": "Semicolon (;)",
-  "metadataSeparatorSlash": "Slash (/)",
-  "metadataSeparatorCustom": "Custom separator",
+  "optionsArtistTagMode": "Modalità tag artista",
+  "metadataSeparators": "Separatori di metadati",
+  "metadataSeparatorsDescription": "Scegli come unire i valori separati da virgola o punto e virgola nei download futuri. I separatori personalizzati degli artisti utilizzano un tag unito; Si applica ancora solo l'artista principale. I nomi contenenti & o / vengono conservati.",
+  "metadataSeparatorSource": "Mantieni la formattazione dell'origine",
+  "metadataSeparatorComma": "Virgola (,)",
+  "metadataSeparatorSemicolon": "Punto e virgola (;)",
+  "metadataSeparatorSlash": "Barra (/)",
+  "metadataSeparatorCustom": "Separatore personalizzato",
   "metadataSeparatorPreview": "Anteprima",
-  "metadataSeparatorInvalid": "Use 1–16 characters without line breaks or control characters.",
+  "metadataSeparatorInvalid": "Utilizza da 1 a 16 caratteri senza interruzioni di riga o caratteri di controllo.",
   "@optionsArtistTagMode": {
     "description": "Setting title for how artist metadata is written into files"
   },
-  "optionsArtistTagModeDescription": "Choose how multiple artists are written into embedded tags.",
+  "optionsArtistTagModeDescription": "Scegli il modo in cui più artisti vengono scritti nei tag incorporati.",
   "@optionsArtistTagModeDescription": {
     "description": "Bottom-sheet description for artist tag mode setting"
   },
