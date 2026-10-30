@@ -1,26 +1,33 @@
-import 'dart:typed_data';
-
+import 'package:flutter/foundation.dart';
 import 'package:flutter_cache_manager/file.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:mornye/services/cover_cache_manager.dart';
+
+/// The cache audio_service loads web covers through, or null for its default.
+/// Android and Apple read the file as each song arrives. The Windows and Linux
+/// sessions hand its path to other programs that read it later, and the cover
+/// cache may delete an old file while its song still plays.
+BaseCacheManager? mediaSessionArtCache() => switch (defaultTargetPlatform) {
+  TargetPlatform.android ||
+  TargetPlatform.iOS ||
+  TargetPlatform.macOS => const MediaSessionArtCache(),
+  _ => null,
+};
 
 /// Where the system media session finds a song's web cover: the app's cover
 /// cache once it is ready, so a cover the app already fetched is neither
 /// downloaded nor stored again, and the default cache until then.
 class MediaSessionArtCache implements BaseCacheManager {
-  MediaSessionArtCache({CacheManager Function()? cache})
-    : _cache = cache ?? _covers;
+  const MediaSessionArtCache();
 
-  final CacheManager Function() _cache;
-
-  static CacheManager _covers() => CoverCacheManager.isInitialized
+  static CacheManager get _cache => CoverCacheManager.isInitialized
       ? CoverCacheManager.instance
       : DefaultCacheManager();
 
   /// The cover cache's byte budget deletes files its memory still lists.
   @override
   Future<FileInfo?> getFileFromMemory(String key) async {
-    final info = await _cache().getFileFromMemory(key);
+    final info = await _cache.getFileFromMemory(key);
     return info != null && await info.file.exists() ? info : null;
   }
 
@@ -29,7 +36,7 @@ class MediaSessionArtCache implements BaseCacheManager {
     String url, {
     String? key,
     Map<String, String>? headers,
-  }) => _cache().getSingleFile(url, key: key, headers: headers);
+  }) => _cache.getSingleFile(url, key: key, headers: headers);
 
   @override
   @Deprecated('Prefer to use the new getFileStream method')
@@ -49,7 +56,7 @@ class MediaSessionArtCache implements BaseCacheManager {
     String? key,
     Map<String, String>? headers,
     bool withProgress = false,
-  }) => _cache().getFileStream(
+  }) => _cache.getFileStream(
     url,
     key: key,
     headers: headers,
@@ -62,7 +69,7 @@ class MediaSessionArtCache implements BaseCacheManager {
     String? key,
     Map<String, String>? authHeaders,
     bool force = false,
-  }) => _cache().downloadFile(
+  }) => _cache.downloadFile(
     url,
     key: key,
     authHeaders: authHeaders,
@@ -73,7 +80,7 @@ class MediaSessionArtCache implements BaseCacheManager {
   Future<FileInfo?> getFileFromCache(
     String key, {
     bool ignoreMemCache = false,
-  }) => _cache().getFileFromCache(key, ignoreMemCache: ignoreMemCache);
+  }) => _cache.getFileFromCache(key, ignoreMemCache: ignoreMemCache);
 
   @override
   Future<File> putFile(
@@ -83,7 +90,7 @@ class MediaSessionArtCache implements BaseCacheManager {
     String? eTag,
     Duration maxAge = const Duration(days: 30),
     String fileExtension = 'file',
-  }) => _cache().putFile(
+  }) => _cache.putFile(
     url,
     fileBytes,
     key: key,
@@ -100,7 +107,7 @@ class MediaSessionArtCache implements BaseCacheManager {
     String? eTag,
     Duration maxAge = const Duration(days: 30),
     String fileExtension = 'file',
-  }) => _cache().putFileStream(
+  }) => _cache.putFileStream(
     url,
     source,
     key: key,
@@ -110,10 +117,10 @@ class MediaSessionArtCache implements BaseCacheManager {
   );
 
   @override
-  Future<void> removeFile(String key) => _cache().removeFile(key);
+  Future<void> removeFile(String key) => _cache.removeFile(key);
 
   @override
-  Future<void> emptyCache() => _cache().emptyCache();
+  Future<void> emptyCache() => _cache.emptyCache();
 
   /// The caches behind it belong to the app.
   @override

@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:audio_service/audio_service.dart';
 import 'package:audio_service_platform_interface/audio_service_platform_interface.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/services/cover_cache_manager.dart';
@@ -85,7 +86,7 @@ void main() {
     AudioServicePlatform.instance = os;
     handler = await AudioService.init(
       builder: BaseAudioHandler.new,
-      cacheManager: MediaSessionArtCache(),
+      cacheManager: mediaSessionArtCache(),
     );
     Future<MediaItemMessage> artwork(String id) => os.items.stream
         .firstWhere(
@@ -110,5 +111,21 @@ void main() {
     final path = (await second).extras!['artCacheFile'] as String;
     expect(File(path).existsSync(), isTrue);
     expect(downloads, 2);
+  });
+
+  test('Windows and Linux keep the default cache for their session art', () {
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    for (final platform in TargetPlatform.values) {
+      debugDefaultTargetPlatformOverride = platform;
+      final readInProcess =
+          platform == TargetPlatform.android ||
+          platform == TargetPlatform.iOS ||
+          platform == TargetPlatform.macOS;
+      expect(
+        mediaSessionArtCache(),
+        readInProcess ? isA<MediaSessionArtCache>() : isNull,
+        reason: platform.name,
+      );
+    }
   });
 }

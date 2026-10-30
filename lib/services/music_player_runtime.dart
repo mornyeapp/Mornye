@@ -200,7 +200,7 @@ class PlaybackDependencies {
   static Future<MusicPlayerHandler> _initializeAudioHandler(
     MusicPlayerHandler Function() builder,
   ) async {
-    // MPRIS on Linux and SMTC on Windows; other OSes keep the plugin. Phones
+    // MPRIS on Linux and SMTC on Windows; other OSes keep the plugin and
     // send it only the states their sessions cannot advance themselves.
     installDesktopMediaSession();
     installMediaSessionFilter();
@@ -208,7 +208,7 @@ class PlaybackDependencies {
     final session = await AudioService.init(
       // The switch lets a remote device take over the system session.
       builder: () => SwitchAudioHandler(handler = builder()),
-      cacheManager: MediaSessionArtCache(),
+      cacheManager: mediaSessionArtCache(),
       config: const AudioServiceConfig(
         androidNotificationChannelId: 'com.zarz.mornye.playback',
         androidNotificationChannelName: 'Playback',

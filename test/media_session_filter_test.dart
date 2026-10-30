@@ -93,11 +93,12 @@ Duration _android(_Os os, double at) {
       _start.add(_seconds(at)).difference(state.updateTime) * state.speed;
 }
 
-/// What Apple's Now Playing shows at [at], as audio_service's Darwin plugin
-/// publishes it: the last state's position as it arrived, published again
-/// when playing, speed or position change and with each media item, then
-/// advanced at the playing rate. A refresh advances it to its update time.
-Duration _apple(_Os os, double at) {
+/// What Apple's Now Playing shows at [at] on iOS and macOS, as audio_service's
+/// Darwin plugin publishes it: the last state's position as it arrived,
+/// published again when playing, speed or position change and with each media
+/// item, then advanced at the playing rate. A refresh, which only iOS asks
+/// for, advances it to its update time.
+Duration _apple(_Os os, double at, {bool refreshes = true}) {
   PlaybackStateMessage? state;
   var elapsed = Duration.zero;
   var rate = 0.0;
@@ -122,7 +123,7 @@ Duration _apple(_Os os, double at) {
       }
     } else if (request is SetMediaItemRequest && state != null) {
       publish(entry.at, state.updatePosition);
-    } else if (request is _Refresh && state != null) {
+    } else if (request is _Refresh && refreshes && state != null) {
       var position = state.updatePosition;
       if (state.playing &&
           state.processingState == AudioProcessingStateMessage.ready) {
@@ -135,6 +136,8 @@ Duration _apple(_Os os, double at) {
   }
   return elapsed + _seconds(at - since) * rate;
 }
+
+Duration _mac(_Os os, double at) => _apple(os, at, refreshes: false);
 
 List<MediaControlMessage> _controls({bool playing = true, bool loved = false}) {
   return [
@@ -305,7 +308,11 @@ class _Player {
   /// of the same view fed every state, and matches it exactly while paused.
   void check(String event) {
     final tolerance = MediaSessionFilter.tolerance.inMicroseconds / 1e6 - 1e-6;
-    for (final (name, view) in [('Android', _android), ('Apple', _apple)]) {
+    for (final (name, view) in [
+      ('Android', _android),
+      ('iOS', _apple),
+      ('macOS', _mac),
+    ]) {
       final expected = view(today, now).inMicroseconds / 1e6;
       final actual = view(filtered, now).inMicroseconds / 1e6;
       final error = (actual - expected).abs();
@@ -582,7 +589,7 @@ void main() {
       AudioServicePlatform.instance = original;
     });
 
-    test('filters the phone sessions and keeps desktop ones', () {
+    test('filters the Android and Apple sessions only', () {
       for (final platform in TargetPlatform.values) {
         final os = _Os();
         AudioServicePlatform.instance = os;
@@ -591,7 +598,8 @@ void main() {
         installMediaSessionFilter();
         final installed = AudioServicePlatform.instance;
         if (platform == TargetPlatform.android ||
-            platform == TargetPlatform.iOS) {
+            platform == TargetPlatform.iOS ||
+            platform == TargetPlatform.macOS) {
           expect(
             installed,
             isA<MediaSessionFilter>().having(
