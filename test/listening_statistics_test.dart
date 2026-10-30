@@ -422,6 +422,12 @@ void main() {
       play('http://127.0.0.1:41234/8b2c', day: '2026-10-21'),
     ]);
     expect((await stored('2026-10-21'))['artwork'], isNull);
+    // A later day without a cover still shows the one recorded before.
+    expect(await shown(), reference);
+    await writeListeningDeltas(db, [
+      play('https://example.com/new.jpg', day: '2026-10-21'),
+    ]);
+    expect(await shown(), 'https://example.com/new.jpg');
   });
 
   test('a recorded cover reference replays as the stored cover', () async {

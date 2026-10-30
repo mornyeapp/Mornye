@@ -387,6 +387,8 @@ Future<void> writeListeningDeltas(
 
 /// Aggregate in SQLite so an annual recap transfers one row per song, artist
 /// and day, rather than every daily song record into the Flutter heap.
+/// A song shows its latest day's details, and the latest cover recorded in
+/// the window when that day has none.
 Future<ListeningSummary> readListeningSummary(
   DatabaseExecutor db,
   DateTime start,
@@ -395,14 +397,18 @@ Future<ListeningSummary> readListeningSummary(
   final arguments = [listeningDay(start), listeningDay(end)];
   final rows = await db.rawQuery('''
     SELECT totals.track_key, details.title, details.artist, details.album,
-      details.artwork, totals.milliseconds, totals.plays
+      COALESCE(details.artwork, covered.artwork) AS artwork,
+      totals.milliseconds, totals.plays
     FROM (
       SELECT track_key, SUM(milliseconds) AS milliseconds, SUM(plays) AS plays,
-        MAX(day) AS last_day
+        MAX(day) AS last_day,
+        MAX(CASE WHEN artwork IS NOT NULL THEN day END) AS cover_day
       FROM listening WHERE day >= ? AND day < ? GROUP BY track_key
     ) AS totals
     JOIN listening AS details ON details.track_key = totals.track_key
       AND details.day = totals.last_day
+    LEFT JOIN listening AS covered ON covered.track_key = totals.track_key
+      AND covered.day = totals.cover_day
     ORDER BY totals.milliseconds DESC
   ''', arguments);
   final artistRows = await db.rawQuery('''
