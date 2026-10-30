@@ -1113,17 +1113,35 @@ class AudioService {
   }
 
   static Future<void> _observeQueue() async {
-    await for (var queue in _handler.queue) {
+    List<MediaItem>? pendingQueue;
+    var sendingQueue = false;
+    _handler.queue.listen((queue) async {
       if (_config.preloadArtwork) {
         _loadAllArtwork(queue);
       }
-      try {
-        await _platform.setQueue(SetQueueRequest(
-            queue: queue.map((item) => item._toMessage()).toList()));
-      } catch (e) {
-        _asyncError.add(e);
+      // Only the Android plugin reads the queue; the darwin and web plugins
+      // and the desktop sessions ignore it.
+      if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) {
+        return;
       }
-    }
+      if (sendingQueue) {
+        pendingQueue = queue;
+        return;
+      }
+      sendingQueue = true;
+      List<MediaItem>? next = queue;
+      while (next != null) {
+        try {
+          await _platform.setQueue(SetQueueRequest(
+              queue: next.map((item) => item._toMessage()).toList()));
+        } catch (e) {
+          _asyncError.add(e);
+        }
+        next = pendingQueue;
+        pendingQueue = null;
+      }
+      sendingQueue = false;
+    });
   }
 
   static Future<void> _observePlaybackState() async {

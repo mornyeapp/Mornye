@@ -85,6 +85,20 @@ from the upstream package are not vendored.
   `lib/audio_service.dart` adds `AudioService.refreshNowPlayingInfo()`, which
   calls the new `refreshNowPlayingInfo` method in AudioServicePlugin.m;
   `lib/services/music_player_service.dart` in the app calls it.
+- Dart: `_observeQueue` in `lib/audio_service.dart` sends the queue to the
+  platform only on Android, the only plugin that reads it. The darwin plugin
+  answers `setQueue` with `@{}` and drops it, the web plugin's `setQueue` is
+  a no-op, and the app's desktop sessions (SMTC, MPRIS) inherit the no-op of
+  `NoOpAudioService`, yet each queue change mapped and encoded every item
+  (about 10 MB for 20,000 songs). `preloadArtwork` still runs on every
+  platform. On Android an idle change is sent at once; while a `setQueue` is
+  in flight, later changes keep only the newest queue, which is sent as soon
+  as the in-flight call completes or fails, so the native queue always ends
+  on the latest change and keeps its place among `setMediaItem` and
+  `setState` calls. The payload and the full queue are unchanged. The app's
+  `test/audio_service_queue_platform_test.dart` covers it. On upgrade, check
+  whether upstream now reads the queue on another platform (then widen the
+  check) or coalesces queue sends itself.
 
 Android 13+ still chooses the positions and built-in transport icons in System
 UI. We preserve real play/pause/previous/next semantics for headsets, lock screen
