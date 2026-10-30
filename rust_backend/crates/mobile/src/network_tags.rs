@@ -1,7 +1,7 @@
 //! Bounded, seekable metadata reads through the app's authenticated loopback
 //! proxy. The native reader never receives NAS credentials or external URLs.
 use base64::Engine;
-use mornye_core::fs::{DEFAULT_TEMP_PREFIX, write_atomic};
+use mornye_core::fs::{DEFAULT_TEMP_PREFIX, OpenOptionsPortableExt, write_atomic};
 use mornye_core::{lower_hex, tags};
 use mornye_network::{
     HttpRequest, NetworkService, NetworkSession, policy::NetworkPermissions, url::UrlParts,
@@ -14,7 +14,7 @@ use std::{
     io::{self, Read, Seek, SeekFrom, Write},
     path::Path,
     sync::{Arc, OnceLock},
-    time::{Duration, Instant},
+    time::{Duration, Instant, SystemTime},
 };
 
 const BLOCK: u64 = 256 * 1024;
@@ -190,6 +190,9 @@ fn cache_cover(
     fs::create_dir_all(directory).map_err(|error| error.to_string())?;
     let digest = lower_hex(&Sha256::digest(bytes));
     let target = directory.join(format!("network_cover_{digest}.image"));
+    if renew_cached(&target, bytes) {
+        return Ok((target.to_string_lossy().into_owned(), digest));
+    }
     write_atomic(
         directory,
         &target,
@@ -225,6 +228,30 @@ fn cache_cover(
         }
     }
     Ok((target.to_string_lossy().into_owned(), digest))
+}
+
+/// Whether `path` already holds `bytes`. Its modification time is then
+/// renewed, as a rewrite would, so the trim keeps it among the newest files.
+fn renew_cached(path: &Path, bytes: &[u8]) -> bool {
+    let Ok(mut file) = File::options()
+        .read(true)
+        .write(true)
+        .nofollow_nonblock()
+        .open(path)
+    else {
+        return false;
+    };
+    let mut cached = Vec::with_capacity(bytes.len());
+    file.metadata()
+        .is_ok_and(|metadata| metadata.is_file() && metadata.len() == bytes.len() as u64)
+        && (&mut file)
+            .take(bytes.len() as u64 + 1)
+            .read_to_end(&mut cached)
+            .is_ok()
+        && cached == bytes
+        && file.set_modified(SystemTime::now()).is_ok()
+        // A concurrent trim may have removed the name before it was renewed.
+        && fs::symlink_metadata(path).is_ok_and(|metadata| metadata.is_file())
 }
 
 fn cover_digest(name: &str) -> Option<&str> {
@@ -643,6 +670,35 @@ mod tests {
         assert_eq!(fs::read(target).unwrap(), b"cover bytes");
         assert!(cache_cover(b"cancelled", &cache, &|| Err("cancelled".into())).is_err());
         assert_eq!(fs::read_dir(&covers).unwrap().count(), 1);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn cached_artwork_with_the_same_bytes_is_kept_and_renewed() {
+        use std::os::unix::fs::MetadataExt;
+        let root = tempfile::tempdir().unwrap();
+        let cache = root.path().join("network_metadata");
+        let (path, _) = cache_cover(b"same cover", &cache, &|| Ok(())).unwrap();
+        let old = SystemTime::now() - Duration::from_secs(600);
+        File::options()
+            .write(true)
+            .open(&path)
+            .unwrap()
+            .set_modified(old)
+            .unwrap();
+        let inode = fs::metadata(&path).unwrap().ino();
+
+        let (again, _) = cache_cover(b"same cover", &cache, &|| Ok(())).unwrap();
+        assert_eq!(again, path);
+        let renewed = fs::metadata(&path).unwrap();
+        assert_eq!(renewed.ino(), inode);
+        assert!(renewed.modified().unwrap() > old + Duration::from_secs(300));
+
+        // A damaged file under the name is replaced.
+        fs::write(&path, [0; 10]).unwrap();
+        cache_cover(b"same cover", &cache, &|| Ok(())).unwrap();
+        assert_eq!(fs::read(&path).unwrap(), b"same cover");
+        assert_ne!(fs::metadata(&path).unwrap().ino(), inode);
     }
 
     #[test]
