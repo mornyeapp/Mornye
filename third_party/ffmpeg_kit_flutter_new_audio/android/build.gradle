@@ -41,8 +41,16 @@ android {
         consumerProguardFiles 'consumer-rules.pro'
     }
 
+    testOptions {
+        unitTests.all {
+            // FFmpegKitConfig's static state lives for the whole JVM.
+            forkEvery = 1
+        }
+    }
+
     dependencies {
         implementation("androidx.annotation:annotation:1.11.0")
         implementation("com.antonkarpenko:ffmpeg-kit-audio:2.2.3")
+        testImplementation("junit:junit:4.13.2")
     }
 }

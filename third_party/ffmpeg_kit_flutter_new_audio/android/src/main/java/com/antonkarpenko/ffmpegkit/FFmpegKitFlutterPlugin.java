@@ -5,6 +5,8 @@ import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
@@ -134,6 +136,17 @@ public class FFmpegKitFlutterPlugin implements FlutterPlugin, ActivityAware, Met
             java.util.concurrent.ConcurrentHashMap.newKeySet();
     private static final AtomicBoolean globalCallbacksRegistered = new AtomicBoolean(false);
 
+    // The first FFmpegKitConfig access runs its static initializer, which loads about 20 MB of
+    // native libraries. Most launches never use FFmpeg, so the registration waits for the first
+    // method call of any engine and runs on the executor, not on the main thread during
+    // onAttachedToEngine; calls wait in arrival order until it is done. Starting it at attach on
+    // another thread would not help: a later plugin's System.loadLibrary on the main thread
+    // would wait for the runtime and linker locks this load holds.
+    private static final Object globalCallbacksLock = new Object();
+    private static List<Runnable> callsWaitingForGlobalCallbacks = new ArrayList<>();
+    private static boolean globalCallbacksScheduled;
+    private static volatile boolean globalCallbacksFailed;
+
     public FFmpegKitFlutterPlugin() {
         this.logsEnabled = new AtomicBoolean(false);
         this.statisticsEnabled = new AtomicBoolean(false);
@@ -179,6 +192,28 @@ public class FFmpegKitFlutterPlugin implements FlutterPlugin, ActivityAware, Met
         }
         if (!delivered) {
             Log.w(LIBRARY_NAME, String.format("No attached engine is listening; complete event for session %d was not delivered.", session.getSessionId()));
+        }
+    }
+
+    private static void loadAndRegisterGlobalCallbacks() {
+        try {
+            registerGlobalCallbacks();
+        } catch (final Throwable t) {
+            globalCallbacksFailed = true;
+            Log.e(LIBRARY_NAME, "FFmpegKitFlutterPlugin failed to load FFmpegKit.", t);
+        } finally {
+            new Handler(Looper.getMainLooper()).post(FFmpegKitFlutterPlugin::runCallsWaitingForGlobalCallbacks);
+        }
+    }
+
+    private static void runCallsWaitingForGlobalCallbacks() {
+        final List<Runnable> calls;
+        synchronized (globalCallbacksLock) {
+            calls = callsWaitingForGlobalCallbacks;
+            callsWaitingForGlobalCallbacks = null;
+        }
+        for (final Runnable call : calls) {
+            call.run();
         }
     }
 
@@ -228,8 +263,6 @@ public class FFmpegKitFlutterPlugin implements FlutterPlugin, ActivityAware, Met
     }
 
     protected void init(final BinaryMessenger messenger, final Context context) {
-        registerGlobalCallbacks();
-
         if (methodChannel == null) {
             methodChannel = new MethodChannel(messenger, METHOD_CHANNEL);
             methodChannel.setMethodCallHandler(this);
@@ -286,6 +319,38 @@ public class FFmpegKitFlutterPlugin implements FlutterPlugin, ActivityAware, Met
 
     @Override
     public void onMethodCall(@NonNull MethodCall call, @NonNull Result result) {
+        synchronized (globalCallbacksLock) {
+            if (callsWaitingForGlobalCallbacks != null) {
+                callsWaitingForGlobalCallbacks.add(() -> handleWaitingMethodCall(call, result));
+                if (!globalCallbacksScheduled) {
+                    globalCallbacksScheduled = true;
+                    asyncExecutorService.execute(FFmpegKitFlutterPlugin::loadAndRegisterGlobalCallbacks);
+                }
+                return;
+            }
+        }
+        handleMethodCall(call, result);
+    }
+
+    // A waiting call runs after the channel's handler returned, so a RuntimeException becomes
+    // the error reply and log line that the channel gives for one thrown inside it.
+    private void handleWaitingMethodCall(@NonNull final MethodCall call, @NonNull final Result result) {
+        try {
+            handleMethodCall(call, result);
+        } catch (final RuntimeException e) {
+            Log.e("MethodChannel#" + METHOD_CHANNEL, "Failed to handle method call", e);
+            result.error("error", e.getMessage(), null);
+        }
+    }
+
+    private void handleMethodCall(@NonNull MethodCall call, @NonNull Result result) {
+        if (globalCallbacksFailed) {
+            // A failed load inside onAttachedToEngine left the channel without a handler, which
+            // Dart reports as MissingPluginException; notImplemented gives the same exception.
+            resultHandler.notImplementedAsync(result);
+            return;
+        }
+
         final Integer sessionId = call.argument(ARGUMENT_SESSION_ID);
         final Integer waitTimeout = call.argument(ARGUMENT_WAIT_TIMEOUT);
         final List<String> arguments = call.argument(ARGUMENT_ARGUMENTS);
