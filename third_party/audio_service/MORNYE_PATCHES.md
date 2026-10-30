@@ -61,6 +61,17 @@ from the upstream package are not vendored.
   decoding, including failure paths. The service listener stays attached while
   an Activity retains its Flutter engine across service recreation; engine
   detachment clears the listener with its handler interface.
+- Android: map queue item artwork through
+  `AudioServicePlugin.setQueueArtResolver`, set in `Application.onCreate`.
+  Android Auto's queue view loads each queue item's icon URI in its own
+  process, so an app-private `file://` cover shows nothing there; the app
+  maps covers in its cover folders to its read-only cover provider's
+  `content://` URI (the same URI the item's browse entry has). `raw2queue`
+  applies it to the `QueueItem` description only: the item's
+  `MediaMetadataCompat`, the metadata cache, the playing item, the
+  notification and the lock screen keep the original artwork. A null
+  answer, a resolver that throws, or no resolver keeps the description as
+  it was.
 - Android build (`android/build.gradle.kts`): AGP 9.0.1 to 9.4.1, compileSdk
   35 to 37, `androidx.media:media` 1.7.0 to 1.8.0, `androidx.core:core`
   1.13.1 to 1.19.1, a `junit:junit:4.13.2` test dependency, and

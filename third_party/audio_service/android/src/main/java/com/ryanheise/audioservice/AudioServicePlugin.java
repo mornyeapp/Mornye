@@ -91,6 +91,21 @@ public class AudioServicePlugin implements FlutterPlugin, ActivityAware {
         resourceResolver = resolver;
     }
 
+    /**
+     * Maps a queue item's artwork URI to one other apps can load, or answers
+     * null to keep it. Only the session queue's descriptions use the result;
+     * the item's metadata keeps its own artwork.
+     */
+    public interface QueueArtResolver {
+        Uri resolve(Uri artUri);
+    }
+
+    private static volatile QueueArtResolver queueArtResolver;
+
+    public static void setQueueArtResolver(QueueArtResolver resolver) {
+        queueArtResolver = resolver;
+    }
+
     static int resolveResourceId(Context context, String resource) {
         if (resource == null) return 0;
         if (resourceResolver != null) {
@@ -1329,10 +1344,35 @@ public class AudioServicePlugin implements FlutterPlugin, ActivityAware {
             MediaMetadataCompat mediaMetadata = createMediaMetadata(rawMediaItem, service);
             metadata.put(mediaMetadata.getString(MediaMetadataCompat.METADATA_KEY_MEDIA_ID), mediaMetadata);
             MediaDescriptionCompat description = addExtrasToMediaDescription(mediaMetadata.getDescription(), (Map<?, ?>)rawMediaItem.get("extras"));
-            queue.add(new MediaSessionCompat.QueueItem(description, i));
+            queue.add(new MediaSessionCompat.QueueItem(withQueueArt(description), i));
             i++;
         }
         return queue;
+    }
+
+    /** A copy of a queue description with the artwork the queue art resolver maps it to. */
+    private static MediaDescriptionCompat withQueueArt(MediaDescriptionCompat description) {
+        QueueArtResolver resolver = queueArtResolver;
+        Uri art = description.getIconUri();
+        if (resolver == null || art == null) return description;
+        Uri shared;
+        try {
+            shared = resolver.resolve(art);
+        } catch (RuntimeException e) {
+            Log.w("AudioServicePlugin", "Queue artwork kept as it is", e);
+            return description;
+        }
+        if (shared == null || shared.equals(art)) return description;
+        return new MediaDescriptionCompat.Builder()
+                .setMediaId(description.getMediaId())
+                .setTitle(description.getTitle())
+                .setSubtitle(description.getSubtitle())
+                .setDescription(description.getDescription())
+                .setIconBitmap(description.getIconBitmap())
+                .setIconUri(shared)
+                .setMediaUri(description.getMediaUri())
+                .setExtras(description.getExtras())
+                .build();
     }
 
     public static Long getLong(Object o) {

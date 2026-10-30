@@ -11,6 +11,7 @@ import android.os.ParcelFileDescriptor
 import android.system.ErrnoException
 import android.system.Os
 import android.system.OsConstants
+import com.ryanheise.audioservice.AudioServicePlugin
 import java.io.File
 import java.io.FileDescriptor
 import java.io.FileNotFoundException
@@ -124,5 +125,30 @@ class CoverContentProvider : ContentProvider() {
             "authority" to authority(context),
             "folders" to coverFolders(context).mapValues { it.value.directory.path },
         )
+
+        /**
+         * Maps a queue item's artwork to the provider URI a car can load,
+         * the same one its browse item gets, when it is a cover file in the
+         * provider's folders; null keeps the artwork as it is.
+         */
+        fun queueArtResolver(context: Context): AudioServicePlugin.QueueArtResolver {
+            val folders by lazy { coverFolders(context) }
+            val authority = authority(context)
+            return AudioServicePlugin.QueueArtResolver { art ->
+                val path = art.path
+                if ((art.scheme != null && art.scheme != ContentResolver.SCHEME_FILE) || path == null) {
+                    null
+                } else {
+                    CoverProviderFiles.locate(folders, path)?.let { (folder, name) ->
+                        Uri.Builder()
+                            .scheme(ContentResolver.SCHEME_CONTENT)
+                            .authority(authority)
+                            .appendPath(folder)
+                            .appendPath(name)
+                            .build()
+                    }
+                }
+            }
+        }
     }
 }

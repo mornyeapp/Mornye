@@ -141,6 +141,34 @@ class CoverProviderFilesTest {
     }
 
     @Test
+    fun locatesCoverPathsAsDartNamesThem() {
+        val files = File(app, "files").path
+        val cache = File(app, "cache").path
+
+        assertEquals("covers" to "0123_abcd.image", CoverProviderFiles.locate(folders, "$files/covers/0123_abcd.image"))
+        assertEquals(
+            "library_covers" to "cover 0123.jpg",
+            CoverProviderFiles.locate(folders, "$files/library_covers/cover 0123.jpg"),
+        )
+        assertEquals(
+            "library_covers" to "cover_0123.jpg",
+            CoverProviderFiles.locate(folders, "$files/covers/../library_covers/./cover_0123.jpg"),
+        )
+        assertEquals(
+            "embedded_cover_previews" to "v2_hash_0.jpg",
+            CoverProviderFiles.locate(folders, "$cache/embedded_cover_previews/v2_hash_0.jpg"),
+        )
+        assertNull(CoverProviderFiles.locate(folders, "$files/library_covers/../shared_prefs/settings.jpg"))
+        assertNull(CoverProviderFiles.locate(folders, "$files/library_covers/sub/nested.jpg"))
+        assertNull(CoverProviderFiles.locate(folders, "$files/library_covers/.regenerate"))
+        assertNull(CoverProviderFiles.locate(folders, "$cache/embedded_cover_previews/v2_hash_0.jpg.source"))
+        assertNull(CoverProviderFiles.locate(folders, "$files/playlist_covers/list.jpg"))
+        assertNull(CoverProviderFiles.locate(folders, "/storage/emulated/0/Music/cover.jpg"))
+        assertNull(CoverProviderFiles.locate(folders, "library_covers/cover_0123.jpg"))
+        assertNull(CoverProviderFiles.locate(folders, "/"))
+    }
+
+    @Test
     fun recognizesTheImageFormatsTheCoverStoreKeeps() {
         fun type(vararg bytes: Int) = CoverProviderFiles.imageType(ByteArray(bytes.size) { bytes[it].toByte() })
         fun type(text: String) = CoverProviderFiles.imageType(text.toByteArray(Charsets.ISO_8859_1))

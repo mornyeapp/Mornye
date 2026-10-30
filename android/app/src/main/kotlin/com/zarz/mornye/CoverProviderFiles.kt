@@ -52,6 +52,20 @@ internal object CoverProviderFiles {
         }
     }
 
+    /**
+     * The folder and file names of the provider URI for the cover file at
+     * the absolute [path], read from the path alone as Dart builds browse
+     * item URIs, or null unless it names a cover directly in [folders].
+     */
+    fun locate(folders: Map<String, Folder>, path: String): Pair<String, String>? {
+        val file = File(path)
+        if (!file.isAbsolute) return null
+        val normal = file.normalize()
+        val parent = normal.parentFile ?: return null
+        val (name, folder) = folders.entries.firstOrNull { it.value.directory.normalize() == parent } ?: return null
+        return if (folder.names(normal.name)) name to normal.name else null
+    }
+
     /** The MIME type of the image whose first 12 bytes are [head], or null. */
     fun imageType(head: ByteArray): String? {
         fun has(offset: Int, vararg magic: Int) =

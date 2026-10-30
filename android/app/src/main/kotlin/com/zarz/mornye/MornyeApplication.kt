@@ -11,6 +11,7 @@ class MornyeApplication : Application() {
         // supply shell args, including when playback starts without an Activity.
         AudioServicePlugin.setFlutterEngineArguments(flutterRendererShellArgs())
         AudioServicePlugin.setFlutterEngineConfigurator(SharedEngineChannels::configure)
+        AudioServicePlugin.setQueueArtResolver(CoverContentProvider.queueArtResolver(this))
         AudioServicePlugin.setResourceResolver { resource ->
             when (resource) {
                 "mipmap/ic_launcher" -> R.mipmap.ic_launcher
