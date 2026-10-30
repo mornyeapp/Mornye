@@ -25,6 +25,8 @@ import 'package:mornye/services/content_uri_playback_cache.dart';
 import 'package:mornye/services/cover_store.dart';
 import 'package:mornye/services/music_player_runtime.dart';
 import 'package:mornye/services/music_playback_deck.dart';
+import 'package:mornye/services/network_storage_service.dart'
+    show subsonicSongIdFromPath;
 import 'package:mornye/services/playback_deck.dart';
 import 'package:mornye/services/automix_analysis.dart';
 import 'package:mornye/services/automix_phase_lock.dart';
@@ -1760,9 +1762,10 @@ class MusicPlayerHandler extends BaseAudioHandler
     try {
       final metadata = await _dependencies.readNetworkMetadata(media.source);
       if (!_isCurrentPlayRequest(generation, media)) return;
-      // A stored tag cover shows through the store, on this play and later.
-      final cover = metadata['cover_path'] as String?;
-      final stored = await _covers.adoptTagCover(media.source, cover);
+      final cover = await _covers.readTagCover(
+        media,
+        metadata['cover_path'] as String?,
+      );
       if (!_isCurrentPlayRequest(generation, media)) return;
       final current = mediaItem.value;
       if (current == null) return;
@@ -1775,10 +1778,7 @@ class MusicPlayerHandler extends BaseAudioHandler
         title: text('title', current.title),
         artist: text('artist', current.artist ?? ''),
         album: text('album', current.album ?? ''),
-        // One the store could not keep shows on this play only.
-        artUri: stored == null && cover != null && cover.isNotEmpty
-            ? Uri.file(cover)
-            : current.artUri,
+        artUri: cover(current.artUri),
         extras: {
           ...?current.extras,
           for (final key in ['bit_depth', 'sample_rate', 'bitrate', 'format'])
@@ -2250,15 +2250,12 @@ class MusicPlayerHandler extends BaseAudioHandler
       if (metadata['error'] != null) return;
       final cover = metadata['cover_path'] as String?;
       String? artwork;
+      Uri? Function(Uri? shown)? networkCover;
       if (source.startsWith('network://')) {
         // The store keeps a network song's covers, which its items show.
-        _covers.invalidate(
-          _media
-              .where((item) => item.source == source)
-              .firstOrNull
-              ?.coverReference,
-        );
-        await _covers.adoptTagCover(source, cover);
+        final media = _media.firstWhere((item) => item.source == source);
+        networkCover = await _covers.readTagCover(media, cover);
+        _covers.invalidate(media.coverReference);
       } else if (cover != null && cover.isNotEmpty) {
         artwork = normalizeArtUri(cover);
       }
@@ -2286,7 +2283,11 @@ class MusicPlayerHandler extends BaseAudioHandler
           artist: facts.artist,
           album: facts.album,
           duration: facts.duration ?? item.duration,
-          artUri: artwork == null ? item.artUri : facts.artUri,
+          artUri: networkCover != null
+              ? networkCover(item.artUri)
+              : artwork == null
+              ? item.artUri
+              : facts.artUri,
           extras: {
             ...?item.extras,
             ...?facts.extras,

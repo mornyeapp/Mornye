@@ -23,7 +23,13 @@ import 'package:mornye/services/library_database.dart';
 import 'package:mornye/services/library_search.dart';
 import 'package:mornye/services/listening_statistics.dart';
 import 'package:mornye/services/link/desktop/link_player.dart';
+import 'package:mornye/services/link/features/link_desktop_remote.dart';
+import 'package:mornye/services/link/features/link_handoff.dart';
+import 'package:mornye/services/link/features/link_phone_client.dart';
 import 'package:mornye/services/link/features/link_phone_player.dart';
+import 'package:mornye/services/link/features/link_remote_playback.dart';
+import 'package:mornye/services/link/features/link_track_refs.dart';
+import 'package:mornye/services/link/features/link_track_resolver.dart';
 import 'package:mornye/services/link/link_protocol.dart';
 import 'package:mornye/services/media_library_browser.dart';
 import 'package:mornye/services/music_player_service.dart';
@@ -38,6 +44,8 @@ import 'package:mornye/utils/logger.dart';
 import 'package:path/path.dart' as p;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart'
     show databaseFactoryFfi, sqfliteFfiInit;
+
+import 'support/link_fakes.dart';
 
 class _Deck implements PlaybackDeck {
   @override
@@ -2937,6 +2945,204 @@ void main() {
     );
 
     test(
+      'a tag cover the tags no longer hold gives way to the folder cover',
+      () async {
+        final stored = Uri.file((await covers.file(cover))!);
+        final temporary = await Directory.systemTemp.createTemp('nas-tags-');
+        addTearDown(() => temporary.delete(recursive: true));
+        final tagCover =
+            File(p.join(temporary.path, 'network_metadata', 'tags.image'))
+              ..createSync(recursive: true)
+              ..writeAsBytesSync([0xFF, 0xD8, 0xFF, 7]);
+        var tags = <String, dynamic>{'cover_path': tagCover.path};
+        final events = SourceMetadataEvents();
+        final handler = await _runtime(
+          coverStore: covers,
+          sourceMetadataEvents: events,
+          resolveNetworkSource: resolve,
+          readNetworkMetadata: (_) async => tags,
+        ).initialize();
+        final reference = CoverStore.songCoverReference(song.source);
+        await handler.setQueueAndPlay([song]);
+        final tagged = await shown(
+          handler,
+          (item) => item.artUri != null && item.artUri != stored,
+        );
+        final adopted = tagged.artUri!.toFilePath();
+        expect(adopted, covers.indexedFile(reference));
+
+        // An edit removes the picture from the tags.
+        tags = {};
+        await events.publish(song.source);
+        await shown(handler, (item) => item.artUri == stored);
+        expect(handler.queue.value.single.artUri, stored);
+        expect(covers.indexedFile(reference), isNull);
+        expect(File(adopted).existsSync(), isFalse);
+
+        // Later plays and later runs show the folder cover.
+        await handler.setQueueAndPlay([song]);
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+        expect(handler.mediaItem.value!.artUri, stored);
+        final restarted = store();
+        addTearDown(restarted.dispose);
+        await restarted.warmUp();
+        expect(restarted.songCover(song.source, cover)?.reference, cover);
+      },
+    );
+
+    test('a tag read for a queued song updates the queue once', () async {
+      const other = PlayableMedia(
+        id: 'nas-other',
+        source: 'network://nas/Album/02.flac',
+        title: 'Two',
+        artist: 'Artist',
+        networkArtworkSource: 'network://nas/Album/02.jpg',
+      );
+      final temporary = await Directory.systemTemp.createTemp('nas-tags-');
+      addTearDown(() => temporary.delete(recursive: true));
+      final tagCover =
+          File(p.join(temporary.path, 'network_metadata', 'tags.image'))
+            ..createSync(recursive: true)
+            ..writeAsBytesSync([0xFF, 0xD8, 0xFF, 7]);
+      final events = SourceMetadataEvents();
+      final handler = await _runtime(
+        coverStore: covers,
+        sourceMetadataEvents: events,
+        resolveNetworkSource: resolve,
+        readNetworkMetadata: (source) async =>
+            source == other.source ? {'cover_path': tagCover.path} : {},
+      ).initialize();
+      await handler.setQueueAndPlay([song, other]);
+      await until(
+        () => handler.queue.value.every((item) => item.artUri != null),
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      final queues = <List<MediaItem>>[];
+      final subscription = handler.queue.skip(1).listen(queues.add);
+      addTearDown(subscription.cancel);
+
+      // As a library job reports a song whose tags it read.
+      await events.publish(other.source);
+      await until(() => queues.isNotEmpty);
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(queues, hasLength(1));
+      expect(
+        queues.single.last.artUri!.toFilePath(),
+        covers.indexedFile(CoverStore.songCoverReference(other.source)),
+      );
+    });
+
+    test(
+      "a desktop song played on the phone shows the desktop's new cover",
+      () async {
+        // A desktop song as Link resolves it, with the server's cover.
+        final source = linkDesktopSongSource(linkTestServer, 's0');
+        final reference = linkDesktopCoverSource(linkTestServer, 's0');
+        final desktopSong = PlayableMedia(
+          id: 'desktop-s0',
+          source: source,
+          title: 'Song s0',
+          artist: 'Artist',
+          networkArtworkSource: reference,
+        );
+        // Its tags come with that same cover, read to a temporary file.
+        final temporary = await Directory.systemTemp.createTemp('link-tags-');
+        addTearDown(() => temporary.delete(recursive: true));
+        final served =
+            File(p.join(temporary.path, 'network_metadata', 'subsonic.image'))
+              ..createSync(recursive: true)
+              ..writeAsBytesSync([0xFF, 0xD8, 0xFF, 0]);
+        final recorder = _Recorder(
+          write: (_) async {},
+          elapsed: () => Duration.zero,
+          now: () => DateTime(2026),
+        );
+        final handler = await _runtime(
+          coverStore: covers,
+          recorder: recorder,
+          resolveNetworkSource: resolve,
+          readNetworkMetadata: (_) async => {
+            'title': 'Played',
+            'cover_path': served.path,
+          },
+        ).initialize();
+        await handler.setQueueAndPlay([desktopSong]);
+        await until(
+          () =>
+              handler.mediaItem.value?.title == 'Played' &&
+              handler.mediaItem.value?.artUri ==
+                  Uri.file(covers.indexedFile(reference) ?? ''),
+        );
+        // Stored once, under the reference the desktop keeps fresh.
+        expect(covers.songCover(source), isNull);
+        await _settle();
+        expect(recorder.latestTrack?.artwork, reference);
+
+        // The phone's remote view of the desktop playing it.
+        final client = FakeLinkClient(
+          onGet: (_, _) => null,
+          onPost: (_, _) => {'resolved': 1, 'missing': <int>[]},
+        );
+        final container = ProviderContainer(
+          overrides: [linkPhoneClientProvider.overrideWithValue(client)],
+        );
+        addTearDown(container.dispose);
+        final lookup = FakeLibraryLookup();
+        final playback = LinkRemotePlayback(
+          name: 'Studio PC',
+          remote: container.read(linkDesktopRemoteProvider.notifier),
+          handoff: LinkHandoff(
+            client: client,
+            player: FakePhonePlayer(),
+            refs: LinkTrackRefCache(lookup: lookup, server: client.server),
+            resolver: LinkTrackResolver(lookup: lookup, server: client.server),
+          ),
+          covers: covers,
+          extractArtwork: (_) async => null,
+          tick: const Duration(milliseconds: 10),
+        );
+        addTearDown(playback.dispose);
+        container.listen(linkDesktopRemoteProvider, (_, next) {
+          playback.update(next);
+        });
+        // The remote's first state request answers before the push.
+        await Future<void>.delayed(Duration.zero);
+        final track = TrackRef(
+          title: 'Song s0',
+          artist: 'Artist',
+          durationMs: 200000,
+          songId: 's0',
+          serverId: linkTestServer.serverId,
+        );
+        client.push({
+          'type': LinkMessageTypes.playerState,
+          'state': LinkPlayerState(
+            track: track,
+            playing: true,
+            durationMs: 200000,
+            updatedMs: 1,
+            queue: [track],
+            index: 0,
+          ).toJson(),
+        });
+        final before = await playback.mediaItems
+            .firstWhere((item) => item?.artUri != null)
+            .timeout(const Duration(seconds: 5));
+        expect(before!.artUri, handler.mediaItem.value!.artUri);
+
+        // The desktop changes the cover.
+        version = 1;
+        playback.refreshCover(reference);
+        final after = await playback.mediaItems
+            .firstWhere((item) => item?.artUri != before.artUri)
+            .timeout(const Duration(seconds: 5));
+        expect(after!.artUri!.toFilePath(), covers.indexedFile(reference));
+        expect(File(after.artUri!.toFilePath()).readAsBytesSync()[3], 1);
+        await until(() => handler.mediaItem.value!.artUri == after.artUri);
+      },
+    );
+
+    test(
       'a restored session shows its stored cover from the first item',
       () async {
         final stored = Uri.file((await covers.file(cover))!);
@@ -2979,5 +3185,30 @@ void main() {
       expect(item.extras!['artworkRef'], cover);
       expect(runtime.handler, isNull);
     });
+
+    test(
+      'the Home resume item drops a loopback cover of earlier versions',
+      () async {
+        final runtime = _runtime(
+          coverStore: covers,
+          sessionDatabase: _ResumeSessionStore()
+            ..preview = {
+              'media': {
+                ...const PlayableMedia(
+                  id: 'nas-old',
+                  source: 'network://nas/Album/04.flac',
+                  title: 'Four',
+                  artist: 'Artist',
+                ).toJson(),
+                'artUri': 'http://127.0.0.1:41234/2f6d1c',
+              },
+              'positionMs': 23000,
+            },
+        );
+        final preview = (await loadPlaybackResumePreview(runtime))!;
+        expect(preview.media.artUri, isNull);
+        expect(preview.media.toMediaItem(covers: covers).artUri, isNull);
+      },
+    );
   });
 }

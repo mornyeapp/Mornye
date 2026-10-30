@@ -23,14 +23,20 @@ Future<PlaybackResumePreview?> loadPlaybackResumePreview(
     final documents = runtime.dependencies.isIOS
         ? (await getApplicationDocumentsDirectory()).path
         : null;
-    final media = PlayableMedia.fromJson(
+    final saved = PlayableMedia.fromJson(
       Map<String, dynamic>.from(preview['media'] as Map),
       iosDocumentsPath: documents,
     );
-    if (media == null ||
-        (!media.isNetwork && !await files.fileExists(media.source))) {
+    if (saved == null ||
+        (!saved.isNetwork && !await files.fileExists(saved.source))) {
       return null;
     }
+    // As on restore, a loopback URL or a temporary cover file of earlier
+    // versions does not show.
+    final artwork = durableCoverReference(saved.artUri);
+    final media = artwork == saved.artUri
+        ? saved
+        : PlayableMedia.fromJson({...saved.toJson(), 'artUri': artwork})!;
     // Its item then shows a stored network cover from the start.
     if (media.coverReference != null || CoverStore.fetches(media.source)) {
       await runtime.dependencies.coverStore.warmUp();

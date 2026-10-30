@@ -56,16 +56,42 @@ class _MusicCovers {
   /// Shows the file the stored cover [ref] moved to.
   void changed(String ref) => _show(ref);
 
-  /// Stores the cover in the tags of the network song [source], read to
-  /// the temporary file [cover], and shows it on the song: once known, it
-  /// is the song's cover on every play. Null when there is none or it
-  /// could not be stored.
-  Future<String?> adoptTagCover(String source, String? cover) async {
-    if (cover == null || cover.isEmpty) return null;
-    final reference = CoverStore.songCoverReference(source);
-    final path = await _store.adopt(reference, cover);
-    if (path != null) _show(reference);
-    return path;
+  /// Keeps the cover read with the tags of the network song [media] to the
+  /// temporary file [cover] when it is the song's own ([_ownsTagCover]):
+  /// once stored, it is the song's cover on every play, until a read finds
+  /// none. Answers the cover an item of the song that shows `shown` shows
+  /// now: its stored cover, else [cover] on this play only, else `shown`
+  /// unless that was the dropped tag cover.
+  Future<Uri? Function(Uri? shown)> readTagCover(
+    PlayableMedia media,
+    String? cover,
+  ) async {
+    final read = cover == null || cover.isEmpty ? null : Uri.file(cover);
+    final reference = CoverStore.songCoverReference(media.source);
+    Uri? dropped;
+    if (_ownsTagCover(media)) {
+      if (read != null) {
+        if (await _store.adopt(reference, cover!) == null) return (_) => read;
+      } else if (_store.indexedFile(reference) case final path?) {
+        // Its tags hold no cover any more: the network cover shows again.
+        dropped = Uri.file(path);
+        await _store.forget(reference);
+      }
+    }
+    final stored = _store.songCover(media.source, media.coverReference);
+    if (stored == null && dropped != null) fetch(media.coverReference);
+    final now = stored == null ? read : Uri.file(stored.path);
+    return (Uri? shown) => now ?? (shown == dropped ? null : shown);
+  }
+
+  /// Whether the cover read with the tags of [media] is its own. A Subsonic
+  /// server answers the cover the song's network reference names, which
+  /// the store keeps fresh under that reference.
+  static bool _ownsTagCover(PlayableMedia media) {
+    if (media.coverReference == null) return true;
+    final uri = Uri.tryParse(media.source);
+    return uri == null ||
+        subsonicSongIdFromPath(uri.pathSegments.join('/')) == null;
   }
 
   /// The reference of the stored cover [item] of the song [source] shows,
