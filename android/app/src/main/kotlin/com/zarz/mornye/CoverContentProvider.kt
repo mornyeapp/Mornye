@@ -87,20 +87,18 @@ class CoverContentProvider : ContentProvider() {
         } catch (_: ErrnoException) {
             return null
         }
-        val type = try {
+        var type: String? = null
+        try {
             if (OsConstants.S_ISREG(Os.fstat(descriptor).st_mode)) {
                 val head = ByteArray(12)
                 val count = Os.pread(descriptor, head, 0, head.size, 0)
-                CoverProviderFiles.imageType(head.copyOf(count))
-            } else {
-                null
+                type = CoverProviderFiles.imageType(head.copyOf(count))
             }
         } catch (_: ErrnoException) {
-            null
         } catch (_: InterruptedIOException) {
-            null
+        } finally {
+            if (type == null) close(descriptor)
         }
-        if (type == null) close(descriptor)
         return type?.let { descriptor to it }
     }
 
