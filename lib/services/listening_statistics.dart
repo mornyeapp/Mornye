@@ -25,17 +25,23 @@ class ListeningTrack {
     this.artwork,
   });
 
-  /// The track of a `listening` row. Older builds recorded loopback URLs
-  /// and temporary files, which read as no artwork, so the fallback shows
-  /// instead of a broken image until the song plays again.
-  factory ListeningTrack.fromRow(Map<String, Object?> row) => ListeningTrack(
+  /// The track of a `listening` row, with [fallbackArtwork] when the row has
+  /// no cover. Older builds recorded loopback URLs and temporary files,
+  /// which read as no artwork, so the fallback shows instead of a broken
+  /// image until the song plays again.
+  factory ListeningTrack.fromRow(
+    Map<String, Object?> row, {
+    String? fallbackArtwork,
+  }) => ListeningTrack(
     key: row['track_key'] as String,
     title: row['title'] as String,
     artist: row['artist'] as String,
     album: row['album'] as String,
-    artwork: durableCoverReference(
-      normalizeStoredCoverReference(row['artwork'] as String?),
-    ),
+    artwork:
+        durableCoverReference(
+          normalizeStoredCoverReference(row['artwork'] as String?),
+        ) ??
+        fallbackArtwork,
   );
 
   final String key;

@@ -315,10 +315,12 @@ class ListeningRewind {
 }
 
 /// Year-in-review extras, splitting credits from SQLite's daily artist totals.
+/// The first song shows its cover in [covers] when its day's row has none.
 Future<ListeningYearDetails> readListeningYearDetails(
   DatabaseExecutor db,
-  ListeningRewindRange range,
-) async {
+  ListeningRewindRange range, {
+  Map<String, String?> covers = const {},
+}) async {
   final window = [listeningDay(range.start), listeningDay(range.end)];
   final artistDays = await db.rawQuery('''
     SELECT day, artist, SUM(milliseconds) AS milliseconds
@@ -377,7 +379,10 @@ Future<ListeningYearDetails> readListeningYearDetails(
     firstPlay: firstRow == null
         ? null
         : ListeningFirstPlay(
-            ListeningTrack.fromRow(firstRow),
+            ListeningTrack.fromRow(
+              firstRow,
+              fallbackArtwork: covers[firstRow['track_key']],
+            ),
             DateTime.parse(firstRow['day'] as String),
           ),
   );
@@ -391,6 +396,11 @@ Future<ListeningRewind> readListeningRewind(
   bool yearly = false,
 }) async {
   final summary = await readListeningSummary(db, range.start, range.end);
+  // The first song and the replay read one day's row, which an older build
+  // may have recorded without a usable cover; the window's cover is shown.
+  final covers = {
+    for (final total in summary.tracks) total.track.key: total.track.artwork,
+  };
   final start = listeningDay(range.start);
   final end = listeningDay(range.end);
   final previous = await db.rawQuery(
@@ -438,7 +448,9 @@ Future<ListeningRewind> readListeningRewind(
     [start, end],
   );
   final replay = replays.isEmpty ? null : replays.first;
-  final year = yearly ? await readListeningYearDetails(db, range) : null;
+  final year = yearly
+      ? await readListeningYearDetails(db, range, covers: covers)
+      : null;
   return ListeningRewind.compute(
     year: year,
     range: range,
@@ -448,7 +460,10 @@ Future<ListeningRewind> readListeningRewind(
     replay: replay == null
         ? null
         : ListeningReplay(
-            ListeningTrack.fromRow(replay),
+            ListeningTrack.fromRow(
+              replay,
+              fallbackArtwork: covers[replay['track_key']],
+            ),
             DateTime.parse(replay['day'] as String),
             replay['plays'] as int,
           ),
