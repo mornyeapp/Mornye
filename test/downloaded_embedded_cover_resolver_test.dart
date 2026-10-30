@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:path/path.dart' as p;
 import 'package:mornye/services/downloaded_embedded_cover_resolver.dart';
 import 'package:mornye/widgets/cached_cover_image.dart';
 
@@ -124,6 +125,47 @@ void main() {
         recovered,
       );
       expect(extractions, 2);
+    },
+  );
+
+  test(
+    'a preview without a source timestamp stays on disk after memory eviction',
+    () async {
+      const untimed = 'content://example.documents/tree/nas/document/u.flac';
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(backendChannel, (call) async {
+            if (call.method == 'getSafFileModTimes') {
+              final uris = jsonDecode(
+                (call.arguments as Map)['uris'] as String,
+              );
+              return jsonEncode({
+                for (final uri in uris as List)
+                  if (uri != untimed) uri: 1234,
+              });
+            }
+            expect(call.method, 'extractCoverToFile');
+            final args = call.arguments as Map<Object?, Object?>;
+            await File(args['output_path']! as String).writeAsBytes([7, 8]);
+            return jsonEncode({'success': true});
+          });
+
+      final preview = await DownloadedEmbeddedCoverResolver.resolveOrExtract(
+        untimed,
+      );
+      expect(preview, isNotNull);
+      expect(p.isWithin(persistentCacheDirectory.path, preview!), isTrue);
+      // 180 newer previews push the first one out of the memory cache.
+      for (var index = 0; index < 180; index++) {
+        await DownloadedEmbeddedCoverResolver.resolveOrExtract(
+          'content://example.documents/tree/nas/document/$index.flac',
+        );
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+      expect(await File(preview).readAsBytes(), [7, 8]);
+      expect(
+        await DownloadedEmbeddedCoverResolver.resolveOrExtract(untimed),
+        preview,
+      );
     },
   );
 

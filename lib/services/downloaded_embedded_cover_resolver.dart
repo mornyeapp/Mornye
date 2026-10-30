@@ -12,12 +12,10 @@ import 'package:mornye/utils/file_access.dart';
 class _EmbeddedCoverCacheEntry {
   final String previewPath;
   final int? sourceModTimeMillis;
-  final bool isPersistent;
   DateTime? lastValidatedAt;
 
   _EmbeddedCoverCacheEntry({
     required this.previewPath,
-    required this.isPersistent,
     this.sourceModTimeMillis,
   });
 }
@@ -261,15 +259,11 @@ class DownloadedEmbeddedCoverResolver {
     }
     _cacheGeneration.clear();
 
-    final entries = _cache.values.toList(growable: false);
     _cache.clear();
     _pendingRefresh.clear();
     _pendingPreviewValidation.clear();
     await _previewValidationFuture;
     _failedExtract.clear();
-    for (final entry in entries) {
-      if (!entry.isPersistent) await _cleanupTempCoverPath(entry.previewPath);
-    }
 
     final maintenance = _persistentMaintenanceFuture;
     if (maintenance != null) await maintenance;
@@ -306,7 +300,6 @@ class DownloadedEmbeddedCoverResolver {
       await Future<void>.delayed(const Duration(milliseconds: 1));
     }
 
-    final entries = _cache.values.toList(growable: false);
     _cache.clear();
     _pendingExtract.clear();
     _foregroundExtractionQueue.clear();
@@ -318,9 +311,6 @@ class DownloadedEmbeddedCoverResolver {
     _failedExtract.clear();
     _cacheGeneration.clear();
     _drainScheduled = false;
-    for (final entry in entries) {
-      if (!entry.isPersistent) await _cleanupTempCoverPath(entry.previewPath);
-    }
 
     if (!preservePersistentFiles) {
       final directory = await _getPersistentCacheDirectory();
@@ -353,11 +343,10 @@ class DownloadedEmbeddedCoverResolver {
 
   static void _trimCacheIfNeeded() {
     while (_cache.length > _maxCacheEntries) {
+      // The preview file stays: players and sessions may still show it.
+      // Only the disk budget in _runPersistentCacheMaintenance removes it.
       final oldestKey = _cache.keys.first;
-      final removed = _cache.remove(oldestKey);
-      if (removed != null && !removed.isPersistent) {
-        _scheduleTempCoverCleanup(removed.previewPath);
-      }
+      _cache.remove(oldestKey);
       _cacheGeneration[oldestKey] = (_cacheGeneration[oldestKey] ?? 0) + 1;
       _cancelPendingExtraction(oldestKey);
       _cacheGeneration.remove(oldestKey);
@@ -614,7 +603,6 @@ class DownloadedEmbeddedCoverResolver {
   ) async {
     final cleanPath = job.cleanPath;
     String? outputPath;
-    var outputIsPersistent = false;
     try {
       if (!_isCurrentExtraction(job)) return null;
       final candidateModTime =
@@ -624,44 +612,35 @@ class DownloadedEmbeddedCoverResolver {
           : null;
       if (!_isCurrentExtraction(job)) return null;
 
-      String? persistentPath;
-      if (modTime != null) {
-        final directory = await _getPersistentCacheDirectory();
-        persistentPath = p.join(
-          directory.path,
-          _persistentFileName(cleanPath, modTime),
+      final directory = await _getPersistentCacheDirectory();
+      final persistentPath = p.join(
+        directory.path,
+        _persistentFileName(cleanPath, modTime),
+      );
+      // Without a timestamp a disk copy cannot be validated: it is extracted
+      // again once per memory miss, but under the same durable name.
+      if (modTime != null &&
+          !job.forceRefresh &&
+          await _isReusablePersistentPreview(persistentPath, cleanPath)) {
+        if (!_isCurrentExtraction(job)) return null;
+        await _touchPersistentPreview(persistentPath);
+        final next = _EmbeddedCoverCacheEntry(
+          previewPath: persistentPath,
+          sourceModTimeMillis: modTime,
         );
-        if (!job.forceRefresh &&
-            await _isReusablePersistentPreview(persistentPath, cleanPath)) {
-          if (!_isCurrentExtraction(job)) return null;
-          await _touchPersistentPreview(persistentPath);
-          final next = _EmbeddedCoverCacheEntry(
-            previewPath: persistentPath,
-            sourceModTimeMillis: modTime,
-            isPersistent: true,
-          );
-          _touch(cleanPath, next);
-          _failedExtract.remove(cleanPath);
-          _trimCacheIfNeeded();
-          _notifyCoverChanged(job);
-          _schedulePersistentMaintenance();
-          return persistentPath;
-        }
+        _touch(cleanPath, next);
+        _failedExtract.remove(cleanPath);
+        _trimCacheIfNeeded();
+        _notifyCoverChanged(job);
+        _schedulePersistentMaintenance();
+        return persistentPath;
       }
 
-      if (persistentPath != null) {
-        final directory = File(persistentPath).parent;
-        outputPath = p.join(
-          directory.path,
-          '.${p.basenameWithoutExtension(persistentPath)}.stage_'
-          '${DateTime.now().microsecondsSinceEpoch}_${_stagingSequence++}.jpg',
-        );
-      } else {
-        final tempDir = await Directory.systemTemp.createTemp(
-          'download_cover_preview_',
-        );
-        outputPath = p.join(tempDir.path, 'cover_preview.jpg');
-      }
+      outputPath = p.join(
+        directory.path,
+        '.${p.basenameWithoutExtension(persistentPath)}.stage_'
+        '${DateTime.now().microsecondsSinceEpoch}_${_stagingSequence++}.jpg',
+      );
 
       final result = await PlatformBridge.extractCoverToFile(
         cleanPath,
@@ -695,16 +674,12 @@ class DownloadedEmbeddedCoverResolver {
         return null;
       }
 
-      var finalPath = outputPath;
-      if (persistentPath != null) {
-        finalPath = await _publishPersistentPreview(
-          stagingPath: outputPath,
-          targetPath: persistentPath,
-          cleanPath: cleanPath,
-        );
-        outputPath = finalPath;
-        outputIsPersistent = true;
-      }
+      final finalPath = await _publishPersistentPreview(
+        stagingPath: outputPath,
+        targetPath: persistentPath,
+        cleanPath: cleanPath,
+      );
+      outputPath = finalPath;
 
       if (!_isCurrentExtraction(job)) {
         await _cleanupCoverPath(finalPath);
@@ -715,7 +690,6 @@ class DownloadedEmbeddedCoverResolver {
       final next = _EmbeddedCoverCacheEntry(
         previewPath: finalPath,
         sourceModTimeMillis: modTime,
-        isPersistent: outputIsPersistent,
       );
       _touch(cleanPath, next);
       _failedExtract.remove(cleanPath);
@@ -724,13 +698,11 @@ class DownloadedEmbeddedCoverResolver {
       if (previous != null && previous.previewPath != finalPath) {
         await _cleanupCacheEntry(previous);
       }
-      if (outputIsPersistent) {
-        await _deletePersistentVariantsForSource(
-          cleanPath,
-          exceptPath: finalPath,
-        );
-        _schedulePersistentMaintenance();
-      }
+      await _deletePersistentVariantsForSource(
+        cleanPath,
+        exceptPath: finalPath,
+      );
+      _schedulePersistentMaintenance();
       _notifyCoverChanged(job);
       return finalPath;
     } catch (_) {
@@ -786,9 +758,10 @@ class DownloadedEmbeddedCoverResolver {
     return directory;
   }
 
-  static String _persistentFileName(String cleanPath, int modTime) {
+  /// A source without a timestamp (null [modTime]) keeps one `_0` preview.
+  static String _persistentFileName(String cleanPath, int? modTime) {
     return '${_persistentCacheVersion}_${_stablePathHash(cleanPath)}_'
-        '${modTime.toRadixString(16)}.jpg';
+        '${(modTime ?? 0).toRadixString(16)}.jpg';
   }
 
   /// Two independently mixed 63-bit FNV-1a lanes keep filenames compact.
@@ -903,7 +876,6 @@ class DownloadedEmbeddedCoverResolver {
     if (!await directory.exists()) return;
 
     final activePaths = _cache.values
-        .where((entry) => entry.isPersistent)
         .map((entry) => _normalizedAbsolutePath(entry.previewPath))
         .toSet();
     final files = <File>[];
@@ -1019,42 +991,18 @@ class DownloadedEmbeddedCoverResolver {
   static String _normalizedAbsolutePath(String path) =>
       p.normalize(p.absolute(path));
 
-  static Future<void> _cleanupCacheEntry(_EmbeddedCoverCacheEntry entry) async {
-    if (entry.isPersistent) {
-      await _cleanupPersistentCoverPath(entry.previewPath);
-    } else {
-      await _cleanupTempCoverPath(entry.previewPath);
-    }
-  }
+  static Future<void> _cleanupCacheEntry(_EmbeddedCoverCacheEntry entry) =>
+      _cleanupCoverPath(entry.previewPath);
 
+  /// Only files inside the persistent root are ever deleted here.
   static Future<void> _cleanupCoverPath(String? coverPath) async {
-    if (coverPath == null || coverPath.isEmpty) return;
-    if (_isPathInsidePersistentRoot(coverPath)) {
-      await _cleanupPersistentCoverPath(coverPath);
-    } else {
-      await _cleanupTempCoverPath(coverPath);
+    if (coverPath == null ||
+        coverPath.isEmpty ||
+        !_isPathInsidePersistentRoot(coverPath)) {
+      return;
     }
-  }
-
-  static void _scheduleTempCoverCleanup(String? coverPath) {
-    unawaited(_cleanupTempCoverPath(coverPath));
-  }
-
-  static Future<void> _cleanupPersistentCoverPath(String? coverPath) async {
-    if (coverPath == null || coverPath.isEmpty) return;
     await _deleteFileIfPresent(File(coverPath));
     await _deleteFileIfPresent(File(_persistentSourceSidecarPath(coverPath)));
-  }
-
-  static Future<void> _cleanupTempCoverPath(String? coverPath) async {
-    if (coverPath == null || coverPath.isEmpty) return;
-    try {
-      final file = File(coverPath);
-      await _deleteFileIfPresent(file);
-      try {
-        await file.parent.delete(recursive: true);
-      } catch (_) {}
-    } catch (_) {}
   }
 
   static Future<void> _deleteFileIfPresent(File file) async {
