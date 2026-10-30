@@ -4,6 +4,7 @@ import 'package:path/path.dart';
 import 'package:mornye/utils/logger.dart';
 import 'package:mornye/utils/audio_format_utils.dart';
 import 'package:mornye/utils/file_access.dart';
+import 'package:mornye/services/album_completeness.dart';
 import 'package:mornye/services/history_database.dart';
 import 'package:mornye/services/library_queue_store.dart';
 import 'package:mornye/services/library_file_sizes.dart';
@@ -139,6 +140,8 @@ class LibraryDatabase {
   }) async {
     final db = await database;
     await _ensureHistoryAttached(db);
+    // The row check runs only on the matching rows, so a search after a
+    // write keeps it rather than wait for a snapshot build.
     return _shadowRead(
       db,
       includeLocal,
@@ -155,15 +158,18 @@ class LibraryDatabase {
             limit: limit,
             offset: offset,
           ),
+      rebuild: false,
     );
   }
 
   /// [includeLocal] reads scanned rows, which the shadow snapshot serves.
+  /// [rebuild] false keeps the row check while the snapshot is stale.
   Future<T> _shadowRead<T>(
     Database db,
     bool includeLocal,
-    Future<T> Function(bool snapshot) read,
-  ) => includeLocal ? _shadow.read(db, read) : read(false);
+    Future<T> Function(bool snapshot) read, {
+    bool rebuild = true,
+  }) => includeLocal ? _shadow.read(db, read, rebuild: rebuild) : read(false);
 
   Future<void> _ensureHistoryAttached(Database db) async {
     if (_historyAttached) return;
@@ -411,6 +417,7 @@ class LibraryDatabase {
     Future<T> Function(LibraryQueueStore store) read, {
     required bool includeLocal,
     QueueLibraryDbQuery? sizes,
+    bool rebuild = true,
   }) async {
     final db = await database;
     await _ensureHistoryAttached(db);
@@ -431,15 +438,20 @@ class LibraryDatabase {
           shadowSnapshot: snapshot,
         ),
       ),
+      rebuild: rebuild,
     );
   }
 
+  /// After a write a page keeps the row check, at its old cost, rather than
+  /// wait for a snapshot build. An album completeness filter assesses every
+  /// album, so it builds one.
   Future<QueueLibraryDbPage> getQueueTrackPageResult(
     QueueLibraryDbQuery request,
   ) => _queueRead(
     (store) => store.trackPage(request),
     includeLocal: request.includeLocal,
     sizes: request,
+    rebuild: isAlbumCompletenessFilter(request.metadata),
   );
 
   Future<QueueLibraryCounts> getQueueCounts(QueueLibraryDbQuery request) =>

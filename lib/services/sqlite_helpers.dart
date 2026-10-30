@@ -554,45 +554,84 @@ class LibraryShadowSnapshot {
   Database? _db;
   String? _stamp;
   Future<String?>? _building;
+  // A failed build is tried again only once the data has changed.
+  ({Database db, String stamp})? _failed;
+  Database? _buildWarned;
+  Database? _queryWarned;
   int _rebuilds = 0;
 
+  /// Builds started, failed ones included.
   @visibleForTesting
   int get rebuilds => _rebuilds;
 
   /// The stamp of a current [libraryShadowTable], or null to keep the
-  /// per-row check, as when the platform returns no stamp.
-  Future<String?> refresh(Database db) async {
+  /// per-row check, as when the platform returns no stamp. With [rebuild]
+  /// false a stale table is not built and also gives null.
+  Future<String?> refresh(Database db, {bool rebuild = true}) async {
     // A rebuild in flight may have read the files before the caller's write.
     final building = _building;
-    if (building != null) await building;
+    if (building != null) {
+      if (!rebuild) return null;
+      await building;
+    }
     final stamp = await readWriteStamp(db, _schemas);
     if (stamp == null) return null;
     if (identical(db, _db) && stamp == _stamp) return stamp;
-    return _building ??= _rebuild(db).whenComplete(() => _building = null);
+    final failed = _failed;
+    if (!rebuild ||
+        (failed != null && identical(failed.db, db) && failed.stamp == stamp)) {
+      return null;
+    }
+    return _building ??= _rebuild(
+      db,
+      stamp,
+    ).whenComplete(() => _building = null);
   }
 
   /// Runs [query] on [libraryShadowTable] when the table stays current
   /// until [query] has finished. Otherwise, as after a write between the
   /// two, its rows and the table could be from different states, so
-  /// [query] runs again with the per-row check.
+  /// [query] runs again with the per-row check. [rebuild] false suits reads
+  /// the row check keeps cheap, such as a page that stops after a few rows:
+  /// they use the table only when it is already current, never waiting for
+  /// a build.
   Future<T> read<T>(
     Database db,
-    Future<T> Function(bool snapshot) query,
-  ) async {
-    final stamp = await refresh(db);
+    Future<T> Function(bool snapshot) query, {
+    bool rebuild = true,
+  }) async {
+    final stamp = await refresh(db, rebuild: rebuild);
     if (stamp == null) return query(false);
     try {
       final result = await query(true);
       if (await readWriteStamp(db, _schemas) == stamp) return result;
-    } on DatabaseException {
+    } on DatabaseException catch (error) {
       // A failed rebuild can leave no table; the row check needs none.
+      if (!identical(_queryWarned, db)) {
+        _queryWarned = db;
+        _log.w(
+          'Download shadow snapshot query failed; using the row check: $error',
+        );
+      }
     }
     return query(false);
   }
 
-  Future<String?> _rebuild(Database db) async {
+  String? _buildFailed(Database db, String stamp, Object error) {
+    _failed = (db: db, stamp: stamp);
+    if (!identical(_buildWarned, db)) {
+      _buildWarned = db;
+      _log.w(
+        'Download shadow snapshot unavailable; using the row check: $error',
+      );
+    }
+    return null;
+  }
+
+  Future<String?> _rebuild(Database db, String stamp) async {
     _db = null;
     _stamp = null;
+    _rebuilds++;
     try {
       final sizes = (await db.rawQuery(
         'SELECT (SELECT COUNT(*) FROM library) AS library_rows, '
@@ -627,17 +666,16 @@ class LibraryShadowSnapshot {
                 )
                 ..rawQuery('SELECT total_changes()'))
               .apply();
-      _rebuilds++;
-      final stamp = _writeStamp(results, const [0, 1, 9]);
-      if (stamp == null) return null;
+      final built = _writeStamp(results, const [0, 1, 9]);
+      if (built == null) {
+        return _buildFailed(db, stamp, 'no write stamp after the build');
+      }
       _db = db;
-      _stamp = stamp;
-      return stamp;
+      _stamp = built;
+      _failed = null;
+      return built;
     } catch (error) {
-      _log.w(
-        'Download shadow snapshot unavailable; using the row check: $error',
-      );
-      return null;
+      return _buildFailed(db, stamp, error);
     }
   }
 

@@ -13,6 +13,7 @@ import 'package:mornye/services/library_queue_store.dart';
 import 'package:mornye/services/library_row_mapper.dart';
 import 'package:mornye/services/library_search.dart';
 import 'package:mornye/services/sqlite_helpers.dart' as sqlite;
+import 'package:mornye/utils/logger.dart';
 
 const _sources = ['legacy', 'music', 'offline', 'disabled'];
 
@@ -397,6 +398,18 @@ Future<void> _expectCurrent(String step) async {
   expect(await _shadowPairs(db), await _currentPairs(db), reason: step);
 }
 
+/// Keeps warnings in [LogBuffer] for the rest of the test, from an empty one.
+void _captureWarnings() {
+  final enabled = LogBuffer.loggingEnabled;
+  LogBuffer.loggingEnabled = true;
+  LogBuffer().clear();
+  addTearDown(() => LogBuffer.loggingEnabled = enabled);
+}
+
+int _warnings(String text) => LogBuffer().entries
+    .where((entry) => entry.level == 'WARN' && entry.message.contains(text))
+    .length;
+
 Future<int> _scannedSongs() async =>
     (await LibraryDatabase.instance.getQueueCounts(
       const QueueLibraryDbQuery(source: 'local'),
@@ -431,9 +444,13 @@ void main() {
       () async {
         await _seed(extraDownloads: extraDownloads);
         final db = await LibraryDatabase.instance.database;
-        // Size sorts read the size index this call creates.
+        // Size sorts read the size index this page creates; the counts
+        // build the snapshot.
         await LibraryDatabase.instance.getQueueTrackPageResult(
           const QueueLibraryDbQuery(sortMode: 'size-desc'),
+        );
+        await LibraryDatabase.instance.getQueueCounts(
+          const QueueLibraryDbQuery(),
         );
         final sizes = (await db.rawQuery(
           'SELECT (SELECT COUNT(*) FROM library) AS library, '
@@ -674,6 +691,134 @@ void main() {
       expect(modes, writer == 'none' ? [true] : [true, false], reason: writer);
       expect(counts, _counts(await _store(db).counts(scanned)), reason: writer);
     }
+  });
+
+  test(
+    'a page or a search after a write does not build the snapshot',
+    () async {
+      await _seed();
+      final library = LibraryDatabase.instance;
+      await library.getQueueCounts(const QueueLibraryDbQuery());
+      final db = await library.database;
+      final built = await _shadowPairs(db);
+      // The download shadows l-4-1, which the built snapshot does not hold.
+      await HistoryDatabase.instance.upsert(
+        _download('h-new', _saf(4, 1), album: 4, number: 1),
+      );
+      const page = QueueLibraryDbQuery(source: 'local', limit: 1000);
+      expect(
+        (await library.getQueueTrackPageResult(page)).rows,
+        (await _store(db).trackPage(page)).rows,
+      );
+      expect(
+        _hits(
+          await library.searchLibrary(
+            query: 'song',
+            kind: LibrarySearchKind.songs,
+            includeLocal: true,
+            limit: 1000,
+          ),
+        ),
+        _hits(
+          await LibrarySearchStore(
+            db,
+            historyFts: HistoryDatabase.instance.searchFtsAvailable,
+            localFts: library.searchFtsAvailable,
+          ).search(
+            query: 'song',
+            kind: LibrarySearchKind.songs,
+            includeLocal: true,
+            limit: 1000,
+          ),
+        ),
+      );
+      expect(await _shadowPairs(db), built);
+      expect(await _currentPairs(db), isNot(built));
+
+      // A completeness filter assesses every album, so it builds one.
+      const incomplete = QueueLibraryDbQuery(
+        metadata: incompleteAlbumFilter,
+        limit: 1000,
+      );
+      expect(
+        (await library.getQueueTrackPageResult(incomplete)).rows,
+        (await _store(db).trackPage(incomplete)).rows,
+      );
+      expect(await _shadowPairs(db), await _currentPairs(db));
+    },
+  );
+
+  test('a read that does not build uses only a current snapshot', () async {
+    await _seed();
+    final library = LibraryDatabase.instance;
+    await library.getQueueCounts(const QueueLibraryDbQuery());
+    final db = await library.database;
+    final snapshot = sqlite.LibraryShadowSnapshot();
+    Future<bool> pageRead() =>
+        snapshot.read(db, (snap) async => snap, rebuild: false);
+    expect(await pageRead(), isFalse);
+    expect(snapshot.rebuilds, 0);
+    expect(await snapshot.refresh(db), isNotNull);
+    expect(await pageRead(), isTrue);
+    await HistoryDatabase.instance.upsert(
+      _download('h-new', _saf(4, 1), album: 4, number: 1),
+    );
+    expect(await pageRead(), isFalse);
+    expect(snapshot.rebuilds, 1);
+  });
+
+  test('a failed build waits for the next write and warns once', () async {
+    _captureWarnings();
+    final db = await _connection(inMemoryDatabasePath);
+    addTearDown(db.close);
+    await db.execute('ATTACH DATABASE ? AS history_db', [':memory:']);
+    // Without History tables every build fails.
+    await db.execute('CREATE TABLE library(id TEXT PRIMARY KEY)');
+    await db.execute(
+      'CREATE TABLE library_path_keys(item_id TEXT NOT NULL, '
+      'path_key TEXT NOT NULL)',
+    );
+    final snapshot = sqlite.LibraryShadowSnapshot();
+    for (var i = 0; i < 3; i++) {
+      expect(await snapshot.read(db, (snap) async => snap), isFalse);
+    }
+    expect(snapshot.rebuilds, 1);
+    await db.insert('library', {'id': 'a'});
+    expect(await snapshot.refresh(db), isNull);
+    expect(await snapshot.refresh(db), isNull);
+    expect(snapshot.rebuilds, 2);
+    expect(_warnings('Download shadow snapshot unavailable'), 1);
+
+    await db.execute('CREATE TABLE history_db.history(id TEXT)');
+    await db.execute(
+      'CREATE TABLE history_db.history_path_keys(item_id TEXT NOT NULL, '
+      'path_key TEXT NOT NULL)',
+    );
+    // DDL is no data change; the next write is.
+    expect(await snapshot.refresh(db), isNull);
+    await db.insert('library', {'id': 'b'});
+    expect(await snapshot.read(db, (snap) async => snap), isTrue);
+    expect(snapshot.rebuilds, 3);
+  });
+
+  test('a failing snapshot query keeps the row check and warns once', () async {
+    await _seed();
+    final library = LibraryDatabase.instance;
+    await library.getQueueCounts(const QueueLibraryDbQuery());
+    final db = await library.database;
+    final snapshot = sqlite.LibraryShadowSnapshot();
+    expect(await snapshot.refresh(db), isNotNull);
+    _captureWarnings();
+    for (var i = 0; i < 2; i++) {
+      final modes = <bool>[];
+      await snapshot.read(db, (snap) async {
+        modes.add(snap);
+        if (snap) await db.rawQuery('SELECT * FROM temp.no_such_snapshot');
+        return snap;
+      });
+      expect(modes, [true, false]);
+    }
+    expect(_warnings('Download shadow snapshot query failed'), 1);
   });
 
   test('without a stamp the reads keep the row check', () async {
