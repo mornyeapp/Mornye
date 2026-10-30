@@ -81,6 +81,9 @@ pub(crate) struct Song {
     pub(crate) isrc: Option<String>,
     pub(crate) match_key: Option<String>,
     pub(crate) cover_path: Option<PathBuf>,
+    /// The desktop's copy of the song's web cover, used only when no cover
+    /// file or embedded picture serves.
+    pub(crate) web_cover_path: Option<PathBuf>,
     pub(crate) added_ms: Option<i64>,
     pub(crate) track_gain: Option<f64>,
     pub(crate) album_gain: Option<f64>,
@@ -117,6 +120,12 @@ impl Song {
     pub(crate) fn embedded_cover_format(&self) -> Option<&'static str> {
         cover_format(&self.suffix)
     }
+
+    /// Whether the song has a cover file or a container that can embed a
+    /// picture, the sources tried before a web copy.
+    fn has_own_cover(&self) -> bool {
+        self.cover_path.is_some() || self.embedded_cover_format().is_some()
+    }
 }
 
 /// The `mornye_core::tags::extract_cover` format for a file with `suffix`
@@ -138,7 +147,8 @@ pub(crate) fn cover_format(suffix: &str) -> Option<&'static str> {
 }
 
 /// Where the image behind a `coverArt` id comes from: the first of `files`
-/// still on disk, else the first picture embedded in `embedded`.
+/// still on disk, else the first picture embedded in `embedded`, else the
+/// first of `web` still on disk.
 #[derive(Debug)]
 pub(crate) struct CoverSource<'a> {
     /// Separate image files, tried in order.
@@ -146,6 +156,8 @@ pub(crate) struct CoverSource<'a> {
     /// Pictures embedded in these audio files (path and
     /// [`Song::embedded_cover_format`]), tried in order.
     pub(crate) embedded: Vec<(&'a Path, &'static str)>,
+    /// Copies of web covers ([`Song::web_cover_path`]), tried in order.
+    pub(crate) web: Vec<&'a Path>,
 }
 
 /// Songs grouped by album key.
@@ -159,7 +171,7 @@ pub(crate) struct Album {
     /// Song indexes by disc, track, then title.
     pub(crate) songs: Vec<usize>,
     /// The first song (in album order) with a cover file, else the first
-    /// whose container can embed a cover.
+    /// whose container can embed a cover, else the first with a web copy.
     pub(crate) cover: Option<usize>,
     pub(crate) year: Option<i32>,
     pub(crate) genre: Option<String>,
@@ -179,7 +191,8 @@ pub(crate) struct Artist {
     pub(crate) albums: Vec<usize>,
     /// Albums with at least one song by this artist.
     pub(crate) appears_on: Vec<usize>,
-    /// The first owned (else appeared-on) album with a cover.
+    /// The first owned (else appeared-on) album with a cover; an album whose
+    /// only cover is a web copy only when no other has one.
     pub(crate) cover_album: Option<usize>,
     /// Folded name, for sorting and search.
     sort_name: Box<str>,
@@ -331,7 +344,7 @@ impl Catalog {
         let album = &self.albums[song.album];
         if album.cover.is_some() {
             Some(&album.id)
-        } else if song.cover_path.is_some() {
+        } else if song.cover_path.is_some() || song.web_cover_path.is_some() {
             Some(&song.id)
         } else {
             None
@@ -353,7 +366,8 @@ impl Catalog {
     /// The image behind a `coverArt` id (album, artist or song id): a song's
     /// own cover file, else its album's cover file, else the pictures
     /// embedded in the song itself and then in its album's songs, in album
-    /// order. A listed file that is gone falls through to the next.
+    /// order, else the song's own web copy, else its album's first (album
+    /// order). A listed file that is gone falls through to the next.
     pub(crate) fn cover_source(&self, id: &str) -> Option<CoverSource<'_>> {
         let (album, own) = if let Some(index) = self.album_index(id) {
             (index, None)
@@ -390,7 +404,23 @@ impl Catalog {
             })
             .take(EMBEDDED_COVER_TRIES)
             .collect();
-        (!files.is_empty() || !embedded.is_empty()).then_some(CoverSource { files, embedded })
+        let mut web: Vec<&Path> = own
+            .and_then(|index| self.songs[index].web_cover_path.as_deref())
+            .into_iter()
+            .collect();
+        if let Some(path) = album
+            .songs
+            .iter()
+            .find_map(|index| self.songs[*index].web_cover_path.as_deref())
+            && !web.contains(&path)
+        {
+            web.push(path);
+        }
+        (!files.is_empty() || !embedded.is_empty() || !web.is_empty()).then_some(CoverSource {
+            files,
+            embedded,
+            web,
+        })
     }
 
     /// Songs matching every term (title, artist or album), export order.
@@ -542,6 +572,7 @@ impl Builder {
             isrc: non_empty(row.isrc),
             match_key: non_empty(row.match_key),
             cover_path: non_empty(row.cover_path).map(PathBuf::from),
+            web_cover_path: non_empty(row.web_cover_path).map(PathBuf::from),
             added_ms: row.added_ms,
             track_gain: row.track_gain,
             album_gain: row.album_gain,
@@ -663,6 +694,13 @@ impl Builder {
                         .iter()
                         .copied()
                         .find(|index| songs[*index].embedded_cover_format().is_some())
+                })
+                .or_else(|| {
+                    album
+                        .songs
+                        .iter()
+                        .copied()
+                        .find(|index| songs[*index].web_cover_path.is_some())
                 });
             album.year = members.clone().find_map(|song| song.year);
             album.genre = members.clone().find_map(|song| song.genre.clone());
@@ -695,11 +733,15 @@ impl Builder {
                         &albums[*b].id,
                     ))
             });
-            artist.cover_album = artist
-                .browse_albums()
+            // An album whose only cover is a web copy comes last.
+            let cover =
+                |album: &usize| albums[*album].cover.map(|song| songs[song].has_own_cover());
+            let browse = artist.browse_albums();
+            artist.cover_album = browse
                 .iter()
                 .copied()
-                .find(|album| albums[*album].cover.is_some());
+                .find(|album| cover(album) == Some(true))
+                .or_else(|| browse.iter().copied().find(|album| cover(album).is_some()));
         }
 
         let mut genres: Vec<Genre> = Vec::new();

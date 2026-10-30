@@ -1,5 +1,6 @@
 use super::*;
-use crate::subsonic::covers::{CACHE_DIR, embeds_picture, trim_cache};
+use crate::subsonic::covers::{CACHE_DIR, embeds_picture, read_picture, trim_cache};
+use std::io::{Cursor, Read, Seek, SeekFrom};
 
 fn cached_files(fixture: &Fixture) -> Vec<PathBuf> {
     std::fs::read_dir(fixture.shared.config.temp_dir.join(CACHE_DIR))
@@ -203,7 +204,7 @@ fn picture_block(image: &[u8]) -> Vec<u8> {
 
 /// A FLAC with `image` embedded, and one of the same length without a
 /// picture (a PADDING block instead).
-fn flac_pair(image: &[u8]) -> (Vec<u8>, Vec<u8>) {
+pub(super) fn flac_pair(image: &[u8]) -> (Vec<u8>, Vec<u8>) {
     let picture = picture_block(image);
     (flac(6, &picture), flac(1, &vec![0; picture.len()]))
 }
@@ -300,6 +301,49 @@ fn embeds_picture_tells_files_with_a_picture_from_the_rest() {
     assert_eq!(embeds_picture(dir.path()), None);
 }
 
+/// Bytes whose reads fail from `after` on, like a disk that went away.
+struct Failing {
+    bytes: Cursor<Vec<u8>>,
+    after: u64,
+}
+
+impl Read for Failing {
+    fn read(&mut self, buffer: &mut [u8]) -> std::io::Result<usize> {
+        let left = self.after.saturating_sub(self.bytes.position());
+        if left == 0 {
+            return Err(std::io::Error::other("disk gone"));
+        }
+        let take = buffer
+            .len()
+            .min(usize::try_from(left).unwrap_or(usize::MAX));
+        self.bytes.read(&mut buffer[..take])
+    }
+}
+
+impl Seek for Failing {
+    fn seek(&mut self, position: SeekFrom) -> std::io::Result<u64> {
+        self.bytes.seek(position)
+    }
+}
+
+#[test]
+fn a_failed_read_is_not_a_file_without_a_picture() {
+    let (with, without) = flac_pair(&png(8, 8));
+    assert!(matches!(
+        read_picture(Cursor::new(with.clone()), "flac"),
+        Ok(Some(_))
+    ));
+    assert!(matches!(
+        read_picture(Cursor::new(without), "flac"),
+        Ok(None)
+    ));
+    let failing = Failing {
+        bytes: Cursor::new(with),
+        after: 12,
+    };
+    assert!(read_picture(failing, "flac").is_err(), "not remembered");
+}
+
 #[tokio::test]
 async fn a_missing_cover_file_falls_back_to_the_embedded_picture() {
     let original = png(40, 20);
@@ -392,7 +436,7 @@ async fn small_cover(fixture: &Fixture, id: &str, headers: HeaderMap) -> Reply {
         .await
 }
 
-async fn json_cover(fixture: &Fixture, id: &str) -> Reply {
+pub(super) async fn json_cover(fixture: &Fixture, id: &str) -> Reply {
     fixture
         .raw(
             "getCoverArt",

@@ -500,6 +500,110 @@ fn a_cover_source_lists_every_fallback_in_order() {
     );
 }
 
+/// The web copies tried last for `id`.
+fn web_copies<'a>(catalog: &'a Catalog, id: &str) -> Vec<&'a Path> {
+    catalog
+        .cover_source(id)
+        .map(|source| source.web)
+        .unwrap_or_default()
+}
+
+#[test]
+fn web_copies_come_after_every_other_cover() {
+    let web = |name: &str| json!(format!("/web/{name}.png"));
+    let catalog = catalog(&[
+        // A line from before web copies, and ones without a copy.
+        row("h:1", "One", "Band", json!({ "album": "H", "track": 1 })),
+        row(
+            "h:2",
+            "Two",
+            "Band",
+            json!({ "album": "H", "track": 2, "webCoverPath": null }),
+        ),
+        row(
+            "h:3",
+            "Three",
+            "Band",
+            json!({ "album": "H", "track": 3, "webCoverPath": "" }),
+        ),
+        // A copy ahead of a cover file and of an embeddable song.
+        row(
+            "i:1",
+            "One",
+            "Band",
+            json!({ "album": "I", "track": 1, "suffix": "dsf", "webCoverPath": web("i1") }),
+        ),
+        row(
+            "i:2",
+            "Two",
+            "Band",
+            json!({ "album": "I", "track": 2, "coverPath": "/c/i2.jpg" }),
+        ),
+        row(
+            "j:1",
+            "One",
+            "Band",
+            json!({ "album": "J", "track": 1, "suffix": "dsf", "webCoverPath": web("j1") }),
+        ),
+        row(
+            "j:2",
+            "Two",
+            "Band",
+            json!({ "album": "J", "track": 2, "webCoverPath": web("j2") }),
+        ),
+        // Only web copies, in a format that cannot embed a picture.
+        row(
+            "k:1",
+            "One",
+            "Solo",
+            json!({ "album": "K", "track": 1, "suffix": "dsf", "webCoverPath": web("k1") }),
+        ),
+        row(
+            "k:2",
+            "Two",
+            "Solo",
+            json!({ "album": "K", "track": 2, "suffix": "dsf", "webCoverPath": web("k2") }),
+        ),
+        // The artist's first album has only a copy, a later one its own.
+        row(
+            "m:1",
+            "One",
+            "Mixed",
+            json!({ "album": "A First", "suffix": "dsf", "webCoverPath": web("m1") }),
+        ),
+        row("m:2", "Two", "Mixed", json!({ "album": "B Second" })),
+    ]);
+    for id in ["h:1", "h:2", "h:3"] {
+        assert_eq!(catalog.song(id).expect("song").web_cover_path, None);
+    }
+    assert!(web_copies(&catalog, "h:1").is_empty());
+
+    assert_eq!(album_of(&catalog, "i:1").cover, catalog.song_index("i:2"));
+    assert_eq!(cover_files(&catalog, "i:1"), [Path::new("/c/i2.jpg")]);
+    assert_eq!(web_copies(&catalog, "i:1"), [Path::new("/web/i1.png")]);
+    assert_eq!(album_of(&catalog, "j:1").cover, catalog.song_index("j:2"));
+    assert_eq!(
+        web_copies(&catalog, "j:2"),
+        [Path::new("/web/j2.png"), Path::new("/web/j1.png")],
+        "its own copy, then its album's first"
+    );
+
+    let k = album_of(&catalog, "k:1");
+    assert_eq!(k.cover, catalog.song_index("k:1"));
+    let two = catalog.song_index("k:2").expect("song");
+    assert_eq!(catalog.song_cover_id(two), Some(k.id.as_str()));
+    assert!(embedded(&catalog, "k:2").is_empty());
+    assert!(cover_files(&catalog, "k:2").is_empty());
+    assert_eq!(web_copies(&catalog, &k.id), [Path::new("/web/k1.png")]);
+    // An artist's cover comes from an album with a cover of its own first.
+    let album = |id: &str| catalog.song(id).expect("song").album;
+    let artist = |id: &str| {
+        &catalog.artists()[catalog.songs()[catalog.song_index(id).expect("song")].artist_ref]
+    };
+    assert_eq!(artist("m:1").cover_album, Some(album("m:2")));
+    assert_eq!(artist("k:1").cover_album, Some(album("k:1")));
+}
+
 /// Run with `cargo test --release -p mornye-link -- --ignored --nocapture`.
 #[test]
 #[ignore = "timing check for release builds"]

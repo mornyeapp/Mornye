@@ -7,6 +7,7 @@ mod covers;
 mod forward;
 mod lyrics;
 mod media;
+mod web_covers;
 mod xml;
 
 use super::*;

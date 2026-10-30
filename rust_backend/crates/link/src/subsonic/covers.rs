@@ -15,10 +15,11 @@ use http::{HeaderMap, Response};
 use image::codecs::jpeg::JpegEncoder;
 use image::imageops::FilterType;
 use image::{ImageReader, Limits};
+use mornye_core::tags::CoverArt;
 use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 use std::fs;
-use std::io::{Cursor, Read};
+use std::io::{self, Cursor, Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{LazyLock, Mutex, MutexGuard, PoisonError};
@@ -57,9 +58,10 @@ pub(super) async fn cover_art(
         .into_iter()
         .map(|(path, format)| (path.to_owned(), format))
         .collect();
+    let web: Vec<PathBuf> = source.web.into_iter().map(Path::to_owned).collect();
     let dir = shared.config.temp_dir.join(CACHE_DIR);
     let cache = dir.clone();
-    let image = tokio::task::spawn_blocking(move || find_image(&cache, &files, &candidates))
+    let image = tokio::task::spawn_blocking(move || find_image(&cache, &files, &candidates, &web))
         .await
         .ok()
         .flatten()
@@ -117,27 +119,30 @@ struct Image {
 
 /// The first of `files` on disk, else the first picture embedded in
 /// `candidates` (audio file and extraction format), extracted into `dir` on
-/// first use. Blocking.
+/// first use, else the first of `web` on disk. Blocking.
 fn find_image(
     dir: &Path,
     files: &[PathBuf],
     candidates: &[(PathBuf, &'static str)],
+    web: &[PathBuf],
 ) -> Option<Image> {
+    let on_disk = |path: &PathBuf| {
+        let metadata = fs::metadata(path).ok().filter(fs::Metadata::is_file)?;
+        Some(Image {
+            path: path.clone(),
+            len: metadata.len(),
+            stamp: version_stamp(path, &metadata),
+        })
+    };
     files
         .iter()
-        .find_map(|path| {
-            let metadata = fs::metadata(path).ok().filter(fs::Metadata::is_file)?;
-            Some(Image {
-                path: path.clone(),
-                len: metadata.len(),
-                stamp: version_stamp(path, &metadata),
-            })
-        })
+        .find_map(on_disk)
         .or_else(|| {
             candidates
                 .iter()
                 .find_map(|(audio, format)| extract_cached(dir, audio, format))
         })
+        .or_else(|| web.iter().find_map(on_disk))
 }
 
 /// Identifies one version of a file: its path, mtime and length.
@@ -172,9 +177,10 @@ fn remember_without_picture(key: [u8; 16]) {
 }
 
 /// Whether the audio file at `path` embeds a picture `getCoverArt` would
-/// serve; `None` when it is not a readable file. A file whose format cannot
-/// embed one has none. Reads the picture without decoding it, and remembers
-/// a file without one as `getCoverArt` does. Blocking.
+/// serve; `None` when it is not a readable file or reading it failed. A file
+/// whose format cannot embed one has none. Reads the picture without
+/// decoding it, and remembers a file read without one as `getCoverArt`
+/// does. Blocking.
 pub fn embeds_picture(path: &Path) -> Option<bool> {
     let metadata = fs::metadata(path).ok().filter(fs::Metadata::is_file)?;
     let suffix = path
@@ -189,19 +195,64 @@ pub fn embeds_picture(path: &Path) -> Option<bool> {
     if without_picture().contains(&key) {
         return Some(false);
     }
-    let mut file = fs::File::open(path).ok()?;
-    match mornye_core::tags::extract_cover(&mut file, format, &|| Ok(())) {
-        Ok(cover) if !cover.data.is_empty() => Some(true),
-        _ => {
+    match read_picture(fs::File::open(path).ok()?, format).ok()? {
+        Some(_) => Some(true),
+        None => {
             remember_without_picture(key);
             Some(false)
         }
     }
 }
 
+/// The picture embedded in `file`: `Ok(None)` when it has none
+/// `extract_cover` can read, `Err` when reading the file failed, which is
+/// not an answer to remember.
+pub(super) fn read_picture(file: impl Read + Seek, format: &str) -> Result<Option<CoverArt>, ()> {
+    let mut file = Watched {
+        file,
+        failed: false,
+    };
+    match mornye_core::tags::extract_cover(&mut file, format, &|| Ok(())) {
+        Ok(cover) if !cover.data.is_empty() => Ok(Some(cover)),
+        _ if file.failed => Err(()),
+        _ => Ok(None),
+    }
+}
+
+/// A file that notes whether a read or seek failed.
+struct Watched<F> {
+    file: F,
+    failed: bool,
+}
+
+impl<F> Watched<F> {
+    fn note<T>(&mut self, result: io::Result<T>) -> io::Result<T> {
+        if let Err(error) = &result
+            && error.kind() != io::ErrorKind::Interrupted
+        {
+            self.failed = true;
+        }
+        result
+    }
+}
+
+impl<F: Read> Read for Watched<F> {
+    fn read(&mut self, buffer: &mut [u8]) -> io::Result<usize> {
+        let result = self.file.read(buffer);
+        self.note(result)
+    }
+}
+
+impl<F: Seek> Seek for Watched<F> {
+    fn seek(&mut self, position: SeekFrom) -> io::Result<u64> {
+        let result = self.file.seek(position);
+        self.note(result)
+    }
+}
+
 /// The cached picture of `audio`, extracted when missing. `None` when the
-/// file is unreadable or embeds no picture (remembered), or the cache is
-/// unwritable.
+/// file is unreadable, or embeds no picture (remembered once read), or the
+/// cache is unwritable.
 fn extract_cached(dir: &Path, audio: &Path, format: &str) -> Option<Image> {
     let metadata = fs::metadata(audio).ok().filter(fs::Metadata::is_file)?;
     // The picture is a version of the audio file, whatever its cached copy.
@@ -224,10 +275,9 @@ fn extract_cached(dir: &Path, audio: &Path, format: &str) -> Option<Image> {
     {
         return Some(Image { path, len, stamp });
     }
-    let mut file = fs::File::open(audio).ok()?;
-    let cover = match mornye_core::tags::extract_cover(&mut file, format, &|| Ok(())) {
-        Ok(cover) if !cover.data.is_empty() => cover,
-        _ => {
+    let cover = match read_picture(fs::File::open(audio).ok()?, format).ok()? {
+        Some(cover) => cover,
+        None => {
             remember_without_picture(key);
             return None;
         }

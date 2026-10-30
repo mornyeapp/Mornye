@@ -85,6 +85,8 @@ pub(super) struct Row {
     pub(super) match_key: Option<String>,
     #[serde(deserialize_with = "text")]
     pub(super) cover_path: Option<String>,
+    #[serde(deserialize_with = "text")]
+    pub(super) web_cover_path: Option<String>,
     #[serde(deserialize_with = "integer")]
     pub(super) added_ms: Option<i64>,
     #[serde(deserialize_with = "decimal")]
