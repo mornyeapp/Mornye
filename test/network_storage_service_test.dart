@@ -334,6 +334,53 @@ void main() {
     }
   });
 
+  test('a rejected cover never holds a pooled connection', () async {
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(() => server.close(force: true));
+    server.listen((request) async {
+      final response = request.response;
+      switch (request.uri.pathSegments.last) {
+        case 'song.flac':
+          response.headers.contentType = ContentType('audio', 'flac');
+          response.add(List.filled(64, 1));
+        case 'page.jpg':
+          response.headers.contentType = ContentType.html;
+          response.write('<html></html>');
+        default:
+          response.statusCode = HttpStatus.notFound;
+          response.write('missing');
+      }
+      await response.close();
+    });
+    final service = NetworkStorageService(
+      read: () async => null,
+      write: (_) async {},
+      ensureAccess: (_) async {},
+    );
+    addTearDown(service.dispose);
+    await service.save(
+      connection('http://127.0.0.1:${server.port}/art/', id: 'web'),
+    );
+    final temp = await Directory.systemTemp.createTemp('network-cover-');
+    addTearDown(() => temp.delete(recursive: true));
+    // Six pooled connections: a rejected response left unread would keep
+    // the seventh request from starting.
+    for (var attempt = 0; attempt < 8; attempt++) {
+      for (final name in ['missing.jpg', 'song.flac', 'page.jpg']) {
+        await expectLater(
+          service
+              .downloadCover(
+                NetworkStorageService.source('web', name),
+                File('${temp.path}/$attempt.image'),
+              )
+              .timeout(const Duration(seconds: 5)),
+          throwsA(isA<HttpException>()),
+          reason: '$attempt $name',
+        );
+      }
+    }
+  });
+
   test('a Subsonic 404 document reports the cover missing', () async {
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     addTearDown(() => server.close(force: true));

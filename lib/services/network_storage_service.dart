@@ -1168,7 +1168,7 @@ class NetworkStorageService {
           return (
             status: HttpStatus.requestedRangeNotSatisfiable,
             headers: {
-              HttpHeaders.contentLengthHeader: '0',
+              if (method == 'GET') HttpHeaders.contentLengthHeader: '0',
               HttpHeaders.contentRangeHeader: 'bytes */${file.size}',
             },
             bytes: const Stream<List<int>>.empty(),
