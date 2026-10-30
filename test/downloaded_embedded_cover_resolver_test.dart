@@ -170,6 +170,42 @@ void main() {
   );
 
   test(
+    'an edited cover of a source without a timestamp gets a new path',
+    () async {
+      const untimed = 'content://example.documents/tree/nas/document/e.flac';
+      var cover = [7, 8];
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(backendChannel, (call) async {
+            if (call.method == 'getSafFileModTimes') return jsonEncode({});
+            expect(call.method, 'extractCoverToFile');
+            final args = call.arguments as Map<Object?, Object?>;
+            await File(args['output_path']! as String).writeAsBytes(cover);
+            return jsonEncode({'success': true});
+          });
+
+      final original = await DownloadedEmbeddedCoverResolver.resolveOrExtract(
+        untimed,
+      );
+      // A memory miss extracts the same cover to the same path.
+      await DownloadedEmbeddedCoverResolver.resetMemoryStateForTesting();
+      expect(
+        await DownloadedEmbeddedCoverResolver.resolveOrExtract(untimed),
+        original,
+      );
+
+      // Editing the cover in the app invalidates and extracts again.
+      cover = [9, 9, 9];
+      await DownloadedEmbeddedCoverResolver.invalidate(untimed);
+      final edited = await DownloadedEmbeddedCoverResolver.resolveOrExtract(
+        untimed,
+      );
+      expect(edited, isNot(original));
+      expect(await File(edited!).readAsBytes(), [9, 9, 9]);
+      expect(await File(original!).exists(), isFalse);
+    },
+  );
+
+  test(
     'cold resolve starts extraction and reports the cached preview',
     () async {
       final sourcePath = await createAudioFixture('cold-cache');

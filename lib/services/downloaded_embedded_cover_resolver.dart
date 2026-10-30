@@ -3,6 +3,7 @@ import 'dart:collection';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -618,7 +619,7 @@ class DownloadedEmbeddedCoverResolver {
         _persistentFileName(cleanPath, modTime),
       );
       // Without a timestamp a disk copy cannot be validated: it is extracted
-      // again once per memory miss, but under the same durable name.
+      // again once per memory miss and named by its content below.
       if (modTime != null &&
           !job.forceRefresh &&
           await _isReusablePersistentPreview(persistentPath, cleanPath)) {
@@ -674,9 +675,25 @@ class DownloadedEmbeddedCoverResolver {
         return null;
       }
 
+      // An unchanged cover keeps its path; an edited one gets a new path, so
+      // no decoded image of the old cover is shown for it.
+      final targetPath = modTime != null
+          ? persistentPath
+          : p.join(
+              directory.path,
+              _persistentFileName(
+                cleanPath,
+                null,
+                content: await _contentHash(outputPath),
+              ),
+            );
+      if (!_isCurrentExtraction(job)) {
+        await _cleanupCoverPath(outputPath);
+        return null;
+      }
       final finalPath = await _publishPersistentPreview(
         stagingPath: outputPath,
-        targetPath: persistentPath,
+        targetPath: targetPath,
         cleanPath: cleanPath,
       );
       outputPath = finalPath;
@@ -758,10 +775,21 @@ class DownloadedEmbeddedCoverResolver {
     return directory;
   }
 
-  /// A source without a timestamp (null [modTime]) keeps one `_0` preview.
-  static String _persistentFileName(String cleanPath, int? modTime) {
+  /// A source without a timestamp (null [modTime]) is named `_0_<content>`
+  /// by a hash of the extracted preview.
+  static String _persistentFileName(
+    String cleanPath,
+    int? modTime, {
+    String? content,
+  }) {
     return '${_persistentCacheVersion}_${_stablePathHash(cleanPath)}_'
-        '${(modTime ?? 0).toRadixString(16)}.jpg';
+        '${(modTime ?? 0).toRadixString(16)}'
+        '${content == null ? '' : '_$content'}.jpg';
+  }
+
+  static Future<String> _contentHash(String path) async {
+    final digest = await sha256.bind(File(path).openRead()).first;
+    return digest.toString().substring(0, 16);
   }
 
   /// Two independently mixed 63-bit FNV-1a lanes keep filenames compact.
@@ -828,8 +856,8 @@ class DownloadedEmbeddedCoverResolver {
       if (await sidecar.exists()) await sidecar.delete();
       await sidecarStaging.rename(sidecar.path);
 
-      if (await target.exists()) await target.delete();
-      await File(stagingPath).rename(targetPath);
+      // Rename replaces the target atomically, so readers never miss it.
+      await File(stagingPath).rename(target.path);
       return targetPath;
     } finally {
       await _deleteFileIfPresent(sidecarStaging);
