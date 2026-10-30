@@ -323,6 +323,12 @@ extension _LocalLibraryScan on LocalLibraryNotifier {
         if (skippedDownloads > 0) {
           _log.i('Skipped $skippedDownloads files already in download history');
         }
+        if (forceFullScan) {
+          // A forced scan rewrites thumbnails under their existing paths.
+          PaintingBinding.instance.imageCache
+            ..clear()
+            ..clearLiveImages();
+        }
 
         await _finishScan(
           sourceId: activeSourceId,

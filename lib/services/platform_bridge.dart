@@ -26,6 +26,10 @@ final _log = AppLogger('PlatformBridge');
 const foregroundServiceStartNotAllowedCode =
     'foreground_service_start_not_allowed';
 
+/// The marker a forced rescan writes into the Library cover directory
+/// (`LIBRARY_COVER_REGENERATE_MARKER` in the Rust backend).
+const libraryCoverRegenerateMarker = '.regenerate';
+
 bool isForegroundServiceStartNotAllowed(Object error) {
   return error is PlatformException &&
       error.code == foregroundServiceStartNotAllowedCode;
@@ -2531,12 +2535,14 @@ class PlatformBridge {
       for (final file in [output, File('${output.path}.state')]) {
         if (await file.exists()) await file.delete();
       }
-      // Preserve covers referenced by the current DB until ingestion succeeds.
-      // Fresh paths bypass native disk and Flutter image caches together.
+      // Native scans extract thumbnails older than this marker again under
+      // their stable names, so playlists and sessions keep valid paths.
       final covers = Directory('${scanDir.path}/library_covers');
       await covers.create(recursive: true);
-      final freshCovers = await covers.createTemp('full_scan_');
-      await setLibraryCoverCacheDir(freshCovers.path);
+      await File(
+        '${covers.path}/$libraryCoverRegenerateMarker',
+      ).writeAsString(DateTime.now().toIso8601String(), flush: true);
+      await setLibraryCoverCacheDir(covers.path);
     }
     if (isCancelled?.call() == true) {
       throw StateError('Library scan cancelled before native scan');

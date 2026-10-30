@@ -77,57 +77,75 @@ void main() {
             isCancelled: isCancelled,
           );
 
-    test('forced scan resets checkpoints and cover paths (SAF=$saf)', () async {
-      final oldCovers = await Directory('${root.path}/library_covers').create();
-      final oldCover = await File(
-        '${oldCovers.path}/cover_same-key.jpg',
-      ).writeAsBytes([1]);
-      final unrelated = await File(
-        '${root.path}/library_scan_other.ndjson.state',
-      ).writeAsString('other source');
-      final coverDirectories = <String>[];
-      final resumed = <bool>[];
-      messenger.setMockMethodCallHandler(backend, (call) async {
-        final args = call.arguments as Map;
-        if (call.method == 'setLibraryCoverCacheDir') {
-          final directory = args['cache_dir'] as String;
-          expect(await Directory(directory).exists(), isTrue);
-          expect(await File('$directory/cover_same-key.jpg').exists(), isFalse);
-          coverDirectories.add(directory);
-          return null;
-        }
+    test(
+      'forced scan resets checkpoints and keeps cover paths (SAF=$saf)',
+      () async {
+        final oldCovers = await Directory(
+          '${root.path}/library_covers',
+        ).create();
+        final oldCover = await File(
+          '${oldCovers.path}/cover_same-key.jpg',
+        ).writeAsBytes([1]);
+        final unrelated = await File(
+          '${root.path}/library_scan_other.ndjson.state',
+        ).writeAsString('other source');
+        final marker = File('${oldCovers.path}/$libraryCoverRegenerateMarker');
+        final coverDirectories = <String>[];
+        final markerTimes = <DateTime>[];
+        final resumed = <bool>[];
+        messenger.setMockMethodCallHandler(backend, (call) async {
+          final args = call.arguments as Map;
+          if (call.method == 'setLibraryCoverCacheDir') {
+            final directory = args['cache_dir'] as String;
+            // Thumbnails keep their names; the marker asks for new extraction.
+            expect(directory, oldCovers.path);
+            expect(
+              await File('$directory/cover_same-key.jpg').exists(),
+              isTrue,
+            );
+            markerTimes.add(await marker.lastModified());
+            coverDirectories.add(directory);
+            return null;
+          }
+          expect(
+            call.method,
+            saf ? 'scanSafTreeToNDJSONFile' : 'scanLibraryFolderToNDJSONFile',
+          );
+          final output = File(args['output_path'] as String);
+          final checkpoint = File('${output.path}.state');
+          final hasCheckpoint = await checkpoint.exists();
+          expect(await output.exists(), hasCheckpoint);
+          resumed.add(hasCheckpoint);
+          await output.writeAsString('{"id":"track"}\n');
+          await checkpoint.writeAsString('track\t123\n');
+          return {'path': output.path, 'count': 1, 'error_count': 0};
+        });
+
+        final first = await scan();
+        final resumedScan = await scan();
+        expect(resumedScan.file.path, first.file.path);
+        expect(coverDirectories, isEmpty);
+        final forced = await scan(force: true);
+        expect(await forced.rows().toList(), [
+          {'id': 'track'},
+        ]);
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+        await scan(force: true);
+        expect(resumed, [false, true, false, false]);
+        expect(coverDirectories, hasLength(2));
+        expect(markerTimes.last.isAfter(markerTimes.first), isTrue);
         expect(
-          call.method,
-          saf ? 'scanSafTreeToNDJSONFile' : 'scanLibraryFolderToNDJSONFile',
+          await oldCovers.list().map((entry) => entry.path).toList(),
+          unorderedEquals([oldCover.path, marker.path]),
         );
-        final output = File(args['output_path'] as String);
-        final checkpoint = File('${output.path}.state');
-        final hasCheckpoint = await checkpoint.exists();
-        expect(await output.exists(), hasCheckpoint);
-        resumed.add(hasCheckpoint);
-        await output.writeAsString('{"id":"track"}\n');
-        await checkpoint.writeAsString('track\t123\n');
-        return {'path': output.path, 'count': 1, 'error_count': 0};
-      });
+        expect(await oldCover.readAsBytes(), [1]);
+        expect(await unrelated.readAsString(), 'other source');
 
-      final first = await scan();
-      final resumedScan = await scan();
-      expect(resumedScan.file.path, first.file.path);
-      expect(coverDirectories, isEmpty);
-      final forced = await scan(force: true);
-      expect(await forced.rows().toList(), [
-        {'id': 'track'},
-      ]);
-      await scan(force: true);
-      expect(resumed, [false, true, false, false]);
-      expect(coverDirectories.toSet(), hasLength(2));
-      expect(await oldCover.readAsBytes(), [1]);
-      expect(await unrelated.readAsString(), 'other source');
-
-      await forced.delete();
-      expect(await forced.file.exists(), isFalse);
-      expect(await File('${forced.file.path}.state').exists(), isFalse);
-    });
+        await forced.delete();
+        expect(await forced.file.exists(), isFalse);
+        expect(await File('${forced.file.path}.state').exists(), isFalse);
+      },
+    );
 
     test(
       'cancel before forced scan preserves resumable output (SAF=$saf)',
