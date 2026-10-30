@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:mornye/services/link/sync/link_history_sync_schema.dart';
 import 'package:mornye/services/link/sync/link_history_sync_store.dart';
 import 'package:mornye/services/link/sync/link_sync_protocol.dart';
 import 'package:mornye/services/listening_statistics.dart';
@@ -46,6 +47,57 @@ LinkHistoryEvent _event(
 
 Future<List<Map<String, Object?>>> _listening(Database db) =>
     db.rawQuery('SELECT * FROM listening ORDER BY day, track_key');
+
+/// A database that counts the statements it reads.
+class _CountingDatabase implements Database {
+  _CountingDatabase(this._db);
+
+  final Database _db;
+  int reads = 0;
+
+  @override
+  Future<List<Map<String, Object?>>> rawQuery(
+    String sql, [
+    List<Object?>? arguments,
+  ]) {
+    reads++;
+    return _db.rawQuery(sql, arguments);
+  }
+
+  @override
+  Future<T> transaction<T>(
+    Future<T> Function(Transaction txn) action, {
+    bool? exclusive,
+  }) => _db.transaction(
+    (txn) => action(_CountingTransaction(txn, this)),
+    exclusive: exclusive,
+  );
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _CountingTransaction implements Transaction {
+  _CountingTransaction(this._txn, this._database);
+
+  final Transaction _txn;
+  final _CountingDatabase _database;
+
+  @override
+  Future<List<Map<String, Object?>>> rawQuery(
+    String sql, [
+    List<Object?>? arguments,
+  ]) {
+    _database.reads++;
+    return _txn.rawQuery(sql, arguments);
+  }
+
+  @override
+  Batch batch() => _txn.batch();
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
 
 void main() {
   test('v1 statistics migrate to v2 and seed this device totals', () async {
@@ -159,6 +211,70 @@ void main() {
       ('2026-10-19', 10000),
       ('2026-10-20', 500),
     });
+  });
+
+  test('songs new to this device are matched by title and artist in a few '
+      'statements, on their newest day', () async {
+    final directory = await linkSyncTempDirectory();
+    final db = await openLinkListeningDatabase(directory, 'desk');
+    ListeningDelta heard(String key, String title, String day) =>
+        _delta(key, 1000, plays: 1, day: day, title: title);
+    await writeListeningDeltas(db, [
+      heard('/desk/old.flac', 'Song', '2026-10-01'),
+      heard('/desk/new.flac', 'Song', '2026-10-15'),
+      heard('/desk/tie-a.flac', 'Tie', '2026-10-10'),
+      heard('/desk/tie-b.flac', 'Tie', '2026-10-10'),
+      heard('/desk/case.flac', 'Case Song', '2026-10-02'),
+      for (var i = 0; i < 450; i++)
+        heard('/desk/many-$i.flac', 'Many $i', '2026-10-03'),
+    ]);
+    final events = [
+      _event('phone', '/phone/song.flac', 5000),
+      _event('phone', '/phone/song.flac', 5000, day: '2026-10-21'),
+      _event('phone', '/phone/tie.flac', 5000, title: 'Tie'),
+      _event('phone', '/phone/case.flac', 5000, title: 'CASE SONG'),
+      _event('phone', '/phone/new.flac', 5000, title: 'Only on the phone'),
+      _event('phone', '/phone/untitled.flac', 5000, title: ''),
+      for (var i = 0; i < 450; i++)
+        _event('phone', '/phone/many-$i.flac', 5000, title: 'Many $i'),
+    ];
+    // What a lookup of each song on its own finds.
+    final expected = <String, String>{};
+    for (final event in events) {
+      final match = await db.rawQuery(
+        'SELECT track_key FROM listening '
+        'WHERE title = ? COLLATE NOCASE AND artist = ? COLLATE NOCASE '
+        'ORDER BY day DESC LIMIT 1',
+        [event.title, event.artist],
+      );
+      expected[event.trackKey] = event.title.isEmpty || match.isEmpty
+          ? event.trackKey
+          : match.first['track_key']! as String;
+    }
+    expect(expected['/phone/song.flac'], '/desk/new.flac');
+    expect(expected['/phone/case.flac'], '/desk/case.flac');
+    expect(expected['/phone/new.flac'], '/phone/new.flac');
+
+    final counted = _CountingDatabase(db);
+    final result = await LinkHistorySyncStore(
+      () async => counted,
+    ).apply(events);
+
+    expect(result.applied, events.length);
+    final rows = await db.rawQuery(
+      'SELECT track_key, local_key FROM $listeningSyncTable WHERE origin = ?',
+      ['phone'],
+    );
+    expect({
+      for (final row in rows) row['track_key']: row['local_key'],
+    }, expected);
+    expect(
+      counted.reads,
+      7,
+      reason:
+          'the device id, 2 pages of known keys, 3 lookups of up to 200 '
+          'songs and the sequence',
+    );
   });
 
   test('events round-trip the wire and drop device-local artwork', () async {

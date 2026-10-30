@@ -9,6 +9,9 @@ import 'package:mornye/services/sqlite_helpers.dart' as sqlite;
 /// Old Android SQLite allows 999 bound parameters per statement.
 const _chunkSize = 400;
 
+/// Songs looked up by title and artist per statement, two parameters each.
+const _songChunkSize = _chunkSize ~/ 2;
+
 typedef _EventIdentity = (String origin, String day, String trackKey);
 
 /// Reads and writes listening totals for Mornye Link history sync.
@@ -166,6 +169,16 @@ class LinkHistorySyncStore {
           }
         }
       }
+      // The batch below writes at the end, so songs are matched against the
+      // totals as they were before these events.
+      final matches = await _songKeys(txn, {
+        for (final MapEntry(key: identity, value: event) in incoming.entries)
+          if (event.title.isNotEmpty &&
+              seen[identity] == null &&
+              !mapped.containsKey((event.origin, event.trackKey)) &&
+              (event.milliseconds > 0 || event.plays > 0))
+            (event.title, event.artist),
+      });
       final batch = txn.batch();
       var applied = 0;
       for (final MapEntry(key: identity, value: event) in incoming.entries) {
@@ -175,15 +188,9 @@ class LinkHistorySyncStore {
         if (milliseconds <= 0 && plays <= 0) continue;
         var localKey = previous?.$1 ?? mapped[(event.origin, event.trackKey)];
         if (localKey == null) {
-          final match = await txn.rawQuery(
-            'SELECT track_key FROM listening '
-            'WHERE title = ? COLLATE NOCASE AND artist = ? COLLATE NOCASE '
-            'ORDER BY day DESC LIMIT 1',
-            [event.title, event.artist],
-          );
-          localKey = event.title.isEmpty || match.isEmpty
+          localKey = event.title.isEmpty
               ? event.trackKey
-              : match.first['track_key']! as String;
+              : matches[(event.title, event.artist)] ?? event.trackKey;
           mapped[(event.origin, event.trackKey)] = localKey;
         }
         if (applied++ == 0) {
@@ -251,6 +258,41 @@ class LinkHistorySyncStore {
         latest: latest.first['seq']! as int,
       );
     });
+  }
+
+  /// The key of each of [songs] (title and artist, either case) on its
+  /// newest listening day, for those this device has heard.
+  static Future<Map<(String, String), String>> _songKeys(
+    Transaction txn,
+    Set<(String, String)> songs,
+  ) async {
+    final keys = <(String, String), String>{};
+    final list = songs.toList();
+    for (var start = 0; start < list.length; start += _songChunkSize) {
+      final chunk = list.sublist(
+        start,
+        start + _songChunkSize < list.length
+            ? start + _songChunkSize
+            : list.length,
+      );
+      final rows = await txn.rawQuery(
+        'WITH wanted(title, artist) AS '
+        '(VALUES ${List.filled(chunk.length, '(?, ?)').join(', ')}) '
+        'SELECT title, artist, (SELECT l.track_key FROM listening l '
+        'WHERE l.title = wanted.title COLLATE NOCASE '
+        'AND l.artist = wanted.artist COLLATE NOCASE '
+        'ORDER BY l.day DESC LIMIT 1) AS track_key FROM wanted',
+        [
+          for (final (title, artist) in chunk) ...[title, artist],
+        ],
+      );
+      for (final row in rows) {
+        if (row['track_key'] case final String key) {
+          keys[(row['title']! as String, row['artist']! as String)] = key;
+        }
+      }
+    }
+    return keys;
   }
 }
 
