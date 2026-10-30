@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:isolate';
 import 'dart:ui' show AppExitResponse;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_cache_manager/file.dart' as cache_file;
@@ -33,18 +34,9 @@ class CoverCacheManager {
   static Future<void> _cacheWork = Future<void>.value();
   static final _maintenance = PeriodicAsyncTask(
     interval: const Duration(minutes: 15),
-    run: () => _serializeCacheWork(() async {
-      final cachePath = _cachePath;
-      if (cachePath == null) return;
-      final deleted = await trimCacheToByteBudget(
-        Directory(cachePath),
-        maxBytes: _maxCacheBytes,
-        targetBytes: _sweepTargetBytes,
-      );
-      if (deleted > 0) {
-        debugPrint('CoverCacheManager: Trimmed $deleted cached covers');
-      }
-    }),
+    run: () => _serializeCacheWork(
+      () => _trim(maxBytes: _maxCacheBytes, targetBytes: _sweepTargetBytes),
+    ),
     onError: (error, _) =>
         debugPrint('CoverCacheManager: Sweep failed: $error'),
   );
@@ -121,6 +113,57 @@ class CoverCacheManager {
     return next;
   }
 
+  /// Runs the byte budget sweep with a test budget.
+  @visibleForTesting
+  static Future<void> trimForTesting({
+    required int maxBytes,
+    required int targetBytes,
+  }) => _serializeCacheWork(
+    () => _trim(maxBytes: maxBytes, targetBytes: targetBytes),
+  );
+
+  static Future<void> _trim({
+    required int maxBytes,
+    required int targetBytes,
+  }) async {
+    final cachePath = _cachePath;
+    if (cachePath == null) return;
+    final deleted = await trimCacheToByteBudget(
+      Directory(cachePath),
+      maxBytes: maxBytes,
+      targetBytes: targetBytes,
+    );
+    if (deleted > 0) {
+      debugPrint('CoverCacheManager: Trimmed $deleted cached covers');
+      await _forgetDeletedFiles(cachePath);
+    }
+  }
+
+  /// The sweep deletes files behind the cache manager; drop their index
+  /// entries and memory hits.
+  static Future<void> _forgetDeletedFiles(String cachePath) async {
+    final instance = _instance;
+    final repository = _repository;
+    if (instance == null || repository == null) return;
+    final objects = await repository.getAllObjects();
+    final paths = [
+      for (final object in objects) p.join(cachePath, object.relativePath),
+    ];
+    final missing = await Isolate.run(() => _missingFileIndexes(paths));
+    for (final index in missing) {
+      // Checks the file again: a download may have replaced it since.
+      await instance.store.retrieveCacheData(
+        objects[index].key,
+        ignoreMemCache: true,
+      );
+    }
+  }
+
+  static List<int> _missingFileIndexes(List<String> paths) => [
+    for (var i = 0; i < paths.length; i++)
+      if (!File(paths[i]).existsSync()) i,
+  ];
+
   static Future<void> clearCache() => _serializeCacheWork(_clearCache);
 
   static Future<void> _clearCache() async {
@@ -181,7 +224,7 @@ class CoverCacheManager {
 
   static CacheManager _createManager() {
     final repository = _repository = CoverCacheInfoRepository(_indexFile);
-    return CacheManager(
+    return _CoverCache(
       Config(
         _cacheKey,
         stalePeriod: _maxCacheAge,
@@ -216,6 +259,18 @@ class CoverCacheManager {
     try {
       await directory.create(recursive: true);
     } catch (_) {}
+  }
+}
+
+/// The byte budget sweep deletes files behind the cache manager, so a memory
+/// hit counts only while its file exists.
+class _CoverCache extends CacheManager {
+  _CoverCache(super.config);
+
+  @override
+  Future<FileInfo?> getFileFromMemory(String key) async {
+    final info = await super.getFileFromMemory(key);
+    return info != null && await info.file.exists() ? info : null;
   }
 }
 

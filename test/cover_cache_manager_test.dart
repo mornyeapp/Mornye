@@ -152,6 +152,48 @@ void main() {
     }
   });
 
+  test('a memory hit whose file is gone is not handed out', () async {
+    const url = 'https://covers.example.invalid/removed.jpg';
+    final cache = CoverCacheManager.instance;
+    final file = await cache.putFile(url, Uint8List.fromList([7]));
+    expect(await cache.getFileFromMemory(url), isNotNull);
+    await file.delete();
+    expect(await cache.getFileFromMemory(url), isNull);
+    expect(await cache.getFileFromCache(url), isNull);
+  });
+
+  test('the byte budget sweep forgets the covers it deleted', () async {
+    final cache = CoverCacheManager.instance;
+    final repository = cache.config.repo;
+    final swept = [
+      for (var i = 0; i < 3; i++) 'https://covers.example.invalid/old-$i.jpg',
+    ];
+    const kept = 'https://covers.example.invalid/new.jpg';
+    for (final url in swept) {
+      final file = await cache.putFile(url, Uint8List(64));
+      await file.setLastModified(
+        DateTime.now().subtract(const Duration(hours: 1)),
+      );
+    }
+    await cache.putFile(kept, Uint8List(64));
+    for (final url in [...swept, kept]) {
+      expect(await cache.getFileFromMemory(url), isNotNull);
+    }
+
+    await CoverCacheManager.trimForTesting(maxBytes: 0, targetBytes: 0);
+
+    for (final url in swept) {
+      expect(await cache.getFileFromMemory(url), isNull);
+      expect(cache.store.memoryCacheContainsKey(url), isFalse);
+      expect(await repository.get(url), isNull);
+      expect(await cache.getFileFromCache(url), isNull);
+    }
+    final survivor = await cache.getFileFromMemory(kept);
+    expect(await survivor!.file.exists(), isTrue);
+    expect(await repository.get(kept), isNotNull);
+    expect(await repository.get(_cover(size).key), isNotNull);
+  });
+
   test('an exit request saves pending index changes first', () async {
     await CoverCacheManager.flush();
     const url = 'https://covers.example.invalid/before-exit.jpg';
