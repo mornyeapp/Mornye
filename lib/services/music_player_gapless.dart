@@ -16,7 +16,6 @@ class _MusicGapless {
   PlaybackDeck? _prepared;
   PlayableMedia? _next;
   String? _nextPath;
-  String? _nextArtwork;
   Duration? _nextDuration;
   double _nextVolume = 1;
   bool _nextIsCopy = false;
@@ -98,15 +97,6 @@ class _MusicGapless {
       if (path == null || !_current(generation)) return;
       final isCopy = next.isContentUri && lease == null;
       if (isCopy) _pins.add(path);
-      String? artwork;
-      if (next.networkArtworkSource case final source?) {
-        try {
-          artwork = await handler._dependencies.resolveNetworkSource(source);
-        } catch (_) {
-          // Cover failure must not prevent audio playback.
-        }
-        if (!_current(generation)) return;
-      }
       final volume = await handler._normalizationVolumeFor(
         path,
         cacheKey: next.isContentUri ? next.source : null,
@@ -141,7 +131,6 @@ class _MusicGapless {
       _next = next;
       _nextIndex = nextIndex;
       _nextPath = path;
-      _nextArtwork = artwork;
       _nextDuration = duration != null && duration > Duration.zero
           ? duration
           : next.duration;
@@ -210,13 +199,12 @@ class _MusicGapless {
     handler._runtime.personalization.begin(_learningTrack(next));
     handler.mediaItem.add(
       handler
-          ._toMediaItem(
-            next,
-            resolvedSource: _nextIsCopy ? path : null,
-            resolvedArtwork: _nextArtwork,
-          )
+          ._toMediaItem(next, resolvedSource: _nextIsCopy ? path : null)
           .copyWith(duration: _nextDuration),
     );
+    handler._covers
+      ..fetch(next.networkArtworkSource)
+      ..fetchAhead();
     handler._lastBroadcastPosition = Duration.zero;
     handler._lastPositionBroadcastAt = null;
     handler._broadcastPosition(Duration.zero, force: true);
@@ -245,7 +233,6 @@ class _MusicGapless {
     _prepared = null;
     _next = null;
     _nextPath = null;
-    _nextArtwork = null;
     _pins.clear();
     if (prepared == null) return;
     try {

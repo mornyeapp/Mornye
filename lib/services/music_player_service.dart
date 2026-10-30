@@ -22,6 +22,7 @@ import 'package:mornye/services/playback_normalization.dart';
 import 'package:mornye/services/playback_automation.dart';
 import 'package:mornye/services/playback_session_writer.dart';
 import 'package:mornye/services/content_uri_playback_cache.dart';
+import 'package:mornye/services/cover_store.dart';
 import 'package:mornye/services/music_player_runtime.dart';
 import 'package:mornye/services/music_playback_deck.dart';
 import 'package:mornye/services/playback_deck.dart';
@@ -49,6 +50,7 @@ export 'playback_session_restore.dart';
 
 part 'music_player_automix.dart';
 part 'music_player_autoplay.dart';
+part 'music_player_covers.dart';
 part 'music_player_gapless.dart';
 
 final _log = AppLogger('MusicPlayer');
@@ -118,6 +120,7 @@ class MusicPlayerHandler extends BaseAudioHandler
   late PlaybackDeck _player;
   late final _MusicAutoMix _autoMix;
   late final _MusicGapless _gapless = _MusicGapless(this);
+  late final _MusicCovers _covers = _MusicCovers(this);
   late final _MusicAutoplay _autoplay;
   late final MusicHaptics _haptics;
   bool _completing = false;
@@ -300,16 +303,13 @@ class MusicPlayerHandler extends BaseAudioHandler
     }
   }
 
-  MediaItem _toMediaItem(
-    PlayableMedia media, {
-    String? resolvedSource,
-    String? resolvedArtwork,
-  }) => media.toMediaItem(
-    resolvedSource: resolvedSource,
-    resolvedArtwork: resolvedArtwork,
-    unknownTitle: _runtime.unknownTitle,
-    unknownArtist: _runtime.unknownArtist,
-  );
+  MediaItem _toMediaItem(PlayableMedia media, {String? resolvedSource}) =>
+      media.toMediaItem(
+        resolvedSource: resolvedSource,
+        unknownTitle: _runtime.unknownTitle,
+        unknownArtist: _runtime.unknownArtist,
+        covers: _dependencies.coverStore,
+      );
 
   void _init() {
     if (_initialized) return;
@@ -333,7 +333,11 @@ class MusicPlayerHandler extends BaseAudioHandler
                 title: item.title,
                 artist: item.artist ?? '',
                 album: item.album ?? '',
-                artwork: item.artUri?.toString(),
+                // A reference that outlasts this run, never a loopback URL
+                // or a temporary file.
+                artwork:
+                    item.extras?['artworkRef']?.toString() ??
+                    durableCoverReference(item.artUri?.toString()),
               ),
         playing:
             state.playing &&
@@ -365,6 +369,9 @@ class MusicPlayerHandler extends BaseAudioHandler
     );
     _subscriptions.add(mediaItem.listen((_) => _updateHaptics()));
     _subscriptions.add(playbackState.listen((_) => _updateHaptics()));
+    _subscriptions.add(
+      _dependencies.coverStore.changes.listen(_covers.changed),
+    );
     _listeningTimer = Timer.periodic(const Duration(seconds: 10), (_) {
       unawaited(_dependencies.recorder.flush());
     });
@@ -1228,6 +1235,11 @@ class MusicPlayerHandler extends BaseAudioHandler
     AudioServiceRepeatMode repeatMode = AudioServiceRepeatMode.none,
   }) async {
     if (items.isEmpty) return;
+    // Network songs show their stored covers from the first item.
+    if (items.any((item) => item.networkArtworkSource != null)) {
+      await _dependencies.coverStore.warmUp();
+      if (_disposed) return;
+    }
     // Never clobber a session the user already started this launch.
     if (_index >= 0 || (_media.isNotEmpty && !replaceStoppedQueue)) return;
     _restoringSession = true;
@@ -1255,6 +1267,7 @@ class MusicPlayerHandler extends BaseAudioHandler
       _sessionWriter.queueRestored(needsRewrite: queueNeedsRewrite);
       queue.add(List<MediaItem>.unmodifiable(_queueItems));
       mediaItem.add(_toMediaItem(_media[_index]));
+      _covers.fetch(_media[_index].networkArtworkSource);
       if (position > Duration.zero) {
         playbackState.add(
           playbackState.value.copyWith(updatePosition: position),
@@ -1556,17 +1569,9 @@ class MusicPlayerHandler extends BaseAudioHandler
     if (!media.isNetwork) {
       unawaited(_recoverEmbeddedArtwork(media, generation));
     }
-    if (media.networkArtworkSource != null) {
-      try {
-        final artwork = await _dependencies.resolveNetworkSource(
-          media.networkArtworkSource!,
-        );
-        if (!_isCurrentPlayRequest(generation, media)) return;
-        mediaItem.add(_toMediaItem(media, resolvedArtwork: artwork));
-      } catch (_) {
-        // Cover failure must not prevent audio playback.
-      }
-    }
+    _covers
+      ..fetch(media.networkArtworkSource)
+      ..fetchAhead();
 
     // Android opens SAF files through a short-lived file-descriptor lease.
     // MediaPlayer duplicates that descriptor, so the original can be closed
@@ -1755,6 +1760,12 @@ class MusicPlayerHandler extends BaseAudioHandler
     try {
       final metadata = await _dependencies.readNetworkMetadata(media.source);
       if (!_isCurrentPlayRequest(generation, media)) return;
+      final cover = await _covers.adoptTagCover(
+        media.source,
+        media.networkArtworkSource,
+        metadata['cover_path'] as String?,
+      );
+      if (!_isCurrentPlayRequest(generation, media)) return;
       final current = mediaItem.value;
       if (current == null) return;
       String text(String key, String fallback) {
@@ -1762,7 +1773,6 @@ class MusicPlayerHandler extends BaseAudioHandler
         return value.isEmpty ? fallback : value;
       }
 
-      final cover = metadata['cover_path'] as String?;
       final updated = current.copyWith(
         title: text('title', current.title),
         artist: text('artist', current.artist ?? ''),
@@ -2239,9 +2249,20 @@ class MusicPlayerHandler extends BaseAudioHandler
           : await _dependencies.readMetadata(source);
       if (metadata['error'] != null) return;
       final cover = metadata['cover_path'] as String?;
-      final artwork = cover == null || cover.isEmpty
-          ? null
-          : normalizeArtUri(cover);
+      final String? artwork;
+      if (source.startsWith('network://')) {
+        final reference = _media
+            .where((item) => item.source == source)
+            .firstOrNull
+            ?.networkArtworkSource;
+        _covers.refresh(reference);
+        final stored = await _covers.adoptTagCover(source, reference, cover);
+        artwork = stored == null ? null : Uri.file(stored).toString();
+      } else {
+        artwork = cover == null || cover.isEmpty
+            ? null
+            : normalizeArtUri(cover);
+      }
       if (_disposed || !identical(_metadataChanges[source], token)) return;
       var changed = false;
       for (var i = 0; i < _media.length; i++) {

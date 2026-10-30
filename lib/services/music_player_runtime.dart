@@ -14,6 +14,7 @@ import 'package:mornye/services/autoplay_personalization.dart';
 import 'package:mornye/services/autoplay_ranker.dart';
 import 'package:mornye/services/autoplay_taste.dart';
 import 'package:mornye/services/background_favorites.dart';
+import 'package:mornye/services/cover_store.dart';
 import 'package:mornye/services/discord_presence_service.dart';
 import 'package:mornye/services/history_database.dart';
 import 'package:mornye/services/library_collections_database.dart';
@@ -69,6 +70,7 @@ class PlaybackDependencies {
     HistoryDatabase? historyDatabase,
     LibraryCollectionsDatabase? collectionsDatabase,
     ListeningRecorder? recorder,
+    CoverStore? coverStore,
     SourceDeletionEvents? sourceDeletionEvents,
     SourceMetadataEvents? sourceMetadataEvents,
     Stream<double>? volumeChanges,
@@ -82,6 +84,7 @@ class PlaybackDependencies {
        _historyDatabase = historyDatabase,
        _collectionsDatabase = collectionsDatabase,
        _recorder = recorder,
+       _coverStore = coverStore,
        _sourceDeletionEvents = sourceDeletionEvents,
        _sourceMetadataEvents = sourceMetadataEvents,
        _volumeChanges = volumeChanges,
@@ -122,6 +125,7 @@ class PlaybackDependencies {
   final HistoryDatabase? _historyDatabase;
   final LibraryCollectionsDatabase? _collectionsDatabase;
   final ListeningRecorder? _recorder;
+  final CoverStore? _coverStore;
   final SourceDeletionEvents? _sourceDeletionEvents;
   final SourceMetadataEvents? _sourceMetadataEvents;
   final Stream<double>? _volumeChanges;
@@ -136,6 +140,7 @@ class PlaybackDependencies {
   LibraryCollectionsDatabase get collectionsDatabase =>
       _collectionsDatabase ?? LibraryCollectionsDatabase.instance;
   ListeningRecorder get recorder => _recorder ?? listeningRecorder;
+  CoverStore get coverStore => _coverStore ?? CoverStore.instance;
   SourceDeletionEvents get sourceDeletionEvents =>
       _sourceDeletionEvents ?? SourceDeletionEvents.instance;
   SourceMetadataEvents get sourceMetadataEvents =>
@@ -264,6 +269,8 @@ class MusicPlayerRuntime {
   RemotePlayback? _remote;
   RemoteMediaSession? _remoteSession;
   final _arriving = <String, ({String url, Future<void> done})>{};
+  bool _coversPrepared = false;
+  static const _coverTrimDelay = Duration(minutes: 2);
 
   /// The Library that media browsers such as Android Auto show.
   late final browser = MediaLibraryBrowser(
@@ -341,6 +348,23 @@ class MusicPlayerRuntime {
   /// soon after it starts.
   void startSongAnalysis() {
     if (!_disposed) songAnalysis.start(mediaItemEvents());
+  }
+
+  /// Reads which network covers are stored, so songs show theirs from the
+  /// start, then trims the stored covers once, a while later.
+  void prepareCovers() {
+    if (_coversPrepared || _disposed) return;
+    _coversPrepared = true;
+    final covers = dependencies.coverStore;
+    unawaited(
+      () async {
+        await covers.warmUp();
+        await Future<void>.delayed(_coverTrimDelay);
+        if (!_disposed) await covers.trim();
+      }().catchError((Object error) {
+        _log.w('Could not trim stored covers: $error');
+      }),
+    );
   }
 
   void updateStrings({

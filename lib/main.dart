@@ -211,6 +211,7 @@ void main() {
           ),
         ),
       );
+      musicPlayerRuntime.prepareCovers();
       // Waits until startup settles, then analyzes how songs sound for
       // Autoplay. Media browsers that start without the app shell skip it.
       musicPlayerRuntime.startSongAnalysis();
@@ -326,7 +327,9 @@ Future<void> _startBackgroundPlayback() async {
     // An Activity that attached meanwhile runs the full startup instead.
     if (isActivityAttached(WidgetsBinding.instance)) return;
     final settings = loadBootstrapSettings(prefs);
-    final runtime = musicPlayerRuntime..configure(settings);
+    final runtime = musicPlayerRuntime
+      ..configure(settings)
+      ..prepareCovers();
     final l10n = appLocalizationsFor(settings.locale);
     runtime.updateStrings(
       unknownTitle: l10n.unknownTitle,

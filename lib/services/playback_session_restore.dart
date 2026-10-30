@@ -30,6 +30,10 @@ Future<PlaybackResumePreview?> loadPlaybackResumePreview(
         (!media.isNetwork && !await files.fileExists(media.source))) {
       return null;
     }
+    // Its item then shows a stored network cover from the start.
+    if (media.networkArtworkSource != null) {
+      await runtime.dependencies.coverStore.warmUp();
+    }
     return (
       media: media,
       position: Duration(

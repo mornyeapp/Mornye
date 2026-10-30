@@ -2,6 +2,7 @@ import 'package:audio_service/audio_service.dart' show MediaItem;
 import 'package:mornye/models/download_history.dart';
 import 'package:mornye/models/library_database_models.dart';
 import 'package:mornye/models/track.dart';
+import 'package:mornye/services/cover_store.dart';
 import 'package:mornye/services/music_player_runtime.dart';
 import 'package:mornye/utils/file_access.dart' show isContentUri;
 import 'package:mornye/utils/int_utils.dart';
@@ -111,12 +112,22 @@ class PlayableMedia {
     );
   }
 
+  /// The item players show. A network cover shows the file [covers] stored
+  /// for it, the same on every play, and travels as `extras['artworkRef']`,
+  /// the reference to keep instead of the file.
   MediaItem toMediaItem({
     String? resolvedSource,
     String? resolvedArtwork,
     String? unknownTitle,
     String? unknownArtist,
+    CoverStore? covers,
   }) {
+    final reference = networkArtworkSource;
+    final stored = resolvedArtwork == null && reference != null
+        ? (covers ?? musicPlayerRuntime.dependencies.coverStore).indexedFile(
+            reference,
+          )
+        : null;
     final artwork = resolvedArtwork ?? artUri;
     return MediaItem(
       id: id,
@@ -128,13 +139,16 @@ class PlayableMedia {
           : artist,
       album: album.isEmpty ? null : album,
       duration: duration,
-      artUri: (artwork != null && artwork.isNotEmpty)
+      artUri: stored != null
+          ? Uri.file(stored)
+          : (artwork != null && artwork.isNotEmpty)
           ? Uri.tryParse(artwork)
           : null,
       extras: {
         'source': source,
         if (resolvedSource != null && resolvedSource.isNotEmpty)
           'resolvedSource': resolvedSource,
+        'artworkRef': ?reference,
         if (bitDepth != null && bitDepth! > 0) 'bit_depth': bitDepth,
         if (sampleRate != null && sampleRate! > 0) 'sample_rate': sampleRate,
         if (bitrate != null && bitrate! > 0) 'bitrate': bitrate,
