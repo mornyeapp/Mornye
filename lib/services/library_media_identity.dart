@@ -39,14 +39,35 @@ Future<UnifiedLibraryItem?> libraryItemForMedia({
 /// The collection track that loves [item]: its Library record's identity
 /// when it has one ([match]), otherwise the media item's own fields, with
 /// no cover when the item shows one that does not outlast this run.
-Track collectionTrackForMedia(MediaItem item, UnifiedLibraryItem? match) =>
+///
+/// A network song keeps the network cover it shows, or shows once fetched,
+/// as its reference (`extras['artworkRef']`), which [covers] fetches again
+/// after a trim, rather than the stored file.
+Track collectionTrackForMedia(
+  MediaItem item,
+  UnifiedLibraryItem? match, {
+  CoverStore? covers,
+}) =>
     match?.toTrack() ??
     Track(
       id: item.id,
       name: item.title,
       artistName: item.artist ?? '',
       albumName: item.album ?? '',
-      coverUrl: durableCoverReference(item.artUri?.toString()),
+      coverUrl: _collectionCover(item, covers ?? CoverStore.instance),
       duration: item.duration?.inSeconds ?? 0,
       source: 'local',
     );
+
+String? _collectionCover(MediaItem item, CoverStore covers) {
+  final reference = item.extras?['artworkRef']?.toString();
+  final shown = item.artUri;
+  if (CoverStore.refetches(reference)) {
+    // Unless the item shows another cover, such as the one from its tags.
+    final stored = covers.indexedFile(reference);
+    if (shown == null || (stored != null && shown == Uri.file(stored))) {
+      return reference;
+    }
+  }
+  return durableCoverReference(shown?.toString());
+}

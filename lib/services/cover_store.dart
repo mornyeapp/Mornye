@@ -113,6 +113,10 @@ class CoverStore {
   /// Whether only [adopt] stores [ref], which no server answers.
   static bool _adoptedOnly(String ref) => ref.endsWith(_songCover);
 
+  /// Whether [ref] names a cover the store fetches again after a [trim]: a
+  /// network cover a server answers, not one only [adopt] stores.
+  static bool refetches(String? ref) => fetches(ref) && !_adoptedOnly(ref!);
+
   /// Reads which covers are stored, so [cachedFile] answers covers saved
   /// in earlier runs. [file] and [trim] wait for it themselves.
   Future<void> warmUp() {

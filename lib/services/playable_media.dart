@@ -183,17 +183,21 @@ String? normalizeArtUri(String cover) {
   return Uri.file(value).toString();
 }
 
-/// A collection or catalog [track] that plays the file at [path].
-PlayableMedia playableFromTrack(Track track, String path) => PlayableMedia(
-  id: path,
-  source: path,
-  title: track.name,
-  artist: track.artistName,
-  album: track.albumName,
-  artUri: normalizeArtUri(track.coverUrl ?? ''),
-  duration: track.duration > 0 ? Duration(seconds: track.duration) : null,
-  explicit: track.isExplicit,
-);
+/// A collection or catalog [track] that plays the file at [path]. A
+/// `network://` cover stays the reference, its [PlayableMedia.coverReference].
+PlayableMedia playableFromTrack(Track track, String path) {
+  final cover = track.coverUrl ?? '';
+  return PlayableMedia(
+    id: path,
+    source: path,
+    title: track.name,
+    artist: track.artistName,
+    album: track.albumName,
+    artUri: CoverStore.fetches(cover) ? cover : normalizeArtUri(cover),
+    duration: track.duration > 0 ? Duration(seconds: track.duration) : null,
+    explicit: track.isExplicit,
+  );
+}
 
 PlayableMedia playableFromHistory(DownloadHistoryItem item) {
   return PlayableMedia(
