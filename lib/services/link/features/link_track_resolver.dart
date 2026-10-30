@@ -6,7 +6,6 @@ import 'package:crypto/crypto.dart';
 import 'package:mornye/services/link/features/link_track_refs.dart';
 import 'package:mornye/services/link/link_client_api.dart';
 import 'package:mornye/services/link/link_protocol.dart';
-import 'package:mornye/services/network_storage_service.dart';
 import 'package:mornye/services/playable_media.dart';
 
 /// A download or Library record the phone can play, with the identity the
@@ -56,11 +55,7 @@ PlayableMedia? linkDesktopPlayable(TrackRef ref, LinkServerRecord? server) {
     title: ref.title,
     artist: ref.artist,
     album: ref.album ?? '',
-    // A song id names its cover too: its own, its album's or an embedded one.
-    networkArtworkSource: NetworkStorageService.source(
-      server.connectionId,
-      subsonicCoverPath(songId),
-    ),
+    networkArtworkSource: linkDesktopCoverSource(server, songId),
     duration: durationMs == null ? null : Duration(milliseconds: durationMs),
   );
 }

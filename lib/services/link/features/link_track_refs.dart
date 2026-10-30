@@ -52,6 +52,14 @@ String linkDesktopSongSource(
   subsonicSongPath(songId, format),
 );
 
+/// The cover of the desktop catalog song [songId]: its own, its album's or
+/// an embedded one. The cover store keys covers by this exact string.
+String linkDesktopCoverSource(LinkServerRecord server, String songId) =>
+    NetworkStorageService.source(
+      server.connectionId,
+      subsonicCoverPath(songId),
+    );
+
 TrackRef _ref({
   required String title,
   required String artist,
