@@ -211,6 +211,40 @@ fn missing_directory_is_empty_and_recent_unreferenced_covers_survive() {
 }
 
 #[test]
+fn a_referenced_subsonic_cover_keeps_the_pointer_to_its_refreshed_file() {
+    let fixture = TempDir::new().unwrap();
+    let (kept, gone) = ("a".repeat(64), "b".repeat(64));
+    let age = Duration::from_secs(600);
+    let refreshed = old_file(
+        fixture.path(),
+        &format!("subsonic_{kept}_{}.image", "c".repeat(48)),
+        1,
+        age,
+    );
+    let pointer = old_file(
+        fixture.path(),
+        &format!("subsonic_{kept}.image.current"),
+        1,
+        age,
+    );
+    let replaced = old_file(fixture.path(), &format!("subsonic_{kept}.image"), 1, age);
+    let orphan = old_file(
+        fixture.path(),
+        &format!("subsonic_{gone}.image.current"),
+        1,
+        age,
+    );
+    let result = execute(
+        &prune_request(fixture.path(), std::slice::from_ref(&refreshed)),
+        &|| Ok(()),
+    )
+    .unwrap();
+    assert_eq!(result["deleted"], 2);
+    assert!(refreshed.exists() && pointer.exists());
+    assert!(!replaced.exists() && !orphan.exists());
+}
+
+#[test]
 fn database_retains_all_sources_and_blocks_concurrent_reference_writers() {
     let fixture = TempDir::new().unwrap();
     let root = fixture.path().join("covers");

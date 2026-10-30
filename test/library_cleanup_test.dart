@@ -117,6 +117,7 @@ void main() {
       final deleted = await pruneUnreferencedLibraryCovers(
         directory,
         {'not-transferred'},
+        referenceColumns: const [],
         libraryDatabase: database,
         temporaryDirectory: directory,
         requestId: 'scan-lease',
@@ -158,6 +159,7 @@ void main() {
         await pruneUnreferencedLibraryCovers(
           directory,
           {},
+          referenceColumns: const [],
           minimumAge: const Duration(minutes: 1),
         ),
         1,
@@ -193,7 +195,7 @@ void main() {
             await canonical.resolveSymbolicLinks(),
             '${alias.path}/legacy.jpg',
             '${alias.path}/already-missing.jpg',
-          });
+          }, referenceColumns: const []);
 
       expect(await canonical.exists(), isTrue);
       expect(await legacy.exists(), isTrue);

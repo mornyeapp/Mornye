@@ -1,7 +1,12 @@
 import 'dart:io';
 import 'dart:isolate';
+import 'package:path/path.dart' as p;
 import 'package:sqflite/sqflite.dart';
+import 'package:mornye/services/app_state_database.dart';
+import 'package:mornye/services/history_database.dart';
+import 'package:mornye/services/library_collections_database.dart';
 import 'package:mornye/services/library_cover_snapshot.dart';
+import 'package:mornye/services/listening_statistics.dart';
 import 'package:mornye/services/native_cache_maintenance.dart';
 import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/utils/file_access.dart';
@@ -95,9 +100,39 @@ Future<void> deleteLibraryItemsByIds(Database db, Iterable<String> ids) async {
   });
 }
 
+/// Every store besides the `library` table that keeps Library cover paths
+/// copied from rows, the player or Link save offline.
+Future<List<LibraryCoverReferenceColumn>>
+appLibraryCoverReferenceColumns() async {
+  final collections = await LibraryCollectionsDatabase.instance.database;
+  final appState = await AppStateDatabase.instance.database;
+  final history = await HistoryDatabase.instance.database;
+  final statistics = await ListeningStatisticsStore.instance.database;
+  return [
+    for (final table in const [
+      'wishlist_tracks',
+      'loved_tracks',
+      'playlist_tracks',
+    ])
+      (database: collections, table: table, column: 'track_json'),
+    (database: collections, table: 'playlists', column: 'cover_image_path'),
+    (database: collections, table: 'favorite_artists', column: 'artist_json'),
+    (database: appState, table: 'playback_session', column: 'media_json'),
+    (database: appState, table: 'playback_resume', column: 'media_json'),
+    (database: appState, table: 'playback_resume', column: 'preview_json'),
+    (database: appState, table: 'recent_access_items', column: 'item_json'),
+    (database: appState, table: 'download_queue_items', column: 'item_json'),
+    (database: history, table: 'history', column: 'cover_url'),
+    (database: statistics, table: 'listening', column: 'artwork'),
+  ];
+}
+
+/// Deletes files in [directory] that neither the Library nor
+/// [referenceColumns] (see [appLibraryCoverReferenceColumns]) name.
 Future<int> pruneUnreferencedLibraryCovers(
   Directory directory,
   Set<String> referencedPaths, {
+  required Iterable<LibraryCoverReferenceColumn> referenceColumns,
   Database? libraryDatabase,
   String? requestId,
   Duration minimumAge = Duration.zero,
@@ -109,6 +144,8 @@ Future<int> pruneUnreferencedLibraryCovers(
     throw ArgumentError.value(minimumAge, 'minimumAge');
   }
   if (canPrune != null && !canPrune()) return 0;
+  final stored = await readStoredLibraryCoverPaths(directory, referenceColumns);
+  if (canPrune != null && !canPrune()) return 0;
   if (libraryDatabase != null) {
     if (nativeJobRunner == null && !PlatformBridge.supportsCoreBackend) {
       return libraryDatabase.transaction((txn) async {
@@ -116,7 +153,7 @@ Future<int> pruneUnreferencedLibraryCovers(
         if (canPrune != null && !canPrune()) return 0;
         return _pruneUnreferencedLibraryCovers(
           directory,
-          paths,
+          {...paths, ...stored},
           requestId: requestId,
           minimumAge: minimumAge,
         );
@@ -134,11 +171,12 @@ Future<int> pruneUnreferencedLibraryCovers(
       ),
       canPrune: canPrune,
       temporaryDirectory: temporaryDirectory,
+      storedReferences: stored,
     );
   }
   return _pruneUnreferencedLibraryCovers(
     directory,
-    referencedPaths,
+    {...referencedPaths, ...stored},
     requestId: requestId,
     minimumAge: minimumAge,
     nativeJobRunner: nativeJobRunner,
@@ -207,9 +245,13 @@ Future<({int deleted, List<String> errors})> _pruneCoversInWorker(
 ) async {
   final directory = Directory(path);
   final cutoff = DateTime.now().subtract(minimumAge);
+  final references = {
+    ...referencedPaths,
+    for (final path in referencedPaths) ?_subsonicCoverPointer(path),
+  };
   // Native scans may return canonical paths while Dart lists a directory alias.
-  final retainedPaths = {...referencedPaths};
-  for (final path in referencedPaths) {
+  final retainedPaths = {...references};
+  for (final path in references) {
     try {
       retainedPaths.add(await File(path).resolveSymbolicLinks());
     } on FileSystemException {
@@ -239,6 +281,17 @@ Future<({int deleted, List<String> errors})> _pruneCoversInWorker(
     }
   }
   return (deleted: deleted, errors: errors);
+}
+
+final _subsonicCover = RegExp(r'^subsonic_([0-9a-fA-F]{64})(?:_.*)?\.image$');
+
+/// A Subsonic cover (`subsonic_<hash>.image`, or `subsonic_<hash>_<id>.image`
+/// after a refresh) is found again through `subsonic_<hash>.image.current`.
+String? _subsonicCoverPointer(String path) {
+  final hash = _subsonicCover.firstMatch(p.basename(path))?.group(1);
+  return hash == null
+      ? null
+      : p.join(p.dirname(path), 'subsonic_$hash.image.current');
 }
 
 /// Pages by stable ID (not OFFSET, since rows are removed during traversal).

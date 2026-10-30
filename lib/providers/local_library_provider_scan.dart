@@ -922,10 +922,15 @@ extension _LocalLibraryScan on LocalLibraryNotifier {
       if (!ref.mounted || _scanCancelRequested) return;
       final libraryDatabase = await _db.database;
       if (!ref.mounted || _scanCancelRequested) return;
+      // Playlists, favorites, sessions, statistics and history copy cover
+      // paths; their files stay while any of them is named.
+      final referenceColumns = await appLibraryCoverReferenceColumns();
+      if (!ref.mounted || _scanCancelRequested) return;
 
       final deletedCount = await pruneUnreferencedLibraryCovers(
         libraryCoverDir,
         const {},
+        referenceColumns: referenceColumns,
         libraryDatabase: libraryDatabase,
         requestId: _nativeLibraryRequestId,
         canPrune: () => ref.mounted && !_scanCancelRequested,

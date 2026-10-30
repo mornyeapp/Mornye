@@ -324,6 +324,11 @@ fn references(
             ));
         }
     }
+    let pointers: Vec<_> = paths
+        .iter()
+        .filter_map(|path| subsonic_pointer(path))
+        .collect();
+    paths.extend(pointers);
     let mut canonical = Vec::new();
     for path in &paths {
         check()?;
@@ -333,6 +338,16 @@ fn references(
     }
     paths.extend(canonical);
     Ok(paths)
+}
+
+/// A Subsonic cover (`subsonic_<hash>.image`, or `subsonic_<hash>_<id>.image`
+/// after a refresh) is found again through `subsonic_<hash>.image.current`.
+fn subsonic_pointer(path: &Path) -> Option<PathBuf> {
+    let name = path.file_name()?.to_str()?;
+    let hash = name.strip_prefix("subsonic_")?.strip_suffix(".image")?;
+    let hash = hash.split_once('_').map_or(hash, |(hash, _)| hash);
+    (hash.len() == 64 && hash.bytes().all(|byte| byte.is_ascii_hexdigit()))
+        .then(|| path.with_file_name(format!("subsonic_{hash}.image.current")))
 }
 
 fn prune(request: &Value, check: Check<'_>) -> Result<Value, String> {

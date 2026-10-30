@@ -822,13 +822,13 @@ void main() {
       expect(
         await pruneUnreferencedLibraryCovers(covers, {
           for (final row in rows.skip(1)) row['coverPath'] as String,
-        }),
+        }, referenceColumns: const []),
         0,
       );
       expect(
         await pruneUnreferencedLibraryCovers(covers, {
           rows[2]['coverPath'] as String,
-        }),
+        }, referenceColumns: const []),
         1,
       );
       expect(await File(rows[2]['coverPath'] as String).readAsBytes(), [3]);

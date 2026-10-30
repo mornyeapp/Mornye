@@ -255,6 +255,63 @@ void main() {
     },
   );
 
+  test('stored references join the projection without postponing it', () async {
+    final stored = {
+      for (var index = 0; index < 300; index++) '/covers/stored-$index.jpg',
+      '/covers/visible.jpg',
+    };
+    expect(
+      await withLibraryCoverSnapshot(
+        database,
+        (path) async {
+          final snapshot = await SqliteProcessDatabase.open(path: path);
+          try {
+            expect(await readLibraryCoverReferences(snapshot), {
+              '/alias/hidden.jpg',
+              ...stored,
+            });
+          } finally {
+            await snapshot.close();
+          }
+          return 4;
+        },
+        temporaryDirectory: directory,
+        storedReferences: stored,
+      ),
+      4,
+    );
+    await _expectClean(database, directory);
+  });
+
+  test('stored cover names are read in pages and rebased', () async {
+    await database.execute('CREATE TABLE stored (value TEXT)');
+    await database.transaction((txn) async {
+      for (var index = 0; index < 300; index++) {
+        await txn.rawInsert('INSERT INTO stored VALUES (?)', [
+          '{"coverUrl":"/old/library_covers/page-$index.jpg"}',
+        ]);
+      }
+    });
+    await database.execute('''
+      INSERT INTO stored VALUES
+        ('{"artUri":"file:///old/Application%20Support/library_covers/a%20b.jpg"}'),
+        ('{"coverUrl":"\\/old\\/library_covers\\/escaped.jpg"}'),
+        ('[{"a":"/x/library_covers/full_scan_1/one.jpg"},{"b":"/x/library_covers/two.png"}]'),
+        ('https://example.com/cover.jpg'),
+        (NULL)
+    ''');
+    final paths = await readStoredLibraryCoverPaths(Directory('/covers'), [
+      (database: database, table: 'stored', column: 'value'),
+    ]);
+    expect(paths, {
+      for (var index = 0; index < 300; index++) '/covers/page-$index.jpg',
+      '/covers/a b.jpg',
+      '/covers/escaped.jpg',
+      '/covers/full_scan_1/one.jpg',
+      '/covers/two.png',
+    });
+  });
+
   test(
     'desktop reference pages remain bounded and retain exact distinct paths',
     () async {
