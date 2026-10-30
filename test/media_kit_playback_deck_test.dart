@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/models/equalizer_settings.dart';
@@ -80,6 +82,53 @@ void main() {
     await Future<void>.delayed(const Duration(milliseconds: 40));
     expect(positions, isNotEmpty);
     expect(positions.last, const Duration(seconds: 3));
+  });
+
+  test('the position timer runs only while playing', () async {
+    const interval = Duration(milliseconds: 10);
+    final timers = <Timer>[];
+    final positions = <Duration>[];
+    bool ticking() => timers.any((timer) => timer.isActive);
+    await runZoned(
+      () async {
+        deck.onPositionChanged.listen(positions.add);
+        deck.startPositionUpdates(interval);
+        expect(ticking(), isFalse);
+        await deck.setFileSource('/song.flac');
+        expect(ticking(), isFalse);
+        await deck.resume();
+        expect(ticking(), isTrue);
+        await Future<void>.delayed(const Duration(milliseconds: 40));
+        expect(positions, isNotEmpty);
+        await deck.pause();
+        expect(ticking(), isFalse);
+        // A tick from just before the pause may still be in delivery.
+        await Future<void>.delayed(Duration.zero);
+        positions.clear();
+        await Future<void>.delayed(const Duration(milliseconds: 40));
+        expect(positions, isEmpty);
+        await deck.resume();
+        expect(ticking(), isTrue);
+        await Future<void>.delayed(const Duration(milliseconds: 40));
+        expect(positions, isNotEmpty);
+        engine.completedEvents.add(true);
+        await Future<void>.delayed(Duration.zero);
+        expect(deck.state, PlaybackDeckState.completed);
+        expect(ticking(), isFalse);
+        await deck.resume();
+        await deck.stop();
+        expect(ticking(), isFalse);
+      },
+      zoneSpecification: ZoneSpecification(
+        createPeriodicTimer: (self, parent, zone, period, callback) {
+          final timer = parent.createPeriodicTimer(zone, period, callback);
+          if (period == interval) timers.add(timer);
+          return timer;
+        },
+      ),
+    );
+    // One timer for each of the three times the deck played.
+    expect(timers, hasLength(3));
   });
 
   test(

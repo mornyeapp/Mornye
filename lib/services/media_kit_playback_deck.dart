@@ -227,6 +227,7 @@ class MediaKitPlaybackDeck implements PlaybackDeck {
   AsyncError? _failure;
   Completer<String?>? _pendingLoad;
   Duration? _duration;
+  Duration? _positionInterval;
   Timer? _positionTimer;
   int _token = 0;
   bool _disposed = false;
@@ -280,6 +281,7 @@ class MediaKitPlaybackDeck implements PlaybackDeck {
 
   void _setState(PlaybackDeckState value) {
     _state = value;
+    _syncPositionTimer();
     if (!_disposed) _states.add(value);
   }
 
@@ -369,9 +371,23 @@ class MediaKitPlaybackDeck implements PlaybackDeck {
 
   @override
   void startPositionUpdates(Duration interval) {
+    _positionInterval = interval;
     _positionTimer?.cancel();
+    _positionTimer = null;
+    _syncPositionTimer();
+  }
+
+  /// Positions are published only while playing, so the timer runs only
+  /// then: an idle deck does not wake the isolate.
+  void _syncPositionTimer() {
+    final interval = _positionInterval;
+    if (_disposed || interval == null || _state != PlaybackDeckState.playing) {
+      _positionTimer?.cancel();
+      _positionTimer = null;
+      return;
+    }
     // A timer rather than frames: AutoMix runs with the display asleep.
-    _positionTimer = Timer.periodic(interval, (_) {
+    _positionTimer ??= Timer.periodic(interval, (_) {
       if (!_disposed && _state == PlaybackDeckState.playing) {
         _positions.add(_engine.position);
       }
