@@ -5,6 +5,7 @@ import 'package:mornye/l10n/app_localizations.dart';
 import 'package:mornye/models/album_track_order.dart';
 import 'package:mornye/models/download_history.dart';
 import 'package:mornye/models/track.dart';
+import 'package:mornye/services/cover_store.dart';
 import 'package:mornye/services/history_database.dart';
 import 'package:mornye/services/library_collections_database.dart';
 import 'package:mornye/services/library_database.dart';
@@ -134,9 +135,14 @@ class MediaLibraryBrowser {
       MediaItem(id: shuffleId, title: strings().nowPlayingShuffleLibrary);
 
   /// Artwork a car can load. It cannot open the app's own files, so local
-  /// covers are left out of lists; the playing song keeps its artwork.
+  /// covers are left out of lists; the playing song keeps its artwork. Nor
+  /// can it load the loopback URLs older builds stored in collections.
   static Uri? _browserArt(String? art) =>
-      art != null && art.startsWith('http') ? Uri.tryParse(art) : null;
+      art != null &&
+          art.startsWith('http') &&
+          durableCoverReference(art) != null
+      ? Uri.tryParse(art)
+      : null;
 
   static Map<String, dynamic>? _group(String? title) =>
       title == null ? null : {_groupTitleKey: title};

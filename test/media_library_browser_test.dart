@@ -357,6 +357,34 @@ void main() {
     },
   );
 
+  test('Loved shows no loopback cover an older build stored', () async {
+    final directory = await Directory.systemTemp.createTemp('browser');
+    addTearDown(() => directory.delete(recursive: true));
+    final file = (await File('${directory.path}/loved.flac').create()).path;
+    Track loved(String name, String cover) => Track(
+      id: 'catalog-$name',
+      name: name,
+      artistName: 'Artist',
+      albumName: 'Album',
+      coverUrl: cover,
+      duration: 200,
+    );
+    final browser = _browser(
+      library: _Library(filesByTitle: {'Old': file, 'Web': file}),
+      collections: _Collections(
+        loved: [
+          loved('Old', 'http://127.0.0.1:41234/7f3a'),
+          loved('Web', 'https://covers.example/web.jpg'),
+        ],
+      ),
+    );
+
+    final songs = await browser.children(MediaLibraryBrowser.lovedId);
+    expect(_titles(songs), ['Old', 'Web']);
+    expect(songs.first.artUri, isNull);
+    expect(songs.last.artUri.toString(), 'https://covers.example/web.jpg');
+  });
+
   test('with Local Library off, Loved plays no scanned files', () async {
     final directory = await Directory.systemTemp.createTemp('browser');
     addTearDown(() => directory.delete(recursive: true));
