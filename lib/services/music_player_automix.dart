@@ -379,6 +379,9 @@ class _MusicAutoMix {
             )
             .copyWith(duration: _nextDuration),
       );
+      handler._covers
+        ..fetch(next.networkArtworkSource)
+        ..fetchAhead();
       // A song without a listed cover shows its embedded one, as when it
       // starts without a mix.
       unawaited(
