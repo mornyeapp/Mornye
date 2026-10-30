@@ -4,13 +4,49 @@
 use crate::cancellation::RequestLease;
 use crate::tags::{AudioTagsError, check_lease, open_audio_file};
 use mornye_core::{cover, tags};
+use mornye_extensions::backend::{
+    LIBRARY_COVER_REGENERATE_MARKER, library_cover_is_current, library_cover_stem,
+};
+use std::path::Path;
 use std::sync::Arc;
+use std::time::UNIX_EPOCH;
 
 #[derive(uniffi::Record)]
 pub struct DescriptorLibraryMetadata {
     pub metadata_json: String,
     pub cover_bytes: Vec<u8>,
     pub cover_mime: String,
+}
+
+/// A Library thumbnail slot for the document provider scan, which writes
+/// descriptor artwork itself: the file to reuse, if any, and the stem for a
+/// new `.jpg` or `.png` file. Names match the Rust scan's thumbnails.
+#[derive(uniffi::Record)]
+pub struct LibraryCoverSlot {
+    pub stem: String,
+    pub cached: Option<String>,
+}
+
+#[uniffi::export]
+pub fn library_cover_slot(directory: String, key: String) -> LibraryCoverSlot {
+    let stem = library_cover_stem(key.trim());
+    let directory = Path::new(&directory);
+    let regenerate = std::fs::metadata(directory.join(LIBRARY_COVER_REGENERATE_MARKER))
+        .and_then(|metadata| metadata.modified())
+        .ok();
+    let cached = ["jpg", "png"]
+        .into_iter()
+        .filter_map(|extension| {
+            let path = directory.join(format!("{stem}.{extension}"));
+            let metadata = std::fs::metadata(&path)
+                .ok()
+                .filter(|metadata| metadata.is_file())?;
+            let modified = metadata.modified().unwrap_or(UNIX_EPOCH);
+            library_cover_is_current(modified, regenerate).then_some((modified, path))
+        })
+        .max_by_key(|(modified, _)| *modified)
+        .map(|(_, path)| path.to_string_lossy().into_owned());
+    LibraryCoverSlot { stem, cached }
 }
 
 fn descriptor_path(descriptor: i32) -> Result<String, AudioTagsError> {
@@ -103,6 +139,34 @@ mod tests {
     use std::fs::{File, OpenOptions};
     use std::io::Write;
     use std::os::fd::AsRawFd;
+    use std::time::{Duration, SystemTime};
+
+    #[test]
+    fn document_scan_thumbnails_share_names_and_regeneration_with_the_rust_scan() {
+        let directory = tempfile::tempdir().unwrap();
+        let root = directory.path().to_str().unwrap().to_owned();
+        let key = "content://provider/document/track|1700000000000";
+        let slot = library_cover_slot(root.clone(), format!(" {key} "));
+        assert_eq!(slot.stem, library_cover_stem(key));
+        assert_eq!(slot.cached, None);
+        let jpg = directory.path().join(format!("{}.jpg", slot.stem));
+        std::fs::write(&jpg, b"old").unwrap();
+        File::options()
+            .write(true)
+            .open(&jpg)
+            .unwrap()
+            .set_modified(SystemTime::now() - Duration::from_secs(60))
+            .unwrap();
+        let cached = library_cover_slot(root.clone(), key.into()).cached;
+        assert_eq!(cached.as_deref(), jpg.to_str());
+        std::fs::write(directory.path().join(LIBRARY_COVER_REGENERATE_MARKER), "").unwrap();
+        assert_eq!(library_cover_slot(root.clone(), key.into()).cached, None);
+        // A regenerated thumbnail may change format; the newer file wins.
+        let png = directory.path().join(format!("{}.png", slot.stem));
+        std::fs::write(&png, b"new").unwrap();
+        let cached = library_cover_slot(root, key.into()).cached;
+        assert_eq!(cached.as_deref(), png.to_str());
+    }
 
     #[test]
     fn original_artwork_is_copied_without_decoding_or_changing_the_source() {

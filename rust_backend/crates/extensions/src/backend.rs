@@ -12,6 +12,7 @@ mod reenrich;
 mod share;
 mod tags;
 
+pub use cover::{LIBRARY_COVER_REGENERATE_MARKER, library_cover_is_current, library_cover_stem};
 pub use lyrics::LyricsRequest;
 pub use metadata::MetadataOptions;
 
