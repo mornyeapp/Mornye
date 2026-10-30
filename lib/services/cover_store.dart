@@ -30,7 +30,8 @@ class CoverStore {
     this.maxBytes = 200 * 1024 * 1024,
     this.maxFetches = 4,
     this.retryDelay = const Duration(minutes: 1),
-  }) : _directory = directory ?? defaultDirectory,
+  }) : assert(maxFetches > 0),
+       _directory = directory ?? defaultDirectory,
        _fetcher = fetch ?? NetworkStorageService.instance.downloadCover;
 
   static final instance = CoverStore();
@@ -79,9 +80,11 @@ class CoverStore {
   final _fetches = <String, Future<String?>>{};
   final _failures = <String, ({DateTime at, Duration wait})>{};
 
-  /// Fetches holding a turn, and fetches waiting for one.
+  /// Fetches holding a turn, and fetches waiting for one: fetches a caller
+  /// awaits go before background rechecks.
   var _fetching = 0;
   final _turns = Queue<Completer<void>>();
+  final _rechecks = Queue<Completer<void>>();
 
   /// Names being written or touched now, which [trim] leaves alone.
   final _busy = <String>{};
@@ -128,7 +131,8 @@ class CoverStore {
   /// [maxFetches] references are fetched at once, and a failed fetch waits
   /// [retryDelay] before the next. A cover stored more than a day ago (or
   /// dated more than a day ahead) is answered at once and fetched again in
-  /// the background: [changes] reports when its bytes changed.
+  /// the background, after the fetches callers await: [changes] reports
+  /// when its bytes changed.
   Future<String?> file(String? ref) async {
     if (ref == null || ref.isEmpty) return null;
     if (!fetches(ref)) {
@@ -146,7 +150,7 @@ class CoverStore {
         // A date ahead of the clock means the clock was wrong when saved.
         if (DateTime.now().difference(stat.modified).abs() >= _refreshAge &&
             !_failedRecently(key)) {
-          unawaited(_fetch(ref, root, key));
+          unawaited(_fetch(ref, root, key, recheck: true));
         }
         return path;
       }
@@ -157,8 +161,9 @@ class CoverStore {
   }
 
   /// Deletes superseded covers and abandoned staging files, then the
-  /// covers validated longest ago until at most [maxFiles] covers of at
-  /// most [maxBytes] remain.
+  /// covers validated longest ago (a cover dated more than a day ahead
+  /// counts as the oldest) until at most [maxFiles] covers of at most
+  /// [maxBytes] remain.
   Future<void> trim() async {
     await warmUp();
     final root = _root;
@@ -189,7 +194,12 @@ class CoverStore {
         await deleteFileQuietly(entry);
       }
     }
-    current.sort((a, b) => a.stat.modified.compareTo(b.stat.modified));
+    current.sort(
+      (a, b) => _validated(
+        a.stat.modified,
+        now,
+      ).compareTo(_validated(b.stat.modified, now)),
+    );
     var count = current.length;
     var bytes = current.fold(0, (sum, cover) => sum + cover.stat.size);
     for (final cover in current) {
@@ -211,6 +221,7 @@ class CoverStore {
   Future<void> _readIndex() async {
     try {
       final root = await _directory();
+      final now = DateTime.now();
       final newest = <String, ({String name, DateTime modified})>{};
       if (await root.exists()) {
         await for (final entry in root.list(followLinks: false)) {
@@ -220,9 +231,10 @@ class CoverStore {
           if (key == null) continue;
           final stat = await entry.stat();
           if (stat.type != FileSystemEntityType.file) continue;
+          final modified = _validated(stat.modified, now);
           final known = newest[key];
-          if (known == null || stat.modified.isAfter(known.modified)) {
-            newest[key] = (name: name, modified: stat.modified);
+          if (known == null || modified.isAfter(known.modified)) {
+            newest[key] = (name: name, modified: modified);
           }
         }
       }
@@ -235,33 +247,42 @@ class CoverStore {
     }
   }
 
-  Future<String?> _fetch(String ref, String root, String key) =>
-      _fetches.putIfAbsent(key, () async {
-        try {
-          return await _save(ref, root, key);
-        } catch (error) {
-          _failures[key] = (
-            at: DateTime.now(),
-            wait: error is NetworkMediaUnavailable || error is FormatException
-                ? _missingRetryDelay
-                : retryDelay,
-          );
-          _log.d('Could not fetch a network cover: ${error.runtimeType}');
-          return null;
-        } finally {
-          _fetches.remove(key);
-        }
-      });
+  Future<String?> _fetch(
+    String ref,
+    String root,
+    String key, {
+    bool recheck = false,
+  }) => _fetches.putIfAbsent(key, () async {
+    try {
+      return await _save(ref, root, key, recheck: recheck);
+    } catch (error) {
+      _failures[key] = (
+        at: DateTime.now(),
+        wait: error is NetworkMediaUnavailable || error is FormatException
+            ? _missingRetryDelay
+            : retryDelay,
+      );
+      _log.d('Could not fetch a network cover: ${error.runtimeType}');
+      return null;
+    } finally {
+      _fetches.remove(key);
+    }
+  });
 
-  Future<String> _save(String ref, String root, String key) async {
-    await Directory(root).create(recursive: true);
+  Future<String> _save(
+    String ref,
+    String root,
+    String key, {
+    required bool recheck,
+  }) async {
     final stagedName = '$key.${NetworkStorageService.newId()}.tmp';
     final staged = File(p.join(root, stagedName));
     String? name;
     _busy.add(stagedName);
     try {
-      await _takeTurn();
+      await _takeTurn(recheck: recheck);
       try {
+        await Directory(root).create(recursive: true);
         await _fetcher(ref, staged);
       } finally {
         _endTurn();
@@ -321,24 +342,34 @@ class CoverStore {
   static String _key(String ref) =>
       sha256.convert(utf8.encode(ref)).toString().substring(0, 32);
 
-  Future<void> _takeTurn() async {
+  Future<void> _takeTurn({required bool recheck}) async {
     if (_fetching < maxFetches) {
       _fetching++;
       return;
     }
     final turn = Completer<void>();
-    _turns.add(turn);
+    (recheck ? _rechecks : _turns).add(turn);
     await turn.future;
   }
 
-  /// Hands the turn to the next waiting fetch, if any.
+  /// Hands the turn to the next waiting fetch, if any: a fetch a caller
+  /// awaits goes before a background recheck.
   void _endTurn() {
     if (_turns.isNotEmpty) {
       _turns.removeFirst().complete();
+    } else if (_rechecks.isNotEmpty) {
+      _rechecks.removeFirst().complete();
     } else {
       _fetching--;
     }
   }
+
+  /// [modified] as a validation time: a file dated more than a day ahead
+  /// counts as the oldest, so a clock that ran ahead cannot pin it.
+  static DateTime _validated(DateTime modified, DateTime now) =>
+      modified.difference(now) >= _refreshAge
+      ? DateTime.fromMillisecondsSinceEpoch(0)
+      : modified;
 
   bool _failedRecently(String key) {
     final failed = _failures[key];

@@ -51,6 +51,14 @@ void main() {
       [for (final entry in directory.listSync()) p.basename(entry.path)]
         ..sort();
 
+  Future<void> until(bool Function() done) async {
+    final deadline = DateTime.now().add(const Duration(seconds: 10));
+    while (!done()) {
+      if (DateTime.now().isAfter(deadline)) fail('Timed out waiting');
+      await Future<void>.delayed(const Duration(milliseconds: 5));
+    }
+  }
+
   test(
     'a network cover keeps one path while resolve answers a new URL',
     () async {
@@ -140,6 +148,7 @@ void main() {
       for (var row = 0; row < 10; row++)
         covers.file('network://desktop/subsonic/cover/$row.image'),
     ];
+    await until(() => started == 4);
     await pumpEventQueue();
     expect(started, 4);
     release.complete();
@@ -147,6 +156,43 @@ void main() {
     expect(paths, everyElement(isNotNull));
     expect(started, 10);
     expect(peak, 4);
+  });
+
+  test('an awaited first fetch goes before background rechecks', () async {
+    Completer<void>? gate;
+    final started = <String>[];
+    final covers = store(
+      maxFetches: 1,
+      fetch: (ref, output) async {
+        started.add(ref);
+        await gate?.future;
+        await output.writeAsBytes(_jpeg(1));
+      },
+    );
+    final stale = [
+      for (var row = 0; row < 5; row++)
+        'network://desktop/subsonic/cover/$row.image',
+    ];
+    final old = DateTime.now().subtract(const Duration(days: 2));
+    for (final ref in stale) {
+      await File((await covers.file(ref))!).setLastModified(old);
+    }
+    started.clear();
+    gate = Completer<void>();
+    // Each answer queues a background recheck; the first one runs.
+    for (final ref in stale) {
+      expect(await covers.file(ref), isNotNull);
+    }
+    await until(() => started.isNotEmpty);
+    expect(started, [stale.first]);
+    const playing = 'network://desktop/subsonic/cover/playing.image';
+    final first = covers.file(playing);
+    await pumpEventQueue();
+    gate.complete();
+    expect(await first, isNotNull);
+    // Waits for the background fetches.
+    await covers.dispose();
+    expect(started, [stale.first, playing, ...stale.skip(1)]);
   });
 
   test(
@@ -370,13 +416,14 @@ void main() {
   });
 
   test('a cover dated ahead of the clock is checked again', () async {
+    var bytes = _jpeg(1);
     var fetches = 0;
-    final covers = store(
-      fetch: (ref, output) async {
-        fetches++;
-        await output.writeAsBytes(_jpeg(1));
-      },
-    );
+    Future<void> fetch(String ref, File output) async {
+      fetches++;
+      await output.writeAsBytes(bytes);
+    }
+
+    final covers = store(fetch: fetch);
     const ref = 'network://desktop/subsonic/cover/YQ.image';
     final path = (await covers.file(ref))!;
     final ahead = DateTime.now().add(const Duration(days: 400));
@@ -386,6 +433,36 @@ void main() {
     await covers.dispose();
     expect(fetches, 2);
     expect((await File(path).stat()).modified.isBefore(ahead), isTrue);
+
+    // Changed bytes leave the old file dated ahead; it still loses.
+    await File(path).setLastModified(ahead);
+    bytes = _jpeg(2);
+    final changed = store(fetch: fetch);
+    expect(await changed.file(ref), path);
+    const other = 'network://desktop/subsonic/cover/Yg.image';
+    final otherPath = (await changed.file(other))!;
+    await changed.dispose();
+    expect(fetches, 4);
+    final newer = changed.cachedFile(ref)!;
+    expect(newer, isNot(path));
+
+    Future<void> refetch(String ref, File output) async =>
+        fail('A stored cover is not fetched again');
+    final restarted = store(fetch: refetch);
+    await restarted.warmUp();
+    expect(restarted.cachedFile(ref), newer);
+    await restarted.trim();
+    expect(names(), [p.basename(newer), p.basename(otherPath)]..sort());
+
+    // A trim counts a cover dated ahead as the oldest.
+    await File(newer).setLastModified(ahead);
+    await File(
+      otherPath,
+    ).setLastModified(DateTime.now().subtract(const Duration(hours: 2)));
+    final budget = store(maxFiles: 1, fetch: refetch);
+    await budget.trim();
+    expect(budget.cachedFile(ref), isNull);
+    expect(names(), [p.basename(otherPath)]);
   });
 
   test('file references pass through while their file exists', () async {
