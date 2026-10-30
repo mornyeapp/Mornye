@@ -186,4 +186,33 @@ void main() {
       isNull,
     );
   });
+
+  test('loopback artwork an older build recorded is never synced', () async {
+    final directory = await linkSyncTempDirectory();
+    final db = await openLinkListeningDatabase(directory, 'phone');
+    final store = LinkHistorySyncStore(() async => db);
+    const loopback = 'http://127.0.0.1:41234/7f3a';
+    await db.insert('listening', {
+      'day': '2026-10-20',
+      'track_key': '/a.flac',
+      'title': 'Song',
+      'artist': 'Artist',
+      'album': 'Album',
+      'artwork': loopback,
+      'milliseconds': 1000,
+      'plays': 0,
+    });
+    final page = await store.eventsSince(0);
+    expect(page.items.single.trackKey, '/a.flac');
+    expect(page.items.single.artwork, isNull);
+    final event = LinkHistoryEvent.fromJson({
+      'origin': 'peer',
+      'day': '2026-10-20',
+      'trackKey': '/b.flac',
+      'artwork': loopback,
+      'ms': 1000,
+      'plays': 0,
+    });
+    expect(event!.artwork, isNull);
+  });
 }

@@ -1,3 +1,5 @@
+import 'package:mornye/services/cover_store.dart';
+
 /// Mornye Link collections and history sync (unit L4). Both directions use
 /// the same JSON, so the desktop (server) and the phone (client) share one
 /// store implementation per database.
@@ -224,13 +226,14 @@ class LinkHistoryEvent {
   }
 }
 
-/// Artwork another device can load: http and https URLs only.
+/// Artwork another device can load: http and https URLs only, without the
+/// loopback URLs older builds recorded, which named the author's own proxy.
 String? linkSyncRemoteArtwork(Object? value) {
   final artwork = _string(value);
   if (artwork == null) return null;
   final lower = artwork.toLowerCase();
   return lower.startsWith('https://') || lower.startsWith('http://')
-      ? artwork
+      ? durableCoverReference(artwork)
       : null;
 }
 
