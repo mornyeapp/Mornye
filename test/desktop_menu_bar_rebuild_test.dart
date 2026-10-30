@@ -208,6 +208,12 @@ void main() {
     expect(sent, hasLength(afterFirst));
     expect(menuItems(tester), same(items));
     expect(shortcutLayer(tester).shortcuts, same(bindings));
+
+    // A hot reload still rebuilds the items, so edited menus show up.
+    tester.binding.buildOwner!.reassemble(tester.binding.rootElement!);
+    await tester.pump();
+    expect(sent, hasLength(afterFirst + 1));
+    expect(menuItems(tester), isNot(same(items)));
   }, variant: _macOS);
 
   testWidgets(

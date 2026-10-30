@@ -305,6 +305,12 @@ class _DesktopMenuBarState extends ConsumerState<_DesktopMenuBar> {
   Object? _shown;
   List<PlatformMenuItem> _menus = const [];
 
+  @override
+  void reassemble() {
+    super.reassemble();
+    _shown = null;
+  }
+
   PlatformMenuItem _command(String label, DesktopCommand command) {
     final state = widget.state;
     return PlatformMenuItem(
