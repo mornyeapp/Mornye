@@ -1919,9 +1919,17 @@ void main() {
   /// Plays [_track] on a [_TickingDeck] and sends [ticks] engine ticks on
   /// its interval, each reading the time played. [deliver] decides whether
   /// a tick reaches the handler. Returns the ticks the handler asked for,
-  /// those it took longer than a quick platform reply to handle, and those
-  /// whose position it published or saved.
-  Future<({Set<int> asked, Set<int> slow, List<int> published, Set<int> saved})>
+  /// those it took longer than a quick platform reply to handle, those
+  /// whose position it published or saved, and the time the ticks took.
+  Future<
+    ({
+      Set<int> asked,
+      Set<int> slow,
+      List<int> published,
+      Set<int> saved,
+      Duration elapsed,
+    })
+  >
   tickPlayback(int ticks, {required bool Function(bool wanted) deliver}) async {
     final deck = _TickingDeck();
     final store = _PositionLog();
@@ -1960,14 +1968,24 @@ void main() {
         slow.add(tick);
       }
     }
+    final elapsed = clock.elapsed;
     await subscription.cancel();
     return (
       asked: asked,
       slow: slow,
       published: published,
       saved: {for (final ms in store.positions) ?readAt[ms]},
+      elapsed: elapsed,
     );
   }
+
+  /// The most queries [elapsed] of ticks may make: the first tick, one per
+  /// save, and per publish (at least 450 ms apart) one more when a late
+  /// tick left the first ask just short of the gate, so at most one per
+  /// 300 ms. Querying every 200 ms tick exceeds it; a loaded machine that
+  /// spaces ticks further apart raises it.
+  int queryBudget(Duration elapsed) =>
+      elapsed.inMilliseconds ~/ 300 + elapsed.inSeconds ~/ 10 + 2;
 
   test(
     'position ticks ask the engine only for positions the player uses',
@@ -1985,17 +2003,14 @@ void main() {
         ...run.saved,
       }.difference(run.asked).difference(run.slow);
       expect(missed, isEmpty);
-      expect(run.asked.length, lessThan(ticks ~/ 2));
+      expect(run.asked.length, lessThanOrEqualTo(queryBudget(run.elapsed)));
     },
   );
 
   test('a deck that skips declined ticks queries once per position', () async {
-    final run = await tickPlayback(15, deliver: (wanted) => wanted);
-    expect(run.published.length, greaterThanOrEqualTo(4));
-    // Beside the published ones: the first tick after the song started,
-    // which checks the engine against the published start position, and
-    // at most one that a late tick left just short of the gate.
-    expect(run.asked.length, lessThanOrEqualTo(run.published.length + 2));
+    final run = await tickPlayback(30, deliver: (wanted) => wanted);
+    expect(run.published.length, greaterThanOrEqualTo(8));
+    expect(run.asked.length, lessThanOrEqualTo(queryBudget(run.elapsed)));
   });
 
   test(

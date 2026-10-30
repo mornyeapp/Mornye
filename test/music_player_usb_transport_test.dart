@@ -300,10 +300,14 @@ void main() {
       );
       await deck.setFileSource('/one.flac', preferBitPerfect: true);
       await deck.resume();
-      await Future<void>.delayed(const Duration(milliseconds: 60));
-      expect(usbCalls, isNot(contains('position')));
+      int reads() => usbCalls.where((call) => call == 'position').length;
+      // Longer than the 200 ms the direct path once polled on regardless.
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+      expect(reads(), 0);
       wanted = true;
-      await _until(() => usbCalls.contains('position'));
+      await Future<void>.delayed(const Duration(milliseconds: 150));
+      // Only the 10 ms interval reads this often.
+      expect(reads(), greaterThanOrEqualTo(3));
       await deck.pause();
     });
 
