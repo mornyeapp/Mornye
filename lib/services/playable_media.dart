@@ -184,7 +184,8 @@ String? normalizeArtUri(String cover) {
 }
 
 /// A collection or catalog [track] that plays the file at [path]. A
-/// `network://` cover stays the reference, its [PlayableMedia.coverReference].
+/// `network://` cover stays the reference, its [PlayableMedia.coverReference],
+/// while a network [path] plays; a local file shows its own cover instead.
 PlayableMedia playableFromTrack(Track track, String path) {
   final cover = track.coverUrl ?? '';
   return PlayableMedia(
@@ -193,7 +194,11 @@ PlayableMedia playableFromTrack(Track track, String path) {
     title: track.name,
     artist: track.artistName,
     album: track.albumName,
-    artUri: CoverStore.fetches(cover) ? cover : normalizeArtUri(cover),
+    artUri: !CoverStore.fetches(cover)
+        ? normalizeArtUri(cover)
+        : path.startsWith('network://')
+        ? cover
+        : null,
     duration: track.duration > 0 ? Duration(seconds: track.duration) : null,
     explicit: track.isExplicit,
   );

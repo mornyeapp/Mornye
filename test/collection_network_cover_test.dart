@@ -4,10 +4,18 @@ import 'dart:io';
 import 'package:audio_service/audio_service.dart' show MediaItem;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mornye/controllers/clickable_metadata.dart';
 import 'package:mornye/models/track.dart';
+import 'package:mornye/screens/extension_collection_screens.dart'
+    show ExtensionAlbumScreen;
+import 'package:mornye/services/background_favorites.dart';
 import 'package:mornye/services/cover_store.dart';
+import 'package:mornye/services/history_database.dart';
+import 'package:mornye/services/library_collections_database.dart';
+import 'package:mornye/services/library_database.dart';
 import 'package:mornye/services/library_media_identity.dart';
 import 'package:mornye/services/playable_media.dart';
+import 'package:mornye/utils/playback_artwork.dart';
 import 'package:mornye/widgets/cached_cover_image.dart';
 
 const _source = 'network://nas/Album/song.flac';
@@ -61,6 +69,26 @@ void main() {
     expect(shown.artUri, Uri.file(file!));
     expect(_stored(loved(shown)).coverUrl, _ref);
   });
+
+  test(
+    'the media controls love a network song with the player store',
+    () async {
+      await covers.file(_ref);
+      final collections = _LovedRows();
+      final favorites = BackgroundFavorites(
+        library: _NoLibrary(),
+        history: _NoHistory(),
+        collections: collections,
+        covers: covers,
+      );
+      expect(await favorites.toggle(media.toMediaItem(covers: covers)), isTrue);
+      expect(
+        (jsonDecode(collections.rows.values.single)
+            as Map<String, dynamic>)['coverUrl'],
+        _ref,
+      );
+    },
+  );
 
   test('a song showing another cover keeps that cover as before', () async {
     await covers.file(_ref);
@@ -177,4 +205,131 @@ void main() {
       expect(older.coverReference, isNull);
     }
   });
+
+  test(
+    'a collection song that plays a local file shows its own cover',
+    () async {
+      const track = Track(
+        id: _source,
+        name: 'Song',
+        artistName: 'Artist',
+        albumName: 'Album',
+        coverUrl: _ref,
+        duration: 180,
+        source: 'local',
+      );
+      for (final path in ['/music/song.flac', 'content://media/audio/1']) {
+        final playable = playableFromTrack(track, path);
+        expect(playable.artUri, isNull);
+        expect(playable.coverReference, isNull);
+        final item = playable.toMediaItem(covers: covers);
+        expect(item.artUri, isNull);
+        expect(item.extras?['artworkRef'], isNull);
+        expect(
+          await resolveEmbeddedArtworkUri(
+            path,
+            item.artUri?.toString(),
+            extract: (_) async => '/covers/embedded.jpg',
+          ),
+          Uri.file('/covers/embedded.jpg').toString(),
+        );
+      }
+      expect(fetches, 0);
+    },
+  );
+
+  testWidgets('Go to album leaves a network cover behind', (tester) async {
+    final pushed = <Route<dynamic>>[];
+    late BuildContext context;
+    await tester.pumpWidget(
+      MaterialApp(
+        navigatorObservers: [_Pushes(pushed)],
+        home: Builder(
+          builder: (inner) {
+            context = inner;
+            return const SizedBox();
+          },
+        ),
+      ),
+    );
+    const web = 'https://example.com/cover.jpg';
+    for (final cover in [_ref, web]) {
+      await navigateToTrackAlbum(
+        context,
+        Track(
+          id: 'song',
+          name: 'Song',
+          artistName: 'Artist',
+          albumName: 'Album',
+          albumId: 'album',
+          coverUrl: cover,
+          duration: 180,
+          source: 'example',
+        ),
+      );
+    }
+    // The pages are never shown: the test ends before the next frame.
+    expect(
+      [
+        for (final route in pushed)
+          ((route as MaterialPageRoute<void>).builder(context)
+                  as ExtensionAlbumScreen)
+              .coverUrl,
+      ],
+      [null, web],
+    );
+  });
+}
+
+class _NoLibrary implements LibraryDatabase {
+  @override
+  Future<Map<String, dynamic>?> getById(String id) async => null;
+
+  @override
+  Future<List<Map<String, dynamic>>> findByTrackAndArtist(
+    String trackName,
+    String artistName,
+  ) async => const [];
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _NoHistory implements HistoryDatabase {
+  @override
+  Future<Map<String, dynamic>?> findByFilePath(String filePath) async => null;
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+/// Loved rows by track key.
+class _LovedRows implements LibraryCollectionsDatabase {
+  final rows = <String, String>{};
+
+  @override
+  Future<bool> containsLovedTrack(String trackKey) async =>
+      rows.containsKey(trackKey);
+
+  @override
+  Future<void> upsertLovedEntry({
+    required String trackKey,
+    required String trackJson,
+    required String addedAt,
+  }) async => rows[trackKey] = trackJson;
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+/// Records pushed routes after the first.
+class _Pushes extends NavigatorObserver {
+  _Pushes(this.pushed);
+
+  final List<Route<dynamic>> pushed;
+
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    if (previousRoute != null) pushed.add(route);
+  }
 }

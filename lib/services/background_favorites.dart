@@ -4,6 +4,7 @@ import 'package:audio_service/audio_service.dart' show MediaItem;
 import 'package:mornye/models/download_history.dart';
 import 'package:mornye/models/library_collections.dart';
 import 'package:mornye/models/track.dart';
+import 'package:mornye/services/cover_store.dart';
 import 'package:mornye/services/history_database.dart';
 import 'package:mornye/services/library_collections_database.dart';
 import 'package:mornye/services/library_database.dart';
@@ -17,11 +18,15 @@ class BackgroundFavorites {
     required this.library,
     required this.history,
     required this.collections,
+    this.covers,
   });
 
   final LibraryDatabase library;
   final HistoryDatabase history;
   final LibraryCollectionsDatabase collections;
+
+  /// The player's cover store, which chose the covers media items show.
+  final CoverStore? covers;
 
   Future<Track> _track(MediaItem item) async => collectionTrackForMedia(
     item,
@@ -36,6 +41,7 @@ class BackgroundFavorites {
       },
       library: library,
     ),
+    covers: covers,
   );
 
   Future<bool> isLoved(MediaItem item) async =>

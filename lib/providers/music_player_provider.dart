@@ -144,7 +144,11 @@ final playerCollectionTrackProvider = FutureProvider.autoDispose
         title: item.title,
         artist: item.artist ?? '',
       );
-      return collectionTrackForMedia(item, match);
+      return collectionTrackForMedia(
+        item,
+        match,
+        covers: ref.watch(musicPlayerRuntimeProvider).dependencies.coverStore,
+      );
     });
 
 final playbackStateProvider = StreamProvider<PlaybackState>((ref) {

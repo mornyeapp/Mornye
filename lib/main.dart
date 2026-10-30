@@ -348,6 +348,7 @@ Future<void> _startBackgroundPlayback() async {
         library: dependencies.libraryDatabase,
         history: dependencies.historyDatabase,
         collections: dependencies.collectionsDatabase,
+        covers: dependencies.coverStore,
       ),
     );
     await runtime.restoreSession();
