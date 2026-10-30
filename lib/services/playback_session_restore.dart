@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:audio_service/audio_service.dart' show AudioServiceRepeatMode;
 import 'package:path_provider/path_provider.dart';
+import 'package:mornye/services/cover_store.dart';
 import 'package:mornye/services/music_player_runtime.dart';
 import 'package:mornye/services/playable_media.dart';
 import 'package:mornye/utils/logger.dart';
@@ -31,7 +32,7 @@ Future<PlaybackResumePreview?> loadPlaybackResumePreview(
       return null;
     }
     // Its item then shows a stored network cover from the start.
-    if (media.networkArtworkSource != null) {
+    if (media.coverReference != null || CoverStore.fetches(media.source)) {
       await runtime.dependencies.coverStore.warmUp();
     }
     return (
@@ -85,10 +86,14 @@ prepareRestoredPlaybackMedia(
         !await exists(media.source)) {
       return null;
     }
-    final artwork = await resolveRestoredArtworkUri(
-      media.artUri,
-      fileExists: exists,
-      loadLibraryCoverPath: () => loadLibraryCoverPath(media),
+    // Sessions of earlier versions can hold a loopback URL or a temporary
+    // cover file, which the next save then leaves out.
+    final artwork = durableCoverReference(
+      await resolveRestoredArtworkUri(
+        media.artUri,
+        fileExists: exists,
+        loadLibraryCoverPath: () => loadLibraryCoverPath(media),
+      ),
     );
     return (
       artwork == media.artUri

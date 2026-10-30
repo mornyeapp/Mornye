@@ -44,6 +44,12 @@ class PlayableMedia {
     this.autoplay = false,
   });
 
+  /// The `network://` cover the cover store keeps for this song:
+  /// [networkArtworkSource], or [artUri] when it names one, as a cover
+  /// reference listening statistics recorded does.
+  String? get coverReference =>
+      networkArtworkSource ?? (CoverStore.fetches(artUri) ? artUri : null);
+
   bool get isContentUri => source.startsWith('content://');
   bool get isNetwork =>
       const {'network', 'http', 'https'}.contains(Uri.tryParse(source)?.scheme);
@@ -112,9 +118,11 @@ class PlayableMedia {
     );
   }
 
-  /// The item players show. A network cover shows the file [covers] stored
-  /// for it, the same on every play, and travels as `extras['artworkRef']`,
-  /// the reference to keep instead of the file.
+  /// The item players show. A network song shows the file [covers] stored
+  /// for it, the same on every play: the cover from its tags once read,
+  /// else its network cover ([coverReference]), which travels as
+  /// `extras['artworkRef']`, the reference to keep instead of the file. A
+  /// `network://` string is never the item's artUri.
   MediaItem toMediaItem({
     String? resolvedSource,
     String? resolvedArtwork,
@@ -122,13 +130,15 @@ class PlayableMedia {
     String? unknownArtist,
     CoverStore? covers,
   }) {
-    final reference = networkArtworkSource;
-    final stored = resolvedArtwork == null && reference != null
-        ? (covers ?? musicPlayerRuntime.dependencies.coverStore).indexedFile(
+    final reference = coverReference;
+    final stored = resolvedArtwork == null
+        ? (covers ?? musicPlayerRuntime.dependencies.coverStore).songCover(
+            source,
             reference,
           )
         : null;
-    final artwork = resolvedArtwork ?? artUri;
+    final artwork =
+        resolvedArtwork ?? (CoverStore.fetches(artUri) ? null : artUri);
     return MediaItem(
       id: id,
       title: title.isEmpty
@@ -140,7 +150,7 @@ class PlayableMedia {
       album: album.isEmpty ? null : album,
       duration: duration,
       artUri: stored != null
-          ? Uri.file(stored)
+          ? Uri.file(stored.path)
           : (artwork != null && artwork.isNotEmpty)
           ? Uri.tryParse(artwork)
           : null,

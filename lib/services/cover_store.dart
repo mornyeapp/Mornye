@@ -80,6 +80,9 @@ class CoverStore {
   final _fetches = <String, Future<String?>>{};
   final _failures = <String, ({DateTime at, Duration wait})>{};
 
+  /// Reference keys [invalidate]d since their cover was last checked.
+  final _stale = <String>{};
+
   /// Fetches holding a turn, and fetches waiting for one: fetches a caller
   /// awaits go before background rechecks.
   var _fetching = 0;
@@ -102,7 +105,12 @@ class CoverStore {
 
   /// The reference [adopt] keeps the cover in the tags of the `network://`
   /// song [source] under. No server answers it, so it lasts while stored.
-  static String songCoverReference(String source) => '$source#cover';
+  static String songCoverReference(String source) => '$source$_songCover';
+
+  static const _songCover = '#cover';
+
+  /// Whether only [adopt] stores [ref], which no server answers.
+  static bool _adoptedOnly(String ref) => ref.endsWith(_songCover);
 
   /// Reads which covers are stored, so [cachedFile] answers covers saved
   /// in earlier runs. [file] and [trim] wait for it themselves.
@@ -157,29 +165,48 @@ class CoverStore {
       final stat = await FileStat.stat(path);
       if (stat.type == FileSystemEntityType.file) {
         // A date ahead of the clock means the clock was wrong when saved.
-        if (DateTime.now().difference(stat.modified).abs() >= _refreshAge &&
-            !_failedRecently(key)) {
+        final due =
+            _stale.remove(key) ||
+            DateTime.now().difference(stat.modified).abs() >= _refreshAge;
+        if (due && !_failedRecently(key) && !_adoptedOnly(ref)) {
           unawaited(_fetch(ref, root, key, recheck: true));
         }
         return path;
       }
       if (_index[key] == name) _index.remove(key);
     }
-    if (_failedRecently(key)) return null;
+    if (_failedRecently(key) || _adoptedOnly(ref)) return null;
+    _stale.remove(key);
     return _fetch(ref, root, key);
   }
 
-  /// [file] for a network cover its server just changed: fetches [ref]
-  /// again now, however recently it was stored, and answers the stored
-  /// file. [changes] reports when its bytes changed.
-  Future<String?> refresh(String? ref) async {
-    if (!fetches(ref)) return file(ref);
-    await warmUp();
-    final root = _root;
-    if (root == null) return null;
+  /// The server changed the cover [ref], or can be reached again: drops
+  /// the wait after a failed fetch, and the next [file] call checks a
+  /// stored copy again in the background. Fetches nothing itself, so a
+  /// burst of changes to covers nobody shows costs nothing.
+  void invalidate(String? ref) {
+    if (!fetches(ref)) return;
     final key = _key(ref!);
     _failures.remove(key);
-    return await _fetch(ref, root, key) ?? indexedFile(ref);
+    _stale.add(key);
+  }
+
+  /// The stored cover the song [source] shows, read from the index like
+  /// [indexedFile]: the cover from its tags once [adopt]ed (see
+  /// [songCoverReference]), else its network cover [reference]. Null when
+  /// neither is stored.
+  ({String reference, String path})? songCover(
+    String source, [
+    String? reference,
+  ]) {
+    final tags = songCoverReference(source);
+    if (indexedFile(tags) case final path?) {
+      return (reference: tags, path: path);
+    }
+    if (indexedFile(reference) case final path?) {
+      return (reference: reference!, path: path);
+    }
+    return null;
   }
 
   /// Stores a copy of the image at the local [path] as the cover of the
@@ -462,9 +489,15 @@ String? durableCoverReference(String? reference) {
   final path = CoverStore._localPath(value);
   if (path == null) return value;
   final normalized = p.normalize(path);
+  // Network tags and download previews are read to these temporary folders.
   final temporary =
-      p.split(normalized).contains('network_metadata') ||
-      p.basename(normalized).startsWith('download_cover_preview_') ||
+      p
+          .split(normalized)
+          .any(
+            (part) =>
+                part == 'network_metadata' ||
+                part.startsWith('download_cover_preview_'),
+          ) ||
       p.isWithin(p.normalize(Directory.systemTemp.path), normalized);
   return temporary ? null : value;
 }

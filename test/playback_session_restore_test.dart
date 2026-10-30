@@ -205,4 +205,32 @@ void main() {
       expect(result.artworkRelocated, isFalse);
     },
   );
+
+  test(
+    'restore drops loopback and temporary covers of older sessions',
+    () async {
+      final result = await prepareRestoredPlaybackMedia(
+        [
+          _media(0, artwork: 'http://127.0.0.1:41234/2f6d1c'),
+          _media(
+            1,
+            artwork:
+                '/data/user/0/app/cache/network_metadata/subsonic_ab.image',
+          ),
+          _media(2, artwork: 'https://example.test/cover.jpg'),
+          _media(3, artwork: 'network://nas/Album/cover.jpg'),
+        ],
+        fileExists: (_) async => true,
+        loadLibraryCoverPath: (_) async => null,
+      );
+      expect(result.items.map((item) => item.artUri), [
+        null,
+        null,
+        'https://example.test/cover.jpg',
+        'network://nas/Album/cover.jpg',
+      ]);
+      // The next save writes the queue without them.
+      expect(result.artworkRelocated, isTrue);
+    },
+  );
 }

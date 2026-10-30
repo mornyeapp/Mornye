@@ -1,10 +1,12 @@
 part of 'music_player_service.dart';
 
-/// Network covers ([PlayableMedia.networkArtworkSource]) shown from the
-/// cover store: a stored cover shows from a song's first item, the same file
-/// on every play; one not stored yet shows on the current song and its queue
-/// entries once fetched. The covers of the next songs are fetched ahead, so
-/// a skip or a gapless start shows its cover at once.
+/// Network covers shown from the cover store: a stored cover shows from a
+/// song's first item, the same file on every play; one not stored yet shows
+/// on the current song and its queue entries once fetched. A network song
+/// shows the cover from its tags once read (see [CoverStore.songCover]),
+/// else its network cover ([PlayableMedia.coverReference]). The covers of
+/// the next songs are fetched ahead, so a skip or a gapless start shows its
+/// cover at once.
 class _MusicCovers {
   _MusicCovers(this.handler);
 
@@ -19,62 +21,96 @@ class _MusicCovers {
   /// it is not stored yet and checking a stored one.
   void fetch(String? ref) {
     if (ref == null) return;
-    unawaited(_store.file(ref).then((path) => _show(ref, path)));
+    unawaited(_store.file(ref).then((_) => _show(ref)));
   }
 
-  /// [fetch] for the covers of the songs after the current one that are
-  /// not stored yet.
+  /// [fetch] for the network cover of [media], unless it shows the cover
+  /// from its tags.
+  void fetchFor(PlayableMedia media) {
+    if (_store.songCover(media.source) == null) fetch(media.coverReference);
+  }
+
+  /// [fetch] for the covers of the songs after the current one that have
+  /// no stored cover yet.
   void fetchAhead() {
     final media = handler._media;
     final index = handler._index;
     for (var i = index + 1; i < media.length && i <= index + ahead; i++) {
-      final ref = media[i].networkArtworkSource;
-      if (ref != null && _store.indexedFile(ref) == null) fetch(ref);
+      final ref = media[i].coverReference;
+      if (ref != null && _store.songCover(media[i].source, ref) == null) {
+        fetch(ref);
+      }
     }
   }
 
-  /// [fetch] for a cover its server just changed.
-  void refresh(String? ref) {
-    if (ref == null) return;
-    unawaited(_store.refresh(ref).then((path) => _show(ref, path)));
+  /// The server changed the cover [ref]: the current song checks it again
+  /// now, others when they next ask the store.
+  void invalidate(String? ref) {
+    _store.invalidate(ref);
+    final index = handler._index;
+    if (ref == null || index < 0 || index >= handler._media.length) return;
+    final current = handler._media[index];
+    if (current.coverReference == ref) fetchFor(current);
   }
 
   /// Shows the file the stored cover [ref] moved to.
-  void changed(String ref) => _show(ref, _store.indexedFile(ref));
+  void changed(String ref) => _show(ref);
 
-  /// The stored copy of the cover in the tags of the network song [source],
-  /// read to the temporary file [cover], so the session keeps a path that
-  /// lasts. Null when the song's network cover [reference] is stored, which
-  /// it shows instead, or when the copy failed.
-  Future<String?> adoptTagCover(
-    String source,
-    String? reference,
-    String? cover,
-  ) async {
+  /// Stores the cover in the tags of the network song [source], read to
+  /// the temporary file [cover], and shows it on the song: once known, it
+  /// is the song's cover on every play. Null when there is none or it
+  /// could not be stored.
+  Future<String?> adoptTagCover(String source, String? cover) async {
     if (cover == null || cover.isEmpty) return null;
-    if (_store.indexedFile(reference) != null) return null;
-    return _store.adopt(CoverStore.songCoverReference(source), cover);
+    final reference = CoverStore.songCoverReference(source);
+    final path = await _store.adopt(reference, cover);
+    if (path != null) _show(reference);
+    return path;
   }
 
-  /// Shows [path], the stored file of the network cover [ref], on the current
-  /// song and on the queue entries with that cover.
-  void _show(String ref, String? path) {
-    if (path == null || handler._disposed) return;
-    final artUri = Uri.file(path);
+  /// The reference of the stored cover [item] of the song [source] shows,
+  /// for listening statistics to keep: its tag cover's, else its network
+  /// cover's, else the artwork when it outlasts this run.
+  String? reference(MediaItem item) {
+    final source = item.extras?['source']?.toString();
+    final shown = source == null ? null : _store.songCover(source);
+    if (shown != null && item.artUri == Uri.file(shown.path)) {
+      return shown.reference;
+    }
+    return item.extras?['artworkRef']?.toString() ??
+        durableCoverReference(item.artUri?.toString());
+  }
+
+  /// Shows the stored cover of the songs whose tag cover or network cover
+  /// is [ref] on the current song and their queue entries.
+  void _show(String ref) {
+    if (handler._disposed) return;
+    MediaItem? covered(MediaItem item, String source, String? reference) {
+      if (ref != reference && ref != CoverStore.songCoverReference(source)) {
+        return null;
+      }
+      final cover = _store.songCover(source, reference);
+      if (cover == null) return null;
+      final artUri = Uri.file(cover.path);
+      return item.artUri == artUri ? null : item.copyWith(artUri: artUri);
+    }
+
     final current = handler.mediaItem.value;
-    if (current != null &&
-        current.extras?['artworkRef'] == ref &&
-        current.artUri != artUri) {
-      handler.mediaItem.add(current.copyWith(artUri: artUri));
+    final source = current?.extras?['source']?.toString();
+    if (current != null && source != null) {
+      final updated = covered(
+        current,
+        source,
+        current.extras?['artworkRef']?.toString(),
+      );
+      if (updated != null) handler.mediaItem.add(updated);
     }
     var changed = false;
     for (var i = 0; i < handler._media.length; i++) {
+      final media = handler._media[i];
       final entry = handler._queueItems[i];
-      if (handler._media[i].networkArtworkSource != ref ||
-          entry.artUri == artUri) {
-        continue;
-      }
-      final updated = entry.copyWith(artUri: artUri);
+      final updated = covered(entry, media.source, media.coverReference);
+      if (updated == null) continue;
       handler._queueItems[i] = updated;
       // Keep the saved shuffle order paired with the updated entry.
       final original = handler._originalQueueOrder;

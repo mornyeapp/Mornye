@@ -21,7 +21,6 @@ import 'package:mornye/services/link/features/link_track_resolver.dart';
 import 'package:mornye/services/link/link_client_api.dart';
 import 'package:mornye/services/link/link_protocol.dart';
 import 'package:mornye/services/music_player_service.dart';
-import 'package:mornye/services/network_storage_service.dart';
 import 'package:mornye/services/remote_playback.dart';
 
 import 'support/link_fakes.dart';
@@ -101,7 +100,6 @@ void main() {
           ...utf8.encode(source),
         ]);
       },
-      retryDelay: Duration.zero,
     );
     client = FakeLinkClient(
       onGet: (op, query) => null,
@@ -156,10 +154,8 @@ void main() {
       .timeout(const Duration(seconds: 2))
       .then((item) => item!);
 
-  String desktopCover(String songId) => NetworkStorageService.source(
-    linkTestServer.connectionId,
-    subsonicCoverPath(songId),
-  );
+  String desktopCover(String songId) =>
+      linkDesktopCoverSource(linkTestServer, songId);
 
   test(
     'active remote preferences stay synchronized through reconnection',
@@ -285,6 +281,20 @@ void main() {
         .timeout(const Duration(seconds: 2));
     expect(after!.artUri!.toFilePath(), covers.indexedFile(desktopCover('s0')));
     expect((await playback.queues.first).first.artUri, after.artUri);
+  });
+
+  test('changes to songs nobody shows fetch no covers', () async {
+    client.push(_state());
+    await withCover();
+    await settle();
+    final fetched = artwork.length;
+    // As a desktop library job reports every song it changed.
+    for (var i = 0; i < 50; i++) {
+      playback.refreshCover(desktopCover('other$i'));
+    }
+    playback.refreshTracks();
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+    expect(artwork, hasLength(fetched));
   });
 
   test('a desktop song the phone has shows as its own file', () async {

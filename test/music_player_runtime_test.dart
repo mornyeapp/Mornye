@@ -2666,23 +2666,82 @@ void main() {
     );
 
     test(
-      'a cover the store replaced shows on the song and its entry',
+      'a changed cover of the playing song replaces it, others wait',
       () async {
+        final events = SourceMetadataEvents();
+        final songs = [
+          for (var i = 0; i < 6; i++)
+            PlayableMedia(
+              id: 'nas-$i',
+              source: 'network://nas/Album/0$i.flac',
+              title: 'Song $i',
+              artist: 'Artist',
+              networkArtworkSource: 'network://nas/Album/$i.jpg',
+            ),
+        ];
+        final handler = await _runtime(
+          coverStore: covers,
+          sourceMetadataEvents: events,
+          resolveNetworkSource: resolve,
+          readNetworkMetadata: (_) async => {},
+        ).initialize();
+        await handler.setQueueAndPlay(songs);
+        final before = await shown(handler, (item) => item.artUri != null);
+        await until(() => fetched.length == 4);
+
+        // As a library job reports every song it changed: queued songs past
+        // the fetched ones, and songs not queued, fetch nothing.
+        version = 1;
+        for (final song in songs.skip(4)) {
+          await events.publish(song.source);
+        }
+        await events.publish('network://nas/Album/elsewhere.flac');
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+        expect(fetched, hasLength(4));
+
+        await events.publish(songs.first.source);
+        final after = await shown(
+          handler,
+          (item) => item.artUri != before.artUri,
+        );
+        expect(
+          after.artUri!.toFilePath(),
+          covers.indexedFile(songs.first.networkArtworkSource),
+        );
+        expect(handler.queue.value.first.artUri, after.artUri);
+        expect(fetched, hasLength(5));
+      },
+    );
+
+    test(
+      'a network:// artwork shows as its stored file, never as itself',
+      () async {
+        // As Home plays a song listening statistics kept.
+        const recorded = PlayableMedia(
+          id: 'nas-recorded',
+          source: 'network://nas/Album/03.flac',
+          title: 'Three',
+          artist: 'Artist',
+          artUri: cover,
+        );
+        expect(recorded.coverReference, cover);
         final handler = await _runtime(
           coverStore: covers,
           resolveNetworkSource: resolve,
           readNetworkMetadata: (_) async => {},
         ).initialize();
-        await handler.setQueueAndPlay([song]);
-        final before = await shown(handler, (item) => item.artUri != null);
-        version = 1;
-        await covers.refresh(cover);
-        final after = await shown(
-          handler,
-          (item) => item.artUri != before.artUri,
-        );
-        expect(after.artUri!.toFilePath(), covers.indexedFile(cover));
-        expect(handler.queue.value.single.artUri, after.artUri);
+        final covered = <Uri?>[];
+        final subscription = handler.mediaItem.listen((item) {
+          if (item != null) covered.add(item.artUri);
+        });
+        addTearDown(subscription.cancel);
+        await handler.setQueueAndPlay([recorded]);
+        final item = await shown(handler, (item) => item.artUri != null);
+        expect(item.artUri!.toFilePath(), covers.indexedFile(cover));
+        expect(item.extras!['artworkRef'], cover);
+        expect(fetched, [cover]);
+        expect(covered.whereType<Uri>(), everyElement(item.artUri));
+        expect(handler.queue.value.single.artUri, item.artUri);
       },
     );
 
@@ -2740,8 +2799,14 @@ void main() {
         var title = 'Tagged';
         final events = SourceMetadataEvents();
         final session = _ResumeSessionStore();
+        final recorder = _Recorder(
+          write: (_) async {},
+          elapsed: () => Duration.zero,
+          now: () => DateTime(2026),
+        );
         final handler = await _runtime(
           coverStore: covers,
+          recorder: recorder,
           sessionDatabase: session,
           sourceMetadataEvents: events,
           resolveNetworkSource: resolve,
@@ -2760,8 +2825,12 @@ void main() {
         await handler.setQueueAndPlay([tagged]);
         final first = await shown(handler, (item) => item.title == 'Tagged');
         expect(first.artUri!.toFilePath(), covers.indexedFile(reference));
+        await _settle();
+        // Statistics keep the tag cover's reference, not a store file.
+        expect(recorder.latestTrack?.artwork, reference);
 
-        // A tag edit stores the new cover, and the session keeps that file.
+        // A tag edit stores the new cover. The session keeps neither file:
+        // the store finds the song's tag cover by its source.
         tagCover.writeAsBytesSync([0xFF, 0xD8, 0xFF, 2]);
         title = 'Retagged';
         await events.publish(tagged.source);
@@ -2777,10 +2846,93 @@ void main() {
               title,
         );
         final saved = (session.active!['media'] as List).single as Map;
-        expect(saved['artUri'], edited.artUri.toString());
+        expect(saved.containsKey('artUri'), isFalse);
         expect('${session.active}', isNot(contains(temporary.path)));
         await tagCover.delete();
         expect(File(path).readAsBytesSync(), [0xFF, 0xD8, 0xFF, 2]);
+
+        final restarted = store();
+        addTearDown(restarted.dispose);
+        final restored = await _runtime(
+          coverStore: restarted,
+          resolveNetworkSource: resolve,
+        ).initialize();
+        await restored.restoreSession(
+          items: [PlayableMedia.fromJson(Map<String, dynamic>.from(saved))!],
+          index: 0,
+          position: Duration.zero,
+          shuffle: false,
+        );
+        expect(restored.mediaItem.value!.artUri, edited.artUri);
+      },
+    );
+
+    test(
+      'a known tag cover wins over the folder cover on every later play',
+      () async {
+        final stored = Uri.file((await covers.file(cover))!);
+        fetched.clear();
+        final temporary = await Directory.systemTemp.createTemp('nas-tags-');
+        addTearDown(() => temporary.delete(recursive: true));
+        final tagCover =
+            File(p.join(temporary.path, 'network_metadata', 'tags.image'))
+              ..createSync(recursive: true)
+              ..writeAsBytesSync([0xFF, 0xD8, 0xFF, 7]);
+        final recorder = _Recorder(
+          write: (_) async {},
+          elapsed: () => Duration.zero,
+          now: () => DateTime(2026),
+        );
+        final handler = await _runtime(
+          coverStore: covers,
+          recorder: recorder,
+          resolveNetworkSource: resolve,
+          readNetworkMetadata: (_) async => {'cover_path': tagCover.path},
+        ).initialize();
+        final tags = CoverStore.songCoverReference(song.source);
+        final first = <Uri?>[];
+        final firstPlay = handler.mediaItem.listen((item) {
+          if (item != null) first.add(item.artUri);
+        });
+
+        // The folder cover shows only until the tags are read.
+        await handler.setQueueAndPlay([song]);
+        final tagged = await shown(
+          handler,
+          (item) => item.artUri != null && item.artUri != stored,
+        );
+        await firstPlay.cancel();
+        expect(first.first, stored);
+        expect(
+          first.skipWhile((uri) => uri == stored),
+          everyElement(tagged.artUri),
+        );
+        expect(tagged.artUri!.toFilePath(), covers.indexedFile(tags));
+        expect(tagged.extras!['artworkRef'], cover);
+        expect(handler.queue.value.single.artUri, tagged.artUri);
+        await _settle();
+        expect(recorder.latestTrack?.artwork, tags);
+
+        // A changed folder cover does not replace it.
+        version = 1;
+        covers.invalidate(cover);
+        await covers.file(cover);
+        await until(() => covers.indexedFile(cover) != stored.toFilePath());
+        await _settle();
+        expect(handler.mediaItem.value!.artUri, tagged.artUri);
+        expect(handler.queue.value.single.artUri, tagged.artUri);
+
+        // A later play shows it from its first item, and fetches no folder.
+        final covered = <Uri?>[];
+        final subscription = handler.mediaItem.listen((item) {
+          if (item != null) covered.add(item.artUri);
+        });
+        addTearDown(subscription.cancel);
+        final fetches = fetched.length;
+        await handler.setQueueAndPlay([song]);
+        await _settle();
+        expect(covered, everyElement(tagged.artUri));
+        expect(fetched, hasLength(fetches));
       },
     );
 

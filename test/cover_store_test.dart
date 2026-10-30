@@ -555,12 +555,14 @@ void main() {
     },
   );
 
-  test('refresh fetches a stored cover again at once', () async {
+  test('an invalidated cover is checked on its next use, not before', () async {
     var version = 1;
     var fetches = 0;
+    var offline = false;
     final covers = store(
       fetch: (_, output) async {
         fetches++;
+        if (offline) throw const SocketException('offline');
         await output.writeAsBytes(_jpeg(version));
       },
     );
@@ -569,14 +571,70 @@ void main() {
     expect(await covers.file(ref), path);
     expect(fetches, 1);
 
+    // A burst of changes fetches nothing, stored or not.
     version = 2;
+    for (var i = 0; i < 50; i++) {
+      covers
+        ..invalidate(ref)
+        ..invalidate('network://desktop/subsonic/cover/$i.image');
+    }
+    covers.invalidate(null);
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+    expect(fetches, 1);
+
+    // The next use answers the stored file and checks it in the background.
     final changed = covers.changes.first;
-    final refreshed = (await covers.refresh(ref))!;
-    expect(refreshed, isNot(path));
+    expect(await covers.file(ref), path);
     expect(await changed.timeout(const Duration(seconds: 10)), ref);
-    expect(covers.indexedFile(ref), refreshed);
+    expect(covers.indexedFile(ref), isNot(path));
     expect(fetches, 2);
-    expect(await covers.refresh(null), isNull);
+    expect(await covers.file(ref), covers.indexedFile(ref));
+    expect(fetches, 2);
+
+    // A fetch that failed while offline is not waited out once back.
+    offline = true;
+    const missing = 'network://desktop/subsonic/cover/Yg.image';
+    expect(await covers.file(missing), isNull);
+    offline = false;
+    expect(await covers.file(missing), isNull);
+    expect(fetches, 3);
+    covers.invalidate(missing);
+    expect(await covers.file(missing), isNotNull);
+    expect(fetches, 4);
+  });
+
+  test('a song shows its adopted tag cover over its network cover', () async {
+    final covers = store(
+      fetch: (ref, output) async => output.writeAsBytes(_jpeg(ref.length)),
+    );
+    const song = 'network://nas/Album/01.flac';
+    const folder = 'network://nas/Album/cover.jpg';
+    final tags = CoverStore.songCoverReference(song);
+    expect(covers.songCover(song, folder), isNull);
+
+    final network = (await covers.file(folder))!;
+    expect(covers.songCover(song, folder), (reference: folder, path: network));
+    expect(covers.songCover(song), isNull);
+
+    final source = File('${directory.path}/tags.image')
+      ..writeAsBytesSync(_jpeg(9));
+    final adopted = (await covers.adopt(tags, source.path))!;
+    expect(covers.songCover(song, folder), (reference: tags, path: adopted));
+    expect(covers.songCover(song), (reference: tags, path: adopted));
+    expect(covers.songCover('/music/01.flac', folder)?.reference, folder);
+
+    // No server answers a tag cover: a missing one is never fetched.
+    var fetched = false;
+    final fresh = store(
+      fetch: (_, _) async {
+        fetched = true;
+      },
+    );
+    expect(
+      await fresh.file(CoverStore.songCoverReference('network://nas/b.flac')),
+      isNull,
+    );
+    expect(fetched, isFalse);
   });
 
   test('durable references leave out loopback URLs and temporary files', () {
@@ -593,7 +651,9 @@ void main() {
       Uri.file(
         '/var/mobile/Library/Caches/network_metadata/a.image',
       ).toString(),
-      '/music/download_cover_preview_123.jpg',
+      // Previews of an earlier install, whose container path changed.
+      '/var/mobile/Containers/Data/Application/A1/tmp/'
+          'download_cover_preview_x1/cover_preview.jpg',
       p.join(temporary, 'link-cover', 'a.jpg'),
       Uri.file(p.join(temporary, 'a.jpg')).toString(),
     ]) {

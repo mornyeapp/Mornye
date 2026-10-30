@@ -67,9 +67,7 @@ abstract class LinkMirroredPlayback implements RemotePlayback {
        _tick = tick,
        _seekTimeout = seekTimeout,
        _nowMs = nowMs ?? (() => DateTime.now().millisecondsSinceEpoch) {
-    _coverChanges = covers.changes.listen(
-      (reference) => _showCover(reference, covers.indexedFile(reference)),
-    );
+    _coverChanges = covers.changes.listen(_showCover);
   }
 
   @override
@@ -161,6 +159,13 @@ abstract class LinkMirroredPlayback implements RemotePlayback {
   /// device is reachable again.
   @protected
   void retryFailed() {
+    for (final ref in _failed) {
+      final reference = _items[ref]?.extras?['artworkRef'];
+      if (reference is! String) continue;
+      // The store waits a while after a failed fetch; the device is back.
+      _covers.invalidate(reference);
+      _coverChecks.remove(reference);
+    }
     _resolved.removeAll(_failed);
     _failed.clear();
   }
@@ -176,13 +181,14 @@ abstract class LinkMirroredPlayback implements RemotePlayback {
     _showTracks(force: false);
   }
 
-  /// The network cover [reference] changed on its server: fetches it again
-  /// and shows it on the items with that cover.
+  /// The network cover [reference] changed on its server: the playing and
+  /// next songs with it check it again now, other songs once they show, so
+  /// a job changing many songs fetches no covers nobody sees.
   void refreshCover(String reference) {
     if (_disposed) return;
-    unawaited(
-      _covers.refresh(reference).then((path) => _showCover(reference, path)),
-    );
+    _covers.invalidate(reference);
+    _coverChecks.remove(reference);
+    _fetchShownCovers();
   }
 
   /// Shows the device's [player].
@@ -239,19 +245,30 @@ abstract class LinkMirroredPlayback implements RemotePlayback {
       schedule(ref);
     }
     _drainResolutions();
+    _fetchShownCovers();
+  }
+
+  /// [_fetchCovers] for the playing song and the next [_coversAhead].
+  void _fetchShownCovers() {
+    final player = _player;
+    final start = player?.index ?? 0;
     _fetchCovers({
-      ?track,
-      ...refs.skip(start < 0 ? 0 : start).take(_coversAhead + 1),
+      ?player?.track,
+      ...?player?.queue.skip(start < 0 ? 0 : start).take(_coversAhead + 1),
     });
   }
 
   /// Asks the store for the network covers of [refs], fetching those not
-  /// stored yet, and shows each once it is there.
+  /// stored yet, and shows each once it is there. Songs showing the cover
+  /// from their tags skip it.
   void _fetchCovers(Set<TrackRef> refs) {
     for (final ref in refs) {
-      final reference = _items[ref]?.extras?['artworkRef'];
+      final extras = _items[ref]?.extras;
+      final reference = extras?['artworkRef'];
+      final source = extras?['source'];
       if (reference is! String ||
           _failed.contains(ref) ||
+          (source is String && _covers.songCover(source) != null) ||
           !_coverChecks.add(reference)) {
         continue;
       }
@@ -261,23 +278,31 @@ abstract class LinkMirroredPlayback implements RemotePlayback {
             _coverChecks.remove(reference);
             _failed.add(ref);
           }
-          _showCover(reference, path);
+          _showCover(reference);
         }),
       );
     }
   }
 
-  /// Shows [path], the stored file of the network cover [reference], on the
-  /// items with that cover.
-  void _showCover(String reference, String? path) {
-    if (path == null || _disposed) return;
-    final artUri = Uri.file(path);
+  /// Shows the stored cover of the songs whose tag cover or network cover
+  /// is [reference] on their items.
+  void _showCover(String reference) {
+    if (_disposed) return;
     var changed = false;
     for (final MapEntry(:key, :value) in _items.entries.toList()) {
-      if (value.extras?['artworkRef'] != reference || value.artUri == artUri) {
+      final source = value.extras?['source'];
+      final network = value.extras?['artworkRef'];
+      if (source is! String ||
+          (reference != network &&
+              reference != CoverStore.songCoverReference(source))) {
         continue;
       }
-      _items[key] = value.copyWith(artUri: artUri);
+      final cover = _covers.songCover(
+        source,
+        network is String ? network : null,
+      );
+      if (cover == null || value.artUri == Uri.file(cover.path)) continue;
+      _items[key] = value.copyWith(artUri: Uri.file(cover.path));
       changed = true;
     }
     if (changed) _showTracks(force: true);
@@ -398,14 +423,16 @@ abstract class LinkMirroredPlayback implements RemotePlayback {
       final uri = Uri.tryParse(artwork ?? '');
       final local = uri != null && (!uri.hasScheme || uri.scheme == 'file');
       String? borrowed;
+      // A network cover shows from the store, not as the artwork itself.
       if (artwork == null ||
           artwork.isEmpty ||
+          CoverStore.fetches(artwork) ||
           (local &&
               !await File(
                 uri.scheme == 'file' ? uri.toFilePath() : artwork,
               ).exists())) {
         artwork = null;
-        if (media.networkArtworkSource == null) {
+        if (media.coverReference == null) {
           borrowed = immediatePlayable(ref)?.networkArtworkSource;
         }
       }

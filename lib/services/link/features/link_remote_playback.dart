@@ -16,7 +16,6 @@ import 'package:mornye/services/link/features/link_track_resolver.dart';
 import 'package:mornye/services/link/link_client_api.dart';
 import 'package:mornye/services/link/link_mirrored_playback.dart';
 import 'package:mornye/services/link/link_protocol.dart';
-import 'package:mornye/services/network_storage_service.dart';
 import 'package:mornye/services/playable_media.dart';
 import 'package:mornye/services/source_metadata_events.dart';
 import 'package:mornye/utils/logger.dart';
@@ -191,12 +190,7 @@ final linkRemotePlaybackProvider = Provider<LinkRemotePlayback?>((ref) {
       final songId = linkDesktopSongId(source, client.server);
       if (songId == null) return;
       playback
-        ..refreshCover(
-          NetworkStorageService.source(
-            client.server.connectionId,
-            subsonicCoverPath(songId),
-          ),
-        )
+        ..refreshCover(linkDesktopCoverSource(client.server, songId))
         ..refreshTracks();
       await remote.refresh();
     }),

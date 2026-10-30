@@ -335,9 +335,7 @@ class MusicPlayerHandler extends BaseAudioHandler
                 album: item.album ?? '',
                 // A reference that outlasts this run, never a loopback URL
                 // or a temporary file.
-                artwork:
-                    item.extras?['artworkRef']?.toString() ??
-                    durableCoverReference(item.artUri?.toString()),
+                artwork: _covers.reference(item),
               ),
         playing:
             state.playing &&
@@ -1236,7 +1234,9 @@ class MusicPlayerHandler extends BaseAudioHandler
   }) async {
     if (items.isEmpty) return;
     // Network songs show their stored covers from the first item.
-    if (items.any((item) => item.networkArtworkSource != null)) {
+    if (items.any(
+      (item) => item.coverReference != null || CoverStore.fetches(item.source),
+    )) {
       await _dependencies.coverStore.warmUp();
       if (_disposed) return;
     }
@@ -1267,7 +1267,7 @@ class MusicPlayerHandler extends BaseAudioHandler
       _sessionWriter.queueRestored(needsRewrite: queueNeedsRewrite);
       queue.add(List<MediaItem>.unmodifiable(_queueItems));
       mediaItem.add(_toMediaItem(_media[_index]));
-      _covers.fetch(_media[_index].networkArtworkSource);
+      _covers.fetchFor(_media[_index]);
       if (position > Duration.zero) {
         playbackState.add(
           playbackState.value.copyWith(updatePosition: position),
@@ -1570,7 +1570,7 @@ class MusicPlayerHandler extends BaseAudioHandler
       unawaited(_recoverEmbeddedArtwork(media, generation));
     }
     _covers
-      ..fetch(media.networkArtworkSource)
+      ..fetchFor(media)
       ..fetchAhead();
 
     // Android opens SAF files through a short-lived file-descriptor lease.
@@ -1760,11 +1760,9 @@ class MusicPlayerHandler extends BaseAudioHandler
     try {
       final metadata = await _dependencies.readNetworkMetadata(media.source);
       if (!_isCurrentPlayRequest(generation, media)) return;
-      final cover = await _covers.adoptTagCover(
-        media.source,
-        media.networkArtworkSource,
-        metadata['cover_path'] as String?,
-      );
+      // A stored tag cover shows through the store, on this play and later.
+      final cover = metadata['cover_path'] as String?;
+      final stored = await _covers.adoptTagCover(media.source, cover);
       if (!_isCurrentPlayRequest(generation, media)) return;
       final current = mediaItem.value;
       if (current == null) return;
@@ -1777,7 +1775,10 @@ class MusicPlayerHandler extends BaseAudioHandler
         title: text('title', current.title),
         artist: text('artist', current.artist ?? ''),
         album: text('album', current.album ?? ''),
-        artUri: cover == null ? current.artUri : Uri.file(cover),
+        // One the store could not keep shows on this play only.
+        artUri: stored == null && cover != null && cover.isNotEmpty
+            ? Uri.file(cover)
+            : current.artUri,
         extras: {
           ...?current.extras,
           for (final key in ['bit_depth', 'sample_rate', 'bitrate', 'format'])
@@ -1790,7 +1791,6 @@ class MusicPlayerHandler extends BaseAudioHandler
         'title': updated.title,
         'artist': updated.artist,
         'album': updated.album,
-        'artUri': updated.artUri?.toString(),
         'bitDepth': metadata['bit_depth'] ?? media.bitDepth,
         'sampleRate': metadata['sample_rate'] ?? media.sampleRate,
         'bitrate': metadata['bitrate'] ?? media.bitrate,
@@ -2249,19 +2249,18 @@ class MusicPlayerHandler extends BaseAudioHandler
           : await _dependencies.readMetadata(source);
       if (metadata['error'] != null) return;
       final cover = metadata['cover_path'] as String?;
-      final String? artwork;
+      String? artwork;
       if (source.startsWith('network://')) {
-        final reference = _media
-            .where((item) => item.source == source)
-            .firstOrNull
-            ?.networkArtworkSource;
-        _covers.refresh(reference);
-        final stored = await _covers.adoptTagCover(source, reference, cover);
-        artwork = stored == null ? null : Uri.file(stored).toString();
-      } else {
-        artwork = cover == null || cover.isEmpty
-            ? null
-            : normalizeArtUri(cover);
+        // The store keeps a network song's covers, which its items show.
+        _covers.invalidate(
+          _media
+              .where((item) => item.source == source)
+              .firstOrNull
+              ?.coverReference,
+        );
+        await _covers.adoptTagCover(source, cover);
+      } else if (cover != null && cover.isNotEmpty) {
+        artwork = normalizeArtUri(cover);
       }
       if (_disposed || !identical(_metadataChanges[source], token)) return;
       var changed = false;

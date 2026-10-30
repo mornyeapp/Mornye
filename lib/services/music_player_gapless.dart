@@ -203,7 +203,7 @@ class _MusicGapless {
           .copyWith(duration: _nextDuration),
     );
     handler._covers
-      ..fetch(next.networkArtworkSource)
+      ..fetchFor(next)
       ..fetchAhead();
     handler._lastBroadcastPosition = Duration.zero;
     handler._lastPositionBroadcastAt = null;
