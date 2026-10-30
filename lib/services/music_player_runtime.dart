@@ -22,6 +22,7 @@ import 'package:mornye/services/library_database.dart';
 import 'package:mornye/services/listening_statistics.dart';
 import 'package:mornye/services/media_kit_playback_deck.dart';
 import 'package:mornye/services/media_library_browser.dart';
+import 'package:mornye/services/media_session_art_cache.dart';
 import 'package:mornye/services/media_session_desktop.dart';
 import 'package:mornye/services/media_session_filter.dart';
 import 'package:mornye/services/music_playback_deck.dart';
@@ -207,6 +208,7 @@ class PlaybackDependencies {
     final session = await AudioService.init(
       // The switch lets a remote device take over the system session.
       builder: () => SwitchAudioHandler(handler = builder()),
+      cacheManager: MediaSessionArtCache(),
       config: const AudioServiceConfig(
         androidNotificationChannelId: 'com.zarz.mornye.playback',
         androidNotificationChannelName: 'Playback',
