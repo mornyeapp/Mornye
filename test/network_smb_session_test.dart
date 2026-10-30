@@ -469,24 +469,30 @@ void main() {
     },
   );
 
-  for (final (type, retires) in [
-    (Smb2ErrorType.connection, true),
-    (Smb2ErrorType.timeout, true),
-    (Smb2ErrorType.auth, true),
-    (Smb2ErrorType.state, true),
-    (Smb2ErrorType.io, true),
-    (Smb2ErrorType.unknown, true),
-    (Smb2ErrorType.notFound, false),
-    (Smb2ErrorType.accessDenied, false),
-    (Smb2ErrorType.isADirectory, false),
-    (Smb2ErrorType.inUse, false),
+  // Answers about a path carry it ('' for the share root). A reconnect the
+  // pool keeps refusing carries none, whatever its type.
+  for (final (type, path, retires) in [
+    (Smb2ErrorType.connection, '', true),
+    (Smb2ErrorType.timeout, '', true),
+    (Smb2ErrorType.auth, '', true),
+    (Smb2ErrorType.state, '', true),
+    (Smb2ErrorType.io, '', true),
+    (Smb2ErrorType.unknown, '', true),
+    (Smb2ErrorType.notFound, '', false),
+    (Smb2ErrorType.accessDenied, '', false),
+    (Smb2ErrorType.isADirectory, '', false),
+    (Smb2ErrorType.inUse, '', false),
+    (Smb2ErrorType.notFound, null, true),
+    (Smb2ErrorType.accessDenied, null, true),
+    (Smb2ErrorType.inUse, null, true),
   ]) {
-    test('a ${type.name} failure reaches the caller as it is and '
+    test('a ${type.name} failure ${path == null ? 'without a path ' : ''}'
+        'reaches the caller as it is and '
         '${retires ? 'replaces' : 'keeps'} the session', () async {
       setUpStorage();
       await storage.save(_connection());
       await storage.list(_connection());
-      final failure = Smb2Exception('Injected', type: type);
+      final failure = Smb2Exception('Injected', type: type, path: path);
       server.failNext = failure;
       await expectLater(storage.list(_connection()), throwsA(same(failure)));
       if (retires) {
@@ -525,6 +531,22 @@ void main() {
       expect(server.openHandles, 0);
     },
   );
+
+  test('verify logs on again instead of reusing a live session', () async {
+    setUpStorage();
+    await storage.save(_connection());
+    await storage.list(_connection());
+    expect(server.opened, 1);
+    const refusal = Smb2Exception('Logon failure', type: Smb2ErrorType.auth);
+    server.refuse = refusal;
+    await expectLater(storage.verify(_connection()), throwsA(same(refusal)));
+    expect(server.opened, 2);
+    await _until(() => server.closed == 1);
+    expect(server.closed, 1);
+    server.refuse = null;
+    expect(await storage.verify(_connection()), hasLength(2));
+    expect(server.opened, 3);
+  });
 
   test(
     'concurrent first calls share one logon and a refusal is not kept',

@@ -882,6 +882,13 @@ class NetworkStorageService {
     return response;
   }
 
+  /// Lists the root of [c] to check it before saving: SMB logs on again
+  /// instead of reusing a live session, which survives a password change.
+  Future<List<NetworkEntry>> verify(NetworkConnection c) {
+    _smbSessions.retire(c.id);
+    return list(c);
+  }
+
   Future<List<NetworkEntry>> list(
     NetworkConnection c, [
     String path = '',

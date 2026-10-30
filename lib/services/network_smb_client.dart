@@ -105,7 +105,9 @@ class NetworkSmbClient {
   }
 
   /// Runs [action] under the native lock. A failure that may come from a
-  /// shared session rather than the path retires that session.
+  /// shared session rather than the path retires that session. Answers
+  /// about a path carry it; a refused reconnect, which the pool repeats for
+  /// minutes without asking the server, does not.
   Future<T> _call<T>(Future<T> Function() action) async {
     try {
       return await _native.synchronized(action);
@@ -117,6 +119,7 @@ class NetworkSmbClient {
 
   static bool _breaksSession(Object error) =>
       error is! Smb2Exception ||
+      error.path == null ||
       switch (error.type) {
         Smb2ErrorType.notFound ||
         Smb2ErrorType.accessDenied ||

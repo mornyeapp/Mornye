@@ -656,7 +656,7 @@ class _NetworkConnectionFormState extends State<_NetworkConnectionForm> {
             : null,
       );
       c.validate();
-      await widget.service.list(c);
+      await widget.service.verify(c);
       await widget.service.save(c);
       if (mounted) Navigator.pop(context);
     } catch (error) {
