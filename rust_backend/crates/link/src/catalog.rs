@@ -115,20 +115,26 @@ impl Song {
     /// The `mornye_core::tags::extract_cover` format for this song's file,
     /// when its container can embed a cover.
     pub(crate) fn embedded_cover_format(&self) -> Option<&'static str> {
-        Some(match self.suffix.as_str() {
-            "flac" => "flac",
-            "m4a" | "mp4" | "m4b" | "alac" => "m4a",
-            "aac" => "aac",
-            "mp3" => "mp3",
-            "ogg" | "oga" => "ogg",
-            "opus" => "opus",
-            "wav" => "wav",
-            "aiff" => "aiff",
-            "aif" => "aif",
-            "aifc" => "aifc",
-            _ => return None,
-        })
+        cover_format(&self.suffix)
     }
+}
+
+/// The `mornye_core::tags::extract_cover` format for a file with `suffix`
+/// (lowercase), when its container can embed a cover.
+pub(crate) fn cover_format(suffix: &str) -> Option<&'static str> {
+    Some(match suffix {
+        "flac" => "flac",
+        "m4a" | "mp4" | "m4b" | "alac" => "m4a",
+        "aac" => "aac",
+        "mp3" => "mp3",
+        "ogg" | "oga" => "ogg",
+        "opus" => "opus",
+        "wav" => "wav",
+        "aiff" => "aiff",
+        "aif" => "aif",
+        "aifc" => "aifc",
+        _ => return None,
+    })
 }
 
 /// Where the image behind a `coverArt` id comes from: the first of `files`

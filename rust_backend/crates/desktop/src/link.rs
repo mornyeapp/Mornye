@@ -17,6 +17,9 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use tokio::sync::oneshot;
 
+/// The most files one `linkEmbeddedPictures` call reads.
+const MAX_PICTURE_PROBES: usize = 1000;
+
 type Emitter = Arc<dyn Fn(&str, Value) + Send + Sync>;
 type Waiting = Arc<Mutex<HashMap<String, oneshot::Sender<Result<Value, HostError>>>>>;
 type ReplyFuture = Pin<Box<dyn Future<Output = Result<Value, HostError>> + Send>>;
@@ -241,6 +244,32 @@ impl Link {
         Ok(Reply::null())
     }
 
+    /// `linkEmbeddedPictures {"paths": [String]}`: `{"pictures": [bool|null]}`,
+    /// whether each audio file embeds a picture the server would serve, null
+    /// when it is not a readable file. Works while stopped.
+    pub(crate) fn embedded_pictures(&self, args: &Args) -> CallResult {
+        let paths = args
+            .value()
+            .get("paths")
+            .and_then(Value::as_array)
+            .filter(|paths| paths.len() <= MAX_PICTURE_PROBES)
+            .ok_or_else(|| {
+                CallError::invalid_arguments(format!(
+                    "paths must be a list of at most {MAX_PICTURE_PROBES} paths"
+                ))
+            })?;
+        let pictures: Vec<Value> = paths
+            .iter()
+            .map(|path| {
+                path.as_str()
+                    .filter(|path| !path.is_empty())
+                    .and_then(|path| mornye_link::embeds_picture(Path::new(path)))
+                    .map_or(Value::Null, Value::Bool)
+            })
+            .collect();
+        Ok(json!({"pictures": pictures}).into())
+    }
+
     /// `linkSend {"deviceId"?, "message"}`: `{"delivered": <int>}`.
     pub(crate) fn send(&self, args: &Args) -> CallResult {
         let message = args
@@ -402,6 +431,22 @@ mod tests {
             Reply::Json(json!({"delivered": 0}))
         );
         assert!(link.send(&args(json!({}))).is_err());
+        let notes = dir.path().join("notes.txt");
+        std::fs::write(&notes, b"no audio").unwrap();
+        assert_eq!(
+            link.embedded_pictures(&args(json!({
+                "paths": [notes, dir.path().join("gone.flac"), "", 7],
+            })))
+            .unwrap(),
+            Reply::Json(json!({"pictures": [false, null, null, null]}))
+        );
+        let many = vec![""; MAX_PICTURE_PROBES + 1];
+        for bad in [json!({}), json!({"paths": "x"}), json!({"paths": many})] {
+            assert_eq!(
+                link.embedded_pictures(&args(bad)).unwrap_err().code,
+                "invalid_arguments"
+            );
+        }
         link.end_pairing();
         link.stop();
         assert_eq!(

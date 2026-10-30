@@ -27,6 +27,7 @@ mod ws;
 pub use catalog::Catalog;
 pub use files::received_dir;
 pub use server::Tuning;
+pub use subsonic::embeds_picture;
 pub use types::{Device, Host, HostError, LinkConfig, Shared};
 
 use crate::server::{State, TimedHost};

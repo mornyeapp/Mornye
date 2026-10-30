@@ -383,6 +383,14 @@ fn link_methods_answer_while_stopped() {
         call("linkSend", json!({"message": {"type": "x"}})).unwrap(),
         json!({"delivered": 0})
     );
+    assert_eq!(
+        call(
+            "linkEmbeddedPictures",
+            json!({"paths": ["/no/such/song.flac"]})
+        )
+        .unwrap(),
+        json!({"pictures": [null]})
+    );
     assert_eq!(call("linkEndPairing", Value::Null).unwrap(), Value::Null);
     assert_eq!(call("linkStop", Value::Null).unwrap(), Value::Null);
     assert!(call("linkBeginPairing", Value::Null).is_err());

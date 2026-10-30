@@ -1,5 +1,5 @@
 use super::*;
-use crate::subsonic::covers::{CACHE_DIR, trim_cache};
+use crate::subsonic::covers::{CACHE_DIR, embeds_picture, trim_cache};
 
 fn cached_files(fixture: &Fixture) -> Vec<PathBuf> {
     std::fs::read_dir(fixture.shared.config.temp_dir.join(CACHE_DIR))
@@ -283,6 +283,21 @@ async fn cover_art_without_any_picture_is_404_and_remembered() {
     assert_eq!(found.status, 200);
     assert_eq!(found.body.as_ref(), original.as_slice());
     assert_eq!(cached_files(&fixture).len(), 1);
+}
+
+#[test]
+fn embeds_picture_tells_files_with_a_picture_from_the_rest() {
+    let dir = tempfile::tempdir().expect("temp dir");
+    let (with, without) = flac_pair(&png(8, 8));
+    let embedded = write_file(dir.path(), "with.FLAC", &with);
+    let bare = write_file(dir.path(), "bare.flac", &without);
+    let other = write_file(dir.path(), "song.xyz", &with);
+    assert_eq!(embeds_picture(Path::new(&embedded)), Some(true));
+    assert_eq!(embeds_picture(Path::new(&bare)), Some(false));
+    // A format the server cannot read pictures from has none to serve.
+    assert_eq!(embeds_picture(Path::new(&other)), Some(false));
+    assert_eq!(embeds_picture(&dir.path().join("gone.flac")), None);
+    assert_eq!(embeds_picture(dir.path()), None);
 }
 
 #[tokio::test]

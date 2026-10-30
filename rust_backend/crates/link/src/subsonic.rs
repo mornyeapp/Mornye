@@ -16,6 +16,8 @@ mod objects;
 mod tests;
 mod xml;
 
+pub use covers::embeds_picture;
+
 use crate::catalog::Catalog;
 use crate::types::{HttpResponse, Shared, SubsonicRequest, param, respond};
 use serde_json::{Map, Value, json};

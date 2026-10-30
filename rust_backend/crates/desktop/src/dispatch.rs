@@ -709,6 +709,9 @@ pub(crate) static METHODS: &[Entry] = &[
     pool("linkCreateKey", |c, a| c.rt.link.create_key(a)),
     pool("linkReply", |c, a| c.rt.link.reply(a)),
     pool("linkSend", |c, a| c.rt.link.send(a)),
+    pool("linkEmbeddedPictures", |c, a| {
+        c.rt.link.embedded_pictures(a)
+    }),
 ];
 
 fn table() -> &'static HashMap<&'static str, &'static Entry> {

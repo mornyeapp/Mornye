@@ -8,7 +8,7 @@
 
 use super::media::file_response;
 use super::{Failure, number, required};
-use crate::catalog::{Catalog, hex};
+use crate::catalog::{Catalog, cover_format, hex};
 use crate::types::{HttpResponse, Shared, SubsonicRequest, full};
 use http::header::{CACHE_CONTROL, ETAG, IF_NONE_MATCH};
 use http::{HeaderMap, Response};
@@ -21,7 +21,7 @@ use std::fs;
 use std::io::{Cursor, Read};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{LazyLock, Mutex, PoisonError};
+use std::sync::{LazyLock, Mutex, MutexGuard, PoisonError};
 use std::time::UNIX_EPOCH;
 
 /// Cache folder under the temp dir.
@@ -157,6 +157,48 @@ fn digest(stamp: &str) -> [u8; 16] {
     key
 }
 
+fn without_picture() -> MutexGuard<'static, HashSet<[u8; 16]>> {
+    WITHOUT_PICTURE
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+}
+
+fn remember_without_picture(key: [u8; 16]) {
+    let mut remembered = without_picture();
+    if remembered.len() >= MAX_WITHOUT_PICTURE {
+        remembered.clear();
+    }
+    remembered.insert(key);
+}
+
+/// Whether the audio file at `path` embeds a picture `getCoverArt` would
+/// serve; `None` when it is not a readable file. A file whose format cannot
+/// embed one has none. Reads the picture without decoding it, and remembers
+/// a file without one as `getCoverArt` does. Blocking.
+pub fn embeds_picture(path: &Path) -> Option<bool> {
+    let metadata = fs::metadata(path).ok().filter(fs::Metadata::is_file)?;
+    let suffix = path
+        .extension()
+        .and_then(|extension| extension.to_str())
+        .map(str::to_ascii_lowercase)
+        .unwrap_or_default();
+    let Some(format) = cover_format(&suffix) else {
+        return Some(false);
+    };
+    let key = digest(&format!("embedded\0{}", version_stamp(path, &metadata)));
+    if without_picture().contains(&key) {
+        return Some(false);
+    }
+    let mut file = fs::File::open(path).ok()?;
+    match mornye_core::tags::extract_cover(&mut file, format, &|| Ok(())) {
+        Ok(cover) if !cover.data.is_empty() => Some(true),
+        _ => {
+            remember_without_picture(key);
+            Some(false)
+        }
+    }
+}
+
 /// The cached picture of `audio`, extracted when missing. `None` when the
 /// file is unreadable or embeds no picture (remembered), or the cache is
 /// unwritable.
@@ -165,11 +207,6 @@ fn extract_cached(dir: &Path, audio: &Path, format: &str) -> Option<Image> {
     // The picture is a version of the audio file, whatever its cached copy.
     let stamp = format!("embedded\0{}", version_stamp(audio, &metadata));
     let key = digest(&stamp);
-    let without_picture = || {
-        WITHOUT_PICTURE
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-    };
     if without_picture().contains(&key) {
         return None;
     }
@@ -191,11 +228,7 @@ fn extract_cached(dir: &Path, audio: &Path, format: &str) -> Option<Image> {
     let cover = match mornye_core::tags::extract_cover(&mut file, format, &|| Ok(())) {
         Ok(cover) if !cover.data.is_empty() => cover,
         _ => {
-            let mut remembered = without_picture();
-            if remembered.len() >= MAX_WITHOUT_PICTURE {
-                remembered.clear();
-            }
-            remembered.insert(key);
+            remember_without_picture(key);
             return None;
         }
     };
