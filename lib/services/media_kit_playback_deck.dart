@@ -228,6 +228,7 @@ class MediaKitPlaybackDeck implements PlaybackDeck {
   Completer<String?>? _pendingLoad;
   Duration? _duration;
   Duration? _positionInterval;
+  bool Function()? _positionWanted;
   Timer? _positionTimer;
   int _token = 0;
   bool _disposed = false;
@@ -370,8 +371,9 @@ class MediaKitPlaybackDeck implements PlaybackDeck {
   }
 
   @override
-  void startPositionUpdates(Duration interval) {
+  void startPositionUpdates(Duration interval, {bool Function()? wanted}) {
     _positionInterval = interval;
+    _positionWanted = wanted;
     _positionTimer?.cancel();
     _positionTimer = null;
     _syncPositionTimer();
@@ -388,7 +390,9 @@ class MediaKitPlaybackDeck implements PlaybackDeck {
     }
     // A timer rather than frames: AutoMix runs with the display asleep.
     _positionTimer ??= Timer.periodic(interval, (_) {
-      if (!_disposed && _state == PlaybackDeckState.playing) {
+      if (!_disposed &&
+          _state == PlaybackDeckState.playing &&
+          (_positionWanted?.call() ?? true)) {
         _positions.add(_engine.position);
       }
     });

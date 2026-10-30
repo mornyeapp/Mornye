@@ -176,12 +176,25 @@ class MusicPlayerHandler extends BaseAudioHandler
   Duration _lastBroadcastPosition = Duration.zero;
   DateTime? _lastPositionBroadcastAt;
   DateTime? _lastPeriodicPersistAt;
+
+  /// When the engine read the last published position, and when the last
+  /// tick asked it for one, on a clock that wall-clock changes cannot move.
+  final Stopwatch _positionClock = autoMixStopwatch()..start();
+  Duration? _lastPositionReadAt;
+  Duration? _positionQueriedAt;
+
+  /// No engine position has arrived since a forced broadcast.
+  bool _positionCheckDue = false;
   late final PlaybackSessionWriter _sessionWriter;
   int get _sessionQueueRevision => _sessionWriter.queueRevision;
   static const Duration _positionBroadcastInterval = Duration(
     milliseconds: 500,
   );
   static const Duration _positionPersistInterval = Duration(seconds: 10);
+
+  /// How early a tick may ask the engine: the answer arrives a platform
+  /// round trip later, which can carry it past an interval.
+  static const Duration _positionQueryAllowance = Duration(milliseconds: 50);
 
   DateTime? get sleepTimerEndsAt => _sleepTimerEndsAt;
   bool get isDisposed => _disposed;
@@ -469,7 +482,10 @@ class MusicPlayerHandler extends BaseAudioHandler
     // Position updates must continue with the display asleep. UI progress is
     // interpolated between updates; querying native playback every frame is
     // unnecessary and would stop preparing AutoMix when there are no frames.
-    player.startPositionUpdates(const Duration(milliseconds: 200));
+    player.startPositionUpdates(
+      const Duration(milliseconds: 200),
+      wanted: () => _wantsPosition(player),
+    );
     _playerSubscriptions[player] = [
       player.onPlayerStateChanged.listen(
         (state) {
@@ -907,7 +923,11 @@ class MusicPlayerHandler extends BaseAudioHandler
     }
   }
 
-  void _broadcastPosition(Duration position, {bool force = false}) {
+  void _broadcastPosition(
+    Duration position, {
+    bool force = false,
+    Duration? readAt,
+  }) {
     final now = DateTime.now();
     final lastAt = _lastPositionBroadcastAt;
     final elapsed = lastAt == null ? null : now.difference(lastAt);
@@ -919,7 +939,9 @@ class MusicPlayerHandler extends BaseAudioHandler
       return;
     }
     _lastPositionBroadcastAt = now;
+    _lastPositionReadAt = readAt ?? _positionClock.elapsed;
     _lastBroadcastPosition = position;
+    if (force) _positionCheckDue = true;
     playbackState.add(
       playbackState.value.copyWith(
         updatePosition: position,
@@ -928,9 +950,45 @@ class MusicPlayerHandler extends BaseAudioHandler
     );
   }
 
+  /// Whether a position tick of [player] can change anything. The handler
+  /// ignores other decks and songs still switching. The gate above passes
+  /// a position [_positionBroadcastInterval] after the engine read the last
+  /// one (which arrived a round trip later), and the session is saved every
+  /// [_positionPersistInterval]. After a forced broadcast the next tick
+  /// still reads the engine, which may be far from the published position.
+  /// AutoMix, gapless playback and Autoplay get every tick they act on.
+  bool _wantsPosition(PlaybackDeck player) {
+    if (!identical(player, _player) ||
+        !_sourceReady ||
+        _switchingGeneration != 0) {
+      return false;
+    }
+    final now = _positionClock.elapsed;
+    final readAt = _lastPositionReadAt;
+    final persistedAt = _lastPeriodicPersistAt;
+    if (!_positionCheckDue &&
+        readAt != null &&
+        now - readAt < _positionBroadcastInterval - _positionQueryAllowance &&
+        persistedAt != null &&
+        DateTime.now().difference(persistedAt) <
+            _positionPersistInterval - _positionQueryAllowance &&
+        !_autoMix.wantsPosition &&
+        !_gapless.wantsPosition(
+          _lastBroadcastPosition + (now - readAt) * _autoMix.rate,
+        ) &&
+        !_autoplay.wouldFill) {
+      return false;
+    }
+    _positionQueriedAt = now;
+    return true;
+  }
+
   void _handlePositionChanged(Duration position) {
     if (!_sourceReady || _switchingGeneration != 0) return;
-    _broadcastPosition(position);
+    final readAt = _positionQueriedAt;
+    _positionQueriedAt = null;
+    _positionCheckDue = false;
+    _broadcastPosition(position, readAt: readAt);
     _autoMix.onPosition(position);
     _gapless.onPosition(position);
     unawaited(_autoplay.fill());

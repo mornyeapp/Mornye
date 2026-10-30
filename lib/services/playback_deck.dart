@@ -100,7 +100,8 @@ abstract interface class PlaybackDeck {
 
   /// Emits [onPositionChanged] every [interval] while playing. Updates must
   /// not depend on rendered frames: AutoMix runs with the display asleep.
-  void startPositionUpdates(Duration interval);
+  /// A tick [wanted] answers false for is skipped without asking the engine.
+  void startPositionUpdates(Duration interval, {bool Function()? wanted});
 
   /// Applies the platform's music output configuration (audio focus, usage,
   /// keeping the source after completion). Called before each new source.

@@ -1,7 +1,8 @@
 part of 'music_player_service.dart';
 
-/// Creates the clocks that time AutoMix fades and audio-progress checks.
-/// Only tests replace it, to run transitions on a fake clock.
+/// Creates the clocks that time AutoMix fades, audio-progress checks and the
+/// position ticks that feed them. Only tests replace it, to run transitions
+/// on a fake clock.
 Stopwatch Function() autoMixStopwatch = Stopwatch.new;
 
 /// Owns only the extra deck and transition work. The ordinary player remains
@@ -75,6 +76,21 @@ class _MusicAutoMix {
       _canMix &&
       _playGeneration == handler._playRequestGeneration &&
       _queueRevision == handler._sessionQueueRevision;
+
+  /// Whether [onPosition] would act now: a planned mix times its start from
+  /// every position, and a song not yet planned starts its analysis.
+  bool get wantsPosition {
+    if (!_canMix || _cancelling > 0 || _starting || _fadeTimer != null) {
+      return false;
+    }
+    if (_plan != null) return true;
+    if (_preparing) return false;
+    final duration = handler.mediaItem.value?.duration;
+    return duration != null &&
+        duration >= const Duration(seconds: 20) &&
+        _attempt !=
+            '${handler._playRequestGeneration}:${handler._sessionQueueRevision}';
+  }
 
   void onPosition(Duration position) {
     if (!_canMix || _cancelling > 0 || _starting || _fadeTimer != null) return;

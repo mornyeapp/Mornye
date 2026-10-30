@@ -47,6 +47,21 @@ class _MusicGapless {
       _playGeneration == handler._playRequestGeneration &&
       _queueRevision == handler._sessionQueueRevision;
 
+  /// Whether [onPosition] may act on a position near [estimate]: it drops a
+  /// prepared song no longer next, and prepares the next one once [lead]
+  /// remains. A second of slack keeps the tick that crosses [lead] read.
+  bool wantsPosition(Duration estimate) {
+    if (_preparing) return false;
+    if (_prepared != null) return !_current(_generation);
+    if (!_enabled) return false;
+    final duration = handler.mediaItem.value?.duration;
+    return duration != null &&
+        duration > Duration.zero &&
+        duration - estimate <= lead + const Duration(seconds: 1) &&
+        _attempt !=
+            '${handler._playRequestGeneration}:${handler._sessionQueueRevision}';
+  }
+
   void onPosition(Duration position) {
     if (_preparing) return;
     if (_prepared != null) {

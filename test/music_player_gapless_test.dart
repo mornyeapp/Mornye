@@ -173,4 +173,24 @@ void main() {
     await Future<void>.delayed(const Duration(milliseconds: 600));
     expect(_gaplessDecks, isEmpty);
   });
+
+  fakeTimeTest('every tick close to the lead reads the position', () async {
+    setGaplessEnabled(true);
+    await handler.setQueueAndPlay(_tracks);
+    await _until(() => handler.mediaItem.value?.duration != null);
+    native.clocks['music-player'] = time.stopwatch()..start();
+    await handler.seek(const Duration(seconds: 29));
+    await Future<void>.delayed(const Duration(milliseconds: 100));
+    int reads() => native.calls
+        .where(
+          (call) =>
+              call.$1 == 'music-player' && call.$2 == 'getCurrentPosition',
+        )
+        .length;
+    final before = reads();
+    await Future<void>.delayed(const Duration(milliseconds: 600));
+    expect(reads() - before, 3);
+    expect(_gaplessDecks, isEmpty);
+    await _until(() => _gaplessDecks.length == 1);
+  });
 }

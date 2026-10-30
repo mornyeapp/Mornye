@@ -438,6 +438,19 @@ class _MusicAutoplay {
     if (enabled) unawaited(fill());
   }
 
+  /// Whether [fill] would start a refill now.
+  bool get wouldFill {
+    final index = handler._index;
+    final media = handler._media;
+    return enabled &&
+        !handler._disposed &&
+        index >= 0 &&
+        index < media.length &&
+        media.length - index - 1 < 3 &&
+        _pending == null &&
+        _attempt != (media[index].source, handler._sessionQueueRevision);
+  }
+
   Future<void> fill() async {
     if (!enabled ||
         handler._disposed ||

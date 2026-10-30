@@ -70,7 +70,7 @@ class _Deck implements PlaybackDeck {
   @override
   Stream<void> get onPlayerComplete => const Stream.empty();
   @override
-  void startPositionUpdates(Duration interval) {}
+  void startPositionUpdates(Duration interval, {bool Function()? wanted}) {}
   @override
   Future<void> configureOutput() async {}
   @override
@@ -134,6 +134,29 @@ class _DelayedSeekDeck extends _Deck {
     await seekBarrier.future;
     seekSources.add(sources.last);
     await super.seek(value);
+  }
+}
+
+/// Delivers positions only when a test sends them, and keeps the tick filter
+/// the handler passes.
+class _TickingDeck extends _Deck {
+  final positionEvents = StreamController<Duration>.broadcast();
+  Duration? interval;
+  bool Function()? wanted;
+
+  @override
+  Stream<Duration> get onPositionChanged => positionEvents.stream;
+
+  @override
+  void startPositionUpdates(Duration interval, {bool Function()? wanted}) {
+    this.interval = interval;
+    this.wanted = wanted;
+  }
+
+  @override
+  Future<void> dispose() async {
+    await positionEvents.close();
+    await super.dispose();
   }
 }
 
@@ -209,6 +232,32 @@ class _SessionStore implements AppStateDatabase {
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _PositionLog extends _SessionStore {
+  final positions = <int>[];
+
+  @override
+  Future<void> savePlaybackSession(Map<String, dynamic> session) async {
+    positions.add(session['positionMs'] as int? ?? 0);
+    await super.savePlaybackSession(session);
+  }
+
+  @override
+  Future<bool> updatePlaybackSessionState({
+    required int index,
+    required int positionMs,
+    required bool shuffle,
+    required String repeatMode,
+  }) {
+    positions.add(positionMs);
+    return super.updatePlaybackSessionState(
+      index: index,
+      positionMs: positionMs,
+      shuffle: shuffle,
+      repeatMode: repeatMode,
+    );
+  }
 }
 
 class _ResumeSessionStore extends _SessionStore {
@@ -1790,6 +1839,88 @@ void main() {
       expect(writes.last.plays, 0);
     },
   );
+
+  /// Plays [_track] on a [_TickingDeck] and sends [ticks] engine ticks on
+  /// its interval, each reading the time played. [deliver] decides whether
+  /// a tick reaches the handler. Returns the ticks the handler asked for,
+  /// those it took longer than a quick platform reply to handle, and those
+  /// whose position it published or saved.
+  Future<({Set<int> asked, Set<int> slow, List<int> published, Set<int> saved})>
+  tickPlayback(int ticks, {required bool Function(bool wanted) deliver}) async {
+    final deck = _TickingDeck();
+    final store = _PositionLog();
+    var created = 0;
+    final handler = await _runtime(
+      createDeck: (_) => created++ == 0 ? deck : _Deck(),
+      sessionDatabase: store,
+    ).initialize();
+    await handler.setQueueAndPlay([_track]);
+    await _settle();
+    final interval = deck.interval!;
+    expect(interval, const Duration(milliseconds: 200));
+    var tick = 0;
+    final published = <int>[];
+    var last = handler.playbackState.value.updatePosition;
+    final subscription = handler.playbackState.listen((state) {
+      if (state.updatePosition == last) return;
+      last = state.updatePosition;
+      published.add(tick);
+    });
+    final asked = <int>{};
+    final slow = <int>{};
+    final readAt = <int, int>{};
+    final clock = Stopwatch()..start();
+    for (tick = 1; tick <= ticks; tick++) {
+      await Future<void>.delayed(interval);
+      final askedAt = clock.elapsed;
+      final wanted = deck.wanted?.call() ?? true;
+      if (wanted) asked.add(tick);
+      if (!deliver(wanted)) continue;
+      deck.position = askedAt;
+      readAt[deck.position.inMilliseconds] = tick;
+      deck.positionEvents.add(deck.position);
+      await _settle();
+      if (clock.elapsed - askedAt > const Duration(milliseconds: 40)) {
+        slow.add(tick);
+      }
+    }
+    await subscription.cancel();
+    return (
+      asked: asked,
+      slow: slow,
+      published: published,
+      saved: {for (final ms in store.positions) ?readAt[ms]},
+    );
+  }
+
+  test(
+    'position ticks ask the engine only for positions the player uses',
+    () async {
+      // Every tick reaches the handler, as it did when each one read the
+      // engine; none of those the handler declines may be published or
+      // saved. A reply slower than the query allowance is the one case
+      // where a declined tick could have passed the gate.
+      const ticks = 55;
+      final run = await tickPlayback(ticks, deliver: (_) => true);
+      expect(run.published.length, greaterThanOrEqualTo(ticks ~/ 3 - 1));
+      expect(run.saved, isNotEmpty);
+      final missed = {
+        ...run.published,
+        ...run.saved,
+      }.difference(run.asked).difference(run.slow);
+      expect(missed, isEmpty);
+      expect(run.asked.length, lessThan(ticks ~/ 2));
+    },
+  );
+
+  test('a deck that skips declined ticks queries once per position', () async {
+    final run = await tickPlayback(15, deliver: (wanted) => wanted);
+    expect(run.published.length, greaterThanOrEqualTo(4));
+    // Beside the published ones: the first tick after the song started,
+    // which checks the engine against the published start position, and
+    // at most one that a late tick left just short of the gate.
+    expect(run.asked.length, lessThanOrEqualTo(run.published.length + 2));
+  });
 
   test(
     'deletion subscriptions follow handler ownership and scoped overrides',

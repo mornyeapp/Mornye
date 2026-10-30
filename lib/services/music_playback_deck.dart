@@ -87,6 +87,35 @@ final AudioContext _musicAudioContext = AudioContext(
   ),
 );
 
+/// audioplayers' [TimerPositionUpdater], except that a tick [wanted] answers
+/// false for asks the platform nothing. The updates the plugin requests
+/// itself, after a load, seek, pause or stop, always read the position.
+class _PositionTicker extends PositionUpdater {
+  _PositionTicker({
+    required super.getPosition,
+    required this.interval,
+    this.wanted,
+  });
+
+  final Duration interval;
+  final bool Function()? wanted;
+  Timer? _timer;
+
+  @override
+  void start() {
+    _timer?.cancel();
+    _timer = Timer.periodic(interval, (_) async {
+      if (wanted?.call() ?? true) await update();
+    });
+  }
+
+  @override
+  void stop() {
+    _timer?.cancel();
+    _timer = null;
+  }
+}
+
 PlaybackDeckState _deckState(PlayerState state) => switch (state) {
   PlayerState.stopped => PlaybackDeckState.stopped,
   PlayerState.playing => PlaybackDeckState.playing,
@@ -220,6 +249,8 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
   AsyncError? _ordinaryError;
   StreamSubscription<dynamic>? _nativeSubscription;
   StreamSubscription<Duration>? _positionSubscription;
+  Duration _positionInterval = const Duration(milliseconds: 200);
+  bool Function()? _positionWanted;
   Timer? _timer;
   bool _polling = false;
   bool _direct = false;
@@ -263,9 +294,12 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
   Stream<void> get onPlayerComplete => _completions.stream;
 
   @override
-  void startPositionUpdates(Duration interval) {
-    _ordinary.positionUpdater = TimerPositionUpdater(
+  void startPositionUpdates(Duration interval, {bool Function()? wanted}) {
+    _positionInterval = interval;
+    _positionWanted = wanted;
+    _ordinary.positionUpdater = _PositionTicker(
       interval: interval,
+      wanted: wanted,
       getPosition: getCurrentPosition,
     );
     unawaited(_positionSubscription?.cancel());
@@ -524,8 +558,8 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
     _setState(PlaybackDeckState.playing);
     usbAudioStatus.value = _preparedStatus;
     _timer?.cancel();
-    _timer = Timer.periodic(const Duration(milliseconds: 200), (_) async {
-      if (_polling || _disposed) return;
+    _timer = Timer.periodic(_positionInterval, (_) async {
+      if (_polling || _disposed || !(_positionWanted?.call() ?? true)) return;
       _polling = true;
       final token = _token;
       try {

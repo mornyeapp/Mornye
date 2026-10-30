@@ -38,6 +38,7 @@ class ExclusiveOutputDeck implements PlaybackDeck {
   /// Settings a deck taking over must apply as well.
   double _volume = 1, _rate = 1;
   Duration? _positionInterval;
+  bool Function()? _positionWanted;
 
   /// Loads the current source on a deck; null before the first.
   Future<void> Function(PlaybackDeck deck)? _source;
@@ -100,7 +101,7 @@ class ExclusiveOutputDeck implements PlaybackDeck {
     await target.setVolume(_volume);
     await target.setPlaybackRate(_rate);
     if (_positionInterval case final interval?) {
-      target.startPositionUpdates(interval);
+      target.startPositionUpdates(interval, wanted: _positionWanted);
     }
     await previous.stop();
     if (!exclusive) {
@@ -143,9 +144,10 @@ class ExclusiveOutputDeck implements PlaybackDeck {
   Stream<void> get onPlayerComplete => _completions.stream;
 
   @override
-  void startPositionUpdates(Duration interval) {
+  void startPositionUpdates(Duration interval, {bool Function()? wanted}) {
     _positionInterval = interval;
-    _active.startPositionUpdates(interval);
+    _positionWanted = wanted;
+    _active.startPositionUpdates(interval, wanted: wanted);
   }
 
   @override

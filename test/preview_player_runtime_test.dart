@@ -188,7 +188,8 @@ class _PreviewDeck implements PlaybackDeck {
   @override
   Stream<void> get onPlayerComplete => completions.stream;
   @override
-  void startPositionUpdates(Duration interval) => calls.add('positions');
+  void startPositionUpdates(Duration interval, {bool Function()? wanted}) =>
+      calls.add('positions');
   @override
   Future<void> configureOutput() async => calls.add('configure');
   @override

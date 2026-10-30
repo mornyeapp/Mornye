@@ -14,6 +14,7 @@ class _Deck implements PlaybackDeck {
   final positions = StreamController<Duration>.broadcast();
   final completions = StreamController<void>.broadcast();
   Duration position = Duration.zero;
+  bool Function()? wanted;
   bool disposed = false;
 
   @override
@@ -32,8 +33,11 @@ class _Deck implements PlaybackDeck {
   Stream<void> get onPlayerComplete => completions.stream;
 
   @override
-  void startPositionUpdates(Duration interval) =>
-      calls.add('positions ${interval.inMilliseconds}');
+  void startPositionUpdates(Duration interval, {bool Function()? wanted}) {
+    calls.add('positions ${interval.inMilliseconds}');
+    this.wanted = wanted;
+  }
+
   @override
   Future<void> configureOutput() async => calls.add('configure');
   @override
@@ -130,8 +134,13 @@ void main() {
   });
 
   test('the next source opens on libmpv once it is on', () async {
+    bool wanted() => true;
     await deck.setVolume(0.5);
-    deck.startPositionUpdates(const Duration(milliseconds: 200));
+    deck.startPositionUpdates(
+      const Duration(milliseconds: 200),
+      wanted: wanted,
+    );
+    expect(shared.wanted, same(wanted));
     playbackExclusiveOutput.value = true;
     await _settle();
     await deck.configureOutput();
@@ -144,6 +153,7 @@ void main() {
       'configure',
       'file /song.flac',
     ]);
+    expect(exclusives.single.wanted, same(wanted));
     expect(shared.calls.last, 'stop');
   });
 
