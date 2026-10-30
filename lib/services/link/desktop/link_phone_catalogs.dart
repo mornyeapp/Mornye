@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/services/link/desktop/link_catalog_index.dart'
     show linkDurationToleranceMs, linkMatchKey;
+import 'package:mornye/services/link/desktop/link_web_covers.dart';
 import 'package:mornye/services/link/link_cover_shrink.dart';
 import 'package:mornye/services/link/link_host_router.dart';
 import 'package:mornye/services/link/link_protocol.dart';
@@ -40,48 +41,9 @@ int? _intArg(Map<String, dynamic> args, String key) {
   return value is num ? value.toInt() : null;
 }
 
-/// Fetches a cover from its web address; null when it cannot.
-typedef LinkCoverFetcher = Future<Uint8List?> Function(Uri url);
-
 /// The cover files the desktop's Library rows of the phone [sourceId] name
 /// now; throws when they cannot be read.
 typedef LinkLibraryCovers = Future<Set<String>> Function(String sourceId);
-
-/// Fetches a cover of at most [LinkPhoneCatalogs.maxFetchedCoverBytes].
-Future<Uint8List?> _fetchCover(Uri url) async {
-  const timeout = Duration(seconds: 20);
-  final client = HttpClient()..connectionTimeout = const Duration(seconds: 10);
-  try {
-    final response = await (await client.getUrl(url)).close().timeout(timeout);
-    if (response.statusCode != HttpStatus.ok) return null;
-    final bytes = BytesBuilder(copy: false);
-    await for (final chunk in response.timeout(timeout)) {
-      bytes.add(chunk);
-      if (bytes.length > LinkPhoneCatalogs.maxFetchedCoverBytes) return null;
-    }
-    return bytes.takeBytes();
-  } finally {
-    client.close(force: true);
-  }
-}
-
-/// `jpg`, `png` or `webp` from an image's first bytes, else null.
-String? _imageExtension(Uint8List bytes) {
-  bool starts(int offset, List<int> magic) {
-    if (bytes.length < offset + magic.length) return false;
-    for (var i = 0; i < magic.length; i++) {
-      if (bytes[offset + i] != magic[i]) return false;
-    }
-    return true;
-  }
-
-  if (starts(0, const [0xFF, 0xD8, 0xFF])) return 'jpg';
-  if (starts(0, const [0x89, 0x50, 0x4E, 0x47])) return 'png';
-  if (starts(0, ascii.encode('RIFF')) && starts(8, ascii.encode('WEBP'))) {
-    return 'webp';
-  }
-  return null;
-}
 
 /// The song lists and covers paired phones send for the desktop's Library
 /// (contract 12.2 and 12.3). Each phone has a folder named after its
@@ -98,19 +60,16 @@ class LinkPhoneCatalogs {
   }) : _root = root,
        _paired = paired,
        _onCommit = onCommit,
-       _fetch = fetchCover ?? _fetchCover,
+       _fetch = fetchCover ?? fetchLinkCover,
        _shrink = shrinkCover ?? shrinkLinkCover,
        _libraryCovers = libraryCovers ?? ((_) async => const {});
 
   /// The most songs a phone may list.
   static const maxSongs = 100000;
 
-  /// The largest cover file. A phone sends larger covers shrunk.
+  /// The largest cover file. A phone sends larger covers shrunk, and a
+  /// larger one fetched from the web is kept shrunk to [linkShrunkCoverSize].
   static const maxCoverBytes = 2 * 1024 * 1024;
-
-  /// The largest cover fetched from the web; one over [maxCoverBytes] is
-  /// kept shrunk to [linkShrunkCoverSize].
-  static const maxFetchedCoverBytes = 24 * 1024 * 1024;
 
   /// The most base64 characters of covers in one request.
   static const maxCoversRequest = 4 * 1024 * 1024;
@@ -346,13 +305,13 @@ class LinkPhoneCatalogs {
           if (bytes != null && bytes.length > maxCoverBytes) {
             bytes = await _shrink(bytes);
           }
-          final ext = bytes == null ? null : _imageExtension(bytes);
+          final ext = bytes == null ? null : linkCoverExtension(bytes);
           if (ext == null) continue;
           if (stored + bytes!.length > maxCoverStore) {
             _log.w('Phone covers are over their limit; leaving the rest out');
             break fetching;
           }
-          await _writeCover(folder, batch[i].id, ext, bytes);
+          await writeLinkCover(folder, batch[i].id, ext, bytes);
           stored += bytes.length;
           added++;
         }
@@ -377,17 +336,6 @@ class LinkPhoneCatalogs {
       }
     }
     return bytes;
-  }
-
-  Future<void> _writeCover(
-    String folder,
-    String id,
-    String ext,
-    Uint8List bytes,
-  ) async {
-    final staged = File('$folder/.$id.$ext.tmp');
-    await staged.writeAsBytes(bytes, flush: true);
-    await staged.rename('$folder/$id.$ext');
   }
 
   Future<Object?> _covers(LinkRequest request) async {
@@ -444,7 +392,7 @@ class LinkPhoneCatalogs {
           _log.w('Phone covers are over their limit; leaving the rest out');
           break;
         }
-        await _writeCover(folder, id, ext as String, bytes);
+        await writeLinkCover(folder, id, ext as String, bytes);
         held[id] = '$folder/$id.$ext';
         stored += bytes.length;
       }

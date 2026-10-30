@@ -30,6 +30,7 @@ void main() {
   late FakeLinkBackend backend;
   late FakeLinkPlayer player;
   late FakeLinkCatalogExporter exporter;
+  late FakeLinkWebCovers webCovers;
   late List<String> opened;
   late ProviderContainer container;
 
@@ -40,6 +41,7 @@ void main() {
     exporter = FakeLinkCatalogExporter(
       songs: [catalogSong('l:a'), catalogSong('d:b')],
     );
+    webCovers = FakeLinkWebCovers(backend: backend);
     opened = [];
   });
 
@@ -70,6 +72,7 @@ void main() {
         player: player,
         exporter: exporter,
         openedUrls: opened,
+        webCovers: webCovers,
       ),
     );
     container.read(linkDesktopHostProvider);
@@ -471,6 +474,31 @@ void main() {
     await host().setEnabled(false);
     await flush(tester);
     revision.bump();
+    await tester.pump(const Duration(seconds: 11));
+    expect(exporter.exports, hasLength(2));
+    await shutdown(tester);
+  });
+
+  testWidgets('keeps the web covers the served catalog wants and exports '
+      'again once they arrive', (tester) async {
+    const url = 'https://example.com/a.jpg';
+    exporter.webCoverUrls = {url};
+    await boot(tester);
+    // Both after the server took the first catalog.
+    expect(webCovers.calls, ['prune:1:$url', 'fetch:1:$url']);
+
+    webCovers.arrive();
+    await tester.pump(const Duration(seconds: 9));
+    expect(exporter.exports, hasLength(1));
+    await tester.pump(const Duration(seconds: 2));
+    await flush(tester);
+    expect(exporter.exports, hasLength(2));
+    expect(webCovers.calls.sublist(2), ['prune:2:$url', 'fetch:2:$url']);
+
+    await host().setEnabled(false);
+    await flush(tester);
+    expect(webCovers.calls.last, 'stop');
+    webCovers.arrive();
     await tester.pump(const Duration(seconds: 11));
     expect(exporter.exports, hasLength(2));
     await shutdown(tester);

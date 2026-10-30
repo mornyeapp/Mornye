@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/models/library_database_models.dart';
 import 'package:mornye/services/link/desktop/link_catalog_exporter.dart';
+import 'package:mornye/services/link/link_protocol.dart';
 
 void main() {
   late Directory temp;
@@ -148,7 +149,107 @@ void main() {
     expect(second['size'], 32, reason: 'falls back to the file size');
     expect(second['suffix'], 'mp3');
     expect(second['albumKey'], isNull);
-    expect(second['coverPath'], isNull, reason: 'remote covers are dropped');
+    expect(second['coverPath'], isNull, reason: 'no copy is held yet');
+    expect(page.webCoverUrls, {'https://example.com/cover.jpg'});
+  });
+
+  group('web covers', () {
+    const webUrl = 'https://example.com/album.jpg';
+    late String held;
+
+    setUp(() => held = '${temp.path}/${linkCoverUrlId(webUrl)}.jpg');
+
+    Map<String, dynamic> downloaded(
+      String id, {
+      String? coverUrl,
+      String? file,
+    }) => {
+      'source': 'downloaded',
+      'item': {
+        'id': id,
+        'trackName': 'Track $id',
+        'artistName': 'Artist',
+        'filePath': file ?? download,
+        'coverUrl': ?coverUrl,
+      },
+    };
+
+    test('a song with only a web cover names the copy held', () {
+      final page = mapLinkCatalogRows(
+        [
+          downloaded('web', coverUrl: webUrl),
+          downloaded('again', coverUrl: webUrl, file: song),
+          downloaded('plain', coverUrl: 'http://example.com/plain.jpg'),
+          downloaded('none'),
+        ],
+        webCovers: {linkCoverUrlId(webUrl): held},
+      );
+      final lines = const LineSplitter()
+          .convert(utf8.decode(page.bytes))
+          .map((line) => jsonDecode(line) as Map<String, dynamic>)
+          .toList();
+
+      expect(lines.map((line) => line['coverPath']), [held, held, null, null]);
+      // Only https covers are fetched.
+      expect(page.webCoverUrls, {webUrl});
+      // The desktop player keeps showing the web cover itself.
+      expect(page.covers, [
+        webUrl,
+        webUrl,
+        'http://example.com/plain.jpg',
+        null,
+      ]);
+    });
+
+    test('a local cover file is kept and wants no web cover', () {
+      final page = mapLinkCatalogRows(
+        [
+          local('1', song, {'coverPath': cover, 'coverUrl': webUrl}),
+          downloaded('2', coverUrl: cover),
+        ],
+        webCovers: {linkCoverUrlId(webUrl): held},
+      );
+      final lines = const LineSplitter()
+          .convert(utf8.decode(page.bytes))
+          .map((line) => jsonDecode(line) as Map<String, dynamic>)
+          .toList();
+
+      expect(lines.map((line) => line['coverPath']), [cover, cover]);
+      expect(page.webCoverUrls, isEmpty);
+      expect(page.covers, [cover, cover]);
+    });
+
+    test('an export names the copies held when it starts', () async {
+      var listed = 0;
+      final exporter = LinkCatalogExporter(
+        directory: () async => Directory('${temp.path}/out'),
+        mapPage: (rows, webCovers) async =>
+            mapLinkCatalogRows(rows, webCovers: webCovers),
+        webCovers: () async {
+          listed++;
+          return {linkCoverUrlId(webUrl): held};
+        },
+        pageSize: 1,
+        loadPage: (query) async => QueueLibraryDbPage(
+          rows: [
+            downloaded('a', coverUrl: webUrl),
+            downloaded('b', coverUrl: webUrl, file: song),
+          ].skip(query.offset).take(query.limit).toList(),
+          nextCursor: null,
+        ),
+      );
+
+      final export = await exporter.export(includeLocal: true, serverId: 's');
+
+      expect(listed, 1, reason: 'one listing for every page');
+      final lines = File(export.path).readAsLinesSync().skip(1);
+      expect(lines.map((line) => (jsonDecode(line) as Map)['coverPath']), [
+        held,
+        held,
+      ]);
+      expect(export.webCoverUrls, {webUrl});
+      expect(export.index.coverFor('d:a'), webUrl);
+    });
   });
 
   test('writes the header with the final count and pages by cursor', () async {
@@ -158,7 +259,8 @@ void main() {
       pageSize: 3,
       nowMs: () => 1700000000000,
       directory: () async => Directory('${temp.path}/out'),
-      mapPage: (rows) async => mapLinkCatalogRows(rows),
+      mapPage: (rows, webCovers) async =>
+          mapLinkCatalogRows(rows, webCovers: webCovers),
       loadPage: (query) async {
         queries.add(query);
         final page = all.skip(query.offset).take(query.limit).toList();
@@ -200,7 +302,8 @@ void main() {
     final exporter = LinkCatalogExporter(
       nowMs: () => 5,
       directory: () async => Directory('${temp.path}/empty'),
-      mapPage: (rows) async => mapLinkCatalogRows(rows),
+      mapPage: (rows, webCovers) async =>
+          mapLinkCatalogRows(rows, webCovers: webCovers),
       loadPage: (_) async =>
           const QueueLibraryDbPage(rows: [], nextCursor: null),
     );

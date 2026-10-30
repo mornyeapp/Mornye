@@ -23,6 +23,7 @@ import 'package:mornye/services/link/desktop/link_phone_library.dart';
 import 'package:mornye/services/link/desktop/link_phone_sources.dart';
 import 'package:mornye/services/link/desktop/link_player.dart';
 import 'package:mornye/services/link/desktop/link_transfer_songs.dart';
+import 'package:mornye/services/link/desktop/link_web_covers.dart';
 import 'package:mornye/services/link/link_host_router.dart';
 import 'package:mornye/services/link/link_protocol.dart';
 import 'package:mornye/services/link/link_transfers.dart';
@@ -187,6 +188,8 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
   LinkPhoneCatalogs? _phoneCatalogs;
   LinkPhoneSources? _phoneSources;
   LinkDesktopTransfers? _transfers;
+  LinkWebCovers? _webCovers;
+  StreamSubscription<void>? _webCoversAdded;
   DesktopLinkCatalogIndex? _index;
 
   /// Phone sources to scan again after the next export, which knows the
@@ -209,9 +212,20 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
     ref.onDispose(_dispose);
     if (isDesktopPlatform) {
       _installPhoneSongs();
+      _installWebCovers();
       Future.microtask(_restore);
     }
     return const LinkDesktopHostState();
+  }
+
+  /// Fetches the web covers of the songs that have no cover file once an
+  /// export lists them; the next export names them.
+  void _installWebCovers() {
+    final covers = ref.read(linkWebCoversProvider);
+    _webCovers = covers;
+    _webCoversAdded = covers.added.listen((_) {
+      if (ref.mounted) _scheduleExport();
+    });
   }
 
   /// Keeps paired phones' songs and shows them in Library; they play while
@@ -413,6 +427,7 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
   Future<void> _stop() async {
     _cancelApp();
     _cancelBackend();
+    _webCovers?.stop();
     _exportAgain = false;
     if (_serverStarted) {
       _serverStarted = false;
@@ -887,6 +902,12 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
       if (!ref.mounted || !state.running) return;
       final songs = await _backend.setCatalog(export.path);
       if (!ref.mounted || !state.running) return;
+      // The server reads this catalog now, so the covers it does not want
+      // can go. The fetch runs in the background.
+      if (_webCovers case final webCovers?) {
+        unawaited(webCovers.prune(export.webCoverUrls));
+        webCovers.fetch(export.webCoverUrls);
+      }
       _index = export.index;
       ref.read(linkCatalogIndexProvider.notifier).set(export.index);
       state = state.copyWith(catalogSongs: songs);
@@ -1046,6 +1067,8 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
     _cancelApp();
     _cancelBackend();
     _transfers?.close();
+    _webCovers?.stop();
+    unawaited(_webCoversAdded?.cancel());
     final phoneSources = _phoneSources;
     if (phoneSources != null) {
       phoneSources.close();

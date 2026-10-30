@@ -6,7 +6,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/services/library_database.dart';
 import 'package:mornye/services/link/desktop/link_catalog_index.dart';
+import 'package:mornye/services/link/desktop/link_web_covers.dart';
 import 'package:mornye/services/link/link_host_router.dart';
+import 'package:mornye/services/link/link_protocol.dart';
 import 'package:mornye/services/sqlite_helpers.dart';
 import 'package:mornye/utils/isrc_utils.dart';
 import 'package:path_provider/path_provider.dart';
@@ -23,9 +25,13 @@ const _headerWidth = 96;
 typedef LinkCatalogPageLoader =
     Future<QueueLibraryDbPage> Function(QueueLibraryDbQuery query);
 
-/// Maps one page of rows to NDJSON lines; the default runs in an isolate.
+/// Maps one page of rows to NDJSON lines with the web covers held
+/// ([LinkWebCovers.held]); the default runs in an isolate.
 typedef LinkCatalogPageMapper =
-    Future<LinkCatalogPage> Function(List<Map<String, dynamic>> rows);
+    Future<LinkCatalogPage> Function(
+      List<Map<String, dynamic>> rows,
+      Map<String, String> webCovers,
+    );
 
 /// One page of exported songs.
 class LinkCatalogPage {
@@ -33,6 +39,7 @@ class LinkCatalogPage {
     required this.bytes,
     required this.songs,
     required this.covers,
+    this.webCoverUrls = const {},
   });
 
   /// UTF-8 NDJSON, one line per song.
@@ -40,8 +47,11 @@ class LinkCatalogPage {
   final List<LinkCatalogSong> songs;
 
   /// The cover the desktop player shows for each song in [songs]: its
-  /// exported cover file, else its web cover URL, or null.
+  /// local cover file, else its web cover URL, or null.
   final List<String?> covers;
+
+  /// The web covers of the songs in [songs] without a local cover file.
+  final Set<String> webCoverUrls;
 }
 
 /// A finished export.
@@ -50,11 +60,15 @@ class LinkCatalogExport {
     required this.path,
     required this.count,
     required this.index,
+    this.webCoverUrls = const {},
   });
 
   final String path;
   final int count;
   final DesktopLinkCatalogIndex index;
+
+  /// The web covers the exported songs want kept in [LinkWebCovers].
+  final Set<String> webCoverUrls;
 }
 
 final _uriScheme = RegExp(r'^[a-zA-Z][a-zA-Z0-9+.-]*://');
@@ -117,13 +131,20 @@ String _basenameWithoutExtension(String path) {
 }
 
 /// Maps Library Songs rows (`{'source', 'item'}`) to catalog lines. Rows
-/// whose file is not a readable local file are left out. Runs in an
-/// isolate: it checks every file on disk.
-LinkCatalogPage mapLinkCatalogRows(List<Map<String, dynamic>> rows) {
+/// whose file is not a readable local file are left out. A song without a
+/// local cover file names its web cover's copy in [webCovers] (by
+/// [linkCoverUrlId]) when held. Runs in an isolate: it checks every file on
+/// disk.
+LinkCatalogPage mapLinkCatalogRows(
+  List<Map<String, dynamic>> rows, {
+  Map<String, String> webCovers = const {},
+}) {
   final bytes = BytesBuilder(copy: false);
   final songs = <LinkCatalogSong>[];
   final covers = <String?>[];
+  final webCoverUrls = <String>{};
   final coverChecks = <String, bool>{};
+  final webCoverPaths = <String, String?>{};
   bool isFile(String path) =>
       FileSystemEntity.typeSync(path) == FileSystemEntityType.file;
 
@@ -165,6 +186,13 @@ LinkCatalogPage mapLinkCatalogRows(List<Map<String, dynamic>> rows) {
             )
         ? coverCandidate
         : null;
+    final webCover = coverPath == null ? linkCoverUrl(item['coverUrl']) : null;
+    final webCoverPath = webCover == null
+        ? null
+        : webCoverPaths.putIfAbsent(
+            webCover,
+            () => webCovers[linkCoverUrlId(webCover)],
+          );
     final year = _year.firstMatch('${item['releaseDate'] ?? ''}')?.group(1);
     final song = LinkCatalogSong(
       id: prefix(recordId),
@@ -201,7 +229,7 @@ LinkCatalogPage mapLinkCatalogRows(List<Map<String, dynamic>> rows) {
       'channels': null,
       'isrc': song.isrc,
       'matchKey': song.matchKey,
-      'coverPath': coverPath,
+      'coverPath': coverPath ?? webCoverPath,
       'addedMs': _epochMs(
         source == 'local' ? item['scannedAt'] : item['downloadedAt'],
       ),
@@ -216,18 +244,26 @@ LinkCatalogPage mapLinkCatalogRows(List<Map<String, dynamic>> rows) {
       ..add(utf8.encode(jsonEncode(line)))
       ..addByte(0x0A);
     songs.add(song);
-    // The desktop player also shows a web cover, which the catalog leaves out.
+    if (webCover != null) webCoverUrls.add(webCover);
+    // The desktop player shows the web cover itself, not the Link copy.
     covers.add(coverPath ?? _webUrl(item['coverUrl']));
   }
   return LinkCatalogPage(
     bytes: bytes.takeBytes(),
     songs: songs,
     covers: covers,
+    webCoverUrls: webCoverUrls,
   );
 }
 
-Future<LinkCatalogPage> _mapInIsolate(List<Map<String, dynamic>> rows) =>
-    compute(mapLinkCatalogRows, rows);
+LinkCatalogPage _mapMessage(
+  (List<Map<String, dynamic>>, Map<String, String>) page,
+) => mapLinkCatalogRows(page.$1, webCovers: page.$2);
+
+Future<LinkCatalogPage> _mapInIsolate(
+  List<Map<String, dynamic>> rows,
+  Map<String, String> webCovers,
+) => compute(_mapMessage, (rows, webCovers));
 
 Future<Directory> _defaultDirectory() async =>
     Directory('${(await getTemporaryDirectory()).path}/mornye-link');
@@ -245,18 +281,21 @@ class LinkCatalogExporter {
     LinkCatalogPageMapper? mapPage,
     Future<Directory> Function()? directory,
     int Function()? nowMs,
+    Future<Map<String, String>> Function()? webCovers,
     this.pageSize = 1000,
   }) : _loadPage =
            loadPage ??
            ((query) => LibraryDatabase.instance.getQueueTrackPageResult(query)),
        _mapPage = mapPage ?? _mapInIsolate,
        _directory = directory ?? _defaultDirectory,
-       _nowMs = nowMs ?? (() => DateTime.now().millisecondsSinceEpoch);
+       _nowMs = nowMs ?? (() => DateTime.now().millisecondsSinceEpoch),
+       _webCovers = webCovers ?? (() async => const {});
 
   final LinkCatalogPageLoader _loadPage;
   final LinkCatalogPageMapper _mapPage;
   final Future<Directory> Function() _directory;
   final int Function() _nowMs;
+  final Future<Map<String, String>> Function() _webCovers;
   final int pageSize;
 
   static Uint8List _header(int generatedMs, int count) {
@@ -279,6 +318,8 @@ class LinkCatalogExporter {
     final part = File('${target.path}.part');
     final builder = LinkCatalogIndexBuilder();
     final generatedMs = _nowMs();
+    final webCovers = await _webCovers();
+    final webCoverUrls = <String>{};
     final file = await part.open(mode: FileMode.write);
     try {
       await file.writeFrom(_header(generatedMs, 0));
@@ -293,11 +334,12 @@ class LinkCatalogExporter {
           ),
         );
         if (page.rows.isNotEmpty) {
-          final mapped = await _mapPage(page.rows);
+          final mapped = await _mapPage(page.rows, webCovers);
           if (mapped.bytes.isNotEmpty) await file.writeFrom(mapped.bytes);
           for (var i = 0; i < mapped.songs.length; i++) {
             builder.add(mapped.songs[i], cover: mapped.covers[i]);
           }
+          webCoverUrls.addAll(mapped.webCoverUrls);
         }
         if (page.rows.length < pageSize) break;
         cursor = page.nextCursor;
@@ -312,11 +354,12 @@ class LinkCatalogExporter {
       path: target.path,
       count: builder.length,
       index: builder.build(serverId),
+      webCoverUrls: webCoverUrls,
     );
   }
 }
 
 /// The catalog exporter the desktop host uses. Tests override it.
 final linkCatalogExporterProvider = Provider<LinkCatalogExporter>(
-  (ref) => LinkCatalogExporter(),
+  (ref) => LinkCatalogExporter(webCovers: ref.read(linkWebCoversProvider).held),
 );

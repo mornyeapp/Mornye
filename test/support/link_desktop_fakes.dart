@@ -17,6 +17,7 @@ import 'package:mornye/services/link/desktop/link_phone_catalogs.dart';
 import 'package:mornye/services/link/desktop/link_phone_library.dart';
 import 'package:mornye/services/link/desktop/link_player.dart';
 import 'package:mornye/services/link/desktop/link_transfer_songs.dart';
+import 'package:mornye/services/link/desktop/link_web_covers.dart';
 import 'package:mornye/services/link/features/link_save_offline.dart';
 import 'package:mornye/services/link/link_host_router.dart';
 import 'package:mornye/services/link/link_protocol.dart';
@@ -312,6 +313,9 @@ class FakeLinkCatalogExporter extends LinkCatalogExporter {
   FakeLinkCatalogExporter({this.songs = const []});
 
   List<LinkCatalogSong> songs;
+
+  /// The web covers each export reports its songs want.
+  Set<String> webCoverUrls = const {};
   final exports = <({bool includeLocal, String serverId})>[];
 
   @override
@@ -324,8 +328,42 @@ class FakeLinkCatalogExporter extends LinkCatalogExporter {
       path: '${Directory.systemTemp.path}/fake-catalog.ndjson',
       count: songs.length,
       index: DesktopLinkCatalogIndex(serverId: serverId, songs: songs),
+      webCoverUrls: webCoverUrls,
     );
   }
+}
+
+/// The desktop's web covers in memory: records the host's calls (with
+/// whether the server had a catalog then) and fires [added] on demand.
+class FakeLinkWebCovers extends LinkWebCovers {
+  FakeLinkWebCovers({this.backend})
+    : super(folder: () async => Directory.systemTemp);
+
+  final FakeLinkBackend? backend;
+  final calls = <String>[];
+  final _added = StreamController<void>.broadcast();
+
+  String get _catalogs => '${backend?.catalogs.length ?? 0}';
+
+  @override
+  Stream<void> get added => _added.stream;
+
+  /// Covers arrived; the host exports again.
+  void arrive() => _added.add(null);
+
+  @override
+  Future<Map<String, String>> held() async => const {};
+
+  @override
+  Future<void> prune(Set<String> urls) async =>
+      calls.add('prune:$_catalogs:${urls.join(',')}');
+
+  @override
+  void fetch(Set<String> urls) =>
+      calls.add('fetch:$_catalogs:${urls.join(',')}');
+
+  @override
+  void stop() => calls.add('stop');
 }
 
 class FakeDownloadItems extends Notifier<List<DownloadItem>> {
@@ -424,7 +462,9 @@ List<Override> linkHostOverrides({
   FakeLinkPhoneLibrary? phoneLibrary,
   Directory? phoneFolder,
   LinkTransferDownloads? transferDownloads,
+  LinkWebCovers? webCovers,
 }) => [
+  linkWebCoversProvider.overrideWithValue(webCovers ?? FakeLinkWebCovers()),
   if (transferDownloads != null)
     linkTransferDownloadsProvider.overrideWithValue(transferDownloads),
   linkPhoneLibraryProvider.overrideWithValue(
