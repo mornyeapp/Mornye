@@ -164,12 +164,15 @@ SingleActivator desktopDestinationShortcut(
 ]) =>
     _primary(_destinationKeys[position - 1], platform ?? defaultTargetPlatform);
 
-/// Every desktop key binding.
+final _shortcutBindings = <TargetPlatform, Map<ShortcutActivator, Intent>>{};
+
+/// Every desktop key binding. Each platform gets one unmodifiable map, so
+/// [Shortcuts] keeps its index when the shortcut layer rebuilds.
 Map<ShortcutActivator, Intent> desktopShortcutBindings([
   TargetPlatform? platform,
 ]) {
   final target = platform ?? defaultTargetPlatform;
-  return {
+  return _shortcutBindings[target] ??= Map.unmodifiable({
     for (final command in DesktopCommand.values)
       for (final shortcut in desktopCommandShortcuts(command, target))
         shortcut: DesktopCommandIntent(command),
@@ -177,7 +180,7 @@ Map<ShortcutActivator, Intent> desktopShortcutBindings([
       desktopDestinationShortcut(position, target): DesktopDestinationIntent(
         position,
       ),
-  };
+  });
 }
 
 /// Human-readable form of [activator]: "⌘→" on macOS, "Ctrl+Right" elsewhere.
