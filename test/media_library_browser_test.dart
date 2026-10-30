@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:audio_service/audio_service.dart';
@@ -512,6 +513,52 @@ void main() {
         ).values.nonNulls,
         ['https://covers.example/w.jpg'],
       );
+    });
+
+    test('looks for the provider again after it was not found', () async {
+      final answers = <Object?>[StateError('channel'), null, provider()];
+      var loads = 0;
+      final browser = _browser(
+        library: _Library(albums: [album('Path', '$library/a.jpg')]),
+        covers: covers,
+        coverProvider: () async {
+          final answer = answers[loads++];
+          if (answer is Error) throw answer;
+          return answer as BrowserCoverProvider?;
+        },
+      );
+      Future<String?> shown() async => (await browser.children(
+        MediaLibraryBrowser.albumsId,
+      )).single.artUri?.toString();
+
+      expect(await shown(), isNull);
+      expect(await shown(), isNull);
+      expect(await shown(), cover('library_covers', 'a.jpg'));
+      expect(await shown(), cover('library_covers', 'a.jpg'));
+      expect(loads, 3);
+    });
+
+    test('the tabs do not wait for the provider', () async {
+      final found = Completer<BrowserCoverProvider?>();
+      var loads = 0;
+      final browser = _browser(
+        library: _Library(albums: [album('Path', '$library/a.jpg')]),
+        covers: covers,
+        coverProvider: () {
+          loads++;
+          return found.future;
+        },
+      );
+
+      final tabs = await browser.children(AudioService.browsableRootId);
+      expect(_titles(tabs), ['Songs', 'Albums', 'Artists', 'Playlists']);
+      final albums = browser.children(MediaLibraryBrowser.albumsId);
+      found.complete(provider());
+      expect(
+        (await albums).single.artUri.toString(),
+        cover('library_covers', 'a.jpg'),
+      );
+      expect(loads, 1);
     });
 
     test('shows the file the store keeps for a network cover', () async {

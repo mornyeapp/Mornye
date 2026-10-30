@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 
@@ -36,7 +37,8 @@ class BrowserCoverProvider {
 
   static const _channel = MethodChannel('com.zarz.mornye/covers');
 
-  /// This app's cover provider, or null where there is none.
+  /// This app's cover provider, or null where there is none or it could
+  /// not be reached.
   static Future<BrowserCoverProvider?> load() async {
     if (!Platform.isAndroid) return null;
     try {
@@ -51,9 +53,7 @@ class BrowserCoverProvider {
             if (key is String && value is String) key: value,
         },
       );
-    } on PlatformException {
-      return null;
-    } on MissingPluginException {
+    } on Object {
       return null;
     }
   }
@@ -120,7 +120,7 @@ class MediaLibraryBrowser {
 
   final CoverStore? _coverStore;
   final Future<BrowserCoverProvider?> Function() _loadCoverProvider;
-  Future<BrowserCoverProvider?>? _coverProviderLoad;
+  Future<void>? _coverProviderLoad;
   BrowserCoverProvider? _coverProvider;
 
   CoverStore get _covers => _coverStore ?? CoverStore.instance;
@@ -167,8 +167,12 @@ class MediaLibraryBrowser {
     String parentId, [
     Map<String, dynamic>? options,
   ]) async {
+    if (parentId == AudioService.browsableRootId) {
+      // The tabs have no artwork; the lists opened from them next do.
+      unawaited(_prepareCovers());
+      return _tabs();
+    }
     await _prepareCovers();
-    if (parentId == AudioService.browsableRootId) return _tabs();
     final uri = _parse(parentId);
     if (uri == null) return const [];
     final query = uri.queryParameters;
@@ -222,12 +226,25 @@ class MediaLibraryBrowser {
   MediaItem _shuffleItem() =>
       MediaItem(id: shuffleId, title: strings().nowPlayingShuffleLibrary);
 
-  /// Finds the cover provider once and reads which network covers are
-  /// stored, so the items built next can show the app's cover files.
+  /// Finds the cover provider and reads which network covers are stored,
+  /// so the items built next can show the app's cover files. Only a found
+  /// provider is kept: without one, as after an error, those items show no
+  /// local covers and the next browse looks again.
   Future<void> _prepareCovers() async {
-    final provider = _coverProvider = await (_coverProviderLoad ??=
-        _loadCoverProvider());
-    if (provider != null) await _covers.warmUp();
+    if (_coverProvider == null) {
+      final load = _coverProviderLoad ??= _findCoverProvider();
+      await load;
+      if (identical(_coverProviderLoad, load)) _coverProviderLoad = null;
+    }
+    if (_coverProvider != null) await _covers.warmUp();
+  }
+
+  Future<void> _findCoverProvider() async {
+    try {
+      _coverProvider = await _loadCoverProvider();
+    } on Object {
+      _coverProvider = null;
+    }
   }
 
   /// Artwork a car can load: a web cover as it is, and a cover file of the
