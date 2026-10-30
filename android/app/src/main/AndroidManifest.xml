@@ -220,6 +220,15 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
+
+        <!-- Cover images Android Auto loads for browse lists. A car cannot
+             hold a permission, so it is exported and serves read-only cover
+             files of the app's cover folders (see CoverProviderFiles). -->
+        <provider
+            android:name=".CoverContentProvider"
+            android:authorities="${applicationId}.covers"
+            android:exported="true"
+            android:grantUriPermissions="false" />
     </application>
 
     <queries>

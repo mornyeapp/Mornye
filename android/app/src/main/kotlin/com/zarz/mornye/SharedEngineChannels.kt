@@ -23,6 +23,13 @@ internal object SharedEngineChannels {
         engine.plugins.add(MusicHapticsPlugin())
         PlayerWidgetBridge.attach(context, engine)
         registerPlaybackBackend(context, MethodChannel(engine.dartExecutor.binaryMessenger, BACKEND_CHANNEL))
+        MethodChannel(engine.dartExecutor.binaryMessenger, COVERS_CHANNEL).setMethodCallHandler { call, result ->
+            if (call.method == "provider") {
+                result.success(CoverContentProvider.describe(context))
+            } else {
+                result.notImplemented()
+            }
+        }
     }
 
     /**
@@ -50,4 +57,5 @@ internal object SharedEngineChannels {
     }
 
     private const val BACKEND_CHANNEL = "com.zarz.mornye/backend"
+    private const val COVERS_CHANNEL = "com.zarz.mornye/covers"
 }
