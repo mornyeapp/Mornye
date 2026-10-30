@@ -29,16 +29,30 @@ class _Controls implements SmtcControls {
   final metadata = <smtc.MusicMetadata>[];
   ({bool next, bool previous})? skips;
 
+  /// Thrown once by the next call, which then records nothing.
+  Object? statusError;
+  Object? timelineError;
+
   Future<void> close() => buttonEvents.close();
 
   @override
   Stream<smtc.PressedButton> get buttons => buttonEvents.stream;
   @override
-  Future<void> setStatus(smtc.PlaybackStatus status) async =>
-      statuses.add(status);
+  Future<void> setStatus(smtc.PlaybackStatus status) async {
+    final error = statusError;
+    statusError = null;
+    if (error != null) throw error;
+    statuses.add(status);
+  }
+
   @override
-  Future<void> setTimeline(smtc.PlaybackTimeline timeline) async =>
-      timelines.add(timeline);
+  Future<void> setTimeline(smtc.PlaybackTimeline timeline) async {
+    final error = timelineError;
+    timelineError = null;
+    if (error != null) throw error;
+    timelines.add(timeline);
+  }
+
   @override
   Future<void> setMetadata(smtc.MusicMetadata value) async =>
       metadata.add(value);
@@ -62,6 +76,7 @@ PlaybackStateMessage _state({
   bool playing = true,
   Duration position = Duration.zero,
   DateTime? at,
+  double speed = 1,
   AudioProcessingStateMessage processing = AudioProcessingStateMessage.ready,
 }) => PlaybackStateMessage(
   processingState: processing,
@@ -74,6 +89,7 @@ PlaybackStateMessage _state({
   },
   updatePosition: position,
   updateTime: at ?? DateTime(2026),
+  speed: speed,
 );
 
 void main() {
@@ -283,6 +299,133 @@ void main() {
       expect(controls.statuses.last, smtc.PlaybackStatus.paused);
       await service.stopService(const StopServiceRequest());
       expect(controls.statuses.last, smtc.PlaybackStatus.stopped);
+    });
+
+    test('an unchanged status is sent once', () async {
+      for (var i = 0; i < 10; i++) {
+        await service.setState(
+          SetStateRequest(
+            state: _state(position: Duration(milliseconds: 500 * i)),
+          ),
+        );
+      }
+      expect(controls.statuses, [smtc.PlaybackStatus.playing]);
+      await service.setState(SetStateRequest(state: _state(playing: false)));
+      await service.setState(SetStateRequest(state: _state(playing: false)));
+      await service.stopService(const StopServiceRequest());
+      await service.stopService(const StopServiceRequest());
+      await service.setState(
+        SetStateRequest(
+          state: _state(processing: AudioProcessingStateMessage.idle),
+        ),
+      );
+      await service.setState(SetStateRequest(state: _state()));
+      expect(controls.statuses, [
+        smtc.PlaybackStatus.playing,
+        smtc.PlaybackStatus.paused,
+        smtc.PlaybackStatus.stopped,
+        smtc.PlaybackStatus.playing,
+      ]);
+    });
+
+    test(
+      'the timeline goes out on changes and jumps, else every 5 s',
+      () async {
+        final start = DateTime(2026);
+        Future<void> update(
+          int atMs, {
+          int? positionMs,
+          bool playing = true,
+          double speed = 1,
+        }) => service.setState(
+          SetStateRequest(
+            state: _state(
+              playing: playing,
+              position: Duration(milliseconds: positionMs ?? atMs),
+              at: start.add(Duration(milliseconds: atMs)),
+              speed: speed,
+            ),
+          ),
+        );
+        List<int> sent() => [
+          for (final timeline in controls.timelines) timeline.positionMs,
+        ];
+
+        await service.setMediaItem(const SetMediaItemRequest(mediaItem: _item));
+        // Twelve seconds of the player's position updates, 25 states.
+        for (var ms = 0; ms <= 12000; ms += 500) {
+          await update(ms);
+        }
+        expect(sent(), [0, 0, 5000, 10000]);
+
+        // A seek while playing goes out at once; a drift within 1 s waits.
+        await update(12500, positionMs: 60000);
+        await update(13000, positionMs: 61300);
+        // A speed change goes out, and the position then advances with it.
+        await update(13500, positionMs: 61800, speed: 1.5);
+        await update(17500, positionMs: 67800, speed: 1.5);
+        expect(sent().skip(4), [60000, 61800]);
+
+        // Pausing goes out, a paused seek too, a repeated paused state not.
+        await update(18000, positionMs: 68550, playing: false);
+        await update(19000, positionMs: 68550, playing: false);
+        await update(30000, positionMs: 68550, playing: false);
+        await update(31000, positionMs: 90000, playing: false);
+        await update(32000, positionMs: 90000);
+        expect(sent().skip(6), [68550, 90000, 90000]);
+
+        // Every new item still sends its own timeline.
+        await service.setMediaItem(const SetMediaItemRequest(mediaItem: _item));
+        await update(32500, positionMs: 0);
+        expect(sent().skip(9), [90000, 0]);
+        expect(controls.timelines.last.endTimeMs, 180000);
+      },
+    );
+
+    test('a failed update is sent again with the next state', () async {
+      await service.setMediaItem(const SetMediaItemRequest(mediaItem: _item));
+      controls.timelines.clear();
+      controls.statusError = StateError('busy');
+      await service.setState(SetStateRequest(state: _state()));
+      expect(controls.statuses, isEmpty);
+      expect(controls.timelines, isEmpty);
+      await service.setState(
+        SetStateRequest(
+          state: _state(
+            position: const Duration(milliseconds: 500),
+            at: DateTime(2026).add(const Duration(milliseconds: 500)),
+          ),
+        ),
+      );
+      expect(controls.statuses, [smtc.PlaybackStatus.playing]);
+      expect(controls.timelines.single.positionMs, 500);
+
+      controls.timelineError = StateError('busy');
+      final paused = DateTime(2026).add(const Duration(seconds: 1));
+      await service.setState(
+        SetStateRequest(
+          state: _state(
+            playing: false,
+            position: const Duration(seconds: 1),
+            at: paused,
+          ),
+        ),
+      );
+      expect(controls.timelines, hasLength(1));
+      await service.setState(
+        SetStateRequest(
+          state: _state(
+            playing: false,
+            position: const Duration(seconds: 1),
+            at: paused.add(const Duration(seconds: 1)),
+          ),
+        ),
+      );
+      expect(controls.timelines.last.positionMs, 1000);
+      expect(controls.statuses, [
+        smtc.PlaybackStatus.playing,
+        smtc.PlaybackStatus.paused,
+      ]);
     });
 
     test('only readable artwork is passed on', () {
