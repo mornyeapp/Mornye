@@ -73,6 +73,57 @@ bool historyItemsReferToSameStoredFile(
   ).any((key) => firstKeys.contains(key));
 }
 
+/// Compares every field [DownloadHistoryItem.toJson] persists.
+bool _sameHistoryItem(DownloadHistoryItem a, DownloadHistoryItem b) =>
+    identical(a, b) ||
+    (a.id == b.id &&
+        a.trackName == b.trackName &&
+        a.artistName == b.artistName &&
+        a.albumName == b.albumName &&
+        a.albumArtist == b.albumArtist &&
+        a.coverUrl == b.coverUrl &&
+        a.filePath == b.filePath &&
+        a.storageMode == b.storageMode &&
+        a.downloadTreeUri == b.downloadTreeUri &&
+        a.safRelativeDir == b.safRelativeDir &&
+        a.safFileName == b.safFileName &&
+        a.safRepaired == b.safRepaired &&
+        a.service == b.service &&
+        a.downloadedAt.isAtSameMomentAs(b.downloadedAt) &&
+        a.isrc == b.isrc &&
+        a.spotifyId == b.spotifyId &&
+        a.trackNumber == b.trackNumber &&
+        a.totalTracks == b.totalTracks &&
+        a.discNumber == b.discNumber &&
+        a.totalDiscs == b.totalDiscs &&
+        a.duration == b.duration &&
+        a.releaseDate == b.releaseDate &&
+        a.quality == b.quality &&
+        a.bitDepth == b.bitDepth &&
+        a.sampleRate == b.sampleRate &&
+        a.bitrate == b.bitrate &&
+        a.format == b.format &&
+        a.genre == b.genre &&
+        a.composer == b.composer &&
+        a.label == b.label &&
+        a.copyright == b.copyright &&
+        a.explicit == b.explicit &&
+        a.hasLyrics == b.hasLyrics &&
+        a.lyricsMetadataScanVersion == b.lyricsMetadataScanVersion &&
+        a.hasReplayGain == b.hasReplayGain &&
+        a.replayGainMetadataScanVersion == b.replayGainMetadataScanVersion);
+
+bool _sameHistoryItems(
+  List<DownloadHistoryItem> current,
+  List<DownloadHistoryItem> loaded,
+) {
+  if (current.length != loaded.length) return false;
+  for (var i = 0; i < current.length; i++) {
+    if (!_sameHistoryItem(current[i], loaded[i])) return false;
+  }
+  return true;
+}
+
 String? resolvePersistedHistoryQuality({
   required String? incoming,
   required String? existing,
@@ -111,6 +162,7 @@ class DownloadHistoryNotifier extends Notifier<DownloadHistoryState> {
   bool _startupMaintenanceScheduled = false;
   Future<void> _historyWriteChain = Future<void>.value();
   Future<void>? _reloadFuture;
+  Future<void>? _refreshFuture;
   Timer? _indexBumpTimer;
   DateTime? _lastIndexBumpAt;
   static const _indexBumpWindow = Duration(seconds: 1);
@@ -130,15 +182,16 @@ class DownloadHistoryNotifier extends Notifier<DownloadHistoryState> {
     });
   }
 
-  Future<void> _loadFromDatabase() async {
+  Future<void> _loadFromDatabase({bool publishUnchanged = true}) async {
     try {
       final migrated = await _db.migrateFromSharedPreferences();
       if (migrated) {
         _historyLog.i('Migrated history from SharedPreferences to SQLite');
       }
 
+      var pathsMigrated = false;
       if (Platform.isIOS) {
-        final pathsMigrated = await _db.migrateIosContainerPaths();
+        pathsMigrated = await _db.migrateIosContainerPaths();
         if (pathsMigrated) {
           _historyLog.i('Migrated iOS container paths after app update');
         }
@@ -151,12 +204,17 @@ class DownloadHistoryNotifier extends Notifier<DownloadHistoryState> {
           .toList();
       final totalCount = await countFuture;
 
-      state = state.copyWith(
-        items: items,
-        totalCount: totalCount,
-        loadedIndexVersion: state.loadedIndexVersion + 1,
-        lookupItems: items,
-      );
+      if (publishUnchanged ||
+          migrated ||
+          pathsMigrated ||
+          !_holdsLoadedSnapshot(items, totalCount)) {
+        state = state.copyWith(
+          items: items,
+          totalCount: totalCount,
+          loadedIndexVersion: state.loadedIndexVersion + 1,
+          lookupItems: items,
+        );
+      }
       _historyLog.i(
         'Loaded ${items.length}/$totalCount recent history items from SQLite database',
       );
@@ -170,6 +228,24 @@ class DownloadHistoryNotifier extends Notifier<DownloadHistoryState> {
       _enqueueHistoryWrite(_loadFromDatabase).whenComplete(() {
         _reloadFuture = null;
       });
+
+  /// Reloads history another writer may have changed, such as a native
+  /// download that finished while the app was suspended. Unlike
+  /// [reloadFromStorage], an unchanged snapshot publishes nothing, so Library
+  /// views and the Link catalog keep their revision.
+  Future<void> refreshFromStorage() =>
+      _reloadFuture ??
+      (_refreshFuture ??=
+          _enqueueHistoryWrite(
+            () => _loadFromDatabase(publishUnchanged: false),
+          ).whenComplete(() {
+            _refreshFuture = null;
+          }));
+
+  bool _holdsLoadedSnapshot(List<DownloadHistoryItem> items, int totalCount) =>
+      state.totalCount == totalCount &&
+      _sameHistoryItems(state.items, items) &&
+      _sameHistoryItems(state.lookupItems, items);
 
   void _bumpHistoryRevision() {
     state = state.copyWith(loadedIndexVersion: state.loadedIndexVersion + 1);

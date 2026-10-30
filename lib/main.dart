@@ -590,7 +590,7 @@ class _EagerInitializationState extends ConsumerState<EagerInitialization>
       // persisted history even when no queued item remains to reconcile.
       if (ref.exists(downloadHistoryProvider)) {
         unawaited(
-          ref.read(downloadHistoryProvider.notifier).reloadFromStorage(),
+          ref.read(downloadHistoryProvider.notifier).refreshFromStorage(),
         );
       }
       _maybeAutoScanLocalLibrary();
