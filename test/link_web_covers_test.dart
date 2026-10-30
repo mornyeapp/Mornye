@@ -452,9 +452,9 @@ void main() {
     });
 
     /// Exports [rows], then does what the host does once the server reads
-    /// the catalog. Returns each song's `coverPath`.
-    Future<({List<Object?> coverPaths, LinkCatalogExport export})>
-    export() async {
+    /// the catalog. Returns each song's `webCoverPath`; none has a
+    /// `coverPath`.
+    Future<({List<Object?> copies, LinkCatalogExport export})> export() async {
       final exporter = LinkCatalogExporter(
         directory: () async => Directory('${temp.path}/out'),
         mapPage: (rows, webCovers, pictures) async =>
@@ -470,11 +470,13 @@ void main() {
       final pruned = covers.prune(export.webCoverSongs);
       covers.fetch(export.webCoverSongs);
       await Future.wait([pruned, covers.idle()]);
+      final lines = [
+        for (final line in File(export.path).readAsLinesSync().skip(1))
+          jsonDecode(line) as Map,
+      ];
+      expect(lines.map((line) => line['coverPath']), everyElement(isNull));
       return (
-        coverPaths: [
-          for (final line in File(export.path).readAsLinesSync().skip(1))
-            (jsonDecode(line) as Map)['coverPath'],
-        ],
+        copies: [for (final line in lines) line['webCoverPath']],
         export: export,
       );
     }
@@ -482,14 +484,14 @@ void main() {
     test('a web-only download names a lasting cover after the '
         'fetch', () async {
       final first = await export();
-      expect(first.coverPaths, [null], reason: 'not fetched yet');
+      expect(first.copies, [null], reason: 'not fetched yet');
       expect(first.export.webCoverSongs.single.url, _url('album'));
 
       final second = await export();
-      expect(second.coverPaths, [pathOf(_url('album'))]);
+      expect(second.copies, [pathOf(_url('album'))]);
       // The prune after it keeps the cover the catalog names.
       final third = await export();
-      expect(third.coverPaths, [pathOf(_url('album'))]);
+      expect(third.copies, [pathOf(_url('album'))]);
       expect(File(pathOf(_url('album'))).existsSync(), isTrue);
       expect(fetched, hasLength(1));
 
@@ -502,7 +504,7 @@ void main() {
     test('a download with an embedded picture keeps it', () async {
       rows = [download('embeds', embeds)];
       for (var i = 0; i < 3; i++) {
-        expect((await export()).coverPaths, [null]);
+        expect((await export()).copies, [null]);
       }
       expect(fetched, isEmpty);
       expect(listed(), {'pictures.json'});
@@ -511,7 +513,7 @@ void main() {
       // the copy.
       rows = [download('embeds', embeds), download('bare', bare)];
       await export();
-      expect((await export()).coverPaths, [null, pathOf(_url('album'))]);
+      expect((await export()).copies, [null, pathOf(_url('album'))]);
       expect(fetched, hasLength(1));
 
       // Once the web-only song goes, so does the copy.
@@ -526,7 +528,7 @@ void main() {
       final second = await export();
       expect(first.export.count, 1);
       expect(second.export.count, 1);
-      expect(second.coverPaths, [null]);
+      expect(second.copies, [null]);
       expect(fetched, hasLength(1), reason: 'not tried again at once');
     });
   });

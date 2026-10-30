@@ -110,6 +110,7 @@ void main() {
       'isrc',
       'matchKey',
       'coverPath',
+      'webCoverPath',
       'addedMs',
       'trackGain',
       'albumGain',
@@ -150,7 +151,8 @@ void main() {
     expect(second['size'], 32, reason: 'falls back to the file size');
     expect(second['suffix'], 'mp3');
     expect(second['albumKey'], isNull);
-    expect(second['coverPath'], isNull, reason: 'no copy is held yet');
+    expect(second['coverPath'], isNull);
+    expect(second['webCoverPath'], isNull, reason: 'no copy is held yet');
     expect(page.webCoverSongs, [
       (
         path: download,
@@ -189,10 +191,15 @@ void main() {
       },
     };
 
-    List<Object?> coverPaths(LinkCatalogPage page) => const LineSplitter()
-        .convert(utf8.decode(page.bytes))
-        .map((line) => (jsonDecode(line) as Map)['coverPath'])
-        .toList();
+    /// Each line's `coverPath` and `webCoverPath`.
+    List<(Object?, Object?)> coverFields(Iterable<String> lines) => [
+      for (final line in lines)
+        if (jsonDecode(line) case final Map<String, dynamic> json)
+          (json['coverPath'], json['webCoverPath']),
+    ];
+
+    List<(Object?, Object?)> pageCovers(LinkCatalogPage page) =>
+        coverFields(const LineSplitter().convert(utf8.decode(page.bytes)));
 
     test('only a song whose file has no picture names the copy held', () {
       final page = mapLinkCatalogRows(
@@ -208,7 +215,14 @@ void main() {
         pictures: {stamp(download): false, stamp(song): true},
       );
 
-      expect(coverPaths(page), [held, null, null, null, null]);
+      // The copy stays out of `coverPath`, so the server tries it last.
+      expect(pageCovers(page), [
+        (null, held),
+        (null, null),
+        (null, null),
+        (null, null),
+        (null, null),
+      ]);
       // Every https cover is reported, so the store can ask about its file.
       expect(page.webCoverSongs, [
         (path: download, stamp: stamp(download), url: webUrl),
@@ -234,7 +248,7 @@ void main() {
         pictures: {before: false},
       );
 
-      expect(coverPaths(page), [null]);
+      expect(pageCovers(page), [(null, null)]);
       expect(page.webCoverSongs.single.stamp, isNot(before));
     });
 
@@ -248,7 +262,7 @@ void main() {
         pictures: {stamp(song): false, stamp(download): false},
       );
 
-      expect(coverPaths(page), [cover, cover]);
+      expect(pageCovers(page), [(cover, null), (cover, null)]);
       expect(page.webCoverSongs, isEmpty);
       expect(page.covers, [cover, cover]);
     });
@@ -265,7 +279,7 @@ void main() {
         pictures: {stamp(download): false},
       );
 
-      expect(coverPaths(page), List.filled(urls.length, null));
+      expect(pageCovers(page), List.filled(urls.length, (null, null)));
       expect(page.webCoverSongs, isEmpty);
       expect(page.covers, urls, reason: 'the desktop player keeps them');
     });
@@ -299,10 +313,7 @@ void main() {
 
       expect((listed, asked), (1, 1), reason: 'once for every page');
       final lines = File(export.path).readAsLinesSync().skip(1);
-      expect(lines.map((line) => (jsonDecode(line) as Map)['coverPath']), [
-        held,
-        null,
-      ]);
+      expect(coverFields(lines), [(null, held), (null, null)]);
       expect(export.webCoverSongs.map((song) => song.path), [download, song]);
       expect(export.index.coverFor('d:a'), webUrl);
     });

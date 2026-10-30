@@ -143,8 +143,9 @@ String? _webCoverUrl(Object? value) {
 /// whose file is not a readable local file are left out. A song without a
 /// local cover file whose audio file is known to embed no picture
 /// ([pictures] by [linkPictureStamp]) names its web cover's copy in
-/// [webCovers] (by [linkCoverUrlId]) when held. Runs in an isolate: it
-/// checks every file on disk.
+/// [webCovers] (by [linkCoverUrlId]) as `webCoverPath` when held, which the
+/// server tries after every other cover. Runs in an isolate: it checks every
+/// file on disk.
 LinkCatalogPage mapLinkCatalogRows(
   List<Map<String, dynamic>> rows, {
   Map<String, String> webCovers = const {},
@@ -246,7 +247,10 @@ LinkCatalogPage mapLinkCatalogRows(
       'channels': null,
       'isrc': song.isrc,
       'matchKey': song.matchKey,
-      'coverPath': coverPath ?? webCoverPath,
+      'coverPath': coverPath,
+      // Apart from `coverPath`, so the server tries every cover file and
+      // embedded picture first.
+      'webCoverPath': webCoverPath,
       'addedMs': _epochMs(
         source == 'local' ? item['scannedAt'] : item['downloadedAt'],
       ),
