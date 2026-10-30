@@ -1778,7 +1778,7 @@ class MusicPlayerHandler extends BaseAudioHandler
         title: text('title', current.title),
         artist: text('artist', current.artist ?? ''),
         album: text('album', current.album ?? ''),
-        artUri: cover(current.artUri),
+        artUri: cover ?? current.artUri,
         extras: {
           ...?current.extras,
           for (final key in ['bit_depth', 'sample_rate', 'bitrate', 'format'])
@@ -2250,10 +2250,16 @@ class MusicPlayerHandler extends BaseAudioHandler
       if (metadata['error'] != null) return;
       final cover = metadata['cover_path'] as String?;
       String? artwork;
-      Uri? Function(Uri? shown)? networkCover;
+      Uri? networkCover;
       if (source.startsWith('network://')) {
+        final media = _media.where((item) => item.source == source).firstOrNull;
+        // The song left the queue, or a newer change reads its tags again.
+        if (media == null ||
+            _disposed ||
+            !identical(_metadataChanges[source], token)) {
+          return;
+        }
         // The store keeps a network song's covers, which its items show.
-        final media = _media.firstWhere((item) => item.source == source);
         networkCover = await _covers.readTagCover(media, cover);
         _covers.invalidate(media.coverReference);
       } else if (cover != null && cover.isNotEmpty) {
@@ -2283,11 +2289,8 @@ class MusicPlayerHandler extends BaseAudioHandler
           artist: facts.artist,
           album: facts.album,
           duration: facts.duration ?? item.duration,
-          artUri: networkCover != null
-              ? networkCover(item.artUri)
-              : artwork == null
-              ? item.artUri
-              : facts.artUri,
+          artUri:
+              networkCover ?? (artwork == null ? item.artUri : facts.artUri),
           extras: {
             ...?item.extras,
             ...?facts.extras,

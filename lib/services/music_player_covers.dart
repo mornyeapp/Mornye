@@ -58,30 +58,19 @@ class _MusicCovers {
 
   /// Keeps the cover read with the tags of the network song [media] to the
   /// temporary file [cover] when it is the song's own ([_ownsTagCover]):
-  /// once stored, it is the song's cover on every play, until a read finds
-  /// none. Answers the cover an item of the song that shows `shown` shows
-  /// now: its stored cover, else [cover] on this play only, else `shown`
-  /// unless that was the dropped tag cover.
-  Future<Uri? Function(Uri? shown)> readTagCover(
-    PlayableMedia media,
-    String? cover,
-  ) async {
+  /// once stored, it is the song's cover on every play. A read without one
+  /// keeps it, since a failed cover request reads the same. Answers the
+  /// cover the song shows now: its stored cover, else [cover] on this play
+  /// only. Null keeps what its items show.
+  Future<Uri?> readTagCover(PlayableMedia media, String? cover) async {
     final read = cover == null || cover.isEmpty ? null : Uri.file(cover);
-    final reference = CoverStore.songCoverReference(media.source);
-    Uri? dropped;
-    if (_ownsTagCover(media)) {
-      if (read != null) {
-        if (await _store.adopt(reference, cover!) == null) return (_) => read;
-      } else if (_store.indexedFile(reference) case final path?) {
-        // Its tags hold no cover any more: the network cover shows again.
-        dropped = Uri.file(path);
-        await _store.forget(reference);
-      }
+    if (read != null && _ownsTagCover(media)) {
+      final reference = CoverStore.songCoverReference(media.source);
+      // One the store could not keep shows on this play only.
+      if (await _store.adopt(reference, cover!) == null) return read;
     }
     final stored = _store.songCover(media.source, media.coverReference);
-    if (stored == null && dropped != null) fetch(media.coverReference);
-    final now = stored == null ? read : Uri.file(stored.path);
-    return (Uri? shown) => now ?? (shown == dropped ? null : shown);
+    return stored == null ? read : Uri.file(stored.path);
   }
 
   /// Whether the cover read with the tags of [media] is its own. A Subsonic

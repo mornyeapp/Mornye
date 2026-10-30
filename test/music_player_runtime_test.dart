@@ -2944,51 +2944,106 @@ void main() {
       },
     );
 
-    test(
-      'a tag cover the tags no longer hold gives way to the folder cover',
-      () async {
-        final stored = Uri.file((await covers.file(cover))!);
-        final temporary = await Directory.systemTemp.createTemp('nas-tags-');
-        addTearDown(() => temporary.delete(recursive: true));
-        final tagCover =
-            File(p.join(temporary.path, 'network_metadata', 'tags.image'))
-              ..createSync(recursive: true)
-              ..writeAsBytesSync([0xFF, 0xD8, 0xFF, 7]);
-        var tags = <String, dynamic>{'cover_path': tagCover.path};
-        final events = SourceMetadataEvents();
-        final handler = await _runtime(
-          coverStore: covers,
-          sourceMetadataEvents: events,
-          resolveNetworkSource: resolve,
-          readNetworkMetadata: (_) async => tags,
-        ).initialize();
-        final reference = CoverStore.songCoverReference(song.source);
-        await handler.setQueueAndPlay([song]);
-        final tagged = await shown(
-          handler,
-          (item) => item.artUri != null && item.artUri != stored,
-        );
-        final adopted = tagged.artUri!.toFilePath();
-        expect(adopted, covers.indexedFile(reference));
+    test('a tag read without a cover keeps the stored one', () async {
+      // A Subsonic song played from the Library: its cover comes with its
+      // tags, and a failed cover request leaves it out of them.
+      final temporary = await Directory.systemTemp.createTemp('nas-tags-');
+      addTearDown(() => temporary.delete(recursive: true));
+      final thumbnail = File(p.join(temporary.path, 'thumbnail.jpg'))
+        ..writeAsBytesSync([0xFF, 0xD8, 0xFF, 3]);
+      final served =
+          File(p.join(temporary.path, 'network_metadata', 'subsonic.image'))
+            ..createSync(recursive: true)
+            ..writeAsBytesSync([0xFF, 0xD8, 0xFF, 4]);
+      final library = PlayableMedia(
+        id: 'library-s1',
+        source: NetworkStorageService.source(
+          'nas',
+          subsonicSongPath('s1', 'flac'),
+        ),
+        title: 'One',
+        artist: 'Artist',
+        artUri: thumbnail.path,
+      );
+      var tags = <String, dynamic>{'cover_path': served.path};
+      final events = SourceMetadataEvents();
+      final handler = await _runtime(
+        coverStore: covers,
+        sourceMetadataEvents: events,
+        resolveNetworkSource: resolve,
+        readNetworkMetadata: (_) async => tags,
+      ).initialize();
+      final reference = CoverStore.songCoverReference(library.source);
+      await handler.setQueueAndPlay([library]);
+      final adopted = await shown(
+        handler,
+        (item) => item.artUri?.toFilePath() == covers.indexedFile(reference),
+      );
 
-        // An edit removes the picture from the tags.
-        tags = {};
-        await events.publish(song.source);
-        await shown(handler, (item) => item.artUri == stored);
-        expect(handler.queue.value.single.artUri, stored);
-        expect(covers.indexedFile(reference), isNull);
-        expect(File(adopted).existsSync(), isFalse);
+      tags = {};
+      await events.publish(library.source);
+      await handler.setQueueAndPlay([library]);
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(covers.indexedFile(reference), adopted.artUri!.toFilePath());
+      expect(File(adopted.artUri!.toFilePath()).existsSync(), isTrue);
+      expect(handler.mediaItem.value!.artUri, adopted.artUri);
+      expect(handler.queue.value.single.artUri, adopted.artUri);
+    });
 
-        // Later plays and later runs show the folder cover.
-        await handler.setQueueAndPlay([song]);
-        await Future<void>.delayed(const Duration(milliseconds: 20));
-        expect(handler.mediaItem.value!.artUri, stored);
-        final restarted = store();
-        addTearDown(restarted.dispose);
-        await restarted.warmUp();
-        expect(restarted.songCover(song.source, cover)?.reference, cover);
-      },
-    );
+    test('an older or orphaned tag read changes nothing', () async {
+      final temporary = await Directory.systemTemp.createTemp('nas-tags-');
+      addTearDown(() => temporary.delete(recursive: true));
+      File tagCover(int version) =>
+          File(p.join(temporary.path, 'network_metadata', '$version.image'))
+            ..createSync(recursive: true)
+            ..writeAsBytesSync([0xFF, 0xD8, 0xFF, version]);
+      final first = tagCover(1);
+      final second = tagCover(2);
+      final reads = <Completer<Map<String, dynamic>>>[];
+      var held = false;
+      final handler = await _runtime(
+        coverStore: covers,
+        resolveNetworkSource: resolve,
+        readNetworkMetadata: (_) {
+          if (!held) return Future.value({});
+          final read = Completer<Map<String, dynamic>>();
+          reads.add(read);
+          return read.future;
+        },
+      ).initialize();
+      await handler.setQueueAndPlay([song]);
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      held = true;
+      final reference = CoverStore.songCoverReference(song.source);
+
+      // The newer change's read answers first.
+      final older = handler.onSourceMetadataChanged(song.source);
+      final newer = handler.onSourceMetadataChanged(song.source);
+      await until(() => reads.length == 2);
+      reads[1].complete({'cover_path': second.path});
+      await newer;
+      final kept = covers.indexedFile(reference);
+      expect(File(kept!).readAsBytesSync(), [0xFF, 0xD8, 0xFF, 2]);
+      reads[0].complete({'cover_path': first.path});
+      await older;
+      expect(covers.indexedFile(reference), kept);
+
+      // The song leaves the queue during the read.
+      final orphaned = handler.onSourceMetadataChanged(song.source);
+      await until(() => reads.length == 3);
+      held = false;
+      await handler.setQueueAndPlay([
+        const PlayableMedia(
+          id: 'nas-next',
+          source: 'network://nas/Album/05.flac',
+          title: 'Five',
+          artist: 'Artist',
+        ),
+      ]);
+      reads[2].complete({'cover_path': first.path});
+      await expectLater(orphaned, completes);
+      expect(covers.indexedFile(reference), kept);
+    });
 
     test('a tag read for a queued song updates the queue once', () async {
       const other = PlayableMedia(

@@ -191,29 +191,6 @@ class CoverStore {
     _stale.add(key);
   }
 
-  /// Deletes the stored cover [ref] and its older copies, which the next
-  /// run would read as the cover, as for a song whose tags hold no cover
-  /// any more.
-  Future<void> forget(String? ref) async {
-    if (!fetches(ref)) return;
-    await warmUp();
-    final root = _root;
-    final key = _key(ref!);
-    if (_index.remove(key) == null || root == null) return;
-    try {
-      await for (final entry in Directory(root).list(followLinks: false)) {
-        final name = p.basename(entry.path);
-        if (entry is File &&
-            !_busy.contains(name) &&
-            _storedName.firstMatch(name)?[1] == key) {
-          await deleteFileQuietly(entry);
-        }
-      }
-    } on FileSystemException catch (error) {
-      _log.d('Could not delete a cover: ${error.runtimeType}');
-    }
-  }
-
   /// The stored cover the song [source] shows, read from the index like
   /// [indexedFile]: the cover from its tags once [adopt]ed (see
   /// [songCoverReference]), else its network cover [reference]. Null when

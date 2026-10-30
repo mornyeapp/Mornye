@@ -637,34 +637,6 @@ void main() {
     expect(fetched, isFalse);
   });
 
-  test('a forgotten cover and its older copies are gone for good', () async {
-    final covers = store(
-      fetch: (ref, output) async => output.writeAsBytes(_jpeg(ref.length)),
-    );
-    const song = 'network://nas/Album/01.flac';
-    const folder = 'network://nas/Album/cover.jpg';
-    final tags = CoverStore.songCoverReference(song);
-    final network = (await covers.file(folder))!;
-    for (final version in [1, 2]) {
-      final source = File('${directory.path}/tags$version.image')
-        ..writeAsBytesSync(_jpeg(version));
-      await covers.adopt(tags, source.path);
-    }
-    final stored = names();
-
-    await covers.forget(tags);
-    expect(covers.songCover(song, folder), (reference: folder, path: network));
-    expect(names(), hasLength(stored.length - 2));
-    expect(names(), contains(p.basename(network)));
-    await covers.forget(tags);
-    await covers.forget(null);
-
-    final restarted = store(fetch: (_, _) async => fail('No fetch'));
-    await restarted.warmUp();
-    expect(restarted.indexedFile(tags), isNull);
-    expect(restarted.indexedFile(folder), network);
-  });
-
   test('durable references leave out loopback URLs and temporary files', () {
     final temporary = Directory.systemTemp.path;
     for (final reference in [
