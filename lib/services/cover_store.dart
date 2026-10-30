@@ -100,6 +100,10 @@ class CoverStore {
   static bool fetches(String? ref) =>
       ref != null && ref.startsWith('network://');
 
+  /// The reference [adopt] keeps the cover in the tags of the `network://`
+  /// song [source] under. No server answers it, so it lasts while stored.
+  static String songCoverReference(String source) => '$source#cover';
+
   /// Reads which covers are stored, so [cachedFile] answers covers saved
   /// in earlier runs. [file] and [trim] wait for it themselves.
   Future<void> warmUp() {
@@ -113,15 +117,20 @@ class CoverStore {
   /// Safe on the first frame.
   String? cachedFile(String? ref) {
     if (ref == null || ref.isEmpty) return null;
-    final String? path;
-    if (fetches(ref)) {
-      final root = _root;
-      final name = _index[_key(ref)];
-      path = root == null || name == null ? null : p.join(root, name);
-    } else {
-      path = _localPath(ref);
-    }
+    final path = fetches(ref) ? indexedFile(ref) : _localPath(ref);
     return path != null && File(path).existsSync() ? path : null;
+  }
+
+  /// The file the store names for the network cover [ref], read from memory
+  /// without any file IO, so it is safe while building widgets. Null for
+  /// other references, for covers not stored, and for covers of earlier
+  /// runs until [warmUp] is done. The file can be gone since, as after a
+  /// cleared folder; [file] checks it and fetches again.
+  String? indexedFile(String? ref) {
+    if (!fetches(ref)) return null;
+    final root = _root;
+    final name = _index[_key(ref!)];
+    return root == null || name == null ? null : p.join(root, name);
   }
 
   /// The durable local file for [ref], fetching a `network://` cover once.
@@ -158,6 +167,40 @@ class CoverStore {
     }
     if (_failedRecently(key)) return null;
     return _fetch(ref, root, key);
+  }
+
+  /// [file] for a network cover its server just changed: fetches [ref]
+  /// again now, however recently it was stored, and answers the stored
+  /// file. [changes] reports when its bytes changed.
+  Future<String?> refresh(String? ref) async {
+    if (!fetches(ref)) return file(ref);
+    await warmUp();
+    final root = _root;
+    if (root == null) return null;
+    final key = _key(ref!);
+    _failures.remove(key);
+    return await _fetch(ref, root, key) ?? indexedFile(ref);
+  }
+
+  /// Stores a copy of the image at the local [path] as the cover of the
+  /// network reference [ref], named by its bytes as a fetched cover is,
+  /// for a cover that reached the device another way (see
+  /// [songCoverReference]). Null when [path] is not a cover image or could
+  /// not be copied.
+  Future<String?> adopt(String ref, String path) async {
+    if (!fetches(ref)) return null;
+    await warmUp();
+    final root = _root;
+    if (root == null) return null;
+    try {
+      return await _write(ref, root, _key(ref), (staged) async {
+        await Directory(root).create(recursive: true);
+        await File(path).copy(staged.path);
+      });
+    } catch (error) {
+      _log.d('Could not store a cover: ${error.runtimeType}');
+      return null;
+    }
   }
 
   /// Deletes superseded covers and abandoned staging files, then the
@@ -274,19 +317,29 @@ class CoverStore {
     String root,
     String key, {
     required bool recheck,
-  }) async {
+  }) => _write(ref, root, key, (staged) async {
+    await _takeTurn(recheck: recheck);
+    try {
+      await Directory(root).create(recursive: true);
+      await _fetcher(ref, staged);
+    } finally {
+      _endTurn();
+    }
+  });
+
+  /// Stores the cover [fill] writes to a staged file as the cover of [ref].
+  Future<String> _write(
+    String ref,
+    String root,
+    String key,
+    Future<void> Function(File staged) fill,
+  ) async {
     final stagedName = '$key.${NetworkStorageService.newId()}.tmp';
     final staged = File(p.join(root, stagedName));
     String? name;
     _busy.add(stagedName);
     try {
-      await _takeTurn(recheck: recheck);
-      try {
-        await Directory(root).create(recursive: true);
-        await _fetcher(ref, staged);
-      } finally {
-        _endTurn();
-      }
+      await fill(staged);
       name = '${key}_${await _contentKey(staged)}.image';
       _busy.add(name);
       final target = File(p.join(root, name));
@@ -390,4 +443,28 @@ class CoverStore {
       return null;
     }
   }
+}
+
+/// [reference] when it names a cover that outlasts this run, else null: a
+/// loopback URL ends with the app's process, and a file in a temporary
+/// folder goes with the next purge. Other references pass unchanged.
+String? durableCoverReference(String? reference) {
+  final value = reference?.trim();
+  if (value == null || value.isEmpty) return null;
+  final uri = Uri.tryParse(value);
+  if (uri != null && (uri.isScheme('http') || uri.isScheme('https'))) {
+    final host = uri.host.toLowerCase();
+    final loopback =
+        host == 'localhost' ||
+        (InternetAddress.tryParse(host)?.isLoopback ?? false);
+    return loopback ? null : value;
+  }
+  final path = CoverStore._localPath(value);
+  if (path == null) return value;
+  final normalized = p.normalize(path);
+  final temporary =
+      p.split(normalized).contains('network_metadata') ||
+      p.basename(normalized).startsWith('download_cover_preview_') ||
+      p.isWithin(p.normalize(Directory.systemTemp.path), normalized);
+  return temporary ? null : value;
 }

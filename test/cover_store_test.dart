@@ -490,4 +490,124 @@ void main() {
     }
     expect(CoverStore.fetches('network://nas/cover.jpg'), isTrue);
   });
+
+  test('the index answers stored covers without reading the disk', () async {
+    final covers = store(
+      fetch: (_, output) async => output.writeAsBytes(_jpeg(1)),
+    );
+    const ref = 'network://desktop/subsonic/cover/YQ.image';
+    expect(covers.indexedFile(ref), isNull);
+    final path = (await covers.file(ref))!;
+    expect(covers.indexedFile(ref), path);
+    // No stat: a file removed behind the store's back is still named, and
+    // file() finds out and fetches it again.
+    await File(path).delete();
+    expect(covers.indexedFile(ref), path);
+    expect(covers.cachedFile(ref), isNull);
+    expect(await covers.file(ref), path);
+
+    final restarted = store(fetch: (_, _) async => fail('Stored already'));
+    expect(restarted.indexedFile(ref), isNull);
+    await restarted.warmUp();
+    expect(restarted.indexedFile(ref), path);
+    for (final other in [null, '', path, Uri.file(path).toString()]) {
+      expect(restarted.indexedFile(other), isNull, reason: other);
+    }
+  });
+
+  test(
+    'an adopted cover is stored by its bytes and outlasts its copy',
+    () async {
+      final temporary = await Directory.systemTemp.createTemp('cover-adopt-');
+      addTearDown(() => temporary.delete(recursive: true));
+      final source = File('${temporary.path}/network_metadata/a.image')
+        ..createSync(recursive: true)
+        ..writeAsBytesSync(_jpeg(1));
+      final covers = store(fetch: (_, _) async => fail('Adopted covers stay'));
+      final ref = CoverStore.songCoverReference('network://nas/Album/01.flac');
+      expect(CoverStore.fetches(ref), isTrue);
+
+      final path = (await covers.adopt(ref, source.path))!;
+      expect(p.isWithin(directory.path, path), isTrue);
+      expect(await File(path).readAsBytes(), _jpeg(1));
+      expect(await covers.adopt(ref, source.path), path);
+      expect(names(), [p.basename(path)]);
+      expect(covers.indexedFile(ref), path);
+      expect(await covers.file(ref), path);
+
+      // The temporary copy can go; the stored one stays.
+      await source.delete();
+      expect(await covers.adopt(ref, source.path), isNull);
+      expect(await covers.file(ref), path);
+
+      final changed = covers.changes.first;
+      source.writeAsBytesSync(_jpeg(2));
+      final replaced = (await covers.adopt(ref, source.path))!;
+      expect(replaced, isNot(path));
+      expect(await changed.timeout(const Duration(seconds: 10)), ref);
+      expect(covers.indexedFile(ref), replaced);
+
+      source.writeAsStringSync('<html></html>');
+      expect(await covers.adopt(ref, source.path), isNull);
+      expect(await covers.adopt('/music/cover.jpg', source.path), isNull);
+      expect(covers.indexedFile(ref), replaced);
+      expect(names().where((name) => name.endsWith('.tmp')), isEmpty);
+    },
+  );
+
+  test('refresh fetches a stored cover again at once', () async {
+    var version = 1;
+    var fetches = 0;
+    final covers = store(
+      fetch: (_, output) async {
+        fetches++;
+        await output.writeAsBytes(_jpeg(version));
+      },
+    );
+    const ref = 'network://desktop/subsonic/cover/YQ.image';
+    final path = (await covers.file(ref))!;
+    expect(await covers.file(ref), path);
+    expect(fetches, 1);
+
+    version = 2;
+    final changed = covers.changes.first;
+    final refreshed = (await covers.refresh(ref))!;
+    expect(refreshed, isNot(path));
+    expect(await changed.timeout(const Duration(seconds: 10)), ref);
+    expect(covers.indexedFile(ref), refreshed);
+    expect(fetches, 2);
+    expect(await covers.refresh(null), isNull);
+  });
+
+  test('durable references leave out loopback URLs and temporary files', () {
+    final temporary = Directory.systemTemp.path;
+    for (final reference in [
+      null,
+      '',
+      '  ',
+      'http://127.0.0.1:41234/2f6d1c',
+      'http://127.0.0.5/cover',
+      'http://localhost:8080/cover.jpg',
+      'http://[::1]:8080/cover.jpg',
+      '/data/user/0/app/cache/network_metadata/subsonic_ab.image',
+      Uri.file(
+        '/var/mobile/Library/Caches/network_metadata/a.image',
+      ).toString(),
+      '/music/download_cover_preview_123.jpg',
+      p.join(temporary, 'link-cover', 'a.jpg'),
+      Uri.file(p.join(temporary, 'a.jpg')).toString(),
+    ]) {
+      expect(durableCoverReference(reference), isNull, reason: reference);
+    }
+    for (final reference in [
+      'https://example.test/cover.jpg',
+      'http://192.168.1.20/cover.jpg',
+      'network://desktop/subsonic/cover/YQ.image',
+      'content://media/external/images/media/1',
+      '/music/covers/a.jpg',
+      Uri.file('/music/covers/a.jpg').toString(),
+    ]) {
+      expect(durableCoverReference(reference), reference);
+    }
+  });
 }
