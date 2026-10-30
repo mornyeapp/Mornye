@@ -78,7 +78,8 @@ class _MusicAutoMix {
       _queueRevision == handler._sessionQueueRevision;
 
   /// Whether [onPosition] would act now: a planned mix times its start from
-  /// every position, and a song not yet planned starts its analysis.
+  /// every position, and a song not yet planned starts its analysis. Keep
+  /// in step with the early returns of [onPosition].
   bool get wantsPosition {
     if (!_canMix || _cancelling > 0 || _starting || _fadeTimer != null) {
       return false;

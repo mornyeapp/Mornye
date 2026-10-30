@@ -438,7 +438,8 @@ class _MusicAutoplay {
     if (enabled) unawaited(fill());
   }
 
-  /// Whether [fill] would start a refill now.
+  /// Whether [fill] would start a refill now. Keep in step with the early
+  /// returns of [fill].
   bool get wouldFill {
     final index = handler._index;
     final media = handler._media;

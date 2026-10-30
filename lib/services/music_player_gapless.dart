@@ -50,6 +50,7 @@ class _MusicGapless {
   /// Whether [onPosition] may act on a position near [estimate]: it drops a
   /// prepared song no longer next, and prepares the next one once [lead]
   /// remains. A second of slack keeps the tick that crosses [lead] read.
+  /// Keep in step with the early returns of [onPosition].
   bool wantsPosition(Duration estimate) {
     if (_preparing) return false;
     if (_prepared != null) return !_current(_generation);
