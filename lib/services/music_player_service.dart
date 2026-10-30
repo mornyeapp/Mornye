@@ -395,8 +395,8 @@ class MusicPlayerHandler extends BaseAudioHandler
   }
 
   /// Writes listening time every 10 s from the start of playback until a
-  /// flush finds nothing playing and nothing waiting, including a write
-  /// that failed and is retried.
+  /// flush finds the recorder idle, so a failed write, this timer's or
+  /// another caller's, is retried within 10 s.
   void _scheduleListeningFlushes() {
     if (_disposed || _dependencies.recorder.idle) return;
     _listeningTimer ??= Timer.periodic(const Duration(seconds: 10), (_) {

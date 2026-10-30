@@ -1916,6 +1916,58 @@ void main() {
     });
   });
 
+  test('a failed write by another caller is retried within 10 s', () async {
+    final time = VirtualTime();
+    final writes = <int>[];
+    Completer<void>? hold;
+    var calls = 0;
+    final recorder = _Recorder(
+      write: (batch) async {
+        final call = ++calls;
+        await hold?.future;
+        if (call == 2) throw StateError('database is locked');
+        writes.add(batch.fold(0, (sum, delta) => sum + delta.milliseconds));
+      },
+      elapsed: () => time.now,
+      now: () => DateTime(2026, 10, 1, 12).add(time.now),
+    );
+    await time.run(() async {
+      final handler = await _runtime(recorder: recorder).initialize();
+      Future<void> wait(int seconds) =>
+          Future<void>.delayed(Duration(seconds: seconds));
+      Future<void> playing(bool value) async {
+        handler.playbackState.add(
+          handler.playbackState.value.copyWith(
+            playing: value,
+            processingState: AudioProcessingState.ready,
+          ),
+        );
+        await _settle();
+      }
+
+      handler.mediaItem.add(_item);
+      await playing(true);
+      // The timer's write is still in flight when playback pauses and
+      // another caller takes the last seconds; then that write fails.
+      hold = Completer<void>();
+      await wait(13);
+      expect(calls, 1);
+      await playing(false);
+      unawaited(recorder.flush());
+      final pending = hold!;
+      hold = null;
+      pending.complete();
+      await wait(1);
+      expect(writes, hasLength(1));
+      expect(calls, 2);
+      await wait(10);
+      expect(writes, hasLength(2));
+      expect(writes.last, closeTo(3000, 2000));
+      await handler.dispose();
+      expect(writes, hasLength(2));
+    });
+  });
+
   /// Plays [_track] on a [_TickingDeck] and sends [ticks] engine ticks on
   /// its interval, each reading the time played. [deliver] decides whether
   /// a tick reaches the handler. Returns the ticks the handler asked for,

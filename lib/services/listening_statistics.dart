@@ -154,6 +154,7 @@ class ListeningRecorder {
   final DateTime Function() now;
   final Map<(String, String), ListeningDelta> _pending = {};
   Future<void> _writeTail = Future<void>.value();
+  int _writing = 0;
   ListeningTrack? _track;
   Duration? _lastElapsed;
   DateTime? _lastDate;
@@ -163,8 +164,9 @@ class ListeningRecorder {
   int _sessionMilliseconds = 0;
   bool _counted = false;
 
-  /// Nothing plays and nothing waits to be written: [flush] has no work.
-  bool get idle => !_playing && _pending.isEmpty;
+  /// Nothing plays, nothing waits to be written and no write can still fail
+  /// and return its time: [flush] has no work.
+  bool get idle => !_playing && _pending.isEmpty && _writing == 0;
 
   void update(
     ListeningTrack? track, {
@@ -234,6 +236,7 @@ class ListeningRecorder {
     checkpoint();
     final batch = _pending.values.toList(growable: false);
     _pending.clear();
+    if (batch.isNotEmpty) _writing++;
     _writeTail = _writeTail.then((_) async {
       if (batch.isEmpty) return;
       try {
@@ -251,6 +254,8 @@ class ListeningRecorder {
           }
         }
         _log.w('Could not persist listening statistics: $error');
+      } finally {
+        _writing--;
       }
     });
     return _writeTail;
