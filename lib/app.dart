@@ -167,6 +167,60 @@ class _OrientationFadeState extends State<_OrientationFade>
   }
 }
 
+/// The [MaterialApp.builder] of [MornyeApp]: the app-wide layers around the
+/// router's [child].
+@visibleForTesting
+Widget buildAppContent(
+  BuildContext context,
+  Widget? child, {
+  required bool heroAnimationsEnabled,
+}) {
+  final mediaQuery = MediaQuery.of(context);
+  Widget appContent = _OrientationFade(
+    child: AppScaffoldMessenger(
+      child: PlaybackFeedback(
+        child: DesktopLibraryDropTarget(
+          child: child ?? const SizedBox.shrink(),
+        ),
+      ),
+    ),
+  );
+  // HeroMode only affects heroes below a *route* subtree. At this level it
+  // sits above the router's Navigator, so the controller never encounters it
+  // while collecting heroes. Removing the inherited controller disables
+  // flights on the root Navigator.
+  if (!heroAnimationsEnabled) {
+    appContent = HeroControllerScope.none(child: appContent);
+  }
+  // Above the root navigator, so shortcuts and the macOS menu bar also reach
+  // Now Playing, dialogs and pushed pages. It stays outside every conditional
+  // wrapper: remounting it would mount a second macOS menu bar before the
+  // first is gone.
+  if (isDesktopPlatform) {
+    appContent = DesktopShortcuts(child: appContent);
+  }
+  if (isAndroidTv) {
+    appContent = ColoredBox(
+      color: Theme.of(context).scaffoldBackgroundColor,
+      child: SafeArea(
+        minimum: const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
+        child: TvNavigation(child: appContent),
+      ),
+    );
+  }
+  // Treat the display as one continuous surface so bottom sheets and dialogs
+  // stay centered on large/foldable devices.
+  return MediaQuery(
+    data: mediaQuery.copyWith(
+      displayFeatures: const [],
+      navigationMode: isAndroidTv
+          ? NavigationMode.directional
+          : mediaQuery.navigationMode,
+    ),
+    child: MornyeGlassPreparation(child: AdaptiveUiScaler(child: appContent)),
+  );
+}
+
 class MornyeApp extends ConsumerWidget {
   final bool disableOverscrollEffects;
 
@@ -206,57 +260,11 @@ class MornyeApp extends ConsumerWidget {
           scrollBehavior: scrollBehavior,
           themeAnimationDuration: const Duration(milliseconds: 300),
           themeAnimationCurve: Curves.easeInOut,
-          // Treat the display as one continuous surface so bottom sheets and
-          // dialogs stay centered on large/foldable devices.
-          builder: (context, child) {
-            final mediaQuery = MediaQuery.of(context);
-            Widget appContent = _OrientationFade(
-              child: AppScaffoldMessenger(
-                child: PlaybackFeedback(
-                  child: DesktopLibraryDropTarget(
-                    child: child ?? const SizedBox.shrink(),
-                  ),
-                ),
-              ),
-            );
-            // HeroMode only affects heroes below a *route* subtree. At this
-            // level it sits above the router's Navigator, so the controller
-            // never encounters it while collecting heroes. Removing the
-            // inherited controller disables flights on the root Navigator.
-            if (!heroAnimationsEnabled) {
-              appContent = HeroControllerScope.none(child: appContent);
-            }
-            // Above the root navigator, so shortcuts and the macOS menu bar
-            // also reach Now Playing, dialogs and pushed pages. It stays
-            // outside every conditional wrapper: remounting it would mount a
-            // second macOS menu bar before the first is gone.
-            if (isDesktopPlatform) {
-              appContent = DesktopShortcuts(child: appContent);
-            }
-            if (isAndroidTv) {
-              appContent = ColoredBox(
-                color: Theme.of(context).scaffoldBackgroundColor,
-                child: SafeArea(
-                  minimum: const EdgeInsets.symmetric(
-                    horizontal: 40,
-                    vertical: 24,
-                  ),
-                  child: TvNavigation(child: appContent),
-                ),
-              );
-            }
-            return MediaQuery(
-              data: mediaQuery.copyWith(
-                displayFeatures: const [],
-                navigationMode: isAndroidTv
-                    ? NavigationMode.directional
-                    : mediaQuery.navigationMode,
-              ),
-              child: MornyeGlassPreparation(
-                child: AdaptiveUiScaler(child: appContent),
-              ),
-            );
-          },
+          builder: (context, child) => buildAppContent(
+            context,
+            child,
+            heroAnimationsEnabled: heroAnimationsEnabled,
+          ),
           routerConfig: router,
           locale: locale,
           localeResolutionCallback: (deviceLocale, supportedLocales) {
