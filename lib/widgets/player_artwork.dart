@@ -8,7 +8,8 @@ class PlayerArtwork extends StatelessWidget {
   /// Shared decode for the mini player and the full player's blurred cover.
   static const miniCacheWidth = 132;
 
-  /// An HTTP(S) URL, file URI, or absolute local artwork path.
+  /// An HTTP(S) URL, file URI, absolute local artwork path, or `network://`
+  /// cover reference.
   final String? artUri;
   final ColorScheme colorScheme;
   final int? cacheWidth;
@@ -54,7 +55,9 @@ class PlayerArtwork extends StatelessWidget {
       );
     }
     final image = coverImageProvider(uri, cacheWidth: cacheWidth);
-    if (image == null) return placeholder;
+    if (image == null) {
+      return pendingCover(uri, placeholder: placeholder, builder: build);
+    }
     return Image(
       image: image,
       fit: BoxFit.cover,

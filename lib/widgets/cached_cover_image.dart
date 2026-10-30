@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
@@ -6,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:path/path.dart' as p;
 import 'package:mornye/services/cover_cache_manager.dart';
+import 'package:mornye/services/cover_store.dart';
 import 'package:mornye/utils/image_cache_utils.dart';
 
 class CachedCoverImage extends StatelessWidget {
@@ -168,7 +170,13 @@ class LocalOrNetworkCoverImage extends StatelessWidget {
     }
 
     final path = coverFilePath(url);
-    if (path == null) return _clip(placeholder(context));
+    if (path == null) {
+      return pendingCover(
+        url,
+        placeholder: _clip(placeholder(context)),
+        builder: build,
+      );
+    }
     final file = File(path);
     if (localCacheWidth != null) {
       return _buildLocalImage(context, file, const BoxConstraints());
@@ -324,8 +332,9 @@ bool isHttpCoverUrl(String? source) =>
     source != null &&
     (source.startsWith('http://') || source.startsWith('https://'));
 
-/// The local file a stored cover string names: an absolute path or a
-/// `file://` URI. Null for URLs, `content://` URIs and other forms.
+/// The local file a stored cover string names: an absolute path, a
+/// `file://` URI, or a `network://` cover the cover store holds. Null for
+/// URLs, `content://` URIs and other forms.
 String? coverFilePath(String? source) {
   if (source == null || source.isEmpty) return null;
   if (source.startsWith('file://')) {
@@ -337,11 +346,80 @@ String? coverFilePath(String? source) {
       return null;
     }
   }
-  // The cover store's saved file for a `network://` cover plugs in here.
-  // Widgets and palettes call this during build, so that lookup must read
-  // only the store's in-memory index, without file IO.
-  if (source.startsWith('network://')) return null;
+  // Widgets and palettes call this during build, so a `network://` cover
+  // reads only the store's in-memory index, without file IO.
+  if (CoverStore.fetches(source)) {
+    return CoverStore.instance.indexedFile(source);
+  }
   return p.isAbsolute(source) ? source : null;
+}
+
+/// [placeholder] for a cover string without an image, and for a `network://`
+/// cover the store ([covers], the shared one by default) does not hold yet,
+/// which it fetches: [builder] builds again once the cover is stored.
+Widget pendingCover(
+  String? source, {
+  required Widget placeholder,
+  required WidgetBuilder builder,
+  CoverStore? covers,
+}) => CoverStore.fetches(source)
+    ? _PendingCover(
+        source: source!,
+        covers: covers ?? CoverStore.instance,
+        placeholder: placeholder,
+        builder: builder,
+      )
+    : placeholder;
+
+class _PendingCover extends StatefulWidget {
+  const _PendingCover({
+    required this.source,
+    required this.covers,
+    required this.placeholder,
+    required this.builder,
+  });
+
+  final String source;
+  final CoverStore covers;
+  final Widget placeholder;
+  final WidgetBuilder builder;
+
+  @override
+  State<_PendingCover> createState() => _PendingCoverState();
+}
+
+class _PendingCoverState extends State<_PendingCover> {
+  bool _stored = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetch();
+  }
+
+  @override
+  void didUpdateWidget(covariant _PendingCover oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.source != widget.source) {
+      _stored = false;
+      _fetch();
+    }
+  }
+
+  void _fetch() {
+    final source = widget.source;
+    unawaited(
+      widget.covers.file(source).then((path) {
+        if (path != null && mounted && widget.source == source) {
+          setState(() => _stored = true);
+        }
+      }),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) =>
+      _stored ? widget.builder(context) : widget.placeholder;
 }
 
 /// What the cover widgets, precaching and palettes decode for a stored cover
