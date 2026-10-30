@@ -234,14 +234,6 @@ class _NetworkStorageScreenState extends ConsumerState<NetworkStorageScreen> {
                 }.contains(e.name.toLowerCase()),
           )
           .firstOrNull;
-      final artwork = cover == null
-          ? null
-          : Uri.parse(
-              await service.resolve(
-                NetworkStorageService.source(connection.id, cover.path),
-              ),
-            );
-      if (!mounted) return;
       await ref.read(musicPlayerControllerProvider).playAll([
         for (final entry in tracks)
           PlayableMedia(
@@ -255,7 +247,6 @@ class _NetworkStorageScreenState extends ConsumerState<NetworkStorageScreen> {
                 entry.song?.album ??
                 widget.path.split('/').where((p) => p.isNotEmpty).lastOrNull ??
                 '',
-            artUri: artwork?.toString(),
             networkArtworkSource: entry.song?.coverPath != null
                 ? NetworkStorageService.source(
                     connection.id,

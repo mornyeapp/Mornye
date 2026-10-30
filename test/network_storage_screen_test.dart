@@ -6,15 +6,59 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/l10n/l10n.dart';
+import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/screens/network_storage_screen.dart';
 import 'package:mornye/services/link/link_source_names.dart';
 import 'package:mornye/services/local_network_access.dart';
 import 'package:mornye/services/network_certificate.dart';
 import 'package:mornye/services/network_storage_service.dart';
+import 'package:mornye/services/playable_media.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/app_action_button.dart';
 
 void main() {
+  testWidgets('playing a folder passes its cover image as a reference', (
+    tester,
+  ) async {
+    final service = _CoverFolder();
+    final played = <PlayableMedia>[];
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          musicPlayerControllerProvider.overrideWithValue(
+            _PlayedController(played),
+          ),
+        ],
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: NetworkStorageScreen(
+            service: service,
+            path: 'Album',
+            connection: const NetworkConnection(
+              id: 'nas',
+              name: 'NAS',
+              protocol: NetworkProtocol.webdav,
+              address: 'https://nas.test/music/',
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Song.flac'));
+    await tester.pumpAndSettle();
+    // The cover store keeps the cover by its reference; a loopback URL
+    // would name it for this run only.
+    expect(service.resolved, isEmpty);
+    expect(played.single.artUri, isNull);
+    expect(
+      played.single.networkArtworkSource,
+      NetworkStorageService.source('nas', 'Album/cover.jpg'),
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   for (final olderFails in [false, true]) {
     testWidgets('latest folder refresh wins (older fails: $olderFails)', (
       tester,
@@ -354,6 +398,38 @@ void main() {
       },
     );
   }
+}
+
+class _CoverFolder extends NetworkStorageService {
+  _CoverFolder() : super(read: () async => null, write: (_) async {});
+  final resolved = <String>[];
+
+  @override
+  Future<List<NetworkEntry>> list(
+    NetworkConnection connection, [
+    String path = '',
+  ]) async => const [
+    NetworkEntry('Album/Song.flac', 'Song.flac'),
+    NetworkEntry('Album/cover.jpg', 'cover.jpg'),
+  ];
+
+  @override
+  Future<String> resolve(String source) async {
+    resolved.add(source);
+    return 'http://127.0.0.1:1/${resolved.length}';
+  }
+}
+
+class _PlayedController extends MusicPlayerController {
+  _PlayedController(this.played);
+
+  final List<PlayableMedia> played;
+
+  @override
+  Future<void> playAll(
+    List<PlayableMedia> items, {
+    int initialIndex = 0,
+  }) async => played.addAll(items);
 }
 
 class _NetworkFixture extends NetworkStorageService {
