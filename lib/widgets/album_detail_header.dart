@@ -1,5 +1,4 @@
 import 'dart:math' as math;
-import 'dart:ui';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
@@ -24,6 +23,7 @@ import 'package:mornye/utils/adaptive_layout.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/widgets/desktop/context_menu.dart';
 import 'package:mornye/widgets/desktop/detail_header.dart';
+import 'package:mornye/widgets/settled_blur.dart';
 import 'package:mornye/widgets/sliver_layout_info_builder.dart';
 
 /// Collapsing album-detail header shared by the album, local-album, and
@@ -475,10 +475,7 @@ class AlbumDetailHeader extends StatelessWidget {
                 if (plainArtworkHeader)
                   ColoredBox(color: headerScheme.surface)
                 else if (blurAndScrimBackground)
-                  ImageFiltered(
-                    imageFilter: ImageFilter.blur(sigmaX: 32, sigmaY: 32),
-                    child: background,
-                  )
+                  SettledBlur(sigma: 32, child: background)
                 else
                   background,
                 if (!plainArtworkHeader && blurAndScrimBackground)
