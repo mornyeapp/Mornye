@@ -212,6 +212,10 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
   /// The digest of the catalog the server of [_serverRun] read last.
   ({int run, String digest})? _pushedCatalog;
 
+  /// The phones told of that catalog: the server's push reaches only the
+  /// phones connected then, so one that connects later is told itself.
+  final _catalogTold = <String>{};
+
   @override
   LinkDesktopHostState build() {
     _backend = ref.watch(linkDesktopBackendProvider);
@@ -808,8 +812,24 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
     if (!known.containsAll(ids)) {
       _lastSentState = null;
       _onPlayerChanged();
+      _tellCatalog();
     }
     unawaited(refreshDevices());
+  }
+
+  /// Sends `catalog.changed` to each connected phone not told of the
+  /// catalog the server holds, as when it was offline during the push.
+  void _tellCatalog() {
+    if (_pushedCatalog?.run != _serverRun) return;
+    for (final client in state.clients) {
+      if (!_catalogTold.add(client.deviceId)) continue;
+      unawaited(
+        _send({
+          'type': LinkMessageTypes.catalogChanged,
+          'songs': ?state.catalogSongs,
+        }, deviceId: client.deviceId),
+      );
+    }
   }
 
   void _onPairing(LinkPairingEvent event) {
@@ -914,10 +934,17 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
       final changed = pushed != _pushedCatalog;
       int? songs;
       if (changed) {
+        final connected = {for (final client in state.clients) client.deviceId};
         _pushedCatalog = null;
         songs = await _backend.setCatalog(export.path);
         if (!ref.mounted || !state.running) return;
         _pushedCatalog = pushed;
+        _catalogTold
+          ..clear()
+          ..addAll([
+            for (final client in state.clients)
+              if (connected.contains(client.deviceId)) client.deviceId,
+          ]);
       }
       // The server reads this catalog now, so the covers it does not want
       // can go. The fetch runs in the background.
@@ -927,7 +954,11 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
       }
       _index = export.index;
       ref.read(linkCatalogIndexProvider.notifier).set(export.index);
-      if (changed) state = state.copyWith(catalogSongs: songs);
+      if (changed) {
+        state = state.copyWith(catalogSongs: songs);
+        // Phones that connected during the push may have missed it.
+        _tellCatalog();
+      }
       // Phone songs scanned before the index, or saved here by a transfer,
       // leave out the desktop's own.
       final library = ref.read(linkPhoneLibraryProvider);

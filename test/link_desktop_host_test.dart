@@ -282,7 +282,14 @@ void main() {
     expect(pushed(), isEmpty);
     await tester.pump(const Duration(milliseconds: 100));
     expect(pushed(), hasLength(1));
-    expect(backend.sent.single.deviceId, isNull);
+    expect(
+      backend.sent
+          .singleWhere(
+            (entry) => entry.message['type'] == LinkMessageTypes.playerState,
+          )
+          .deviceId,
+      isNull,
+    );
     final state = pushed().single['state'] as Map<String, dynamic>;
     expect(state['playing'], isTrue);
     expect((state['track'] as Map)['title'], 'Title a');
@@ -528,6 +535,79 @@ void main() {
     await host().setEnabled(true);
     await flush(tester);
     expect(backend.catalogs, hasLength(4));
+    await shutdown(tester);
+  });
+
+  testWidgets('a phone that missed the last push is told when it connects, '
+      'one that got it is not', (tester) async {
+    await boot(tester);
+    expect(backend.catalogs, hasLength(1));
+    List<String?> told() => [
+      for (final entry in backend.sent)
+        if (entry.message['type'] == LinkMessageTypes.catalogChanged)
+          entry.deviceId,
+    ];
+
+    // Offline during the push at start.
+    backend.connect([_phone]);
+    await flush(tester);
+    expect(told(), ['p1']);
+    expect(backend.sentOfType(LinkMessageTypes.catalogChanged).single, {
+      'type': LinkMessageTypes.catalogChanged,
+      'songs': 2,
+    });
+    backend.connect(const []);
+    await flush(tester);
+    backend.connect([_phone]);
+    await flush(tester);
+    expect(told(), ['p1'], reason: 'told already');
+
+    // The push reaches the phone; the tablet, offline, is told later.
+    await host().exportCatalog();
+    await flush(tester);
+    expect(backend.catalogs, hasLength(2));
+    backend.connect(const []);
+    await flush(tester);
+    backend.connect([_phone, _tablet]);
+    await flush(tester);
+    expect(told(), ['p1', 'p2']);
+
+    // A push while both are away.
+    backend.connect(const []);
+    await flush(tester);
+    await host().exportCatalog();
+    await flush(tester);
+    expect(backend.catalogs, hasLength(3));
+    backend.connect([_tablet]);
+    await flush(tester);
+    expect(told(), ['p1', 'p2', 'p2']);
+    await shutdown(tester);
+  });
+
+  testWidgets('a phone that connects during a push is told once it ends', (
+    tester,
+  ) async {
+    await boot(tester);
+    backend.connect([_phone]);
+    await flush(tester);
+    backend.sent.clear();
+    backend.catalogGate = Completer();
+    unawaited(host().exportCatalog());
+    await flush(tester);
+
+    backend.connect([_phone, _tablet]);
+    await flush(tester);
+    expect(backend.sentOfType(LinkMessageTypes.catalogChanged), isEmpty);
+    backend.catalogGate!.complete();
+    await flush(tester);
+    expect(
+      [
+        for (final entry in backend.sent)
+          if (entry.message['type'] == LinkMessageTypes.catalogChanged)
+            entry.deviceId,
+      ],
+      ['p2'],
+    );
     await shutdown(tester);
   });
 
