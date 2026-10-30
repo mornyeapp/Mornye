@@ -599,6 +599,8 @@ class SubsonicClient {
         try {
           await target.setLastModified(DateTime.now());
         } on FileSystemException {
+          // A 304 cannot restore an image removed since the check.
+          if (fetched.unchanged && !await target.exists()) rethrow;
           // The next lookup asks the server again.
         }
         if (!fetched.unchanged) {
@@ -732,9 +734,6 @@ class SubsonicClient {
       await writer.close();
     }
   }
-
-  Future<void> saveCover(SubsonicSong song, File output) =>
-      _protectTransport(() => _saveCover(song, output));
 
   /// Saves the artwork of [song] to [output] and returns the ETag the server
   /// sent with it. With [etag], a server that still has that image answers

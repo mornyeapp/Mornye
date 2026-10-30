@@ -194,6 +194,24 @@ void main() {
     },
   );
 
+  test('a 304 for an image removed meanwhile is no cover', () async {
+    server.coverEtag = '"v1"';
+    final client = storage.openSubsonic(server.connection());
+    addTearDown(client.close);
+    final song = SubsonicSong(server.song);
+    final before = await client.cachedCover(song, directory);
+    await File(
+      before!,
+    ).setLastModified(DateTime.now().subtract(const Duration(days: 2)));
+    server.blockMethod = 'getCoverArt';
+    final pending = client.cachedCover(song, directory);
+    await server.held.future;
+    await File(before).delete();
+    server.release.complete();
+    await expectLater(pending, throwsA(isA<FileSystemException>()));
+    expect(server.ifNoneMatch.last, '"v1"');
+  });
+
   test('song metadata keeps 32 covers, each with its ETag', () async {
     server.coverEtag = '"v1"';
     final cache = await Directory(
