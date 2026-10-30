@@ -1,6 +1,5 @@
 import 'package:mornye/services/listening_statistics.dart';
 import 'package:mornye/utils/artist_utils.dart';
-import 'package:mornye/utils/string_utils.dart';
 import 'package:sqflite/sqflite.dart';
 
 /// Windows a Rewind can look back over. Rolling windows end today; [year]
@@ -184,9 +183,7 @@ class ListeningRewind {
         album: existing?.album ?? album,
         artist: existing?.artist ?? total.track.artist,
         // Tracks arrive most listened first, so the first cover wins.
-        artwork:
-            existing?.artwork ??
-            normalizeStoredCoverReference(total.track.artwork),
+        artwork: existing?.artwork ?? total.track.artwork,
         milliseconds: (existing?.milliseconds ?? 0) + total.milliseconds,
         plays: (existing?.plays ?? 0) + total.plays,
       );

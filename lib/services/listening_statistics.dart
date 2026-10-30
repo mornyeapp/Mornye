@@ -78,7 +78,7 @@ class ListeningSummary {
     final artwork = <String, String>{};
     final listeningTime = <String, int>{};
     for (final total in tracks) {
-      final cover = normalizeStoredCoverReference(total.track.artwork);
+      final cover = total.track.artwork;
       if (cover == null) continue;
       for (final artist in splitArtistTagValues(total.track.artist)) {
         if (listeningTime.containsKey(artist) &&
@@ -92,6 +92,9 @@ class ListeningSummary {
     return artwork;
   }
 
+  /// A summary of daily [rows]; each song keeps its last row's details.
+  /// [readListeningSummary] is the reader the app uses.
+  @visibleForTesting
   factory ListeningSummary.fromRows(List<Map<String, Object?>> rows) {
     final tracks = <String, ListeningTotal>{};
     final artists = <String, int>{};

@@ -1,11 +1,8 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:audio_service/audio_service.dart' show MediaItem;
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mornye/services/cover_store.dart';
 import 'package:mornye/services/listening_statistics.dart';
-import 'package:mornye/services/playable_media.dart';
 
 import 'support/link_sync_support.dart';
 import 'support/sqlite_process_database.dart';
@@ -281,7 +278,7 @@ void main() {
               title: 'More',
               artist: 'Artist, Collaborator',
               album: 'Album',
-              artwork: ' file:///covers/album.jpg ',
+              artwork: 'file:///covers/album.jpg',
             ),
             120000,
             2,
@@ -428,43 +425,5 @@ void main() {
       play('https://example.com/new.jpg', day: '2026-10-21'),
     ]);
     expect(await shown(), 'https://example.com/new.jpg');
-  });
-
-  test('a recorded cover reference replays as the stored cover', () async {
-    final directory = await Directory.systemTemp.createTemp('replay-cover-');
-    addTearDown(() => directory.delete(recursive: true));
-    final covers = CoverStore(
-      directory: () async => Directory('${directory.path}/covers'),
-      fetch: (_, output) => output.writeAsBytes([0xFF, 0xD8, 0xFF, 0]),
-    );
-    addTearDown(covers.dispose);
-    const source = 'network://nas/Album/song.flac';
-    const folder = 'network://nas/Album/cover.jpg';
-    final tags = CoverStore.songCoverReference(source);
-    final tagFile = File('${directory.path}/tags.jpg')
-      ..writeAsBytesSync([0xFF, 0xD8, 0xFF, 1]);
-    final folderFile = await covers.file(folder);
-    final tagCover = await covers.adopt(tags, tagFile.path);
-    expect(folderFile, isNotNull);
-    expect(tagCover, isNot(folderFile));
-    // As Home On repeat plays a statistics track.
-    MediaItem replay(String artwork) => PlayableMedia(
-      id: source,
-      source: source,
-      title: 'Song',
-      artist: 'Artist',
-      artUri: artwork,
-    ).toMediaItem(covers: covers);
-    expect(replay(tags).artUri, Uri.file(tagCover!));
-    expect(replay(tags).extras!['artworkRef'], tags);
-    final other = PlayableMedia(
-      id: 'other',
-      source: 'network://nas/Other/song.flac',
-      title: 'Other',
-      artist: 'Artist',
-      artUri: folder,
-    ).toMediaItem(covers: covers);
-    expect(other.artUri, Uri.file(folderFile!));
-    expect(other.extras!['artworkRef'], folder);
   });
 }

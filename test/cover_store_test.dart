@@ -4,9 +4,11 @@ import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
 
+import 'package:audio_service/audio_service.dart' show MediaItem;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/services/cover_store.dart';
 import 'package:mornye/services/network_storage_service.dart';
+import 'package:mornye/services/playable_media.dart';
 import 'package:path/path.dart' as p;
 
 List<int> _jpeg(int version) => [
@@ -635,6 +637,33 @@ void main() {
       isNull,
     );
     expect(fetched, isFalse);
+  });
+
+  test('a recorded cover reference plays as the song stored cover', () async {
+    final covers = store(
+      fetch: (ref, output) async => output.writeAsBytes(_jpeg(ref.length)),
+    );
+    const song = 'network://nas/Album/01.flac';
+    const folder = 'network://nas/Album/cover.jpg';
+    final tags = CoverStore.songCoverReference(song);
+    final network = (await covers.file(folder))!;
+    final source = File('${directory.path}/tags.image')
+      ..writeAsBytesSync(_jpeg(9));
+    final adopted = (await covers.adopt(tags, source.path))!;
+    // As Home On repeat plays a song with the cover statistics recorded.
+    MediaItem replay(String id, String artwork) => PlayableMedia(
+      id: id,
+      source: id,
+      title: 'Song',
+      artist: 'Artist',
+      artUri: artwork,
+    ).toMediaItem(covers: covers);
+    final tagged = replay(song, tags);
+    expect(tagged.artUri, Uri.file(adopted));
+    expect(tagged.extras!['artworkRef'], tags);
+    final other = replay('network://nas/Album/02.flac', folder);
+    expect(other.artUri, Uri.file(network));
+    expect(other.extras!['artworkRef'], folder);
   });
 
   test('durable references leave out loopback URLs and temporary files', () {
