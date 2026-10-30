@@ -81,7 +81,10 @@ fn flac_inner(
             let data = bytes(reader, length as usize)?;
             // FLAC uses the first valid Vorbis block; later blocks do not merge.
             if valid_comments(&data) {
-                comments::flac(&mut metadata, &comments::parse(&data, usize::MAX));
+                comments::flac(
+                    &mut metadata,
+                    &comments::parse(&data, usize::MAX).collect::<Vec<_>>(),
+                );
                 found = true;
             }
         } else if header[0] & 0x7f == 6 && !front_cover && cover.is_some() {
@@ -330,7 +333,7 @@ pub(super) fn ogg(reader: &mut impl Read) -> Result<AudioMetadata, String> {
     // Every Opus and Vorbis stream has this header, so a complete one without
     // a title or artist is an untagged or partly tagged song, not a failed read.
     packet
-        .map(|data| comments::ogg(&comments::parse(data, 512 * 1024)))
+        .map(|data| comments::ogg(comments::parse(data, 512 * 1024), stream == Some(true)))
         .ok_or_else(|| "no Vorbis comments found".into())
 }
 

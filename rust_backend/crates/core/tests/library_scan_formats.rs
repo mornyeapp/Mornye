@@ -214,6 +214,100 @@ fn opus_comments_after_a_large_cover_on_small_pages_are_read() {
 }
 
 #[test]
+fn opus_replaygain_after_many_comments_is_read_by_scan_and_playback() {
+    let mut comments: Vec<_> = (0..120)
+        .map(|index| format!("CUSTOM_CREDIT_{index}=Example credit"))
+        .collect();
+    comments.extend([
+        picture_comment(600 * 1024),
+        "TITLE=Normalized song".into(),
+        "r128_track_gain=-2816".into(),
+        "R128_ALBUM_GAIN=-2304".into(),
+    ]);
+    let data = opus(Some(&comments), 16);
+    let metadata = scan(&data, "Tagged.opus");
+    assert_readable(&metadata);
+    assert_eq!(metadata["replaygain_track_gain"], "-6.00 dB");
+    assert_eq!(metadata["replaygain_album_gain"], "-4.00 dB");
+    assert_eq!(metadata["trackName"], "Normalized song");
+    for hint in ["Tagged.opus", "Tagged.ogg"] {
+        let details = read_file_metadata(
+            &mut Cursor::new(&data),
+            "/proc/self/fd/42",
+            hint,
+            &|| Ok(()),
+        )
+        .unwrap();
+        assert_eq!(details["replaygain_track_gain"], "-6.00 dB");
+        assert_eq!(details["replaygain_album_gain"], "-4.00 dB");
+    }
+    let cover = extract_cover(&mut Cursor::new(&data), "opus", &|| Ok(())).unwrap();
+    assert_eq!(cover.data.len(), 600 * 1024);
+}
+
+#[test]
+fn opus_prefers_r128_over_legacy_gains_in_either_comment_order() {
+    let mut comments = vec![
+        "R128_TRACK_GAIN=-3072".into(),
+        "R128_ALBUM_GAIN=-2048".into(),
+        "REPLAYGAIN_TRACK_GAIN=-1.00 dB".into(),
+        "REPLAYGAIN_ALBUM_GAIN=-2.00 dB".into(),
+    ];
+    for _ in 0..2 {
+        let data = opus(Some(&comments), 255);
+        let details =
+            read_file_metadata(&mut Cursor::new(data), "Tagged.opus", "", &|| Ok(())).unwrap();
+        assert_eq!(details["replaygain_track_gain"], "-7.00 dB");
+        assert_eq!(details["replaygain_album_gain"], "-3.00 dB");
+        comments.reverse();
+    }
+}
+
+#[test]
+fn opus_invalid_r128_does_not_hide_valid_legacy_gain() {
+    for value in ["", "NaN", "32768", "-32769", "-3.0", "-3 dB"] {
+        let data = opus(
+            Some(&[
+                "REPLAYGAIN_TRACK_GAIN=-6.00 dB".into(),
+                format!("R128_TRACK_GAIN={value}"),
+                "r128_album_gain=+00256".into(),
+            ]),
+            255,
+        );
+        let details =
+            read_file_metadata(&mut Cursor::new(data), "Tagged.opus", "", &|| Ok(())).unwrap();
+        assert_eq!(details["replaygain_track_gain"], "-6.00 dB", "{value}");
+        assert_eq!(details["replaygain_album_gain"], "6.00 dB", "{value}");
+    }
+}
+
+#[test]
+fn opus_r128_is_additional_to_the_decoder_header_gain() {
+    let mut data = opus(Some(&["R128_TRACK_GAIN=-2816".into()]), 255);
+    let head = data
+        .windows(8)
+        .position(|bytes| bytes == b"OpusHead")
+        .unwrap();
+    data[head + 16..head + 18].copy_from_slice(&(-1536_i16).to_le_bytes());
+    let details =
+        read_file_metadata(&mut Cursor::new(&data), "Tagged.opus", "", &|| Ok(())).unwrap();
+    // The decoder already applies the -6 dB header gain. Normalization applies
+    // only the additional -6 dB at Mornye's -18 LUFS reference.
+    assert_eq!(details["replaygain_track_gain"], "-6.00 dB");
+    let mut rewritten = Vec::new();
+    rewrite_audio_tags(
+        &mut Cursor::new(&data),
+        &mut rewritten,
+        "opus",
+        &[("title".into(), "Renamed song".into())].into(),
+        None,
+        &|| Ok(()),
+    )
+    .unwrap();
+    assert_eq!(&rewritten[head..head + 19], &data[head..head + 19]);
+}
+
+#[test]
 fn opus_with_high_resolution_artwork_remains_readable() {
     // Base64 expands an 8 MiB picture past the old 10 MiB packet limit;
     // a 13 MiB picture also exceeds the old 16 MiB header read window.

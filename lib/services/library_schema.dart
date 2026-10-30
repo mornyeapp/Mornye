@@ -12,7 +12,7 @@ final _log = AppLogger('LibraryDatabase');
 
 /// Schema lifecycle is independent of collection reads and scan transactions.
 abstract final class LibrarySchema {
-  static const version = 19;
+  static const version = 20;
   static const visibleView = 'library_visible';
   static const searchFtsTable = 'library_search_fts';
   static const lookupSummaryTable = 'library_lookup_summary';
@@ -169,6 +169,19 @@ abstract final class LibrarySchema {
     if (oldVersion < 19) {
       await _createCueSplits(db);
       await _createVisibleView(db);
+    }
+    if (oldVersion < 20) {
+      // Older Ogg reads stopped after 100 comments and could miss gain tags.
+      // Re-read only local Ogg songs on the next scan, keeping lyrics known.
+      await db.rawUpdate(
+        'UPDATE library SET audio_metadata_scan_version = ? '
+        'WHERE audio_metadata_scan_version >= ? '
+        "AND file_path NOT LIKE 'network://%' "
+        "AND (LOWER(format) IN ('opus', 'ogg', 'vorbis') "
+        "OR LOWER(file_path) LIKE '%.opus' "
+        "OR LOWER(file_path) LIKE '%.ogg')",
+        [libraryLyricsMetadataScanVersion, libraryAudioMetadataScanVersion],
+      );
     }
   }
 
