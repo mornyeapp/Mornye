@@ -1,8 +1,13 @@
 import 'dart:async';
+import 'dart:io';
 
+import 'package:audio_service/audio_service.dart' show MediaItem;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mornye/services/cover_store.dart';
 import 'package:mornye/services/listening_statistics.dart';
+import 'package:mornye/services/playable_media.dart';
 
+import 'support/link_sync_support.dart';
 import 'support/sqlite_process_database.dart';
 
 const _one = ListeningTrack(
@@ -296,4 +301,164 @@ void main() {
       );
     },
   );
+
+  test(
+    'older loopback and temporary covers read as none, references stay',
+    () async {
+      const kept = {
+        'network': 'network://nas/Album/cover.jpg',
+        'tags': 'network://nas/Album/song.flac#cover',
+        'web': 'https://example.com/cover.jpg',
+        'file': '/data/user/0/app/files/covers/a.image',
+      };
+      final dropped = [
+        'http://127.0.0.1:41234/7f3a',
+        'http://localhost:8080/cover',
+        '/data/user/0/app/cache/network_metadata/a1.jpg',
+        '/var/mobile/Containers/Data/Application/X/tmp/'
+            'download_cover_preview_x1/cover_preview.jpg',
+        '${Directory.systemTemp.path}/cover.jpg',
+      ];
+      final rows = [
+        for (final (key, artwork) in [
+          ...kept.entries.map((entry) => (entry.key, entry.value)),
+          ...dropped.indexed.map((entry) => ('old${entry.$1}', entry.$2)),
+        ])
+          {
+            'day': '2026-10-20',
+            'track_key': key,
+            'title': key,
+            'artist': key,
+            'album': 'Album',
+            'artwork': artwork,
+            'milliseconds': 60000,
+            'plays': 1,
+          },
+      ];
+      final db = await SqliteProcessDatabase.open();
+      addTearDown(db.close);
+      await db.execute('''
+        CREATE TABLE listening (
+          day TEXT, track_key TEXT, title TEXT, artist TEXT, album TEXT,
+          artwork TEXT, milliseconds INTEGER, plays INTEGER,
+          PRIMARY KEY(day, track_key)
+        )
+      ''');
+      for (final row in rows) {
+        await db.insert('listening', row);
+      }
+      for (final summary in [
+        ListeningSummary.fromRows(rows),
+        await readListeningSummary(db, DateTime(2026), DateTime(2027)),
+      ]) {
+        expect(
+          {
+            for (final total in summary.tracks)
+              total.track.key: total.track.artwork,
+          },
+          {...kept, for (var i = 0; i < dropped.length; i++) 'old$i': null},
+        );
+        expect(summary.artistArtwork, kept);
+      }
+    },
+  );
+
+  test('a later play replaces a broken cover; one without keeps it', () async {
+    final db = await openLinkListeningDatabase(
+      await linkSyncTempDirectory(),
+      'covers',
+    );
+    const reference = 'network://nas/Album/cover.jpg';
+    ListeningDelta play(String? artwork, {String day = '2026-10-20'}) =>
+        ListeningDelta(
+          day,
+          ListeningTrack(
+            key: 'network://nas/Album/song.flac',
+            title: 'Song',
+            artist: 'Artist',
+            album: 'Album',
+            artwork: artwork,
+          ),
+          5000,
+          0,
+        );
+    Future<Map<String, Object?>> stored(String day) async => (await db.query(
+      'listening',
+      where: 'day = ?',
+      whereArgs: [day],
+    )).single;
+    Future<String?> shown() async => (await readListeningSummary(
+      db,
+      DateTime(2026, 10, 20),
+      DateTime(2026, 10, 22),
+    )).tracks.single.track.artwork;
+
+    // Recorded by an older build.
+    await db.insert('listening', {
+      'day': '2026-10-20',
+      'track_key': 'network://nas/Album/song.flac',
+      'title': 'Song',
+      'artist': 'Artist',
+      'album': 'Album',
+      'artwork': 'http://127.0.0.1:41234/7f3a',
+      'milliseconds': 5000,
+      'plays': 0,
+    });
+    expect(await shown(), isNull);
+    await writeListeningDeltas(db, [play(null)]);
+    expect(await shown(), isNull);
+    await writeListeningDeltas(db, [play(reference)]);
+    expect(await shown(), reference);
+    for (final artwork in [
+      null,
+      'http://127.0.0.1:41234/8b2c',
+      '/data/user/0/app/cache/network_metadata/a1.jpg',
+    ]) {
+      await writeListeningDeltas(db, [play(artwork)]);
+      expect((await stored('2026-10-20'))['artwork'], reference);
+    }
+    expect((await stored('2026-10-20'))['milliseconds'], 30000);
+    await writeListeningDeltas(db, [
+      play('http://127.0.0.1:41234/8b2c', day: '2026-10-21'),
+    ]);
+    expect((await stored('2026-10-21'))['artwork'], isNull);
+  });
+
+  test('a recorded cover reference replays as the stored cover', () async {
+    final directory = await Directory.systemTemp.createTemp('replay-cover-');
+    addTearDown(() => directory.delete(recursive: true));
+    final covers = CoverStore(
+      directory: () async => Directory('${directory.path}/covers'),
+      fetch: (_, output) => output.writeAsBytes([0xFF, 0xD8, 0xFF, 0]),
+    );
+    addTearDown(covers.dispose);
+    const source = 'network://nas/Album/song.flac';
+    const folder = 'network://nas/Album/cover.jpg';
+    final tags = CoverStore.songCoverReference(source);
+    final tagFile = File('${directory.path}/tags.jpg')
+      ..writeAsBytesSync([0xFF, 0xD8, 0xFF, 1]);
+    final folderFile = await covers.file(folder);
+    final tagCover = await covers.adopt(tags, tagFile.path);
+    expect(folderFile, isNotNull);
+    expect(tagCover, isNot(folderFile));
+    // As Home On repeat plays a statistics track.
+    MediaItem replay(String artwork) => PlayableMedia(
+      id: source,
+      source: source,
+      title: 'Song',
+      artist: 'Artist',
+      artUri: artwork,
+    ).toMediaItem(covers: covers);
+    expect(replay(tags).artUri, Uri.file(tagCover!));
+    expect(replay(tags).extras!['artworkRef'], tags);
+    final other = PlayableMedia(
+      id: 'other',
+      source: 'network://nas/Other/song.flac',
+      title: 'Other',
+      artist: 'Artist',
+      artUri: folder,
+    ).toMediaItem(covers: covers);
+    expect(other.artUri, Uri.file(folderFile!));
+    expect(other.extras!['artworkRef'], folder);
+  });
 }

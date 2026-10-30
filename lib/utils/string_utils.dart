@@ -46,6 +46,16 @@ String? normalizeCoverReference(String? value) {
   return null;
 }
 
+/// [normalizeCoverReference] that also keeps a `network://` cover source,
+/// for stores whose readers resolve one, such as listening statistics.
+String? normalizeStoredCoverReference(String? value) {
+  final normalized = normalizeOptionalString(value);
+  if (normalized != null && normalized.startsWith('network://')) {
+    return normalized;
+  }
+  return normalizeCoverReference(normalized);
+}
+
 String? normalizeRemoteHttpUrl(String? value) {
   final normalized = normalizeCoverReference(value);
   if (normalized == null) return null;

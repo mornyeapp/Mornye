@@ -143,6 +143,42 @@ void main() {
       },
     );
 
+    test(
+      'covers keep network references and drop older loopback ones',
+      () async {
+        const folder = 'network://nas/Album/cover.jpg';
+        const tags = 'network://nas/Else/song.flac#cover';
+        final rows = [
+          {
+            ..._row('2026-01-02', 'first', minutes: 3),
+            'artwork': 'http://127.0.0.1:41234/7f3a',
+          },
+          {..._row('2026-03-10', 'top', minutes: 90), 'artwork': folder},
+          {
+            ..._row('2026-03-11', 'other', artist: 'Other', album: 'Else'),
+            'artwork': tags,
+          },
+          {
+            ..._row('2026-06-01', 'loop', artist: 'Third', album: '', plays: 9),
+            'artwork': 'http://localhost:8080/cover',
+          },
+        ];
+        for (final row in rows) {
+          await db.insert('listening', row);
+        }
+        final rewind = await readListeningRewind(db, _yearRange, yearly: true);
+        expect(rewind.year?.firstPlay?.track.key, 'first');
+        expect(rewind.year?.firstPlay?.track.artwork, isNull);
+        expect(rewind.replay?.track.key, 'loop');
+        expect(rewind.replay?.track.artwork, isNull);
+        expect(
+          [for (final album in rewind.topAlbums) album.artwork],
+          [folder, tags],
+        );
+        expect(rewind.summary.artistArtwork, {'Artist': folder, 'Other': tags});
+      },
+    );
+
     test('empty history has no invented yearly highlights', () async {
       final rewind = await readListeningRewind(db, _yearRange, yearly: true);
       expect(rewind.isEmpty, isTrue);

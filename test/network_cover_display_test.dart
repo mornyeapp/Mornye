@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/services/cover_store.dart';
 import 'package:mornye/widgets/cached_cover_image.dart';
+import 'package:mornye/widgets/player_artwork.dart';
 
 // The shared cover store keeps a warm-up started in an earlier test's zone,
 // so the test reading it lives in this file of its own.
@@ -57,6 +58,27 @@ void main() {
       );
       expect(find.byKey(const ValueKey('placeholder')), findsNothing);
       expect(find.byType(Image), findsOneWidget);
+
+      // Statistics, Rewind and Home On repeat show it through PlayerArtwork.
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Center(
+            child: SizedBox.square(
+              dimension: 56,
+              child: PlayerArtwork(
+                artUri: ref,
+                colorScheme: ColorScheme.light(),
+                cacheWidth: 56,
+              ),
+            ),
+          ),
+        ),
+      );
+      final image = tester.widget<Image>(find.byType(Image)).image;
+      expect(
+        ((image as ResizeImage).imageProvider as FileImage).file.path,
+        stored,
+      );
     } finally {
       await tester.pumpWidget(const SizedBox());
       PaintingBinding.instance.imageCache

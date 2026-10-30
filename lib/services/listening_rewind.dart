@@ -185,7 +185,8 @@ class ListeningRewind {
         artist: existing?.artist ?? total.track.artist,
         // Tracks arrive most listened first, so the first cover wins.
         artwork:
-            existing?.artwork ?? normalizeCoverReference(total.track.artwork),
+            existing?.artwork ??
+            normalizeStoredCoverReference(total.track.artwork),
         milliseconds: (existing?.milliseconds ?? 0) + total.milliseconds,
         plays: (existing?.plays ?? 0) + total.plays,
       );
@@ -376,13 +377,7 @@ Future<ListeningYearDetails> readListeningYearDetails(
     firstPlay: firstRow == null
         ? null
         : ListeningFirstPlay(
-            ListeningTrack(
-              key: firstRow['track_key'] as String,
-              title: firstRow['title'] as String,
-              artist: firstRow['artist'] as String,
-              album: firstRow['album'] as String,
-              artwork: firstRow['artwork'] as String?,
-            ),
+            ListeningTrack.fromRow(firstRow),
             DateTime.parse(firstRow['day'] as String),
           ),
   );
@@ -453,13 +448,7 @@ Future<ListeningRewind> readListeningRewind(
     replay: replay == null
         ? null
         : ListeningReplay(
-            ListeningTrack(
-              key: replay['track_key'] as String,
-              title: replay['title'] as String,
-              artist: replay['artist'] as String,
-              album: replay['album'] as String,
-              artwork: replay['artwork'] as String?,
-            ),
+            ListeningTrack.fromRow(replay),
             DateTime.parse(replay['day'] as String),
             replay['plays'] as int,
           ),

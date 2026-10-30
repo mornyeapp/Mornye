@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart' show visibleForTesting;
+import 'package:mornye/services/cover_store.dart';
 import 'package:mornye/services/link/sync/link_history_sync_schema.dart';
 import 'package:mornye/services/sqlite_helpers.dart' as sqlite;
 import 'package:mornye/utils/artist_utils.dart';
@@ -23,6 +24,19 @@ class ListeningTrack {
     required this.album,
     this.artwork,
   });
+
+  /// The track of a `listening` row. Older builds recorded loopback URLs
+  /// and temporary files, which read as no artwork, so the fallback shows
+  /// instead of a broken image until the song plays again.
+  factory ListeningTrack.fromRow(Map<String, Object?> row) => ListeningTrack(
+    key: row['track_key'] as String,
+    title: row['title'] as String,
+    artist: row['artist'] as String,
+    album: row['album'] as String,
+    artwork: durableCoverReference(
+      normalizeStoredCoverReference(row['artwork'] as String?),
+    ),
+  );
 
   final String key;
   final String title;
@@ -58,7 +72,7 @@ class ListeningSummary {
     final artwork = <String, String>{};
     final listeningTime = <String, int>{};
     for (final total in tracks) {
-      final cover = normalizeCoverReference(total.track.artwork);
+      final cover = normalizeStoredCoverReference(total.track.artwork);
       if (cover == null) continue;
       for (final artist in splitArtistTagValues(total.track.artist)) {
         if (listeningTime.containsKey(artist) &&
@@ -87,13 +101,7 @@ class ListeningSummary {
       milliseconds += time;
       plays += count;
       tracks[key] = ListeningTotal(
-        ListeningTrack(
-          key: key,
-          title: row['title'] as String,
-          artist: artist,
-          album: row['album'] as String,
-          artwork: row['artwork'] as String?,
-        ),
+        ListeningTrack.fromRow(row),
         (tracks[key]?.milliseconds ?? 0) + time,
         (tracks[key]?.plays ?? 0) + count,
       );
@@ -336,6 +344,7 @@ Future<void> writeListeningDeltas(
   await db.transaction((transaction) async {
     final batch = transaction.batch();
     for (final delta in deltas) {
+      final artwork = durableCoverReference(delta.track.artwork);
       batch.rawInsert(
         '''
         INSERT OR IGNORE INTO listening
@@ -348,13 +357,15 @@ Future<void> writeListeningDeltas(
           delta.track.title,
           delta.track.artist,
           delta.track.album,
-          delta.track.artwork,
+          artwork,
         ],
       );
       // Avoid UPSERT syntax unavailable in older Android SQLite versions.
+      // A play whose cover is not known yet keeps the one stored.
       batch.rawUpdate(
         '''
-        UPDATE listening SET title = ?, artist = ?, album = ?, artwork = ?,
+        UPDATE listening SET title = ?, artist = ?, album = ?,
+          artwork = COALESCE(?, artwork),
           milliseconds = milliseconds + ?, plays = plays + ?
         WHERE day = ? AND track_key = ?
       ''',
@@ -362,7 +373,7 @@ Future<void> writeListeningDeltas(
           delta.track.title,
           delta.track.artist,
           delta.track.album,
-          delta.track.artwork,
+          artwork,
           delta.milliseconds,
           delta.plays,
           delta.day,
@@ -405,13 +416,7 @@ Future<ListeningSummary> readListeningSummary(
   final tracks = [
     for (final row in rows)
       ListeningTotal(
-        ListeningTrack(
-          key: row['track_key'] as String,
-          title: row['title'] as String,
-          artist: row['artist'] as String,
-          album: row['album'] as String,
-          artwork: row['artwork'] as String?,
-        ),
+        ListeningTrack.fromRow(row),
         row['milliseconds'] as int,
         row['plays'] as int,
       ),
