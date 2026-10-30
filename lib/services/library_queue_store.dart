@@ -21,27 +21,25 @@ class _QueueOrderTerm {
   const _QueueOrderTerm(this.column, {this.descending = false});
 }
 
-/// The Library row is not shadowed by a downloaded History file.
-String _notShadowedByHistory(String alias) =>
-    '''
-  NOT EXISTS (
-    SELECT 1
-    FROM library_path_keys lpk
-    JOIN history_db.history_path_keys hpk ON hpk.path_key = lpk.path_key
-    WHERE lpk.item_id = $alias.id
-  )''';
-
 /// Queue reads against an already opened library with history attached.
 class LibraryQueueStore {
   final Database _db;
   final bool historyFts;
   final bool localFts;
 
+  /// Whether the connection holds a current [sqlite.libraryShadowTable].
+  final bool shadowSnapshot;
+
   const LibraryQueueStore(
     this._db, {
     required this.historyFts,
     required this.localFts,
+    this.shadowSnapshot = false,
   });
+
+  /// The Library row is not shadowed by a downloaded History file.
+  String _notShadowedByHistory(String alias) =>
+      sqlite.libraryNotShadowedSql(alias, snapshot: shadowSnapshot);
 
   Future<QueueLibraryDbPage> trackPage(QueueLibraryDbQuery request) =>
       _queuePage(
@@ -590,7 +588,10 @@ class LibraryQueueStore {
         request.includeSingleTrackAlbums || assessesCompleteness ? 0 : 1;
     final completenessSql = assessesCompleteness
         ? albumCompletenessSql(
-            albumInventorySql(includeLocal: request.includeLocal),
+            albumInventorySql(
+              includeLocal: request.includeLocal,
+              shadowSnapshot: shadowSnapshot,
+            ),
           )
         : null;
     final completenessColumns = assessesCompleteness
@@ -863,7 +864,10 @@ class LibraryQueueStore {
       return;
     }
     final assessment = albumCompletenessSql(
-      albumInventorySql(includeLocal: request.includeLocal),
+      albumInventorySql(
+        includeLocal: request.includeLocal,
+        shadowSnapshot: shadowSnapshot,
+      ),
     );
     where.add(
       "$albumKey IN (SELECT album_key FROM ($assessment) WHERE album_completeness = '$status')",

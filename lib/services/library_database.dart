@@ -50,6 +50,7 @@ class LibraryDatabase {
   // null means this database connection has not attempted FTS setup yet.
   // false is a completed capability/setup result and must not be retried.
   bool? _searchFtsAvailable;
+  final _shadow = sqlite.LibraryShadowSnapshot();
 
   LibraryDatabase._init();
 
@@ -137,18 +138,31 @@ class LibraryDatabase {
   }) async {
     final db = await database;
     await _ensureHistoryAttached(db);
-    return LibrarySearchStore(
+    return _shadowRead(
       db,
-      historyFts: HistoryDatabase.instance.searchFtsAvailable,
-      localFts: searchFtsAvailable,
-    ).search(
-      query: query,
-      kind: kind,
-      includeLocal: includeLocal,
-      limit: limit,
-      offset: offset,
+      includeLocal,
+      (snapshot) =>
+          LibrarySearchStore(
+            db,
+            historyFts: HistoryDatabase.instance.searchFtsAvailable,
+            localFts: searchFtsAvailable,
+            shadowSnapshot: snapshot,
+          ).search(
+            query: query,
+            kind: kind,
+            includeLocal: includeLocal,
+            limit: limit,
+            offset: offset,
+          ),
     );
   }
+
+  /// [includeLocal] reads scanned rows, which the shadow snapshot serves.
+  Future<T> _shadowRead<T>(
+    Database db,
+    bool includeLocal,
+    Future<T> Function(bool snapshot) read,
+  ) => includeLocal ? _shadow.read(db, read) : read(false);
 
   Future<void> _ensureHistoryAttached(Database db) async {
     if (_historyAttached) return;
@@ -391,39 +405,59 @@ class LibraryDatabase {
     return (await getQueueTrackPageResult(request)).rows;
   }
 
-  Future<LibraryQueueStore> _queueStore([QueueLibraryDbQuery? request]) async {
+  /// [sizes] fills file sizes first when it sorts by size.
+  Future<T> _queueRead<T>(
+    Future<T> Function(LibraryQueueStore store) read, {
+    required bool includeLocal,
+    QueueLibraryDbQuery? sizes,
+  }) async {
     final db = await database;
     await _ensureHistoryAttached(db);
-    if (request != null && isLibrarySizeSort(request.sortMode)) {
+    if (sizes != null && isLibrarySizeSort(sizes.sortMode)) {
       await (_fileSizes ??= LibraryFileSizes(db)).refresh(
-        includeLocal: request.includeLocal && request.source != 'downloaded',
-        includeHistory: request.source != 'local',
+        includeLocal: sizes.includeLocal && sizes.source != 'downloaded',
+        includeHistory: sizes.source != 'local',
       );
     }
-    return LibraryQueueStore(
+    return _shadowRead(
       db,
-      historyFts: HistoryDatabase.instance.searchFtsAvailable,
-      localFts: searchFtsAvailable,
+      includeLocal,
+      (snapshot) => read(
+        LibraryQueueStore(
+          db,
+          historyFts: HistoryDatabase.instance.searchFtsAvailable,
+          localFts: searchFtsAvailable,
+          shadowSnapshot: snapshot,
+        ),
+      ),
     );
   }
 
   Future<QueueLibraryDbPage> getQueueTrackPageResult(
     QueueLibraryDbQuery request,
-  ) async => (await _queueStore(request)).trackPage(request);
+  ) => _queueRead(
+    (store) => store.trackPage(request),
+    includeLocal: request.includeLocal,
+    sizes: request,
+  );
 
-  Future<QueueLibraryCounts> getQueueCounts(
-    QueueLibraryDbQuery request,
-  ) async => (await _queueStore()).counts(request);
+  Future<QueueLibraryCounts> getQueueCounts(QueueLibraryDbQuery request) =>
+      _queueRead(
+        (store) => store.counts(request),
+        includeLocal: request.includeLocal,
+      );
 
   /// Ids, paths and covers of every Library song, for the Folders index.
   Future<List<Map<String, Object?>>> getDirectoryEntries({
     required bool includeLocal,
-  }) async =>
-      (await _queueStore()).directoryEntries(includeLocal: includeLocal);
+  }) => _queueRead(
+    (store) => store.directoryEntries(includeLocal: includeLocal),
+    includeLocal: includeLocal,
+  );
 
   /// Paths and durations of every downloaded and scanned song.
-  Future<List<Map<String, Object?>>> getSongFiles() async =>
-      (await _queueStore()).songFiles();
+  Future<List<Map<String, Object?>>> getSongFiles() =>
+      _queueRead((store) => store.songFiles(), includeLocal: true);
 
   /// One page of every downloaded and scanned song's metadata, for the
   /// Home mixes.
@@ -431,10 +465,13 @@ class LibraryDatabase {
     required bool includeLocal,
     required int limit,
     required int offset,
-  }) async => (await _queueStore()).mixSongs(
+  }) => _queueRead(
+    (store) => store.mixSongs(
+      includeLocal: includeLocal,
+      limit: limit,
+      offset: offset,
+    ),
     includeLocal: includeLocal,
-    limit: limit,
-    offset: offset,
   );
 
   @visibleForTesting
@@ -446,12 +483,19 @@ class LibraryDatabase {
 
   Future<QueueLibraryDbPage> getQueueAlbumPageResult(
     QueueLibraryDbQuery request,
-  ) async => (await _queueStore(request)).albumPage(request);
+  ) => _queueRead(
+    (store) => store.albumPage(request),
+    includeLocal: request.includeLocal,
+    sizes: request,
+  );
 
   /// Album artists across downloaded and scanned music, excluding duplicate paths.
   Future<List<Map<String, dynamic>>> getQueueArtistPage(
     QueueLibraryDbQuery request,
-  ) async => (await _queueStore()).artistPage(request);
+  ) => _queueRead(
+    (store) => store.artistPage(request),
+    includeLocal: request.includeLocal,
+  );
 
   Future<List<Map<String, dynamic>>> getQueueLocalAlbumTracks(
     String albumName,

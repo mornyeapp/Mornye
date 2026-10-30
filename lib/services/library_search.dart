@@ -1,4 +1,6 @@
 import 'package:sqflite/sqflite.dart';
+import 'package:mornye/services/sqlite_helpers.dart'
+    show libraryNotShadowedSql, libraryShadowTable;
 
 enum LibrarySearchKind { songs, albums, artists, playlists }
 
@@ -112,11 +114,15 @@ class LibrarySearchStore {
     this.db, {
     required this.historyFts,
     required this.localFts,
+    this.shadowSnapshot = false,
   });
 
   final DatabaseExecutor db;
   final bool historyFts;
   final bool localFts;
+
+  /// Whether the connection holds a current [libraryShadowTable].
+  final bool shadowSnapshot;
 
   Future<List<LibrarySearchHit>> search({
     required String query,
@@ -137,12 +143,7 @@ class LibrarySearchStore {
       final album = local ? 'album_name_norm' : 'sort_album';
       final title = local ? 'track_name_norm' : 'sort_track';
       final where = <String>[
-        if (local)
-          '''NOT EXISTS (
-            SELECT 1 FROM library_path_keys lpk
-            JOIN history_db.history_path_keys hpk ON hpk.path_key = lpk.path_key
-            WHERE lpk.item_id = l.id
-          )''',
+        if (local) libraryNotShadowedSql('l', snapshot: shadowSnapshot),
       ];
       final column = switch (kind) {
         LibrarySearchKind.songs => '$alias.search_text',

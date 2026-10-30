@@ -4,7 +4,13 @@ import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:mornye/models/library_database_models.dart';
+import 'package:mornye/services/album_completeness.dart';
 import 'package:mornye/services/library_queue_store.dart';
+import 'package:mornye/services/sqlite_helpers.dart' as sqlite;
+
+// Whitespace outside literals is insignificant, and no literal in the queue
+// SQL contains a whitespace run.
+String _normalized(String sql) => sql.replaceAll(RegExp(r'\s+'), ' ').trim();
 
 /// Records every query and returns no rows, so the generated SQL can be pinned
 /// without a database.
@@ -16,10 +22,7 @@ class _RecordingDatabase implements Database {
     String sql, [
     List<Object?>? arguments,
   ]) async {
-    // Whitespace outside literals is insignificant, and no literal in the
-    // queue SQL contains a whitespace run.
-    final normalized = sql.replaceAll(RegExp(r'\s+'), ' ').trim();
-    queries.add('$normalized\n${jsonEncode(arguments)}');
+    queries.add('${_normalized(sql)}\n${jsonEncode(arguments)}');
     return const [];
   }
 
@@ -277,6 +280,22 @@ const _expectedDigests = <String, String>{
       'b226159a52ced0eb1302c3abccb51ca0af82d59fbc741dce502918bc53c6d40d',
 };
 
+/// Each shadow check of the snapshot SQL, with the row check it replaces.
+final _rowChecks = {
+  for (final includeLocal in [true, false])
+    _normalized(
+      albumInventorySql(includeLocal: includeLocal, shadowSnapshot: true),
+    ): _normalized(
+      albumInventorySql(includeLocal: includeLocal),
+    ),
+  for (final alias in ['l', 'candidate'])
+    _normalized(sqlite.libraryNotShadowedSql(alias, snapshot: true)):
+        _normalized(sqlite.libraryNotShadowedSql(alias)),
+};
+final _snapshotSql = <String>[];
+
+/// Also issues the shadow-snapshot SQL, which must equal the pinned SQL once
+/// each shadow check is put back to its row check.
 Future<String> _digest(
   Future<void> Function(LibraryQueueStore store) issue,
 ) async {
@@ -285,6 +304,23 @@ Future<String> _digest(
     final db = _RecordingDatabase();
     await issue(LibraryQueueStore(db, historyFts: fts, localFts: fts));
     queries.addAll(db.queries);
+    final snapshot = _RecordingDatabase();
+    await issue(
+      LibraryQueueStore(
+        snapshot,
+        historyFts: fts,
+        localFts: fts,
+        shadowSnapshot: true,
+      ),
+    );
+    _snapshotSql.addAll(snapshot.queries);
+    expect([
+      for (final sql in snapshot.queries)
+        _rowChecks.entries.fold(
+          sql,
+          (sql, check) => sql.replaceAll(check.key, check.value),
+        ),
+    ], db.queries);
   }
   return sha256.convert(utf8.encode(queries.join('\n---\n'))).toString();
 }
@@ -337,6 +373,15 @@ void main() {
         reason: 'Changed SQL digests:\n${mismatches.join('\n')}',
       );
       expect(_expectedDigests.keys, unorderedEquals(actual.keys));
+      // No snapshot query probes a row's path keys against History.
+      expect(
+        _snapshotSql.where((sql) => sql.contains('history_path_keys')),
+        isEmpty,
+      );
+      expect(
+        _snapshotSql.where((sql) => sql.contains('library_shadowed')),
+        isNotEmpty,
+      );
     },
   );
 }

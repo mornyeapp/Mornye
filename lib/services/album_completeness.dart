@@ -1,3 +1,6 @@
+import 'package:mornye/services/sqlite_helpers.dart'
+    show libraryNotShadowedSql, libraryShadowTable;
+
 const incompleteAlbumFilter = 'incomplete-album';
 const unknownAlbumCompletenessFilter = 'unknown-album-completeness';
 
@@ -6,19 +9,34 @@ bool isAlbumCompletenessFilter(String? filter) =>
 
 /// Combine downloaded and scanned music without counting the same stored file
 /// twice. Retained rows on disconnected sources make the assessment unknown.
-String albumInventorySql({required bool includeLocal}) {
+/// [shadowSnapshot] reads the stored-file matches from [libraryShadowTable].
+String albumInventorySql({
+  required bool includeLocal,
+  bool shadowSnapshot = false,
+}) {
   const sameStoredFile = '''
     SELECT 1 FROM library_path_keys lpk
     JOIN history_db.history_path_keys hpk ON hpk.path_key = lpk.path_key
     WHERE lpk.item_id = l.id
   ''';
-  final historyUnavailable = includeLocal
+  final historyUnavailable = !includeLocal
+      ? '0'
+      : shadowSnapshot
       ? '''EXISTS (
+          SELECT 1 FROM $libraryShadowTable shadow
+          JOIN library l ON l.id = shadow.item_id
+          JOIN library_sources source ON source.id = l.source_id
+          WHERE shadow.history_id = h.id
+            AND source.enabled = 1 AND source.available = 0
+        )'''
+      : '''EXISTS (
           SELECT 1 FROM library l JOIN library_sources source ON source.id = l.source_id
           WHERE source.enabled = 1 AND source.available = 0
             AND EXISTS ($sameStoredFile AND hpk.item_id = h.id)
-        )'''
-      : '0';
+        )''';
+  final notShadowed = shadowSnapshot
+      ? libraryNotShadowedSql('l', snapshot: true)
+      : 'NOT EXISTS ($sameStoredFile)';
   return '''
     SELECT h.album_key, LOWER(TRIM(h.track_name)) AS title,
       h.track_number, h.total_tracks, h.disc_number, h.total_discs,
@@ -30,7 +48,7 @@ String albumInventorySql({required bool includeLocal}) {
       l.track_number, l.total_tracks, l.disc_number, l.total_discs,
       CASE WHEN source.available = 0 THEN 1 ELSE 0 END AS unavailable
     FROM library l LEFT JOIN library_sources source ON source.id = l.source_id
-    WHERE COALESCE(source.enabled, 1) = 1 AND NOT EXISTS ($sameStoredFile)
+    WHERE COALESCE(source.enabled, 1) = 1 AND $notShadowed
     ''' : ''}
   ''';
 }

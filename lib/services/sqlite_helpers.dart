@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:mornye/utils/desktop_platform.dart';
@@ -500,4 +501,179 @@ void putPathKeysInBatch(
       'path_key': key,
     }, conflictAlgorithm: ConflictAlgorithm.ignore);
   }
+}
+
+/// Reads, in one call, values that change after any write [db] can see in
+/// [schemas]: each schema's `PRAGMA data_version` moves when another
+/// connection commits, and `total_changes()` counts every row this
+/// connection writes, raw writes outside its repository included. Equal
+/// stamps from one connection mean nothing was written in between. Null when
+/// the platform returns no stamp.
+Future<String?> readWriteStamp(Database db, List<String> schemas) async {
+  final batch = db.batch();
+  for (final schema in schemas) {
+    batch.rawQuery('PRAGMA $schema.data_version');
+  }
+  batch.rawQuery('SELECT total_changes()');
+  try {
+    return _writeStamp(await batch.apply(), [
+      for (var index = 0; index <= schemas.length; index++) index,
+    ]);
+  } catch (error) {
+    _log.w('Could not read the database write stamp: $error');
+    return null;
+  }
+}
+
+String? _writeStamp(List<Object?> results, List<int> indexes) {
+  final values = <int>[];
+  for (final index in indexes) {
+    final rows = index < results.length ? results[index] : null;
+    final value = rows is List && rows.isNotEmpty && rows.first is Map
+        ? (rows.first as Map).values.firstOrNull
+        : null;
+    if (value is! int) return null;
+    values.add(value);
+  }
+  return values.join(':');
+}
+
+/// TEMP pairs of a Library row and the History row whose path keys match it:
+/// the scanned files a download already holds. [LibraryShadowSnapshot]
+/// keeps it on the Library connection.
+const libraryShadowTable = 'temp.library_shadowed';
+
+/// The Library row [alias] is not shadowed by a downloaded History file.
+/// [snapshot] reads [libraryShadowTable] instead of probing every path key
+/// of the row; both select the same rows.
+String libraryNotShadowedSql(String alias, {bool snapshot = false}) => snapshot
+    ? '''
+  NOT EXISTS (
+    SELECT 1 FROM $libraryShadowTable shadow WHERE shadow.item_id = $alias.id
+  )'''
+    : '''
+  NOT EXISTS (
+    SELECT 1
+    FROM library_path_keys lpk
+    JOIN history_db.history_path_keys hpk ON hpk.path_key = lpk.path_key
+    WHERE lpk.item_id = $alias.id
+  )''';
+
+/// Keeps [libraryShadowTable] on one Library connection with history_db
+/// attached, rebuilt only after a write that could change it. The stamp sees
+/// every writer: a commit by another connection (HistoryDatabase, Android's
+/// native history store, a Rust restore) moves the `PRAGMA data_version` of
+/// its schema, and this connection's own writes, raw ones included, move
+/// `total_changes()`. A rebuild is one batch call, so nothing else on the
+/// connection runs inside it, and reads that counter after its statements.
+class LibraryShadowSnapshot {
+  static const _schemas = ['main', 'history_db'];
+
+  Database? _db;
+  String? _stamp;
+  Future<String?>? _building;
+  int _rebuilds = 0;
+
+  @visibleForTesting
+  int get rebuilds => _rebuilds;
+
+  /// The stamp of a current [libraryShadowTable], or null to keep the
+  /// per-row check, as when the platform returns no stamp.
+  Future<String?> refresh(Database db) async {
+    // A rebuild in flight may have read the files before the caller's write.
+    final building = _building;
+    if (building != null) await building;
+    final stamp = await readWriteStamp(db, _schemas);
+    if (stamp == null) return null;
+    if (identical(db, _db) && stamp == _stamp) return stamp;
+    return _building ??= _rebuild(db).whenComplete(() => _building = null);
+  }
+
+  /// Runs [query] on [libraryShadowTable] when the table stays current
+  /// until [query] has finished. Otherwise, as after a write between the
+  /// two, its rows and the table could be from different states, so
+  /// [query] runs again with the per-row check.
+  Future<T> read<T>(
+    Database db,
+    Future<T> Function(bool snapshot) query,
+  ) async {
+    final stamp = await refresh(db);
+    if (stamp == null) return query(false);
+    try {
+      final result = await query(true);
+      if (await readWriteStamp(db, _schemas) == stamp) return result;
+    } on DatabaseException {
+      // A failed rebuild can leave no table; the row check needs none.
+    }
+    return query(false);
+  }
+
+  Future<String?> _rebuild(Database db) async {
+    _db = null;
+    _stamp = null;
+    try {
+      final sizes = (await db.rawQuery(
+        'SELECT (SELECT COUNT(*) FROM library) AS library_rows, '
+        '(SELECT COUNT(*) FROM history_db.history) AS history_rows',
+      )).first;
+      final libraryRows = (sizes['library_rows'] as num?)?.toInt() ?? 0;
+      final historyRows = (sizes['history_rows'] as num?)?.toInt() ?? 0;
+      // The pairs go to a staging table first, so a failed build leaves the
+      // previous snapshot in place for queries already issued.
+      final results =
+          await (db.batch()
+                ..rawQuery('PRAGMA main.data_version')
+                ..rawQuery('PRAGMA history_db.data_version')
+                ..execute('DROP TABLE IF EXISTS temp.library_shadowed_next')
+                ..execute(
+                  'CREATE TEMP TABLE library_shadowed_next AS '
+                  '${_shadowPairsSql(fromHistory: historyRows * 2 < libraryRows)}',
+                )
+                ..execute('DROP TABLE IF EXISTS $libraryShadowTable')
+                ..execute(
+                  'CREATE TEMP TABLE library_shadowed AS '
+                  'SELECT * FROM temp.library_shadowed_next',
+                )
+                ..execute('DROP TABLE temp.library_shadowed_next')
+                ..execute(
+                  'CREATE INDEX temp.library_shadowed_item '
+                  'ON library_shadowed(item_id)',
+                )
+                ..execute(
+                  'CREATE INDEX temp.library_shadowed_history '
+                  'ON library_shadowed(history_id)',
+                )
+                ..rawQuery('SELECT total_changes()'))
+              .apply();
+      _rebuilds++;
+      final stamp = _writeStamp(results, const [0, 1, 9]);
+      if (stamp == null) return null;
+      _db = db;
+      _stamp = stamp;
+      return stamp;
+    } catch (error) {
+      _log.w(
+        'Download shadow snapshot unavailable; using the row check: $error',
+      );
+      return null;
+    }
+  }
+
+  /// Distinct pairs, from the side that costs less: a key read from History
+  /// costs about twice one read from the Library, as it first collects the
+  /// matching Library ids.
+  static String _shadowPairsSql({required bool fromHistory}) => fromHistory
+      ? '''
+    SELECT DISTINCT lpk.item_id AS item_id, hpk.item_id AS history_id
+    FROM library_path_keys lpk
+    JOIN history_db.history_path_keys hpk ON hpk.path_key = lpk.path_key
+    WHERE lpk.item_id IN (
+      SELECT item_id FROM library_path_keys
+      WHERE path_key IN (SELECT path_key FROM history_db.history_path_keys)
+    )'''
+      : '''
+    SELECT DISTINCT lpk.item_id AS item_id, hpk.item_id AS history_id
+    FROM library_path_keys lpk
+    CROSS JOIN history_db.history_path_keys hpk
+      ON hpk.path_key = lpk.path_key''';
 }
