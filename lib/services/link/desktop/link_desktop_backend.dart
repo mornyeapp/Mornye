@@ -181,6 +181,10 @@ abstract interface class LinkDesktopBackend {
   /// Sends [message] to [deviceId], or to every connected phone.
   Future<int> send(Map<String, dynamic> message, {String? deviceId});
 
+  /// Whether each audio file of [paths] embeds a picture the server would
+  /// serve; null for one that is not a readable file.
+  Future<List<bool?>> embeddedPictures(List<String> paths);
+
   Stream<LinkRequestEvent> get requests;
   Stream<LinkMessageEvent> get messages;
   Stream<List<LinkClientInfo>> get clients;
@@ -281,6 +285,10 @@ class PlatformLinkDesktopBackend implements LinkDesktopBackend {
   @override
   Future<int> send(Map<String, dynamic> message, {String? deviceId}) =>
       PlatformBridge.linkSend(message, deviceId: deviceId);
+
+  @override
+  Future<List<bool?>> embeddedPictures(List<String> paths) =>
+      PlatformBridge.linkEmbeddedPictures(paths);
 
   @override
   Stream<LinkRequestEvent> get requests =>

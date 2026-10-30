@@ -41,6 +41,14 @@ class FakeLinkBackend implements LinkDesktopBackend {
   bool running = false;
   String? runningName;
 
+  /// Holds [setCatalog] and [stop] open while set.
+  Completer<void>? catalogGate;
+  Completer<void>? stopGate;
+
+  /// Whether each audio file embeds a picture; missing ones answer null.
+  Map<String, bool> pictures = {};
+  final probed = <List<String>>[];
+
   /// Where the server says phones' uploads land.
   String receivedDir = '';
   LinkPairingWindow pairingWindow = LinkPairingWindow(
@@ -103,6 +111,7 @@ class FakeLinkBackend implements LinkDesktopBackend {
   @override
   Future<void> stop() async {
     calls.add('stop');
+    await stopGate?.future;
     running = false;
   }
 
@@ -119,6 +128,7 @@ class FakeLinkBackend implements LinkDesktopBackend {
   @override
   Future<int> setCatalog(String path) async {
     calls.add('setCatalog');
+    await catalogGate?.future;
     catalogs.add(path);
     return catalogSongs;
   }
@@ -166,6 +176,12 @@ class FakeLinkBackend implements LinkDesktopBackend {
   Future<int> send(Map<String, dynamic> message, {String? deviceId}) async {
     sent.add((message: message, deviceId: deviceId));
     return delivered;
+  }
+
+  @override
+  Future<List<bool?>> embeddedPictures(List<String> paths) async {
+    probed.add(paths);
+    return [for (final path in paths) pictures[path]];
   }
 
   @override
@@ -314,8 +330,8 @@ class FakeLinkCatalogExporter extends LinkCatalogExporter {
 
   List<LinkCatalogSong> songs;
 
-  /// The web covers each export reports its songs want.
-  Set<String> webCoverUrls = const {};
+  /// The songs with a web cover each export reports.
+  List<LinkWebCoverSong> webCoverSongs = const [];
   final exports = <({bool includeLocal, String serverId})>[];
 
   @override
@@ -328,7 +344,7 @@ class FakeLinkCatalogExporter extends LinkCatalogExporter {
       path: '${Directory.systemTemp.path}/fake-catalog.ndjson',
       count: songs.length,
       index: DesktopLinkCatalogIndex(serverId: serverId, songs: songs),
-      webCoverUrls: webCoverUrls,
+      webCoverSongs: webCoverSongs,
     );
   }
 }
@@ -337,7 +353,10 @@ class FakeLinkCatalogExporter extends LinkCatalogExporter {
 /// whether the server had a catalog then) and fires [added] on demand.
 class FakeLinkWebCovers extends LinkWebCovers {
   FakeLinkWebCovers({this.backend})
-    : super(folder: () async => Directory.systemTemp);
+    : super(
+        folder: () async => Directory.systemTemp,
+        probe: (paths) async => [for (final _ in paths) null],
+      );
 
   final FakeLinkBackend? backend;
   final calls = <String>[];
@@ -355,12 +374,18 @@ class FakeLinkWebCovers extends LinkWebCovers {
   Future<Map<String, String>> held() async => const {};
 
   @override
-  Future<void> prune(Set<String> urls) async =>
-      calls.add('prune:$_catalogs:${urls.join(',')}');
+  Future<Map<String, bool>> pictures() async => const {};
+
+  static String _urls(List<LinkWebCoverSong> songs) =>
+      songs.map((song) => song.url).join(',');
 
   @override
-  void fetch(Set<String> urls) =>
-      calls.add('fetch:$_catalogs:${urls.join(',')}');
+  Future<void> prune(List<LinkWebCoverSong> songs) async =>
+      calls.add('prune:$_catalogs:${_urls(songs)}');
+
+  @override
+  void fetch(List<LinkWebCoverSong> songs) =>
+      calls.add('fetch:$_catalogs:${_urls(songs)}');
 
   @override
   void stop() => calls.add('stop');

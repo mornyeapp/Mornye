@@ -381,6 +381,21 @@ class PlatformBridge {
     return (result['delivered'] as num?)?.toInt() ?? 0;
   }
 
+  /// Whether each audio file of [paths] embeds a picture the server would
+  /// serve; null for one that is not a readable file. Works while stopped.
+  static Future<List<bool?>> linkEmbeddedPictures(List<String> paths) async {
+    final result = _linkMap(
+      await _channel.invokeMethod('linkEmbeddedPictures', {'paths': paths}),
+    );
+    final pictures = result['pictures'];
+    return [
+      for (var i = 0; i < paths.length; i++)
+        pictures is List && i < pictures.length && pictures[i] is bool
+            ? pictures[i] as bool
+            : null,
+    ];
+  }
+
   /// Forwarded requests: `requestId`, `op`, `deviceId` and `args`.
   static Stream<Map<String, dynamic>> linkRequestEvents() =>
       _events(_linkRequestEvents);

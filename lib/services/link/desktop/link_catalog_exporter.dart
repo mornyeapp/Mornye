@@ -26,11 +26,13 @@ typedef LinkCatalogPageLoader =
     Future<QueueLibraryDbPage> Function(QueueLibraryDbQuery query);
 
 /// Maps one page of rows to NDJSON lines with the web covers held
-/// ([LinkWebCovers.held]); the default runs in an isolate.
+/// ([LinkWebCovers.held]) and the files known to embed a picture
+/// ([LinkWebCovers.pictures]); the default runs in an isolate.
 typedef LinkCatalogPageMapper =
     Future<LinkCatalogPage> Function(
       List<Map<String, dynamic>> rows,
       Map<String, String> webCovers,
+      Map<String, bool> pictures,
     );
 
 /// One page of exported songs.
@@ -39,7 +41,7 @@ class LinkCatalogPage {
     required this.bytes,
     required this.songs,
     required this.covers,
-    this.webCoverUrls = const {},
+    this.webCoverSongs = const [],
   });
 
   /// UTF-8 NDJSON, one line per song.
@@ -50,8 +52,8 @@ class LinkCatalogPage {
   /// local cover file, else its web cover URL, or null.
   final List<String?> covers;
 
-  /// The web covers of the songs in [songs] without a local cover file.
-  final Set<String> webCoverUrls;
+  /// The songs in [songs] without a local cover file but with a web cover.
+  final List<LinkWebCoverSong> webCoverSongs;
 }
 
 /// A finished export.
@@ -60,15 +62,16 @@ class LinkCatalogExport {
     required this.path,
     required this.count,
     required this.index,
-    this.webCoverUrls = const {},
+    this.webCoverSongs = const [],
   });
 
   final String path;
   final int count;
   final DesktopLinkCatalogIndex index;
 
-  /// The web covers the exported songs want kept in [LinkWebCovers].
-  final Set<String> webCoverUrls;
+  /// The exported songs without a local cover file but with a web cover,
+  /// for [LinkWebCovers].
+  final List<LinkWebCoverSong> webCoverSongs;
 }
 
 final _uriScheme = RegExp(r'^[a-zA-Z][a-zA-Z0-9+.-]*://');
@@ -130,19 +133,27 @@ String _basenameWithoutExtension(String path) {
   return dot > 0 ? name.substring(0, dot) : name;
 }
 
+/// [value] when the desktop fetches it as a web cover.
+String? _webCoverUrl(Object? value) {
+  final url = linkCoverUrl(value);
+  return url != null && isLinkWebCoverUrl(Uri.parse(url)) ? url : null;
+}
+
 /// Maps Library Songs rows (`{'source', 'item'}`) to catalog lines. Rows
 /// whose file is not a readable local file are left out. A song without a
-/// local cover file names its web cover's copy in [webCovers] (by
-/// [linkCoverUrlId]) when held. Runs in an isolate: it checks every file on
-/// disk.
+/// local cover file whose audio file is known to embed no picture
+/// ([pictures] by [linkPictureStamp]) names its web cover's copy in
+/// [webCovers] (by [linkCoverUrlId]) when held. Runs in an isolate: it
+/// checks every file on disk.
 LinkCatalogPage mapLinkCatalogRows(
   List<Map<String, dynamic>> rows, {
   Map<String, String> webCovers = const {},
+  Map<String, bool> pictures = const {},
 }) {
   final bytes = BytesBuilder(copy: false);
   final songs = <LinkCatalogSong>[];
   final covers = <String?>[];
-  final webCoverUrls = <String>{};
+  final webCoverSongs = <LinkWebCoverSong>[];
   final coverChecks = <String, bool>{};
   final webCoverPaths = <String, String?>{};
   bool isFile(String path) =>
@@ -186,13 +197,19 @@ LinkCatalogPage mapLinkCatalogRows(
             )
         ? coverCandidate
         : null;
-    final webCover = coverPath == null ? linkCoverUrl(item['coverUrl']) : null;
-    final webCoverPath = webCover == null
-        ? null
-        : webCoverPaths.putIfAbsent(
-            webCover,
-            () => webCovers[linkCoverUrlId(webCover)],
-          );
+    final webCover = coverPath == null ? _webCoverUrl(item['coverUrl']) : null;
+    String? webCoverPath;
+    if (webCover != null) {
+      final stamp = linkPictureStamp(path, stat);
+      webCoverSongs.add((path: path, stamp: stamp, url: webCover));
+      // A picture in the file comes first; the web copy only stands in.
+      if (pictures[stamp] == false) {
+        webCoverPath = webCoverPaths.putIfAbsent(
+          webCover,
+          () => webCovers[linkCoverUrlId(webCover)],
+        );
+      }
+    }
     final year = _year.firstMatch('${item['releaseDate'] ?? ''}')?.group(1);
     final song = LinkCatalogSong(
       id: prefix(recordId),
@@ -244,7 +261,6 @@ LinkCatalogPage mapLinkCatalogRows(
       ..add(utf8.encode(jsonEncode(line)))
       ..addByte(0x0A);
     songs.add(song);
-    if (webCover != null) webCoverUrls.add(webCover);
     // The desktop player shows the web cover itself, not the Link copy.
     covers.add(coverPath ?? _webUrl(item['coverUrl']));
   }
@@ -252,18 +268,19 @@ LinkCatalogPage mapLinkCatalogRows(
     bytes: bytes.takeBytes(),
     songs: songs,
     covers: covers,
-    webCoverUrls: webCoverUrls,
+    webCoverSongs: webCoverSongs,
   );
 }
 
 LinkCatalogPage _mapMessage(
-  (List<Map<String, dynamic>>, Map<String, String>) page,
-) => mapLinkCatalogRows(page.$1, webCovers: page.$2);
+  (List<Map<String, dynamic>>, Map<String, String>, Map<String, bool>) page,
+) => mapLinkCatalogRows(page.$1, webCovers: page.$2, pictures: page.$3);
 
 Future<LinkCatalogPage> _mapInIsolate(
   List<Map<String, dynamic>> rows,
   Map<String, String> webCovers,
-) => compute(_mapMessage, (rows, webCovers));
+  Map<String, bool> pictures,
+) => compute(_mapMessage, (rows, webCovers, pictures));
 
 Future<Directory> _defaultDirectory() async =>
     Directory('${(await getTemporaryDirectory()).path}/mornye-link');
@@ -282,6 +299,7 @@ class LinkCatalogExporter {
     Future<Directory> Function()? directory,
     int Function()? nowMs,
     Future<Map<String, String>> Function()? webCovers,
+    Future<Map<String, bool>> Function()? pictures,
     this.pageSize = 1000,
   }) : _loadPage =
            loadPage ??
@@ -289,13 +307,15 @@ class LinkCatalogExporter {
        _mapPage = mapPage ?? _mapInIsolate,
        _directory = directory ?? _defaultDirectory,
        _nowMs = nowMs ?? (() => DateTime.now().millisecondsSinceEpoch),
-       _webCovers = webCovers ?? (() async => const {});
+       _webCovers = webCovers ?? (() async => const {}),
+       _pictures = pictures ?? (() async => const {});
 
   final LinkCatalogPageLoader _loadPage;
   final LinkCatalogPageMapper _mapPage;
   final Future<Directory> Function() _directory;
   final int Function() _nowMs;
   final Future<Map<String, String>> Function() _webCovers;
+  final Future<Map<String, bool>> Function() _pictures;
   final int pageSize;
 
   static Uint8List _header(int generatedMs, int count) {
@@ -319,7 +339,8 @@ class LinkCatalogExporter {
     final builder = LinkCatalogIndexBuilder();
     final generatedMs = _nowMs();
     final webCovers = await _webCovers();
-    final webCoverUrls = <String>{};
+    final pictures = await _pictures();
+    final webCoverSongs = <LinkWebCoverSong>[];
     final file = await part.open(mode: FileMode.write);
     try {
       await file.writeFrom(_header(generatedMs, 0));
@@ -334,12 +355,12 @@ class LinkCatalogExporter {
           ),
         );
         if (page.rows.isNotEmpty) {
-          final mapped = await _mapPage(page.rows, webCovers);
+          final mapped = await _mapPage(page.rows, webCovers, pictures);
           if (mapped.bytes.isNotEmpty) await file.writeFrom(mapped.bytes);
           for (var i = 0; i < mapped.songs.length; i++) {
             builder.add(mapped.songs[i], cover: mapped.covers[i]);
           }
-          webCoverUrls.addAll(mapped.webCoverUrls);
+          webCoverSongs.addAll(mapped.webCoverSongs);
         }
         if (page.rows.length < pageSize) break;
         cursor = page.nextCursor;
@@ -354,12 +375,16 @@ class LinkCatalogExporter {
       path: target.path,
       count: builder.length,
       index: builder.build(serverId),
-      webCoverUrls: webCoverUrls,
+      webCoverSongs: webCoverSongs,
     );
   }
 }
 
 /// The catalog exporter the desktop host uses. Tests override it.
-final linkCatalogExporterProvider = Provider<LinkCatalogExporter>(
-  (ref) => LinkCatalogExporter(webCovers: ref.read(linkWebCoversProvider).held),
-);
+final linkCatalogExporterProvider = Provider<LinkCatalogExporter>((ref) {
+  final webCovers = ref.read(linkWebCoversProvider);
+  return LinkCatalogExporter(
+    webCovers: webCovers.held,
+    pictures: webCovers.pictures,
+  );
+});

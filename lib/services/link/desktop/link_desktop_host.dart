@@ -427,7 +427,6 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
   Future<void> _stop() async {
     _cancelApp();
     _cancelBackend();
-    _webCovers?.stop();
     _exportAgain = false;
     if (_serverStarted) {
       _serverStarted = false;
@@ -437,6 +436,8 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
         _log.w('Could not stop Mornye Link: $error');
       }
     }
+    // After the stop, so an export finishing meanwhile fetches nothing.
+    _webCovers?.stop();
     _index = null;
     _lastSentState = null;
     _localPlaying = false;
@@ -905,8 +906,8 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
       // The server reads this catalog now, so the covers it does not want
       // can go. The fetch runs in the background.
       if (_webCovers case final webCovers?) {
-        unawaited(webCovers.prune(export.webCoverUrls));
-        webCovers.fetch(export.webCoverUrls);
+        unawaited(webCovers.prune(export.webCoverSongs));
+        webCovers.fetch(export.webCoverSongs);
       }
       _index = export.index;
       ref.read(linkCatalogIndexProvider.notifier).set(export.index);

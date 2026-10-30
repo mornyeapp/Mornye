@@ -482,7 +482,7 @@ void main() {
   testWidgets('keeps the web covers the served catalog wants and exports '
       'again once they arrive', (tester) async {
     const url = 'https://example.com/a.jpg';
-    exporter.webCoverUrls = {url};
+    exporter.webCoverSongs = const [(path: '/a.flac', stamp: 'a', url: url)];
     await boot(tester);
     // Both after the server took the first catalog.
     expect(webCovers.calls, ['prune:1:$url', 'fetch:1:$url']);
@@ -501,6 +501,31 @@ void main() {
     webCovers.arrive();
     await tester.pump(const Duration(seconds: 11));
     expect(exporter.exports, hasLength(2));
+    await shutdown(tester);
+  });
+
+  testWidgets('fetches no web covers once Link is turned off during an '
+      'export', (tester) async {
+    const url = 'https://example.com/a.jpg';
+    exporter.webCoverSongs = const [(path: '/a.flac', stamp: 'a', url: url)];
+    await boot(tester);
+    backend.catalogGate = Completer();
+    backend.stopGate = Completer();
+    unawaited(host().exportCatalog());
+    await flush(tester);
+    expect(backend.calls.last, 'setCatalog');
+
+    unawaited(host().setEnabled(false));
+    await flush(tester);
+    expect(backend.calls.last, 'stop');
+    // The server takes the catalog while it stops.
+    backend.catalogGate!.complete();
+    await flush(tester);
+    backend.stopGate!.complete();
+    await flush(tester);
+
+    expect(hostState().running, isFalse);
+    expect(webCovers.calls.last, 'stop');
     await shutdown(tester);
   });
 

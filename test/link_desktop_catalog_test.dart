@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/models/library_database_models.dart';
 import 'package:mornye/services/link/desktop/link_catalog_exporter.dart';
+import 'package:mornye/services/link/desktop/link_web_covers.dart';
 import 'package:mornye/services/link/link_protocol.dart';
 
 void main() {
@@ -150,14 +151,28 @@ void main() {
     expect(second['suffix'], 'mp3');
     expect(second['albumKey'], isNull);
     expect(second['coverPath'], isNull, reason: 'no copy is held yet');
-    expect(page.webCoverUrls, {'https://example.com/cover.jpg'});
+    expect(page.webCoverSongs, [
+      (
+        path: download,
+        stamp: linkPictureStamp(download, FileStat.statSync(download)),
+        url: 'https://example.com/cover.jpg',
+      ),
+    ]);
   });
 
   group('web covers', () {
     const webUrl = 'https://example.com/album.jpg';
     late String held;
+    late String unknown;
 
-    setUp(() => held = '${temp.path}/${linkCoverUrlId(webUrl)}.jpg');
+    String stamp(String path) =>
+        linkPictureStamp(path, FileStat.statSync(path));
+
+    setUp(() {
+      held = '${temp.path}/${linkCoverUrlId(webUrl)}.jpg';
+      unknown = '${temp.path}/Three.m4a';
+      File(unknown).writeAsBytesSync(List.filled(16, 3));
+    });
 
     Map<String, dynamic> downloaded(
       String id, {
@@ -174,31 +189,53 @@ void main() {
       },
     };
 
-    test('a song with only a web cover names the copy held', () {
+    List<Object?> coverPaths(LinkCatalogPage page) => const LineSplitter()
+        .convert(utf8.decode(page.bytes))
+        .map((line) => (jsonDecode(line) as Map)['coverPath'])
+        .toList();
+
+    test('only a song whose file has no picture names the copy held', () {
       final page = mapLinkCatalogRows(
         [
-          downloaded('web', coverUrl: webUrl),
-          downloaded('again', coverUrl: webUrl, file: song),
+          downloaded('bare', coverUrl: webUrl),
+          // The same address, but the file embeds its own picture.
+          downloaded('embeds', coverUrl: webUrl, file: song),
+          downloaded('unknown', coverUrl: webUrl, file: unknown),
           downloaded('plain', coverUrl: 'http://example.com/plain.jpg'),
           downloaded('none'),
         ],
         webCovers: {linkCoverUrlId(webUrl): held},
+        pictures: {stamp(download): false, stamp(song): true},
       );
-      final lines = const LineSplitter()
-          .convert(utf8.decode(page.bytes))
-          .map((line) => jsonDecode(line) as Map<String, dynamic>)
-          .toList();
 
-      expect(lines.map((line) => line['coverPath']), [held, held, null, null]);
-      // Only https covers are fetched.
-      expect(page.webCoverUrls, {webUrl});
+      expect(coverPaths(page), [held, null, null, null, null]);
+      // Every https cover is reported, so the store can ask about its file.
+      expect(page.webCoverSongs, [
+        (path: download, stamp: stamp(download), url: webUrl),
+        (path: song, stamp: stamp(song), url: webUrl),
+        (path: unknown, stamp: stamp(unknown), url: webUrl),
+      ]);
       // The desktop player keeps showing the web cover itself.
       expect(page.covers, [
+        webUrl,
         webUrl,
         webUrl,
         'http://example.com/plain.jpg',
         null,
       ]);
+    });
+
+    test('a changed file is asked about again', () {
+      final before = stamp(download);
+      File(download).writeAsBytesSync(List.filled(48, 2));
+      final page = mapLinkCatalogRows(
+        [downloaded('bare', coverUrl: webUrl)],
+        webCovers: {linkCoverUrlId(webUrl): held},
+        pictures: {before: false},
+      );
+
+      expect(coverPaths(page), [null]);
+      expect(page.webCoverSongs.single.stamp, isNot(before));
     });
 
     test('a local cover file is kept and wants no web cover', () {
@@ -208,26 +245,45 @@ void main() {
           downloaded('2', coverUrl: cover),
         ],
         webCovers: {linkCoverUrlId(webUrl): held},
+        pictures: {stamp(song): false, stamp(download): false},
       );
-      final lines = const LineSplitter()
-          .convert(utf8.decode(page.bytes))
-          .map((line) => jsonDecode(line) as Map<String, dynamic>)
-          .toList();
 
-      expect(lines.map((line) => line['coverPath']), [cover, cover]);
-      expect(page.webCoverUrls, isEmpty);
+      expect(coverPaths(page), [cover, cover]);
+      expect(page.webCoverSongs, isEmpty);
       expect(page.covers, [cover, cover]);
+    });
+
+    test('a web cover on a local or private address is not fetched', () {
+      const urls = [
+        'https://localhost/a.jpg',
+        'https://127.0.0.1/a.jpg',
+        'https://192.168.1.2/a.jpg',
+        'https://[::1]/a.jpg',
+      ];
+      final page = mapLinkCatalogRows(
+        [for (final url in urls) downloaded(url, coverUrl: url)],
+        pictures: {stamp(download): false},
+      );
+
+      expect(coverPaths(page), List.filled(urls.length, null));
+      expect(page.webCoverSongs, isEmpty);
+      expect(page.covers, urls, reason: 'the desktop player keeps them');
     });
 
     test('an export names the copies held when it starts', () async {
       var listed = 0;
+      var asked = 0;
       final exporter = LinkCatalogExporter(
         directory: () async => Directory('${temp.path}/out'),
-        mapPage: (rows, webCovers) async =>
-            mapLinkCatalogRows(rows, webCovers: webCovers),
+        mapPage: (rows, webCovers, pictures) async =>
+            mapLinkCatalogRows(rows, webCovers: webCovers, pictures: pictures),
         webCovers: () async {
           listed++;
           return {linkCoverUrlId(webUrl): held};
+        },
+        pictures: () async {
+          asked++;
+          return {stamp(download): false, stamp(song): true};
         },
         pageSize: 1,
         loadPage: (query) async => QueueLibraryDbPage(
@@ -241,13 +297,13 @@ void main() {
 
       final export = await exporter.export(includeLocal: true, serverId: 's');
 
-      expect(listed, 1, reason: 'one listing for every page');
+      expect((listed, asked), (1, 1), reason: 'once for every page');
       final lines = File(export.path).readAsLinesSync().skip(1);
       expect(lines.map((line) => (jsonDecode(line) as Map)['coverPath']), [
         held,
-        held,
+        null,
       ]);
-      expect(export.webCoverUrls, {webUrl});
+      expect(export.webCoverSongs.map((song) => song.path), [download, song]);
       expect(export.index.coverFor('d:a'), webUrl);
     });
   });
@@ -259,8 +315,8 @@ void main() {
       pageSize: 3,
       nowMs: () => 1700000000000,
       directory: () async => Directory('${temp.path}/out'),
-      mapPage: (rows, webCovers) async =>
-          mapLinkCatalogRows(rows, webCovers: webCovers),
+      mapPage: (rows, webCovers, pictures) async =>
+          mapLinkCatalogRows(rows, webCovers: webCovers, pictures: pictures),
       loadPage: (query) async {
         queries.add(query);
         final page = all.skip(query.offset).take(query.limit).toList();
@@ -302,8 +358,8 @@ void main() {
     final exporter = LinkCatalogExporter(
       nowMs: () => 5,
       directory: () async => Directory('${temp.path}/empty'),
-      mapPage: (rows, webCovers) async =>
-          mapLinkCatalogRows(rows, webCovers: webCovers),
+      mapPage: (rows, webCovers, pictures) async =>
+          mapLinkCatalogRows(rows, webCovers: webCovers, pictures: pictures),
       loadPage: (_) async =>
           const QueueLibraryDbPage(rows: [], nextCursor: null),
     );
