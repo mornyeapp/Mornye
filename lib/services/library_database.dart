@@ -51,6 +51,7 @@ class LibraryDatabase {
   // false is a completed capability/setup result and must not be retried.
   bool? _searchFtsAvailable;
   final _shadow = sqlite.LibraryShadowSnapshot();
+  ({Database db, String stamp, LocalLibraryLookupIndex index})? _lookupIndex;
 
   LibraryDatabase._init();
 
@@ -681,8 +682,18 @@ class LibraryDatabase {
         .toList(growable: false);
   }
 
+  /// Unchanged after a summary refresh that wrote nothing, such as a reload,
+  /// so it skips copying every ISRC and match key to Dart again.
   Future<LocalLibraryLookupIndex> getLookupIndex() async {
     final db = await database;
+    final stamp = await sqlite.readWriteStamp(db, const ['main']);
+    final cached = _lookupIndex;
+    if (stamp != null &&
+        cached != null &&
+        identical(cached.db, db) &&
+        cached.stamp == stamp) {
+      return cached.index;
+    }
     final rows = await db.rawQuery('''
       SELECT summary.kind, summary.value
       FROM $lookupSummaryTable summary
@@ -701,10 +712,12 @@ class LibraryDatabase {
         matchKeys.add(value);
       }
     }
-    return LocalLibraryLookupIndex(
+    final index = LocalLibraryLookupIndex(
       isrcs: Set<String>.unmodifiable(isrcs),
       matchKeys: Set<String>.unmodifiable(matchKeys),
     );
+    _lookupIndex = stamp == null ? null : (db: db, stamp: stamp, index: index);
+    return index;
   }
 
   /// Physical copies sharing one ISRC, excluding inactive NAS sources and
@@ -941,6 +954,7 @@ class LibraryDatabase {
     _historyAttached = false;
     _fileSizes = null;
     _searchFtsAvailable = null;
+    _lookupIndex = null;
   }
 
   Future<Map<String, int>> getFileModTimes({String? sourceId}) async {

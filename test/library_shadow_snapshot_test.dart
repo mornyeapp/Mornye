@@ -686,6 +686,48 @@ void main() {
     expect(await snapshot.read(memory, (snap) async => snap), isFalse);
     expect(snapshot.rebuilds, 0);
   });
+
+  test('the lookup index is reused until the Library changes', () async {
+    await _seed();
+    final library = LibraryDatabase.instance;
+    final first = await library.getLookupIndex();
+    expect(first.isrcs, containsAll(['ISRC01', 'ISRC31']));
+    expect(identical(await library.getLookupIndex(), first), isTrue);
+
+    // Downloads, reads and snapshot rebuilds leave the Library unchanged.
+    await HistoryDatabase.instance.upsert(
+      _download('h-new', _saf(4, 1), album: 4, number: 1),
+    );
+    await library.getQueueCounts(const QueueLibraryDbQuery());
+    expect(identical(await library.getLookupIndex(), first), isTrue);
+
+    // 'ISRC01' is scanned in the music source, 'ISRC31' in the legacy one.
+    await library.updateSourceState('music', enabled: false);
+    final disabled = await library.getLookupIndex();
+    expect(disabled.isrcs, isNot(contains('ISRC01')));
+    expect(disabled.isrcs, contains('ISRC31'));
+    await library.updateSourceState('music', enabled: true);
+    expect((await library.getLookupIndex()).isrcs, contains('ISRC01'));
+
+    final other = await _connection(p.join(root.path, 'local_library.db'));
+    addTearDown(other.close);
+    await _addScanned(
+      other,
+      _scanned('l-other', '/Users/me/Music/Other/1.flac', album: 30, number: 1),
+    );
+    expect((await library.getLookupIndex()).isrcs, contains('ISRC301'));
+
+    await _addScanned(
+      await library.database,
+      _scanned('l-raw', '/Users/me/Music/Raw/1.flac', album: 31, number: 1),
+    );
+    final raw = await library.getLookupIndex();
+    expect(raw.isrcs, contains('ISRC311'));
+    expect(identical(await library.getLookupIndex(), raw), isTrue);
+
+    await library.close();
+    expect(identical(await library.getLookupIndex(), raw), isFalse);
+  });
 }
 
 /// A platform whose batch calls return no results, as a mocked channel does.
