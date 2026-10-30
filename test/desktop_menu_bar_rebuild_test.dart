@@ -12,6 +12,7 @@ import 'package:mornye/services/app_navigation_service.dart';
 import 'package:mornye/services/shell_navigation_service.dart';
 import 'package:mornye/theme/app_theme.dart';
 import 'package:mornye/utils/desktop_platform.dart';
+import 'package:mornye/widgets/app_snack_bar.dart';
 import 'package:mornye/widgets/desktop/desktop_player_bar.dart';
 import 'package:mornye/widgets/desktop/desktop_shortcuts.dart';
 import 'package:mornye/widgets/desktop/desktop_window.dart';
@@ -261,6 +262,33 @@ void main() {
     },
     variant: _macOS,
   );
+
+  testWidgets('resizes reuse the app fade and still fade at the rail', (
+    tester,
+  ) async {
+    await pumpApp(tester);
+    Animation<double> fade() => tester
+        .widget<FadeTransition>(
+          find
+              .ancestor(
+                of: find.byType(AppScaffoldMessenger),
+                matching: find.byType(FadeTransition),
+              )
+              .first,
+        )
+        .opacity;
+    final opacity = fade();
+
+    await resize(tester);
+    expect(fade(), same(opacity));
+
+    tester.view.physicalSize = const Size(1500, 800);
+    await tester.pump();
+    expect(fade(), same(opacity));
+    expect(opacity.value, lessThan(1));
+    await tester.pumpAndSettle();
+    expect(opacity.value, 1);
+  });
 
   testWidgets(
     'Windows and Linux keep their key bindings across resizes',

@@ -131,6 +131,10 @@ class _OrientationFadeState extends State<_OrientationFade>
     duration: const Duration(milliseconds: 300),
     value: 1,
   );
+  late final _opacity = CurvedAnimation(
+    parent: _controller,
+    curve: Curves.easeOut,
+  );
   Orientation? _lastOrientation;
   double? _lastWidth;
 
@@ -154,16 +158,14 @@ class _OrientationFadeState extends State<_OrientationFade>
 
   @override
   void dispose() {
+    _opacity.dispose();
     _controller.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return FadeTransition(
-      opacity: CurvedAnimation(parent: _controller, curve: Curves.easeOut),
-      child: widget.child,
-    );
+    return FadeTransition(opacity: _opacity, child: widget.child);
   }
 }
 
