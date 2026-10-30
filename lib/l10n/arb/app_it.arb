@@ -1,8 +1,8 @@
 {
   "trackBpm": "BPM",
-  "trackMood": "Mood",
-  "subsonicAddToLibrary": "Add server to Library",
-  "subsonicLibraryAdded": "Server added to Library",
+  "trackMood": "Umore",
+  "subsonicAddToLibrary": "Aggiungi server alla Libreria",
+  "subsonicLibraryAdded": "Server aggiunto alla Libreria",
   "subsonicLibraryDescription": "Sync the server catalogue and artwork to Library. Music stays on your server. Rescan it in Local Library settings to update the catalogue.",
   "subsonicAuthentication": "Authentication",
   "subsonicToken": "Salted token",
