@@ -659,24 +659,9 @@ mod tests {
     fn padded_id3_cache_is_replaced_without_changing_the_audio() {
         let directory = tempfile::tempdir().unwrap();
         let data = directory.path().join("data");
-        let backend = Backend::new(
-            &directory.path().join("sources"),
-            &data,
-            "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
-            "1",
-            crate::RuntimeLimits::default(),
-        )
-        .unwrap();
+        let backend = backend(directory.path());
         let jpeg = b"\xff\xd8\xff\xe0";
-        let mut picture = b"\0image/jpeg\0\x03\0\0".to_vec();
-        picture.extend(jpeg);
-        let mut frame = b"APIC".to_vec();
-        frame.extend((picture.len() as u32).to_be_bytes());
-        frame.extend([0, 0]);
-        frame.extend(picture);
-        let mut audio = b"ID3\x03\0\0\0\0\0".to_vec();
-        audio.push(frame.len() as u8);
-        audio.extend(frame);
+        let audio = id3_audio(jpeg);
         let source = data.join("track.mp3");
         std::fs::write(&source, &audio).unwrap();
         let cache = data.join("covers");

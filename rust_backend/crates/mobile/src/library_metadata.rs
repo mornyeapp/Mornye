@@ -169,6 +169,59 @@ mod tests {
     }
 
     #[test]
+    fn document_scan_reuses_the_thumbnail_the_rust_scan_wrote() {
+        let directory = tempfile::tempdir().unwrap();
+        let data = directory.path().join("data");
+        let backend = mornye_extensions::backend::Backend::new(
+            &directory.path().join("sources"),
+            &data,
+            "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+            "1",
+            mornye_extensions::RuntimeLimits::default(),
+        )
+        .unwrap();
+        let mut picture = b"\0image/jpeg\0\x03\0\0".to_vec();
+        picture.extend(b"\xff\xd8\xff\xe0scan");
+        let mut frame = b"APIC".to_vec();
+        frame.extend((picture.len() as u32).to_be_bytes());
+        frame.extend([0, 0]);
+        frame.extend(picture);
+        let mut audio = b"ID3\x03\0\0\0\0\0".to_vec();
+        audio.push(frame.len() as u8);
+        audio.extend(frame);
+        let source = data.join("track.mp3");
+        std::fs::write(&source, audio).unwrap();
+        let covers = data.join("covers");
+        let key = "content://provider/document/track|1700000000000";
+        let written = backend
+            .save_cover_to_cache_with_hint_and_key(
+                source.to_str().unwrap(),
+                "",
+                covers.to_str().unwrap(),
+                key,
+                &|| Ok(()),
+            )
+            .unwrap();
+        let root = covers.to_str().unwrap().to_owned();
+        let found = library_cover_slot(root.clone(), key.into()).cached.unwrap();
+        assert_eq!(
+            std::fs::canonicalize(found).unwrap(),
+            std::fs::canonicalize(&written).unwrap()
+        );
+        // Of two current siblings, the newer one wins.
+        File::options()
+            .write(true)
+            .open(&written)
+            .unwrap()
+            .set_modified(SystemTime::now() - Duration::from_secs(60))
+            .unwrap();
+        let png = covers.join(format!("{}.png", library_cover_stem(key)));
+        std::fs::write(&png, b"newer").unwrap();
+        let cached = library_cover_slot(root, key.into()).cached;
+        assert_eq!(cached.as_deref(), png.to_str());
+    }
+
+    #[test]
     fn original_artwork_is_copied_without_decoding_or_changing_the_source() {
         // Extraction preserves even formats the thumbnail decoder cannot read.
         let artwork = b"original embedded image bytes";

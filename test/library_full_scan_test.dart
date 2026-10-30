@@ -91,7 +91,7 @@ void main() {
         ).writeAsString('other source');
         final marker = File('${oldCovers.path}/$libraryCoverRegenerateMarker');
         final coverDirectories = <String>[];
-        final markerTimes = <DateTime>[];
+        final markerStamps = <String>[];
         final resumed = <bool>[];
         messenger.setMockMethodCallHandler(backend, (call) async {
           final args = call.arguments as Map;
@@ -103,7 +103,9 @@ void main() {
               await File('$directory/cover_same-key.jpg').exists(),
               isTrue,
             );
-            markerTimes.add(await marker.lastModified());
+            // Each forced scan rewrites the marker (contents, not mtime: some
+            // filesystems store whole seconds).
+            markerStamps.add(await marker.readAsString());
             coverDirectories.add(directory);
             return null;
           }
@@ -129,11 +131,10 @@ void main() {
         expect(await forced.rows().toList(), [
           {'id': 'track'},
         ]);
-        await Future<void>.delayed(const Duration(milliseconds: 20));
         await scan(force: true);
         expect(resumed, [false, true, false, false]);
         expect(coverDirectories, hasLength(2));
-        expect(markerTimes.last.isAfter(markerTimes.first), isTrue);
+        expect(markerStamps.toSet(), hasLength(2));
         expect(
           await oldCovers.list().map((entry) => entry.path).toList(),
           unorderedEquals([oldCover.path, marker.path]),
