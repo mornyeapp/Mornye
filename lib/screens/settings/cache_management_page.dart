@@ -19,6 +19,8 @@ import 'package:mornye/providers/player_motion_artwork_provider.dart';
 import 'package:mornye/services/motion_artwork_store.dart';
 import 'package:mornye/services/downloaded_embedded_cover_resolver.dart';
 import 'package:mornye/services/explore_cache_store.dart';
+import 'package:mornye/services/library_cleanup.dart';
+import 'package:mornye/services/library_database.dart';
 import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/utils/string_utils.dart';
 import 'package:mornye/widgets/settings_group.dart';
@@ -159,7 +161,10 @@ class _CacheManagementPageState extends ConsumerState<CacheManagementPage> {
   Future<void> _clearLibraryCoverCache() async {
     final appSupportDir = await getApplicationSupportDirectory();
     final libraryCoverDir = Directory('${appSupportDir.path}/library_covers');
-    await CacheMaintenanceService.clearDirectoryContents(libraryCoverDir.path);
+    await clearLibraryCoverFiles(
+      libraryCoverDir,
+      await LibraryDatabase.instance.database,
+    );
   }
 
   Future<void> _clearAudioAnalysisCache() async {

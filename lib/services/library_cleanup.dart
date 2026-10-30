@@ -2,7 +2,9 @@ import 'dart:io';
 import 'dart:isolate';
 import 'package:path/path.dart' as p;
 import 'package:sqflite/sqflite.dart';
+import 'package:mornye/models/library_database_models.dart';
 import 'package:mornye/services/app_state_database.dart';
+import 'package:mornye/services/cache_maintenance_service.dart';
 import 'package:mornye/services/history_database.dart';
 import 'package:mornye/services/library_collections_database.dart';
 import 'package:mornye/services/library_cover_snapshot.dart';
@@ -281,6 +283,33 @@ Future<({int deleted, List<String> errors})> _pruneCoversInWorker(
     }
   }
   return (deleted: deleted, errors: errors);
+}
+
+/// Deletes every file in [directory] (Settings, Storage) and marks the local
+/// Library rows whose covers lived there for one rescan, so the next scan of
+/// any kind extracts them again under the same names. Network songs need no
+/// mark: their scan already reads a song again when its cover file is gone.
+/// Returns the number of marked rows.
+Future<int> clearLibraryCoverFiles(
+  Directory directory,
+  DatabaseExecutor libraryDatabase,
+) async {
+  await CacheMaintenanceService.clearDirectoryContents(directory.path);
+  final prefix = '${directory.path}/';
+  // Below the audio version, the incremental snapshot reports the file as
+  // changed; the lyrics version keeps lyrics filters as they were meanwhile.
+  return libraryDatabase.rawUpdate(
+    'UPDATE library SET audio_metadata_scan_version = ? '
+    'WHERE audio_metadata_scan_version > ? '
+    'AND substr(cover_path, 1, length(?)) = ? '
+    "AND file_path NOT LIKE 'network://%'",
+    [
+      libraryLyricsMetadataScanVersion,
+      libraryLyricsMetadataScanVersion,
+      prefix,
+      prefix,
+    ],
+  );
 }
 
 final _subsonicCover = RegExp(r'^subsonic_([0-9a-fA-F]{64})(?:_.*)?\.image$');
