@@ -521,7 +521,17 @@ class SubsonicClient {
     File? pointer;
     try {
       await saveCover(song, staged);
-      if (refresh || target.path != base.path) {
+      final published = stat.type == FileSystemEntityType.file;
+      if (published && await _sameBytes(staged, target)) {
+        // Unchanged artwork keeps its path, so decoded sizes stay valid.
+        try {
+          await target.setLastModified(DateTime.now());
+        } on FileSystemException {
+          // The next lookup asks the server again.
+        }
+        return target.path;
+      }
+      if (published || target.path != base.path) {
         // A new path invalidates every decoded size of the old artwork.
         // Existing Library rows keep their old image until the scan commits.
         final name = 'subsonic_${hash}_${NetworkStorageService.newId()}.image';
@@ -539,6 +549,10 @@ class SubsonicClient {
       if (pointer != null && await pointer.exists()) await pointer.delete();
     }
   }
+
+  static Future<bool> _sameBytes(File a, File b) async =>
+      await a.length() == await b.length() &&
+      listEquals(await a.readAsBytes(), await b.readAsBytes());
 
   /// Saves the original file of the song [id] (the `download` method) to
   /// [output]. [progress] receives the bytes written and the size the server

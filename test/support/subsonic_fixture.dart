@@ -40,6 +40,7 @@ class SubsonicFixture {
   bool repeatPage = false;
   String? redirect;
   List<int>? audio;
+  List<int>? cover;
 
   /// The `lyricsList` answered by getLyricsBySongId; without one the server
   /// lacks the songLyrics extension.
@@ -127,7 +128,7 @@ class SubsonicFixture {
         );
         final range = request.headers.value('range');
         response.statusCode = range == null ? 200 : 206;
-        final media = isAudio ? audio ?? [0, 1, 2, 3] : [0, 1, 2, 3];
+        final media = (isAudio ? audio : cover) ?? [0, 1, 2, 3];
         final part = networkByteRange(range, media.length);
         if (range != null) {
           response.headers.set(

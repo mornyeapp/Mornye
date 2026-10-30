@@ -42,14 +42,16 @@ void main() {
       final client = storage.openSubsonic(server.connection());
       final song = SubsonicSong(server.song);
       final before = await client.cachedCover(song, directory);
+      server.cover = [4, 5, 6, 7];
       final refreshed = await client.cachedCover(
         song,
         directory,
         refresh: true,
       );
       expect(refreshed, isNot(before));
+      expect(await File(refreshed!).readAsBytes(), [4, 5, 6, 7]);
       expect(await File(before!).exists(), isTrue);
-      expect(await File(refreshed!).exists(), isTrue);
+      expect(await File(refreshed).exists(), isTrue);
       expect(await client.cachedCover(song, directory), refreshed);
       client.close();
       final next = storage.openSubsonic(server.connection());
@@ -57,6 +59,45 @@ void main() {
       final requests = server.requests.length;
       expect(await next.cachedCover(song, directory), refreshed);
       expect(server.requests.length, requests);
+    },
+  );
+
+  test('unchanged artwork keeps its path on a forced refresh', () async {
+    final client = storage.openSubsonic(server.connection());
+    addTearDown(client.close);
+    final song = SubsonicSong(server.song);
+    final before = await client.cachedCover(song, directory);
+    final old = DateTime.now().subtract(const Duration(hours: 2));
+    await File(before!).setLastModified(old);
+    final requests = server.methods.length;
+    expect(await client.cachedCover(song, directory, refresh: true), before);
+    expect(server.methods.length, greaterThan(requests));
+    expect((await File(before).stat()).modified.isAfter(old), isTrue);
+    expect(
+      await directory.list().map((file) => file.path).toList(),
+      unorderedEquals([before]),
+    );
+  });
+
+  test(
+    'daily artwork check keeps an unchanged image and moves a changed one',
+    () async {
+      final client = storage.openSubsonic(server.connection());
+      addTearDown(client.close);
+      final song = SubsonicSong(server.song);
+      final before = await client.cachedCover(song, directory);
+      final stale = DateTime.now().subtract(const Duration(days: 2));
+      await File(before!).setLastModified(stale);
+      expect(await client.cachedCover(song, directory), before);
+      expect(await File(before).readAsBytes(), [0, 1, 2, 3]);
+
+      await File(before).setLastModified(stale);
+      server.cover = [4, 5, 6, 7];
+      final changed = await client.cachedCover(song, directory);
+      expect(changed, isNot(before));
+      expect(await File(before).readAsBytes(), [0, 1, 2, 3]);
+      expect(await File(changed!).readAsBytes(), [4, 5, 6, 7]);
+      expect(await client.cachedCover(song, directory), changed);
     },
   );
 
