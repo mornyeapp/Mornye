@@ -237,9 +237,21 @@ impl Backend {
             },
             check,
         )?;
-        Ok(
-            json!({"scanned":tracks,"deletedPaths":if summary.deleted.is_empty() { Value::Null } else { json!(summary.deleted) },"skippedCount":summary.skipped,"totalFiles":summary.total}),
-        )
+        // json! serializes every value again by reference; moving the rows
+        // into the map avoids a second copy of the whole delta.
+        let mut delta = serde_json::Map::new();
+        delta.insert("scanned".into(), Value::Array(tracks));
+        delta.insert(
+            "deletedPaths".into(),
+            if summary.deleted.is_empty() {
+                Value::Null
+            } else {
+                summary.deleted.into()
+            },
+        );
+        delta.insert("skippedCount".into(), summary.skipped.into());
+        delta.insert("totalFiles".into(), summary.total.into());
+        Ok(Value::Object(delta))
     }
 
     pub fn scan_library_folder_to_ndjson_file(
@@ -974,6 +986,45 @@ mod tests {
             assert_eq!(files.len(), 2);
         } else {
             assert_eq!(files.len(), 6);
+        }
+    }
+
+    #[test]
+    fn incremental_delta_matches_the_json_the_scan_always_returned() {
+        let root = tempfile::tempdir().unwrap();
+        let library = library_with_artwork(root.path(), 1, 3, 8_500);
+        let backend = backend(root.path(), &library);
+        let unchanged = library.join("0000/00.flac");
+        let modified = fs::metadata(&unchanged)
+            .unwrap()
+            .modified()
+            .unwrap()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as i64;
+        let gone = library
+            .join("0000/gone.flac")
+            .to_string_lossy()
+            .into_owned();
+        let snapshots = [
+            json!({unchanged.to_string_lossy(): modified, &gone: 5}),
+            json!({}),
+        ];
+        for (snapshot, deleted, skipped) in [
+            (&snapshots[0], json!([gone]), 1),
+            (&snapshots[1], Value::Null, 0),
+        ] {
+            let result = backend
+                .scan_library_folder_incremental(
+                    &library.to_string_lossy(),
+                    &snapshot.to_string(),
+                    &|| Ok(()),
+                )
+                .unwrap();
+            let tracks = result["scanned"].as_array().unwrap().clone();
+            assert_eq!(tracks.len(), 3 - skipped);
+            let previous = json!({"scanned":tracks,"deletedPaths":deleted,"skippedCount":skipped,"totalFiles":3});
+            assert_eq!(result.to_string(), previous.to_string());
         }
     }
 
