@@ -22,6 +22,8 @@ import 'package:mornye/services/metadata_cover_resources.dart';
 import 'package:mornye/services/metadata_persistence_service.dart';
 import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/services/replaygain_service.dart';
+import 'package:mornye/services/source_deletion_events.dart';
+import 'package:mornye/services/source_metadata_events.dart';
 import 'package:mornye/utils/artist_utils.dart';
 import 'package:mornye/utils/audio_conversion_utils.dart';
 import 'package:mornye/utils/file_access.dart';
@@ -210,6 +212,10 @@ class LinkLibraryExecutor {
           _log.w('Desktop conversion failed: ${result.failureDetail}');
           return {'error': 'conversion_failed'};
         }
+        final removed =
+            options['keepOriginal'] == false && !await File(path).exists();
+        if (removed) await SourceDeletionEvents.instance.publish(path);
+        return {'removed': removed};
       case LinkLibraryAction.reEnrichPreview:
         final mode = ReEnrichBatchMode.values.asNameMap()[options['mode']];
         if (mode == null) return {'error': 'invalid_fields'};
@@ -329,6 +335,10 @@ class LinkLibraryExecutor {
           songId,
           cover: work.action == LinkLibraryAction.saveCover,
         );
+    }
+    if (linkLibraryActionChangesCatalog(work.action) &&
+        work.action != LinkLibraryAction.delete) {
+      await SourceMetadataEvents.instance.publish(path);
     }
     return {};
   }

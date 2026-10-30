@@ -35,6 +35,7 @@ import 'package:mornye/services/remote_media_session.dart';
 import 'package:mornye/services/remote_playback.dart';
 import 'package:mornye/services/song_analysis.dart';
 import 'package:mornye/services/source_deletion_events.dart';
+import 'package:mornye/services/source_metadata_events.dart';
 import 'package:mornye/services/system_volume_service.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/utils/logger.dart';
@@ -69,6 +70,7 @@ class PlaybackDependencies {
     LibraryCollectionsDatabase? collectionsDatabase,
     ListeningRecorder? recorder,
     SourceDeletionEvents? sourceDeletionEvents,
+    SourceMetadataEvents? sourceMetadataEvents,
     Stream<double>? volumeChanges,
     bool? isIOS,
     bool? isAndroid,
@@ -81,6 +83,7 @@ class PlaybackDependencies {
        _collectionsDatabase = collectionsDatabase,
        _recorder = recorder,
        _sourceDeletionEvents = sourceDeletionEvents,
+       _sourceMetadataEvents = sourceMetadataEvents,
        _volumeChanges = volumeChanges,
        _isIOS = isIOS,
        _isAndroid = isAndroid;
@@ -120,6 +123,7 @@ class PlaybackDependencies {
   final LibraryCollectionsDatabase? _collectionsDatabase;
   final ListeningRecorder? _recorder;
   final SourceDeletionEvents? _sourceDeletionEvents;
+  final SourceMetadataEvents? _sourceMetadataEvents;
   final Stream<double>? _volumeChanges;
   final bool? _isIOS, _isAndroid;
 
@@ -134,6 +138,8 @@ class PlaybackDependencies {
   ListeningRecorder get recorder => _recorder ?? listeningRecorder;
   SourceDeletionEvents get sourceDeletionEvents =>
       _sourceDeletionEvents ?? SourceDeletionEvents.instance;
+  SourceMetadataEvents get sourceMetadataEvents =>
+      _sourceMetadataEvents ?? SourceMetadataEvents.instance;
   Stream<double> get volumeChanges =>
       _volumeChanges ?? SystemVolumeService.instance.changes;
   bool get isIOS => _isIOS ?? Platform.isIOS;
@@ -242,6 +248,7 @@ class MusicPlayerRuntime {
   AppSettings _settings;
   MusicPlayerHandler? _handler;
   void Function()? _unsubscribeSourceDeletion;
+  void Function()? _unsubscribeSourceMetadata;
   Future<MusicPlayerHandler>? _initFuture;
   Future<void>? _restoreFuture;
   final _handlers = StreamController<MusicPlayerHandler?>.broadcast(sync: true);
@@ -426,6 +433,9 @@ class MusicPlayerRuntime {
       _unsubscribeSourceDeletion = dependencies.sourceDeletionEvents.subscribe(
         handler.onSourceDeleted,
       );
+      _unsubscribeSourceMetadata = dependencies.sourceMetadataEvents.subscribe(
+        handler.onSourceMetadataChanged,
+      );
     }
     if (!_initializing && !identical(existing, handler)) _handlers.add(handler);
   }
@@ -434,6 +444,8 @@ class MusicPlayerRuntime {
     if (!identical(_handler, handler)) return;
     _unsubscribeSourceDeletion?.call();
     _unsubscribeSourceDeletion = null;
+    _unsubscribeSourceMetadata?.call();
+    _unsubscribeSourceMetadata = null;
     _handler = null;
     _restoreFuture = null;
     if (!_handlers.isClosed) _handlers.add(null);

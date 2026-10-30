@@ -30,6 +30,7 @@ import 'package:mornye/services/network_storage_service.dart';
 import 'package:mornye/services/playback_deck.dart';
 import 'package:mornye/services/playback_notification.dart';
 import 'package:mornye/services/source_deletion_events.dart';
+import 'package:mornye/services/source_metadata_events.dart';
 import 'package:mornye/utils/file_access.dart';
 import 'package:mornye/utils/logger.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart'
@@ -422,6 +423,9 @@ MusicPlayerRuntime _runtime({
   PlaybackDeck Function(String)? createDeck,
   Stream<double> volumeChanges = const Stream.empty(),
   SourceDeletionEvents? sourceDeletionEvents,
+  SourceMetadataEvents? sourceMetadataEvents,
+  Future<Map<String, dynamic>> Function(String, {String? displayName})?
+  readMetadata,
   ListeningRecorder? recorder,
   AutoplayPersonalization Function()? createPersonalization,
   AutoplayTaste Function()? createTaste,
@@ -465,9 +469,9 @@ MusicPlayerRuntime _runtime({
       audioSession: () async => audioSession,
       initializeHandler: initialize ?? (builder) async => builder(),
       synchronizePlaybackState: synchronizePlaybackState ?? () async {},
-      readMetadata: (_, {displayName}) async => {
-        'replaygain_track_gain': '-6 dB',
-      },
+      readMetadata:
+          readMetadata ??
+          (_, {displayName}) async => {'replaygain_track_gain': '-6 dB'},
       recoverMissingFile: recoverMissingFile ?? (_) async => null,
       resolveNetworkSource:
           resolveNetworkSource ?? NetworkStorageService.instance.resolve,
@@ -484,6 +488,7 @@ MusicPlayerRuntime _runtime({
           ),
       volumeChanges: volumeChanges,
       sourceDeletionEvents: sourceDeletionEvents ?? SourceDeletionEvents(),
+      sourceMetadataEvents: sourceMetadataEvents ?? SourceMetadataEvents(),
       isAndroid: isAndroid,
       isIOS: isIOS,
     ),
@@ -505,6 +510,71 @@ const _track = PlayableMedia(
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  test(
+    'changed tags update queued copies without restarting playback',
+    () async {
+      final events = SourceMetadataEvents();
+      final decks = <_Deck>[];
+      var title = 'Old title';
+      final runtime = _runtime(
+        decks: decks,
+        sourceMetadataEvents: events,
+        readMetadata: (_, {displayName}) async => {
+          'title': title,
+          'artist': 'Edited artist',
+          'album': 'Edited album',
+        },
+      );
+      final handler = await runtime.initialize();
+      await handler.setQueueAndPlay([_track, _track]);
+      await handler.seek(const Duration(seconds: 34));
+      await handler.pause();
+      final sources = List.of(decks.first.sources);
+      final position = decks.first.position;
+      title = 'Edited title';
+      await events.publish(_track.source);
+      expect(handler.mediaItem.value!.title, title);
+      expect(handler.queue.value.map((item) => item.title), [title, title]);
+      expect(handler.mediaItem.value!.artist, 'Edited artist');
+      expect(decks.first.sources, sources);
+      expect(decks.first.position, position);
+      expect(handler.playbackState.value.playing, isFalse);
+      expect(RuntimeLinkPlayerPort(runtime).snapshot().current!.title, title);
+      await runtime.dispose();
+      await events.publish(_track.source);
+    },
+  );
+
+  test(
+    'an older metadata read cannot overwrite a newer successful edit',
+    () async {
+      final old = Completer<Map<String, dynamic>>();
+      var reads = 0;
+      final handler = await _runtime(
+        settings: const AppSettings(
+          playbackNormalization: false,
+          pauseOnMute: false,
+        ),
+        readMetadata: (_, {displayName}) {
+          reads++;
+          return reads == 1
+              ? old.future
+              : Future.value({'title': 'Newest title'});
+        },
+      ).initialize();
+      await handler.setQueueAndPlay([_track]);
+      await handler.onSourceMetadataChanged('/unrelated.flac');
+      expect(reads, 0);
+      final pending = handler.onSourceMetadataChanged(_track.source);
+      await handler.onSourceMetadataChanged(_track.source);
+      expect(handler.mediaItem.value!.title, 'Newest title');
+      old.complete({'title': 'Stale title'});
+      await pending;
+      expect(handler.mediaItem.value!.title, 'Newest title');
+      expect(handler.queue.value.single.title, 'Newest title');
+    },
+  );
 
   test('the local player publishes Android stream volume handling', () async {
     final handler = await _runtime().initialize();

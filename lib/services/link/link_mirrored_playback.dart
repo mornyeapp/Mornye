@@ -283,18 +283,27 @@ abstract class LinkMirroredPlayback implements RemotePlayback {
   MediaItem _itemFor(TrackRef ref) =>
       _items[ref] ??= _playable(ref, immediatePlayable(ref)).toMediaItem();
 
-  PlayableMedia _playable(TrackRef ref, PlayableMedia? media) =>
-      media ??
-      PlayableMedia(
-        id: 'link:${ref.fileId ?? ref.isrc ?? ref.matchKey ?? ref.title}',
-        source: '',
-        title: ref.title,
-        artist: ref.artist,
-        album: ref.album ?? '',
-        duration: ref.durationMs == null
-            ? null
-            : Duration(milliseconds: ref.durationMs!),
-      );
+  PlayableMedia _playable(TrackRef ref, PlayableMedia? media) => PlayableMedia(
+    id:
+        media?.id ??
+        'link:${ref.fileId ?? ref.isrc ?? ref.matchKey ?? ref.title}',
+    source: media?.source ?? '',
+    title: ref.title,
+    artist: ref.artist,
+    album: ref.album ?? media?.album ?? '',
+    artUri: media?.artUri,
+    networkArtworkSource: media?.networkArtworkSource,
+    duration: ref.durationMs == null
+        ? media?.duration
+        : Duration(milliseconds: ref.durationMs!),
+    bitDepth: media?.bitDepth,
+    sampleRate: media?.sampleRate,
+    bitrate: media?.bitrate,
+    format: media?.format,
+    explicit: media?.explicit ?? false,
+    genre: media?.genre,
+    autoplay: media?.autoplay ?? false,
+  );
 
   /// Looks [ref] up once, with its cover: the one embedded in a local file,
   /// else the network cover its item, or the device's own song, names.

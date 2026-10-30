@@ -247,6 +247,45 @@ void main() {
     expect(item.extras!['source'], '/music/mine.flac');
   });
 
+  test(
+    'desktop edits stay authoritative when the phone has an older copy',
+    () async {
+      lookup.tracks.add(
+        LinkLocalTrack(
+          linkLocalMedia('mine', title: 'Old title', artist: 'Old artist'),
+          isrc: 'USAAA0000001',
+        ),
+      );
+      final track = TrackRef(
+        title: 'Edited title',
+        artist: 'Edited artist',
+        album: 'Edited album',
+        isrc: 'USAAA0000001',
+        songId: 's0',
+        serverId: linkTestServer.serverId,
+      );
+      client.push({
+        'type': LinkMessageTypes.playerState,
+        'state': LinkPlayerState(
+          track: track,
+          playing: false,
+          positionMs: 34000,
+          updatedMs: 1,
+          queue: [track],
+          index: 0,
+          volume: 1,
+        ).toJson(),
+      });
+      await settle();
+      final item = (await playback.mediaItems.first)!;
+      expect(item.id, 'mine');
+      expect(item.title, 'Edited title');
+      expect(item.artist, 'Edited artist');
+      expect(item.album, 'Edited album');
+      expect((await playback.queues.first).single.title, 'Edited title');
+    },
+  );
+
   for (final staleThumbnail in [false, true]) {
     test(
       'recovers matched phone artwork in both views ($staleThumbnail)',

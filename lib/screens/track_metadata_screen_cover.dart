@@ -315,7 +315,8 @@ extension _TrackMetadataCover on _TrackMetadataScreenState {
       : highResCoverUrl(normalizeRemoteHttpUrl(_downloadItem!.coverUrl));
 
   String? get _localCoverPath =>
-      _isLocalItem ? _localLibraryItem!.coverPath : null;
+      normalizeOptionalString(_editedMetadata?['cover_path']?.toString()) ??
+      (_isLocalItem ? _localLibraryItem!.coverPath : null);
   String? get _spotifyId => _isLocalItem ? null : _downloadItem!.spotifyId;
   String get _service =>
       _isLocalItem ? MusicServices.local : _downloadItem!.service;

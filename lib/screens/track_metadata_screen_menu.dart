@@ -23,6 +23,7 @@ extension _TrackMetadataMenu on _TrackMetadataScreenState {
         ? null
         : UnifiedLibraryItem.fromLocalLibrary(localItem);
     final remoteFile =
+        _fileExists &&
         remoteItem != null &&
         linkClient != null &&
         linkDesktopSongId(remoteItem.filePath, linkClient.server) != null;

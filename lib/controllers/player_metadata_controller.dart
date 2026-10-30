@@ -4,6 +4,7 @@ import 'package:audio_service/audio_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/services/playback_metadata.dart';
+import 'package:mornye/services/source_metadata_events.dart';
 import 'package:mornye/utils/int_utils.dart';
 import 'package:mornye/utils/logger.dart';
 import 'package:mornye/utils/lyrics_parser.dart';
@@ -30,9 +31,19 @@ class PlayerMetadataController extends ChangeNotifier {
     PlaybackMetadataReader? readMetadata,
     Future<ParsedLyrics> Function(String?)? parseLyrics,
     OnlineLyricsFetcher? fetchOnlineLyrics,
+    SourceMetadataEvents? metadataEvents,
   }) : _readMetadata = readMetadata ?? readPlaybackFileMetadataWithRetry,
        _parseLyrics = parseLyrics ?? LyricsParser.parseAsyncNative,
-       _fetchOnline = fetchOnlineLyrics ?? _fetchOnlineLyrics;
+       _fetchOnline = fetchOnlineLyrics ?? _fetchOnlineLyrics {
+    _unsubscribeMetadata = (metadataEvents ?? SourceMetadataEvents.instance)
+        .subscribe((changed) async {
+          if (_disposed || changed != source) return;
+          _requestKey = null;
+          await load(_item);
+        });
+  }
+
+  late final void Function() _unsubscribeMetadata;
 
   final PlaybackMetadataReader _readMetadata;
   final Future<ParsedLyrics> Function(String?) _parseLyrics;
@@ -318,6 +329,7 @@ class PlayerMetadataController extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    _unsubscribeMetadata();
     _generation++;
     super.dispose();
   }

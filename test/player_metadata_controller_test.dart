@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/controllers/player_metadata_controller.dart';
+import 'package:mornye/services/source_metadata_events.dart';
 import 'package:mornye/utils/lyrics_parser.dart';
 
 MediaItem _item(
@@ -24,6 +25,33 @@ MediaItem _item(
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  test(
+    'file changes refresh cached lyrics and tags without changing tracks',
+    () async {
+      final events = SourceMetadataEvents();
+      var reads = 0;
+      final controller = PlayerMetadataController(
+        metadataEvents: events,
+        readMetadata: (_) async => {
+          'title': 'Title ${++reads}',
+          'lyrics': '[00:01]Verse $reads',
+          'replaygain_track_gain': '-$reads dB',
+        },
+      );
+      await controller.load(_item('a'));
+      expect(controller.lyrics.lines.single.text, 'Verse 1');
+      await events.publish('/other.flac');
+      expect(reads, 1);
+      await events.publish('/music/a.flac');
+      expect(controller.metadata!['title'], 'Title 2');
+      expect(controller.lyrics.lines.single.text, 'Verse 2');
+      expect(controller.metadata!['replaygain_track_gain'], '-2 dB');
+      controller.dispose();
+      await events.publish('/music/a.flac');
+      expect(reads, 2);
+    },
+  );
 
   test(
     'new metadata is visible immediately while lyrics parse is pending',

@@ -39,6 +39,7 @@ class NetworkMetadataService {
   final Future<Directory> Function() _directory;
   final _cache = <String, ({DateTime time, Map<String, dynamic> value})>{};
   final _pending = <String, Future<Map<String, dynamic>>>{};
+  final _refreshArtwork = <String>{};
   final List<({Future<void> tail, int pending})> _lanes;
   final _requestIds = <String>{};
   final _subsonicClients = <SubsonicClient>{};
@@ -93,6 +94,23 @@ class NetworkMetadataService {
     return result;
   }
 
+  /// Retires an in-flight old read too, so it cannot refill the stale cache.
+  Future<void> invalidate(String source, {bool refreshArtwork = false}) async {
+    _cache.remove(source);
+    try {
+      await _pending[source];
+    } catch (_) {
+      // A failed old read must not prevent reading the edited file again.
+    }
+    _cache.remove(source);
+    if (refreshArtwork) {
+      if (_refreshArtwork.length >= 32) {
+        _refreshArtwork.remove(_refreshArtwork.first);
+      }
+      _refreshArtwork.add(source);
+    }
+  }
+
   /// Scan-owned readers can stop their work without cancelling playback reads.
   Future<void> cancelPending() async {
     _stopped = true;
@@ -111,6 +129,7 @@ class NetworkMetadataService {
 
   Future<Map<String, dynamic>> _load(String source, String requestId) async {
     _checkStopped();
+    final refreshArtwork = _refreshArtwork.remove(source);
     final uri = Uri.parse(source);
     if (uri.scheme != 'network') {
       throw const FormatException('Expected a network source');
@@ -131,6 +150,7 @@ class NetworkMetadataService {
           final cover = await client.cachedCover(
             song,
             Directory('${(await _directory()).path}/network_metadata'),
+            refresh: refreshArtwork,
           );
           if (cover != null) {
             metadata['cover_path'] = cover;

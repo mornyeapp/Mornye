@@ -200,6 +200,36 @@ void main() {
     },
   );
 
+  test(
+    'an edit retires an in-flight read before it can refill old tags',
+    () async {
+      final old = Completer<Map<String, dynamic>>();
+      final started = Completer<void>();
+      var calls = 0;
+      final reader = NetworkMetadataService(
+        storage: storage,
+        reader: (_, _) {
+          calls++;
+          if (calls == 1) {
+            started.complete();
+            return old.future;
+          }
+          return Future.value({'title': 'Edited title'});
+        },
+      );
+      final source = NetworkStorageService.source('nas', 'song.flac');
+      final pending = reader.read(source);
+      await started.future;
+      final invalidated = reader.invalidate(source);
+      old.complete({'title': 'Old title'});
+      await pending;
+      await invalidated;
+      expect((await reader.read(source))['title'], 'Edited title');
+      expect((await reader.read(source))['title'], 'Edited title');
+      expect(calls, 2);
+    },
+  );
+
   test('rescans can refresh tags without reusing the playback cache', () async {
     var calls = 0;
     final reader = NetworkMetadataService(

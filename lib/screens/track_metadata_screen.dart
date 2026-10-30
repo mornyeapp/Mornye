@@ -41,6 +41,8 @@ import 'package:mornye/services/ffmpeg_metadata.dart';
 import 'package:mornye/services/ffmpeg_models.dart';
 import 'package:mornye/services/ffmpeg_probe.dart';
 import 'package:mornye/services/replaygain_service.dart';
+import 'package:mornye/services/source_deletion_events.dart';
+import 'package:mornye/services/source_metadata_events.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/utils/adaptive_layout.dart';
 import 'package:mornye/utils/audio_conversion_utils.dart';
@@ -205,6 +207,8 @@ class _TrackMetadataScreenState extends ConsumerState<TrackMetadataScreen>
   bool _isTrackSwipeNavigationInFlight = false;
   int _metadataLoadGeneration = 0;
   int _metadataTransitionDirection = 0;
+  late final void Function() _unsubscribeMetadata;
+  late final void Function() _unsubscribeDeletion;
   late DownloadHistoryItem? _currentDownloadItem;
   late LocalLibraryItem? _currentLocalLibraryItem;
   late int? _currentNavigationIndex;
@@ -226,11 +230,41 @@ class _TrackMetadataScreenState extends ConsumerState<TrackMetadataScreen>
     _currentDownloadItem = widget.item;
     _currentLocalLibraryItem = widget.localItem;
     _currentNavigationIndex = widget.navigationIndex;
+    _unsubscribeMetadata = SourceMetadataEvents.instance.subscribe((
+      source,
+    ) async {
+      if (!mounted || source != cleanFilePath) return;
+      setState(() {
+        _metadataLoadGeneration++;
+        _hasLoadedResolvedAudioMetadata = false;
+        _editedMetadata = null;
+        _embeddedLyricsChecked = false;
+        _lyrics = null;
+        _rawLyrics = null;
+        _lyricsError = null;
+        _lyricsLoading = false;
+      });
+      await _checkFile();
+      if (mounted && source == cleanFilePath && !_isNetworkItem) {
+        unawaited(_refreshEmbeddedCoverPreview(force: true));
+      }
+    });
+    _unsubscribeDeletion = SourceDeletionEvents.instance.subscribe((
+      source,
+    ) async {
+      if (!mounted || source != cleanFilePath) return;
+      setState(() {
+        _metadataLoadGeneration++;
+        _fileAccess = const FileAccessMissing();
+      });
+    });
     unawaited(_checkFile());
   }
 
   @override
   void dispose() {
+    _unsubscribeMetadata();
+    _unsubscribeDeletion();
     unawaited(_cleanupTempFileAndParentIfNotCached(_embeddedCoverPreviewPath));
     _lyricsScrollController.dispose();
     super.dispose();
@@ -359,6 +393,9 @@ class _TrackMetadataScreenState extends ConsumerState<TrackMetadataScreen>
       );
       final resolvedDuration = readPositiveInt(metadata['duration']);
       final resolvedAlbum = metadata['album']?.toString();
+      final resolvedCover = normalizeOptionalString(
+        metadata['cover_path']?.toString(),
+      );
       final resolvedTitle = metadata['title']?.toString();
       final resolvedArtist = metadata['artist']?.toString();
       final resolvedAlbumArtist = metadata['album_artist']?.toString();
@@ -527,6 +564,7 @@ class _TrackMetadataScreenState extends ConsumerState<TrackMetadataScreen>
           _editedMetadata = {
             ...?_editedMetadata,
             ...replayGainMetadata,
+            'cover_path': ?resolvedCover,
             'bpm': ?resolvedBpm,
             'mood': ?resolvedMood,
             // ignore: use_null_aware_elements

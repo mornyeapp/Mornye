@@ -136,6 +136,7 @@ class MusicPlayerHandler extends BaseAudioHandler
   final List<StreamSubscription<dynamic>> _subscriptions = [];
   int _index = -1;
   int _playRequestGeneration = 0;
+  final _metadataChanges = <String, Object>{};
   String? _activeResolvedPath;
   bool _disposed = false;
   Future<void>? _disposeFuture;
@@ -2226,6 +2227,79 @@ class MusicPlayerHandler extends BaseAudioHandler
   @override
   Future<void> playMediaItem(MediaItem mediaItem) =>
       playFromMediaId(mediaItem.id);
+
+  /// Refreshes every occurrence without reopening the decoder or seeking.
+  Future<void> onSourceMetadataChanged(String source) async {
+    if (_disposed || !_media.any((item) => item.source == source)) return;
+    final token = Object();
+    _metadataChanges[source] = token;
+    try {
+      final metadata = source.startsWith('network://')
+          ? await _dependencies.readNetworkMetadata(source)
+          : await _dependencies.readMetadata(source);
+      if (metadata['error'] != null) return;
+      final cover = metadata['cover_path'] as String?;
+      final artwork = cover == null || cover.isEmpty
+          ? null
+          : normalizeArtUri(cover);
+      if (_disposed || !identical(_metadataChanges[source], token)) return;
+      var changed = false;
+      for (var i = 0; i < _media.length; i++) {
+        final previous = _media[i];
+        if (previous.source != source) continue;
+        final duration = readPositiveInt(metadata['duration']);
+        final updated = PlayableMedia.fromJson({
+          ...previous.toJson(),
+          for (final field in const ['title', 'artist', 'album', 'genre'])
+            if (metadata[field] != null) field: metadata[field].toString(),
+          if (duration != null) 'durationMs': duration * 1000,
+          'artUri': ?(artwork ?? previous.artUri),
+          'bitDepth': metadata['bit_depth'] ?? previous.bitDepth,
+          'sampleRate': metadata['sample_rate'] ?? previous.sampleRate,
+          'bitrate': metadata['bitrate'] ?? previous.bitrate,
+          'format': metadata['format'] ?? previous.format,
+          'explicit': metadata['explicit'] ?? previous.explicit,
+        })!;
+        final facts = _toMediaItem(updated);
+        MediaItem replace(MediaItem item) => item.copyWith(
+          title: facts.title,
+          artist: facts.artist,
+          album: facts.album,
+          duration: facts.duration ?? item.duration,
+          artUri: artwork == null ? item.artUri : facts.artUri,
+          extras: {
+            ...?item.extras,
+            ...?facts.extras,
+            'explicit': updated.explicit,
+          },
+        );
+        final old = _queueItems[i];
+        final next = replace(old);
+        _media[i] = updated;
+        _queueItems[i] = next;
+        final originalIndex = _originalQueueOrder?.indexWhere(
+          (item) => identical(item, old),
+        );
+        if (originalIndex != null && originalIndex >= 0) {
+          _originalQueueOrder![originalIndex] = next;
+        }
+        final current = mediaItem.value;
+        if (i == _index && current != null) {
+          mediaItem.add(replace(current));
+        }
+        changed = true;
+      }
+      if (changed) {
+        _markSessionQueueChanged();
+        queue.add(List.unmodifiable(_queueItems));
+        await _persistSession(position: playbackState.value.position);
+      }
+    } finally {
+      if (identical(_metadataChanges[source], token)) {
+        _metadataChanges.remove(source);
+      }
+    }
+  }
 
   /// Called when a file is deleted from disk. Removes it from the queue and, if
   /// it is the track currently playing, stops or advances so a deleted song can

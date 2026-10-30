@@ -11,11 +11,13 @@ import 'package:mornye/services/link/features/link_ios_now_playing.dart';
 import 'package:mornye/services/link/features/link_phone_features.dart';
 import 'package:mornye/services/link/features/link_phone_options.dart';
 import 'package:mornye/services/link/features/link_playback_preferences.dart';
+import 'package:mornye/services/link/features/link_track_refs.dart';
 import 'package:mornye/services/link/features/link_track_resolver.dart';
 import 'package:mornye/services/link/link_client_api.dart';
 import 'package:mornye/services/link/link_mirrored_playback.dart';
 import 'package:mornye/services/link/link_protocol.dart';
 import 'package:mornye/services/playable_media.dart';
+import 'package:mornye/services/source_metadata_events.dart';
 import 'package:mornye/utils/logger.dart';
 
 final _log = AppLogger('LinkRemotePlayback');
@@ -186,6 +188,13 @@ final linkRemotePlaybackProvider = Provider<LinkRemotePlayback?>((ref) {
     initialItem: ref.read(localMediaItemProvider).value,
   );
   update(ref.read(linkDesktopRemoteProvider));
+  ref.onDispose(
+    SourceMetadataEvents.instance.subscribe((source) async {
+      if (linkDesktopSongId(source, client.server) == null) return;
+      playback.refreshTracks();
+      await remote.refresh();
+    }),
+  );
   if (Platform.isIOS) {
     final nowPlaying = IosLinkNowPlaying(
       remote: playback,

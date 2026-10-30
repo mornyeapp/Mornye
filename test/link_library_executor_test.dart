@@ -13,6 +13,7 @@ import 'package:mornye/services/link/desktop/link_catalog_index.dart';
 import 'package:mornye/services/link/desktop/link_library_executor.dart';
 import 'package:mornye/services/link/link_host_router.dart';
 import 'package:mornye/services/link/link_library_jobs.dart';
+import 'package:mornye/services/source_metadata_events.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 
 class _Settings extends SettingsNotifier {
@@ -24,8 +25,34 @@ class _Settings extends SettingsNotifier {
 
 class _History extends DownloadHistoryNotifier {
   final removed = <String>[];
+  String? savedTitle;
   @override
   DownloadHistoryState build() => DownloadHistoryState();
+  @override
+  Future<void> updateMetadataForItem({
+    required String id,
+    required String trackName,
+    required String artistName,
+    required String albumName,
+    String? coverUrl,
+    String? albumArtist,
+    String? isrc,
+    int? trackNumber,
+    int? totalTracks,
+    int? discNumber,
+    int? totalDiscs,
+    String? releaseDate,
+    String? genre,
+    String? composer,
+    String? label,
+    String? copyright,
+    bool? explicit,
+    bool? hasLyrics,
+    int? lyricsMetadataScanVersion,
+  }) async {
+    savedTitle = trackName;
+  }
+
   @override
   Future<void> removePhysicalFiles(Iterable<String> paths) async {
     for (final path in paths) {
@@ -181,6 +208,88 @@ void main() {
             .length,
         1,
       );
+    },
+  );
+
+  test(
+    'saved tags reach the index before notification, failed edits do not notify',
+    () async {
+      final historyItem = DownloadHistoryItem(
+        id: 'download',
+        trackName: 'Old title',
+        artistName: 'Artist',
+        albumName: 'Album',
+        filePath: audio.path,
+        service: 'provider-a',
+        downloadedAt: DateTime(2026),
+      );
+      final history =
+          container.read(downloadHistoryProvider.notifier) as _History;
+      final published = <String?>[];
+      addTearDown(
+        SourceMetadataEvents.instance.subscribe((source) async {
+          expect(source, audio.path);
+          published.add(history.savedTitle);
+        }),
+      );
+      var fail = false;
+      final tags = <String, dynamic>{'title': 'Old title', 'artist': 'Artist'};
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+            if (call.method == 'editFileMetadata') {
+              if (fail) return jsonEncode({'error': 'write_failed'});
+              final args = call.arguments as Map;
+              tags.addAll(
+                Map<String, dynamic>.from(
+                  jsonDecode(args['metadata_json'] as String) as Map,
+                ),
+              );
+              return jsonEncode({'success': true, 'method': 'native'});
+            }
+            if (call.method == 'extractCoverToFile') {
+              return jsonEncode({'error': 'no_cover'});
+            }
+            return jsonEncode(tags);
+          });
+      executor = LinkLibraryExecutor(
+        container: container,
+        index: () => DesktopLinkCatalogIndex(
+          serverId: 'desktop',
+          songs: [
+            LinkCatalogSong(
+              id: 'd:download',
+              title: 'Old title',
+              artist: 'Artist',
+              path: audio.path,
+            ),
+          ],
+        ),
+        readDownloadRecord: (_) async => historyItem.toJson(),
+      );
+      expect(
+        await run(
+          LinkLibraryAction.editMetadata,
+          id: 'd:download',
+          options: {
+            'metadata': {'title': 'Edited title'},
+          },
+        ),
+        isEmpty,
+      );
+      expect(published, ['Edited title']);
+      fail = true;
+      expect(
+        await run(
+          LinkLibraryAction.editMetadata,
+          id: 'd:download',
+          options: {
+            'metadata': {'title': 'Failed title'},
+          },
+        ),
+        {'error': 'metadata_failed'},
+      );
+      expect(published, ['Edited title']);
+      expect(history.savedTitle, 'Edited title');
     },
   );
 
