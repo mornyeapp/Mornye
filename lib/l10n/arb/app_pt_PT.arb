@@ -232,7 +232,7 @@
       }
     }
   },
-  "appearanceGlassClarityHighContrast": "Your system requests increased contrast, so glass stays opaque. Turn on “{setting}” to use glass anyway; text contrast is preserved.",
+  "appearanceGlassClarityHighContrast": "Seu sistema solicita um aumento do contraste, então o vidro permanece opaco. Ligue “{setting}” para usar o vidro; o contraste de texto é preservado.",
   "@appearanceGlassClarityHighContrast": {
     "description": "Explains the system contrast request (which can include medium contrast) and the explicit glass-only override.",
     "placeholders": {
@@ -246,7 +246,7 @@
   "@appearanceStyle": {
     "description": "Appearance section for choosing the app visual style"
   },
-  "@@locale": "pt_PT",
+  "@@locale": "pt-PT",
   "@@last_modified": "2026-04-28",
   "appName": "Mornye",
   "@appName": {
@@ -373,7 +373,7 @@
   "@folderOrganizationCustom": {
     "description": "Folder organization mode using a user-defined template"
   },
-  "folderTemplateInvalid": "Enter a relative folder path with supported tags. Empty folders, . and .. are not allowed.",
+  "folderTemplateInvalid": "Informe um caminho relativo da pasta com os marcadores suportados. Pastas vazias, . e .. não são permitidos.",
   "@folderTemplateInvalid": {
     "description": "Validation error for an invalid folder template"
   },
@@ -563,7 +563,7 @@
   },
   "optionsArtistTagMode": "Modo de etiqueta de artista",
   "metadataSeparators": "Metadata separators",
-  "metadataSeparatorsDescription": "Choose how comma- or semicolon-separated values are joined in future downloads. Custom artist separators use a joined tag; Primary artist only still applies. Names containing & or / are preserved.",
+  "metadataSeparatorsDescription": "Escolha como os valores separados por vírgulas ou ponto e vírgula serão combinados nos próximos downloads. Os separadores personalizados de artistas usam uma tag combinada; a opção Somente artista principal continua sendo aplicada. Nomes que contenham & ou / são preservados.",
   "metadataSeparatorSource": "Keep source formatting",
   "metadataSeparatorComma": "Comma (,)",
   "metadataSeparatorSemicolon": "Semicolon (;)",
@@ -2041,7 +2041,7 @@
   "@trackDeleteConfirmTitle": {
     "description": "Delete confirmation title"
   },
-  "trackDeleteNetworkConfirmMessage": "This will permanently delete the file from your network storage and remove it from your library and history.",
+  "trackDeleteNetworkConfirmMessage": "Isso excluirá permanentemente o arquivo do armazenamento de rede e o removerá da sua biblioteca e do histórico.",
   "snackbarDeleteTracksFailed": "Could not delete {count} {count, plural, =1{track} other{tracks}}. Check storage access and try again.",
   "@snackbarDeleteTracksFailed": {
     "placeholders": {
@@ -2412,7 +2412,7 @@
   "@downloadAutoConvertBitrateSubtitle": {
     "description": "Automatic conversion bitrate picker explanation"
   },
-  "downloadAutoConvertMp3Subtitle": "Best compatibility across players and devices",
+  "downloadAutoConvertMp3Subtitle": "Melhor compatibilidade com reprodutores e dispositivos",
   "@downloadAutoConvertMp3Subtitle": {
     "description": "MP3 automatic conversion option description"
   },

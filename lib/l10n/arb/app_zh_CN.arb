@@ -246,7 +246,7 @@
   "@appearanceStyle": {
     "description": "Appearance section for choosing the app visual style"
   },
-  "@@locale": "zh_CN",
+  "@@locale": "zh-CN",
   "@@last_modified": "2026-04-28",
   "appName": "Mornye",
   "@appName": {
@@ -1184,7 +1184,7 @@
   "@duplicatesKeepBestAll": {
     "description": "Button that keeps the highest-quality copy in every duplicate group and deletes the rest"
   },
-  "duplicatesKeepBestAllMessage": "保留 {groupCount} 首歌曲的最佳副本，并删除 {count} 个低质量副本？\n\n删除的文件将从存储空间中移除。",
+  "duplicatesKeepBestAllMessage": "保留 {groupCount} {groupCount, plural, =1{{track}} other{{tracks}}} 的最佳副本，并删除 {count} 个低质量 {count, plural, =1{{copy}} other{{copies}}}？\n已删除的文件将从存储空间中移除。",
   "@duplicatesKeepBestAllMessage": {
     "description": "Confirmation message for keeping the best copy across every duplicate group",
     "placeholders": {

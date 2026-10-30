@@ -1,18 +1,18 @@
 {
   "trackBpm": "BPM",
-  "trackMood": "Mood",
-  "subsonicAddToLibrary": "Add server to Library",
-  "subsonicLibraryAdded": "Server added to Library",
-  "subsonicLibraryDescription": "Sync the server catalogue and artwork to Library. Music stays on your server. Rescan it in Local Library settings to update the catalogue.",
-  "subsonicAuthentication": "Authentication",
+  "trackMood": "Настроение",
+  "subsonicAddToLibrary": "Добавить сервер в Библиотеку",
+  "subsonicLibraryAdded": "Сервер добавлен в Библиотеку",
+  "subsonicLibraryDescription": "Синхронизировать серверный каталог и обложки в Библиотеке. Музыка остаётся на Вашем сервере. Пересканируйте его в настройках Локальной Библиотеки для обновления каталога.",
+  "subsonicAuthentication": "Аутентификация",
   "subsonicToken": "Salted token",
-  "subsonicPasswordAuth": "Password",
-  "subsonicApiKey": "API key",
-  "subsonicUsername": "Username",
-  "subsonicPassword": "Password",
-  "subsonicSearch": "Search server music...",
-  "subsonicMoreAlbums": "More albums",
-  "subsonicErrorApi": "The server does not support this API version or authentication method. Check the server settings and the selected sign-in method.",
+  "subsonicPasswordAuth": "Пароль",
+  "subsonicApiKey": "API ключ",
+  "subsonicUsername": "Имя пользователя",
+  "subsonicPassword": "Пароль",
+  "subsonicSearch": "Найти музыку с сервера...",
+  "subsonicMoreAlbums": "Больше альбомов",
+  "subsonicErrorApi": "Сервер не поддерживает эту версию API или метод аутентификации. Проверьте настройки сервера и выбранный метод входа.",
   "networkDownloadDestination": "Network download destination",
   "@networkDownloadDestination": {
     "description": "Files settings item that opens network storage to choose a folder for downloaded music"
@@ -113,7 +113,7 @@
   "@networkAddConnection": {
     "description": "Action label, toolbar tooltip, and form title for adding a network storage connection"
   },
-  "networkEditConnection": "Edit connection",
+  "networkEditConnection": "Редактировать соединение",
   "@networkEditConnection": {
     "description": "Edit button tooltip and form title for changing an existing network storage connection"
   },
@@ -121,7 +121,7 @@
   "@networkConnectionName": {
     "description": "Required connection form field for a user-chosen display name identifying the saved connection"
   },
-  "networkAddress": "Server or audio URL",
+  "networkAddress": "URL сервера или аудио",
   "@networkAddress": {
     "description": "Required connection form field for the server or direct audio URL, using the scheme appropriate to the selected protocol"
   },
@@ -157,7 +157,7 @@
   "@networkTrustCertificate": {
     "description": "Action approving the displayed certificate SHA-256 fingerprint for this connection's HTTPS origin and retrying connect-and-save; does not grant global certificate trust"
   },
-  "networkRemoveConnection": "Remove connection",
+  "networkRemoveConnection": "Удалить подключение",
   "@networkRemoveConnection": {
     "description": "Connection form action that removes the saved connection and its credentials, without deleting files on the server"
   },
@@ -169,16 +169,16 @@
   "@networkConnectionError": {
     "description": "Fallback network access error when the failure has no more specific classification"
   },
-  "extensionAccountTitle": "Extension account",
+  "extensionAccountTitle": "Аккаунт расширения",
   "extensionAccountInvalidForm": "The extension returned an invalid account form.",
   "extensionAccountRestartLogin": "Restart account login to continue.",
   "extensionAccountRequiredValue": "Введите значение.",
   "extensionAccountInvalidNumber": "Введите корректное значение.",
-  "settingsPlaybackSubtitle": "Воспроизведение, громкость, автомикс и аудиовыход",
+  "settingsPlaybackSubtitle": "Плеер, громкость, автомикс и аудиовыход",
   "sectionPlayer": "Плеер",
   "sectionVolumeAndTransitions": "Громкость и переходы",
-  "sectionAudioOutput": "Аудиовыход",
-  "usbBitPerfect": "Hi-Res и Bit-perfect",
+  "sectionAudioOutput": "Выход аудио",
+  "usbBitPerfect": "Hi-Res и Bit-perfect аудио",
   "usbBitPerfectDescription": "Сохранение исходной точности для поддерживаемых выходов. Ниже выберите прямой USB-выход или эксклюзивный режим AAudio; в противном случае для вывода USB требуется Android 14 или новее. Параметр применяется со следующего трека без учета AutoMix и нормализации. Системная громкость может не регулировать прямой вывод USB.",
   "usbHardwareVolume": "Аппаратная громкость ЦАПа",
   "usbVolumeWarningTitle": "Проверьте уровень громкости",
@@ -220,9 +220,9 @@
   "appearanceGlassOutlines": "Контур стекла",
   "appearanceGlassOutlinesSubtitle": "Show decorative edges around Mornye glass. Turning this off keeps blur and refraction.",
   "appearanceGlassClaritySubtitle": "Adjust transparency in Mornye menus and navigation. Text contrast is preserved.",
-  "appearanceGlassTinted": "Tinted",
+  "appearanceGlassTinted": "Тонированное",
   "appearanceGlassClear": "Очистить",
-  "appearanceGlassClearPerformance": "Very clear glass may use more power and feel less smooth on older devices. Lower clarity if needed.",
+  "appearanceGlassClearPerformance": "Очень чистое стекло может использовать больше энергии и может работать менее гладко на старых устройствах. Уменьшите прозрачность при необходимости.",
   "appearanceGlassClarityBlurOff": "Glass is opaque on this device. Turn on “{setting}” to adjust clarity.",
   "@appearanceGlassClarityBlurOff": {
     "description": "Shown under the disabled glass clarity slider when the device renders Mornye glass without blur. The placeholder is the name of the force-blur toggle.",
@@ -288,7 +288,7 @@
   "@homeRecent": {
     "description": "Section header for recent searches"
   },
-  "searchRecentlySearched": "Recently Searched",
+  "searchRecentlySearched": "История поиска",
   "@searchRecentlySearched": {
     "description": "Section header for recent searches on the desktop Search page"
   },
@@ -296,7 +296,7 @@
   "@searchLibraryPrompt": {
     "description": "Shown on the desktop Search page when the Library scope has no search words yet"
   },
-  "searchBrowse": "Browse",
+  "searchBrowse": "Искать",
   "@searchBrowse": {
     "description": "Section header for home feed tiles on the desktop Search page"
   },
@@ -369,7 +369,7 @@
   "@downloadFolderTemplateDescription": {
     "description": "Help for custom download folder templates"
   },
-  "folderOrganizationCustom": "Custom template",
+  "folderOrganizationCustom": "Свой шаблон",
   "@folderOrganizationCustom": {
     "description": "Folder organization mode using a user-defined template"
   },
@@ -562,15 +562,15 @@
     }
   },
   "optionsArtistTagMode": "Режим тега исполнителя",
-  "metadataSeparators": "Metadata separators",
-  "metadataSeparatorsDescription": "Choose how comma- or semicolon-separated values are joined in future downloads. Custom artist separators use a joined tag; Primary artist only still applies. Names containing & or / are preserved.",
-  "metadataSeparatorSource": "Keep source formatting",
+  "metadataSeparators": "Разделители метаданных",
+  "metadataSeparatorsDescription": "Выберите способ объединения значений, разделённых запятыми или точкой с запятой, при последующих загрузках. Для пользовательских разделителей исполнителей используется объединённый тег; по-прежнему применяется только основной исполнитель. Имена с & или / сохраняются.",
+  "metadataSeparatorSource": "Сохранить исходное форматирование",
   "metadataSeparatorComma": "Запятая (,)",
-  "metadataSeparatorSemicolon": "Semicolon (;)",
-  "metadataSeparatorSlash": "Slash (/)",
+  "metadataSeparatorSemicolon": "Точка с запятой (;)",
+  "metadataSeparatorSlash": "Слэш (/)",
   "metadataSeparatorCustom": "Свой разделитель",
   "metadataSeparatorPreview": "Предпросмотр",
-  "metadataSeparatorInvalid": "Use 1–16 characters without line breaks or control characters.",
+  "metadataSeparatorInvalid": "Используйте 1-16 символов без управляющих символов и разделителей строк.",
   "@optionsArtistTagMode": {
     "description": "Setting title for how artist metadata is written into files"
   },
@@ -1610,7 +1610,7 @@
   "@updateViewRelease": {
     "description": "Update button - open the release page when this install cannot update itself (deb, Flatpak, no matching package)"
   },
-  "updateStartingInstaller": "Starting the installer...",
+  "updateStartingInstaller": "Запуск установщика...",
   "@updateStartingInstaller": {
     "description": "Update status on Windows - the downloaded installer is starting and the app will close"
   },
@@ -1622,11 +1622,11 @@
   "@updateQuitApp": {
     "description": "Update button on macOS - quit the app so the new version can replace it"
   },
-  "updateReadyToRestart": "The update is installed. Restart Mornye to use it.",
+  "updateReadyToRestart": "Обновление установлено. Перезапустите Mornye чтобы им воспользоваться.",
   "@updateReadyToRestart": {
     "description": "Update status on Linux after the AppImage was replaced"
   },
-  "updateRestartNow": "Restart Now",
+  "updateRestartNow": "Перезапустить сейчас",
   "@updateRestartNow": {
     "description": "Update button on Linux - restart the app after the AppImage was replaced"
   },
@@ -1781,7 +1781,7 @@
     "description": "Settings section header"
   },
   "lyricsKeepScreenOn": "Keep screen on while viewing lyrics",
-  "lyricsKeepScreenOnSubtitle": "Prevent screen timeout while lyrics are open, including when playback is paused.",
+  "lyricsKeepScreenOnSubtitle": "Запретить отключение экрана при открытом тексте песни, даже когда воспроизведение на паузе.",
   "lyricsMode": "Режим текстов песен",
   "@lyricsMode": {
     "description": "Setting - how to save lyrics"
@@ -2041,8 +2041,8 @@
   "@trackDeleteConfirmTitle": {
     "description": "Delete confirmation title"
   },
-  "trackDeleteNetworkConfirmMessage": "This will permanently delete the file from your network storage and remove it from your library and history.",
-  "snackbarDeleteTracksFailed": "Could not delete {count} {count, plural, =1{track} other{tracks}}. Check storage access and try again.",
+  "trackDeleteNetworkConfirmMessage": "Это навсегда удалит файл из Вашего сетевого хранилища и удалит его из библиотеки и истории.",
+  "snackbarDeleteTracksFailed": "Не удалось удалить {count} {count, plural, =1{трек} other{трека(-ов)}}. Проверьте доступ к хранилищу и попробуйте снова.",
   "@snackbarDeleteTracksFailed": {
     "placeholders": {
       "count": {
@@ -2913,7 +2913,7 @@
       }
     }
   },
-  "libraryUnreadableFilesTitle": "Unreadable files",
+  "libraryUnreadableFilesTitle": "Нечитаемые файлы",
   "@libraryUnreadableFilesTitle": {
     "description": "Title of the list of files a library scan could not read, and the action that opens it"
   },
@@ -3430,7 +3430,7 @@
   "@libraryPlaybackNormalizationSubtitle": {
     "description": "Subtitle explaining playback volume normalization"
   },
-  "playbackNormalizationMode": "Gain mode",
+  "playbackNormalizationMode": "Режим усиления",
   "@playbackNormalizationMode": {
     "description": "Label for choosing between track and album ReplayGain during playback"
   },
@@ -3442,7 +3442,7 @@
   "@playbackNormalizationModeAlbum": {
     "description": "Gain mode that keeps the loudness differences inside an album"
   },
-  "playbackNormalizationPreamp": "Pre-amp",
+  "playbackNormalizationPreamp": "Предусиление",
   "@playbackNormalizationPreamp": {
     "description": "Label for the dB offset applied on top of ReplayGain during playback"
   },
@@ -3460,7 +3460,7 @@
       }
     }
   },
-  "playbackNormalizationPreampHint": "Lower values play quieter. Normalization only turns tracks down, so it never clips.",
+  "playbackNormalizationPreampHint": "Ниже значение — тише звук. Нормализация только понижает громкость треков, из-за чего искажения исключаются.",
   "@playbackNormalizationPreampHint": {
     "description": "Hint under the normalization pre-amp slider"
   },
@@ -4931,15 +4931,15 @@
   "@editMetadataAutoFillNoneSelected": {
     "description": "Snackbar when user taps Fetch without selecting any fields"
   },
-  "editMetadataLyricsSearch": "Find lyrics online",
+  "editMetadataLyricsSearch": "Найти текст в Интернете",
   "@editMetadataLyricsSearch": {
     "description": "Button in the edit metadata lyrics section that searches every lyrics provider"
   },
-  "lyricsPickerTitle": "Choose lyrics",
+  "lyricsPickerTitle": "Выберите текст",
   "@lyricsPickerTitle": {
     "description": "Title of the sheet listing each lyrics provider's result"
   },
-  "lyricsPickerNeedsTitle": "Enter a title and artist first",
+  "lyricsPickerNeedsTitle": "Сперва введите название и артиста",
   "@lyricsPickerNeedsTitle": {
     "description": "Snackbar when searching lyrics without a title or artist"
   },
@@ -4963,7 +4963,7 @@
   "@lyricsPickerInstrumental": {
     "description": "Lyrics result that marks the track as instrumental"
   },
-  "lyricsPickerNotFound": "No lyrics found",
+  "lyricsPickerNotFound": "Текст песни не найден",
   "@lyricsPickerNotFound": {
     "description": "A lyrics provider returned nothing for this track"
   },
@@ -5216,7 +5216,7 @@
   "@audioAnalysisRescan": {
     "description": "Tooltip/label for the button that re-runs the audio analysis, discarding cached results"
   },
-  "audioAnalysisSaveSpectrogram": "Save Spectrogram",
+  "audioAnalysisSaveSpectrogram": "Сохранить спектрограмму",
   "@audioAnalysisSaveSpectrogram": {
     "description": "Tooltip for the spectrogram button that saves the plot, with its axes and legend, as a PNG image the user places in storage"
   },
@@ -7161,7 +7161,7 @@
   "@extensionVerificationOpenBrowser": {
     "description": "Button to open the extension verification URL in a browser"
   },
-  "settingsSearchHint": "Настройки поиска",
+  "settingsSearchHint": "Найти настройки",
   "@settingsSearchHint": {
     "description": "Placeholder of the search field on the Settings tab"
   },
@@ -7296,10 +7296,10 @@
   "autoplayFromLibrary": "Автовоспроизведение из вашей медиатеки",
   "autoplayDescription": "Continue with related songs from your Library when the queue ends.",
   "autoplayPersonalization": "Умное автовоспроизведение",
-  "autoplayPersonalizationDescription": "Учится на песнях, которые вы слушаете и пропускаете, приватно на этом устройстве. При выключении перестаёт учиться и возвращает обычное автовоспроизведение.",
+  "autoplayPersonalizationDescription": "Учиться на песнях, которые вы слушаете и пропускаете, приватно на этом устройстве. При выключении перестаёт учиться и возвращает обычное автовоспроизведение.",
   "autoplayResetLearning": "Сбросить обучение рекомендаций",
   "autoplayResetLearningConfirmTitle": "Сбросить обучение рекомендаций?",
-  "autoplayResetLearningConfirmMessage": "Autoplay forgets what it learned from your listening and skips. This can't be undone.",
+  "autoplayResetLearningConfirmMessage": "Автовоспроизведение забудет все ваши предпочтения в музыке. Это действие необратимо.",
   "autoplayResetLearningConfirm": "Сбросить",
   "profileTitle": "Профиль",
   "profileSetUp": "Настройте свой профиль",
@@ -7430,7 +7430,7 @@
       }
     }
   },
-  "listeningRewindThisYear": "Более {year}",
+  "listeningRewindThisYear": "За {year} год",
   "@listeningRewindThisYear": {
     "placeholders": {
       "year": {
@@ -7541,7 +7541,7 @@
   "listeningRewindOutroTitle": "Это ваш Rewind",
   "listeningRewindOutroBody": "Keep listening. Your next Rewind is already taking shape.",
   "listeningRewindEmpty": "Not enough listening in this period yet. Play some music with the built-in player and come back later.",
-  "listeningRewindLoadError": "Could not load your Rewind",
+  "listeningRewindLoadError": "Не получилось загрузить Ваш Rewind",
   "listeningRewindSlide": "Slide {index} of {count}",
   "@listeningRewindSlide": {
     "placeholders": {
@@ -7554,7 +7554,7 @@
     }
   },
   "listeningRewindShare": "Поделиться",
-  "listeningRewindShareError": "Could not share your Rewind",
+  "listeningRewindShareError": "Не получилось поделиться Вашим Rewind",
   "listeningRewindNext": "Далее",
   "listeningRewindPrevious": "Previous",
   "listeningRewindMonthlyReady": "Your last 4 weeks are ready to replay",
@@ -7643,7 +7643,7 @@
   "autoMixSettingsTitle": "Mix transitions",
   "autoMixAutomaticDuration": "Automatic duration",
   "autoMixDuration": "Mix duration",
-  "autoMixEffect": "Transition effect",
+  "autoMixEffect": "Эффект перехода",
   "autoMixEffectAuto": "Авто",
   "autoMixEffectCrossfade": "Плавный переход",
   "autoMixEffectMuffled": "Muffled",
@@ -7657,22 +7657,22 @@
   "autoMixLowPass": "Muffled filter",
   "autoMixMixing": "Микширование",
   "autoMixCrossfading": "Плавный переход",
-  "playbackAutomation": "Automatic playback",
+  "playbackAutomation": "Автовоспроизведение",
   "playbackPauseOnMute": "Пауза при отключении звука",
   "snackbarPlaybackMuted": "Громкость равна нулю. Воспроизведение приостановлено. Нажмите ещё раз, чтобы продолжить.",
   "@snackbarPlaybackMuted": {
     "description": "Shown after mute automation pauses playback; another explicit play request can override the pause."
   },
-  "playbackPauseOnMuteDescription": "Pause at zero media volume and resume when raised. Manual pauses stay paused. Standard audio output only.",
+  "playbackPauseOnMuteDescription": "Пауза на нулевой громкости и продолжение при её повышении. Ручные паузы остаются нетронутыми. Только для стандартного аудиовыхода.",
   "playbackOnHeadphonesConnected": "Играть при подключении наушников",
   "playbackOnHeadphonesConnectedDescription": "Resume the current song when wired or Bluetooth headphones connect. Disconnecting pauses playback. Built-in player only.",
-  "appearanceCustomFont": "Custom font",
+  "appearanceCustomFont": "Пользовательский шрифт",
   "appearanceCustomFontSubtitle": "Import a TTF or OTF file (up to 10 MB). Overrides the theme and system font.",
   "appearanceCustomFontInvalid": "Could not load this font. Choose a valid TTF or OTF file up to 10 MB.",
   "appearanceCustomFontReset": "Use theme font",
-  "equalizerTitle": "Equalizer",
+  "equalizerTitle": "Эквалайзер",
   "equalizerDescription": "5–31 bands, tone controls, preamp and dynamics",
-  "equalizerEnable": "Enable equalizer",
+  "equalizerEnable": "Включить эквалайзер",
   "equalizerBands": "Bands",
   "equalizerTone": "Tone & stereo",
   "equalizerPreamp": "Preamp",
@@ -7803,7 +7803,7 @@
   "audioInfoOff": "Выкл",
   "audioInfoBypassed": "Bypassed by direct output",
   "audioInfoPlayer": "Плеер",
-  "audioInfoPlayerValue": "Mornye built-in player",
+  "audioInfoPlayerValue": "Встроенный плеер Mornye",
   "audioInfoSignalPath": "Signal path",
   "audioInfoPathSystem": "System mixer",
   "audioInfoPathDirect": "Direct USB, bypasses the system mixer",
@@ -7996,7 +7996,7 @@
   "@settingsKeyboardShortcuts": {
     "description": "Desktop Settings page that lists the app's keyboard shortcuts"
   },
-  "settingsKeyboardShortcutsSubtitle": "Keys for playback, navigation and panels",
+  "settingsKeyboardShortcutsSubtitle": "Кнопки для воспроизведения, навигации и панелей",
   "@settingsKeyboardShortcutsSubtitle": {
     "description": "Subtitle of the Keyboard Shortcuts entry in desktop Settings"
   },

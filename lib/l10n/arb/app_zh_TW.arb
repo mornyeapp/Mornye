@@ -246,7 +246,7 @@
   "@appearanceStyle": {
     "description": "Appearance section for choosing the app visual style"
   },
-  "@@locale": "zh_TW",
+  "@@locale": "zh-TW",
   "@@last_modified": "2026-04-28",
   "appName": "Mornye",
   "@appName": {

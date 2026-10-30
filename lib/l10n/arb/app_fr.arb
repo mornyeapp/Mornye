@@ -1,18 +1,18 @@
 {
   "trackBpm": "BPM",
-  "trackMood": "Mood",
-  "subsonicAddToLibrary": "Add server to Library",
-  "subsonicLibraryAdded": "Server added to Library",
+  "trackMood": "Humeur",
+  "subsonicAddToLibrary": "Connecte un serveur à ta bibliothèque",
+  "subsonicLibraryAdded": "Serveur connecté à la bibliothèque",
   "subsonicLibraryDescription": "Sync the server catalogue and artwork to Library. Music stays on your server. Rescan it in Local Library settings to update the catalogue.",
-  "subsonicAuthentication": "Authentication",
+  "subsonicAuthentication": "Authentification",
   "subsonicToken": "Salted token",
-  "subsonicPasswordAuth": "Password",
-  "subsonicApiKey": "API key",
-  "subsonicUsername": "Username",
-  "subsonicPassword": "Password",
-  "subsonicSearch": "Search server music...",
-  "subsonicMoreAlbums": "More albums",
-  "subsonicErrorApi": "The server does not support this API version or authentication method. Check the server settings and the selected sign-in method.",
+  "subsonicPasswordAuth": "Mot de passe",
+  "subsonicApiKey": "Clé API",
+  "subsonicUsername": "Nom d'utilisateur",
+  "subsonicPassword": "Mot de passe",
+  "subsonicSearch": "Rechercher parmi les musiques du serveur...",
+  "subsonicMoreAlbums": "Plus d'albums",
+  "subsonicErrorApi": "Ce serveur ne supporte pas cette version de l'API ou ce moyen d'authentification. Vérifiez les paramètres du serveur et sélectionnez comment vous voulez connecter.",
   "networkDownloadDestination": "Destination du téléchargement réseau",
   "@networkDownloadDestination": {
     "description": "Files settings item that opens network storage to choose a folder for downloaded music"
@@ -563,14 +563,14 @@
   },
   "optionsArtistTagMode": "Mode « Artiste »",
   "metadataSeparators": "Metadata separators",
-  "metadataSeparatorsDescription": "Choose how comma- or semicolon-separated values are joined in future downloads. Custom artist separators use a joined tag; Primary artist only still applies. Names containing & or / are preserved.",
-  "metadataSeparatorSource": "Keep source formatting",
+  "metadataSeparatorsDescription": "Choisissez comment les valeurs séparées par des virgules ou des points-virgules seront regroupées lors des prochains téléchargements. Les séparateurs d'artistes personnalisés utilisent une balise de regroupement ; l'option « Artiste principal uniquement » reste applicable. Les noms contenant « & » ou « / » sont conservés.",
+  "metadataSeparatorSource": "Conserver la mise en forme du texte source",
   "metadataSeparatorComma": "Comma (,)",
   "metadataSeparatorSemicolon": "Semicolon (;)",
   "metadataSeparatorSlash": "Slash (/)",
-  "metadataSeparatorCustom": "Custom separator",
+  "metadataSeparatorCustom": "Séparateur personnalisé",
   "metadataSeparatorPreview": "Aperçu",
-  "metadataSeparatorInvalid": "Use 1–16 characters without line breaks or control characters.",
+  "metadataSeparatorInvalid": "Utilisez entre 1 et 16 caractères, sans saut de ligne ni caractères de contrôle.",
   "@optionsArtistTagMode": {
     "description": "Setting title for how artist metadata is written into files"
   },
@@ -727,11 +727,11 @@
   "@aboutMobileSource": {
     "description": "Link to mobile GitHub repo"
   },
-  "aboutLyricsWebsite": "Lyrics website",
+  "aboutLyricsWebsite": "Site web de paroles de chansons",
   "@aboutLyricsWebsite": {
     "description": "Link to the Zarz-LRC website for searching and saving word-timed lyrics"
   },
-  "aboutServiceStatus": "Service status",
+  "aboutServiceStatus": "État du service",
   "@aboutServiceStatus": {
     "description": "Link to the status page of the Mornye online services"
   },
@@ -1606,27 +1606,27 @@
   "@updateDontRemind": {
     "description": "Update button - skip this version"
   },
-  "updateViewRelease": "View Release",
+  "updateViewRelease": "Consulter le communiqué de presse",
   "@updateViewRelease": {
     "description": "Update button - open the release page when this install cannot update itself (deb, Flatpak, no matching package)"
   },
-  "updateStartingInstaller": "Starting the installer...",
+  "updateStartingInstaller": "Lancement du programme d'installation...",
   "@updateStartingInstaller": {
     "description": "Update status on Windows - the downloaded installer is starting and the app will close"
   },
-  "updateMacInstallHint": "The disk image is open in Finder. Quit Mornye, then drag Mornye from the disk image to Applications and replace the old copy.",
+  "updateMacInstallHint": "L'image disque est ouverte dans le Finder. Quittez Mornye, puis faites glisser Mornye depuis l'image disque vers le dossier « Applications » et remplacez l'ancienne copie.",
   "@updateMacInstallHint": {
     "description": "Update instructions on macOS after the downloaded disk image opens"
   },
-  "updateQuitApp": "Quit Mornye",
+  "updateQuitApp": "Quitter Mornye",
   "@updateQuitApp": {
     "description": "Update button on macOS - quit the app so the new version can replace it"
   },
-  "updateReadyToRestart": "The update is installed. Restart Mornye to use it.",
+  "updateReadyToRestart": "La mise à jour est installée. Redémarrez Mornye pour en profiter.",
   "@updateReadyToRestart": {
     "description": "Update status on Linux after the AppImage was replaced"
   },
-  "updateRestartNow": "Restart Now",
+  "updateRestartNow": "Redémarrer maintenant",
   "@updateRestartNow": {
     "description": "Update button on Linux - restart the app after the AppImage was replaced"
   },
@@ -7040,11 +7040,11 @@
   "@regionCountryUS": {
     "description": "Country name for SongLink region picker"
   },
-  "regionCountryIT": "Italy",
+  "regionCountryIT": "Italie",
   "@regionCountryIT": {
     "description": "Country name for Italy"
   },
-  "regionCountryES": "Spain",
+  "regionCountryES": "Espagne",
   "@regionCountryES": {
     "description": "Country name for Spain"
   },
@@ -7182,15 +7182,15 @@
   "@libraryFilterMetadataMissingReplayGain": {
     "description": "Filter option for scanned tracks without ReplayGain gain tags"
   },
-  "libraryFilterMetadataHasReplayGain": "Has ReplayGain",
+  "libraryFilterMetadataHasReplayGain": "Prend en charge ReplayGain",
   "@libraryFilterMetadataHasReplayGain": {
     "description": "Filter option for tracks with indexed ReplayGain track or album gain tags"
   },
-  "libraryFilterIncompleteAlbums": "Incomplete albums",
+  "libraryFilterIncompleteAlbums": "Album incomplet",
   "@libraryFilterIncompleteAlbums": {
     "description": "Library filter for albums with confirmed missing track positions"
   },
-  "libraryAlbumCompletenessUnknown": "Album completeness unknown",
+  "libraryAlbumCompletenessUnknown": "Complétude de l'album inconnue",
   "@libraryAlbumCompletenessUnknown": {
     "description": "Library filter and status for missing, conflicting or ambiguous album track counts"
   },
@@ -7265,7 +7265,7 @@
   "@playerCoverStyleDefaultDescription": {
     "description": "Subtitle of the default cover art style"
   },
-  "playerCoverStyleFullScreen": "Full screen",
+  "playerCoverStyleFullScreen": "Plein écran",
   "@playerCoverStyleFullScreen": {
     "description": "Cover art style: artwork fills the top of the player"
   },
@@ -7867,7 +7867,7 @@
   "appCrashCopy": "Copy report for developer",
   "appCrashDismiss": "Ignorer",
   "appCrashCopyFailed": "Could not copy the crash report. Please try again.",
-  "appCrashDismissFailed": "Could not dismiss the crash report. Please try again.",
+  "appCrashDismissFailed": "Impossible de fermer le rapport d'erreur. Veuillez réessayer.",
   "optionsEmbeddedCoverSizeOriginal": "Résolution originale",
   "@optionsEmbeddedCoverSizeOriginal": {
     "description": "Option that preserves the provider artwork at its original resolution"
@@ -7888,9 +7888,9 @@
   "@desktopPlayerIdle": {
     "description": "Desktop player bar text when no track is loaded"
   },
-  "desktopVolumeUp": "Increase volume",
-  "desktopVolumeDown": "Decrease volume",
-  "desktopTableSortedAscending": "{column}, sorted ascending",
+  "desktopVolumeUp": "Augmenter le volume",
+  "desktopVolumeDown": "Baisser le volume",
+  "desktopTableSortedAscending": "{column}, triée par ordre croissant",
   "@desktopTableSortedAscending": {
     "description": "Screen reader label of a song table column header that sorts the table A to Z",
     "placeholders": {
@@ -7908,15 +7908,15 @@
       }
     }
   },
-  "desktopMenuOpen": "Open",
+  "desktopMenuOpen": "Ouvrir",
   "@desktopMenuOpen": {
     "description": "Context menu item that opens an album, artist, playlist or folder"
   },
-  "desktopMenuShowDetails": "Show details",
+  "desktopMenuShowDetails": "Afficher les détails",
   "@desktopMenuShowDetails": {
     "description": "Context menu item that opens a track's metadata page"
   },
-  "desktopDropToImport": "Drop to add to your library",
+  "desktopDropToImport": "Faites-y glisser pour l'ajouter à votre bibliothèque",
   "@desktopDropToImport": {
     "description": "Overlay shown while music files or folders are dragged over the desktop window"
   },
@@ -7929,7 +7929,7 @@
       }
     }
   },
-  "desktopDropNothingToImport": "Drop music files or folders to add them to your library",
+  "desktopDropNothingToImport": "Faites glisser des fichiers ou des dossiers musicaux pour les ajouter à votre bibliothèque",
   "@desktopDropNothingToImport": {
     "description": "Snackbar when the dropped items contain no folders or audio files"
   },
@@ -7954,7 +7954,7 @@
   "desktopWindowModeUnavailable": "The window mode could not be changed. Try again after the current window transition finishes.",
   "desktopMenuControls": "Controls",
   "desktopMenuWindow": "Window",
-  "desktopMenuHelp": "Help",
+  "desktopMenuHelp": "Aide",
   "desktopMenuPlayPause": "Play/Pause",
   "desktopMenuMiniPlayer": "Mini Player",
   "@desktopMenuMiniPlayer": {
@@ -7992,11 +7992,11 @@
   "@desktopScrollForward": {
     "description": "Tooltip of the desktop button that scrolls a horizontal shelf of albums or artists forward"
   },
-  "settingsKeyboardShortcuts": "Keyboard Shortcuts",
+  "settingsKeyboardShortcuts": "Raccourcis clavier",
   "@settingsKeyboardShortcuts": {
     "description": "Desktop Settings page that lists the app's keyboard shortcuts"
   },
-  "settingsKeyboardShortcutsSubtitle": "Keys for playback, navigation and panels",
+  "settingsKeyboardShortcutsSubtitle": "Touches de lecture, de navigation et des panneaux",
   "@settingsKeyboardShortcutsSubtitle": {
     "description": "Subtitle of the Keyboard Shortcuts entry in desktop Settings"
   },
@@ -8004,11 +8004,11 @@
   "@desktopShortcutsNavigation": {
     "description": "Keyboard Shortcuts section for moving between pages"
   },
-  "desktopShortcutDismiss": "Close dialog or page",
+  "desktopShortcutDismiss": "Fermer la boîte de dialogue ou la page",
   "@desktopShortcutDismiss": {
     "description": "Keyboard Shortcuts row for Escape, which leaves a text field or closes the top dialog or page"
   },
-  "desktopShortcutToggleSidebar": "Show or hide sidebar",
+  "desktopShortcutToggleSidebar": "Afficher ou masquer la barre latérale",
   "@desktopShortcutToggleSidebar": {
     "description": "Keyboard Shortcuts row for the shortcut that collapses or expands the desktop sidebar"
   }
