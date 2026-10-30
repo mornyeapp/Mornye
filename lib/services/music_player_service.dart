@@ -350,18 +350,21 @@ class MusicPlayerHandler extends BaseAudioHandler
     _refreshPlaybackAutomation();
 
     _listenToPlayer(_player);
-    if (_dependencies.isIOS) WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addObserver(this);
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.inactive ||
-        state == AppLifecycleState.paused) {
+        state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached) {
       unawaited(_runtime.personalization.flush());
+      unawaited(_dependencies.recorder.flush());
     }
-    if (state == AppLifecycleState.resumed ||
-        state == AppLifecycleState.inactive ||
-        state == AppLifecycleState.paused) {
+    if (_dependencies.isIOS &&
+        (state == AppLifecycleState.resumed ||
+            state == AppLifecycleState.inactive ||
+            state == AppLifecycleState.paused)) {
       unawaited(restoreIosNowPlaying());
     }
   }
@@ -2062,7 +2065,7 @@ class MusicPlayerHandler extends BaseAudioHandler
     _disposed = true;
     _runtime.personalization.finish();
     await _runtime.personalization.flush();
-    if (_dependencies.isIOS) WidgetsBinding.instance.removeObserver(this);
+    WidgetsBinding.instance.removeObserver(this);
     if (identical(musicPlayerRuntime.handler, this)) {
       autoMixStatus.value = AutoMixStatus.idle;
     }

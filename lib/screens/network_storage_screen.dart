@@ -1,18 +1,31 @@
+import 'dart:async';
+import 'dart:io';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import 'package:mornye/l10n/l10n.dart';
+import 'package:mornye/providers/listening_statistics_provider.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/local_library_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
+import 'package:mornye/screens/listening_rewind_screen.dart';
+import 'package:mornye/services/listening_statistics.dart';
 import 'package:mornye/services/music_player_service.dart';
 import 'package:mornye/services/network_storage_service.dart';
 import 'package:mornye/services/network_storage_error.dart';
 import 'package:mornye/services/network_certificate.dart';
+import 'package:mornye/services/sync/sync_orchestration_service.dart';
 import 'package:mornye/utils/adaptive_layout.dart';
+import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/utils/nav_bar_inset.dart';
+import 'package:mornye/widgets/app_alert_dialog.dart';
 import 'package:mornye/widgets/app_sliver_header.dart';
 import 'package:mornye/widgets/app_search_field.dart';
+import 'package:mornye/widgets/app_switch.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/theme/app_tokens.dart';
 import 'package:mornye/widgets/app_action_button.dart';
@@ -56,9 +69,20 @@ class _NetworkStorageScreenState extends ConsumerState<NetworkStorageScreen> {
   final _search = TextEditingController();
   bool get _subsonic => widget.connection?.protocol == NetworkProtocol.subsonic;
 
+  bool _syncEnabled = false;
+  String _syncDeviceName = '';
+  String _syncDeviceId = '';
+  String? _selectedSyncConnId;
+  String _syncStorageType = 'local';
+  String _syncLocalPath = '';
+  SyncStatus _syncStatus = const SyncStatus();
+  bool _syncingNow = false;
+  StreamSubscription<SyncStatus>? _syncStatusSub;
+
   @override
   void dispose() {
     _search.dispose();
+    _syncStatusSub?.cancel();
     super.dispose();
   }
 
@@ -140,10 +164,39 @@ class _NetworkStorageScreenState extends ConsumerState<NetworkStorageScreen> {
     }
   }
 
+  Future<void> _loadSyncSettings() async {
+    final syncService = SyncOrchestrationService.instance;
+    final config = await syncService.loadConfig();
+    final devId = await syncService.getDeviceId();
+    if (!mounted) return;
+    setState(() {
+      _syncEnabled = config.enabled;
+      _syncDeviceName = config.deviceName;
+      _syncDeviceId = devId;
+      _selectedSyncConnId = config.selectedNetworkConnectionId;
+      _syncStorageType = config.storageType;
+      _syncLocalPath = config.localPath;
+      _syncStatus = syncService.currentStatus;
+      _syncingNow = syncService.currentStatus.state == SyncStatusState.syncing;
+    });
+  }
+
   @override
   void initState() {
     super.initState();
     _load();
+    if (widget.connection == null) {
+      _syncStatusSub = SyncOrchestrationService.instance.statusStream.listen((
+        status,
+      ) {
+        if (mounted) {
+          setState(() {
+            _syncStatus = status;
+            _syncingNow = status.state == SyncStatusState.syncing;
+          });
+        }
+      });
+    }
   }
 
   @override
@@ -168,7 +221,10 @@ class _NetworkStorageScreenState extends ConsumerState<NetworkStorageScreen> {
       final connection = widget.connection;
       if (connection == null) {
         final connections = await service.connections();
-        if (isCurrent()) _connections = connections;
+        if (isCurrent()) {
+          _connections = connections;
+          await _loadSyncSettings();
+        }
       } else {
         final entries = _subsonic && _search.text.trim().isNotEmpty
             ? await service.searchSubsonic(connection, _search.text)
@@ -286,6 +342,353 @@ class _NetworkStorageScreenState extends ConsumerState<NetworkStorageScreen> {
     } finally {
       if (mounted) setState(() => _starting = false);
     }
+  }
+
+  Future<void> _editDeviceName() async {
+    final controller = TextEditingController(text: _syncDeviceName);
+    final updated = await showAppDialog<String>(
+      context: context,
+      builder: (dialogContext) => AppAlertDialog(
+        title: const Text('Edit Device Name'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(
+            labelText: 'Device Display Name',
+            hintText: 'e.g. Living Room PC, My Phone',
+          ),
+        ),
+        actions: [
+          AppDialogAction(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text(context.l10n.dialogCancel),
+          ),
+          AppDialogAction(
+            onPressed: () =>
+                Navigator.pop(dialogContext, controller.text.trim()),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    if (updated != null && updated.isNotEmpty && updated != _syncDeviceName) {
+      await SyncOrchestrationService.instance.setDeviceName(updated);
+      if (mounted) {
+        setState(() => _syncDeviceName = updated);
+      }
+    }
+  }
+
+  Future<void> _copyDeviceId() async {
+    if (_syncDeviceId.isEmpty) return;
+    await Clipboard.setData(ClipboardData(text: _syncDeviceId));
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Device ID copied to clipboard'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
+  Future<void> _selectSyncConnection() async {
+    final isWin = isDesktopPlatform && Platform.isWindows;
+    final compatibleConns = _connections
+        .where((c) => c.protocol == NetworkProtocol.webdav)
+        .toList();
+
+    await showAppDialog<void>(
+      context: context,
+      builder: (dialogContext) => AppAlertDialog(
+        title: const Text('Select Sync Connection'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (isWin)
+                ListTile(
+                  leading: const Icon(Icons.folder_outlined),
+                  title: Text(
+                    _syncLocalPath.isNotEmpty
+                        ? 'Local Folder ($_syncLocalPath)'
+                        : 'Local Folder (Select directory...)',
+                  ),
+                  subtitle: const Text('Direct file system storage on Windows'),
+                  selected: _syncStorageType == 'local',
+                  trailing: _syncStorageType == 'local'
+                      ? const Icon(Icons.check, color: Colors.green)
+                      : null,
+                  onTap: () async {
+                    String? targetPath = _syncLocalPath;
+                    if (targetPath.isEmpty || _syncStorageType == 'local') {
+                      final picked = await FilePicker.getDirectoryPath(
+                        dialogTitle: 'Select Sync Folder',
+                      );
+                      if (picked != null && picked.isNotEmpty) {
+                        targetPath = picked;
+                      }
+                    }
+                    if (targetPath.isNotEmpty) {
+                      await SyncOrchestrationService.instance
+                          .setLocalStorageType(localPath: targetPath);
+                      await _loadSyncSettings();
+                      if (dialogContext.mounted) Navigator.pop(dialogContext);
+                    }
+                  },
+                ),
+              for (final conn in compatibleConns)
+                ListTile(
+                  leading: const Icon(Icons.cloud_outlined),
+                  title: Text(conn.name),
+                  subtitle: Text('WebDAV · ${conn.address}'),
+                  selected:
+                      _syncStorageType == 'webdav' &&
+                      (_selectedSyncConnId == conn.id ||
+                          (_selectedSyncConnId == null &&
+                              SyncOrchestrationService.findIntendedWebDavConnection(
+                                    _connections,
+                                  )?.id ==
+                                  conn.id)),
+                  trailing:
+                      (_syncStorageType == 'webdav' &&
+                          (_selectedSyncConnId == conn.id ||
+                              (_selectedSyncConnId == null &&
+                                  SyncOrchestrationService.findIntendedWebDavConnection(
+                                        _connections,
+                                      )?.id ==
+                                      conn.id)))
+                      ? const Icon(Icons.check, color: Colors.green)
+                      : null,
+                  onTap: () async {
+                    await SyncOrchestrationService.instance
+                        .setSelectedNetworkConnection(conn);
+                    await _loadSyncSettings();
+                    if (dialogContext.mounted) Navigator.pop(dialogContext);
+                  },
+                ),
+            ],
+          ),
+        ),
+        actions: [
+          AppDialogAction(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text(context.l10n.dialogCancel),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _syncStatusSubtitle() {
+    if (_syncingNow) return 'Syncing in progress...';
+    if (_syncStatus.state == SyncStatusState.error &&
+        _syncStatus.errorMessage != null) {
+      return 'Sync error: ${_syncStatus.errorMessage}';
+    }
+    if (_syncStatus.lastSyncTime != null) {
+      final formattedTime = DateFormat.yMMMd().add_jm().format(
+        _syncStatus.lastSyncTime!.toLocal(),
+      );
+      final deviceText = _syncStatus.activeDeviceCount > 0
+          ? ' • ${_syncStatus.activeDeviceCount} active device${_syncStatus.activeDeviceCount == 1 ? '' : 's'} in sync'
+          : '';
+      return 'Last synced: $formattedTime$deviceText';
+    }
+    return 'Not synced yet';
+  }
+
+  Future<void> _triggerManualSync() async {
+    if (_syncingNow) return;
+    setState(() => _syncingNow = true);
+    try {
+      await listeningRecorder.flush();
+      final status = await SyncOrchestrationService.instance.synchronize();
+      ref.invalidate(listeningSummaryProvider);
+      ref.invalidate(listeningRewindProvider);
+      ref.invalidate(listeningRewindSpotlightProvider);
+      if (!mounted) return;
+      if (status.state == SyncStatusState.error) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Sync failed: ${status.errorMessage ?? "Unknown error"}',
+            ),
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      } else {
+        final activeCount = status.activeDeviceCount;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Synchronized • $activeCount active device${activeCount == 1 ? '' : 's'} in sync',
+            ),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Sync failed: $e'),
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _syncingNow = false);
+      }
+    }
+  }
+
+  Widget _buildCrossDeviceSyncSection() {
+    final isWin = isDesktopPlatform && Platform.isWindows;
+    final compatibleConns = _connections
+        .where((c) => c.protocol == NetworkProtocol.webdav)
+        .toList();
+
+    String connectionSubtitle;
+    if (_syncStorageType == 'local' && isWin) {
+      connectionSubtitle = _syncLocalPath.isNotEmpty
+          ? 'Local Folder ($_syncLocalPath)'
+          : 'Local Folder (no directory selected)';
+    } else if (_selectedSyncConnId != null) {
+      final conn = _connections
+          .where((c) => c.id == _selectedSyncConnId)
+          .firstOrNull;
+      if (conn != null && conn.protocol == NetworkProtocol.webdav) {
+        connectionSubtitle = '${conn.name} (${conn.address})';
+      } else if (conn != null) {
+        connectionSubtitle = 'Saved connection is not WebDAV (${conn.name})';
+      } else {
+        connectionSubtitle = 'Saved connection not found (selection required)';
+      }
+    } else {
+      final auto = SyncOrchestrationService.findIntendedWebDavConnection(
+        _connections,
+      );
+      if (auto != null) {
+        connectionSubtitle = '${auto.name} (${auto.address})';
+      } else if (compatibleConns.length > 1) {
+        connectionSubtitle = 'Multiple WebDAV connections (selection required)';
+      } else if (isWin && _syncLocalPath.isNotEmpty) {
+        connectionSubtitle = 'Local Folder ($_syncLocalPath)';
+      } else {
+        connectionSubtitle = 'No compatible WebDAV connection found';
+      }
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SettingsSectionHeader(title: 'Cross-Device Sync'),
+        SettingsGroup(
+          children: [
+            SettingsItem(
+              icon: Icons.sync,
+              showIconInMornye: true,
+              title: 'Cross-Device Synchronization',
+              subtitle:
+                  'Synchronize listening statistics and Rewind metrics between your devices via network storage.',
+              showDivider: _syncEnabled,
+              trailing: AppSwitch(
+                value: _syncEnabled,
+                semanticLabel: 'Cross-Device Synchronization',
+                onChanged: (val) async {
+                  await SyncOrchestrationService.instance.setSyncEnabled(val);
+                  setState(() => _syncEnabled = val);
+                  if (val) {
+                    await _loadSyncSettings();
+                  }
+                },
+              ),
+            ),
+            if (_syncEnabled) ...[
+              SettingsItem(
+                icon: Icons.badge_outlined,
+                showIconInMornye: true,
+                title: 'Device Display Name',
+                subtitle: _syncDeviceName.isNotEmpty
+                    ? _syncDeviceName
+                    : 'Not set',
+                showDivider: true,
+                trailing: const Icon(Icons.edit_outlined, size: 20),
+                onTap: _editDeviceName,
+              ),
+              SettingsItem(
+                icon: Icons.fingerprint,
+                showIconInMornye: true,
+                title: 'Device ID',
+                subtitle: _syncDeviceId.isNotEmpty
+                    ? _syncDeviceId
+                    : 'Not assigned',
+                showDivider: true,
+                trailing: Tooltip(
+                  message: 'Copy Device ID',
+                  child: IconButton(
+                    icon: const Icon(Icons.copy_rounded, size: 20),
+                    onPressed: _syncDeviceId.isNotEmpty ? _copyDeviceId : null,
+                  ),
+                ),
+                onTap: _syncDeviceId.isNotEmpty ? _copyDeviceId : null,
+              ),
+              SettingsItem(
+                icon: Icons.folder_shared_outlined,
+                showIconInMornye: true,
+                title: 'Sync Connection',
+                subtitle: connectionSubtitle,
+                showDivider: true,
+                trailing:
+                    (compatibleConns.length > 1 ||
+                        (compatibleConns.isNotEmpty && isWin))
+                    ? const Icon(Icons.swap_horiz, size: 20)
+                    : null,
+                onTap:
+                    (compatibleConns.length > 1 ||
+                        (compatibleConns.isNotEmpty && isWin))
+                    ? _selectSyncConnection
+                    : null,
+              ),
+              SettingsItem(
+                icon: Icons.cloud_sync_outlined,
+                showIconInMornye: true,
+                title: 'Sync Status',
+                subtitle: _syncStatusSubtitle(),
+                showDivider: false,
+                trailing: _syncingNow
+                    ? const SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : AppActionButton(
+                        onPressed: _triggerManualSync,
+                        label: const Text('Sync Now'),
+                        icon: const Icon(Icons.sync, size: 18),
+                        tonal: true,
+                      ),
+              ),
+            ],
+          ],
+        ),
+        if (_syncEnabled &&
+            compatibleConns.isEmpty &&
+            (!isWin || _syncStorageType != 'local'))
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+            child: Text(
+              'Note: Cross-Device Sync requires a compatible WebDAV network connection${isWin ? ' or a local storage folder' : ''}. '
+              'SMB and Subsonic protocols do not support the sync format. Please add a WebDAV connection above.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.error,
+              ),
+            ),
+          ),
+      ],
+    );
   }
 
   @override
@@ -476,6 +879,7 @@ class _NetworkStorageScreenState extends ConsumerState<NetworkStorageScreen> {
                       );
                     },
                   ),
+                  SliverToBoxAdapter(child: _buildCrossDeviceSyncSection()),
                 ],
                 if (!_loading && !_failed && connection != null) ...[
                   SliverToBoxAdapter(

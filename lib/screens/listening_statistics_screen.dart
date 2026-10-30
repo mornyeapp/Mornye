@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -6,6 +8,7 @@ import 'package:mornye/providers/listening_statistics_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/screens/listening_rewind_screen.dart';
 import 'package:mornye/services/listening_statistics.dart';
+import 'package:mornye/services/sync/sync_orchestration_service.dart';
 import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/material_expressive.dart';
 import 'package:mornye/theme/mornye_theme.dart';
@@ -37,30 +40,179 @@ class _ListeningStatisticsScreenState
   int _days = 7;
   int _year = DateTime.now().year;
   bool _clearing = false;
+  bool _syncing = false;
+  bool _syncEnabled = false;
+  DateTime? _lastSyncTime;
+  StreamSubscription<SyncStatus>? _statusSub;
+
+  @override
+  void initState() {
+    super.initState();
+    _initSyncState();
+    final current = SyncOrchestrationService.instance.currentStatus;
+    _lastSyncTime = current.lastSyncTime;
+    _syncing = current.state == SyncStatusState.syncing;
+    _statusSub = SyncOrchestrationService.instance.statusStream.listen((
+      status,
+    ) {
+      if (mounted) {
+        setState(() {
+          _syncing = status.state == SyncStatusState.syncing;
+          if (status.lastSyncTime != null) {
+            _lastSyncTime = status.lastSyncTime;
+          }
+        });
+        if (status.state == SyncStatusState.success) {
+          final period = (days: _days, year: _year);
+          ref.invalidate(listeningSummaryProvider(period));
+          ref.invalidate(listeningRewindProvider);
+          ref.invalidate(listeningRewindSpotlightProvider);
+        }
+      }
+    });
+  }
+
+  Future<void> _initSyncState() async {
+    final enabled = await SyncOrchestrationService.instance.isSyncEnabled();
+    if (mounted) {
+      setState(() => _syncEnabled = enabled);
+    }
+  }
+
+  @override
+  void dispose() {
+    _statusSub?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _handleManualSync() async {
+    if (_syncing || _clearing || !_syncEnabled) return;
+    setState(() => _syncing = true);
+    final period = (days: _days, year: _year);
+    try {
+      await listeningRecorder.flush();
+      final status = await SyncOrchestrationService.instance.synchronize();
+      ref.invalidate(listeningSummaryProvider(period));
+      ref.invalidate(listeningRewindProvider);
+      ref.invalidate(listeningRewindSpotlightProvider);
+      if (!mounted) return;
+      final activeCount = status.activeDeviceCount;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Synchronized • $activeCount active device${activeCount == 1 ? '' : 's'} in sync',
+          ),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Sync failed: $e'),
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _syncing = false);
+      }
+    }
+  }
 
   Future<void> _clear() async {
-    final confirmed = await showAppDialog<bool>(
+    if (!_syncEnabled) {
+      final confirmed = await showAppDialog<bool>(
+        context: context,
+        builder: (context) => AppAlertDialog(
+          title: Text(context.l10n.listeningStatsClear),
+          content: Text(context.l10n.listeningStatsClearDescription),
+          actions: [
+            AppDialogAction(
+              onPressed: () => Navigator.pop(context, false),
+              child: Text(context.l10n.dialogCancel),
+            ),
+            AppDialogAction(
+              isDestructive: true,
+              onPressed: () => Navigator.pop(context, true),
+              child: Text(context.l10n.listeningStatsClear),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true || !mounted) return;
+      setState(() => _clearing = true);
+      try {
+        await listeningRecorder.clear(
+          ListeningStatisticsStore.instance.clearThisDeviceHistory,
+        );
+        ref.invalidate(listeningSummaryProvider);
+        ref.invalidate(listeningRewindProvider);
+        ref.invalidate(listeningRewindSpotlightProvider);
+      } finally {
+        if (mounted) setState(() => _clearing = false);
+      }
+      return;
+    }
+
+    final choice = await showAppDialog<int>(
       context: context,
       builder: (context) => AppAlertDialog(
         title: Text(context.l10n.listeningStatsClear),
-        content: Text(context.l10n.listeningStatsClearDescription),
+        content: const Text(
+          'Choose how you want to clear your listening history:\n\n'
+          '• This Device Only: Removes history recorded by this device, keeps imported peer data, and empties this device\'s sync partition.\n\n'
+          '• Across All Synced Devices: Permanently purges history on all synced phones and PCs, advancing the sync epoch.',
+        ),
         actions: [
           AppDialogAction(
-            onPressed: () => Navigator.pop(context, false),
+            onPressed: () => Navigator.pop(context, 0),
             child: Text(context.l10n.dialogCancel),
           ),
           AppDialogAction(
+            onPressed: () => Navigator.pop(context, 1),
+            child: const Text('This Device Only'),
+          ),
+          AppDialogAction(
             isDestructive: true,
-            onPressed: () => Navigator.pop(context, true),
-            child: Text(context.l10n.listeningStatsClear),
+            onPressed: () => Navigator.pop(context, 2),
+            child: const Text('All Synced Devices'),
           ),
         ],
       ),
     );
-    if (confirmed != true || !mounted) return;
+    if (choice == null || choice == 0 || !mounted) return;
     setState(() => _clearing = true);
     try {
-      await listeningRecorder.clear(ListeningStatisticsStore.instance.clear);
+      if (choice == 1) {
+        await listeningRecorder.clear(
+          ListeningStatisticsStore.instance.clearThisDeviceHistory,
+        );
+      } else if (choice == 2) {
+        final confirmed = await showAppDialog<bool>(
+          context: context,
+          builder: (context) => AppAlertDialog(
+            title: const Text('Confirm Global Clear'),
+            content: const Text(
+              'Are you sure you want to delete listening history across ALL your devices? This action cannot be undone.',
+            ),
+            actions: [
+              AppDialogAction(
+                onPressed: () => Navigator.pop(context, false),
+                child: Text(context.l10n.dialogCancel),
+              ),
+              AppDialogAction(
+                isDestructive: true,
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Delete Everywhere'),
+              ),
+            ],
+          ),
+        );
+        if (confirmed == true) {
+          await SyncOrchestrationService.instance.clearAcrossAllDevices();
+        }
+      }
       ref.invalidate(listeningSummaryProvider);
       ref.invalidate(listeningRewindProvider);
       ref.invalidate(listeningRewindSpotlightProvider);
@@ -85,7 +237,27 @@ class _ListeningStatisticsScreenState
         onRefresh: () => ref.refresh(listeningSummaryProvider(period).future),
         child: CustomScrollView(
           slivers: [
-            AppSliverHeader.page(title: context.l10n.listeningStats),
+            AppSliverHeader.page(
+              title: context.l10n.listeningStats,
+              actions: [
+                if (_syncEnabled)
+                  AppIconButton(
+                    icon: _syncing
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.sync),
+                    tooltip: _syncing
+                        ? 'Syncing...'
+                        : (_lastSyncTime != null
+                              ? 'Last synced: ${DateFormat.jm().format(_lastSyncTime!.toLocal())}'
+                              : 'Sync Listening Statistics'),
+                    onPressed: _syncing || _clearing ? null : _handleManualSync,
+                  ),
+              ],
+            ),
             // Centered at the reading width on tablets, under the title.
             SliverPadding(
               padding: EdgeInsets.symmetric(horizontal: wideListInset(context)),

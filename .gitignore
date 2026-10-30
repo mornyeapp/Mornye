@@ -96,8 +96,12 @@ DerivedData/
 /extension/
 /tool/
 
+# Task board and internal planning notes
+/TASK_BOARD.md
+
 # Local documentation, migration archives, fixtures, and benchmark evidence.
-/docs/
+/docs/internal/
+/docs/drafts/
 
 # Temporary files and logs
 /.tmp/

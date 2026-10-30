@@ -1,8 +1,12 @@
 import 'dart:async';
+import 'dart:io';
+import 'dart:math';
 
 import 'package:mornye/services/sqlite_helpers.dart' as sqlite;
 import 'package:mornye/utils/logger.dart';
 import 'package:mornye/utils/string_utils.dart';
+import 'package:mornye/utils/track_identity_utils.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 
 final _log = AppLogger('ListeningStatistics');
@@ -255,54 +259,654 @@ class ListeningStatisticsStore {
   ListeningStatisticsStore._();
 
   final _database = sqlite.SingleFlightInitializer<Database>();
+  String? _cachedDeviceId;
+
+  static String _generateDeviceId() {
+    final platform = Platform.operatingSystem.toLowerCase();
+    final random = Random.secure();
+    final hex = List.generate(
+      16,
+      (_) => random.nextInt(256).toRadixString(16).padLeft(2, '0'),
+    ).join();
+    return 'dev_${platform}_$hex';
+  }
+
+  static Future<void> _createTablesAndTriggers(DatabaseExecutor db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS listening_metadata (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+      );
+    ''');
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS listening_device_records (
+        device_id TEXT NOT NULL,
+        day TEXT NOT NULL,
+        track_key TEXT NOT NULL,
+        title TEXT NOT NULL,
+        artist TEXT NOT NULL,
+        album TEXT NOT NULL,
+        artwork TEXT,
+        milliseconds INTEGER NOT NULL DEFAULT 0,
+        plays INTEGER NOT NULL DEFAULT 0,
+        updated_at INTEGER NOT NULL DEFAULT 0,
+        is_legacy INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (device_id, day, track_key)
+      );
+    ''');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_ldr_day ON listening_device_records(day);',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_ldr_device ON listening_device_records(device_id);',
+    );
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS listening (
+        day TEXT NOT NULL,
+        track_key TEXT NOT NULL,
+        title TEXT NOT NULL,
+        artist TEXT NOT NULL,
+        album TEXT NOT NULL,
+        artwork TEXT,
+        milliseconds INTEGER NOT NULL DEFAULT 0,
+        plays INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (day, track_key)
+      );
+    ''');
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS sync_outbox (
+        month TEXT PRIMARY KEY,
+        dirty INTEGER NOT NULL DEFAULT 1,
+        updated_at INTEGER NOT NULL
+      );
+    ''');
+
+    await db.execute('''
+      CREATE TRIGGER IF NOT EXISTS trg_ldr_insert AFTER INSERT ON listening_device_records
+      BEGIN
+        INSERT OR IGNORE INTO listening (day, track_key, title, artist, album, artwork, milliseconds, plays)
+        VALUES (new.day, new.track_key, new.title, new.artist, new.album, new.artwork, 0, 0);
+        UPDATE listening SET
+          title = new.title, artist = new.artist, album = new.album, artwork = new.artwork,
+          milliseconds = milliseconds + new.milliseconds,
+          plays = plays + new.plays
+        WHERE day = new.day AND track_key = new.track_key;
+      END;
+    ''');
+
+    await db.execute('''
+      CREATE TRIGGER IF NOT EXISTS trg_ldr_update AFTER UPDATE ON listening_device_records
+      BEGIN
+        -- Branch 1: Same grouping key
+        UPDATE listening SET
+          title = new.title, artist = new.artist, album = new.album, artwork = new.artwork,
+          milliseconds = milliseconds + (new.milliseconds - old.milliseconds),
+          plays = plays + (new.plays - old.plays)
+        WHERE day = new.day AND track_key = new.track_key
+          AND (old.day = new.day AND old.track_key = new.track_key);
+
+        -- Branch 2: Grouping key changed
+        UPDATE listening SET
+          milliseconds = milliseconds - old.milliseconds,
+          plays = plays - old.plays
+        WHERE day = old.day AND track_key = old.track_key
+          AND (old.day != new.day OR old.track_key != new.track_key);
+
+        DELETE FROM listening
+        WHERE day = old.day AND track_key = old.track_key
+          AND (old.day != new.day OR old.track_key != new.track_key)
+          AND milliseconds <= 0 AND plays <= 0;
+
+        INSERT OR IGNORE INTO listening (day, track_key, title, artist, album, artwork, milliseconds, plays)
+        SELECT new.day, new.track_key, new.title, new.artist, new.album, new.artwork, 0, 0
+        WHERE (old.day != new.day OR old.track_key != new.track_key);
+
+        UPDATE listening SET
+          title = new.title, artist = new.artist, album = new.album, artwork = new.artwork,
+          milliseconds = milliseconds + new.milliseconds,
+          plays = plays + new.plays
+        WHERE day = new.day AND track_key = new.track_key
+          AND (old.day != new.day OR old.track_key != new.track_key);
+      END;
+    ''');
+
+    await db.execute('''
+      CREATE TRIGGER IF NOT EXISTS trg_ldr_delete AFTER DELETE ON listening_device_records
+      BEGIN
+        UPDATE listening SET
+          milliseconds = milliseconds - old.milliseconds,
+          plays = plays - old.plays
+        WHERE day = old.day AND track_key = old.track_key;
+
+        DELETE FROM listening
+        WHERE day = old.day AND track_key = old.track_key
+          AND milliseconds <= 0 AND plays <= 0;
+      END;
+    ''');
+  }
 
   Future<Database> _open() => _database.getOrCreate(
     () => sqlite.openAppDatabase(
       'listening_statistics.db',
-      version: 1,
-      onCreate: (db, _) => db.execute('''
-        CREATE TABLE listening (
-          day TEXT NOT NULL,
-          track_key TEXT NOT NULL,
-          title TEXT NOT NULL,
-          artist TEXT NOT NULL,
-          album TEXT NOT NULL,
-          artwork TEXT,
-          milliseconds INTEGER NOT NULL DEFAULT 0,
-          plays INTEGER NOT NULL DEFAULT 0,
-          PRIMARY KEY (day, track_key)
-        )
-      '''),
-      onUpgrade: (_, _, _) async {},
+      version: 2,
+      onCreate: (db, _) async {
+        await _createTablesAndTriggers(db);
+        String? devId;
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          devId = prefs.getString('mornye_sync_device_id');
+        } catch (_) {}
+        devId ??= _generateDeviceId();
+        _cachedDeviceId = devId;
+
+        await db.insert('listening_metadata', {
+          'key': 'local_device_id',
+          'value': devId,
+        }, conflictAlgorithm: ConflictAlgorithm.ignore);
+        await db.insert('listening_metadata', {
+          'key': 'schema_version',
+          'value': '2',
+        }, conflictAlgorithm: ConflictAlgorithm.replace);
+        await db.insert('listening_metadata', {
+          'key': 'sync_epoch',
+          'value': '1',
+        }, conflictAlgorithm: ConflictAlgorithm.ignore);
+      },
+      onUpgrade: (db, oldVersion, newVersion) async {
+        if (oldVersion < 2) {
+          await _createTablesAndTriggers(db);
+
+          // Preserve existing local_device_id if already present
+          final existingRows = await db.query(
+            'listening_metadata',
+            where: 'key = ?',
+            whereArgs: ['local_device_id'],
+            limit: 1,
+          );
+          String? devId;
+          if (existingRows.isNotEmpty) {
+            devId = existingRows.first['value'] as String?;
+          }
+          if (devId == null || devId.isEmpty) {
+            try {
+              final prefs = await SharedPreferences.getInstance();
+              devId = prefs.getString('mornye_sync_device_id');
+            } catch (_) {}
+          }
+          devId ??= _generateDeviceId();
+          _cachedDeviceId = devId;
+
+          await db.insert('listening_metadata', {
+            'key': 'local_device_id',
+            'value': devId,
+          }, conflictAlgorithm: ConflictAlgorithm.ignore);
+          await db.insert('listening_metadata', {
+            'key': 'schema_version',
+            'value': '2',
+          }, conflictAlgorithm: ConflictAlgorithm.replace);
+          await db.insert('listening_metadata', {
+            'key': 'sync_epoch',
+            'value': '1',
+          }, conflictAlgorithm: ConflictAlgorithm.ignore);
+
+          // Migrate legacy listening records safely (idempotent)
+          await migrateLegacyHistory(dbOverride: db, targetDeviceId: devId);
+        }
+      },
     ),
   );
 
+  /// Migrates legacy v1 `listening` records into `listening_device_records`
+  /// keyed under the target device ID with canonicalized track keys,
+  /// marks affected months dirty in `sync_outbox`, and rebuilds the summary table.
+  ///
+  /// Can be called during [onUpgrade] or manually on an arbitrary [DatabaseExecutor].
+  Future<void> migrateLegacyHistory({
+    DatabaseExecutor? dbOverride,
+    String? targetDeviceId,
+  }) async {
+    final db = dbOverride ?? (await _open());
+    final devId = targetDeviceId ?? (await deviceId());
+
+    // Never duplicate legacy records if already migrated
+    final legacyCount =
+        Sqflite.firstIntValue(
+          await db.rawQuery(
+            'SELECT COUNT(*) FROM listening_device_records WHERE is_legacy = 1',
+          ),
+        ) ??
+        0;
+    if (legacyCount > 0) return;
+
+    final existingForDev =
+        Sqflite.firstIntValue(
+          await db.rawQuery(
+            'SELECT COUNT(*) FROM listening_device_records WHERE device_id = ?',
+            [devId],
+          ),
+        ) ??
+        0;
+    if (existingForDev > 0) return;
+
+    final legacyRows = await db.query('listening');
+    if (legacyRows.isEmpty) return;
+
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
+    final monthsToDirty = <String>{};
+
+    for (final row in legacyRows) {
+      final rawKey = row['track_key'] as String;
+      final title = row['title'] as String;
+      final artist = row['artist'] as String;
+      final day = row['day'] as String;
+      final canonical = TrackIdentityUtils.canonicalKey(
+        title: title,
+        artist: artist,
+        source: rawKey,
+      );
+      await db.rawInsert(
+        '''
+        INSERT INTO listening_device_records
+          (device_id, day, track_key, title, artist, album, artwork, milliseconds, plays, updated_at, is_legacy)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+        ON CONFLICT(device_id, day, track_key) DO UPDATE SET
+          title = excluded.title,
+          artist = excluded.artist,
+          album = excluded.album,
+          artwork = COALESCE(excluded.artwork, listening_device_records.artwork),
+          milliseconds = listening_device_records.milliseconds + excluded.milliseconds,
+          plays = listening_device_records.plays + excluded.plays
+      ''',
+        [
+          devId,
+          day,
+          canonical,
+          title,
+          artist,
+          row['album'] as String,
+          row['artwork'] as String?,
+          row['milliseconds'] as int,
+          row['plays'] as int,
+          nowMs,
+        ],
+      );
+      if (day.length >= 7) {
+        monthsToDirty.add(day.substring(0, 7));
+      }
+    }
+
+    // Mark historical months dirty in sync outbox so baseline will sync
+    for (final month in monthsToDirty) {
+      await db.rawInsert(
+        '''
+        INSERT OR REPLACE INTO sync_outbox (month, dirty, updated_at)
+        VALUES (?, 1, ?)
+      ''',
+        [month, nowMs],
+      );
+    }
+
+    // Self-healing rebuild of physical summary table
+    await db.execute('DELETE FROM listening;');
+    await db.execute('''
+      INSERT INTO listening (day, track_key, title, artist, album, artwork, milliseconds, plays)
+      SELECT day, track_key, MAX(title), MAX(artist), MAX(album), MAX(artwork),
+             SUM(milliseconds), SUM(plays)
+      FROM listening_device_records
+      GROUP BY day, track_key
+      HAVING SUM(milliseconds) > 0 OR SUM(plays) > 0;
+    ''');
+  }
+
+  /// Returns the persistent unique identifier for this local device installation.
+  Future<String> deviceId() async {
+    if (_cachedDeviceId != null) return _cachedDeviceId!;
+
+    // 1. Check SharedPreferences first (durable anchor across DB upgrades/rebuilds)
+    String? devId;
+    try {
+      final prefs = await SharedPreferences.getInstance().timeout(
+        const Duration(milliseconds: 300),
+      );
+      devId = prefs.getString('mornye_sync_device_id');
+    } catch (_) {}
+
+    if (devId != null && devId.isNotEmpty) {
+      _cachedDeviceId = devId;
+      return devId;
+    }
+
+    // 2. Generate once and persist in SharedPreferences
+    final generated = _generateDeviceId();
+    _cachedDeviceId = generated;
+    try {
+      final prefs = await SharedPreferences.getInstance().timeout(
+        const Duration(milliseconds: 300),
+      );
+      await prefs.setString('mornye_sync_device_id', generated);
+    } catch (_) {}
+    return generated;
+  }
+
+  /// Reconciles device records by removing orphaned or superseded device IDs
+  /// that are no longer part of the valid device set. Native triggers ensure
+  /// the materialized summary table immediately decrements accordingly.
+  Future<void> pruneObsoleteDeviceRecords({
+    required String localDeviceId,
+    required Set<String> activePeerDeviceIds,
+  }) async {
+    final db = await _open();
+    final allAllowedIds = {localDeviceId, ...activePeerDeviceIds};
+    final placeholders = List.filled(allAllowedIds.length, '?').join(', ');
+
+    final obsoleteRows = await db.rawQuery(
+      'SELECT DISTINCT device_id FROM listening_device_records WHERE device_id NOT IN ($placeholders)',
+      allAllowedIds.toList(),
+    );
+    if (obsoleteRows.isEmpty) return;
+
+    await db.transaction((txn) async {
+      for (final row in obsoleteRows) {
+        final obsoleteId = row['device_id'] as String;
+        _log.i('Pruning obsolete/superseded device records for $obsoleteId');
+        await txn.delete(
+          'listening_device_records',
+          where: 'device_id = ?',
+          whereArgs: [obsoleteId],
+        );
+      }
+    });
+  }
+
+  /// Safely cleans up foreign peer records from listening_device_records
+  /// whose device registration was superseded or pruned from manifest.json.
+  /// Strictly NEVER modifies local device records (device_id == localDeviceId).
+  Future<void> pruneObsoletePeerRecords({
+    required String localDeviceId,
+    required Set<String> validPeerDeviceIds,
+  }) async {
+    final db = await _open();
+    final allPeerRows = await db.rawQuery(
+      'SELECT DISTINCT device_id FROM listening_device_records WHERE device_id != ?',
+      [localDeviceId],
+    );
+    if (allPeerRows.isEmpty) return;
+
+    final obsoletePeerIds = <String>[];
+    for (final row in allPeerRows) {
+      final peerId = row['device_id'] as String;
+      if (!validPeerDeviceIds.contains(peerId)) {
+        obsoletePeerIds.add(peerId);
+      }
+    }
+    if (obsoletePeerIds.isEmpty) return;
+
+    await db.transaction((txn) async {
+      for (final obsoleteId in obsoletePeerIds) {
+        _log.i('Pruning superseded foreign peer records for $obsoleteId');
+        await txn.delete(
+          'listening_device_records',
+          where: 'device_id = ?',
+          whereArgs: [obsoleteId],
+        );
+      }
+    });
+  }
+
+  /// Returns all unique device IDs currently present in listening_device_records.
+  Future<Set<String>> knownDeviceIds() async {
+    final db = await _open();
+    final rows = await db.rawQuery(
+      'SELECT DISTINCT device_id FROM listening_device_records',
+    );
+    return {
+      for (final r in rows)
+        if (r['device_id'] is String && (r['device_id'] as String).isNotEmpty)
+          r['device_id'] as String,
+    };
+  }
+
+  /// Reads a value from listening_metadata.
+  Future<String?> readMetadata(String key) async {
+    final db = await _open();
+    final rows = await db.query(
+      'listening_metadata',
+      where: 'key = ?',
+      whereArgs: [key],
+      limit: 1,
+    );
+    if (rows.isNotEmpty) {
+      return rows.first['value'] as String?;
+    }
+    return null;
+  }
+
+  /// Writes a key-value pair to listening_metadata.
+  Future<void> writeMetadata(String key, String value) async {
+    final db = await _open();
+    await db.insert('listening_metadata', {
+      'key': key,
+      'value': value,
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  /// Returns the current sync epoch from metadata.
+  Future<int> currentSyncEpoch() async {
+    final val = await readMetadata('sync_epoch');
+    if (val != null) {
+      return int.tryParse(val) ?? 1;
+    }
+    return 1;
+  }
+
+  /// Sets the sync epoch in metadata.
+  Future<void> updateSyncEpoch(int epoch) async {
+    await writeMetadata('sync_epoch', epoch.toString());
+  }
+
+  /// Returns the set of months (YYYY-MM) with pending dirty changes to upload.
+  Future<List<String>> dirtyMonths() async {
+    final db = await _open();
+    final rows = await db.query(
+      'sync_outbox',
+      where: 'dirty = 1',
+      orderBy: 'month ASC',
+    );
+    return [for (final row in rows) row['month'] as String];
+  }
+
+  /// Marks a month clean in the sync outbox once successfully uploaded.
+  Future<void> markMonthClean(String month) async {
+    final db = await _open();
+    await db.delete('sync_outbox', where: 'month = ?', whereArgs: [month]);
+  }
+
+  /// Marks a month dirty in the sync outbox.
+  Future<void> markMonthDirty(String month) async {
+    final db = await _open();
+    await db.insert('sync_outbox', {
+      'month': month,
+      'dirty': 1,
+      'updated_at': DateTime.now().millisecondsSinceEpoch,
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  /// Reads all device records for a specific device and calendar month (YYYY-MM).
+  Future<List<Map<String, dynamic>>> getRecordsForMonth(
+    String deviceId,
+    String month,
+  ) async {
+    final db = await _open();
+    final rows = await db.rawQuery(
+      '''
+      SELECT day, track_key, title, artist, album, artwork, milliseconds, plays, updated_at
+      FROM listening_device_records
+      WHERE device_id = ? AND day >= ? AND day <= ?
+      ORDER BY day ASC, milliseconds DESC
+    ''',
+      [deviceId, '$month-01', '$month-31'],
+    );
+    return [for (final r in rows) Map<String, dynamic>.from(r)];
+  }
+
+  /// Atomically replaces an entire month partition for a given peer device.
+  /// Native triggers automatically update the physical summary table.
+  Future<void> replaceDeviceMonthRecords(
+    String remoteDeviceId,
+    String month,
+    List<Map<String, dynamic>> records,
+  ) async {
+    final localId = await deviceId();
+    if (remoteDeviceId == localId) {
+      _log.w(
+        'Refusing to replace partition for local device ID: $remoteDeviceId',
+      );
+      return;
+    }
+
+    final db = await _open();
+    await db.transaction((transaction) async {
+      await transaction.delete(
+        'listening_device_records',
+        where: 'device_id = ? AND day >= ? AND day <= ?',
+        whereArgs: [remoteDeviceId, '$month-01', '$month-31'],
+      );
+      final batch = transaction.batch();
+      for (final record in records) {
+        batch.rawInsert(
+          '''
+          INSERT INTO listening_device_records
+            (device_id, day, track_key, title, artist, album, artwork, milliseconds, plays, updated_at, is_legacy)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+          ON CONFLICT(device_id, day, track_key) DO UPDATE SET
+            title = excluded.title,
+            artist = excluded.artist,
+            album = excluded.album,
+            artwork = COALESCE(excluded.artwork, listening_device_records.artwork),
+            milliseconds = excluded.milliseconds,
+            plays = excluded.plays,
+            updated_at = excluded.updated_at
+        ''',
+          [
+            remoteDeviceId,
+            record['day'],
+            record['track_key'] ?? record['canonicalKey'],
+            record['title'] ?? '',
+            record['artist'] ?? '',
+            record['album'] ?? '',
+            record['artwork'],
+            record['milliseconds'] ?? 0,
+            record['plays'] ?? 0,
+            record['updated_at'] ?? DateTime.now().millisecondsSinceEpoch,
+          ],
+        );
+      }
+      await batch.commit(noResult: true);
+    });
+  }
+
+  /// Rebuilds the physical summary table from all device records.
+  Future<void> rebuildSummaryTable() async {
+    final db = await _open();
+    await db.transaction((transaction) async {
+      await transaction.execute('DELETE FROM listening;');
+      await transaction.execute('''
+        INSERT INTO listening (day, track_key, title, artist, album, artwork, milliseconds, plays)
+        SELECT day, track_key, MAX(title), MAX(artist), MAX(album), MAX(artwork),
+               SUM(milliseconds), SUM(plays)
+        FROM listening_device_records
+        GROUP BY day, track_key
+        HAVING SUM(milliseconds) > 0 OR SUM(plays) > 0;
+      ''');
+    });
+  }
+
+  /// Clears listening records created by this device only.
+  Future<void> clearThisDeviceHistory() async {
+    final db = await _open();
+    final devId = await deviceId();
+    await db.transaction((transaction) async {
+      // Find all months affected by this device
+      final rows = await transaction.rawQuery(
+        'SELECT DISTINCT substr(day, 1, 7) AS month FROM listening_device_records WHERE device_id = ?',
+        [devId],
+      );
+      await transaction.delete(
+        'listening_device_records',
+        where: 'device_id = ?',
+        whereArgs: [devId],
+      );
+      final nowMs = DateTime.now().millisecondsSinceEpoch;
+      for (final r in rows) {
+        final month = r['month'] as String?;
+        if (month != null && month.isNotEmpty) {
+          await transaction.insert('sync_outbox', {
+            'month': month,
+            'dirty': 1,
+            'updated_at': nowMs,
+          }, conflictAlgorithm: ConflictAlgorithm.replace);
+        }
+      }
+    });
+  }
+
+  /// Clears history across all synced devices and advances to a new sync epoch.
+  Future<void> clearAllHistory({required int newEpoch}) async {
+    final db = await _open();
+    await db.transaction((transaction) async {
+      await transaction.delete('listening_device_records');
+      await transaction.delete('listening');
+      await transaction.delete('sync_outbox');
+      await transaction.insert('listening_metadata', {
+        'key': 'sync_epoch',
+        'value': newEpoch.toString(),
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+    });
+  }
+
   Future<void> add(List<ListeningDelta> deltas) async {
     final db = await _open();
+    final localDeviceId = await deviceId();
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
+    final dirtyMonths = <String>{};
+
     await db.transaction((transaction) async {
       final batch = transaction.batch();
       for (final delta in deltas) {
+        final canonicalKey = TrackIdentityUtils.canonicalKey(
+          title: delta.track.title,
+          artist: delta.track.artist,
+          source: delta.track.key,
+        );
+
         batch.rawInsert(
           '''
-          INSERT OR IGNORE INTO listening
-            (day, track_key, title, artist, album, artwork, milliseconds, plays)
-          VALUES (?, ?, ?, ?, ?, ?, 0, 0)
+          INSERT OR IGNORE INTO listening_device_records
+            (device_id, day, track_key, title, artist, album, artwork, milliseconds, plays, updated_at, is_legacy)
+          VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0, ?, 0)
         ''',
           [
+            localDeviceId,
             delta.day,
-            delta.track.key,
+            canonicalKey,
             delta.track.title,
             delta.track.artist,
             delta.track.album,
             delta.track.artwork,
+            nowMs,
           ],
         );
-        // Avoid UPSERT syntax unavailable in older Android SQLite versions.
+
         batch.rawUpdate(
           '''
-          UPDATE listening SET title = ?, artist = ?, album = ?, artwork = ?,
-            milliseconds = milliseconds + ?, plays = plays + ?
-          WHERE day = ? AND track_key = ?
+          UPDATE listening_device_records SET
+            title = ?, artist = ?, album = ?, artwork = ?,
+            milliseconds = milliseconds + ?, plays = plays + ?,
+            updated_at = ?
+          WHERE device_id = ? AND day = ? AND track_key = ?
         ''',
           [
             delta.track.title,
@@ -311,11 +915,28 @@ class ListeningStatisticsStore {
             delta.track.artwork,
             delta.milliseconds,
             delta.plays,
+            nowMs,
+            localDeviceId,
             delta.day,
-            delta.track.key,
+            canonicalKey,
           ],
         );
+
+        if (delta.day.length >= 7) {
+          dirtyMonths.add(delta.day.substring(0, 7));
+        }
       }
+
+      for (final month in dirtyMonths) {
+        batch.rawInsert(
+          '''
+          INSERT OR REPLACE INTO sync_outbox (month, dirty, updated_at)
+          VALUES (?, 1, ?)
+        ''',
+          [month, nowMs],
+        );
+      }
+
       await batch.commit(noResult: true);
     });
   }
@@ -329,7 +950,7 @@ class ListeningStatisticsStore {
   Future<T> read<T>(Future<T> Function(DatabaseExecutor db) query) async =>
       query(await _open());
 
-  Future<void> clear() async => (await _open()).delete('listening');
+  Future<void> clear() async => clearThisDeviceHistory();
 }
 
 /// Aggregate in SQLite so an annual recap transfers one row per song, artist
