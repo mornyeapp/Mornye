@@ -82,6 +82,9 @@ void main() {
         }
         await waitForActivityAttachment(binding);
       }
+      // Asked after attachment, so an app a media browser started long
+      // before it opens still reads the current wallpaper colors.
+      final dynamicColors = DynamicColors.request();
       final orientation = _initializeOrientation();
       // Desktop: log files and the unclean-exit marker, before the error
       // hooks below start writing to them.
@@ -171,6 +174,9 @@ void main() {
       final runtimeProfile = await _resolveRuntimeProfile(prefs);
       _configureImageCache(runtimeProfile);
       await orientation;
+      // Usually answered by now. The first frame then has the final theme,
+      // with no fade from the seed colors; a late answer still applies.
+      await dynamicColors.settle(const Duration(milliseconds: 100));
 
       runApp(
         ProviderScope(
@@ -191,6 +197,7 @@ void main() {
               initialSafAccessLost,
             ),
             initialThemeSettingsProvider.overrideWithValue(bootstrapTheme),
+            initialDynamicColorsProvider.overrideWithValue(dynamicColors),
             // While the paired desktop plays in the phone's place, the
             // player screens show and drive it; on the desktop, the phone
             // it follows.

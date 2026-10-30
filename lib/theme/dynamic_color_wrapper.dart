@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:dynamic_color/dynamic_color.dart';
 import 'package:material_ui/material_ui.dart' as material_ui;
 import 'package:mornye/providers/theme_provider.dart';
 import 'package:mornye/providers/custom_font_provider.dart';
@@ -32,12 +31,16 @@ class DynamicColorWrapper extends ConsumerWidget {
         ),
       ),
     );
-    final fontFamily = ref.watch(customFontFamilyProvider).asData?.value;
+    // Only the family: a rebuild while it loads would animate an equal theme.
+    final fontFamily = ref.watch(
+      customFontFamilyProvider.select((font) => font.asData?.value),
+    );
 
-    // Both styles build below the same DynamicColorBuilder. Switching styles
+    // Both styles build below the same _DynamicColorBuilder. Switching styles
     // must update the app in place: a different parent remounted the whole
     // app, losing its state and briefly mounting a second macOS menu bar.
-    return DynamicColorBuilder(
+    return _DynamicColorBuilder(
+      colors: ref.watch(initialDynamicColorsProvider),
       builder: (lightDynamic, darkDynamic) {
         if (themeSettings.style == AppThemeStyle.mornye) {
           return builder(
@@ -160,4 +163,41 @@ class DynamicColorWrapper extends ConsumerWidget {
       onInverseSurface: Colors.black,
     );
   }
+}
+
+/// Builds with the system's colors. A launch request answered before the
+/// first frame builds it with them, so the theme does not fade into them.
+class _DynamicColorBuilder extends StatefulWidget {
+  const _DynamicColorBuilder({required this.colors, required this.builder});
+
+  final DynamicColors? colors;
+  final Widget Function(
+    material_ui.ColorScheme? lightDynamic,
+    material_ui.ColorScheme? darkDynamic,
+  )
+  builder;
+
+  @override
+  State<_DynamicColorBuilder> createState() => _DynamicColorBuilderState();
+}
+
+class _DynamicColorBuilderState extends State<_DynamicColorBuilder> {
+  DynamicColorSchemes? _schemes;
+
+  @override
+  void initState() {
+    super.initState();
+    final colors = widget.colors ?? DynamicColors.request();
+    if (colors.isSettled) {
+      _schemes = colors.schemes;
+      return;
+    }
+    colors.future.then<void>((schemes) {
+      if (mounted && schemes != null) setState(() => _schemes = schemes);
+    }, onError: (Object _) {});
+  }
+
+  @override
+  Widget build(BuildContext context) =>
+      widget.builder(_schemes?.light, _schemes?.dark);
 }
