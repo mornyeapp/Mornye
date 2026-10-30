@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -438,6 +439,104 @@ void main() {
       expect(tags['cover_path'], isNotNull);
       expect(
         server.requests.where((uri) => uri.path.contains('stream')),
+        isEmpty,
+      );
+    },
+  );
+
+  /// 120 albums of ten songs and one video. Albums 110 to 114 have no
+  /// cover; the songs of albums 115 to 119 have their own.
+  List<Map<String, dynamic>> library() => [
+    for (var album = 0; album < 120; album++)
+      for (var track = 1; track <= 10; track++)
+        {
+          for (final field in server.song.entries)
+            if (field.key != 'coverArt') field.key: field.value,
+          'id': 'song $album/$track',
+          'title': 'Song $album/$track',
+          'album': 'Album $album',
+          'albumId': 'album/$album',
+          'track': track,
+          if (album < 110) 'coverArt': 'album/$album',
+          if (album >= 115) 'coverArt': 'song $album/$track',
+        },
+    {...server.song, 'id': 'video', 'albumId': 'album/0', 'isVideo': true},
+  ];
+
+  List<Map<String, String>> requested(String method) => [
+    for (final uri in server.requests)
+      if (uri.pathSegments.last == '$method.view') uri.queryParameters,
+  ];
+
+  test(
+    'a Mornye desktop syncs through search3 pages with the same rows',
+    () async {
+      Future<List<String>> rows() async {
+        final scan = await scanner().scan(
+          'network://fixture/',
+          checkpoint: () async {},
+          onProgress: (_, _, _) {},
+        );
+        expect(scan.expectedCount, 1200);
+        return [
+          for (final row in await scan.rows().toList())
+            jsonEncode(row..remove('scannedAt')),
+        ]..sort();
+      }
+
+      final songs = library();
+      server.type = 'mornye';
+      // search3 lists songs in export order, which keeps no album together.
+      server.library = [...songs]..shuffle(Random(7));
+      final searched = await rows();
+      expect(requested('getAlbumList2'), hasLength(1));
+      expect(requested('getAlbum'), isEmpty);
+      final pages = requested('search3');
+      expect(pages.map((page) => page['songOffset']), ['0', '500', '1000']);
+      for (final page in pages) {
+        expect(page, containsPair('query', ''));
+        expect(page, containsPair('songCount', '500'));
+        expect(page, containsPair('artistCount', '0'));
+        expect(page, containsPair('albumCount', '0'));
+      }
+      // One artwork request per cover id: 110 albums and 50 songs.
+      final covers = requested('getCoverArt').map((query) => query['id']);
+      expect(covers, hasLength(160));
+      expect(covers.toSet(), hasLength(160));
+      expect(
+        searched.where((row) => row.contains('"coverPath"')),
+        hasLength(1150),
+      );
+
+      server.requests.clear();
+      server.type = null;
+      server.library = songs;
+      final walked = await rows();
+      expect(requested('getAlbumList2'), hasLength(1));
+      expect(requested('getAlbum'), hasLength(120));
+      expect(requested('search3'), isEmpty);
+      expect(requested('getCoverArt'), isEmpty);
+      expect(searched, walked);
+    },
+  );
+
+  test(
+    'a Mornye desktop that repeats full song pages cannot publish a truncated catalogue',
+    () async {
+      server.type = 'mornye';
+      server.library = library();
+      server.repeatPage = true;
+      await expectLater(
+        scanner().scan(
+          'network://fixture/',
+          checkpoint: () async {},
+          onProgress: (_, _, _) {},
+        ),
+        throwsA(isA<HttpException>()),
+      );
+      expect(requested('search3'), hasLength(2));
+      expect(
+        await Directory('${directory.path}/network_scans').list().toList(),
         isEmpty,
       );
     },

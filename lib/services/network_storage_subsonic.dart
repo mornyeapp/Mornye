@@ -371,15 +371,16 @@ class SubsonicClient {
     throw const FormatException('Invalid Subsonic folder');
   }
 
-  Future<List<Map<String, dynamic>>> _albums(int offset) async => _subsonicList(
-    _subsonicMap(
-      (await request('getAlbumList2', {
-        'type': 'alphabeticalByName',
-        'size': '200',
-        'offset': '$offset',
-      }))['albumList2'],
-    )['album'],
+  Future<List<Map<String, dynamic>>> _albums(int offset) async =>
+      _albumPage(await _albumList(offset));
+
+  Future<Map<String, dynamic>> _albumList(int offset) => request(
+    'getAlbumList2',
+    {'type': 'alphabeticalByName', 'size': '200', 'offset': '$offset'},
   );
+
+  static List<Map<String, dynamic>> _albumPage(Map<String, dynamic> response) =>
+      _subsonicList(_subsonicMap(response['albumList2'])['album']);
 
   Future<List<SubsonicSong>> _songs(String albumId) async => _subsonicList(
     _subsonicMap((await request('getAlbum', {'id': albumId}))['album'])['song'],
@@ -452,14 +453,28 @@ class SubsonicClient {
     return '${two(time ~/ 60000)}:${two(time ~/ 1000 % 60)}.${two(time % 1000 ~/ 10)}';
   }
 
+  /// Every song of the server once. A Mornye desktop (`type: "mornye"`)
+  /// pages them through an empty `search3` query, which answers the same
+  /// song objects as `getAlbum`; other servers are walked album by album.
   Stream<SubsonicSong> catalog({
     required Future<void> Function() checkpoint,
   }) async* {
+    await checkpoint();
+    final first = await _albumList(0);
+    yield* first['type'] == 'mornye'
+        ? _searchCatalog(checkpoint)
+        : _albumCatalog(first, checkpoint);
+  }
+
+  Stream<SubsonicSong> _albumCatalog(
+    Map<String, dynamic> first,
+    Future<void> Function() checkpoint,
+  ) async* {
     final albums = <String>{};
     final songs = <String>{};
     for (var offset = 0; offset <= 1000000; offset += 200) {
-      await checkpoint();
-      final page = await _albums(offset);
+      if (offset > 0) await checkpoint();
+      final page = offset == 0 ? _albumPage(first) : await _albums(offset);
       await checkpoint();
       var newAlbums = 0;
       for (final album in page) {
@@ -478,6 +493,43 @@ class SubsonicClient {
       }
       if (page.length < 200) return;
       if (newAlbums == 0) {
+        throw const HttpException('Subsonic pagination did not advance');
+      }
+    }
+    throw const HttpException('Subsonic library is too large');
+  }
+
+  Stream<SubsonicSong> _searchCatalog(
+    Future<void> Function() checkpoint,
+  ) async* {
+    final songs = <String>{};
+    for (var offset = 0; offset <= 1000000; offset += 500) {
+      await checkpoint();
+      final page = _subsonicList(
+        _subsonicMap(
+          (await request('search3', {
+            'query': '',
+            'artistCount': '0',
+            'albumCount': '0',
+            'songCount': '500',
+            'songOffset': '$offset',
+          }))['searchResult3'],
+        )['song'],
+      );
+      await checkpoint();
+      var newSongs = 0;
+      for (final value in page.where((song) => song['isVideo'] != true)) {
+        await checkpoint();
+        final song = SubsonicSong(value);
+        if (!songs.add(song.id)) continue;
+        newSongs++;
+        yield song;
+        if (songs.length > 500000) {
+          throw const HttpException('Subsonic library is too large');
+        }
+      }
+      if (page.length < 500) return;
+      if (newSongs == 0) {
         throw const HttpException('Subsonic pagination did not advance');
       }
     }

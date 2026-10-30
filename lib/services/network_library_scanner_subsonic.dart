@@ -32,7 +32,8 @@ extension on NetworkLibraryScanner {
         String? cover;
         if (song.coverId.isNotEmpty) {
           if (!artwork.containsKey(song.coverId)) {
-            if (artwork.length >= 128) artwork.remove(artwork.keys.first);
+            // A search3 catalog keeps no album's songs together.
+            if (artwork.length >= 20000) artwork.remove(artwork.keys.first);
             try {
               artwork[song.coverId] = await client.cachedCover(
                 song,

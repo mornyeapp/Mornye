@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:mornye/services/network_storage_service.dart';
 
@@ -41,6 +42,14 @@ class SubsonicFixture {
   String? redirect;
   List<int>? audio;
   List<int>? cover;
+
+  /// The OpenSubsonic `type` of every response (`mornye` for a desktop).
+  String? type;
+
+  /// Songs with an `albumId`, served instead of [song]: getAlbumList2 lists
+  /// their album ids in order, getAlbum and search3 (by `songOffset`, at
+  /// most 500 a page) list songs in this order.
+  List<Map<String, dynamic>>? library;
 
   /// The `lyricsList` answered by getLyricsBySongId; without one the server
   /// lacks the songLyrics extension.
@@ -141,7 +150,35 @@ class SubsonicFixture {
         response.contentLength = bytes.length;
         response.add(bytes);
       } else {
+        final query = request.uri.queryParameters;
+        final songs = library;
         final payload = switch (method) {
+          'getAlbumList2' when songs != null => {
+            'albumList2': {
+              'album': [
+                for (final id in {
+                  for (final song in songs) song['albumId'],
+                }.skip(int.parse(query['offset']!)).take(200))
+                  {'id': id, 'name': id},
+              ],
+            },
+          },
+          'getAlbum' when songs != null => {
+            'album': {
+              'song': [
+                for (final song in songs)
+                  if (song['albumId'] == query['id']) song,
+              ],
+            },
+          },
+          'search3' when songs != null => {
+            'searchResult3': {
+              'song': songs
+                  .skip(repeatPage ? 0 : int.parse(query['songOffset']!))
+                  .take(min(int.parse(query['songCount']!), 500))
+                  .toList(),
+            },
+          },
           'ping' => <String, dynamic>{},
           'getArtists' => {
             'artists': {
@@ -209,6 +246,7 @@ class SubsonicFixture {
           jsonEncode({
             'subsonic-response': {
               'status': payload.containsKey('error') ? 'failed' : 'ok',
+              'type': ?type,
               ...payload,
             },
           }),
