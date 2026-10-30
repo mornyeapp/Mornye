@@ -13,7 +13,16 @@ struct Entry {
     hash: u64,
     original: Arc<[u8]>,
     thumbnail: Arc<[u8]>,
+    stored: Arc<Mutex<Option<String>>>,
     bytes: usize,
+}
+
+/// A Library thumbnail. Every hit on the same artwork shares `stored`, where
+/// a caller notes the file that holds these bytes, so the next song can link
+/// that file instead of writing them again.
+pub struct LibraryThumbnail {
+    pub data: Arc<[u8]>,
+    pub stored: Arc<Mutex<Option<String>>>,
 }
 
 #[derive(Default)]
@@ -45,6 +54,14 @@ pub fn library_thumbnail(
     data: &[u8],
     check: &dyn Fn() -> Result<(), String>,
 ) -> Result<Arc<[u8]>, String> {
+    library_thumbnail_entry(data, check).map(|thumbnail| thumbnail.data)
+}
+
+/// [`library_thumbnail`] with the record of where its bytes are stored.
+pub fn library_thumbnail_entry(
+    data: &[u8],
+    check: &dyn Fn() -> Result<(), String>,
+) -> Result<LibraryThumbnail, String> {
     check()?;
     let mut hasher = DefaultHasher::new();
     data.hash(&mut hasher);
@@ -64,7 +81,10 @@ pub fn library_thumbnail(
         .position(|entry| entry.hash == hash && &*entry.original == data)
     {
         let entry = cache.entries.remove(index).expect("cached thumbnail");
-        let thumbnail = entry.thumbnail.clone();
+        let thumbnail = LibraryThumbnail {
+            data: entry.thumbnail.clone(),
+            stored: entry.stored.clone(),
+        };
         cache.entries.push_back(entry);
         return Ok(thumbnail);
     }
@@ -76,7 +96,10 @@ pub fn library_thumbnail(
         let std::borrow::Cow::Owned(thumbnail) = resized else {
             unreachable!("owned resized thumbnail");
         };
-        return Ok(thumbnail.into());
+        return Ok(LibraryThumbnail {
+            data: thumbnail.into(),
+            stored: Arc::default(),
+        });
     }
     let original: Arc<[u8]> = data.into();
     let thumbnail = match resized {
@@ -90,13 +113,18 @@ pub fn library_thumbnail(
         } else {
             thumbnail.len()
         };
+    let stored = Arc::<Mutex<_>>::default();
     cache.insert(Entry {
         hash,
         original,
         thumbnail: thumbnail.clone(),
+        stored: stored.clone(),
         bytes,
     });
-    Ok(thumbnail)
+    Ok(LibraryThumbnail {
+        data: thumbnail,
+        stored,
+    })
 }
 
 #[cfg(test)]
@@ -116,6 +144,24 @@ mod tests {
         assert!(Arc::ptr_eq(&first, &second));
         assert_eq!(super::super::dimensions(&first), (800, 800));
         assert!(library_thumbnail(png.get_ref(), &|| Err("cancelled".into())).is_err());
+    }
+
+    #[test]
+    fn hits_on_the_same_artwork_share_where_it_is_stored() {
+        let picture = |red: u8| {
+            let mut png = Cursor::new(Vec::new());
+            ImageBuffer::from_pixel(900, 900, Rgb([red, 7, 7]))
+                .write_to(&mut png, ImageFormat::Png)
+                .unwrap();
+            png.into_inner()
+        };
+        let first = library_thumbnail_entry(&picture(11), &|| Ok(())).unwrap();
+        *first.stored.lock().unwrap() = Some("first.jpg".into());
+        let again = library_thumbnail_entry(&picture(11), &|| Ok(())).unwrap();
+        assert!(Arc::ptr_eq(&first.data, &again.data));
+        assert_eq!(again.stored.lock().unwrap().as_deref(), Some("first.jpg"));
+        let other = library_thumbnail_entry(&picture(12), &|| Ok(())).unwrap();
+        assert_eq!(*other.stored.lock().unwrap(), None);
     }
 
     #[test]
@@ -148,6 +194,7 @@ mod tests {
                 hash,
                 original: data.clone(),
                 thumbnail: data,
+                stored: Arc::default(),
                 bytes: 1 << 20,
             });
             assert!(cache.bytes <= MAX_BYTES);

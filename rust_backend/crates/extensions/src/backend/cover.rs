@@ -39,6 +39,12 @@ pub fn library_cover_stem(key: &str) -> String {
     format!("cover_{hex}")
 }
 
+/// Songs that embed the same picture share one stored thumbnail through hard
+/// links on desktop and iOS; every song keeps its own name. Android keeps a
+/// file per song (content-addressed names there are a separate change), and
+/// so does Windows, where a reader's sharing mode covers every name of a file.
+const LINK_THUMBNAILS: bool = cfg!(any(target_vendor = "apple", target_os = "linux"));
+
 /// Whether a thumbnail written at `modified` may be reused after the
 /// directory's regenerate marker was touched at `regenerate`.
 pub fn library_cover_is_current(modified: SystemTime, regenerate: Option<SystemTime>) -> bool {
@@ -401,7 +407,9 @@ impl Backend {
             ));
         }
         let mut cover = read(&input, &format, &check)?;
-        if let Ok(resized) = mornye_core::cover::library_thumbnail(&cover.data, &check) {
+        let mut stored = None;
+        if let Ok(thumbnail) = mornye_core::cover::library_thumbnail_entry(&cover.data, &check) {
+            let resized = thumbnail.data;
             cover.mime = if resized.starts_with(b"\x89PNG") {
                 "image/png"
             } else if resized.starts_with(b"\xff\xd8") {
@@ -411,6 +419,7 @@ impl Backend {
             }
             .into();
             cover.data = resized.to_vec();
+            stored = LINK_THUMBNAILS.then_some(thumbnail.stored);
         }
         // Library caching may retain unsupported image bytes, but must never
         // swallow cancellation while attempting the optional resize.
@@ -425,13 +434,33 @@ impl Backend {
             .map_err(|error| format!("failed to create cache dir: {error}"))?;
         let permissions = output_permissions(&output)
             .map_err(|error| format!("failed to write cover: {error}"))?;
-        let stage = stage_cover(&output, permissions, &cover.data, &check)
+        // Songs of one album reach this point together; holding the record
+        // until the first file is published lets the others link it.
+        let mut stored = stored.as_deref().and_then(|stored| stored.lock().ok());
+        let source = stored
+            .as_deref()
+            .and_then(Option::as_deref)
+            .and_then(|path| {
+                stored_cover(
+                    &files,
+                    path,
+                    &output,
+                    &cover.data,
+                    permissions.as_ref(),
+                    regenerate,
+                )
+            });
+        let source = source.as_ref().map(|(path, file)| (path, file));
+        let stage = stage_cover(&output, permissions, &cover.data, source, &check)
             .map_err(|error| format!("failed to write cover: {error}"))?;
         match batch {
             Some(batch) => stage.publish_batched(batch, &check),
             None => stage.publish(&check),
         }
         .map_err(|error| format!("failed to write cover: {error}"))?;
+        if let Some(stored) = stored.as_deref_mut() {
+            *stored = Some(output.display());
+        }
         Ok(output.display())
     }
 
@@ -539,25 +568,64 @@ fn output_permissions(
     }
 }
 
+/// `stored`, where an earlier song put this thumbnail, opened for linking. It
+/// qualifies only while it holds exactly `data`, is current for the
+/// regenerate marker and has the permissions a new file would get.
+fn stored_cover(
+    files: &crate::files::ExtensionFiles,
+    stored: &str,
+    output: &crate::files::FilePath,
+    data: &[u8],
+    permissions: Option<&cap_std::fs::Permissions>,
+    regenerate: Option<SystemTime>,
+) -> Option<(crate::files::FilePath, cap_std::fs::File)> {
+    let source = files.resolve_legacy(stored).ok()?;
+    if source.absolute == output.absolute {
+        return None;
+    }
+    let mut file = source.open(OpenOptions::new().read(true)).ok()?;
+    let metadata = file.metadata().ok()?;
+    let modified = metadata.modified().ok()?.into_std();
+    if metadata.len() != data.len() as u64
+        || !library_cover_is_current(modified, regenerate)
+        || permissions.is_some_and(|permissions| *permissions != metadata.permissions())
+    {
+        return None;
+    }
+    let mut bytes = Vec::with_capacity(data.len());
+    (&mut file)
+        .take(data.len() as u64 + 1)
+        .read_to_end(&mut bytes)
+        .ok()?;
+    (bytes == data).then_some((source, file))
+}
+
 fn publish_cover(
     output: &crate::files::FilePath,
     permissions: Option<cap_std::fs::Permissions>,
     data: &[u8],
     check: &Check<'_>,
 ) -> Result<(), String> {
-    stage_cover(output, permissions, data, check)?.publish(check)
+    stage_cover(output, permissions, data, None, check)?.publish(check)
 }
 
+/// Stages `data` for `output`, as a hard link to `source` when it can.
 fn stage_cover(
     output: &crate::files::FilePath,
     permissions: Option<cap_std::fs::Permissions>,
     data: &[u8],
+    source: Option<(&crate::files::FilePath, &cap_std::fs::File)>,
     check: &Check<'_>,
 ) -> Result<StagedFile, String> {
     check()?;
-    let mut stage = output
-        .stage_existing_parent()
-        .map_err(|error| error.to_string())?;
+    let (mut stage, linked) = match source {
+        Some((path, file)) => output.stage_from(path, file),
+        None => output.stage_existing_parent().map(|stage| (stage, false)),
+    }
+    .map_err(|error| error.to_string())?;
+    if linked {
+        return Ok(stage);
+    }
     if let Some(permissions) = permissions {
         stage
             .file
@@ -752,6 +820,96 @@ pub(super) mod tests {
         assert_eq!(save(), cached);
         assert_eq!(std::fs::read(&cached).unwrap(), jpeg);
         assert_eq!(std::fs::read(&source).unwrap(), audio);
+    }
+
+    #[cfg(unix)]
+    fn inode(path: &str) -> u64 {
+        use std::os::unix::fs::MetadataExt;
+        std::fs::metadata(path).unwrap().ino()
+    }
+
+    /// Desktop and iOS link identical thumbnails; Android keeps copies.
+    const LINKED: bool = cfg!(any(target_vendor = "apple", target_os = "linux"));
+
+    #[cfg(unix)]
+    #[test]
+    fn songs_with_the_same_picture_link_one_file_that_still_holds_it() {
+        let directory = tempfile::tempdir().unwrap();
+        let backend = backend(directory.path());
+        let data = directory.path().join("data");
+        let cache = data.join("covers");
+        let art = artwork(9_100, 600);
+        let save = |key: &str, picture: &[u8]| {
+            let source = data.join(format!("{key}.flac"));
+            std::fs::write(&source, flac_with_picture(picture)).unwrap();
+            backend
+                .save_cover_to_cache_with_hint_and_key(
+                    source.to_str().unwrap(),
+                    "",
+                    cache.to_str().unwrap(),
+                    key,
+                    &|| Ok(()),
+                )
+                .unwrap()
+        };
+        let first = save("first", &art);
+        let second = save("second", &art);
+        let other = save("other", &artwork(9_101, 600));
+        assert_ne!(first, second);
+        assert_eq!(std::fs::read(&second).unwrap(), art);
+        assert_eq!(inode(&first) == inode(&second), LINKED);
+        assert_ne!(inode(&first), inode(&other));
+
+        // Removing one name leaves the other song's cover in place.
+        std::fs::remove_file(&first).unwrap();
+        assert_eq!(std::fs::read(&second).unwrap(), art);
+        let third = save("third", &art);
+        assert_eq!(inode(&third) == inode(&second), LINKED);
+
+        // A stored file that no longer holds the bytes is never linked.
+        let replaced = cache.join("replaced");
+        std::fs::write(&replaced, vec![0; art.len()]).unwrap();
+        std::fs::rename(&replaced, &third).unwrap();
+        let fourth = save("fourth", &art);
+        assert_eq!(std::fs::read(&fourth).unwrap(), art);
+        assert_ne!(inode(&fourth), inode(&third));
+        assert_eq!(std::fs::read(&second).unwrap(), art);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_thumbnail_older_than_the_regenerate_marker_is_not_linked() {
+        let directory = tempfile::tempdir().unwrap();
+        let backend = backend(directory.path());
+        let data = directory.path().join("data");
+        let cache = data.join("covers");
+        let art = artwork(9_200, 600);
+        let save = |key: &str| {
+            let source = data.join(format!("{key}.flac"));
+            std::fs::write(&source, flac_with_picture(&art)).unwrap();
+            backend
+                .save_cover_to_cache_with_hint_and_key(
+                    source.to_str().unwrap(),
+                    "",
+                    cache.to_str().unwrap(),
+                    key,
+                    &|| Ok(()),
+                )
+                .unwrap()
+        };
+        let stale = save("stale");
+        std::fs::File::options()
+            .write(true)
+            .open(&stale)
+            .unwrap()
+            .set_modified(SystemTime::now() - Duration::from_secs(60))
+            .unwrap();
+        std::fs::write(cache.join(LIBRARY_COVER_REGENERATE_MARKER), "").unwrap();
+        let fresh = save("fresh");
+        assert_ne!(inode(&fresh), inode(&stale));
+        assert_eq!(std::fs::read(&fresh).unwrap(), art);
+        let later = save("later");
+        assert_eq!(inode(&later) == inode(&fresh), LINKED);
     }
 
     #[test]

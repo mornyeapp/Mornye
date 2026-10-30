@@ -211,6 +211,24 @@ fn missing_directory_is_empty_and_recent_unreferenced_covers_survive() {
 }
 
 #[test]
+fn hard_linked_covers_lose_only_their_own_name() {
+    let fixture = TempDir::new().unwrap();
+    let first = old_file(fixture.path(), "first.jpg", 3, Duration::from_secs(600));
+    let second = fixture.path().join("second.jpg");
+    fs::hard_link(&first, &second).unwrap();
+    // The new name keeps the inode's old mtime; linking it updated the ctime.
+    let mut request = prune_request(fixture.path(), &[]);
+    request["minimum_age_ms"] = json!(60_000);
+    assert_eq!(execute(&request, &|| Ok(())).unwrap()["deleted"], 0);
+    assert!(first.exists() && second.exists());
+
+    let request = prune_request(fixture.path(), std::slice::from_ref(&second));
+    assert_eq!(execute(&request, &|| Ok(())).unwrap()["deleted"], 1);
+    assert!(!first.exists());
+    assert_eq!(fs::read(&second).unwrap(), vec![0; 3]);
+}
+
+#[test]
 fn a_referenced_subsonic_cover_keeps_the_pointer_to_its_refreshed_file() {
     let fixture = TempDir::new().unwrap();
     let (kept, gone) = ("a".repeat(64), "b".repeat(64));

@@ -941,6 +941,43 @@ mod tests {
     }
 
     #[test]
+    fn a_scan_stores_one_thumbnail_file_per_picture_under_every_song_name() {
+        use std::os::unix::fs::MetadataExt;
+        let root = tempfile::tempdir().unwrap();
+        let library = library_with_artwork(root.path(), 2, 3, 8_000);
+        let backend = backend(root.path(), &library);
+        let covers = root.path().join("data/library_covers");
+        backend
+            .set_library_cover_cache_directory(&covers.to_string_lossy())
+            .unwrap();
+
+        let result = backend
+            .scan_library_folder_incremental(&library.to_string_lossy(), "{}", &|| Ok(()))
+            .unwrap();
+
+        let mut albums: BTreeMap<String, BTreeSet<u64>> = BTreeMap::new();
+        let mut names = BTreeSet::new();
+        for row in result["scanned"].as_array().unwrap() {
+            let song = Path::new(row["filePath"].as_str().unwrap());
+            let cover = row["coverPath"].as_str().unwrap();
+            assert!(names.insert(cover.to_owned()));
+            albums
+                .entry(song.parent().unwrap().to_string_lossy().into_owned())
+                .or_default()
+                .insert(fs::metadata(cover).unwrap().ino());
+        }
+        assert_eq!(names.len(), 6);
+        assert_eq!(thumbnails(&covers).len(), 6);
+        let files: BTreeSet<_> = albums.values().flatten().collect();
+        if cfg!(any(target_vendor = "apple", target_os = "linux")) {
+            assert!(albums.values().all(|inodes| inodes.len() == 1));
+            assert_eq!(files.len(), 2);
+        } else {
+            assert_eq!(files.len(), 6);
+        }
+    }
+
+    #[test]
     #[ignore = "manual scan timing with many thumbnails"]
     fn scan_timing_with_many_thumbnails() {
         use std::os::unix::fs::MetadataExt;
