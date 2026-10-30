@@ -23,6 +23,7 @@ import 'package:mornye/services/listening_statistics.dart';
 import 'package:mornye/services/media_kit_playback_deck.dart';
 import 'package:mornye/services/media_library_browser.dart';
 import 'package:mornye/services/media_session_desktop.dart';
+import 'package:mornye/services/media_session_filter.dart';
 import 'package:mornye/services/music_playback_deck.dart';
 import 'package:mornye/services/music_player_service.dart';
 import 'package:mornye/services/network_metadata_service.dart';
@@ -198,8 +199,10 @@ class PlaybackDependencies {
   static Future<MusicPlayerHandler> _initializeAudioHandler(
     MusicPlayerHandler Function() builder,
   ) async {
-    // MPRIS on Linux and SMTC on Windows; other OSes keep the plugin.
+    // MPRIS on Linux and SMTC on Windows; other OSes keep the plugin. Phones
+    // send it only the states their sessions cannot advance themselves.
     installDesktopMediaSession();
+    installMediaSessionFilter();
     late final MusicPlayerHandler handler;
     final session = await AudioService.init(
       // The switch lets a remote device take over the system session.
