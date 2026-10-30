@@ -316,7 +316,10 @@ class _HomeContinueListeningCardState
                 child: SizedBox.square(
                   dimension: _coverSize,
                   child: PlayerArtwork(
-                    artUri: mediaItem.artUri?.toString(),
+                    // A network cover not stored yet shows once fetched.
+                    artUri:
+                        mediaItem.artUri?.toString() ??
+                        mediaItem.extras?['artworkRef']?.toString(),
                     colorScheme: colorScheme,
                     cacheWidth:
                         (_coverSize * MediaQuery.devicePixelRatioOf(context))
