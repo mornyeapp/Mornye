@@ -29,6 +29,7 @@ class SubsonicFixture {
   final authorizations = <String?>[];
   final ranges = <String?>[];
   final salts = <String>[];
+  final ifNoneMatch = <String?>[];
   final held = Completer<void>();
   final release = Completer<void>();
   String? blockMethod;
@@ -45,6 +46,9 @@ class SubsonicFixture {
 
   /// The OpenSubsonic `type` of every response (`mornye` for a desktop).
   String? type;
+
+  /// Sent with the cover; a request naming it in If-None-Match gets 304.
+  String? coverEtag;
 
   /// Songs with an `albumId`, served instead of [song]: getAlbumList2 lists
   /// their album ids in order, getAlbum and search3 (by `songOffset`, at
@@ -95,6 +99,7 @@ class SubsonicFixture {
     methods.add(request.method);
     authorizations.add(request.headers.value('authorization'));
     ranges.add(request.headers.value('range'));
+    ifNoneMatch.add(request.headers.value('if-none-match'));
     final salt = request.uri.queryParameters['s'];
     if (salt != null) salts.add(salt);
     final method = request.uri.pathSegments.last.replaceFirst('.view', '');
@@ -127,6 +132,11 @@ class SubsonicFixture {
             },
           }),
         );
+      } else if (method == 'getCoverArt' &&
+          coverEtag != null &&
+          request.headers.value('if-none-match') == coverEtag) {
+        response.statusCode = 304;
+        response.headers.set('etag', coverEtag!);
       } else if ((method == 'stream' ||
               method == 'download' ||
               method == 'getCoverArt') &&
@@ -135,6 +145,9 @@ class SubsonicFixture {
         response.headers.contentType = ContentType.parse(
           isAudio ? song['contentType'] as String : 'image/png',
         );
+        if (!isAudio && coverEtag != null) {
+          response.headers.set('etag', coverEtag!);
+        }
         final range = request.headers.value('range');
         response.statusCode = range == null ? 200 : 206;
         final media = (isAudio ? audio : cover) ?? [0, 1, 2, 3];

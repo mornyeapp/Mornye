@@ -103,6 +103,129 @@ void main() {
   );
 
   test(
+    'a stale cover is revalidated by its ETag and a 304 keeps the image',
+    () async {
+      server.coverEtag = '"v1"';
+      final song = SubsonicSong(server.song);
+      final client = storage.openSubsonic(server.connection());
+      final before = await client.cachedCover(song, directory);
+      client.close();
+      expect(server.ifNoneMatch.last, isNull);
+      expect(await File('$before.etag').readAsString(), '"v1"\n4');
+      final stale = DateTime.now().subtract(const Duration(days: 2));
+      await File(before!).setLastModified(stale);
+      // Never sent: the server answers 304.
+      server.cover = [4, 5, 6, 7];
+      // A new client, as after a restart, reads the ETag from disk.
+      final next = storage.openSubsonic(server.connection());
+      addTearDown(next.close);
+      expect(await next.cachedCover(song, directory), before);
+      expect(server.ifNoneMatch.last, '"v1"');
+      expect(await File(before).readAsBytes(), [0, 1, 2, 3]);
+      expect(
+        DateTime.now().difference((await File(before).stat()).modified),
+        lessThan(const Duration(hours: 1)),
+      );
+      expect(
+        await directory.list().map((file) => file.path).toList(),
+        unorderedEquals([before, '$before.etag']),
+      );
+    },
+  );
+
+  test('a changed cover behind a new ETag moves to a new path', () async {
+    server.coverEtag = '"v1"';
+    final client = storage.openSubsonic(server.connection());
+    addTearDown(client.close);
+    final song = SubsonicSong(server.song);
+    final before = await client.cachedCover(song, directory);
+    final stale = DateTime.now().subtract(const Duration(days: 2));
+    await File(before!).setLastModified(stale);
+    server.cover = [4, 5, 6, 7, 8];
+    server.coverEtag = '"v2"';
+    final changed = await client.cachedCover(song, directory);
+    expect(server.ifNoneMatch.last, '"v1"');
+    expect(changed, isNot(before));
+    expect(await File(changed!).readAsBytes(), [4, 5, 6, 7, 8]);
+    expect(await File('$changed.etag').readAsString(), '"v2"\n5');
+    expect(await File(before).readAsBytes(), [0, 1, 2, 3]);
+    await File(changed).setLastModified(stale);
+    expect(await client.cachedCover(song, directory), changed);
+    expect(server.ifNoneMatch.last, '"v2"');
+  });
+
+  test(
+    'covers without a matching ETag are checked by their bytes as before',
+    () async {
+      final client = storage.openSubsonic(server.connection());
+      addTearDown(client.close);
+      final song = SubsonicSong(server.song);
+      final stale = DateTime.now().subtract(const Duration(days: 2));
+      final before = await client.cachedCover(song, directory);
+      final validator = File('$before.etag');
+      expect(await validator.exists(), isFalse);
+      await File(before!).setLastModified(stale);
+      expect(await client.cachedCover(song, directory), before);
+      expect(server.ifNoneMatch, everyElement(isNull));
+
+      // An older cache has no validator; the next download stores one.
+      server.coverEtag = '"v1"';
+      await File(before).setLastModified(stale);
+      expect(await client.cachedCover(song, directory), before);
+      expect(server.ifNoneMatch.last, isNull);
+      expect(await validator.readAsString(), '"v1"\n4');
+
+      // A validator written for other bytes is ignored.
+      await validator.writeAsString('"v1"\n5');
+      await File(before).setLastModified(stale);
+      expect(await client.cachedCover(song, directory), before);
+      expect(server.ifNoneMatch.last, isNull);
+
+      // A forced refresh reads the image again.
+      expect(await client.cachedCover(song, directory, refresh: true), before);
+      expect(server.ifNoneMatch.last, isNull);
+
+      // A server that stops sending ETags loses the validator.
+      server.coverEtag = null;
+      await File(before).setLastModified(stale);
+      expect(await client.cachedCover(song, directory), before);
+      expect(server.ifNoneMatch.last, '"v1"');
+      expect(await validator.exists(), isFalse);
+    },
+  );
+
+  test('song metadata keeps 32 covers, each with its ETag', () async {
+    server.coverEtag = '"v1"';
+    final cache = await Directory(
+      '${directory.path}/network_metadata',
+    ).create();
+    final old = DateTime.now().subtract(const Duration(hours: 1));
+    for (var i = 0; i < 40; i++) {
+      final cover = File('${cache.path}/cover_$i.image');
+      await cover.writeAsBytes([i]);
+      await File('${cover.path}.etag').writeAsString('"$i"\n1');
+      await cover.setLastModified(old.add(Duration(seconds: i)));
+    }
+    final metadata = NetworkMetadataService(
+      storage: storage,
+      cacheDirectory: () async => directory,
+    );
+    final tags = await metadata.read(
+      NetworkStorageService.source('fixture', SubsonicSong(server.song).path),
+    );
+    final cover = tags['cover_path'] as String;
+    expect(await File('$cover.etag').readAsString(), '"v1"\n4');
+    final names = await cache.list().map((file) => file.path).toSet();
+    expect(names.where((name) => name.endsWith('.image')), hasLength(32));
+    expect(names.where((name) => name.endsWith('.etag')), hasLength(32));
+    expect(names, contains(cover));
+    for (var i = 9; i < 40; i++) {
+      final kept = '${cache.path}/cover_$i.image';
+      expect(names, containsAll([kept, '$kept.etag']));
+    }
+  });
+
+  test(
     'failed artwork refresh preserves the previously published image',
     () async {
       final client = storage.openSubsonic(server.connection());

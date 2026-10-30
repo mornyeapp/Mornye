@@ -227,7 +227,19 @@ fn a_referenced_subsonic_cover_keeps_the_pointer_to_its_refreshed_file() {
         1,
         age,
     );
+    let etag = old_file(
+        fixture.path(),
+        &format!("subsonic_{kept}_{}.image.etag", "c".repeat(48)),
+        1,
+        age,
+    );
     let replaced = old_file(fixture.path(), &format!("subsonic_{kept}.image"), 1, age);
+    let replaced_etag = old_file(
+        fixture.path(),
+        &format!("subsonic_{kept}.image.etag"),
+        1,
+        age,
+    );
     let orphan = old_file(
         fixture.path(),
         &format!("subsonic_{gone}.image.current"),
@@ -239,9 +251,9 @@ fn a_referenced_subsonic_cover_keeps_the_pointer_to_its_refreshed_file() {
         &|| Ok(()),
     )
     .unwrap();
-    assert_eq!(result["deleted"], 2);
-    assert!(refreshed.exists() && pointer.exists());
-    assert!(!replaced.exists() && !orphan.exists());
+    assert_eq!(result["deleted"], 3);
+    assert!(refreshed.exists() && pointer.exists() && etag.exists());
+    assert!(!replaced.exists() && !replaced_etag.exists() && !orphan.exists());
 }
 
 #[test]

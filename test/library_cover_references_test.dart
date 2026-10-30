@@ -47,10 +47,13 @@ void main() {
         await cover('${subsonic}_${'b' * 48}.image'),
         await cover('$subsonic.image.current'),
         await cover('network_cover_history.image'),
+        await cover('${subsonic}_${'b' * 48}.image.etag'),
       ];
       final orphans = [
         await cover('cover_orphan.jpg'),
         await cover('$subsonic.image'),
+        await cover('$subsonic.image.etag'),
+        await cover('cover_playlist.jpg.etag'),
       ];
 
       final collections = await LibraryCollectionsDatabase.instance.database;

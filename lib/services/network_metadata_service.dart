@@ -270,10 +270,19 @@ Future<void> _trimNetworkMetadataCovers(Directory directory) async {
       .toList();
   final dated = <({File file, DateTime time})>[];
   for (final entry in files) {
+    if (entry.path.endsWith('.etag')) continue;
     dated.add((file: entry, time: (await entry.stat()).modified));
   }
   dated.sort((a, b) => b.time.compareTo(a.time));
   for (final old in dated.skip(32)) {
     await old.file.delete();
+  }
+  // A cover's ETag (`<cover>.etag`) goes with the cover.
+  final kept = {for (final entry in dated.take(32)) entry.file.path};
+  for (final entry in files) {
+    if (entry.path.endsWith('.etag') &&
+        !kept.contains(entry.path.substring(0, entry.path.length - 5))) {
+      await entry.delete();
+    }
   }
 }

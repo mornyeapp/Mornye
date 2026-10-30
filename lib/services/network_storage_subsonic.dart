@@ -563,8 +563,9 @@ class SubsonicClient {
       // Older caches have only the original image path.
     }
     final stat = await target.stat();
+    final published = stat.type == FileSystemEntityType.file;
     if (!refresh &&
-        stat.type == FileSystemEntityType.file &&
+        published &&
         stat.size > 0 &&
         DateTime.now().difference(stat.modified) < const Duration(days: 1)) {
       return target.path;
@@ -572,14 +573,22 @@ class SubsonicClient {
     final staged = File('${base.path}.${NetworkStorageService.newId()}.tmp');
     File? pointer;
     try {
-      await saveCover(song, staged);
-      final published = stat.type == FileSystemEntityType.file;
-      if (published && await _sameBytes(staged, target)) {
+      final etag = !refresh && published && stat.size > 0
+          ? await _storedEtag(target, stat.size)
+          : null;
+      final fetched = await _protectTransport(
+        () => _saveCover(song, staged, etag: etag),
+      );
+      if (fetched.unchanged ||
+          (published && await _sameBytes(staged, target))) {
         // Unchanged artwork keeps its path, so decoded sizes stay valid.
         try {
           await target.setLastModified(DateTime.now());
         } on FileSystemException {
           // The next lookup asks the server again.
+        }
+        if (!fetched.unchanged) {
+          await _storeEtag(target, fetched.etag, fetched.size);
         }
         return target.path;
       }
@@ -589,11 +598,13 @@ class SubsonicClient {
         final name = 'subsonic_${hash}_${NetworkStorageService.newId()}.image';
         target = File('${directory.path}/$name');
         await staged.rename(target.path);
+        await _storeEtag(target, fetched.etag, fetched.size);
         pointer = File('${current.path}.${NetworkStorageService.newId()}.tmp');
         await pointer.writeAsString(name, flush: true);
         await pointer.rename(current.path);
       } else {
         await staged.rename(target.path);
+        await _storeEtag(target, fetched.etag, fetched.size);
       }
       return target.path;
     } finally {
@@ -605,6 +616,47 @@ class SubsonicClient {
   static Future<bool> _sameBytes(File a, File b) async =>
       await a.length() == await b.length() &&
       listEquals(await a.readAsBytes(), await b.readAsBytes());
+
+  static final _etag = RegExp(r'^[\x21-\x7e]{1,512}$');
+
+  /// The ETag the server sent with [image], kept in `<image>.etag` with the
+  /// image length; null when unknown or when the image changed since.
+  static Future<String?> _storedEtag(File image, int size) async {
+    try {
+      if ((await File('${image.path}.etag').readAsString()).split('\n') case [
+        final etag,
+        final length,
+      ] when length == '$size' && _etag.hasMatch(etag)) {
+        return etag;
+      }
+    } on FileSystemException {
+      // Older caches and servers without ETags keep no validator.
+    } on FormatException {
+      // An unreadable validator is ignored like a missing one.
+    }
+    return null;
+  }
+
+  static Future<void> _storeEtag(File image, String? etag, int size) async {
+    final validator = File('${image.path}.etag');
+    try {
+      if (etag == null || !_etag.hasMatch(etag)) {
+        if (await validator.exists()) await validator.delete();
+        return;
+      }
+      final staged = File(
+        '${validator.path}.${NetworkStorageService.newId()}.tmp',
+      );
+      try {
+        await staged.writeAsString('$etag\n$size');
+        await staged.rename(validator.path);
+      } finally {
+        if (await staged.exists()) await staged.delete();
+      }
+    } on FileSystemException {
+      // Without a validator the next check downloads the image again.
+    }
+  }
 
   /// Saves the original file of the song [id] (the `download` method) to
   /// [output]. [progress] receives the bytes written and the size the server
@@ -670,14 +722,26 @@ class SubsonicClient {
   Future<void> saveCover(SubsonicSong song, File output) =>
       _protectTransport(() => _saveCover(song, output));
 
-  Future<void> _saveCover(SubsonicSong song, File output) async {
-    if (song.coverPath == null) return;
+  /// Saves the artwork of [song] to [output] and returns the ETag the server
+  /// sent with it. With [etag], a server that still has that image answers
+  /// 304 instead and nothing is written ([unchanged]).
+  Future<({bool unchanged, String? etag, int size})> _saveCover(
+    SubsonicSong song,
+    File output, {
+    String? etag,
+  }) async {
+    if (song.coverPath == null) return (unchanged: false, etag: null, size: 0);
     final response = await _storage._request(
       _http,
       connection,
       'GET',
       _subsonicMediaTarget(connection, song.coverPath!),
+      headers: {HttpHeaders.ifNoneMatchHeader: ?etag},
     );
+    if (etag != null && response.statusCode == 304) {
+      await response.drain<void>().timeout(NetworkStorageService.timeout);
+      return (unchanged: true, etag: etag, size: 0);
+    }
     if (response.statusCode != 200 ||
         !(response.headers.contentType?.mimeType.startsWith('image/') ??
             false)) {
@@ -701,5 +765,11 @@ class SubsonicClient {
     } finally {
       await writer.close();
     }
+    final tags = response.headers[HttpHeaders.etagHeader];
+    return (
+      unchanged: false,
+      etag: tags != null && tags.length == 1 ? tags.single : null,
+      size: size,
+    );
   }
 }

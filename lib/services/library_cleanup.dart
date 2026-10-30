@@ -250,7 +250,11 @@ Future<({int deleted, List<String> errors})> _pruneCoversInWorker(
   final cutoff = DateTime.now().subtract(minimumAge);
   final references = {
     ...referencedPaths,
-    for (final path in referencedPaths) ?_subsonicCoverPointer(path),
+    for (final path in referencedPaths)
+      if (_subsonicCoverPointer(path) case final pointer?) ...[
+        pointer,
+        '$path.etag',
+      ],
   };
   // Native scans may return canonical paths while Dart lists a directory alias.
   final retainedPaths = {...references};
@@ -318,6 +322,7 @@ final _subsonicCover = RegExp(r'^subsonic_([0-9a-fA-F]{64})(?:_.*)?\.image$');
 
 /// A Subsonic cover (`subsonic_<hash>.image`, or `subsonic_<hash>_<id>.image`
 /// after a refresh) is found again through `subsonic_<hash>.image.current`.
+/// Its ETag stays beside it in `<cover>.etag`.
 String? _subsonicCoverPointer(String path) {
   final hash = _subsonicCover.firstMatch(p.basename(path))?.group(1);
   return hash == null
