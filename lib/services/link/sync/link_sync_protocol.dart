@@ -1,4 +1,4 @@
-import 'package:mornye/services/cover_store.dart';
+import 'package:mornye/utils/cover_art_utils.dart';
 
 /// Mornye Link collections and history sync (unit L4). Both directions use
 /// the same JSON, so the desktop (server) and the phone (client) share one
@@ -51,7 +51,8 @@ import 'package:mornye/services/cover_store.dart';
 /// with `events` instead of `changes`. An event is one author's running
 /// total for one song on one day:
 ///   `{"origin", "day": "YYYY-MM-DD", "trackKey", "title", "artist",
-///     "album", "artwork"? (http and https only), "ms": int, "plays": int}`
+///     "album", "artwork"? (http and https only, no loopback), "ms": int,
+///     "plays": int}`
 /// Its stable id is (origin, day, trackKey). Totals only grow, so a receiver
 /// adds the growth since the last value it saw and re-sending is harmless.
 /// Clearing statistics is local to one device.
@@ -232,8 +233,9 @@ String? linkSyncRemoteArtwork(Object? value) {
   final artwork = _string(value);
   if (artwork == null) return null;
   final lower = artwork.toLowerCase();
-  return lower.startsWith('https://') || lower.startsWith('http://')
-      ? durableCoverReference(artwork)
+  return (lower.startsWith('https://') || lower.startsWith('http://')) &&
+          !isLoopbackHost(Uri.tryParse(artwork)?.host ?? '')
+      ? artwork
       : null;
 }
 

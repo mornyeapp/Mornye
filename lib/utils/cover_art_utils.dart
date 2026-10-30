@@ -1,3 +1,13 @@
+import 'dart:io';
+
+/// Whether the URL host [host] names this device (`localhost`, 127/8,
+/// `::1`): a cover URL there ends with the process that serves it.
+bool isLoopbackHost(String host) {
+  final name = host.toLowerCase();
+  return name == 'localhost' ||
+      (InternetAddress.tryParse(name)?.isLoopback ?? false);
+}
+
 /// Deezer CDN cover size pattern: /WxH-q-p-o-n.jpg
 final RegExp _deezerCoverSizeRegex = RegExp(
   r'/(\d+)x(\d+)-(\d+)-(\d+)-(\d+)-(\d+)\.jpg$',
