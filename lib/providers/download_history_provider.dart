@@ -1242,43 +1242,74 @@ final downloadHistoryBatchExistsProvider = FutureProvider.autoDispose
       };
     });
 
+/// The in-memory index keys of one lookup, derived once per request.
+typedef _MemoryLookupKeys = ({
+  List<String> spotifyIds,
+  String isrc,
+  String trackArtist,
+});
+
+_MemoryLookupKeys _memoryLookupKeys(HistoryLookupRequest request) => (
+  spotifyIds: HistoryDatabase.spotifyLookupCandidates(request.spotifyId),
+  isrc: request.isrc?.trim() ?? '',
+  trackArtist: DownloadHistoryState.trackArtistKey(
+    request.trackName,
+    request.artistName,
+  ),
+);
+
 bool _historyLookupExistsInMemory(
   DownloadHistoryState state,
-  HistoryLookupRequest request,
+  _MemoryLookupKeys keys,
 ) {
-  for (final candidate in HistoryDatabase.spotifyLookupCandidates(
-    request.spotifyId,
-  )) {
+  for (final candidate in keys.spotifyIds) {
     if (state.getBySpotifyId(candidate) != null) return true;
   }
 
-  final isrc = request.isrc?.trim();
-  if (isrc != null && isrc.isNotEmpty && state.getByIsrc(isrc) != null) {
+  if (keys.isrc.isNotEmpty && state.getByIsrc(keys.isrc) != null) {
     return true;
   }
 
-  return state.findByTrackAndArtist(request.trackName, request.artistName) !=
-      null;
+  return state.findByTrackArtistKey(keys.trackArtist) != null;
+}
+
+Set<String> _mergeVisibleHistoryKeys(
+  DownloadHistoryState state,
+  List<_MemoryLookupKeys> memoryKeys,
+  List<String> lookupKeys,
+  Set<String> persistedKeys,
+) {
+  final keys = <String>{...persistedKeys};
+  for (var i = 0; i < memoryKeys.length; i++) {
+    if (_historyLookupExistsInMemory(state, memoryKeys[i])) {
+      keys.add(lookupKeys[i]);
+    }
+  }
+  return keys;
 }
 
 Set<String> mergeVisibleHistoryLookupKeys({
   required DownloadHistoryState state,
   required HistoryBatchLookupRequest request,
   required Set<String> persistedKeys,
-}) {
-  final keys = <String>{...persistedKeys};
-  for (final track in request.tracks) {
-    if (_historyLookupExistsInMemory(state, track)) {
-      keys.add(track.lookupKey);
-    }
-  }
-  return keys;
-}
+}) => _mergeVisibleHistoryKeys(
+  state,
+  request.tracks.map(_memoryLookupKeys).toList(growable: false),
+  request.lookupKeys,
+  persistedKeys,
+);
 
 class _VisibleHistoryBatchExistsNotifier extends Notifier<Set<String>> {
   _VisibleHistoryBatchExistsNotifier(this.request);
 
   final HistoryBatchLookupRequest request;
+  late final List<String> _lookupKeys = request.lookupKeys;
+  late final List<_MemoryLookupKeys> _memoryKeys = request.tracks
+      .map(_memoryLookupKeys)
+      .toList(growable: false);
+  List<DownloadHistoryItem>? _mergedLookupItems;
+  Set<String>? _mergedPersistedKeys;
+  Set<String> _merged = const <String>{};
 
   @override
   Set<String> build() {
@@ -1291,11 +1322,21 @@ class _VisibleHistoryBatchExistsNotifier extends Notifier<Set<String>> {
           data: (keys) => keys,
           orElse: () => const <String>{},
         );
-    return mergeVisibleHistoryLookupKeys(
-      state: history,
-      request: request,
-      persistedKeys: persistedKeys,
+    // The lookup indexes live and change with lookupItems, so revision bumps
+    // and count refreshes cannot change which tracks are held in memory.
+    if (identical(history.lookupItems, _mergedLookupItems) &&
+        identical(persistedKeys, _mergedPersistedKeys)) {
+      return _merged;
+    }
+    _merged = _mergeVisibleHistoryKeys(
+      history,
+      _memoryKeys,
+      _lookupKeys,
+      persistedKeys,
     );
+    _mergedLookupItems = history.lookupItems;
+    _mergedPersistedKeys = persistedKeys;
+    return _merged;
   }
 
   @override

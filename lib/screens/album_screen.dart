@@ -689,7 +689,7 @@ class _AlbumScreenState extends ConsumerState<AlbumScreen>
     Track? commonQualityTrack,
   ) {
     _historySnapshot.update(tracks);
-    final historyLookups = _historySnapshot.lookups;
+    final historyKeys = _historySnapshot.lookupKeys;
     final existingHistoryKeys = ref.watch(
       downloadHistoryVisibleBatchExistsProvider(_historySnapshot.request),
     );
@@ -706,8 +706,7 @@ class _AlbumScreenState extends ConsumerState<AlbumScreen>
         for (var i = 0; i < tracks.length; i++) _trackSelectionId(tracks[i], i),
       ];
       final inHistory = [
-        for (final lookup in historyLookups)
-          existingHistoryKeys.contains(lookup.lookupKey),
+        for (final key in historyKeys) existingHistoryKeys.contains(key),
       ];
       void activate(int index) => TrackListTile.activate(
         context,
@@ -746,9 +745,7 @@ class _AlbumScreenState extends ConsumerState<AlbumScreen>
         delegate: SliverChildBuilderDelegate((context, index) {
           final track = tracks[index];
           final selectionId = _trackSelectionId(track, index);
-          final isInHistory = existingHistoryKeys.contains(
-            historyLookups[index].lookupKey,
-          );
+          final isInHistory = existingHistoryKeys.contains(historyKeys[index]);
           final row = KeyedSubtree(
             key: ValueKey(selectionId),
             child: StaggeredListItem(

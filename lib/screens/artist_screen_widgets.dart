@@ -668,7 +668,7 @@ extension _ArtistScreenSections on _ArtistScreenState {
 
     final tracks = _topTracks!;
     _historySnapshot.update(tracks);
-    final historyLookups = _historySnapshot.lookups;
+    final historyKeys = _historySnapshot.lookupKeys;
     final existingHistoryKeys = ref.watch(
       downloadHistoryVisibleBatchExistsProvider(_historySnapshot.request),
     );
@@ -712,9 +712,7 @@ extension _ArtistScreenSections on _ArtistScreenState {
                     globalIndex + 1,
                     entry.value,
                     colorScheme,
-                    existingHistoryKeys.contains(
-                      historyLookups[globalIndex].lookupKey,
-                    ),
+                    existingHistoryKeys.contains(historyKeys[globalIndex]),
                   );
                 }).toList(),
               );

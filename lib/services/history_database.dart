@@ -59,6 +59,10 @@ class HistoryBatchLookupRequest {
     Iterable<HistoryLookupRequest> tracks,
   ) = _HistoryBatchLookupSnapshot;
 
+  /// The [HistoryLookupRequest.lookupKey] of each track, in order. A
+  /// [HistoryBatchLookupRequest.snapshot] computes them once.
+  List<String> get lookupKeys => [for (final track in tracks) track.lookupKey];
+
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
@@ -81,6 +85,9 @@ class _HistoryBatchLookupSnapshot extends HistoryBatchLookupRequest {
     : super(List.unmodifiable(tracks));
 
   late final int _hash = Object.hashAll(tracks);
+
+  @override
+  late final List<String> lookupKeys = List.unmodifiable(super.lookupKeys);
 
   @override
   bool operator ==(Object other) =>

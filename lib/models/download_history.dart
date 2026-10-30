@@ -285,7 +285,7 @@ class DownloadHistoryState {
        ),
        _byTrackArtistKey = _indexRecentHistoryItems(
          lookupItems ?? items,
-         (item) => _trackArtistKey(item.trackName, item.artistName),
+         (item) => trackArtistKey(item.trackName, item.artistName),
        );
 
   DownloadHistoryState._withExistingLookup({
@@ -313,11 +313,12 @@ class DownloadHistoryState {
        _byIsrc = _indexWithNewest(source._byIsrc, item.isrc, item),
        _byTrackArtistKey = _indexWithNewest(
          source._byTrackArtistKey,
-         _trackArtistKey(item.trackName, item.artistName),
+         trackArtistKey(item.trackName, item.artistName),
          item,
        );
 
-  static String _trackArtistKey(String trackName, String artistName) {
+  /// The key [findByTrackArtistKey] reads; '' for an empty track name.
+  static String trackArtistKey(String trackName, String artistName) {
     final normalizedTrack = trackName.trim().toLowerCase();
     if (normalizedTrack.isEmpty) return '';
     final normalizedArtist = artistName.trim().toLowerCase();
@@ -334,11 +335,10 @@ class DownloadHistoryState {
   DownloadHistoryItem? findByTrackAndArtist(
     String trackName,
     String artistName,
-  ) {
-    final key = _trackArtistKey(trackName, artistName);
-    if (key.isEmpty) return null;
-    return _byTrackArtistKey[key];
-  }
+  ) => findByTrackArtistKey(trackArtistKey(trackName, artistName));
+
+  DownloadHistoryItem? findByTrackArtistKey(String key) =>
+      key.isEmpty ? null : _byTrackArtistKey[key];
 
   List<DownloadHistoryItem> get lookupItems => _lookupItems;
 
