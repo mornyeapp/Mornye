@@ -153,7 +153,12 @@ void main() {
     () async {
       final root = await Directory.systemTemp.createTemp('clear-covers-');
       addTearDown(() => root.delete(recursive: true));
-      final covers = await Directory('${root.path}/library_covers').create();
+      // Settings clears the Dart spelling of the folder, while scans store
+      // their own: a canonical alias target (older Android) or backslashes.
+      final canonical = await Directory('${root.path}/data').create();
+      final alias = await Link('${root.path}/user').create(canonical.path);
+      final covers = await Directory('${alias.path}/library_covers').create();
+      final stored = '${canonical.path}/library_covers';
       await File('${covers.path}/cover_a.jpg').writeAsBytes([1]);
       await File('${covers.path}/network_cover_b.image').writeAsBytes([2]);
       final database = await SqliteProcessDatabase.open(
@@ -166,12 +171,18 @@ void main() {
         'audio_metadata_scan_version INTEGER)',
       );
       for (final (id, path, cover, version) in [
-        ('local', '/music/a.flac', '${covers.path}/cover_a.jpg', 4),
+        ('local', '/music/a.flac', '$stored/cover_a.jpg', 4),
         ('saf', 'content://tree/b.flac', '${covers.path}/cover_b.png', 4),
-        ('network', 'network://nas/b.flac', '${covers.path}/x.image', 4),
+        (
+          'windows',
+          r'C:\Music\f.flac',
+          r'\\?\C:\Users\me\AppData\Roaming\mornye\library_covers\cover_f.jpg',
+          4,
+        ),
+        ('network', 'network://nas/b.flac', '$stored/x.image', 4),
         ('download', '/music/c.flac', '${root.path}/downloads/c.jpg', 4),
         ('named', '/music/d.flac', null, 0),
-        ('sibling', '/music/e.flac', '${covers.path}_old/e.jpg', 4),
+        ('sibling', '/music/e.flac', '${stored}_old/e.jpg', 4),
       ]) {
         await database.rawInsert(
           'INSERT INTO library VALUES (?, ?, ?, 1000, ?)',
@@ -179,7 +190,7 @@ void main() {
         );
       }
 
-      expect(await clearLibraryCoverFiles(covers, database), 2);
+      expect(await clearLibraryCoverFiles(covers, database), 3);
 
       expect(await covers.list().toList(), isEmpty);
       final rows = await database.rawQuery(
@@ -196,6 +207,7 @@ void main() {
         {
           'local': -1,
           'saf': -1,
+          'windows': -1,
           'network': 1000,
           'download': 1000,
           'named': -1,

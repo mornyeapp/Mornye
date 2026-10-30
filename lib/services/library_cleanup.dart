@@ -11,6 +11,7 @@ import 'package:mornye/services/library_cover_snapshot.dart';
 import 'package:mornye/services/listening_statistics.dart';
 import 'package:mornye/services/native_cache_maintenance.dart';
 import 'package:mornye/services/platform_bridge.dart';
+import 'package:mornye/services/sqlite_helpers.dart' as sqlite;
 import 'package:mornye/utils/file_access.dart';
 import 'package:mornye/utils/logger.dart';
 
@@ -292,23 +293,24 @@ Future<({int deleted, List<String> errors})> _pruneCoversInWorker(
 /// Returns the number of marked rows.
 Future<int> clearLibraryCoverFiles(
   Directory directory,
-  DatabaseExecutor libraryDatabase,
+  Database libraryDatabase,
 ) async {
   await CacheMaintenanceService.clearDirectoryContents(directory.path);
-  final prefix = '${directory.path}/';
+  // Rows keep the scan's spelling of the folder (canonical /data/data on
+  // older Android, backslashes on Windows), so match the folder by name:
+  // after the clear, every file in a library_covers folder is gone.
   // Below the audio version, the incremental snapshot reports the file as
   // changed; the lyrics version keeps lyrics filters as they were meanwhile.
-  return libraryDatabase.rawUpdate(
-    'UPDATE library SET audio_metadata_scan_version = ? '
-    'WHERE audio_metadata_scan_version > ? '
-    'AND substr(cover_path, 1, length(?)) = ? '
-    "AND file_path NOT LIKE 'network://%'",
-    [
-      libraryLyricsMetadataScanVersion,
-      libraryLyricsMetadataScanVersion,
-      prefix,
-      prefix,
-    ],
+  return sqlite.transactionWithBusyRetry(
+    libraryDatabase,
+    (txn) => txn.rawUpdate(
+      'UPDATE library SET audio_metadata_scan_version = ? '
+      'WHERE audio_metadata_scan_version > ? '
+      r"AND cover_path GLOB '*[/\]library_covers[/\]*' "
+      "AND file_path NOT LIKE 'network://%'",
+      [libraryLyricsMetadataScanVersion, libraryLyricsMetadataScanVersion],
+    ),
+    exclusive: true,
   );
 }
 
