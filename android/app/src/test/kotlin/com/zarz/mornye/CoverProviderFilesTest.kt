@@ -10,14 +10,14 @@ import org.junit.Test
 
 class CoverProviderFilesTest {
     private lateinit var app: File
-    private lateinit var folders: Map<String, File>
+    private lateinit var folders: Map<String, CoverProviderFiles.Folder>
     private val jpeg = byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte(), 0xE0.toByte(), 0, 16)
 
     @Before
     fun createFolders() {
         app = Files.createTempDirectory("cover-provider-test").toFile().canonicalFile
         folders = CoverProviderFiles.folders(File(app, "files"), File(app, "cache"))
-        folders.values.forEach { it.mkdirs() }
+        folders.values.forEach { it.directory.mkdirs() }
     }
 
     @After
@@ -41,15 +41,19 @@ class CoverProviderFilesTest {
                 "library_covers" to File(app, "files/library_covers"),
                 "embedded_cover_previews" to File(app, "cache/embedded_cover_previews"),
             ),
-            folders,
+            folders.mapValues { it.value.directory },
         )
         val stored = write("files/covers/0123_abcd.image")
-        val thumbnail = write("files/library_covers/thumb.jpg")
-        val embedded = write("cache/embedded_cover_previews/v1_hash_0.jpg")
+        val thumbnail = write("files/library_covers/cover_0123.jpg")
+        val png = write("files/library_covers/cover_4567.png")
+        val subsonic = write("files/library_covers/subsonic_0123_89ab.image")
+        val embedded = write("cache/embedded_cover_previews/v2_hash_0.jpg")
 
         assertEquals(stored, resolve("covers", "0123_abcd.image"))
-        assertEquals(thumbnail, resolve("library_covers", "thumb.jpg"))
-        assertEquals(embedded, resolve("embedded_cover_previews", "v1_hash_0.jpg"))
+        assertEquals(thumbnail, resolve("library_covers", "cover_0123.jpg"))
+        assertEquals(png, resolve("library_covers", "cover_4567.png"))
+        assertEquals(subsonic, resolve("library_covers", "subsonic_0123_89ab.image"))
+        assertEquals(embedded, resolve("embedded_cover_previews", "v2_hash_0.jpg"))
     }
 
     @Test
@@ -57,6 +61,7 @@ class CoverProviderFilesTest {
         write("files/shared_prefs/settings.jpg")
         write("files/playlist_covers/list.jpg")
         write("files/library_covers/sub/nested.jpg")
+        File(app, "files/library_covers/folder.jpg").mkdirs()
 
         assertNull(resolve("playlist_covers", "list.jpg"))
         assertNull(resolve("files", "covers"))
@@ -67,7 +72,7 @@ class CoverProviderFilesTest {
         assertNull(resolve("library_covers", ".."))
         assertNull(resolve("library_covers", "."))
         assertNull(resolve("library_covers", ""))
-        assertNull(resolve("library_covers", "sub"))
+        assertNull(resolve("library_covers", "folder.jpg"))
         assertNull(resolve("library_covers", "missing.jpg"))
         assertNull(resolve("library_covers", "thumb.jpg\u0000.png"))
     }
@@ -77,25 +82,46 @@ class CoverProviderFilesTest {
         val secret = write("files/shared_prefs/settings.jpg")
         val thumbnail = write("files/library_covers/thumb.jpg")
         Files.createSymbolicLink(File(app, "files/library_covers/link.jpg").toPath(), secret.toPath())
-        Files.createSymbolicLink(File(app, "files/covers/linked.jpg").toPath(), thumbnail.toPath())
-        Files.createSymbolicLink(File(app, "files/library_covers/folder").toPath(), secret.parentFile!!.toPath())
+        Files.createSymbolicLink(File(app, "files/covers/0123_link.image").toPath(), thumbnail.toPath())
+        Files.createSymbolicLink(File(app, "files/library_covers/folder.jpg").toPath(), secret.parentFile!!.toPath())
 
         assertNull(resolve("library_covers", "link.jpg"))
-        assertNull(resolve("covers", "linked.jpg"))
-        assertNull(resolve("library_covers", "folder"))
+        assertNull(resolve("covers", "0123_link.image"))
+        assertNull(resolve("library_covers", "folder.jpg"))
     }
 
     @Test
-    fun servesOnlyImagesThatAreNotHidden() {
-        write("files/library_covers/.staged.jpg")
-        write("files/library_covers/notes.txt", "not an image".toByteArray())
-        write("files/library_covers/empty.jpg", ByteArray(0))
-        write("files/library_covers/regenerate.marker", "2026-10-30T00:00:00".toByteArray())
-
-        assertNull(resolve("library_covers", ".staged.jpg"))
-        assertNull(resolve("library_covers", "notes.txt"))
-        assertNull(resolve("library_covers", "empty.jpg"))
-        assertNull(resolve("library_covers", "regenerate.marker"))
+    fun refusesNamesThatAreNotCoversByName() {
+        val names = mapOf(
+            "covers" to listOf(
+                "0123_abcd.image.0001.tmp",
+                ".0123_abcd.image",
+                "0123.jpg",
+                ".image",
+            ),
+            "library_covers" to listOf(
+                ".regenerate",
+                "subsonic_0123.image.current",
+                "subsonic_0123.image.0001.tmp",
+                "cover_0123.jpg.tmp",
+                "notes.txt",
+                "cover_0123.webp",
+                ".jpg",
+            ),
+            "embedded_cover_previews" to listOf(
+                "v2_hash_0.jpg.source",
+                "v2_hash_0.jpg.source.stage_1_2",
+                ".v2_hash_0.stage_1.jpg",
+                "v2_hash_0.png",
+                "v2_hash_0.image",
+            ),
+        )
+        for ((folder, files) in names) {
+            for (name in files) {
+                write("${folders.getValue(folder).directory.relativeTo(app).path}/$name")
+                assertNull("$folder/$name", resolve(folder, name))
+            }
+        }
     }
 
     @Test
@@ -107,7 +133,10 @@ class CoverProviderFilesTest {
 
         assertEquals(
             cover,
-            CoverProviderFiles.resolve(mapOf("library_covers" to linked), listOf("library_covers", "thumb.jpg")),
+            CoverProviderFiles.resolve(
+                mapOf("library_covers" to CoverProviderFiles.Folder(linked, listOf(".jpg"))),
+                listOf("library_covers", "thumb.jpg"),
+            ),
         )
     }
 
@@ -126,6 +155,7 @@ class CoverProviderFilesTest {
         assertNull(type("\u0000\u0000\u0000 ftypisom"))
         assertNull(type("<svg"))
         assertNull(type(0xFF, 0xD8))
+        assertNull(type(0x89, 0x50, 0x4E, 0x47))
         assertNull(CoverProviderFiles.imageType(ByteArray(0)))
     }
 }

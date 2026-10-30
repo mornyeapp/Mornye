@@ -6,9 +6,16 @@ import android.content.ContentValues
 import android.content.Context
 import android.database.Cursor
 import android.net.Uri
+import android.os.Build
 import android.os.ParcelFileDescriptor
+import android.system.ErrnoException
+import android.system.Os
+import android.system.OsConstants
 import java.io.File
+import java.io.FileDescriptor
 import java.io.FileNotFoundException
+import java.io.IOException
+import java.io.InterruptedIOException
 
 /**
  * Cover images for media browsers such as Android Auto, which run in
@@ -19,17 +26,26 @@ import java.io.FileNotFoundException
  * listing and no writes.
  */
 class CoverContentProvider : ContentProvider() {
-    private val folders: Map<String, File> by lazy { coverFolders(requireNotNull(context)) }
+    private val folders: Map<String, CoverProviderFiles.Folder> by lazy { coverFolders(requireNotNull(context)) }
 
     override fun onCreate() = true
 
     override fun openFile(uri: Uri, mode: String): ParcelFileDescriptor {
         if (mode != "r") throw SecurityException("Covers are read-only")
-        val file = coverFile(uri) ?: throw FileNotFoundException("No cover at this URI")
-        return ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
+        val (descriptor, _) = openCover(uri) ?: throw FileNotFoundException("No cover at this URI")
+        try {
+            return ParcelFileDescriptor.dup(descriptor)
+        } catch (_: IOException) {
+            throw FileNotFoundException("Could not open the cover")
+        } finally {
+            close(descriptor)
+        }
     }
 
-    override fun getType(uri: Uri): String? = coverFile(uri)?.let(CoverProviderFiles::imageType)
+    override fun getType(uri: Uri): String? = openCover(uri)?.let { (descriptor, type) ->
+        close(descriptor)
+        type
+    }
 
     override fun query(
         uri: Uri,
@@ -58,7 +74,46 @@ class CoverContentProvider : ContentProvider() {
         return CoverProviderFiles.resolve(folders, uri.pathSegments)
     }
 
+    /**
+     * The cover [uri] names, opened once without following a link, and its
+     * image type, both checked on that descriptor: a regular file that
+     * starts with an image signature. Null for anything else.
+     */
+    private fun openCover(uri: Uri): Pair<FileDescriptor, String>? {
+        val file = coverFile(uri) ?: return null
+        val descriptor = try {
+            Os.open(file.path, openFlags, 0)
+        } catch (_: ErrnoException) {
+            return null
+        }
+        val type = try {
+            if (OsConstants.S_ISREG(Os.fstat(descriptor).st_mode)) {
+                val head = ByteArray(12)
+                val count = Os.pread(descriptor, head, 0, head.size, 0)
+                CoverProviderFiles.imageType(head.copyOf(count))
+            } else {
+                null
+            }
+        } catch (_: ErrnoException) {
+            null
+        } catch (_: InterruptedIOException) {
+            null
+        }
+        if (type == null) close(descriptor)
+        return type?.let { descriptor to it }
+    }
+
+    private fun close(descriptor: FileDescriptor) {
+        try {
+            Os.close(descriptor)
+        } catch (_: ErrnoException) {
+        }
+    }
+
     companion object {
+        private val openFlags = OsConstants.O_RDONLY or OsConstants.O_NOFOLLOW or
+            if (Build.VERSION.SDK_INT >= 27) OsConstants.O_CLOEXEC else 0
+
         private fun authority(context: Context) = "${context.packageName}.covers"
 
         private fun coverFolders(context: Context) =
@@ -67,7 +122,7 @@ class CoverContentProvider : ContentProvider() {
         /** The authority and folder paths Dart builds cover URIs from. */
         fun describe(context: Context): Map<String, Any> = mapOf(
             "authority" to authority(context),
-            "folders" to coverFolders(context).mapValues { it.value.path },
+            "folders" to coverFolders(context).mapValues { it.value.directory.path },
         )
     }
 }
