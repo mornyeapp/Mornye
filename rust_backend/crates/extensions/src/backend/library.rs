@@ -51,7 +51,7 @@ impl Backend {
         };
         check()?;
         let files = self.environment().native_files()?;
-        self.scan_audio_file(&files, path, hint, cache_key, &scan_time(), 0, &check)
+        self.scan_audio_file(&files, path, hint, cache_key, &scan_time(), 0, None, &check)
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -63,6 +63,7 @@ impl Backend {
         cache_key: &str,
         scan_time: &str,
         mod_time: i64,
+        covers: Option<&crate::files::SyncBatch>,
         check: &dyn Fn() -> Result<(), String>,
     ) -> Result<Value, String> {
         check()?;
@@ -106,6 +107,7 @@ impl Backend {
                         extract_cover(file, if aac { "aac" } else { format }, check)
                     }
                 },
+                covers,
                 check,
             )
             .ok()

@@ -1708,6 +1708,7 @@ dependencies = [
  "getrandom 0.4.3",
  "hmac",
  "httpdate",
+ "image",
  "libc",
  "md-5",
  "mornye-core",

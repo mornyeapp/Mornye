@@ -45,6 +45,7 @@ windows-sys = { workspace = true, features = ["Win32_Storage_FileSystem"] }
 winx = "=0.36.4"
 
 [dev-dependencies]
+image.workspace = true
 libc.workspace = true
 rustls.workspace = true
 rcgen = { version = "=0.14.10", default-features = false, features = ["crypto", "ring", "pem"] }

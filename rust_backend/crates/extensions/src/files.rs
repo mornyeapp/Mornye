@@ -773,6 +773,37 @@ impl StagedFile {
             .and_then(|parent| parent.into_std_file().sync_all());
         Ok(())
     }
+
+    /// Publishes a file of a cache that can be regenerated and leaves the
+    /// folder flush to `batch`. On Apple, `sync_all` is F_FULLFSYNC, which
+    /// drains the drive cache for every file. fsync(2) still hands the whole
+    /// file to the drive before its name appears, and the batch's single
+    /// F_FULLFSYNC makes everything before it as durable as `publish`. Other
+    /// platforms publish as `publish` does.
+    pub fn publish_batched(
+        self,
+        batch: &SyncBatch,
+        check: &dyn Fn() -> Result<(), String>,
+    ) -> Result<(), String> {
+        #[cfg(target_vendor = "apple")]
+        {
+            let mut stage = self;
+            rustix::fs::fsync(&stage.file).map_err(|error| error.to_string())?;
+            check()?;
+            stage
+                .parent
+                .rename(&stage.name, &stage.parent, &stage.target)
+                .map_err(|error| error.to_string())?;
+            stage.published = true;
+            batch.add(&stage.parent);
+            Ok(())
+        }
+        #[cfg(not(target_vendor = "apple"))]
+        {
+            let _ = batch;
+            self.publish(check)
+        }
+    }
 }
 
 impl Drop for StagedFile {
@@ -780,6 +811,53 @@ impl Drop for StagedFile {
         if !self.published {
             let _ = self.parent.remove_file(&self.name);
         }
+    }
+}
+
+/// Folders that received files through [`StagedFile::publish_batched`] and
+/// still wait for their flush. [`Self::flush`], or dropping the batch,
+/// flushes each folder once.
+#[derive(Default)]
+pub(crate) struct SyncBatch {
+    #[cfg(target_vendor = "apple")]
+    folders: Mutex<Vec<(u64, u64, Dir)>>,
+}
+
+impl SyncBatch {
+    #[cfg(target_vendor = "apple")]
+    fn add(&self, folder: &Dir) {
+        let Ok(stat) = rustix::fs::fstat(folder) else {
+            let _ = rustix::fs::fcntl_fullfsync(folder);
+            return;
+        };
+        let (device, inode) = (stat.st_dev as u64, stat.st_ino);
+        let mut folders = self.folders.lock().expect("sync batch lock");
+        if folders
+            .iter()
+            .any(|(known_device, known_inode, _)| (*known_device, *known_inode) == (device, inode))
+        {
+            return;
+        }
+        match folder.try_clone() {
+            Ok(folder) => folders.push((device, inode, folder)),
+            Err(_) => {
+                drop(folders);
+                let _ = rustix::fs::fcntl_fullfsync(folder);
+            }
+        }
+    }
+
+    pub fn flush(&self) {
+        #[cfg(target_vendor = "apple")]
+        for (_, _, folder) in std::mem::take(&mut *self.folders.lock().expect("sync batch lock")) {
+            let _ = folder.into_std_file().sync_all();
+        }
+    }
+}
+
+impl Drop for SyncBatch {
+    fn drop(&mut self) {
+        self.flush();
     }
 }
 

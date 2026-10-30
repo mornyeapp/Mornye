@@ -1,6 +1,7 @@
 //! Backend cover art handling: downloading, resizing, extracting from audio files, and caching.
 
 use super::Backend;
+use crate::files::{StagedFile, SyncBatch};
 use cap_std::fs::OpenOptions;
 use mornye_core::app_version::AppVersion;
 use mornye_core::cover::{MAX_DOWNLOAD_BYTES, resize};
@@ -284,10 +285,13 @@ impl Backend {
             explicit_key,
             None,
             read_cover,
+            None,
             check,
         )
     }
 
+    /// With `batch`, the scan flushes the thumbnail folder once at its end
+    /// instead of per file.
     #[allow(clippy::too_many_arguments)]
     pub(super) fn save_cover_to_cache_for_scan(
         &self,
@@ -296,6 +300,7 @@ impl Backend {
         cache_directory: &str,
         explicit_key: &str,
         read: impl FnOnce(&crate::files::FilePath, &str, &Check<'_>) -> Result<CoverArt, String>,
+        batch: Option<&SyncBatch>,
         check: &Check<'_>,
     ) -> Result<String, String> {
         let format = mornye_core::tags::library_extension(audio_path, hint);
@@ -309,6 +314,7 @@ impl Backend {
             explicit_key,
             format,
             read,
+            batch,
             check,
         )
     }
@@ -322,6 +328,7 @@ impl Backend {
         explicit_key: &str,
         format_override: Option<&str>,
         read: impl FnOnce(&crate::files::FilePath, &str, &Check<'_>) -> Result<CoverArt, String>,
+        batch: Option<&SyncBatch>,
         check: &Check<'_>,
     ) -> Result<String, String> {
         let _operation = self.enter()?;
@@ -418,8 +425,13 @@ impl Backend {
             .map_err(|error| format!("failed to create cache dir: {error}"))?;
         let permissions = output_permissions(&output)
             .map_err(|error| format!("failed to write cover: {error}"))?;
-        publish_cover(&output, permissions, &cover.data, &check)
+        let stage = stage_cover(&output, permissions, &cover.data, &check)
             .map_err(|error| format!("failed to write cover: {error}"))?;
+        match batch {
+            Some(batch) => stage.publish_batched(batch, &check),
+            None => stage.publish(&check),
+        }
+        .map_err(|error| format!("failed to write cover: {error}"))?;
         Ok(output.display())
     }
 
@@ -484,12 +496,16 @@ fn read_cover(
     extract_cover(&mut file, format, check)
 }
 
-/// The modification time of a cached thumbnail that may be reused.
+/// The modification time of a cached thumbnail that may be reused. An empty
+/// file, which a power loss before a scan's final flush can leave, is missing.
 fn reusable_cached_cover(
     path: &crate::files::FilePath,
     regenerate: Option<SystemTime>,
 ) -> Option<SystemTime> {
-    let metadata = path.metadata().ok().filter(|metadata| metadata.is_file())?;
+    let metadata = path
+        .metadata()
+        .ok()
+        .filter(|metadata| metadata.is_file() && metadata.len() > 0)?;
     let modified = metadata
         .modified()
         .map_or(UNIX_EPOCH, |modified| modified.into_std());
@@ -529,6 +545,15 @@ fn publish_cover(
     data: &[u8],
     check: &Check<'_>,
 ) -> Result<(), String> {
+    stage_cover(output, permissions, data, check)?.publish(check)
+}
+
+fn stage_cover(
+    output: &crate::files::FilePath,
+    permissions: Option<cap_std::fs::Permissions>,
+    data: &[u8],
+    check: &Check<'_>,
+) -> Result<StagedFile, String> {
     check()?;
     let mut stage = output
         .stage_existing_parent()
@@ -546,16 +571,61 @@ fn publish_cover(
             .write_all(chunk)
             .map_err(|error| error.to_string())?;
     }
-    stage.publish(check)
+    Ok(stage)
 }
 
 #[cfg(test)]
-mod tests {
+pub(super) mod tests {
     use super::*;
     use std::cell::Cell;
     use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
     use std::sync::mpsc;
     use std::thread;
+
+    /// A `size` px JPEG with a little noise, so it compresses like album art.
+    /// Each `seed` gives different bytes.
+    pub(in crate::backend) fn artwork(seed: u32, size: u32) -> Vec<u8> {
+        let mut state = seed.wrapping_mul(2_654_435_761) | 1;
+        let image = image::RgbImage::from_fn(size, size, |x, y| {
+            state ^= state << 13;
+            state ^= state >> 17;
+            state ^= state << 5;
+            let noise = (state & 63) as u8;
+            image::Rgb([
+                (x * 255 / size) as u8 ^ noise,
+                (y * 255 / size) as u8 ^ noise,
+                seed.wrapping_mul(37) as u8 ^ noise,
+            ])
+        });
+        let mut jpeg = Vec::new();
+        image::codecs::jpeg::JpegEncoder::new_with_quality(&mut jpeg, 90)
+            .encode_image(&image)
+            .unwrap();
+        jpeg
+    }
+
+    /// An untagged FLAC file with `jpeg` as its front cover.
+    pub(in crate::backend) fn flac_with_picture(jpeg: &[u8]) -> Vec<u8> {
+        let mut picture = 3_u32.to_be_bytes().to_vec();
+        for field in [b"image/jpeg".as_slice(), b""] {
+            picture.extend((field.len() as u32).to_be_bytes());
+            picture.extend(field);
+        }
+        picture.extend([0; 16]);
+        picture.extend((jpeg.len() as u32).to_be_bytes());
+        picture.extend(jpeg);
+        let mut info = [0; 34];
+        let packed = (44_100_u64 << 44) | (1_u64 << 41) | (15_u64 << 36) | 44_100;
+        info[10..18].copy_from_slice(&packed.to_be_bytes());
+        let mut flac = b"fLaC\0".to_vec();
+        flac.extend(&(info.len() as u32).to_be_bytes()[1..]);
+        flac.extend(info);
+        flac.push(0x86);
+        flac.extend(&(picture.len() as u32).to_be_bytes()[1..]);
+        flac.extend(picture);
+        flac.extend([0xff, 0xf8]);
+        flac
+    }
 
     fn cover() -> Cover {
         Cover::new(&NetworkService::new().unwrap(), "1".into())
@@ -682,6 +752,33 @@ mod tests {
         assert_eq!(save(), cached);
         assert_eq!(std::fs::read(&cached).unwrap(), jpeg);
         assert_eq!(std::fs::read(&source).unwrap(), audio);
+    }
+
+    #[test]
+    fn an_empty_thumbnail_is_extracted_again() {
+        let directory = tempfile::tempdir().unwrap();
+        let data = directory.path().join("data");
+        let backend = backend(directory.path());
+        let jpeg = b"\xff\xd8\xff\xe0empty";
+        let source = data.join("track.mp3");
+        std::fs::write(&source, id3_audio(jpeg)).unwrap();
+        let cache = data.join("covers");
+        let save = || {
+            backend
+                .save_cover_to_cache_with_hint_and_key(
+                    source.to_str().unwrap(),
+                    "",
+                    cache.to_str().unwrap(),
+                    "track",
+                    &|| Ok(()),
+                )
+                .unwrap()
+        };
+        let cached = save();
+        // What a power loss between a scan's fsync and its final flush can leave.
+        std::fs::write(&cached, b"").unwrap();
+        assert_eq!(save(), cached);
+        assert_eq!(std::fs::read(&cached).unwrap(), jpeg);
     }
 
     #[test]

@@ -202,6 +202,42 @@ fn windows_network_share_directory_operations() {
     check_directory_operations(&std::fs::canonicalize(root.path()).unwrap());
 }
 
+#[test]
+fn batched_publication_keeps_each_folder_once_until_the_flush() {
+    let root = tempfile::tempdir().unwrap();
+    let files = Arc::new(FileRegistry::default())
+        .extension(root.path())
+        .unwrap();
+    let batch = SyncBatch::default();
+    for name in ["covers/a.jpg", "covers/b.jpg", "other/c.jpg"] {
+        let output = files.resolve(name).unwrap();
+        let mut stage = output.stage().unwrap();
+        stage.file.write_all(name.as_bytes()).unwrap();
+        stage.publish_batched(&batch, &|| Ok(())).unwrap();
+        assert_eq!(std::fs::read(&output.absolute).unwrap(), name.as_bytes());
+    }
+    let output = files.resolve("covers/cancelled.jpg").unwrap();
+    let stage = output.stage().unwrap();
+    assert_eq!(
+        stage
+            .publish_batched(&batch, &|| Err("cancelled".into()))
+            .unwrap_err(),
+        "cancelled"
+    );
+    assert!(!output.absolute.exists());
+    assert_eq!(
+        std::fs::read_dir(root.path().join("covers"))
+            .unwrap()
+            .count(),
+        2
+    );
+    #[cfg(target_vendor = "apple")]
+    assert_eq!(batch.folders.lock().unwrap().len(), 2);
+    batch.flush();
+    #[cfg(target_vendor = "apple")]
+    assert!(batch.folders.lock().unwrap().is_empty());
+}
+
 #[cfg(unix)]
 #[test]
 fn stage_from_links_same_filesystem_source_and_survives_source_cleanup() {
