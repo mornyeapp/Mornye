@@ -76,9 +76,7 @@ extension _QueueTabFilterWidgets on _QueueTabState {
     if (hasQueueItems &&
         filterMode != 'albums' &&
         _completionBridge.isNotEmpty) {
-      final libIdSet = <String>{
-        for (final item in allFilteredUnifiedItems) item.id,
-      };
+      final libIdSet = _loadedSongs(filterMode, allFilteredUnifiedItems).ids;
       final now = DateTime.now();
       final stale = <String>[];
       final pending = <String>[];
@@ -174,51 +172,40 @@ extension _QueueTabFilterWidgets on _QueueTabState {
       final pinnedHistoryIds = <String>{
         for (final id in bridgeIds) 'dl_${bridgeHistoryById[id]?.id ?? id}',
       };
-      filteredUnifiedItems = allFilteredUnifiedItems
-          .where((item) => !pinnedHistoryIds.contains(item.id))
-          .toList(growable: false);
-    }
-
-    final downloadedNavigationItems = <DownloadHistoryItem>[];
-    final downloadedNavigationIndexByUnifiedId = <String, int>{};
-    final localNavigationItems = <LocalLibraryItem>[];
-    final localNavigationIndexByUnifiedId = <String, int>{};
-
-    for (final item in filteredUnifiedItems) {
-      final historyItem = item.historyItem;
-      if (historyItem != null) {
-        downloadedNavigationIndexByUnifiedId[item.id] =
-            downloadedNavigationItems.length;
-        downloadedNavigationItems.add(historyItem);
-      }
-
-      final localItem = item.localItem;
-      if (localItem != null) {
-        localNavigationIndexByUnifiedId[item.id] = localNavigationItems.length;
-        localNavigationItems.add(localItem);
+      final loaded = _loadedSongs(filterMode, allFilteredUnifiedItems);
+      final unpinned = loaded.unpinned;
+      if (unpinned != null && setEquals(unpinned.$1, pinnedHistoryIds)) {
+        filteredUnifiedItems = unpinned.$2;
+      } else {
+        filteredUnifiedItems = allFilteredUnifiedItems
+            .where((item) => !pinnedHistoryIds.contains(item.id))
+            .toList(growable: false);
+        loaded.unpinned = (pinnedHistoryIds, filteredUnifiedItems);
       }
     }
 
     // Completion-bridge tracks are hidden from filteredUnifiedItems, so weave
     // them into the front of the swipe-navigation list (matching their pinned
-    // lead-zone position) — otherwise a just-downloaded track opens with no
+    // lead-zone position); otherwise a just-downloaded track opens with no
     // swipe navigation at all until its row lands in the library query.
     final bridgeNavigationIndexById = <String, int>{};
-    if (bridgeIds.isNotEmpty) {
-      final bridgeHistoryItems = <DownloadHistoryItem>[];
-      for (final id in bridgeIds) {
-        final historyItem = bridgeHistoryById[id];
-        if (historyItem == null) continue;
-        bridgeNavigationIndexById[id] = bridgeHistoryItems.length;
-        bridgeHistoryItems.add(historyItem);
-      }
-      if (bridgeHistoryItems.isNotEmpty) {
-        downloadedNavigationItems.insertAll(0, bridgeHistoryItems);
-        downloadedNavigationIndexByUnifiedId.updateAll(
-          (_, index) => index + bridgeHistoryItems.length,
-        );
-      }
+    final bridgeHistoryItems = <DownloadHistoryItem>[];
+    for (final id in bridgeIds) {
+      final historyItem = bridgeHistoryById[id];
+      if (historyItem == null) continue;
+      bridgeNavigationIndexById[id] = bridgeHistoryItems.length;
+      bridgeHistoryItems.add(historyItem);
     }
+    final (
+      downloaded: downloadedNavigationItems,
+      downloadedIndexById: downloadedNavigationIndexByUnifiedId,
+      local: localNavigationItems,
+      localIndexById: localNavigationIndexByUnifiedId,
+    ) = _libraryNavigation(
+      filterMode,
+      filteredUnifiedItems,
+      bridgeHistoryItems,
+    );
 
     final leadCount = activeDownloadIds.length + bridgeIds.length;
     // The tab-root Library keeps Songs to songs: collections live on the
@@ -634,6 +621,7 @@ extension _QueueTabFilterWidgets on _QueueTabState {
             // and active downloads leading it.
             _buildLibrarySongTable(
               context,
+              filterMode: filterMode,
               items: filteredUnifiedItems,
               leadCount: collectionCount + leadCount,
               leadBuilder: (index) => index < collectionCount
@@ -1125,6 +1113,52 @@ extension _QueueTabFilterWidgets on _QueueTabState {
     );
   }
 
+  _LoadedSongs _loadedSongs(String filterMode, List<UnifiedLibraryItem> items) {
+    final cached = _loadedSongsByMode[filterMode];
+    if (cached != null && identical(cached.items, items)) return cached;
+    return _loadedSongsByMode[filterMode] = _LoadedSongs(items);
+  }
+
+  /// The swipe-navigation lists over [items], [bridgeHistoryItems] first,
+  /// kept while the songs and the pinned downloads stay the same.
+  _LibraryNavigation _libraryNavigation(
+    String filterMode,
+    List<UnifiedLibraryItem> items,
+    List<DownloadHistoryItem> bridgeHistoryItems,
+  ) {
+    final cached = _navigationByMode[filterMode];
+    if (cached != null &&
+        identical(cached.$1, items) &&
+        listEquals(cached.$2, bridgeHistoryItems)) {
+      return cached.$3;
+    }
+    final downloaded = <DownloadHistoryItem>[...bridgeHistoryItems];
+    final downloadedIndexById = <String, int>{};
+    final local = <LocalLibraryItem>[];
+    final localIndexById = <String, int>{};
+    for (final item in items) {
+      final historyItem = item.historyItem;
+      if (historyItem != null) {
+        downloadedIndexById[item.id] = downloaded.length;
+        downloaded.add(historyItem);
+      }
+
+      final localItem = item.localItem;
+      if (localItem != null) {
+        localIndexById[item.id] = local.length;
+        local.add(localItem);
+      }
+    }
+    final navigation = (
+      downloaded: downloaded,
+      downloadedIndexById: downloadedIndexById,
+      local: local,
+      localIndexById: localIndexById,
+    );
+    _navigationByMode[filterMode] = (items, bridgeHistoryItems, navigation);
+    return navigation;
+  }
+
   List<UnifiedLibraryItem> _selectedItemsFromAll(
     List<UnifiedLibraryItem> allItems,
   ) {
@@ -1141,3 +1175,23 @@ extension _QueueTabFilterWidgets on _QueueTabState {
         selectedItems.every((item) => item.localItem != null);
   }
 }
+
+/// What a Library page derives from one list of loaded songs.
+class _LoadedSongs {
+  _LoadedSongs(this.items);
+
+  final List<UnifiedLibraryItem> items;
+  late final Set<String> ids = {for (final item in items) item.id};
+
+  /// The songs without the pinned download rows, by the pinned row ids.
+  (Set<String>, List<UnifiedLibraryItem>)? unpinned;
+}
+
+/// Swipe-navigation lists over a Library page's songs, with each song's
+/// position in them.
+typedef _LibraryNavigation = ({
+  List<DownloadHistoryItem> downloaded,
+  Map<String, int> downloadedIndexById,
+  List<LocalLibraryItem> local,
+  Map<String, int> localIndexById,
+});

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
-import 'package:flutter/foundation.dart' show ValueListenable;
+import 'package:flutter/foundation.dart'
+    show ValueListenable, listEquals, setEquals;
 import 'package:flutter/material.dart';
 import 'package:mornye/widgets/app_alert_dialog.dart';
 import 'package:mornye/widgets/app_choice_chip.dart';
@@ -223,6 +224,18 @@ class _QueueTabState extends ConsumerState<QueueTab> {
   /// from, so an unchanged page keeps its filtered rows across rebuilds.
   final Map<String, (_QueueLibraryPageData, int?, int?, _FilterContentData)>
   _filterDataByMode = {};
+
+  /// Per mode, what the page derives from its loaded songs: their ids, the
+  /// songs without the pinned download rows, their navigation lists and the
+  /// desktop table rows. Each is kept while its inputs stay the same, so a
+  /// click or a resize does not walk every loaded song.
+  final Map<String, _LoadedSongs> _loadedSongsByMode = {};
+  final Map<
+    String,
+    (List<UnifiedLibraryItem>, List<DownloadHistoryItem>, _LibraryNavigation)
+  >
+  _navigationByMode = {};
+  final Map<String, _LibrarySongTableRows> _songTableByMode = {};
 
   final QueueLibraryPager<
     _QueueLibraryCountsRequest,
