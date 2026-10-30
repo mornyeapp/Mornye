@@ -636,4 +636,100 @@ void main() {
       containsAll([null, web]),
     );
   });
+
+  test('a desktop edit of a song keeps the phone its network cover', () async {
+    final directory = await linkSyncTempDirectory();
+    final phone = await openLinkCollectionsDatabase(directory, 'phone');
+    final desk = await openLinkCollectionsDatabase(directory, 'desk');
+    final phoneStore = LinkCollectionSyncStore(() async => phone);
+    final deskStore = LinkCollectionSyncStore(() async => desk);
+    final phoneCollections = LibraryCollectionsDatabase.withDatabase(phone);
+    final deskCollections = LibraryCollectionsDatabase.withDatabase(desk);
+    String cover(String id) => 'network://nas/$id/cover.jpg';
+    String json(String id, String? cover) =>
+        jsonEncode({...linkTestTrack(id).toJson(), 'coverUrl': cover});
+    Future<void> sync(
+      LinkCollectionSyncStore from,
+      LinkCollectionSyncStore to,
+    ) async {
+      final page = await from.changesSince(
+        0,
+        excludeOrigin: await to.deviceId(),
+      );
+      final wire = linkJsonRoundTrip(page.toJson('changes', (c) => c.toJson()));
+      await to.apply(
+        LinkSyncPage.fromJson<LinkSyncChange>(
+          wire,
+          'changes',
+          (item, origin) =>
+              LinkSyncChange.fromJson(item, fallbackOrigin: origin),
+        )!.items,
+      );
+    }
+
+    await phoneCollections.upsertLovedEntry(
+      trackKey: 'example:loved',
+      trackJson: json('loved', cover('loved')),
+      addedAt: DateTime.now().toIso8601String(),
+    );
+    await phoneCollections.upsertPlaylist(
+      id: 'pl_1',
+      name: 'Mix',
+      createdAt: DateTime.now().toIso8601String(),
+      updatedAt: DateTime.now().toIso8601String(),
+    );
+    for (final (id, at) in [('one', '2026-01-01'), ('two', '2026-01-02')]) {
+      await phoneCollections.upsertPlaylistTrack(
+        playlistId: 'pl_1',
+        trackKey: 'example:$id',
+        trackJson: json(id, cover(id)),
+        addedAt: '${at}T00:00:00.000',
+        playlistUpdatedAt: DateTime.now().toIso8601String(),
+      );
+    }
+    await sync(phoneStore, deskStore);
+    expect(
+      (await deskCollections.loadPlaylistTracks(
+        'pl_1',
+      )).map((track) => track.coverUrl),
+      [null, null],
+    );
+
+    // The desktop reorders the playlist and saves the Loved song again,
+    // both from its own rows, which have no cover.
+    await deskCollections.reorderPlaylistTracks(
+      playlistId: 'pl_1',
+      addedAtByKey: {
+        'example:two': '2026-01-01T00:00:00.000',
+        'example:one': '2026-01-01T00:00:00.001',
+      },
+      playlistUpdatedAt: DateTime.now().toIso8601String(),
+    );
+    await deskCollections.upsertLovedEntry(
+      trackKey: 'example:loved',
+      trackJson: json('loved', null),
+      addedAt: DateTime.now().toIso8601String(),
+    );
+    await sync(deskStore, phoneStore);
+    expect(
+      (await phoneCollections.loadPlaylistTracks(
+        'pl_1',
+      )).map((track) => (track.id, track.coverUrl)),
+      [('two', cover('two')), ('one', cover('one'))],
+    );
+    expect(
+      (await phoneCollections.loadLovedTracks()).single.coverUrl,
+      cover('loved'),
+    );
+
+    // A cover the desktop sends still replaces it.
+    const web = 'https://example.com/cover.jpg';
+    await deskCollections.upsertLovedEntry(
+      trackKey: 'example:loved',
+      trackJson: json('loved', web),
+      addedAt: DateTime.now().toIso8601String(),
+    );
+    await sync(deskStore, phoneStore);
+    expect((await phoneCollections.loadLovedTracks()).single.coverUrl, web);
+  });
 }

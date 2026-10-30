@@ -363,13 +363,14 @@ class LinkCollectionSyncStore {
         );
         playlists.addAll(rows.map((row) => row['id']! as String));
       }
+      final kept = await _keptCovers(txn, winners);
       final batch = txn.batch();
       var applied = 0;
       for (final change in [
         ...winners.where((change) => change.kind == LinkSyncKinds.playlist),
         ...winners.where((change) => change.kind != LinkSyncKinds.playlist),
       ]) {
-        if (_write(batch, change, playlists)) applied++;
+        if (_write(batch, change, playlists, kept)) applied++;
       }
       if (applied > 0) {
         batch.rawUpdate(
@@ -388,10 +389,66 @@ class LinkCollectionSyncStore {
     });
   }
 
-  /// Queues the writes for one winning change. Returns false when the change
-  /// cannot be applied (malformed data, or a member of a missing playlist).
-  bool _write(Batch batch, LinkSyncChange change, Set<String> playlists) {
+  /// The `network://` covers of this device's rows that [winners] replace
+  /// with a song without a cover. [linkSyncTrack] never sends one, so a
+  /// peer's later edit of such a row, such as a playlist reorder, comes back
+  /// without it; the row keeps it. A cover the peer sends wins.
+  Future<Map<_Identity, String>> _keptCovers(
+    DatabaseExecutor db,
+    List<LinkSyncChange> winners,
+  ) async {
+    final groups = <(String, String), List<String>>{};
+    for (final change in winners) {
+      final track = change.data?['track'];
+      if (change.deleted || track is! Map) continue;
+      if (track['coverUrl'] case final String cover
+          when cover.trim().isNotEmpty) {
+        continue;
+      }
+      if (_trackTables.containsKey(change.kind) ||
+          change.kind == LinkSyncKinds.playlistTrack) {
+        groups
+            .putIfAbsent((change.kind, change.playlistId), () => [])
+            .add(change.key);
+      }
+    }
+    final kept = <_Identity, String>{};
+    for (final MapEntry(key: (kind, scope), value: keys) in groups.entries) {
+      final table = _trackTables[kind];
+      for (final chunk in _chunks(keys)) {
+        final rows = await db.rawQuery(
+          table != null
+              ? 'SELECT track_key, track_json FROM $table '
+                    'WHERE track_key IN (${_placeholders(chunk.length)})'
+              : 'SELECT track_key, track_json FROM playlist_tracks '
+                    'WHERE playlist_id = ? '
+                    'AND track_key IN (${_placeholders(chunk.length)})',
+          [if (table == null) scope, ...chunk],
+        );
+        for (final row in rows) {
+          final cover = _decodeMap(row['track_json'])?['coverUrl'];
+          if (cover is String && cover.startsWith('network://')) {
+            kept[(kind, scope, row['track_key']! as String)] = cover;
+          }
+        }
+      }
+    }
+    return kept;
+  }
+
+  /// Queues the writes for one winning change, with the cover [kept] for
+  /// its row. Returns false when the change cannot be applied (malformed
+  /// data, or a member of a missing playlist).
+  bool _write(
+    Batch batch,
+    LinkSyncChange change,
+    Set<String> playlists,
+    Map<_Identity, String> kept,
+  ) {
     final data = change.data ?? const <String, dynamic>{};
+    final cover = kept[(change.kind, change.playlistId, change.key)];
+    Map<dynamic, dynamic> withCover(Map<dynamic, dynamic> track) =>
+        cover == null ? track : {...track, 'coverUrl': cover};
     final addedAt = linkSyncMsToIso(
       linkSyncInt(data['addedMs']) ?? change.updatedMs,
     );
@@ -414,7 +471,7 @@ class LinkCollectionSyncStore {
           writes.add(
             () => batch.insert(table, {
               'track_key': change.key,
-              'track_json': jsonEncode(track),
+              'track_json': jsonEncode(withCover(track)),
               'added_at': addedAt,
             }, conflictAlgorithm: ConflictAlgorithm.replace),
           );
@@ -498,7 +555,7 @@ class LinkCollectionSyncStore {
             () => batch.insert('playlist_tracks', {
               'playlist_id': change.playlistId,
               'track_key': change.key,
-              'track_json': jsonEncode(track),
+              'track_json': jsonEncode(withCover(track)),
               'added_at': addedAt,
             }, conflictAlgorithm: ConflictAlgorithm.replace),
           );

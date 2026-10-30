@@ -34,7 +34,8 @@ import 'package:mornye/utils/cover_art_utils.dart';
 ///   playlist id (`playlist`) or the artist key (`favoriteArtist`).
 ///   `data`: `loved`, `wishlist`, `playlistTrack`:
 ///   `{"track": Track JSON, "addedMs": int}` (no `network://` `coverUrl`,
-///   which names a connection of the author only); `playlist`:
+///   which names a connection of the author only; a receiver whose row
+///   holds one keeps it when the track comes without a cover); `playlist`:
 ///   `{"name", "createdMs", "updatedMs"}` (cover images are device-local and
 ///   never sync); `favoriteArtist`: `{"artist": artist entry JSON,
 ///   "addedMs": int}`.
