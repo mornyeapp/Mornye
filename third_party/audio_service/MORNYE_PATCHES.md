@@ -88,6 +88,17 @@ from the upstream package are not vendored.
   their pixels; the notification's 256 px large icon is now scaled from the
   512 px bitmap instead of from up to 1023 px (owner-approved). The app's
   instrumented `MediaControlMetadataTest` covers the 512 px bound.
+- Darwin: `setMediaItem` reuses the last `MPMediaItemArtwork` while its
+  `artCacheFile` has the same path, device, inode, size and modification time
+  (`artworkForFile:`), instead of reading the file into a new image and
+  artwork for each media item (two to four per song). `updateNowPlayingField`
+  treats `NSNull` and a missing field as equal: upstream counted an item
+  without an album or `isLive` (the app sends neither) as changed on every
+  call, so each call reassigned `nowPlayingInfo`. A media item that changes
+  nothing now leaves `MPNowPlayingInfoCenter` alone, and the system keeps
+  advancing the elapsed time it last got. `stopService` empties the retained
+  `nowPlayingInfo` fields together with the center's, so the next update
+  sends every field again.
 - Android build (`android/build.gradle.kts`): AGP 9.0.1 to 9.4.1, compileSdk
   35 to 37, `androidx.media:media` 1.7.0 to 1.8.0, `androidx.core:core`
   1.13.1 to 1.19.1, a `junit:junit:4.13.2` test dependency, and
@@ -146,7 +157,7 @@ Compared against the pub.dev 0.18.19 package in the local pub cache:
    each patch above by hand. Check first whether upstream now configures
    engines it creates, shows custom
    actions on Android 12 and older, bounds its metadata cache or art cache,
-   or reuses its media executor.
+   reuses its media executor, or compares Now Playing fields with `NSNull`.
 4. Keep the Gradle values in step with the app's `android/app/build.gradle.kts`.
 5. Test notification controls on Android 12 or older and on Android 13+,
    Android Auto browsing, and iOS lock screen controls after a video plays.
