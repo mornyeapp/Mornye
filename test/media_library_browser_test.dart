@@ -5,11 +5,13 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/l10n/app_localizations.dart';
 import 'package:mornye/models/track.dart';
+import 'package:mornye/services/cover_store.dart';
 import 'package:mornye/services/history_database.dart';
 import 'package:mornye/services/library_collections_database.dart';
 import 'package:mornye/services/library_database.dart';
 import 'package:mornye/services/library_search.dart';
 import 'package:mornye/services/media_library_browser.dart';
+import 'package:path/path.dart' as p;
 
 const _added = '2026-01-01T00:00:00.000Z';
 
@@ -188,13 +190,19 @@ MediaLibraryBrowser _browser({
   _History? history,
   _Collections? collections,
   bool includeLocal = true,
+  CoverStore? covers,
+  Future<BrowserCoverProvider?> Function()? coverProvider,
 }) => MediaLibraryBrowser(
   library: library ?? _Library(),
   history: history ?? _History(),
   collections: collections ?? _Collections(),
   includeLocal: () => includeLocal,
   strings: () => lookupAppLocalizations(const Locale('en')),
+  covers: covers,
+  coverProvider: coverProvider ?? BrowserCoverProvider.load,
 );
+
+const _jpeg = [0xFF, 0xD8, 0xFF, 0xE0, 0, 16, 0x4A, 0x46, 0x49, 0x46];
 
 List<String> _titles(List<MediaItem> items) => [
   for (final item in items) item.title,
@@ -233,7 +241,7 @@ void main() {
       expect(items, hasLength(MediaLibraryBrowser.listLimit + 1));
       expect(items[1].title, 'Song d0');
       expect(items[1].artUri.toString(), 'https://covers.example/d0.jpg');
-      // A car cannot open the app's own cover files.
+      // Without the cover provider, as here, a car cannot load local covers.
       expect(items[2].artUri, isNull);
 
       final queue = (await browser.queueFor(items[2].id))!;
@@ -383,6 +391,179 @@ void main() {
     expect(_titles(songs), ['Old', 'Web']);
     expect(songs.first.artUri, isNull);
     expect(songs.last.artUri.toString(), 'https://covers.example/web.jpg');
+  });
+
+  group('the cover provider', () {
+    const library = '/data/app/files/library_covers';
+    late Directory directory;
+    late CoverStore covers;
+    setUp(() async {
+      directory = await Directory.systemTemp.createTemp('browser-covers');
+      covers = CoverStore(
+        directory: () async => Directory('${directory.path}/covers'),
+        fetch: (ref, output) => output.writeAsBytes(_jpeg),
+      );
+    });
+    tearDown(() async {
+      await covers.dispose();
+      await directory.delete(recursive: true);
+    });
+
+    BrowserCoverProvider provider() => BrowserCoverProvider(
+      authority: 'app.covers',
+      folders: {
+        'covers': '${directory.path}/covers',
+        'library_covers': library,
+        // Even a folder the provider serves shows no temporary file.
+        'temporary': Directory.systemTemp.path,
+      },
+    );
+    String cover(String folder, String name) => Uri(
+      scheme: 'content',
+      host: 'app.covers',
+      pathSegments: [folder, name],
+    ).toString();
+    Map<String, dynamic> album(String name, String? cover) => {
+      'queue_source': 'local',
+      'album_key': name,
+      'album_name': name,
+      'artist_name': 'Artist',
+      'cover_url': cover,
+    };
+    Map<String, String?> art(List<MediaItem> items) => {
+      for (final item in items) item.title: item.artUri?.toString(),
+    };
+
+    test('shows the covers in its folders, the same for every form', () async {
+      var loads = 0;
+      final rows = _Library(
+        songs: [
+          {
+            'source': 'local',
+            'item': {..._scanned('l'), 'coverPath': '$library/l 1.jpg'},
+          },
+        ],
+        albums: [
+          album('Path', '$library/a.jpg'),
+          album('File URI', 'file://$library/a.jpg'),
+          album('Web', 'https://covers.example/w.jpg'),
+          album('Loopback', 'http://127.0.0.1:41234/7f3a'),
+          album('Elsewhere', '/storage/emulated/0/Music/cover.jpg'),
+          album('Nested', '$library/old/a.jpg'),
+          album('Escape', '$library/../shared_prefs/a.jpg'),
+          album('Hidden', '$library/.a.jpg'),
+          album('Temporary', '${Directory.systemTemp.path}/a.jpg'),
+          album('Content', 'content://media/external/images/media/1'),
+          album('None', null),
+        ],
+        artists: [
+          {
+            'artist_key': 'artist',
+            'artist_name': 'Artist',
+            'cover_url': '$library/artist.jpg',
+          },
+        ],
+      );
+      final browser = _browser(
+        library: rows,
+        covers: covers,
+        coverProvider: () async {
+          loads++;
+          return provider();
+        },
+      );
+
+      final songs = await browser.children(MediaLibraryBrowser.songsId);
+      expect(songs[1].artUri.toString(), cover('library_covers', 'l 1.jpg'));
+      final albums = await browser.children(MediaLibraryBrowser.albumsId);
+      expect(art(albums), {
+        'Path': cover('library_covers', 'a.jpg'),
+        'File URI': cover('library_covers', 'a.jpg'),
+        'Web': 'https://covers.example/w.jpg',
+        'Loopback': null,
+        'Elsewhere': null,
+        'Nested': null,
+        'Escape': null,
+        'Hidden': null,
+        'Temporary': null,
+        'Content': null,
+        'None': null,
+      });
+      expect(
+        art(await browser.children(MediaLibraryBrowser.albumsId)),
+        art(albums),
+      );
+      final artists = await browser.children(MediaLibraryBrowser.artistsId);
+      expect(
+        artists.single.artUri.toString(),
+        cover('library_covers', 'artist.jpg'),
+      );
+      expect(loads, 1);
+
+      // Without the provider a car cannot load them.
+      final without = _browser(
+        library: rows,
+        covers: covers,
+        coverProvider: () async => null,
+      );
+      expect(
+        art(
+          await without.children(MediaLibraryBrowser.albumsId),
+        ).values.nonNulls,
+        ['https://covers.example/w.jpg'],
+      );
+    });
+
+    test('shows the file the store keeps for a network cover', () async {
+      const stored = 'network://connection/covers/a.jpg';
+      const song = 'network://connection/music/song.flac';
+      final storedPath = (await covers.file(stored))!;
+      final tags = await File('${directory.path}/tags.jpg').writeAsBytes(_jpeg);
+      final adoptedPath = (await covers.adopt(
+        CoverStore.songCoverReference(song),
+        tags.path,
+      ))!;
+      final browser = _browser(
+        library: _Library(
+          songs: [
+            {
+              'source': 'local',
+              'item': {..._scanned('n'), 'filePath': song, 'coverPath': null},
+            },
+          ],
+          hits: {
+            LibrarySearchKind.albums: const [
+              LibrarySearchHit(
+                kind: LibrarySearchKind.albums,
+                id: 'stored',
+                title: 'Stored',
+                source: 'local',
+                cover: stored,
+              ),
+              LibrarySearchHit(
+                kind: LibrarySearchKind.albums,
+                id: 'missing',
+                title: 'Not stored',
+                source: 'local',
+                cover: 'network://connection/covers/b.jpg',
+              ),
+            ],
+          },
+        ),
+        covers: covers,
+        coverProvider: () async => provider(),
+      );
+
+      expect(art(await browser.search('stored')), {
+        'Stored': cover('covers', p.basename(storedPath)),
+        'Not stored': null,
+      });
+      final songs = await browser.children(MediaLibraryBrowser.songsId);
+      expect(
+        songs[1].artUri.toString(),
+        cover('covers', p.basename(adoptedPath)),
+      );
+    });
   });
 
   test('with Local Library off, Loved plays no scanned files', () async {

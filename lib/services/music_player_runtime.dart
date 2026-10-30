@@ -279,6 +279,7 @@ class MusicPlayerRuntime {
     collections: dependencies.collectionsDatabase,
     includeLocal: () => _settings.localLibraryEnabled,
     strings: () => appLocalizationsFor(_settings.locale),
+    covers: dependencies.coverStore,
   );
 
   AppSettings get settings => _settings;

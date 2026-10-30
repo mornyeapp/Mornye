@@ -1,6 +1,8 @@
+import 'dart:io';
 import 'dart:math';
 
 import 'package:audio_service/audio_service.dart';
+import 'package:flutter/services.dart';
 import 'package:mornye/l10n/app_localizations.dart';
 import 'package:mornye/models/album_track_order.dart';
 import 'package:mornye/models/download_history.dart';
@@ -13,10 +15,84 @@ import 'package:mornye/services/library_search.dart';
 import 'package:mornye/services/playable_media.dart';
 import 'package:mornye/services/track_file_resolver.dart';
 import 'package:mornye/utils/file_access.dart' show isCueVirtualPath;
+import 'package:path/path.dart' as p;
 
 /// The songs a media browser item plays, the one to start at, and whether
 /// playing it turns shuffle on.
 typedef BrowserQueue = ({List<PlayableMedia> items, int index, bool shuffle});
+
+/// The app's cover files as media browsers such as Android Auto load them.
+/// A car runs in another process and cannot open the app's files, so it
+/// reads them through the Android cover provider, which serves the image
+/// files directly in its [folders] as
+/// `content://<authority>/<folder name>/<file name>`.
+class BrowserCoverProvider {
+  const BrowserCoverProvider({required this.authority, required this.folders});
+
+  final String authority;
+
+  /// The folders the provider serves, by the name their URIs start with.
+  final Map<String, String> folders;
+
+  static const _channel = MethodChannel('com.zarz.mornye/covers');
+
+  /// This app's cover provider, or null where there is none.
+  static Future<BrowserCoverProvider?> load() async {
+    if (!Platform.isAndroid) return null;
+    try {
+      final info = await _channel.invokeMapMethod<String, Object?>('provider');
+      final authority = info?['authority'];
+      final folders = info?['folders'];
+      if (authority is! String || folders is! Map) return null;
+      return BrowserCoverProvider(
+        authority: authority,
+        folders: {
+          for (final MapEntry(:key, :value) in folders.entries)
+            if (key is String && value is String) key: value,
+        },
+      );
+    } on PlatformException {
+      return null;
+    } on MissingPluginException {
+      return null;
+    }
+  }
+
+  /// The URI of the cover file [reference] names (an absolute path or a
+  /// `file://` URI), the same for every form of one path. Null unless the
+  /// file is directly in one of the [folders], as the provider serves
+  /// nothing else.
+  Uri? uriFor(String? reference) {
+    final path = _localPath(reference);
+    if (path == null) return null;
+    final normalized = p.normalize(path);
+    final name = p.basename(normalized);
+    if (name.isEmpty || name.startsWith('.')) return null;
+    final parent = p.dirname(normalized);
+    for (final MapEntry(key: folder, value: directory) in folders.entries) {
+      if (p.equals(parent, directory)) {
+        return Uri(
+          scheme: 'content',
+          host: authority,
+          pathSegments: [folder, name],
+        );
+      }
+    }
+    return null;
+  }
+
+  static String? _localPath(String? reference) {
+    if (reference == null || reference.isEmpty) return null;
+    if (p.isAbsolute(reference)) return reference;
+    final uri = Uri.tryParse(reference);
+    if (uri == null || !uri.isScheme('file')) return null;
+    try {
+      return uri.toFilePath();
+    } on UnsupportedError {
+      return null;
+    }
+  }
+}
 
 /// The Library as media browsers such as Android Auto show it: tabs for
 /// songs, albums, artists and playlists, a search, and the queue each item
@@ -28,7 +104,11 @@ class MediaLibraryBrowser {
     required this.collections,
     required this.includeLocal,
     required this.strings,
-  });
+    CoverStore? covers,
+    Future<BrowserCoverProvider?> Function() coverProvider =
+        BrowserCoverProvider.load,
+  }) : _coverStore = covers,
+       _loadCoverProvider = coverProvider;
 
   final LibraryDatabase library;
   final HistoryDatabase history;
@@ -37,6 +117,13 @@ class MediaLibraryBrowser {
   /// Whether scanned songs belong to the Library, as on the Library tab.
   final bool Function() includeLocal;
   final AppLocalizations Function() strings;
+
+  final CoverStore? _coverStore;
+  final Future<BrowserCoverProvider?> Function() _loadCoverProvider;
+  Future<BrowserCoverProvider?>? _coverProviderLoad;
+  BrowserCoverProvider? _coverProvider;
+
+  CoverStore get _covers => _coverStore ?? CoverStore.instance;
 
   static const _scheme = 'mornye-browse';
 
@@ -80,6 +167,7 @@ class MediaLibraryBrowser {
     String parentId, [
     Map<String, dynamic>? options,
   ]) async {
+    await _prepareCovers();
     if (parentId == AudioService.browsableRootId) return _tabs();
     final uri = _parse(parentId);
     if (uri == null) return const [];
@@ -134,15 +222,34 @@ class MediaLibraryBrowser {
   MediaItem _shuffleItem() =>
       MediaItem(id: shuffleId, title: strings().nowPlayingShuffleLibrary);
 
-  /// Artwork a car can load. It cannot open the app's own files, so local
-  /// covers are left out of lists; the playing song keeps its artwork. Nor
-  /// can it load the loopback URLs older builds stored in collections.
-  static Uri? _browserArt(String? art) =>
-      art != null &&
-          art.startsWith('http') &&
-          durableCoverReference(art) != null
-      ? Uri.tryParse(art)
-      : null;
+  /// Finds the cover provider once and reads which network covers are
+  /// stored, so the items built next can show the app's cover files.
+  Future<void> _prepareCovers() async {
+    final provider = _coverProvider = await (_coverProviderLoad ??=
+        _loadCoverProvider());
+    if (provider != null) await _covers.warmUp();
+  }
+
+  /// Artwork a car can load: a web cover as it is, and a cover file of the
+  /// app's own (a `network://` cover as the file the store keeps for it)
+  /// through the cover provider. Without the provider local covers are
+  /// left out; the playing song keeps its artwork either way. Loopback URLs
+  /// older builds stored in collections and temporary files are left out.
+  Uri? _browserArt(String? art) {
+    if (art == null || durableCoverReference(art) == null) return null;
+    if (art.startsWith('http')) return Uri.tryParse(art);
+    return _coverProvider?.uriFor(
+      CoverStore.fetches(art) ? _covers.indexedFile(art) : art,
+    );
+  }
+
+  /// [_browserArt] for a song: the stored cover a network song shows when
+  /// it plays (see [CoverStore.songCover]), else its artwork.
+  Uri? _songArt(PlayableMedia media) =>
+      _coverProvider?.uriFor(
+        _covers.songCover(media.source, media.coverReference)?.path,
+      ) ??
+      _browserArt(media.artUri);
 
   static Map<String, dynamic>? _group(String? title) =>
       title == null ? null : {_groupTitleKey: title};
@@ -159,7 +266,7 @@ class MediaLibraryBrowser {
         artist: media.artist.isEmpty ? null : media.artist,
         album: media.album.isEmpty ? null : media.album,
         duration: media.duration,
-        artUri: _browserArt(media.artUri),
+        artUri: _songArt(media),
         extras: _group(group),
       ),
   ];
@@ -404,6 +511,7 @@ class MediaLibraryBrowser {
   Future<List<MediaItem>> search(String query) async {
     final text = query.trim();
     if (text.isEmpty) return const [];
+    await _prepareCovers();
     final l10n = strings();
     final (songs, albums, artists, playlists) = await (
       _searchSongs(text),
