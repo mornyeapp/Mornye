@@ -16,6 +16,7 @@ import 'package:mornye/services/link/features/link_track_resolver.dart';
 import 'package:mornye/services/link/link_client_api.dart';
 import 'package:mornye/services/link/link_mirrored_playback.dart';
 import 'package:mornye/services/link/link_protocol.dart';
+import 'package:mornye/services/network_storage_service.dart';
 import 'package:mornye/services/playable_media.dart';
 import 'package:mornye/services/source_metadata_events.dart';
 import 'package:mornye/utils/logger.dart';
@@ -181,17 +182,22 @@ final linkRemotePlaybackProvider = Provider<LinkRemotePlayback?>((ref) {
     name: linkDesktopName(client),
     remote: remote,
     handoff: handoff,
-    resolveArtwork: ref
-        .watch(musicPlayerRuntimeProvider)
-        .dependencies
-        .resolveNetworkSource,
+    covers: ref.watch(musicPlayerRuntimeProvider).dependencies.coverStore,
     initialItem: ref.read(localMediaItemProvider).value,
   );
   update(ref.read(linkDesktopRemoteProvider));
   ref.onDispose(
     SourceMetadataEvents.instance.subscribe((source) async {
-      if (linkDesktopSongId(source, client.server) == null) return;
-      playback.refreshTracks();
+      final songId = linkDesktopSongId(source, client.server);
+      if (songId == null) return;
+      playback
+        ..refreshCover(
+          NetworkStorageService.source(
+            client.server.connectionId,
+            subsonicCoverPath(songId),
+          ),
+        )
+        ..refreshTracks();
       await remote.refresh();
     }),
   );
@@ -221,7 +227,7 @@ class LinkRemotePlayback extends LinkMirroredPlayback {
     required super.name,
     required LinkDesktopRemote remote,
     required LinkHandoff handoff,
-    required super.resolveArtwork,
+    required super.covers,
     super.extractArtwork,
     super.initialItem,
     super.tick,

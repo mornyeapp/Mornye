@@ -19,7 +19,7 @@ class LinkPhonePlayback extends LinkMirroredPlayback {
     playHere,
     required Future<void> Function(List<PlayableMedia> items, bool playNext)
     enqueueHere,
-    required super.resolveArtwork,
+    required super.covers,
     super.tick,
     super.seekTimeout,
     super.nowMs,
@@ -80,7 +80,7 @@ final linkFollowedPhonePlaybackProvider = Provider<RemotePlayback?>((ref) {
         playNext: playNext,
       );
     },
-    resolveArtwork: runtime.dependencies.resolveNetworkSource,
+    covers: runtime.dependencies.coverStore,
   );
   playback.show(ref.read(linkDesktopHostProvider).phoneStates[deviceId]);
   ref.listen(

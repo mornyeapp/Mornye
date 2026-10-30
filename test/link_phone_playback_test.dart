@@ -1,11 +1,14 @@
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mornye/services/cover_store.dart';
 import 'package:mornye/services/link/desktop/link_phone_playback.dart';
 import 'package:mornye/services/link/link_protocol.dart';
 import 'package:mornye/services/playable_media.dart';
 
 void main() {
+  // Phone songs bring their covers as files; none is a network cover.
+  final covers = CoverStore(fetch: (_, _) async => fail('No network cover'));
   const song = TrackRef(
     title: 'On the phone',
     artist: 'Band',
@@ -35,7 +38,7 @@ void main() {
     resolve: (_) async => null,
     playHere: (_, _) async {},
     enqueueHere: (_, _) async {},
-    resolveArtwork: (source) async => source,
+    covers: covers,
     nowMs: () => 100000,
     seekTimeout: seekTimeout,
   );
@@ -234,7 +237,7 @@ void main() {
       ),
       playHere: (items, index) async => played.add((items, index)),
       enqueueHere: (items, playNext) async => queued.add((items, playNext)),
-      resolveArtwork: (source) async => source,
+      covers: covers,
       nowMs: () => 61000,
     );
     addTearDown(playback.dispose);
@@ -314,7 +317,7 @@ void main() {
           },
           playHere: (_, _) async {},
           enqueueHere: (_, _) async {},
-          resolveArtwork: (source) async => source,
+          covers: covers,
         );
         addTearDown(playback.dispose);
         final state = LinkPlayerState(
@@ -364,7 +367,7 @@ void main() {
       },
       playHere: (_, _) async {},
       enqueueHere: (_, _) async {},
-      resolveArtwork: (source) async => source,
+      covers: covers,
     );
     addTearDown(playback.dispose);
     final shown = <String?>[];

@@ -1,12 +1,15 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:path/path.dart' as p;
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/models/settings.dart';
+import 'package:mornye/services/cover_store.dart';
 import 'package:mornye/services/link/features/link_desktop_remote.dart';
 import 'package:mornye/services/link/features/link_handoff.dart';
 import 'package:mornye/services/link/features/link_phone_features.dart';
@@ -18,6 +21,7 @@ import 'package:mornye/services/link/features/link_track_resolver.dart';
 import 'package:mornye/services/link/link_client_api.dart';
 import 'package:mornye/services/link/link_protocol.dart';
 import 'package:mornye/services/music_player_service.dart';
+import 'package:mornye/services/network_storage_service.dart';
 import 'package:mornye/services/remote_playback.dart';
 
 import 'support/link_fakes.dart';
@@ -77,9 +81,28 @@ void main() {
   final extracted = <String>[];
   String? embeddedCover;
   var artworkUnavailable = false;
-  Future<String> Function(String)? resolveCover;
+  var coverVersion = 0;
+  Future<String?> Function(String)? extractCover;
+  late Directory coverDirectory;
+  late CoverStore covers;
 
   setUp(() async {
+    coverDirectory = await Directory.systemTemp.createTemp('link-covers-');
+    covers = CoverStore(
+      directory: () async => coverDirectory,
+      fetch: (source, output) async {
+        artwork.add(source);
+        if (artworkUnavailable) throw StateError('offline');
+        await output.writeAsBytes([
+          0xFF,
+          0xD8,
+          0xFF,
+          coverVersion,
+          ...utf8.encode(source),
+        ]);
+      },
+      retryDelay: Duration.zero,
+    );
     client = FakeLinkClient(
       onGet: (op, query) => null,
       onPost: (op, body) => {'resolved': 1, 'missing': <int>[]},
@@ -95,7 +118,8 @@ void main() {
     extracted.clear();
     embeddedCover = null;
     artworkUnavailable = false;
-    resolveCover = null;
+    coverVersion = 0;
+    extractCover = null;
     playback = LinkRemotePlayback(
       name: 'Studio PC',
       remote: container.read(linkDesktopRemoteProvider.notifier),
@@ -105,14 +129,10 @@ void main() {
         refs: LinkTrackRefCache(lookup: lookup, server: client.server),
         resolver: LinkTrackResolver(lookup: lookup, server: client.server),
       ),
-      resolveArtwork: (source) async {
-        artwork.add(source);
-        if (artworkUnavailable) throw StateError('offline');
-        if (resolveCover case final resolve?) return resolve(source);
-        return 'http://127.0.0.1:1/${artwork.length}';
-      },
+      covers: covers,
       extractArtwork: (source) async {
         extracted.add(source);
+        if (extractCover case final extract?) return extract(source);
         return embeddedCover;
       },
       tick: const Duration(milliseconds: 10),
@@ -120,13 +140,26 @@ void main() {
     await Future<void>.delayed(Duration.zero);
   });
 
-  tearDown(() {
+  tearDown(() async {
     playback.dispose();
     container.dispose();
+    await covers.dispose();
+    await coverDirectory.delete(recursive: true);
   });
 
   Future<void> settle() =>
       Future<void>.delayed(const Duration(milliseconds: 5));
+
+  /// The current item once its cover shows.
+  Future<MediaItem> withCover() => playback.mediaItems
+      .firstWhere((item) => item?.artUri != null)
+      .timeout(const Duration(seconds: 2))
+      .then((item) => item!);
+
+  String desktopCover(String songId) => NetworkStorageService.source(
+    linkTestServer.connectionId,
+    subsonicCoverPath(songId),
+  );
 
   test(
     'active remote preferences stay synchronized through reconnection',
@@ -201,11 +234,13 @@ void main() {
     client.push(_state());
     await settle();
 
-    final item = await playback.mediaItems.first;
-    expect(item!.title, 'Song s0');
+    final item = await withCover();
+    expect(item.title, 'Song s0');
     expect(item.extras!['source'], linkDesktopSongSource(linkTestServer, 's0'));
-    // Its cover comes from the desktop by the song's id.
-    expect(item.artUri.toString(), startsWith('http://127.0.0.1:1/'));
+    // Its cover comes from the desktop by the song's id, as a stored file.
+    expect(item.extras!['artworkRef'], desktopCover('s0'));
+    expect(item.artUri!.toFilePath(), covers.indexedFile(desktopCover('s0')));
+    expect(p.isWithin(coverDirectory.path, item.artUri!.toFilePath()), isTrue);
     expect(artwork.first, contains('subsonic/cover/'));
 
     final queue = await playback.queues.first;
@@ -219,6 +254,37 @@ void main() {
     expect(state.shuffleMode, AudioServiceShuffleMode.all);
     expect(state.repeatMode, AudioServiceRepeatMode.one);
     expect(await playback.volumes.first, 0.4);
+  });
+
+  test('a stored desktop cover shows from the first item', () async {
+    final stored = await covers.file(desktopCover('s0'));
+    artwork.clear();
+    final shown = <Uri?>[];
+    final subscription = playback.mediaItems.listen(
+      (item) => shown.add(item?.artUri),
+    );
+    addTearDown(subscription.cancel);
+    client.push(_state());
+    await settle();
+
+    // Every item of the song, from the first, shows the same stored file,
+    // never a loopback URL, and the store fetched nothing again.
+    expect(shown.whereType<Uri>(), isNotEmpty);
+    expect(shown.skip(1), everyElement(Uri.file(stored!)));
+    expect((await playback.queues.first).first.artUri, Uri.file(stored));
+    expect(artwork, [desktopCover('s1')]);
+  });
+
+  test('a changed desktop cover replaces the shown one', () async {
+    client.push(_state());
+    final before = await withCover();
+    coverVersion = 1;
+    playback.refreshCover(desktopCover('s0'));
+    final after = await playback.mediaItems
+        .firstWhere((item) => item?.artUri != before.artUri)
+        .timeout(const Duration(seconds: 2));
+    expect(after!.artUri!.toFilePath(), covers.indexedFile(desktopCover('s0')));
+    expect((await playback.queues.first).first.artUri, after.artUri);
   });
 
   test('a desktop song the phone has shows as its own file', () async {
@@ -354,16 +420,17 @@ void main() {
     client.push(_state());
     await settle();
 
-    final item = (await playback.mediaItems.first)!;
+    final item = await withCover();
     expect(item.id, 'mine');
     expect(item.extras!['source'], '/music/mine.flac');
-    expect(item.artUri.toString(), startsWith('http://127.0.0.1:1/'));
+    expect(item.extras!['artworkRef'], desktopCover('s0'));
+    expect(item.artUri!.toFilePath(), covers.indexedFile(desktopCover('s0')));
     expect((await playback.queues.first).first.artUri, item.artUri);
     expect(extracted, ['/music/mine.flac']);
   });
 
   test(
-    'resolves covers before the current song and beyond the next twenty',
+    'fetches the covers of the playing song and the next three only',
     () async {
       await settle();
       final songs = [for (var i = 0; i < 55; i++) _desktopSong('long$i')];
@@ -383,11 +450,18 @@ void main() {
           .firstWhere(
             (rows) =>
                 rows.length == songs.length &&
-                rows.every((row) => row.artUri != null),
+                rows.where((row) => row.artUri != null).length == 4,
           )
           .timeout(const Duration(seconds: 2));
-      expect(queue.first.artUri, isNotNull);
-      expect(queue.last.artUri, isNotNull);
+      expect(
+        artwork,
+        unorderedEquals([for (var i = 5; i < 9; i++) desktopCover('long$i')]),
+      );
+      for (final (i, row) in queue.indexed) {
+        // Rows further away fetch their covers once they show.
+        expect(row.extras!['artworkRef'], desktopCover('long$i'));
+        expect(row.artUri != null, i >= 5 && i < 9);
+      }
       expect((await playback.mediaItems.first)!.artUri, queue[5].artUri);
       final resolved = artwork.length;
       client.push({
@@ -422,8 +496,7 @@ void main() {
     client.setConnection(LinkConnectionState.disconnected);
     client.setConnection(LinkConnectionState.connected);
     await settle();
-    final item = (await playback.mediaItems.first)!;
-    expect(item.artUri, isNotNull);
+    final item = await withCover();
     expect((await playback.queues.first).first.artUri, item.artUri);
     expect(artwork, hasLength(failed * 2));
   });
@@ -431,13 +504,27 @@ void main() {
   test(
     'queue lookups stay bounded and stop scheduling after disposal',
     () async {
-      final pending = <Completer<String>>[];
-      resolveCover = (_) {
-        final reply = Completer<String>();
+      final directory = await Directory.systemTemp.createTemp('link-cover-');
+      addTearDown(() => directory.delete(recursive: true));
+      final cover = await File('${directory.path}/a.jpg').writeAsBytes([1]);
+      final pending = <Completer<String?>>[];
+      extractCover = (_) {
+        final reply = Completer<String?>();
         pending.add(reply);
         return reply.future;
       };
-      final songs = [for (var i = 0; i < 55; i++) _desktopSong('long$i')];
+      String isrc(int i) => 'USAAA00000${i.toString().padLeft(2, '0')}';
+      final songs = [
+        for (var i = 0; i < 55; i++) _desktopSong('long$i', isrc: isrc(i)),
+      ];
+      for (var i = 0; i < 55; i++) {
+        lookup.tracks.add(
+          LinkLocalTrack(
+            linkLocalMedia('mine$i', title: 'Song long$i'),
+            isrc: isrc(i),
+          ),
+        );
+      }
       client.push({
         'type': LinkMessageTypes.playerState,
         'state': LinkPlayerState(
@@ -452,17 +539,14 @@ void main() {
       });
       await settle();
       expect(pending, hasLength(4));
-      pending.first.complete('https://example.test/cover.jpg');
+      pending.first.complete(cover.path);
       await settle();
       expect(pending, hasLength(5));
-      expect(
-        (await playback.mediaItems.first)!.artUri.toString(),
-        'https://example.test/cover.jpg',
-      );
+      expect((await playback.mediaItems.first)!.artUri, cover.uri);
       playback.dispose();
       final queue = await playback.queues.first;
       for (final reply in pending.skip(1)) {
-        reply.complete('https://example.test/cover.jpg');
+        reply.complete(cover.path);
       }
       await settle();
       expect(pending, hasLength(5));
@@ -594,7 +678,7 @@ void main() {
         resolver: LinkTrackResolver(lookup: lookup, server: client.server),
         files: LinkPhoneFiles(copyContentUri: (_) async => null),
       ),
-      resolveArtwork: (source) async => source,
+      covers: covers,
     );
     addTearDown(sending.dispose);
     final transfers = <RemoteTransfer?>[];
@@ -628,7 +712,7 @@ void main() {
         refs: LinkTrackRefCache(lookup: lookup),
         resolver: LinkTrackResolver(lookup: lookup),
       ),
-      resolveArtwork: (source) async => source,
+      covers: covers,
       initialItem: sent,
     );
     addTearDown(seeded.dispose);

@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/foundation.dart' show listEquals, protected;
+import 'package:mornye/services/cover_store.dart';
 import 'package:mornye/services/downloaded_embedded_cover_resolver.dart';
 import 'package:mornye/services/link/link_protocol.dart';
 import 'package:mornye/services/playable_media.dart';
@@ -51,13 +52,13 @@ class _LinkSeek {
 abstract class LinkMirroredPlayback implements RemotePlayback {
   LinkMirroredPlayback({
     required this.name,
-    required Future<String> Function(String source) resolveArtwork,
+    required CoverStore covers,
     Future<String?> Function(String source)? extractArtwork,
     MediaItem? initialItem,
     Duration tick = const Duration(milliseconds: 500),
     Duration seekTimeout = const Duration(seconds: 3),
     int Function()? nowMs,
-  }) : _resolveArtwork = resolveArtwork,
+  }) : _covers = covers,
        _extractArtwork =
            extractArtwork ??
            ((source) =>
@@ -65,12 +66,17 @@ abstract class LinkMirroredPlayback implements RemotePlayback {
        _mediaItem = _Latest(initialItem),
        _tick = tick,
        _seekTimeout = seekTimeout,
-       _nowMs = nowMs ?? (() => DateTime.now().millisecondsSinceEpoch);
+       _nowMs = nowMs ?? (() => DateTime.now().millisecondsSinceEpoch) {
+    _coverChanges = covers.changes.listen(
+      (reference) => _showCover(reference, covers.indexedFile(reference)),
+    );
+  }
 
   @override
   final String name;
 
-  final Future<String> Function(String source) _resolveArtwork;
+  /// The stored files of network covers, which items show.
+  final CoverStore _covers;
   final Future<String?> Function(String source) _extractArtwork;
   final Duration _tick;
   final Duration _seekTimeout;
@@ -80,6 +86,10 @@ abstract class LinkMirroredPlayback implements RemotePlayback {
   static const _resolveAhead = 20;
   static const _maxResolutions = 4;
   static const _itemLimit = 500;
+
+  /// How many entries after the current song have their network covers
+  /// fetched ahead. Other rows fetch theirs as they show.
+  static const _coversAhead = 3;
 
   /// Starts with the constructor's `initialItem`, the song just sent there,
   /// so the player does not empty out until the device's state arrives.
@@ -99,6 +109,10 @@ abstract class LinkMirroredPlayback implements RemotePlayback {
   final _resolving = <TrackRef>{};
   final _pending = <TrackRef>{};
   final _failed = <TrackRef>{};
+
+  /// Network covers asked of the store since the tracks were last refreshed.
+  final _coverChecks = <String>{};
+  late final StreamSubscription<String> _coverChanges;
 
   LinkPlayerState? _player;
   List<TrackRef> _queueRefs = const [];
@@ -158,7 +172,17 @@ abstract class LinkMirroredPlayback implements RemotePlayback {
     _lookupGeneration++;
     _resolved.clear();
     _failed.clear();
+    _coverChecks.clear();
     _showTracks(force: false);
+  }
+
+  /// The network cover [reference] changed on its server: fetches it again
+  /// and shows it on the items with that cover.
+  void refreshCover(String reference) {
+    if (_disposed) return;
+    unawaited(
+      _covers.refresh(reference).then((path) => _showCover(reference, path)),
+    );
   }
 
   /// Shows the device's [player].
@@ -215,6 +239,48 @@ abstract class LinkMirroredPlayback implements RemotePlayback {
       schedule(ref);
     }
     _drainResolutions();
+    _fetchCovers({
+      ?track,
+      ...refs.skip(start < 0 ? 0 : start).take(_coversAhead + 1),
+    });
+  }
+
+  /// Asks the store for the network covers of [refs], fetching those not
+  /// stored yet, and shows each once it is there.
+  void _fetchCovers(Set<TrackRef> refs) {
+    for (final ref in refs) {
+      final reference = _items[ref]?.extras?['artworkRef'];
+      if (reference is! String ||
+          _failed.contains(ref) ||
+          !_coverChecks.add(reference)) {
+        continue;
+      }
+      unawaited(
+        _covers.file(reference).then((path) {
+          if (path == null && !_disposed) {
+            _coverChecks.remove(reference);
+            _failed.add(ref);
+          }
+          _showCover(reference, path);
+        }),
+      );
+    }
+  }
+
+  /// Shows [path], the stored file of the network cover [reference], on the
+  /// items with that cover.
+  void _showCover(String reference, String? path) {
+    if (path == null || _disposed) return;
+    final artUri = Uri.file(path);
+    var changed = false;
+    for (final MapEntry(:key, :value) in _items.entries.toList()) {
+      if (value.extras?['artworkRef'] != reference || value.artUri == artUri) {
+        continue;
+      }
+      _items[key] = value.copyWith(artUri: artUri);
+      changed = true;
+    }
+    if (changed) _showTracks(force: true);
   }
 
   void _drainResolutions() {
@@ -280,8 +346,10 @@ abstract class LinkMirroredPlayback implements RemotePlayback {
   }
 
   /// The item for [ref]: the looked-up one, else one built from [ref].
-  MediaItem _itemFor(TrackRef ref) =>
-      _items[ref] ??= _playable(ref, immediatePlayable(ref)).toMediaItem();
+  MediaItem _itemFor(TrackRef ref) => _items[ref] ??= _playable(
+    ref,
+    immediatePlayable(ref),
+  ).toMediaItem(covers: _covers);
 
   PlayableMedia _playable(TrackRef ref, PlayableMedia? media) => PlayableMedia(
     id:
@@ -329,6 +397,7 @@ abstract class LinkMirroredPlayback implements RemotePlayback {
       // cover.
       final uri = Uri.tryParse(artwork ?? '');
       final local = uri != null && (!uri.hasScheme || uri.scheme == 'file');
+      String? borrowed;
       if (artwork == null ||
           artwork.isEmpty ||
           (local &&
@@ -336,15 +405,8 @@ abstract class LinkMirroredPlayback implements RemotePlayback {
                 uri.scheme == 'file' ? uri.toFilePath() : artwork,
               ).exists())) {
         artwork = null;
-        final source =
-            media.networkArtworkSource ??
-            immediatePlayable(ref)?.networkArtworkSource;
-        if (source != null) {
-          try {
-            artwork = await _resolveArtwork(source);
-          } on Object {
-            _failed.add(ref);
-          }
+        if (media.networkArtworkSource == null) {
+          borrowed = immediatePlayable(ref)?.networkArtworkSource;
         }
       }
       if (!current()) return;
@@ -353,7 +415,15 @@ abstract class LinkMirroredPlayback implements RemotePlayback {
         _resolved.removeWhere((key) => !_queueRefs.contains(key));
         _failed.removeWhere((key) => !_queueRefs.contains(key));
       }
-      _items[ref] = media.toMediaItem(resolvedArtwork: artwork);
+      var item = media.toMediaItem(resolvedArtwork: artwork, covers: _covers);
+      if (borrowed != null) {
+        final stored = _covers.indexedFile(borrowed);
+        item = item.copyWith(
+          artUri: stored == null ? null : Uri.file(stored),
+          extras: {...?item.extras, 'artworkRef': borrowed},
+        );
+      }
+      _items[ref] = item;
       _resolved.add(ref);
       if (ref == _player?.track || _queueRefs.contains(ref)) {
         _showTracks(force: true);
@@ -509,6 +579,7 @@ abstract class LinkMirroredPlayback implements RemotePlayback {
     _endSeek();
     _pending.clear();
     _ticker?.cancel();
+    unawaited(_coverChanges.cancel());
     _mediaItem.close();
     _playbackState.close();
     _queue.close();

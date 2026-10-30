@@ -1,6 +1,7 @@
 import 'package:audio_service/audio_service.dart' show PlaybackState;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mornye/services/cover_store.dart';
 import 'package:mornye/services/link/desktop/link_phone_playback.dart';
 import 'package:mornye/services/link/link_protocol.dart';
 import 'package:mornye/theme/app_theme.dart';
@@ -37,7 +38,7 @@ void main() {
           resolve: (_) async => null,
           playHere: (_, _) async {},
           enqueueHere: (_, _) async {},
-          resolveArtwork: (source) async => source,
+          covers: CoverStore(fetch: (_, _) async => fail('No network cover')),
           nowMs: () => nowMs,
         );
         final preview = PlaybackSeekPreview();
