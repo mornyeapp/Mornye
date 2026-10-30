@@ -25,6 +25,7 @@ extension on NetworkLibraryScanner {
       output = writer;
       final buffer = StringBuffer();
       final artwork = <String, String?>{};
+      final started = DateTime.now();
       var count = 0;
       var buffered = 0;
       await for (final song in client.catalog(checkpoint: checkpoint)) {
@@ -52,6 +53,12 @@ extension on NetworkLibraryScanner {
         final source = NetworkStorageService.source(connection.id, song.path);
         final row = networkLibraryRow(source, song.entry, song.metadata);
         row['id'] = 'network_${sha256.convert(utf8.encode(source))}';
+        if (client.catalogNewestFirst) {
+          // The Library sorts latest by scannedAt: keep the server's order.
+          row['scannedAt'] = started
+              .subtract(Duration(milliseconds: count))
+              .toIso8601String();
+        }
         if (cover != null) row['coverPath'] = cover;
         buffer.writeln(jsonEncode(row));
         count++;

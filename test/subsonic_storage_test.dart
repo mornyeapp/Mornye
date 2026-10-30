@@ -648,6 +648,62 @@ void main() {
     },
   );
 
+  test('a Mornye sync puts the desktop order first in latest', () async {
+    Future<List<(String, int)>> scanned() async {
+      final scan = await scanner().scan(
+        'network://fixture/',
+        checkpoint: () async {},
+        onProgress: (_, _, _) {},
+      );
+      // Network rows have no file time, so sort_added is scannedAt.
+      return [
+        for (final row in await scan.rows().toList())
+          (
+            row['filePath'] as String,
+            DateTime.parse(row['scannedAt'] as String).millisecondsSinceEpoch,
+          ),
+      ];
+    }
+
+    List<String> sources(List<Map<String, dynamic>> songs) => [
+      for (final song in songs)
+        if (song['isVideo'] != true)
+          NetworkStorageService.source('fixture', SubsonicSong(song).path),
+    ];
+
+    final songs = library();
+    server.type = 'mornye';
+    server.library = [...songs]..shuffle(Random(7));
+    final searched = await scanned();
+    final latest = [...searched]..sort((a, b) => b.$2.compareTo(a.$2));
+    expect(latest.map((row) => row.$1), sources(server.library!));
+    expect({for (final row in searched) row.$2}, hasLength(1200));
+
+    // Other servers keep the album walk, stamped as each row is read.
+    server.type = null;
+    server.library = songs;
+    final walked = await scanned();
+    expect(walked.map((row) => row.$1), sources(songs));
+    for (var i = 1; i < walked.length; i++) {
+      expect(walked[i].$2, greaterThanOrEqualTo(walked[i - 1].$2));
+    }
+  });
+
+  test('a forced Mornye sync refreshes each cover once', () async {
+    server.type = 'mornye';
+    server.library = library()..shuffle(Random(7));
+    Future<void> scan({bool forceFullScan = false}) => scanner().scan(
+      'network://fixture/',
+      forceFullScan: forceFullScan,
+      checkpoint: () async {},
+      onProgress: (_, _, _) {},
+    );
+    await scan();
+    server.requests.clear();
+    await scan(forceFullScan: true);
+    expect(requested('getCoverArt'), hasLength(160));
+  });
+
   test('a Mornye desktop with smaller song pages syncs every song', () async {
     server.type = 'mornye';
     // The last page holds only the video.

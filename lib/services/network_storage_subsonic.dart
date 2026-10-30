@@ -461,10 +461,16 @@ class SubsonicClient {
   }) async* {
     await checkpoint();
     final first = await _albumList(0);
-    yield* first['type'] == 'mornye'
+    _catalogNewestFirst = first['type'] == 'mornye';
+    yield* _catalogNewestFirst
         ? _searchCatalog(checkpoint)
         : _albumCatalog(first, checkpoint);
   }
+
+  /// Whether [catalog] lists songs newest first: a Mornye desktop pages them
+  /// in its export order, its Library's latest sort. Known by the first song.
+  bool get catalogNewestFirst => _catalogNewestFirst;
+  bool _catalogNewestFirst = false;
 
   Stream<SubsonicSong> _albumCatalog(
     Map<String, dynamic> first,
