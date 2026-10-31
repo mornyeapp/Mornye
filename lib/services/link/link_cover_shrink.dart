@@ -7,11 +7,15 @@ const linkShrunkCoverSize = 800;
 /// A smaller copy of a cover's image; null when it cannot be made.
 typedef LinkCoverShrinker = Future<Uint8List?> Function(Uint8List image);
 
-/// [image] as a PNG at most [linkShrunkCoverSize] pixels on its longer
+/// [image] as a PNG at most [maxSize] pixels on its longer
 /// side, keeping its shape; null when it cannot be decoded. Stores and
 /// embedded art are often 3000 to 6000 pixels and several megabytes.
-Future<Uint8List?> shrinkLinkCover(Uint8List image) async {
-  const size = linkShrunkCoverSize;
+Future<Uint8List?> shrinkLinkCover(
+  Uint8List image, {
+  int maxSize = linkShrunkCoverSize,
+}) async {
+  assert(maxSize > 0);
+  final size = maxSize;
   ui.Codec? codec;
   ui.Image? frame;
   try {

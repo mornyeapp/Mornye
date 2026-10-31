@@ -97,6 +97,7 @@ abstract final class LinkOps {
   static const libraryJobs = 'library/jobs';
   static const collections = 'collections';
   static const history = 'history';
+  static const historyArtwork = 'history/artwork';
 
   /// A phone's songs for the desktop's Library: GET `{"version"}` held,
   /// POST one page of [LinkPhoneSong]s.

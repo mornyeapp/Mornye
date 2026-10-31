@@ -13,6 +13,7 @@ import 'package:mornye/services/link/link_host_router.dart';
 import 'package:mornye/services/link/link_protocol.dart';
 import 'package:mornye/services/link/sync/link_collection_sync_store.dart';
 import 'package:mornye/services/link/sync/link_history_sync_store.dart';
+import 'package:mornye/services/link/sync/link_history_artwork.dart';
 import 'package:mornye/services/link/sync/link_sync_protocol.dart';
 import 'package:mornye/services/link/sync/link_sync_runner.dart';
 import 'package:mornye/services/listening_statistics.dart';
@@ -110,6 +111,7 @@ void registerLinkSyncHandlers(LinkHostRouter router, Ref ref) {
   router
     ..register(LinkOps.collections, handlers.collections)
     ..register(LinkOps.history, handlers.history)
+    ..register(LinkOps.historyArtwork, handlers.historyArtwork)
     ..register(LinkSyncSubsonicOps.getPlaylists, handlers.getPlaylists)
     ..register(LinkSyncSubsonicOps.getPlaylist, handlers.getPlaylist)
     ..register(LinkSyncSubsonicOps.createPlaylist, handlers.createPlaylist)
@@ -260,6 +262,14 @@ class _LinkSyncHandlers {
     ]);
     if (result.applied > 0) refreshLinkListeningProviders(ref);
     return {'applied': result.applied, 'cursor': result.latest};
+  }
+
+  Future<Object?> historyArtwork(LinkRequest request) async {
+    final reply = await ref.read(linkHistoryArtworkProvider).handle(request);
+    if ((reply['applied'] as int? ?? 0) > 0) {
+      refreshLinkListeningProviders(ref);
+    }
+    return reply;
   }
 
   Future<List<_Member>> _members(

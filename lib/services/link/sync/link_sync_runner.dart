@@ -9,6 +9,7 @@ import 'package:mornye/services/link/link_client_api.dart';
 import 'package:mornye/services/link/link_protocol.dart';
 import 'package:mornye/services/link/sync/link_collection_sync_store.dart';
 import 'package:mornye/services/link/sync/link_history_sync_store.dart';
+import 'package:mornye/services/link/sync/link_history_artwork.dart';
 import 'package:mornye/services/link/sync/link_sync_protocol.dart';
 import 'package:mornye/services/listening_statistics.dart';
 import 'package:mornye/utils/logger.dart';
@@ -374,6 +375,12 @@ class LinkSyncRunner extends Notifier<LinkSyncStatus> {
       latest: store.latestSeq,
       encode: (event) => event.toJson(),
     );
+    try {
+      final changed = await ref.read(linkHistoryArtworkProvider).sync(client);
+      if (changed > 0 && ref.mounted) refreshLinkListeningProviders(ref);
+    } on LinkException catch (error) {
+      if (error.code != 'not_found') rethrow;
+    }
   }
 
   /// Returns how many changes applied and the desktop's sync device id.

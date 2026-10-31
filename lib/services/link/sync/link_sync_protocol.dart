@@ -58,6 +58,14 @@ import 'package:mornye/utils/cover_art_utils.dart';
 /// Its stable id is (origin, day, trackKey). Totals only grow, so a receiver
 /// adds the growth since the last value it saw and re-sending is harmless.
 /// Clearing statistics is local to one device.
+///
+/// `history/artwork` repairs missing covers independently of these counters,
+/// so an old event needs no new listening time to acquire artwork. GET pages
+/// missing song descriptors and the identities of available covers. POST
+/// `want` requests at most four covers; POST `covers` supplies them. Covers
+/// carry a web URL or a validated 256-pixel thumbnail (at most 512 KiB each).
+/// Device-local artwork paths are never sent as image references. A receiver
+/// stores thumbnails locally and retains its existing usable covers.
 const linkSyncPageSize = 500;
 
 abstract final class LinkSyncKinds {

@@ -306,6 +306,65 @@ void main() {
     );
   });
 
+  test(
+    'cover-only repairs run even after listening cursors have advanced',
+    () async {
+      final desk = await _side('desk', desktop: true);
+      final phone = await _side('phone');
+      await desk.container.read(linkHistorySyncStoreProvider).record([
+        _listen('Song', 60000),
+      ]);
+      final client = _FakeClient(desk.container.read(_routerProvider));
+      addTearDown(client.close);
+      final runner = phone.container.read(linkSyncRunnerProvider.notifier);
+      phone.container.read(linkActiveClientProvider.notifier).set(client);
+      await runner.syncNow();
+      expect(
+        (await phone.listening.query('listening')).single['artwork'],
+        isNull,
+      );
+      final sequence = await desk.container
+          .read(linkHistorySyncStoreProvider)
+          .latestSeq();
+      await desk.listening.rawUpdate('UPDATE listening SET artwork = ?', [
+        'https://example.test/late.png',
+      ]);
+      await runner.syncNow();
+      final row = (await phone.listening.query('listening')).single;
+      expect(row['artwork'], 'https://example.test/late.png');
+      expect(row['milliseconds'], 60000);
+      expect(row['plays'], 1);
+      expect(
+        await desk.container.read(linkHistorySyncStoreProvider).latestSeq(),
+        sequence,
+      );
+      expect(phone.container.read(linkSyncRunnerProvider).error, isNull);
+    },
+  );
+
+  test(
+    'older desktops still sync statistics without the artwork endpoint',
+    () async {
+      final desk = await _side('desk', desktop: true);
+      final phone = await _side('phone');
+      final router = desk.container.read(_routerProvider);
+      router.unregister(LinkOps.historyArtwork);
+      await desk.container.read(linkHistorySyncStoreProvider).record([
+        _listen('Song', 60000),
+      ]);
+      final client = _FakeClient(router);
+      addTearDown(client.close);
+      final runner = phone.container.read(linkSyncRunnerProvider.notifier);
+      phone.container.read(linkActiveClientProvider.notifier).set(client);
+      await runner.syncNow();
+      expect(
+        (await phone.listening.query('listening')).single['milliseconds'],
+        60000,
+      );
+      expect(phone.container.read(linkSyncRunnerProvider).error, isNull);
+    },
+  );
+
   test('a replaced desktop database is pulled again from the start', () async {
     final desk = await _side('desk', desktop: true);
     final phone = await _side('phone');
