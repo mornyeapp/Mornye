@@ -1678,6 +1678,16 @@ class PlatformBridge {
   static Future<void> stopBackgroundWork(String kind) =>
       _invokeVoid('stopBackgroundWork', {'kind': kind});
 
+  /// Keeps a paired Android phone available as a Link playback target.
+  static Future<bool> startLinkConnectionService(String name) async =>
+      await _channel.invokeMethod<bool>('startLinkConnectionService', {
+        'name': name,
+      }) ??
+      false;
+
+  static Future<void> stopLinkConnectionService() =>
+      _invokeVoid('stopLinkConnectionService');
+
   static Future<void> updateDownloadServiceProgress({
     required String trackName,
     required String artistName,

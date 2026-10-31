@@ -18,12 +18,17 @@ import 'support/link_client_fakes.dart';
 
 Future<LinkClientHarness> _started({
   bool supported = true,
+  String platform = 'android',
   bool localNetworkAllowed = true,
   bool onWifi = true,
   Stream<void> networkChanges = const Stream<void>.empty(),
 }) async {
   final harness =
-      LinkClientHarness(supported: supported, networkChanges: networkChanges)
+      LinkClientHarness(
+          supported: supported,
+          platform: platform,
+          networkChanges: networkChanges,
+        )
         ..localNetworkAllowed = localNetworkAllowed
         ..onWifi = onWifi;
   addTearDown(harness.container.dispose);
@@ -341,8 +346,8 @@ void main() {
     );
   });
 
-  test('the session pauses in the background and resumes after', () async {
-    final harness = await _started();
+  test('iOS pauses in the background without a playback lease', () async {
+    final harness = await _started(platform: 'ios');
     await harness.controller.pair(linkTestTarget('a'), '123456');
     await pumpEventQueue();
     final session = harness.sessions.single;
@@ -364,7 +369,7 @@ void main() {
   });
 
   test('the session stays connected in the background when asked', () async {
-    final harness = await _started();
+    final harness = await _started(platform: 'ios');
     await harness.controller.pair(linkTestTarget('a'), '123456');
     await pumpEventQueue();
     final session = harness.sessions.single;
@@ -391,6 +396,76 @@ void main() {
     await pumpEventQueue();
     expect(session.calls, ['start', 'pause', 'resume', 'reconnect']);
   });
+
+  test('an idle Android phone remains available after backgrounding', () async {
+    final harness = await _started();
+    await harness.controller.pair(linkTestTarget('a'), '123456');
+    await pumpEventQueue();
+    final session = harness.sessions.single;
+    session.emit(LinkConnectionState.connected);
+    await pumpEventQueue();
+
+    await _lifecycle([AppLifecycleState.hidden, AppLifecycleState.paused]);
+    expect(session.calls, ['start']);
+    expect(harness.state.connection, LinkConnectionState.connected);
+    expect(harness.backgroundConnections, ['Desktop a']);
+
+    // No playback or transfer lease is needed for the PC to see this phone.
+    harness.keepConnected(true);
+    harness.keepConnected(false);
+    await pumpEventQueue();
+    expect(session.calls, ['start']);
+    await harness.controller.forget('a', removeLibrary: false);
+    await pumpEventQueue();
+    expect(harness.backgroundConnections, ['Desktop a', null]);
+    expect(session.disposed, isTrue);
+  });
+
+  test(
+    'Android keeps reconnecting, but a revoked pairing releases work',
+    () async {
+      final harness = await _started();
+      await harness.controller.pair(linkTestTarget('a'), '123456');
+      await pumpEventQueue();
+      final session = harness.sessions.single;
+      await _lifecycle([AppLifecycleState.hidden, AppLifecycleState.paused]);
+      session.emit(
+        LinkConnectionState.disconnected,
+        LinkSessionIssue.unreachable,
+      );
+      await pumpEventQueue();
+      expect(harness.backgroundConnections, ['Desktop a']);
+      expect(session.calls, ['start']);
+
+      session.emit(
+        LinkConnectionState.disconnected,
+        LinkSessionIssue.unauthorized,
+      );
+      await pumpEventQueue();
+      expect(harness.backgroundConnections, ['Desktop a', null]);
+      expect(session.calls.last, 'pause');
+    },
+  );
+
+  test(
+    'disposing during a native start releases the eventual service',
+    () async {
+      final starting = Completer<void>();
+      final harness = LinkClientHarness(
+        updateBackgroundConnection: (name) async {
+          if (name != null) await starting.future;
+        },
+      );
+      await harness.start();
+      await harness.controller.pair(linkTestTarget('a'), '123456');
+      await pumpEventQueue();
+      expect(harness.backgroundConnections, ['Desktop a']);
+      harness.container.dispose();
+      starting.complete();
+      await pumpEventQueue();
+      expect(harness.backgroundConnections, ['Desktop a', null]);
+    },
+  );
 
   test('catalog.changed rescans the desktop once bursts settle', () async {
     final harness = await _started();

@@ -17,6 +17,7 @@ import 'package:mornye/services/link/link_client_api.dart';
 import 'package:mornye/services/link/link_protocol.dart';
 import 'package:mornye/services/local_network_access.dart';
 import 'package:mornye/services/network_storage_service.dart';
+import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/utils/logger.dart';
 
 final _log = AppLogger('LinkClient');
@@ -37,6 +38,7 @@ class LinkClientEnvironment {
     required this.ensureLocalNetwork,
     required this.onLocalNetwork,
     this.networkChanges = const Stream<void>.empty(),
+    this.updateBackgroundConnection,
   });
 
   /// The name desktops list this phone under.
@@ -63,6 +65,10 @@ class LinkClientEnvironment {
   /// Interface changes can invalidate discovery even when Wi-Fi stays on.
   final Stream<void> networkChanges;
 
+  /// Holds Android's connected-device foreground service for this computer,
+  /// or releases it when [name] is null. Other platforms need no service.
+  final Future<void> Function(String? name)? updateBackgroundConnection;
+
   factory LinkClientEnvironment.device() => LinkClientEnvironment(
     deviceName: _deviceName,
     platform: Platform.isIOS ? 'ios' : 'android',
@@ -73,7 +79,17 @@ class LinkClientEnvironment {
     ensureLocalNetwork: LocalNetworkAccess.instance.ensureGranted,
     onLocalNetwork: _onLocalNetwork,
     networkChanges: Connectivity().onConnectivityChanged.map((_) {}),
+    updateBackgroundConnection: _updateBackgroundConnection,
   );
+
+  static Future<void> _updateBackgroundConnection(String? name) async {
+    if (!Platform.isAndroid) return;
+    if (name == null) {
+      await PlatformBridge.stopLinkConnectionService();
+    } else if (!await PlatformBridge.startLinkConnectionService(name)) {
+      throw StateError('Android could not keep the Link connection active');
+    }
+  }
 
   static Future<String> _deviceName() async {
     try {
@@ -225,6 +241,10 @@ class LinkClientController extends Notifier<LinkClientState> {
   Future<void>? _loading;
   LinkDeviceIdentity? _device;
   var _foreground = true;
+  var _android = false;
+  Future<void> Function(String?)? _backgroundUpdater;
+  Future<void> _backgroundUpdates = Future.value();
+  String? _backgroundName;
 
   /// [linkKeepConnectedProvider]: the session stays connected in the
   /// background too.
@@ -253,6 +273,11 @@ class LinkClientController extends Notifier<LinkClientState> {
       return const LinkClientState(loaded: true);
     }
     _disposed = false;
+    final environment = _environment;
+    _android = environment.platform == 'android';
+    _backgroundUpdater = _android
+        ? environment.updateBackgroundConnection
+        : null;
     _lifecycle = AppLifecycleListener(onStateChange: _onLifecycle);
     _networkSubscription = _environment.networkChanges.listen(
       (_) => unawaited(_refreshNetworkConnection()),
@@ -362,6 +387,7 @@ class LinkClientController extends Notifier<LinkClientState> {
       clearIssue: issue == null,
     );
     await previous?.dispose();
+    unawaited(_syncBackgroundConnection());
     if (next != null) {
       if (!_connected) next.pause();
       next.start();
@@ -380,6 +406,8 @@ class LinkClientController extends Notifier<LinkClientState> {
       session.server.connectionId,
       reachable: session.issue != LinkSessionIssue.unreachable,
     );
+    unawaited(_syncBackgroundConnection());
+    if (!_connected) session.pause();
     _updateDiscovery();
   }
 
@@ -408,6 +436,7 @@ class LinkClientController extends Notifier<LinkClientState> {
     if (foreground == _foreground && !foreground) return;
     _updateConnected(() => _foreground = foreground);
     if (foreground) {
+      unawaited(_syncBackgroundConnection(force: true));
       // Control Centre and permission dialogs can change the network without
       // ever putting the app into the paused lifecycle state.
       unawaited(_refreshNetworkConnection());
@@ -416,8 +445,37 @@ class LinkClientController extends Notifier<LinkClientState> {
     }
   }
 
-  /// Whether the session is connected rather than paused.
-  bool get _connected => _foreground || _keepConnected;
+  bool get _backgroundConnectionWanted =>
+      _android &&
+      _session != null &&
+      switch (_session!.issue) {
+        null || LinkSessionIssue.unreachable => true,
+        _ => false,
+      };
+
+  /// Android remains an available playback target even while idle. iOS keeps
+  /// its existing playback/transfer lease because its OS can suspend the app.
+  bool get _connected =>
+      _foreground || _keepConnected || _backgroundConnectionWanted;
+
+  Future<void> _syncBackgroundConnection({bool force = false}) {
+    final update = _backgroundUpdater;
+    if (update == null) return Future.value();
+    final name = !_disposed && _backgroundConnectionWanted
+        ? _session!.server.name
+        : null;
+    // A late start must finish before an unpair/disposal releases its service.
+    return _backgroundUpdates = _backgroundUpdates
+        .then((_) async {
+          if (!force && name == _backgroundName) return;
+          await update(name);
+          _backgroundName = name;
+        })
+        .catchError(
+          (Object error) =>
+              _log.w('Updating Link background connection failed: $error'),
+        );
+  }
 
   /// Applies [change], then pauses or resumes the session when that changed
   /// [_connected].
@@ -788,6 +846,7 @@ class LinkClientController extends Notifier<LinkClientState> {
 
   void _dispose() {
     _disposed = true;
+    unawaited(_syncBackgroundConnection());
     _lifecycle?.dispose();
     _lifecycle = null;
     unawaited(_networkSubscription?.cancel());

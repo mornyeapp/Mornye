@@ -242,11 +242,16 @@ final _keepConnectedProvider = NotifierProvider<_KeepConnected, bool>(
 class LinkClientHarness {
   LinkClientHarness({
     this.supported = true,
+    this.platform = 'android',
     this.networkChanges = const Stream<void>.empty(),
+    this.updateBackgroundConnection,
   });
 
   final bool supported;
+  final String platform;
   final Stream<void> networkChanges;
+  final Future<void> Function(String?)? updateBackgroundConnection;
+  final backgroundConnections = <String?>[];
   final browser = FakeLinkBrowser();
   final bridge = FakeLinkBridge();
   final pairing = FakeLinkPairing();
@@ -259,7 +264,7 @@ class LinkClientHarness {
     linkClientEnvironmentProvider.overrideWithValue(
       LinkClientEnvironment(
         deviceName: () async => 'Test phone',
-        platform: 'android',
+        platform: platform,
         appVersion: '5.3.0',
         createBrowser: () => browser,
         createSession: (server, apiKey, device) {
@@ -274,6 +279,10 @@ class LinkClientHarness {
         },
         onLocalNetwork: () async => onWifi,
         networkChanges: networkChanges,
+        updateBackgroundConnection: (name) async {
+          backgroundConnections.add(name);
+          await updateBackgroundConnection?.call(name);
+        },
       ),
     ),
     linkClientStoreProvider.overrideWithValue(LinkClientStore()),

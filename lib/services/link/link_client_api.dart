@@ -100,8 +100,9 @@ class LinkActiveClient extends Notifier<LinkClientApi?> {
 final linkActiveClientProvider =
     NotifierProvider<LinkActiveClient, LinkClientApi?>(LinkActiveClient.new);
 
-/// Whether the session stays connected while the app is in the background,
-/// which it otherwise leaves. The app root sets it while the desktop plays
+/// Requests a background session on platforms that otherwise suspend an idle
+/// Link session. Android already keeps paired phones available through its
+/// connected-device service. The app root sets this while the desktop plays
 /// in the phone's place: the notification shows the desktop's song, and
 /// only the session hears when the desktop moves to another one.
 final linkKeepConnectedProvider = Provider<bool>((ref) => false);
