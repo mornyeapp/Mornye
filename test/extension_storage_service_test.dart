@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -17,6 +18,9 @@ void main() {
   late Map<String, String> values;
   late List<MethodCall> mutations;
   Object? readError;
+  Object? writeError;
+  bool ignoreWrites = false;
+  late List<MethodCall> secureCalls;
   const keyName = 'extension_storage_master_key_v2';
 
   setUp(() async {
@@ -26,6 +30,9 @@ void main() {
     values = {};
     mutations = [];
     readError = null;
+    writeError = null;
+    ignoreWrites = false;
+    secureCalls = [];
     messenger.setMockMethodCallHandler(
       paths,
       (call) async =>
@@ -34,21 +41,27 @@ void main() {
     messenger.setMockMethodCallHandler(secure, (call) async {
       final args = Map<String, dynamic>.from(call.arguments as Map);
       final options = Map<String, dynamic>.from(args['options'] as Map);
-      expect(options['resetOnError'], 'false');
-      expect(options['migrateOnAlgorithmChange'], 'true');
-      expect(options['migrateWithBackup'], 'true');
-      expect(
-        options['keyCipherAlgorithm'],
-        'RSA_ECB_OAEPwithSHA_256andMGF1Padding',
-      );
-      expect(options['storageCipherAlgorithm'], 'AES_GCM_NoPadding');
+      secureCalls.add(call);
+      if (defaultTargetPlatform == TargetPlatform.android) {
+        expect(options['resetOnError'], 'false');
+        expect(options['migrateOnAlgorithmChange'], 'true');
+        expect(options['migrateWithBackup'], 'true');
+        expect(
+          options['keyCipherAlgorithm'],
+          'RSA_ECB_OAEPwithSHA_256andMGF1Padding',
+        );
+        expect(options['storageCipherAlgorithm'], 'AES_GCM_NoPadding');
+      }
       if (call.method == 'read') {
         if (readError != null) throw readError!;
         return values[args['key']];
       }
       mutations.add(call);
       if (call.method == 'write') {
-        values[args['key'] as String] = args['value'] as String;
+        if (writeError != null) throw writeError!;
+        if (!ignoreWrites) {
+          values[args['key'] as String] = args['value'] as String;
+        }
       }
       return null;
     });
@@ -56,6 +69,7 @@ void main() {
   tearDown(() async {
     ExtensionStorageService.resetForTesting();
     debugDefaultTargetPlatformOverride = null;
+    debugDesktopPlatformOverride = null;
     messenger.setMockMethodCallHandler(paths, null);
     messenger.setMockMethodCallHandler(secure, null);
     await root.delete(recursive: true);
@@ -67,6 +81,186 @@ void main() {
     await file.writeAsBytes(bytes);
     return file;
   }
+
+  void linux() {
+    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+    debugDesktopPlatformOverride = true;
+  }
+
+  File localKey() =>
+      File('${root.path}/support/extension_data/.master_key_unsecured');
+
+  test('mode changes serialize with startup and waiting preparation', () async {
+    linux();
+    final reading = Completer<void>();
+    final ready = Completer<String>();
+    final key = base64Encode(List.filled(32, 5));
+    messenger.setMockMethodCallHandler(secure, (call) async {
+      expect(call.method, 'read');
+      if (!reading.isCompleted) reading.complete();
+      return ready.future;
+    });
+    final startup = ExtensionStorageService.prepare();
+    await reading.future;
+    final changing = ExtensionStorageService.setUnsecuredStorage(true);
+    final waiting = ExtensionStorageService.prepare();
+    ready.complete(key);
+    expect((await startup).masterKey, key);
+    await changing;
+    expect((await waiting).masterKey, key);
+    expect(await localKey().readAsString(), key);
+  });
+
+  test(
+    'Linux requires explicit opt-in and reuses its owner-only local key',
+    () async {
+      linux();
+      readError = PlatformException(
+        code: 'Libsecret error',
+        message: 'secret_service_get_sync: The name is not activatable',
+      );
+      await expectLater(
+        ExtensionStorageService.prepare(),
+        throwsA(isA<PlatformException>()),
+      );
+      expect(await localKey().exists(), isFalse);
+      await ExtensionStorageService.setUnsecuredStorage(true);
+      expect(await ExtensionStorageService.isUnsecuredStorageEnabled(), isTrue);
+      final key = await localKey().readAsString();
+      expect(base64Decode(key), hasLength(32));
+      expect((await localKey().stat()).mode & 0x1ff, 0x180);
+      secureCalls.clear();
+      ExtensionStorageService.resetForTesting();
+      expect((await ExtensionStorageService.prepare()).masterKey, key);
+      expect(secureCalls, isEmpty);
+    },
+  );
+
+  test(
+    'switching modes preserves the original key and encrypted data',
+    () async {
+      linux();
+      final key = base64Encode(List.filled(32, 9));
+      values[keyName] = key;
+      final data = await seed('support/extension_data/example/settings.enc', [
+        4,
+        5,
+        6,
+      ]);
+      await ExtensionStorageService.prepare();
+      readError = PlatformException(code: 'keyring_locked');
+      await ExtensionStorageService.setUnsecuredStorage(true);
+      expect(await localKey().readAsString(), key);
+      readError = null;
+      values.clear();
+      await ExtensionStorageService.setUnsecuredStorage(false);
+      expect(values[keyName], key);
+      expect(await localKey().exists(), isFalse);
+      expect((await ExtensionStorageService.prepare()).masterKey, key);
+      expect(await data.readAsBytes(), [4, 5, 6]);
+    },
+  );
+
+  for (final name in [
+    'example/settings.enc',
+    'example/.credentials.enc',
+    '.pending-auth.enc',
+  ]) {
+    test('unavailable keyring never replaces the key for $name', () async {
+      linux();
+      final data = await seed('support/extension_data/$name', [7, 8, 9]);
+      readError = PlatformException(code: 'Libsecret error');
+      await expectLater(
+        ExtensionStorageService.setUnsecuredStorage(true),
+        throwsA(
+          isA<ExtensionStorageModeException>().having(
+            (e) => e.reason,
+            'reason',
+            ExtensionStorageModeFailure.keyringRequired,
+          ),
+        ),
+      );
+      expect(await localKey().exists(), isFalse);
+      expect(await data.readAsBytes(), [7, 8, 9]);
+      expect(mutations, isEmpty);
+    });
+  }
+
+  for (final failure in ['read', 'write', 'verification', 'conflict']) {
+    test('failed secure migration keeps the local key ($failure)', () async {
+      linux();
+      await ExtensionStorageService.setUnsecuredStorage(true);
+      final key = await localKey().readAsString();
+      switch (failure) {
+        case 'read':
+          readError = PlatformException(code: 'Libsecret error');
+        case 'write':
+          writeError = PlatformException(code: 'keyring_locked');
+        case 'verification':
+          ignoreWrites = true;
+        case 'conflict':
+          values[keyName] = base64Encode(List.filled(32, 6));
+      }
+      await expectLater(
+        ExtensionStorageService.setUnsecuredStorage(false),
+        throwsA(anything),
+      );
+      expect(await localKey().readAsString(), key);
+      expect(await ExtensionStorageService.isUnsecuredStorageEnabled(), isTrue);
+      expect((await ExtensionStorageService.prepare()).masterKey, key);
+    });
+  }
+
+  test(
+    'invalid and symlinked local keys are preserved without keyring fallback',
+    () async {
+      linux();
+      await seed(
+        'support/extension_data/.master_key_unsecured',
+        utf8.encode('invalid'),
+      );
+      await expectLater(
+        ExtensionStorageService.prepare(),
+        throwsA(isA<StateError>()),
+      );
+      expect(await localKey().readAsString(), 'invalid');
+      await localKey().delete();
+      final target = await seed(
+        'outside',
+        utf8.encode(base64Encode(List.filled(32, 3))),
+      );
+      await Link(localKey().path).create(target.path);
+      await expectLater(
+        ExtensionStorageService.prepare(),
+        throwsA(isA<FileSystemException>()),
+      );
+      expect(await FileSystemEntity.isLink(localKey().path), isTrue);
+      expect(secureCalls, isEmpty);
+    },
+  );
+
+  test(
+    'other platforms keep secure storage even when a local key file exists',
+    () async {
+      values[keyName] = base64Encode(List.filled(32, 1));
+      await seed(
+        'support/extension_data/.master_key_unsecured',
+        utf8.encode(base64Encode(List.filled(32, 2))),
+      );
+      expect(
+        await ExtensionStorageService.isUnsecuredStorageEnabled(),
+        isFalse,
+      );
+      await expectLater(
+        ExtensionStorageService.setUnsecuredStorage(true),
+        throwsUnsupportedError,
+      );
+      expect(
+        (await ExtensionStorageService.prepare()).masterKey,
+        values[keyName],
+      );
+    },
+  );
 
   test(
     'upgrade retains the same key and migrates encrypted files intact',

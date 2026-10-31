@@ -10,6 +10,23 @@ import 'package:mornye/services/secure_storage_options.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 
 const _extensionMasterKeyName = 'extension_storage_master_key_v2';
+const _localMasterKeyFileName = '.master_key_unsecured';
+
+enum ExtensionStorageModeFailure { keyringRequired, conflictingKeys }
+
+class ExtensionStorageModeException implements Exception {
+  const ExtensionStorageModeException(this.reason);
+
+  final ExtensionStorageModeFailure reason;
+
+  @override
+  String toString() => switch (reason) {
+    ExtensionStorageModeFailure.keyringRequired =>
+      'Unlock the keyring once to move existing encrypted extension data.',
+    ExtensionStorageModeFailure.conflictingKeys =>
+      'The local and keyring extension keys differ. Both have been preserved.',
+  };
+}
 
 class ExtensionStoragePaths {
   const ExtensionStoragePaths({
@@ -31,11 +48,109 @@ class ExtensionStorageService {
     mOptions: secureStorageMacOsOptions,
   );
   static Future<ExtensionStoragePaths>? _preparing;
+  static Future<void>? _changingMode;
+
+  static bool get supportsUnsecuredStorage =>
+      isDesktopPlatform && defaultTargetPlatform == TargetPlatform.linux;
 
   @visibleForTesting
-  static void resetForTesting() => _preparing = null;
+  static void resetForTesting() {
+    _preparing = null;
+    _changingMode = null;
+  }
+
+  static Future<bool> isUnsecuredStorageEnabled() async {
+    if (!supportsUnsecuredStorage) return false;
+    await _changingMode;
+    final support = await getApplicationSupportDirectory();
+    return await _readLocalMasterKey(
+          Directory(p.join(support.path, 'extension_data')),
+        ) !=
+        null;
+  }
+
+  /// The local key file is the durable opt-in. No keyring fallback is automatic.
+  static Future<void> setUnsecuredStorage(bool enabled) {
+    if (!supportsUnsecuredStorage) {
+      return Future.error(
+        UnsupportedError('Unsecured extension storage is Linux-only'),
+      );
+    }
+    final previous = _changingMode;
+    late final Future<void> changing;
+    changing =
+        (() async {
+          if (previous != null) {
+            try {
+              await previous;
+            } catch (_) {}
+          }
+          ExtensionStoragePaths? prepared;
+          try {
+            prepared = await _preparing;
+          } catch (_) {
+            // A failed keyring read must not block an explicit local-storage choice.
+          }
+          _preparing = null;
+          final support = await getApplicationSupportDirectory();
+          final dataDir = Directory(p.join(support.path, 'extension_data'));
+          await dataDir.create(recursive: true);
+          final local = await _readLocalMasterKey(dataDir);
+          if (enabled) {
+            if (local != null) return;
+            String? key = prepared?.masterKey;
+            if (key == null) {
+              try {
+                key = await _secureStorage.read(key: _extensionMasterKeyName);
+              } catch (_) {
+                if (await _hasEncryptedData(dataDir)) {
+                  throw const ExtensionStorageModeException(
+                    ExtensionStorageModeFailure.keyringRequired,
+                  );
+                }
+              }
+            }
+            if (key == null && await _hasEncryptedData(dataDir)) {
+              throw const ExtensionStorageModeException(
+                ExtensionStorageModeFailure.keyringRequired,
+              );
+            }
+            key = key == null ? _generateMasterKey() : _validateMasterKey(key);
+            await _writeLocalMasterKey(dataDir, key);
+          } else if (local != null) {
+            final secured = await _secureStorage.read(
+              key: _extensionMasterKeyName,
+            );
+            if (secured != null && _validateMasterKey(secured) != local) {
+              throw const ExtensionStorageModeException(
+                ExtensionStorageModeFailure.conflictingKeys,
+              );
+            }
+            if (secured == null) {
+              await _secureStorage.write(
+                key: _extensionMasterKeyName,
+                value: local,
+              );
+            }
+            if (await _secureStorage.read(key: _extensionMasterKeyName) !=
+                local) {
+              throw StateError(
+                'Could not verify the extension key in the keyring',
+              );
+            }
+            await File(p.join(dataDir.path, _localMasterKeyFileName)).delete();
+          }
+        })().whenComplete(() {
+          _preparing = null;
+          if (identical(_changingMode, changing)) _changingMode = null;
+        });
+    _changingMode = changing;
+    return changing;
+  }
 
   static Future<ExtensionStoragePaths> prepare() {
+    final changing = _changingMode;
+    if (changing != null) return changing.then((_) => prepare());
     return _preparing ??= _prepare().catchError((
       Object error,
       StackTrace stack,
@@ -77,41 +192,101 @@ class ExtensionStorageService {
   }
 
   static Future<String> _loadOrCreateMasterKey(Directory dataDir) async {
+    if (supportsUnsecuredStorage) {
+      final local = await _readLocalMasterKey(dataDir);
+      if (local != null) return local;
+    }
     final existing = await _secureStorage.read(key: _extensionMasterKeyName);
     if (existing != null) {
-      try {
-        if (base64Decode(existing).length == 32) return existing;
-      } on FormatException {
-        // Preserve the stored value for recovery instead of silently rotating it.
-      }
-      throw StateError(
-        'The extension storage key is invalid. Existing extension data has '
-        'been preserved.',
-      );
+      return _validateMasterKey(existing);
     }
 
     // Plaintext settings and salt-based legacy credentials can be migrated with
     // a new key. Encrypted settings require the original key; generating another
     // one would leave every installed extension permanently unreadable.
+    if (await _hasEncryptedData(dataDir)) {
+      throw StateError(
+        'The extension storage key is missing. Existing encrypted extension '
+        'data has been preserved.',
+      );
+    }
+
+    final encoded = _generateMasterKey();
+    await _secureStorage.write(key: _extensionMasterKeyName, value: encoded);
+    return encoded;
+  }
+
+  static Future<bool> _hasEncryptedData(Directory dataDir) async {
+    if (await FileSystemEntity.type(
+          p.join(dataDir.path, '.pending-auth.enc'),
+          followLinks: false,
+        ) !=
+        FileSystemEntityType.notFound) {
+      return true;
+    }
     await for (final entry in dataDir.list(followLinks: false)) {
-      if (entry is Directory &&
-          await FileSystemEntity.type(
-                p.join(entry.path, 'settings.enc'),
+      if (entry is Directory) {
+        for (final name in ['settings.enc', '.credentials.enc']) {
+          if (await FileSystemEntity.type(
+                p.join(entry.path, name),
                 followLinks: false,
               ) !=
               FileSystemEntityType.notFound) {
-        throw StateError(
-          'The extension storage key is missing. Existing encrypted extension '
-          'data has been preserved.',
-        );
+            return true;
+          }
+        }
       }
     }
 
+    return false;
+  }
+
+  static String _generateMasterKey() {
     final random = Random.secure();
-    final key = List<int>.generate(32, (_) => random.nextInt(256));
-    final encoded = base64Encode(key);
-    await _secureStorage.write(key: _extensionMasterKeyName, value: encoded);
-    return encoded;
+    return base64Encode(List<int>.generate(32, (_) => random.nextInt(256)));
+  }
+
+  static String _validateMasterKey(String value) {
+    try {
+      if (base64Decode(value).length == 32) return value;
+    } on FormatException {
+      // Preserve invalid keys for recovery rather than silently rotating them.
+    }
+    throw StateError(
+      'The extension storage key is invalid. Existing extension data has been preserved.',
+    );
+  }
+
+  static Future<String?> _readLocalMasterKey(Directory dataDir) async {
+    final file = File(p.join(dataDir.path, _localMasterKeyFileName));
+    final type = await FileSystemEntity.type(file.path, followLinks: false);
+    if (type == FileSystemEntityType.notFound) return null;
+    if (type != FileSystemEntityType.file) {
+      throw FileSystemException('Refusing a non-file extension key', file.path);
+    }
+    return _validateMasterKey(await file.readAsString());
+  }
+
+  static Future<void> _writeLocalMasterKey(
+    Directory dataDir,
+    String key,
+  ) async {
+    final file = File(p.join(dataDir.path, _localMasterKeyFileName));
+    await file.create(exclusive: true);
+    try {
+      // Set owner-only access before writing any key bytes.
+      final permission = await Process.run('chmod', ['600', file.path]);
+      if (permission.exitCode != 0) {
+        throw FileSystemException(
+          'Could not protect the local extension key',
+          file.path,
+        );
+      }
+      await file.writeAsString(key, flush: true);
+    } catch (_) {
+      await file.delete();
+      rethrow;
+    }
   }
 
   static Future<void> _migrateDirectory(

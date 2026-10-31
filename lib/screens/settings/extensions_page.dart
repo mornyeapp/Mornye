@@ -25,6 +25,7 @@ import 'package:mornye/widgets/app_loading_indicator.dart';
 import 'package:mornye/widgets/mornye_chrome.dart';
 import 'package:mornye/widgets/settings_group.dart';
 import 'package:mornye/widgets/home_feed_region_setting.dart';
+import 'package:mornye/widgets/extension_storage_setting.dart';
 import 'package:mornye/widgets/app_sliver_header.dart';
 import 'package:mornye/widgets/extension_health.dart';
 
@@ -79,6 +80,8 @@ class _ExtensionsPageState extends ConsumerState<ExtensionsPage> {
         body: CustomScrollView(
           slivers: [
             AppSliverHeader.page(title: context.l10n.extensionsTitle),
+
+            const SliverToBoxAdapter(child: ExtensionStorageSetting()),
 
             if (extState.isLoading)
               const SliverToBoxAdapter(
