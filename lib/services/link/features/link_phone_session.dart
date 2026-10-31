@@ -25,6 +25,7 @@ class LinkPhoneSession {
     required this.refs,
     required this.handoff,
     required this.openUrl,
+    this.onDesktopPlaybackStarted,
     int Function()? nowMs,
     this.debounce = const Duration(milliseconds: 250),
     this.heartbeat = const Duration(seconds: 15),
@@ -35,6 +36,7 @@ class LinkPhoneSession {
   final LinkTrackRefCache refs;
   final LinkHandoff handoff;
   final LinkOpenUrl openUrl;
+  final VoidCallback? onDesktopPlaybackStarted;
   final Duration debounce;
   final Duration heartbeat;
   final int Function() _nowMs;
@@ -250,6 +252,11 @@ class LinkPhoneSession {
             'Desktop queue: ${result.skipped.length} tracks are not on this '
             'phone',
           );
+        }
+      case LinkActions.playOnDesktop:
+        final result = await handoff.playOnDesktop();
+        if (!_disposed && result?.started == true) {
+          onDesktopPlaybackStarted?.call();
         }
       default:
         _log.w('Unknown desktop command ${command.action}');

@@ -95,6 +95,7 @@ class LinkDesktopHostState {
     this.devices = const [],
     this.phoneStates = const {},
     this.phoneCatalogRevisions = const {},
+    this.libraryJobs = const [],
     this.catalogSongs,
     this.followedPhone,
   });
@@ -123,13 +124,16 @@ class LinkDesktopHostState {
   /// Catalog or cover updates that can complete after a phone's player state.
   final Map<String, int> phoneCatalogRevisions;
 
+  /// File changes requested by phones, including finished and failed jobs.
+  final List<LinkHostedLibraryJob> libraryJobs;
+
   /// Songs in the last catalog the server loaded.
   final int? catalogSongs;
 
   /// The connected phone whose player the desktop's player screens show and
   /// drive, as the phone shows the desktop after Play on desktop: one that
-  /// started playing while the desktop did not. Null while the desktop
-  /// shows its own player.
+  /// started playing while the desktop did not, or the explicit target of
+  /// Continue on phone. Null while the desktop shows its own player.
   final String? followedPhone;
 
   bool get running => phase == LinkHostPhase.running && server != null;
@@ -145,6 +149,7 @@ class LinkDesktopHostState {
     List<LinkPairedDevice>? devices,
     Map<String, LinkPlayerState>? phoneStates,
     Map<String, int>? phoneCatalogRevisions,
+    List<LinkHostedLibraryJob>? libraryJobs,
     Object? catalogSongs = _keep,
     Object? followedPhone = _keep,
   }) => LinkDesktopHostState(
@@ -158,6 +163,7 @@ class LinkDesktopHostState {
     devices: devices ?? this.devices,
     phoneStates: phoneStates ?? this.phoneStates,
     phoneCatalogRevisions: phoneCatalogRevisions ?? this.phoneCatalogRevisions,
+    libraryJobs: libraryJobs ?? this.libraryJobs,
     catalogSongs: identical(catalogSongs, _keep)
         ? this.catalogSongs
         : catalogSongs as int?,
@@ -514,12 +520,16 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
         ),
         execute: executor.call,
         titleFor: (id) => _index?.songById(id)?.title ?? id,
-        notify: (deviceId, job) => unawaited(
-          _send({
-            'type': 'library.job',
-            'job': job.toJson(),
-          }, deviceId: deviceId),
-        ),
+        notify: (deviceId, job) {
+          if (!ref.mounted) return;
+          state = state.copyWith(libraryJobs: _libraryJobs!.jobs);
+          unawaited(
+            _send({
+              'type': 'library.job',
+              'job': job.toJson(),
+            }, deviceId: deviceId),
+          );
+        },
         onChanged: () async {
           if (!ref.mounted) return;
           await ref.read(downloadHistoryProvider.notifier).reloadFromStorage();
@@ -662,6 +672,7 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
   /// Answers one forwarded request with its handler's result or error.
   Future<void> _onRequest(LinkRequestEvent event) async {
     if (!ref.mounted) return;
+    final serverRun = _serverRun;
     final router = ref.read(linkHostRouterProvider);
     Object? result;
     LinkException? error;
@@ -674,6 +685,13 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
           args: event.args,
         ),
       );
+      if (event.op == LinkOps.command) {
+        final command = LinkCommand.fromJson(event.args);
+        if (command?.action == LinkActions.pause &&
+            command?.args['continueOnPhone'] == true) {
+          _followPhoneAfterHandoff(event.deviceId, serverRun);
+        }
+      }
     } on LinkException catch (failure) {
       error = failure;
     } on Object catch (failure) {
@@ -751,6 +769,20 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
   void stopFollowingPhone() {
     if (state.followedPhone != null) {
       state = state.copyWith(followedPhone: null);
+    }
+  }
+
+  void _followPhoneAfterHandoff(String deviceId, int serverRun) {
+    if (!ref.mounted ||
+        _serverRun != serverRun ||
+        !state.running ||
+        !state.clients.any((client) => client.deviceId == deviceId)) {
+      return;
+    }
+    // A handoff can leave both playing flags unchanged. Choose its target
+    // explicitly so the UI does not remain on the paused local player.
+    if (state.followedPhone != deviceId) {
+      state = state.copyWith(followedPhone: deviceId);
     }
   }
 
@@ -1050,12 +1082,39 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
   /// Whether the desktop's own player is playing.
   bool get isPlaying => _player?.snapshot().playing ?? false;
 
+  /// Selects an already playing or paused phone without restarting it.
+  bool followPhone(String deviceId) {
+    _followPhoneAfterHandoff(deviceId, _serverRun);
+    return ref.mounted && state.followedPhone == deviceId;
+  }
+
+  /// The phone prepares its current queue on this computer, including files
+  /// it needs to send first. Keep its player visible until ours starts.
+  Future<bool> continueOnComputer() async {
+    final deviceId = state.followedPhone;
+    if (deviceId == null || !state.running) return false;
+    if (state.phoneStates[deviceId]?.track == null) {
+      stopFollowingPhone();
+      return true;
+    }
+    return sendCommand(deviceId, const LinkCommand(LinkActions.playOnDesktop));
+  }
+
+  void cancelLibraryJob(String deviceId, String id) =>
+      _libraryJobs?.cancel(deviceId, id);
+
   /// Hands the desktop queue around the current song, at its position, to
   /// the phone [deviceId] and pauses the desktop once the phone has it.
   Future<bool> continueOnPhone(String deviceId) async {
     final ops = _ops;
     final player = _player;
-    if (ops == null || player == null) return false;
+    if (ops == null ||
+        player == null ||
+        !state.running ||
+        !state.clients.any((client) => client.deviceId == deviceId)) {
+      return false;
+    }
+    final serverRun = _serverRun;
     final current = ops.state();
     if (current.track == null || current.index < 0) return false;
     final position = current.positionAt(DateTime.now().millisecondsSinceEpoch);
@@ -1066,7 +1125,13 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
         'positionMs': position,
       }),
     );
-    if (delivered) await player.pause();
+    if (delivered) {
+      if (!ref.mounted || _serverRun != serverRun || !state.running) {
+        return false;
+      }
+      await player.pause();
+      _followPhoneAfterHandoff(deviceId, serverRun);
+    }
     return delivered;
   }
 
@@ -1147,11 +1212,13 @@ final linkDesktopHostProvider =
     );
 
 /// Whether the player bar shows the Devices control: the server runs and a
-/// phone is connected.
+/// phone is connected or file changes remain available to review.
 final linkDevicesAvailableProvider = Provider<bool>(
   (ref) => ref.watch(
     linkDesktopHostProvider.select(
-      (state) => state.running && state.clients.isNotEmpty,
+      (state) =>
+          state.running &&
+          (state.clients.isNotEmpty || state.libraryJobs.isNotEmpty),
     ),
   ),
 );

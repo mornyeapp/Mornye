@@ -670,7 +670,10 @@ void main() {
       expect(player.snapshot.autoMix, isTrue);
       final pause = client.posts.single;
       expect(pause.op, LinkOps.command);
-      expect(pause.body, {'action': 'pause', 'args': <String, dynamic>{}});
+      expect(pause.body, {
+        'action': 'pause',
+        'args': {'continueOnPhone': true},
+      });
     });
 
     test('an unresolved current track starts the next one from its '

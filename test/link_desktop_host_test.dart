@@ -722,11 +722,87 @@ void main() {
       'd:b',
     ]);
     expect(player.calls, ['pause']);
+    expect(hostState().followedPhone, 'p1');
 
     // A phone that does not receive it leaves the desktop playing.
+    host().stopFollowingPhone();
     backend.delivered = 0;
     expect(await host().continueOnPhone('p1'), isFalse);
     expect(player.calls, ['pause']);
+    expect(hostState().followedPhone, isNull);
+    await shutdown(tester);
+  });
+
+  testWidgets('phone-initiated continue explicitly selects that phone', (
+    tester,
+  ) async {
+    await boot(tester);
+    backend.connect([_phone]);
+    player.emit(snapshot(playing: false));
+    await flush(tester);
+    backend.request(
+      LinkOps.command,
+      deviceId: 'p1',
+      args: const LinkCommand(LinkActions.pause, {
+        'continueOnPhone': true,
+      }).toJson(),
+    );
+    await flush(tester);
+    expect(backend.replies.last.error, isNull);
+    expect(player.calls, ['pause']);
+    expect(hostState().followedPhone, 'p1');
+    await shutdown(tester);
+  });
+
+  testWidgets('a normal remote pause keeps showing the desktop player', (
+    tester,
+  ) async {
+    await boot(tester);
+    backend.connect([_phone]);
+    await flush(tester);
+    backend.request(
+      LinkOps.command,
+      deviceId: 'p1',
+      args: const LinkCommand(LinkActions.pause).toJson(),
+    );
+    await flush(tester);
+    expect(hostState().followedPhone, isNull);
+    await shutdown(tester);
+  });
+
+  testWidgets('desktop activity keeps phone file changes after disconnect', (
+    tester,
+  ) async {
+    backend.deviceList = [
+      const LinkPairedDevice(
+        deviceId: 'p1',
+        name: 'Pixel',
+        platform: 'android',
+      ),
+    ];
+    await boot(tester);
+    backend.connect([_phone]);
+    await flush(tester);
+    backend.request(
+      LinkOps.libraryJobs,
+      deviceId: 'p1',
+      args: {
+        'id': 'missing_song',
+        'action': 'delete',
+        'songIds': ['l:missing'],
+      },
+    );
+    await tester.pump(const Duration(seconds: 1));
+    await flush(tester);
+    final entry = hostState().libraryJobs.single;
+    expect(entry.deviceId, 'p1');
+    expect(entry.job.id, 'missing_song');
+    expect(entry.job.active, isFalse);
+    expect(entry.job.failed, 1);
+    backend.connect(const []);
+    await flush(tester);
+    expect(hostState().libraryJobs.single.job.id, 'missing_song');
+    expect(container.read(linkDevicesAvailableProvider), isTrue);
     await shutdown(tester);
   });
 

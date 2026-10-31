@@ -605,7 +605,9 @@ class LinkHandoff {
     if (result.started) {
       await client.post(
         LinkOps.command,
-        const LinkCommand(LinkActions.pause).toJson(),
+        const LinkCommand(LinkActions.pause, {
+          'continueOnPhone': true,
+        }).toJson(),
       );
     }
     return result;

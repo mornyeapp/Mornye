@@ -8,6 +8,8 @@ import 'package:mornye/utils/logger.dart';
 typedef LinkLibraryExecute =
     Future<Map<String, dynamic>> Function(LinkLibraryWork work, String songId);
 
+typedef LinkHostedLibraryJob = ({String deviceId, LinkLibraryJob job});
+
 class _Job {
   _Job(this.work);
 
@@ -51,6 +53,23 @@ class LinkLibraryJobsHost {
   bool _running = false;
   bool _closed = false;
 
+  /// All phones' changes for the computer's local activity view. Remote
+  /// requests still see only the requesting phone's jobs.
+  List<LinkHostedLibraryJob> get jobs => List.unmodifiable([
+    for (final job in _jobs.values)
+      (deviceId: job.work.deviceId, job: job.snapshot),
+  ]);
+
+  void cancel(String deviceId, String id) {
+    final job = _jobs['$deviceId:$id'];
+    if (_closed || job == null || !job.snapshot.active) return;
+    job.cancelled = true;
+    if (job.status == LinkLibraryJobStatus.queued) {
+      job.status = LinkLibraryJobStatus.cancelled;
+    }
+    _notify(job);
+  }
+
   void register(LinkHostRouter router) =>
       router.register(LinkOps.libraryJobs, handle);
 
@@ -76,13 +95,7 @@ class LinkLibraryJobsHost {
     if (args['cancel'] == true) {
       final job = _jobs[key];
       if (job == null) throw const LinkException('not_found', 'No such job');
-      if (job.snapshot.active) {
-        job.cancelled = true;
-        if (job.status == LinkLibraryJobStatus.queued) {
-          job.status = LinkLibraryJobStatus.cancelled;
-        }
-        _notify(job);
-      }
+      cancel(request.deviceId, id);
       return job.snapshot.toJson();
     }
     final action = LinkLibraryAction.values.asNameMap()[args['action']];

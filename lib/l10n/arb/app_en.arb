@@ -32,6 +32,14 @@
   },
   "linkFileJobsEmpty": "No file changes yet",
   "linkFileJobsEmptyMessage": "Edits, conversions and deletions you start on the computer's songs from this phone appear here.",
+  "linkDesktopFileJobsSubtitle": "Changes requested from your phones",
+  "linkDesktopFileJobsEmptyMessage": "Edits, conversions and deletions requested from your phones appear here.",
+  "linkFileJobRequestedBy": "From {name}",
+  "@linkFileJobRequestedBy": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
   "linkFileJobsView": "View",
   "@linkFileJobsView": {
     "description": "Snackbar action that opens the file changes list to see which songs failed"

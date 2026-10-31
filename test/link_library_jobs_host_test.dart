@@ -91,6 +91,43 @@ void main() {
   );
 
   test(
+    'local activity includes both phones but remote lists stay scoped',
+    () async {
+      await call(request(id: 'phone_one'), device: 'one');
+      await complete();
+      await call(request(id: 'phone_two'), device: 'two');
+      await complete();
+      expect(host.jobs.map((entry) => entry.deviceId), ['one', 'two']);
+      expect(host.jobs.every((entry) => !entry.job.active), isTrue);
+      final remote = linkLibraryMap(
+        await router.dispatch(
+          const LinkRequest(
+            requestId: 'list',
+            op: LinkOps.libraryJobs,
+            deviceId: 'one',
+            args: {'_method': 'GET'},
+          ),
+        ),
+      );
+      expect((remote['jobs'] as List).map((job) => (job as Map)['id']), [
+        'phone_one',
+      ]);
+    },
+  );
+
+  test('local cancellation stops after the current song', () async {
+    final first = Completer<Map<String, dynamic>>();
+    run = (_, _) => first.future;
+    await call(request());
+    await Future<void>.delayed(Duration.zero);
+    host.cancel('phone', 'request_1');
+    first.complete({});
+    await complete();
+    expect(executed, ['l:one:replayGain']);
+    expect(host.jobs.single.job.status, LinkLibraryJobStatus.cancelled);
+  });
+
+  test(
     'completed work is recovered on reconnect and isolated per phone',
     () async {
       await call(request());

@@ -24,6 +24,7 @@ import 'package:mornye/services/link/features/link_phone_player.dart';
 import 'package:mornye/services/link/features/link_phone_receiver.dart';
 import 'package:mornye/services/link/features/link_phone_sender.dart';
 import 'package:mornye/services/link/features/link_phone_session.dart';
+import 'package:mornye/services/link/features/link_remote_playback.dart';
 import 'package:mornye/services/link/features/link_save_offline.dart';
 import 'package:mornye/services/link/features/link_track_resolver.dart';
 import 'package:mornye/services/link/link_transfers.dart';
@@ -279,6 +280,11 @@ final linkPhoneFeaturesProvider = Provider<LinkPhoneSession?>((ref) {
     refs: handoff.refs,
     handoff: handoff,
     openUrl: ref.watch(linkOpenUrlProvider),
+    onDesktopPlaybackStarted: () {
+      if (ref.mounted) {
+        ref.read(linkPlaysOnDesktopProvider.notifier).set(true);
+      }
+    },
   )..start();
   ref.listen(settingsProvider.select((s) => (s.autoplay, s.autoMix)), (_, _) {
     scheduleMicrotask(() {

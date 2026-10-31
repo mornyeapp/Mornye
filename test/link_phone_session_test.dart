@@ -15,6 +15,7 @@ void main() {
   late FakeLinkClient client;
   late FakePhonePlayer player;
   late List<String> opened;
+  late int desktopStarts;
   var now = 1000;
 
   LinkPhoneSession session([FakeLibraryLookup? lookup]) {
@@ -31,6 +32,7 @@ void main() {
         resolver: LinkTrackResolver(lookup: records, server: client.server),
       ),
       openUrl: opened.add,
+      onDesktopPlaybackStarted: () => desktopStarts++,
       nowMs: () => now,
     );
   }
@@ -54,6 +56,7 @@ void main() {
     client = FakeLinkClient();
     player = FakePhonePlayer(playing());
     opened = [];
+    desktopStarts = 0;
     now = 1000;
   });
 
@@ -214,6 +217,29 @@ void main() {
       await tester.pump();
       expect(opened, ['https://music.example.com/album/1']);
       await tester.pump(const Duration(milliseconds: 250));
+      linked.dispose();
+    });
+
+    test('device picker returns the current phone queue to desktop', () async {
+      client.onPost = (op, body) => {'resolved': 3, 'missing': <int>[]};
+      final linked = session()..start();
+      await command(linked, LinkActions.playOnDesktop);
+      expect(client.posts.single.op, LinkOps.handoffPlay);
+      expect(client.posts.single.body['queue'], hasLength(3));
+      expect(player.calls, ['pause']);
+      expect(desktopStarts, 1);
+      linked.dispose();
+    });
+
+    test('failed desktop handoff leaves the phone as player', () async {
+      client.onPost = (op, body) => {
+        'resolved': 0,
+        'missing': [0, 1, 2],
+      };
+      final linked = session()..start();
+      await command(linked, LinkActions.playOnDesktop);
+      expect(player.calls, isEmpty);
+      expect(desktopStarts, 0);
       linked.dispose();
     });
 

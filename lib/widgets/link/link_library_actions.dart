@@ -618,7 +618,16 @@ class LinkLibraryJobsView extends ConsumerWidget {
           SettingsGroup(
             children: [
               for (final (i, job) in jobs.indexed)
-                _JobRow(job: job, showDivider: i < jobs.length - 1),
+                LinkLibraryJobRow(
+                  job: job,
+                  showDivider: i < jobs.length - 1,
+                  onCancel: () => unawaited(
+                    ref
+                        .read(linkLibraryJobsProvider.notifier)
+                        .cancel(job.id)
+                        .catchError((Object _) {}),
+                  ),
+                ),
             ],
           ),
         ],
@@ -627,14 +636,23 @@ class LinkLibraryJobsView extends ConsumerWidget {
   }
 }
 
-class _JobRow extends ConsumerWidget {
-  const _JobRow({required this.job, required this.showDivider});
+/// Shared progress and results for file changes on the phone and computer.
+class LinkLibraryJobRow extends StatelessWidget {
+  const LinkLibraryJobRow({
+    super.key,
+    required this.job,
+    required this.showDivider,
+    this.deviceName,
+    this.onCancel,
+  });
 
   final LinkLibraryJob job;
   final bool showDivider;
+  final String? deviceName;
+  final VoidCallback? onCancel;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final l10n = context.l10n;
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
@@ -654,11 +672,18 @@ class _JobRow extends ConsumerWidget {
                 ? l10n.trackCoverSaved(fileName)
                 : l10n.trackLyricsSaved(fileName),
     ];
+    final changed = [
+      if (deviceName != null)
+        for (final result in job.results)
+          if (result['error'] == null && result['title'] is String)
+            result['title'] as String,
+    ];
     final detailStyle = theme.textTheme.bodySmall;
     return SettingsItem(
       icon: linkLibraryActionIcon(job.action),
       title: linkLibraryActionLabel(context, job.action),
       subtitle: [
+        if (deviceName != null) l10n.linkFileJobRequestedBy(deviceName!),
         if (job.status == LinkLibraryJobStatus.queued)
           l10n.linkFileJobQueued
         else if (job.active && job.currentTitle.isNotEmpty)
@@ -667,16 +692,11 @@ class _JobRow extends ConsumerWidget {
         if (job.failed > 0) l10n.linkFileJobFailedCount(job.failed),
       ].join(' · '),
       showDivider: showDivider,
-      trailing: job.active
+      trailing: job.active && onCancel != null
           ? AppIconButton(
               icon: const AppIcon.adaptive(Icons.stop_circle_outlined),
               tooltip: l10n.linkFileCancelHint,
-              onPressed: () => unawaited(
-                ref
-                    .read(linkLibraryJobsProvider.notifier)
-                    .cancel(job.id)
-                    .catchError((Object _) {}),
-              ),
+              onPressed: onCancel,
             )
           : Text(
               switch (job.status) {
@@ -697,13 +717,14 @@ class _JobRow extends ConsumerWidget {
                     : job.finished / job.total,
               ),
             )
-          : failures.isEmpty && saved.isEmpty
+          : failures.isEmpty && saved.isEmpty && changed.isEmpty
           ? null
           : Padding(
               padding: EdgeInsets.only(top: tokens.gapXs),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  for (final title in changed) Text(title, style: detailStyle),
                   for (final line in failures)
                     Text(
                       line,

@@ -425,6 +425,9 @@ abstract final class LinkActions {
   /// `{"index"}`: removes a queue entry other than the current one.
   static const remove = 'remove';
   static const playQueue = 'play_queue';
+
+  /// Asks a phone to continue its queue on the paired computer.
+  static const playOnDesktop = 'play_on_desktop';
 }
 
 /// The pairing proof: HMAC-SHA256 keyed by the PIN over the certificate
