@@ -7,6 +7,9 @@ import 'package:mornye/services/link/features/link_phone_session.dart';
 import 'package:mornye/services/link/features/link_track_resolver.dart';
 import 'package:mornye/services/link/link_client_api.dart';
 import 'package:mornye/services/link/link_protocol.dart';
+import 'package:mornye/services/link/link_lyrics_translations.dart';
+import 'package:mornye/services/lyrics_translation.dart';
+import 'package:mornye/services/lyrics_translation_sharing.dart';
 import 'package:mornye/services/share_intent_service.dart';
 
 import 'support/link_fakes.dart';
@@ -16,6 +19,7 @@ void main() {
   late FakePhonePlayer player;
   late List<String> opened;
   late int desktopStarts;
+  late LyricsTranslationSharing sharing;
   var now = 1000;
 
   LinkPhoneSession session([FakeLibraryLookup? lookup]) {
@@ -33,6 +37,10 @@ void main() {
       ),
       openUrl: opened.add,
       onDesktopPlaybackStarted: () => desktopStarts++,
+      lyricsTranslations: LinkLyricsTranslations(
+        sharing: sharing,
+        send: (message, _) => client.send(message),
+      ),
       nowMs: () => now,
     );
   }
@@ -57,8 +65,10 @@ void main() {
     player = FakePhonePlayer(playing());
     opened = [];
     desktopStarts = 0;
+    sharing = LyricsTranslationSharing();
     now = 1000;
   });
+  tearDown(() => sharing.dispose());
 
   group('state push', () {
     testWidgets('sends once 250 ms after a burst of changes', (tester) async {
@@ -117,6 +127,62 @@ void main() {
   });
 
   group('incoming messages', () {
+    testWidgets(
+      'phone sends completed lyrics and refreshes on desktop updates',
+      (tester) async {
+        final linked = session()..start();
+        final hash = List.filled(64, 'b').join();
+        sharing.publish(
+          SharedLyricsTranslation(
+            sourceHash: hash,
+            language: 'id',
+            updatedMs: 1,
+            result: const LyricsTranslationResult(['Dari HP']),
+          ),
+        );
+        await tester.pump();
+        expect(
+          client.sent.where(
+            (message) => message['type'] == LinkMessageTypes.lyricsTranslation,
+          ),
+          hasLength(1),
+        );
+        client.push({
+          'type': LinkMessageTypes.lyricsTranslation,
+          'translation': SharedLyricsTranslation(
+            sourceHash: hash,
+            language: 'id',
+            updatedMs: 2,
+            result: const LyricsTranslationResult(['Dari komputer']),
+          ).toJson(),
+        });
+        await tester.pump();
+        expect(sharing.receivedFor(hash)?.result.translations, [
+          'Dari komputer',
+        ]);
+        expect(
+          client.sent.where(
+            (message) => message['type'] == LinkMessageTypes.lyricsTranslation,
+          ),
+          hasLength(1),
+        );
+        sharing.request(hash);
+        await tester.pump();
+        client.sent.clear();
+        client.setConnection(LinkConnectionState.disconnected);
+        client.setConnection(LinkConnectionState.connected);
+        await tester.pump();
+        expect(
+          client.sent.where(
+            (message) =>
+                message['type'] == LinkMessageTypes.lyricsTranslationRequest,
+          ),
+          hasLength(1),
+        );
+        linked.dispose();
+      },
+    );
+
     Future<void> command(
       LinkPhoneSession linked,
       String action, [

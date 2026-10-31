@@ -27,7 +27,10 @@ import 'package:mornye/services/link/features/link_phone_session.dart';
 import 'package:mornye/services/link/features/link_remote_playback.dart';
 import 'package:mornye/services/link/features/link_save_offline.dart';
 import 'package:mornye/services/link/features/link_track_resolver.dart';
+import 'package:mornye/services/link/link_client_api.dart';
+import 'package:mornye/services/link/link_lyrics_translations.dart';
 import 'package:mornye/services/link/link_transfers.dart';
+import 'package:mornye/services/lyrics_translation_sharing.dart';
 import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/services/share_intent_service.dart';
 import 'package:mornye/services/system_volume_service.dart';
@@ -280,6 +283,14 @@ final linkPhoneFeaturesProvider = Provider<LinkPhoneSession?>((ref) {
     refs: handoff.refs,
     handoff: handoff,
     openUrl: ref.watch(linkOpenUrlProvider),
+    lyricsTranslations: LinkLyricsTranslations(
+      sharing: ref.watch(lyricsTranslationSharingProvider),
+      send: (message, _) {
+        if (client.connectionState == LinkConnectionState.connected) {
+          client.send(message);
+        }
+      },
+    ),
     onDesktopPlaybackStarted: () {
       if (ref.mounted) {
         ref.read(linkPlaysOnDesktopProvider.notifier).set(true);

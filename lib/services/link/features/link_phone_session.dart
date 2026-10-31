@@ -7,6 +7,7 @@ import 'package:mornye/services/link/features/link_phone_player.dart';
 import 'package:mornye/services/link/features/link_track_refs.dart';
 import 'package:mornye/services/link/features/link_track_resolver.dart';
 import 'package:mornye/services/link/link_client_api.dart';
+import 'package:mornye/services/link/link_lyrics_translations.dart';
 import 'package:mornye/services/link/link_protocol.dart';
 import 'package:mornye/utils/logger.dart';
 
@@ -26,6 +27,7 @@ class LinkPhoneSession {
     required this.handoff,
     required this.openUrl,
     this.onDesktopPlaybackStarted,
+    this.lyricsTranslations,
     int Function()? nowMs,
     this.debounce = const Duration(milliseconds: 250),
     this.heartbeat = const Duration(seconds: 15),
@@ -37,6 +39,7 @@ class LinkPhoneSession {
   final LinkHandoff handoff;
   final LinkOpenUrl openUrl;
   final VoidCallback? onDesktopPlaybackStarted;
+  final LinkLyricsTranslations? lyricsTranslations;
   final Duration debounce;
   final Duration heartbeat;
   final int Function() _nowMs;
@@ -57,23 +60,29 @@ class LinkPhoneSession {
   LinkPlayerState? get lastSent => _lastSent;
 
   void start() {
+    lyricsTranslations?.start();
     _subscriptions
       ..add(client.messages.listen((message) => unawaited(handle(message))))
       ..add(player.changes.listen((_) => _onPlayerChanged()))
       ..add(
         client.connectionStates.listen((connection) {
           if (connection == LinkConnectionState.connected) {
+            lyricsTranslations?.connected();
             _lastSent = null;
             _schedule();
           }
         }),
       );
-    if (client.connectionState == LinkConnectionState.connected) _schedule();
+    if (client.connectionState == LinkConnectionState.connected) {
+      lyricsTranslations?.connected();
+      _schedule();
+    }
     _restartHeartbeat();
   }
 
   void dispose() {
     _disposed = true;
+    lyricsTranslations?.dispose();
     _debounceTimer?.cancel();
     _heartbeatTimer?.cancel();
     for (final subscription in _subscriptions) {
@@ -190,6 +199,7 @@ class LinkPhoneSession {
   /// Applies one message the desktop pushed.
   Future<void> handle(Map<String, dynamic> message) async {
     if (_disposed) return;
+    if (lyricsTranslations?.handle(message) ?? false) return;
     try {
       switch (message['type']) {
         case LinkMessageTypes.command:

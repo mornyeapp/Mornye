@@ -25,9 +25,11 @@ import 'package:mornye/services/link/desktop/link_player.dart';
 import 'package:mornye/services/link/desktop/link_transfer_songs.dart';
 import 'package:mornye/services/link/desktop/link_web_covers.dart';
 import 'package:mornye/services/link/link_host_router.dart';
+import 'package:mornye/services/link/link_lyrics_translations.dart';
 import 'package:mornye/services/link/link_protocol.dart';
 import 'package:mornye/services/link/link_transfers.dart';
 import 'package:mornye/services/link/sync/link_sync_handlers.dart';
+import 'package:mornye/services/lyrics_translation_sharing.dart';
 import 'package:mornye/services/network_storage_service.dart';
 import 'package:mornye/services/playable_media.dart';
 import 'package:mornye/utils/desktop_platform.dart';
@@ -190,6 +192,7 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
   LinkPlayerPort? _player;
   LinkDesktopOps? _ops;
   LinkLibraryJobsHost? _libraryJobs;
+  LinkLyricsTranslations? _lyricsTranslations;
   LinkArrivingFiles? _arriving;
   LinkPhoneCatalogs? _phoneCatalogs;
   LinkPhoneSources? _phoneSources;
@@ -642,6 +645,18 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
   }
 
   void _listenApp() {
+    _lyricsTranslations = LinkLyricsTranslations(
+      sharing: ref.read(lyricsTranslationSharingProvider),
+      send: (message, deviceId) async {
+        if (ref.mounted && state.running && state.clients.isNotEmpty) {
+          await _send(message, deviceId: deviceId);
+        }
+      },
+      peers: () => ref.mounted
+          ? state.clients.map((client) => client.deviceId)
+          : const <String>[],
+    )..start();
+    _lyricsTranslations!.connected();
     _appSubscriptions.addAll([
       ref.listen(linkLibraryRevisionProvider, (_, _) => _scheduleExport()),
       ref.listen(linkDownloadItemsProvider, (_, _) => _scheduleDownloads()),
@@ -656,6 +671,8 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
   }
 
   void _cancelApp() {
+    _lyricsTranslations?.dispose();
+    _lyricsTranslations = null;
     for (final subscription in _appSubscriptions) {
       subscription.close();
     }
@@ -705,6 +722,11 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
   }
 
   void _onMessage(LinkMessageEvent event) {
+    if (state.clients.any((client) => client.deviceId == event.deviceId) &&
+        (_lyricsTranslations?.handle(event.message, deviceId: event.deviceId) ??
+            false)) {
+      return;
+    }
     if (_phoneSources?.onMessage(event.deviceId, event.message) ?? false) {
       return;
     }
@@ -842,6 +864,9 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
     _updateHeartbeat();
     // A phone that just connected gets the desktop's state right away.
     if (!known.containsAll(ids)) {
+      for (final id in ids.difference(known)) {
+        _lyricsTranslations?.connected(id);
+      }
       _lastSentState = null;
       _onPlayerChanged();
       _tellCatalog();

@@ -11,6 +11,7 @@ import 'package:mornye/services/lyrics_ai_client.dart';
 import 'package:mornye/services/lyrics_language_guess.dart';
 import 'package:mornye/services/lyrics_translation.dart';
 import 'package:mornye/services/lyrics_translation_languages.dart';
+import 'package:mornye/services/lyrics_translation_sharing.dart';
 import 'package:mornye/services/secure_storage_options.dart';
 import 'package:mornye/utils/logger.dart';
 import 'package:mornye/utils/lyrics_parser.dart';
@@ -185,9 +186,36 @@ class LyricsTranslationController extends Notifier<LyricsTranslationState> {
   LyricsTranslationCancelToken? _cancel;
   Object? _owner;
   int _jobIds = 0;
+  late LyricsTranslationSharing _sharing;
 
   @override
   LyricsTranslationState build() {
+    _sharing = ref.watch(lyricsTranslationSharingProvider);
+    final incoming = _sharing.incoming.listen((update) {
+      if (!ref.mounted) return;
+      state = LyricsTranslationState(
+        // The sharing store owns the bounded overlays. This entry only
+        // invalidates views that watch results, without retaining every song.
+        results: {...state.results, 'link:latest': update.result},
+        job: state.job,
+      );
+    });
+    ref.onDispose(incoming.cancel);
+    ref.listen(
+      settingsProvider.select(
+        (settings) => (
+          settings.lyricsTranslationLanguage,
+          settings.locale,
+          settings.lyricsAiProvider,
+          settings.lyricsAiModel,
+          settings.lyricsAiBaseUrl,
+        ),
+      ),
+      (_, _) {
+        _sharing.clearReceived();
+        _lookedUp.clear();
+      },
+    );
     ref.onDispose(() => _cancel?.cancel());
     return const LyricsTranslationState();
   }
@@ -213,6 +241,10 @@ class LyricsTranslationController extends Notifier<LyricsTranslationState> {
     if (!lyrics.synced || lyrics.lines.isEmpty) return lyrics;
     final settings = ref.read(settingsProvider);
     final source = LyricsTranslationSource.cached(lyrics);
+    if (source.isEmpty) return lyrics;
+    _sharing.request(source.hash);
+    final shared = _sharing.receivedFor(source.hash);
+    if (shared != null) return _apply(lyrics, source, shared.result);
     final key = _cacheKey(source, settings);
     if (key == null) return lyrics;
     final result = state.results[key];
@@ -222,6 +254,14 @@ class LyricsTranslationController extends Notifier<LyricsTranslationState> {
       }
       return lyrics;
     }
+    return _apply(lyrics, source, result);
+  }
+
+  ParsedLyrics _apply(
+    ParsedLyrics lyrics,
+    LyricsTranslationSource source,
+    LyricsTranslationResult result,
+  ) {
     final memo = _merged[lyrics];
     if (memo != null && identical(memo.$1, result)) return memo.$2;
     final merged = applyLyricsTranslation(
@@ -234,6 +274,21 @@ class LyricsTranslationController extends Notifier<LyricsTranslationState> {
     return merged;
   }
 
+  void _publish(
+    String sourceHash,
+    String language,
+    LyricsTranslationResult result,
+  ) {
+    _sharing.publish(
+      SharedLyricsTranslation(
+        sourceHash: sourceHash,
+        language: language,
+        result: result,
+        updatedMs: DateTime.now().millisecondsSinceEpoch,
+      ),
+    );
+  }
+
   Future<void> _lookUp(
     String key,
     ParsedLyrics lyrics,
@@ -242,11 +297,21 @@ class LyricsTranslationController extends Notifier<LyricsTranslationState> {
     if (!ref.mounted) return;
     final cached = await ref.read(lyricsTranslationCacheProvider).read(key);
     if (!ref.mounted) return;
+    final source = LyricsTranslationSource.cached(lyrics);
+    // A peer can finish while the local disk lookup is still pending.
+    if (_sharing.receivedFor(source.hash) != null) return;
     if (cached != null) {
       state = LyricsTranslationState(
         results: {...state.results, key: cached},
         job: state.job,
       );
+      if (_cacheKey(source, ref.read(settingsProvider)) == key) {
+        _publish(
+          source.hash,
+          lyricsTranslationTargetFor(settings).code,
+          cached,
+        );
+      }
       return;
     }
     if (!settings.lyricsAutoTranslate ||
@@ -265,7 +330,11 @@ class LyricsTranslationController extends Notifier<LyricsTranslationState> {
     final apiKey = await ref.read(
       lyricsAiKeyProvider(settings.lyricsAiProvider).future,
     );
-    if (!ref.mounted || !lyricsAiReady(settings, apiKey)) return;
+    if (!ref.mounted ||
+        !lyricsAiReady(settings, apiKey) ||
+        _sharing.receivedFor(source.hash) != null) {
+      return;
+    }
     final outcome = await translate(lyrics);
     if (outcome.error != null) {
       _log.w('Automatic translation failed: ${outcome.error!.name}');
@@ -332,6 +401,7 @@ class LyricsTranslationController extends Notifier<LyricsTranslationState> {
           settings.lyricsAiRomanize && lyricsNeedRomanization(lyrics);
       if (cached != null && (!romanize || cached.romanized)) {
         _finish(id, key, cached);
+        _publish(source.hash, target.code, cached);
         return const LyricsTranslationOutcome.success();
       }
       final apiKey = await ref.read(
@@ -376,7 +446,9 @@ class LyricsTranslationController extends Notifier<LyricsTranslationState> {
       );
       cancel.throwIfCancelled();
       await cache.write(key, result);
+      cancel.throwIfCancelled();
       _finish(id, key, result);
+      _publish(source.hash, target.code, result);
       return LyricsTranslationOutcome.success(
         missing: result.missing,
         unchanged: lyricsTranslationUnchanged(source, result.translations),
@@ -462,6 +534,7 @@ class LyricsTranslationController extends Notifier<LyricsTranslationState> {
 
   Future<void> clearCache() async {
     await ref.read(lyricsTranslationCacheProvider).clear();
+    _sharing.clear();
     _lookedUp.clear();
     _autoAttempted.clear();
     if (ref.mounted) state = LyricsTranslationState(job: state.job);

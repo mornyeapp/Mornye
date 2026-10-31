@@ -125,6 +125,8 @@ abstract final class LinkMessageTypes {
   static const downloadsChanged = 'downloads.changed';
   static const collectionsChanged = 'collections.changed';
   static const catalogChanged = 'catalog.changed';
+  static const lyricsTranslation = 'lyrics.translation';
+  static const lyricsTranslationRequest = 'lyrics.translation.request';
 
   /// Desktop to phone: send the song `{"name"}` (`<fileId>.<suffix>` of a
   /// [LinkPhoneSong]) to `PUT <linkFilesPath>`.

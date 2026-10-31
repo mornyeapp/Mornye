@@ -10,6 +10,8 @@ import 'package:mornye/services/link/desktop/link_desktop_host.dart';
 import 'package:mornye/services/link/desktop/link_player.dart';
 import 'package:mornye/services/link/link_host_router.dart';
 import 'package:mornye/services/link/link_protocol.dart';
+import 'package:mornye/services/lyrics_translation.dart';
+import 'package:mornye/services/lyrics_translation_sharing.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -767,6 +769,50 @@ void main() {
     );
     await flush(tester);
     expect(hostState().followedPhone, isNull);
+    await shutdown(tester);
+  });
+
+  testWidgets('host shares lyrics and relays phone changes without an echo', (
+    tester,
+  ) async {
+    await boot(tester);
+    backend.connect([_phone, _tablet]);
+    await flush(tester);
+    final sharing = container.read(lyricsTranslationSharingProvider);
+    final hash = List.filled(64, 'a').join();
+    sharing.publish(
+      SharedLyricsTranslation(
+        sourceHash: hash,
+        language: 'id',
+        updatedMs: 1,
+        result: const LyricsTranslationResult(['Dari komputer']),
+      ),
+    );
+    await flush(tester);
+    expect(
+      backend.sentOfType(LinkMessageTypes.lyricsTranslation),
+      hasLength(1),
+    );
+    backend.sent.clear();
+    backend.message('p1', {
+      'type': LinkMessageTypes.lyricsTranslation,
+      'translation': SharedLyricsTranslation(
+        sourceHash: hash,
+        language: 'id',
+        updatedMs: 2,
+        result: const LyricsTranslationResult(['Dari HP']),
+      ).toJson(),
+    });
+    await flush(tester);
+    expect(sharing.receivedFor(hash)?.result.translations, ['Dari HP']);
+    final relayed = backend.sent
+        .where(
+          (entry) =>
+              entry.message['type'] == LinkMessageTypes.lyricsTranslation,
+        )
+        .toList();
+    expect(relayed, hasLength(1));
+    expect(relayed.single.deviceId, 'p2');
     await shutdown(tester);
   });
 
