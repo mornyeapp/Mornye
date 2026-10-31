@@ -24,6 +24,7 @@ pub(crate) fn execute(request: &Value, bytes: Option<&[u8]>) -> Result<Value, St
         base.set_path(&format!("{}/", base.path()));
     }
     let base_segments = decoded_segments(&base)?;
+    let webdav = request["protocol"] == "webdav";
     let mut entries = Vec::<Value>::new();
     let mut positions = HashMap::<String, usize>::new();
     let mut add = |href: &str,
@@ -33,7 +34,11 @@ pub(crate) fn execute(request: &Value, bytes: Option<&[u8]>) -> Result<Value, St
                    etag: Option<String>|
      -> Result<(), String> {
         let uri = base.join(&dart_href(href)).map_err(|e| e.to_string())?;
-        if uri.origin() != base.origin()
+        // DAV hrefs can advertise the HTTPS listener of the same server.
+        // Only child paths leave this parser; transport keeps the saved origin.
+        let same_server = uri.origin() == base.origin()
+            || (webdav && uri.host() == base.host() && matches!(uri.scheme(), "http" | "https"));
+        if !same_server
             || uri.query().is_some()
             || uri.fragment().is_some()
             || !uri.username().is_empty()
@@ -73,9 +78,12 @@ pub(crate) fn execute(request: &Value, bytes: Option<&[u8]>) -> Result<Value, St
         }
         Ok(())
     };
-    if request["protocol"] == "webdav" {
+    if webdav {
         mornye_core::xml::check_depth(&body)?;
         let document = roxmltree::Document::parse(&body).map_err(|e| e.to_string())?;
+        if !named(document.root_element(), "multistatus") {
+            return Err("Server did not return a WebDAV directory listing".into());
+        }
         for response in document
             .descendants()
             .filter(|node| named(*node, "response"))
@@ -86,7 +94,7 @@ pub(crate) fn execute(request: &Value, bytes: Option<&[u8]>) -> Result<Value, St
                 .filter(|node| {
                     named(*node, "propstat")
                         && node.children().any(|child| {
-                            named(child, "status") && inner_text(child).contains(" 200 ")
+                            named(child, "status") && successful_status(&inner_text(child))
                         })
                 })
                 .collect();
@@ -175,6 +183,15 @@ fn dart_href(href: &str) -> String {
 
 fn named(node: roxmltree::Node<'_, '_>, name: &str) -> bool {
     node.is_element() && node.tag_name().name() == name
+}
+
+fn successful_status(value: &str) -> bool {
+    let mut parts = value.split_whitespace();
+    parts
+        .next()
+        .and_then(|version| version.strip_prefix("HTTP/"))
+        .is_some_and(|version| !version.is_empty())
+        && parts.next() == Some("200")
 }
 
 fn inner_text(node: roxmltree::Node<'_, '_>) -> String {
@@ -298,5 +315,16 @@ mod tests {
         );
         let error = execute(&json!({"base_url":"https://nas.test/dav/", "path":"", "protocol":"webdav", "body":body}), None).unwrap_err();
         assert_eq!(error, "XML nesting exceeds 16 elements");
+    }
+
+    #[test]
+    fn non_dav_documents_are_not_empty_dav_directories() {
+        let error = execute(
+            &json!({"base_url":"http://nas.test/dav/", "path":"", "protocol":"webdav",
+                "body":"<html><body>Please sign in</body></html>"}),
+            None,
+        )
+        .unwrap_err();
+        assert_eq!(error, "Server did not return a WebDAV directory listing");
     }
 }

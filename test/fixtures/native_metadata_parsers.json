@@ -75,6 +75,45 @@
       "entries": [
         {"path": "A & B.flac", "name": "A & B.flac", "directory": false, "size": 123}
       ]
+    },
+    {
+      "protocol": "webdav",
+      "address": "http://nas.test:5005/dav/",
+      "base_url": "http://nas.test:5005/dav/Album/",
+      "path": "Album/",
+      "body": "<d:multistatus xmlns:d='DAV:'><d:response><d:href>https://nas.test:5006/dav/Album/A%20B.flac</d:href><d:propstat><d:prop><d:getcontentlength>123</d:getcontentlength></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response><d:response><d:href>https://other.test/dav/Album/foreign.flac</d:href><d:propstat><d:prop/><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response><d:response><d:href>https://user@nas.test:5006/dav/Album/private.flac</d:href><d:propstat><d:prop/><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response><d:response><d:href>ftp://nas.test/dav/Album/ftp.flac</d:href><d:propstat><d:prop/><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response><d:response><d:href>https://nas.test:5006/outside/other.flac</d:href><d:propstat><d:prop/><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response><d:response><d:href>https://nas.test:5006/dav/Album/nested%2Fsong.flac</d:href><d:propstat><d:prop/><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response></d:multistatus>",
+      "entries": [
+        {"path": "Album/A B.flac", "name": "A B.flac", "directory": false, "size": 123}
+      ]
+    },
+    {
+      "protocol": "webdav",
+      "address": "https://nas.test:5006/dav/",
+      "base_url": "https://nas.test:5006/dav/",
+      "path": "",
+      "body": "<d:multistatus xmlns:d='DAV:'><d:response><d:href>http://nas.test:5005/dav/Album/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/></d:resourcetype></d:prop><d:status>HTTP/1.1 200</d:status></d:propstat></d:response><d:response><d:href>/dav/song.flac</d:href><d:propstat><d:prop><d:getcontentlength>123</d:getcontentlength></d:prop><d:status>HTTP/2 200</d:status></d:propstat><d:propstat><d:prop><d:getcontentlength>999</d:getcontentlength></d:prop><d:status>HTTP/1.1 404 Not Found</d:status></d:propstat></d:response><d:response><d:href>/dav/wrong.flac</d:href><d:propstat><d:prop/><d:status>HTTP/1.1 1200 OK</d:status></d:propstat></d:response></d:multistatus>",
+      "entries": [
+        {"path": "Album/", "name": "Album", "directory": true, "size": null},
+        {"path": "song.flac", "name": "song.flac", "directory": false, "size": 123}
+      ]
+    },
+    {
+      "protocol": "http",
+      "address": "http://nas.test:5005/dav/",
+      "base_url": "http://nas.test:5005/dav/",
+      "path": "",
+      "body": "<a href='https://nas.test:5006/dav/other.flac'>different origin</a><a href='song.flac'>same origin</a>",
+      "entries": [
+        {"path": "song.flac", "name": "song.flac", "directory": false, "size": null}
+      ]
+    },
+    {
+      "protocol": "webdav",
+      "address": "http://nas.test/dav/",
+      "base_url": "http://nas.test/dav/",
+      "path": "",
+      "body": "<d:multistatus xmlns:d='DAV:'/>",
+      "entries": []
     }
   ],
   "playlists": [

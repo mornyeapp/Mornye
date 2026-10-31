@@ -1037,7 +1037,14 @@ class NetworkStorageService {
       String? etag,
     }) {
       final uri = base.resolve(href);
-      if (uri.origin != base.origin ||
+      // A DAV server behind a TLS proxy can advertise its HTTPS port even
+      // when contacted over HTTP. Retain only the child path, never its
+      // advertised origin: reads and writes still use the saved connection.
+      final sameServer =
+          (uri.scheme == 'http' || uri.scheme == 'https') &&
+          (uri.origin == base.origin ||
+              (c.protocol == NetworkProtocol.webdav && uri.host == base.host));
+      if (!sameServer ||
           uri.hasQuery ||
           uri.hasFragment ||
           uri.userInfo.isNotEmpty) {
@@ -1077,6 +1084,12 @@ class NetworkStorageService {
 
     if (c.protocol == NetworkProtocol.webdav) {
       final doc = XmlDocument.parse(body);
+      if (doc.rootElement.name.local != 'multistatus') {
+        throw const HttpException(
+          'Server did not return a WebDAV directory listing',
+        );
+      }
+      final successfulStatus = RegExp(r'^HTTP/\S+\s+200(?:\s|$)');
       for (final response in doc.descendants.whereType<XmlElement>().where(
         (e) => e.name.local == 'response',
       )) {
@@ -1090,7 +1103,8 @@ class NetworkStorageService {
             .where(
               (e) => e.childElements.any(
                 (s) =>
-                    s.name.local == 'status' && s.innerText.contains(' 200 '),
+                    s.name.local == 'status' &&
+                    successfulStatus.hasMatch(s.innerText.trim()),
               ),
             );
         final values = props.expand(
