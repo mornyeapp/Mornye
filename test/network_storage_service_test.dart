@@ -1,6 +1,7 @@
 // Host-only native library injection into the SMB worker isolates.
 // ignore_for_file: invalid_use_of_internal_member
 
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -243,6 +244,17 @@ void main() {
         } else if (r.uri.path == '/external') {
           r.response.statusCode = 302;
           r.response.headers.set('location', 'https://elsewhere.invalid/');
+        } else if (r.uri.path == '/slow-response') {
+          final delayMs =
+              int.tryParse(r.uri.queryParameters['delay'] ?? '0') ?? 0;
+          if (r.method == 'PUT') {
+            await r.drain<void>();
+          }
+          if (delayMs > 0) {
+            await Future<void>.delayed(Duration(milliseconds: delayMs));
+          }
+          r.response.statusCode = 200;
+          r.response.write('ok');
         } else if (r.uri.path == '/chunks/') {
           try {
             for (final chunk in listingChunks!) {
@@ -410,6 +422,181 @@ void main() {
         );
       },
     );
+
+    test('timeout configuration decouples chunk and response timeouts', () {
+      expect(NetworkStorageService.timeout, const Duration(seconds: 20));
+      expect(
+        NetworkStorageService.uploadChunkTimeout,
+        const Duration(minutes: 2),
+      );
+      expect(
+        NetworkStorageService.uploadResponseTimeout,
+        const Duration(minutes: 30),
+      );
+    });
+
+    test(
+      'upload requests use uploadResponseTimeout while non-upload requests use normal timeout',
+      () async {
+        final c = connection(origin, user: 'test', password: 'secret');
+        final client = HttpClient();
+        addTearDown(() {
+          client.close(force: true);
+          NetworkStorageService.debugTimeoutOverride = null;
+          NetworkStorageService.debugUploadChunkTimeoutOverride = null;
+          NetworkStorageService.debugUploadResponseTimeoutOverride = null;
+        });
+
+        // Test seam: normal timeout = 100ms, upload response timeout = 500ms
+        NetworkStorageService.debugTimeoutOverride = const Duration(
+          milliseconds: 100,
+        );
+        NetworkStorageService.debugUploadResponseTimeoutOverride =
+            const Duration(milliseconds: 500);
+
+        final tempDir = await Directory.systemTemp.createTemp(
+          'upload-timeout-',
+        );
+        addTearDown(() => tempDir.delete(recursive: true));
+        final uploadFile = File('${tempDir.path}/test.bin');
+        await uploadFile.writeAsBytes(List.generate(1024, (i) => i % 256));
+
+        // 1. Non-upload request with 250ms server delay:
+        // Must fail with TimeoutException because 250ms > normal timeout (100ms).
+        await expectLater(
+          service.debugRequest(
+            client: client,
+            connection: c,
+            method: 'GET',
+            uri: Uri.parse('$origin/slow-response?delay=250'),
+          ),
+          throwsA(
+            isA<TimeoutException>().having(
+              (e) => e.message,
+              'message',
+              'Network response timed out',
+            ),
+          ),
+        );
+
+        // 2. Upload request with the same 250ms server delay:
+        // Must succeed because 250ms < uploadResponseTimeout (500ms).
+        final uploadResponse = await service.debugRequest(
+          client: client,
+          connection: c,
+          method: 'PUT',
+          uri: Uri.parse('$origin/slow-response?delay=250'),
+          upload: uploadFile,
+        );
+        expect(uploadResponse.statusCode, 200);
+        await uploadResponse.drain<void>();
+
+        // 3. Upload request exceeding uploadResponseTimeout (650ms delay > 500ms timeout):
+        // Must fail with TimeoutException and abort the request.
+        await expectLater(
+          service.debugRequest(
+            client: client,
+            connection: c,
+            method: 'PUT',
+            uri: Uri.parse('$origin/slow-response?delay=650'),
+            upload: uploadFile,
+          ),
+          throwsA(
+            isA<TimeoutException>().having(
+              (e) => e.message,
+              'message',
+              'Network response timed out',
+            ),
+          ),
+        );
+      },
+    );
+
+    test(
+      'upload chunk flushing uses uploadChunkTimeout and stalled flush aborts',
+      () async {
+        final c = connection(origin, user: 'test', password: 'secret');
+        final tempDir = await Directory.systemTemp.createTemp('chunk-timeout-');
+        addTearDown(() async {
+          NetworkStorageService.debugTimeoutOverride = null;
+          NetworkStorageService.debugUploadChunkTimeoutOverride = null;
+          NetworkStorageService.debugUploadResponseTimeoutOverride = null;
+          await tempDir.delete(recursive: true);
+        });
+
+        final uploadFile = File('${tempDir.path}/test.bin');
+        await uploadFile.writeAsBytes(List.generate(1024, (i) => i % 256));
+
+        // 1. Chunk flushing uses dedicated uploadChunkTimeout rather than normal timeout:
+        // Normal timeout is short (50ms), chunk timeout is longer (300ms).
+        // A flush delay of 120ms exceeds normal timeout (50ms) but is within
+        // chunk timeout (300ms). The upload must succeed.
+        NetworkStorageService.debugTimeoutOverride = const Duration(
+          milliseconds: 50,
+        );
+        NetworkStorageService.debugUploadChunkTimeoutOverride = const Duration(
+          milliseconds: 300,
+        );
+        NetworkStorageService.debugUploadResponseTimeoutOverride =
+            const Duration(milliseconds: 500);
+
+        // ignore: close_sinks
+        final successfulRequest = _FakeHttpClientRequest(
+          onFlush: () =>
+              Future<void>.delayed(const Duration(milliseconds: 120)),
+        );
+        final client1 = _FakeHttpClient(
+          (method, uri) async => successfulRequest,
+        );
+
+        final okResponse = await service.debugRequest(
+          client: client1,
+          connection: c,
+          method: 'PUT',
+          uri: Uri.parse('$origin/upload'),
+          upload: uploadFile,
+        );
+        expect(okResponse.statusCode, 200);
+        expect(successfulRequest.aborted, isFalse);
+        expect(successfulRequest.chunks.isNotEmpty, isTrue);
+
+        // 2. Stalled chunk flush triggers timeout and aborts the request:
+        // Set chunk timeout short (50ms) with a stalled flush completer.
+        NetworkStorageService.debugUploadChunkTimeoutOverride = const Duration(
+          milliseconds: 50,
+        );
+        final stalledCompleter = Completer<void>();
+        // ignore: close_sinks
+        final stalledRequest = _FakeHttpClientRequest(
+          onFlush: () => stalledCompleter.future,
+        );
+        final client2 = _FakeHttpClient((method, uri) async => stalledRequest);
+
+        await expectLater(
+          service.debugRequest(
+            client: client2,
+            connection: c,
+            method: 'PUT',
+            uri: Uri.parse('$origin/upload'),
+            upload: uploadFile,
+          ),
+          throwsA(isA<TimeoutException>()),
+        );
+        expect(stalledRequest.aborted, isTrue);
+      },
+    );
+
+    test(
+      'all test-only timeout overrides are reset to null after teardown',
+      () {
+        expect(NetworkStorageService.debugTimeoutOverride, isNull);
+        expect(NetworkStorageService.debugUploadChunkTimeoutOverride, isNull);
+        expect(
+          NetworkStorageService.debugUploadResponseTimeoutOverride,
+          isNull,
+        );
+      },
+    );
   });
 
   test('SMB server browsing and byte-range streaming', () async {
@@ -537,4 +724,86 @@ void main() {
       await service.dispose();
     }
   }, skip: Platform.environment['TEST_SMB_GUEST_PORT'] == null);
+}
+
+class _FakeHttpHeaders extends Fake implements HttpHeaders {
+  final Map<String, Object> values = {};
+
+  @override
+  void set(String name, Object value, {bool preserveHeaderCase = false}) {
+    values[name] = value;
+  }
+}
+
+class _FakeHttpClientRequest extends Fake implements HttpClientRequest {
+  @override
+  final HttpHeaders headers = _FakeHttpHeaders();
+  @override
+  int contentLength = 0;
+  @override
+  bool followRedirects = true;
+
+  bool aborted = false;
+  final List<List<int>> chunks = [];
+  final Future<void> Function()? onFlush;
+
+  _FakeHttpClientRequest({this.onFlush});
+
+  @override
+  void abort([Object? exception, StackTrace? stackTrace]) {
+    aborted = true;
+  }
+
+  @override
+  void add(List<int> data) {
+    chunks.add(data);
+  }
+
+  @override
+  Future<void> flush() {
+    if (onFlush != null) {
+      return onFlush!();
+    }
+    return Future<void>.value();
+  }
+
+  @override
+  Future<HttpClientResponse> close() => Future.value(_FakeHttpClientResponse());
+}
+
+class _FakeHttpClientResponse extends Fake implements HttpClientResponse {
+  @override
+  int get statusCode => 200;
+
+  @override
+  HttpHeaders get headers => _FakeHttpHeaders();
+
+  @override
+  StreamSubscription<List<int>> listen(
+    void Function(List<int> event)? onData, {
+    Function? onError,
+    void Function()? onDone,
+    bool? cancelOnError,
+  }) {
+    return const Stream<List<int>>.empty().listen(
+      onData,
+      onError: onError,
+      onDone: onDone,
+      cancelOnError: cancelOnError,
+    );
+  }
+}
+
+class _FakeHttpClient extends Fake implements HttpClient {
+  final Future<HttpClientRequest> Function(String method, Uri uri) onOpenUrl;
+  _FakeHttpClient(this.onOpenUrl);
+
+  @override
+  set badCertificateCallback(
+    bool Function(X509Certificate cert, String host, int port)? callback,
+  ) {}
+
+  @override
+  Future<HttpClientRequest> openUrl(String method, Uri uri) =>
+      onOpenUrl(method, uri);
 }
