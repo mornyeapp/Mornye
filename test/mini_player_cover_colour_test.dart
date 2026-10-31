@@ -155,14 +155,15 @@ void main() {
             ),
           ),
         );
-        // Both the sharp cover and blur render on the first player frame.
+        // Both the sharp cover (drawn above and inside its fade) and blur
+        // render on the first player frame.
         expect(find.byType(ImageFiltered), findsNothing);
         expect(find.byIcon(Icons.music_note), findsNothing);
         expect(
           find.byWidgetPredicate(
             (widget) => widget is RawImage && widget.image != null,
           ),
-          findsNWidgets(2),
+          findsNWidgets(3),
         );
       }
       expect(tester.takeException(), isNull);

@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:mornye/routes/now_playing_route.dart';
 import 'package:mornye/widgets/cached_cover_image.dart';
 import 'package:mornye/widgets/player_artwork.dart';
@@ -60,14 +61,7 @@ class MaterialPlayerBackdrop extends StatelessWidget {
             child: Hero(
               tag: kNowPlayingArtworkHeroTag,
               // The flying cover must keep its fade in the route overlay.
-              child: ShaderMask(
-                blendMode: BlendMode.dstIn,
-                shaderCallback: (bounds) => const LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  stops: [0, 0.72, 1],
-                  colors: [Colors.white, Colors.white, Colors.transparent],
-                ).createShader(bounds),
+              child: _FadedArtwork(
                 child: PlayerArtwork(
                   artUri: artUri,
                   colorScheme: colorScheme,
@@ -106,6 +100,130 @@ class MaterialPlayerBackdrop extends StatelessWidget {
         ),
       ],
     );
+  }
+}
+
+const _fadeStart = 0.72;
+
+const _fade = LinearGradient(
+  begin: Alignment.topCenter,
+  end: Alignment.bottomCenter,
+  stops: [0, _fadeStart, 1],
+  colors: [Colors.white, Colors.white, Colors.transparent],
+);
+
+/// Top of the band [_fade] changes: a whole device pixel at least one pixel
+/// above the first faded row, so a row the edge crosses is unfaded on
+/// either side of it.
+double _fadeTop(double height, double devicePixelRatio) {
+  final row = (height * _fadeStart * devicePixelRatio).floorToDouble() - 1;
+  return math.max(0.0, row) / devicePixelRatio;
+}
+
+/// The cover faded out by [_fade]. Only the faded band goes through an
+/// offscreen mask; a second copy of the same artwork, sharing its decode,
+/// draws the rows above it directly.
+class _FadedArtwork extends StatelessWidget {
+  const _FadedArtwork({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final devicePixelRatio = MediaQuery.devicePixelRatioOf(context);
+    return Stack(
+      fit: StackFit.passthrough,
+      children: [
+        ClipRect(clipper: _AboveFade(devicePixelRatio), child: child),
+        ExcludeSemantics(
+          child: _FadeBand(devicePixelRatio: devicePixelRatio, child: child),
+        ),
+      ],
+    );
+  }
+}
+
+class _AboveFade extends CustomClipper<Rect> {
+  const _AboveFade(this.devicePixelRatio);
+
+  final double devicePixelRatio;
+
+  @override
+  Rect getClip(Size size) =>
+      Rect.fromLTRB(0, 0, size.width, _fadeTop(size.height, devicePixelRatio));
+
+  @override
+  bool shouldReclip(_AboveFade oldClipper) =>
+      oldClipper.devicePixelRatio != devicePixelRatio;
+}
+
+class _FadeBand extends SingleChildRenderObjectWidget {
+  const _FadeBand({required this.devicePixelRatio, required super.child});
+
+  final double devicePixelRatio;
+
+  @override
+  RenderObject createRenderObject(BuildContext context) =>
+      _RenderFadeBand(devicePixelRatio);
+
+  @override
+  void updateRenderObject(BuildContext context, _RenderFadeBand renderObject) =>
+      renderObject.devicePixelRatio = devicePixelRatio;
+}
+
+/// Paints its child from [_fadeTop] down, masked by [_fade] laid over the
+/// whole box, so the mask's offscreen layer spans only that band.
+class _RenderFadeBand extends RenderProxyBox {
+  _RenderFadeBand(this._devicePixelRatio);
+
+  double _devicePixelRatio;
+  set devicePixelRatio(double value) {
+    if (value == _devicePixelRatio) return;
+    _devicePixelRatio = value;
+    markNeedsPaint();
+  }
+
+  final _clip = LayerHandle<ClipRectLayer>();
+
+  @override
+  ShaderMaskLayer? get layer => super.layer as ShaderMaskLayer?;
+
+  @override
+  bool get alwaysNeedsCompositing => child != null;
+
+  @override
+  void paint(PaintingContext context, Offset offset) {
+    final child = this.child;
+    if (child == null) {
+      layer = null;
+      _clip.layer = null;
+      return;
+    }
+    final top = _fadeTop(size.height, _devicePixelRatio);
+    final band = Rect.fromLTRB(0, top, size.width, size.height);
+    // The layer draws the shader from the band's corner, so the gradient's
+    // box starts above it, where the cover's box starts.
+    layer = (layer ?? ShaderMaskLayer())
+      ..shader = _fade.createShader(
+        Rect.fromLTWH(0, -top, size.width, size.height),
+      )
+      ..maskRect = band.shift(offset)
+      ..blendMode = BlendMode.dstIn;
+    context.pushLayer(layer!, (context, offset) {
+      _clip.layer = context.pushClipRect(
+        child.needsCompositing,
+        offset,
+        band,
+        super.paint,
+        oldLayer: _clip.layer,
+      );
+    }, offset);
+  }
+
+  @override
+  void dispose() {
+    _clip.layer = null;
+    super.dispose();
   }
 }
 

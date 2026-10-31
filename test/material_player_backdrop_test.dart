@@ -1,11 +1,13 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart' show RenderRepaintBoundary;
+import 'package:flutter/rendering.dart'
+    show PictureLayer, RenderRepaintBoundary, ShaderMaskLayer;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/routes/now_playing_route.dart';
 import 'package:mornye/widgets/material_player_backdrop.dart';
@@ -18,6 +20,184 @@ final _cached = find.byWidgetPredicate(
 final _scheme = ColorScheme.fromSeed(seedColor: Colors.teal);
 
 late File _cover;
+late File _noise;
+late File _translucent;
+
+MediaItem _item(File cover) =>
+    MediaItem(id: cover.path, title: 'Track', artUri: Uri.file(cover.path));
+
+/// One colour per pixel at an odd size, so any shift in how the cover is
+/// sampled or masked shows up; [translucent] also varies the alpha.
+Future<File> _writeNoise(Directory dir, {required bool translucent}) async {
+  final random = math.Random(translucent ? 2 : 1);
+  final recorder = ui.PictureRecorder();
+  final canvas = Canvas(recorder);
+  for (var y = 0; y < 89; y++) {
+    for (var x = 0; x < 97; x++) {
+      canvas.drawRect(
+        Rect.fromLTWH(x.toDouble(), y.toDouble(), 1, 1),
+        Paint()
+          ..color = Color.fromARGB(
+            translucent ? 64 + random.nextInt(192) : 255,
+            random.nextInt(256),
+            random.nextInt(256),
+            random.nextInt(256),
+          ),
+      );
+    }
+  }
+  final image = await recorder.endRecording().toImage(97, 89);
+  final png = await image.toByteData(format: ui.ImageByteFormat.png);
+  image.dispose();
+  return File('${dir.path}/noise_$translucent.png')
+    ..writeAsBytesSync(png!.buffer.asUint8List());
+}
+
+/// [MaterialPlayerBackdrop] as it drew the cover before the band mask: one
+/// `ShaderMask` over the whole cover box. The blurred surface below it is
+/// the widget's own.
+class _WholeBoxMask extends StatelessWidget {
+  const _WholeBoxMask({required this.mediaItem, required this.showArtwork});
+
+  final MediaItem mediaItem;
+  final bool showArtwork;
+
+  @override
+  Widget build(BuildContext context) {
+    final size = MediaQuery.sizeOf(context);
+    final appBarHeight = MediaQuery.paddingOf(context).top + kToolbarHeight;
+    const motion = Duration(milliseconds: 300);
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        HeroMode(
+          enabled: false,
+          child: MaterialPlayerBackdrop(
+            mediaItem: mediaItem,
+            colorScheme: _scheme,
+            showArtwork: false,
+          ),
+        ),
+        Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          height: size.width < size.height * 0.56
+              ? size.height * 0.56
+              : size.width.clamp(0.0, size.height * 0.62),
+          child: AnimatedOpacity(
+            opacity: showArtwork ? 1 : 0,
+            duration: motion,
+            curve: Curves.easeInOutCubic,
+            child: Hero(
+              tag: kNowPlayingArtworkHeroTag,
+              child: ShaderMask(
+                blendMode: BlendMode.dstIn,
+                shaderCallback: (bounds) => const LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  stops: [0, 0.72, 1],
+                  colors: [Colors.white, Colors.white, Colors.transparent],
+                ).createShader(bounds),
+                child: PlayerArtwork(
+                  artUri: mediaItem.artUri?.toString(),
+                  colorScheme: _scheme,
+                  cacheWidth: PlayerArtwork.transitionCacheWidth(context),
+                ),
+              ),
+            ),
+          ),
+        ),
+        Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          height: appBarHeight + 32,
+          child: AnimatedOpacity(
+            opacity: showArtwork ? 1 : 0,
+            duration: motion,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  stops: [0, appBarHeight / (appBarHeight + 32), 1],
+                  colors: const [
+                    Color(0x40000000),
+                    Color(0x14000000),
+                    Color(0x00000000),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+typedef _BuildBackdrop = Widget Function(MediaItem item, bool showArtwork);
+
+/// Labels the frames captured while the cover fades for lyrics.
+const _fading = 'fading to ';
+
+Widget _bandMask(MediaItem item, bool showArtwork) => MaterialPlayerBackdrop(
+  mediaItem: item,
+  colorScheme: _scheme,
+  showArtwork: showArtwork,
+);
+
+Widget _wholeBoxMask(MediaItem item, bool showArtwork) =>
+    _WholeBoxMask(mediaItem: item, showArtwork: showArtwork);
+
+/// Waits until the blur is cached and every image on screen has decoded.
+Future<void> _waitForImages(WidgetTester tester) async {
+  bool ready() =>
+      _cached.evaluate().isNotEmpty &&
+      tester
+          .widgetList<RawImage>(find.byType(RawImage))
+          .every((image) => image.image != null);
+  for (var i = 0; i < 200 && !ready(); i++) {
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 5)),
+    );
+    await tester.pump();
+  }
+  expect(ready(), isTrue);
+}
+
+/// The largest channel difference between two captures, and how many
+/// channels differ at all.
+({int max, int count}) _difference(Uint8List a, Uint8List b) {
+  expect(a.length, b.length);
+  var max = 0;
+  var count = 0;
+  for (var i = 0; i < a.length; i++) {
+    final difference = (a[i] - b[i]).abs();
+    if (difference == 0) continue;
+    count++;
+    if (difference > max) max = difference;
+  }
+  return (max: max, count: count);
+}
+
+/// What drawing the cover directly instead of through an 8-bit offscreen
+/// copy may change: rounding, by at most one level in a channel. With an
+/// opaque cover only a few channels are left where the offscreen's origin
+/// rounded a sample differently; a translucent cover blends every pixel.
+void _expectRounding(
+  Uint8List band,
+  Uint8List whole, {
+  required bool opaque,
+  String? reason,
+}) {
+  final difference = _difference(band, whole);
+  expect(difference.max, lessThanOrEqualTo(1), reason: reason);
+  if (opaque) {
+    expect(difference.count, lessThan(band.length ~/ 5000), reason: reason);
+  }
+}
 
 Widget _app(Widget child) => MaterialApp(
   home: RepaintBoundary(key: _key, child: child),
@@ -114,6 +294,8 @@ void main() {
     final dir = Directory.systemTemp.createTempSync('backdrop_test');
     _cover = File('${dir.path}/cover.png')
       ..writeAsBytesSync(png!.buffer.asUint8List());
+    _noise = await _writeNoise(dir, translucent: false);
+    _translucent = await _writeNoise(dir, translucent: true);
   });
 
   tearDownAll(() => _cover.parent.deleteSync(recursive: true));
@@ -171,17 +353,22 @@ void main() {
     );
     await tester.pump();
     await _waitForCover(tester, _cached);
-    final artwork = find.byWidgetPredicate(
-      (widget) => widget is PlayerArtwork && widget.cacheWidth == 160,
-    );
+    // Two copies of the cover share the box: one above the fade, one in it.
+    final artwork = find
+        .byWidgetPredicate(
+          (widget) => widget is PlayerArtwork && widget.cacheWidth == 160,
+        )
+        .first;
     await _waitForCover(
       tester,
-      find.descendant(
-        of: artwork,
-        matching: find.byWidgetPredicate(
-          (widget) => widget is RawImage && widget.image != null,
-        ),
-      ),
+      find
+          .descendant(
+            of: artwork,
+            matching: find.byWidgetPredicate(
+              (widget) => widget is RawImage && widget.image != null,
+            ),
+          )
+          .first,
     );
 
     Future<List<int>> fadePixel() async {
@@ -275,4 +462,229 @@ void main() {
       expect(difference, lessThan(smaller / 4));
     });
   }
+
+  for (final (physical, dpr) in [
+    (const Size(160, 320), 1.0),
+    (const Size(540, 1170), 3.0),
+    (const Size(1080, 2340), 2.625),
+    (const Size(800, 1000), 2.0),
+  ]) {
+    testWidgets('the band mask draws the whole-box mask at $physical, '
+        '${dpr}x', (tester) async {
+      tester.view.physicalSize = physical;
+      tester.view.devicePixelRatio = dpr;
+      addTearDown(tester.view.reset);
+
+      for (final cover in [_cover, _noise, _translucent]) {
+        Future<Uint8List> capture(_BuildBackdrop backdrop) async {
+          await tester.pumpWidget(_app(backdrop(_item(cover), true)));
+          await _waitForImages(tester);
+          return _capture(tester, dpr);
+        }
+
+        _expectRounding(
+          await capture(_bandMask),
+          await capture(_wholeBoxMask),
+          opaque: cover != _translucent,
+          reason: cover.path,
+        );
+      }
+    });
+  }
+
+  testWidgets('masks only the band of the cover the fade changes', (
+    tester,
+  ) async {
+    const dpr = 2.625;
+    tester.view.physicalSize = const Size(1080, 2340);
+    tester.view.devicePixelRatio = dpr;
+    addTearDown(tester.view.reset);
+    final box = Rect.fromLTWH(0, 0, 1080 / dpr, 2340 / dpr * 0.56);
+
+    Future<ShaderMaskLayer> mask(_BuildBackdrop backdrop) async {
+      await tester.pumpWidget(_app(backdrop(_item(_noise), true)));
+      await _waitForImages(tester);
+      final masks = tester.layers.whereType<ShaderMaskLayer>();
+      expect(masks, hasLength(1));
+      return masks.single;
+    }
+
+    expect((await mask(_wholeBoxMask)).maskRect, box);
+    final layer = await mask(_bandMask);
+    final band = layer.maskRect!;
+    expect(band.left, 0);
+    expect(band.right, box.right);
+    expect(band.bottom, box.bottom);
+    // On a whole device pixel, one or two above the first faded row: the
+    // offscreen layer covers 28% of the box instead of all of it.
+    final top = band.top * dpr;
+    expect(top, closeTo(top.roundToDouble(), 1e-9));
+    expect(
+      top,
+      inInclusiveRange(
+        box.height * 0.72 * dpr - 2,
+        box.height * 0.72 * dpr - 1,
+      ),
+    );
+    expect(band.height / box.height, lessThan(0.282));
+
+    // The masked copy draws nothing above the band, so the offscreen
+    // layer holds the band alone.
+    final picture = (layer.firstChild! as PictureLayer).picture!;
+    final width = box.width.ceil();
+    final height = box.height.ceil();
+    final image = picture.toImageSync(width, height);
+    final pixels = (await tester.runAsync(
+      () => image.toByteData(format: ui.ImageByteFormat.rawRgba),
+    ))!;
+    image.dispose();
+    bool rowDrawn(int y) => Iterable.generate(
+      width,
+      (x) => pixels.getUint8((y * width + x) * 4 + 3),
+    ).any((alpha) => alpha > 0);
+    expect(Iterable<int>.generate(band.top.floor()).where(rowDrawn), isEmpty);
+    expect(rowDrawn(band.top.ceil()), isTrue);
+    expect(rowDrawn(box.height.floor() - 1), isTrue);
+  });
+
+  for (final dpr in [1.0, 3.0]) {
+    for (final dragToClose in [false, true]) {
+      testWidgets('the band mask draws the whole-box mask while opening, '
+          'dragging, showing lyrics and closing by '
+          '${dragToClose ? 'drag' : 'button'} at ${dpr}x', (tester) async {
+        final logical = dpr == 1 ? const Size(160, 320) : const Size(120, 260);
+        tester.view.physicalSize = logical * dpr;
+        tester.view.devicePixelRatio = dpr;
+        addTearDown(tester.view.reset);
+
+        final band = await _transitionFrames(
+          tester,
+          _bandMask,
+          dpr: dpr,
+          pageHeight: logical.height,
+          dragToClose: dragToClose,
+        );
+        final whole = await _transitionFrames(
+          tester,
+          _wholeBoxMask,
+          dpr: dpr,
+          pageHeight: logical.height,
+          dragToClose: dragToClose,
+        );
+        expect(band.map((frame) => frame.$1), whole.map((frame) => frame.$1));
+        for (final (index, (label, pixels)) in band.indexed) {
+          final (_, reference) = whole[index];
+          if (label.startsWith(_fading)) {
+            // The opacity reaches the rows above the band directly instead
+            // of through the offscreen copy: two roundings become one.
+            expect(
+              _difference(pixels, reference).max,
+              lessThanOrEqualTo(2),
+              reason: label,
+            );
+          } else {
+            _expectRounding(pixels, reference, opaque: true, reason: label);
+          }
+        }
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
+}
+
+/// Opens the player over a mini player cover, drags it, shows and hides
+/// lyrics, and closes it, capturing the screen along the way.
+Future<List<(String, Uint8List)>> _transitionFrames(
+  WidgetTester tester,
+  _BuildBackdrop backdrop, {
+  required double dpr,
+  required double pageHeight,
+  required bool dragToClose,
+}) async {
+  final navigator = GlobalKey<NavigatorState>();
+  final showArtwork = ValueNotifier(true);
+  addTearDown(showArtwork.dispose);
+  final item = _item(_noise);
+  await tester.pumpWidget(
+    RepaintBoundary(
+      key: _key,
+      child: MaterialApp(
+        navigatorKey: navigator,
+        home: Align(
+          alignment: Alignment.bottomLeft,
+          child: SizedBox.square(
+            dimension: 44,
+            child: Hero(
+              tag: kNowPlayingArtworkHeroTag,
+              child: PlayerArtwork(
+                artUri: item.artUri.toString(),
+                colorScheme: _scheme,
+                cacheWidth: PlayerArtwork.miniCacheWidth,
+              ),
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+  final route = NowPlayingRoute(
+    child: ValueListenableBuilder(
+      valueListenable: showArtwork,
+      builder: (_, show, _) => backdrop(item, show),
+    ),
+  );
+  final frames = <(String, Uint8List)>[];
+  Future<void> capture(String label) async =>
+      frames.add((label, await _capture(tester, dpr)));
+  Future<void> captureEvery(
+    String label,
+    int milliseconds,
+    int end, {
+    bool fading = false,
+  }) async {
+    for (var time = 0; time < end; time += milliseconds) {
+      await capture('${fading ? _fading : ''}$label $time ms');
+      await tester.pump(Duration(milliseconds: milliseconds));
+    }
+    await tester.pumpAndSettle();
+    await capture('$label settled');
+  }
+
+  unawaited(navigator.currentState!.push(route));
+  await tester.pump();
+  await _waitForImages(tester);
+  await captureEvery('opening', 40, 400);
+
+  route
+    ..startDrag()
+    ..updateDrag(
+      DragUpdateDetails(
+        globalPosition: Offset.zero,
+        delta: const Offset(0, 37.3),
+        primaryDelta: 37.3,
+      ),
+      pageHeight,
+    );
+  await tester.pump();
+  await capture('dragged');
+  if (dragToClose) {
+    route.endDrag(
+      DragEndDetails(
+        velocity: const Velocity(pixelsPerSecond: Offset(0, 2000)),
+        primaryVelocity: 2000,
+      ),
+      pageHeight,
+    );
+  } else {
+    route.cancelDrag();
+    await captureEvery('settling', 55, 220);
+    showArtwork.value = false;
+    await captureEvery('lyrics', 50, 300, fading: true);
+    showArtwork.value = true;
+    await captureEvery('cover', 75, 300, fading: true);
+    navigator.currentState!.pop();
+  }
+  await tester.pump();
+  await captureEvery('closing', 40, 300);
+  return frames;
 }
