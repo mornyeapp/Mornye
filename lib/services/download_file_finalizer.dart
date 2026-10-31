@@ -219,7 +219,7 @@ class DownloadFileFinalizer {
     }
     final baseName = fileName?.trim().isNotEmpty == true
         ? fileName!.trim()
-        : File(filePath).uri.pathSegments.last;
+        : downloadSourceFileName(filePath);
     final convertedName = convertedOutputFileName(
       originalFileName: baseName,
       targetFormat: targetFormat,
@@ -304,6 +304,20 @@ class DownloadFileFinalizer {
       return original;
     }
   }
+}
+
+/// The file name of a downloaded file. A SAF document URI has no file name segment: its
+/// last segment is the percent-encoded document id (`primary:Music/Album/Song.flac`), of
+/// which the name is the part after the last `/` and `:`.
+String downloadSourceFileName(String filePath) {
+  if (!isContentUri(filePath)) return File(filePath).uri.pathSegments.last;
+  final segments = Uri.tryParse(filePath)?.pathSegments ?? const <String>[];
+  var name = segments.isEmpty ? filePath : segments.last;
+  for (final separator in const ['/', ':']) {
+    final index = name.lastIndexOf(separator);
+    if (index >= 0 && index + 1 < name.length) name = name.substring(index + 1);
+  }
+  return name;
 }
 
 bool _isMp4Container(String path) {
