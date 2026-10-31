@@ -85,7 +85,8 @@ void main() {
       // Asked after attachment, so an app a media browser started long
       // before it opens still reads the current wallpaper colors.
       final dynamicColors = DynamicColors.request();
-      final orientation = _initializeOrientation();
+      // Awaited before runApp, which reports a failure once.
+      final orientation = _initializeOrientation()..ignore();
       // Desktop: log files and the unclean-exit marker, before the error
       // hooks below start writing to them.
       await DesktopDiagnostics.initialize();
