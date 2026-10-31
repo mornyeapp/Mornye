@@ -70,6 +70,11 @@ part 'main_shell_startup_prompts.dart';
 
 final _log = AppLogger('MainShell');
 
+/// The download count on the Library destination. Only the navigation
+/// chrome watches it, so a finished download does not rebuild every tab.
+int _watchQueuedCount(WidgetRef ref) =>
+    ref.watch(downloadQueueProvider.select((s) => s.queuedCount));
+
 /// The tab at [index] in a style's destination order.
 @visibleForTesting
 ShellTab shellTabAt(
@@ -549,6 +554,20 @@ class _MainShellState extends ConsumerState<MainShell>
     return media.data.viewInsets.bottom > 0;
   }
 
+  /// Whether scrolling may collapse the Mornye tab bar at [width].
+  bool _canMinimizeChromeAt(double width, TextScaler textScaler) =>
+      !isDesktopPlatform &&
+      context.isMornye &&
+      !useNavigationRailForWidth(width) &&
+      textScaler.scale(15) <= 20;
+
+  /// [_canMinimizeChromeAt] for the window now, read without depending on
+  /// its size, so the tab pages' scroll listeners do not rebuild the shell.
+  bool get _canMinimizeChrome {
+    final media = context.getInheritedWidgetOfExactType<MediaQuery>()!.data;
+    return _canMinimizeChromeAt(media.size.width, media.textScaler);
+  }
+
   Future<void> _handleBackPress() async {
     final rootNavigator = Navigator.of(context, rootNavigator: true);
     final handledByRootNavigator = await rootNavigator.maybePop();
@@ -889,9 +908,6 @@ class _MainShellState extends ConsumerState<MainShell>
       settingsProvider.select((s) => s.listeningStatisticsEnabled),
       (_, enabled) => listeningRecorder.setEnabled(enabled),
     );
-    final queueState = ref.watch(
-      downloadQueueProvider.select((s) => s.queuedCount),
-    );
     final showStore = ref.watch(
       settingsProvider.select((s) => s.showExtensionStore),
     );
@@ -949,8 +965,174 @@ class _MainShellState extends ConsumerState<MainShell>
       if (_mornyeSettingsTab) const SettingsTab(key: ValueKey('tab-settings')),
     ];
 
+    final maxIndex = tabs.length - 1;
+    final selectedDestination = _currentIndex.clamp(0, maxIndex);
+    if (_currentIndex > maxIndex) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          setState(() => _currentIndex = maxIndex);
+          if (_pageController.hasClients) {
+            _pageController.jumpToPage(maxIndex);
+          }
+        }
+      });
+    }
+
+    Widget observeScroll(Widget child, int index) =>
+        NotificationListener<ScrollNotification>(
+          onNotification: (notification) {
+            // The chrome stays expanded while the keyboard is up.
+            if (_canMinimizeChrome &&
+                index == _currentIndex &&
+                !_keyboardVisible) {
+              return _mornyeChrome.handleScroll(notification);
+            }
+            return false;
+          },
+          child: child,
+        );
+
+    final pageView = KeyedSubtree(
+      key: _pageViewKey,
+      child: context.isMornye || isAndroidTv
+          ? LazyTabView(
+              index: selectedDestination,
+              preloadKeys: isAndroidTv
+                  ? const {}
+                  : {const ValueKey('tab-search')},
+              children: [
+                for (var index = 0; index < tabs.length; index++)
+                  KeyedSubtree(
+                    key: tabs[index].key,
+                    child: observeScroll(tabs[index], index),
+                  ),
+              ],
+            )
+          : FadeTransition(
+              opacity: _tabJumpOpacity,
+              child: ScaleTransition(
+                scale: _tabJumpScale,
+                child: PageView.builder(
+                  controller: _pageController,
+                  itemCount: tabs.length,
+                  onPageChanged: _onPageChanged,
+                  physics: const NeverScrollableScrollPhysics(),
+                  // TickerMode mutes animations and lets visibility-aware widgets
+                  // (e.g. MotionHeaderBanner) pause when their tab is hidden;
+                  // kept-alive pages otherwise keep running offscreen.
+                  itemBuilder: (context, index) => _KeepAliveTabPage(
+                    key: ValueKey('page-$index'),
+                    child: TickerMode(
+                      enabled: index == _currentIndex,
+                      child: observeScroll(tabs[index], index),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+    );
+
+    // From here only the navigation chrome follows the window size and the
+    // download count. It gets the same tab view each time, so neither
+    // rebuilds the shell or the routes of its tabs; pages read them
+    // themselves.
+    if (isAndroidTv) {
+      return DownloadQueueFeedback(
+        child: BackButtonListener(
+          onBackButtonPressed: () async {
+            await _handleBackPress();
+            return true;
+          },
+          child: Scaffold(
+            body: Consumer(
+              child: SelectionOverlayHost(child: pageView),
+              builder: (context, ref, body) => TvShell(
+                destinations: _navigationDestinations(
+                  queuedCount: _watchQueuedCount(ref),
+                  repoUpdatesCount: repoUpdatesCount,
+                  showStore: showStore,
+                ),
+                selectedIndex: selectedDestination,
+                onSelected: _onNavTap,
+                child: body!,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (isDesktopPlatform) {
+      // Desktop windows: a rail (Material) or source-list sidebar (Mornye)
+      // with a persistent player; no bottom tabs or touch gestures.
+      final mornye = context.isMornye;
+      final selectedTab = _tabForIndex(selectedDestination, showStore);
+      return DownloadQueueFeedback(
+        child: DesktopLinkTransferNotices(
+          child: Scaffold(
+            body: Consumer(
+              // The selection bar floats over the pages, not the sidebar.
+              child: SelectionOverlayHost(child: pageView),
+              builder: (context, ref, body) {
+                final queuedCount = _watchQueuedCount(ref);
+                return DesktopShellLayout(
+                  destinations: _desktopDestinations(
+                    showStore: showStore,
+                    // Mornye shows the queue on its Downloads link instead.
+                    queueCount: mornye ? 0 : queuedCount,
+                    repoUpdatesCount: repoUpdatesCount,
+                  ),
+                  selected: selectedTab,
+                  onSelected: _onShellTabRequested,
+                  libraryLinks: mornye
+                      ? _desktopLibraryLinks(queueCount: queuedCount)
+                      : const [],
+                  // The Material rail opens playlists alone.
+                  onOpenLibraryLink: _openDesktopLibraryLink,
+                  onOpenProfile: mornye ? _openDesktopProfile : null,
+                  body: body!,
+                );
+              },
+            ),
+          ),
+        ),
+      );
+    }
+
+    final shell = SelectionOverlayHost(
+      child: BackButtonListener(
+        onBackButtonPressed: () async {
+          await _handleBackPress();
+          return true;
+        },
+        child: Consumer(
+          child: pageView,
+          builder: (context, ref, pageView) => _mobileScaffold(
+            context,
+            ref,
+            pageView: pageView!,
+            destinations: _navigationDestinations(
+              queuedCount: _watchQueuedCount(ref),
+              repoUpdatesCount: repoUpdatesCount,
+              showStore: showStore,
+            ),
+            selectedDestination: selectedDestination,
+            maxIndex: maxIndex,
+          ),
+        ),
+      ),
+    );
+    return DownloadQueueFeedback(child: shell);
+  }
+
+  /// Phone, tablet and TV destinations, with the download count on Library.
+  List<NavigationDestination> _navigationDestinations({
+    required int queuedCount,
+    required int repoUpdatesCount,
+    required bool showStore,
+  }) {
     final l10n = context.l10n;
-    final destinations = <NavigationDestination>[
+    return <NavigationDestination>[
       NavigationDestination(
         icon: AppIcon(
           context.isMornye ? CupertinoIcons.house_fill : Icons.home_outlined,
@@ -962,22 +1144,22 @@ class _MainShellState extends ConsumerState<MainShell>
         icon: context.isMornye
             ? MornyeNavigationIcon(
                 icon: CupertinoIcons.square_stack_fill,
-                badgeCount: queueState,
+                badgeCount: queuedCount,
               )
             : AnimatedBadge(
-                count: queueState,
+                count: queuedCount,
                 child: Badge(
-                  isLabelVisible: queueState > 0,
-                  label: Text('$queueState'),
+                  isLabelVisible: queuedCount > 0,
+                  label: Text('$queuedCount'),
                   child: const AppIcon(Icons.library_music_outlined),
                 ),
               ),
         selectedIcon: SlidingIcon(
           child: AnimatedBadge(
-            count: queueState,
+            count: queuedCount,
             child: Badge(
-              isLabelVisible: queueState > 0,
-              label: Text('$queueState'),
+              isLabelVisible: queuedCount > 0,
+              label: Text('$queuedCount'),
               child: const AppIcon(Icons.library_music),
             ),
           ),
@@ -1028,20 +1210,18 @@ class _MainShellState extends ConsumerState<MainShell>
           label: l10n.navSettings,
         ),
     ];
+  }
 
-    final maxIndex = tabs.length - 1;
-    final selectedDestination = _currentIndex.clamp(0, maxIndex);
-    if (_currentIndex > maxIndex) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          setState(() => _currentIndex = maxIndex);
-          if (_pageController.hasClients) {
-            _pageController.jumpToPage(maxIndex);
-          }
-        }
-      });
-    }
-
+  /// The phone and tablet chrome around [pageView]: the bottom bar, or the
+  /// rail in wide windows, and the mini player.
+  Widget _mobileScaffold(
+    BuildContext context,
+    WidgetRef ref, {
+    required Widget pageView,
+    required List<NavigationDestination> destinations,
+    required int selectedDestination,
+    required int maxIndex,
+  }) {
     final screenSize = MediaQuery.sizeOf(context);
     final isTablet = screenSize.shortestSide >= 600;
     // Material follows its expanded window class: landscape tablets get the
@@ -1053,286 +1233,164 @@ class _MainShellState extends ConsumerState<MainShell>
         : useMaterialNavigationRailForWidth(screenSize.width);
     final compactMornyeChrome =
         context.isMornye && screenSize.width >= expandedLayoutBreakpoint;
-    final canMinimizeChrome =
-        !isDesktopPlatform &&
-        context.isMornye &&
-        !useNavigationRail &&
-        MediaQuery.textScalerOf(context).scale(15) <= 20;
+    final canMinimizeChrome = _canMinimizeChromeAt(
+      screenSize.width,
+      MediaQuery.textScalerOf(context),
+    );
 
-    Widget observeScroll(Widget child, int index) =>
-        NotificationListener<ScrollNotification>(
-          onNotification: (notification) {
-            // The chrome stays expanded while the keyboard is up.
-            if (canMinimizeChrome &&
-                index == _currentIndex &&
-                !_keyboardVisible) {
-              return _mornyeChrome.handleScroll(notification);
-            }
-            return false;
-          },
-          child: child,
-        );
-
-    final pageView = KeyedSubtree(
-      key: _pageViewKey,
-      child: context.isMornye || isAndroidTv
-          ? LazyTabView(
-              index: selectedDestination,
-              preloadKeys: isAndroidTv
-                  ? const {}
-                  : {const ValueKey('tab-search')},
+    return Scaffold(
+      extendBody: true,
+      // The tab view keeps one element across the rail<->bar structure
+      // swap via _pageViewKey so rotation doesn't remount tab navigators.
+      body: useNavigationRail
+          ? Row(
               children: [
-                for (var index = 0; index < tabs.length; index++)
-                  KeyedSubtree(
-                    key: tabs[index].key,
-                    child: observeScroll(tabs[index], index),
+                SafeArea(
+                  right: false,
+                  bottom: false,
+                  child: ExpressiveNavigationRail(
+                    selectedIndex: selectedDestination,
+                    onDestinationSelected: _onNavTap,
+                    backgroundColor: Theme.of(
+                      context,
+                    ).colorScheme.surfaceContainer,
+                    destinations: destinations,
                   ),
+                ),
+                const VerticalDivider(width: 1),
+                // Width-based layout (centered columns, grids) measures
+                // the space beside the rail rather than the whole screen.
+                Expanded(
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final mediaQuery = MediaQuery.of(context);
+                      return MediaQuery(
+                        data: mediaQuery
+                            .copyWith(
+                              size: Size(
+                                constraints.maxWidth,
+                                mediaQuery.size.height,
+                              ),
+                            )
+                            .removePadding(removeLeft: true),
+                        child: pageView,
+                      );
+                    },
+                  ),
+                ),
               ],
             )
-          : FadeTransition(
-              opacity: _tabJumpOpacity,
-              child: ScaleTransition(
-                scale: _tabJumpScale,
-                child: PageView.builder(
-                  controller: _pageController,
-                  itemCount: tabs.length,
-                  onPageChanged: _onPageChanged,
-                  physics: const NeverScrollableScrollPhysics(),
-                  // TickerMode mutes animations and lets visibility-aware widgets
-                  // (e.g. MotionHeaderBanner) pause when their tab is hidden —
-                  // kept-alive pages otherwise keep running offscreen.
-                  itemBuilder: (context, index) => _KeepAliveTabPage(
-                    key: ValueKey('page-$index'),
-                    child: TickerMode(
-                      enabled: index == _currentIndex,
-                      child: observeScroll(tabs[index], index),
+          : pageView,
+      bottomNavigationBar: Builder(
+        builder: (context) {
+          if (context.isMornye) {
+            return ListenableBuilder(
+              listenable: Listenable.merge([
+                ShellNavigationService.chromeBrightness,
+                ShellNavigationService.chromeSurface,
+              ]),
+              builder: (context, child) => Theme(
+                data: ShellNavigationService.chromeBrightness.value == null
+                    ? Theme.of(context)
+                    : MornyeTheme.fromContext(
+                        context,
+                        brightness:
+                            ShellNavigationService.chromeBrightness.value!,
+                        chromeSurface:
+                            ShellNavigationService.chromeSurface.value,
+                      ),
+                child: child!,
+              ),
+              child: SafeArea(
+                top: false,
+                minimum: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                // iPadOS-style chrome: one compact, centered pill rather
+                // than a bar spread across a landscape tablet.
+                child: Center(
+                  heightFactor: 1,
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxWidth: compactMornyeChrome ? 600 : double.infinity,
                     ),
+                    child: useNavigationRail
+                        ? const MiniPlayer()
+                        : ValueListenableBuilder<bool>(
+                            valueListenable: _mornyeChrome,
+                            builder: (context, collapsed, _) => MornyeBottomBar(
+                              collapsed:
+                                  canMinimizeChrome &&
+                                  collapsed &&
+                                  MediaQuery.viewInsetsOf(context).bottom == 0,
+                              destinations: destinations,
+                              selectedIndex: selectedDestination,
+                              onSelected: _onNavTap,
+                              onHome: () => _onNavTap(0),
+                              onSearch: ShellNavigationService.requestSearch,
+                              blurEnabled: ref.watch(mornyeBlurEnabledProvider),
+                            ),
+                          ),
                   ),
                 ),
               ),
+            );
+          }
+          final blurEnabled = ref.watch(backdropBlurEnabledProvider);
+          // The mini player and the bar read as one surface, so the bar
+          // takes the playing track's artwork scheme too; with nothing
+          // playing both keep the app scheme. Only this scope listens
+          // to the track, so a cover change does not rebuild the shell.
+          return Consumer(
+            builder: (context, ref, child) => PlayerArtworkTheme(
+              artUri: ref.watch(
+                currentMediaItemProvider.select(
+                  (item) => item.value?.artUri?.toString(),
+                ),
+              ),
+              child: child!,
             ),
-    );
-
-    if (isAndroidTv) {
-      return DownloadQueueFeedback(
-        child: BackButtonListener(
-          onBackButtonPressed: () async {
-            await _handleBackPress();
-            return true;
-          },
-          child: Scaffold(
-            body: TvShell(
-              destinations: destinations,
-              selectedIndex: selectedDestination,
-              onSelected: _onNavTap,
-              child: SelectionOverlayHost(child: pageView),
-            ),
-          ),
-        ),
-      );
-    }
-
-    if (isDesktopPlatform) {
-      // Desktop windows: a rail (Material) or source-list sidebar (Mornye)
-      // with a persistent player; no bottom tabs or touch gestures.
-      final mornye = context.isMornye;
-      final selectedTab = _tabForIndex(selectedDestination, showStore);
-      final destinations = _desktopDestinations(
-        showStore: showStore,
-        // Mornye shows the queue on its Downloads link instead.
-        queueCount: mornye ? 0 : queueState,
-        repoUpdatesCount: repoUpdatesCount,
-      );
-      return DownloadQueueFeedback(
-        child: DesktopLinkTransferNotices(
-          child: Scaffold(
-            body: DesktopShellLayout(
-              destinations: destinations,
-              selected: selectedTab,
-              onSelected: _onShellTabRequested,
-              libraryLinks: mornye
-                  ? _desktopLibraryLinks(queueCount: queueState)
-                  : const [],
-              // The Material rail opens playlists alone.
-              onOpenLibraryLink: _openDesktopLibraryLink,
-              onOpenProfile: mornye ? _openDesktopProfile : null,
-              // The selection bar floats over the pages, not the sidebar.
-              body: SelectionOverlayHost(child: pageView),
-            ),
-          ),
-        ),
-      );
-    }
-
-    final shell = SelectionOverlayHost(
-      child: BackButtonListener(
-        onBackButtonPressed: () async {
-          await _handleBackPress();
-          return true;
-        },
-        child: Scaffold(
-          extendBody: true,
-          // The tab view keeps one element across the rail<->bar structure
-          // swap via _pageViewKey so rotation doesn't remount tab navigators.
-          body: useNavigationRail
-              ? Row(
+            child: Builder(
+              builder: (context) {
+                final bottomBar = Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    SafeArea(
-                      right: false,
-                      bottom: false,
-                      child: ExpressiveNavigationRail(
-                        selectedIndex: selectedDestination,
+                    const MiniPlayer(),
+                    // The bar's container fill separates it; no divider,
+                    // so the mini player and the bar read as one surface.
+                    if (!useNavigationRail)
+                      ExpressiveNavigationBar(
+                        selectedIndex: _currentIndex.clamp(0, maxIndex),
                         onDestinationSelected: _onNavTap,
-                        backgroundColor: Theme.of(
+                        isTablet: isTablet,
+                        backgroundColor: settingsGroupColor(
                           context,
-                        ).colorScheme.surfaceContainer,
+                        ).withValues(alpha: 0.72),
                         destinations: destinations,
                       ),
-                    ),
-                    const VerticalDivider(width: 1),
-                    // Width-based layout (centered columns, grids) measures
-                    // the space beside the rail rather than the whole screen.
-                    Expanded(
-                      child: LayoutBuilder(
-                        builder: (context, constraints) {
-                          final mediaQuery = MediaQuery.of(context);
-                          return MediaQuery(
-                            data: mediaQuery
-                                .copyWith(
-                                  size: Size(
-                                    constraints.maxWidth,
-                                    mediaQuery.size.height,
-                                  ),
-                                )
-                                .removePadding(removeLeft: true),
-                            child: pageView,
-                          );
-                        },
-                      ),
-                    ),
                   ],
-                )
-              : pageView,
-          bottomNavigationBar: Builder(
-            builder: (context) {
-              if (context.isMornye) {
-                return ListenableBuilder(
-                  listenable: Listenable.merge([
-                    ShellNavigationService.chromeBrightness,
-                    ShellNavigationService.chromeSurface,
-                  ]),
-                  builder: (context, child) => Theme(
-                    data: ShellNavigationService.chromeBrightness.value == null
-                        ? Theme.of(context)
-                        : MornyeTheme.fromContext(
-                            context,
-                            brightness:
-                                ShellNavigationService.chromeBrightness.value!,
-                            chromeSurface:
-                                ShellNavigationService.chromeSurface.value,
-                          ),
-                    child: child!,
-                  ),
-                  child: SafeArea(
-                    top: false,
-                    minimum: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-                    // iPadOS-style chrome: one compact, centered pill rather
-                    // than a bar spread across a landscape tablet.
-                    child: Center(
-                      heightFactor: 1,
-                      child: ConstrainedBox(
-                        constraints: BoxConstraints(
-                          maxWidth: compactMornyeChrome ? 600 : double.infinity,
-                        ),
-                        child: useNavigationRail
-                            ? const MiniPlayer()
-                            : ValueListenableBuilder<bool>(
-                                valueListenable: _mornyeChrome,
-                                builder: (context, collapsed, _) =>
-                                    MornyeBottomBar(
-                                      collapsed:
-                                          canMinimizeChrome &&
-                                          collapsed &&
-                                          MediaQuery.viewInsetsOf(
-                                                context,
-                                              ).bottom ==
-                                              0,
-                                      destinations: destinations,
-                                      selectedIndex: selectedDestination,
-                                      onSelected: _onNavTap,
-                                      onHome: () => _onNavTap(0),
-                                      onSearch:
-                                          ShellNavigationService.requestSearch,
-                                      blurEnabled: ref.watch(
-                                        mornyeBlurEnabledProvider,
-                                      ),
-                                    ),
-                              ),
-                      ),
-                    ),
+                );
+                // The backdrop blur re-filters everything scrolling
+                // underneath on every frame; low-end devices get an
+                // opaque base instead unless the user forces blur on in
+                // appearance settings.
+                if (!blurEnabled) {
+                  return ColoredBox(
+                    color: settingsGroupColor(context),
+                    child: bottomBar,
+                  );
+                }
+                return ClipRect(
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                    blendMode: BlendMode.src,
+                    child: bottomBar,
                   ),
                 );
-              }
-              final blurEnabled = ref.watch(backdropBlurEnabledProvider);
-              // The mini player and the bar read as one surface, so the bar
-              // takes the playing track's artwork scheme too; with nothing
-              // playing both keep the app scheme. Only this scope listens
-              // to the track, so a cover change does not rebuild the shell.
-              return Consumer(
-                builder: (context, ref, child) => PlayerArtworkTheme(
-                  artUri: ref.watch(
-                    currentMediaItemProvider.select(
-                      (item) => item.value?.artUri?.toString(),
-                    ),
-                  ),
-                  child: child!,
-                ),
-                child: Builder(
-                  builder: (context) {
-                    final bottomBar = Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const MiniPlayer(),
-                        // The bar's container fill separates it; no divider,
-                        // so the mini player and the bar read as one surface.
-                        if (!useNavigationRail)
-                          ExpressiveNavigationBar(
-                            selectedIndex: _currentIndex.clamp(0, maxIndex),
-                            onDestinationSelected: _onNavTap,
-                            isTablet: isTablet,
-                            backgroundColor: settingsGroupColor(
-                              context,
-                            ).withValues(alpha: 0.72),
-                            destinations: destinations,
-                          ),
-                      ],
-                    );
-                    // The backdrop blur re-filters everything scrolling
-                    // underneath on every frame; low-end devices get an
-                    // opaque base instead unless the user forces blur on in
-                    // appearance settings.
-                    if (!blurEnabled) {
-                      return ColoredBox(
-                        color: settingsGroupColor(context),
-                        child: bottomBar,
-                      );
-                    }
-                    return ClipRect(
-                      child: BackdropFilter(
-                        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                        blendMode: BlendMode.src,
-                        child: bottomBar,
-                      ),
-                    );
-                  },
-                ),
-              );
-            },
-          ),
-        ),
+              },
+            ),
+          );
+        },
       ),
     );
-    return DownloadQueueFeedback(child: shell);
   }
 }
 
