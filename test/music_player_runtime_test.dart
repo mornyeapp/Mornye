@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:audio_service/audio_service.dart';
@@ -209,8 +210,14 @@ class _SessionStore implements AppStateDatabase {
   @override
   Future<Map<String, dynamic>?> getPlaybackSession() async => null;
   @override
-  Future<void> savePlaybackSession(Map<String, dynamic> session) async {
-    persistedPositionMs = session['positionMs'] as int?;
+  Future<void> savePlaybackSession({
+    required Uint8List mediaJson,
+    required int index,
+    required int positionMs,
+    required bool shuffle,
+    required String repeatMode,
+  }) async {
+    persistedPositionMs = positionMs;
   }
 
   @override
@@ -239,9 +246,21 @@ class _PositionLog extends _SessionStore {
   final positions = <int>[];
 
   @override
-  Future<void> savePlaybackSession(Map<String, dynamic> session) async {
-    positions.add(session['positionMs'] as int? ?? 0);
-    await super.savePlaybackSession(session);
+  Future<void> savePlaybackSession({
+    required Uint8List mediaJson,
+    required int index,
+    required int positionMs,
+    required bool shuffle,
+    required String repeatMode,
+  }) async {
+    positions.add(positionMs);
+    await super.savePlaybackSession(
+      mediaJson: mediaJson,
+      index: index,
+      positionMs: positionMs,
+      shuffle: shuffle,
+      repeatMode: repeatMode,
+    );
   }
 
   @override
@@ -272,9 +291,28 @@ class _ResumeSessionStore extends _SessionStore {
   Future<Map<String, dynamic>?> getPlaybackSession() async => active;
 
   @override
-  Future<void> savePlaybackSession(Map<String, dynamic> session) async {
-    await super.savePlaybackSession(session);
-    active = session;
+  Future<void> savePlaybackSession({
+    required Uint8List mediaJson,
+    required int index,
+    required int positionMs,
+    required bool shuffle,
+    required String repeatMode,
+  }) async {
+    await super.savePlaybackSession(
+      mediaJson: mediaJson,
+      index: index,
+      positionMs: positionMs,
+      shuffle: shuffle,
+      repeatMode: repeatMode,
+    );
+    active = {
+      'version': 2,
+      'media': jsonDecode(utf8.decode(mediaJson)),
+      'index': index,
+      'positionMs': positionMs,
+      'shuffle': shuffle,
+      'repeat': repeatMode,
+    };
   }
 
   @override

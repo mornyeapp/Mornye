@@ -428,14 +428,53 @@ class AppStateDatabase {
     return null;
   }
 
-  Future<void> savePlaybackSession(Map<String, dynamic> session) async {
-    final db = await database;
-    await db.insert(
-      _playbackSessionTable,
-      _playbackSessionRow(session),
-      conflictAlgorithm: ConflictAlgorithm.replace,
+  /// Replaces the saved session in one statement. [mediaJson] is the UTF-8
+  /// JSON of its media list, stored as the same `media_json` text.
+  Future<void> savePlaybackSession({
+    required Uint8List mediaJson,
+    required int index,
+    required int positionMs,
+    required bool shuffle,
+    required String repeatMode,
+  }) async => writePlaybackSession(
+    await database,
+    mediaJson: mediaJson,
+    index: index,
+    positionMs: positionMs,
+    shuffle: shuffle,
+    repeatMode: repeatMode,
+  );
+
+  @visibleForTesting
+  static Future<void> writePlaybackSession(
+    Database db, {
+    required Uint8List mediaJson,
+    required int index,
+    required int positionMs,
+    required bool shuffle,
+    required String repeatMode,
+  }) async {
+    // Bytes cross the platform channel as one copy; SQLite reads them as
+    // text in the database encoding, which only UTF-8 matches.
+    final utf8Text = _utf8Databases[db] ??=
+        (await db.rawQuery('PRAGMA encoding')).single.values.single == 'UTF-8';
+    await db.rawInsert(
+      'INSERT OR REPLACE INTO $_playbackSessionTable '
+      '(id, media_json, current_index, position_ms, shuffle, repeat_mode, '
+      'updated_at) '
+      'VALUES (1, ${utf8Text ? 'CAST(? AS TEXT)' : '?'}, ?, ?, ?, ?, ?)',
+      [
+        utf8Text ? mediaJson : utf8.decode(mediaJson),
+        index,
+        positionMs,
+        shuffle ? 1 : 0,
+        repeatMode,
+        DateTime.now().toIso8601String(),
+      ],
     );
   }
+
+  static final _utf8Databases = Expando<bool>('UTF-8 database');
 
   Future<bool> updatePlaybackSessionState({
     required int index,

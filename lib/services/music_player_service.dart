@@ -1154,21 +1154,20 @@ class MusicPlayerHandler extends BaseAudioHandler
 
   void _markSessionQueueChanged() => _sessionWriter.queueChanged();
 
-  List<Map<String, dynamic>> _sessionMedia() {
+  PlaybackSessionQueue _sessionQueue() {
+    final media = List.of(_media);
     final original = _originalQueueOrder;
+    if (original == null) return (media: media, originalIndices: null);
     final ranks = Map<MediaItem, int>.identity();
-    if (original != null) {
-      for (var i = 0; i < original.length; i++) {
-        ranks[original[i]] = i;
-      }
+    for (var i = 0; i < original.length; i++) {
+      ranks[original[i]] = i;
     }
-    return [
-      for (var i = 0; i < _media.length; i++)
-        {
-          ..._media[i].toJson(),
-          'queueOriginalIndex': ranks[_queueItems[i]] ?? i,
-        },
-    ];
+    return (
+      media: media,
+      originalIndices: [
+        for (var i = 0; i < _media.length; i++) ranks[_queueItems[i]] ?? i,
+      ],
+    );
   }
 
   void _applyQueueOrder(List<MediaItem> order) {
@@ -1265,7 +1264,7 @@ class MusicPlayerHandler extends BaseAudioHandler
       return _sessionWriter.clear();
     }
     return _sessionWriter.persist(
-      serializeQueue: _sessionMedia,
+      queue: _sessionQueue,
       index: _index,
       position: position ?? Duration.zero,
       shuffle: _shuffle,
