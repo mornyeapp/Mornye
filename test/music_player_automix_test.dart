@@ -8,6 +8,7 @@ import 'package:mornye/models/settings.dart';
 import 'package:mornye/services/playback_notification.dart';
 import 'package:mornye/models/automix_options.dart';
 import 'package:mornye/services/automix_status.dart';
+import 'package:mornye/services/playback_deck.dart';
 
 import 'support/music_player_automix_harness.dart';
 
@@ -1351,4 +1352,324 @@ void main() {
     expect(native.live, {'music-player'});
     expect(analyzer.calls, isEmpty);
   });
+
+  const four = PlayableMedia(
+    id: 'four',
+    source: '/four.flac',
+    title: 'Four',
+    artist: 'Artist',
+  );
+
+  void setLengths(Duration length) {
+    for (final track in [..._tracks, four]) {
+      native.durations[track.source] = length.inMilliseconds;
+    }
+  }
+
+  /// Plays deck [id] on from [milliseconds], its position following the
+  /// clock as a song does.
+  void playFrom(int milliseconds, [String id = 'music-player']) {
+    native.positions[id] = milliseconds;
+    native.clocks[id] = time.stopwatch()..start();
+  }
+
+  /// Waits for [ready] while the songs play, up to [limit] of their time.
+  Future<void> playUntil(bool Function() ready, Duration limit) async {
+    final clock = time.stopwatch()..start();
+    while (!ready()) {
+      if (clock.elapsed > limit) {
+        fail('Playback did not reach the expected state');
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    }
+  }
+
+  List<String> mixDecks() => [
+    for (final call in native.calls)
+      if (call.$2 == 'create' && call.$1.startsWith('music-mix-')) call.$1,
+  ];
+
+  /// Where [outgoing] was when [incoming] began to play, and how [incoming]
+  /// was cued: the start, cue and rate of the plan.
+  ({int at, int cue, double rate}) mixStart(
+    String incoming, [
+    String outgoing = 'music-player',
+  ]) {
+    Map<Object?, Object?> first(String method) => native.calls
+        .firstWhere((call) => call.$1 == incoming && call.$2 == method)
+        .$3;
+    return (
+      at: native.positionsAtResume[incoming]![outgoing]!,
+      cue: first('seek')['position']! as int,
+      rate: (first('setPlaybackRate')['playbackRate']! as num).toDouble(),
+    );
+  }
+
+  fakeTimeTest('a long song prepares its mix only in its last 150 s', () async {
+    setLengths(const Duration(minutes: 4));
+    setAutoMixEnabled(true);
+    await handler.setQueueAndPlay(_tracks);
+    native.positions['music-player'] = 89000;
+    await Future<void>.delayed(const Duration(seconds: 2));
+    expect(analyzer.calls, isEmpty);
+    expect(native.live, {'music-player'});
+    expect(autoMixPreparing.value, isFalse);
+
+    native.positions['music-player'] = 90500;
+    await _until(() => native.calls.any((c) => c.$2 == 'setPlaybackRate'));
+    expect(analyzer.calls, ['/one.flac', '/two.flac']);
+    expect(mixDecks(), hasLength(1));
+    native.positions['music-player'] = 235000;
+    await _until(() => handler.mediaItem.value?.id == 'two');
+  });
+
+  fakeTimeTest(
+    'songs skipped before their last 150 s decode and open nothing',
+    () async {
+      setLengths(const Duration(minutes: 4));
+      setAutoMixEnabled(true);
+      await handler.setQueueAndPlay([..._tracks, four]);
+      native.positions['music-player'] = 10000;
+      await Future<void>.delayed(const Duration(seconds: 1));
+      await handler.skipToNext();
+      native.positions['music-player'] = 60000;
+      await Future<void>.delayed(const Duration(seconds: 1));
+      await handler.skipToNext();
+      native.positions['music-player'] = 85000;
+      await Future<void>.delayed(const Duration(seconds: 1));
+      expect(handler.mediaItem.value?.id, 'three');
+      expect(analyzer.calls, isEmpty);
+      expect(mixDecks(), isEmpty);
+
+      native.positions['music-player'] = 200000;
+      await _until(() => native.calls.any((c) => c.$2 == 'setPlaybackRate'));
+      expect(analyzer.calls, ['/three.flac', '/four.flac']);
+      expect(mixDecks(), hasLength(1));
+      native.positions['music-player'] = 235000;
+      await _until(() => handler.mediaItem.value?.id == 'four');
+      expect(analyzer.calls, hasLength(2));
+      expect(mixDecks(), hasLength(1));
+    },
+  );
+
+  fakeTimeTest('a short song still prepares in its first seconds', () async {
+    setLengths(const Duration(seconds: 150));
+    setAutoMixEnabled(true);
+    await handler.setQueueAndPlay(_tracks);
+    await Future<void>.delayed(const Duration(milliseconds: 400));
+    expect(analyzer.calls, ['/one.flac', '/two.flac']);
+    expect(mixDecks(), hasLength(1));
+  });
+
+  fakeTimeTest('preparation is reported until it ends or is dropped', () async {
+    analyzer.pending = Completer<AutoMixBeatGrid?>();
+    setAutoMixEnabled(true);
+    await handler.setQueueAndPlay(_tracks);
+    await _until(() => analyzer.calls.isNotEmpty);
+    expect(autoMixPreparing.value, isTrue);
+    analyzer.pending!.complete(null);
+    analyzer.pending = null;
+    await _until(() => native.calls.any((c) => c.$2 == 'setPlaybackRate'));
+    await _until(() => !autoMixPreparing.value);
+
+    analyzer.pending = Completer<AutoMixBeatGrid?>();
+    await handler.skipToNext();
+    await _until(() => analyzer.calls.length == 3);
+    expect(autoMixPreparing.value, isTrue);
+    await handler.skipToNext();
+    expect(autoMixPreparing.value, isFalse);
+    await handler.skipToPrevious();
+    await _until(() => analyzer.calls.length == 4);
+    expect(autoMixPreparing.value, isTrue);
+    await handler.dispose();
+    expect(autoMixPreparing.value, isFalse);
+  });
+
+  fakeTimeTest('a long song mixes at its planned moment', () async {
+    setLengths(const Duration(seconds: 200));
+    setAutoMixEnabled(true);
+    await handler.setQueueAndPlay(_tracks);
+    playFrom(0);
+    await playUntil(
+      () => handler.mediaItem.value?.id == 'two',
+      const Duration(seconds: 200),
+    );
+    final start = mixStart(mixDecks().single);
+    expect(start.at, inInclusiveRange(195000, 195100));
+    expect(start.cue, 0);
+    expect(start.rate, 1);
+  });
+
+  fakeTimeTest('a long beat-matched song mixes on its planned beat', () async {
+    analyzer.matchBeats = true;
+    setLengths(const Duration(seconds: 200));
+    setAutoMixEnabled(true);
+    await handler.setQueueAndPlay(_tracks);
+    playFrom(0);
+    await playUntil(
+      () => handler.mediaItem.value?.id == 'two',
+      const Duration(seconds: 200),
+    );
+    final start = mixStart(mixDecks().single);
+    // 176.17 s (outro window plus phase) and 39 beats of 0.5 s, 4 s from
+    // the end.
+    expect(start.at, inInclusiveRange(195670, 195770));
+    expect(start.cue, 170);
+    expect(start.rate, closeTo(120 / 124, 1e-9));
+    expect(autoMixStatus.value, AutoMixStatus.mixing);
+  });
+
+  fakeTimeTest(
+    'a seek into the last 150 s prepares and mixes on time',
+    () async {
+      setLengths(const Duration(minutes: 4));
+      setAutoMixEnabled(true);
+      await handler.setQueueAndPlay(_tracks);
+      playFrom(0);
+      await Future<void>.delayed(const Duration(seconds: 1));
+      await handler.seek(const Duration(seconds: 200));
+      await playUntil(
+        () => handler.mediaItem.value?.id == 'two',
+        const Duration(seconds: 40),
+      );
+      final start = mixStart(mixDecks().last);
+      expect(start.at, inInclusiveRange(235000, 235100));
+      expect(start.cue, 0);
+      expect(start.rate, 1);
+    },
+  );
+
+  fakeTimeTest(
+    'a seek back out of the last 150 s drops the mix until it returns',
+    () async {
+      setLengths(const Duration(minutes: 4));
+      setAutoMixEnabled(true);
+      await handler.setQueueAndPlay(_tracks);
+      playFrom(100000);
+      await _until(() => native.calls.any((c) => c.$2 == 'setPlaybackRate'));
+      final dropped = native.prepared;
+      expect(analyzer.calls, hasLength(2));
+
+      await handler.seek(const Duration(seconds: 30));
+      await Future<void>.delayed(const Duration(seconds: 2));
+      expect(native.live, {'music-player'});
+      expect(native.live, isNot(contains(dropped)));
+      expect(analyzer.calls, hasLength(2));
+
+      await handler.seek(const Duration(seconds: 89));
+      await Future<void>.delayed(const Duration(milliseconds: 600));
+      expect(analyzer.calls, hasLength(2));
+      await Future<void>.delayed(const Duration(seconds: 2));
+      expect(analyzer.calls, hasLength(4));
+      await playUntil(
+        () => handler.mediaItem.value?.id == 'two',
+        const Duration(seconds: 150),
+      );
+      expect(mixStart(mixDecks().last).at, inInclusiveRange(235000, 235100));
+    },
+  );
+
+  fakeTimeTest('a mix after a beat-matched one starts on time', () async {
+    analyzer.matchBeats = true;
+    setAutoMixEnabled(true);
+    await handler.setQueueAndPlay(_tracks);
+    playFrom(0);
+    await playUntil(
+      () => handler.mediaItem.value?.id == 'two',
+      const Duration(seconds: 60),
+    );
+    final second = mixDecks().single;
+    expect(mixStart(second).at, inInclusiveRange(55670, 55770));
+    expect(handler.playbackState.value.speed, closeTo(120 / 124, 1e-9));
+    // The second song plays slowed while the first fades, then recovers
+    // before its own mix is prepared.
+    await playUntil(() => mixDecks().length == 2, const Duration(seconds: 20));
+    expect(handler.playbackState.value.speed, 1);
+    await playUntil(
+      () => handler.mediaItem.value?.id == 'three',
+      const Duration(seconds: 60),
+    );
+    expect(
+      mixStart(mixDecks().last, second).at,
+      inInclusiveRange(55670, 55770),
+    );
+    expect(analyzer.calls, hasLength(4));
+  });
+
+  fakeTimeTest(
+    'a queue edit before the last 150 s costs no preparation',
+    () async {
+      setLengths(const Duration(minutes: 4));
+      setAutoMixEnabled(true);
+      await handler.setQueueAndPlay(_tracks);
+      playFrom(0);
+      await Future<void>.delayed(const Duration(seconds: 10));
+      await handler.enqueue(four, playNext: true);
+      await Future<void>.delayed(const Duration(seconds: 5));
+      expect(analyzer.calls, isEmpty);
+      await handler.seek(const Duration(seconds: 100));
+      await _until(() => native.calls.any((c) => c.$2 == 'setPlaybackRate'));
+      expect(analyzer.calls, ['/one.flac', '/four.flac']);
+      final incoming = native.prepared;
+      expect(native.sources[incoming], '/four.flac');
+      await playUntil(
+        () => handler.mediaItem.value?.id == 'four',
+        const Duration(seconds: 140),
+      );
+      expect(mixStart(incoming).at, inInclusiveRange(235000, 235100));
+    },
+  );
+
+  fakeTimeTest('repeat all prepares the wrap in the last 150 s', () async {
+    setLengths(const Duration(minutes: 4));
+    setAutoMixEnabled(true);
+    await handler.setRepeatMode(AudioServiceRepeatMode.all);
+    await handler.setQueueAndPlay(_tracks.take(2).toList());
+    await handler.skipToNext();
+    native.positions['music-player'] = 60000;
+    await Future<void>.delayed(const Duration(seconds: 1));
+    expect(analyzer.calls, isEmpty);
+    native.positions['music-player'] = 200000;
+    await _until(() => native.calls.any((c) => c.$2 == 'setPlaybackRate'));
+    expect(analyzer.calls, ['/two.flac', '/one.flac']);
+    native.positions['music-player'] = 235000;
+    await _until(() => handler.mediaItem.value?.id == 'one');
+  });
+
+  fakeTimeTest('exclusive output keeps the last 150 s unmixed', () async {
+    setLengths(const Duration(minutes: 4));
+    setAutoMixEnabled(true);
+    // Settings changes set it from the exclusive output setting.
+    playbackExclusiveOutput.value = true;
+    addTearDown(() => playbackExclusiveOutput.value = false);
+    await handler.setQueueAndPlay(_tracks);
+    native.positions['music-player'] = 200000;
+    await Future<void>.delayed(const Duration(seconds: 1));
+    expect(analyzer.calls, isEmpty);
+    expect(native.live, {'music-player'});
+    playbackExclusiveOutput.value = false;
+    await _until(() => native.calls.any((c) => c.$2 == 'setPlaybackRate'));
+    expect(analyzer.calls, ['/one.flac', '/two.flac']);
+  });
+
+  fakeTimeTest(
+    'a next song that arrives before the last 150 s is mixed in',
+    () async {
+      setLengths(const Duration(minutes: 4));
+      final arrived = Completer<void>();
+      musicPlayerRuntime.streamWhileArriving(
+        '/two.flac',
+        url: 'http://127.0.0.1:1/two.flac',
+        done: arrived.future,
+      );
+      setAutoMixEnabled(true);
+      await handler.setQueueAndPlay(_tracks);
+      native.positions['music-player'] = 10000;
+      await Future<void>.delayed(const Duration(seconds: 1));
+      arrived.complete();
+      native.positions['music-player'] = 200000;
+      await _until(() => native.calls.any((c) => c.$2 == 'setPlaybackRate'));
+      expect(native.sources[native.prepared], '/two.flac');
+    },
+  );
 }

@@ -10,6 +10,11 @@ Stopwatch Function() autoMixStopwatch = Stopwatch.new;
 class _MusicAutoMix {
   _MusicAutoMix(this.handler, this.analyzer, this.renderer);
 
+  /// How long before the end of a song its mix is prepared. A plan starts
+  /// within the last minute (the longest fade), which leaves preparation
+  /// at least 90 s, and a song skipped earlier prepares nothing.
+  static const lead = Duration(seconds: 150);
+
   final MusicPlayerHandler handler;
   final AutoMixAnalyzer analyzer;
   final AutoMixEffectRenderer renderer;
@@ -45,6 +50,13 @@ class _MusicAutoMix {
     }
   }
 
+  void _setPreparing(bool preparing) {
+    _preparing = preparing;
+    if (identical(musicPlayerRuntime.handler, handler)) {
+      autoMixPreparing.value = preparing;
+    }
+  }
+
   String _beatSummary(AutoMixBeatGrid? grid) => grid == null
       ? 'unavailable'
       : '${grid.bpm.toStringAsFixed(2)} BPM/${grid.confidence.toStringAsFixed(3)} confidence';
@@ -77,10 +89,12 @@ class _MusicAutoMix {
       _playGeneration == handler._playRequestGeneration &&
       _queueRevision == handler._sessionQueueRevision;
 
-  /// Whether [onPosition] would act now: a planned mix times its start from
-  /// every position, and a song not yet planned starts its analysis. Keep
-  /// in step with the early returns of [onPosition].
-  bool get wantsPosition {
+  /// Whether [onPosition] would act on a position near [estimate]: a planned
+  /// mix times its start from every position, and a song not yet planned
+  /// starts its analysis once [lead] remains. A second of slack keeps the
+  /// tick that crosses [lead] read. Keep in step with the early returns of
+  /// [onPosition].
+  bool wantsPosition(Duration estimate) {
     if (!_canMix || _cancelling > 0 || _starting || _fadeTimer != null) {
       return false;
     }
@@ -89,6 +103,7 @@ class _MusicAutoMix {
     final duration = handler.mediaItem.value?.duration;
     return duration != null &&
         duration >= const Duration(seconds: 20) &&
+        duration - estimate <= lead + const Duration(seconds: 1) &&
         _attempt !=
             '${handler._playRequestGeneration}:${handler._sessionQueueRevision}';
   }
@@ -111,7 +126,11 @@ class _MusicAutoMix {
     }
     if (_preparing) return;
     final duration = handler.mediaItem.value?.duration;
-    if (duration == null || duration < const Duration(seconds: 20)) return;
+    if (duration == null ||
+        duration < const Duration(seconds: 20) ||
+        duration - position > lead) {
+      return;
+    }
     final key =
         '${handler._playRequestGeneration}:${handler._sessionQueueRevision}';
     if (_attempt == key) return;
@@ -120,7 +139,7 @@ class _MusicAutoMix {
   }
 
   Future<void> _prepare(Duration duration) async {
-    _preparing = true;
+    _setPreparing(true);
     final generation = ++_generation;
     _playGeneration = handler._playRequestGeneration;
     _queueRevision = handler._sessionQueueRevision;
@@ -246,7 +265,7 @@ class _MusicAutoMix {
       if (effectDeck != null) await handler._disposeDeck(effectDeck);
       if (effectTail != null) await effectTail.dispose();
       _preparationPins.remove(generation);
-      if (generation == _generation) _preparing = false;
+      if (generation == _generation) _setPreparing(false);
       await handler._cleanupPendingResolvedPaths();
     }
   }
@@ -679,7 +698,7 @@ class _MusicAutoMix {
     _next = null;
     _nextPath = null;
     _nextDuration = null;
-    _preparing = false;
+    _setPreparing(false);
     _starting = false;
     _attempt = null;
     try {

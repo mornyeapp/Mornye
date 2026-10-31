@@ -105,6 +105,12 @@ class AudioNative {
   final missingPositions = <String>{};
   final positionReplies = <String, Completer<int?>>{};
   final nextPlayers = <String, String>{};
+
+  /// Song lengths in milliseconds by source; a minute otherwise.
+  final durations = <String, int>{};
+
+  /// The position of every playing deck at the moment each deck resumed.
+  final positionsAtResume = <String, Map<String, int>>{};
   bool emitsDuration = true;
 
   /// Ends [id]'s song the way the forks do: a chained next player starts
@@ -165,7 +171,11 @@ class AudioNative {
               preparedContents[id] = sourceContents[source] ?? source;
             }
             unawaited(event(id, 'audio.onPrepared', true));
-            if (emitsDuration) unawaited(event(id, 'audio.onDuration', 60000));
+            if (emitsDuration) {
+              unawaited(
+                event(id, 'audio.onDuration', durations[source] ?? 60000),
+              );
+            }
           case 'seek':
             if (!ignoredSeeks.contains(id)) {
               positions[id] = args['position']! as int;
@@ -193,6 +203,9 @@ class AudioNative {
               await error(id);
               return null;
             }
+            positionsAtResume[id] = {
+              for (final other in playing) other: currentPosition(other),
+            };
             playing.add(id);
             resumedSources.add(sources[id]!);
             if (id.startsWith('music-mix-') || id.startsWith('music-effect-')) {
@@ -211,7 +224,7 @@ class AudioNative {
             playing.remove(id);
             live.remove(id);
           case 'getDuration':
-            return 60000;
+            return durations[sources[id]] ?? 60000;
           case 'getCurrentPosition':
             if (positionReplies[id] case final reply?) return reply.future;
             if (missingPositions.contains(id)) return null;

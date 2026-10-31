@@ -987,13 +987,13 @@ class MusicPlayerHandler extends BaseAudioHandler
         now - readAt < _positionBroadcastInterval - _positionQueryAllowance &&
         persistedAt != null &&
         DateTime.now().difference(persistedAt) <
-            _positionPersistInterval - _positionQueryAllowance &&
-        !_autoMix.wantsPosition &&
-        !_gapless.wantsPosition(
-          _lastBroadcastPosition + (now - readAt) * _autoMix.rate,
-        ) &&
-        !_autoplay.wouldFill) {
-      return false;
+            _positionPersistInterval - _positionQueryAllowance) {
+      final estimate = _lastBroadcastPosition + (now - readAt) * _autoMix.rate;
+      if (!_autoMix.wantsPosition(estimate) &&
+          !_gapless.wantsPosition(estimate) &&
+          !_autoplay.wouldFill) {
+        return false;
+      }
     }
     _positionQueriedAt = now;
     return true;
@@ -2516,6 +2516,7 @@ class MusicPlayerHandler extends BaseAudioHandler
     if (_dependencies.isIOS) WidgetsBinding.instance.removeObserver(this);
     if (identical(musicPlayerRuntime.handler, this)) {
       autoMixStatus.value = AutoMixStatus.idle;
+      autoMixPreparing.value = false;
     }
     _runtime.detach(this);
     cancelSleepTimer();

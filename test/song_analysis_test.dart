@@ -6,6 +6,7 @@ import 'package:audio_service/audio_service.dart' show MediaItem;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:mornye/models/settings.dart';
+import 'package:mornye/services/automix_status.dart';
 import 'package:mornye/services/autoplay_sound_signal.dart';
 import 'package:mornye/services/playable_media.dart';
 import 'package:mornye/services/song_analysis.dart';
@@ -78,6 +79,8 @@ class _Waits {
 PlayableMedia _media(String source) =>
     PlayableMedia(id: source, source: source, title: source, artist: 'A');
 
+bool _idle() => false;
+
 MediaItem _playing(String source) => MediaItem(
   id: source,
   title: source,
@@ -123,10 +126,13 @@ void main() {
     );
   }
 
+  /// [busy] null keeps the analysis's own check of AutoMix and song starts.
   (SongAnalysis, SongAnalysisStore) create({
     SongAnalysisSweep sweep = SongAnalysisSweep.whileCharging,
     bool isAndroid = true,
     AppSettings settings = const AppSettings(songAnalysis: true),
+    bool Function()? busy = _idle,
+    Future<void> Function(Duration)? wait,
   }) {
     final store = openStore();
     final analysis = SongAnalysis(
@@ -138,8 +144,8 @@ void main() {
       ],
       stamp: (path) async => files[path],
       isCharging: () async => charging,
-      busy: () => false,
-      wait: waits.call,
+      busy: busy,
+      wait: wait ?? waits.call,
       sweep: sweep,
       isAndroid: isAndroid,
     )..configure(settings);
@@ -232,6 +238,52 @@ void main() {
     analysis.configure(settings.copyWith(songAnalysis: true));
     expect(await waits.next(), const Duration(minutes: 30));
     expect(analyzer.calls, ['/a.flac', '/a.flac', '/b.flac']);
+  });
+
+  group('while AutoMix prepares a mix', () {
+    var rechecks = 0;
+
+    /// Busy rechecks pass after an event-loop turn; the second one finds
+    /// AutoMix done.
+    Future<void> wait(Duration delay) {
+      if (delay != const Duration(seconds: 15)) return waits.call(delay);
+      if (++rechecks == 2) autoMixPreparing.value = false;
+      return Future<void>.delayed(Duration.zero);
+    }
+
+    setUp(() {
+      rechecks = 0;
+      autoMixPreparing.value = true;
+      addTearDown(() => autoMixPreparing.value = false);
+    });
+
+    test('the Library sweep waits', () async {
+      final (analysis, _) = create(
+        settings: const AppSettings(
+          songAnalysis: true,
+          songAnalysisOnlyWhileCharging: false,
+        ),
+        busy: null,
+        wait: wait,
+      );
+      analysis.start(playing.stream);
+      expect(await waits.next(), const Duration(seconds: 90));
+      final first = analyzer.next();
+      waits.release();
+      expect(await first, '/a.flac');
+      expect(rechecks, 2);
+    });
+
+    test('the song playing waits', () async {
+      final (analysis, _) = create(busy: null, wait: wait);
+      analysis.start(playing.stream);
+      expect(await waits.next(), const Duration(seconds: 90));
+      final current = analyzer.next();
+      playing.add(_playing('/c.flac'));
+      expect(await current, '/c.flac');
+      expect(rechecks, 2);
+      expect(analyzer.calls, ['/c.flac']);
+    });
   });
 
   test('failures are recorded and tried again only once the file changes; '

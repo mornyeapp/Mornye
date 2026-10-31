@@ -48,9 +48,9 @@ enum _Outcome { analyzed, failed, unavailable, skipped }
 /// Analyzes how each local Library song sounds, once, in the background, so
 /// Autoplay can pick songs that sound like the session. One song at a time,
 /// on one decoder thread, with rests several times longer than the work,
-/// and never while a song has just started or AutoMix is mixing. The song
-/// playing is analyzed soon after it starts, on battery too. Everything
-/// stays on the device.
+/// and never while a song has just started or AutoMix is preparing or
+/// mixing. The song playing is analyzed soon after it starts, on battery
+/// too. Everything stays on the device.
 class SongAnalysis {
   SongAnalysis({
     LibraryDatabase? library,
@@ -160,11 +160,12 @@ class SongAnalysis {
     return !path.contains('://');
   }
 
-  /// A song started moments ago, when AutoMix analyzes it too, or AutoMix
-  /// is mixing.
+  /// AutoMix is preparing or mixing, or a song started moments ago: its
+  /// start loads covers, lyrics and haptics, and its own analysis follows.
   bool get _busy =>
       _busyOverride?.call() ??
-      (autoMixStatus.value != AutoMixStatus.idle ||
+      (autoMixPreparing.value ||
+          autoMixStatus.value != AutoMixStatus.idle ||
           (_sinceChange.isRunning && _sinceChange.elapsed < _currentDelay));
 
   /// Runs [action] after the analysis before it, so one runs at a time.
@@ -223,11 +224,14 @@ class SongAnalysis {
     final generation = ++_currentGeneration;
     if (source == null || !_working || !_analyzable(source)) return;
     final song = (path: source, duration: item?.duration, local: false);
+    bool current() => generation == _currentGeneration && _working;
     unawaited(
       _wait(_currentDelay).then((_) async {
-        if (generation == _currentGeneration && _working) {
-          await _analyze(song);
+        // AutoMix may prepare a mix around this time on shorter songs.
+        while (current() && autoMixPreparing.value) {
+          await _wait(_busyRecheck);
         }
+        if (current()) await _analyze(song);
       }),
     );
   }
