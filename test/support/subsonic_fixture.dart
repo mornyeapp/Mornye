@@ -30,6 +30,9 @@ class SubsonicFixture {
   final ranges = <String?>[];
   final salts = <String>[];
   final ifNoneMatch = <String?>[];
+
+  /// The client port of each request; one per TCP (and TLS) connection.
+  final remotePorts = <int>{};
   final held = Completer<void>();
   final release = Completer<void>();
   String? blockMethod;
@@ -101,6 +104,9 @@ class SubsonicFixture {
     authorizations.add(request.headers.value('authorization'));
     ranges.add(request.headers.value('range'));
     ifNoneMatch.add(request.headers.value('if-none-match'));
+    if (request.connectionInfo case final info?) {
+      remotePorts.add(info.remotePort);
+    }
     final salt = request.uri.queryParameters['s'];
     if (salt != null) salts.add(salt);
     final method = request.uri.pathSegments.last.replaceFirst('.view', '');

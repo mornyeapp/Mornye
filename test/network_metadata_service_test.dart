@@ -2,10 +2,14 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:crypto/crypto.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mornye/services/network_certificate.dart';
 import 'package:mornye/services/network_storage_service.dart';
 import 'package:mornye/services/network_metadata_service.dart';
+
+import 'support/subsonic_fixture.dart';
 
 class _VirtualSources implements NetworkVirtualSources {
   _VirtualSources(this.tags);
@@ -346,4 +350,196 @@ void main() {
       );
     },
   );
+
+  group('Subsonic metadata over TLS', () {
+    late SubsonicFixture server;
+    late NetworkStorageService tls;
+    late NetworkConnection trusted;
+    late _CountingHttpOverrides http;
+    HttpOverrides? previous;
+    final readers = <NetworkMetadataService>[];
+    setUp(() async {
+      previous = HttpOverrides.current;
+      HttpOverrides.global = http = _CountingHttpOverrides();
+      server = await SubsonicFixture.start(
+        context: SecurityContext()
+          ..useCertificateChain('test/fixtures/network_tls/cert.pem')
+          ..usePrivateKey('test/fixtures/network_tls/key.pem'),
+      );
+      String? saved;
+      tls = NetworkStorageService(
+        read: () async => saved,
+        write: (value) async => saved = value,
+        ensureAccess: (_) async {},
+      );
+      String? pin;
+      try {
+        await tls.list(server.connection());
+      } on NetworkCertificateException catch (error) {
+        pin = error.fingerprint;
+      }
+      trusted = server.connection(fingerprint: pin);
+      await tls.save(trusted);
+      http.clients = 0;
+      server.remotePorts.clear();
+      server.requests.clear();
+    });
+    tearDown(() async {
+      for (final reader in readers) {
+        await reader.cancelPending();
+      }
+      readers.clear();
+      await tls.dispose();
+      await server.close();
+      HttpOverrides.global = previous;
+    });
+
+    NetworkMetadataService reader({Duration idle = const Duration(hours: 1)}) {
+      final reader = NetworkMetadataService(
+        storage: tls,
+        cacheDirectory: () async => directory,
+        subsonicIdle: idle,
+      );
+      readers.add(reader);
+      return reader;
+    }
+
+    final source = NetworkStorageService.source(
+      'fixture',
+      subsonicSongPath('song / 日本語?&', 'flac'),
+    );
+
+    Future<void> openConnections(int count) async {
+      for (
+        var i = 0;
+        i < 200 && server.server.connectionsInfo().total > count;
+        i++
+      ) {
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      }
+      expect(server.server.connectionsInfo().total, lessThanOrEqualTo(count));
+    }
+
+    test('a burst of reads shares one client and its connections', () async {
+      final metadata = reader();
+      for (var i = 0; i < 6; i++) {
+        final tags = await metadata.read(source, forceRefresh: true);
+        expect(tags['title'], 'A song');
+        expect(tags['cover_path'], isNotNull);
+      }
+      final methods = server.requests.map((uri) => uri.pathSegments.last);
+      expect(methods.where((method) => method == 'getSong.view'), hasLength(6));
+      expect(
+        methods.where((method) => method == 'getLyricsBySongId.view'),
+        hasLength(6),
+      );
+      expect(
+        methods.where((method) => method == 'getCoverArt.view'),
+        hasLength(1),
+      );
+      expect(methods, hasLength(13));
+      expect(http.clients, 1);
+      expect(server.remotePorts.length, lessThanOrEqualTo(2));
+    });
+
+    test('an idle client closes and the next read opens another', () async {
+      final metadata = reader(idle: const Duration(milliseconds: 50));
+      await metadata.read(source, forceRefresh: true);
+      await openConnections(0);
+      await metadata.read(source, forceRefresh: true);
+      expect(http.clients, 2);
+    });
+
+    test('an edited connection reads with a new client', () async {
+      final metadata = reader();
+      await metadata.read(source, forceRefresh: true);
+      final before = {...server.remotePorts};
+      final edited = NetworkConnection(
+        id: trusted.id,
+        name: trusted.name,
+        protocol: trusted.protocol,
+        address: trusted.address,
+        subsonicAuth: trusted.subsonicAuth,
+        username: trusted.username,
+        password: 'edited',
+        apiKey: trusted.apiKey,
+        trustedCertificateSha256: trusted.trustedCertificateSha256,
+      );
+      await tls.save(edited);
+      server.requests.clear();
+      await metadata.read(source, forceRefresh: true);
+      expect(http.clients, 2);
+      for (final uri in server.requests) {
+        final query = uri.queryParameters;
+        expect(
+          query['t'],
+          md5.convert(utf8.encode('edited${query['s']}')).toString(),
+        );
+      }
+      await openConnections(server.remotePorts.difference(before).length);
+    });
+
+    test('a changed certificate pin is checked again', () async {
+      final metadata = reader();
+      await metadata.read(source, forceRefresh: true);
+      await tls.save(server.connection(fingerprint: '0' * 64));
+      await expectLater(
+        metadata.read(source, forceRefresh: true),
+        throwsA(isA<NetworkCertificateException>()),
+      );
+    });
+
+    test('a removed connection closes its client', () async {
+      final metadata = reader();
+      await metadata.read(source, forceRefresh: true);
+      await tls.remove(trusted.id);
+      await openConnections(0);
+    });
+
+    test(
+      'a broken transport replaces the client, a server error does not',
+      () async {
+        final metadata = reader();
+        await metadata.read(source, forceRefresh: true);
+        server.errorCode = 70;
+        server.failMethod = 'getSong';
+        await expectLater(
+          metadata.read(source, forceRefresh: true),
+          throwsA(isA<SubsonicException>()),
+        );
+        server.errorCode = null;
+        await metadata.read(source, forceRefresh: true);
+        expect(http.clients, 1);
+        server.disconnect = true;
+        await expectLater(
+          metadata.read(source, forceRefresh: true),
+          throwsA(isA<HttpException>()),
+        );
+        await openConnections(0);
+        server.disconnect = false;
+        expect(
+          (await metadata.read(source, forceRefresh: true))['title'],
+          'A song',
+        );
+        expect(http.clients, 2);
+      },
+    );
+
+    test('cancelling a reader closes its shared client', () async {
+      final metadata = reader();
+      await metadata.read(source, forceRefresh: true);
+      await metadata.cancelPending();
+      await openConnections(0);
+    });
+  });
+}
+
+class _CountingHttpOverrides extends HttpOverrides {
+  int clients = 0;
+
+  @override
+  HttpClient createHttpClient(SecurityContext? context) {
+    clients++;
+    return super.createHttpClient(context);
+  }
 }

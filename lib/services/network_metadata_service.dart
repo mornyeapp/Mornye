@@ -20,7 +20,9 @@ class NetworkMetadataService {
     NetworkTagReader? reader,
     Future<Directory> Function()? cacheDirectory,
     int maxConcurrentReads = 1,
+    Duration subsonicIdle = NetworkStorageService.timeout,
   }) : _storage = storage ?? NetworkStorageService.instance,
+       _subsonicIdle = subsonicIdle,
        _useNativeReader = reader == null,
        _reader =
            reader ??
@@ -42,7 +44,12 @@ class NetworkMetadataService {
   final _refreshArtwork = <String>{};
   final List<({Future<void> tail, int pending})> _lanes;
   final _requestIds = <String>{};
-  final _subsonicClients = <SubsonicClient>{};
+  final Duration _subsonicIdle;
+  // One client per connection keeps its TLS connections alive across reads;
+  // retired ones close when their last read ends.
+  final _subsonicClients = <String, _SubsonicLease>{};
+  final _subsonicLeases = <_SubsonicLease>{};
+  void Function()? _unsubscribeRemovals;
   bool _stopped = false;
 
   Future<Map<String, dynamic>> read(
@@ -114,8 +121,8 @@ class NetworkMetadataService {
   /// Scan-owned readers can stop their work without cancelling playback reads.
   Future<void> cancelPending() async {
     _stopped = true;
-    for (final client in _subsonicClients.toList()) {
-      client.close();
+    for (final lease in _subsonicLeases.toList()) {
+      _retireSubsonic(lease, force: true);
     }
     await Future.wait([
       for (final id in _requestIds.toList())
@@ -127,6 +134,65 @@ class NetworkMetadataService {
     if (_stopped) throw StateError('Network metadata reader stopped');
   }
 
+  /// A kept client is reused only for the exact saved connection, so an edit
+  /// of its address, credentials or certificate pin opens a new one.
+  _SubsonicLease _leaseSubsonic(NetworkConnection connection) {
+    final identity = jsonEncode(connection.toJson());
+    var lease = _subsonicClients[connection.id];
+    if (lease != null && lease.identity != identity) {
+      _retireSubsonic(lease);
+      lease = null;
+    }
+    if (lease == null) {
+      lease = _SubsonicLease(_storage.openSubsonic(connection), identity);
+      _subsonicClients[connection.id] = lease;
+      _subsonicLeases.add(lease);
+      _unsubscribeRemovals ??= _storage.connectionRemovals.subscribe((
+        id,
+      ) async {
+        if (_subsonicClients[id] case final removed?) _retireSubsonic(removed);
+      });
+    }
+    lease.idle?.cancel();
+    lease.users++;
+    return lease;
+  }
+
+  void _releaseSubsonic(_SubsonicLease lease, {required bool broken}) {
+    if (lease.closed) return;
+    lease.users--;
+    if (broken || lease.retired || _stopped) {
+      _retireSubsonic(lease);
+    } else if (lease.users == 0) {
+      lease.idle = Timer(_subsonicIdle, () => _retireSubsonic(lease));
+    }
+  }
+
+  void _retireSubsonic(_SubsonicLease lease, {bool force = false}) {
+    lease.retired = true;
+    lease.idle?.cancel();
+    final id = lease.client.connection.id;
+    if (_subsonicClients[id] == lease) _subsonicClients.remove(id);
+    if ((lease.users > 0 && !force) || lease.closed) return;
+    lease.closed = true;
+    lease.client.close();
+    _subsonicLeases.remove(lease);
+    if (_subsonicLeases.isEmpty) {
+      _unsubscribeRemovals?.call();
+      _unsubscribeRemovals = null;
+    }
+  }
+
+  /// Answers from the server leave the client usable; anything else (a
+  /// dropped connection, a timeout, a TLS failure) replaces it.
+  static bool _breaksClient(Object error) => switch (error) {
+    SubsonicException() || FileSystemException() => false,
+    HttpException(:final message) => !RegExp(
+      r'^Server returned \d{3}$',
+    ).hasMatch(message),
+    _ => true,
+  };
+
   Future<Map<String, dynamic>> _load(String source, String requestId) async {
     _checkStopped();
     final refreshArtwork = _refreshArtwork.remove(source);
@@ -137,15 +203,25 @@ class NetworkMetadataService {
     final connection = await _storage.connection(uri.host);
     final path = uri.pathSegments.join('/');
     if (connection.protocol == NetworkProtocol.subsonic) {
-      final client = _storage.openSubsonic(connection);
-      _subsonicClients.add(client);
+      final lease = _leaseSubsonic(connection);
+      final client = lease.client;
+      var broken = false;
       try {
         _checkStopped();
-        final song = await client.song(path);
+        final SubsonicSong song;
+        try {
+          song = await client.song(path);
+        } catch (error) {
+          broken = _breaksClient(error);
+          rethrow;
+        }
         final metadata = Map<String, dynamic>.from(song.metadata);
         // Asked alongside the cover. Servers without the songLyrics
         // extension fail it, which leaves the tags as they are.
-        final lyrics = client.lyrics(song).catchError((Object _) => '');
+        final lyrics = client.lyrics(song).catchError((Object error) {
+          if (_breaksClient(error)) broken = true;
+          return '';
+        });
         try {
           final cover = await client.cachedCover(
             song,
@@ -156,7 +232,8 @@ class NetworkMetadataService {
             metadata['cover_path'] = cover;
             await _trimNetworkMetadataCovers(File(cover).parent);
           }
-        } catch (_) {
+        } catch (error) {
+          if (_breaksClient(error)) broken = true;
           _checkStopped();
         }
         final text = await lyrics;
@@ -164,8 +241,7 @@ class NetworkMetadataService {
         _checkStopped();
         return _remember(source, metadata);
       } finally {
-        client.close();
-        _subsonicClients.remove(client);
+        _releaseSubsonic(lease, broken: broken);
       }
     }
     var name =
@@ -231,6 +307,16 @@ class NetworkMetadataService {
     _cache[source] = (time: DateTime.now(), value: value);
     return value;
   }
+}
+
+class _SubsonicLease {
+  _SubsonicLease(this.client, this.identity);
+  final SubsonicClient client;
+  final String identity;
+  int users = 0;
+  bool retired = false;
+  bool closed = false;
+  Timer? idle;
 }
 
 /// Compatibility path keeps cover decoding/hash/directory sorting off the UI
