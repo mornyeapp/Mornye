@@ -88,10 +88,22 @@ void main() {
   });
 
   group('automatic download conversion settings', () {
+    test('batch caps use the highest source and retain unknown options', () {
+      expect(conversionSourceMaximum([44100, 96000]), 96000);
+      expect(conversionSourceMaximum([16, 24]), 24);
+      expect(conversionSourceMaximum([44100, null]), isNull);
+      expect(conversionSourceMaximum([]), isNull);
+      expect(normalizeAutoConvertBitDepth(0), 0);
+      expect(normalizeAutoConvertBitDepth(32), 16);
+      expect(normalizeAutoConvertSampleRate(0), 0);
+      expect(normalizeAutoConvertSampleRate(12345), 48000);
+    });
+
     test('normalizes supported formats and bitrates', () {
       expect(normalizeAutoConvertFormat('M4A'), 'aac');
       expect(normalizeAutoConvertFormat('unexpected'), 'mp3');
       expect(normalizeAutoConvertBitrate('256 kbps'), '256k');
+      expect(normalizeAutoConvertBitrate('160 kbps'), '160k');
       expect(normalizeAutoConvertBitrate('999k'), '320k');
     });
 

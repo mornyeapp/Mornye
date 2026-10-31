@@ -222,6 +222,74 @@ void main() {
     expect(await pcmHash(path, 24), originalHash);
   });
 
+  for (final rate in [44100, 96000]) {
+    test(
+      'FLAC 16/48 caps preserve embedded artwork and tags at $rate',
+      () async {
+        if (!haveTools()) return;
+        final wav = await source(24, rate);
+        final input = '${directory.path}/Tagged.flac';
+        await ffmpeg([
+          '-i',
+          wav,
+          '-f',
+          'lavfi',
+          '-i',
+          'color=c=blue:s=16x16',
+          '-map',
+          '0:a',
+          '-map',
+          '1:v',
+          '-c:a',
+          'flac',
+          '-c:v',
+          'png',
+          '-frames:v',
+          '1',
+          '-disposition:v',
+          'attached_pic',
+          '-metadata',
+          'TITLE=Song',
+          '-metadata',
+          'LYRICS=[00:01.00]Lyrics',
+          input,
+        ]);
+        final output = await FFmpegConversion.convertAudioFormat(
+          inputPath: input,
+          targetFormat: 'flac',
+          bitrate: '',
+          metadata: const {},
+          losslessQuality: const LosslessConversionQuality(
+            maxBitDepth: 16,
+            maxSampleRate: 48000,
+          ),
+        );
+        expect(output, input);
+        final properties = await FFmpegProbe.audioProperties(output!);
+        expect(properties.bitDepth, 16);
+        expect(properties.sampleRate, rate > 48000 ? 48000 : rate);
+        final result = await Process.run(tools.ffprobePath!, [
+          '-v',
+          'error',
+          '-show_format',
+          '-show_streams',
+          '-of',
+          'json',
+          output,
+        ]);
+        expect(result.exitCode, 0, reason: result.stderr.toString());
+        final probe =
+            jsonDecode(result.stdout as String) as Map<String, dynamic>;
+        final tags = (probe['format'] as Map)['tags'] as Map;
+        expect(tags['TITLE'], 'Song');
+        expect(tags['LYRICS'], '[00:01.00]Lyrics');
+        final streams = (probe['streams'] as List).cast<Map<String, dynamic>>();
+        final artwork = streams.singleWhere((s) => s['codec_type'] == 'video');
+        expect((artwork['disposition'] as Map)['attached_pic'], 1);
+      },
+    );
+  }
+
   test('invalid WAV preserves the source and removes partial FLAC', () async {
     if (!haveTools()) return;
     final path = File('${directory.path}/invalid.wav');

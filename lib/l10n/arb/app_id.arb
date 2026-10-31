@@ -2441,6 +2441,12 @@
   "@downloadAutoConvert": {
     "description": "Toggle for automatic post-download audio conversion"
   },
+  "downloadAutoConvertAllFormatsSubtitle": "Ubah format hasil download atau batasi bit depth dan sample rate FLAC. File asli diganti hanya setelah konversi berhasil.",
+  "downloadAutoConvertOutputSubtitle": "Pilih format output untuk download yang baru selesai.",
+  "downloadAutoConvertFlacSubtitle": "FLAC lossless dengan batas kualitas. Bit depth dan sample rate yang lebih rendah tetap dipertahankan.",
+  "downloadAutoConvertMaxBitDepth": "Bit depth maksimal",
+  "downloadAutoConvertMaxSampleRate": "Sample rate maksimal",
+  "downloadAutoConvertFlacLimitsSubtitle": "Ini adalah batas maksimal. Misalnya, sumber 44,1 kHz tetap 44,1 kHz saat 48 kHz dipilih. Sumber lossy tetap dalam format aslinya.",
   "downloadAutoConvertSubtitle": "Mengubah format ke lossy akan mengecilkan ukuran file. File asli akan dihapus setelah perubahan format selesai.",
   "@downloadAutoConvertSubtitle": {
     "description": "Explanation of safe automatic post-download conversion"

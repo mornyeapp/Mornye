@@ -737,6 +737,18 @@ class _DownloadRun {
       }
     }
 
+    // Verify extension output before intentional conversion can change PCM.
+    if (originalHiResPath != null &&
+        (filePath == null ||
+            !await HiResCheckService.replacementPreservesAudio(
+              originalHiResPath,
+              filePath!,
+            ))) {
+      throw StateError(
+        'Finalized replacement no longer preserves the original audio',
+      );
+    }
+
     final autoConvertInput = filePath;
     stageCompleted('extension hooks');
     if (!wasExisting && autoConvertInput != null) {
@@ -785,16 +797,6 @@ class _DownloadRun {
     if (normalizeOptionalString(filePath) == null) {
       throw StateError(
         'Download backend reported success without a final file path',
-      );
-    }
-
-    if (originalHiResPath != null &&
-        !await HiResCheckService.replacementPreservesAudio(
-          originalHiResPath,
-          filePath!,
-        )) {
-      throw StateError(
-        'Finalized replacement no longer preserves the original audio',
       );
     }
 

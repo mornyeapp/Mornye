@@ -153,8 +153,8 @@ Future<void> showBatchConvertSheet(
       formats: formats,
       title: sheetTitle,
       confirmLabel: sheetConfirmLabel,
-      sourceBitDepth: lowestKnownPositiveInt(sourceBitDepths),
-      sourceSampleRate: lowestKnownPositiveInt(sourceSampleRates),
+      sourceBitDepth: conversionSourceMaximum(sourceBitDepths),
+      sourceSampleRate: conversionSourceMaximum(sourceSampleRates),
       onConvert:
           (format, bitrate, losslessQuality, losslessProcessing, keepOriginal) {
             didStartConversion = true;

@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/models/download_result.dart';
 import 'package:mornye/services/download_file_finalizer.dart';
 import 'package:mornye/services/download_saf_file_replacer.dart';
+import 'package:mornye/services/ffmpeg_probe.dart';
 
 void main() {
   late Directory directory;
@@ -19,6 +20,7 @@ void main() {
     ConvertDownloadAudio? convert,
     ReplaceSafDownloadFile? replaceSaf,
     Future<String?> Function(String)? probe,
+    Future<PrimaryAudioProperties> Function(String)? properties,
     Future<void> Function(String, String)? repair,
   }) => DownloadFileFinalizer(
     decryptFile:
@@ -36,6 +38,7 @@ void main() {
           required targetFormat,
           required bitrate,
           required deleteOriginal,
+          required losslessQuality,
         }) async => throw StateError('Unexpected conversion'),
     replaceSafFile:
         replaceSaf ??
@@ -48,6 +51,8 @@ void main() {
           onPublishedFileName,
         }) async => throw StateError('Unexpected SAF access'),
     probeCodec: probe ?? (_) async => throw StateError('Unexpected probe'),
+    probeProperties:
+        properties ?? (_) async => throw StateError('Unexpected properties'),
     repairAc4: repair ?? (_, _) async => throw StateError('Unexpected repair'),
     warn: warnings.add,
     info: (_) {},
@@ -226,6 +231,7 @@ void main() {
     String? name,
     bool saf = false,
     bool enabled = true,
+    String format = 'opus',
     Future<void> Function(String, String)? embed,
     void Function()? start,
   }) => stage.autoConvert(
@@ -234,7 +240,7 @@ void main() {
     fileName: name,
     quality: '24-bit/96kHz',
     enabled: enabled,
-    targetFormat: 'opus',
+    targetFormat: format,
     targetBitrate: '192k',
     useSaf: saf,
     treeUri: 'content://tree',
@@ -271,6 +277,7 @@ void main() {
               required targetFormat,
               required bitrate,
               required deleteOriginal,
+              required losslessQuality,
             }) async => null,
       );
       final outcome = await convert(stage, result, name: 'Song.flac');
@@ -287,6 +294,90 @@ void main() {
     },
   );
 
+  for (final rate in [44100, 96000]) {
+    test('FLAC auto conversion caps 24-bit/$rate without upsampling', () async {
+      final result = DownloadResult.fromMap({
+        'actual_bit_depth': 24,
+        'actual_sample_rate': rate,
+        'bitrate': 4000,
+        'extension_context': {'example': true},
+      });
+      final expectedRate = rate > 48000 ? 48000 : rate;
+      final stage = finalizer(
+        properties: (path) async {
+          if (rate == 96000 && path != '/source.flac') {
+            throw StateError('Output probe unavailable after conversion');
+          }
+          return PrimaryAudioProperties(
+            codec: 'flac',
+            bitDepth: path == '/source.flac' ? 24 : 16,
+            sampleRate: path == '/source.flac' ? rate : expectedRate,
+          );
+        },
+        convert:
+            ({
+              required inputPath,
+              required targetFormat,
+              required bitrate,
+              required deleteOriginal,
+              required losslessQuality,
+            }) async {
+              expect(targetFormat, 'flac');
+              expect(losslessQuality.maxBitDepth, 16);
+              expect(losslessQuality.maxSampleRate, 48000);
+              return '/converted.flac';
+            },
+      );
+      final outcome = await convert(
+        stage,
+        result,
+        format: 'flac',
+        embed: (_, format) async => expect(format, 'flac'),
+      );
+      expect(outcome.converted, isTrue);
+      expect(result.actualBitDepth, 16);
+      expect(result.actualSampleRate, expectedRate);
+      expect(result.bitrateKbps, isNull);
+      expect(result.audioCodec, 'flac');
+      expect(result['extension_context'], {'example': true});
+      expect(outcome.quality, contains(rate == 44100 ? '44.1' : '48'));
+      expect(warnings, isEmpty);
+    });
+  }
+
+  test('FLAC auto conversion preserves compliant and lossy sources', () async {
+    for (final codec in ['flac', 'aac']) {
+      final result = DownloadResult.fromMap({});
+      final outcome = await convert(
+        finalizer(
+          properties: (_) async => PrimaryAudioProperties(
+            codec: codec,
+            bitDepth: codec == 'flac' ? 16 : null,
+            sampleRate: 44100,
+          ),
+        ),
+        result,
+        format: 'flac',
+      );
+      expect(outcome.converted, isFalse);
+      expect(outcome.filePath, '/source.flac');
+      expect(warnings, isEmpty);
+    }
+  });
+
+  test('unknown FLAC quality preserves the original with a warning', () async {
+    final result = DownloadResult.fromMap({});
+    final outcome = await convert(
+      finalizer(
+        properties: (_) async => const PrimaryAudioProperties(codec: 'flac'),
+      ),
+      result,
+      format: 'flac',
+    );
+    expect(outcome.converted, isFalse);
+    expect(result['auto_conversion_warning'], contains('Cannot inspect'));
+  });
+
   test(
     'deferred SAF conversion retains its logical filename despite tag failure',
     () async {
@@ -302,6 +393,7 @@ void main() {
               required targetFormat,
               required bitrate,
               required deleteOriginal,
+              required losslessQuality,
             }) async {
               expect(deleteOriginal, isTrue);
               expect(targetFormat, 'opus');
@@ -332,66 +424,78 @@ void main() {
     },
   );
 
-  test(
-    'SAF conversion adopts the collision-safe published name and cleans temps',
-    () async {
-      final temp = File('${directory.path}/cache.flac');
-      final output = File('${directory.path}/cache.opus');
-      final events = <String>[];
-      final replacer = DownloadSafFileReplacer(
-        copyToTemp: (_) async => (await temp.writeAsString('source')).path,
-        publish:
-            ({
-              required treeUri,
-              required relativeDir,
-              required fileName,
-              required srcPath,
-              required avoidOverwrite,
-              required preservedSuffix,
-              collisionCleanFileName,
-              collisionVariantFileName,
-            }) async {
-              expect(avoidOverwrite, isTrue);
-              expect(fileName, 'Song.opus');
-              expect(
-                await File(srcPath).readAsString(),
-                'converted and tagged',
-              );
-              events.add('published');
-              return (uri: 'content://converted', fileName: 'Song (2).opus');
-            },
-        deleteSource: (_) async => events.add('deleted'),
-      );
-      final stage = finalizer(
-        replaceSaf: replacer.replace,
-        convert:
-            ({
-              required inputPath,
-              required targetFormat,
-              required bitrate,
-              required deleteOriginal,
-            }) async {
-              expect(deleteOriginal, isFalse);
-              return (await output.writeAsString('converted')).path;
-            },
-      );
-      final result = encrypted();
-      final outcome = await convert(
-        stage,
-        result,
-        path: 'content://source',
-        name: 'Song.flac',
-        saf: true,
-        embed: (path, format) async {
-          expect(format, 'opus');
-          await File(path).writeAsString('converted and tagged');
-        },
-      );
-      expect(outcome.filePath, 'content://converted');
-      expect(outcome.fileName, 'Song (2).opus');
-      expect(result.fileName, 'Song (2).opus');
-      expect(events, ['published', 'deleted']);
-      expect(await directory.list().length, 0);
-    },
-  );
+  for (final format in ['opus', 'flac']) {
+    test(
+      'SAF $format conversion adopts the published name and cleans temps',
+      () async {
+        final temp = File('${directory.path}/cache.flac');
+        final output = File('${directory.path}/converted.$format');
+        final events = <String>[];
+        final replacer = DownloadSafFileReplacer(
+          copyToTemp: (_) async => (await temp.writeAsString('source')).path,
+          publish:
+              ({
+                required treeUri,
+                required relativeDir,
+                required fileName,
+                required srcPath,
+                required avoidOverwrite,
+                required preservedSuffix,
+                collisionCleanFileName,
+                collisionVariantFileName,
+              }) async {
+                expect(avoidOverwrite, format != 'flac');
+                expect(fileName, 'Song.$format');
+                expect(
+                  await File(srcPath).readAsString(),
+                  'converted and tagged',
+                );
+                events.add('published');
+                return (
+                  uri: 'content://converted',
+                  fileName: 'Song (2).$format',
+                );
+              },
+          deleteSource: (_) async => events.add('deleted'),
+        );
+        final stage = finalizer(
+          replaceSaf: replacer.replace,
+          properties: (path) async => PrimaryAudioProperties(
+            codec: 'flac',
+            bitDepth: path == temp.path ? 24 : 16,
+            sampleRate: path == temp.path ? 96000 : 48000,
+          ),
+          convert:
+              ({
+                required inputPath,
+                required targetFormat,
+                required bitrate,
+                required deleteOriginal,
+                required losslessQuality,
+              }) async {
+                expect(deleteOriginal, isFalse);
+                return (await output.writeAsString('converted')).path;
+              },
+        );
+        final result = encrypted();
+        final outcome = await convert(
+          stage,
+          result,
+          path: 'content://source',
+          name: 'Song.flac',
+          format: format,
+          saf: true,
+          embed: (path, metadataFormat) async {
+            expect(metadataFormat, format);
+            await File(path).writeAsString('converted and tagged');
+          },
+        );
+        expect(outcome.filePath, 'content://converted');
+        expect(outcome.fileName, 'Song (2).$format');
+        expect(result.fileName, 'Song (2).$format');
+        expect(events, ['published', 'deleted']);
+        expect(await directory.list().length, 0);
+      },
+    );
+  }
 }

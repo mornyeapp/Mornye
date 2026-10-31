@@ -172,8 +172,10 @@ class AppSettings {
   final bool autoConvertDownloads;
   // Re-download a Hi-Res request at LOSSLESS when the file measures as fake.
   final bool redownloadFakeHiRes;
-  final String autoConvertFormat; // 'mp3', 'aac' (M4A), or 'opus'
-  final String autoConvertBitrate; // '128k', '192k', '256k', or '320k'
+  final String autoConvertFormat; // 'mp3', 'aac' (M4A), 'opus', or 'flac'
+  final String autoConvertBitrate; // '128k', '160k', '192k', '256k', or '320k'
+  final int autoConvertMaxBitDepth; // 0 retains the source bit depth.
+  final int autoConvertMaxSampleRate; // 0 retains the source sample rate.
   final bool
   useAllFilesAccess; // Android 13+ only: enable MANAGE_EXTERNAL_STORAGE
   final bool autoExportFailedDownloads;
@@ -333,6 +335,8 @@ class AppSettings {
     this.redownloadFakeHiRes = false,
     this.autoConvertFormat = 'mp3',
     this.autoConvertBitrate = '320k',
+    this.autoConvertMaxBitDepth = 16,
+    this.autoConvertMaxSampleRate = 48000,
     this.useAllFilesAccess = false,
     this.autoExportFailedDownloads = false,
     this.downloadNetworkMode = 'any',
@@ -483,6 +487,8 @@ class AppSettings {
     bool? redownloadFakeHiRes,
     String? autoConvertFormat,
     String? autoConvertBitrate,
+    int? autoConvertMaxBitDepth,
+    int? autoConvertMaxSampleRate,
     bool? useAllFilesAccess,
     bool? autoExportFailedDownloads,
     String? downloadNetworkMode,
@@ -634,6 +640,10 @@ class AppSettings {
       redownloadFakeHiRes: redownloadFakeHiRes ?? this.redownloadFakeHiRes,
       autoConvertFormat: autoConvertFormat ?? this.autoConvertFormat,
       autoConvertBitrate: autoConvertBitrate ?? this.autoConvertBitrate,
+      autoConvertMaxBitDepth:
+          autoConvertMaxBitDepth ?? this.autoConvertMaxBitDepth,
+      autoConvertMaxSampleRate:
+          autoConvertMaxSampleRate ?? this.autoConvertMaxSampleRate,
       useAllFilesAccess: useAllFilesAccess ?? this.useAllFilesAccess,
       autoExportFailedDownloads:
           autoExportFailedDownloads ?? this.autoExportFailedDownloads,

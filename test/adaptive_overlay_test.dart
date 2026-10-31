@@ -159,7 +159,10 @@ void main() {
               : materialSymbolFor(Icons.check)!.icon;
           for (final (picker, initial, next) in [
             ('Output format', 'MP3', 'Opus'),
-            ('Output quality', '320 kbps', '192 kbps'),
+            ('Output quality', '320 kbps', '160 kbps'),
+            ('Output format', 'Opus', 'FLAC'),
+            ('Maximum bit depth', '16-bit', '24-bit'),
+            ('Maximum sample rate', '48 kHz', '96 kHz'),
             (
               'Concurrent downloads',
               '1 track at a time',
@@ -199,9 +202,13 @@ void main() {
             final settings = container.read(settingsProvider);
             switch (picker) {
               case 'Output format':
-                expect(settings.autoConvertFormat, 'opus');
+                expect(settings.autoConvertFormat, next.toLowerCase());
               case 'Output quality':
-                expect(settings.autoConvertBitrate, '192k');
+                expect(settings.autoConvertBitrate, '160k');
+              case 'Maximum bit depth':
+                expect(settings.autoConvertMaxBitDepth, 24);
+              case 'Maximum sample rate':
+                expect(settings.autoConvertMaxSampleRate, 96000);
               case 'Concurrent downloads':
                 expect(settings.concurrentDownloads, 3);
             }

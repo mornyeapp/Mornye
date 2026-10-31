@@ -383,6 +383,16 @@ abstract final class FFmpegConversion {
     if (hasCover) arguments.addAll(['-i', coverPath]);
     arguments.addAll(['-map', '0:a']);
     if (hasCover) FFmpegMetadata.appendCoverInputArguments(arguments);
+    if (!hasCover && !isAlac) {
+      arguments.addAll([
+        '-map',
+        '0:v?',
+        '-c:v',
+        'copy',
+        '-disposition:v',
+        'attached_pic',
+      ]);
+    }
     arguments.addAll(['-c:a', codec]);
     if (!isAlac) {
       arguments.addAll(['-compression_level', _flacCompressionLevel]);

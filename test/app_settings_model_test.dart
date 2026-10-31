@@ -54,6 +54,8 @@ void main() {
       expect(settings.autoConvertDownloads, isFalse);
       expect(settings.autoConvertFormat, 'mp3');
       expect(settings.autoConvertBitrate, '320k');
+      expect(settings.autoConvertMaxBitDepth, 16);
+      expect(settings.autoConvertMaxSampleRate, 48000);
       expect(
         settings.libraryQualityLabelMode,
         AppSettings.libraryQualityLabelBitDepthOnly,
@@ -137,6 +139,8 @@ void main() {
         autoConvertDownloads: true,
         autoConvertFormat: 'opus',
         autoConvertBitrate: '192k',
+        autoConvertMaxBitDepth: 24,
+        autoConvertMaxSampleRate: 96000,
         libraryQualityLabelMode: AppSettings.libraryQualityLabelBitDepthOnly,
         embeddedCoverMaxDimension: 1500,
       );
@@ -168,6 +172,8 @@ void main() {
       expect(decoded.autoConvertDownloads, isTrue);
       expect(decoded.autoConvertFormat, 'opus');
       expect(decoded.autoConvertBitrate, '192k');
+      expect(decoded.autoConvertMaxBitDepth, 24);
+      expect(decoded.autoConvertMaxSampleRate, 96000);
       expect(decoded.embeddedCoverMaxDimension, 1500);
     });
   });

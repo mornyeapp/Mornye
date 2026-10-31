@@ -83,16 +83,28 @@ List<int> availableLosslessSampleRateOptions(int? sourceSampleRate) {
       .toList();
 }
 
-int? lowestKnownPositiveInt(Iterable<int?> values) {
-  int? lowest;
+/// Offer every cap that can reduce a file in the batch. Unknown sources leave
+/// the options open; the converter inspects each file before applying a cap.
+int? conversionSourceMaximum(Iterable<int?> values) {
+  int? highest;
   for (final value in values) {
-    if (value == null || value <= 0) continue;
-    if (lowest == null || value < lowest) {
-      lowest = value;
+    if (value == null || value <= 0) return null;
+    if (highest == null || value > highest) {
+      highest = value;
     }
   }
-  return lowest;
+  return highest;
 }
+
+int normalizeAutoConvertBitDepth(int value) =>
+    value == 0 || losslessConversionBitDepthOptions.contains(value)
+    ? value
+    : 16;
+
+int normalizeAutoConvertSampleRate(int value) =>
+    value == 0 || losslessConversionSampleRateOptions.contains(value)
+    ? value
+    : 48000;
 
 class LosslessConversionQuality {
   final int? maxBitDepth;

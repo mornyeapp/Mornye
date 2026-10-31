@@ -53,7 +53,7 @@ class BatchConvertSheet extends StatefulWidget {
 }
 
 class _BatchConvertSheetState extends State<BatchConvertSheet> {
-  static const _bitrates = ['128k', '192k', '256k', '320k'];
+  static const _bitrates = ['128k', '160k', '192k', '256k', '320k'];
 
   late String _selectedFormat;
   late bool _isLosslessTarget;

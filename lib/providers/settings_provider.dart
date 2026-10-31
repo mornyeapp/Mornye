@@ -15,6 +15,7 @@ import 'package:mornye/services/download_file_recovery.dart';
 import 'package:mornye/services/secure_storage_options.dart';
 import 'package:mornye/utils/artist_utils.dart';
 import 'package:mornye/utils/audio_format_utils.dart';
+import 'package:mornye/utils/audio_conversion_utils.dart';
 import 'package:mornye/utils/audio_quality_badge_policy.dart';
 import 'package:mornye/utils/file_access.dart';
 import 'package:mornye/utils/logger.dart';
@@ -214,6 +215,12 @@ class SettingsNotifier extends Notifier<AppSettings> {
           ),
           autoConvertBitrate: normalizeAutoConvertBitrate(
             loaded.autoConvertBitrate,
+          ),
+          autoConvertMaxBitDepth: normalizeAutoConvertBitDepth(
+            loaded.autoConvertMaxBitDepth,
+          ),
+          autoConvertMaxSampleRate: normalizeAutoConvertSampleRate(
+            loaded.autoConvertMaxSampleRate,
           ),
           embeddedCoverMaxDimension: _normalizeEmbeddedCoverMaxDimension(
             loaded.embeddedCoverMaxDimension,
@@ -995,6 +1002,16 @@ class SettingsNotifier extends Notifier<AppSettings> {
 
   void setAutoConvertBitrate(String bitrate) => _commit(
     state.copyWith(autoConvertBitrate: normalizeAutoConvertBitrate(bitrate)),
+  );
+
+  void setAutoConvertMaxBitDepth(int depth) => _commit(
+    state.copyWith(autoConvertMaxBitDepth: normalizeAutoConvertBitDepth(depth)),
+  );
+
+  void setAutoConvertMaxSampleRate(int rate) => _commit(
+    state.copyWith(
+      autoConvertMaxSampleRate: normalizeAutoConvertSampleRate(rate),
+    ),
   );
 
   void setUseAllFilesAccess(bool enabled) =>

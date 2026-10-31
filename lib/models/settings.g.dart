@@ -135,6 +135,10 @@ AppSettings _$AppSettingsFromJson(Map<String, dynamic> json) => AppSettings(
   redownloadFakeHiRes: json['redownloadFakeHiRes'] as bool? ?? false,
   autoConvertFormat: json['autoConvertFormat'] as String? ?? 'mp3',
   autoConvertBitrate: json['autoConvertBitrate'] as String? ?? '320k',
+  autoConvertMaxBitDepth:
+      (json['autoConvertMaxBitDepth'] as num?)?.toInt() ?? 16,
+  autoConvertMaxSampleRate:
+      (json['autoConvertMaxSampleRate'] as num?)?.toInt() ?? 48000,
   useAllFilesAccess: json['useAllFilesAccess'] as bool? ?? false,
   autoExportFailedDownloads:
       json['autoExportFailedDownloads'] as bool? ?? false,
@@ -271,6 +275,8 @@ Map<String, dynamic> _$AppSettingsToJson(
   'redownloadFakeHiRes': instance.redownloadFakeHiRes,
   'autoConvertFormat': instance.autoConvertFormat,
   'autoConvertBitrate': instance.autoConvertBitrate,
+  'autoConvertMaxBitDepth': instance.autoConvertMaxBitDepth,
+  'autoConvertMaxSampleRate': instance.autoConvertMaxSampleRate,
   'useAllFilesAccess': instance.useAllFilesAccess,
   'autoExportFailedDownloads': instance.autoExportFailedDownloads,
   'downloadNetworkMode': instance.downloadNetworkMode,

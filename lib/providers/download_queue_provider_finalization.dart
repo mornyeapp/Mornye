@@ -32,12 +32,14 @@ extension _DownloadQueueFinalization on DownloadQueueNotifier {
           required targetFormat,
           required bitrate,
           required deleteOriginal,
+          required losslessQuality,
         }) => FFmpegConversion.convertAudioFormat(
           inputPath: inputPath,
           targetFormat: targetFormat,
           bitrate: bitrate,
           metadata: const {},
           deleteOriginal: deleteOriginal,
+          losslessQuality: losslessQuality,
         ),
     replaceSafFile: _replaceSafFileVia,
     warn: _log.w,
@@ -105,6 +107,14 @@ extension _DownloadQueueFinalization on DownloadQueueNotifier {
     enabled: settings.autoConvertDownloads,
     targetFormat: settings.autoConvertFormat,
     targetBitrate: settings.autoConvertBitrate,
+    losslessQuality: LosslessConversionQuality(
+      maxBitDepth: settings.autoConvertMaxBitDepth == 0
+          ? null
+          : settings.autoConvertMaxBitDepth,
+      maxSampleRate: settings.autoConvertMaxSampleRate == 0
+          ? null
+          : settings.autoConvertMaxSampleRate,
+    ),
     useSaf: storageMode == 'saf',
     treeUri: downloadTreeUri,
     relativeDir: safRelativeDir ?? '',

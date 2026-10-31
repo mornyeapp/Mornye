@@ -48,15 +48,27 @@ class DownloadResult extends MapBase<String, dynamic> {
     required String path,
     required String? name,
     required String format,
-    required int bitrateKbps,
+    required int? bitrateKbps,
+    int? bitDepth,
+    int? sampleRate,
   }) {
     filePath = path;
     fileName = name;
     _values['audio_codec'] = format;
     _values['format'] = format;
-    _values['bitrate'] = bitrateKbps;
-    _values.remove('actual_bit_depth');
-    _values.remove('actual_sample_rate');
+    _values.remove('actual_bitrate');
+    for (final entry in {
+      'bitrate': bitrateKbps,
+      'actual_bit_depth': bitDepth,
+      'actual_sample_rate': sampleRate,
+    }.entries) {
+      if (entry.value == null) {
+        _values.remove(entry.key);
+      } else {
+        _values[entry.key] = entry.value;
+      }
+    }
+    if (format == 'flac') markFlacContainer();
   }
 
   void markFlacContainer({String? path, String? name}) {

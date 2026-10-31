@@ -49,6 +49,7 @@ import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/utils/file_access.dart';
 import 'package:mornye/utils/string_utils.dart';
 import 'package:mornye/utils/audio_format_utils.dart';
+import 'package:mornye/utils/audio_conversion_utils.dart';
 import 'package:mornye/utils/int_utils.dart';
 import 'package:mornye/utils/path_match_keys.dart';
 import 'package:mornye/controllers/extension_auth_launcher.dart';
@@ -607,6 +608,12 @@ class DownloadQueueNotifier extends Notifier<DownloadQueueState> {
       autoConvertFormat: normalizeAutoConvertFormat(settings.autoConvertFormat),
       autoConvertBitrate: normalizeAutoConvertBitrate(
         settings.autoConvertBitrate,
+      ),
+      autoConvertMaxBitDepth: normalizeAutoConvertBitDepth(
+        settings.autoConvertMaxBitDepth,
+      ),
+      autoConvertMaxSampleRate: normalizeAutoConvertSampleRate(
+        settings.autoConvertMaxSampleRate,
       ),
       trackNumber: normalizedTrackNumber,
       playlistPosition: _validPlaylistPosition(item),

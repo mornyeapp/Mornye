@@ -17,12 +17,27 @@ internal fun NativeDownloadFinalizer.finalizeAutoConversion(
         enabled = input.request.optBoolean("auto_convert_downloads", false),
         format = input.request.optString("auto_convert_format", ""),
         bitrate = input.request.optString("auto_convert_bitrate", ""),
+        maxBitDepth = input.request.optInt("auto_convert_max_bit_depth", 16),
+        maxSampleRate = input.request.optInt("auto_convert_max_sample_rate", 48000),
     ) ?: return
+    if (target.codec == "flac") {
+        refreshFinalAudioQualityMetadata(context, input.result, state)
+        val codec = normalizeAudioCodec(state.audioCodec).orEmpty()
+        if (!NativeFinalizationPolicy.isLosslessAudioCodec(codec)) return
+        check(target.maxBitDepth == null || state.bitDepth != null) {
+            "Cannot inspect source bit depth for FLAC conversion"
+        }
+        check(target.maxSampleRate == null || state.sampleRate != null) {
+            "Cannot inspect source sample rate for FLAC conversion"
+        }
+    }
     if (
         NativeFinalizationPolicy.autoConversionAlreadySatisfied(
             target,
             state.audioCodec,
             state.bitrateKbps,
+            state.bitDepth,
+            state.sampleRate,
         )
     ) return
 
@@ -44,7 +59,16 @@ internal fun NativeDownloadFinalizer.finalizeAutoConversion(
             "aac" -> "-v error -hide_banner -i ${q(localInput)} -codec:a aac -b:a $bitrate -map 0:a -f mp4 ${q(stagedOutput)} -y"
             else -> "-v error -hide_banner -i ${q(localInput)} -codec:a libmp3lame -b:a $bitrate -map 0:a -id3v2_version 3 ${q(stagedOutput)} -y"
         }
-        val conversion = runFFmpeg(command, shouldCancel)
+        val conversion = if (target.codec == "flac") {
+            runFFmpegArguments(
+                NativeFinalizationPolicy.flacAutoConversionArguments(
+                    target, localInput, stagedOutput, state.bitDepth, state.sampleRate,
+                ).toTypedArray(),
+                shouldCancel,
+            )
+        } else {
+            runFFmpeg(command, shouldCancel)
+        }
         if (!conversion.first || !File(stagedOutput).exists()) {
             throw IllegalStateException("automatic conversion failed: ${conversion.second}")
         }
@@ -69,11 +93,27 @@ internal fun NativeDownloadFinalizer.finalizeAutoConversion(
         if (sourceWasSaf) File(localInput).delete()
     }
 
-    state.quality = "${if (target.codec == "aac") "AAC" else target.codec.uppercase(Locale.ROOT)} ${target.bitrateKbps}kbps"
-    state.bitDepth = null
-    state.sampleRate = null
-    state.bitrateKbps = target.bitrateKbps
     state.audioCodec = target.codec
+    if (target.codec == "flac") {
+        state.bitDepth = state.bitDepth?.let { depth -> target.maxBitDepth?.let { minOf(depth, it) } ?: depth }
+        state.sampleRate = state.sampleRate?.let { rate -> target.maxSampleRate?.let { minOf(rate, it) } ?: rate }
+        state.bitrateKbps = null
+        state.quality = NativeFinalizationPolicy.displayAudioQuality(
+            state.filePath, state.fileName, state.bitDepth, state.sampleRate, null, "flac", null,
+        ) ?: "FLAC"
+        input.result.remove("actual_bitrate")
+        input.result.remove("bitrate")
+        input.result.put("actual_bit_depth", state.bitDepth)
+        input.result.put("actual_sample_rate", state.sampleRate)
+        input.result.put("actual_container", "flac")
+        input.result.put("actual_extension", ".flac")
+        input.result.put("output_extension", ".flac")
+    } else {
+        state.quality = "${if (target.codec == "aac") "AAC" else target.codec.uppercase(Locale.ROOT)} ${target.bitrateKbps}kbps"
+        state.bitDepth = null
+        state.sampleRate = null
+        state.bitrateKbps = target.bitrateKbps
+    }
 }
 
 private fun NativeDownloadFinalizer.uniqueAutoConversionOutputPath(inputPath: String, extension: String): String {

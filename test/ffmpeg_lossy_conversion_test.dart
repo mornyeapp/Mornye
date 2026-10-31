@@ -115,7 +115,7 @@ void main() {
       final converted = await FFmpegConversion.convertAudioFormat(
         inputPath: path,
         targetFormat: format,
-        bitrate: '128k',
+        bitrate: format == 'opus' ? '160k' : '128k',
         metadata: const {},
       );
 

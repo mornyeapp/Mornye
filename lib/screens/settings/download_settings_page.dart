@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/controllers/clickable_metadata.dart';
 import 'package:mornye/l10n/l10n.dart';
+import 'package:mornye/utils/audio_conversion_utils.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/providers/extension_provider.dart';
 import 'package:mornye/screens/settings/download_fallback_extensions_page.dart';
@@ -116,7 +117,7 @@ class _DownloadSettingsPageState extends ConsumerState<DownloadSettingsPage> {
                 SettingsSwitchItem(
                   icon: Icons.auto_fix_high_outlined,
                   title: context.l10n.downloadAutoConvert,
-                  subtitle: context.l10n.downloadAutoConvertSubtitle,
+                  subtitle: context.l10n.downloadAutoConvertAllFormatsSubtitle,
                   value: settings.autoConvertDownloads,
                   onChanged: (value) => ref
                       .read(settingsProvider.notifier)
@@ -136,19 +137,53 @@ class _DownloadSettingsPageState extends ConsumerState<DownloadSettingsPage> {
                       settings.autoConvertFormat,
                     ),
                   ),
-                  SettingsItem(
-                    icon: Icons.speed_outlined,
-                    title: context.l10n.downloadAutoConvertBitrate,
-                    subtitle: normalizeAutoConvertBitrate(
-                      settings.autoConvertBitrate,
-                    ).replaceAll('k', ' kbps'),
-                    onTap: () => _showAutoConvertBitratePicker(
-                      context,
-                      ref,
-                      settings.autoConvertBitrate,
+                  if (normalizeAutoConvertFormat(settings.autoConvertFormat) ==
+                      'flac') ...[
+                    SettingsItem(
+                      icon: Icons.high_quality_outlined,
+                      title: context.l10n.downloadAutoConvertMaxBitDepth,
+                      subtitle: losslessBitDepthLabel(
+                        settings.autoConvertMaxBitDepth == 0
+                            ? null
+                            : settings.autoConvertMaxBitDepth,
+                        originalLabel: context.l10n.trackConvertOriginal,
+                      ),
+                      onTap: () => _showAutoConvertBitDepthPicker(
+                        context,
+                        ref,
+                        settings.autoConvertMaxBitDepth,
+                      ),
                     ),
-                    showDivider: false,
-                  ),
+                    SettingsItem(
+                      icon: Icons.graphic_eq,
+                      title: context.l10n.downloadAutoConvertMaxSampleRate,
+                      subtitle: losslessSampleRateLabel(
+                        settings.autoConvertMaxSampleRate == 0
+                            ? null
+                            : settings.autoConvertMaxSampleRate,
+                        originalLabel: context.l10n.trackConvertOriginal,
+                      ),
+                      onTap: () => _showAutoConvertSampleRatePicker(
+                        context,
+                        ref,
+                        settings.autoConvertMaxSampleRate,
+                      ),
+                      showDivider: false,
+                    ),
+                  ] else
+                    SettingsItem(
+                      icon: Icons.speed_outlined,
+                      title: context.l10n.downloadAutoConvertBitrate,
+                      subtitle: normalizeAutoConvertBitrate(
+                        settings.autoConvertBitrate,
+                      ).replaceAll('k', ' kbps'),
+                      onTap: () => _showAutoConvertBitratePicker(
+                        context,
+                        ref,
+                        settings.autoConvertBitrate,
+                      ),
+                      showDivider: false,
+                    ),
                 ],
               ],
             ),
@@ -341,7 +376,7 @@ class _DownloadSettingsPageState extends ConsumerState<DownloadSettingsPage> {
   ) => showAppChoiceSheet(
     context: context,
     title: context.l10n.downloadAutoConvertFormat,
-    subtitle: context.l10n.downloadAutoConvertFormatSubtitle,
+    subtitle: context.l10n.downloadAutoConvertOutputSubtitle,
     selected: normalizeAutoConvertFormat(current),
     bottomSpacing: 8,
     choices: [
@@ -357,6 +392,7 @@ class _DownloadSettingsPageState extends ConsumerState<DownloadSettingsPage> {
           subtitle: switch (format) {
             'aac' => context.l10n.downloadAutoConvertM4aSubtitle,
             'opus' => context.l10n.downloadAutoConvertOpusSubtitle,
+            'flac' => context.l10n.downloadAutoConvertFlacSubtitle,
             _ => context.l10n.downloadAutoConvertMp3Subtitle,
           },
         ),
@@ -385,6 +421,54 @@ class _DownloadSettingsPageState extends ConsumerState<DownloadSettingsPage> {
     ],
     onSelected: (bitrate) =>
         ref.read(settingsProvider.notifier).setAutoConvertBitrate(bitrate),
+  );
+
+  void _showAutoConvertBitDepthPicker(
+    BuildContext context,
+    WidgetRef ref,
+    int current,
+  ) => showAppChoiceSheet(
+    context: context,
+    title: context.l10n.downloadAutoConvertMaxBitDepth,
+    subtitle: context.l10n.downloadAutoConvertFlacLimitsSubtitle,
+    selected: current,
+    choices: [
+      for (final depth in [0, ...losslessConversionBitDepthOptions])
+        AppChoice(
+          depth,
+          Icons.high_quality_outlined,
+          losslessBitDepthLabel(
+            depth == 0 ? null : depth,
+            originalLabel: context.l10n.trackConvertOriginal,
+          ),
+        ),
+    ],
+    onSelected: (depth) =>
+        ref.read(settingsProvider.notifier).setAutoConvertMaxBitDepth(depth),
+  );
+
+  void _showAutoConvertSampleRatePicker(
+    BuildContext context,
+    WidgetRef ref,
+    int current,
+  ) => showAppChoiceSheet(
+    context: context,
+    title: context.l10n.downloadAutoConvertMaxSampleRate,
+    subtitle: context.l10n.downloadAutoConvertFlacLimitsSubtitle,
+    selected: current,
+    choices: [
+      for (final rate in [0, ...losslessConversionSampleRateOptions])
+        AppChoice(
+          rate,
+          Icons.graphic_eq,
+          losslessSampleRateLabel(
+            rate == 0 ? null : rate,
+            originalLabel: context.l10n.trackConvertOriginal,
+          ),
+        ),
+    ],
+    onSelected: (rate) =>
+        ref.read(settingsProvider.notifier).setAutoConvertMaxSampleRate(rate),
   );
 
   void _showNetworkModePicker(

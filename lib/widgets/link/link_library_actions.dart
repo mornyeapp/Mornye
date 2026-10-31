@@ -143,12 +143,12 @@ Future<void> runLinkLibraryAction(
             name,
           ),
           confirmLabel: context.l10n.selectionConvertCount(items.length),
-          sourceBitDepth: lowestKnownPositiveInt(
+          sourceBitDepth: conversionSourceMaximum(
             items.map(
               (item) => item.localItem?.bitDepth ?? item.historyItem?.bitDepth,
             ),
           ),
-          sourceSampleRate: lowestKnownPositiveInt(
+          sourceSampleRate: conversionSourceMaximum(
             items.map(
               (item) =>
                   item.localItem?.sampleRate ?? item.historyItem?.sampleRate,
