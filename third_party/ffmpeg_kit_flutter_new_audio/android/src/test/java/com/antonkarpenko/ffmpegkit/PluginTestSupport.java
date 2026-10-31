@@ -1,5 +1,8 @@
 package com.antonkarpenko.ffmpegkit;
 
+import android.os.Handler;
+import android.os.Looper;
+
 import java.lang.reflect.Field;
 import java.nio.ByteBuffer;
 import java.util.concurrent.CountDownLatch;
@@ -20,6 +23,20 @@ final class PluginTestSupport {
     static void enableTestMode() {
         // NativeLoader skips System.loadLibrary in this mode; the static initializer still runs.
         System.setProperty("enable.ffmpeg.kit.test.mode", "true");
+    }
+
+    static Thread mainThread() {
+        return Looper.getMainLooper().getThread();
+    }
+
+    /** Runs the work on the main thread, where the platform delivers method calls. */
+    static boolean runOnMain(final Runnable runnable, final long millis) throws InterruptedException {
+        final CountDownLatch done = new CountDownLatch(1);
+        new Handler(Looper.getMainLooper()).post(() -> {
+            runnable.run();
+            done.countDown();
+        });
+        return done.await(millis, TimeUnit.MILLISECONDS);
     }
 
     static Thread start(final String name, final Runnable runnable) {
@@ -86,6 +103,7 @@ final class PluginTestSupport {
         volatile String kind;
         volatile Object value;
         volatile int order;
+        volatile Thread thread;
         volatile boolean callbacksRegisteredAtReply;
 
         Reply(final boolean observeCallbacks) {
@@ -117,6 +135,7 @@ final class PluginTestSupport {
             }
             this.kind = kind;
             this.value = value;
+            this.thread = Thread.currentThread();
             this.order = replies.incrementAndGet();
             done.countDown();
         }

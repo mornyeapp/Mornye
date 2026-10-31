@@ -47,9 +47,22 @@ log line that the channel gives (the reply has no stack trace). If the
 load fails, every call answers `notImplemented`, which Dart reports as the
 same `MissingPluginException` as the channel without a handler that the
 failed attach left, and the failure is logged once under
-`ffmpeg-kit-flutter`. Kotlin code that uses FFmpegKit directly (the app's
-download finalizer) loads it on its own thread, or waits on the JVM class
-initialization lock while the plugin loads it.
+`ffmpeg-kit-flutter`.
+
+Kotlin code that uses FFmpegKit directly loads it on its own thread, or
+waits on the JVM class initialization lock while the plugin loads it. Code
+that wraps a global callback calls the public static
+`FFmpegKitFlutterPlugin.ensureGlobalCallbacksRegistered()` first: it
+registers the callbacks on the calling thread (loading FFmpegKit if
+needed), waits for a registration already in progress, and throws a load
+failure to the first caller. The app's download finalizer wraps the
+FFmpeg complete callback; without this call, a download that ran before the
+first Dart FFmpeg call (the usual order now) would wrap nothing, and the
+plugin would replace the wrapper when Dart first used FFmpeg. As a side
+effect, a process with no engine (the download service started on its own)
+now also has the plugin's global log callback, so FFmpeg log lines of
+calls without a session are no longer printed to logcat, as already
+happened in every process with an engine.
 
 The load does not start at attach on a background thread instead: the
 registrant attaches `JniPlugin` a few plugins later, whose static
@@ -58,7 +71,9 @@ initializer calls `System.loadLibrary` on the main thread, and
 would make it wait for the FFmpegKit load anyway.
 
 Tests: `android/src/test` (JUnit on the host JVM, with stand-ins for the
-four Android classes the path touches; `build.gradle` adds JUnit and forks
-one JVM per test class, since `FFmpegKitConfig` initializes once per JVM).
+four Android classes the path touches; the main looper stand-in is a
+thread named `main` that the tests post calls through, so replies are
+checked against it; `build.gradle` adds JUnit and forks one JVM per test
+class, since `FFmpegKitConfig` initializes once per JVM).
 From the app's `android/` folder:
 `gradle --offline :ffmpeg_kit_flutter_new_audio:testDebugUnitTest -x buildRustBackend`.

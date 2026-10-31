@@ -2,6 +2,8 @@ package com.antonkarpenko.ffmpegkit;
 
 import static com.antonkarpenko.ffmpegkit.PluginTestSupport.FFMPEG_KIT_TAG;
 import static com.antonkarpenko.ffmpegkit.PluginTestSupport.LOADING_MESSAGE;
+import static com.antonkarpenko.ffmpegkit.PluginTestSupport.mainThread;
+import static com.antonkarpenko.ffmpegkit.PluginTestSupport.runOnMain;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
@@ -44,9 +46,11 @@ public class FFmpegKitFlutterPluginLoadFailureTest {
         };
         try {
             final FFmpegKitFlutterPlugin engine = new FFmpegKitFlutterPlugin();
-            engine.init(new Messenger(), null);
             final FFmpegKitFlutterPlugin backgroundEngine = new FFmpegKitFlutterPlugin();
-            backgroundEngine.init(new Messenger(), null);
+            assertTrue(runOnMain(() -> {
+                engine.init(new Messenger(), null);
+                backgroundEngine.init(new Messenger(), null);
+            }, 2000));
 
             assertNotImplemented(engine, new MethodCall("getLogLevel", null));
             assertNotImplemented(engine, new MethodCall("getPlatform", null));
@@ -55,11 +59,12 @@ public class FFmpegKitFlutterPluginLoadFailureTest {
 
             assertEquals(1, logged.size());
             assertSame(failure, logged.get(0));
+            // Direct callers, such as the app's Kotlin finalizer, get the same error as before.
+            FFmpegKitFlutterPlugin.ensureGlobalCallbacksRegistered();
             try {
                 FFmpegKitConfig.getLogLevel();
                 fail("FFmpegKitConfig stays unusable after a failed load");
             } catch (final NoClassDefFoundError expected) {
-                // Direct callers, such as the app's Kotlin finalizer, get the same error as before.
             }
         } finally {
             Log.listener = null;
@@ -68,8 +73,9 @@ public class FFmpegKitFlutterPluginLoadFailureTest {
 
     private static void assertNotImplemented(final FFmpegKitFlutterPlugin plugin, final MethodCall call) throws InterruptedException {
         final Reply reply = new Reply(false);
-        plugin.onMethodCall(call, reply);
+        assertTrue(runOnMain(() -> plugin.onMethodCall(call, reply), 2000));
         assertTrue(reply.await(5000));
         assertEquals(call.method, "notImplemented", reply.kind);
+        assertSame(call.method, mainThread(), reply.thread);
     }
 }

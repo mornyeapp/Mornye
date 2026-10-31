@@ -1,13 +1,16 @@
 package android.os;
 
-/** Host stand-in that runs posted replies at once on the posting thread. */
+/** Host stand-in that queues posted work on its looper's thread. */
 public class Handler {
 
+    private final Looper looper;
+
     public Handler(final Looper looper) {
+        this.looper = looper;
     }
 
     public final boolean post(final Runnable r) {
-        r.run();
+        looper.enqueue(r);
         return true;
     }
 }

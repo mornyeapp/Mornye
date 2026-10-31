@@ -136,16 +136,13 @@ public class FFmpegKitFlutterPlugin implements FlutterPlugin, ActivityAware, Met
             java.util.concurrent.ConcurrentHashMap.newKeySet();
     private static final AtomicBoolean globalCallbacksRegistered = new AtomicBoolean(false);
 
-    // The first FFmpegKitConfig access runs its static initializer, which loads about 20 MB of
-    // native libraries. Most launches never use FFmpeg, so the registration waits for the first
-    // method call of any engine and runs on the executor, not on the main thread during
-    // onAttachedToEngine; calls wait in arrival order until it is done. Starting it at attach on
-    // another thread would not help: a later plugin's System.loadLibrary on the main thread
-    // would wait for the runtime and linker locks this load holds.
+    // Registering loads about 20 MB of native libraries, so the first method call starts it on
+    // the executor and calls wait in arrival order (MORNYE_PATCHES.md).
+    private static final Object globalCallbacksRegistrationLock = new Object();
+    private static volatile Throwable globalCallbacksFailure;
     private static final Object globalCallbacksLock = new Object();
     private static List<Runnable> callsWaitingForGlobalCallbacks = new ArrayList<>();
     private static boolean globalCallbacksScheduled;
-    private static volatile boolean globalCallbacksFailed;
 
     public FFmpegKitFlutterPlugin() {
         this.logsEnabled = new AtomicBoolean(false);
@@ -195,11 +192,27 @@ public class FFmpegKitFlutterPlugin implements FlutterPlugin, ActivityAware, Met
         }
     }
 
+    /**
+     * Registers the global callbacks on the calling thread, loading FFmpegKit if needed, and
+     * returns once they are registered. Code that wraps a global FFmpegKit callback calls this
+     * first, so the registration cannot replace the wrapper later. Only the first caller gets a
+     * load failure.
+     */
+    public static void ensureGlobalCallbacksRegistered() {
+        synchronized (globalCallbacksRegistrationLock) {
+            try {
+                registerGlobalCallbacks();
+            } catch (final Throwable t) {
+                globalCallbacksFailure = t;
+                throw t;
+            }
+        }
+    }
+
     private static void loadAndRegisterGlobalCallbacks() {
         try {
-            registerGlobalCallbacks();
+            ensureGlobalCallbacksRegistered();
         } catch (final Throwable t) {
-            globalCallbacksFailed = true;
             Log.e(LIBRARY_NAME, "FFmpegKitFlutterPlugin failed to load FFmpegKit.", t);
         } finally {
             new Handler(Looper.getMainLooper()).post(FFmpegKitFlutterPlugin::runCallsWaitingForGlobalCallbacks);
@@ -344,7 +357,7 @@ public class FFmpegKitFlutterPlugin implements FlutterPlugin, ActivityAware, Met
     }
 
     private void handleMethodCall(@NonNull MethodCall call, @NonNull Result result) {
-        if (globalCallbacksFailed) {
+        if (globalCallbacksFailure != null) {
             // A failed load inside onAttachedToEngine left the channel without a handler, which
             // Dart reports as MissingPluginException; notImplemented gives the same exception.
             resultHandler.notImplementedAsync(result);

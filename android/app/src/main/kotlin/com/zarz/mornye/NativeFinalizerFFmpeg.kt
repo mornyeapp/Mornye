@@ -3,6 +3,7 @@ package com.zarz.mornye
 import android.util.Log
 import com.antonkarpenko.ffmpegkit.FFmpegKit
 import com.antonkarpenko.ffmpegkit.FFmpegKitConfig
+import com.antonkarpenko.ffmpegkit.FFmpegKitFlutterPlugin
 import com.antonkarpenko.ffmpegkit.FFmpegSession
 import com.antonkarpenko.ffmpegkit.LogRedirectionStrategy
 import com.antonkarpenko.ffmpegkit.ReturnCode
@@ -126,6 +127,8 @@ internal fun NativeDownloadFinalizer.runFFmpegArguments(arguments: Array<String>
 }
 
 internal fun NativeDownloadFinalizer.installNativeFFmpegCallbackFilter() {
+    // The plugin registers its callback once, possibly later; wrap it only after that.
+    FFmpegKitFlutterPlugin.ensureGlobalCallbacksRegistered()
     synchronized(ffmpegCompleteCallbackLock) {
         val current = FFmpegKitConfig.getFFmpegSessionCompleteCallback()
         if (current !== nativeFilteringFFmpegCompleteCallback) {

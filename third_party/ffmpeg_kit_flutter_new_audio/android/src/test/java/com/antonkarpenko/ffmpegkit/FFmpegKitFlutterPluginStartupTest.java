@@ -3,11 +3,14 @@ package com.antonkarpenko.ffmpegkit;
 import static com.antonkarpenko.ffmpegkit.PluginTestSupport.FFMPEG_KIT_TAG;
 import static com.antonkarpenko.ffmpegkit.PluginTestSupport.LOADING_MESSAGE;
 import static com.antonkarpenko.ffmpegkit.PluginTestSupport.awaitUninterruptibly;
+import static com.antonkarpenko.ffmpegkit.PluginTestSupport.mainThread;
+import static com.antonkarpenko.ffmpegkit.PluginTestSupport.runOnMain;
 import static com.antonkarpenko.ffmpegkit.PluginTestSupport.start;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNotSame;
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
 import android.util.Log;
@@ -23,6 +26,7 @@ import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -55,36 +59,48 @@ public class FFmpegKitFlutterPluginStartupTest {
         };
         try {
             final FFmpegKitFlutterPlugin engine = new FFmpegKitFlutterPlugin();
-            final Thread attach = start("attach", () -> engine.init(new Messenger(), null));
-            attach.join(2000);
-            assertFalse("attach returned", attach.isAlive());
             final FFmpegKitFlutterPlugin backgroundEngine = new FFmpegKitFlutterPlugin();
-            backgroundEngine.init(new Messenger(), null);
+            assertTrue("attach returned", runOnMain(() -> {
+                engine.init(new Messenger(), null);
+                backgroundEngine.init(new Messenger(), null);
+            }, 2000));
             assertFalse("attach does not load FFmpegKit", loading.await(300, TimeUnit.MILLISECONDS));
 
             final Reply logLevel = new Reply(true);
-            final Thread call = start("call", () -> engine.onMethodCall(new MethodCall("getLogLevel", null), logLevel));
+            assertTrue("the main thread does not wait for the load",
+                    runOnMain(() -> engine.onMethodCall(new MethodCall("getLogLevel", null), logLevel), 2000));
             assertTrue("the first call starts the load", loading.await(5, TimeUnit.SECONDS));
-            call.join(2000);
-            assertFalse("the calling thread does not wait for the load", call.isAlive());
-            assertNotSame(call, loader.get());
+            assertNotSame(mainThread(), loader.get());
+
+            final CountDownLatch directCallerReturned = new CountDownLatch(1);
+            final AtomicBoolean registeredForDirectCaller = new AtomicBoolean();
+            start("worker", () -> {
+                FFmpegKitFlutterPlugin.ensureGlobalCallbacksRegistered();
+                directCallerReturned.countDown();
+                registeredForDirectCaller.set(PluginTestSupport.globalCallbacksRegistered());
+            });
 
             final Reply platform = new Reply(true);
-            backgroundEngine.onMethodCall(new MethodCall("getPlatform", null), platform);
             final Reply badArgument = new Reply(false);
-            engine.onMethodCall(new MethodCall("getSession",
-                    Collections.singletonMap(FFmpegKitFlutterPlugin.ARGUMENT_SESSION_ID, "not a number")), badArgument);
+            assertTrue(runOnMain(() -> {
+                backgroundEngine.onMethodCall(new MethodCall("getPlatform", null), platform);
+                engine.onMethodCall(new MethodCall("getSession",
+                        Collections.singletonMap(FFmpegKitFlutterPlugin.ARGUMENT_SESSION_ID, "not a number")), badArgument);
+            }, 2000));
             assertFalse("a call during the load waits for it", logLevel.await(300));
             assertFalse("a call from another engine waits for it too", platform.await(0));
             assertFalse(badArgument.await(0));
+            assertFalse("a direct caller waits for the registration in progress",
+                    directCallerReturned.await(0, TimeUnit.MILLISECONDS));
 
             release.countDown();
             assertTrue(logLevel.await(5000));
             assertTrue(platform.await(5000));
             assertTrue(badArgument.await(5000));
+            assertTrue(directCallerReturned.await(5, TimeUnit.SECONDS));
 
             final Reply logLevelAfterLoad = new Reply(true);
-            engine.onMethodCall(new MethodCall("getLogLevel", null), logLevelAfterLoad);
+            assertTrue(runOnMain(() -> engine.onMethodCall(new MethodCall("getLogLevel", null), logLevelAfterLoad), 2000));
             assertTrue(logLevelAfterLoad.await(5000));
 
             assertEquals("success", logLevel.kind);
@@ -94,11 +110,15 @@ public class FFmpegKitFlutterPluginStartupTest {
             assertEquals(FFmpegKitFlutterPlugin.PLATFORM_NAME, platform.value);
             assertTrue("callbacks were registered before the reply", logLevel.callbacksRegisteredAtReply);
             assertTrue("callbacks were registered before the reply", platform.callbacksRegisteredAtReply);
+            assertTrue("the direct caller returned after the registration", registeredForDirectCaller.get());
             assertEquals("error", badArgument.kind);
             assertEquals("error", badArgument.value);
             assertEquals(Collections.singletonList("MethodChannel#flutter.arthenica.com/ffmpeg_kit"), failedCallLogs);
-            assertTrue("waiting calls run in arrival order",
-                    logLevel.order < platform.order && platform.order < badArgument.order);
+            // Successes are posted to the main thread; the error is sent while the call runs.
+            assertTrue("waiting calls run in arrival order", logLevel.order < platform.order);
+            for (final Reply reply : new Reply[]{logLevel, platform, badArgument, logLevelAfterLoad}) {
+                assertSame("replies arrive on the main thread", mainThread(), reply.thread);
+            }
             assertEquals(1, loads.get());
         } finally {
             release.countDown();
