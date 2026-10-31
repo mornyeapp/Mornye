@@ -47,7 +47,10 @@ final _routerProvider = Provider<GoRouter>((ref) {
       (settings) => (
         isFirstLaunch: settings.isFirstLaunch,
         hasCompletedTutorial: settings.hasCompletedTutorial,
-        hasSeenWhatsNew: settings.whatsNewSeen == AppInfo.whatsNewRelease,
+        // Desktop shows the tour as a dialog over the shell instead.
+        hasSeenWhatsNew:
+            isDesktopPlatform ||
+            settings.whatsNewSeen == AppInfo.whatsNewRelease,
       ),
     ),
   );

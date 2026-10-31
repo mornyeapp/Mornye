@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -247,6 +248,95 @@ void main() {
       await tester.tap(find.text('Skip for now'));
       await tester.pumpAndSettle();
       expect(find.byType(WhatsNewScreen), findsNothing);
+      expect(
+        container.read(settingsProvider).whatsNewSeen,
+        AppInfo.whatsNewRelease,
+      );
+    });
+
+    Future<ProviderContainer> openDialog(WidgetTester tester) async {
+      tester.view.physicalSize = const Size(1280, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final container = ProviderContainer(
+        overrides: [
+          settingsProvider.overrideWith(
+            () => _Settings(_updated, _Preferences()),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            theme: mornye ? MornyeTheme.build(Brightness.dark) : ThemeData(),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Builder(
+              builder: (context) => TextButton(
+                onPressed: () => showWhatsNewDialog(context),
+                child: const Text('about'),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('about'));
+      await tester.pumpAndSettle();
+      return container;
+    }
+
+    testWidgets('$style desktop dialog lists the sections beside one', (
+      tester,
+    ) async {
+      final container = await openDialog(tester);
+
+      expect(find.byType(WhatsNewScreen), findsNothing);
+      expect(find.text('Mornye ${AppInfo.whatsNewRelease} is here'), findsOne);
+      // The list names every section; the first one is shown.
+      for (final title in [
+        'A Home that learns',
+        'Player and lyrics',
+        'Library and search',
+        'Faster everywhere',
+      ]) {
+        expect(find.text(title), findsOne);
+      }
+      expect(find.text('Mornye Link'), findsNWidgets(2));
+      expect(find.text('Play across devices'), findsOne);
+
+      // A click on a section shows it; Next walks to the last one.
+      await tester.tap(find.text('Library and search'));
+      await tester.pumpAndSettle();
+      expect(find.text('Browse by folder'), findsOne);
+      await tester.tap(find.text('Next'));
+      await tester.pumpAndSettle();
+      expect(find.text('Faster everywhere'), findsNWidgets(2));
+      expect(find.text('Skip for now'), findsNothing);
+      expect(tester.takeException(), isNull);
+
+      await tester.tap(find.text('Start listening'));
+      await tester.pumpAndSettle();
+      expect(find.text('Faster everywhere'), findsNothing);
+      expect(
+        container.read(settingsProvider).whatsNewSeen,
+        AppInfo.whatsNewRelease,
+      );
+    });
+
+    testWidgets('$style desktop dialog marks the tour seen on Esc', (
+      tester,
+    ) async {
+      final container = await openDialog(tester);
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pumpAndSettle();
+      expect(find.text('Gapless playback'), findsNothing);
+      expect(find.text('Mixes from your Library'), findsOne);
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+      expect(find.text('Mixes from your Library'), findsNothing);
       expect(
         container.read(settingsProvider).whatsNewSeen,
         AppInfo.whatsNewRelease,

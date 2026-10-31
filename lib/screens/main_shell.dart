@@ -27,6 +27,7 @@ import 'package:mornye/screens/repo_tab.dart';
 import 'package:mornye/screens/queue_tab.dart';
 import 'package:mornye/screens/settings/profile_settings_page.dart';
 import 'package:mornye/screens/settings/settings_tab.dart';
+import 'package:mornye/screens/whats_new_screen.dart';
 import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/services/shell_navigation_service.dart';
 import 'package:mornye/services/share_intent_service.dart';
@@ -272,6 +273,9 @@ class _MainShellState extends ConsumerState<MainShell>
       unawaited(_restorePlayback());
       _setupShareListener();
       await _checkSafMigration();
+      if (!mounted) return;
+      await maybeShowWhatsNewDialog(context, ref);
+      if (!mounted) return;
       final updateDialogShown = await _checkForUpdates();
       if (!updateDialogShown) {
         await _checkAppAnnouncement();
