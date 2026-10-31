@@ -17,18 +17,20 @@ final _log = AppLogger('LinkNowPlaying');
 class IosLinkNowPlaying with WidgetsBindingObserver {
   IosLinkNowPlaying({
     required this.remote,
-    required this.server,
+    required LinkServerRecord server,
     required this.apiKey,
     required this.track,
     Future<Object?> Function(String, Map<String, Object?>?)? invoke,
-  }) : _invoke = invoke ?? _channel.invokeMethod<Object?>,
+  }) : _server = server,
+       _invoke = invoke ?? _channel.invokeMethod<Object?>,
        _binding = '${DateTime.now().microsecondsSinceEpoch}-${_nextBinding++}';
 
   static const _channel = MethodChannel('com.zarz.mornye/link_now_playing');
   static int _nextBinding = 0;
 
   final RemotePlayback remote;
-  final LinkServerRecord server;
+  LinkServerRecord _server;
+  LinkServerRecord get server => _server;
   final Future<String?> Function() apiKey;
 
   /// The computer's current track.
@@ -41,6 +43,8 @@ class IosLinkNowPlaying with WidgetsBindingObserver {
   double _volume = 1;
   bool _disposed = false;
   bool _configured = false;
+  bool _nativeConfigured = false;
+  bool _ended = false;
   bool _scheduled = false;
   bool _draining = false;
   Map<String, Object?>? _pending;
@@ -68,11 +72,34 @@ class IosLinkNowPlaying with WidgetsBindingObserver {
     unawaited(_configure());
   }
 
+  /// Keeps the system's remote controls on the paired computer's current IP.
+  void updateServer(LinkServerRecord server) {
+    if (_disposed || server.serverId != _server.serverId) return;
+    if (server.address == _server.address &&
+        server.fingerprint == _server.fingerprint &&
+        server.name == _server.name) {
+      return;
+    }
+    _server = server;
+    _configured = false;
+    unawaited(_configure());
+  }
+
   Future<void> _configure() async {
+    final server = _server;
     try {
-      if (await _invoke('supported', null) != true || _disposed) return;
+      if (await _invoke('supported', null) != true ||
+          _disposed ||
+          !identical(server, _server)) {
+        return;
+      }
       final key = await apiKey();
-      if (_disposed || key == null || key.isEmpty) return;
+      if (_disposed ||
+          !identical(server, _server) ||
+          key == null ||
+          key.isEmpty) {
+        return;
+      }
       await _invoke('configure', {
         'binding': _binding,
         'id': server.serverId,
@@ -80,11 +107,16 @@ class IosLinkNowPlaying with WidgetsBindingObserver {
         'fingerprint': server.fingerprint,
         'apiKey': key,
       });
-      _configured = true;
+      _nativeConfigured = true;
       if (_disposed) {
         await _end();
         return;
       }
+      if (!identical(server, _server)) return;
+      _configured = true;
+      _sent = null;
+      _retryAfter = null;
+      _schedule();
       await _drain();
     } on MissingPluginException {
       // An older native build continues to use its existing media handler.
@@ -186,6 +218,8 @@ class IosLinkNowPlaying with WidgetsBindingObserver {
   }
 
   Future<void> _end() async {
+    if (_ended) return;
+    _ended = true;
     try {
       await _invoke('end', {'binding': _binding});
     } on Object catch (error) {
@@ -200,6 +234,6 @@ class IosLinkNowPlaying with WidgetsBindingObserver {
     for (final subscription in _subscriptions) {
       unawaited(subscription.cancel());
     }
-    if (_configured) unawaited(_end());
+    if (_nativeConfigured) unawaited(_end());
   }
 }

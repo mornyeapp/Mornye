@@ -170,6 +170,44 @@ void main() {
     },
   );
 
+  for (final whileConfiguring in [false, true]) {
+    test(
+      'a new IP refreshes native controls (configuring: $whileConfiguring)',
+      () async {
+        if (whileConfiguring) native.configure = Completer<void>();
+        binding.start();
+        remote.items.add(item);
+        remote.states.add(state(34));
+        await _flush();
+        final moved = LinkServerRecord(
+          serverId: server.serverId,
+          name: server.name,
+          connectionId: server.connectionId,
+          address: 'https://192.168.18.5:3939',
+          fingerprint: server.fingerprint,
+        );
+        binding.updateServer(moved);
+        await _flush();
+        if (whileConfiguring) native.configure!.complete();
+        await _flush();
+
+        final configurations = native.calls.where(
+          (call) => call.method == 'configure',
+        );
+        expect(configurations, hasLength(2));
+        expect(configurations.last.arguments!['address'], moved.address);
+        expect(configurations.last.arguments!['apiKey'], 'pairing-secret');
+        expect(
+          configurations.map((call) => call.arguments!['binding']).toSet(),
+          hasLength(1),
+        );
+        expect(native.snapshots.last['title'], 'Song');
+        expect(native.snapshots.last['position'], 34.0);
+        expect(jsonEncode(native.snapshots), isNot(contains('pairing-secret')));
+      },
+    );
+  }
+
   test(
     'a missing remote track clears the card instead of retaining local media',
     () async {
@@ -225,6 +263,25 @@ void main() {
       expect(ended.arguments!['binding'], configured.arguments!['binding']);
     },
   );
+
+  test('disposal while changing IP ends the previous native card', () async {
+    binding.start();
+    remote.items.add(item);
+    remote.states.add(state(0));
+    await _flush();
+    binding.updateServer(
+      LinkServerRecord(
+        serverId: server.serverId,
+        name: server.name,
+        connectionId: server.connectionId,
+        address: 'https://192.168.18.5:3939',
+        fingerprint: server.fingerprint,
+      ),
+    );
+    binding.dispose();
+    await _flush();
+    expect(native.calls.where((call) => call.method == 'end'), hasLength(1));
+  });
 
   test('returning to local playback ends the remote session once', () async {
     binding.start();

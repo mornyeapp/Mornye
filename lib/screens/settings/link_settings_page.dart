@@ -78,16 +78,21 @@ class _LinkSettingsPageState extends ConsumerState<LinkSettingsPage> {
     int port, {
     String? expectedFingerprint,
     String? name,
+    bool reusePairing = false,
   }) async {
     if (_busy) return;
     setState(() => _busy = true);
     final LinkPairingTarget target;
+    var reconnected = false;
     try {
       target = await _controller.probe(
         host,
         port,
         expectedFingerprint: expectedFingerprint,
       );
+      if (reusePairing) {
+        reconnected = await _controller.reconnectPaired(target);
+      }
     } on LinkPairingException catch (error) {
       if (!mounted) return;
       setState(() => _busy = false);
@@ -100,6 +105,7 @@ class _LinkSettingsPageState extends ConsumerState<LinkSettingsPage> {
     }
     if (!mounted) return;
     setState(() => _busy = false);
+    if (reconnected) return;
     final serverName = target.info.name.isNotEmpty
         ? target.info.name
         : name ?? host;
@@ -149,7 +155,7 @@ class _LinkSettingsPageState extends ConsumerState<LinkSettingsPage> {
       builder: (_) => const LinkManualAddDialog(),
     );
     if (address == null || !mounted) return;
-    await _pair(address.host, address.port);
+    await _pair(address.host, address.port, reusePairing: true);
   }
 
   Future<void> _forget(LinkServerRecord record) async {

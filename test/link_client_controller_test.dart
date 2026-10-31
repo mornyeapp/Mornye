@@ -153,6 +153,77 @@ void main() {
     expect(harness.active, isNull);
   });
 
+  test('a known manual address reuses the saved pairing and Library', () async {
+    final harness = await _started();
+    final record = await harness.controller.pair(linkTestTarget('a'), '123456');
+    await pumpEventQueue();
+    final session = harness.sessions.single;
+    final moved = linkTestTarget('a', host: '192.168.18.5', pairing: false);
+
+    expect(await harness.controller.reconnectPaired(moved), isTrue);
+    expect(session.server.address, moved.address);
+    expect(harness.state.activeServer!.connectionId, record.connectionId);
+    expect(harness.bridge.connections[record.connectionId]!.apiKey, 'key-1');
+    expect(harness.pairing.pins, ['123456']);
+    expect(harness.sessions, [session]);
+    expect(harness.bridge.calls.where((call) => call.startsWith('source ')), [
+      'source ${record.connectionId}',
+    ]);
+  });
+
+  test('a new computer or a refused key still needs pairing', () async {
+    final harness = await _started();
+    expect(
+      await harness.controller.reconnectPaired(linkTestTarget('a')),
+      isFalse,
+    );
+    await harness.controller.pair(linkTestTarget('a'), '123456');
+    await pumpEventQueue();
+    harness.sessions.single.emit(
+      LinkConnectionState.disconnected,
+      LinkSessionIssue.unauthorized,
+    );
+    await pumpEventQueue();
+    expect(
+      await harness.controller.reconnectPaired(
+        linkTestTarget('a', host: '192.168.18.5'),
+      ),
+      isFalse,
+    );
+    expect(harness.state.activeServer!.address, 'https://10.0.0.2:47710');
+  });
+
+  test('a known manual address must keep the paired certificate', () async {
+    final harness = await _started();
+    await harness.controller.pair(linkTestTarget('a'), '123456');
+    await pumpEventQueue();
+    final other = linkTestTarget('b', host: '192.168.18.5');
+    await expectLater(
+      harness.controller.reconnectPaired(
+        LinkPairingTarget(
+          address: other.address,
+          info: LinkServerInfo(
+            serverId: 'a',
+            name: other.info.name,
+            protocol: other.info.protocol,
+            appVersion: other.info.appVersion,
+            fingerprint: other.fingerprint,
+            pairing: false,
+          ),
+        ),
+      ),
+      throwsA(
+        isA<LinkPairingException>().having(
+          (error) => error.error,
+          'error',
+          LinkPairingError.certificateMismatch,
+        ),
+      ),
+    );
+    expect(harness.state.activeServer!.address, 'https://10.0.0.2:47710');
+    expect(harness.sessions.single.calls, ['start']);
+  });
+
   test('a bad address fails before any request', () async {
     final harness = await _started();
     await expectLater(
@@ -422,20 +493,115 @@ void main() {
     expect(harness.browser.started, started + 1);
   });
 
-  test('network changes keep an already connected session open', () async {
+  test(
+    'network changes rediscover a connected desktop at its new IP',
+    () async {
+      final changes = StreamController<void>.broadcast();
+      addTearDown(changes.close);
+      final harness = await _started(networkChanges: changes.stream);
+      final record = await harness.controller.pair(
+        linkTestTarget('a'),
+        '123456',
+      );
+      await pumpEventQueue();
+      final session = harness.sessions.single;
+      session.emit(LinkConnectionState.connected);
+      await pumpEventQueue();
+      changes.add(null);
+      await pumpEventQueue();
+      expect(session.calls, ['start']);
+      expect(harness.state.connection, LinkConnectionState.connected);
+      expect(harness.state.discovery, LinkDiscoveryStatus.searching);
+
+      harness.browser.resolve('a', '192.168.18.5');
+      await pumpEventQueue();
+      expect(session.server.address, 'https://192.168.18.5:47710');
+      expect(harness.state.activeServer!.connectionId, record.connectionId);
+      expect(harness.bridge.connections[record.connectionId]!.apiKey, 'key-1');
+      expect(harness.pairing.pins, ['123456']);
+      expect(harness.sessions, [session]);
+      expect(
+        (await LinkClientStore().servers()).single.address,
+        'https://192.168.18.5:47710',
+      );
+    },
+  );
+
+  testWidgets('network rediscovery ends while a healthy session stays open', (
+    tester,
+  ) async {
     final changes = StreamController<void>.broadcast();
     addTearDown(changes.close);
-    final harness = await _started(networkChanges: changes.stream);
+    final harness = LinkClientHarness(networkChanges: changes.stream);
+    addTearDown(harness.container.dispose);
+    await harness.start();
     await harness.controller.pair(linkTestTarget('a'), '123456');
-    await pumpEventQueue();
+    await tester.pump();
     final session = harness.sessions.single;
     session.emit(LinkConnectionState.connected);
-    await pumpEventQueue();
+    await tester.pump();
+
     changes.add(null);
-    await pumpEventQueue();
-    expect(session.calls, ['start']);
+    await tester.pump();
+    expect(harness.state.discovery, LinkDiscoveryStatus.searching);
+    await tester.pump(const Duration(seconds: 31));
+    expect(harness.state.discovery, LinkDiscoveryStatus.idle);
     expect(harness.state.connection, LinkConnectionState.connected);
+    expect(session.calls, ['start']);
   });
+
+  testWidgets('an unreachable desktop gets a fresh address resolution', (
+    tester,
+  ) async {
+    final harness = LinkClientHarness();
+    addTearDown(harness.container.dispose);
+    await harness.start();
+    await harness.controller.pair(linkTestTarget('a'), '123456');
+    await tester.pump();
+    harness.browser.resolve('a', '10.0.0.2');
+    await tester.pump();
+    final started = harness.browser.started;
+
+    await tester.pump(const Duration(seconds: 16));
+    await tester.runAsync(pumpEventQueue);
+    await tester.pump();
+    expect(harness.browser.started, started + 1);
+    harness.browser.resolve('a', '192.168.18.5');
+    await tester.pump();
+    expect(
+      harness.sessions.single.server.address,
+      'https://192.168.18.5:47710',
+    );
+
+    harness.sessions.single.emit(LinkConnectionState.connected);
+    await tester.pump();
+    final connected = harness.browser.started;
+    await tester.pump(const Duration(seconds: 31));
+    expect(harness.browser.started, connected);
+  });
+
+  test(
+    'background playback rediscovers a desktop after disconnecting',
+    () async {
+      final harness = await _started();
+      await harness.controller.pair(linkTestTarget('a'), '123456');
+      await pumpEventQueue();
+      final session = harness.sessions.single;
+      session.emit(LinkConnectionState.connected);
+      harness.keepConnected(true);
+      await _lifecycle([AppLifecycleState.hidden, AppLifecycleState.paused]);
+
+      session.emit(
+        LinkConnectionState.disconnected,
+        LinkSessionIssue.unreachable,
+      );
+      await pumpEventQueue();
+      expect(harness.state.discovery, LinkDiscoveryStatus.searching);
+      harness.browser.resolve('a', '192.168.18.5');
+      await pumpEventQueue();
+      expect(session.server.address, 'https://192.168.18.5:47710');
+    },
+  );
 
   test(
     'a failed browser is recreated while the Link page stays open',

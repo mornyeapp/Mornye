@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/screens/settings/link_pairing_dialogs.dart';
 import 'package:mornye/screens/settings/link_settings_page.dart';
+import 'package:mornye/services/link/client/link_client_controller.dart';
 import 'package:mornye/services/link/client/link_client_pairing.dart';
 import 'package:mornye/services/link/client/link_client_store.dart';
 import 'package:mornye/services/link/features/link_phone_options.dart';
@@ -268,6 +269,43 @@ void main() {
     }
 
     for (final mornye in [false, true]) {
+      testWidgets(
+        '${mornye ? 'Mornye' : 'Material'}: a known new IP skips the PIN dialog',
+        (tester) async {
+          final harness = await pumpPage(tester, mornye: mornye);
+          final controller = ProviderScope.containerOf(
+            tester.element(find.byType(LinkSettingsPage)),
+          ).read(linkClientControllerProvider.notifier);
+          final record = await controller.pair(linkTestTarget('a'), '123456');
+          await _settle(tester);
+          final session = harness.sessions.single;
+          harness.pairing.targets['192.168.18.5'] = linkTestTarget(
+            'a',
+            host: '192.168.18.5',
+            pairing: false,
+          );
+
+          final add = find.text(_l10n.linkAddManually);
+          await tester.scrollUntilVisible(add, 300);
+          await tester.tap(add);
+          await _settle(tester);
+          await tester.enterText(
+            find.byKey(LinkManualAddDialog.hostKey),
+            '192.168.18.5',
+          );
+          await tester.tap(find.text(_l10n.linkContinue));
+          await _settle(tester);
+
+          expect(find.byType(LinkPinDialog), findsNothing);
+          expect(harness.pairing.pins, ['123456']);
+          expect(harness.sessions, [session]);
+          expect(session.server.address, 'https://192.168.18.5:47710');
+          expect(session.server.connectionId, record.connectionId);
+          await tester.pumpWidget(const SizedBox());
+          await tester.pump();
+        },
+      );
+
       testWidgets(
         '${mornye ? 'Mornye' : 'Material'}: pairs a nearby computer',
         (tester) async {

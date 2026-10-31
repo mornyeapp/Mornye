@@ -208,6 +208,12 @@ final linkRemotePlaybackProvider = Provider<LinkRemotePlayback?>((ref) {
               ?.apiKey,
       track: () => ref.read(linkDesktopRemoteProvider).player?.track,
     )..start();
+    ref.listen(
+      linkClientControllerProvider.select((state) => state.activeServer),
+      (_, server) {
+        if (server != null) nowPlaying.updateServer(server);
+      },
+    );
     ref.onDispose(nowPlaying.dispose);
   }
   ref.onDispose(playback.dispose);

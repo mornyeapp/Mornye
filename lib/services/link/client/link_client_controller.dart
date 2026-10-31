@@ -206,6 +206,8 @@ class LinkClientController extends Notifier<LinkClientState> {
   /// How long `catalog.changed` bursts settle before a rescan.
   static const rescanDelay = Duration(seconds: 2);
   static const discoveryRetryDelay = Duration(seconds: 2);
+  static const discoveryRefreshInterval = Duration(seconds: 15);
+  static const networkDiscoveryDuration = Duration(seconds: 30);
 
   LinkSession? _session;
   StreamSubscription<LinkConnectionState>? _stateSubscription;
@@ -214,6 +216,8 @@ class LinkClientController extends Notifier<LinkClientState> {
   AppLifecycleListener? _lifecycle;
   StreamSubscription<void>? _networkSubscription;
   Timer? _discoveryRetry;
+  Timer? _discoveryRefresh;
+  Timer? _networkDiscovery;
   var _discoveryFailures = 0;
   var _restartingDiscovery = false;
   Timer? _rescan;
@@ -426,6 +430,7 @@ class LinkClientController extends Notifier<LinkClientState> {
     } else {
       _session?.pause();
     }
+    if (!_foreground) _updateDiscovery();
   }
 
   /// Keeps discovery running while the returned callback is not called, for
@@ -450,13 +455,19 @@ class LinkClientController extends Notifier<LinkClientState> {
 
   void _updateDiscovery() {
     if (_disposed || _restartingDiscovery) return;
+    if (!_connected || !state.localNetworkAvailable || _session == null) {
+      _networkDiscovery?.cancel();
+      _networkDiscovery = null;
+    }
+    final reconnecting =
+        _session != null && state.connection != LinkConnectionState.connected;
     final wanted =
-        _foreground &&
+        _connected &&
         state.localNetworkAvailable &&
         !_discoveryBlocked &&
-        (_discoveryHolds > 0 ||
-            (_session != null &&
-                state.connection != LinkConnectionState.connected));
+        ((_foreground && _discoveryHolds > 0) ||
+            reconnecting ||
+            _networkDiscovery != null);
     final discovery = _discovery ??= LinkDiscovery(
       createBrowser: _environment.createBrowser,
       ensureAccess: _environment.ensureLocalNetwork,
@@ -474,6 +485,17 @@ class LinkClientController extends Notifier<LinkClientState> {
     } else if (!wanted && discovery.status == LinkDiscoveryStatus.searching) {
       unawaited(discovery.stop());
     }
+    // Older NSD/Bonjour resolvers can keep the first IP indefinitely without
+    // emitting an update. Recreate them only while a session needs recovery.
+    if (wanted && reconnecting && discovery.running) {
+      _discoveryRefresh ??= Timer(discoveryRefreshInterval, () {
+        _discoveryRefresh = null;
+        unawaited(_restartDiscovery());
+      });
+    } else {
+      _discoveryRefresh?.cancel();
+      _discoveryRefresh = null;
+    }
   }
 
   void _onDiscoveryChanged() {
@@ -481,13 +503,17 @@ class LinkClientController extends Notifier<LinkClientState> {
     if (_disposed || discovery == null) return;
     final before = {for (final s in state.discovered) s.serverId};
     final found = discovery.servers;
+    if (!discovery.running) {
+      _discoveryRefresh?.cancel();
+      _discoveryRefresh = null;
+    }
     if (discovery.status == LinkDiscoveryStatus.permissionDenied) {
       // Do not ask again on every reconnect; the page offers a button.
       _discoveryBlocked = true;
     }
     state = state.copyWith(discovered: found, discovery: discovery.status);
     if (discovery.status == LinkDiscoveryStatus.failed &&
-        _foreground &&
+        _connected &&
         state.localNetworkAvailable &&
         !_discoveryBlocked &&
         _discoveryRetry == null) {
@@ -507,7 +533,18 @@ class LinkClientController extends Notifier<LinkClientState> {
       // Another certificate under a known id is not followed anywhere.
       if (record == null || record.fingerprint != server.fingerprint) continue;
       if (record.address != server.address) {
-        unawaited(_serial(() => _move(record.serverId, server.address)));
+        unawaited(
+          _serial(
+            () => _move(
+              record.serverId,
+              server.address,
+              fingerprint: server.fingerprint,
+            ),
+          ).catchError(
+            (Object error) =>
+                _log.w('Updating the computer address failed: $error'),
+          ),
+        );
       } else if (!before.contains(server.serverId) &&
           record.serverId == state.activeServerId) {
         _session?.reconnectNow();
@@ -515,11 +552,20 @@ class LinkClientController extends Notifier<LinkClientState> {
     }
   }
 
-  Future<void> _move(String serverId, String address) async {
+  Future<void> _move(
+    String serverId,
+    String address, {
+    required String fingerprint,
+  }) async {
     final record = state.servers
         .where((s) => s.serverId == serverId)
         .firstOrNull;
-    if (record == null || record.address == address || _disposed) return;
+    if (record == null ||
+        record.fingerprint != fingerprint ||
+        record.address == address ||
+        _disposed) {
+      return;
+    }
     _log.i('Computer ${record.name} moved to a new address');
     final servers = await _store.updateAddress(serverId, address);
     await _library.updateAddress(record.connectionId, address);
@@ -546,6 +592,16 @@ class LinkClientController extends Notifier<LinkClientState> {
   Future<void> _refreshNetworkConnection() async {
     await refreshLocalNetwork();
     if (_disposed) return;
+    _networkDiscovery?.cancel();
+    _networkDiscovery = null;
+    if (_connected && state.localNetworkAvailable && _session != null) {
+      // TCP may still look connected after changing Wi-Fi or waking the app.
+      // Resolve the desktop again without interrupting a healthy socket.
+      _networkDiscovery = Timer(networkDiscoveryDuration, () {
+        _networkDiscovery = null;
+        _updateDiscovery();
+      });
+    }
     await _restartDiscovery();
     if (!_disposed &&
         _connected &&
@@ -560,6 +616,8 @@ class LinkClientController extends Notifier<LinkClientState> {
     _restartingDiscovery = true;
     _discoveryRetry?.cancel();
     _discoveryRetry = null;
+    _discoveryRefresh?.cancel();
+    _discoveryRefresh = null;
     _discoveryFailures = 0;
     try {
       await _discovery?.stop();
@@ -602,6 +660,40 @@ class LinkClientController extends Notifier<LinkClientState> {
         .read(linkPairingApiProvider)
         .probe(address, expectedFingerprint: expectedFingerprint);
   }
+
+  /// Reuses a paired computer after a certificate-checked [probe], including
+  /// a manually entered new IP. A missing or refused key still needs a PIN.
+  Future<bool> reconnectPaired(LinkPairingTarget target) => _serial(() async {
+    if (_disposed) return false;
+    final record = state.servers
+        .where((server) => server.serverId == target.info.serverId)
+        .firstOrNull;
+    if (record == null) return false;
+    if (record.fingerprint != target.fingerprint) {
+      throw const LinkPairingException(LinkPairingError.certificateMismatch);
+    }
+    final connection = await _library.connection(record.connectionId);
+    if (_disposed || connection == null || connection.apiKey.isEmpty) {
+      return false;
+    }
+    final active = state.activeServerId == record.serverId;
+    if (active && state.issue == LinkSessionIssue.unauthorized) return false;
+    await _move(
+      record.serverId,
+      target.address,
+      fingerprint: target.fingerprint,
+    );
+    if (_disposed) return false;
+    if (!active) {
+      await _store.setActiveServerId(record.serverId);
+      if (_disposed) return false;
+      state = state.copyWith(activeServerId: record.serverId);
+      await _restartSession();
+    } else {
+      _session?.reconnectNow();
+    }
+    return true;
+  });
 
   /// Pairs with [target] using [pin]. On success the desktop is saved as a
   /// Subsonic network connection, added to Library and scanned; re-pairing
@@ -701,6 +793,8 @@ class LinkClientController extends Notifier<LinkClientState> {
     unawaited(_networkSubscription?.cancel());
     _networkSubscription = null;
     _discoveryRetry?.cancel();
+    _discoveryRefresh?.cancel();
+    _networkDiscovery?.cancel();
     _rescan?.cancel();
     unawaited(_stateSubscription?.cancel());
     unawaited(_messageSubscription?.cancel());
