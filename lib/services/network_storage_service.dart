@@ -239,7 +239,26 @@ class NetworkStorageService {
   final Future<String?> Function() _read;
   final Future<void> Function(String) _write;
   final Future<void> Function(Uri) _ensureAccess;
+
+  /// Default timeout for general network operations, listings, and downloads.
   static const timeout = Duration(seconds: 20);
+
+  /// Maximum socket backpressure wait time per chunk during file uploads.
+  /// Prevents false stall failures on slow or fluctuating mobile networks.
+  static const uploadChunkTimeout = Duration(minutes: 2);
+
+  /// Maximum wait time for the server to commit and return response headers
+  /// after all upload bytes have been flushed. Accommodates slow NAS disk I/O.
+  static const uploadResponseTimeout = Duration(minutes: 30);
+
+  @visibleForTesting
+  static Duration? debugTimeoutOverride;
+
+  @visibleForTesting
+  static Duration? debugUploadChunkTimeoutOverride;
+
+  @visibleForTesting
+  static Duration? debugUploadResponseTimeoutOverride;
   Future<List<NetworkConnection>>? _loading;
   List<NetworkConnection>? _connections;
   Future<HttpServer>? _server;
@@ -526,10 +545,12 @@ class NetworkStorageService {
       request.contentLength = await upload.length();
       var sent = 0;
       try {
+        final chunkTimeout =
+            debugUploadChunkTimeoutOverride ?? uploadChunkTimeout;
         await for (final chunk in upload.openRead()) {
           checkpoint?.call();
           request.add(chunk);
-          await request.flush().timeout(timeout);
+          await request.flush().timeout(chunkTimeout);
           sent += chunk.length;
           progress?.call(sent);
         }
@@ -553,8 +574,11 @@ class NetworkStorageService {
     }
     final HttpClientResponse response;
     try {
+      final effectiveTimeout = upload != null
+          ? (debugUploadResponseTimeoutOverride ?? uploadResponseTimeout)
+          : (debugTimeoutOverride ?? timeout);
       response = await request.close().timeout(
-        timeout,
+        effectiveTimeout,
         onTimeout: () {
           request.abort();
           throw TimeoutException('Network response timed out');
@@ -978,6 +1002,15 @@ class NetworkStorageService {
       } catch (_) {}
     }
   }
+
+  @visibleForTesting
+  Future<HttpClientResponse> debugRequest({
+    required HttpClient client,
+    required NetworkConnection connection,
+    required String method,
+    required Uri uri,
+    File? upload,
+  }) => _request(client, connection, method, uri, upload: upload);
 
   Future<void> dispose() async {
     final server = _server;
