@@ -17,6 +17,7 @@ import 'package:mornye/providers/library_collections_provider.dart';
 import 'package:mornye/providers/local_library_provider.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/recent_access_provider.dart';
+import 'package:mornye/providers/repo_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/providers/system_volume_provider.dart';
 import 'package:mornye/screens/home_tab.dart';
@@ -54,6 +55,7 @@ void main() {
   });
 
   late _Queue queue;
+  late _Repo repo;
 
   Future<void> settle(WidgetTester tester) async {
     for (var i = 0; i < 25; i++) {
@@ -88,6 +90,7 @@ void main() {
           localLibraryProvider.overrideWith(_Local.new),
           libraryCollectionsProvider.overrideWith(_Collections.new),
           downloadQueueProvider.overrideWith(() => queue = _Queue()),
+          repoProvider.overrideWith(() => repo = _Repo()),
           currentMediaItemProvider.overrideWithBuild(
             (ref, notifier) => Stream.value(null),
           ),
@@ -179,27 +182,32 @@ void main() {
         expect(tester.takeException(), isNull);
       });
 
-      testWidgets('a download count change rebuilds only the badges '
-          '($platform, $style)', (tester) async {
-        await pumpShell(tester, desktop: desktop, mornye: mornye);
-        final probeBuilds = await pushProbeInLibrary(tester);
-        final builds = probeBuilds.single;
-        final before = shellAndPages(tester);
-        expect(find.text('3'), findsNothing);
+      for (final (badge, setCount) in <(String, void Function(int))>[
+        ('download', (count) => queue.setQueued(count)),
+        ('Store update', (count) => repo.setUpdates(count)),
+      ]) {
+        testWidgets('a $badge count change rebuilds only the badges '
+            '($platform, $style)', (tester) async {
+          await pumpShell(tester, desktop: desktop, mornye: mornye);
+          final probeBuilds = await pushProbeInLibrary(tester);
+          final builds = probeBuilds.single;
+          final before = shellAndPages(tester);
+          expect(find.text('3'), findsNothing);
 
-        queue.setQueued(3);
-        await settle(tester);
-        expect(find.text('3'), findsWidgets);
+          setCount(3);
+          await settle(tester);
+          expect(find.text('3'), findsWidgets);
 
-        queue.setQueued(2);
-        await settle(tester);
-        expect(find.text('3'), findsNothing);
-        expect(find.text('2'), findsWidgets);
+          setCount(2);
+          await settle(tester);
+          expect(find.text('3'), findsNothing);
+          expect(find.text('2'), findsWidgets);
 
-        expect(probeBuilds.single, builds);
-        expectSameInstances(before, shellAndPages(tester));
-        expect(tester.takeException(), isNull);
-      });
+          expect(probeBuilds.single, builds);
+          expectSameInstances(before, shellAndPages(tester));
+          expect(tester.takeException(), isNull);
+        });
+      }
     }
   }
 
@@ -324,6 +332,31 @@ class _Queue extends DownloadQueueNotifier {
           ),
           service: 'example-provider',
           createdAt: DateTime(2026),
+        ),
+    ],
+  );
+}
+
+class _Repo extends RepoNotifier {
+  @override
+  RepoState build() => const RepoState(isInitialized: true);
+
+  @override
+  Future<void> initialize(String cacheDir) async {}
+
+  void setUpdates(int count) => state = state.copyWith(
+    extensions: [
+      for (var i = 0; i < count; i++)
+        RepoExtension(
+          id: 'extension-$i',
+          name: 'extension-$i',
+          displayName: 'Extension $i',
+          version: '1.0.0',
+          description: '',
+          category: RepoCategory.metadata,
+          updatedAt: '2026-01-01',
+          isInstalled: true,
+          hasUpdate: true,
         ),
     ],
   );

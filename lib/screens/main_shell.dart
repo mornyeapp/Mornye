@@ -70,10 +70,14 @@ part 'main_shell_startup_prompts.dart';
 
 final _log = AppLogger('MainShell');
 
-/// The download count on the Library destination. Only the navigation
-/// chrome watches it, so a finished download does not rebuild every tab.
+/// The badge counts on Library (queued downloads) and Store (extension
+/// updates). Only the navigation chrome watches them, so a finished
+/// download or an update check does not rebuild every tab.
 int _watchQueuedCount(WidgetRef ref) =>
     ref.watch(downloadQueueProvider.select((s) => s.queuedCount));
+
+int _watchRepoUpdatesCount(WidgetRef ref) =>
+    ref.watch(repoProvider.select((s) => s.updatesAvailableCount));
 
 /// The tab at [index] in a style's destination order.
 @visibleForTesting
@@ -919,9 +923,6 @@ class _MainShellState extends ConsumerState<MainShell>
       showRepoTab: showStore,
       showSearchTab: context.isMornye,
     );
-    final repoUpdatesCount = ref.watch(
-      repoProvider.select((s) => s.updatesAvailableCount),
-    );
 
     final tabs = <Widget>[
       _TabNavigator(
@@ -1033,7 +1034,7 @@ class _MainShellState extends ConsumerState<MainShell>
     );
 
     // From here only the navigation chrome follows the window size and the
-    // download count. It gets the same tab view each time, so neither
+    // badge counts. It gets the same tab view each time, so none of them
     // rebuilds the shell or the routes of its tabs; pages read them
     // themselves.
     if (isAndroidTv) {
@@ -1049,7 +1050,7 @@ class _MainShellState extends ConsumerState<MainShell>
               builder: (context, ref, body) => TvShell(
                 destinations: _navigationDestinations(
                   queuedCount: _watchQueuedCount(ref),
-                  repoUpdatesCount: repoUpdatesCount,
+                  repoUpdatesCount: _watchRepoUpdatesCount(ref),
                   showStore: showStore,
                 ),
                 selectedIndex: selectedDestination,
@@ -1080,7 +1081,7 @@ class _MainShellState extends ConsumerState<MainShell>
                     showStore: showStore,
                     // Mornye shows the queue on its Downloads link instead.
                     queueCount: mornye ? 0 : queuedCount,
-                    repoUpdatesCount: repoUpdatesCount,
+                    repoUpdatesCount: _watchRepoUpdatesCount(ref),
                   ),
                   selected: selectedTab,
                   onSelected: _onShellTabRequested,
@@ -1113,7 +1114,7 @@ class _MainShellState extends ConsumerState<MainShell>
             pageView: pageView!,
             destinations: _navigationDestinations(
               queuedCount: _watchQueuedCount(ref),
-              repoUpdatesCount: repoUpdatesCount,
+              repoUpdatesCount: _watchRepoUpdatesCount(ref),
               showStore: showStore,
             ),
             selectedDestination: selectedDestination,
