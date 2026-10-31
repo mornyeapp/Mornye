@@ -8,9 +8,12 @@ import 'package:sqflite/sqflite.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart'
     show databaseFactoryFfi, sqfliteFfiInit;
 import 'package:mornye/services/app_state_database.dart';
+import 'package:mornye/services/library_cover_snapshot.dart';
 import 'package:mornye/services/playable_media.dart';
+import 'package:mornye/services/playback_resume_store.dart';
 import 'package:mornye/services/playback_session_restore.dart';
 import 'package:mornye/services/playback_session_writer.dart';
+import 'package:mornye/services/sqlite_long_text.dart';
 
 PlayableMedia _song(int i) => PlayableMedia(
   id: 'song-$i',
@@ -200,4 +203,195 @@ void main() {
     expect(row['type'], 'text');
     expect(row['media_json'], _legacyJson(songs));
   });
+
+  test('a session over 2 MB reads back whole in pieces', () async {
+    final songs = [
+      for (var i = 0; i < 10000; i++)
+        i % 1000 == 999
+            ? PlayableMedia(
+                id: 'covered-$i',
+                source: '/Music/$i.flac',
+                title: 'Covered $i',
+                artist: 'Artist',
+                artUri: 'file:///data/library_covers/cover_$i.jpg',
+              )
+            : _song(i),
+    ];
+    final errors = <Object>[];
+    await PlaybackSessionWriter(database: store, onError: errors.add).persist(
+      queue: () => (media: List.of(songs), originalIndices: null),
+      index: 9999,
+      position: const Duration(seconds: 61),
+      shuffle: false,
+      repeatMode: 'all',
+    );
+    expect(errors, isEmpty);
+    final legacy = _legacyJson(songs);
+    expect(utf8.encode(legacy).length, greaterThan(2 * 1024 * 1024));
+    final covers = {
+      for (var i = 999; i < songs.length; i += 1000)
+        '${root.path}/cover_$i.jpg',
+    };
+
+    final watched = _Watched(db);
+    expect(
+      await readStoredLibraryCoverPaths(root, [
+        (database: watched, table: 'playback_session', column: 'media_json'),
+      ]),
+      covers,
+    );
+    final session = await store.getPlaybackSession();
+    expect(session?['media'], jsonDecode(legacy));
+    expect(session?['index'], 9999);
+    expect(session?['positionMs'], 61000);
+
+    await store.archivePlaybackSession(songs.last.toJson());
+    final resumed = await PlaybackResumeStore(watched).session();
+    expect(resumed?['media'], jsonDecode(legacy));
+    expect(resumed?['index'], 9999);
+    expect(resumed?['repeat'], 'all');
+    expect(
+      await readStoredLibraryCoverPaths(root, [
+        (database: watched, table: 'playback_resume', column: 'media_json'),
+      ]),
+      covers,
+    );
+    expect(watched.largest, lessThanOrEqualTo(longTextPieceBytes));
+    expect(watched.pieces, greaterThan(8));
+  });
+
+  test('pieces join to the same text at every boundary', () async {
+    for (final encoding in ['UTF-8', 'UTF-16le', 'UTF-16be']) {
+      final other = await databaseFactoryFfi.openDatabase(
+        inMemoryDatabasePath,
+        options: OpenDatabaseOptions(singleInstance: false),
+      );
+      await other.execute("PRAGMA encoding = '$encoding'");
+      await other.execute('CREATE TABLE t (id INTEGER PRIMARY KEY, body TEXT)');
+      final watched = _Watched(other);
+      // Byte sizes around one and two pieces, with two-, three- and
+      // four-byte characters split by a piece boundary.
+      final bodies = [
+        '',
+        'a' * longTextPieceBytes,
+        'a' * (longTextPieceBytes + 1),
+        'a' * (2 * longTextPieceBytes),
+        '${'a' * (longTextPieceBytes - 1)}é${'b' * 10}',
+        '${'a' * (longTextPieceBytes - 2)}坂${'b' * 10}',
+        '${'a' * (longTextPieceBytes - 3)}🎧${'b' * longTextPieceBytes}',
+      ];
+      for (final body in bodies) {
+        final id = await other.insert('t', {'body': body});
+        final row = (await watched.rawQuery(
+          'SELECT ${selectShortText('body', 'body')} FROM t WHERE id = ?',
+          [id],
+        )).single;
+        final bytes =
+            (await other.rawQuery(
+                  'SELECT length(CAST(body AS BLOB)) AS n FROM t WHERE id = ?',
+                  [id],
+                )).single['n']!
+                as int;
+        expect(row['body_bytes'], bytes, reason: encoding);
+        expect(
+          row['body'],
+          bytes <= longTextPieceBytes ? body : isNull,
+          reason: '$encoding ${body.length}',
+        );
+        final read = await readLongTextRow(
+          watched,
+          table: 't',
+          rowid: id,
+          textColumn: 'body',
+          decode: _sameText,
+        );
+        expect(read?.$2, body, reason: '$encoding ${body.length}');
+      }
+      expect(watched.largest, lessThanOrEqualTo(longTextPieceBytes));
+      await other.close();
+    }
+  });
+
+  test('a long session that does not decode throws when read', () async {
+    final text = '[${'"x",' * longTextPieceBytes}';
+    await db.insert('playback_session', {
+      'id': 1,
+      'media_json': text,
+      'current_index': 0,
+      'updated_at': '2026-10-31T00:00:00.000',
+    });
+    final stored = await readJsonTextRow(
+      db,
+      table: 'playback_session',
+      jsonColumn: 'media_json',
+      columns: const ['current_index'],
+    );
+    expect(stored?.row['media_json_bytes'], utf8.encode(text).length);
+    expect(stored?.json, throwsFormatException);
+    expect(await store.getPlaybackSession(), isNull);
+  });
+}
+
+String _sameText(String text) => text;
+
+/// Records the largest value any read returns and how many long-text
+/// pieces it read, through the database and its transactions.
+class _Watched implements Database {
+  _Watched(this._db);
+
+  final Database _db;
+  int largest = 0;
+  int pieces = 0;
+
+  List<Map<String, Object?>> watch(
+    String sql,
+    List<Map<String, Object?>> rows,
+  ) {
+    if (sql.contains('substr(')) pieces++;
+    for (final row in rows) {
+      for (final value in row.values) {
+        final size = switch (value) {
+          final String text => utf8.encode(text).length,
+          final Uint8List bytes => bytes.length,
+          _ => 0,
+        };
+        if (size > largest) largest = size;
+      }
+    }
+    return rows;
+  }
+
+  @override
+  Future<List<Map<String, Object?>>> rawQuery(
+    String sql, [
+    List<Object?>? arguments,
+  ]) async => watch(sql, await _db.rawQuery(sql, arguments));
+
+  @override
+  Future<T> transaction<T>(
+    Future<T> Function(Transaction txn) action, {
+    bool? exclusive,
+  }) => _db.transaction(
+    (txn) => action(_WatchedTransaction(txn, this)),
+    exclusive: exclusive,
+  );
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _WatchedTransaction implements Transaction {
+  _WatchedTransaction(this._txn, this._owner);
+
+  final Transaction _txn;
+  final _Watched _owner;
+
+  @override
+  Future<List<Map<String, Object?>>> rawQuery(
+    String sql, [
+    List<Object?>? arguments,
+  ]) async => _owner.watch(sql, await _txn.rawQuery(sql, arguments));
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }

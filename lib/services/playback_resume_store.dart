@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:sqflite/sqflite.dart';
+import 'package:mornye/services/sqlite_long_text.dart';
 
 /// A dismissed player's last session, separate from the active player state.
 class PlaybackResumeStore {
@@ -55,12 +56,17 @@ class PlaybackResumeStore {
   }
 
   Future<Map<String, dynamic>?> session() async {
-    final rows = await database.query(_table, limit: 1);
-    if (rows.isEmpty) return null;
-    final row = rows.first;
+    final stored = await readJsonTextRow(
+      database,
+      table: _table,
+      jsonColumn: 'media_json',
+      columns: const ['current_index', 'position_ms', 'shuffle', 'repeat_mode'],
+    );
+    if (stored == null) return null;
+    final row = stored.row;
     return {
       'version': 2,
-      'media': jsonDecode(row['media_json'] as String),
+      'media': stored.json(),
       'index': row['current_index'],
       'positionMs': row['position_ms'],
       'shuffle': row['shuffle'] == 1,

@@ -6,6 +6,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:mornye/services/download_queue_codec.dart';
 import 'package:mornye/services/playback_resume_store.dart';
 import 'package:mornye/services/sqlite_helpers.dart' as sqlite;
+import 'package:mornye/services/sqlite_long_text.dart';
 import 'package:mornye/utils/logger.dart';
 
 final _log = AppLogger('AppStateDb');
@@ -405,14 +406,17 @@ class AppStateDatabase {
   }
 
   Future<Map<String, dynamic>?> getPlaybackSession() async {
-    final db = await database;
-    final rows = await db.query(_playbackSessionTable, limit: 1);
-    if (rows.isEmpty) return null;
-    final row = rows.first;
-    final raw = row['media_json'] as String?;
-    if (raw == null || raw.isEmpty) return null;
+    final stored = await readJsonTextRow(
+      await database,
+      table: _playbackSessionTable,
+      jsonColumn: 'media_json',
+      columns: const ['current_index', 'position_ms', 'shuffle', 'repeat_mode'],
+    );
+    if (stored == null) return null;
+    final row = stored.row;
+    if ((row['media_json_bytes'] as int? ?? 0) == 0) return null;
     try {
-      final decoded = jsonDecode(raw);
+      final decoded = stored.json();
       if (decoded is! List) return null;
       return {
         'version': 2,

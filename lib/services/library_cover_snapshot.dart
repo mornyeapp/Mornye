@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:sqflite/sqflite.dart';
+import 'package:mornye/services/sqlite_long_text.dart';
 import 'package:mornye/utils/logger.dart';
 
 var _snapshotSequence = 0;
@@ -18,6 +19,22 @@ typedef LibraryCoverReferenceColumn = ({
 
 final _storedCoverName = RegExp(r'''library_covers/([^"'\s\\?#]+)''');
 
+/// The Library cover file names a stored text column value names.
+List<String> _storedCoverNames(String stored) {
+  final value = stored.replaceAll(r'\/', '/');
+  final names = <String>[];
+  for (final match in _storedCoverName.allMatches(value)) {
+    var name = match.group(1)!;
+    try {
+      name = Uri.decodeComponent(name);
+    } catch (_) {
+      // A literal percent sign names the file as stored.
+    }
+    names.add(name);
+  }
+  return names;
+}
+
 /// Files under [directory] that [columns] name, as paths in [directory]: a
 /// stored `file://` URI or a path from an older app container still matches.
 /// A failed read throws, so incomplete references never permit a deletion.
@@ -30,20 +47,25 @@ Future<Set<String>> readStoredLibraryCoverPaths(
     var after = 0;
     while (true) {
       final page = await database.rawQuery(
-        'SELECT rowid AS stored_rowid, $column AS stored_value FROM $table '
+        'SELECT rowid AS stored_rowid, '
+        '${selectShortText(column, 'stored_value')} FROM $table '
         "WHERE rowid > ? AND instr($column, 'library_covers') > 0 "
         'ORDER BY rowid LIMIT 256',
         [after],
       );
       for (final row in page) {
-        final value = (row['stored_value'] as String).replaceAll(r'\/', '/');
-        for (final match in _storedCoverName.allMatches(value)) {
-          var name = match.group(1)!;
-          try {
-            name = Uri.decodeComponent(name);
-          } catch (_) {
-            // A literal percent sign names the file as stored.
-          }
+        final value = row['stored_value'] as String?;
+        final names = value != null
+            ? _storedCoverNames(value)
+            : (await readLongTextRow(
+                    database,
+                    table: table,
+                    rowid: row['stored_rowid'] as int,
+                    textColumn: column,
+                    decode: _storedCoverNames,
+                  ))?.$2 ??
+                  const <String>[];
+        for (final name in names) {
           paths.add('${directory.path}/$name');
         }
       }
