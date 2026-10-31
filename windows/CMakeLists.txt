@@ -57,6 +57,18 @@ if(TARGET permission_handler_windows_plugin)
     "_SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS")
 endif()
 
+if(TARGET audioplayers_windows_plugin)
+  target_include_directories(audioplayers_windows_plugin BEFORE PRIVATE "${CMAKE_BINARY_DIR}/include")
+  target_compile_options(audioplayers_windows_plugin PRIVATE "/await")
+endif()
+
+if(TARGET flutter_local_notifications_windows)
+  target_include_directories(flutter_local_notifications_windows PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/atl_shim")
+endif()
+if(TARGET flutter_secure_storage_windows_plugin)
+  target_include_directories(flutter_secure_storage_windows_plugin PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/atl_shim")
+endif()
+
 
 # === Installation ===
 # Support files are copied into place next to the executable, so that it can
