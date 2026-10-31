@@ -1,9 +1,37 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mornye/services/ffmpeg_metadata.dart';
 import 'package:mornye/services/ffmpeg_service.dart';
+
+/// The cover is handed to FFmpeg through an FFMETADATA input file, never as a
+/// `-metadata` argument (Windows limits a command line to about 32,767
+/// characters). Reads and unescapes that file while FFmpeg would be running.
+Future<List<int>> readOpusPictureFromArguments(List<String> arguments) async {
+  expect(
+    arguments.where((argument) => argument.contains('METADATA_BLOCK_PICTURE')),
+    isEmpty,
+    reason: 'the picture must not travel on the command line',
+  );
+  final inputs = [
+    for (var i = 0; i < arguments.length - 1; i++)
+      if (arguments[i] == '-i') arguments[i + 1],
+  ];
+  expect(inputs, hasLength(2));
+  final text = await File(inputs[1]).readAsString();
+  const header = ';FFMETADATA1\nMETADATA_BLOCK_PICTURE=';
+  expect(text, startsWith(header));
+  expect(arguments, containsAllInOrder(['-map_metadata:s:a:0', '1:g']));
+  final escaped = text.substring(header.length, text.length - 1);
+  final unescaped = escaped.replaceAllMapped(
+    RegExp(r'\\(.)', dotAll: true),
+    (match) => match[1]!,
+  );
+  return base64Decode(unescaped);
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -122,14 +150,9 @@ void main() {
             opusPath: opusPath,
             coverPath: coverFile.path,
             execute: (arguments) async {
-              const prefix = 'METADATA_BLOCK_PICTURE=';
-              final argument = arguments.singleWhere(
-                (argument) => argument.startsWith(prefix),
-              );
-              pictureBytes = base64Decode(argument.substring(prefix.length));
-              await File(
-                arguments[arguments.length - 2],
-              ).writeAsBytes(audioBytes);
+              pictureBytes = await readOpusPictureFromArguments(arguments);
+              await File(arguments[arguments.length - 2])
+                  .writeAsBytes(audioBytes);
               return FFmpegResult(success: true, returnCode: 0, output: '');
             },
           ),
@@ -152,6 +175,58 @@ void main() {
       },
     );
   }
+
+  test(
+    'large cover never reaches the command line and the file is removed',
+    () async {
+      final imageBytes = List<int>.generate(
+        700000,
+        (index) => (index * 7) & 0xff,
+      );
+      imageBytes.setRange(0, 2, [0xff, 0xd8]);
+      final coverFile = File('${directory.path}/big.jpg');
+      await coverFile.writeAsBytes(imageBytes);
+      final opusPath = '${directory.path}/big.opus';
+      final audioBytes = [0x4f, 0x67, 0x67, 0x53];
+      await File(opusPath).writeAsBytes(audioBytes);
+      String? pictureFile;
+      List<int>? pictureBytes;
+
+      expect(
+        await FFmpegService.embedMetadataToOpus(
+          opusPath: opusPath,
+          coverPath: coverFile.path,
+          execute: (arguments) async {
+            expect(
+              arguments.map((argument) => argument.length).reduce(math.max),
+              lessThan(32767),
+            );
+            pictureBytes = await readOpusPictureFromArguments(arguments);
+            pictureFile =
+                arguments[arguments.indexOf('-i', arguments.indexOf('-i') + 1) +
+                    1];
+            await File(arguments[arguments.length - 2])
+                .writeAsBytes(audioBytes);
+            return FFmpegResult(success: true, returnCode: 0, output: '');
+          },
+        ),
+        opusPath,
+      );
+
+      expect(
+        pictureBytes!.sublist(pictureBytes!.length - imageBytes.length),
+        imageBytes,
+      );
+      expect(File(pictureFile!).existsSync(), isFalse);
+    },
+  );
+
+  test('opusPictureFfmetadata escapes the characters FFMETADATA reserves', () {
+    expect(
+      FFmpegMetadata.opusPictureFfmetadata('a=b;c#d\\e\nf'),
+      ';FFMETADATA1\nMETADATA_BLOCK_PICTURE=a\\=b\\;c\\#d\\\\e\\\nf\n',
+    );
+  });
 
   for (final scenario in [
     (

@@ -270,6 +270,29 @@ abstract final class FFmpegMetadata {
     Future<FFmpegResult> Function(List<String>)? execute,
   }) async {
     final tempOutput = await FFmpegOutput.tempPath('.opus');
+    // The picture block of a high resolution cover is hundreds of kilobytes of
+    // base64. As a command line argument it exceeds the Windows limit of about
+    // 32,767 characters and FFmpeg never starts, so it is read from an
+    // FFMETADATA file instead of being passed with -metadata.
+    String? pictureFile;
+    if (coverPath != null) {
+      try {
+        final pictureBlock = await _createMetadataBlockPicture(coverPath);
+        if (pictureBlock != null) {
+          pictureFile = '$tempOutput.picture.ffmeta';
+          await File(pictureFile)
+              .writeAsString(opusPictureFfmetadata(pictureBlock), flush: true);
+          _log.d(
+            'Created METADATA_BLOCK_PICTURE for Opus (${pictureBlock.length} chars)',
+          );
+        } else {
+          _log.w('Failed to create METADATA_BLOCK_PICTURE, skipping cover');
+        }
+      } catch (e) {
+        pictureFile = null;
+        _log.e('Error creating METADATA_BLOCK_PICTURE: $e');
+      }
+    }
     // Opus tags are on the audio stream. Copy to output globals, override the
     // selected values and let the muxer write globals into the output stream.
     final arguments = <String>[
@@ -278,12 +301,14 @@ abstract final class FFmpegMetadata {
       '-hide_banner',
       '-i',
       opusPath,
+      if (pictureFile != null) ...['-i', pictureFile],
       '-map',
       '0:a',
       '-map_metadata',
       preserveMetadata ? '0:s:a:0' : '-1',
       '-map_metadata:s:a',
       '-1',
+      if (pictureFile != null) ...['-map_metadata:s:a:0', '1:g'],
       '-c:a',
       'copy',
     ];
@@ -294,32 +319,25 @@ abstract final class FFmpegMetadata {
         artistTagMode: artistTagMode,
       );
     }
-    if (coverPath != null) {
-      try {
-        final pictureBlock = await _createMetadataBlockPicture(coverPath);
-        if (pictureBlock != null) {
-          arguments.addAll([
-            '-metadata',
-            'METADATA_BLOCK_PICTURE=$pictureBlock',
-          ]);
-          _log.d(
-            'Created METADATA_BLOCK_PICTURE for Opus (${pictureBlock.length} chars)',
-          );
-        } else {
-          _log.w('Failed to create METADATA_BLOCK_PICTURE, skipping cover');
-        }
-      } catch (e) {
-        _log.e('Error creating METADATA_BLOCK_PICTURE: $e');
-      }
-    }
     arguments.addAll([tempOutput, '-y']);
     _log.d('Executing FFmpeg Opus embed command');
-    return _finish(
-      await (execute ?? FFmpegExecution.arguments)(arguments),
-      tempOutput,
-      opusPath,
-      'Opus',
+    final FFmpegResult result;
+    try {
+      result = await (execute ?? FFmpegExecution.arguments)(arguments);
+    } finally {
+      if (pictureFile != null) await FFmpegOutput.cleanup(pictureFile);
+    }
+    return _finish(result, tempOutput, opusPath, 'Opus');
+  }
+
+  /// FFMETADATA1 document that carries the Opus cover picture. `=`, `;`, `#`,
+  /// `\` and line breaks are escaped as the format requires.
+  static String opusPictureFfmetadata(String pictureBlock) {
+    final escaped = pictureBlock.replaceAllMapped(
+      RegExp(r'[=;#\\\n]'),
+      (match) => '\\${match[0]}',
     );
+    return ';FFMETADATA1\nMETADATA_BLOCK_PICTURE=$escaped\n';
   }
 
   static Future<String?> embedMetadataToM4a({
