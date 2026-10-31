@@ -55,6 +55,7 @@ abstract class LinkMirroredPlayback implements RemotePlayback {
     required CoverStore covers,
     Future<String?> Function(String source)? extractArtwork,
     MediaItem? initialItem,
+    PlaybackState? initialState,
     Duration tick = const Duration(milliseconds: 500),
     Duration seekTimeout = const Duration(seconds: 3),
     int Function()? nowMs,
@@ -64,6 +65,7 @@ abstract class LinkMirroredPlayback implements RemotePlayback {
            ((source) =>
                DownloadedEmbeddedCoverResolver.resolveOrExtract(source)),
        _mediaItem = _Latest(initialItem),
+       _playbackState = _Latest(initialState ?? PlaybackState()),
        _tick = tick,
        _seekTimeout = seekTimeout,
        _nowMs = nowMs ?? (() => DateTime.now().millisecondsSinceEpoch) {
@@ -92,7 +94,7 @@ abstract class LinkMirroredPlayback implements RemotePlayback {
   /// Starts with the constructor's `initialItem`, the song just sent there,
   /// so the player does not empty out until the device's state arrives.
   final _Latest<MediaItem?> _mediaItem;
-  final _playbackState = _Latest<PlaybackState>(PlaybackState());
+  final _Latest<PlaybackState> _playbackState;
   final _queue = _Latest<List<MediaItem>>(const []);
   final _volume = _Latest<double>(1);
   final _transfer = _Latest<RemoteTransfer?>(null);

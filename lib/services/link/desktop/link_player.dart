@@ -253,12 +253,12 @@ class RuntimeLinkPlayerPort implements LinkPlayerPort {
     await handler.setQueueAndPlay(
       items,
       initialIndex: index,
+      initialPosition: position,
       shuffle:
           shuffle ??
           (handler.playbackState.value.shuffleMode !=
               AudioServiceShuffleMode.none),
     );
-    if (position > Duration.zero) await handler.seek(position);
     if (!playing) await handler.pause();
   }
 

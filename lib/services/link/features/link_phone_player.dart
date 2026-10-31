@@ -175,9 +175,9 @@ class LinkMusicPhonePlayer implements LinkPhonePlayer {
     await handler.setQueueAndPlay(
       items,
       initialIndex: index,
+      initialPosition: position,
       shuffle: shuffle ?? false,
     );
-    if (position > Duration.zero) await handler.seek(position);
     if (!playing) await handler.pause();
   }
 

@@ -177,12 +177,14 @@ final linkRemotePlaybackProvider = Provider<LinkRemotePlayback?>((ref) {
       }),
     );
   });
+  final runtime = ref.watch(musicPlayerRuntimeProvider);
   playback = LinkRemotePlayback(
     name: linkDesktopName(client),
     remote: remote,
     handoff: handoff,
-    covers: ref.watch(musicPlayerRuntimeProvider).dependencies.coverStore,
+    covers: runtime.dependencies.coverStore,
     initialItem: ref.read(localMediaItemProvider).value,
+    initialState: runtime.handler?.playbackState.value,
   );
   update(ref.read(linkDesktopRemoteProvider));
   ref.onDispose(
@@ -224,6 +226,7 @@ class LinkRemotePlayback extends LinkMirroredPlayback {
     required super.covers,
     super.extractArtwork,
     super.initialItem,
+    super.initialState,
     super.tick,
     super.seekTimeout,
     super.nowMs,

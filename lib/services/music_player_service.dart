@@ -1380,6 +1380,7 @@ class MusicPlayerHandler extends BaseAudioHandler
   Future<void> setQueueAndPlay(
     List<PlayableMedia> items, {
     int initialIndex = 0,
+    Duration initialPosition = Duration.zero,
     bool? shuffle,
   }) async {
     if (items.isEmpty) return;
@@ -1400,7 +1401,7 @@ class MusicPlayerHandler extends BaseAudioHandler
     _markSessionQueueChanged();
     _playHistory.clear();
     queue.add(List<MediaItem>.unmodifiable(_queueItems));
-    await _playIndex(_index);
+    await _playIndex(_index, startPosition: initialPosition);
   }
 
   Future<void> enqueue(PlayableMedia item, {bool playNext = false}) async {

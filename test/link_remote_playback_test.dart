@@ -711,7 +711,7 @@ void main() {
     expect(transfers.last, isNull);
   });
 
-  test('keeps the song just sent until the desktop state arrives', () async {
+  test('keeps the song and position until the desktop state arrives', () async {
     final sent = linkMediaItem(linkLocalMedia('sent', title: 'Sent'));
     final seeded = LinkRemotePlayback(
       name: 'Studio PC',
@@ -724,10 +724,18 @@ void main() {
       ),
       covers: covers,
       initialItem: sent,
+      initialState: PlaybackState(
+        processingState: AudioProcessingState.ready,
+        updatePosition: const Duration(seconds: 42),
+      ),
     );
     addTearDown(seeded.dispose);
     seeded.update(const LinkRemoteState(loading: true));
     expect((await seeded.mediaItems.first)?.title, 'Sent');
+    expect(
+      (await seeded.playbackStates.first).updatePosition,
+      const Duration(seconds: 42),
+    );
   });
 
   test('a failed command is logged, not thrown', () async {

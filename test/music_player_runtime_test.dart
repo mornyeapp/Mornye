@@ -162,6 +162,33 @@ class _TickingDeck extends _Deck {
   }
 }
 
+class _HandoffDeck extends _TickingDeck {
+  final preparing = Completer<void>();
+  final prepared = Completer<void>();
+  final resumedPositions = <Duration>[];
+
+  @override
+  Future<void> setFileSource(
+    String path, {
+    bool preferBitPerfect = false,
+    bool directUsb = false,
+    bool allowDop = false,
+    bool requiresDsd = false,
+    bool allowFixedVolume = false,
+    bool dapExclusive = false,
+  }) async {
+    await super.setFileSource(path);
+    preparing.complete();
+    await prepared.future;
+  }
+
+  @override
+  Future<void> resume() async {
+    resumedPositions.add(position);
+    await super.resume();
+  }
+}
+
 class _Session implements AudioSession {
   int configurations = 0;
   final activations = <bool>[];
@@ -713,6 +740,44 @@ void main() {
       );
     },
   );
+
+  for (final desktop in [false, true]) {
+    test('Link handoff starts at its position on desktop=$desktop', () async {
+      final deck = _HandoffDeck();
+      final runtime = _runtime(createDeck: (_) => deck);
+      final handler = await runtime.initialize();
+      const target = Duration(seconds: 42);
+      final positions = <Duration>[];
+      final subscription = handler.playbackState.listen((state) {
+        if (handler.mediaItem.value?.id == _track.id) {
+          positions.add(state.updatePosition);
+        }
+      });
+      addTearDown(subscription.cancel);
+      final playing = desktop
+          ? RuntimeLinkPlayerPort(
+              runtime,
+            ).playQueue([_track], index: 0, position: target, playing: true)
+          : LinkMusicPhonePlayer(
+              runtime: runtime,
+              controller: MusicPlayerController(runtime: runtime),
+              writeVolume: (_) async {},
+            ).playQueue([_track], index: 0, position: target, playing: true);
+      try {
+        await deck.preparing.future;
+        deck.positionEvents.add(Duration.zero);
+        await _settle();
+        expect(handler.playbackState.value.updatePosition, target);
+        expect(positions, isNotEmpty);
+        expect(positions, everyElement(target));
+      } finally {
+        deck.prepared.complete();
+        await playing;
+      }
+      expect(deck.resumedPositions, [target]);
+      expect(positions, everyElement(target));
+    });
+  }
 
   test(
     'a handed-off shuffled queue keeps its order and current song',
