@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -299,6 +300,42 @@ void main() {
     await repository.close();
     expect(file.readAsBytesSync(), written);
   });
+
+  test('reads the index in place when no worker can start', () async {
+    await _writeIndex(file, 3);
+    final repository = CoverCacheInfoRepository(
+      () async => file,
+      runInWorker: <T>(_) =>
+          Future<T>.error(IsolateSpawnException('no worker')),
+    );
+    await repository.open();
+    expect(await repository.getAllObjects(), hasLength(3));
+    expect(await repository.get(_cover(2).key), isNotNull);
+    await repository.insert(_cover(4));
+    await repository.close();
+    expect(_rows(file).map((row) => row['key']), [
+      for (var i = 1; i <= 4; i++) _cover(i).key,
+    ]);
+  });
+
+  test('an index it cannot read is reported and never replaced', () async {
+    await _writeIndex(file, 3);
+    final written = file.readAsBytesSync();
+    await Process.run('chmod', ['000', file.path]);
+    addTearDown(() => Process.run('chmod', ['644', file.path]));
+    final errors = <FlutterErrorDetails>[];
+    final previous = FlutterError.onError;
+    FlutterError.onError = errors.add;
+    addTearDown(() => FlutterError.onError = previous);
+    final repository = CoverCacheInfoRepository(() async => file);
+    await repository.open();
+    expect(errors.single.exception, isA<FileSystemException>());
+    final added = await repository.insert(_cover(9));
+    expect(await repository.get(added.key), isNotNull);
+    await repository.close();
+    await Process.run('chmod', ['644', file.path]);
+    expect(file.readAsBytesSync(), written);
+  }, skip: Platform.isWindows ? 'needs POSIX permissions' : null);
 
   test('a corrupt index is reported and replaced', () async {
     await file.writeAsString('[{"_id": 1, "url": ');

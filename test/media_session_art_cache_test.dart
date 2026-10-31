@@ -78,9 +78,10 @@ void main() {
       await request.response.close();
     });
     final url = 'http://127.0.0.1:${server.port}/cover.png';
-    await CoverCacheManager.initialize();
-    // The app shows the cover first, from its cover cache.
+    // The app shows the cover first, from its cover cache, before the app
+    // shell has initialized it.
     final shown = await CoverCacheManager.instance.getSingleFile(url);
+    expect(CoverCacheManager.isInitialized, isFalse);
     expect(downloads, 1);
 
     AudioServicePlatform.instance = os;

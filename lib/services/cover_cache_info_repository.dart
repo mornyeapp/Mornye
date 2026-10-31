@@ -15,19 +15,25 @@ import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 /// its encoded JSON until it changes, and the file is saved [saveDelay] after
 /// an insert, delete or content update, or [touchSaveDelay] after a change of
 /// only the last-used time. [flush] and [close] save pending changes at once.
+/// Nothing is saved unless the file was read or found missing.
 class CoverCacheInfoRepository extends CacheInfoRepository {
-  /// [encodeRow] encodes one index row; tests count calls through it.
+  /// [encodeRow] encodes one index row and [runInWorker] runs the read off
+  /// the UI isolate; tests count calls through the first and fail the second.
   CoverCacheInfoRepository(
     this._resolveFile, {
     this.saveDelay = const Duration(seconds: 1),
     this.touchSaveDelay = const Duration(seconds: 30),
     String Function(Map<String, dynamic> row) encodeRow = jsonEncode,
-  }) : _encodeRow = encodeRow;
+    Future<T> Function<T>(FutureOr<T> Function() computation) runInWorker =
+        Isolate.run,
+  }) : _encodeRow = encodeRow,
+       _runInWorker = runInWorker;
 
   final Future<File> Function() _resolveFile;
   final Duration saveDelay;
   final Duration touchSaveDelay;
   final String Function(Map<String, dynamic> row) _encodeRow;
+  final Future<T> Function<T>(FutureOr<T> Function() computation) _runInWorker;
 
   _Index _index = _Index();
   File? _file;
@@ -164,15 +170,19 @@ class CoverCacheInfoRepository extends CacheInfoRepository {
       debugPrint('CoverCacheInfoRepository: Index unavailable: $error');
       return;
     }
-    _file = file;
     final path = file.path;
     _IndexFile read;
     try {
-      read = await Isolate.run(() => _readIndexFile(path));
-    } on Object catch (error, stack) {
-      read = _IndexFile(_Index(), error, stack);
+      read = await _runInWorker(() => _readIndexFile(path));
+    } on Object {
+      // A worker that cannot start must not cost the index.
+      read = _readIndexFile(path);
     }
-    _index = read.index;
+    // An unreadable file stays as it is; changes stay in memory.
+    if (read.index case final index?) {
+      _file = file;
+      _index = index;
+    }
     final error = read.error;
     if (error != null) {
       FlutterError.reportError(
@@ -309,21 +319,41 @@ class _Index {
 }
 
 class _IndexFile {
-  const _IndexFile(this.index, [this.error, this.stack]);
+  const _IndexFile(_Index this.index, [this.error, this.stack]);
 
-  final _Index index;
+  const _IndexFile.unreadable(this.error, this.stack) : index = null;
+
+  /// Null when the file could not be read at all.
+  final _Index? index;
   final Object? error;
   final StackTrace? stack;
 }
 
-/// Runs in a worker isolate. Keeps the rows read before a bad one, as
-/// [JsonCacheInfoRepository] does.
+/// Runs in a worker isolate, or inline if none can start. Keeps the rows read
+/// before a bad one, as [JsonCacheInfoRepository] does; a file that could
+/// not be read at all is unreadable, not empty.
 _IndexFile _readIndexFile(String path) {
+  final file = File(path);
+  final Uint8List bytes;
+  try {
+    if (!file.existsSync()) return _IndexFile(_Index());
+    bytes = file.readAsBytesSync();
+  } on Object catch (error, stack) {
+    return _IndexFile.unreadable(error, StackTrace.fromString('$stack'));
+  }
   final index = _Index();
   try {
-    final file = File(path);
-    if (!file.existsSync()) return _IndexFile(index);
-    final json = jsonDecode(file.readAsStringSync()) as List<dynamic>;
+    final String text;
+    try {
+      text = utf8.decode(bytes);
+    } on FormatException {
+      // The error File.readAsStringSync reports for the same bytes.
+      throw FileSystemException(
+        "Failed to decode data using encoding 'utf-8'",
+        path,
+      );
+    }
+    final json = jsonDecode(text) as List<dynamic>;
     for (final element in json) {
       if (element is! Map<String, dynamic>) continue;
       index.set(

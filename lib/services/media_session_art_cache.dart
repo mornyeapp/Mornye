@@ -15,21 +15,16 @@ BaseCacheManager? mediaSessionArtCache() => switch (defaultTargetPlatform) {
 };
 
 /// Where the system media session finds a song's web cover: the app's cover
-/// cache once it is ready, so a cover the app already fetched is neither
-/// downloaded nor stored again, and the default cache until then.
+/// cache, so a cover the app already fetched is neither downloaded nor stored
+/// again. The cover cache works before the app shell initializes it.
 class MediaSessionArtCache implements BaseCacheManager {
   const MediaSessionArtCache();
 
-  static CacheManager get _cache => CoverCacheManager.isInitialized
-      ? CoverCacheManager.instance
-      : DefaultCacheManager();
+  static CacheManager get _cache => CoverCacheManager.instance;
 
-  /// The cover cache's byte budget deletes files its memory still lists.
   @override
-  Future<FileInfo?> getFileFromMemory(String key) async {
-    final info = await _cache.getFileFromMemory(key);
-    return info != null && await info.file.exists() ? info : null;
-  }
+  Future<FileInfo?> getFileFromMemory(String key) =>
+      _cache.getFileFromMemory(key);
 
   @override
   Future<File> getSingleFile(
