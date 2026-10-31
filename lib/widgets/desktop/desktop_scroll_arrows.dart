@@ -25,10 +25,12 @@ class DesktopScrollArrows extends StatefulWidget {
 
 class _DesktopScrollArrowsState extends State<DesktopScrollArrows> {
   final _controller = ScrollController();
-  bool _hovered = false;
+  // Hovering shows the arrows alone; the list and its cards keep their build.
+  final _hovered = ValueNotifier<bool>(false);
 
   @override
   void dispose() {
+    _hovered.dispose();
     _controller.dispose();
     super.dispose();
   }
@@ -57,29 +59,35 @@ class _DesktopScrollArrowsState extends State<DesktopScrollArrows> {
     final list = widget.builder(context, _controller);
     if (!isDesktopPlatform) return list;
     return MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
+      onEnter: (_) => _hovered.value = true,
+      onExit: (_) => _hovered.value = false,
       child: Stack(
         children: [
           list,
-          if (_hovered)
-            ListenableBuilder(
-              listenable: _controller,
-              builder: (context, _) {
-                final position = _controller.hasClients
-                    ? _controller.position
-                    : null;
-                final ready = position != null && position.hasContentDimensions;
-                return Stack(
-                  children: [
-                    if (ready && position.extentBefore > 0)
-                      _arrow(context, forward: false),
-                    if (ready && position.extentAfter > 0)
-                      _arrow(context, forward: true),
-                  ],
-                );
-              },
-            ),
+          // A zero-size child paints and hits nothing, as no child did.
+          ValueListenableBuilder<bool>(
+            valueListenable: _hovered,
+            builder: (context, hovered, _) => !hovered
+                ? const SizedBox.shrink()
+                : ListenableBuilder(
+                    listenable: _controller,
+                    builder: (context, _) {
+                      final position = _controller.hasClients
+                          ? _controller.position
+                          : null;
+                      final ready =
+                          position != null && position.hasContentDimensions;
+                      return Stack(
+                        children: [
+                          if (ready && position.extentBefore > 0)
+                            _arrow(context, forward: false),
+                          if (ready && position.extentAfter > 0)
+                            _arrow(context, forward: true),
+                        ],
+                      );
+                    },
+                  ),
+          ),
         ],
       ),
     );

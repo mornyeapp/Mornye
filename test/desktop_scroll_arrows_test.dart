@@ -67,6 +67,61 @@ void main() {
     expect(find.byTooltip('Scroll back'), findsNothing);
   });
 
+  testWidgets('hovering a card rebuilds only that card', (tester) async {
+    debugDesktopPlatformOverride = true;
+    var lists = 0;
+    final cardBuilds = <int, int>{};
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Center(
+          child: SizedBox(
+            width: 300,
+            height: 100,
+            child: DesktopScrollArrows(
+              builder: (context, scrollController) {
+                lists++;
+                return ListView.builder(
+                  controller: scrollController,
+                  scrollDirection: Axis.horizontal,
+                  itemCount: 20,
+                  itemBuilder: (_, index) =>
+                      _HoverCard(index: index, builds: cardBuilds),
+                );
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+    final visible = cardBuilds.keys.toList();
+    expect(visible, hasLength(greaterThan(2)));
+    expect(cardBuilds.values, everyElement(1));
+
+    final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    addTearDown(mouse.removePointer);
+    await mouse.addPointer(location: Offset.zero);
+    await mouse.moveTo(tester.getCenter(find.text('Card 1')));
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('Scroll forward'), findsOneWidget);
+    expect(cardBuilds, {for (final i in visible) i: i == 1 ? 2 : 1});
+
+    await mouse.moveTo(tester.getCenter(find.text('Card 2')));
+    await tester.pumpAndSettle();
+    expect(cardBuilds, {
+      for (final i in visible) i: i == 1 ? 3 : (i == 2 ? 2 : 1),
+    });
+
+    await mouse.moveTo(Offset.zero);
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('Scroll forward'), findsNothing);
+    expect(cardBuilds, {
+      for (final i in visible) i: i == 1 ? 3 : (i == 2 ? 3 : 1),
+    });
+    expect(lists, 1);
+  });
+
   testWidgets('phones and tablets keep the plain list', (tester) async {
     debugDesktopPlatformOverride = false;
     await pumpShelf(tester);
@@ -77,4 +132,32 @@ void main() {
       findsNothing,
     );
   });
+}
+
+/// A shelf card with its own hover state that counts its builds.
+class _HoverCard extends StatefulWidget {
+  const _HoverCard({required this.index, required this.builds});
+
+  final int index;
+  final Map<int, int> builds;
+
+  @override
+  State<_HoverCard> createState() => _HoverCardState();
+}
+
+class _HoverCardState extends State<_HoverCard> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    widget.builds.update(widget.index, (n) => n + 1, ifAbsent: () => 1);
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: SizedBox(
+        width: 100,
+        child: Text('Card ${widget.index}${_hovered ? ' hovered' : ''}'),
+      ),
+    );
+  }
 }
