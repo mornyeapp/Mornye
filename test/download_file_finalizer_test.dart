@@ -332,6 +332,66 @@ void main() {
     },
   );
 
+  for (final uri in [
+    'content://com.android.externalstorage.documents/tree/primary%3AMusic/document/primary%3AMusic%2FAlbum%2FSong.flac',
+    'content://com.android.providers.downloads.documents/document/msf%3A1234',
+  ]) {
+    test(
+      'SAF conversion without a file name never publishes a path as name ($uri)',
+      () async {
+        final output = File('${directory.path}/cache2.opus');
+        String? published;
+        final stage = finalizer(
+          replaceSaf:
+              ({
+                required uri,
+                required treeUri,
+                required relativeDir,
+                required op,
+                avoidOverwrite = false,
+                onPublishedFileName,
+              }) async {
+                final done = await op('${directory.path}/cache2.flac', (_) {});
+                published = done?.$2;
+                return 'content://converted';
+              },
+          convert:
+              ({
+                required inputPath,
+                required targetFormat,
+                required bitrate,
+                required deleteOriginal,
+              }) async => (await output.writeAsString('converted')).path,
+        );
+        await convert(stage, encrypted(), path: uri, name: null, saf: true);
+        expect(published, isNotNull);
+        expect(published, isNot(contains('/')));
+        expect(published, isNot(contains(':')));
+        expect(published, isNot(contains('%')));
+        expect(published, endsWith('.opus'));
+      },
+    );
+  }
+
+  test('downloadSourceFileName reads the name out of SAF document ids', () {
+    expect(
+      downloadSourceFileName(
+        'content://com.android.externalstorage.documents/tree/primary%3AMusic/document/primary%3AMusic%2FAlbum%2FSong.flac',
+      ),
+      'Song.flac',
+    );
+    expect(
+      downloadSourceFileName(
+        'content://com.android.providers.downloads.documents/document/msf%3A1234',
+      ),
+      '1234',
+    );
+    expect(
+      downloadSourceFileName('/storage/emulated/0/Music/Song.flac'),
+      'Song.flac',
+    );
+  });
+
   test(
     'SAF conversion adopts the collision-safe published name and cleans temps',
     () async {
