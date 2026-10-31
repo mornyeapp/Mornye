@@ -1,8 +1,8 @@
 part of 'music_player_service.dart';
 
-/// Creates the clocks that time AutoMix fades, audio-progress checks and the
-/// position ticks that feed them. Only tests replace it, to run transitions
-/// on a fake clock.
+/// Creates the clocks that time AutoMix fades, its start, audio-progress
+/// checks and the position ticks that feed them. Only tests replace it, to
+/// run transitions on a fake clock.
 Stopwatch Function() autoMixStopwatch = Stopwatch.new;
 
 /// Owns only the extra deck and transition work. The ordinary player remains
@@ -14,6 +14,10 @@ class _MusicAutoMix {
   /// within the last minute (the longest fade), which leaves preparation
   /// at least 90 s, and a song skipped earlier prepares nothing.
   static const lead = Duration(seconds: 150);
+
+  /// How far a start computed from a new position may move before the
+  /// start timer is set again.
+  static const _startTolerance = Duration(milliseconds: 20);
 
   final MusicPlayerHandler handler;
   final AutoMixAnalyzer analyzer;
@@ -39,7 +43,9 @@ class _MusicAutoMix {
   bool _starting = false;
   double _incomingVolume = 1;
   double rate = 1;
+  final Stopwatch _clock = autoMixStopwatch()..start();
   Timer? _startTimer;
+  Duration _startDue = Duration.zero;
   Timer? _fadeTimer;
   Future<void> _fadeWrite = Future<void>.value();
   bool _writing = false;
@@ -117,9 +123,17 @@ class _MusicAutoMix {
         return;
       }
       final delay = plan.start - position;
+      final wait = delay.isNegative ? Duration.zero : delay;
+      final due = _clock.elapsed + wait;
+      // Positions follow the clock, so most ticks confirm the timer set.
+      if ((_startTimer?.isActive ?? false) &&
+          (due - _startDue).abs() <= _startTolerance) {
+        return;
+      }
       _startTimer?.cancel();
+      _startDue = due;
       final generation = _generation;
-      _startTimer = Timer(delay.isNegative ? Duration.zero : delay, () {
+      _startTimer = Timer(wait, () {
         if (_current(generation)) unawaited(_start(generation));
       });
       return;

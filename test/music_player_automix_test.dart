@@ -1485,6 +1485,27 @@ void main() {
     expect(autoMixPreparing.value, isFalse);
   });
 
+  fakeTimeTest('a pending mix sets its start timer once per song', () async {
+    var arms = 0;
+    time.onTimer = (_) {
+      if (StackTrace.current.toString().contains('_MusicAutoMix.onPosition')) {
+        arms++;
+      }
+    };
+    addTearDown(() => time.onTimer = null);
+    setAutoMixEnabled(true);
+    await handler.setQueueAndPlay(_tracks);
+    playFrom(0);
+    await playUntil(
+      () => handler.mediaItem.value?.id == 'two',
+      const Duration(seconds: 60),
+    );
+    expect(mixStart(mixDecks().single).at, inInclusiveRange(55000, 55100));
+    // One timer from the end of preparation; the 270 ticks since then
+    // followed the clock. A loaded machine may move a few by over 20 ms.
+    expect(arms, inInclusiveRange(1, 6));
+  });
+
   fakeTimeTest('a long song mixes at its planned moment', () async {
     setLengths(const Duration(seconds: 200));
     setAutoMixEnabled(true);

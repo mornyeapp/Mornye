@@ -11,9 +11,12 @@ class VirtualTime {
   VirtualTime() {
     zone = _parent.fork(
       specification: ZoneSpecification(
-        createTimer: (self, parent, zone, duration, callback) => _virtual
-            ? _add(duration, null, (_) => callback())
-            : parent.createTimer(zone, duration, callback),
+        createTimer: (self, parent, zone, duration, callback) {
+          onTimer?.call(duration);
+          return _virtual
+              ? _add(duration, null, (_) => callback())
+              : parent.createTimer(zone, duration, callback);
+        },
         createPeriodicTimer: (self, parent, zone, period, callback) => _virtual
             ? _add(period, period, callback)
             : parent.createPeriodicTimer(zone, period, callback),
@@ -23,6 +26,9 @@ class VirtualTime {
 
   final _parent = Zone.current;
   late final Zone zone;
+
+  /// Called as each one-shot timer is created in [zone], virtual or not.
+  void Function(Duration duration)? onTimer;
   final _real = Stopwatch()..start();
   final _timers = <_VirtualTimer>[];
   var _skipped = Duration.zero;
