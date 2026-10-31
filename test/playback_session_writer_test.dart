@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:isolate';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -302,6 +303,35 @@ void main() {
     expect(database.operations, ['save', 'save']);
     expect(database.writes.last['json'], _legacyJson(live));
     expect(database.writes.last['index'], 3);
+    expect(errors, isEmpty);
+  });
+
+  test('a large write encodes here when no isolate can start', () async {
+    writer = PlaybackSessionWriter(
+      database: database,
+      onError: errors.add,
+      encodeInBackground: (_) =>
+          throw IsolateSpawnException('Isolates unavailable'),
+    );
+    final songs = [for (var i = 0; i < 100; i++) _CountedSong(i)];
+    _CountedSong.encodes = 0;
+    await _persist(writer, () => _queue(songs));
+    expect(_CountedSong.encodes, 100);
+    expect(database.row?['json'], _legacyJson(songs));
+    expect(errors, isEmpty);
+  });
+
+  test('a position save queued before a dismissal updates its row', () async {
+    final release = Completer<void>();
+    database.beforeSave = () => release.future;
+    PlaybackSessionQueue queue() => _queue([_song('track')]);
+    final save = _persist(writer, queue, seconds: 1);
+    final position = _persist(writer, queue, seconds: 9);
+    final dismiss = writer.clear(resumeMedia: {'id': 'track'});
+    release.complete();
+    await Future.wait([save, position, dismiss]);
+    expect(database.operations, ['save', 'update', 'archive']);
+    expect(database.archived?['positionMs'], 9000);
     expect(errors, isEmpty);
   });
 

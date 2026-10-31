@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:isolate';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:mornye/services/app_state_database.dart';
 import 'package:mornye/services/playable_media.dart';
 
@@ -38,14 +39,21 @@ class PlaybackSessionWriter {
   PlaybackSessionWriter({
     required AppStateDatabase database,
     required void Function(Object) onError,
+    @visibleForTesting
+    Future<List<Uint8List>> Function(List<PlayableMedia> songs)
+        encodeInBackground =
+        _encodeSongsInBackground,
   }) : _database = database,
-       _onError = onError;
+       _onError = onError,
+       _encodeInBackground = encodeInBackground;
 
   /// Songs new to the queue from this many on encode on another isolate.
   static const backgroundEncodeThreshold = 64;
 
   final AppStateDatabase _database;
   final void Function(Object) _onError;
+  final Future<List<Uint8List>> Function(List<PlayableMedia>)
+  _encodeInBackground;
   final Expando<Uint8List> _encodedSongs = Expando('playback session song');
   Future<void> _tail = Future<void>.value();
   _QueueWrite? _pendingWrite;
@@ -65,14 +73,16 @@ class PlaybackSessionWriter {
   }
 
   Future<void> clear({Map<String, dynamic>? resumeMedia}) {
-    _scheduledRevision = _persistedRevision = -1;
+    _scheduledRevision = -1;
     // The archive keeps the write queued before it, never a later queue.
     _pendingWrite = null;
-    return _enqueue(
-      resumeMedia == null
-          ? _database.clearPlaybackSession
-          : () => _database.archivePlaybackSession(resumeMedia),
-    );
+    // Position saves queued before it still update their own stored row.
+    return _enqueue(() {
+      _persistedRevision = -1;
+      return resumeMedia == null
+          ? _database.clearPlaybackSession()
+          : _database.archivePlaybackSession(resumeMedia);
+    });
   }
 
   Future<void> persist({
@@ -160,9 +170,17 @@ class PlaybackSessionWriter {
     ];
     if (missing.isNotEmpty) {
       final added = [for (final i in missing) media[i]];
-      final encoded = added.length < backgroundEncodeThreshold
-          ? _encodeSongs(added)
-          : await _encodeSongsInBackground(added);
+      List<Uint8List> encoded;
+      if (added.length < backgroundEncodeThreshold) {
+        encoded = _encodeSongs(added);
+      } else {
+        try {
+          encoded = await _encodeInBackground(added);
+        } catch (_) {
+          // An isolate that cannot start must not fail every large write.
+          encoded = _encodeSongs(added);
+        }
+      }
       for (var i = 0; i < missing.length; i++) {
         songs[missing[i]] = _encodedSongs[added[i]] = encoded[i];
       }

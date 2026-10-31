@@ -13,7 +13,13 @@ import 'package:mornye/services/playback_deck.dart';
 
 class _SessionStore implements AppStateDatabase {
   @override
-  Future<void> savePlaybackSession(Map<String, dynamic> session) async {}
+  Future<void> savePlaybackSession({
+    required Uint8List mediaJson,
+    required int index,
+    required int positionMs,
+    required bool shuffle,
+    required String repeatMode,
+  }) async {}
 
   @override
   Future<void> clearPlaybackSession() async {}
