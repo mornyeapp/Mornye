@@ -23,13 +23,23 @@ Future<PlaybackResumePreview?> loadPlaybackResumePreview(
     final documents = runtime.dependencies.isIOS
         ? (await getApplicationDocumentsDirectory()).path
         : null;
-    final saved = PlayableMedia.fromJson(
+    var saved = PlayableMedia.fromJson(
       Map<String, dynamic>.from(preview['media'] as Map),
       iosDocumentsPath: documents,
     );
-    if (saved == null ||
-        (!saved.isNetwork && !await files.fileExists(saved.source))) {
-      return null;
+    if (saved == null) return null;
+    if (!saved.isNetwork && !await files.fileExists(saved.source)) {
+      if (!runtime.dependencies.isAndroid) return null;
+      final replacement = await runtime.dependencies.recoverMovedDownload(
+        saved.source,
+        saved.id,
+        runtime.settings,
+      );
+      if (replacement == null) return null;
+      saved = PlayableMedia.fromJson({
+        ...saved.toJson(),
+        'source': replacement,
+      })!;
     }
     // As on restore, a loopback URL or a temporary cover file of earlier
     // versions does not show.
@@ -61,6 +71,7 @@ Future<
     List<PlayableMedia> items,
     List<int> keptOriginalIndices,
     bool artworkRelocated,
+    bool sourceRelocated,
   })
 >
 prepareRestoredPlaybackMedia(
@@ -68,6 +79,7 @@ prepareRestoredPlaybackMedia(
   String? iosDocumentsPath,
   required Future<String?> Function(PlayableMedia) loadLibraryCoverPath,
   Future<bool> Function(String)? fileExists,
+  Future<String?> Function(PlayableMedia)? recoverSource,
 }) async {
   const batchSize = 8;
   final checks = <String, Future<bool>>{};
@@ -79,26 +91,44 @@ prepareRestoredPlaybackMedia(
     return pending;
   }
 
-  Future<(PlayableMedia, int, bool)?> resolve(int index) async {
+  Future<(PlayableMedia, int, bool, bool)?> resolve(int index) async {
     final entry = rawMedia[index];
     if (entry is! Map) return null;
-    final media = PlayableMedia.fromJson(
+    var media = PlayableMedia.fromJson(
       Map<String, dynamic>.from(entry),
       iosDocumentsPath: iosDocumentsPath,
     );
     if (media == null) return null;
+    var sourceRelocated = false;
     if (!media.isContentUri &&
         !media.isNetwork &&
         !await exists(media.source)) {
-      return null;
+      String? replacement;
+      try {
+        replacement = await recoverSource?.call(media);
+      } catch (error) {
+        // Keep an inconclusive entry for retry instead of failing the whole
+        // restore or silently removing a song on an unavailable volume.
+        _log.w(
+          'Keeping a saved download while its folder is unavailable: $error',
+        );
+        return (media, index, false, false);
+      }
+      if (replacement == null) return null;
+      media = PlayableMedia.fromJson({
+        ...media.toJson(),
+        'source': replacement,
+      })!;
+      sourceRelocated = true;
     }
     // Sessions of earlier versions can hold a loopback URL or a temporary
     // cover file, which the next save then leaves out.
+    final recoveredMedia = media;
     final artwork = durableCoverReference(
       await resolveRestoredArtworkUri(
         media.artUri,
         fileExists: exists,
-        loadLibraryCoverPath: () => loadLibraryCoverPath(media),
+        loadLibraryCoverPath: () => loadLibraryCoverPath(recoveredMedia),
       ),
     );
     return (
@@ -107,12 +137,14 @@ prepareRestoredPlaybackMedia(
           : PlayableMedia.fromJson({...media.toJson(), 'artUri': artwork})!,
       index,
       artwork != entry['artUri'],
+      sourceRelocated,
     );
   }
 
   final items = <PlayableMedia>[];
   final keptOriginalIndices = <int>[];
   var artworkRelocated = false;
+  var sourceRelocated = false;
   for (var start = 0; start < rawMedia.length; start += batchSize) {
     final end = (start + batchSize).clamp(0, rawMedia.length);
     final batch = await Future.wait([
@@ -123,6 +155,7 @@ prepareRestoredPlaybackMedia(
       items.add(result.$1);
       keptOriginalIndices.add(result.$2);
       artworkRelocated |= result.$3;
+      sourceRelocated |= result.$4;
     }
     // Cached covers and remote tracks can otherwise complete entirely through
     // microtasks and starve rendering while a very large queue is restored.
@@ -132,6 +165,7 @@ prepareRestoredPlaybackMedia(
     items: items,
     keptOriginalIndices: keptOriginalIndices,
     artworkRelocated: artworkRelocated,
+    sourceRelocated: sourceRelocated,
   );
 }
 
@@ -164,6 +198,13 @@ Future<bool> restorePlaybackSession(
     final prepared = await prepareRestoredPlaybackMedia(
       rawMedia,
       iosDocumentsPath: iosDocumentsPath,
+      recoverSource: runtime.dependencies.isAndroid
+          ? (media) => runtime.dependencies.recoverMovedDownload(
+              media.source,
+              media.id,
+              runtime.settings,
+            )
+          : null,
       loadLibraryCoverPath: (media) async {
         final database = runtime.dependencies.libraryDatabase;
         final row = await database.getById(media.id);
@@ -180,7 +221,8 @@ Future<bool> restorePlaybackSession(
         return null;
       },
     );
-    final (:items, :keptOriginalIndices, :artworkRelocated) = prepared;
+    final (:items, :keptOriginalIndices, :artworkRelocated, :sourceRelocated) =
+        prepared;
     if (items.isEmpty) {
       await clear();
       return false;
@@ -216,7 +258,10 @@ Future<bool> restorePlaybackSession(
         for (final i in keptOriginalIndices)
           ((rawMedia[i] as Map)['queueOriginalIndex'] as num?)?.toInt() ?? i,
       ],
-      queueNeedsRewrite: items.length != rawMedia.length || artworkRelocated,
+      queueNeedsRewrite:
+          items.length != rawMedia.length ||
+          artworkRelocated ||
+          sourceRelocated,
       replaceStoppedQueue: fromResume,
       repeatMode: AudioServiceRepeatMode.values.firstWhere(
         (mode) => mode.name == session['repeat'],

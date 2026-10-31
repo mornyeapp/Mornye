@@ -8,6 +8,7 @@ import 'package:mornye/models/download_history.dart';
 import 'package:mornye/models/track.dart';
 import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/services/history_database.dart';
+import 'package:mornye/services/download_file_recovery.dart';
 import 'package:mornye/services/history_maintenance.dart';
 import 'package:mornye/utils/logger.dart';
 import 'package:mornye/utils/file_access.dart';
@@ -170,6 +171,11 @@ class DownloadHistoryNotifier extends Notifier<DownloadHistoryState> {
   @override
   DownloadHistoryState build() {
     ref.onDispose(() => _indexBumpTimer?.cancel());
+    ref.onDispose(
+      DownloadFileRecovery.subscribe(() {
+        unawaited(refreshFromStorage());
+      }),
+    );
     _scheduleLoadFromDatabase();
     return DownloadHistoryState();
   }
@@ -851,6 +857,12 @@ class DownloadHistoryNotifier extends Notifier<DownloadHistoryState> {
           try {
             if (await fileExists(filePath)) return MapEntry(id, true);
 
+            final moved = Platform.isAndroid
+                ? await DownloadFileRecovery(
+                    history: _db,
+                  ).recover(filePath, historyId: id, knownMissing: true)
+                : null;
+            if (moved != null) return MapEntry(id, true);
             final sibling = await _findConvertedSibling(filePath);
             if (sibling != null) {
               _historyLog.i(
@@ -911,6 +923,19 @@ class DownloadHistoryNotifier extends Notifier<DownloadHistoryState> {
           final result = resultsById[id];
           final status = result?['status'] as String? ?? 'unknown';
           if (status == 'missing') {
+            try {
+              final moved = await DownloadFileRecovery(history: _db).recover(
+                entry['file_path'] as String,
+                historyId: id,
+                knownMissing: true,
+              );
+              if (moved != null) continue;
+            } catch (error) {
+              _historyLog.w(
+                'Retaining download while its new folder is unavailable: $error',
+              );
+              continue;
+            }
             orphanedIds.add(id);
             _historyLog.d(
               'Found orphaned SAF entry: $id (${pathById[id] ?? ''})',

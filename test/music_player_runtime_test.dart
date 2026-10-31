@@ -572,6 +572,7 @@ MusicPlayerRuntime _runtime({
   HistoryDatabase? historyDatabase,
   LibraryCollectionsDatabase? collectionsDatabase,
   Future<String?> Function(String)? recoverMissingFile,
+  Future<String?> Function(String, String, AppSettings)? recoverMovedDownload,
   Future<String> Function(String)? resolveNetworkSource,
   Future<Map<String, dynamic>> Function(String)? readNetworkMetadata,
   CoverStore? coverStore,
@@ -608,6 +609,7 @@ MusicPlayerRuntime _runtime({
           readMetadata ??
           (_, {displayName}) async => {'replaygain_track_gain': '-6 dB'},
       recoverMissingFile: recoverMissingFile ?? (_) async => null,
+      recoverMovedDownload: recoverMovedDownload ?? (_, _, _) async => null,
       resolveNetworkSource:
           resolveNetworkSource ?? NetworkStorageService.instance.resolve,
       readNetworkMetadata:
@@ -648,6 +650,68 @@ const _track = PlayableMedia(
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  test(
+    'Android updates every queued copy before playing a moved download',
+    () async {
+      final decks = <_Deck>[];
+      final store = _ResumeSessionStore();
+      final runtime = _runtime(
+        isAndroid: true,
+        decks: decks,
+        sessionDatabase: store,
+        recoverMovedDownload: (source, id, settings) async =>
+            source == _track.source ? '/new-folder/song.flac' : null,
+      );
+      final handler = await runtime.initialize();
+      await handler.setQueueAndPlay([_track, _track]);
+      expect(decks.single.sources, ['/new-folder/song.flac']);
+      expect(
+        handler.mediaItem.value?.extras?['source'],
+        '/new-folder/song.flac',
+      );
+      expect(handler.queue.value.map((item) => item.extras?['source']), [
+        '/new-folder/song.flac',
+        '/new-folder/song.flac',
+      ]);
+      await handler.skipToQueueItem(1);
+      expect(decks.single.sources.last, '/new-folder/song.flac');
+      expect(handler.playbackState.value.errorMessage, isNull);
+      await handler.pause();
+      await _settle();
+      expect(
+        (store.active!['media'] as List).map((item) => (item as Map)['source']),
+        ['/new-folder/song.flac', '/new-folder/song.flac'],
+      );
+    },
+  );
+
+  test(
+    'a late moved-file lookup cannot replace the newly selected song',
+    () async {
+      final pending = Completer<String?>();
+      final decks = <_Deck>[];
+      final handler = await _runtime(
+        isAndroid: true,
+        decks: decks,
+        recoverMovedDownload: (source, id, settings) async =>
+            source == _track.source ? pending.future : null,
+      ).initialize();
+      final first = handler.setQueueAndPlay([_track]);
+      await _settle();
+      final second = handler.setQueueAndPlay([
+        PlayableMedia.fromJson({
+          ..._track.toJson(),
+          'id': 'next',
+          'source': '/next.flac',
+        })!,
+      ]);
+      pending.complete('/new-folder/song.flac');
+      await Future.wait([first, second]);
+      expect(handler.mediaItem.value?.id, 'next');
+      expect(decks.single.sources, ['/next.flac']);
+    },
+  );
 
   test(
     'changed tags update queued copies without restarting playback',

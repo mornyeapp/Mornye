@@ -1,5 +1,6 @@
 import 'package:mornye/models/track.dart';
 import 'package:mornye/services/history_database.dart';
+import 'package:mornye/services/download_file_recovery.dart';
 import 'package:mornye/services/library_database.dart';
 import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/utils/file_access.dart';
@@ -14,6 +15,7 @@ resolveTrackFiles(
   required LibraryDatabase library,
   required HistoryDatabase history,
   required bool includeLocal,
+  Future<String?> Function(String source, String? historyId)? recoverDownload,
 }) async {
   if (tracks.isEmpty) {
     return (paths: const <String?>[], missingHistoryIds: const <String>{});
@@ -72,6 +74,7 @@ resolveTrackFiles(
     }
   }
   final invalidHistoryIds = <String>{};
+  final recovery = DownloadFileRecovery(history: history);
   var next = 0;
   final workerCount = tracks.length < 8 ? tracks.length : 8;
 
@@ -97,6 +100,24 @@ resolveTrackFiles(
         continue;
       }
       final historyId = historyMatch?['id']?.toString() ?? '';
+      if (historyPath.isNotEmpty) {
+        try {
+          final moved = recoverDownload != null
+              ? await recoverDownload(historyPath, historyId)
+              : await recovery.recover(
+                  historyPath,
+                  historyId: historyId,
+                  knownMissing: true,
+                );
+          if (moved != null) {
+            results[index] = moved;
+            continue;
+          }
+        } catch (_) {
+          // Failed access or a concurrent edit cannot establish an orphan.
+          continue;
+        }
+      }
       if (historyId.isNotEmpty &&
           !unknownSafPaths.contains(stripCueTrackSuffix(historyPath))) {
         invalidHistoryIds.add(historyId);

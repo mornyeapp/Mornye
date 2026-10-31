@@ -79,6 +79,7 @@ private data class SafFileInspectionRequest(
     val relativeDir: String,
     val currentUri: String,
     val fileNames: List<String>,
+    val exactRelativeDir: Boolean,
 )
 
 /**
@@ -132,6 +133,7 @@ internal fun Context.inspectSafFiles(requestsJson: String): String {
                     ),
                     currentUri = raw.optString("current_uri").trim(),
                     fileNames = names,
+                    exactRelativeDir = raw.optBoolean("exact_relative_dir", false),
                 ),
             )
         }
@@ -226,6 +228,11 @@ internal fun Context.inspectSafFiles(requestsJson: String): String {
                         uri = direct.doc.uri.toString(),
                         fileName = direct.name ?: directName,
                         relativeDir = request.relativeDir,
+                    )
+                } else if (request.exactRelativeDir) {
+                    resultsByKey[request.key] = result(
+                        request.key,
+                        if (directDir == null) "unknown" else "missing",
                     )
                 } else {
                     unresolved.add(request)

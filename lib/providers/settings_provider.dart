@@ -11,6 +11,7 @@ import 'package:mornye/models/automix_options.dart';
 import 'package:mornye/constants/app_info.dart';
 import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/services/folder_path_template.dart';
+import 'package:mornye/services/download_file_recovery.dart';
 import 'package:mornye/services/secure_storage_options.dart';
 import 'package:mornye/utils/artist_utils.dart';
 import 'package:mornye/utils/audio_format_utils.dart';
@@ -140,6 +141,7 @@ class SettingsNotifier extends Notifier<AppSettings> {
     mOptions: secureStorageMacOsOptions,
   );
   Future<void>? _saveSettingsFuture;
+  final _previousDownloadDirectories = <String>{};
   bool _saveQueued = false;
   String? _pendingSettingsJson;
   Future<void>? _loadSettingsFuture;
@@ -357,6 +359,10 @@ class SettingsNotifier extends Notifier<AppSettings> {
   }
 
   Future<void> _commit(AppSettings next) {
+    if (state.downloadDirectory.startsWith('/') &&
+        state.downloadDirectory != next.downloadDirectory) {
+      _previousDownloadDirectories.add(state.downloadDirectory);
+    }
     state = next;
     return _saveSettings();
   }
@@ -382,6 +388,16 @@ class SettingsNotifier extends Notifier<AppSettings> {
       do {
         final jsonToWrite = _pendingSettingsJson;
         _saveQueued = false;
+        if (_previousDownloadDirectories.isNotEmpty) {
+          final roots = _previousDownloadDirectories.toList();
+          _previousDownloadDirectories.clear();
+          try {
+            await DownloadFileRecovery.rememberDirectories(prefs, roots);
+          } catch (error) {
+            _previousDownloadDirectories.addAll(roots);
+            _log.w('Could not save previous download folders: $error');
+          }
+        }
         if (jsonToWrite != null) {
           await prefs.setString(_settingsKey, jsonToWrite);
         }

@@ -1203,6 +1203,7 @@ class PlatformBridge {
 
   /// Checks and repairs many SAF file references in a single native pass.
   /// Android groups requests by tree and scans each tree no more than once.
+  /// `exact_relative_dir` restricts a request to its recorded subfolder.
   static Future<List<Map<String, dynamic>>> inspectSafFiles(
     List<Map<String, dynamic>> requests,
   ) async {

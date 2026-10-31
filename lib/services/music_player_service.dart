@@ -1642,6 +1642,24 @@ class MusicPlayerHandler extends BaseAudioHandler
     _broadcastState(playerState: PlaybackDeckState.playing, loading: true);
     await _claimHardwareMediaButtons();
     if (!_isCurrentPlayRequest(generation, media)) return;
+    if (_dependencies.isAndroid && !media.isNetwork) {
+      try {
+        final recovered = await _dependencies.recoverMovedDownload(
+          media.source,
+          media.id,
+          _settings,
+        );
+        if (!_isCurrentPlayRequest(generation, media)) return;
+        if (recovered != null && recovered != media.source) {
+          _relocateQueuedSource(media.source, recovered);
+          media = _media[_index];
+          mediaItem.add(_toMediaItem(media));
+        }
+      } catch (error) {
+        _log.w('Could not resolve a moved download: $error');
+      }
+      if (!_isCurrentPlayRequest(generation, media)) return;
+    }
     if (!media.isNetwork) {
       unawaited(_recoverEmbeddedArtwork(media, generation));
     }
@@ -2311,6 +2329,32 @@ class MusicPlayerHandler extends BaseAudioHandler
   @override
   Future<void> playMediaItem(MediaItem mediaItem) =>
       playFromMediaId(mediaItem.id);
+
+  void _relocateQueuedSource(String previous, String replacement) {
+    _normalizationCache.invalidate(previous);
+    unawaited(_sourceCache.invalidate(previous));
+    for (var i = 0; i < _media.length; i++) {
+      final media = _media[i];
+      if (media.source != previous) continue;
+      _media[i] = PlayableMedia.fromJson({
+        ...media.toJson(),
+        'source': replacement,
+      })!;
+      final old = _queueItems[i];
+      final next = old.copyWith(
+        extras: {...?old.extras, 'source': replacement, 'resolvedSource': null},
+      );
+      _queueItems[i] = next;
+      final original = _originalQueueOrder?.indexWhere(
+        (item) => identical(item, old),
+      );
+      if (original != null && original >= 0) {
+        _originalQueueOrder![original] = next;
+      }
+    }
+    _markSessionQueueChanged();
+    queue.add(List<MediaItem>.unmodifiable(_queueItems));
+  }
 
   /// Refreshes every occurrence without reopening the decoder or seeking.
   Future<void> onSourceMetadataChanged(String source) async {

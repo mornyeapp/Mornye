@@ -608,6 +608,8 @@ class HistoryDatabase {
   Future<bool> updateFilePath(
     String id,
     String newFilePath, {
+    String? newStorageMode,
+    String? newDownloadTreeUri,
     String? newSafFileName,
     String? newSafRelativeDir,
     String? newQuality,
@@ -621,6 +623,10 @@ class HistoryDatabase {
   }) async {
     final db = await database;
     final values = <String, dynamic>{'file_path': newFilePath};
+    if (newStorageMode != null) values['storage_mode'] = newStorageMode;
+    if (newDownloadTreeUri != null) {
+      values['download_tree_uri'] = newDownloadTreeUri;
+    }
     if (newSafFileName != null) {
       values['saf_file_name'] = newSafFileName;
     }

@@ -17,6 +17,7 @@ import 'package:mornye/services/background_favorites.dart';
 import 'package:mornye/services/cover_store.dart';
 import 'package:mornye/services/discord_presence_service.dart';
 import 'package:mornye/services/history_database.dart';
+import 'package:mornye/services/download_file_recovery.dart';
 import 'package:mornye/services/library_collections_database.dart';
 import 'package:mornye/services/library_database.dart';
 import 'package:mornye/services/listening_statistics.dart';
@@ -61,6 +62,7 @@ class PlaybackDependencies {
     this.resolveNetworkSource = _resolveNetworkSource,
     this.networkSourceReachable = _networkSourceReachable,
     this.recoverMissingFile = _recoverMissingFile,
+    this.recoverMovedDownload = _recoverMovedDownload,
     this.initializeHandler = _initializeAudioHandler,
     this.synchronizePlaybackState = _synchronizePlaybackState,
     this.createPersonalization = AutoplayPersonalization.new,
@@ -112,6 +114,12 @@ class PlaybackDependencies {
   /// folder pruned: a path, or a URL streaming it as it arrives. Null for
   /// any other path; throws when it cannot be fetched.
   final Future<String?> Function(String) recoverMissingFile;
+  final Future<String?> Function(
+    String source,
+    String historyId,
+    AppSettings settings,
+  )
+  recoverMovedDownload;
   final Future<MusicPlayerHandler> Function(MusicPlayerHandler Function())
   initializeHandler;
   final Future<void> Function() synchronizePlaybackState;
@@ -189,6 +197,16 @@ class PlaybackDependencies {
     final sources = NetworkStorageService.instance.virtualSources;
     return sources is NetworkLocalCopies ? sources.recover(path) : null;
   }
+
+  static Future<String?> _recoverMovedDownload(
+    String source,
+    String historyId,
+    AppSettings settings,
+  ) => DownloadFileRecovery.instance.recover(
+    source,
+    historyId: historyId,
+    settings: settings,
+  );
 
   static Future<void> _synchronizePlaybackState() async {
     // The session's switch takes each state from the player a microtask
