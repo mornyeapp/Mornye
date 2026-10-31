@@ -202,7 +202,7 @@ void main() {
         'Player and lyrics',
         'Library and search',
       ]) {
-        await tester.tap(find.text('Next'));
+        await tester.tap(find.text('Continue'));
         await tester.pumpAndSettle();
         expect(find.text(title), findsWidgets);
       }
@@ -210,12 +210,12 @@ void main() {
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       expect(find.text('Player and lyrics'), findsWidgets);
-      await tester.tap(find.text('Next'));
+      await tester.tap(find.text('Continue'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Next'));
+      await tester.tap(find.text('Continue'));
       await tester.pumpAndSettle();
       expect(find.text('Faster everywhere'), findsWidgets);
-      expect(find.text('Next'), findsNothing);
+      expect(find.text('Continue'), findsNothing);
       expect(container.read(settingsProvider).whatsNewSeen, isEmpty);
 
       await tester.tap(find.text('Start listening'));
@@ -239,7 +239,7 @@ void main() {
       final container = await openTour(tester, textScale: 1.6);
       for (var page = 0; page < 5; page++) {
         expect(tester.takeException(), isNull);
-        await tester.tap(find.text('Next'));
+        await tester.tap(find.text('Continue'));
         await tester.pumpAndSettle();
       }
       expect(tester.takeException(), isNull);
@@ -310,7 +310,7 @@ void main() {
       await tester.tap(find.text('Library and search'));
       await tester.pumpAndSettle();
       expect(find.text('Browse by folder'), findsOne);
-      await tester.tap(find.text('Next'));
+      await tester.tap(find.text('Continue'));
       await tester.pumpAndSettle();
       expect(find.text('Faster everywhere'), findsNWidgets(2));
       expect(find.text('Skip for now'), findsNothing);

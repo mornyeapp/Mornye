@@ -1,26 +1,34 @@
 import 'dart:io' show Platform;
+import 'dart:math' as math;
 
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show LogicalKeyboardKey;
+import 'package:flutter/services.dart' show HapticFeedback, LogicalKeyboardKey;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:material_3_expressive/material_3_expressive.dart'
+    show
+        M3EShapeKind,
+        Morph,
+        MorphToPathExtension,
+        RoundedPolygonToPathExtension;
 import 'package:mornye/constants/app_info.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/theme/app_tokens.dart';
+import 'package:mornye/theme/mornye_icons.dart';
 import 'package:mornye/theme/mornye_theme.dart';
-import 'package:mornye/utils/adaptive_layout.dart';
 import 'package:mornye/utils/android_tv.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/widgets/app_bottom_sheet.dart';
 import 'package:mornye/widgets/app_icon_button.dart';
+import 'package:mornye/widgets/app_shape.dart';
 import 'package:mornye/widgets/expressive_button.dart';
-import 'package:mornye/widgets/scroll_edge_fade.dart';
 
 /// The highlights of [AppInfo.whatsNewRelease] on phones and tablets, shown
-/// once after an update and again from About. It shares the tutorial's
-/// layout and motion, so the app's tours look alike; pages list only what
-/// this device can use. Desktop uses [showWhatsNewDialog] instead.
+/// once after an update and again from About. It keeps the look of the
+/// 5.2 rebrand tour; pages list only what this device can use. Desktop uses
+/// [showWhatsNewDialog] instead.
 class WhatsNewScreen extends ConsumerStatefulWidget {
   const WhatsNewScreen({super.key});
 
@@ -29,32 +37,31 @@ class WhatsNewScreen extends ConsumerStatefulWidget {
 }
 
 class _WhatsNewScreenState extends ConsumerState<WhatsNewScreen> {
-  final _pageController = PageController();
-  int _currentPage = 0;
+  final _pages = PageController();
+  int _page = 0;
 
   @override
   void dispose() {
-    _pageController.dispose();
+    _pages.dispose();
     super.dispose();
   }
 
   void _goTo(int page) {
     if (MediaQuery.disableAnimationsOf(context)) {
-      _pageController.jumpToPage(page);
-      return;
+      _pages.jumpToPage(page);
+    } else {
+      _pages.animateToPage(
+        page,
+        duration: const Duration(milliseconds: 420),
+        curve: Curves.easeInOutCubicEmphasized,
+      );
     }
-    _pageController.animateToPage(
-      page,
-      duration: const Duration(milliseconds: 600),
-      curve: Curves.easeOutQuart,
-    );
   }
 
-  void _nextPage(int count) =>
-      _currentPage < count - 1 ? _goTo(_currentPage + 1) : _finish();
+  void _next(int count) => _page < count - 1 ? _goTo(_page + 1) : _finish();
 
-  void _prevPage() {
-    if (_currentPage > 0) _goTo(_currentPage - 1);
+  void _previous() {
+    if (_page > 0) _goTo(_page - 1);
   }
 
   /// Done and Skip both mark the tour seen. Opened from About, the tour
@@ -71,193 +78,121 @@ class _WhatsNewScreenState extends ConsumerState<WhatsNewScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
     final l10n = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
+    final mornye = context.isMornye;
     final pages = whatsNewHighlights(l10n);
-    final totalPages = pages.length;
-    final isLastPage = _currentPage == totalPages - 1;
-    final scale = responsiveScale(context: context, min: 0.86, max: 1.05);
-    final textScale = effectiveTextScale(context);
-    final bottomGap = (32 * scale) + ((textScale - 1) * 8);
-    final actionButtonHeight = (56 * scale) + ((textScale - 1) * 6);
-
-    final scaffold = Scaffold(
-      backgroundColor: colorScheme.surface,
-      body: SafeArea(
-        child: _desktopColumn(
-          Column(
-            children: [
-              Padding(
-                padding: EdgeInsets.symmetric(
-                  horizontal: 24 * scale,
-                  vertical: 16 * scale,
-                ),
-                child: Row(
-                  children: [
-                    AnimatedOpacity(
-                      duration: const Duration(milliseconds: 300),
-                      opacity: _currentPage > 0 ? 1.0 : 0.0,
-                      child: AppIconButton.filledTonal(
-                        onPressed: _currentPage > 0 ? _prevPage : null,
-                        tooltip: MaterialLocalizations.of(
-                          context,
-                        ).backButtonTooltip,
-                        icon: const Icon(Icons.arrow_back),
-                        style: IconButton.styleFrom(
-                          backgroundColor: colorScheme.surfaceContainerHighest,
-                          foregroundColor: colorScheme.onSurfaceVariant,
-                        ),
-                      ),
+    final last = _page == pages.length - 1;
+    // Back steps through the pages, then leaves the tour as Skip does.
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        _page > 0 ? _previous() : _finish();
+      },
+      child: Scaffold(
+        backgroundColor: scheme.surface,
+        body: SafeArea(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 560),
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 4,
                     ),
-                    const SizedBox(width: 8),
-                    // Large text wraps Skip instead of pushing it off screen.
-                    Expanded(
-                      child: Align(
-                        alignment: AlignmentDirectional.centerEnd,
-                        child: AnimatedOpacity(
-                          duration: const Duration(milliseconds: 300),
-                          opacity: isLastPage ? 0.0 : 1.0,
-                          child: IgnorePointer(
-                            ignoring: isLastPage,
-                            child: ExpressiveButton(
-                              text: true,
-                              onPressed: _finish,
-                              style: TextButton.styleFrom(
-                                foregroundColor: colorScheme.onSurfaceVariant,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 8,
-                                ),
-                              ),
-                              child: Text(
-                                l10n.setupSkip,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
+                    child: Row(
+                      children: [
+                        if (_page > 0)
+                          AppIconButton(
+                            tooltip: MaterialLocalizations.of(
+                              context,
+                            ).backButtonTooltip,
+                            onPressed: _previous,
+                            color: scheme.primary,
+                            icon: Icon(
+                              mornye
+                                  ? CupertinoIcons.chevron_back
+                                  : Icons.arrow_back,
+                            ),
+                          )
+                        else
+                          const SizedBox(width: 48, height: 48),
+                        // Large text shrinks the dots instead of pushing
+                        // Skip off screen.
+                        Expanded(
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: _PageIndicator(
+                              count: pages.length,
+                              page: _page,
                             ),
                           ),
                         ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              Expanded(
-                child: PageView.builder(
-                  controller: _pageController,
-                  itemCount: totalPages,
-                  onPageChanged: (page) => setState(() => _currentPage = page),
-                  itemBuilder: (context, index) => _WhatsNewPage(
-                    index: index,
-                    currentIndex: _currentPage,
-                    highlight: pages[index],
-                  ),
-                ),
-              ),
-
-              Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  children: [
-                    ExcludeSemantics(
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: List.generate(totalPages, (index) {
-                          final isActive = _currentPage == index;
-                          return AnimatedContainer(
-                            duration: const Duration(milliseconds: 300),
-                            curve: Curves.easeOutBack,
-                            margin: EdgeInsets.symmetric(horizontal: 4 * scale),
-                            height: 8 * scale,
-                            width: isActive ? 32 * scale : 8 * scale,
-                            decoration: BoxDecoration(
-                              color: isActive
-                                  ? colorScheme.primary
-                                  // Visible on AMOLED black, unlike
-                                  // surfaceContainerHighest.
-                                  : colorScheme.onSurfaceVariant.withValues(
-                                      alpha: 0.4,
-                                    ),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                          );
-                        }),
-                      ),
-                    ),
-                    SizedBox(height: bottomGap),
-                    Center(
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 400),
-                        child: SizedBox(
-                          width: double.infinity,
-                          height: actionButtonHeight,
+                        // Capped so large text cannot push it off screen;
+                        // the dots keep the rest of the row.
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 160),
                           child: ExpressiveButton(
-                            onPressed: () => _nextPage(totalPages),
-                            style: FilledButton.styleFrom(
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(28),
-                              ),
-                            ),
+                            text: true,
+                            onPressed: _finish,
                             child: Text(
-                              isLastPage ? l10n.whatsNewDone : l10n.setupNext,
-                              style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
+                              l10n.setupSkip,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                         ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: PageView.builder(
+                      controller: _pages,
+                      itemCount: pages.length,
+                      onPageChanged: (page) => setState(() => _page = page),
+                      itemBuilder: (context, index) =>
+                          _TourPage(index: index, highlight: pages[index]),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 12, 24, 20),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: ExpressiveButton(
+                        onPressed: () => _next(pages.length),
+                        icon: last
+                            ? null
+                            : Icon(
+                                mornye
+                                    ? CupertinoIcons.arrow_right
+                                    : Icons.arrow_forward,
+                              ),
+                        style: FilledButton.styleFrom(
+                          minimumSize: const Size.fromHeight(56),
+                          shape: mornye
+                              ? RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                )
+                              : null,
+                          textStyle: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        child: Text(
+                          last ? l10n.whatsNewDone : l10n.upgradeIntroContinue,
+                        ),
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),
     );
-
-    // Back steps through the pages, then leaves the tour as Skip does.
-    final tour = PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, _) {
-        if (didPop) return;
-        _currentPage > 0 ? _prevPage() : _finish();
-      },
-      child: scaffold,
-    );
-    if (!isDesktopPlatform) return tour;
-    final rtl = Directionality.of(context) == TextDirection.rtl;
-    void forward() => _nextPage(totalPages);
-    // Enter moves on, as the default button of a desktop window would.
-    return CallbackShortcuts(
-      bindings: {
-        const SingleActivator(LogicalKeyboardKey.enter): forward,
-        const SingleActivator(LogicalKeyboardKey.numpadEnter): forward,
-        const SingleActivator(LogicalKeyboardKey.arrowRight): rtl
-            ? _prevPage
-            : forward,
-        const SingleActivator(LogicalKeyboardKey.arrowLeft): rtl
-            ? forward
-            : _prevPage,
-        const SingleActivator(LogicalKeyboardKey.escape): _finish,
-      },
-      child: Focus(autofocus: true, child: tour),
-    );
   }
-
-  /// Desktop windows keep the tour in one centered column.
-  Widget _desktopColumn(Widget child) => isDesktopPlatform
-      ? Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 560),
-            child: child,
-          ),
-        )
-      : child;
 }
 
 /// Desktop shows the tour once over the app, as the dialog of
@@ -271,7 +206,7 @@ Future<void> maybeShowWhatsNewDialog(BuildContext context, WidgetRef ref) {
 }
 
 /// The tour as a desktop dialog: the sections listed beside the selected
-/// one, Skip and Next in the footer. Closing it any way marks it seen.
+/// one, Skip and Continue in the footer. Closing it any way marks it seen.
 Future<void> showWhatsNewDialog(BuildContext context) async {
   final settings = ProviderScope.containerOf(
     context,
@@ -306,7 +241,7 @@ class _WhatsNewDialogState extends State<_WhatsNewDialog> {
     final l10n = context.l10n;
     final tokens = context.tokens;
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    final scheme = theme.colorScheme;
     // The header already says what the opening page would.
     final sections = whatsNewHighlights(l10n).skip(1).toList();
     final section = sections[_selected];
@@ -345,50 +280,46 @@ class _WhatsNewDialogState extends State<_WhatsNewDialog> {
               tokens.gapXl,
               tokens.gapLg,
             ),
-            child: KeyedSubtree(
-              // Rows rise in again for each section.
-              key: ValueKey(_selected),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: colorScheme.primary.withValues(alpha: 0.15),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          section.icon,
-                          size: 28,
-                          color: colorScheme.primary,
-                        ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    AppShapeBadge(
+                      // Sections keep the hero shape they have on phones.
+                      kind: _heroShapes[_selected + 1].$1,
+                      size: 56,
+                      color: scheme.primaryContainer,
+                      child: Icon(
+                        context.adaptiveIcon(section.icon),
+                        size: 28,
+                        color: scheme.onPrimaryContainer,
                       ),
-                      SizedBox(width: tokens.gapLg),
-                      Expanded(
-                        child: Text(
-                          section.title,
-                          style: theme.textTheme.headlineSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: colorScheme.onSurface,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: tokens.gapMd),
-                  Text(
-                    section.description,
-                    style: theme.textTheme.bodyLarge?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                      height: 1.5,
                     ),
+                    SizedBox(width: tokens.gapLg),
+                    Expanded(
+                      child: Text(
+                        section.title,
+                        style: theme.textTheme.headlineSmall?.copyWith(
+                          fontWeight: context.isMornye
+                              ? FontWeight.w700
+                              : FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: tokens.gapMd),
+                Text(
+                  section.description,
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    height: 1.4,
+                    color: scheme.onSurfaceVariant,
                   ),
-                  SizedBox(height: tokens.gapXl),
-                  _FeatureList(features: section.features),
-                ],
-              ),
+                ),
+                SizedBox(height: tokens.gapXl),
+                _FeatureList(features: section.features),
+              ],
             ),
           ),
         ),
@@ -413,7 +344,7 @@ class _WhatsNewDialogState extends State<_WhatsNewDialog> {
             mainAxisSize: MainAxisSize.min,
             children: [
               // One height for every section, so the dialog does not jump.
-              Flexible(child: SizedBox(height: 440, child: body)),
+              Flexible(child: SizedBox(height: 500, child: body)),
               Padding(
                 padding: EdgeInsetsDirectional.fromSTEB(
                   tokens.gapXl,
@@ -434,7 +365,9 @@ class _WhatsNewDialogState extends State<_WhatsNewDialog> {
                     ],
                     ExpressiveButton(
                       onPressed: forward,
-                      child: Text(isLast ? l10n.whatsNewDone : l10n.setupNext),
+                      child: Text(
+                        isLast ? l10n.whatsNewDone : l10n.upgradeIntroContinue,
+                      ),
                     ),
                   ],
                 ),
@@ -462,22 +395,18 @@ class _SectionTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    final scheme = theme.colorScheme;
     final tokens = context.tokens;
-    final mornye = context.isMornye;
-    final fill = mornye
-        ? colorScheme.primary.withValues(alpha: 0.14)
-        : colorScheme.secondaryContainer;
     final foreground = selected
-        ? (mornye ? colorScheme.primary : colorScheme.onSecondaryContainer)
-        : colorScheme.onSurfaceVariant;
+        ? scheme.onSecondaryContainer
+        : scheme.onSurfaceVariant;
     return Padding(
       padding: EdgeInsets.only(bottom: tokens.gapXs),
       child: Semantics(
         selected: selected,
         button: true,
         child: Material(
-          color: selected ? fill : Colors.transparent,
+          color: selected ? scheme.secondaryContainer : Colors.transparent,
           borderRadius: BorderRadius.circular(tokens.radiusControl),
           clipBehavior: Clip.antiAlias,
           child: InkWell(
@@ -491,13 +420,17 @@ class _SectionTab extends StatelessWidget {
                 ),
                 child: Row(
                   children: [
-                    Icon(highlight.icon, size: 20, color: foreground),
+                    Icon(
+                      context.adaptiveIcon(highlight.icon),
+                      size: 20,
+                      color: foreground,
+                    ),
                     SizedBox(width: tokens.gapMd),
                     Expanded(
                       child: Text(
                         highlight.title,
                         style: theme.textTheme.bodyMedium?.copyWith(
-                          color: selected ? foreground : colorScheme.onSurface,
+                          color: selected ? foreground : scheme.onSurface,
                           fontWeight: selected
                               ? FontWeight.w600
                               : FontWeight.w500,
@@ -554,105 +487,105 @@ List<WhatsNewHighlight> whatsNewHighlights(
   final showExclusiveOutput = desktop ?? isDesktopPlatform;
   final sections = [
     WhatsNewHighlight(
-      icon: Icons.devices_rounded,
+      icon: Icons.computer,
       title: l10n.whatsNewLinkTitle,
       description: l10n.whatsNewLinkDesc,
       features: [
         WhatsNewFeature(
-          Icons.play_circle_rounded,
+          Icons.play_circle,
           l10n.whatsNewLinkPlayTitle,
           l10n.whatsNewLinkPlayBody,
         ),
         WhatsNewFeature(
-          Icons.swap_horiz_rounded,
+          Icons.swap_horiz,
           l10n.whatsNewLinkTransferTitle,
           l10n.whatsNewLinkTransferBody,
         ),
         WhatsNewFeature(
-          Icons.sync_rounded,
+          Icons.sync,
           l10n.whatsNewLinkSyncTitle,
           l10n.whatsNewLinkSyncBody,
         ),
       ],
     ),
     WhatsNewHighlight(
-      icon: Icons.auto_awesome_rounded,
+      icon: Icons.auto_awesome,
       title: l10n.whatsNewHomeTitle,
       description: l10n.whatsNewHomeDesc,
       features: [
         WhatsNewFeature(
-          Icons.queue_music_rounded,
+          Icons.playlist_play,
           l10n.whatsNewHomeMixesTitle,
           l10n.whatsNewHomeMixesBody,
         ),
         WhatsNewFeature(
-          Icons.favorite_rounded,
+          Icons.favorite,
           l10n.whatsNewHomeAutoplayTitle,
           l10n.whatsNewHomeAutoplayBody,
         ),
         WhatsNewFeature(
-          Icons.graphic_eq_rounded,
+          Icons.graphic_eq,
           l10n.whatsNewHomeAnalysisTitle,
           l10n.whatsNewHomeAnalysisBody,
         ),
       ],
     ),
     WhatsNewHighlight(
-      icon: Icons.lyrics_rounded,
+      icon: Icons.lyrics,
       title: l10n.whatsNewPlayerTitle,
       description: l10n.whatsNewPlayerDesc,
       features: [
         WhatsNewFeature(
-          Icons.album_rounded,
+          Icons.album,
           l10n.whatsNewPlayerGaplessTitle,
           l10n.whatsNewPlayerGaplessBody,
         ),
         WhatsNewFeature(
-          Icons.translate_rounded,
+          Icons.translate,
           l10n.whatsNewPlayerTranslateTitle,
           l10n.whatsNewPlayerTranslateBody,
         ),
         WhatsNewFeature(
-          Icons.timer_rounded,
+          Icons.timer_outlined,
           l10n.whatsNewPlayerTimingTitle,
           l10n.whatsNewPlayerTimingBody,
         ),
         if (showAndroidAuto)
           WhatsNewFeature(
-            Icons.directions_car_rounded,
+            Icons.directions_car,
             l10n.whatsNewPlayerAutoTitle,
             l10n.whatsNewPlayerAutoBody,
           ),
         if (showExclusiveOutput)
           WhatsNewFeature(
-            Icons.high_quality_rounded,
+            Icons.high_quality,
             l10n.whatsNewPlayerExclusiveTitle,
             l10n.whatsNewPlayerExclusiveBody,
           ),
       ],
     ),
     WhatsNewHighlight(
-      icon: Icons.library_music_rounded,
+      icon: Icons.library_music,
       title: l10n.whatsNewLibraryTitle,
       description: l10n.whatsNewLibraryDesc,
       features: [
         WhatsNewFeature(
-          Icons.folder_open_rounded,
+          Icons.folder_open,
           l10n.whatsNewLibraryFoldersTitle,
           l10n.whatsNewLibraryFoldersBody,
         ),
         WhatsNewFeature(
-          Icons.lightbulb_rounded,
+          Icons.lightbulb_outline,
           l10n.whatsNewLibrarySuggestionsTitle,
           l10n.whatsNewLibrarySuggestionsBody,
         ),
         WhatsNewFeature(
-          Icons.mic_rounded,
+          Icons.mic,
           l10n.whatsNewLibraryRecognizeTitle,
           l10n.whatsNewLibraryRecognizeBody,
         ),
         WhatsNewFeature(
-          Icons.playlist_add_rounded,
+          Icons.playlist_add,
           l10n.whatsNewLibraryPlaylistsTitle,
           l10n.whatsNewLibraryPlaylistsBody,
         ),
@@ -664,22 +597,22 @@ List<WhatsNewHighlight> whatsNewHighlights(
       description: l10n.whatsNewFasterDesc,
       features: [
         WhatsNewFeature(
-          Icons.grid_view_rounded,
+          Icons.library_music_outlined,
           l10n.whatsNewFasterLibraryTitle,
           l10n.whatsNewFasterLibraryBody,
         ),
         WhatsNewFeature(
-          Icons.lan_rounded,
+          Icons.lan_outlined,
           l10n.whatsNewFasterNetworkTitle,
           l10n.whatsNewFasterNetworkBody,
         ),
         WhatsNewFeature(
-          Icons.history_rounded,
+          Icons.history,
           l10n.whatsNewFasterQueueTitle,
           l10n.whatsNewFasterQueueBody,
         ),
         WhatsNewFeature(
-          Icons.bolt_rounded,
+          Icons.timer,
           l10n.whatsNewFasterBackgroundTitle,
           l10n.whatsNewFasterBackgroundBody,
         ),
@@ -688,7 +621,7 @@ List<WhatsNewHighlight> whatsNewHighlights(
   ];
   return [
     WhatsNewHighlight(
-      icon: Icons.celebration_rounded,
+      icon: Icons.new_releases,
       title: l10n.whatsNewIntroTitle(AppInfo.whatsNewRelease),
       description: l10n.whatsNewIntroDesc,
       features: [
@@ -700,192 +633,426 @@ List<WhatsNewHighlight> whatsNewHighlights(
   ];
 }
 
-/// The tutorial's page layout: the symbol on a tinted circle, the title and
-/// line fading in while the page is current, then the feature rows.
-class _WhatsNewPage extends StatelessWidget {
-  const _WhatsNewPage({
-    required this.index,
-    required this.currentIndex,
-    required this.highlight,
-  });
+/// The hero shape and its small accent for each page, by index.
+const _heroShapes = [
+  (M3EShapeKind.cookie12Sided, M3EShapeKind.sunny),
+  (M3EShapeKind.flower, M3EShapeKind.pill),
+  (M3EShapeKind.softBurst, M3EShapeKind.clover4Leaf),
+  (M3EShapeKind.clover8Leaf, M3EShapeKind.gem),
+  (M3EShapeKind.cookie9Sided, M3EShapeKind.sunny),
+  (M3EShapeKind.puffy, M3EShapeKind.pill),
+];
 
-  final int index;
-  final int currentIndex;
-  final WhatsNewHighlight highlight;
+/// Dots that stretch into a pill for the current page.
+class _PageIndicator extends StatelessWidget {
+  const _PageIndicator({required this.count, required this.page});
+
+  final int count;
+  final int page;
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final shortestSide = MediaQuery.sizeOf(context).shortestSide;
-    final textScale = MediaQuery.textScalerOf(
-      context,
-    ).scale(1.0).clamp(1.0, 1.4);
-    final scale = (shortestSide / 390).clamp(0.86, 1.05);
-    final isActive = currentIndex == index;
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        // Shrink vertical rhythm on short viewports so a page fits with
-        // little or no scrolling.
-        final heightScale = (constraints.maxHeight / 640).clamp(0.6, 1.0);
-        final topGap = (24 * scale).clamp(16.0, 24.0) * heightScale;
-        final iconPadding = (24 * scale).clamp(18.0, 24.0) * heightScale;
-        final iconSize = (56 * scale).clamp(44.0, 56.0) * heightScale;
-        final iconTextGap = (48 * scale).clamp(28.0, 48.0) * heightScale;
-        final descriptionGap = (20 * scale).clamp(12.0, 20.0) * heightScale;
-        final contentGap =
-            ((56 * scale) + ((textScale - 1) * 10)) * heightScale;
-        final bottomGap = (32 * scale).clamp(20.0, 32.0) * heightScale;
-
-        return ScrollEdgeFade(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            physics: const BouncingScrollPhysics(),
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 560),
-                child: Column(
-                  children: [
-                    SizedBox(height: topGap),
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 500),
-                      curve: Curves.easeOutBack,
-                      transform: Matrix4.translationValues(
-                        0,
-                        isActive ? 0 : -20,
-                        0,
-                      ),
-                      padding: EdgeInsets.all(iconPadding),
-                      decoration: BoxDecoration(
-                        color: colorScheme.primary.withValues(alpha: 0.15),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        highlight.icon,
-                        size: iconSize,
-                        color: colorScheme.primary,
-                      ),
-                    ),
-                    SizedBox(height: iconTextGap),
-                    AnimatedOpacity(
-                      duration: const Duration(milliseconds: 500),
-                      opacity: isActive ? 1.0 : 0.0,
-                      curve: Curves.easeOut,
-                      child: Text(
-                        highlight.title,
-                        style: Theme.of(context).textTheme.headlineLarge
-                            ?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: colorScheme.onSurface,
-                              letterSpacing: -0.5,
-                            ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                    SizedBox(height: descriptionGap),
-                    AnimatedOpacity(
-                      duration: const Duration(milliseconds: 500),
-                      opacity: isActive ? 1.0 : 0.0,
-                      curve: Curves.easeOut,
-                      child: Text(
-                        highlight.description,
-                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
-                          height: 1.5,
-                          fontSize: 16 * (1 + ((textScale - 1) * 0.1)),
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                    SizedBox(height: contentGap),
-                    _FeatureList(features: highlight.features),
-                    SizedBox(height: bottomGap),
-                  ],
+    final scheme = Theme.of(context).colorScheme;
+    final duration = MediaQuery.disableAnimationsOf(context)
+        ? Duration.zero
+        : const Duration(milliseconds: 360);
+    return Semantics(
+      label: '${page + 1} / $count',
+      child: ExcludeSemantics(
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (var index = 0; index < count; index++)
+              AnimatedContainer(
+                duration: duration,
+                curve: Curves.easeOutBack,
+                margin: const EdgeInsets.symmetric(horizontal: 3),
+                width: index == page ? 24 : 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(4),
+                  color: index == page
+                      ? scheme.primary
+                      : index < page
+                      ? scheme.primary.withValues(alpha: 0.38)
+                      : scheme.outlineVariant,
                 ),
               ),
-            ),
-          ),
-        );
-      },
+          ],
+        ),
+      ),
     );
   }
 }
 
-/// The tutorial's feature list: a tinted tile with the symbol, then the
-/// text, each row rising in after the one before it.
+class _TourPage extends StatelessWidget {
+  const _TourPage({required this.index, required this.highlight});
+
+  final int index;
+  final WhatsNewHighlight highlight;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final mornye = context.isMornye;
+    final (shape, accent) = _heroShapes[index % _heroShapes.length];
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: _TourHero(
+              shape: shape,
+              accent: accent,
+              icon: highlight.icon,
+              logo: index == 0,
+            ),
+          ),
+          const SizedBox(height: 24),
+          Text(
+            highlight.title,
+            style: mornye
+                ? theme.textTheme.headlineLarge?.copyWith(
+                    fontSize: 36,
+                    height: 1.08,
+                    letterSpacing: -1.2,
+                    fontWeight: FontWeight.w700,
+                  )
+                : theme.textTheme.displaySmall?.copyWith(
+                    height: 1.1,
+                    letterSpacing: -0.4,
+                    fontWeight: FontWeight.w500,
+                  ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            highlight.description,
+            style: theme.textTheme.bodyLarge?.copyWith(
+              fontSize: 17,
+              height: 1.4,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 28),
+          _FeatureList(features: highlight.features),
+        ],
+      ),
+    );
+  }
+}
+
+/// A large expressive shape with two smaller ones beside it. It springs in
+/// with its page, morphs once on its own, and morphs into the next shape on
+/// each tap.
+class _TourHero extends StatefulWidget {
+  const _TourHero({
+    required this.shape,
+    required this.accent,
+    required this.icon,
+    this.logo = false,
+  });
+
+  final M3EShapeKind shape;
+  final M3EShapeKind accent;
+  final IconData icon;
+  final bool logo;
+
+  @override
+  State<_TourHero> createState() => _TourHeroState();
+}
+
+class _TourHeroState extends State<_TourHero> with TickerProviderStateMixin {
+  /// Shapes the hero morphs through, after the page's own shape.
+  static const _cycle = [
+    M3EShapeKind.cookie12Sided,
+    M3EShapeKind.flower,
+    M3EShapeKind.softBurst,
+    M3EShapeKind.cookie9Sided,
+    M3EShapeKind.puffy,
+    M3EShapeKind.clover8Leaf,
+    M3EShapeKind.sunny,
+    M3EShapeKind.cookie6Sided,
+  ];
+
+  late final _entrance = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 700),
+  );
+  late final _morph = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 650),
+    value: 1,
+  );
+  late M3EShapeKind _to = widget.shape;
+  Morph? _shapeMorph;
+  int _turns = 0;
+  bool _started = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_started) return;
+    _started = true;
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _entrance.value = 1;
+      return;
+    }
+    // One unprompted morph shows the shape can change.
+    _entrance.forward().whenComplete(() {
+      if (mounted) _next();
+    });
+  }
+
+  @override
+  void dispose() {
+    _entrance.dispose();
+    _morph.dispose();
+    super.dispose();
+  }
+
+  void _next() {
+    if (context.isMornye || MediaQuery.disableAnimationsOf(context)) return;
+    final from = _to;
+    _to = _cycle[(_cycle.indexOf(from) + 1) % _cycle.length];
+    _shapeMorph = Morph(from.polygon, _to.polygon);
+    _turns++;
+    _morph.forward(from: 0);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final mornye = context.isMornye;
+    // The logo asset is the bare white mark, tinted like the icons.
+    final glyph = widget.logo
+        ? Image.asset(
+            'assets/images/logo-transparent.png',
+            height: 64,
+            color: scheme.onPrimaryContainer,
+            errorBuilder: (_, _, _) => const SizedBox.shrink(),
+          )
+        : Icon(
+            context.adaptiveIcon(widget.icon),
+            size: 56,
+            color: scheme.onPrimaryContainer,
+          );
+    // Decorative: tapping to morph is a small extra, not a control.
+    return ExcludeSemantics(
+      child: AnimatedBuilder(
+        animation: Listenable.merge([_entrance, _morph]),
+        child: glyph,
+        builder: (context, glyph) {
+          final t = Curves.elasticOut.transform(_entrance.value);
+          final morph = Curves.easeInOutCubicEmphasized.transform(_morph.value);
+          // Each morph adds an eighth of a turn, settling with a spring.
+          final turn =
+              (_turns - 1 + Curves.elasticOut.transform(_morph.value)) *
+              math.pi /
+              4;
+          final shape = GestureDetector(
+            onTap: () {
+              HapticFeedback.selectionClick();
+              _next();
+            },
+            child: Transform.rotate(
+              angle: (1 - t) * -0.35 + turn,
+              child: Transform.scale(
+                scale: 0.6 + 0.4 * t,
+                child: SizedBox.square(
+                  dimension: 132,
+                  child: CustomPaint(
+                    painter: _MorphPainter(
+                      morph: mornye ? null : _shapeMorph,
+                      kind: mornye ? M3EShapeKind.circle : _to,
+                      progress: morph,
+                      color: scheme.primaryContainer,
+                    ),
+                    // Keep the glyph upright while the shape turns.
+                    child: Transform.rotate(
+                      angle: -turn,
+                      child: Center(child: glyph),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+          return _heroStage(scheme, t, shape);
+        },
+      ),
+    );
+  }
+
+  Widget _heroStage(ColorScheme scheme, double t, Widget child) => SizedBox(
+    width: 220,
+    height: 172,
+    child: Stack(
+      alignment: Alignment.center,
+      children: [
+        child,
+        Positioned(
+          right: 18,
+          top: 8,
+          child: Transform.scale(
+            scale: t,
+            child: AppShapeBadge(
+              kind: widget.accent,
+              size: 44,
+              color: scheme.tertiaryContainer,
+              child: const SizedBox.shrink(),
+            ),
+          ),
+        ),
+        Positioned(
+          left: 30,
+          bottom: 16,
+          child: Transform.scale(
+            scale: t,
+            child: AppShapeBadge(
+              kind: M3EShapeKind.circle,
+              size: 20,
+              color: scheme.secondaryContainer,
+              child: const SizedBox.shrink(),
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+/// Fills the shape between two expressive polygons; [morph] null draws [kind].
+class _MorphPainter extends CustomPainter {
+  const _MorphPainter({
+    required this.morph,
+    required this.kind,
+    required this.progress,
+    required this.color,
+  });
+
+  final Morph? morph;
+  final M3EShapeKind kind;
+  final double progress;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // Catalog polygons are normalized to the unit square.
+    final unit = morph?.toPath(progress: progress) ?? kind.polygon.toPath();
+    final scale = Matrix4.diagonal3Values(size.width, size.height, 1);
+    canvas.drawPath(
+      unit.transform(scale.storage),
+      Paint()
+        ..color = color
+        ..isAntiAlias = true,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_MorphPainter oldDelegate) =>
+      morph != oldDelegate.morph ||
+      kind != oldDelegate.kind ||
+      progress != oldDelegate.progress ||
+      color != oldDelegate.color;
+}
+
+/// Feature rows as one connected list: large outer corners, small inner
+/// ones.
 class _FeatureList extends StatelessWidget {
   const _FeatureList({required this.features});
 
   final List<WhatsNewFeature> features;
 
   @override
+  Widget build(BuildContext context) => Column(
+    children: [
+      for (var index = 0; index < features.length; index++)
+        _FeatureRow(
+          feature: features[index],
+          first: index == 0,
+          last: index == features.length - 1,
+        ),
+    ],
+  );
+}
+
+class _FeatureRow extends StatelessWidget {
+  const _FeatureRow({
+    required this.feature,
+    required this.first,
+    required this.last,
+  });
+
+  final WhatsNewFeature feature;
+  final bool first;
+  final bool last;
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final reduceMotion = MediaQuery.disableAnimationsOf(context);
-    return Column(
-      children: [
-        for (var index = 0; index < features.length; index++)
-          TweenAnimationBuilder<double>(
-            tween: Tween(begin: reduceMotion ? 1 : 0, end: 1),
-            duration: Duration(milliseconds: 600 + (index * 200)),
-            curve: Curves.easeOutQuart,
-            builder: (context, value, child) => Transform.translate(
-              offset: Offset(0, 20 * (1 - value)),
-              child: Opacity(opacity: value, child: child),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.only(bottom: 16),
-              child: MergeSemantics(
-                child: Row(
-                  crossAxisAlignment: features[index].body == null
-                      ? CrossAxisAlignment.center
-                      : CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: colorScheme.surfaceContainerHighest,
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Icon(
-                        features[index].icon,
-                        size: 24,
-                        color: colorScheme.primary,
-                      ),
-                    ),
-                    const SizedBox(width: 20),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            features[index].title,
-                            style: theme.textTheme.bodyLarge?.copyWith(
-                              color: colorScheme.onSurface,
-                              fontWeight: features[index].body == null
-                                  ? FontWeight.w500
-                                  : FontWeight.w600,
-                            ),
-                          ),
-                          if (features[index].body case final body?) ...[
-                            const SizedBox(height: 2),
-                            Text(
-                              body,
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                color: colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                  ],
+    final scheme = theme.colorScheme;
+    final outer = Radius.circular(context.isMornye ? 18 : 24);
+    const inner = Radius.circular(6);
+    final body = feature.body;
+    return Padding(
+      padding: EdgeInsets.only(bottom: last ? 0 : 2),
+      child: MergeSemantics(
+        child: Material(
+          color: scheme.surfaceContainer,
+          borderRadius: BorderRadius.vertical(
+            top: first ? outer : inner,
+            bottom: last ? outer : inner,
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 20, 16),
+            child: Row(
+              crossAxisAlignment: body == null
+                  ? CrossAxisAlignment.center
+                  : CrossAxisAlignment.start,
+              children: [
+                // Icon containers in one list share the plain circle;
+                // abstract shapes are reserved for the decorative hero.
+                AppShapeBadge(
+                  kind: M3EShapeKind.circle,
+                  size: 44,
+                  color: scheme.secondaryContainer,
+                  child: Icon(
+                    context.adaptiveIcon(feature.icon),
+                    size: 22,
+                    color: scheme.onSecondaryContainer,
+                  ),
                 ),
-              ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        feature.title,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      if (body != null) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          body,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            height: 1.35,
+                            color: scheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
-      ],
+        ),
+      ),
     );
   }
 }
