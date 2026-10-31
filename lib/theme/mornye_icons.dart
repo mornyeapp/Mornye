@@ -215,6 +215,7 @@ IconData _cupertinoFor(IconData icon) {
     Icons.drag_handle => CupertinoIcons.line_horizontal_3,
     Icons.swap_vert => CupertinoIcons.arrow_up_arrow_down,
     Icons.file_open_outlined => CupertinoIcons.doc,
+    Icons.directions_car => CupertinoIcons.car_detailed,
     // Preserve meaning for symbols without a Cupertino counterpart, such as
     // numbered download limits. An unrelated gear hides the action's purpose.
     _ => icon,

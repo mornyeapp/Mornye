@@ -4,10 +4,12 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:mornye/services/cover_cache_manager.dart';
 import 'package:mornye/constants/app_info.dart';
 import 'package:mornye/l10n/l10n.dart';
+import 'package:mornye/screens/whats_new_screen.dart';
 import 'package:mornye/theme/mornye_icons.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/adaptive_layout.dart';
 import 'package:mornye/utils/nav_bar_inset.dart';
+import 'package:mornye/widgets/animation_utils.dart';
 import 'package:mornye/widgets/settings_group.dart';
 import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/app_sliver_header.dart';
@@ -199,6 +201,18 @@ class AboutPage extends StatelessWidget {
                   title: context.l10n.aboutVersion,
                   subtitle:
                       'v${AppInfo.displayVersion} (build ${AppInfo.buildNumber})',
+                  showDivider: true,
+                ),
+                _AboutSettingsItem(
+                  icon: Icons.new_releases,
+                  title: context.l10n.whatsNewAboutTitle(
+                    AppInfo.whatsNewRelease,
+                  ),
+                  // Above the shell, as it shows after an update.
+                  onTap: () => Navigator.of(
+                    context,
+                    rootNavigator: true,
+                  ).push(slidePageRoute<void>(page: const WhatsNewScreen())),
                   showDivider: true,
                 ),
                 _AboutSettingsItem(

@@ -853,7 +853,11 @@ class SettingsNotifier extends Notifier<AppSettings> {
     try {
       do {
         _saveQueued = false;
-        final completed = state.copyWith(isFirstLaunch: false);
+        // A new install already has this release, so it skips its tour.
+        final completed = state.copyWith(
+          isFirstLaunch: false,
+          whatsNewSeen: AppInfo.whatsNewRelease,
+        );
         if (!await prefs.setString(
           _settingsKey,
           jsonEncode(completed.toJson()),
@@ -1057,6 +1061,9 @@ class SettingsNotifier extends Notifier<AppSettings> {
 
   void setTutorialComplete() =>
       _commit(state.copyWith(hasCompletedTutorial: true));
+
+  void setWhatsNewSeen() =>
+      _commit(state.copyWith(whatsNewSeen: AppInfo.whatsNewRelease));
 
   void setDeduplicateDownloads(bool enabled) =>
       _commit(state.copyWith(deduplicateDownloads: enabled));

@@ -4,6 +4,10 @@ class AppInfo {
   static const String version = '5.3.0';
   static const String buildNumber = '166';
 
+  /// The release whose What's New tour people see once after updating. Change
+  /// it together with the tour's pages when a release earns a new one.
+  static const String whatsNewRelease = '5.3';
+
   static const String gitCommit = String.fromEnvironment('GIT_COMMIT');
   static String get shortGitCommit =>
       gitCommit.length > 8 ? gitCommit.substring(0, 8) : gitCommit;
