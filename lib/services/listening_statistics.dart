@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:mornye/services/sqlite_helpers.dart' as sqlite;
+import 'package:mornye/utils/artist_utils.dart';
 import 'package:mornye/utils/logger.dart';
 import 'package:mornye/utils/string_utils.dart';
 import 'package:sqflite/sqflite.dart';
@@ -36,6 +37,13 @@ class ListeningTotal {
   final int plays;
 }
 
+/// A track's artist field holds every credit ("A, B feat. C"). Statistics list each
+/// credited artist on their own and give each the full listening time.
+List<String> creditedListeningArtists(String credit) {
+  final names = splitArtistNames(credit);
+  return names.isEmpty ? [credit] : names;
+}
+
 class ListeningSummary {
   const ListeningSummary({
     this.milliseconds = 0,
@@ -57,13 +65,14 @@ class ListeningSummary {
     for (final total in tracks) {
       final cover = normalizeCoverReference(total.track.artwork);
       if (cover == null) continue;
-      final artist = total.track.artist;
-      if (listeningTime.containsKey(artist) &&
-          total.milliseconds <= listeningTime[artist]!) {
-        continue;
+      for (final artist in creditedListeningArtists(total.track.artist)) {
+        if (listeningTime.containsKey(artist) &&
+            total.milliseconds <= listeningTime[artist]!) {
+          continue;
+        }
+        artwork[artist] = cover;
+        listeningTime[artist] = total.milliseconds;
       }
-      artwork[artist] = cover;
-      listeningTime[artist] = total.milliseconds;
     }
     return artwork;
   }
@@ -93,7 +102,9 @@ class ListeningSummary {
         (tracks[key]?.milliseconds ?? 0) + time,
         (tracks[key]?.plays ?? 0) + count,
       );
-      artists[artist] = (artists[artist] ?? 0) + time;
+      for (final name in creditedListeningArtists(artist)) {
+        artists[name] = (artists[name] ?? 0) + time;
+      }
       days[day] = (days[day] ?? 0) + time;
     }
     final ranked = tracks.values.toList()
@@ -356,6 +367,13 @@ Future<ListeningSummary> readListeningSummary(
     SELECT artist, SUM(milliseconds) AS milliseconds
     FROM listening WHERE day >= ? AND day < ? GROUP BY artist
   ''', arguments);
+  final artists = <String, int>{};
+  for (final row in artistRows) {
+    final time = row['milliseconds'] as int;
+    for (final name in creditedListeningArtists(row['artist'] as String)) {
+      artists[name] = (artists[name] ?? 0) + time;
+    }
+  }
   final dayRows = await db.rawQuery('''
     SELECT day, SUM(milliseconds) AS milliseconds
     FROM listening WHERE day >= ? AND day < ? GROUP BY day ORDER BY day
@@ -378,10 +396,7 @@ Future<ListeningSummary> readListeningSummary(
     milliseconds: tracks.fold(0, (sum, track) => sum + track.milliseconds),
     plays: tracks.fold(0, (sum, track) => sum + track.plays),
     tracks: tracks,
-    artists: {
-      for (final row in artistRows)
-        row['artist'] as String: row['milliseconds'] as int,
-    },
+    artists: artists,
     days: {
       for (final row in dayRows)
         row['day'] as String: row['milliseconds'] as int,

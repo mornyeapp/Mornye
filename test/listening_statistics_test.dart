@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/services/listening_statistics.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 const _one = ListeningTrack(
   key: 'one',
@@ -150,6 +151,100 @@ void main() {
     await recorder.flush();
     expect(writes.single.milliseconds, 30000);
     expect(writes.single.plays, 1);
+  });
+
+  test('summary lists every credited artist on their own', () {
+    Map<String, Object?> row(String key, String artist, int ms) => {
+      'day': '2026-10-01',
+      'track_key': key,
+      'title': key,
+      'artist': artist,
+      'album': 'Album',
+      'artwork': null,
+      'milliseconds': ms,
+      'plays': 1,
+    };
+    final summary = ListeningSummary.fromRows([
+      row('duet', 'Alice, Bob', 60000),
+      row('feature', 'Alice feat. Carol', 30000),
+      row('solo', 'Bob', 10000),
+    ]);
+    expect(summary.artists, {'Alice': 90000, 'Bob': 70000, 'Carol': 30000});
+    expect(summary.milliseconds, 100000);
+  });
+
+  test('the SQL summary lists every credited artist on their own', () async {
+    sqfliteFfiInit();
+    final db = await databaseFactoryFfi.openDatabase(
+      inMemoryDatabasePath,
+      options: OpenDatabaseOptions(
+        version: 1,
+        onCreate: (db, _) => db.execute('''
+          CREATE TABLE listening (
+            day TEXT NOT NULL, track_key TEXT NOT NULL, title TEXT NOT NULL,
+            artist TEXT NOT NULL, album TEXT NOT NULL, artwork TEXT,
+            milliseconds INTEGER NOT NULL DEFAULT 0,
+            plays INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY (day, track_key)
+          )
+        '''),
+      ),
+    );
+    addTearDown(db.close);
+    Future<void> add(String day, String key, String artist, int ms) =>
+        db.insert('listening', {
+          'day': day,
+          'track_key': key,
+          'title': key,
+          'artist': artist,
+          'album': 'Album',
+          'artwork': null,
+          'milliseconds': ms,
+          'plays': 1,
+        });
+    await add('2026-10-01', 'duet', 'Alice, Bob', 60000);
+    await add('2026-10-02', 'duet', 'Alice, Bob', 20000);
+    await add('2026-10-02', 'feature', 'Alice feat. Carol', 30000);
+    await add('2026-10-03', 'solo', 'Bob', 10000);
+    final summary = await readListeningSummary(
+      db,
+      DateTime(2026, 10, 1),
+      DateTime(2026, 10, 4),
+    );
+    expect(summary.artists, {'Alice': 110000, 'Bob': 90000, 'Carol': 30000});
+    expect(summary.milliseconds, 120000);
+  });
+
+  test('artist artwork is chosen per credited artist', () {
+    final summary = ListeningSummary(
+      tracks: const [
+        ListeningTotal(
+          ListeningTrack(
+            key: 'duet',
+            title: 'Duet',
+            artist: 'Alice, Bob',
+            album: 'Album',
+            artwork: 'https://example.com/duet.jpg',
+          ),
+          90000,
+          1,
+        ),
+        ListeningTotal(
+          ListeningTrack(
+            key: 'solo',
+            title: 'Solo',
+            artist: 'Bob',
+            album: 'Solo Album',
+            artwork: 'https://example.com/solo.jpg',
+          ),
+          30000,
+          1,
+        ),
+      ],
+    );
+    expect(summary.artistArtwork.keys, unorderedEquals(['Alice', 'Bob']));
+    expect(summary.artistArtwork['Alice'], 'https://example.com/duet.jpg');
+    expect(summary.artistArtwork['Bob'], 'https://example.com/duet.jpg');
   });
 
   test('summary merges days for the same track and credits artists once', () {
