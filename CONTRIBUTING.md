@@ -72,9 +72,11 @@ exact Flutter version declared in `.fvmrc` and replace `fvm flutter` with
    ```
 
 The About footer shows the short commit supplied through `GIT_COMMIT` at
-compile time. The Android build script and iOS release workflow supply it
-automatically. Include the same `--dart-define` when running Flutter build
-commands directly; without it, the footer shows only the copyright.
+compile time. Android Gradle and the iOS Flutter build phase supply it
+automatically, including direct mobile Flutter builds and Xcode builds.
+An explicit `--dart-define` takes precedence. Supply it when building from
+a source archive without Git metadata or running desktop Flutter commands
+directly; without a revision, the footer shows only the copyright.
 
 ## Building the App
 

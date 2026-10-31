@@ -8,6 +8,17 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+// Direct Flutter builds also need the revision displayed in About.
+val buildDartDefines = providers.exec {
+    workingDir(rootProject.projectDir.parentFile)
+    commandLine(
+        "bash",
+        "scripts/flutter_git_commit.sh",
+        project.findProperty("dart-defines")?.toString().orEmpty(),
+    )
+}.standardOutput.asText.get().trim()
+project.extensions.extraProperties["dart-defines"] = buildDartDefines
+
 // Flutter reads this when configuring variant tasks, after this build script.
 // Keep release AOT debug data outside libapp.so; explicit paths and size analysis take precedence.
 if (!project.hasProperty("split-debug-info") && !project.hasProperty("code-size-directory")) {

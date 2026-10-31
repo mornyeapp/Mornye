@@ -68,6 +68,8 @@ jobs:
               - 'third_party/discord/*.zip.gpg'
               - 'ios/**'
               - 'scripts/build_ios.sh'
+              - 'scripts/flutter_git_commit.sh'
+              - 'scripts/test_flutter_git_commit.py'
               - 'scripts/prepare_flutter_sdk.dart'
               - 'patches/flutter/**'
               - 'scripts/check_backend_ios.py'
@@ -90,6 +92,8 @@ jobs:
               - 'android/**'
               - 'rust_backend/**'
               - 'scripts/build_android.sh'
+              - 'scripts/flutter_git_commit.sh'
+              - 'scripts/test_flutter_git_commit.py'
               - 'scripts/prepare_flutter_sdk.dart'
               - 'patches/flutter/**'
               - 'scripts/build_rust_backend.sh'
@@ -238,6 +242,7 @@ jobs:
       - name: Build and audit Rust iOS release application
         run: |
           python3 -m unittest discover -s scripts -p 'test_check_backend_ios.py'
+          python3 -m unittest discover -s scripts -p 'test_flutter_git_commit.py'
           flutter build ios --release --no-codesign --target lib/main.dart
           test -s build/ios/iphoneos/Runner.app/Extensions/LinkNowPlaying.appex/LinkNowPlaying
           if [[ "$MORNYE_DISCORD_SDK" == "1" ]]; then
@@ -298,6 +303,7 @@ jobs:
         run: |
           python3 -m unittest discover -s scripts -p 'test_prepare_discord_sdk.py'
           python3 -m unittest discover -s scripts -p 'test_build_android.py'
+          python3 -m unittest discover -s scripts -p 'test_flutter_git_commit.py'
           python3 -m unittest discover -s scripts -p 'test_check_backend_apk.py'
 
       # Fork PRs cannot access repository secrets and exercise the Lite build.
