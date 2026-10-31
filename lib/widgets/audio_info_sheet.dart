@@ -63,7 +63,8 @@ class _AudioInfoSheet extends StatefulWidget {
   State<_AudioInfoSheet> createState() => _AudioInfoSheetState();
 }
 
-class _AudioInfoSheetState extends State<_AudioInfoSheet> {
+class _AudioInfoSheetState extends State<_AudioInfoSheet>
+    with WidgetsBindingObserver {
   AudioRouteInfo? _route;
   int? _fileSize;
   String? _loadedPath;
@@ -73,19 +74,26 @@ class _AudioInfoSheetState extends State<_AudioInfoSheet> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     widget.metadata.addListener(_load);
     _load();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     widget.metadata.removeListener(_load);
     super.dispose();
   }
 
-  Future<void> _load() async {
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) unawaited(_load(force: true));
+  }
+
+  Future<void> _load({bool force = false}) async {
     final path = widget.metadata.filePath;
-    if (path == _loadedPath && (_loading || _route != null)) return;
+    if (!force && path == _loadedPath && (_loading || _route != null)) return;
     final generation = ++_loadGeneration;
     _loadedPath = path;
     _loading = true;
@@ -576,12 +584,17 @@ class _AudioFacts {
   // A preferred mixer format is configuration, not proof of active playback.
   bool get _bitPerfect => direct;
 
+  bool get _bluetoothFormatUnreported =>
+      !direct && route?.bluetoothFormatUnreported == true;
+
   int? get _outputRate {
     if (direct) return usb.sampleRate;
+    if (_bluetoothFormatUnreported) return null;
     return route?.device?.mixerSampleRate ?? route?.mixerSampleRate;
   }
 
   String? get _resampling {
+    if (_bluetoothFormatUnreported) return l10n.audioInfoAndroidNotReported;
     final source = sampleRate, output = _outputRate;
     if (source == null || output == null) return null;
     if (_bitPerfect || source == output) return l10n.audioInfoResamplingNone;
@@ -607,6 +620,11 @@ class _AudioFacts {
         ),
       if (_outputRate case final rate?)
         _Fact(l10n.audioInfoOutputRate, _khz(rate)),
+      if (_bluetoothFormatUnreported) ...[
+        _Fact(l10n.audioInfoBluetoothFormat, l10n.audioInfoAndroidNotReported),
+        if (route?.mixerSampleRate case final rate?)
+          _Fact(l10n.audioInfoSystemDefaultRate, _khz(rate)),
+      ],
       if (direct && usb.bitDepth != null)
         _Fact(
           l10n.audioInfoOutputFormat,
@@ -615,18 +633,23 @@ class _AudioFacts {
             if (usb.transport != 'pcm') usb.transport.toUpperCase(),
           ].join(' · '),
         )
-      else if (device?.mixerBitDepth case final bits?)
+      else if (device?.mixerBitDepth case final bits?
+          when !_bluetoothFormatUnreported)
         _Fact(l10n.audioInfoOutputFormat, '$bits-bit'),
       if (device != null && route?.platform == 'android')
         _Fact(
-          l10n.audioInfoDeviceRates,
+          _bluetoothFormatUnreported
+              ? l10n.audioInfoAndroidPcmRates
+              : l10n.audioInfoDeviceRates,
           device.sampleRates.isEmpty
               ? l10n.audioInfoAnyRate
               : device.sampleRates.map(_khz).join(', '),
         ),
       if (device != null && (device.bitDepths.isNotEmpty || device.floatOutput))
         _Fact(
-          l10n.audioInfoDeviceFormats,
+          _bluetoothFormatUnreported
+              ? l10n.audioInfoAndroidPcmFormats
+              : l10n.audioInfoDeviceFormats,
           [
             for (final bits in device.bitDepths)
               if (bits != 32 || !device.floatOutput) '$bits-bit',
@@ -637,7 +660,9 @@ class _AudioFacts {
         _Fact(l10n.audioInfoChannels, l10n.audioInfoChannelCount(count)),
       if (bufferMs != null)
         _Fact(
-          l10n.audioInfoBuffer,
+          _bluetoothFormatUnreported
+              ? l10n.audioInfoSystemDefaultBuffer
+              : l10n.audioInfoBuffer,
           [
             '${bufferMs.toStringAsFixed(1)} ms',
             if (route?.framesPerBuffer case final frames?) '$frames frames',

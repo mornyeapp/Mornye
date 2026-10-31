@@ -8607,6 +8607,15 @@
   },
   "audioInfoOutputRate": "Output sample rate",
   "audioInfoOutputFormat": "Output format",
+  "audioInfoBluetoothFormat": "Bluetooth codec format",
+  "@audioInfoBluetoothFormat": {
+    "description": "Negotiated Bluetooth transport format, separate from Android PCM mixer properties"
+  },
+  "audioInfoAndroidNotReported": "Not reported by Android",
+  "audioInfoSystemDefaultRate": "System default sample rate",
+  "audioInfoAndroidPcmRates": "Android PCM sample rates",
+  "audioInfoAndroidPcmFormats": "Android PCM formats",
+  "audioInfoSystemDefaultBuffer": "System default buffer",
   "audioInfoDeviceRates": "Device sample rates",
   "audioInfoDeviceFormats": "Device formats",
   "audioInfoAnyRate": "Any",

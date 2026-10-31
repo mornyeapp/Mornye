@@ -41,6 +41,169 @@ void main() {
     expect(info.stream, isNull);
   });
 
+  test('Android Bluetooth PCM properties do not report codec transport', () {
+    for (final type in ['bluetooth', 'bluetooth_le', 'hearing_aid']) {
+      final info = AudioRouteInfo.fromMap({
+        'platform': 'android',
+        'mixerSampleRate': 48000,
+        'device': {
+          'type': type,
+          'sampleRates': [44100, 48000],
+          'bitDepths': [16],
+          'mixer': {'sampleRate': 96000, 'bitDepth': 24},
+        },
+      });
+      expect(info.bluetoothFormatUnreported, isTrue, reason: type);
+    }
+    for (final (platform, type) in [
+      ('android', 'usb'),
+      ('android', 'speaker'),
+      ('ios', 'bluetooth'),
+    ]) {
+      expect(
+        AudioRouteInfo.fromMap({
+          'platform': platform,
+          'device': {'type': type},
+        }).bluetoothFormatUnreported,
+        isFalse,
+      );
+    }
+  });
+
+  for (final mornye in [false, true]) {
+    testWidgets(
+      'Bluetooth transport is separate from PCM defaults (Mornye=$mornye)',
+      (tester) async {
+        tester.view.physicalSize = const Size(390, 844);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(
+              _route,
+              (call) async => {
+                'platform': 'android',
+                'mixerSampleRate': 48000,
+                'framesPerBuffer': 256,
+                'device': {
+                  'type': 'bluetooth',
+                  'name': 'Example earbuds',
+                  'sampleRates': [44100, 48000],
+                  'bitDepths': [16],
+                  // A PCM preference is also not a measured codec format.
+                  'mixer': {'sampleRate': 96000, 'bitDepth': 24},
+                },
+              },
+            );
+        final metadata = PlayerMetadataController();
+        addTearDown(metadata.dispose);
+        await metadata.load(
+          const MediaItem(
+            id: 'song',
+            title: 'Song',
+            extras: {
+              'source': 'https://example.test/song.m4a',
+              'format': 'm4a',
+              'sample_rate': 44100,
+              'bitrate': 333,
+            },
+          ),
+        );
+        await tester.pumpWidget(
+          ProviderScope(
+            child: MaterialApp(
+              theme: mornye ? MornyeTheme.build(Brightness.dark) : ThemeData(),
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              home: Builder(
+                builder: (context) => TextButton(
+                  onPressed: () =>
+                      showAudioInfoSheet(context, metadata: metadata),
+                  child: const Text('open'),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.tap(find.text('open'));
+        await tester.pumpAndSettle();
+        await tester.scrollUntilVisible(
+          find.text('Bluetooth codec format'),
+          200,
+        );
+        expect(find.text('Not reported by Android'), findsNWidgets(2));
+        expect(find.text('44.1 kHz → 48 kHz'), findsNothing);
+        expect(find.text('44.1 kHz → 96 kHz'), findsNothing);
+        expect(find.text('Output sample rate'), findsNothing);
+        expect(find.text('Output format'), findsNothing);
+        expect(find.text('System default sample rate'), findsOneWidget);
+        expect(find.text('48 kHz'), findsOneWidget);
+        await tester.scrollUntilVisible(find.text('Android PCM formats'), 200);
+        expect(find.text('Android PCM sample rates'), findsOneWidget);
+        expect(find.text('44.1 kHz, 48 kHz'), findsOneWidget);
+        expect(find.text('16-bit'), findsOneWidget);
+        expect(find.text('24-bit'), findsNothing);
+        expect(find.text('System default buffer'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets('returning from settings refreshes the same track route', (
+    tester,
+  ) async {
+    var bluetooth = true;
+    var reads = 0;
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(_route, (call) async {
+          reads++;
+          return {
+            'platform': 'android',
+            'mixerSampleRate': 48000,
+            'device': {
+              'type': bluetooth ? 'bluetooth' : 'speaker',
+              'name': bluetooth ? 'Example earbuds' : 'Example phone',
+            },
+          };
+        });
+    final metadata = PlayerMetadataController();
+    addTearDown(metadata.dispose);
+    await metadata.load(
+      const MediaItem(
+        id: 'song',
+        title: 'Song',
+        extras: {
+          'source': 'https://example.test/song.m4a',
+          'format': 'm4a',
+          'sample_rate': 44100,
+        },
+      ),
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Builder(
+          builder: (context) => TextButton(
+            onPressed: () => showAudioInfoSheet(context, metadata: metadata),
+            child: const Text('open'),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+    expect(find.text('Bluetooth codec format'), findsOneWidget);
+    final initialReads = reads;
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    bluetooth = false;
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pumpAndSettle();
+    expect(reads, initialReads + 1);
+    expect(find.text('Bluetooth codec format'), findsNothing);
+    expect(find.text('Phone speaker · Example phone'), findsOneWidget);
+  });
+
   testWidgets('shows source, signal and resampling to the output device', (
     tester,
   ) async {
