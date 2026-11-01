@@ -79,17 +79,7 @@ impl Control {
             return Err(ExtensionError::Closed);
         }
         if let Some(operation) = &*self.operation.lock().expect("extension operation lock") {
-            if let Some(lease) = &operation.lease {
-                lease.check_active().map_err(ExtensionError::Cancelled)?;
-            }
-            if Instant::now() >= operation.deadline
-                || operation
-                    .resolution
-                    .as_ref()
-                    .is_some_and(|budget| budget.remaining().is_zero())
-            {
-                return Err(ExtensionError::Timeout);
-            }
+            operation.check()?;
         }
         Ok(())
     }

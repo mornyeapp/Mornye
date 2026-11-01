@@ -147,11 +147,29 @@ impl RuntimeLimits {
     }
 }
 
+#[derive(Clone)]
 struct Operation {
     item_id: String,
     deadline: Instant,
     lease: Option<Arc<RequestLease>>,
     resolution: Option<Arc<crate::resolution::ResolutionBudget>>,
+}
+
+impl Operation {
+    fn check(&self) -> Result<(), ExtensionError> {
+        if let Some(lease) = &self.lease {
+            lease.check_active().map_err(ExtensionError::Cancelled)?;
+        }
+        if Instant::now() >= self.deadline
+            || self
+                .resolution
+                .as_ref()
+                .is_some_and(|budget| budget.remaining().is_zero())
+        {
+            return Err(ExtensionError::Timeout);
+        }
+        Ok(())
+    }
 }
 
 type Reply = SyncSender<Result<String, ExtensionError>>;
@@ -171,6 +189,7 @@ enum Command {
         method: String,
         arguments: String,
         operation: Operation,
+        started: SyncSender<()>,
         reply: Reply,
         kind: CallKind,
     },
@@ -523,14 +542,14 @@ impl ExtensionRuntime {
             ));
         }
         validate_size(method)?;
-        if let Some(lease) = &operation.lease {
-            lease.check_active().map_err(ExtensionError::Cancelled)?;
-        }
+        operation.check()?;
+        let (started, waiting) = mpsc::sync_channel(0);
         let (reply, result) = mpsc::sync_channel(1);
         let command = Command::Call {
             method: method.to_owned(),
             arguments: arguments_json.to_owned(),
-            operation,
+            operation: operation.clone(),
+            started,
             reply,
             kind,
         };
@@ -538,6 +557,20 @@ impl ExtensionRuntime {
             TrySendError::Full(_) => ExtensionError::Busy,
             TrySendError::Disconnected(_) => ExtensionError::Closed,
         })?;
+        loop {
+            if self.control.is_closed() {
+                return Err(ExtensionError::Closed);
+            }
+            operation.check()?;
+            let remaining = operation.deadline.saturating_duration_since(Instant::now());
+            match waiting.recv_timeout(remaining.min(Duration::from_millis(50))) {
+                Ok(()) => break,
+                Err(mpsc::RecvTimeoutError::Timeout) => continue,
+                Err(mpsc::RecvTimeoutError::Disconnected) => return Err(ExtensionError::Closed),
+            }
+        }
+        // The rendezvous transfers responsibility for interruption to the VM.
+        // Active calls must finish cleanup and retire the VM before returning.
         result.recv().unwrap_or(Err(ExtensionError::Closed))
     }
 

@@ -99,12 +99,18 @@ pub(super) fn run_worker(
             method,
             arguments,
             operation,
+            started,
             reply,
             kind,
         } = command
         else {
             break;
         };
+        // A caller that expired or cancelled while queued has dropped its
+        // receiver. Never execute that abandoned command or retire this VM.
+        if started.send(()).is_err() {
+            continue;
+        }
         let result = vm.execute(control, &method, &arguments, operation, kind);
         collect_at = Some(Instant::now() + IDLE_GC_DELAY);
         let _ = reply.send(result);

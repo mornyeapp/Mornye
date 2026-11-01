@@ -3,6 +3,87 @@ use super::*;
 use std::sync::atomic::Ordering;
 
 #[test]
+fn queued_timeout_returns_before_busy_worker_is_released() {
+    let runtime = ExtensionRuntime::load(
+        "let calls=0;registerExtension({next(){return ++calls}});",
+        "{}",
+        RuntimeLimits::default(),
+    )
+    .unwrap();
+    // Hold the worker at a rendezvous without consuming CPU or relying on a
+    // slow JavaScript function. The following call must remain queued.
+    let (hold, release) = mpsc::sync_channel(0);
+    runtime.sender.send(Command::InspectHeap(hold)).unwrap();
+    thread::scope(|scope| {
+        let runtime = &runtime;
+        let (done, result) = mpsc::sync_channel(1);
+        scope.spawn(move || done.send(runtime.call("next", "[]", None, 30)).unwrap());
+        let early = result.recv_timeout(Duration::from_secs(1));
+        // Always release before asserting so a failed regression cannot hang.
+        release.recv_timeout(Duration::from_secs(1)).unwrap();
+        assert_eq!(early, Ok(Err(ExtensionError::Timeout)));
+    });
+    assert_eq!(runtime.call("next", "[]", None, 1000).unwrap(), "1");
+}
+
+#[test]
+fn queued_lease_interruption_returns_without_retiring_the_busy_worker() {
+    use mornye_core::cancellation::{CancellationDomain, CancellationRegistry};
+
+    for mode in ["cancel", "release", "shutdown"] {
+        let runtime = ExtensionRuntime::load(
+            "let calls=0;registerExtension({next(){return ++calls}});",
+            "{}",
+            RuntimeLimits::default(),
+        )
+        .unwrap();
+        let registry = CancellationRegistry::new(CancellationDomain::ExtensionRequest);
+        let lease = Arc::new(registry.acquire("queued").unwrap());
+        let (hold, release) = mpsc::sync_channel(0);
+        runtime.sender.send(Command::InspectHeap(hold)).unwrap();
+        thread::scope(|scope| {
+            let runtime = &runtime;
+            let request = Arc::clone(&lease);
+            let (done, result) = mpsc::sync_channel(1);
+            scope.spawn(move || {
+                done.send(runtime.call("next", "[]", Some(request), 5000))
+                    .unwrap()
+            });
+            // The pending operation is cloned only after its initial check.
+            // Interrupt after that check, while the VM is still held above.
+            let began = Instant::now();
+            while Arc::strong_count(&lease) < 3 && began.elapsed() < Duration::from_secs(1) {
+                thread::sleep(Duration::from_millis(1));
+            }
+            let pending = Arc::strong_count(&lease) >= 3;
+            let expected = match mode {
+                "cancel" => {
+                    registry.cancel("queued").unwrap();
+                    CancellationError::ExtensionRequestCancelled
+                }
+                "release" => {
+                    lease.release();
+                    CancellationError::LeaseReleased
+                }
+                _ => {
+                    registry.shutdown();
+                    CancellationError::RegistryClosed
+                }
+            };
+            let early = result.recv_timeout(Duration::from_secs(1));
+            release.recv_timeout(Duration::from_secs(1)).unwrap();
+            assert!(pending, "call did not reach the queue: {mode}");
+            assert_eq!(
+                early,
+                Ok(Err(ExtensionError::Cancelled(expected))),
+                "{mode}"
+            );
+        });
+        assert_eq!(runtime.call("next", "[]", None, 1000).unwrap(), "1");
+    }
+}
+
+#[test]
 fn worker_collects_once_after_idle_burst_and_preserves_live_state() {
     let runtime = ExtensionRuntime::load(
         "let calls=0;const keep={value:'live-state'};registerExtension({allocate(){const cycle={bytes:new Uint8Array(16*1024*1024)};cycle.self=cycle;return ++calls;},state(){return {calls,value:keep.value};}});",
@@ -292,6 +373,7 @@ fn interrupted_worker_is_closed_before_publishing_its_reply() {
     .unwrap();
     // A rendezvous reply holds the worker at publication until we receive.
     // This makes the ordering assertion independent of thread scheduling.
+    let (started, waiting) = mpsc::sync_channel(0);
     let (reply, result) = mpsc::sync_channel(0);
     assert!(
         runtime
@@ -305,11 +387,13 @@ fn interrupted_worker_is_closed_before_publishing_its_reply() {
                     lease: Some(Arc::new(downloads.acquire("example-item").unwrap())),
                     resolution: None,
                 },
+                started,
                 reply,
                 kind: CallKind::Function,
             })
             .is_ok()
     );
+    waiting.recv_timeout(Duration::from_secs(1)).unwrap();
     let began = Instant::now();
     while logs.count().unwrap() == 0 {
         assert!(
