@@ -59,52 +59,103 @@ class _RewindStory extends StatefulWidget {
 }
 
 class _RewindStoryState extends State<_RewindStory>
-    with SingleTickerProviderStateMixin {
+    with WidgetsBindingObserver {
   static const _slideDuration = Duration(seconds: 6);
 
   late final List<_Slide> _slides = _slidesFor(widget.rewind);
   final _pages = PageController();
-  late final _progress = AnimationController(
-    vsync: this,
-    duration: _slideDuration,
-  )..addStatusListener(_onProgressStatus);
+  final _progress = ValueNotifier(0.0);
+  final _progressTicks = DecorativePhase(_slideDuration);
+  late final _elapsed = WidgetsBinding.instance.samplingClock.stopwatch();
+  Timer? _advanceTimer;
   final _captureKey = GlobalKey();
   var _index = 0;
   var _autoAdvance = false;
+  var _tickersEnabled = true;
   var _sharing = false;
+  var _capturing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _progressTicks.addListener(_updateProgress);
+  }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    _tickersEnabled = TickerMode.valuesOf(context).enabled;
     final autoAdvance = !MediaQuery.disableAnimationsOf(context);
     if (autoAdvance != _autoAdvance) {
       _autoAdvance = autoAdvance;
       _restartProgress();
+    } else {
+      _syncProgress();
     }
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) => _syncProgress();
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _advanceTimer?.cancel();
+    _elapsed.stop();
+    _progressTicks.dispose();
     _progress.dispose();
     _pages.dispose();
     super.dispose();
   }
 
-  void _onProgressStatus(AnimationStatus status) {
-    if (status == AnimationStatus.completed) _go(_index + 1);
-  }
+  void _updateProgress() => _progress.value =
+      (_elapsed.elapsed.inMicroseconds / _slideDuration.inMicroseconds).clamp(
+        0.0,
+        1.0,
+      );
 
   void _restartProgress() {
-    if (!_autoAdvance) {
-      _progress.stop();
-      return;
-    }
+    _pauseProgress();
+    if (!_autoAdvance) return;
+    _elapsed.reset();
     _progress.value = 0;
     if (_index < _slides.length - 1) {
-      _progress.forward();
+      _resumeProgress();
     } else {
       _progress.value = 1;
     }
+  }
+
+  void _pauseProgress() {
+    _elapsed.stop();
+    _advanceTimer?.cancel();
+    _progressTicks.stop();
+  }
+
+  void _resumeProgress() {
+    if (!_autoAdvance || _index == _slides.length - 1) return;
+    _elapsed.start();
+    _syncProgress();
+  }
+
+  void _syncProgress() {
+    _advanceTimer?.cancel();
+    if (!_elapsed.isRunning ||
+        !_tickersEnabled ||
+        !WidgetsBinding.instance.framesEnabled) {
+      _progressTicks.stop();
+      return;
+    }
+    _updateProgress();
+    _progressTicks.start();
+    // Muted tickers catch up on return, but do not navigate while hidden.
+    final remaining = _slideDuration - _elapsed.elapsed;
+    _advanceTimer = Timer(remaining.isNegative ? Duration.zero : remaining, () {
+      _pauseProgress();
+      _progress.value = 1;
+      _go(_index + 1);
+    });
   }
 
   void _go(int index) {
@@ -137,11 +188,7 @@ class _RewindStoryState extends State<_RewindStory>
     final pixelRatio = MediaQuery.devicePixelRatioOf(context);
     setState(() => _sharing = true);
     try {
-      final file = await captureBoundaryToPngFile(
-        _captureKey,
-        pixelRatio: pixelRatio,
-        fileName: 'mornye_rewind.png',
-      );
+      final file = await _capture(pixelRatio);
       if (file == null) return;
       await SharePlus.instance.share(
         ShareParams(
@@ -155,6 +202,22 @@ class _RewindStoryState extends State<_RewindStory>
       );
     } finally {
       if (mounted) setState(() => _sharing = false);
+    }
+  }
+
+  /// Captures the slide with the backdrop blurred live for one frame, as its
+  /// settled blur is drawn from a quarter-resolution image.
+  Future<File?> _capture(double pixelRatio) async {
+    setState(() => _capturing = true);
+    try {
+      await WidgetsBinding.instance.endOfFrame;
+      return await captureBoundaryToPngFile(
+        _captureKey,
+        pixelRatio: pixelRatio,
+        fileName: 'mornye_rewind.png',
+      );
+    } finally {
+      if (mounted) setState(() => _capturing = false);
     }
   }
 
@@ -186,12 +249,8 @@ class _RewindStoryState extends State<_RewindStory>
             final width = context.size?.width ?? 0;
             _go(details.localPosition.dx < width / 3 ? _index - 1 : _index + 1);
           },
-          onLongPressStart: (_) => _progress.stop(),
-          onLongPressEnd: (_) {
-            if (_autoAdvance && _index < _slides.length - 1) {
-              _progress.forward();
-            }
-          },
+          onLongPressStart: (_) => _pauseProgress(),
+          onLongPressEnd: (_) => _resumeProgress(),
           child: Stack(
             children: [
               RepaintBoundary(
@@ -206,6 +265,7 @@ class _RewindStoryState extends State<_RewindStory>
                           for (final slide in _slides)
                             _slideArtwork(slide, widget.rewind),
                         ],
+                        capturing: _capturing,
                       ),
                     ),
                     PageView.builder(

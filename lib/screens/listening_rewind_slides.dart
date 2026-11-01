@@ -431,35 +431,46 @@ String? _slideArtwork(_Slide slide, ListeningRewind rewind) => switch (slide) {
 /// Material floats large expressive shapes that drift, turn and follow the
 /// swipe. Mornye cross-fades the slides' blurred artwork while it slowly
 /// zooms. Reduced motion keeps the shapes and artwork still.
+///
+/// The drift advances on the 30 Hz decorative clock. Each artwork blurs once
+/// into a quarter-resolution image that the zoom and cross-fade then move;
+/// [capturing] blurs it live so a shared image keeps the full blur.
 class _RewindBackdrop extends StatefulWidget {
   const _RewindBackdrop({
     required this.pages,
     required this.palettes,
     required this.artworks,
+    this.capturing = false,
   });
 
   final PageController pages;
   final List<_RewindPalette> palettes;
   final List<String?> artworks;
+  final bool capturing;
 
   @override
   State<_RewindBackdrop> createState() => _RewindBackdropState();
 }
 
-class _RewindBackdropState extends State<_RewindBackdrop>
-    with SingleTickerProviderStateMixin {
-  late final _ambient = AnimationController(
-    vsync: this,
-    duration: const Duration(seconds: 24),
-  );
+class _RewindBackdropState extends State<_RewindBackdrop> {
+  final _ambient = DecorativePhase(const Duration(seconds: 24));
+  // One instance per artwork keeps its settled blur across the drift ticks.
+  final _artwork = <String, Widget>{};
+  ColorScheme? _artworkColors;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (MediaQuery.disableAnimationsOf(context)) {
+    if (MediaQuery.disableAnimationsOf(context) ||
+        !TickerMode.valuesOf(context).enabled) {
       _ambient.stop();
-    } else if (!_ambient.isAnimating) {
-      _ambient.repeat();
+    } else {
+      _ambient.start();
+    }
+    final colors = Theme.of(context).colorScheme;
+    if (colors != _artworkColors) {
+      _artworkColors = colors;
+      _artwork.clear();
     }
   }
 
@@ -583,13 +594,15 @@ class _RewindBackdropState extends State<_RewindBackdrop>
     Widget artwork(String? uri, double opacity) => uri == null || opacity <= 0
         ? const SizedBox.shrink()
         : Opacity(
+            key: ValueKey(uri),
             opacity: opacity,
             child: Transform.scale(
               // A slow Ken Burns drift.
               scale: 1.15 + 0.06 * math.sin(t),
-              child: ImageFiltered(
-                imageFilter: ImageFilter.blur(sigmaX: 48, sigmaY: 48),
-                child: PlayerArtwork(
+              child: SettledBlur(
+                sigma: 48,
+                resolution: widget.capturing ? 1 : 0.25,
+                child: _artwork[uri] ??= PlayerArtwork(
                   artUri: uri,
                   colorScheme: Theme.of(context).colorScheme,
                   cacheWidth: 200,
