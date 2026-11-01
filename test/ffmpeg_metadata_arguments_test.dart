@@ -131,4 +131,21 @@ void main() {
       expect(await root.list().where((entry) => entry is Directory).length, 0);
     });
   }
+
+  test('MP3 lyrics edits preserve existing artwork streams and tags', () async {
+    final source = File.fromUri(root.uri.resolve('Song.mp3'));
+    await FFmpegMetadata.embedMetadataToMp3(
+      mp3Path: source.path,
+      metadata: const {'LYRICS': 'Found'},
+      preserveMetadata: true,
+    );
+    expect(commands, hasLength(1));
+    expect(commands.single, containsAllInOrder(['-map_metadata', '0']));
+    expect(
+      commands.single,
+      containsAllInOrder(['-map', '0:v?', '-c:v', 'copy']),
+    );
+    expect(commands.single, containsAllInOrder(['-c:a', 'copy']));
+    expect(await source.readAsBytes(), [1, 2, 3, 4]);
+  });
 }

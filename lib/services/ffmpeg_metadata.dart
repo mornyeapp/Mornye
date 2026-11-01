@@ -231,6 +231,8 @@ abstract final class FFmpegMetadata {
         '-metadata:s:v',
         'comment=Cover (front)',
       ]);
+    } else if (preserveMetadata) {
+      arguments.addAll(['-map', '0:v?', '-c:v', 'copy']);
     }
     arguments.addAll(['-c:a', audioCodec]);
     if (audioBitrate != null) arguments.addAll(['-b:a', audioBitrate]);

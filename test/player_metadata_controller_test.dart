@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/controllers/player_metadata_controller.dart';
+import 'package:mornye/services/playback_metadata.dart';
 import 'package:mornye/services/source_metadata_events.dart';
 import 'package:mornye/utils/lyrics_parser.dart';
 
@@ -393,12 +394,17 @@ void main() {
 
   group('online lyrics search', () {
     PlayerMetadataController controllerFor(
-      Future<String> Function(MediaItem) fetch,
-    ) {
+      Future<String> Function(MediaItem) fetch, {
+      OnlineLyricsSaver? save,
+      PlaybackMetadataReader? read,
+      SourceMetadataEvents? events,
+    }) {
       final controller = PlayerMetadataController(
-        readMetadata: (_) async => const {},
+        readMetadata: read ?? (_) async => const {},
         parseLyrics: (raw) async => LyricsParser.parse(raw),
         fetchOnlineLyrics: fetch,
+        saveOnlineLyrics: save ?? (_, _) async {},
+        metadataEvents: events,
       );
       addTearDown(controller.dispose);
       return controller;
@@ -450,6 +456,173 @@ void main() {
       expect(controller.lyrics.isEmpty, isTrue);
       expect(controller.onlineSearchMissed, isFalse);
     });
+
+    test(
+      'embeds raw timed lyrics and reloads them without another search',
+      () async {
+        const raw = '[ar:Artist]\n[00:01.00]Found\n[00:02.00]Offline';
+        final stored = <String, String>{};
+        final events = SourceMetadataEvents();
+        final changes = <String>[];
+        final unsubscribe = events.subscribe(
+          (source) async => changes.add(source),
+        );
+        addTearDown(unsubscribe);
+        var fetches = 0;
+        Future<Map<String, dynamic>> read(String path) async => {
+          'lyrics': stored[path] ?? '',
+          'format': 'FLAC',
+        };
+        final controller = controllerFor(
+          (_) async {
+            fetches++;
+            return raw;
+          },
+          read: read,
+          save: (source, lyrics) async {
+            stored[source] = lyrics;
+          },
+          events: events,
+        );
+        await controller.load(_item('a'));
+        await controller.searchOnline();
+        expect(stored, {'/music/a.flac': raw});
+        expect(changes, ['/music/a.flac']);
+        expect(controller.metadata!['lyrics'], raw);
+        expect(controller.onlineLyricsSaveFailed, isFalse);
+
+        final reopened = controllerFor(
+          (_) async => fail('Embedded lyrics must load offline'),
+          read: read,
+        );
+        await reopened.load(_item('a'));
+        expect(reopened.lyrics.lines.map((line) => line.text), [
+          'Found',
+          'Offline',
+        ]);
+        expect(fetches, 1);
+      },
+    );
+
+    test(
+      'SAF saves to the original URI instead of the playback temp file',
+      () async {
+        final saves = <String>[];
+        final controller = controllerFor(
+          (_) async => '[00:01.00]Found',
+          save: (source, _) async => saves.add(source),
+        );
+        const source = 'content://library/song.flac';
+        await controller.load(
+          _item('a', source: source, resolved: '/tmp/song.flac'),
+        );
+        await controller.searchOnline();
+        expect(saves, [source]);
+      },
+    );
+
+    test(
+      'a save failure retains found lyrics and exposes the failure',
+      () async {
+        final controller = controllerFor(
+          (_) async => '[00:01.00]Found',
+          save: (_, _) async => throw StateError('Read-only file'),
+        );
+        await controller.load(_item('a'));
+        await controller.searchOnline();
+        expect(controller.lyrics.lines.single.text, 'Found');
+        expect(controller.onlineLyricsSaveFailed, isTrue);
+        expect(controller.onlineSearchMissed, isFalse);
+        await controller.load(_item('b'));
+        expect(controller.onlineLyricsSaveFailed, isFalse);
+      },
+    );
+
+    test(
+      'switching tracks during parsing never saves a stale result',
+      () async {
+        final parse = Completer<ParsedLyrics>();
+        final saves = <String>[];
+        final controller = PlayerMetadataController(
+          readMetadata: (_) async => const {},
+          fetchOnlineLyrics: (_) async => '[00:01.00]Old',
+          parseLyrics: (_) => parse.future,
+          saveOnlineLyrics: (source, _) async => saves.add(source),
+        );
+        addTearDown(controller.dispose);
+        await controller.load(_item('a'));
+        final pending = controller.searchOnline();
+        await Future<void>.delayed(Duration.zero);
+        await controller.load(_item('b'));
+        parse.complete(LyricsParser.parse('[00:01.00]Old'));
+        await pending;
+        expect(saves, isEmpty);
+      },
+    );
+
+    test(
+      'an in-flight save finishes on its original file after a track change',
+      () async {
+        final saved = Completer<void>();
+        final saves = <String>[];
+        final controller = controllerFor(
+          (_) async => '[00:01.00]First',
+          save: (source, _) async {
+            saves.add(source);
+            await saved.future;
+          },
+        );
+        await controller.load(_item('a'));
+        final pending = controller.searchOnline();
+        await Future<void>.delayed(Duration.zero);
+        expect(controller.lyrics.lines.single.text, 'First');
+        await controller.load(_item('b'));
+        saved.complete();
+        await pending;
+        expect(saves, ['/music/a.flac']);
+        expect(controller.lyrics.isEmpty, isTrue);
+        expect(controller.onlineLyricsSaveFailed, isFalse);
+      },
+    );
+
+    test('empty results never write tags', () async {
+      final controller = controllerFor(
+        (_) async => '',
+        save: (_, _) async => fail('Empty lyrics must not change the file'),
+      );
+      await controller.load(_item('a'));
+      await controller.searchOnline();
+      expect(controller.onlineSearchMissed, isTrue);
+    });
+
+    test(
+      'closing the player during a save still finishes the original file',
+      () async {
+        final saved = Completer<void>();
+        final writes = <String>[];
+        final controller = PlayerMetadataController(
+          readMetadata: (_) async => const {},
+          parseLyrics: (raw) async => LyricsParser.parse(raw),
+          fetchOnlineLyrics: (_) async => '[00:01.00]Found',
+          saveOnlineLyrics: (source, _) async {
+            await saved.future;
+            writes.add(source);
+          },
+        );
+        var notifications = 0;
+        controller.addListener(() => notifications++);
+        await controller.load(_item('a'));
+        final pending = controller.searchOnline();
+        await Future<void>.delayed(Duration.zero);
+        await controller.searchOnline();
+        controller.dispose();
+        final before = notifications;
+        saved.complete();
+        await pending;
+        expect(writes, ['/music/a.flac']);
+        expect(notifications, before);
+      },
+    );
 
     test('needs a title and artist to search', () async {
       final controller = controllerFor((_) async => '[00:01.00]Found');

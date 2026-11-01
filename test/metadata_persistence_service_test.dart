@@ -85,6 +85,38 @@ void main() {
 
   for (final extension in ['mp3', 'm4a', 'aac', 'opus', 'OGG']) {
     test(
+      'lyrics-only fallback retains unspecified tags for $extension',
+      () async {
+        final service = MetadataPersistenceService(
+          covers: covers,
+          edit: (_, metadata) async {
+            expect(metadata['lyrics'], '[00:01.00]Found');
+            expect(metadata.containsKey('title'), isFalse);
+            expect(metadata.containsKey('artist'), isFalse);
+            return {'method': 'ffmpeg'};
+          },
+          read: (_) async => const {},
+          embed: (codec, path, cover, tags, artistMode) async {
+            expect(tags, {
+              'LYRICS': '[00:01.00]Found',
+              'UNSYNCEDLYRICS': '[00:01.00]Found',
+            });
+            return path;
+          },
+        );
+        final saved = await service.save(
+          MetadataSaveRequest(
+            filePath: 'song.$extension',
+            metadata: const {'lyrics': '[00:01.00]Found'},
+            artistTagMode: artistTagModeJoined,
+            preserveUnspecifiedTags: true,
+          ),
+        );
+        expect(saved.failure, isNull);
+      },
+    );
+
+    test(
       'fallback preserves edited/empty tags and artist mode for $extension',
       () async {
         final cover = await covers.create();

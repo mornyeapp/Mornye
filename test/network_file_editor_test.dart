@@ -57,6 +57,7 @@ void main() {
 
       Future<MetadataSaveResult> save({
         bool failEdit = false,
+        bool lyricsOnly = false,
         void Function()? duringEdit,
       }) async {
         final covers = MetadataCoverResources();
@@ -71,7 +72,7 @@ void main() {
               await File(path).writeAsString(
                 jsonEncode({
                   ...old,
-                  'title': metadata['title'],
+                  if (metadata.containsKey('title')) 'title': metadata['title'],
                   'lyrics': metadata['lyrics'],
                 }),
               );
@@ -84,8 +85,9 @@ void main() {
             MetadataSaveRequest(
               filePath: NetworkEditFixture.source,
               artistTagMode: artistTagModeJoined,
-              metadata: const {
-                'title': 'New title',
+              preserveUnspecifiedTags: lyricsOnly,
+              metadata: {
+                if (!lyricsOnly) 'title': 'New title',
                 'lyrics': '[00:01.00]New lyrics',
               },
             ),
@@ -94,6 +96,15 @@ void main() {
           await covers.dispose();
         }
       }
+
+      test('lyrics-only save retains the title and other NAS tags', () async {
+        expect((await save(lyricsOnly: true)).failure, isNull);
+        expect(jsonDecode(utf8.decode(nas.files['song.flac']!)), {
+          ...original,
+          'lyrics': '[00:01.00]New lyrics',
+        });
+        expect(changes, [NetworkEditFixture.source]);
+      });
 
       test('writes metadata and lyrics back to the same NAS file', () async {
         expect((await save()).failure, isNull);

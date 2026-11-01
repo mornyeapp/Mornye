@@ -10,6 +10,7 @@ import 'package:mornye/utils/lyrics_parser.dart';
 import 'package:mornye/utils/playback_seek_preview.dart';
 import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/app_loading_indicator.dart';
+import 'package:mornye/widgets/app_snack_bar.dart';
 import 'package:mornye/widgets/expressive_button.dart';
 import 'package:mornye/widgets/player_lyrics.dart';
 import 'package:mornye/widgets/lyrics_text_scale.dart';
@@ -88,7 +89,7 @@ class PlayerLyricsSection extends ConsumerWidget {
       // Scrolls when a short screen leaves too little room above the
       // controls, so the search button stays reachable.
       return LayoutBuilder(
-        builder: (context, constraints) {
+        builder: (_, constraints) {
           final covered = LyricsCoveredBottom.of(context);
           return SingleChildScrollView(
             padding: EdgeInsets.only(bottom: covered),
@@ -134,7 +135,15 @@ class PlayerLyricsSection extends ConsumerWidget {
           const SizedBox(height: 16),
           ExpressiveButton(
             tonal: true,
-            onPressed: metadata.searchOnline,
+            onPressed: () async {
+              await metadata.searchOnline();
+              if (context.mounted && metadata.onlineLyricsSaveFailed) {
+                showAppSnackBar(
+                  context,
+                  content: Text(context.l10n.snackbarFailedToEmbedLyrics),
+                );
+              }
+            },
             icon: const Icon(Icons.manage_search),
             child: Text(context.l10n.nowPlayingSearchLyricsOnline),
           ),
