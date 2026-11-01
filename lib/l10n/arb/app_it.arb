@@ -1,6 +1,6 @@
 {
-  "extensionsUnsecuredStorage": "Use unsecured extension storage",
-  "extensionsUnsecuredStorageDescription": "Run extensions without a Linux keyring. The key is saved locally, so anyone with access to your app files can read extension credentials. Off uses the system keyring.",
+  "extensionsUnsecuredStorage": "Usa spazio di estensione non sicuro",
+  "extensionsUnsecuredStorageDescription": "Esegui le estensioni senza un portachiavi Linux. La chiave è salvata localmente, quindi qualsiasi persona con accesso ai file della tua app può leggere le credenziali. Se questa impostazione è disattivata usa il portachiavi.",
   "extensionsStorageKeyringRequired": "Existing extension data needs its original key. Unlock the system keyring once, then enable unsecured storage again. Your data has been preserved.",
   "extensionsStorageKeyConflict": "The local and system keyring keys differ. Storage was not changed and both keys were preserved.",
   "extensionsStorageKeyringUnavailable": "The system keyring is unavailable or locked. Start or unlock it before switching to secure storage. Your local key has been preserved.",
