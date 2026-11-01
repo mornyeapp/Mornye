@@ -205,6 +205,7 @@ class LinkDesktopOps {
   final int Function() _nowMs;
   final LinkPlaybackDetails _playbackDetails;
   final _random = math.Random();
+  final _playerStateCache = LinkPlayerStateCache();
 
   /// The queue the last `handoff/play` started, which `handoff/append`
   /// extends.
@@ -261,6 +262,7 @@ class LinkDesktopOps {
     index: _index(),
     autoplay: _autoplay?.call(),
     autoMix: _autoMix?.call(),
+    cache: _playerStateCache,
   );
 
   /// Notes the desktop's own queue, so `getPlayQueue` knows when it last

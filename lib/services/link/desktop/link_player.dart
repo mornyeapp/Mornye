@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:collection';
 
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/foundation.dart';
@@ -50,6 +51,101 @@ class LinkPlayerItem {
   final String? artwork;
   final String? metadataSource;
   final Map<String, dynamic> audioMetadata;
+}
+
+class _MappedPlayerItem {
+  _MappedPlayerItem(this.source)
+    : _extras = [for (final key in _extraKeys) source.extras?[key]],
+      _displayMetadata = switch (source.extras?['displayMetadata']) {
+        final Map<Object?, Object?> value => Map<Object?, Object?>.of(value),
+        _ => const {},
+      },
+      item = LinkPlayerItem.fromMediaItem(source);
+
+  static const _extraKeys = [
+    'source',
+    'resolvedSource',
+    'bit_depth',
+    'sample_rate',
+    'bitrate',
+    'format',
+    'explicit',
+  ];
+
+  final MediaItem source;
+  final List<Object?> _extras;
+  final Map<Object?, Object?> _displayMetadata;
+  final LinkPlayerItem item;
+
+  bool matches(MediaItem value) {
+    if (!identical(source, value)) return false;
+    final extras = value.extras;
+    for (var i = 0; i < _extraKeys.length; i++) {
+      if (_extras[i] != extras?[_extraKeys[i]]) return false;
+    }
+    final displayMetadata = extras?['displayMetadata'];
+    return displayMetadata is Map<Object?, Object?>
+        ? mapEquals(_displayMetadata, displayMetadata)
+        : _displayMetadata.isEmpty;
+  }
+}
+
+class _MappedPlayerQueue extends ListBase<LinkPlayerItem> {
+  _MappedPlayerQueue(this._source);
+
+  static const _maxItems = LinkPlayerState.maxQueue * 2;
+  final List<MediaItem> _source;
+  final _items = <int, _MappedPlayerItem>{};
+
+  @override
+  int get length => _source.length;
+
+  @override
+  set length(int value) => throw UnsupportedError('Immutable player queue');
+
+  @override
+  LinkPlayerItem operator [](int index) {
+    final source = _source[index];
+    final cached = _items.remove(index);
+    if (cached != null && cached.matches(source)) {
+      _items[index] = cached;
+      return cached.item;
+    }
+    final mapped = _MappedPlayerItem(source);
+    if (_items.length >= _maxItems) _items.remove(_items.keys.first);
+    _items[index] = mapped;
+    return mapped.item;
+  }
+
+  @override
+  void operator []=(int index, LinkPlayerItem value) =>
+      throw UnsupportedError('Immutable player queue');
+}
+
+class _CurrentPlayerQueue extends ListBase<LinkPlayerItem> {
+  _CurrentPlayerQueue(this._base, this._item, this._index)
+    : _current = _MappedPlayerQueue([_item]);
+
+  final List<LinkPlayerItem> _base;
+  final MediaItem _item;
+  final int _index;
+  final _MappedPlayerQueue _current;
+
+  @override
+  int get length => _base.length;
+
+  @override
+  set length(int value) => throw UnsupportedError('Immutable player queue');
+
+  @override
+  LinkPlayerItem operator [](int index) {
+    RangeError.checkValidIndex(index, this);
+    return index == _index ? _current[0] : _base[index];
+  }
+
+  @override
+  void operator []=(int index, LinkPlayerItem value) =>
+      throw UnsupportedError('Immutable player queue');
 }
 
 /// The desktop player at one moment.
@@ -139,9 +235,14 @@ class RuntimeLinkPlayerPort implements LinkPlayerPort {
   final MusicPlayerController _controller;
   List<MediaItem>? _mappedQueue;
   List<LinkPlayerItem> _mapped = const [];
-  MediaItem? _mappedCurrent;
-  List<LinkPlayerItem>? _currentBase;
-  List<LinkPlayerItem> _currentItems = const [];
+  _CurrentPlayerQueue? _currentItems;
+  MediaItem? _standaloneItem;
+  List<LinkPlayerItem> _standalone = const [];
+
+  @visibleForTesting
+  int get debugMappedQueueItemCount => _mapped is _MappedPlayerQueue
+      ? (_mapped as _MappedPlayerQueue)._items.length
+      : 0;
 
   @override
   LinkPlayerSnapshot snapshot() {
@@ -152,10 +253,10 @@ class RuntimeLinkPlayerPort implements LinkPlayerPort {
       return LinkPlayerSnapshot(updatedMs: now, volume: volume);
     }
     final queue = handler.queue.value;
-    // Map the queue once per change; position ticks reuse it.
+    // Map only entries read by the state window or an explicit queue request.
     if (!identical(queue, _mappedQueue)) {
       _mappedQueue = queue;
-      _mapped = List.unmodifiable(queue.map(LinkPlayerItem.fromMediaItem));
+      _mapped = _MappedPlayerQueue(queue);
     }
     final current = handler.mediaItem.value;
     final state = handler.playbackState.value;
@@ -168,24 +269,28 @@ class RuntimeLinkPlayerPort implements LinkPlayerPort {
         queue[index].id != current.id) {
       index = queue.indexWhere((item) => item.id == current.id);
       if (index < 0) {
-        items = [LinkPlayerItem.fromMediaItem(current)];
+        if (!identical(current, _standaloneItem)) {
+          _standaloneItem = current;
+          _standalone = _MappedPlayerQueue([current]);
+        }
+        items = _standalone;
         index = 0;
       }
     }
     if (current != null &&
+        identical(items, _mapped) &&
         index >= 0 &&
-        index < queue.length &&
         !identical(current, queue[index])) {
-      if (!identical(current, _mappedCurrent) ||
-          !identical(items, _currentBase)) {
-        _mappedCurrent = current;
-        _currentBase = items;
-        _currentItems = List.unmodifiable([
-          for (var i = 0; i < items.length; i++)
-            i == index ? LinkPlayerItem.fromMediaItem(current) : items[i],
-        ]);
+      final overlay = _currentItems;
+      if (overlay == null ||
+          !identical(current, overlay._item) ||
+          !identical(items, overlay._base) ||
+          index != overlay._index) {
+        _currentItems = _CurrentPlayerQueue(items, current, index);
       }
-      items = _currentItems;
+      items = _currentItems!;
+    } else {
+      _currentItems = null;
     }
     return LinkPlayerSnapshot(
       queue: items,
@@ -333,18 +438,62 @@ TrackRef linkTrackRef(LinkPlayerItem item, {DesktopLinkCatalogIndex? index}) {
   );
 }
 
+/// Retains the last queue window while its entries and catalog stay current.
+class LinkPlayerStateCache {
+  List<LinkPlayerItem>? _source;
+  DesktopLinkCatalogIndex? _index;
+  int _start = -1;
+  int _end = -1;
+  List<LinkPlayerItem> _items = const [];
+  List<TrackRef> _refs = const [];
+
+  List<TrackRef> _window(
+    List<LinkPlayerItem> source,
+    ({int start, int end}) window,
+    DesktopLinkCatalogIndex? index,
+  ) {
+    var unchanged =
+        identical(source, _source) &&
+        identical(index, _index) &&
+        window.start == _start &&
+        window.end == _end;
+    if (unchanged) {
+      for (var i = window.start; i < window.end; i++) {
+        if (!identical(source[i], _items[i - window.start])) {
+          unchanged = false;
+          break;
+        }
+      }
+    }
+    if (!unchanged) {
+      _source = source;
+      _index = index;
+      _start = window.start;
+      _end = window.end;
+      _items = [for (var i = window.start; i < window.end; i++) source[i]];
+      _refs = List.unmodifiable([
+        for (final item in _items) linkTrackRef(item, index: index),
+      ]);
+    }
+    return _refs;
+  }
+}
+
 /// The desktop player as `player.state` and `GET state` send it.
 LinkPlayerState linkPlayerState(
   LinkPlayerSnapshot snapshot, {
   DesktopLinkCatalogIndex? index,
   bool? autoplay,
   bool? autoMix,
+  LinkPlayerStateCache? cache,
 }) {
   final window = linkQueueWindow(snapshot.queue.length, snapshot.index);
-  final queue = [
-    for (var i = window.start; i < window.end; i++)
-      linkTrackRef(snapshot.queue[i], index: index),
-  ];
+  final queue =
+      cache?._window(snapshot.queue, window, index) ??
+      [
+        for (var i = window.start; i < window.end; i++)
+          linkTrackRef(snapshot.queue[i], index: index),
+      ];
   final current = snapshot.current;
   final inWindow =
       current != null &&

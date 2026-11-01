@@ -133,6 +133,53 @@ void main() {
     expect((queue.last as Map).containsKey('songId'), isFalse);
   });
 
+  test('state retains its queue refs until entries or catalog change', () {
+    final queue = [playerItem('a'), playerItem('b')];
+    player.current = snapshot(queue: queue);
+    final first = ops.state();
+    player.current = snapshot(queue: queue, positionMs: 48000, playing: false);
+    autoplay = true;
+    autoMix = true;
+    final next = ops.state();
+    expect(identical(next.queue, first.queue), isTrue);
+    expect(identical(next.track, next.queue[1]), isTrue);
+    expect(next.positionMs, 48000);
+    expect(next.playing, isFalse);
+    expect(next.autoplay, isTrue);
+    expect(next.autoMix, isTrue);
+    queue[0] = const LinkPlayerItem(
+      id: 'a',
+      path: '/edited.flac',
+      title: 'Edited',
+      artist: 'Artist',
+    );
+    final edited = ops.state();
+    expect(edited.queue.first.title, 'Edited');
+    expect(identical(edited.queue, next.queue), isFalse);
+    index = DesktopLinkCatalogIndex(
+      serverId: 'new-server',
+      songs: [
+        const LinkCatalogSong(
+          id: 'l:new',
+          path: '/edited.flac',
+          title: 'Edited',
+          artist: 'Artist',
+          album: 'Catalog album',
+          durationMs: 12345,
+          isrc: 'EXAMPLE123',
+        ),
+      ],
+    );
+    final cataloged = ops.state();
+    expect(cataloged.queue.first.songId, 'l:new');
+    expect(cataloged.queue.first.serverId, 'new-server');
+    expect(cataloged.queue.first.album, 'Catalog album');
+    expect(cataloged.queue.first.durationMs, 12345);
+    expect(cataloged.queue.first.isrc, 'EXAMPLE123');
+    expect(first.queue.first.title, 'Title a');
+    expect(() => cataloged.queue.clear(), throwsUnsupportedError);
+  });
+
   test(
     'handoff adopts playback modes and reports automation changes',
     () async {
