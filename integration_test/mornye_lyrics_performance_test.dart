@@ -14,21 +14,30 @@ import 'package:mornye/widgets/player_lyrics.dart';
 
 import 'performance_probe.dart';
 
-final _lyrics = ParsedLyrics(
+final _lyrics = _timedLyrics(lineMilliseconds: 2000);
+final _fastLyrics = _timedLyrics(lineMilliseconds: 300);
+
+ParsedLyrics _timedLyrics({required int lineMilliseconds}) => ParsedLyrics(
   synced: true,
   wordSynced: true,
   plainText: '',
   lines: List.generate(200, (index) {
     final words = ['Fixture ', 'line ', '$index ', 'flows ', 'on'];
     return LyricLine(
-      time: Duration(seconds: index * 2),
-      end: Duration(seconds: (index + 1) * 2),
+      time: Duration(milliseconds: index * lineMilliseconds),
+      end: Duration(milliseconds: (index + 1) * lineMilliseconds),
       text: words.join(),
       words: [
         for (var word = 0; word < words.length; word++)
           LyricWord(
-            time: Duration(milliseconds: index * 2000 + word * 400),
-            end: Duration(milliseconds: index * 2000 + (word + 1) * 400),
+            time: Duration(
+              milliseconds:
+                  index * lineMilliseconds + word * lineMilliseconds ~/ 5,
+            ),
+            end: Duration(
+              milliseconds:
+                  index * lineMilliseconds + (word + 1) * lineMilliseconds ~/ 5,
+            ),
             text: words[word],
           ),
       ],
@@ -54,6 +63,7 @@ void runLyricsPerformanceTests({required bool mornye}) {
     final playback = StreamController<PlaybackState>.broadcast();
     final seek = ValueNotifier<Duration?>(null);
     final active = ValueNotifier(true);
+    final fastPhrases = ValueNotifier(false);
     final elapsed = Stopwatch();
     Timer? timer;
     void report(bool playing) => playback.add(
@@ -84,6 +94,7 @@ void runLyricsPerformanceTests({required bool mornye}) {
       await playback.close();
       seek.dispose();
       active.dispose();
+      fastPhrases.dispose();
     });
     final theme = mornye ? MornyeTheme.build(Brightness.dark) : AppTheme.dark();
     await tester.pumpWidget(
@@ -101,13 +112,16 @@ void runLyricsPerformanceTests({required bool mornye}) {
             body: SafeArea(
               child: ValueListenableBuilder<bool>(
                 valueListenable: active,
-                builder: (_, value, _) => SyncedLyricsView(
-                  lyrics: _lyrics,
-                  seekPreview: seek,
-                  colorScheme: theme.colorScheme,
-                  isActive: value,
-                  showPronunciation: false,
-                  showTranslation: false,
+                builder: (_, value, _) => ValueListenableBuilder<bool>(
+                  valueListenable: fastPhrases,
+                  builder: (_, fast, _) => SyncedLyricsView(
+                    lyrics: fast ? _fastLyrics : _lyrics,
+                    seekPreview: seek,
+                    colorScheme: theme.colorScheme,
+                    isActive: value,
+                    showPronunciation: false,
+                    showTranslation: false,
+                  ),
                 ),
               ),
             ),
@@ -115,6 +129,10 @@ void runLyricsPerformanceTests({required bool mornye}) {
         ),
       ),
     );
+    await tester.runAsync(() async {
+      binding.scheduleFrame();
+      await binding.endOfFrame.timeout(const Duration(seconds: 10));
+    });
     ScrollPosition position() =>
         tester.state<ScrollableState>(find.byType(Scrollable)).position;
     String progressionFailure(double before) {
@@ -190,6 +208,15 @@ void runLyricsPerformanceTests({required bool mornye}) {
         await touch.up();
       }
     });
+    await probe.measure('lyrics_fast_phrase_scroll', () async {
+      fastPhrases.value = true;
+      await reset();
+      final before = position().pixels;
+      start();
+      await probe.wait(const Duration(milliseconds: 1800));
+      stop();
+      expect(position().pixels, greaterThan(before + 60));
+    });
     await tester.runAsync(() async {
       stop();
       active.value = false;
@@ -206,7 +233,8 @@ void runLyricsPerformanceTests({required bool mornye}) {
       metadata: {
         'scope':
             'Production SyncedLyricsView; 200 generated five-word lines, '
-            '200ms in-memory playback stream; no audio, metadata, database, '
+            '200ms in-memory playback stream; normal phrases are 2s and fast '
+            'phrases are 300ms. No audio, metadata, database, '
             'preferences or network. Active samples include a 650ms paused '
             'seek reset to 40s. Idle is inactive and paused.',
         'lineCount': _lyrics.lines.length,
@@ -214,6 +242,7 @@ void runLyricsPerformanceTests({required bool mornye}) {
         'wordsPerLine': 5,
         'manualScrollTolerancePixels': 1,
         'progressionTimeoutMs': 6000,
+        'fastPhraseDurationMs': 300,
       },
     );
   });

@@ -3,7 +3,7 @@ import 'package:flutter/physics.dart';
 
 /// One shared clock adds a small, staggered spring to upcoming visible rows.
 /// Only painting moves: lyric timings and list extents stay fixed.
-class LyricScrollMotion extends StatelessWidget {
+class LyricScrollMotion extends StatefulWidget {
   const LyricScrollMotion({
     super.key,
     required this.progress,
@@ -11,6 +11,8 @@ class LyricScrollMotion extends StatelessWidget {
     required this.rowsAfterFocus,
     required this.child,
     this.enabled = true,
+    this.motionRevision = 0,
+    this.previousProgress = 1,
   });
 
   final Animation<double> progress;
@@ -18,6 +20,10 @@ class LyricScrollMotion extends StatelessWidget {
   final int rowsAfterFocus;
   final Widget child;
   final bool enabled;
+
+  /// A new shared scroll preserves each row's unfinished visual displacement.
+  final int motionRevision;
+  final double previousProgress;
 
   static const duration = Duration(milliseconds: 800);
 
@@ -43,28 +49,50 @@ class LyricScrollMotion extends StatelessWidget {
   );
 
   @override
+  State<LyricScrollMotion> createState() => _LyricScrollMotionState();
+}
+
+class _LyricScrollMotionState extends State<LyricScrollMotion> {
+  double _initialOffset = 0;
+
+  double _offset(LyricScrollMotion motion, double progress) {
+    if (progress >= 1) return 0;
+    final t = progress * LyricScrollMotion.duration.inMilliseconds / 1000;
+    final scroll = LyricScrollMotion.scrollCurve.transform(
+      (t * 1000 / LyricScrollMotion.scrollDuration.inMilliseconds).clamp(
+        0.0,
+        1.0,
+      ),
+    );
+    final inherited = _initialOffset * (1 - scroll);
+    if (motion.rowsAfterFocus <= 0) return inherited;
+    final delay = motion.rowsAfterFocus.clamp(1, 6) * 0.035;
+    final following = t <= delay ? 0.0 : LyricScrollMotion._spring.x(t - delay);
+    return inherited + motion.distance.clamp(-96, 96) * (scroll - following);
+  }
+
+  @override
+  void didUpdateWidget(covariant LyricScrollMotion oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.motionRevision != widget.motionRevision) {
+      _initialOffset = _offset(oldWidget, widget.previousProgress);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    if (!enabled ||
-        rowsAfterFocus <= 0 ||
-        distance == 0 ||
+    if (!widget.enabled ||
+        (_initialOffset == 0 &&
+            (widget.rowsAfterFocus <= 0 || widget.distance == 0)) ||
         MediaQuery.disableAnimationsOf(context)) {
-      return child;
+      return widget.child;
     }
     return AnimatedBuilder(
-      animation: progress,
-      child: child,
+      animation: widget.progress,
+      child: widget.child,
       builder: (context, child) {
-        final t = progress.value * duration.inMilliseconds / 1000;
-        final delay = rowsAfterFocus.clamp(1, 6) * 0.035;
-        final scroll = scrollCurve.transform(
-          (t * 1000 / scrollDuration.inMilliseconds).clamp(0.0, 1.0),
-        );
-        final following = t <= delay ? 0.0 : _spring.x(t - delay);
-        final offset = progress.value >= 1
-            ? 0.0
-            : distance.clamp(-96, 96) * (scroll - following);
         return Transform.translate(
-          offset: Offset(0, offset),
+          offset: Offset(0, _offset(widget, widget.progress.value)),
           transformHitTests: true,
           child: child,
         );

@@ -168,6 +168,8 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
   );
   double _scrollMotionDistance = 0;
   int _scrollMotionFocus = 0;
+  int _scrollMotionRevision = 0;
+  double _previousScrollMotionProgress = 1;
 
   void _stopScrollMotion() {
     _scrollMotion.stop();
@@ -182,6 +184,8 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
       return;
     }
     setState(() {
+      _previousScrollMotionProgress = _scrollMotion.value;
+      _scrollMotionRevision++;
       _scrollMotionDistance = distance;
       _scrollMotionFocus = row;
     });
@@ -1204,7 +1208,8 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
                 progress: _scrollMotion,
                 distance: _scrollMotionDistance,
                 rowsAfterFocus: row - _scrollMotionFocus,
-                enabled: !isActive,
+                motionRevision: _scrollMotionRevision,
+                previousProgress: _previousScrollMotionProgress,
                 child: content,
               );
               return _revealRow(
