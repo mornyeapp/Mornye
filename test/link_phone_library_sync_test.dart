@@ -440,6 +440,56 @@ void main() {
       publisher.dispose();
     });
 
+    testWidgets('deletions replace the list online and after reconnect', (
+      tester,
+    ) async {
+      Object? heldVersion;
+      var heldSongs = <Object?>[];
+      final client = FakeLinkClient(
+        onGet: (op, _) => {'version': heldVersion},
+        onPost: (op, body) {
+          if (op == LinkOps.phoneCatalog) {
+            heldVersion = body['version'];
+            heldSongs = List<Object?>.of(body['songs'] as List);
+          }
+          return null;
+        },
+      );
+      final rows = _uriRows(3);
+      final library = rows.library();
+      final publisher = LinkPhoneLibraryPublisher(
+        client: client,
+        library: library,
+      )..start();
+      addTearDown(publisher.dispose);
+      await tester.pump();
+      final removedId = library.last!.songs.first.fileId;
+      expect(heldSongs, hasLength(3));
+
+      rows.rows.removeAt(0);
+      rows.bump();
+      publisher.libraryChanged();
+      await tester.pump(const Duration(seconds: 2));
+      expect(heldSongs, hasLength(2));
+      expect(
+        heldSongs.map((song) => (song as Map)['fileId']),
+        isNot(contains(removedId)),
+      );
+
+      client.setConnection(LinkConnectionState.disconnected);
+      rows.rows.clear();
+      rows.bump();
+      publisher.libraryChanged();
+      await tester.pump(const Duration(seconds: 2));
+      expect(heldSongs, hasLength(2));
+
+      client.setConnection(LinkConnectionState.connected);
+      await tester.pump();
+      expect(heldSongs, isEmpty);
+      expect(pages(client).last['total'], 0);
+      expect(heldVersion, library.last!.version);
+    });
+
     testWidgets('publish 2 s after the Library settles', (tester) async {
       final client = FakeLinkClient(onGet: (op, _) => {'version': null});
       final publisher = LinkPhoneLibraryPublisher(

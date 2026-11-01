@@ -583,6 +583,25 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
     return ref.mounted && known();
   }
 
+  /// Reconciles stored phone songs on reconnect even when the catalog hash
+  /// matches. A failed or interrupted scan can leave old Library rows behind.
+  Future<void> _refreshPhoneLibrary(String deviceId) async {
+    final catalogs = _phoneCatalogs;
+    if (catalogs == null || !ref.mounted) return;
+    final sourceId = linkPhoneSourceId(deviceId);
+    try {
+      if (await catalogs.version(sourceId) == null ||
+          !ref.mounted ||
+          _phoneCatalogs != catalogs ||
+          _connectedPhone(sourceId) != deviceId) {
+        return;
+      }
+      await ref.read(linkPhoneLibraryProvider).rescan(sourceId);
+    } on Object catch (error) {
+      _log.w('Could not refresh the phone songs in Library: $error');
+    }
+  }
+
   /// Shows a phone's committed songs: adds its Library source the first
   /// time, then rescans it.
   Future<void> _onPhoneCommit(String deviceId) async {
@@ -868,6 +887,7 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
     if (!known.containsAll(ids)) {
       for (final id in ids.difference(known)) {
         _lyricsTranslations?.connected(id);
+        unawaited(_refreshPhoneLibrary(id));
       }
       _lastSentState = null;
       _onPlayerChanged();

@@ -145,6 +145,39 @@ void main() {
     expect(NetworkStorageService.instance.virtualSources, isNull);
   });
 
+  test(
+    'reconnecting rescans a persisted phone catalog without a new upload',
+    () async {
+      await boot();
+      await commit('v1');
+      await until(() => library.calls.contains('rescan:$sourceId'));
+      container!.dispose();
+      container = null;
+      library.calls.clear();
+
+      await boot();
+      expect(library.calls, isEmpty);
+      backend.connect([_phone]);
+      await until(() => library.calls.contains('rescan:$sourceId'));
+      expect(library.calls, ['rescan:$sourceId']);
+      expect((await request(LinkOps.phoneCatalog, {'_method': 'GET'})).result, {
+        'version': 'v1',
+      });
+
+      // Repeated client snapshots do not start another scan.
+      backend.connect([_phone]);
+      await Future<void>.delayed(const Duration(milliseconds: 30));
+      expect(library.calls, ['rescan:$sourceId']);
+
+      // Another connection retries reconciliation if an earlier scan failed.
+      backend.connect([]);
+      await until(() => hostState().clients.isEmpty);
+      backend.connect([_phone]);
+      await until(() => library.calls.length == 2);
+      expect(library.calls, ['rescan:$sourceId', 'rescan:$sourceId']);
+    },
+  );
+
   test('a cover Library still shows outlives the commit dropping it', () async {
     await boot();
     final coverId = 'c' * 32;

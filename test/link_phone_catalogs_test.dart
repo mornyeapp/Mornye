@@ -155,6 +155,27 @@ void main() {
     expect(await reopened.sourceIds(), [sourceId]);
   });
 
+  test('a newer snapshot removes old songs from a persisted catalog', () async {
+    await page(0, 3, [_song(1), _song(2), _song(3)]);
+    catalogs = LinkPhoneCatalogs(
+      root: () async => root,
+      paired: (deviceId) async => paired.contains(deviceId),
+      onCommit: commits.add,
+    )..register(router);
+
+    // A partial upload must keep the last complete snapshot intact.
+    await page(0, 2, [_song(1)], version: 'v2');
+    expect(await catalogs.song(sourceId, _fileId(2)), isNotNull);
+    await page(1, 2, [_song(3)], version: 'v2');
+
+    expect(await catalogs.song(sourceId, _fileId(2)), isNull);
+    expect(
+      (await catalogs.songs(sourceId).toList()).map((song) => song.fileId),
+      [_fileId(1), _fileId(3)],
+    );
+    expect(await catalogs.version(sourceId), 'v2');
+  });
+
   test('leaves out invalid songs while counting them', () async {
     await page(0, 2, [
       _song(1),
