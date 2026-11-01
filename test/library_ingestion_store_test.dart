@@ -94,4 +94,22 @@ void main() {
     expect(await keyOwners(), ['elsewhere', 'kept', 'new']);
     expect(await tempTables(), isEmpty);
   });
+
+  test('Windows scan aliases appear once and match downloaded files', () async {
+    await addNativeLibraryDownload(database, r'C:\Music\downloaded.flac');
+    final result = await store.upsertBatchExcludingHistory([
+      nativeLibraryTrack('win-a', path: r'\\?\C:\Music\song.flac'),
+      nativeLibraryTrack('win-b', path: r'C:\Music\song.flac'),
+      nativeLibraryTrack('win-download', path: r'\\?\C:\Music\downloaded.flac'),
+    ], sourceId: 'source');
+    expect(result, (upserted: 2, skipped: 1));
+    final visible = await database.rawQuery(
+      "SELECT id FROM library_visible WHERE id LIKE 'win-%' ORDER BY id",
+    );
+    expect(visible.map((row) => row['id']), ['win-a']);
+    expect(
+      await database.query('library', where: 'id = ?', whereArgs: ['win-b']),
+      hasLength(1),
+    );
+  });
 }

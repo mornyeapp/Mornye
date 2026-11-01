@@ -1,5 +1,6 @@
 import 'package:mornye/utils/file_access.dart';
 import 'package:mornye/utils/saf_display_path.dart';
+import 'package:mornye/utils/windows_path_identity.dart';
 
 /// One Library song as the folder index reads it: its record and file.
 class LibraryDirectoryEntry {
@@ -120,7 +121,7 @@ LibraryFileLocation? libraryFileLocation(
 }
 
 LibraryFileLocation? _fileLocation(String path) {
-  final normalized = path.replaceAll('\\', '/');
+  final normalized = windowsPathIdentity(path) ?? path.replaceAll('\\', '/');
   final String root;
   final String rootLabel;
   var separator = '/';

@@ -149,6 +149,7 @@ impl Fixture {
 fn backup_replace_round_trip_preserves_flags_dates_keys_order_and_fts() {
     let fixture = Fixture::new();
     fixture.restore(&[track("old")], 1, &|| Ok(())).unwrap();
+    fixture.db.execute_batch("PRAGMA user_version=17").unwrap();
     fixture
         .restore(&[track("b"), track("a")], 2, &|| Ok(()))
         .unwrap();

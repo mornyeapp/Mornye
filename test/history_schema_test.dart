@@ -22,6 +22,38 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test(
+    'v16 migration backfills Windows aliases without changing history',
+    () async {
+      final db = await SqliteProcessDatabase.open();
+      addTearDown(db.close);
+      await HistorySchema.create(db, HistoryDatabase.schemaVersion);
+      await db.insert(
+        'history',
+        HistoryRowMapper.jsonToDbRow({
+          'id': 'windows',
+          'trackName': 'Song',
+          'artistName': 'Artist',
+          'albumName': 'Album',
+          'filePath': r'\\?\C:\Music\song.flac',
+          'service': 'local',
+          'downloadedAt': '2026-01-01T00:00:00Z',
+        }),
+      );
+      final original = await db.query('history');
+      await HistorySchema.upgrade(db, 16, HistoryDatabase.schemaVersion);
+      expect(await db.query('history'), original);
+      expect(
+        await db.query(
+          'history_path_keys',
+          where: 'path_key = ?',
+          whereArgs: ['windows-file:C:/Music/song.flac'],
+        ),
+        hasLength(1),
+      );
+    },
+  );
+
+  test(
     'v15 index migration preserves rows and removes recreated indexes',
     () async {
       final db = await SqliteProcessDatabase.open();

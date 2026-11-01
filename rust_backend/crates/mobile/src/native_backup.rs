@@ -89,9 +89,10 @@ fn open(request: &Value, writable: bool) -> Result<Connection, String> {
     let version: i64 = db
         .pragma_query_value(None, "user_version", |row| row.get(0))
         .map_err(|e| err("History schema", e))?;
-    if version != 16 {
+    // v17 refreshes path identities without changing History columns.
+    if version != 17 && version != 16 {
         return Err(format!(
-            "History schema v{version} is incompatible with native v16"
+            "History schema v{version} is incompatible with native v16/v17"
         ));
     }
     db.execute_batch("PRAGMA recursive_triggers=ON; PRAGMA synchronous=NORMAL;")

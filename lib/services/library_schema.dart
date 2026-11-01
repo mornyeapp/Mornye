@@ -13,7 +13,7 @@ final _log = AppLogger('LibraryDatabase');
 
 /// Schema lifecycle is independent of collection reads and scan transactions.
 abstract final class LibrarySchema {
-  static const version = 21;
+  static const version = 22;
   static const visibleView = 'library_visible';
   static const searchFtsTable = 'library_search_fts';
   static const lookupSummaryTable = 'library_lookup_summary';
@@ -209,6 +209,10 @@ abstract final class LibrarySchema {
       await _createNormalizedIndexes(db);
       await _createState(db);
     }
+    if (oldVersion < 22) {
+      await sqlite.backfillPathKeys(db, 'library', 'library_path_keys');
+      await _createVisibleView(db);
+    }
   }
 
   static Future<bool> createSearchFts(DatabaseExecutor db) =>
@@ -270,12 +274,25 @@ abstract final class LibrarySchema {
   }
 
   static Future<void> _createVisibleView(DatabaseExecutor db) async {
+    // Keep alias records addressable by old playlist IDs. Only suppress a
+    // Windows physical-file alias while another available record represents
+    // it. The dedicated keys keep converted formats and CUE tracks distinct.
     await db.execute('DROP VIEW IF EXISTS $visibleView');
     await db.execute('''
       CREATE VIEW $visibleView AS
       SELECT l.* FROM library l
       JOIN library_sources s ON s.id = l.source_id
       WHERE s.enabled = 1 AND s.available = 1
+        AND NOT EXISTS (
+          SELECT 1 FROM library_path_keys own
+          JOIN library_path_keys other ON other.path_key = own.path_key
+          JOIN library duplicate ON duplicate.id = other.item_id
+          JOIN library_sources ds ON ds.id = duplicate.source_id
+          WHERE own.item_id = l.id
+            AND own.path_key GLOB 'windows-file:*'
+            AND duplicate.id < l.id
+            AND ds.enabled = 1 AND ds.available = 1
+        )
         AND l.file_path NOT IN (
           SELECT c.file_path FROM library_cue_split_sources c
           JOIN (

@@ -671,7 +671,8 @@
         "c:/music/hello",
         "c:/music/hello.flac",
         "c:\\music\\hello",
-        "c:\\music\\hello.flac"
+        "c:\\music\\hello.flac",
+        "windows-file:C:/Music/Hello.flac"
       ]
     },
     {

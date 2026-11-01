@@ -150,6 +150,9 @@ abstract final class HistorySchema {
       await sqlite.backfillPathKeys(db, 'history', 'history_path_keys');
       _log.i('Updated history path keys with provider document identities');
     }
+    if (oldVersion < 17) {
+      await sqlite.backfillPathKeys(db, 'history', 'history_path_keys');
+    }
     if (oldVersion < 16) {
       // Idempotent: an older build lowers user_version without a downgrade
       // step, and its native writer recreates the dropped indexes.

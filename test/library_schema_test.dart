@@ -31,6 +31,54 @@ void main() {
   tearDown(() => db.close());
 
   test(
+    'Windows alias migration hides duplicates without deleting records',
+    () async {
+      await LibrarySchema.create(db, LibrarySchema.version);
+      for (final entry in {
+        'a': r'\\?\C:\Music\song.flac',
+        'b': r'C:\Music\song.flac',
+        'c': r'C:\Music\song.opus',
+        'd': r'\\?\UNC\server\share\song.flac',
+        'e': r'\\server\share\song.flac',
+      }.entries) {
+        await db.insert(
+          'library',
+          LibraryRowMapper.encode({
+            ..._track(entry.key),
+            'filePath': entry.value,
+          }),
+        );
+      }
+      final original = await db.query('library');
+      for (var attempt = 0; attempt < 2; attempt++) {
+        await LibrarySchema.upgrade(db, 21, LibrarySchema.version);
+        expect(await db.query('library'), original);
+        final visible = await db.query(
+          LibrarySchema.visibleView,
+          orderBy: 'id',
+        );
+        expect(visible.map((row) => row['id']), ['a', 'c', 'd']);
+      }
+      // An unavailable winning source must not hide an available alias.
+      await db.insert('library_sources', {
+        'id': 'offline',
+        'path': r'C:\Music',
+        'display_name': 'Offline',
+        'enabled': 1,
+        'available': 0,
+      });
+      await db.update(
+        'library',
+        {'source_id': 'offline'},
+        where: 'id = ?',
+        whereArgs: ['a'],
+      );
+      final visible = await db.query(LibrarySchema.visibleView, orderBy: 'id');
+      expect(visible.map((row) => row['id']), ['b', 'c', 'd']);
+    },
+  );
+
+  test(
     'v20 index migration preserves rows and can run again after a downgrade',
     () async {
       await LibrarySchema.create(db, LibrarySchema.version);

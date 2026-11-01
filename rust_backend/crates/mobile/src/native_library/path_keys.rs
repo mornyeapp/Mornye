@@ -212,6 +212,10 @@ pub(crate) fn build(path: &str, android: bool) -> Result<BTreeSet<String>, Strin
     let mut keys = BTreeSet::new();
     let mut visited = BTreeSet::new();
     let mut pending = VecDeque::from([cleaned.to_string()]);
+    if let Some(path) = mornye_core::windows_path_identity::identity(cleaned) {
+        keys.insert(format!("windows-file:{path}"));
+        pending.push_back(path);
+    }
     if let Ok(uri) = dart_uri(cleaned)
         && let Some(key) = document_key(&uri)
     {
@@ -286,6 +290,9 @@ pub(crate) fn build(path: &str, android: bool) -> Result<BTreeSet<String>, Strin
     let extensionless = keys
         .iter()
         .filter_map(|key| {
+            if key.starts_with("windows-file:") {
+                return None;
+            }
             let lower = dart_lower(key);
             EXTENSIONS
                 .iter()
@@ -301,6 +308,14 @@ pub(crate) fn build(path: &str, android: bool) -> Result<BTreeSet<String>, Strin
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn windows_physical_keys_keep_extensions() {
+        let plain = build(r"C:\Music\song.flac", false).unwrap();
+        let extended = build(r"\\?\C:\Music\song.flac", false).unwrap();
+        assert!(plain.contains("windows-file:C:/Music/song.flac"));
+        assert!(extended.contains("windows-file:C:/Music/song.flac"));
+        assert!(!extended.contains("windows-file:C:/Music/song"));
+    }
     #[test]
     fn saf_document_aliases_keep_opaque_case_and_escape_identity() {
         let direct = build("content://nas.provider/document/Ab%252FC.flac", false).unwrap();

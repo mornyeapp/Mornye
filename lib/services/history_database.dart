@@ -105,7 +105,7 @@ class HistoryDatabase {
   // the existing schema migration. The background native writer shares
   // history.db and must accept the same schema contract and
   // user_version without depending on FTS5.
-  static const int schemaVersion = 16;
+  static const int schemaVersion = 17;
   static const String searchFtsTable = 'history_search_fts';
   static final HistoryDatabase instance = HistoryDatabase._init();
   static final sqlite.SingleFlightInitializer<Database> _database =

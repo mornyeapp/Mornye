@@ -14,7 +14,7 @@ import java.util.Locale
 internal object NativeHistoryStore {
     private const val TAG = "NativeFinalizer"
     // Keep this schema contract in sync with Dart HistoryDatabase before bumping either side.
-    const val HISTORY_SCHEMA_VERSION = 16
+    const val HISTORY_SCHEMA_VERSION = 17
 
     // One guarded native writer prevents interleaved transactions. Flutter/sqflite
     // uses its own WAL connection, so configure the busy timeout once per connection.

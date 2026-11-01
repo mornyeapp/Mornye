@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:mornye/utils/windows_path_identity.dart';
+
 const _androidStoragePathAliases = <String>[
   '/storage/emulated/0',
   '/storage/emulated/legacy',
@@ -83,6 +85,8 @@ Set<String> _buildPathMatchKeys(
 
   final keys = <String>{};
   final visited = <String>{};
+  final windowsPath = windowsPathIdentity(cleaned);
+  if (windowsPath != null) keys.add('windows-file:$windowsPath');
 
   // A DocumentsProvider document can be reached through an album tree, its
   // parent tree, or a direct document URI. Keep that identity independent of
@@ -157,10 +161,12 @@ Set<String> _buildPathMatchKeys(
   }
 
   addNormalized(cleaned);
+  if (windowsPath != null) addNormalized(windowsPath);
 
   if (includeExtensionless) {
     final extensionStrippedKeys = <String>{};
     for (final key in keys) {
+      if (key.startsWith('windows-file:')) continue;
       final stripped = _stripAudioExtension(key);
       if (stripped != null && stripped.isNotEmpty) {
         extensionStrippedKeys.add(stripped);
