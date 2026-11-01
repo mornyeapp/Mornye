@@ -82,6 +82,8 @@ void main() {
   var artworkUnavailable = false;
   var coverVersion = 0;
   Future<String?> Function(String)? extractCover;
+  Future<void> Function(String)? fetchCover;
+  Future<PlayableMedia?> Function(TrackRef, PlayableMedia?)? readDetails;
   late Directory coverDirectory;
   late CoverStore covers;
 
@@ -91,6 +93,7 @@ void main() {
       directory: () async => coverDirectory,
       fetch: (source, output) async {
         artwork.add(source);
+        await fetchCover?.call(source);
         if (artworkUnavailable) throw StateError('offline');
         await output.writeAsBytes([
           0xFF,
@@ -118,6 +121,8 @@ void main() {
     artworkUnavailable = false;
     coverVersion = 0;
     extractCover = null;
+    fetchCover = null;
+    readDetails = null;
     playback = LinkRemotePlayback(
       name: 'Studio PC',
       remote: container.read(linkDesktopRemoteProvider.notifier),
@@ -128,6 +133,8 @@ void main() {
         resolver: LinkTrackResolver(lookup: lookup, server: client.server),
       ),
       covers: covers,
+      details: (track, local) =>
+          readDetails?.call(track, local) ?? Future.value(local),
       extractArtwork: (source) async {
         extracted.add(source);
         if (extractCover case final extract?) return extract(source);
@@ -156,6 +163,18 @@ void main() {
 
   String desktopCover(String songId) =>
       linkDesktopCoverSource(linkTestServer, songId);
+
+  void showTrack(TrackRef track) => client.push({
+    'type': LinkMessageTypes.playerState,
+    'state': LinkPlayerState(
+      track: track,
+      queue: [track],
+      index: 0,
+      playing: false,
+      positionMs: 0,
+      updatedMs: 1,
+    ).toJson(),
+  });
 
   test(
     'download updates leave the active paused playback stream quiet',
@@ -356,6 +375,132 @@ void main() {
     expect(after!.artUri!.toFilePath(), covers.indexedFile(desktopCover('s0')));
     expect((await playback.queues.first).first.artUri, after.artUri);
   });
+
+  test(
+    'rapid remote skips retain artwork until the current lookup completes',
+    () async {
+      client.push(_state());
+      final before = await withCover();
+      final replies = <String, Completer<PlayableMedia?>>{};
+      readDetails = (track, local) =>
+          replies.putIfAbsent(track.title, Completer.new).future;
+      final shown = <MediaItem?>[];
+      final subscription = playback.mediaItems.listen(shown.add);
+      addTearDown(subscription.cancel);
+      const second = TrackRef(title: 'Phone B', artist: 'Artist');
+      const third = TrackRef(title: 'Phone C', artist: 'Artist');
+      showTrack(second);
+      await settle();
+      showTrack(third);
+      await settle();
+      final pending = (await playback.mediaItems.first)!;
+      expect(pending.title, third.title);
+      expect(pending.artUri, before.artUri);
+      expect((await playback.queues.first).single.artUri, isNull);
+      showTrack(third);
+      await settle();
+      expect(await playback.mediaItems.first, same(pending));
+
+      Future<PlayableMedia> complete(TrackRef track) async {
+        final cover = await File(
+          '${coverDirectory.path}/${track.title}.jpg',
+        ).writeAsBytes([1]);
+        final media = PlayableMedia(
+          id: track.title,
+          source: '',
+          title: track.title,
+          artist: track.artist,
+          artUri: cover.uri.toString(),
+        );
+        replies[track.title]!.complete(media);
+        await settle();
+        return media;
+      }
+
+      final current = await complete(third);
+      expect(
+        (await playback.mediaItems.first)!.artUri.toString(),
+        current.artUri,
+      );
+      final count = shown.length;
+      final late = await complete(second);
+      expect(shown, hasLength(count));
+      expect((await playback.mediaItems.first)!.title, third.title);
+      expect(
+        shown.whereType<MediaItem>().map((item) => item.artUri),
+        everyElement(isNotNull),
+      );
+      expect(
+        (await playback.queues.first).single.artUri.toString(),
+        current.artUri,
+      );
+
+      showTrack(second);
+      await settle();
+      expect((await playback.mediaItems.first)!.artUri.toString(), late.artUri);
+      client.push({
+        'type': LinkMessageTypes.playerState,
+        'state': const LinkPlayerState(
+          playing: false,
+          positionMs: 0,
+          updatedMs: 1,
+        ).toJson(),
+      });
+      await settle();
+      expect(await playback.mediaItems.first, isNull);
+    },
+  );
+
+  for (final failure in [false, true]) {
+    test('a completed remote lookup clears a held cover ($failure)', () async {
+      client.push(_state());
+      final before = await withCover();
+      final reply = Completer<PlayableMedia?>();
+      readDetails = (_, _) => reply.future;
+      const track = TrackRef(title: 'No artwork', artist: 'Artist');
+      showTrack(track);
+      await settle();
+      expect((await playback.mediaItems.first)!.artUri, before.artUri);
+      if (failure) {
+        reply.completeError(StateError('unavailable'));
+      } else {
+        reply.complete(null);
+      }
+      await settle();
+      final item = (await playback.mediaItems.first)!;
+      expect(item.title, track.title);
+      expect(item.artUri, isNull);
+      showTrack(track);
+      await settle();
+      expect(await playback.mediaItems.first, same(item));
+    });
+
+    test(
+      'a pending desktop cover stays gapless until it settles ($failure)',
+      () async {
+        client.push(_state());
+        final before = await withCover();
+        final reply = Completer<void>();
+        fetchCover = (_) => reply.future;
+        final track = _desktopSong('uncached');
+        showTrack(track);
+        await settle();
+        expect(artwork, contains(desktopCover('uncached')));
+        expect((await playback.mediaItems.first)!.artUri, before.artUri);
+        expect((await playback.queues.first).single.artUri, isNull);
+        if (failure) {
+          reply.completeError(StateError('offline'));
+        } else {
+          reply.complete();
+        }
+        await settle();
+        final item = (await playback.mediaItems.first)!;
+        expect(item.title, track.title);
+        expect(item.artUri, failure ? isNull : isNot(before.artUri));
+        expect((await playback.queues.first).single.artUri, item.artUri);
+      },
+    );
+  }
 
   test('changes to songs nobody shows fetch no covers', () async {
     client.push(_state());

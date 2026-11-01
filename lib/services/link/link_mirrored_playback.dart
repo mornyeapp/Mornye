@@ -112,8 +112,10 @@ abstract class LinkMirroredPlayback implements RemotePlayback {
 
   /// Network covers asked of the store since the tracks were last refreshed.
   final _coverChecks = <String>{};
+  final _coverRequests = <String, Object>{};
   late final StreamSubscription<String> _coverChanges;
 
+  MediaItem? _currentBase;
   LinkPlayerState? _player;
   List<TrackRef> _queueRefs = const [];
   Timer? _ticker;
@@ -222,8 +224,7 @@ abstract class LinkMirroredPlayback implements RemotePlayback {
   void _showTracks({required bool force}) {
     final player = _player;
     final track = player?.track;
-    final current = track == null ? null : _itemFor(track);
-    if (!identical(current, _mediaItem.value)) _mediaItem.add(current);
+    if (track != null) _itemFor(track);
     final refs = player?.queue ?? const <TrackRef>[];
     if (force || !listEquals(refs, _queueRefs)) {
       _queueRefs = refs;
@@ -248,6 +249,29 @@ abstract class LinkMirroredPlayback implements RemotePlayback {
     }
     _drainResolutions();
     _fetchShownCovers();
+    _showCurrent();
+  }
+
+  /// Keep the previous display cover while the new track's lookup or cover
+  /// fetch is pending. Queue entries never borrow another song's artwork.
+  /// A completed lookup without artwork restores the normal placeholder.
+  void _showCurrent() {
+    final track = _player?.track;
+    final base = track == null ? null : _itemFor(track);
+    final waiting =
+        track != null &&
+        (!_resolved.contains(track) ||
+            _coverRequests.containsKey(base?.extras?['artworkRef']));
+    final artwork = base?.artUri ?? (waiting ? _mediaItem.value?.artUri : null);
+    if (identical(base, _currentBase) && artwork == _mediaItem.value?.artUri) {
+      return;
+    }
+    _currentBase = base;
+    _mediaItem.add(
+      base == null || artwork == base.artUri
+          ? base
+          : base.copyWith(artUri: artwork),
+    );
   }
 
   /// [_fetchCovers] for the playing song and the next [_coversAhead].
@@ -274,13 +298,20 @@ abstract class LinkMirroredPlayback implements RemotePlayback {
           !_coverChecks.add(reference)) {
         continue;
       }
+      final request = Object();
+      _coverRequests[reference] = request;
       unawaited(
         _covers.file(reference).then((path) {
-          if (path == null && !_disposed) {
+          if (_disposed || !identical(_coverRequests[reference], request)) {
+            return;
+          }
+          _coverRequests.remove(reference);
+          if (path == null) {
             _coverChecks.remove(reference);
             _failed.add(ref);
           }
           _showCover(reference);
+          _showCurrent();
         }),
       );
     }
@@ -463,6 +494,7 @@ abstract class LinkMirroredPlayback implements RemotePlayback {
       _resolved.add(ref);
       _failed.add(ref);
       _log.w('Could not look up a song $name plays: $error');
+      _showCurrent();
     } finally {
       _resolving.remove(ref);
       if (generation != _lookupGeneration && !_disposed) {
@@ -608,6 +640,7 @@ abstract class LinkMirroredPlayback implements RemotePlayback {
     _disposed = true;
     _endSeek();
     _pending.clear();
+    _coverRequests.clear();
     _ticker?.cancel();
     unawaited(_coverChanges.cancel());
     _mediaItem.close();
