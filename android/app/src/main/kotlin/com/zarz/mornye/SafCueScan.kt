@@ -3,6 +3,7 @@ package com.zarz.mornye
 import androidx.documentfile.provider.DocumentFile
 import org.json.JSONArray
 import java.io.File
+import java.io.Reader
 import java.util.Locale
 
     /**
@@ -10,30 +11,53 @@ import java.util.Locale
      * Reads the FILE "name" TYPE line from the .cue text.
      * Returns just the filename (no path), or null if not found.
      */
-internal fun MainActivity.extractCueAudioFileName(cueTempPath: String): String? {
-        try {
-            val lines = File(cueTempPath).readLines()
-            for (line in lines) {
-                val trimmed = line.trim().let { l ->
-                    if (l.startsWith("\uFEFF")) l.removePrefix("\uFEFF").trim() else l
-                }
-                if (trimmed.uppercase(Locale.ROOT).startsWith("FILE ")) {
-                    val rest = trimmed.substring(5).trim()
-                    val filename = if (rest.startsWith("\"")) {
-                        val endQuote = rest.indexOf('"', 1)
-                        if (endQuote > 0) rest.substring(1, endQuote) else rest
-                    } else {
-                        val parts = rest.split("\\s+".toRegex())
-                        if (parts.size >= 2) parts.dropLast(1).joinToString(" ") else rest
-                    }
-                    return filename.substringAfterLast("/").substringAfterLast("\\")
-                }
-            }
-        } catch (e: Exception) {
-            android.util.Log.w("Mornye", "Failed to extract audio filename from CUE: ${e.message}")
-        }
-        return null
+internal fun MainActivity.extractCueAudioFileName(cueTempPath: String): String? = try {
+    File(cueTempPath).bufferedReader().use(::extractCueAudioFileName)
+} catch (e: Exception) {
+    android.util.Log.w("Mornye", "Failed to extract audio filename from CUE: ${e.message}")
+    null
+}
+
+internal fun extractCueAudioFileName(source: Reader): String? {
+    val reader = source.buffered(8192)
+    while (true) {
+        val line = reader.readLine() ?: return null
+        cueAudioFileName(line)?.let { return it }
     }
+}
+
+internal data class CueAudioReference(val filename: String?)
+
+internal fun readCueAudioReference(
+    open: () -> Reader?,
+    retryOnDenied: Boolean,
+): CueAudioReference? {
+    fun read(): CueAudioReference? = open()?.use {
+        CueAudioReference(extractCueAudioFileName(it))
+    }
+    return try {
+        read()
+    } catch (error: SecurityException) {
+        if (!retryOnDenied) throw error
+        read()
+    }
+}
+
+private fun cueAudioFileName(line: String): String? {
+    val trimmed = line.trim().let {
+        if (it.startsWith("\uFEFF")) it.removePrefix("\uFEFF").trim() else it
+    }
+    if (!trimmed.uppercase(Locale.ROOT).startsWith("FILE ")) return null
+    val rest = trimmed.substring(5).trim()
+    val filename = if (rest.startsWith("\"")) {
+        val endQuote = rest.indexOf('"', 1)
+        if (endQuote > 0) rest.substring(1, endQuote) else rest
+    } else {
+        val parts = rest.split("\\s+".toRegex())
+        if (parts.size >= 2) parts.dropLast(1).joinToString(" ") else rest
+    }
+    return filename.substringAfterLast("/").substringAfterLast("\\")
+}
 
     private val cueSiblingAudioExtensions = listOf(
         ".flac", ".wav", ".ape", ".mp3", ".ogg", ".wv", ".m4a", ".mp4", ".aac"

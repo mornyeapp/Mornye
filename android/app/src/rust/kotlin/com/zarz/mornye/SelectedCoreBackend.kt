@@ -264,6 +264,15 @@ internal object RustCoreBackend : CoreBackend {
         com.mornye.backend.checkHiresAuthenticity(path, optionsJson, null)
 
     override fun readAudioMetadata(path: String, hint: String, cacheKey: String): String {
+        if (path.startsWith("/proc/self/fd/") && path.removePrefix("/proc/self/fd/").toIntOrNull() != null) {
+            return readAudioMetadataObject(path, hint, cacheKey).toString()
+        }
+        return withMediaFiles(listOf(path)) {
+            it.readAudioMetadata(File(path).canonicalPath, hint, cacheKey, null)
+        }
+    }
+
+    override fun readAudioMetadataObject(path: String, hint: String, cacheKey: String): JSONObject {
         val descriptor = path.removePrefix("/proc/self/fd/").toIntOrNull()
         if (path.startsWith("/proc/self/fd/") && descriptor != null) {
             val directory = libraryCoverDirectory
@@ -294,11 +303,9 @@ internal object RustCoreBackend : CoreBackend {
                 }
             }
             cover?.let { metadata.put("coverPath", it.path) }
-            return metadata.toString()
+            return metadata
         }
-        return withMediaFiles(listOf(path)) {
-            it.readAudioMetadata(File(path).canonicalPath, hint, cacheKey, null)
-        }
+        return JSONObject(readAudioMetadata(path, hint, cacheKey))
     }
 
     // Native callers have already selected/resolved these files through app or
@@ -386,7 +393,7 @@ internal object RustCoreBackend : CoreBackend {
             // Artwork remains optional, as in the filesystem CUE scanner.
             // A cover extraction failure must not discard valid CUE rows.
             val coverPath = try {
-                JSONObject(readAudioMetadata("/proc/self/fd/$descriptor", audioName, cacheKey)).optString("coverPath", "")
+                readAudioMetadataObject("/proc/self/fd/$descriptor", audioName, cacheKey).optString("coverPath", "")
             } catch (error: Exception) {
                 if (error is java.util.concurrent.CancellationException) throw error
                 android.util.Log.w("Mornye", "Could not read CUE artwork", error)

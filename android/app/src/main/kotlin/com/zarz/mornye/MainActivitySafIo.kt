@@ -295,11 +295,18 @@ internal fun Context.readAudioMetadataFromUri(
             }
         }
     }
-    val obj = JSONObject(coreBackend.readAudioMetadata(
-        path, name, coverCacheKey,
-    ))
+    readAudioMetadataForScan(coreBackend, path, name, coverCacheKey)
+}
+
+internal fun readAudioMetadataForScan(
+    coreBackend: CoreBackend,
+    path: String,
+    name: String,
+    coverCacheKey: String,
+): JSONObject {
+    val obj = coreBackend.readAudioMetadataObject(path, name, coverCacheKey)
     if (obj.has("error")) throw IOException(obj.optString("error", "Audio metadata read failed"))
-    obj
+    return obj
 }
 
 /** The Hi-Res check reads only a window from the middle of the file, so a

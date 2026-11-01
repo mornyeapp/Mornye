@@ -800,14 +800,16 @@ internal fun MainActivity.scanSafTreeIncremental(
         }
 
         for ((cueDoc, parentDir, cueName) in unchangedCueFiles) {
-            var tempCue: String? = null
             try {
-                tempCue = copyUriToTemp(coreBackend, cueDoc.uri, ".cue", cueName)
-                if (tempCue != null) {
-                    val audioDoc = resolveCueSheetAudio(
-                        tempCue,
+                val reference = readCueAudioReference(
+                    open = { contentResolver.openInputStream(cueDoc.uri)?.bufferedReader() },
+                    retryOnDenied = isMediaStoreUri(cueDoc.uri),
+                )
+                if (reference != null) {
+                    val audioDoc = resolveCueAudioSibling(
                         parentDir,
                         cueName,
+                        reference.filename,
                         safChildLookupCache,
                     )
                     if (audioDoc != null) {
@@ -816,8 +818,6 @@ internal fun MainActivity.scanSafTreeIncremental(
                 }
             } catch (e: Exception) {
                 android.util.Log.w("Mornye", "SAF incremental scan: failed to resolve audio for unchanged CUE: ${e.message}")
-            } finally {
-                try { tempCue?.let { File(it).delete() } } catch (_: Exception) {}
             }
         }
 
