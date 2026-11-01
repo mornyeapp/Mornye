@@ -119,4 +119,90 @@ void main() {
     }
     expect(_order(container, id), ['a', 'b']);
   });
+
+  for (final mode in [
+    LibraryTracksFolderMode.loved,
+    LibraryTracksFolderMode.wishlist,
+  ]) {
+    test(
+      '${mode.name} order survives reload, syncs and keeps new songs first',
+      () async {
+        final directory = await linkSyncTempDirectory();
+        final db = await openLinkCollectionsDatabase(directory, mode.name);
+        final database = LibraryCollectionsDatabase.withDatabase(db);
+        final container = _container(database);
+        final notifier = container.read(libraryCollectionsProvider.notifier);
+        final tracks = [
+          for (final id in ['a', 'b', 'c', 'd']) linkTestTrack(id),
+        ];
+        if (mode == LibraryTracksFolderMode.loved) {
+          await notifier.toggleLovedTracks(tracks);
+        } else {
+          for (final track in tracks) {
+            await notifier.toggleWishlist(track);
+          }
+        }
+        List<CollectionTrackEntry> entries(ProviderContainer c) =>
+            mode == LibraryTracksFolderMode.loved
+            ? c.read(libraryCollectionsProvider).loved
+            : c.read(libraryCollectionsProvider).wishlist;
+        final byId = {
+          for (final entry in entries(container)) entry.track.id: entry,
+        };
+        final before =
+            (await db.rawQuery(
+                  'SELECT MAX(seq) AS seq FROM link_sync_changes',
+                )).first['seq']!
+                as int;
+        expect(
+          await notifier.reorderSavedTracks(mode, [
+            for (final id in ['c', 'a', 'd', 'b']) byId[id]!.key,
+          ]),
+          isTrue,
+        );
+        expect(entries(container).map((e) => e.track.id), ['c', 'a', 'd', 'b']);
+        if (mode == LibraryTracksFolderMode.loved) {
+          await notifier.toggleLovedTracks([linkTestTrack('e')]);
+        } else {
+          await notifier.toggleWishlist(linkTestTrack('e'));
+        }
+        final reloaded = _container(database);
+        await reloaded
+            .read(libraryCollectionsProvider.notifier)
+            .ensurePlaylistLoaded('unused');
+        expect(entries(reloaded).map((e) => e.track.id), [
+          'e',
+          'c',
+          'a',
+          'd',
+          'b',
+        ]);
+        final changes = await db.rawQuery(
+          'SELECT key FROM link_sync_changes WHERE kind = ? AND seq > ?',
+          [mode.name, before],
+        );
+        expect(changes, hasLength(5));
+        final stable = entries(reloaded).map((e) => e.key).toList();
+        final restored = reloaded.read(libraryCollectionsProvider.notifier);
+        expect(
+          await restored.reorderSavedTracks(mode, [stable.first]),
+          isFalse,
+        );
+        expect(
+          await restored.reorderSavedTracks(mode, [
+            for (final _ in stable) stable.first,
+          ]),
+          isFalse,
+        );
+        expect(await restored.reorderSavedTracks(mode, stable), isFalse);
+        expect(entries(reloaded).map((e) => e.track.id), [
+          'e',
+          'c',
+          'a',
+          'd',
+          'b',
+        ]);
+      },
+    );
+  }
 }

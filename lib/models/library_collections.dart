@@ -3,6 +3,8 @@ import 'dart:collection';
 import 'package:flutter/foundation.dart';
 import 'package:mornye/models/track.dart';
 
+enum LibraryTracksFolderMode { wishlist, loved, playlist }
+
 /// Shared identity for catalog, downloaded, and local playlist entries.
 String libraryTrackCollectionKey({
   required String id,

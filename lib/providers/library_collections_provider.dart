@@ -680,6 +680,52 @@ class LibraryCollectionsNotifier extends Notifier<LibraryCollectionsState> {
     return changed;
   });
 
+  /// Built-in collections use descending added-at order. Keep the same
+  /// ordering contract in storage, backups and Link, with new likes first.
+  Future<bool> reorderSavedTracks(
+    LibraryTracksFolderMode mode,
+    List<String> orderedKeys,
+  ) => _mutate(() async {
+    if (mode == LibraryTracksFolderMode.playlist) return false;
+    final entries = mode == LibraryTracksFolderMode.loved
+        ? state.loved
+        : state.wishlist;
+    final byKey = {for (final entry in entries) entry.key: entry};
+    if (orderedKeys.length != byKey.length ||
+        orderedKeys.toSet().length != orderedKeys.length ||
+        !orderedKeys.every(byKey.containsKey)) {
+      return false;
+    }
+    if (orderedKeys.indexed.every((item) => entries[item.$1].key == item.$2)) {
+      return false;
+    }
+    final now = DateTime.now();
+    final latest = entries
+        .map((entry) => entry.addedAt.toLocal())
+        .reduce((a, b) => a.isAfter(b) ? a : b);
+    final end = latest.isAfter(now) ? now : latest;
+    final reordered = [
+      for (final (i, key) in orderedKeys.indexed)
+        CollectionTrackEntry(
+          key: key,
+          track: byKey[key]!.track,
+          addedAt: end.subtract(Duration(milliseconds: i)),
+        ),
+    ];
+    await _db.reorderSavedTracks(
+      mode: mode,
+      addedAtByKey: {
+        for (final entry in reordered)
+          entry.key: entry.addedAt.toIso8601String(),
+      },
+    );
+    if (!ref.mounted) return false;
+    state = mode == LibraryTracksFolderMode.loved
+        ? state.copyWith(loved: reordered)
+        : state.copyWith(wishlist: reordered);
+    return true;
+  });
+
   Future<void> setPlaylistCover(
     String playlistId,
     String sourceFilePath,

@@ -1065,6 +1065,38 @@ class LibraryCollectionsDatabase {
     });
   }
 
+  /// Updates only ordering stamps, retaining membership and track metadata.
+  /// The existing collection triggers publish the change to Link atomically.
+  Future<void> reorderSavedTracks({
+    required LibraryTracksFolderMode mode,
+    required Map<String, String> addedAtByKey,
+  }) async {
+    final table = switch (mode) {
+      LibraryTracksFolderMode.loved => _tableLoved,
+      LibraryTracksFolderMode.wishlist => _tableWishlist,
+      LibraryTracksFolderMode.playlist => throw ArgumentError.value(mode),
+    };
+    if (addedAtByKey.isEmpty) return;
+    await sqlite.transactionWithBusyRetry(await database, (txn) async {
+      var batch = txn.batch();
+      var pending = 0;
+      for (final MapEntry(:key, :value) in addedAtByKey.entries) {
+        batch.update(
+          table,
+          {'added_at': value},
+          where: 'track_key = ?',
+          whereArgs: [key],
+        );
+        if (++pending == 128) {
+          await batch.commit(noResult: true);
+          batch = txn.batch();
+          pending = 0;
+        }
+      }
+      if (pending > 0) await batch.commit(noResult: true);
+    });
+  }
+
   /// Wipes every collection table and rewrites them from a restored backup.
   ///
   /// [collectionsJson] must use the same shape as
