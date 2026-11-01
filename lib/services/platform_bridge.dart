@@ -147,6 +147,19 @@ class PlatformBridge {
     return await _channel.invokeMethod<bool>('isCharging') ?? false;
   }
 
+  /// Android API level without collecting unrelated device information.
+  static Future<int?> getAndroidSdkVersion() async {
+    try {
+      final sdk = await _channel.invokeMethod<int>('getAndroidSdkVersion');
+      return sdk != null && sdk > 0 ? sdk : null;
+    } on MissingPluginException {
+      return null;
+    } on PlatformException catch (e) {
+      _log.w('Android SDK version unavailable: $e');
+      return null;
+    }
+  }
+
   static const _jsonResultFileKey = '__json_file';
   static const _backgroundJsonDecodeThresholdBytes = 128 * 1024;
   static const _metadataCacheTtl = Duration(minutes: 20);

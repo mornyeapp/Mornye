@@ -63,6 +63,7 @@ class MainActivity: FlutterFragmentActivity() {
     internal val coreBackend: CoreBackend by lazy { createCoreBackend(applicationContext) }
     private val nativeBackendMethods = setOf(
         "isAndroidTv",
+        "getAndroidSdkVersion",
         "setScreenAwake",
         "isCharging",
         "getBackendImplementations",
@@ -476,6 +477,7 @@ class MainActivity: FlutterFragmentActivity() {
                     }
                     when (call.method) {
                         "isAndroidTv" -> result.success(isTelevisionDevice())
+                        "getAndroidSdkVersion" -> result.success(Build.VERSION.SDK_INT)
                         "processPendingExtensionCallbacks" -> {
                             processPendingExtensionCallbacks()
                             result.success(null)

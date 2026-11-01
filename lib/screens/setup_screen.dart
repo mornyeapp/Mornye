@@ -121,8 +121,9 @@ class _SetupScreenState extends ConsumerState<SetupScreen>
     try {
       await ref.read(settingsProvider.notifier).ensureLoaded();
       if (_platform == TargetPlatform.android) {
-        final androidInfo = await DeviceInfoPlugin().androidInfo;
-        _androidSdkVersion = androidInfo.version.sdkInt;
+        _androidSdkVersion =
+            await PlatformBridge.getAndroidSdkVersion() ??
+            (await DeviceInfoPlugin().androidInfo).version.sdkInt;
       }
       final saved = await _progressStore.readDraft();
       if (!mounted) return;
@@ -223,18 +224,7 @@ class _SetupScreenState extends ConsumerState<SetupScreen>
         });
       }
     } else if (_platform == TargetPlatform.android) {
-      bool storageGranted = false;
-
-      if (_androidSdkVersion >= 33) {
-        final audioStatus = await Permission.audio.status;
-        storageGranted = audioStatus.isGranted;
-      } else if (_androidSdkVersion >= 30) {
-        final manageStatus = await Permission.manageExternalStorage.status;
-        storageGranted = manageStatus.isGranted;
-      } else {
-        final storageStatus = await Permission.storage.status;
-        storageGranted = storageStatus.isGranted;
-      }
+      final storageGranted = await _hasAndroidStoragePermission();
 
       PermissionStatus notificationStatus = PermissionStatus.granted;
       if (_androidSdkVersion >= 33) {
@@ -257,6 +247,16 @@ class _SetupScreenState extends ConsumerState<SetupScreen>
     }
   }
 
+  Future<bool> _hasAndroidStoragePermission() async {
+    if (_androidSdkVersion >= 33 && await Permission.audio.isGranted) {
+      return true;
+    }
+    if (_androidSdkVersion >= 30) {
+      return Permission.manageExternalStorage.isGranted;
+    }
+    return Permission.storage.isGranted;
+  }
+
   Future<void> _requestStoragePermission() async {
     if (_isLoading) return;
     final permissionAudio = context.l10n.permissionAudio;
@@ -268,9 +268,9 @@ class _SetupScreenState extends ConsumerState<SetupScreen>
       if (_platform == TargetPlatform.iOS) {
         setState(() => _storagePermissionGranted = true);
       } else if (_platform == TargetPlatform.android) {
-        bool allGranted = false;
+        var allGranted = await _hasAndroidStoragePermission();
 
-        if (_androidSdkVersion >= 33) {
+        if (!allGranted && _androidSdkVersion >= 33) {
           var audioStatus = await Permission.audio.status;
           if (!audioStatus.isGranted) {
             audioStatus = await Permission.audio.request();
@@ -281,7 +281,7 @@ class _SetupScreenState extends ConsumerState<SetupScreen>
             await _showPermissionDeniedDialog(permissionAudio);
             return;
           }
-        } else if (_androidSdkVersion >= 30) {
+        } else if (!allGranted && _androidSdkVersion >= 30) {
           var manageStatus = await Permission.manageExternalStorage.status;
           if (!manageStatus.isGranted) {
             final shouldOpen = await _showAndroid11StorageDialog();
@@ -292,7 +292,7 @@ class _SetupScreenState extends ConsumerState<SetupScreen>
             }
           }
           allGranted = manageStatus.isGranted;
-        } else {
+        } else if (!allGranted) {
           final status = await Permission.storage.request();
           allGranted = status.isGranted;
           if (status.isPermanentlyDenied) {
