@@ -126,6 +126,21 @@ void main() {
     final iPhone = titles(androidPhone: false, desktop: false);
     expect(iPhone, isNot(contains(l10n.whatsNewPlayerAutoTitle)));
     expect(iPhone, isNot(contains(l10n.whatsNewPlayerExclusiveTitle)));
+    // Only Android phones ask for Nearby devices, on the Link page.
+    List<String> asking({required bool androidPhone, required bool desktop}) =>
+        [
+          for (final page in whatsNewHighlights(
+            l10n,
+            androidPhone: androidPhone,
+            desktop: desktop,
+          ))
+            if (page.asksNearbyDevices) page.title,
+        ];
+    expect(asking(androidPhone: true, desktop: false), [
+      l10n.whatsNewLinkTitle,
+    ]);
+    expect(asking(androidPhone: false, desktop: true), isEmpty);
+    expect(asking(androidPhone: false, desktop: false), isEmpty);
 
     // The opening page names every section that follows it.
     final pages = whatsNewHighlights(l10n, androidPhone: true, desktop: false);

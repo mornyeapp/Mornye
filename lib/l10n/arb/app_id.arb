@@ -1020,6 +1020,12 @@
   "@setupSkipForNow": {
     "description": "Skip button text"
   },
+  "setupNearbyEnable": "Izinkan Perangkat di Sekitar",
+  "setupNearbyDescription": "Mornye Link memakainya untuk menemukan komputermu di jaringan yang sama, dan penyimpanan jaringan memerlukannya untuk menjangkau server di rumah.",
+  "setupNearbyGranted": "Perangkat di Sekitar Diizinkan!",
+  "permissionNearbyDevices": "Perangkat di sekitar",
+  "whatsNewLinkNearbyAllow": "Izinkan perangkat di sekitar",
+  "whatsNewLinkNearbyGranted": "Perangkat di sekitar diizinkan",
   "setupNext": "Lanjut",
   "@setupNext": {
     "description": "Next button text"

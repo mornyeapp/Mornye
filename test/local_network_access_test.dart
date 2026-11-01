@@ -96,7 +96,17 @@ void main() {
     final access = LocalNetworkAccess(isAndroid: false);
     await access.ensureAccess(Uri.parse('smb://nas.local/music/'));
     await access.ensureGranted();
+    expect(await access.isGranted(), isTrue);
     expect(checks, 0);
+    expect(requests, 0);
+  });
+
+  test('isGranted reports the Android grant without requesting', () async {
+    final access = LocalNetworkAccess(isAndroid: true);
+    expect(await access.isGranted(), isFalse);
+    granted = true;
+    expect(await access.isGranted(), isTrue);
+    expect(checks, 2);
     expect(requests, 0);
   });
 

@@ -15,6 +15,8 @@ import 'package:material_3_expressive/material_3_expressive.dart'
 import 'package:mornye/constants/app_info.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/settings_provider.dart';
+import 'package:mornye/services/link/client/link_client_controller.dart';
+import 'package:mornye/services/local_network_access.dart';
 import 'package:mornye/theme/app_tokens.dart';
 import 'package:mornye/theme/mornye_icons.dart';
 import 'package:mornye/theme/mornye_theme.dart';
@@ -62,6 +64,17 @@ class _WhatsNewScreenState extends ConsumerState<WhatsNewScreen> {
 
   void _previous() {
     if (_page > 0) _goTo(_page - 1);
+  }
+
+  /// Skip never passes the Nearby devices request while Android still needs
+  /// it: Link cannot find a computer on Android 17 without it.
+  Future<void> _skip(List<WhatsNewHighlight> pages) async {
+    final asks = pages.indexWhere((page) => page.asksNearbyDevices);
+    if (asks > _page && !await LocalNetworkAccess.instance.isGranted()) {
+      if (mounted) _goTo(asks);
+      return;
+    }
+    if (mounted) _finish();
   }
 
   /// Done and Skip both mark the tour seen. Opened from About, the tour
@@ -137,7 +150,7 @@ class _WhatsNewScreenState extends ConsumerState<WhatsNewScreen> {
                           constraints: const BoxConstraints(maxWidth: 160),
                           child: ExpressiveButton(
                             text: true,
-                            onPressed: _finish,
+                            onPressed: () => _skip(pages),
                             child: Text(
                               l10n.setupSkip,
                               maxLines: 1,
@@ -456,12 +469,17 @@ class WhatsNewHighlight {
     required this.title,
     required this.description,
     required this.features,
+    this.asksNearbyDevices = false,
   });
 
   final IconData icon;
   final String title;
   final String description;
   final List<WhatsNewFeature> features;
+
+  /// Ends the page with a request for Android's Nearby devices permission,
+  /// which Mornye Link needs to find a computer from Android 17.
+  final bool asksNearbyDevices;
 }
 
 @visibleForTesting
@@ -476,20 +494,22 @@ class WhatsNewFeature {
 }
 
 /// The tour for [AppInfo.whatsNewRelease]: an overview, then one page per
-/// area. Android Auto and exclusive output appear only where they exist.
+/// area. Android Auto, exclusive output and the Nearby devices request
+/// appear only where they exist.
 @visibleForTesting
 List<WhatsNewHighlight> whatsNewHighlights(
   AppLocalizations l10n, {
   bool? androidPhone,
   bool? desktop,
 }) {
-  final showAndroidAuto = androidPhone ?? (Platform.isAndroid && !isAndroidTv);
+  final onAndroidPhone = androidPhone ?? (Platform.isAndroid && !isAndroidTv);
   final showExclusiveOutput = desktop ?? isDesktopPlatform;
   final sections = [
     WhatsNewHighlight(
       icon: Icons.computer,
       title: l10n.whatsNewLinkTitle,
       description: l10n.whatsNewLinkDesc,
+      asksNearbyDevices: onAndroidPhone,
       features: [
         WhatsNewFeature(
           Icons.play_circle,
@@ -550,7 +570,7 @@ List<WhatsNewHighlight> whatsNewHighlights(
           l10n.whatsNewPlayerTimingTitle,
           l10n.whatsNewPlayerTimingBody,
         ),
-        if (showAndroidAuto)
+        if (onAndroidPhone)
           WhatsNewFeature(
             Icons.directions_car,
             l10n.whatsNewPlayerAutoTitle,
@@ -734,8 +754,110 @@ class _TourPage extends StatelessWidget {
               color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
+          // Above the rows, so it shows without scrolling.
+          if (highlight.asksNearbyDevices) const _NearbyDevicesPrompt(),
           const SizedBox(height: 28),
           _FeatureList(features: highlight.features),
+        ],
+      ),
+    );
+  }
+}
+
+/// Asks for Nearby devices where Android requires it and it is not yet
+/// allowed; shows nothing otherwise, and a confirmation once allowed here.
+class _NearbyDevicesPrompt extends ConsumerStatefulWidget {
+  const _NearbyDevicesPrompt();
+
+  @override
+  ConsumerState<_NearbyDevicesPrompt> createState() =>
+      _NearbyDevicesPromptState();
+}
+
+class _NearbyDevicesPromptState extends ConsumerState<_NearbyDevicesPrompt> {
+  /// Null until the first check answers.
+  bool? _neededAtStart;
+  bool _granted = false;
+  bool _refused = false;
+  bool _asking = false;
+
+  @override
+  void initState() {
+    super.initState();
+    LocalNetworkAccess.instance.isGranted().then((granted) {
+      if (mounted) setState(() => _neededAtStart = !granted);
+    }, onError: (_) {});
+  }
+
+  Future<void> _allow() async {
+    setState(() {
+      _asking = true;
+      _refused = false;
+    });
+    try {
+      // Through Link, so discovery that found nothing without it starts over.
+      await ref
+          .read(linkClientControllerProvider.notifier)
+          .requestLocalNetworkAccess();
+      if (mounted) setState(() => _granted = true);
+    } on LocalNetworkPermissionException {
+      if (mounted) setState(() => _refused = true);
+    } finally {
+      if (mounted) setState(() => _asking = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_neededAtStart != true) return const SizedBox.shrink();
+    final l10n = context.l10n;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    if (_granted) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 20),
+        child: Row(
+          children: [
+            Icon(
+              context.adaptiveIcon(Icons.check_circle),
+              color: scheme.primary,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                l10n.whatsNewLinkNearbyGranted,
+                style: theme.textTheme.titleSmall?.copyWith(
+                  color: scheme.primary,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.only(top: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ExpressiveButton(
+            tonal: true,
+            onPressed: _asking ? null : _allow,
+            icon: Icon(context.adaptiveIcon(Icons.wifi)),
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(48),
+            ),
+            child: Text(l10n.whatsNewLinkNearbyAllow),
+          ),
+          if (_refused) ...[
+            const SizedBox(height: 8),
+            Text(
+              l10n.networkErrorLocalPermission,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: scheme.onSurfaceVariant,
+              ),
+            ),
+          ],
         ],
       ),
     );
