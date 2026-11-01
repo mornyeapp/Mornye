@@ -109,12 +109,12 @@
   "subsonicAddToLibrary": "Add server to Library",
   "subsonicLibraryAdded": "Server added to Library",
   "subsonicLibraryDescription": "Sync the server catalogue and artwork to Library. Music stays on your server. Rescan it in Local Library settings to update the catalogue.",
-  "subsonicAuthentication": "Authentication",
+  "subsonicAuthentication": "認証",
   "subsonicToken": "Salted token",
-  "subsonicPasswordAuth": "Password",
-  "subsonicApiKey": "API key",
-  "subsonicUsername": "Username",
-  "subsonicPassword": "Password",
+  "subsonicPasswordAuth": "パスワード",
+  "subsonicApiKey": "APIキー",
+  "subsonicUsername": "ユーザーネーム",
+  "subsonicPassword": "パスワード",
   "subsonicSearch": "Search server music...",
   "subsonicMoreAlbums": "More albums",
   "subsonicErrorApi": "The server does not support this API version or authentication method. Check the server settings and the selected sign-in method.",
@@ -158,7 +158,7 @@
   "@networkLibraryDescription": {
     "description": "Help below the add-to-Library action explaining recursive scanning, local metadata and artwork storage, and management in Local Library settings"
   },
-  "networkStorage": "Network storage",
+  "networkStorage": "ネットワークストレージ",
   "@networkStorage": {
     "description": "Title and navigation label for the screen used to manage network connections and browse remote music folders"
   },
@@ -210,11 +210,11 @@
   "@networkRefresh": {
     "description": "Toolbar tooltip for reloading saved connections or the current network folder listing"
   },
-  "networkStorageDescription": "Connect to your NAS or music server and browse its folders. Your sign-in details are stored securely on this device.",
+  "networkStorageDescription": "NAS サーバーまたは音楽サーバーに接続し、フォルダーを参照します。サインインの詳細はこのデバイスに安全に保存されます。",
   "@networkStorageDescription": {
     "description": "Introduction shown in the empty connections screen and connection form, explaining remote folder browsing and secure local credential storage; NAS means network-attached storage"
   },
-  "networkAddConnection": "Add connection",
+  "networkAddConnection": "接続を追加",
   "@networkAddConnection": {
     "description": "Action label, toolbar tooltip, and form title for adding a network storage connection"
   },
@@ -383,7 +383,7 @@
   "@navSettings": {
     "description": "Bottom navigation - Settings tab"
   },
-  "navStore": "Repo",
+  "navStore": "リポジトリ",
   "@navStore": {
     "description": "Bottom navigation - Extension repo tab"
   },
@@ -407,11 +407,11 @@
   "@searchRecentlySearched": {
     "description": "Section header for recent searches on the desktop Search page"
   },
-  "searchLibraryPrompt": "Search Your Library",
+  "searchLibraryPrompt": "ライブラリを検索",
   "@searchLibraryPrompt": {
     "description": "Shown on the desktop Search page when the Library scope has no search words yet"
   },
-  "searchBrowse": "Browse",
+  "searchBrowse": "探す",
   "@searchBrowse": {
     "description": "Section header for home feed tiles on the desktop Search page"
   },
@@ -427,12 +427,12 @@
   "@historyFilterSingles": {
     "description": "Filter chip - show singles only"
   },
-  "libraryRecentlyAdded": "Recently Added",
-  "libraryDownloads": "Downloads",
+  "libraryRecentlyAdded": "最近追加された曲",
+  "libraryDownloads": "ダウンロード",
   "libraryNoActiveDownloads": "No active downloads",
   "librarySearchHint": "Search your library",
   "libraryEmptyCollection": "Your music will appear here",
-  "libraryFolders": "Folders",
+  "libraryFolders": "フォルダー",
   "@libraryFolders": {
     "description": "Library view that browses downloaded and scanned songs by the folders their files are in"
   },
@@ -746,7 +746,7 @@
   "@optionsArtistTagModePrimarySubtitle": {
     "description": "Subtitle for the primary-artist tag mode. Applies when downloading and re-enriching; manual edits keep what the user typed."
   },
-  "optionsExtensionStore": "Extension Repo",
+  "optionsExtensionStore": "拡張リポジトリ",
   "@optionsExtensionStore": {
     "description": "Show/hide repo tab"
   },
@@ -819,7 +819,7 @@
   "@extensionsUninstall": {
     "description": "Uninstall extension button"
   },
-  "storeTitle": "Extension Repo",
+  "storeTitle": "拡張リポジトリ",
   "@storeTitle": {
     "description": "Repo screen title"
   },
@@ -1164,7 +1164,7 @@
   "@whatsNewNearbyLinkBody": {
     "description": "Explains how Mornye Link uses the Nearby devices permission"
   },
-  "whatsNewNearbyStorageTitle": "Network storage",
+  "whatsNewNearbyStorageTitle": "ネットワークストレージ",
   "@whatsNewNearbyStorageTitle": {
     "description": "Use of the Nearby devices permission: SMB and WebDAV servers at home"
   },
@@ -4283,7 +4283,7 @@
   "@collectionPlaylist": {
     "description": "Single playlist label"
   },
-  "collectionAddToPlaylist": "Add to playlist",
+  "collectionAddToPlaylist": "プレイリストに追加する",
   "@collectionAddToPlaylist": {
     "description": "Action to add a track to user playlist"
   },
@@ -4671,7 +4671,7 @@
   "@settingsDonateSubtitle": {
     "description": "Subtitle for donate menu item"
   },
-  "settingsBackup": "Backup & Restore",
+  "settingsBackup": "バックアップと復元",
   "@settingsBackup": {
     "description": "Settings menu item - backup and restore page"
   },
@@ -4679,7 +4679,7 @@
   "@settingsBackupSubtitle": {
     "description": "Subtitle for backup and restore settings item"
   },
-  "backupTitle": "Backup & Restore",
+  "backupTitle": "バックアップと復元",
   "@backupTitle": {
     "description": "App bar title for the backup and restore page"
   },
@@ -4830,7 +4830,7 @@
   "@tooltipLoveAll": {
     "description": "Tooltip for the Love All button on album/playlist screens"
   },
-  "tooltipAddToPlaylist": "Add to Playlist",
+  "tooltipAddToPlaylist": "プレイリストに追加する",
   "@tooltipAddToPlaylist": {
     "description": "Tooltip for the Add to Playlist button"
   },
@@ -4869,7 +4869,7 @@
   "@homeSkipAlreadyDownloaded": {
     "description": "Checkbox label in import dialog to skip already-downloaded songs"
   },
-  "homeGoToAlbum": "Go to Album",
+  "homeGoToAlbum": "アルバムを開く",
   "@homeGoToAlbum": {
     "description": "Context menu item to navigate to the album page"
   },
@@ -6920,7 +6920,7 @@
       "service": {}
     }
   },
-  "libraryPlayback": "Playback",
+  "libraryPlayback": "再生",
   "@libraryPlayback": {
     "description": "Section header for playback settings in library settings"
   },
@@ -6940,7 +6940,7 @@
   "@libraryBuiltInPreviewPlayerSubtitle": {
     "description": "Subtitle for built-in preview player option"
   },
-  "nowPlayingTitle": "Now Playing",
+  "nowPlayingTitle": "再生中",
   "@nowPlayingTitle": {
     "description": "Title for the now playing screen"
   },
@@ -6989,11 +6989,11 @@
   "@nowPlayingNextTrack": {
     "description": "Tooltip for the next-track playback control"
   },
-  "nowPlayingDetails": "Details",
+  "nowPlayingDetails": "詳細",
   "@nowPlayingDetails": {
     "description": "Menu item and section title for track metadata details"
   },
-  "nowPlayingSleepTimer": "Sleep timer",
+  "nowPlayingSleepTimer": "スリープタイマー",
   "@nowPlayingSleepTimer": {
     "description": "Menu item and sheet title for the playback sleep timer"
   },
@@ -7036,11 +7036,11 @@
   "@nowPlayingOpenInExternalPlayer": {
     "description": "Menu item to open the current track in an external player"
   },
-  "nowPlayingHideVolume": "Hide volume",
+  "nowPlayingHideVolume": "音量を非表示",
   "@nowPlayingHideVolume": {
     "description": "Now Playing menu item that removes the volume slider from the player"
   },
-  "nowPlayingShowVolume": "Show volume",
+  "nowPlayingShowVolume": "音量を表示",
   "@nowPlayingShowVolume": {
     "description": "Now Playing menu item that brings the volume slider back to the player"
   },
@@ -7817,11 +7817,11 @@
   "@unknownTitle": {
     "description": "Fallback track title when metadata is missing"
   },
-  "trackPlayNext": "Play next",
+  "trackPlayNext": "次に再生",
   "@trackPlayNext": {
     "description": "Menu action to play a track as the next queue item"
   },
-  "trackAddToQueue": "Add to queue",
+  "trackAddToQueue": "再生キューに追加",
   "@trackAddToQueue": {
     "description": "Menu action to add a track to the playback queue"
   },
@@ -8083,12 +8083,12 @@
   "@optionsEmbeddedCoverSizeDescription": {
     "description": "Description shown in the embedded cover size picker"
   },
-  "mornyeFavorite": "Favorite",
-  "mornyeGoToArtist": "Go to Artist",
+  "mornyeFavorite": "お気に入り",
+  "mornyeGoToArtist": "アーティストを開く",
   "@mornyeFavorite": {
     "description": "Compact context menu action that adds a track to Loved"
   },
-  "mornyeFavorited": "Favorited",
+  "mornyeFavorited": "お気に入り済み",
   "@mornyeFavorited": {
     "description": "Selected state of the compact favorite action"
   },
@@ -8237,8 +8237,8 @@
   "songAnalysisClearConfirmMessage": "Autoplay forgets how your songs sound. While song analysis is on, your Library is analyzed again.",
   "songAnalysisClearConfirm": "Clear",
   "profileTitle": "Profile",
-  "profileSetUp": "Set up your profile",
-  "profileEdit": "Edit name and photo",
+  "profileSetUp": "プロフィールを設定する",
+  "profileEdit": "名前と写真を編集",
   "backupIncludesProfile": "Includes your profile name and photo",
   "profileName": "Name",
   "profileNameHint": "Your name",
@@ -8255,7 +8255,7 @@
   "homeGreetingEvening1": "Good evening",
   "homeGreetingEvening2": "Time to unwind",
   "homeGreetingEvening3": "Golden hour",
-  "homeGreetingNight1": "Good night",
+  "homeGreetingNight1": "こんばんは",
   "homeGreetingNight2": "Late-night session",
   "homeGreetingNight3": "Quiet hours",
   "homeGreetingNamed": "{greeting}, {name}",
@@ -8781,7 +8781,7 @@
   "appearanceCustomFontSubtitle": "Import a TTF or OTF file (up to 10 MB). Overrides the theme and system font.",
   "appearanceCustomFontInvalid": "Could not load this font. Choose a valid TTF or OTF file up to 10 MB.",
   "appearanceCustomFontReset": "Use theme font",
-  "equalizerTitle": "Equalizer",
+  "equalizerTitle": "イコライザー",
   "equalizerDescription": "5–31 bands, tone controls, preamp and dynamics",
   "equalizerEnable": "Enable equalizer",
   "equalizerBands": "Bands",
@@ -8817,7 +8817,7 @@
   "equalizerDeletePreset": "Delete preset",
   "equalizerCustom": "Custom",
   "equalizerManagePresets": "Manage presets",
-  "lyricsShareTitle": "Share lyrics",
+  "lyricsShareTitle": "歌詞を共有",
   "@lyricsShareTitle": {
     "description": "Screen that turns selected lyric lines into an image for stories"
   },
@@ -8843,25 +8843,25 @@
   "lyricsShareBackgroundColor": "Cover color",
   "lyricsShareBackgroundDark": "ダーク",
   "lyricsShareBackgroundLight": "ライト",
-  "audioInfoTitle": "Audio info",
+  "audioInfoTitle": "オーディオ情報",
   "@audioInfoTitle": {
     "description": "Sheet with technical details of the playing track, opened from the quality badge"
   },
   "audioInfoSource": "Source file",
   "audioInfoSignal": "Signal",
-  "audioInfoLoudness": "Loudness",
+  "audioInfoLoudness": "ラウドネス",
   "audioInfoProcessing": "Processing",
-  "audioInfoOutput": "Output",
+  "audioInfoOutput": "出力",
   "audioInfoAnalysis": "Spectrum and level analysis",
   "audioInfoQuality": "品質",
-  "audioInfoHiResLossless": "Hi-Res Lossless",
-  "audioInfoLossless": "Lossless",
+  "audioInfoHiResLossless": "ハイレゾロスレス",
+  "audioInfoLossless": "ロスレス",
   "audioInfoLossy": "Lossy",
   "audioInfoFormat": "形式",
-  "audioInfoCodec": "Codec",
-  "audioInfoSampleRate": "Sample rate",
-  "audioInfoBitDepth": "Bit depth",
-  "audioInfoChannels": "Channels",
+  "audioInfoCodec": "コーデック",
+  "audioInfoSampleRate": "サンプリングレート",
+  "audioInfoBitDepth": "ビット数",
+  "audioInfoChannels": "チャンネル",
   "audioInfoChannelCount": "{count, plural, =1{Mono} =2{Stereo} other{{count} channels}}",
   "@audioInfoChannelCount": {
     "placeholders": {
@@ -8872,8 +8872,8 @@
   },
   "audioInfoBitrate": "ビットレート",
   "audioInfoDuration": "再生時間",
-  "audioInfoFileSize": "File size",
-  "audioInfoCompression": "Compression",
+  "audioInfoFileSize": "ファイルサイズ",
+  "audioInfoCompression": "圧縮",
   "audioInfoCompressionValue": "{percent}% of uncompressed size",
   "@audioInfoCompressionValue": {
     "placeholders": {
@@ -8882,10 +8882,10 @@
       }
     }
   },
-  "audioInfoLocation": "Location",
-  "audioInfoLocationLocal": "Device storage",
-  "audioInfoLocationShared": "Shared folder",
-  "audioInfoLocationNetwork": "Network storage",
+  "audioInfoLocation": "保存場所",
+  "audioInfoLocationLocal": "端末ストレージ",
+  "audioInfoLocationShared": "共有フォルダー",
+  "audioInfoLocationNetwork": "ネットワークストレージ",
   "audioInfoLocationLink": "{device} via Mornye Link",
   "@audioInfoLocationLink": {
     "description": "Audio info location of a song played from a paired computer or phone over Mornye Link; device is that device's name",
@@ -8895,8 +8895,8 @@
       }
     }
   },
-  "audioInfoPcmRate": "Uncompressed data rate",
-  "audioInfoFrequencyRange": "Frequency range",
+  "audioInfoPcmRate": "非圧縮データ レート",
+  "audioInfoFrequencyRange": "周波数範囲",
   "audioInfoFrequencyRangeValue": "Up to {frequency} (Nyquist)",
   "@audioInfoFrequencyRangeValue": {
     "placeholders": {
@@ -9079,7 +9079,7 @@
   "@desktopMenuOpen": {
     "description": "Context menu item that opens an album, artist, playlist or folder"
   },
-  "desktopMenuShowDetails": "Show details",
+  "desktopMenuShowDetails": "詳細の表示",
   "@desktopMenuShowDetails": {
     "description": "Context menu item that opens a track's metadata page"
   },
