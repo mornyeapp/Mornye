@@ -966,11 +966,7 @@ extension _QueueTabItemWidgets on _QueueTabState {
                   'album-desc',
                 _ => _sortMode,
               };
-              if (mode == _sortMode) return;
-              _setState(() {
-                _sortMode = mode;
-                _resetLibraryPaging();
-              });
+              _setSortMode(mode);
             },
           ),
         ),

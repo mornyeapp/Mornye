@@ -5,6 +5,22 @@ import 'package:mornye/models/theme_settings.dart';
 import 'package:mornye/utils/artist_utils.dart';
 
 void main() {
+  test('Library sort restores every choice and tolerates old settings', () {
+    expect(AppSettings.fromJson({}).historySortMode, 'latest');
+    for (final invalid in [null, '', 'unsupported', 42]) {
+      expect(
+        AppSettings.fromJson({'historySortMode': invalid}).historySortMode,
+        'latest',
+      );
+    }
+    for (final sort in librarySortModes) {
+      final settings = const AppSettings().copyWith(historySortMode: sort);
+      final restored = AppSettings.fromJson(settings.toJson());
+      expect(restored.historySortMode, sort);
+      expect(restored.copyWith(historyViewMode: 'list').historySortMode, sort);
+    }
+  });
+
   test(
     'retired quality conversion settings do not enable automatic conversion',
     () {

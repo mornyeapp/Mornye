@@ -206,7 +206,14 @@ class _QueueTabState extends ConsumerState<QueueTab> {
   String? _filterQuality;
   String? _filterFormat;
   String? _filterMetadata;
-  String _sortMode = 'latest';
+  String get _sortMode {
+    final settings = ref.read(settingsProvider);
+    final mode = settings.historySortMode;
+    final section = widget.librarySection ?? settings.historyFilterMode;
+    // Playlists have no file size. Keep the saved song order for returning.
+    return section == 'playlists' && mode.startsWith('size-') ? 'latest' : mode;
+  }
+
   String _libraryQualityLabelMode = AppSettings.libraryQualityLabelBitDepthOnly;
   final _libraryGridExtent = ValueNotifier(_libraryGridDefaultExtent);
   double? _libraryGridPinchStartExtent;
@@ -419,9 +426,6 @@ class _QueueTabState extends ConsumerState<QueueTab> {
 
   void _onFilterPageChanged(int index) {
     if (widget.librarySection != null) return;
-    if (_modeForPage(index) == 'playlists' && _sortMode.startsWith('size-')) {
-      setState(() => _sortMode = 'latest');
-    }
     HapticFeedback.selectionClick();
     ref
         .read(settingsProvider.notifier)
@@ -510,9 +514,9 @@ class _QueueTabState extends ConsumerState<QueueTab> {
       _filterQuality = null;
       _filterFormat = null;
       _filterMetadata = null;
-      _sortMode = 'latest';
       _resetLibraryPaging();
     });
+    ref.read(settingsProvider.notifier).setHistorySortMode('latest');
   }
 
   @override
@@ -527,6 +531,7 @@ class _QueueTabState extends ConsumerState<QueueTab> {
     }
     _initializePageController();
     _applyDefaultLibraryViewOnTabVisible();
+    ref.watch(settingsProvider.select((s) => s.historySortMode));
     final localLibraryEnabled = ref.watch(
       settingsProvider.select((s) => s.localLibraryEnabled),
     );

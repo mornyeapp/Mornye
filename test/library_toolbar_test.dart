@@ -26,14 +26,20 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 
 class _Settings extends SettingsNotifier {
+  _Settings(this.initial);
+
+  final AppSettings? initial;
+
   // The Rewind banner animates for as long as it is shown; keep it off so
   // the page settles.
   @override
-  AppSettings build() => const AppSettings(
-    defaultLibraryView: 'all',
-    historyViewMode: 'list',
-    listeningStatisticsEnabled: false,
-  );
+  AppSettings build() =>
+      initial ??
+      const AppSettings(
+        defaultLibraryView: 'all',
+        historyViewMode: 'list',
+        listeningStatisticsEnabled: false,
+      );
 }
 
 /// Downloaded songs added on [dates]. With a queue item present and the
@@ -137,6 +143,7 @@ void main() {
     List<UserPlaylistCollection> playlists = const [],
     bool withQueueItem = true,
   }) async {
+    final preferences = await SharedPreferences.getInstance();
     debugDesktopPlatformOverride = desktop;
     tester.view.physicalSize = const Size(1280, 900);
     tester.view.devicePixelRatio = 1;
@@ -160,7 +167,13 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          settingsProvider.overrideWith(_Settings.new),
+          settingsProvider.overrideWith(
+            () => _Settings(
+              hasPersistedAppSettings(preferences)
+                  ? loadBootstrapSettings(preferences)
+                  : null,
+            ),
+          ),
           downloadHistoryProvider.overrideWith(
             () => _History(dates ?? [DateTime(2026, 1, 10)]),
           ),
@@ -340,6 +353,55 @@ void main() {
 
   for (final desktop in [false, true]) {
     for (final mornye in [false, true]) {
+      testWidgets('title sort survives a fresh Library and settings scope '
+          '(desktop: $desktop, Mornye: $mornye)', (tester) async {
+        await pumpLibrary(tester, desktop: desktop, mornye: mornye);
+        final l10n = l10nOf(tester);
+        await tester.tap(
+          find
+              .text(
+                mornye ? l10n.libraryFilterTitle : l10n.libraryFilterSortLatest,
+              )
+              .hitTestable(),
+        );
+        for (var i = 0; i < 10; i++) {
+          await tester.pump(const Duration(milliseconds: 50));
+        }
+        final choice = find.text(l10n.searchSortTitleAZ);
+        await tester.ensureVisible(choice);
+        await tester.pump(const Duration(milliseconds: 300));
+        await tester.tap(choice);
+        if (mornye) {
+          await tester.ensureVisible(find.text(l10n.libraryFilterApply));
+          await tester.pump(const Duration(milliseconds: 300));
+          await tester.tap(find.text(l10n.libraryFilterApply));
+        }
+        for (var i = 0; i < 10; i++) {
+          await tester.pump(const Duration(milliseconds: 50));
+        }
+        final preferences = await SharedPreferences.getInstance();
+        expect(loadBootstrapSettings(preferences).historySortMode, 'a-z');
+        await tester.pumpWidget(const SizedBox.shrink());
+        queries.clear();
+        await pumpLibrary(tester, desktop: desktop, mornye: mornye);
+        final container = ProviderScope.containerOf(
+          tester.element(find.byType(QueueTab)),
+        );
+        expect(container.read(settingsProvider).historySortMode, 'a-z');
+        expect(
+          queries.any((sql) => sql.contains('ORDER BY sort_track ASC')),
+          isTrue,
+        );
+        if (!mornye) {
+          expect(
+            find.text(l10n.searchSortTitleAZ).hitTestable(),
+            findsOneWidget,
+          );
+          expect(find.text(l10n.libraryFilterSortLatest), findsNothing);
+        }
+        expect(tester.takeException(), isNull);
+      });
+
       testWidgets('size sort applies from the Library menu '
           '(desktop: $desktop, Mornye: $mornye)', (tester) async {
         await pumpLibrary(tester, desktop: desktop, mornye: mornye);
@@ -379,6 +441,34 @@ void main() {
         }
         expect(queries.any((sql) => sql.contains('sort_size DESC')), isTrue);
         expect(find.text(l10n.libraryFilterSortSizeSmallest), findsNothing);
+        if (!mornye) {
+          await tester.tap(
+            find.descendant(
+              of: find.byType(TabBar),
+              matching: find.text(l10n.searchPlaylists),
+            ),
+          );
+          for (var i = 0; i < 40; i++) {
+            await tester.pump(const Duration(milliseconds: 50));
+          }
+          final preferences = await SharedPreferences.getInstance();
+          expect(
+            loadBootstrapSettings(preferences).historySortMode,
+            'size-desc',
+          );
+          await tester.tap(
+            find
+                .descendant(of: find.byType(TabBar), matching: find.byType(Tab))
+                .first,
+          );
+          for (var i = 0; i < 40; i++) {
+            await tester.pump(const Duration(milliseconds: 50));
+          }
+          expect(
+            find.text(l10n.libraryFilterSortSizeLargest).hitTestable(),
+            findsOneWidget,
+          );
+        }
         expect(tester.takeException(), isNull);
       });
     }

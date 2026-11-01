@@ -246,6 +246,11 @@ void main() {
       expect(find.text('Bravo'), findsOneWidget);
       // No month sections: the table sorts through its header instead.
       expect(find.text('January 2026'), findsNothing);
+      final l10n = AppLocalizations.of(tester.element(find.byType(QueueTab)));
+      await tester.tap(find.text(l10n.editMetadataFieldTitle));
+      await _settle(tester);
+      final preferences = await SharedPreferences.getInstance();
+      expect(loadBootstrapSettings(preferences).historySortMode, 'a-z');
     });
 
     testWidgets('a right-click menu leaves the selection toolbar closed '

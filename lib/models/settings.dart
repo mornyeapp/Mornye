@@ -23,6 +23,27 @@ String playbackNormalizationModeFromJson(Object? value) =>
 double musicHapticsLevelFromJson(Object? value) =>
     value is num && value.isFinite ? value.toDouble().clamp(0, 1) : 0.5;
 
+/// Sort choices offered by the Library, in display order.
+const librarySortModes = [
+  'latest',
+  'oldest',
+  'size-desc',
+  'size-asc',
+  'a-z',
+  'z-a',
+  'artist-asc',
+  'artist-desc',
+  'album-asc',
+  'album-desc',
+  'release-newest',
+  'release-oldest',
+  'genre-asc',
+  'genre-desc',
+];
+
+String librarySortModeFromJson(Object? value) =>
+    value is String && librarySortModes.contains(value) ? value : 'latest';
+
 @JsonSerializable(explicitToJson: true)
 class AppSettings {
   static const String homeFeedProviderOff = '__off__';
@@ -130,6 +151,8 @@ class AppSettings {
   final bool filterContributingArtistsInAlbumArtist;
   final String historyViewMode;
   final String historyFilterMode;
+  @JsonKey(fromJson: librarySortModeFromJson)
+  final String historySortMode;
 
   /// Library view opened when switching to the Library tab:
   /// 'last' (keep last used), 'all', 'albums', 'singles', or 'playlists'.
@@ -313,6 +336,7 @@ class AppSettings {
     this.filterContributingArtistsInAlbumArtist = false,
     this.historyViewMode = 'grid',
     this.historyFilterMode = 'all',
+    this.historySortMode = 'latest',
     this.defaultLibraryView = 'last',
     this.libraryQualityLabelMode = AppSettings.libraryQualityLabelBitDepthOnly,
     this.askQualityBeforeDownload = true,
@@ -463,6 +487,7 @@ class AppSettings {
     bool? filterContributingArtistsInAlbumArtist,
     String? historyViewMode,
     String? historyFilterMode,
+    String? historySortMode,
     String? defaultLibraryView,
     String? libraryQualityLabelMode,
     bool? askQualityBeforeDownload,
@@ -607,6 +632,7 @@ class AppSettings {
           this.filterContributingArtistsInAlbumArtist,
       historyViewMode: historyViewMode ?? this.historyViewMode,
       historyFilterMode: historyFilterMode ?? this.historyFilterMode,
+      historySortMode: historySortMode ?? this.historySortMode,
       defaultLibraryView: defaultLibraryView ?? this.defaultLibraryView,
       libraryQualityLabelMode:
           libraryQualityLabelMode ?? this.libraryQualityLabelMode,

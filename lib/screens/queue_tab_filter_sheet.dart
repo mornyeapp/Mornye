@@ -239,9 +239,13 @@ extension _QueueTabFilterSheet on _QueueTabState {
                           _filterQuality = tempQuality;
                           _filterFormat = tempFormat;
                           _filterMetadata = tempMetadata;
-                          _sortMode = tempSortMode;
                           _resetLibraryPaging();
                         });
+                        if (tempSortMode != _sortMode) {
+                          ref
+                              .read(settingsProvider.notifier)
+                              .setHistorySortMode(tempSortMode);
+                        }
                         Navigator.pop(context);
                         if (widget.librarySection == null &&
                             isAlbumCompletenessFilter(tempMetadata)) {
