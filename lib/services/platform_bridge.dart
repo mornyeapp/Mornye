@@ -2300,6 +2300,9 @@ class PlatformBridge {
           );
         }
         return decoded;
+      } on PlatformException catch (e, stack) {
+        _log.e('Extension URL metadata failed', e, stack);
+        rethrow;
       } catch (e) {
         return null;
       }
