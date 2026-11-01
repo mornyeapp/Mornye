@@ -122,6 +122,9 @@ class _ExtensionDetailsScreenState
                 child: ext.iconUrl != null && ext.iconUrl!.isNotEmpty
                     ? Image.network(
                         ext.iconUrl!,
+                        cacheWidth:
+                            (100 * MediaQuery.devicePixelRatioOf(context))
+                                .round(),
                         fit: BoxFit.cover,
                         errorBuilder: (context, error, stackTrace) =>
                             _buildFallbackIcon(ext, colorScheme, 50),

@@ -25,7 +25,7 @@ class PlayerArtwork extends StatelessWidget {
 
   /// Share one full-size decode while artwork moves between player panels.
   static int transitionCacheWidth(BuildContext context) =>
-      (MediaQuery.sizeOf(context).width *
+      (MediaQuery.sizeOf(context).shortestSide *
               MediaQuery.devicePixelRatioOf(context))
           .round();
 

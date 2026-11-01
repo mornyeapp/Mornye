@@ -143,6 +143,12 @@ class _ExtensionDetailPageState extends ConsumerState<ExtensionDetailPage> {
                                         File(extension.iconPath!),
                                         width: 56,
                                         height: 56,
+                                        cacheWidth:
+                                            (56 *
+                                                    MediaQuery.devicePixelRatioOf(
+                                                      context,
+                                                    ))
+                                                .round(),
                                         fit: BoxFit.cover,
                                         errorBuilder:
                                             (

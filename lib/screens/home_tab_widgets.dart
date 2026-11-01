@@ -84,6 +84,8 @@ class _SearchProviderDropdown extends ConsumerWidget {
                   File(iconPath),
                   width: 20,
                   height: 20,
+                  cacheWidth: (20 * MediaQuery.devicePixelRatioOf(context))
+                      .round(),
                   fit: BoxFit.cover,
                   errorBuilder: (_, e, st) => Icon(displayIcon, size: 20),
                 ),
@@ -118,6 +120,9 @@ class _SearchProviderDropdown extends ConsumerWidget {
                         File(ext.iconPath!),
                         width: 20,
                         height: 20,
+                        cacheWidth:
+                            (20 * MediaQuery.devicePixelRatioOf(context))
+                                .round(),
                         fit: BoxFit.cover,
                         errorBuilder: (_, e, st) => Icon(
                           _getIconFromName(ext.searchBehavior?.icon),

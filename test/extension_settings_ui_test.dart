@@ -55,12 +55,61 @@ class _Extensions extends ExtensionNotifier {
   );
 }
 
+class _IconExtensions extends _Extensions {
+  @override
+  ExtensionState build() {
+    final initial = super.build();
+    return initial.copyWith(
+      extensions: [
+        initial.extensions.single.copyWith(iconPath: '/example-icon.png'),
+      ],
+    );
+  }
+}
+
 void main() {
   const channel = MethodChannel('com.zarz.mornye/backend');
   setUp(() => SharedPreferences.setMockInitialValues({}));
   tearDown(() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, null);
+  });
+
+  testWidgets('extension detail icon decode follows display density', (
+    tester,
+  ) async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          channel,
+          (call) async => call.method == 'getExtensionSettings' ? '{}' : null,
+        );
+    for (final density in [1.0, 3.0]) {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            settingsProvider.overrideWith(FixedSettingsNotifier.new),
+            extensionProvider.overrideWith(_IconExtensions.new),
+          ],
+          child: MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(context).copyWith(devicePixelRatio: density),
+              child: child!,
+            ),
+            home: const ExtensionDetailPage(extensionId: 'example.account'),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final image = tester.widget<Image>(find.byType(Image));
+      expect(image.image, isA<ResizeImage>());
+      final resized = image.image as ResizeImage;
+      expect(resized.width, (56 * density).round());
+      expect(resized.height, isNull);
+      expect(tester.getSize(find.byType(Image)), const Size(56, 56));
+      expect(tester.takeException(), isNull);
+    }
   });
 
   for (final mornye in [false, true]) {

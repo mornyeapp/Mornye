@@ -8,6 +8,30 @@ import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/player_artwork.dart';
 
 void main() {
+  testWidgets('player rotation shares a short-side artwork decode size', (
+    tester,
+  ) async {
+    final widths = <int>[];
+    for (final size in [
+      const Size(400, 900),
+      const Size(900, 400),
+      const Size(400, 900),
+    ]) {
+      await tester.pumpWidget(
+        MediaQuery(
+          data: MediaQueryData(size: size, devicePixelRatio: 3),
+          child: Builder(
+            builder: (context) {
+              widths.add(PlayerArtwork.transitionCacheWidth(context));
+              return const SizedBox.shrink();
+            },
+          ),
+        ),
+      );
+    }
+    expect(widths, [1200, 1200, 1200]);
+  });
+
   testWidgets(
     'track changes retain the decoded cover while the next image loads',
     (tester) async {
