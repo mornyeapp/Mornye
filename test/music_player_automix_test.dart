@@ -1461,6 +1461,51 @@ void main() {
     expect(mixDecks(), hasLength(1));
   });
 
+  fakeTimeTest(
+    'a shorter duration brings the preparation lead forward',
+    () async {
+      setLengths(const Duration(minutes: 4));
+      setAutoMixEnabled(true);
+      await handler.setQueueAndPlay(_tracks);
+      playFrom(60000);
+      await Future<void>.delayed(const Duration(milliseconds: 400));
+      expect(analyzer.calls, isEmpty);
+
+      await native.event('music-player', 'audio.onDuration', 200000);
+      await _until(() => mixDecks().isNotEmpty);
+      expect(analyzer.calls, ['/one.flac', '/two.flac']);
+      await playUntil(
+        () => handler.mediaItem.value?.id == 'two',
+        const Duration(seconds: 140),
+      );
+      expect(mixStart(mixDecks().single).at, inInclusiveRange(195000, 195100));
+    },
+  );
+
+  fakeTimeTest('a longer duration postpones the preparation lead', () async {
+    setLengths(const Duration(minutes: 4));
+    setAutoMixEnabled(true);
+    await handler.setQueueAndPlay(_tracks);
+    playFrom(89000);
+    await Future<void>.delayed(const Duration(milliseconds: 400));
+    expect(analyzer.calls, isEmpty);
+
+    await native.event('music-player', 'audio.onDuration', 300000);
+    playFrom(100000);
+    await Future<void>.delayed(const Duration(seconds: 1));
+    expect(analyzer.calls, isEmpty);
+    playFrom(149000);
+    await Future<void>.delayed(const Duration(milliseconds: 600));
+    expect(analyzer.calls, isEmpty);
+    await playUntil(() => mixDecks().isNotEmpty, const Duration(seconds: 2));
+    expect(analyzer.calls, ['/one.flac', '/two.flac']);
+    await playUntil(
+      () => handler.mediaItem.value?.id == 'two',
+      const Duration(seconds: 150),
+    );
+    expect(mixStart(mixDecks().single).at, inInclusiveRange(295000, 295100));
+  });
+
   fakeTimeTest('preparation is reported until it ends or is dropped', () async {
     analyzer.pending = Completer<AutoMixBeatGrid?>();
     setAutoMixEnabled(true);
@@ -1505,6 +1550,37 @@ void main() {
     // followed the clock. A loaded machine may move a few by over 20 ms.
     expect(arms, inInclusiveRange(1, 6));
   });
+
+  for (final action in ['pause', 'stop', 'queue replacement']) {
+    fakeTimeTest('$action cancels a pending mix start', () async {
+      setAutoMixEnabled(true);
+      await handler.setQueueAndPlay(_tracks);
+      playFrom(0);
+      await _until(() => native.calls.any((c) => c.$2 == 'setPlaybackRate'));
+      final incoming = mixDecks().single;
+      await Future<void>.delayed(const Duration(seconds: 1));
+
+      switch (action) {
+        case 'pause':
+          await handler.pause();
+        case 'stop':
+          await handler.stop();
+        default:
+          native.durations[four.source] = 240000;
+          await handler.setQueueAndPlay([four, _tracks[2]]);
+          playFrom(0);
+      }
+      await Future<void>.delayed(const Duration(seconds: 60));
+      expect(native.live, {'music-player'});
+      expect(
+        native.calls.where((c) => c.$1 == incoming && c.$2 == 'resume'),
+        isEmpty,
+      );
+      expect(mixDecks(), hasLength(1));
+      expect(autoMixPreparing.value, isFalse);
+      expect(autoMixStatus.value, AutoMixStatus.idle);
+    });
+  }
 
   fakeTimeTest('a long song mixes at its planned moment', () async {
     setLengths(const Duration(seconds: 200));
