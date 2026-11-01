@@ -286,6 +286,43 @@ void main() {
     expect(await Directory(p.join(root.path, 'Band')).exists(), isFalse);
   });
 
+  test('Windows verbatim paths match their plain spelling', () {
+    expect(
+      plainWindowsPath(r'\\?\C:\Users\admin\Music\a.flac'),
+      r'C:\Users\admin\Music\a.flac',
+    );
+    expect(
+      plainWindowsPath(r'\\?\UNC\server\share\a.flac'),
+      r'\\server\share\a.flac',
+    );
+    expect(plainWindowsPath(r'C:\Music\a.flac'), r'C:\Music\a.flac');
+    expect(plainWindowsPath('/music/a.flac'), '/music/a.flac');
+
+    // A moved file keeps the spelling its scanner used.
+    expect(
+      matchWindowsPathSpelling(
+        r'\\?\C:\Music\old.flac',
+        r'C:\Music\A\new.flac',
+      ),
+      r'\\?\C:\Music\A\new.flac',
+    );
+    expect(
+      matchWindowsPathSpelling(
+        r'\\?\UNC\nas\music\old.flac',
+        r'\\nas\music\new.flac',
+      ),
+      r'\\?\UNC\nas\music\new.flac',
+    );
+    expect(
+      matchWindowsPathSpelling(r'C:\Music\old.flac', r'C:\Music\A\new.flac'),
+      r'C:\Music\A\new.flac',
+    );
+    expect(
+      matchWindowsPathSpelling('/music/old.flac', '/music/A/new.flac'),
+      '/music/A/new.flac',
+    );
+  });
+
   test('relative folder helpers', () {
     expect(normalizeRelativeLibraryDir(r'.\Artist\\Album/'), 'Artist/Album');
     expect(numberedLibraryFileName('Song.flac', 3), 'Song (3).flac');

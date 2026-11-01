@@ -120,6 +120,24 @@ String normalizeRelativeLibraryDir(String value) => value
     .where((part) => part.isNotEmpty && part != '.' && part != '..')
     .join('/');
 
+/// The plain spelling of a Windows "verbatim" path: `\\?\C:\Music` becomes
+/// `C:\Music` and `\\?\UNC\server\share` becomes `\\server\share`. The
+/// desktop library scan reports files in the verbatim form, while settings
+/// hold plain paths; both name the same file. Other paths are unchanged.
+String plainWindowsPath(String path) {
+  if (path.startsWith(r'\\?\UNC\')) return '\\\\${path.substring(8)}';
+  if (path.startsWith(r'\\?\')) return path.substring(4);
+  return path;
+}
+
+/// [path] spelled the way [like] is: verbatim when [like] is verbatim, so a
+/// moved file keeps the spelling its scanner uses and a rescan matches it.
+String matchWindowsPathSpelling(String like, String path) {
+  if (!like.startsWith(r'\\?\') || path.startsWith(r'\\?\')) return path;
+  if (path.startsWith(r'\\')) return '\\\\?\\UNC\\${path.substring(2)}';
+  return '\\\\?\\$path';
+}
+
 /// `Song.flac` → `Song (2).flac`.
 String numberedLibraryFileName(String fileName, int number) {
   final dot = fileName.lastIndexOf('.');
@@ -398,7 +416,7 @@ class LibraryReorganizer {
     var targetPath = p.join(targetDir, move.targetFileName);
     final caseOnlyRename =
         p.normalize(targetPath).toLowerCase() ==
-        p.normalize(source.path).toLowerCase();
+        p.normalize(plainWindowsPath(source.path)).toLowerCase();
     if (!caseOnlyRename) {
       targetPath = await _firstFreeLocalPath(targetPath);
     }
@@ -423,7 +441,8 @@ class LibraryReorganizer {
       _log.w('Could not move lyrics sidecar for ${move.sourcePath}: $e');
     }
 
-    if (!await _recordNewPath(move, newPath)) {
+    final recordedPath = matchWindowsPathSpelling(move.sourcePath, newPath);
+    if (!await _recordNewPath(move, recordedPath)) {
       // The row changed underneath us; put everything back so the stored
       // path stays valid.
       _log.w('Library changed while moving ${move.sourcePath}; reverting');
@@ -436,11 +455,11 @@ class LibraryReorganizer {
         _log.e('Could not revert move of ${move.sourcePath}: $e');
       }
       // Drop the destination folders created for this file if now empty.
-      vacatedDirs.add(p.dirname(newPath));
+      vacatedDirs.add(p.dirname(plainWindowsPath(newPath)));
       return _Outcome.failed;
     }
 
-    vacatedDirs.add(p.dirname(source.path));
+    vacatedDirs.add(p.dirname(plainWindowsPath(source.path)));
     return _Outcome.moved;
   }
 
@@ -478,10 +497,11 @@ class LibraryReorganizer {
 
   /// Deletes folders emptied by the move, walking up but never past [root].
   Future<void> _removeEmptyDirectories(String root, Set<String> dirs) async {
-    final normalizedRoot = p.normalize(root);
+    final normalizedRoot = p.normalize(plainWindowsPath(root));
     // Deepest first so parents are checked after their children.
-    final ordered = dirs.map(p.normalize).toSet().toList()
-      ..sort((a, b) => b.length.compareTo(a.length));
+    final ordered =
+        dirs.map((dir) => p.normalize(plainWindowsPath(dir))).toSet().toList()
+          ..sort((a, b) => b.length.compareTo(a.length));
     for (final start in ordered) {
       var current = start;
       while (p.isWithin(normalizedRoot, current)) {

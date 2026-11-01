@@ -58,7 +58,7 @@ extension DownloadQueueLibraryReorganization on DownloadQueueNotifier {
     if (!safMode && state.outputDir.isEmpty) await _initOutputDir();
     final root = safMode
         ? settings.downloadTreeUri
-        : p.normalize(state.outputDir);
+        : p.normalize(plainWindowsPath(state.outputDir));
 
     if (!settings.separateSingles && settings.folderOrganization == 'custom') {
       // Fail fast with a clear error instead of once per track.
@@ -304,11 +304,12 @@ extension DownloadQueueLibraryReorganization on DownloadQueueNotifier {
       ignoreCase ? a.toLowerCase() == b.toLowerCase() : a == b;
 
   /// Identity of a stored file across history and the Local Library.
-  /// Windows paths ignore case, as the file system does.
+  /// Windows paths ignore case and the verbatim `\\?\` prefix, as the file
+  /// system does.
   String _pathKey(String path, {required bool safMode}) {
     final trimmed = path.trim();
     if (safMode || isContentUri(trimmed)) return trimmed;
-    final normalized = p.normalize(trimmed);
+    final normalized = p.normalize(plainWindowsPath(trimmed));
     return Platform.isWindows ? normalized.toLowerCase() : normalized;
   }
 
@@ -361,7 +362,8 @@ extension DownloadQueueLibraryReorganization on DownloadQueueNotifier {
 
   _StoredLocation? _localLocation(String path, String root) {
     if (isContentUri(path) || root.isEmpty) return null;
-    final normalized = p.normalize(path);
+    // Scanned Windows files arrive as `\\?\C:\…`; compare plain spellings.
+    final normalized = p.normalize(plainWindowsPath(path));
     if (!p.isWithin(root, normalized)) return null;
     final relativeDir = p.relative(p.dirname(normalized), from: root);
     return _StoredLocation(
