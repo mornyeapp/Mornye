@@ -25,6 +25,19 @@ pub(crate) fn execute(request: &Value, bytes: Option<&[u8]>) -> Result<Value, St
     }
     let base_segments = decoded_segments(&base)?;
     let webdav = request["protocol"] == "webdav";
+    let document = if webdav {
+        mornye_core::xml::check_depth(&body)?;
+        let document = roxmltree::Document::parse(&body).map_err(|e| e.to_string())?;
+        if !named(document.root_element(), "multistatus") {
+            return Err("Server did not return a WebDAV directory listing".into());
+        }
+        Some(document)
+    } else {
+        None
+    };
+    let advertised_origin = document
+        .as_ref()
+        .and_then(|document| dav_collection_origin(document, &base, &base_segments));
     let mut entries = Vec::<Value>::new();
     let mut positions = HashMap::<String, usize>::new();
     let mut add = |href: &str,
@@ -34,10 +47,13 @@ pub(crate) fn execute(request: &Value, bytes: Option<&[u8]>) -> Result<Value, St
                    etag: Option<String>|
      -> Result<(), String> {
         let uri = base.join(&dart_href(href)).map_err(|e| e.to_string())?;
-        // DAV hrefs can advertise the HTTPS listener of the same server.
+        // A tunnel can expose a different host from the DAV collection href.
         // Only child paths leave this parser; transport keeps the saved origin.
         let same_server = uri.origin() == base.origin()
-            || (webdav && uri.host() == base.host() && matches!(uri.scheme(), "http" | "https"));
+            || (webdav
+                && matches!(uri.scheme(), "http" | "https")
+                && (uri.host() == base.host()
+                    || advertised_origin.as_ref() == Some(&uri.origin())));
         if !same_server
             || uri.query().is_some()
             || uri.fragment().is_some()
@@ -78,26 +94,13 @@ pub(crate) fn execute(request: &Value, bytes: Option<&[u8]>) -> Result<Value, St
         }
         Ok(())
     };
-    if webdav {
-        mornye_core::xml::check_depth(&body)?;
-        let document = roxmltree::Document::parse(&body).map_err(|e| e.to_string())?;
-        if !named(document.root_element(), "multistatus") {
-            return Err("Server did not return a WebDAV directory listing".into());
-        }
+    if let Some(document) = document {
         for response in document
             .descendants()
             .filter(|node| named(*node, "response"))
         {
             let href = response.descendants().find(|node| named(*node, "href"));
-            let props: Vec<_> = response
-                .descendants()
-                .filter(|node| {
-                    named(*node, "propstat")
-                        && node.children().any(|child| {
-                            named(child, "status") && successful_status(&inner_text(child))
-                        })
-                })
-                .collect();
+            let props: Vec<_> = successful_properties(response).collect();
             if let Some(href) = href.filter(|_| !props.is_empty()) {
                 let values: Vec<_> = props
                     .iter()
@@ -183,6 +186,54 @@ fn dart_href(href: &str) -> String {
 
 fn named(node: roxmltree::Node<'_, '_>, name: &str) -> bool {
     node.is_element() && node.tag_name().name() == name
+}
+
+fn successful_properties<'a, 'input>(
+    response: roxmltree::Node<'a, 'input>,
+) -> impl Iterator<Item = roxmltree::Node<'a, 'input>> {
+    response.descendants().filter(|node| {
+        named(*node, "propstat")
+            && node
+                .children()
+                .any(|child| named(child, "status") && successful_status(&inner_text(child)))
+    })
+}
+
+fn dav_collection_origin(
+    document: &roxmltree::Document<'_>,
+    base: &Url,
+    base_segments: &[String],
+) -> Option<url::Origin> {
+    let mut origin = None;
+    for response in document
+        .descendants()
+        .filter(|node| named(*node, "response"))
+    {
+        let Some(href) = response.descendants().find(|node| named(*node, "href")) else {
+            continue;
+        };
+        let Ok(uri) = base.join(&dart_href(&inner_text(href))) else {
+            continue;
+        };
+        if !matches!(uri.scheme(), "http" | "https")
+            || uri.query().is_some()
+            || uri.fragment().is_some()
+            || !uri.username().is_empty()
+            || uri.password().is_some()
+            || decoded_segments(&uri).ok().as_deref() != Some(base_segments)
+            || !successful_properties(response)
+                .flat_map(|prop| prop.descendants())
+                .any(|node| named(node, "collection"))
+        {
+            continue;
+        }
+        let next = uri.origin();
+        if origin.as_ref().is_some_and(|origin| *origin != next) {
+            return None;
+        }
+        origin = Some(next);
+    }
+    origin
 }
 
 fn successful_status(value: &str) -> bool {

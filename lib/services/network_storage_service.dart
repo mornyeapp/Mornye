@@ -1028,6 +1028,7 @@ class NetworkStorageService {
     if (baseSegments.isNotEmpty && baseSegments.last.isEmpty) {
       baseSegments.removeLast();
     }
+    String? advertisedOrigin;
     final found = <String, NetworkEntry>{};
     void add(
       String href,
@@ -1037,13 +1038,14 @@ class NetworkStorageService {
       String? etag,
     }) {
       final uri = base.resolve(href);
-      // A DAV server behind a TLS proxy can advertise its HTTPS port even
-      // when contacted over HTTP. Retain only the child path, never its
-      // advertised origin: reads and writes still use the saved connection.
+      // A DAV server can advertise its LAN address behind a tunnel. Accept
+      // that origin only when it identifies the requested collection itself.
+      // Reads and writes still use child paths on the saved connection.
       final sameServer =
           (uri.scheme == 'http' || uri.scheme == 'https') &&
           (uri.origin == base.origin ||
-              (c.protocol == NetworkProtocol.webdav && uri.host == base.host));
+              (c.protocol == NetworkProtocol.webdav &&
+                  (uri.host == base.host || uri.origin == advertisedOrigin)));
       if (!sameServer ||
           uri.hasQuery ||
           uri.hasFragment ||
@@ -1090,23 +1092,53 @@ class NetworkStorageService {
         );
       }
       final successfulStatus = RegExp(r'^HTTP/\S+\s+200(?:\s|$)');
-      for (final response in doc.descendants.whereType<XmlElement>().where(
+      final responses = doc.descendants.whereType<XmlElement>().where(
         (e) => e.name.local == 'response',
-      )) {
+      );
+      Iterable<XmlElement> properties(XmlElement response) =>
+          response.descendants.whereType<XmlElement>().where(
+            (e) =>
+                e.name.local == 'propstat' &&
+                e.childElements.any(
+                  (s) =>
+                      s.name.local == 'status' &&
+                      successfulStatus.hasMatch(s.innerText.trim()),
+                ),
+          );
+      final origins = <String>{};
+      for (final response in responses) {
+        final href = response.descendants
+            .whereType<XmlElement>()
+            .where((e) => e.name.local == 'href')
+            .firstOrNull
+            ?.innerText;
+        if (href == null) continue;
+        final uri = base.resolve(href);
+        if ((uri.scheme != 'http' && uri.scheme != 'https') ||
+            uri.hasQuery ||
+            uri.hasFragment ||
+            uri.userInfo.isNotEmpty) {
+          continue;
+        }
+        final segments = [...uri.pathSegments];
+        if (segments.isNotEmpty && segments.last.isEmpty) segments.removeLast();
+        if (listEquals(segments, baseSegments) &&
+            properties(response).any(
+              (prop) => prop.descendants.whereType<XmlElement>().any(
+                (e) => e.name.local == 'collection',
+              ),
+            )) {
+          origins.add(uri.origin);
+        }
+      }
+      if (origins.length == 1) advertisedOrigin = origins.single;
+      for (final response in responses) {
         final elements = response.descendants.whereType<XmlElement>();
         final href = elements
             .where((e) => e.name.local == 'href')
             .firstOrNull
             ?.innerText;
-        final props = elements
-            .where((e) => e.name.local == 'propstat')
-            .where(
-              (e) => e.childElements.any(
-                (s) =>
-                    s.name.local == 'status' &&
-                    successfulStatus.hasMatch(s.innerText.trim()),
-              ),
-            );
+        final props = properties(response);
         final values = props.expand(
           (p) => p.descendants.whereType<XmlElement>(),
         );
