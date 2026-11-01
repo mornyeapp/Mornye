@@ -16,6 +16,7 @@ import 'package:mornye/services/network_smb_client.dart';
 import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/services/secure_storage_options.dart';
 import 'package:mornye/services/source_deletion_events.dart';
+import 'package:mornye/utils/logger.dart';
 import 'package:xml/xml.dart';
 
 part 'network_storage_upload.dart';
@@ -81,6 +82,11 @@ List<NetworkEntry> _hydrateNetworkEntriesInBackground(List<dynamic> entries) =>
     ];
 
 enum NetworkProtocol { smb, webdav, http, subsonic }
+
+class NetworkListingException extends HttpException {
+  const NetworkListingException()
+    : super('Server folder listing could not be read');
+}
 
 enum SubsonicAuth { saltedToken, password, apiKey }
 
@@ -287,6 +293,7 @@ class NetworkMediaUnavailable extends HttpException {
 }
 
 class NetworkStorageService {
+  static final _log = AppLogger('NetworkStorage');
   NetworkStorageService({
     Future<String?> Function()? read,
     Future<void> Function(String)? write,
@@ -846,7 +853,9 @@ class NetworkStorageService {
       if (rejectedCertificate != null) throw rejectedCertificate!;
       rethrow;
     }
-    if ([301, 302, 307, 308].contains(response.statusCode)) {
+    if ([301, 302, 307, 308].contains(response.statusCode) ||
+        (response.statusCode == HttpStatus.seeOther &&
+            (method == 'GET' || method == 'HEAD'))) {
       // Never replay a mutating request to an unselected path.
       if (!['GET', 'HEAD', 'PROPFIND'].contains(method)) {
         await _discardResponse(response);
@@ -963,6 +972,9 @@ class NetworkStorageService {
     );
     if (response.statusCode < 200 || response.statusCode >= 300) {
       await _discardResponse(response);
+      _log.w(
+        'Directory request failed: protocol=${c.protocol.name}, status=${response.statusCode}',
+      );
       throw HttpException('Server returned ${response.statusCode}');
     }
     final bytes = BytesBuilder();
@@ -972,7 +984,40 @@ class NetworkStorageService {
       }
       bytes.add(chunk);
     }
-    return await parseListingInBackground(c, path, bytes.takeBytes());
+    final contentType = response
+        .headers[HttpHeaders.contentTypeHeader]
+        ?.firstOrNull
+        ?.split(';')
+        .first
+        .trim()
+        .toLowerCase();
+    final bodyType = switch (contentType) {
+      'text/html' || 'application/xhtml+xml' => 'html',
+      'application/xml' || 'text/xml' => 'xml',
+      'application/json' => 'json',
+      _ => 'other',
+    };
+    _log.d(
+      'Directory response received: protocol=${c.protocol.name}, status=${response.statusCode}, body=$bodyType, bytes=${bytes.length}',
+    );
+    try {
+      final entries = await parseListingInBackground(
+        c,
+        path,
+        bytes.takeBytes(),
+      );
+      _log.d(
+        'Directory listing parsed: protocol=${c.protocol.name}, entries=${entries.length}',
+      );
+      return entries;
+    } on TimeoutException {
+      rethrow;
+    } catch (error) {
+      _log.w(
+        'Directory listing parse failed: protocol=${c.protocol.name}, type=${error.runtimeType}',
+      );
+      throw const NetworkListingException();
+    }
   }
 
   /// Large SMB listings arrive from native I/O as plain stat objects. Transfer

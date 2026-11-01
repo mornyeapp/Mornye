@@ -1,4 +1,6 @@
 {
+  "networkErrorListing": "Server merespons, tetapi daftar foldernya tidak dapat dibaca. Untuk WebDAV, gunakan endpoint WebDAV. Untuk HTTP, gunakan daftar direktori atau URL audio langsung.",
+  "networkErrorStorage": "Server berhasil diakses, tetapi perangkat ini tidak dapat menyimpan koneksi. Periksa log aplikasi lalu coba lagi.",
   "extensionsUnsecuredStorage": "Gunakan penyimpanan extension tanpa keyring",
   "extensionsUnsecuredStorageDescription": "Jalankan extension tanpa keyring Linux. Kunci disimpan secara lokal, sehingga siapa pun yang dapat mengakses file aplikasi bisa membaca kredensial extension. Nonaktifkan untuk memakai keyring sistem.",
   "extensionsStorageKeyringRequired": "Data extension yang ada memerlukan kunci aslinya. Buka keyring sistem sekali, lalu aktifkan lagi penyimpanan tanpa keyring. Data kamu tetap tersimpan.",

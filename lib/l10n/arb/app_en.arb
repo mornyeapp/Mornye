@@ -1,4 +1,6 @@
 {
+  "networkErrorListing": "The server responded, but its folder listing could not be read. For WebDAV, use the WebDAV endpoint. For HTTP, use a directory listing or direct audio URL.",
+  "networkErrorStorage": "The server was reached, but this device could not save the connection. Check the app log and retry.",
   "extensionsUnsecuredStorage": "Use unsecured extension storage",
   "extensionsUnsecuredStorageDescription": "Run extensions without a Linux keyring. The key is saved locally, so anyone with access to your app files can read extension credentials. Off uses the system keyring.",
   "extensionsStorageKeyringRequired": "Existing extension data needs its original key. Unlock the system keyring once, then enable unsecured storage again. Your data has been preserved.",

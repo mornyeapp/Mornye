@@ -11,6 +11,7 @@ import 'package:mornye/services/network_storage_service.dart';
 import 'package:mornye/services/network_storage_error.dart';
 import 'package:mornye/services/network_certificate.dart';
 import 'package:mornye/utils/adaptive_layout.dart';
+import 'package:mornye/utils/logger.dart';
 import 'package:mornye/utils/nav_bar_inset.dart';
 import 'package:mornye/widgets/app_sliver_header.dart';
 import 'package:mornye/widgets/app_search_field.dart';
@@ -626,6 +627,7 @@ class _NetworkConnectionFormState extends State<_NetworkConnectionForm> {
       _failed = false;
       _pendingCertificate = null;
     });
+    var saving = false;
     try {
       final c = NetworkConnection(
         id: widget.connection?.id ?? NetworkStorageService.newId(),
@@ -657,13 +659,19 @@ class _NetworkConnectionFormState extends State<_NetworkConnectionForm> {
       );
       c.validate();
       await widget.service.verify(c);
+      saving = true;
       await widget.service.save(c);
       if (mounted) Navigator.pop(context);
     } catch (error) {
+      AppLogger('NetworkConnection').w(
+        'Connection failed: protocol=${_protocol.name}, stage=${saving ? 'save' : 'verify'}, type=${error.runtimeType}',
+      );
       if (mounted) {
         setState(() {
           _failed = true;
-          _failure = classifyNetworkStorageError(error);
+          _failure = saving
+              ? NetworkStorageError.storage
+              : classifyNetworkStorageError(error);
           _pendingCertificate = error is NetworkCertificateException
               ? error
               : null;
@@ -1033,6 +1041,8 @@ String _networkErrorMessage(BuildContext context, NetworkStorageError error) =>
       NetworkStorageError.invalidAddress => context.l10n.networkErrorAddress,
       NetworkStorageError.certificate => context.l10n.networkErrorCertificate,
       NetworkStorageError.serverApi => context.l10n.subsonicErrorApi,
+      NetworkStorageError.listing => context.l10n.networkErrorListing,
+      NetworkStorageError.storage => context.l10n.networkErrorStorage,
       NetworkStorageError.unknown => context.l10n.networkConnectionError,
     };
 

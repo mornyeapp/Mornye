@@ -21,6 +21,54 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   HttpOverrides.global = null;
 
+  test(
+    'HTTP directory accepts a 303 redirect to its canonical slash',
+    () async {
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() => server.close(force: true));
+      final requests = <String>[];
+      server.listen((request) async {
+        requests.add('${request.method} ${request.uri.path}');
+        expect(
+          request.headers.value('authorization'),
+          'Basic ${base64Encode(utf8.encode('test:secret'))}',
+        );
+        await request.drain<void>();
+        if (request.uri.path == '/music') {
+          request.response.statusCode = HttpStatus.seeOther;
+          request.response.headers.set('location', '/music/');
+        } else {
+          request.response.headers.contentType = ContentType.html;
+          request.response.write(
+            '<html><a href="A%20B.flac">A B.flac</a></html>',
+          );
+        }
+        await request.response.close();
+      });
+      String? saved;
+      final storage = NetworkStorageService(
+        read: () async => saved,
+        write: (value) async => saved = value,
+      );
+      addTearDown(storage.dispose);
+      final connection = NetworkConnection(
+        id: 'http',
+        name: 'HTTP',
+        protocol: NetworkProtocol.http,
+        address: 'http://127.0.0.1:${server.port}/music',
+        username: 'test',
+        password: 'secret',
+      );
+      expect((await storage.verify(connection)).single.path, 'A B.flac');
+      await storage.save(connection);
+      expect(
+        (await storage.connection(connection.id)).address,
+        connection.address,
+      );
+      expect(requests, ['GET /music', 'GET /music/']);
+    },
+  );
+
   for (final advertised in [
     'https://127.0.0.1:5006',
     'http://192.168.1.20:5005',

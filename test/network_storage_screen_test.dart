@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/l10n/l10n.dart';
@@ -147,6 +148,61 @@ void main() {
     expect(await service.connections(), isEmpty);
   });
   for (final mornye in [false, true]) {
+    for (final failure in ['listing', 'save']) {
+      testWidgets(
+        'HTTP reports $failure failure separately (Mornye: $mornye)',
+        (tester) async {
+          final service = _NetworkFixture();
+          if (failure == 'listing') {
+            service.error = const NetworkListingException();
+          } else {
+            service.saveError = PlatformException(code: 'keystore_unavailable');
+          }
+          await tester.pumpWidget(
+            ProviderScope(
+              child: MaterialApp(
+                theme: mornye
+                    ? MornyeTheme.build(Brightness.dark)
+                    : ThemeData(useMaterial3: true),
+                localizationsDelegates: AppLocalizations.localizationsDelegates,
+                supportedLocales: AppLocalizations.supportedLocales,
+                home: NetworkStorageScreen(service: service),
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+          await tester.tap(find.byTooltip('Add connection'));
+          await tester.pumpAndSettle();
+          await tester.tap(find.text('HTTP(S)').hitTestable());
+          await tester.pumpAndSettle();
+          await tester.enterText(find.byKey(const ValueKey('Name')), 'NAS');
+          await tester.enterText(
+            find.byKey(const ValueKey('Server or audio URL')),
+            'http://nas.test:8080/music/',
+          );
+          final save = find.widgetWithText(AppActionButton, 'Connect and save');
+          await tester.ensureVisible(save);
+          await tester.pumpAndSettle();
+          await tester.tap(save);
+          await tester.pumpAndSettle();
+          expect(
+            find.textContaining(
+              failure == 'listing'
+                  ? 'folder listing could not be read'
+                  : 'device could not save the connection',
+            ),
+            findsOneWidget,
+          );
+          expect(
+            find.textContaining('Could not access the network source.'),
+            findsNothing,
+          );
+          expect(await service.connections(), isEmpty);
+          expect(tester.takeException(), isNull);
+          await tester.pumpWidget(const SizedBox.shrink());
+        },
+      );
+    }
     testWidgets('local permission denial can be retried (Mornye: $mornye)', (
       tester,
     ) async {
@@ -437,6 +493,13 @@ class _NetworkFixture extends NetworkStorageService {
   final paths = <String>[];
   bool fail = false;
   Object? error;
+  Object? saveError;
+  @override
+  Future<void> save(NetworkConnection connection) async {
+    if (saveError != null) throw saveError!;
+    await super.save(connection);
+  }
+
   NetworkConnection? lastAttempt;
   @override
   Future<List<NetworkEntry>> list(

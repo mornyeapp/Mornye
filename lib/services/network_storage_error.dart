@@ -17,11 +17,14 @@ enum NetworkStorageError {
   invalidAddress,
   certificate,
   serverApi,
+  listing,
+  storage,
   unknown,
 }
 
 /// Classify transport failures without exposing URLs, usernames or passwords.
 NetworkStorageError classifyNetworkStorageError(Object error) {
+  if (error is NetworkListingException) return NetworkStorageError.listing;
   if (error is SubsonicException) {
     return switch (error.code) {
       40 || 44 => NetworkStorageError.authentication,
