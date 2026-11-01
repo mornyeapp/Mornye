@@ -8411,5 +8411,10 @@
   "lastfmReauthenticate": "Koneksi Last.fm Anda kedaluwarsa. Hubungkan kembali untuk melanjutkan scrobbling.",
   "lastfmUnavailable": "Last.fm tidak tersedia pada build ini.",
   "lastfmRejected": "Last.fm menolak scrobble. Periksa tag judul dan artis lagu tersebut.",
-  "lastfmPending": "{count, plural, =1{1 scrobble menunggu sinkronisasi} other{{count} scrobble menunggu sinkronisasi}}"
+  "lastfmPending": "{count, plural, =1{1 scrobble menunggu sinkronisasi} other{{count} scrobble menunggu sinkronisasi}}",
+  "audioOutputSystem": "Perangkat ini dan Bluetooth",
+  "audioOutputCast": "Cast ke TV",
+  "audioOutputCastDescription": "Perangkat Google Cast di jaringan Wi-Fi yang sama",
+  "audioOutputStopCasting": "Hentikan casting",
+  "audioOutputCastUnavailable": "Google Cast tidak dapat dibuka. Periksa Google Play services dan akses jaringan lokal."
 }

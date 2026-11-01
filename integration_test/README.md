@@ -107,6 +107,7 @@ Suites:
 | --- | --- |
 | `album_replaygain_completion_test.dart` | Full-queue album ReplayGain completion, with the native worker on Android |
 | `album_replaygain_readiness_test.dart` | Album readiness checks for large queues |
+| `android_cast_picker_test.dart` | Android with Google Play services: the real native bridge opens the Cast device picker; receiver playback needs a physical Cast device on the same network |
 | `automix_analysis_test.dart` | Native decoding for AutoMix beats; Auto and crossfade playback |
 | `automix_effects_test.dart` | Bundled FFmpeg supports every AutoMix transition effect |
 | `collection_remove_batch_test.dart` | Removing 2000 tracks from a collection; rollback and retry |

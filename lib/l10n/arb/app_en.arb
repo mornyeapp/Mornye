@@ -10090,6 +10090,11 @@
       "count": { "type": "int" }
     }
   },
+  "audioOutputSystem": "This device and Bluetooth",
+  "audioOutputCast": "Cast to TV",
+  "audioOutputCastDescription": "Google Cast devices on the same Wi-Fi network",
+  "audioOutputStopCasting": "Stop casting",
+  "audioOutputCastUnavailable": "Unable to open Google Cast. Check Google Play services and local network access.",
   "collectionSuggestionsAddHere": "Add to this playlist",
   "@collectionSuggestionsAddHere": {
     "description": "Tooltip of the button that adds a suggested song to the user's playlist shown above"

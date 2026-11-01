@@ -4,10 +4,17 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:mornye/l10n/l10n.dart';
+import 'package:mornye/services/cast_output.dart';
+import 'package:mornye/services/local_network_access.dart';
+import 'package:mornye/services/music_player_service.dart';
+import 'package:mornye/utils/logger.dart';
+import 'package:mornye/widgets/app_bottom_sheet.dart';
 import 'package:mornye/widgets/app_icon_button.dart';
 import 'package:mornye/widgets/expressive_icon_button.dart';
 
-/// Uses the system's real audio routes and keeps native discovery in native UI.
+enum _OutputChoice { system, cast, disconnect }
+
+/// System routes and Google Cast have separate native device pickers.
 class AudioOutputButton extends StatefulWidget {
   const AudioOutputButton({
     super.key,
@@ -75,19 +82,78 @@ class _AudioOutputButtonState extends State<AudioOutputButton> {
     _opening = true;
     widget.onPickerChanged?.call(true);
     var opened = false;
+    var casting = false;
     try {
-      opened = await _androidChannel.invokeMethod<bool>('show') ?? false;
+      final choice = await showAppBottomSheet<_OutputChoice>(
+        context: context,
+        title: context.l10n.nowPlayingAudioOutput,
+        builder: (context) => ListenableBuilder(
+          listenable: CastOutput.instance,
+          builder: (context, _) => Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AppSheetOption(
+                title: Text(context.l10n.audioOutputSystem),
+                leading: const Icon(Icons.speaker_group_outlined),
+                onTap: () => Navigator.pop(context, _OutputChoice.system),
+              ),
+              AppSheetOption(
+                title: Text(
+                  CastOutput.instance.deviceName ??
+                      context.l10n.audioOutputCast,
+                ),
+                subtitle: Text(context.l10n.audioOutputCastDescription),
+                leading: Icon(
+                  CastOutput.instance.connected
+                      ? Icons.cast_connected
+                      : Icons.cast,
+                ),
+                onTap: () => Navigator.pop(context, _OutputChoice.cast),
+              ),
+              if (CastOutput.instance.connected)
+                AppSheetOption(
+                  title: Text(context.l10n.audioOutputStopCasting),
+                  leading: const Icon(Icons.stop_circle_outlined),
+                  onTap: () => Navigator.pop(context, _OutputChoice.disconnect),
+                ),
+            ],
+          ),
+        ),
+      );
+      if (choice == null || !mounted) return;
+      casting = choice != _OutputChoice.system;
+      switch (choice) {
+        case _OutputChoice.system:
+          opened = await _androidChannel.invokeMethod<bool>('show') ?? false;
+        case _OutputChoice.cast:
+          await LocalNetworkAccess.instance.ensureGranted();
+          await initMusicPlayer();
+          opened = await CastOutput.instance.showPicker();
+        case _OutputChoice.disconnect:
+          await CastOutput.instance.command('disconnect');
+          opened = true;
+      }
     } on PlatformException {
       // Show a visible failure instead of leaving an unresponsive control.
     } on MissingPluginException {
       // The native bridge is not available on unsupported builds.
+    } on LocalNetworkPermissionException {
+      // The picker can be opened again after network access is granted.
+    } on Object catch (error) {
+      AppLogger('AudioOutput').w('Could not open output picker: $error');
     } finally {
       _opening = false;
       if (mounted) widget.onPickerChanged?.call(false);
     }
     if (mounted && !opened) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(context.l10n.nowPlayingAudioOutputUnavailable)),
+        SnackBar(
+          content: Text(
+            casting
+                ? context.l10n.audioOutputCastUnavailable
+                : context.l10n.nowPlayingAudioOutputUnavailable,
+          ),
+        ),
       );
     }
   }
@@ -126,24 +192,34 @@ class _AudioOutputButtonState extends State<AudioOutputButton> {
           ),
         );
       case TargetPlatform.android:
-        if (widget.backgroundColor case final background?) {
-          return ExpressiveIconButton(
-            tooltip: context.l10n.nowPlayingAudioOutput,
-            width: widget.width,
-            foregroundColor: widget.color,
-            backgroundColor: background,
-            icon: const Icon(Icons.speaker_group_outlined),
-            onPressed: _showAndroidPicker,
-          );
-        }
-        return AppIconButton(
-          tooltip: context.l10n.nowPlayingAudioOutput,
-          color: widget.color,
-          icon: const Icon(Icons.speaker_group_outlined),
-          onPressed: _showAndroidPicker,
+        return ListenableBuilder(
+          listenable: CastOutput.instance,
+          builder: (context, _) => _androidButton(context),
         );
       default:
         return const SizedBox.shrink();
     }
+  }
+
+  Widget _androidButton(BuildContext context) {
+    final icon = CastOutput.instance.connected
+        ? Icons.cast_connected
+        : Icons.speaker_group_outlined;
+    if (widget.backgroundColor case final background?) {
+      return ExpressiveIconButton(
+        tooltip: context.l10n.nowPlayingAudioOutput,
+        width: widget.width,
+        foregroundColor: widget.color,
+        backgroundColor: background,
+        icon: Icon(icon),
+        onPressed: _showAndroidPicker,
+      );
+    }
+    return AppIconButton(
+      tooltip: context.l10n.nowPlayingAudioOutput,
+      color: widget.color,
+      icon: Icon(icon),
+      onPressed: _showAndroidPicker,
+    );
   }
 }

@@ -31,6 +31,7 @@ class _MusicGapless {
   bool get _enabled {
     final settings = handler._settings;
     return settings.gaplessPlayback &&
+        !handler._cast.active &&
         !settings.autoMix &&
         !settings.usbBitPerfect &&
         // A second deck cannot open a device held in exclusive mode.

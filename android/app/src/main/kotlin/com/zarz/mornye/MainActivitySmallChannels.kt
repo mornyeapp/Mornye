@@ -43,14 +43,16 @@ internal fun MainActivity.registerAudioOutputChannel(messenger: BinaryMessenger)
                 result.notImplemented()
             } else {
                 try {
-                    val shown = if (Build.VERSION.SDK_INT >= 34) {
+                    val shown = Build.VERSION.SDK_INT >= 34 && try {
                         android.media.MediaRouter2.getInstance(this).showSystemOutputSwitcher()
-                    } else {
-                        // Older Android releases do not expose a public output picker.
-                        startActivity(Intent(android.provider.Settings.ACTION_BLUETOOTH_SETTINGS))
-                        true
+                    } catch (_: Exception) {
+                        false
                     }
-                    result.success(shown)
+                    if (!shown) {
+                        // Older releases and unavailable system pickers still offer Bluetooth settings.
+                        startActivity(Intent(android.provider.Settings.ACTION_BLUETOOTH_SETTINGS))
+                    }
+                    result.success(true)
                 } catch (_: Exception) {
                     result.success(false)
                 }

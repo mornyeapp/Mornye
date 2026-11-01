@@ -15,6 +15,8 @@ import 'package:mornye/services/autoplay_ranker.dart';
 import 'package:mornye/services/autoplay_taste.dart';
 import 'package:mornye/services/background_favorites.dart';
 import 'package:mornye/services/cover_store.dart';
+import 'package:mornye/services/cast_output.dart';
+import 'package:mornye/services/cast_playback_deck.dart';
 import 'package:mornye/services/discord_presence_service.dart';
 import 'package:mornye/services/history_database.dart';
 import 'package:mornye/services/download_file_recovery.dart';
@@ -56,6 +58,7 @@ final _log = AppLogger('MusicPlayerRuntime');
 class PlaybackDependencies {
   const PlaybackDependencies({
     this.createDeck = _createDeck,
+    this.createCastDeck = _createCastDeck,
     this.createPreviewDeck = _createPreviewDeck,
     this.audioSession = _getAudioSession,
     this.readMetadata = PlatformBridge.readFileMetadata,
@@ -97,6 +100,8 @@ class PlaybackDependencies {
        _isAndroid = isAndroid;
 
   final PlaybackDeck Function(String playerId) createDeck;
+  final PlaybackDeck Function(CastOutput output, MediaItem? Function() metadata)
+  createCastDeck;
 
   /// The search and catalog preview player.
   final PlaybackDeck Function(String playerId) createPreviewDeck;
@@ -179,6 +184,11 @@ class PlaybackDependencies {
       exclusiveAvailable: () => MediaKitPlaybackDeck.isAvailable,
     );
   }
+
+  static PlaybackDeck _createCastDeck(
+    CastOutput output,
+    MediaItem? Function() metadata,
+  ) => CastPlaybackDeck(output: output, metadata: metadata);
 
   // Previews follow the in-app volume on desktop. Mobile previews keep
   // playing without the equalizer.

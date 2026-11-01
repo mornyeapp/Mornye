@@ -18,6 +18,7 @@ import 'package:mornye/services/autoplay_ranker.dart';
 import 'package:mornye/services/autoplay_taste.dart';
 import 'package:mornye/services/background_favorites.dart';
 import 'package:mornye/services/cover_store.dart';
+import 'package:mornye/services/cast_output.dart';
 import 'package:mornye/services/history_database.dart';
 import 'package:mornye/services/library_collections_database.dart';
 import 'package:mornye/services/library_database.dart';
@@ -123,6 +124,34 @@ class _Deck implements PlaybackDeck {
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _CastDeck extends _Deck {
+  final states = StreamController<PlaybackDeckState>.broadcast(sync: true);
+  final completions = StreamController<void>.broadcast(sync: true);
+
+  @override
+  Stream<PlaybackDeckState> get onPlayerStateChanged => states.stream;
+  @override
+  Stream<void> get onPlayerComplete => completions.stream;
+
+  void remotePlay() {
+    state = PlaybackDeckState.playing;
+    states.add(state);
+  }
+
+  void complete() {
+    state = PlaybackDeckState.completed;
+    states.add(state);
+    completions.add(null);
+  }
+
+  @override
+  Future<void> dispose() async {
+    await states.close();
+    await completions.close();
+    await super.dispose();
+  }
 }
 
 class _DelayedSeekDeck extends _Deck {
@@ -554,6 +583,7 @@ MusicPlayerRuntime _runtime({
   initialize,
   List<_Deck>? decks,
   PlaybackDeck Function(String)? createDeck,
+  PlaybackDeck Function(CastOutput, MediaItem? Function())? createCastDeck,
   Stream<double> volumeChanges = const Stream.empty(),
   SourceDeletionEvents? sourceDeletionEvents,
   SourceMetadataEvents? sourceMetadataEvents,
@@ -602,6 +632,7 @@ MusicPlayerRuntime _runtime({
             decks?.add(deck);
             return deck;
           },
+      createCastDeck: createCastDeck ?? (_, _) => _Deck(),
       audioSession: () async => audioSession,
       initializeHandler: initialize ?? (builder) async => builder(),
       synchronizePlaybackState: synchronizePlaybackState ?? () async {},
@@ -650,6 +681,105 @@ const _track = PlayableMedia(
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  test(
+    'Cast handoff keeps position, controls and queue, and disconnect returns paused',
+    () async {
+      const channel = MethodChannel('runtime-cast-test');
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      messenger.setMockMethodCallHandler(
+        channel,
+        (call) async => call.method == 'state' ? {'connected': false} : null,
+      );
+      addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+      final events = StreamController<Object?>.broadcast(sync: true);
+      final output = CastOutput(channel: channel, events: events.stream);
+      final local = <_Deck>[];
+      final tv = <_CastDeck>[];
+      final runtime = _runtime(
+        decks: local,
+        createCastDeck: (_, _) {
+          final deck = _CastDeck();
+          tv.add(deck);
+          return deck;
+        },
+      );
+      final handler = MusicPlayerHandler(runtime: runtime, castOutput: output);
+      await output.initialize();
+      await handler.setQueueAndPlay([
+        _track,
+        const PlayableMedia(
+          id: 'two',
+          source: '/two.flac',
+          title: 'Two',
+          artist: 'Artist',
+        ),
+      ]);
+      await handler.seek(const Duration(seconds: 12));
+      events.add({
+        'connected': true,
+        'deviceId': 'tv',
+        'host': '192.0.2.10',
+        'volume': 0.4,
+      });
+      await handler.play();
+      expect(local.single.disposals, 1);
+      expect(tv.single.sources, [_track.source]);
+      expect(tv.single.position.inSeconds, 12);
+      expect(handler.playbackState.value.playing, isTrue);
+      await handler.pause();
+      expect(tv.single.state, PlaybackDeckState.paused);
+      tv.single.remotePlay();
+      expect(handler.playbackState.value.playing, isTrue);
+      tv.single.complete();
+      for (var i = 0; i < 20; i++) {
+        await _settle();
+      }
+      expect(tv.single.sources.last, '/two.flac');
+      expect(handler.queue.value, hasLength(2));
+      events.add({'connected': false});
+      for (var i = 0; i < 20; i++) {
+        await _settle();
+      }
+      expect(local, hasLength(2));
+      expect(local.last.sources.last, '/two.flac');
+      expect(local.last.state, isNot(PlaybackDeckState.playing));
+      expect(handler.playbackState.value.playing, isFalse);
+      await runtime.dispose();
+      output.dispose();
+      await events.close();
+    },
+  );
+
+  test('a paused song stays paused when moved to the TV', () async {
+    const channel = MethodChannel('paused-cast-test');
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(
+      channel,
+      (call) async => call.method == 'state' ? {'connected': false} : null,
+    );
+    addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+    final events = StreamController<Object?>.broadcast(sync: true);
+    final output = CastOutput(channel: channel, events: events.stream);
+    final tv = _Deck();
+    final runtime = _runtime(createCastDeck: (_, _) => tv);
+    final handler = MusicPlayerHandler(runtime: runtime, castOutput: output);
+    await output.initialize();
+    await handler.setQueueAndPlay([_track]);
+    await handler.pause();
+    events.add({'connected': true, 'deviceId': 'tv', 'host': '192.0.2.10'});
+    for (var i = 0; i < 20; i++) {
+      await _settle();
+    }
+    expect(tv.sources, [_track.source]);
+    expect(tv.state, isNot(PlaybackDeckState.playing));
+    expect(handler.playbackState.value.playing, isFalse);
+    await runtime.dispose();
+    output.dispose();
+    await events.close();
+  });
 
   test(
     'playback instances survive pause and seek but change for repeated songs',

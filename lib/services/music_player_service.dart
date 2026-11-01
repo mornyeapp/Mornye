@@ -22,6 +22,7 @@ import 'package:mornye/services/playback_normalization.dart';
 import 'package:mornye/services/playback_automation.dart';
 import 'package:mornye/services/playback_session_writer.dart';
 import 'package:mornye/services/content_uri_playback_cache.dart';
+import 'package:mornye/services/cast_output.dart';
 import 'package:mornye/services/cover_store.dart';
 import 'package:mornye/services/music_player_runtime.dart';
 import 'package:mornye/services/music_playback_deck.dart';
@@ -53,6 +54,7 @@ export 'playback_session_restore.dart';
 part 'music_player_automix.dart';
 part 'music_player_autoplay.dart';
 part 'music_player_covers.dart';
+part 'music_player_cast.dart';
 part 'music_player_gapless.dart';
 
 final _log = AppLogger('MusicPlayer');
@@ -120,6 +122,7 @@ class MusicPlayerHandler extends BaseAudioHandler
   PlaybackDependencies get _dependencies => _runtime.dependencies;
   AppSettings get _settings => _runtime.settings;
   late PlaybackDeck _player;
+  late final _MusicCast _cast;
   late final _MusicAutoMix _autoMix;
   late final _MusicGapless _gapless = _MusicGapless(this);
   late final _MusicCovers _covers = _MusicCovers(this);
@@ -256,6 +259,7 @@ class MusicPlayerHandler extends BaseAudioHandler
     AutoplayLibraryLoader? autoplayLibraryLoader,
     MusicHapticsAnalyzer? hapticsAnalyzer,
     HapticPulse? hapticPulse,
+    CastOutput? castOutput,
   }) : _runtime = runtime ?? musicPlayerRuntime {
     // Switching back from a remote session restores phone volume handling.
     androidPlaybackInfo.add(LocalAndroidPlaybackInfo());
@@ -282,6 +286,10 @@ class MusicPlayerHandler extends BaseAudioHandler
           _log.w('Failed to update persisted playback session: $error'),
     );
     _player = _dependencies.createDeck('music-player');
+    _cast = _MusicCast(
+      this,
+      castOutput ?? (Platform.isAndroid ? CastOutput.instance : null),
+    );
     _normalizationCache = PlaybackNormalizationCache(
       readMetadata: _dependencies.readMetadata,
       onReadError: (error) =>
@@ -396,6 +404,7 @@ class MusicPlayerHandler extends BaseAudioHandler
     _refreshPlaybackAutomation();
 
     _listenToPlayer(_player);
+    _cast.initialize();
     if (_dependencies.isIOS) WidgetsBinding.instance.addObserver(this);
   }
 
@@ -511,6 +520,13 @@ class MusicPlayerHandler extends BaseAudioHandler
       player.onPlayerStateChanged.listen(
         (state) {
           if (!identical(player, _player)) return;
+          if (_cast.active &&
+              state == PlaybackDeckState.playing &&
+              _sourceReady &&
+              _switchingGeneration == 0) {
+            // Playing from the TV's controls also releases a prior app pause.
+            _userPaused = false;
+          }
           if (state == PlaybackDeckState.paused && player.needsSourceReload) {
             _userPaused = true;
             _pausedByInterruption = false;
@@ -642,6 +658,7 @@ class MusicPlayerHandler extends BaseAudioHandler
 
       _subscriptions.add(
         session.interruptionEventStream.listen((event) {
+          if (_cast.active) return;
           _log.d(
             'Audio interruption ${event.begin ? 'began' : 'ended'} '
             'type=${event.type} player=${_player.state} '
@@ -677,6 +694,7 @@ class MusicPlayerHandler extends BaseAudioHandler
 
       _subscriptions.add(
         session.becomingNoisyEventStream.listen((_) {
+          if (_cast.active) return;
           // Headphones unplugged / output route lost.
           _pausedByInterruption = false;
           unawaited(_pauseForFocusLoss(reason: 'becoming noisy'));
@@ -692,11 +710,13 @@ class MusicPlayerHandler extends BaseAudioHandler
     // Both follow mobile system volume and audio_session routes, which
     // desktop does not use.
     final pauseOnMute =
+        !_cast.active &&
         !isDesktopPlatform &&
         _settings.playerMode == 'internal' &&
         _settings.pauseOnMute &&
         !_settings.usbBitPerfect;
     final playOnHeadphonesConnected =
+        !_cast.active &&
         !isDesktopPlatform &&
         _settings.playerMode == 'internal' &&
         _settings.playOnHeadphonesConnected;
@@ -793,6 +813,7 @@ class MusicPlayerHandler extends BaseAudioHandler
   }
 
   Future<bool> _activateAudioSession(int generation) async {
+    if (_cast.active) return true;
     if (isDesktopPlatform) return true;
     try {
       // Android 15+ rejects background focus requests without an active
@@ -1593,8 +1614,9 @@ class MusicPlayerHandler extends BaseAudioHandler
     String path,
     int generation,
     PlayableMedia media,
-    Duration? position,
-  ) async {
+    Duration? position, {
+    bool startPaused = false,
+  }) async {
     // AudioPlayer.play combines prepare/seek/resume without a cancellation
     // boundary. A late prepare from an old request could resume the wrong
     // source. Serialize preparation and recheck before making it audible.
@@ -1621,7 +1643,7 @@ class MusicPlayerHandler extends BaseAudioHandler
       await _player.seek(position);
       if (!_isCurrentPlayRequest(generation, media)) return;
     }
-    await _player.resume();
+    if (!startPaused) await _player.resume();
     if (!_isCurrentPlayRequest(generation, media)) await _player.pause();
   }
 
@@ -1630,10 +1652,13 @@ class MusicPlayerHandler extends BaseAudioHandler
     PlayableMedia media, {
     required bool recordHistory,
     required Duration startPosition,
+    bool startPaused = false,
   }) async {
+    await _cast.applyOutput();
+    if (!_isCurrentPlayRequest(generation, media)) return;
     _pausedByInterruption = false;
     _interruptionActive = false;
-    _userPaused = false;
+    _userPaused = startPaused;
 
     if (recordHistory) _recordPlayHistory(_index);
 
@@ -1650,7 +1675,12 @@ class MusicPlayerHandler extends BaseAudioHandler
     // Claim the playing state up front (while the app is still in the
     // foreground window) so audio_service can start its foreground service
     // before the async source resolve below.
-    _broadcastState(playerState: PlaybackDeckState.playing, loading: true);
+    _broadcastState(
+      playerState: startPaused
+          ? PlaybackDeckState.paused
+          : PlaybackDeckState.playing,
+      loading: true,
+    );
     await _claimHardwareMediaButtons();
     if (!_isCurrentPlayRequest(generation, media)) return;
     if (_dependencies.isAndroid && !media.isNetwork) {
@@ -1682,7 +1712,7 @@ class MusicPlayerHandler extends BaseAudioHandler
     // MediaPlayer duplicates that descriptor, so the original can be closed
     // immediately after play() without retaining a full-file cache copy.
     ContentUriPlaybackLease? playbackLease;
-    if (_dependencies.isAndroid && media.isContentUri) {
+    if (_dependencies.isAndroid && media.isContentUri && !_cast.active) {
       try {
         playbackLease = await PlatformBridge.openContentUriPlaybackLease(
           media.source,
@@ -1731,7 +1761,8 @@ class MusicPlayerHandler extends BaseAudioHandler
       if (!_isCurrentPlayRequest(generation, media)) return;
       await _player.configureOutput();
       if (!_isCurrentPlayRequest(generation, media)) return;
-      final focusGranted = await _activateAudioSession(generation);
+      final focusGranted =
+          startPaused || await _activateAudioSession(generation);
       if (!_isCurrentPlayRequest(generation, media)) return;
       if (!focusGranted) {
         _sourceReady = false;
@@ -1752,7 +1783,13 @@ class MusicPlayerHandler extends BaseAudioHandler
           ? effectiveStartPosition
           : null;
       try {
-        await _startResolvedSource(resolved, generation, media, startAt);
+        await _startResolvedSource(
+          resolved,
+          generation,
+          media,
+          startAt,
+          startPaused: startPaused,
+        );
         if (playbackLease != null) {
           await PlatformBridge.closeContentUriPlaybackLease(
             playbackLease.token,
@@ -2519,9 +2556,18 @@ class MusicPlayerHandler extends BaseAudioHandler
 
   Future<void> dispose() => _disposeFuture ??= _dispose();
 
+  @override
+  Future<void> androidSetRemoteVolume(int volumeIndex) =>
+      _cast.setVolume(volumeIndex);
+
+  @override
+  Future<void> androidAdjustRemoteVolume(AndroidVolumeDirection direction) =>
+      _cast.adjustVolume(direction);
+
   Future<void> _dispose() async {
     _autoplay.reset();
     _disposed = true;
+    await _cast.dispose();
     _runtime.personalization.finish();
     await _runtime.personalization.flush();
     if (_dependencies.isIOS) WidgetsBinding.instance.removeObserver(this);

@@ -87,7 +87,14 @@ void main() {
     });
     await tester.pumpWidget(app(onChanged: visibility.add));
     await tester.tap(find.byTooltip('Audio Output'));
-    await tester.tap(find.byTooltip('Audio Output'));
+    await tester.pumpAndSettle();
+    expect(find.text('Cast to TV'), findsOneWidget);
+    expect(
+      find.text('Google Cast devices on the same Wi-Fi network'),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('This device and Bluetooth'));
+    await tester.pumpAndSettle();
     expect(requests, 1);
     expect(visibility, [true]);
     completion.complete(false);
@@ -103,11 +110,16 @@ void main() {
     await tester.pumpWidget(app());
     await tester.tap(find.byTooltip('Audio Output'));
     await tester.pumpAndSettle();
+    await tester.tap(find.text('This device and Bluetooth'));
+    await tester.pumpAndSettle();
     expect(find.byType(SnackBar), findsNothing);
 
     final completion = Completer<bool>();
     messenger.setMockMethodCallHandler(channel, (_) => completion.future);
     await tester.tap(find.byTooltip('Audio Output'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('This device and Bluetooth'));
+    await tester.pumpAndSettle();
     await tester.pumpWidget(const SizedBox());
     completion.complete(false);
     await tester.pumpAndSettle();
@@ -134,6 +146,8 @@ void main() {
       );
       if (defaultTargetPlatform == TargetPlatform.android) {
         await tester.tap(find.byTooltip('Audio Output'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('This device and Bluetooth'));
         await tester.pumpAndSettle();
         expect(requests, 1);
       }

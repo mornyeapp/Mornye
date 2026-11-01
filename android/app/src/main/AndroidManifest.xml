@@ -15,6 +15,7 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />
     <!-- Mornye Link finds the desktop app over mDNS (multicast lock). -->
     <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
@@ -46,6 +47,9 @@
         android:networkSecurityConfig="@xml/network_security_config"
         android:enableOnBackInvokedCallback="true"
         android:localeConfig="@xml/locale_config">
+        <meta-data
+            android:name="com.google.android.gms.cast.framework.OPTIONS_PROVIDER_CLASS_NAME"
+            android:value="com.zarz.mornye.MornyeCastOptionsProvider" />
         <!-- Presence uses RPC only; do not expose unused SDK voice/auth components. -->
         <service android:name="com.discord.socialsdk.ForegroundService" tools:node="remove" />
         <activity android:name="com.discord.socialsdk.AuthenticationActivity" tools:node="remove" />
