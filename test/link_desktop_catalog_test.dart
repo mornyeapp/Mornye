@@ -398,6 +398,7 @@ void main() {
     expect(queries.first.cursor, isNull);
     expect(queries[1].cursor, const QueueLibraryDbCursor([3]));
     expect(queries.every((query) => query.includeLocal), isTrue);
+    expect(queries.every((query) => query.excludeNetwork), isTrue);
     expect(export.count, 2);
     expect(export.path, endsWith('catalog.ndjson'));
     expect(File('${export.path}.part').existsSync(), isFalse);

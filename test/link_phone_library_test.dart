@@ -195,6 +195,7 @@ void main() {
       expect(catalog.songs, hasLength(5));
       expect([for (final query in rows.queries) query.offset], [0, 2, 4]);
       expect(rows.queries.every((query) => !query.includeLocal), isTrue);
+      expect(rows.queries.every((query) => query.excludeNetwork), isTrue);
     });
   });
 
@@ -370,6 +371,40 @@ void main() {
   });
 
   group('file lookups', () {
+    test(
+      'released payload keeps files and rebuilds identical pages on demand',
+      () async {
+        final rows = FakeLibraryRows([
+          linkLocalRow(song),
+          linkDownloadRow(download),
+        ]);
+        final library = rows.library();
+        final first = await library.catalog();
+        library.releasePayload(first);
+        expect(library.last!.hasPayload, isFalse);
+        expect(library.last!.songs, isEmpty);
+        expect(library.last!.covers, isEmpty);
+        expect(library.last!.files, same(first.files));
+        expect((await library.fileNamed(first.songs.first.name))!.source, song);
+        expect(await library.fileNamed('unknown'), isNull);
+        expect(
+          (await library.catalog(includePayload: false)).version,
+          first.version,
+        );
+        expect(rows.queries, hasLength(1));
+        final rebuilt = await library.catalog();
+        expect(rebuilt.hasPayload, isTrue);
+        expect(rebuilt.version, first.version);
+        expect(
+          rebuilt.songs.map((v) => v.toJson()),
+          first.songs.map((v) => v.toJson()),
+        );
+        expect(rows.queries, hasLength(2));
+        library.releasePayload(first);
+        expect(library.last, same(rebuilt));
+      },
+    );
+
     test('build the list when there is none yet', () async {
       final rows = FakeLibraryRows([linkLocalRow(song)]);
       final library = rows.library();

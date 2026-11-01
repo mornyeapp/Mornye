@@ -87,6 +87,7 @@ class LinkPhoneCatalog {
     required this.songs,
     required this.files,
     required this.covers,
+    this.hasPayload = true,
   });
 
   /// SHA-256 hex of the songs' JSON lines in order.
@@ -98,6 +99,7 @@ class LinkPhoneCatalog {
 
   /// The songs' covers, each once.
   final List<LinkPhoneCover> covers;
+  final bool hasPayload;
 
   /// The file the desktop asks for as `<fileId>.<suffix>`, or null.
   LinkPhoneFile? fileNamed(String name) {
@@ -315,8 +317,8 @@ Future<LinkPhoneSongPage> _mapInIsolate(List<Map<String, dynamic>> rows) =>
 /// lists, and keeps the one built last, with the revision it was built
 /// from, for later connections and the desktop's file requests.
 ///
-/// Rows are paged from SQLite and mapped off the UI isolate, page by page,
-/// so only the songs themselves stay in memory.
+/// Rows are paged and mapped off the UI isolate. After publishing, only the
+/// version and file index stay cached until song pages are needed again.
 class LinkPhoneLibrary {
   LinkPhoneLibrary({
     required LinkPhoneLibraryRevision Function() revision,
@@ -351,9 +353,11 @@ class LinkPhoneLibrary {
   /// The catalog of the Library as it is now: [last] when the revision has
   /// not changed since it was built, else a new build, shared with one
   /// already running for this revision.
-  Future<LinkPhoneCatalog> catalog() {
+  Future<LinkPhoneCatalog> catalog({bool includePayload = true}) {
     final revision = _revision();
-    if (_last case final last? when _lastRevision == revision) {
+    if (_last case final last?
+        when _lastRevision == revision &&
+            (!includePayload || last.hasPayload)) {
       return Future.value(last);
     }
     if (_building case final running? when _buildingRevision == revision) {
@@ -368,10 +372,23 @@ class LinkPhoneLibrary {
     return future;
   }
 
+  /// Keeps file serving available after the desktop has accepted this list.
+  void releasePayload(LinkPhoneCatalog catalog) {
+    if (!identical(_last, catalog) || !catalog.hasPayload) return;
+    _last = LinkPhoneCatalog(
+      version: catalog.version,
+      songs: const [],
+      files: catalog.files,
+      covers: const [],
+      hasPayload: false,
+    );
+  }
+
   /// The file the desktop asks for as `<fileId>.<suffix>`: from [last], or
   /// from a new build when there is none or the Library changed since.
   Future<LinkPhoneFile?> fileNamed(String name) async =>
-      _last?.fileNamed(name) ?? (await catalog()).fileNamed(name);
+      _last?.fileNamed(name) ??
+      (await catalog(includePayload: false)).fileNamed(name);
 
   Future<LinkPhoneCatalog> _build(
     LinkPhoneLibraryRevision revision,
@@ -392,6 +409,7 @@ class LinkPhoneLibrary {
       final page = await _loadPage(
         QueueLibraryDbQuery(
           includeLocal: includeLocal,
+          excludeNetwork: true,
           limit: pageSize,
           offset: offset,
           cursor: cursor,

@@ -91,8 +91,8 @@ int _base64Length(int bytes) => (bytes + 2) ~/ 3 * 4;
 /// Keeps the paired desktop's list of this phone's songs current: on each
 /// connection, and [debounce] after the Library changes while connected, it
 /// sends the list, with the covers the desktop lacks, when the desktop holds
-/// another version. The list is built again only when the Library changed
-/// since the last build. Failures are logged; the next trigger tries again.
+/// another version. Published song pages are released and rebuilt only when
+/// needed again. Failures are logged; the next trigger tries again.
 class LinkPhoneLibraryPublisher {
   LinkPhoneLibraryPublisher({
     required this.client,
@@ -172,14 +172,22 @@ class LinkPhoneLibraryPublisher {
 
     try {
       check();
-      final catalog = await library.catalog();
+      var catalog = await library.catalog(includePayload: false);
       check();
       final held = await client.get(LinkOps.phoneCatalog);
       check();
-      if (held is Map && held['version'] == catalog.version) return;
+      if (held is Map && held['version'] == catalog.version) {
+        library.releasePayload(catalog);
+        return;
+      }
+      if (!catalog.hasPayload) {
+        catalog = await library.catalog();
+        check();
+      }
       await _sendCovers(catalog, check);
       await _sendSongs(catalog, check);
       _log.i('Sent ${catalog.songs.length} songs to the desktop');
+      library.releasePayload(catalog);
     } on _Stale {
       return;
     } on Object catch (error) {

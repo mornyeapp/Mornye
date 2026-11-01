@@ -148,6 +148,52 @@ void main() {
   tearDown(() => db.close());
 
   test(
+    'network exclusion happens before paging and keeps local URI rows',
+    () async {
+      for (var i = 0; i < 50; i++) {
+        await addLocal('remote$i', 1, path: 'network://server/song$i.flac');
+      }
+      await addHistory(
+        'remote-history',
+        'Remote',
+        1,
+        path: 'network://phone/song',
+      );
+      await addHistory(
+        'content-history',
+        'Content',
+        1,
+        path: 'content://media/1',
+      );
+      await addLocal('content-local', 1, path: 'content://media/2');
+      await addLocal('windows-local', 1, path: r'C:\Music\song.flac');
+      final all = await store.trackPage(const QueueLibraryDbQuery(limit: 100));
+      const request = QueueLibraryDbQuery(excludeNetwork: true, limit: 100);
+      final filtered = await store.trackPage(request);
+      expect(all.rows.length - filtered.rows.length, 51);
+      expect(
+        _tracks(filtered),
+        containsAll([
+          'downloaded:content-history',
+          'local:content-local',
+          'local:windows-local',
+        ]),
+      );
+      final paged = <String>[];
+      QueueLibraryDbCursor? cursor;
+      do {
+        final page = await store.trackPage(
+          QueueLibraryDbQuery(excludeNetwork: true, limit: 2, cursor: cursor),
+        );
+        paged.addAll(_tracks(page));
+        cursor = page.nextCursor;
+      } while (cursor != null);
+      expect(paged, _tracks(filtered));
+      expect((await store.counts(request)).allTrackCount, filtered.rows.length);
+    },
+  );
+
+  test(
     'track cursors match offset ordering across source ties for every sort',
     () async {
       for (final sort in [
@@ -358,8 +404,9 @@ void main() {
             ),
           )
           .length;
-      expect(duplicateChecks(fastPlan), 1);
-      expect(duplicateChecks(originalPlan), 2);
+      // The optimized plan uses half as many correlated checks.
+      expect(duplicateChecks(fastPlan), 2);
+      expect(duplicateChecks(originalPlan), 4);
     },
   );
 

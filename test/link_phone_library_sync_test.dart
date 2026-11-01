@@ -85,7 +85,48 @@ void main() {
 
       expect(client.gets, [LinkOps.phoneCatalog]);
       expect(client.posts, isEmpty);
+      expect(library.last!.hasPayload, isFalse);
+      expect(library.last!.songs, isEmpty);
     });
+
+    test(
+      'reconnect retains no pages and rebuilds only if the desktop lost them',
+      () async {
+        final rows = _uriRows(1001);
+        final library = rows.library();
+        Object? heldVersion;
+        final client = FakeLinkClient(
+          onGet: (op, _) => {'version': heldVersion},
+        );
+        final publisher = LinkPhoneLibraryPublisher(
+          client: client,
+          library: library,
+        );
+        addTearDown(publisher.dispose);
+        publisher.publish();
+        await publisher.idle;
+        final original = jsonEncode(pages(client));
+        heldVersion = library.last!.version;
+        expect(library.last!.hasPayload, isFalse);
+        expect(library.last!.songs, isEmpty);
+        expect(library.last!.covers, isEmpty);
+        expect(library.last!.files, hasLength(1001));
+        final firstFile = library.last!.files.values.first;
+        expect(await library.fileNamed(firstFile.fileId), same(firstFile));
+        final queries = rows.queries.length;
+        client.posts.clear();
+        publisher.publish();
+        await publisher.idle;
+        expect(client.posts, isEmpty);
+        expect(rows.queries.length, queries);
+        heldVersion = 'lost';
+        publisher.publish();
+        await publisher.idle;
+        expect(rows.queries.length, queries * 2);
+        expect(jsonEncode(pages(client)), original);
+        expect(library.last!.hasPayload, isFalse);
+      },
+    );
 
     test('sends only the covers the desktop lacks', () async {
       final held = jpeg('held.jpg', 10);
@@ -239,9 +280,11 @@ void main() {
         [linkFileIdFor(kept, 10)],
       );
 
-      // Nothing left to send: no covers request at all.
+      // No changed cover is read from a snapshot built before its replacement.
       client.posts.clear();
+      await library.catalog();
       jpeg('kept.jpg', 12);
+      jpeg('replaced.jpg', 21);
       publisher.publish();
       await publisher.idle;
       expect(
@@ -252,6 +295,7 @@ void main() {
 
     test('sends the songs in pages, in order', () async {
       final library = _uriRows(1001).library();
+      final catalog = await library.catalog();
       final client = FakeLinkClient(onGet: (op, _) => {'version': 'old'});
       final publisher = LinkPhoneLibraryPublisher(
         client: client,
@@ -261,7 +305,6 @@ void main() {
       publisher.publish();
       await publisher.idle;
 
-      final catalog = library.last!;
       final sent = pages(client);
       expect([for (final page in sent) page['offset']], [0, 500, 1000]);
       expect([for (final page in sent) page['total']], [1001, 1001, 1001]);
@@ -463,7 +506,7 @@ void main() {
       )..start();
       addTearDown(publisher.dispose);
       await tester.pump();
-      final removedId = library.last!.songs.first.fileId;
+      final removedId = library.last!.files.keys.first;
       expect(heldSongs, hasLength(3));
 
       rows.rows.removeAt(0);

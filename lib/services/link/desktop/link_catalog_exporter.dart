@@ -375,6 +375,7 @@ class LinkCatalogExporter {
         final page = await _loadPage(
           QueueLibraryDbQuery(
             includeLocal: includeLocal,
+            excludeNetwork: true,
             limit: pageSize,
             offset: offset,
             cursor: cursor,
