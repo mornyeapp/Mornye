@@ -606,6 +606,15 @@ class LibraryQueueStore {
     final parts = <String>[];
     if (request.source != 'local') {
       final albumKey = unfiltered ? 'h.album_key' : 'c.album_key';
+      final albums = <String>[];
+      if (!unfiltered) {
+        _appendQueueHistoryFilters(
+          albums,
+          args,
+          request,
+          albumCompleteness: false,
+        );
+      }
       final where = <String>[];
       _appendQueueHistoryFilters(
         where,
@@ -639,6 +648,7 @@ class LibraryQueueStore {
             COUNT(*) AS track_count,
             MAX(COALESCE(sort_added, 0)) AS latest_added
           FROM history_db.history
+          ${_albumKeysIn('history_db.history', 'h', albums)}
           GROUP BY album_key
           HAVING COUNT(*) > $minimumTracks
         ) c
@@ -661,6 +671,15 @@ class LibraryQueueStore {
 
     if (request.includeLocal && request.source != 'downloaded') {
       final albumKey = unfiltered ? 'l.album_key' : 'c.album_key';
+      final albums = <String>[];
+      if (!unfiltered) {
+        _appendQueueLocalFilters(
+          albums,
+          args,
+          request,
+          albumCompleteness: false,
+        );
+      }
       final where = <String>[_notShadowedByHistory('l')];
       _appendQueueLocalFilters(
         where,
@@ -695,6 +714,7 @@ class LibraryQueueStore {
             MAX(COALESCE(sort_added, 0)) AS latest_added
           FROM ${LibrarySchema.visibleView} candidate
           WHERE ${_notShadowedByHistory('candidate')}
+          ${_albumKeysIn('library', 'l', albums, and: true)}
           GROUP BY album_key
           HAVING COUNT(*) > $minimumTracks
         ) c ON c.album_key = l.album_key'''}
@@ -740,18 +760,37 @@ class LibraryQueueStore {
     return parts.join(' UNION ALL ');
   }
 
+  /// Limits a per-album aggregate to the albums of the rows [where] keeps,
+  /// so a filtered album page aggregates only those albums. The aggregate
+  /// is joined on `album_key`, so any superset of those albums gives the
+  /// same rows.
+  String _albumKeysIn(
+    String table,
+    String alias,
+    List<String> where, {
+    bool and = false,
+  }) => where.isEmpty
+      ? ''
+      : '${and ? 'AND' : 'WHERE'} album_key IN ('
+            'SELECT $alias.album_key FROM $table $alias '
+            'WHERE ${where.join(' AND ')})';
+
+  /// [albumCompleteness] false leaves out the album completeness filter.
   void _appendQueueHistoryFilters(
     List<String> where,
     List<Object?> args,
     QueueLibraryDbQuery request, {
     bool hasCompletenessJoin = false,
+    bool albumCompleteness = true,
   }) {
-    _appendAlbumCompletenessFilter(
-      where,
-      request,
-      albumKey: 'h.album_key',
-      hasJoin: hasCompletenessJoin,
-    );
+    if (albumCompleteness) {
+      _appendAlbumCompletenessFilter(
+        where,
+        request,
+        albumKey: 'h.album_key',
+        hasJoin: hasCompletenessJoin,
+      );
+    }
     if (request.albumArtist != null) {
       where.add('h.sort_album_artist = ?');
       args.add(sqlite.normalizeLookupText(request.albumArtist));
@@ -801,13 +840,16 @@ class LibraryQueueStore {
     List<Object?> args,
     QueueLibraryDbQuery request, {
     bool hasCompletenessJoin = false,
+    bool albumCompleteness = true,
   }) {
-    _appendAlbumCompletenessFilter(
-      where,
-      request,
-      albumKey: 'l.album_key',
-      hasJoin: hasCompletenessJoin,
-    );
+    if (albumCompleteness) {
+      _appendAlbumCompletenessFilter(
+        where,
+        request,
+        albumKey: 'l.album_key',
+        hasJoin: hasCompletenessJoin,
+      );
+    }
     if (request.albumArtist != null) {
       where.add('l.album_artist_norm = ?');
       args.add(sqlite.normalizeLookupText(request.albumArtist));

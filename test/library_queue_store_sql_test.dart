@@ -223,47 +223,47 @@ const _expectedDigests = <String, String>{
   'filter:singles-downloaded':
       '80a4a9998c8b661a8691c03e081e02d2d28d80caf1aed075bdd9cf89b77e291a',
   'filter:search':
-      'd98cb9c3e00591c4b3c6092350d63b317c915cbcf0537ee91c75b9015727b4b1',
+      'e855653be9c292d81b1245c28c82b2fc71c4c3bb1572042548552f5f422f152e',
   'filter:album-artist':
-      'cb63d7d4ff06d393c56ead3ac970c3b6c88ff4823812ebd55bcd5e8300eed277',
+      '22dfba8ce62daa420034585fdae0a4176d10e498b3c93db557f48a73ef3a2680',
   'filter:quality-hires':
-      '8fa4b85f1c1d21a75427d693284a0fa783c51e4a1a3eadf26b395e6d3bc659db',
+      '8523278e250c9d9a50be1676ad11db2bf5183912e2aac24e8e7c5e874bf9490e',
   'filter:quality-cd':
-      '7b3184be5cf7015bd1136a2714e4de0def66de53451b10b89e875381678aaff4',
+      '7aa8c2ad040fb9620cc13dccf6f4e436f0a42340fa29095f0fe02e35aff3c2b2',
   'filter:quality-lossy':
-      '65c1f604a751c315df2aa911eaf2a20cc682e9588a1d987d6969f6220e085260',
+      '72aed01e020a72d0f96019316bddc72a2dabd7f5e4894c176f3bfc1ecec5440f',
   'filter:format-m4a':
-      'dd2f1fad2c74fedec1e2b1350b783dd3ebb3fa28a8ab6c17ef94e63696e80b66',
+      '2a8b0782af25d44ce5e79b8cff56d41aaecb281777ca8a99674044a44c47376c',
   'filter:format-unknown':
-      'ac14c2d401838b7b8fda27efc7af18f968e481e01a795094bf1d69f112a241f2',
+      'e8835f9a3feaa000eadcb3116dbfcf09e3313b25ff75a2516f11819f81972d99',
   'filter:metadata-complete':
-      'fb87783fd82c5907e54b7be899eb9c560670f47ef8c6035266beebf031e1b09f',
+      'e568d9798c828d2a313cc4b7cc740eb0593df095ff95a56837f51f83bad54840',
   'filter:metadata-missing-any':
-      'aaae30fd24864629fc2a2b610297217aef495d910291f6128362701bb2efc362',
+      '461ec155fdfe79fee43559815e55369a53509c81e6cbd3d5142aa3ab39a1e2dc',
   'filter:metadata-missing-year':
-      '116fe0127e2b621f97af5eed5d621af32e6a771b474ead896737544080231b80',
+      '4558bb9d750603622e4584caf1919f48b41b6c349bbc681150c4079b3777991a',
   'filter:metadata-missing-genre':
-      'b6ce59dfce0c0fc84968672da1944869b2e664efd4de3b024be3d1e24e4a1784',
+      '8e249101ee5b6a4a144943e22f8623cbe6b937b04756685824d25da435d9fdad',
   'filter:metadata-missing-album-artist':
-      '1c4e56cbfd15bb8855d155175ea142811da039a852e214f8c2a14263f00324fa',
+      '33745cb4b821d499aef70d477e5475db1fec6be440b8493dc4f8bbc325fcd5fe',
   'filter:metadata-missing-track-number':
-      '9d021d0221998703f962ba9df9450c0c4711e73f313a7e3f85ad490196344f33',
+      'b3f758c7cad16b67359a164a8448c90a6eddcd1ec6dddc6d739cbd257dd751c7',
   'filter:metadata-missing-disc-number':
-      'f09e6629557055088c60417b5801376a95d04d486cff337b004fb9ed092d507f',
+      'fd5076ccc74093f863558c22c2c6f7acbe8df0d3ff12f9e4f1737c432808b483',
   'filter:metadata-missing-artist':
-      '4704c558a93f414bcd477f6a8aa0f9952a32e7c9b7fd4c2b32e632753a145a5d',
+      'c2508a3489e2a586c1fc9ca30e19bfa740f55a0bab2c14e3d1b22bc5ff26e73b',
   'filter:metadata-incorrect-isrc-format':
-      'ea5040bee229a234e989e005f09db1ebe9f510c09a9d4747d3e1aff38b2aae5c',
+      'd1c6eb09dc78fb3a314e95b93cea9373060dab90d3dc0baeaa0840e0280b2523',
   'filter:metadata-missing-isrc':
-      '8051ff1f52182083be4a747de191887b029770fa6acd36f75359b8edd57820d4',
+      'd4c6bfb2c200f5c36e6911d7e7b1cbf0b4065acf6ba5adb3c933f32ffef5a989',
   'filter:metadata-missing-label':
-      '47d4f0e3aacae691a7e6bb0994f1bd088423ba2834f5e88788d29d780ef346d1',
+      '68a36f7747535f9ce76af09eca9ed462e5741ae5c5e6580c3c6d5cb0c647e71d',
   'filter:metadata-missing-lyrics':
-      'c958d9f39d30efb1a563efdbd279905158810624157fc043767cb60bb33c0872',
+      '8300622c7fbe922ff5ab3e308f569418194bbf5b606edab2deab94093a830d71',
   'filter:metadata-has-replaygain':
-      'ce9669c2fa83c6f50e029dd77cfc6ef31b2cf2c89a39106c8705963c7f3207ad',
+      '4429725b2cde12ad850f5174c727dbe790e2885dcb24053d93fff57530a75aa9',
   'filter:metadata-missing-replaygain':
-      '2a9d204bb1b106133842900ef910d21bc9228327881da48aee2d0a70553d0924',
+      '8a2d1efe5e59c51e379249bf1c9bfee09fff87fd9b11722588fc3ddc32b5cba9',
   'filter:metadata-incomplete-album':
       '36864a5cacd0a6abb9b5fda6ae1093aeea40cc6649944c7434cb88f92a05322b',
   'filter:metadata-unknown-album-completeness':
@@ -275,9 +275,9 @@ const _expectedDigests = <String, String>{
   'filter:single-track-albums-incomplete':
       '36864a5cacd0a6abb9b5fda6ae1093aeea40cc6649944c7434cb88f92a05322b',
   'filter:combined':
-      '448ec2bf9e111b8e5e0649c9c56741c074f96ae6c67ddf41b0d0e75db7cdaa80',
+      '2a6bddab48e992a448448aee0803b28325d79ef83cc78a65f347d31ad9de68cc',
   'filter:combined-local':
-      'b226159a52ced0eb1302c3abccb51ca0af82d59fbc741dce502918bc53c6d40d',
+      'e0dbe15bc2ed66fde25a50f7d4f3eec9722f93fbab6e95bf9a6b248083309341',
 };
 
 /// Each shadow check of the snapshot SQL, with the row check it replaces.
