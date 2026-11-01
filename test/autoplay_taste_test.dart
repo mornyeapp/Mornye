@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 
@@ -90,7 +91,144 @@ AutoplayTaste _taste(Database db, {List<int>? trainings}) {
   return taste;
 }
 
+class _TrainingTimer implements Timer {
+  _TrainingTimer(this.callback);
+
+  final void Function() callback;
+  @override
+  bool isActive = true;
+  @override
+  int tick = 0;
+
+  @override
+  void cancel() => isActive = false;
+
+  void fire() {
+    if (!isActive) return;
+    isActive = false;
+    tick++;
+    callback();
+  }
+}
+
+R _captureTraining<R>(List<_TrainingTimer> timers, R Function() action) =>
+    runZoned(
+      action,
+      zoneSpecification: ZoneSpecification(
+        createTimer: (self, parent, zone, duration, callback) {
+          if (duration != const Duration(seconds: 20)) {
+            return parent.createTimer(zone, duration, callback);
+          }
+          final timer = _TrainingTimer(callback);
+          timers.add(timer);
+          return timer;
+        },
+      ),
+    );
+
 void main() {
+  test(
+    'a feedback burst schedules one training outside the track change',
+    () async {
+      final db = await _database(await _directory());
+      addTearDown(db.close);
+      final trainings = <int>[];
+      final taste = _taste(db, trainings: trainings);
+      final timers = <_TrainingTimer>[];
+      _captureTraining(timers, () {
+        for (var i = 0; i < 100; i++) {
+          taste.record(_feedback('Artist', 'Song ${i % 4}', _start));
+        }
+      });
+      await taste.flush();
+      expect(trainings, isEmpty);
+      expect(timers, hasLength(1));
+      expect(timers.single.isActive, isTrue);
+      timers.single.fire();
+      await taste.train();
+      expect(trainings, [100]);
+      expect(taste.model?.through, 100);
+      expect(timers.single.isActive, isFalse);
+    },
+  );
+
+  for (final reset in [false, true]) {
+    test(
+      'pending training is cancelled on ${reset ? 'reset' : 'dispose'}',
+      () async {
+        final db = await _database(await _directory());
+        addTearDown(db.close);
+        final trainings = <int>[];
+        final taste = _taste(db, trainings: trainings);
+        final timers = <_TrainingTimer>[];
+        _captureTraining(timers, () {
+          for (var i = 0; i < 25; i++) {
+            taste.record(_feedback('Artist', 'Song $i', _start));
+          }
+        });
+        expect(timers, hasLength(1));
+        if (reset) {
+          await taste.reset();
+        } else {
+          await taste.dispose();
+        }
+        expect(timers.single.isActive, isFalse);
+        timers.single.fire();
+        expect(trainings, isEmpty);
+        expect(await taste.readLog(), hasLength(reset ? 0 : 25));
+      },
+    );
+  }
+
+  test(
+    'loading an older model schedules catch-up without immediate training',
+    () async {
+      final db = await _database(await _directory());
+      addTearDown(db.close);
+      final earlier = _taste(db);
+      for (var i = 0; i < 24; i++) {
+        earlier.record(_feedback('Artist', 'Song ${i % 4}', _start));
+      }
+      await earlier.dispose();
+      final trainings = <int>[];
+      final taste = _taste(db, trainings: trainings);
+      final timers = <_TrainingTimer>[];
+      await _captureTraining(timers, () => taste.signal([], []));
+      expect(trainings, isEmpty);
+      expect(timers, hasLength(1));
+      timers.single.fire();
+      await taste.train();
+      expect(trainings, [24]);
+    },
+  );
+
+  test(
+    'worker-packed vectors retain the existing persisted model format',
+    () async {
+      final db = await _database(await _directory());
+      addTearDown(db.close);
+      final taste = AutoplayTaste(open: () async => db);
+      addTearDown(taste.dispose);
+      for (final feedback in _clusters()) {
+        taste.record(feedback);
+      }
+      await taste.train();
+      final expected = trainAutoplayTaste(await taste.readLog());
+      expect(taste.model?.vectors, expected.vectors);
+      final rows = await db.query('vectors');
+      expect(rows, hasLength(expected.tokens.length));
+      expect(
+        rows.every((row) => (row['vector'] as Uint8List).length == 64),
+        isTrue,
+      );
+      final restored = _taste(db);
+      await restored.signal([], []);
+      expect(restored.model?.tokens, expected.tokens);
+      expect(restored.model?.vectors, expected.vectors);
+      expect(restored.model?.through, expected.through);
+    },
+  );
+
   test('the log is bounded, persisted, retrains every 25 plays and '
       'reset clears it', () async {
     final directory = await _directory();
