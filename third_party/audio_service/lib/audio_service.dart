@@ -13,6 +13,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:rxdart/rxdart.dart';
 
+import 'src/android_queue_window.dart';
+
 AudioServicePlatform _platform = AudioServicePlatform.instance;
 
 /// The buttons on a headset.
@@ -1113,34 +1115,51 @@ class AudioService {
   }
 
   static Future<void> _observeQueue() async {
-    List<MediaItem>? pendingQueue;
+    const queueIndexKey = 'com.ryanheise.audio_service.queueIndex';
+    final window = AndroidQueueWindow<MediaItem>();
+    var pendingQueue = false;
     var sendingQueue = false;
-    _handler.queue.listen((queue) async {
+
+    Future<void> sendQueue() async {
+      pendingQueue = true;
+      if (sendingQueue) return;
+      sendingQueue = true;
+      while (pendingQueue) {
+        pendingQueue = false;
+        final start = window.start;
+        try {
+          final items = window.items;
+          await _platform.setQueue(SetQueueRequest(queue: [
+            for (var i = 0; i < items.length; i++)
+              if (start == 0 &&
+                  !(items[i].extras?.containsKey(queueIndexKey) ?? false))
+                items[i]._toMessage()
+              else
+                items[i].copyWith(extras: {
+                  ...?items[i].extras,
+                  queueIndexKey: start + i,
+                })._toMessage(),
+          ]));
+        } catch (e) {
+          _asyncError.add(e);
+        }
+      }
+      sendingQueue = false;
+    }
+
+    _handler.queue.listen((queue) {
       if (_config.preloadArtwork) {
         _loadAllArtwork(queue);
       }
       // Only the Android plugin reads the queue; the darwin and web plugins
       // and the desktop sessions ignore it.
-      if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) {
-        return;
-      }
-      if (sendingQueue) {
-        pendingQueue = queue;
-        return;
-      }
-      sendingQueue = true;
-      List<MediaItem>? next = queue;
-      while (next != null) {
-        try {
-          await _platform.setQueue(SetQueueRequest(
-              queue: next.map((item) => item._toMessage()).toList()));
-        } catch (e) {
-          _asyncError.add(e);
-        }
-        next = pendingQueue;
-        pendingQueue = null;
-      }
-      sendingQueue = false;
+      if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return;
+      window.updateQueue(queue, _handler.playbackState.value.queueIndex);
+      sendQueue();
+    });
+    _handler.playbackState.listen((state) {
+      if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return;
+      if (window.moveTo(state.queueIndex)) sendQueue();
     });
   }
 

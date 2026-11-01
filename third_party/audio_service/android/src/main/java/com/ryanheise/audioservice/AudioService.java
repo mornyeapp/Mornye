@@ -826,6 +826,11 @@ public class AudioService extends MediaBrowserServiceCompat {
         mediaSession.setQueue(queue);
     }
 
+    synchronized int queueIndexForPosition(int index) {
+        return queue.isEmpty() ? index
+                : QueueItemIndex.fromPosition(queue.get(0).getQueueId(), queue.size(), index);
+    }
+
     void playMediaItem(MediaDescriptionCompat description) {
         mediaSessionCallback.onPlayMediaItem(description);
     }

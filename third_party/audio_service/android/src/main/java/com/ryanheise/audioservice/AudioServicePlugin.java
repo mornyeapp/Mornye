@@ -813,7 +813,9 @@ public class AudioServicePlugin implements FlutterPlugin, ActivityAware {
 
         @Override
         public void onAddQueueItemAt(MediaDescriptionCompat description, int index) {
-            invokeMediaItemMethod("insertQueueItem", description, index);
+            AudioService service = AudioService.instance;
+            invokeMediaItemMethod("insertQueueItem", description,
+                    service == null ? index : service.queueIndexForPosition(index));
         }
 
         @Override
@@ -853,7 +855,9 @@ public class AudioServicePlugin implements FlutterPlugin, ActivityAware {
 
         @Override
         public void onRemoveQueueItemAt(int index) {
-            invokeMethod("removeQueueItemAt", mapOf("index", index));
+            AudioService service = AudioService.instance;
+            invokeMethod("removeQueueItemAt", mapOf("index",
+                    service == null ? index : service.queueIndexForPosition(index)));
         }
 
         @Override
@@ -1343,8 +1347,9 @@ public class AudioServicePlugin implements FlutterPlugin, ActivityAware {
         for (Map<?, ?> rawMediaItem : rawQueue) {
             MediaMetadataCompat mediaMetadata = createMediaMetadata(rawMediaItem, service);
             metadata.put(mediaMetadata.getString(MediaMetadataCompat.METADATA_KEY_MEDIA_ID), mediaMetadata);
-            MediaDescriptionCompat description = addExtrasToMediaDescription(mediaMetadata.getDescription(), (Map<?, ?>)rawMediaItem.get("extras"));
-            queue.add(new MediaSessionCompat.QueueItem(withQueueArt(description), i));
+            Map<?, ?> extras = (Map<?, ?>)rawMediaItem.get("extras");
+            MediaDescriptionCompat description = addExtrasToMediaDescription(mediaMetadata.getDescription(), extras);
+            queue.add(new MediaSessionCompat.QueueItem(withQueueArt(description), QueueItemIndex.fromExtras(extras, i)));
             i++;
         }
         return queue;
