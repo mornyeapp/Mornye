@@ -25,7 +25,7 @@ Iterable<(String, TextStyle, List<LyricWord>, bool)> _lyricSupplements(
             ? (translation ? FontWeight.w600 : FontWeight.bold)
             : FontWeight.w500,
       ),
-      translation ? const <LyricWord>[] : line.romanizationWords,
+      translation ? line.translationWords : line.romanizationWords,
       translation,
     );
   }

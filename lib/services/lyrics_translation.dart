@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:crypto/crypto.dart';
 import 'package:mornye/services/lyrics_ai_client.dart';
+import 'package:mornye/services/lyrics_translation_alignment.dart';
 import 'package:mornye/utils/logger.dart';
 import 'package:mornye/utils/lyrics_parser.dart';
 import 'package:path_provider/path_provider.dart';
@@ -33,12 +34,18 @@ String translatableLyricText(String text) {
 /// The distinct lines of a song to translate, in first-sung order, and
 /// which of them each lyric line shows. A repeated chorus is sent once.
 class LyricsTranslationSource {
-  LyricsTranslationSource._(this.texts, this.lineSegments, this.hash);
+  LyricsTranslationSource._(
+    this.texts,
+    this.lineSegments,
+    this.hash,
+    this.words,
+  );
 
   factory LyricsTranslationSource.of(ParsedLyrics lyrics) {
     final texts = <String>[];
     final index = <String, int>{};
     final lineSegments = <int?>[];
+    final words = <List<String>>[];
     for (final line in lyrics.lines) {
       final text = translatableLyricText(line.text);
       if (text.isEmpty) {
@@ -47,15 +54,18 @@ class LyricsTranslationSource {
       }
       final segment = index.putIfAbsent(text, () {
         texts.add(text);
+        words.add(const []);
         return texts.length - 1;
       });
       lineSegments.add(segment);
+      if (line.hasWordTiming) words[segment] = lyricsTranslationUnits(text);
     }
     final hash = sha256.convert(utf8.encode(texts.join('\n'))).toString();
     return LyricsTranslationSource._(
       List.unmodifiable(texts),
       List.unmodifiable(lineSegments),
       hash,
+      List.unmodifiable(words),
     );
   }
 
@@ -73,6 +83,9 @@ class LyricsTranslationSource {
 
   /// Hash of [texts], identifying these lyrics regardless of timing.
   final String hash;
+  final List<List<String>> words;
+
+  bool get wordSynced => words.any((line) => line.isNotEmpty);
 
   bool get isEmpty => texts.isEmpty;
 }
@@ -148,6 +161,7 @@ ParsedLyrics applyLyricsTranslation(
   LyricsTranslationSource source,
   List<String?> translations, {
   List<String?> romanizations = const [],
+  List<List<LyricsTranslationChunk>> alignments = const [],
 }) {
   String? at(List<String?> values, int? segment) =>
       segment != null && segment < values.length ? values[segment] : null;
@@ -161,7 +175,6 @@ ParsedLyrics applyLyricsTranslation(
     var translation = at(translations, segment);
     if (translation == null ||
         translation.isEmpty ||
-        translation == line.translation ||
         lyricsTranslationRepeats(source.texts[segment!], translation)) {
       translation = null;
     }
@@ -177,11 +190,27 @@ ParsedLyrics applyLyricsTranslation(
       lines.add(line);
       continue;
     }
+    final alignment = segment != null && segment < alignments.length
+        ? alignments[segment]
+        : const <LyricsTranslationChunk>[];
+    final translatedWords = translation == null || alignment.isEmpty
+        ? null
+        : timedLyricsTranslation(
+            line,
+            source.words[segment!],
+            alignment,
+            nextLine: lyrics.lines
+                .skip(i + 1)
+                .where((next) => next.time > line.time)
+                .firstOrNull
+                ?.time,
+          );
     changed = true;
     lines.add(
       line.withTranslation(
         translation ?? line.translation,
         romanization: romanization,
+        translationWords: translatedWords,
       ),
     );
   }
@@ -207,14 +236,17 @@ List<List<LyricsAiItem>> batchLyricsItems(
   var current = <LyricsAiItem>[];
   var chars = 0;
   for (final item in items) {
+    final size =
+        item.text.length +
+        item.words.fold<int>(0, (total, word) => total + word.length + 4);
     if (current.isNotEmpty &&
-        (current.length >= maxItems || chars + item.text.length > maxChars)) {
+        (current.length >= maxItems || chars + size > maxChars)) {
       batches.add(current);
       current = [];
       chars = 0;
     }
     current.add(item);
-    chars += item.text.length;
+    chars += size;
   }
   if (current.isNotEmpty) batches.add(current);
   return batches;
@@ -273,12 +305,16 @@ class LyricsTranslationResult {
   const LyricsTranslationResult(
     this.translations, {
     this.romanizations = const [],
+    this.alignments = const [],
   });
 
   final List<String?> translations;
 
   /// Indexed like [translations]; empty when none was asked for.
   final List<String?> romanizations;
+  final List<List<LyricsTranslationChunk>> alignments;
+
+  bool get wordSynced => alignments.any((line) => line.isNotEmpty);
 
   int get missing => translations.where((value) => value == null).length;
 
@@ -298,6 +334,7 @@ class LyricsTranslator {
   Future<LyricsTranslationResult> translate(
     List<String> texts, {
     required String systemPrompt,
+    List<List<String>> sourceWords = const [],
     LyricsTranslationCancelToken? cancel,
     void Function(int done, int total)? onProgress,
   }) async {
@@ -306,8 +343,17 @@ class LyricsTranslator {
     }
     final translations = List<String?>.filled(texts.length, null);
     final romanizations = List<String?>.filled(texts.length, null);
+    final alignments = List<List<LyricsTranslationChunk>>.filled(
+      texts.length,
+      const [],
+    );
     final items = [
-      for (var i = 0; i < texts.length; i++) LyricsAiItem(i, texts[i]),
+      for (var i = 0; i < texts.length; i++)
+        LyricsAiItem(
+          i,
+          texts[i],
+          words: i < sourceWords.length ? sourceWords[i] : const [],
+        ),
     ];
     var done = 0;
     LyricsAiException? softError;
@@ -322,6 +368,12 @@ class LyricsTranslator {
         result.forEach((id, line) {
           translations[id] = line.text;
           romanizations[id] = line.romanization;
+          if (items[id].words.isNotEmpty &&
+              line.alignment.every(
+                (chunk) => chunk.source < items[id].words.length,
+              )) {
+            alignments[id] = line.alignment;
+          }
         });
         done += batch.length;
         onProgress?.call(done, texts.length);
@@ -357,6 +409,9 @@ class LyricsTranslator {
       translations,
       romanizations: romanizations.any((value) => value != null)
           ? romanizations
+          : const [],
+      alignments: alignments.any((line) => line.isNotEmpty)
+          ? alignments
           : const [],
     );
   }
@@ -418,6 +473,10 @@ class LyricsTranslationCache {
       LyricsTranslationResult(
         List.unmodifiable(result.translations),
         romanizations: List.unmodifiable(result.romanizations),
+        alignments: List.unmodifiable([
+          for (final line in result.alignments)
+            List<LyricsTranslationChunk>.unmodifiable(line),
+        ]),
       ),
       DateTime.now().millisecondsSinceEpoch,
     );
@@ -474,7 +533,13 @@ class _CacheEntry {
         for (final value in list) value is String ? value : null,
     ]);
     return _CacheEntry(
-      LyricsTranslationResult(strings(list), romanizations: strings(json['r'])),
+      LyricsTranslationResult(
+        strings(list),
+        romanizations: strings(json['r']),
+        alignments:
+            readLyricsTranslationAlignments(json['w'], strings(list)) ??
+            const [],
+      ),
       (json['at'] as num?)?.toInt() ?? 0,
     );
   }
@@ -482,6 +547,11 @@ class _CacheEntry {
   Map<String, Object> toJson() => {
     't': result.translations,
     if (result.romanized) 'r': result.romanizations,
+    if (result.wordSynced)
+      'w': [
+        for (final line in result.alignments)
+          [for (final chunk in line) chunk.toJson()],
+      ],
     'at': usedAt,
   };
 }

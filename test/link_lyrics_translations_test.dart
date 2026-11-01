@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/services/link/link_lyrics_translations.dart';
 import 'package:mornye/services/link/link_protocol.dart';
 import 'package:mornye/services/lyrics_translation.dart';
+import 'package:mornye/services/lyrics_translation_alignment.dart';
 import 'package:mornye/services/lyrics_translation_sharing.dart';
 
 SharedLyricsTranslation update({int version = 1}) => SharedLyricsTranslation(
@@ -11,6 +12,9 @@ SharedLyricsTranslation update({int version = 1}) => SharedLyricsTranslation(
   result: LyricsTranslationResult(
     ['Terjemahan $version'],
     romanizations: const ['Reading'],
+    alignments: [
+      [LyricsTranslationChunk('Terjemahan $version', 0)],
+    ],
   ),
 );
 
@@ -61,12 +65,26 @@ void main() {
       expect(phone.receivedFor(update().sourceHash)?.result.romanizations, [
         'Reading',
       ]);
+      expect(
+        phone
+            .receivedFor(update().sourceHash)
+            ?.result
+            .alignments
+            .single
+            .single
+            .source,
+        0,
+      );
       expect(messages, hasLength(1));
       phone.publish(update(version: 2));
       await flush();
       expect(desktop.receivedFor(update().sourceHash)?.result.translations, [
         'Terjemahan 2',
       ]);
+      expect(
+        desktop.receivedFor(update().sourceHash)?.result.wordSynced,
+        isTrue,
+      );
       expect(messages, hasLength(2));
     },
   );

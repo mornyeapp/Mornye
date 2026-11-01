@@ -269,6 +269,7 @@ class LyricsTranslationController extends Notifier<LyricsTranslationState> {
       source,
       result.translations,
       romanizations: result.romanizations,
+      alignments: result.alignments,
     );
     _merged[lyrics] = (result, merged);
     return merged;
@@ -396,10 +397,12 @@ class LyricsTranslationController extends Notifier<LyricsTranslationState> {
       final cache = ref.read(lyricsTranslationCacheProvider);
       final cached = await cache.read(key);
       cancel.throwIfCancelled();
-      // One saved before romanizations were asked for is made again.
+      // An explicit translation can upgrade older line-only cache entries.
       final romanize =
           settings.lyricsAiRomanize && lyricsNeedRomanization(lyrics);
-      if (cached != null && (!romanize || cached.romanized)) {
+      if (cached != null &&
+          (!romanize || cached.romanized) &&
+          (!source.wordSynced || cached.wordSynced)) {
         _finish(id, key, cached);
         _publish(source.hash, target.code, cached);
         return const LyricsTranslationOutcome.success();
@@ -421,6 +424,7 @@ class LyricsTranslationController extends Notifier<LyricsTranslationState> {
       );
       final result = await translator.translate(
         source.texts,
+        sourceWords: source.words,
         systemPrompt: lyricsTranslationSystemPrompt(
           languageName: target.englishName,
           languageCode: target.code,
@@ -428,6 +432,7 @@ class LyricsTranslationController extends Notifier<LyricsTranslationState> {
           artist: song?.artist ?? '',
           instruction: settings.lyricsAiInstruction,
           romanize: romanize,
+          wordSync: source.wordSynced,
         ),
         cancel: cancel,
         onProgress: (done, total) {

@@ -274,7 +274,11 @@ class _WordHighlightedLyricLineState
     final decorativeMotion =
         context.isMornye && !MediaQuery.disableAnimationsOf(context);
     var end = Duration.zero;
-    for (final words in [widget.line.words, widget.line.romanizationWords]) {
+    for (final words in [
+      widget.line.words,
+      widget.line.romanizationWords,
+      widget.line.translationWords,
+    ]) {
       for (var index = 0; index < words.length; index++) {
         var wordEnd = _segmentEnd(words, index);
         if (decorativeMotion) {

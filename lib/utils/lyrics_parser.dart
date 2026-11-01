@@ -86,6 +86,7 @@ class LyricLine {
   final String? romanization;
   final List<LyricWord> romanizationWords;
   final String? translation;
+  final List<LyricWord> translationWords;
   final LyricVoice? voice;
   final bool isBackground;
 
@@ -100,6 +101,7 @@ class LyricLine {
     this.romanization,
     this.romanizationWords = const [],
     this.translation,
+    this.translationWords = const [],
     this.voice,
     this.isBackground = false,
     this.vocalGroup,
@@ -109,19 +111,25 @@ class LyricLine {
 
   /// This line showing [translation] instead of its own, and [romanization]
   /// when one is given.
-  LyricLine withTranslation(String? translation, {String? romanization}) =>
-      LyricLine(
-        time: time,
-        end: end,
-        text: text,
-        words: words,
-        romanization: romanization ?? this.romanization,
-        romanizationWords: romanization == null ? romanizationWords : const [],
-        translation: translation,
-        voice: voice,
-        isBackground: isBackground,
-        vocalGroup: vocalGroup,
-      );
+  LyricLine withTranslation(
+    String? translation, {
+    String? romanization,
+    List<LyricWord>? translationWords,
+  }) => LyricLine(
+    time: time,
+    end: end,
+    text: text,
+    words: words,
+    romanization: romanization ?? this.romanization,
+    romanizationWords: romanization == null ? romanizationWords : const [],
+    translation: translation,
+    translationWords:
+        translationWords ??
+        (translation == this.translation ? this.translationWords : const []),
+    voice: voice,
+    isBackground: isBackground,
+    vocalGroup: vocalGroup,
+  );
 }
 
 class ParsedLyrics {

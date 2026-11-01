@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:http/http.dart' as http;
+import 'package:mornye/services/lyrics_translation_alignment.dart';
 
 /// The services AI lyrics translation can call with the user's own key.
 enum LyricsAiProvider {
@@ -138,17 +139,26 @@ class LyricsAiException implements Exception {
 
 /// One line sent for translation.
 class LyricsAiItem {
-  const LyricsAiItem(this.id, this.text);
+  const LyricsAiItem(this.id, this.text, {this.words = const []});
 
   final int id;
   final String text;
+  final List<String> words;
 
-  Map<String, Object> toJson() => {'id': id, 'text': text};
+  Map<String, Object> toJson() => {
+    'id': id,
+    'text': text,
+    if (words.isNotEmpty) 'words': words,
+  };
 }
 
 /// What the model returned for one line: its translation and, when asked
 /// for, how the original is pronounced in the Latin alphabet.
-typedef LyricsAiLine = ({String text, String? romanization});
+typedef LyricsAiLine = ({
+  String text,
+  String? romanization,
+  List<LyricsTranslationChunk> alignment,
+});
 
 /// An HTTP request before it is sent, so tests can inspect each provider's
 /// wire format without a server.
@@ -193,6 +203,7 @@ String lyricsTranslationSystemPrompt({
   String artist = '',
   String instruction = '',
   bool romanize = false,
+  bool wordSync = false,
 }) {
   final song = title.trim();
   final by = artist.trim();
@@ -236,6 +247,16 @@ String lyricsTranslationSystemPrompt({
           '{"lines":[{"id":<the same id>,"text":"<translation>"}]} with every '
           'id exactly once.',
     ],
+    if (wordSync)
+      'For inputs with a "words" array, also add "alignment": an array of '
+          '{"text":"translated word or short phrase", "source":0}. '
+          'The chunks must join exactly to the translated "text", including '
+          'spaces and punctuation. "source" is a zero-based index into '
+          'the original "words" array. Keep chunks in translation reading '
+          'order and source indices nondecreasing. Map phrases to the '
+          'nearest meaningful source word without changing natural phrasing. '
+          'Several chunks may refer to one source unit. Never invent '
+          'timestamps. Omit alignment when the input has no "words".',
     if (extra.isNotEmpty) 'Additional preference from the listener: $extra',
   ].join('\n');
 }
@@ -507,6 +528,9 @@ Map<int, LyricsAiLine> parseLyricsTranslationReply(String reply, Set<int> ids) {
     result[id] = (
       text: translation,
       romanization: romanized.isEmpty ? null : romanized,
+      alignment:
+          readLyricsTranslationChunks(entry['alignment'], translation) ??
+          const [],
     );
   }
   return result;

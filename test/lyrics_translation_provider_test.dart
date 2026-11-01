@@ -13,6 +13,7 @@ import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/services/lyrics_ai_client.dart';
 import 'package:mornye/services/lyrics_translation.dart';
+import 'package:mornye/services/lyrics_translation_alignment.dart';
 import 'package:mornye/services/lyrics_translation_sharing.dart';
 import 'package:mornye/utils/lyrics_parser.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -86,6 +87,10 @@ http.Response _reply(http.Request request) {
                       'id': item['id'],
                       'text': 'es:${item['text']}',
                       if (romanize) 'romanization': 'r:${item['text']}',
+                      if ((item['words'] as List?)?.isNotEmpty == true)
+                        'alignment': [
+                          {'text': 'es:${item['text']}', 'source': 0},
+                        ],
                     },
                 ],
               }),
@@ -159,6 +164,98 @@ void main() {
     await Future<void>.delayed(Duration.zero);
     return container;
   }
+
+  test(
+    'upgrades a line-only cache and shares word alignment with local timing',
+    () async {
+      const lyrics = ParsedLyrics(
+        synced: true,
+        wordSynced: true,
+        plainText: 'Hello World',
+        lines: [
+          LyricLine(
+            time: Duration(seconds: 10),
+            end: Duration(seconds: 14),
+            text: 'Hello World',
+            words: [
+              LyricWord(
+                time: Duration(seconds: 10),
+                end: Duration(seconds: 12),
+                text: 'Hello ',
+              ),
+              LyricWord(
+                time: Duration(seconds: 12),
+                end: Duration(seconds: 14),
+                text: 'World',
+              ),
+            ],
+          ),
+        ],
+      );
+      final cache = LyricsTranslationCache(directory: () async => directory);
+      await cache.write(
+        lyricsTranslationCacheKey(
+          sourceHash: LyricsTranslationSource.of(lyrics).hash,
+          language: 'es',
+          config: lyricsAiConfigFor(_settings),
+        ),
+        const LyricsTranslationResult(['Old translation']),
+      );
+      final container = await containerFor();
+      final controller = container.read(lyricsTranslationProvider.notifier);
+      final outgoing = container
+          .read(lyricsTranslationSharingProvider)
+          .outgoing
+          .first;
+      expect((await controller.translate(lyrics)).error, isNull);
+      expect(requests, hasLength(1));
+      final displayed = controller.display(lyrics).lines.single;
+      expect(displayed.translation, 'es:Hello World');
+      expect(displayed.translationWords.single.time.inSeconds, 10);
+      expect(displayed.translationWords.single.end!.inSeconds, 14);
+      final published = await outgoing;
+      expect(published.result.alignments.single.single.source, 0);
+      await controller.translate(lyrics);
+      expect(
+        requests,
+        hasLength(1),
+        reason: 'aligned cache does not call AI again',
+      );
+
+      final peer = await containerFor(
+        settings: const AppSettings(
+          lyricsAiProvider: 'custom',
+          lyricsAiModel: '',
+        ),
+        keys: {},
+      );
+      peer
+          .read(lyricsTranslationSharingProvider)
+          .receive(
+            SharedLyricsTranslation(
+              sourceHash: LyricsTranslationSource.of(lyrics).hash,
+              language: 'es',
+              updatedMs: 1,
+              result: const LyricsTranslationResult(
+                ['Hola Mundo'],
+                alignments: [
+                  [
+                    LyricsTranslationChunk('Hola ', 0),
+                    LyricsTranslationChunk('Mundo', 1),
+                  ],
+                ],
+              ),
+            ),
+          );
+      final peerLine = peer
+          .read(lyricsTranslationProvider.notifier)
+          .display(lyrics)
+          .lines
+          .single;
+      expect(peerLine.translationWords.last.time.inSeconds, 12);
+      expect(requests, hasLength(1));
+    },
+  );
 
   test('translates once, shows it and persists it apart', () async {
     final container = await containerFor();

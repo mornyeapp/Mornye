@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:mornye/services/lyrics_ai_client.dart';
+import 'package:mornye/services/lyrics_translation_alignment.dart';
 
 const _items = [LyricsAiItem(0, 'First line'), LyricsAiItem(1, 'Second line')];
 
@@ -230,9 +231,21 @@ void main() {
           ids,
         ),
         {
-          0: (text: 'Love', romanization: 'ai'),
-          1: (text: 'Hi', romanization: null),
-          2: (text: 'Yes', romanization: null),
+          0: (
+            text: 'Love',
+            romanization: 'ai',
+            alignment: const <LyricsTranslationChunk>[],
+          ),
+          1: (
+            text: 'Hi',
+            romanization: null,
+            alignment: const <LyricsTranslationChunk>[],
+          ),
+          2: (
+            text: 'Yes',
+            romanization: null,
+            alignment: const <LyricsTranslationChunk>[],
+          ),
         },
       );
     });
@@ -481,7 +494,11 @@ void main() {
         delay: (wait) async => waits.add(wait),
       );
       expect(await client.translate(_items, systemPrompt: 's'), {
-        0: (text: 'Uno', romanization: null),
+        0: (
+          text: 'Uno',
+          romanization: null,
+          alignment: const <LyricsTranslationChunk>[],
+        ),
       });
       expect(waits, [const Duration(seconds: 2)]);
     });
@@ -523,7 +540,11 @@ void main() {
         }),
       );
       expect(await client.translate(_items, systemPrompt: 's'), {
-        1: (text: 'Dos', romanization: null),
+        1: (
+          text: 'Dos',
+          romanization: null,
+          alignment: const <LyricsTranslationChunk>[],
+        ),
       });
       expect(bodies, hasLength(2));
       expect(bodies.last.containsKey('max_completion_tokens'), isTrue);
