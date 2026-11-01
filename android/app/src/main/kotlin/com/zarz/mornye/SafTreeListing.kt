@@ -14,10 +14,12 @@ import java.util.concurrent.Future
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 
 // Provider round trips dominate on SD cards, USB drives and network shares.
 private const val SAF_LIST_CONCURRENCY = 4
 private const val SAF_READ_WORKERS = 6
+private const val SAF_READ_CANCEL_POLL_MS = 100L
 
 /**
  * Prefetches the listings of directories already waiting in a breadth-first
@@ -93,13 +95,29 @@ internal fun <T, R> runSafReadsInOrder(
                 inFlight.addLast(item to executor.submit<R> { task(item) })
             }
             val (item, future) = inFlight.removeFirst()
-            val result = try {
-                Result.success(future.get())
-            } catch (e: ExecutionException) {
-                Result.failure(e.cause ?: e)
-            } catch (e: Exception) {
-                Result.failure(e)
+            var result: Result<R>? = null
+            while (result == null) {
+                if (cancelled()) {
+                    future.cancel(true)
+                    inFlight.forEach { it.second.cancel(true) }
+                    return false
+                }
+                result = try {
+                    Result.success(future.get(SAF_READ_CANCEL_POLL_MS, TimeUnit.MILLISECONDS))
+                } catch (_: TimeoutException) {
+                    // A provider read can block while the scan is cancelled or
+                    // paused. Keep checking without submitting more work.
+                    null
+                } catch (e: ExecutionException) {
+                    Result.failure(e.cause ?: e)
+                } catch (e: InterruptedException) {
+                    Thread.currentThread().interrupt()
+                    throw e
+                } catch (e: Exception) {
+                    Result.failure(e)
+                }
             }
+            if (cancelled()) return false
             consume(item, result)
         }
         return true
