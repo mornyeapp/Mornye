@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
@@ -149,9 +148,12 @@ abstract final class AudioAnalysisDiskCache {
       if (!await file.exists()) return null;
 
       final bytes = await file.readAsBytes();
-      final completer = Completer<ui.Image>();
-      ui.decodeImageFromList(bytes, completer.complete);
-      return await completer.future;
+      final codec = await ui.instantiateImageCodec(bytes);
+      try {
+        return (await codec.getNextFrame()).image;
+      } finally {
+        codec.dispose();
+      }
     } catch (_) {
       return null;
     }

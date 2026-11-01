@@ -1,9 +1,76 @@
 import 'dart:io';
+import 'dart:ui' as ui;
 
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/services/audio_analysis_cache.dart';
 
 void main() {
+  final binding = TestWidgetsFlutterBinding.ensureInitialized();
+
+  group('spectrogram disk cache', () {
+    const channel = MethodChannel('plugins.flutter.io/path_provider');
+    late Directory support;
+
+    setUp(() async {
+      support = await Directory.systemTemp.createTemp('spectrogram-cache-');
+      binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        channel,
+        (_) async => support.path,
+      );
+    });
+
+    tearDown(() async {
+      binding.defaultBinaryMessenger.setMockMethodCallHandler(channel, null);
+      await support.delete(recursive: true);
+    });
+
+    test('a corrupt PNG completes as a cache miss', () async {
+      const source = '/music/corrupt.flac';
+      final directory = await AudioAnalysisDiskCache.cacheDir();
+      final key = AudioAnalysisDiskCache.cacheKey(source);
+      await File('${directory.path}/${key}_ch0.png').writeAsBytes([1, 2, 3]);
+
+      await expectLater(
+        AudioAnalysisDiskCache.loadSpectrogramFromCache(
+          source,
+          channel: 0,
+        ).timeout(const Duration(seconds: 2)),
+        completion(isNull),
+      );
+    });
+
+    test('a decoded frame stays usable until its caller disposes it', () async {
+      const source = '/music/valid.flac';
+      final directory = await AudioAnalysisDiskCache.cacheDir();
+      final key = AudioAnalysisDiskCache.cacheKey(source);
+      final recorder = ui.PictureRecorder();
+      ui.Canvas(
+        recorder,
+      ).drawPaint(ui.Paint()..color = const ui.Color(0xff123456));
+      final picture = recorder.endRecording();
+      final original = await picture.toImage(2, 1);
+      try {
+        final bytes = await original.toByteData(format: ui.ImageByteFormat.png);
+        await File(
+          '${directory.path}/$key.png',
+        ).writeAsBytes(bytes!.buffer.asUint8List());
+      } finally {
+        original.dispose();
+        picture.dispose();
+      }
+
+      final image = await AudioAnalysisDiskCache.loadSpectrogramFromCache(
+        source,
+        channel: -1,
+      );
+      expect(image, isNotNull);
+      addTearDown(image!.dispose);
+      expect((image.width, image.height), (2, 1));
+      expect(await image.toByteData(), isNotNull);
+    });
+  });
+
   test('eviction removes whole bundles and retains active analyses', () async {
     final directory = await Directory.systemTemp.createTemp('analysis-budget-');
     addTearDown(() => directory.delete(recursive: true));
