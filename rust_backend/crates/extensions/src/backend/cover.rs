@@ -570,7 +570,7 @@ fn output_permissions(
 
 /// `stored`, where an earlier song put this thumbnail, opened for linking. It
 /// qualifies only while it holds exactly `data`, is current for the
-/// regenerate marker and has the permissions a new file would get.
+/// regenerate marker and matches an existing output's permissions.
 fn stored_cover(
     files: &crate::files::ExtensionFiles,
     stored: &str,
@@ -618,19 +618,32 @@ fn stage_cover(
     check: &Check<'_>,
 ) -> Result<StagedFile, String> {
     check()?;
-    let (mut stage, linked) = match source {
-        Some((path, file)) => output.stage_from(path, file),
-        None => output.stage_existing_parent().map(|stage| (stage, false)),
-    }
-    .map_err(|error| error.to_string())?;
-    if linked {
-        return Ok(stage);
-    }
+    let mut stage = output
+        .stage_existing_parent()
+        .map_err(|error| error.to_string())?;
     if let Some(permissions) = permissions {
         stage
             .file
             .set_permissions(permissions)
             .map_err(|error| error.to_string())?;
+    }
+    if let Some((path, file)) = source {
+        let permissions = stage
+            .file
+            .metadata()
+            .map_err(|error| error.to_string())?
+            .permissions();
+        if file
+            .metadata()
+            .is_ok_and(|metadata| metadata.permissions() == permissions)
+        {
+            let (linked_stage, linked) = output
+                .stage_from(path, file)
+                .map_err(|error| error.to_string())?;
+            if linked {
+                return Ok(linked_stage);
+            }
+        }
     }
     for chunk in data.chunks(16 * 1024) {
         check()?;
@@ -873,6 +886,38 @@ pub(super) mod tests {
         let fourth = save("fourth", &art);
         assert_eq!(std::fs::read(&fourth).unwrap(), art);
         assert_ne!(inode(&fourth), inode(&third));
+        assert_eq!(std::fs::read(&second).unwrap(), art);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_new_thumbnail_keeps_fresh_file_permissions() {
+        use std::os::unix::fs::{MetadataExt, PermissionsExt};
+        let directory = tempfile::tempdir().unwrap();
+        let backend = backend(directory.path());
+        let data = directory.path().join("data");
+        let cache = data.join("covers");
+        let art = artwork(9_150, 600);
+        let save = |key: &str| {
+            let source = data.join(format!("{key}.flac"));
+            std::fs::write(&source, flac_with_picture(&art)).unwrap();
+            backend
+                .save_cover_to_cache_with_hint_and_key(
+                    source.to_str().unwrap(),
+                    "",
+                    cache.to_str().unwrap(),
+                    key,
+                    &|| Ok(()),
+                )
+                .unwrap()
+        };
+        let first = save("first");
+        let mode = std::fs::metadata(&first).unwrap().mode() & 0o7777;
+        std::fs::set_permissions(&first, std::fs::Permissions::from_mode(mode ^ 0o040)).unwrap();
+
+        let second = save("second");
+        assert_eq!(std::fs::metadata(&second).unwrap().mode() & 0o7777, mode);
+        assert_ne!(inode(&first), inode(&second));
         assert_eq!(std::fs::read(&second).unwrap(), art);
     }
 
