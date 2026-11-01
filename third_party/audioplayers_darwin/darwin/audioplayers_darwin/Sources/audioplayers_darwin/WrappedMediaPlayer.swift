@@ -169,7 +169,10 @@ enum ReleaseMode: String {
     guard let currentItem = player.currentItem else {
       return
     }
-    await currentItem.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero)
+    let finished = await currentItem.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero)
+    // Replacing or disposing the source can finish an outstanding seek.
+    // Its completion must not pause the new item or publish an old event.
+    guard finished, player.currentItem === currentItem else { return }
     if !self.isPlaying {
       self.player.pause()
     }
@@ -198,7 +201,7 @@ enum ReleaseMode: String {
   }
 
   private func getDurationCMTime() -> CMTime? {
-    return player.currentItem?.asset.duration
+    return player.currentItem?.duration
   }
 
   private func getCurrentCMTime() -> CMTime? {
@@ -320,7 +323,7 @@ enum ReleaseMode: String {
   }
 
   private func updateDuration() {
-    guard let duration = player.currentItem?.asset.duration else {
+    guard let duration = getDurationCMTime() else {
       return
     }
     if CMTimeGetSeconds(duration) > 0 {

@@ -132,6 +132,7 @@ public class AudioplayersDarwinPlugin: NSObject, FlutterPlugin {
             FlutterError(
               code: "DarwinAudioError", message: "Error configuring global audio session: \(error)",
               details: nil))
+          return
         }
       #else
         globalEvents.onLog(message: "Setting AudioContext is not supported on this platform")
@@ -339,6 +340,7 @@ public class AudioplayersDarwinPlugin: NSObject, FlutterPlugin {
             FlutterError(
               code: "DarwinAudioError", message: "Error configuring audio session: \(error)",
               details: nil))
+          return
         }
       #else
         player.eventHandler.onLog(message: "Setting AudioContext is not supported on this platform")

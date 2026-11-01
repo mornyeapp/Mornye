@@ -212,14 +212,12 @@ import UniformTypeIdentifiers
         let timer = DispatchSource.makeTimerSource(queue: streamQueue)
         timer.schedule(deadline: .now(), repeating: .milliseconds(800))
         timer.setEventHandler { [weak self] in
-            guard let self, self.libraryScanProgressGeneration == generation else { return }
+            guard let self else { return }
             let payload = (try? self.coreBackend.getLibraryScanProgress()) ?? "{}"
-            if payload == self.lastLibraryScanProgressPayload {
-                return
-            }
-            self.lastLibraryScanProgressPayload = payload
             DispatchQueue.main.async { [weak self] in
-                guard let self, self.libraryScanProgressGeneration == generation else { return }
+                guard let self, self.libraryScanProgressGeneration == generation,
+                      payload != self.lastLibraryScanProgressPayload else { return }
+                self.lastLibraryScanProgressPayload = payload
                 eventSink(self.parseJsonPayload(payload))
             }
         }

@@ -10,8 +10,9 @@ import Foundation
 final class AudioPlayersStreamHandler {
   var preparedCount = 0
   var completedCount = 0
+  var seekCompletedCount = 0
 
-  func onSeekComplete() {}
+  func onSeekComplete() { seekCompletedCount += 1 }
   func onPrepared(isPrepared: Bool) { if isPrepared { preparedCount += 1 } }
   func onLog(message: String) {}
   func onDuration(millis: Int) {}
@@ -21,11 +22,27 @@ final class AudioPlayersStreamHandler {
 
 final class DeferredPlayer: AVPlayer {
   private var item: AVPlayerItem?
+  var pauseCount = 0
 
   override var currentItem: AVPlayerItem? { item }
 
   override func replaceCurrentItem(with item: AVPlayerItem?) {
     self.item = item
+  }
+
+  override func pause() {
+    pauseCount += 1
+  }
+}
+
+final class DeferredSeekItem: AVPlayerItem {
+  var pendingSeek: ((Bool) -> Void)?
+
+  override func seek(
+    to time: CMTime, toleranceBefore: CMTime, toleranceAfter: CMTime,
+    completionHandler: ((Bool) -> Void)? = nil
+  ) {
+    pendingSeek = completionHandler
   }
 }
 
@@ -89,7 +106,7 @@ final class DeferredPlayer: AVPlayer {
       reference: AudioplayersDarwinPlugin(), eventHandler: events, player: native)
     let first = Preparation(wrapper, url: firstURL.path)
     try await waitFor("Native source did not finish preparation") { first.result != nil }
-    guard case .success = first.result, events.preparedCount == 1,
+    guard case .success = first.result, events.preparedCount == 1, wrapper.getDuration() == 1000,
       let oldItem = native.currentItem
     else { throw Failure.message("Native source did not prepare successfully") }
 
@@ -163,6 +180,37 @@ final class DeferredPlayer: AVPlayer {
     await following.dispose()
   }
 
+  @MainActor static func testSeekCompletionBelongsToCurrentSource() async throws {
+    for outcome in ["replacement", "disposal", "cancellation", "success"] {
+      let native = DeferredPlayer()
+      let events = AudioPlayersStreamHandler()
+      let wrapper = WrappedMediaPlayer(
+        reference: AudioplayersDarwinPlugin(), eventHandler: events, player: native)
+      let item = DeferredSeekItem(url: URL(fileURLWithPath: "/seek.wav"))
+      native.replaceCurrentItem(with: item)
+      var finished = false
+      Task { @MainActor in
+        await wrapper.seek(time: toCMTime(millis: 100))
+        finished = true
+      }
+      try await waitFor("Seek did not start") { item.pendingSeek != nil }
+      if outcome == "replacement" {
+        native.replaceCurrentItem(with: AVPlayerItem(url: URL(fileURLWithPath: "/replacement.wav")))
+      } else if outcome == "disposal" {
+        await wrapper.dispose()
+      }
+      let pauses = native.pauseCount
+      item.pendingSeek?(outcome != "cancellation")
+      item.pendingSeek = nil
+      try await waitFor("Seek did not finish") { finished }
+      let expected = outcome == "success" ? 1 : 0
+      guard events.seekCompletedCount == expected, native.pauseCount == pauses + expected else {
+        throw Failure.message("A \(outcome) seek emitted a stale event or paused another source")
+      }
+      await wrapper.dispose()
+    }
+  }
+
   @MainActor static func main() async {
     do {
       let native = DeferredPlayer()
@@ -193,6 +241,8 @@ final class DeferredPlayer: AVPlayer {
       print("PASS: native preparation succeeds or fails once, and ignores old completion events")
       try await testNextPlayerStartsOnCompletion()
       print("PASS: a linked next player starts as the current one completes")
+      try await testSeekCompletionBelongsToCurrentSource()
+      print("PASS: replaced, disposed and cancelled seeks cannot affect the current source")
     } catch {
       print("FAIL: \(error)")
       exit(1)

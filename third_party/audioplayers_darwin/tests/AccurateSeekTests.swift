@@ -83,6 +83,11 @@ final class AudioPlayersStreamHandler {
           reference: AudioplayersDarwinPlugin(),
           eventHandler: AudioPlayersStreamHandler(), player: native)
         try await wrapper.setSourceUrl(url: url.path, isLocal: true, mimeType: mime)
+        guard let actualDuration = wrapper.getDuration(),
+          abs(Double(actualDuration) / 1000 - duration) < 0.001
+        else {
+          throw Failure.message("Prepared player duration does not match the precise asset")
+        }
         guard let asset = native.currentItem?.asset else {
           throw Failure.message("Player did not prepare the asset")
         }
