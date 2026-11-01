@@ -40,9 +40,17 @@ List<LyricsTranslationChunk>? readLyricsTranslationChunks(
   var previous = 0;
   var length = 0;
   for (final entry in value) {
-    if (entry is! Map) return null;
-    final part = entry['text'];
-    final source = entry['source'];
+    final Object? part;
+    final Object? source;
+    if (entry is List && entry.length == 2) {
+      source = entry[0];
+      part = entry[1];
+    } else if (entry is Map) {
+      part = entry['text'];
+      source = entry['source'];
+    } else {
+      return null;
+    }
     if (part is! String ||
         part.isEmpty ||
         source is! int ||

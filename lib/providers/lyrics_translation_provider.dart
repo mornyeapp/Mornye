@@ -409,10 +409,12 @@ class LyricsTranslationController extends Notifier<LyricsTranslationState> {
                 line.romanization?.trim().isNotEmpty != true &&
                 lyricNeedsRomanization(line.text),
           );
-      if (cached != null &&
+      final reusable =
+          cached != null &&
           (!romanize || cached.romanized) &&
           (!timedRomanize || cached.romanizationWordSynced) &&
-          (!source.wordSynced || cached.wordSynced)) {
+          (!source.wordSynced || cached.wordSynced);
+      if (reusable && cached.missing == 0) {
         _finish(id, key, cached);
         _publish(source.hash, target.code, cached);
         return const LyricsTranslationOutcome.success();
@@ -434,6 +436,7 @@ class LyricsTranslationController extends Notifier<LyricsTranslationState> {
       );
       final result = await translator.translate(
         source.texts,
+        initialResult: reusable ? cached : null,
         sourceWords: source.words,
         systemPrompt: lyricsTranslationSystemPrompt(
           languageName: target.englishName,

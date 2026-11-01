@@ -308,20 +308,28 @@ void main() {
       expect(progress, [0, 2, 4, 5]);
     });
 
-    test('missing ids stay untranslated', () async {
-      final result = await LyricsTranslator(
-        _client(
-          [],
-          reply: (items, _) => jsonEncode({
-            'lines': [
-              {'id': items.first['id'], 'text': 'only'},
-            ],
-          }),
-        ),
-      ).translate(texts, systemPrompt: 's');
-      expect(result.translations.first, 'only');
-      expect(result.missing, 4);
-    });
+    test(
+      'unrepaired missing ids stay untranslated after one targeted retry',
+      () async {
+        final batches = <List<int>>[];
+        final result = await LyricsTranslator(
+          _client(
+            batches,
+            reply: (items, _) => jsonEncode({
+              'lines': [
+                {'id': items.first['id'], 'text': 'only'},
+              ],
+            }),
+          ),
+        ).translate(texts, systemPrompt: 's');
+        expect(result.translations.first, 'only');
+        expect(result.missing, 3);
+        expect(batches, [
+          [0, 1, 2, 3, 4],
+          [1, 2, 3, 4],
+        ]);
+      },
+    );
 
     test('keeps the romanizations the model returns', () async {
       final result = await LyricsTranslator(

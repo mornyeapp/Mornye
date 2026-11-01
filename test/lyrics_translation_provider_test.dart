@@ -171,6 +171,40 @@ void main() {
   }
 
   test(
+    'fills an incomplete cache without requesting completed lines',
+    () async {
+      final cache = LyricsTranslationCache(directory: () async => directory);
+      final key = lyricsTranslationCacheKey(
+        sourceHash: LyricsTranslationSource.of(_lyrics).hash,
+        language: 'es',
+        config: lyricsAiConfigFor(_settings),
+      );
+      await cache.write(
+        key,
+        const LyricsTranslationResult(['Already done', null]),
+      );
+      final container = await containerFor(cache: cache);
+      final controller = container.read(lyricsTranslationProvider.notifier);
+      final outcome = await controller.translate(_lyrics);
+      expect(outcome.error, isNull);
+      expect(outcome.missing, 0);
+      final body = jsonDecode(requests.single.body) as Map<String, dynamic>;
+      final items =
+          jsonDecode(
+                ((body['messages'] as List).last as Map)['content'] as String,
+              )
+              as List;
+      expect(items.map((item) => (item as Map)['id']), [1]);
+      expect((await cache.read(key))!.translations, [
+        'Already done',
+        'es:World',
+      ]);
+      await controller.translate(_lyrics);
+      expect(requests, hasLength(1));
+    },
+  );
+
+  test(
     'upgrades a line-only cache and shares word alignment with local timing',
     () async {
       const lyrics = ParsedLyrics(

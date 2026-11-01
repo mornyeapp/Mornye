@@ -238,27 +238,34 @@ ParsedLyrics applyLyricsTranslation(
 }
 
 /// Splits [items] into requests of at most [maxItems] lines and [maxChars]
-/// characters of text, keeping their order.
+/// characters of text, keeping their order. Timed units also have a budget:
+/// character limits alone underestimate two sets of generated alignment.
 List<List<LyricsAiItem>> batchLyricsItems(
   List<LyricsAiItem> items, {
   int maxItems = 60,
   int maxChars = 5000,
+  int maxAlignmentUnits = 240,
 }) {
   final batches = <List<LyricsAiItem>>[];
   var current = <LyricsAiItem>[];
   var chars = 0;
+  var units = 0;
   for (final item in items) {
     final size =
         item.text.length +
         item.words.fold<int>(0, (total, word) => total + word.length + 4);
     if (current.isNotEmpty &&
-        (current.length >= maxItems || chars + size > maxChars)) {
+        (current.length >= maxItems ||
+            chars + size > maxChars ||
+            units + item.words.length > maxAlignmentUnits)) {
       batches.add(current);
       current = [];
       chars = 0;
+      units = 0;
     }
     current.add(item);
     chars += size;
+    units += item.words.length;
   }
   if (current.isNotEmpty) batches.add(current);
   return batches;
@@ -337,34 +344,53 @@ class LyricsTranslationResult {
   bool get romanized => romanizations.any((value) => value != null);
 }
 
-/// Sends a song's lines in sequential batches. A malformed batch is retried
+/// Sends a song's lines in bounded batches. A malformed batch is retried
 /// once, then split; a truncated one is split straight away. Lines a batch
 /// still cannot return stay untranslated instead of failing the song.
+/// Timed requests can overlap; valid cached lines and successful reply ids
+/// are kept while only omitted lines are retried.
 class LyricsTranslator {
-  LyricsTranslator(this._client, {this.maxItems = 60, this.maxChars = 5000});
+  LyricsTranslator(
+    this._client, {
+    this.maxItems = 60,
+    this.maxChars = 5000,
+    this.maxAlignmentUnits = 240,
+    this.maxConcurrentRequests = 2,
+  }) : assert(maxConcurrentRequests > 0);
 
   final LyricsAiClient _client;
   final int maxItems;
   final int maxChars;
+  final int maxAlignmentUnits;
+  final int maxConcurrentRequests;
 
   Future<LyricsTranslationResult> translate(
     List<String> texts, {
     required String systemPrompt,
     List<List<String>> sourceWords = const [],
+    LyricsTranslationResult? initialResult,
     LyricsTranslationCancelToken? cancel,
     void Function(int done, int total)? onProgress,
   }) async {
     if (texts.isEmpty) {
       throw const LyricsAiException(LyricsAiErrorKind.noLyrics);
     }
-    final translations = List<String?>.filled(texts.length, null);
-    final romanizations = List<String?>.filled(texts.length, null);
-    final alignments = List<List<LyricsTranslationChunk>>.filled(
-      texts.length,
+    cancel?.throwIfCancelled();
+    List<T> seed<T>(List<T>? values, T empty) => [
+      for (var i = 0; i < texts.length; i++)
+        if (values != null && i < values.length) values[i] else empty,
+    ];
+    final translations = seed<String?>(initialResult?.translations, null);
+    for (var i = 0; i < translations.length; i++) {
+      if (translations[i]?.trim().isEmpty == true) translations[i] = null;
+    }
+    final romanizations = seed<String?>(initialResult?.romanizations, null);
+    final alignments = seed<List<LyricsTranslationChunk>>(
+      initialResult?.alignments,
       const [],
     );
-    final romanizationAlignments = List<List<LyricsTranslationChunk>>.filled(
-      texts.length,
+    final romanizationAlignments = seed<List<LyricsTranslationChunk>>(
+      initialResult?.romanizationAlignments,
       const [],
     );
     final items = [
@@ -375,59 +401,143 @@ class LyricsTranslator {
           words: i < sourceWords.length ? sourceWords[i] : const [],
         ),
     ];
-    var done = 0;
+    final settled = <int>{
+      for (var i = 0; i < translations.length; i++)
+        if (translations[i]?.trim().isNotEmpty == true) i,
+    };
+    var reported = -1;
+    var stopped = false;
     LyricsAiException? softError;
-    onProgress?.call(0, texts.length);
+    void reportProgress() {
+      if (stopped || reported == settled.length) return;
+      reported = settled.length;
+      onProgress?.call(reported, texts.length);
+    }
 
-    Future<void> run(List<LyricsAiItem> batch, {bool retried = false}) async {
+    reportProgress();
+    // Smaller output batches still need the whole song's meaning. Bound the
+    // extra input for unusually large transcripts, which retain batch context.
+    final sourceContext =
+        texts.fold<int>(0, (size, line) => size + line.length) <= 12000
+        ? texts
+        : const <String>[];
+
+    Future<void> run(
+      List<LyricsAiItem> batch, {
+      bool retried = false,
+      bool repairingMissing = false,
+    }) async {
       cancel?.throwIfCancelled();
+      if (stopped) throw const LyricsTranslationCancelled();
+      final clock = Stopwatch()..start();
       try {
-        final request = _client.translate(batch, systemPrompt: systemPrompt);
+        final request = _client.translate(
+          batch,
+          systemPrompt: systemPrompt,
+          context: batch.length < texts.length ? sourceContext : const [],
+        );
         final result = await (cancel?.race(request) ?? request);
         cancel?.throwIfCancelled();
+        if (stopped) throw const LyricsTranslationCancelled();
         result.forEach((id, line) {
           translations[id] = line.text;
-          romanizations[id] = line.romanization;
+          romanizations[id] = line.romanization ?? romanizations[id];
           if (items[id].words.isNotEmpty &&
               line.alignment.every(
                 (chunk) => chunk.source < items[id].words.length,
               )) {
             alignments[id] = line.alignment;
           }
-          if (items[id].words.isNotEmpty &&
+          if (line.romanization != null &&
+              items[id].words.isNotEmpty &&
               line.romanizationAlignment.every(
                 (chunk) => chunk.source < items[id].words.length,
               )) {
             romanizationAlignments[id] = line.romanizationAlignment;
           }
         });
-        done += batch.length;
-        onProgress?.call(done, texts.length);
+        settled.addAll(result.keys);
+        reportProgress();
+        _log.d(
+          'Translated ${result.length}/${batch.length} lines in ${clock.elapsedMilliseconds} ms',
+        );
+        final missing = [
+          for (final item in batch)
+            if (!result.containsKey(item.id)) item,
+        ];
+        if (missing.isNotEmpty && !repairingMissing) {
+          _log.d('Retrying ${missing.length} omitted lines');
+          await run(missing, repairingMissing: true);
+        } else {
+          settled.addAll(missing.map((item) => item.id));
+          reportProgress();
+        }
       } on LyricsAiException catch (error) {
         cancel?.throwIfCancelled();
+        if (stopped) throw const LyricsTranslationCancelled();
         if (error.fatal) rethrow;
         softError = error;
+        _log.d(
+          'Translation batch: ${error.kind.name} after ${clock.elapsedMilliseconds} ms (${batch.length} lines)',
+        );
         final retry = error.kind == LyricsAiErrorKind.badResponse && !retried;
-        if (retry) return run(batch, retried: true);
+        if (retry) {
+          return run(batch, retried: true, repairingMissing: repairingMissing);
+        }
         if (error.kind != LyricsAiErrorKind.refused && batch.length > 1) {
           final half = batch.length ~/ 2;
-          await run(batch.sublist(0, half));
-          await run(batch.sublist(half));
+          await run(batch.sublist(0, half), repairingMissing: repairingMissing);
+          await run(batch.sublist(half), repairingMissing: repairingMissing);
+          return;
+        }
+        if (error.kind != LyricsAiErrorKind.refused &&
+            batch.single.words.isNotEmpty) {
+          // A single oversized alignment cannot split any further. Keep its
+          // readable translation and original line timing as the fallback.
+          final item = batch.single;
+          _log.d('Retrying one line without word alignment');
+          await run([
+            LyricsAiItem(item.id, item.text),
+          ], repairingMissing: repairingMissing);
           return;
         }
         _log.w('Leaving ${batch.length} lines untranslated: $error');
-        done += batch.length;
-        onProgress?.call(done, texts.length);
+        settled.addAll(batch.map((item) => item.id));
+        reportProgress();
       }
     }
 
-    for (final batch in batchLyricsItems(
-      items,
+    final batches = batchLyricsItems(
+      [
+        for (final item in items)
+          if (!settled.contains(item.id)) item,
+      ],
       maxItems: maxItems,
       maxChars: maxChars,
-    )) {
-      await run(batch);
+      maxAlignmentUnits: maxAlignmentUnits,
+    );
+    final workers = sourceWords.any((words) => words.isNotEmpty)
+        ? maxConcurrentRequests
+        : 1;
+    _log.d(
+      'Translating ${texts.length - settled.length} lines in ${batches.length} batches (up to $workers requests)',
+    );
+    var next = 0;
+    Future<void> work() async {
+      try {
+        while (!stopped && next < batches.length) {
+          cancel?.throwIfCancelled();
+          await run(batches[next++]);
+        }
+      } on Object {
+        stopped = true;
+        rethrow;
+      }
     }
+
+    await Future.wait([
+      for (var i = 0; i < workers && i < batches.length; i++) work(),
+    ], eagerError: true);
     if (translations.every((value) => value == null)) {
       throw softError ?? const LyricsAiException(LyricsAiErrorKind.badResponse);
     }

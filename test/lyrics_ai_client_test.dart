@@ -31,6 +31,52 @@ String _openAiReply(String content, {String finish = 'stop'}) => jsonEncode({
 
 void main() {
   group('request building', () {
+    test(
+      'all providers keep song context separate from requested line ids',
+      () {
+        const context = [
+          'Before this line',
+          'Requested line',
+          'After this line',
+        ];
+        const items = [
+          LyricsAiItem(1, 'Requested line', words: ['Requested', 'line']),
+        ];
+        for (final provider in LyricsAiProvider.values) {
+          final request = buildLyricsTranslationRequest(
+            _config(provider, baseUrl: 'https://example.test/v1'),
+            items,
+            systemPrompt: 'system',
+            context: context,
+          );
+          final String sourceContext;
+          final String requested;
+          if (provider == LyricsAiProvider.gemini) {
+            final parts =
+                ((request.body['contents'] as List).single as Map)['parts']
+                    as List;
+            sourceContext = (parts.first as Map)['text'] as String;
+            requested = (parts.last as Map)['text'] as String;
+          } else {
+            final messages = request.body['messages'] as List;
+            final users = messages.cast<Map<Object?, Object?>>().where(
+              (message) => message['role'] == 'user',
+            );
+            sourceContext = users.first['content'] as String;
+            requested = users.last['content'] as String;
+          }
+          expect(
+            sourceContext,
+            contains(jsonEncode(context)),
+            reason: provider.name,
+          );
+          expect(jsonDecode(requested), [
+            items.single.toJson(),
+          ], reason: provider.name);
+        }
+      },
+    );
+
     test('OpenAI classic models send temperature and JSON mode', () {
       final request = buildLyricsTranslationRequest(
         _config(LyricsAiProvider.openAi, model: 'gpt-4.1-mini'),
