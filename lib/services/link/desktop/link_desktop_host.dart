@@ -209,6 +209,7 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
   Timer? _stateTimer;
   Timer? _heartbeat;
   Timer? _downloadsTimer;
+  LinkDownloadUpdates? _downloadUpdates;
   Future<void> _transition = Future.value();
   bool _exporting = false;
   bool _exportAgain = false;
@@ -664,6 +665,11 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
   }
 
   void _listenApp() {
+    final updates = _downloadUpdates = LinkDownloadUpdates(
+      items: () => ref.read(linkDownloadItemsProvider),
+      send: (message, id) => _send(message, deviceId: id),
+    )..keepConnected(state.clients);
+    unawaited(updates.publish(snapshotsOnly: true));
     _lyricsTranslations = LinkLyricsTranslations(
       sharing: ref.read(lyricsTranslationSharingProvider),
       send: (message, deviceId) async {
@@ -690,6 +696,8 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
   }
 
   void _cancelApp() {
+    _downloadUpdates?.dispose();
+    _downloadUpdates = null;
     _lyricsTranslations?.dispose();
     _lyricsTranslations = null;
     for (final subscription in _appSubscriptions) {
@@ -741,6 +749,13 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
   }
 
   void _onMessage(LinkMessageEvent event) {
+    if (event.type == LinkMessageTypes.downloadsSubscribe) {
+      final updates = _downloadUpdates;
+      if (updates?.subscribe(event.deviceId, event.message['deltas']) == true) {
+        unawaited(updates!.publish(snapshotsOnly: true));
+      }
+      return;
+    }
     if (state.clients.any((client) => client.deviceId == event.deviceId) &&
         (_lyricsTranslations?.handle(event.message, deviceId: event.deviceId) ??
             false)) {
@@ -883,6 +898,9 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
     );
     _phoneSources?.keepConnected(ids);
     _transfers?.keepConnected(ids);
+    final updates = _downloadUpdates;
+    updates?.keepConnected(clients);
+    if (updates != null) unawaited(updates.publish(snapshotsOnly: true));
     _updateHeartbeat();
     // A phone that just connected gets the desktop's state right away.
     if (!known.containsAll(ids)) {
@@ -963,12 +981,8 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
     _downloadsTimer = Timer(downloadsDelay, () {
       _downloadsTimer = null;
       if (!ref.mounted || !state.running || state.clients.isEmpty) return;
-      unawaited(
-        _send({
-          'type': LinkMessageTypes.downloadsChanged,
-          ...linkDownloadsPayload(ref.read(linkDownloadItemsProvider)),
-        }),
-      );
+      final updates = _downloadUpdates;
+      if (updates != null) unawaited(updates.publish());
     });
   }
 

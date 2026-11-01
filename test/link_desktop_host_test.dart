@@ -375,6 +375,74 @@ void main() {
     await shutdown(tester);
   });
 
+  testWidgets(
+    'negotiated download pushes target deltas and reconnect snapshots',
+    (tester) async {
+      await boot(tester);
+      DownloadItem item(int id, double progress) => DownloadItem(
+        id: 'q$id',
+        track: Track(
+          id: 't$id',
+          name: 'Song $id',
+          artistName: 'Artist',
+          albumName: 'Album',
+          duration: 100,
+        ),
+        service: 'example-service',
+        status: DownloadStatus.downloading,
+        progress: progress,
+        createdAt: DateTime(2024),
+      );
+      final queue = container.read(fakeDownloadItemsProvider.notifier);
+      queue.replace(List.generate(200, (i) => item(i, 0.1)));
+      backend.connect([_phone, _tablet]);
+      await flush(tester);
+      expect(
+        backend.sentOfType(LinkMessageTypes.downloadsChanged),
+        hasLength(2),
+      );
+      backend.message('p1', {
+        'type': LinkMessageTypes.downloadsSubscribe,
+        'deltas': 1,
+      });
+      await flush(tester);
+      expect(
+        backend.sentOfType(LinkMessageTypes.downloadsChanged),
+        hasLength(3),
+      );
+      backend.sent.clear();
+      queue.replace(List.generate(200, (i) => item(i, i == 0 ? 0.9 : 0.1)));
+      await tester.pump(const Duration(milliseconds: 999));
+      expect(backend.sentOfType(LinkMessageTypes.downloadsDelta), isEmpty);
+      await tester.pump(const Duration(milliseconds: 1));
+      await flush(tester);
+      final deltas = backend.sent
+          .where(
+            (entry) => entry.message['type'] == LinkMessageTypes.downloadsDelta,
+          )
+          .toList();
+      expect(deltas, hasLength(1));
+      final delta = deltas.single;
+      expect(delta.deviceId, 'p1');
+      expect(delta.message['items'], hasLength(1));
+      final legacy = backend.sent.singleWhere(
+        (entry) => entry.message['type'] == LinkMessageTypes.downloadsChanged,
+      );
+      expect(legacy.deviceId, 'p2');
+      expect(legacy.message['items'], hasLength(200));
+
+      backend.connect([_tablet]);
+      await flush(tester);
+      backend.sent.clear();
+      backend.connect([_phone, _tablet]);
+      await flush(tester);
+      final reconnect = backend.sentOfType(LinkMessageTypes.downloadsChanged);
+      expect(reconnect, hasLength(1));
+      expect(reconnect.single['items'], hasLength(200));
+      await shutdown(tester);
+    },
+  );
+
   testWidgets('keeps each phone state until the phone disconnects', (
     tester,
   ) async {

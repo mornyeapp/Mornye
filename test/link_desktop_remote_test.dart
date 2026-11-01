@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/services/link/features/link_desktop_remote.dart';
@@ -247,4 +249,139 @@ void main() {
     expect(read().loading, isFalse);
     expect(read().error, isA<LinkException>());
   });
+
+  test(
+    'negotiates deltas after a full GET and again after reconnect',
+    () async {
+      await start();
+      expect(client.sent, [
+        {'type': LinkMessageTypes.downloadsSubscribe, 'deltas': 1},
+      ]);
+      client.setConnection(LinkConnectionState.disconnected);
+      client.setConnection(LinkConnectionState.connected);
+      await pumpEventQueue();
+      expect(client.sent, hasLength(2));
+      expect(client.gets, [
+        LinkOps.state,
+        LinkOps.downloads,
+        LinkOps.state,
+        LinkOps.downloads,
+      ]);
+      expect(read().downloads.single.id, 'd1');
+    },
+  );
+
+  test(
+    'applies changed rows, removals and ordering after a WS baseline',
+    () async {
+      await start();
+      client.push({
+        'type': LinkMessageTypes.downloadsChanged,
+        'items': [
+          {'id': 'd1', 'title': 'Original', 'progress': 0.4},
+        ],
+      });
+      final retained = read().downloads.single;
+      client.push({
+        'type': LinkMessageTypes.downloadsDelta,
+        'items': [
+          {'id': 'd2', 'title': 'New'},
+        ],
+        'removed': <String>[],
+        'order': ['d2', 'd1'],
+      });
+      expect(read().downloads.map((item) => item.id), ['d2', 'd1']);
+      expect(read().downloads.last, same(retained));
+      client.push({
+        'type': LinkMessageTypes.downloadsDelta,
+        'items': [
+          {'id': 'd2', 'title': 'Renamed', 'status': 'completed'},
+        ],
+        'removed': ['d1'],
+        'order': ['d2'],
+      });
+      expect(read().downloads.single.title, 'Renamed');
+      expect(read().downloads.single.finished, isTrue);
+    },
+  );
+
+  test(
+    'ignores deltas before a baseline and requests recovery for invalid data',
+    () async {
+      await start();
+      client.push({
+        'type': LinkMessageTypes.downloadsDelta,
+        'items': <Object?>[],
+        'removed': ['d1'],
+        'order': <String>[],
+      });
+      expect(read().downloads.single.id, 'd1');
+      client.push({
+        'type': LinkMessageTypes.downloadsChanged,
+        'items': [
+          {'id': 'd1', 'title': 'Original'},
+        ],
+      });
+      client.push({
+        'type': LinkMessageTypes.downloadsDelta,
+        'items': <Object?>[],
+        'removed': <String>[],
+        'order': ['missing'],
+      });
+      expect(read().downloads.single.title, 'Original');
+      expect(client.sent, hasLength(2));
+      client.push({
+        'type': LinkMessageTypes.downloadsChanged,
+        'items': <Object?>[],
+      });
+      expect(read().downloads, isEmpty);
+    },
+  );
+
+  test('a late GET cannot replace newer download pushes', () async {
+    final remote = await start();
+    final reply = Completer<Object?>();
+    client.onGet = (op, _) =>
+        op == LinkOps.state ? _desktopState() : reply.future;
+    final refresh = remote.refresh();
+    await pumpEventQueue();
+    client.push({
+      'type': LinkMessageTypes.downloadsChanged,
+      'items': [
+        {'id': 'new', 'title': 'Newer'},
+      ],
+    });
+    reply.complete({'items': <Object?>[]});
+    await refresh;
+    expect(read().downloads.single.id, 'new');
+  });
+
+  test(
+    'a previous connection GET cannot overwrite the reconnect snapshot',
+    () async {
+      final remote = await start();
+      final old = Completer<Object?>();
+      client.onGet = (op, _) =>
+          op == LinkOps.state ? _desktopState() : old.future;
+      final stale = remote.refresh();
+      await pumpEventQueue();
+      client.setConnection(LinkConnectionState.disconnected);
+      client.onGet = (op, _) => op == LinkOps.state
+          ? _desktopState()
+          : {
+              'items': [
+                {'id': 'reconnected'},
+              ],
+            };
+      client.setConnection(LinkConnectionState.connected);
+      await pumpEventQueue();
+      old.complete({
+        'items': [
+          {'id': 'obsolete'},
+        ],
+      });
+      await stale;
+      expect(read().downloads.single.id, 'reconnected');
+    },
+  );
 }

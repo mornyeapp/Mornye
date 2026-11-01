@@ -133,6 +133,8 @@ abstract final class LinkMessageTypes {
   static const command = 'command';
   static const open = 'open';
   static const downloadsChanged = 'downloads.changed';
+  static const downloadsSubscribe = 'downloads.subscribe';
+  static const downloadsDelta = 'downloads.delta';
   static const collectionsChanged = 'collections.changed';
   static const catalogChanged = 'catalog.changed';
   static const lyricsTranslation = 'lyrics.translation';

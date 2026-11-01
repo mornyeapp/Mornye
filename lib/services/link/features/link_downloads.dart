@@ -54,6 +54,45 @@ List<LinkDesktopDownload> linkParseDownloads(Object? json) {
   return [for (final item in items) ?LinkDesktopDownload.fromJson(item)];
 }
 
+/// Applies a negotiated update to the newest 200 queue entries. A malformed
+/// update needs a fresh snapshot instead of leaving a partial queue visible.
+List<LinkDesktopDownload>? linkApplyDownloadDelta(
+  List<LinkDesktopDownload> before,
+  Map<String, dynamic> message,
+) {
+  final items = message['items'];
+  final removed = message['removed'];
+  final order = message['order'];
+  if (items is! List ||
+      removed is! List ||
+      items.length > 200 ||
+      removed.length > 200 ||
+      (order != null && (order is! List || order.length > 200))) {
+    return null;
+  }
+  final byId = {for (final item in before) item.id: item};
+  for (final id in removed) {
+    if (id is! String) return null;
+    byId.remove(id);
+  }
+  for (final value in items) {
+    final item = LinkDesktopDownload.fromJson(value);
+    if (item == null) return null;
+    byId[item.id] = item;
+  }
+  if (byId.length > 200) return null;
+  if (order == null) return byId.values.toList();
+  final ordered = <LinkDesktopDownload>[];
+  final seen = <String>{};
+  for (final id in order as List) {
+    if (id is! String || !seen.add(id)) return null;
+    final item = byId[id];
+    if (item == null) return null;
+    ordered.add(item);
+  }
+  return ordered.length == byId.length ? ordered : null;
+}
+
 /// The `POST downloads` body that queues [tracks] on the desktop.
 Map<String, dynamic> linkDownloadTracksBody(
   List<Track> tracks, {

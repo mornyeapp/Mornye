@@ -85,18 +85,29 @@ class LinkDesktopRemote extends Notifier<LinkRemoteState> {
 
   final int Function() _nowMs;
   LinkClientApi? _client;
+  int _generation = 0;
+  int _refreshRequest = 0;
+  int _downloadPushes = 0;
+  bool _downloadsReady = false;
 
   @override
   LinkRemoteState build() {
+    _generation++;
+    _downloadsReady = false;
     final client = _client = ref.watch(linkPhoneClientProvider);
     if (client == null) return const LinkRemoteState();
-    final messages = client.messages.listen(_onMessage);
+    final messages = client.messages.listen((message) {
+      if (_client == client) _onMessage(message);
+    });
     final connections = client.connectionStates.listen((connection) {
       if (!ref.mounted || _client != client) return;
+      _generation++;
+      _downloadsReady = false;
       state = state.copyWith(connection: connection);
       if (connection == LinkConnectionState.connected) unawaited(refresh());
     });
     ref.onDispose(() {
+      _generation++;
       unawaited(messages.cancel());
       unawaited(connections.cancel());
     });
@@ -120,7 +131,19 @@ class LinkDesktopRemote extends Notifier<LinkRemoteState> {
         final player = LinkPlayerState.fromJson(message['state']);
         if (player != null) state = state.copyWith(player: _received(player));
       case LinkMessageTypes.downloadsChanged:
+        _downloadPushes++;
+        _downloadsReady = true;
         state = state.copyWith(downloads: linkParseDownloads(message));
+      case LinkMessageTypes.downloadsDelta:
+        if (!_downloadsReady) return;
+        final downloads = linkApplyDownloadDelta(state.downloads, message);
+        if (downloads == null) {
+          _downloadsReady = false;
+          _subscribeDownloads();
+          return;
+        }
+        _downloadPushes++;
+        state = state.copyWith(downloads: downloads);
     }
   }
 
@@ -128,24 +151,43 @@ class LinkDesktopRemote extends Notifier<LinkRemoteState> {
   Future<void> refresh() async {
     final client = _client;
     if (client == null || !ref.mounted) return;
+    final generation = _generation;
+    final request = ++_refreshRequest;
+    bool current() =>
+        ref.mounted &&
+        _client == client &&
+        _generation == generation &&
+        _refreshRequest == request;
     try {
       final player = LinkPlayerState.fromJson(await client.get(LinkOps.state));
-      if (!ref.mounted || _client != client) return;
+      if (!current()) return;
       state = LinkRemoteState(
         connection: state.connection,
         player: player == null ? null : _received(player),
         downloads: state.downloads,
       );
     } on Object catch (error) {
-      if (!ref.mounted || _client != client) return;
+      if (!current()) return;
       state = state.copyWith(loading: false, error: error);
     }
+    final pushes = _downloadPushes;
     try {
       final downloads = linkParseDownloads(await client.get(LinkOps.downloads));
-      if (!ref.mounted || _client != client) return;
-      state = state.copyWith(downloads: downloads);
+      if (!current()) return;
+      if (_downloadPushes == pushes) {
+        state = state.copyWith(downloads: downloads);
+      }
     } on Object {
       // The player stays usable when the download queue is unavailable.
+    } finally {
+      if (current()) _subscribeDownloads();
+    }
+  }
+
+  void _subscribeDownloads() {
+    final client = _client;
+    if (client?.connectionState == LinkConnectionState.connected) {
+      client!.send({'type': LinkMessageTypes.downloadsSubscribe, 'deltas': 1});
     }
   }
 

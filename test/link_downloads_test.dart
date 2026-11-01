@@ -77,4 +77,41 @@ void main() {
     expect(linkParseDownloads(null), isEmpty);
     expect(linkParseDownloads({'items': 'none'}), isEmpty);
   });
+
+  test('delta validation never partially replaces the visible queue', () {
+    final before = linkParseDownloads({
+      'items': [
+        {'id': 'a', 'title': 'A'},
+      ],
+    });
+    for (final message in <Map<String, dynamic>>[
+      {'items': <Object?>[], 'removed': 'a'},
+      {
+        'items': ['bad'],
+        'removed': <String>[],
+      },
+      {
+        'items': <Object?>[],
+        'removed': [1],
+      },
+      {
+        'items': <Object?>[],
+        'removed': <String>[],
+        'order': ['missing'],
+      },
+      {
+        'items': <Object?>[],
+        'removed': <String>[],
+        'order': ['a', 'a'],
+      },
+      {'items': <Object?>[], 'removed': <String>[], 'order': <String>[]},
+      {
+        'items': List.filled(201, {'id': 'b'}),
+        'removed': <String>[],
+      },
+    ]) {
+      expect(linkApplyDownloadDelta(before, message), isNull);
+      expect(before.single.title, 'A');
+    }
+  });
 }

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/models/download_item.dart';
 import 'package:mornye/models/track.dart';
@@ -54,6 +55,121 @@ Map<String, dynamic> linkDownloadsPayload(
       linkDownloadSummary(item),
   ],
 };
+
+/// Negotiated queue updates, with a full snapshot for older phones and each
+/// new subscription. Only the newest send request waits behind an active send.
+class LinkDownloadUpdates {
+  LinkDownloadUpdates({
+    required List<DownloadItem> Function() items,
+    required Future<int> Function(Map<String, dynamic>, String) send,
+  }) : _items = items,
+       _send = send;
+
+  final List<DownloadItem> Function() _items;
+  final Future<int> Function(Map<String, dynamic>, String) _send;
+  final _peers = <String, _DownloadPeer>{};
+  Future<void>? _sending;
+  bool _pending = false;
+  bool _updatesPending = false;
+  bool _disposed = false;
+
+  void keepConnected(List<LinkClientInfo> clients) {
+    final ids = {for (final client in clients) client.deviceId};
+    _peers.removeWhere((id, _) => !ids.contains(id));
+    for (final client in clients) {
+      if (_peers[client.deviceId]?.connectedMs != client.connectedMs) {
+        _peers[client.deviceId] = _DownloadPeer(client.connectedMs);
+      }
+    }
+  }
+
+  bool subscribe(String deviceId, Object? version) {
+    final peer = _peers[deviceId];
+    if (_disposed || peer == null || version != 1) return false;
+    peer.deltas = true;
+    peer.full = true;
+    return true;
+  }
+
+  Future<void> publish({bool snapshotsOnly = false}) {
+    if (_disposed) return Future.value();
+    _pending = true;
+    _updatesPending |= !snapshotsOnly;
+    return _sending ??= _drain().whenComplete(() {
+      _sending = null;
+      if (_pending && !_disposed) return publish(snapshotsOnly: true);
+    });
+  }
+
+  Future<void> _drain() async {
+    while (_pending && !_disposed) {
+      _pending = false;
+      final updates = _updatesPending;
+      _updatesPending = false;
+      if (_peers.isEmpty) continue;
+      final items = (linkDownloadsPayload(_items())['items'] as List)
+          .cast<Map<String, dynamic>>();
+      for (final MapEntry(key: id, value: peer) in Map.of(_peers).entries) {
+        if (_disposed) return;
+        if (_peers[id] != peer) continue;
+        if (!updates && !peer.full) continue;
+        final before = peer.items;
+        final delta = before == null ? null : _delta(before, items);
+        if (!peer.full && before != null && delta == null) continue;
+        final message = peer.deltas && !peer.full && before != null
+            ? {'type': LinkMessageTypes.downloadsDelta, ...delta!}
+            : {'type': LinkMessageTypes.downloadsChanged, 'items': items};
+        peer.full = false;
+        var sent = 0;
+        try {
+          sent = await _send(message, id);
+        } catch (_) {
+          // The next successful send must establish a complete baseline.
+        }
+        if (_peers[id] == peer) peer.items = sent > 0 ? items : null;
+      }
+    }
+  }
+
+  static Map<String, dynamic>? _delta(
+    List<Map<String, dynamic>> before,
+    List<Map<String, dynamic>> items,
+  ) {
+    final old = {for (final item in before) item['id']: item};
+    final ids = [for (final item in items) item['id'] as String];
+    final changed = [
+      for (final item in items)
+        if (!mapEquals(old[item['id']], item)) item,
+    ];
+    final removed = [
+      for (final id in old.keys)
+        if (!ids.contains(id)) id,
+    ];
+    final orderChanged = !listEquals(old.keys.toList(), ids);
+    if (changed.isEmpty && removed.isEmpty && !orderChanged) return null;
+    return {
+      'items': changed,
+      'removed': removed,
+      if (orderChanged) 'order': ids,
+    };
+  }
+
+  void dispose() {
+    _disposed = true;
+    _pending = false;
+    _updatesPending = false;
+    _peers.clear();
+  }
+}
+
+class _DownloadPeer {
+  _DownloadPeer(this.connectedMs);
+
+  final int connectedMs;
+  bool deltas = false;
+  bool full = true;
+  List<Map<String, dynamic>>? items;
+}
 
 class AppLinkDownloadsPort implements LinkDownloadsPort {
   AppLinkDownloadsPort(this._ref);
