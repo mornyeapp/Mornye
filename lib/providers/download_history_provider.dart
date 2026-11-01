@@ -184,13 +184,16 @@ class DownloadHistoryNotifier extends Notifier<DownloadHistoryState> {
     if (_isLoaded) return;
     _isLoaded = true;
     Future.microtask(() async {
+      if (!ref.mounted) return;
       await reloadFromStorage();
     });
   }
 
   Future<void> _loadFromDatabase({bool publishUnchanged = true}) async {
+    if (!ref.mounted) return;
     try {
       final migrated = await _db.migrateFromSharedPreferences();
+      if (!ref.mounted) return;
       if (migrated) {
         _historyLog.i('Migrated history from SharedPreferences to SQLite');
       }
@@ -198,6 +201,7 @@ class DownloadHistoryNotifier extends Notifier<DownloadHistoryState> {
       var pathsMigrated = false;
       if (Platform.isIOS) {
         pathsMigrated = await _db.migrateIosContainerPaths();
+        if (!ref.mounted) return;
         if (pathsMigrated) {
           _historyLog.i('Migrated iOS container paths after app update');
         }
@@ -209,6 +213,7 @@ class DownloadHistoryNotifier extends Notifier<DownloadHistoryState> {
           .map((e) => DownloadHistoryItem.fromJson(e))
           .toList();
       final totalCount = await countFuture;
+      if (!ref.mounted) return;
 
       if (publishUnchanged ||
           migrated ||

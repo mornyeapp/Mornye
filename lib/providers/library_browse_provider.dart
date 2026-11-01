@@ -140,6 +140,8 @@ final libraryBrowseProvider = AsyncNotifierProvider.autoDispose
 class LibraryBrowseNotifier extends AsyncNotifier<LibraryBrowseState> {
   LibraryBrowseNotifier(this.request);
 
+  static const _refreshPageLimit = 200;
+
   final LibraryBrowseRequest request;
   List<LibraryBrowseEntry> _rows = const [];
   QueueLibraryDbCursor? _cursor;
@@ -150,9 +152,19 @@ class LibraryBrowseNotifier extends AsyncNotifier<LibraryBrowseState> {
 
   LibraryBrowsePageRequest _pageRequest(
     int offset,
-    QueueLibraryDbCursor? cursor,
-  ) => (
-    browse: request,
+    QueueLibraryDbCursor? cursor, {
+    int? limit,
+  }) => (
+    browse: limit == null || limit == request.limit
+        ? request
+        : (
+            artists: request.artists,
+            artist: request.artist,
+            search: request.search,
+            sort: request.sort,
+            limit: limit,
+            completeness: request.completeness,
+          ),
     offset: offset,
     cursor: request.artists ? null : cursor,
     includeLocal: _includeLocal,
@@ -174,20 +186,33 @@ class LibraryBrowseNotifier extends AsyncNotifier<LibraryBrowseState> {
     // Refresh the loaded range in bounded reads. Keep the old range visible
     // until its replacement is ready, preserving the user's scroll position.
     final target = math.max(request.limit, _rows.length);
+    // Replaying tiny scroll pages repeatedly recomputes album grouping after
+    // an index revision. Larger refresh pages still cap each SQL transfer.
+    final refreshLimit = _rows.length >= _refreshPageLimit
+        ? math.max(1, _refreshPageLimit ~/ request.limit) * request.limit
+        : request.limit;
     final rows = <LibraryBrowseEntry>[];
     QueueLibraryDbCursor? cursor;
     late LibraryBrowsePage page;
+    late int pageLimit;
     do {
-      page = await loadPage(_pageRequest(rows.length, cursor));
+      pageLimit = math.min(
+        refreshLimit,
+        ((target - rows.length + request.limit - 1) ~/ request.limit) *
+            request.limit,
+      );
+      page = await loadPage(
+        _pageRequest(rows.length, cursor, limit: pageLimit),
+      );
       if (!ref.mounted || generation != _generation) {
         return LibraryBrowseState(rows, hasMore: false);
       }
       rows.addAll(page.entries);
       cursor = page.nextCursor;
-    } while (page.entries.length == request.limit && rows.length < target);
+    } while (page.entries.length == pageLimit && rows.length < target);
     _rows = List.unmodifiable(rows);
     _cursor = cursor;
-    _hasMore = page.entries.length == request.limit;
+    _hasMore = page.entries.length == pageLimit;
     return LibraryBrowseState(_rows, hasMore: _hasMore);
   }
 

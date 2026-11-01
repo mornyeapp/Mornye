@@ -5,53 +5,58 @@ part of 'download_history_provider.dart';
 /// backfill that run staggered after the initial history load.
 extension _HistoryStartupMaintenance on DownloadHistoryNotifier {
   void _scheduleStartupMaintenance(List<DownloadHistoryItem> initialItems) {
-    if (_startupMaintenanceScheduled) {
+    if (!ref.mounted || _startupMaintenanceScheduled) {
       return;
     }
     _startupMaintenanceScheduled = true;
 
-    unawaited(
-      Future<void>.delayed(
-        DownloadHistoryNotifier._startupMaintenanceDelay,
-        () async {
-          try {
-            final prefs = await SharedPreferences.getInstance();
+    final timer = Timer(
+      DownloadHistoryNotifier._startupMaintenanceDelay,
+      () async {
+        try {
+          if (!ref.mounted) return;
+          final prefs = await SharedPreferences.getInstance();
+          if (!ref.mounted) return;
 
-            if (Platform.isAndroid) {
-              await _repairMissingSafEntries(
-                initialItems,
-                maxItems: DownloadHistoryNotifier._safRepairMaxPerLaunch,
-                prefs: prefs,
-              );
-              await Future<void>.delayed(
-                DownloadHistoryNotifier._startupMaintenanceStepGap,
-              );
-            }
-
-            await _cleanupOrphanedDownloadsIncremental(
-              maxItems: DownloadHistoryNotifier._orphanCleanupMaxPerLaunch,
+          if (Platform.isAndroid) {
+            await _repairMissingSafEntries(
+              initialItems,
+              maxItems: DownloadHistoryNotifier._safRepairMaxPerLaunch,
               prefs: prefs,
             );
+            if (!ref.mounted) return;
             await Future<void>.delayed(
               DownloadHistoryNotifier._startupMaintenanceStepGap,
             );
-
-            final currentItems = state.items;
-            if (currentItems.isNotEmpty) {
-              await _backfillAudioMetadata(
-                currentItems,
-                maxItems:
-                    DownloadHistoryNotifier._audioMetadataBackfillMaxPerLaunch,
-                prefs: prefs,
-              );
-            }
-          } catch (e, stack) {
-            _historyLog.w('Startup history maintenance failed: $e');
-            _historyLog.d('$stack');
           }
-        },
-      ),
+
+          if (!ref.mounted) return;
+          await _cleanupOrphanedDownloadsIncremental(
+            maxItems: DownloadHistoryNotifier._orphanCleanupMaxPerLaunch,
+            prefs: prefs,
+          );
+          if (!ref.mounted) return;
+          await Future<void>.delayed(
+            DownloadHistoryNotifier._startupMaintenanceStepGap,
+          );
+
+          if (!ref.mounted) return;
+          final currentItems = state.items;
+          if (currentItems.isNotEmpty) {
+            await _backfillAudioMetadata(
+              currentItems,
+              maxItems:
+                  DownloadHistoryNotifier._audioMetadataBackfillMaxPerLaunch,
+              prefs: prefs,
+            );
+          }
+        } catch (e, stack) {
+          _historyLog.w('Startup history maintenance failed: $e');
+          _historyLog.d('$stack');
+        }
+      },
     );
+    ref.onDispose(timer.cancel);
   }
 
   int _readStartupCursor(SharedPreferences prefs, String key, int totalCount) {

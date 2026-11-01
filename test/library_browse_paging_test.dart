@@ -195,6 +195,69 @@ void main() {
     expect(requests[1].cursor, requests[2].cursor);
   });
 
+  test(
+    'a late batched refresh cannot replace a newer index revision',
+    () async {
+      count = 1000;
+      final provider = libraryBrowseProvider(_request);
+      await container.read(provider.future);
+      final notifier = container.read(provider.notifier);
+      while (container.read(provider).requireValue.entries.length < count) {
+        await notifier.loadMore();
+      }
+      pending = Completer();
+      final latePage = pending!;
+      container.invalidate(provider);
+      final oldRefresh = container.read(provider.future);
+      expect(requests.last.browse.limit, 200);
+
+      pending = null;
+      prefix = 'Fresh';
+      (container.read(downloadHistoryProvider.notifier) as _History).revise();
+      final refreshed = await container.read(provider.future);
+      latePage.complete(
+        LibraryBrowsePage(List.generate(200, (index) => _entry(index))),
+      );
+      await oldRefresh;
+      expect(container.read(provider).requireValue, same(refreshed));
+      expect(refreshed.entries, hasLength(1000));
+      expect(
+        refreshed.entries.every((entry) => entry.name.startsWith('Fresh')),
+        true,
+      );
+    },
+  );
+
+  test(
+    'refresh keeps partial tails on custom scroll page boundaries',
+    () async {
+      await container.read(libraryBrowseProvider(_request).future);
+      count = 299;
+      const request = (
+        artists: false,
+        artist: null,
+        search: '',
+        sort: 'a-z',
+        limit: 60,
+        completeness: null,
+      );
+      final provider = libraryBrowseProvider(request);
+      container.listen(provider, (_, _) {});
+      await container.read(provider.future);
+      final notifier = container.read(provider.notifier);
+      while (container.read(provider).requireValue.hasMore) {
+        await notifier.loadMore();
+      }
+      requests.clear();
+      container.invalidate(provider);
+      final refreshed = await container.read(provider.future);
+      expect(requests.map((page) => page.offset), [0, 180]);
+      expect(requests.map((page) => page.browse.limit), [180, 120]);
+      expect(refreshed.entries, hasLength(299));
+      expect(refreshed.hasMore, false);
+    },
+  );
+
   test('index revision rejects a late next-page response', () async {
     final provider = libraryBrowseProvider(_request);
     await container.read(provider.future);

@@ -10,11 +10,16 @@ import 'package:mornye/services/history_database.dart';
 /// Rows newest first, as `getAll` orders them.
 class _StoredHistory implements HistoryDatabase {
   final rows = <DownloadHistoryItem>[];
+  int migrationReads = 0;
   int pageReads = 0;
+  int maintenanceReads = 0;
   Completer<void>? gate;
 
   @override
-  Future<bool> migrateFromSharedPreferences() async => false;
+  Future<bool> migrateFromSharedPreferences() async {
+    migrationReads++;
+    return false;
+  }
 
   @override
   Future<int> getCount() async => rows.length;
@@ -48,7 +53,10 @@ class _StoredHistory implements HistoryDatabase {
   Future<List<Map<String, dynamic>>> getEntriesWithPathsPage({
     required int limit,
     int offset = 0,
-  }) async => const [];
+  }) async {
+    maintenanceReads++;
+    return const [];
+  }
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
@@ -100,6 +108,45 @@ _loadedHistory(_StoredHistory db) async {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   SharedPreferences.setMockInitialValues({});
+
+  test('disposed startup skips the deferred history load', () async {
+    final db = _StoredHistory();
+    final container = ProviderContainer(
+      overrides: [
+        downloadHistoryProvider.overrideWith(
+          () => DownloadHistoryNotifier(database: db),
+        ),
+      ],
+    );
+    container.read(downloadHistoryProvider);
+    container.dispose();
+
+    await Future<void>.delayed(Duration.zero);
+
+    expect(db.migrationReads, 0);
+    expect(db.pageReads, 0);
+  });
+
+  testWidgets('disposal cancels pending startup history maintenance', (
+    tester,
+  ) async {
+    final db = _StoredHistory()..rows.add(_item(1));
+    final container = ProviderContainer(
+      overrides: [
+        downloadHistoryProvider.overrideWith(
+          () => DownloadHistoryNotifier(database: db),
+        ),
+      ],
+    );
+    container.read(downloadHistoryProvider);
+    await tester.pump();
+    expect(db.pageReads, 1);
+    container.dispose();
+
+    await tester.pump(const Duration(seconds: 5));
+
+    expect(db.maintenanceReads, 0);
+  });
 
   test('an unchanged refresh notifies nobody and keeps the revision', () async {
     final db = _StoredHistory()
