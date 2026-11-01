@@ -56,12 +56,6 @@ internal object AppCrashReporter {
     fun initialize(applicationContext: Context) {
         context = applicationContext
         sessionStartedAt = System.currentTimeMillis()
-        val prefs = context.getSharedPreferences("app_crash_reports", Context.MODE_PRIVATE)
-        val previousStart = prefs.getLong("session_started_at", 0L)
-        val previousVersion = prefs.getString("session_version", "Unknown") ?: "Unknown"
-        prefs.edit().putLong("session_started_at", sessionStartedAt)
-            .putString("session_version", "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})")
-            .commit()
 
         val previousHandler = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, error ->
@@ -91,6 +85,12 @@ internal object AppCrashReporter {
         val executor = Executors.newSingleThreadExecutor()
         recovery = executor.submit {
             try {
+                val prefs = context.getSharedPreferences("app_crash_reports", Context.MODE_PRIVATE)
+                val previousStart = prefs.getLong("session_started_at", 0L)
+                val previousVersion = prefs.getString("session_version", "Unknown") ?: "Unknown"
+                prefs.edit().putLong("session_started_at", sessionStartedAt)
+                    .putString("session_version", "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})")
+                    .commit()
                 recoverPreviousExit(previousStart, previousVersion)
             } catch (error: Exception) {
                 Log.w("AppCrashReporter", "Could not read Android exit diagnostics", error)
