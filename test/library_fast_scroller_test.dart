@@ -2,29 +2,72 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/library_fast_scroller.dart';
 
 void main() {
-  Widget host({required ScrollController controller, int itemCount = 400}) =>
-      MaterialApp(
-        home: Scaffold(
-          body: LibraryFastScroller(
-            labelAt: (fraction) =>
-                String.fromCharCode(65 + (fraction * 25).round()),
-            child: ListView.builder(
-              controller: controller,
-              itemExtent: 56,
-              itemCount: itemCount,
-              itemBuilder: (context, index) => Text('Row $index'),
-            ),
-          ),
+  Widget host({
+    required ScrollController controller,
+    int itemCount = 400,
+    bool mornye = false,
+  }) => MaterialApp(
+    theme: mornye ? MornyeTheme.build(Brightness.light) : null,
+    home: Scaffold(
+      body: LibraryFastScroller(
+        labelAt: (fraction) =>
+            String.fromCharCode(65 + (fraction * 25).round()),
+        child: ListView.builder(
+          controller: controller,
+          itemExtent: 56,
+          itemCount: itemCount,
+          itemBuilder: (context, index) => Text('Row $index'),
         ),
-      );
+      ),
+    ),
+  );
 
   Finder thumb() => find.byWidgetPredicate(
     (widget) =>
         widget is GestureDetector && widget.onVerticalDragUpdate != null,
   );
+
+  for (final platform in [
+    TargetPlatform.windows,
+    TargetPlatform.macOS,
+    TargetPlatform.linux,
+  ]) {
+    for (final mornye in [false, true]) {
+      testWidgets('one desktop scrollbar on $platform (mornye: $mornye)', (
+        tester,
+      ) async {
+        final controller = ScrollController();
+        addTearDown(controller.dispose);
+        final nativeScrollbar = find.byWidgetPredicate(
+          (widget) => widget is RawScrollbar,
+        );
+        await tester.pumpWidget(host(controller: controller, mornye: mornye));
+        await tester.pumpAndSettle();
+        controller.jumpTo(10);
+        await tester.pump();
+        expect(thumb(), findsOneWidget);
+        expect(nativeScrollbar, findsNothing);
+
+        await tester.pumpWidget(const SizedBox());
+        await tester.pumpWidget(
+          host(controller: controller, itemCount: 20, mornye: mornye),
+        );
+        await tester.pumpAndSettle();
+        expect(controller.position.maxScrollExtent, lessThan(1000));
+        expect(thumb(), findsNothing);
+        expect(nativeScrollbar, findsOneWidget);
+        expect(controller.position.maxScrollExtent, greaterThan(0));
+        controller.jumpTo(100);
+        await tester.pump();
+        expect(controller.offset, 100);
+        expect(tester.takeException(), isNull);
+      }, variant: TargetPlatformVariant({platform}));
+    }
+  }
 
   testWidgets('dragging the thumb scrolls and names the section', (
     tester,
