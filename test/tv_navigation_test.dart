@@ -34,6 +34,16 @@ class _Controller implements MusicPlayerController {
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
+class _CountingScope extends FocusScopeNode {
+  int walks = 0;
+
+  @override
+  Iterable<FocusNode> get traversalDescendants {
+    walks++;
+    return super.traversalDescendants;
+  }
+}
+
 void main() {
   late _Controller controller;
 
@@ -95,6 +105,54 @@ void main() {
     await tester.sendKeyEvent(key);
     await tester.pump();
   }
+
+  testWidgets('empty TV pages back off and still focus late content', (
+    tester,
+  ) async {
+    final scope = _CountingScope();
+    final ready = ValueNotifier(false);
+    final target = FocusNode();
+    addTearDown(scope.dispose);
+    addTearDown(ready.dispose);
+    addTearDown(target.dispose);
+    await pumpTv(
+      tester,
+      FocusScope(
+        node: scope,
+        child: ValueListenableBuilder(
+          valueListenable: ready,
+          builder: (context, available, _) => available
+              ? TextButton(
+                  focusNode: target,
+                  onPressed: () {},
+                  child: const Text('Ready'),
+                )
+              : const Text('Loading'),
+        ),
+      ),
+    );
+    scope.requestFocus();
+    await tester.pump();
+    for (var i = 0; i < 12; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    final initial = scope.walks;
+    for (var i = 0; i < 100; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    expect(scope.walks - initial, inInclusiveRange(9, 11));
+    ready.value = true;
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pump();
+    expect(target.hasPrimaryFocus, isTrue);
+    final focused = scope.walks;
+    for (var i = 0; i < 20; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    expect(scope.walks, focused);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
 
   testWidgets('remote enters a touch tile, opens its menu and activates once', (
     tester,

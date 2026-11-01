@@ -17,6 +17,7 @@ import 'package:mornye/widgets/error_card.dart' show EmptyState;
 import 'package:mornye/widgets/expressive_button.dart';
 import 'package:mornye/widgets/link/link_transfer_tile.dart';
 import 'package:mornye/widgets/settings_group.dart';
+import 'package:mornye/widgets/sliver_layout_info_builder.dart';
 
 /// Opens the Transfers list: a page on phones, a dialog of the list size
 /// class on desktop.
@@ -323,13 +324,11 @@ class _TransferGroup extends StatelessWidget {
       );
     }
     // The same edges as the settings groups at any width.
-    return SliverLayoutBuilder(
-      builder: (context, constraints) => SliverPadding(
+    return SliverLayoutInfoBuilder<double>(
+      select: (constraints) => constraints.crossAxisExtent,
+      builder: (context, width) => SliverPadding(
         padding: EdgeInsets.symmetric(
-          horizontal: settingsHorizontalInset(
-            context,
-            constraints.crossAxisExtent,
-          ),
+          horizontal: settingsHorizontalInset(context, width),
           vertical: 4,
         ),
         sliver: group,

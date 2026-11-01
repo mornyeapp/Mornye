@@ -86,6 +86,7 @@ class _TvNavigationState extends ConsumerState<TvNavigation> {
   final _repaint = ValueNotifier<int>(0);
   bool _repaintPending = false;
   Timer? _focusRecovery;
+  int _focusRecoveryAttempts = 0;
   Listenable? _routeMotion;
 
   @override
@@ -99,41 +100,17 @@ class _TvNavigationState extends ConsumerState<TvNavigation> {
     _scheduleRepaint();
     final focused = FocusManager.instance.primaryFocus;
     final focusedContext = focused?.context;
-    _routeMotion?.removeListener(_scheduleRepaint);
+    _routeMotion?.removeListener(_routeChanged);
     final route = focusedContext == null ? null : ModalRoute.of(focusedContext);
     _routeMotion = Listenable.merge([
       route?.animation,
       route?.secondaryAnimation,
     ]);
-    _routeMotion!.addListener(_scheduleRepaint);
+    _routeMotion!.addListener(_routeChanged);
     if (focused is FocusScopeNode ||
         focusedContext == null ||
         focused == _idle) {
-      _focusRecovery ??= Timer.periodic(const Duration(milliseconds: 100), (_) {
-        final primary = FocusManager.instance.primaryFocus;
-        if (primary != _idle && primary is! FocusScopeNode && primary != null) {
-          _focusRecovery?.cancel();
-          _focusRecovery = null;
-          return;
-        }
-        final scope = primary is FocusScopeNode
-            ? primary
-            : primary?.nearestScope;
-        final candidates = scope?.traversalDescendants;
-        if (candidates == null) return;
-        for (final candidate in candidates) {
-          final context = candidate.context;
-          if (candidate is FocusScopeNode ||
-              candidate == _idle ||
-              context == null ||
-              context.widget is EditableText ||
-              context.findAncestorWidgetOfExactType<EditableText>() != null) {
-            continue;
-          }
-          candidate.requestFocus();
-          break;
-        }
-      });
+      _scheduleFocusRecovery(restart: true);
       return;
     }
     _focusRecovery?.cancel();
@@ -146,6 +123,51 @@ class _TvNavigationState extends ConsumerState<TvNavigation> {
         alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtEnd,
       ),
     );
+  }
+
+  void _scheduleFocusRecovery({bool restart = false}) {
+    if (restart) {
+      _focusRecovery?.cancel();
+      _focusRecovery = null;
+      _focusRecoveryAttempts = 0;
+    }
+    _focusRecovery ??= Timer(
+      _focusRecoveryAttempts < 10
+          ? const Duration(milliseconds: 100)
+          : const Duration(seconds: 1),
+      _recoverFocus,
+    );
+  }
+
+  void _recoverFocus() {
+    _focusRecovery = null;
+    final primary = FocusManager.instance.primaryFocus;
+    if (primary != _idle && primary is! FocusScopeNode && primary != null) {
+      return;
+    }
+    final scope = primary is FocusScopeNode ? primary : primary?.nearestScope;
+    for (final candidate in scope?.traversalDescendants ?? <FocusNode>[]) {
+      final context = candidate.context;
+      if (candidate is FocusScopeNode ||
+          candidate == _idle ||
+          context == null ||
+          context.widget is EditableText ||
+          context.findAncestorWidgetOfExactType<EditableText>() != null) {
+        continue;
+      }
+      candidate.requestFocus();
+      return;
+    }
+    _focusRecoveryAttempts++;
+    _scheduleFocusRecovery();
+  }
+
+  void _routeChanged() {
+    _scheduleRepaint();
+    final primary = FocusManager.instance.primaryFocus;
+    if (primary == null || primary == _idle || primary is FocusScopeNode) {
+      _scheduleFocusRecovery(restart: true);
+    }
   }
 
   void _scheduleRepaint() {
@@ -207,7 +229,7 @@ class _TvNavigationState extends ConsumerState<TvNavigation> {
   void dispose() {
     FocusManager.instance.removeListener(_focusChanged);
     _focusRecovery?.cancel();
-    _routeMotion?.removeListener(_scheduleRepaint);
+    _routeMotion?.removeListener(_routeChanged);
     _idle.dispose();
     _repaint.dispose();
     super.dispose();
@@ -222,7 +244,7 @@ class _TvNavigationState extends ConsumerState<TvNavigation> {
       onKeyEvent: _handleKey,
       child: NotificationListener<ScrollNotification>(
         onNotification: (_) {
-          _scheduleRepaint();
+          _routeChanged();
           return false;
         },
         child: CustomPaint(

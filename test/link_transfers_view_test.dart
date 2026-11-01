@@ -10,6 +10,7 @@ import 'package:mornye/widgets/cached_cover_image.dart';
 import 'package:mornye/widgets/error_card.dart' show EmptyState;
 import 'package:mornye/widgets/link/link_transfer_tile.dart';
 import 'package:mornye/widgets/link/link_transfers_view.dart';
+import 'package:mornye/widgets/sliver_layout_info_builder.dart';
 
 final _l10n = lookupAppLocalizations(const Locale('en'));
 
@@ -163,6 +164,44 @@ Finder _tile(String title) => find.ancestor(
 );
 
 void main() {
+  for (final mornye in [false, true]) {
+    testWidgets('transfer group padding survives scroll frames ($mornye)', (
+      tester,
+    ) async {
+      await _pump(
+        tester,
+        mornye: mornye,
+        transfers: [_running, _queued, _done, _failed],
+      );
+      tester.view.physicalSize = const Size(800, 400);
+      await _settle(tester);
+      final builder = find
+          .byWidgetPredicate(
+            (widget) =>
+                widget is SliverLayoutInfoBuilder<double> ||
+                widget is SliverLayoutBuilder,
+          )
+          .first;
+      final padding = find
+          .descendant(of: builder, matching: find.byType(SliverPadding))
+          .first;
+      final original = tester.widget<SliverPadding>(padding);
+      final position = tester
+          .state<ScrollableState>(find.byType(Scrollable).first)
+          .position;
+      expect(position.maxScrollExtent, greaterThan(100));
+      for (var i = 1; i <= 10; i++) {
+        position.jumpTo(i * 10);
+        await tester.pump(const Duration(milliseconds: 16));
+        expect(tester.widget<SliverPadding>(padding), same(original));
+      }
+      tester.view.physicalSize = const Size(600, 400);
+      await tester.pump();
+      expect(tester.widget<SliverPadding>(padding), isNot(same(original)));
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   group('text', () {
     test('titles name the songs, the device and the direction', () {
       expect(linkTransferTitle(_l10n, _running), 'Sending 12 songs to Studio');
