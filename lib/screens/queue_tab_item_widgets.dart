@@ -919,6 +919,7 @@ extension _QueueTabItemWidgets on _QueueTabState {
           padding: inset,
           sliver: SliverTrackTable(
             rows: table.rows,
+            uniformRowHeight: true,
             columns: const [
               TrackTableColumn.title,
               TrackTableColumn.artist,

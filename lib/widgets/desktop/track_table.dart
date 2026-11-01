@@ -88,6 +88,7 @@ class SliverTrackTable extends StatefulWidget {
     this.sortableColumns,
     this.albumLayout = false,
     this.albumArtist,
+    this.uniformRowHeight = false,
   });
 
   /// The album page layout of Apple Music: no column headers, the number,
@@ -99,6 +100,11 @@ class SliverTrackTable extends StatefulWidget {
 
   /// The album's artist, which album rows leave out.
   final String? albumArtist;
+
+  /// Uses the first column row as the extent for every row. Callers opt in
+  /// only when artwork, badges and actions have uniform height. Album rows
+  /// and text scaled above 200% retain variable layout.
+  final bool uniformRowHeight;
 
   final List<TrackTableRow> rows;
   final List<TrackTableColumn> columns;
@@ -211,6 +217,35 @@ class _SliverTrackTableState extends State<SliverTrackTable> {
         },
       );
     }
+    Widget rowList(IndexedWidgetBuilder builder) {
+      if (widget.uniformRowHeight &&
+          rows.isNotEmpty &&
+          MediaQuery.textScalerOf(context).scale(14) <= 28) {
+        return SliverPrototypeExtentList.builder(
+          prototypeItem: TickerMode(
+            enabled: false,
+            child: ExcludeFocus(
+              child: ExcludeSemantics(
+                child: _TrackTableRowView(
+                  row: rows.first,
+                  columns: widget.columns,
+                  hasTrailing: hasTrailing,
+                  selected: false,
+                  current: false,
+                  playing: false,
+                  onTap: () {},
+                  onContextMenu: null,
+                ),
+              ),
+            ),
+          ),
+          itemCount: rows.length,
+          itemBuilder: builder,
+        );
+      }
+      return SliverList.builder(itemCount: rows.length, itemBuilder: builder);
+    }
+
     return SliverMainAxisGroup(
       slivers: [
         SliverPersistentHeader(
@@ -227,49 +262,46 @@ class _SliverTrackTableState extends State<SliverTrackTable> {
             ),
           ),
         ),
-        SliverList.builder(
-          itemCount: rows.length,
-          itemBuilder: (context, index) {
-            final row = rows[index];
-            Widget rowView({
-              Key? key,
-              bool current = false,
-              bool playing = false,
-            }) => _TrackTableRowView(
-              key: key,
-              row: row,
-              columns: widget.columns,
-              hasTrailing: hasTrailing,
-              selected: widget.selectedIds.contains(row.id),
-              current: current,
-              playing: playing,
-              onTap: () => handleDesktopRowClick(
-                row.id,
-                select: (kind) => widget.onSelect(row.id, kind, orderedIds),
-                activate: () => widget.onActivate(row.id),
-              ),
-              onContextMenu: widget.onContextMenu == null
-                  ? null
-                  : (position) => widget.onContextMenu!(row.id, position),
-            );
-            final rowPlayback = row.playback;
-            if (rowPlayback == null || context.isMornye) {
-              return rowView(key: ValueKey(row.id));
-            }
-            // Each row follows only its own track, so a track change
-            // rebuilds the two rows involved rather than the whole table.
-            return Consumer(
-              key: ValueKey(row.id),
-              builder: (context, ref, _) {
-                final playback = ref.watch(rowPlayback);
-                return rowView(
-                  current: playback.isCurrent,
-                  playing: playback.isPlaying,
-                );
-              },
-            );
-          },
-        ),
+        rowList((context, index) {
+          final row = rows[index];
+          Widget rowView({
+            Key? key,
+            bool current = false,
+            bool playing = false,
+          }) => _TrackTableRowView(
+            key: key,
+            row: row,
+            columns: widget.columns,
+            hasTrailing: hasTrailing,
+            selected: widget.selectedIds.contains(row.id),
+            current: current,
+            playing: playing,
+            onTap: () => handleDesktopRowClick(
+              row.id,
+              select: (kind) => widget.onSelect(row.id, kind, orderedIds),
+              activate: () => widget.onActivate(row.id),
+            ),
+            onContextMenu: widget.onContextMenu == null
+                ? null
+                : (position) => widget.onContextMenu!(row.id, position),
+          );
+          final rowPlayback = row.playback;
+          if (rowPlayback == null || context.isMornye) {
+            return rowView(key: ValueKey(row.id));
+          }
+          // Each row follows only its own track, so a track change
+          // rebuilds the two rows involved rather than the whole table.
+          return Consumer(
+            key: ValueKey(row.id),
+            builder: (context, ref, _) {
+              final playback = ref.watch(rowPlayback);
+              return rowView(
+                current: playback.isCurrent,
+                playing: playback.isPlaying,
+              );
+            },
+          );
+        }),
       ],
     );
   }

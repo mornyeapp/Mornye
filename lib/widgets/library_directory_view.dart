@@ -921,6 +921,7 @@ class _LibraryDirectoryViewState extends ConsumerState<LibraryDirectoryView>
       padding: EdgeInsets.symmetric(horizontal: wideListInset(context)),
       sliver: SliverTrackTable(
         rows: rows,
+        uniformRowHeight: true,
         columns: const [
           TrackTableColumn.title,
           TrackTableColumn.artist,

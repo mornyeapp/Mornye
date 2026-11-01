@@ -166,6 +166,7 @@ class _TrackListTableState extends ConsumerState<TrackListTable> {
       padding: EdgeInsets.symmetric(horizontal: wideListInset(context)),
       sliver: SliverTrackTable(
         rows: rows,
+        uniformRowHeight: widget.rowAction == null,
         columns: [
           TrackTableColumn.number,
           TrackTableColumn.title,
