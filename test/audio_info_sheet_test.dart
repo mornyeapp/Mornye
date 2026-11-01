@@ -8,6 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/controllers/player_metadata_controller.dart';
 import 'package:mornye/l10n/app_localizations.dart';
 import 'package:mornye/services/audio_route_info.dart';
+import 'package:mornye/services/music_playback_deck.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/audio_info_sheet.dart';
 
@@ -17,6 +18,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   tearDown(() {
+    usbAudioStatus.value = const UsbAudioStatus();
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(_route, null);
   });
@@ -204,9 +206,7 @@ void main() {
     expect(find.text('Phone speaker · Example phone'), findsOneWidget);
   });
 
-  testWidgets('shows source, signal and resampling to the output device', (
-    tester,
-  ) async {
+  testWidgets('Android defaults do not claim DAC resampling', (tester) async {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(
           _route,
@@ -258,13 +258,69 @@ void main() {
     expect(find.text('Up to 48 kHz (Nyquist)'), findsOneWidget);
     expect(find.text('144 dB'), findsOneWidget);
     expect(find.text('No ReplayGain tags'), findsOneWidget);
-    await tester.scrollUntilVisible(find.text('96 kHz → 48 kHz'), 200);
-    expect(find.text('96 kHz → 48 kHz'), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('Resampling'), 200);
+    expect(find.text('96 kHz → 48 kHz'), findsNothing);
     expect(find.text('Yes, unaltered samples'), findsNothing);
     await tester.scrollUntilVisible(find.text('USB audio · Example DAC'), 200);
+    expect(find.text('System default sample rate'), findsOneWidget);
     await tester.scrollUntilVisible(find.text('2.0 ms · 96 frames'), 200);
     expect(find.text('2.0 ms · 96 frames'), findsOneWidget);
   });
+
+  for (final mornye in [false, true]) {
+    testWidgets('USB changes refresh an open audio sheet (Mornye=$mornye)', (
+      tester,
+    ) async {
+      var device = 'First DAC';
+      var reads = 0;
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(_route, (call) async {
+            reads++;
+            return {
+              'platform': 'android',
+              'device': {'type': 'usb', 'name': device},
+            };
+          });
+      final metadata = PlayerMetadataController();
+      addTearDown(metadata.dispose);
+      await metadata.load(
+        const MediaItem(
+          id: 'track',
+          title: 'Track',
+          extras: {
+            'source': 'https://example.test/track.flac',
+            'format': 'flac',
+          },
+        ),
+      );
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            theme: mornye ? MornyeTheme.build(Brightness.dark) : ThemeData(),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Builder(
+              builder: (context) => TextButton(
+                onPressed: () =>
+                    showAudioInfoSheet(context, metadata: metadata),
+                child: const Text('open'),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+      final before = reads;
+      device = 'Second DAC';
+      usbAudioStatus.value = const UsbAudioStatus(reason: 'route_changed');
+      await tester.pumpAndSettle();
+      expect(reads, greaterThan(before));
+      await tester.scrollUntilVisible(find.text('USB audio · Second DAC'), 200);
+      expect(find.text('USB audio · First DAC'), findsNothing);
+      await tester.pumpWidget(const SizedBox());
+    });
+  }
 
   testWidgets('a song from a paired device shows where it plays from', (
     tester,

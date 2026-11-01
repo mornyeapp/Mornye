@@ -21,6 +21,7 @@ import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/utils/exclusive_output_labels.dart';
 import 'package:mornye/utils/nav_bar_inset.dart';
+import 'package:mornye/utils/usb_output_status_label.dart';
 import 'package:mornye/widgets/animation_utils.dart';
 import 'package:mornye/widgets/app_alert_dialog.dart';
 import 'package:mornye/widgets/app_progress_indicator.dart';
@@ -43,7 +44,17 @@ class PlaybackSettingsPage extends ConsumerStatefulWidget {
       _PlaybackSettingsPageState();
 }
 
-class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage> {
+class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage>
+    with WidgetsBindingObserver {
+  void _refreshOutputStatus() {
+    ref.read(musicPlayerRuntimeProvider).handler?.refreshOutputStatus();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _refreshOutputStatus();
+  }
+
   late final SongAnalysis _songAnalysis = ref
       .read(musicPlayerRuntimeProvider)
       .songAnalysis;
@@ -89,6 +100,8 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _refreshOutputStatus();
     _songAnalysis.progress.addListener(_onAnalysisProgress);
     _rankEvaluation.addListener(_onAnalysisProgress);
     unawaited(_songAnalysis.refreshProgress());
@@ -96,6 +109,7 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _songAnalysis.progress.removeListener(_onAnalysisProgress);
     _rankEvaluation.removeListener(_onAnalysisProgress);
     super.dispose();
@@ -483,28 +497,7 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage> {
                     subtitle: [
                       context.l10n.usbBitPerfectDescription,
                       if (settings.usbBitPerfect)
-                        switch (status.reason) {
-                          'active' =>
-                            '${status.device} · ${status.transport == 'pcm'
-                                ? '${status.bitDepth}-bit PCM'
-                                : status.transport == 'dop'
-                                ? 'DSD (DoP)'
-                                : 'DSD (Native)'} · ${(status.sampleRate! / 1000).toStringAsFixed(1)} kHz',
-                          'dsd_unsupported' => context.l10n.usbDsdUnsupported,
-                          'volume_unavailable' =>
-                            context.l10n.usbVolumeUnavailable,
-                          'exclusive_unavailable' =>
-                            context.l10n.dapExclusiveUnavailable,
-                          'permission_denied' =>
-                            context.l10n.usbPermissionDenied,
-                          'no_usb' => context.l10n.usbBitPerfectNoDevice,
-                          'route_changed' =>
-                            context.l10n.usbBitPerfectRouteChanged,
-                          'android_version' ||
-                          'unsupported' ||
-                          'format' => context.l10n.usbBitPerfectFallback,
-                          _ => context.l10n.usbBitPerfectPending,
-                        },
+                        usbOutputStatusLabel(context.l10n, status),
                     ].join('\n\n'),
                     value: settings.usbBitPerfect,
                     onChanged: (value) async {

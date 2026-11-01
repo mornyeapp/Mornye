@@ -179,7 +179,8 @@ private class UsbPcmPlayback(context: Context, private val emit: (Map<String, An
                         } catch (error: Exception) {
                             closeSource()
                             android.util.Log.i("UsbPcm", "Using normal output: ${error.message}")
-                            mapOf("reason" to (error as? Unavailable)?.reason.orEmpty().ifEmpty { "format" })
+                            mapOf("reason" to (error as? Unavailable)?.reason.orEmpty().ifEmpty { "format" },
+                                "detail" to (error.message ?: "USB preparation failed"))
                         }
                     }
                     "resume" -> { resume(); null }
@@ -187,6 +188,12 @@ private class UsbPcmPlayback(context: Context, private val emit: (Map<String, An
                     "seek" -> { seek((call.argument<Number>("position")?.toLong() ?: 0) * 1000); null }
                     "stop" -> { closeSource(); null }
                     "position" -> positionUs() / 1000
+                    "status" -> mapOf("token" to token, "reason" to when {
+                        invalidRoute -> "route_changed"
+                        track == null -> "idle"
+                        playing -> "active"
+                        else -> "ready"
+                    })
                     else -> error("Unknown USB PCM command")
                 }
                 done(value, null)

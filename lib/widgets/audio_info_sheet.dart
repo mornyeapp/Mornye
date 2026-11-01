@@ -20,6 +20,7 @@ import 'package:mornye/theme/app_tokens.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/int_utils.dart';
 import 'package:mornye/utils/string_utils.dart';
+import 'package:mornye/utils/usb_output_status_label.dart';
 import 'package:mornye/widgets/app_bottom_sheet.dart';
 import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/audio_analysis_widget.dart';
@@ -70,12 +71,16 @@ class _AudioInfoSheetState extends State<_AudioInfoSheet>
   String? _loadedPath;
   int _loadGeneration = 0;
   bool _loading = false;
+  Timer? _statusTimer;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     widget.metadata.addListener(_load);
+    usbAudioStatus.addListener(_usbChanged);
+    _refreshStatus();
+    _scheduleStatusRefresh();
     _load();
   }
 
@@ -83,13 +88,35 @@ class _AudioInfoSheetState extends State<_AudioInfoSheet>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     widget.metadata.removeListener(_load);
+    usbAudioStatus.removeListener(_usbChanged);
+    _statusTimer?.cancel();
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) unawaited(_load(force: true));
+    _scheduleStatusRefresh();
+    if (state == AppLifecycleState.resumed) {
+      _refreshStatus();
+      unawaited(_load(force: true));
+    }
   }
+
+  void _refreshStatus() {
+    unawaited(musicPlayerRuntime.handler?.refreshOutputStatus());
+  }
+
+  void _scheduleStatusRefresh() {
+    _statusTimer?.cancel();
+    if (WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed) {
+      return;
+    }
+    _statusTimer = Timer.periodic(const Duration(seconds: 2), (_) {
+      _refreshStatus();
+    });
+  }
+
+  void _usbChanged() => unawaited(_load(force: true));
 
   Future<void> _load({bool force = false}) async {
     final path = widget.metadata.filePath;
@@ -550,6 +577,8 @@ class _AudioFacts {
     return [
       _Fact(l10n.audioInfoPlayer, l10n.audioInfoPlayerValue),
       _Fact(l10n.audioInfoSignalPath, signalPath),
+      if (settings.usbBitPerfect || usb.reason != 'idle')
+        _Fact(l10n.usbBitPerfect, usbOutputStatusLabel(l10n, usb)),
       if (!direct && decoder != null)
         _Fact(
           l10n.audioInfoDecoder,
@@ -587,14 +616,16 @@ class _AudioFacts {
   bool get _bluetoothFormatUnreported =>
       !direct && route?.bluetoothFormatUnreported == true;
 
+  bool get _androidOutputUnreported => !direct && route?.platform == 'android';
+
   int? get _outputRate {
     if (direct) return usb.sampleRate;
-    if (_bluetoothFormatUnreported) return null;
+    if (_androidOutputUnreported) return null;
     return route?.device?.mixerSampleRate ?? route?.mixerSampleRate;
   }
 
   String? get _resampling {
-    if (_bluetoothFormatUnreported) return l10n.audioInfoAndroidNotReported;
+    if (_androidOutputUnreported) return l10n.audioInfoAndroidNotReported;
     final source = sampleRate, output = _outputRate;
     if (source == null || output == null) return null;
     if (_bitPerfect || source == output) return l10n.audioInfoResamplingNone;
@@ -622,6 +653,10 @@ class _AudioFacts {
         _Fact(l10n.audioInfoOutputRate, _khz(rate)),
       if (_bluetoothFormatUnreported) ...[
         _Fact(l10n.audioInfoBluetoothFormat, l10n.audioInfoAndroidNotReported),
+      ],
+      if (_androidOutputUnreported) ...[
+        if (!_bluetoothFormatUnreported)
+          _Fact(l10n.audioInfoOutputRate, l10n.audioInfoAndroidNotReported),
         if (route?.mixerSampleRate case final rate?)
           _Fact(l10n.audioInfoSystemDefaultRate, _khz(rate)),
       ],
@@ -634,7 +669,7 @@ class _AudioFacts {
           ].join(' · '),
         )
       else if (device?.mixerBitDepth case final bits?
-          when !_bluetoothFormatUnreported)
+          when !_androidOutputUnreported)
         _Fact(l10n.audioInfoOutputFormat, '$bits-bit'),
       if (device != null && route?.platform == 'android')
         _Fact(

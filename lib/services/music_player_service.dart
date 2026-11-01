@@ -1073,6 +1073,11 @@ class MusicPlayerHandler extends BaseAudioHandler
     autoMixRate: _autoMix.rate,
   );
 
+  Future<void> refreshOutputStatus() async {
+    final player = _player;
+    if (player is AudioplayersPlaybackDeck) await player.refreshNativeStatus();
+  }
+
   /// Re-applies normalization to the playing track when the setting flips.
   void reapplyNormalization() {
     final index = _index;

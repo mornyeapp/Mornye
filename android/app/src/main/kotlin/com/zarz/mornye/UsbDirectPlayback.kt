@@ -116,6 +116,13 @@ internal class UsbDirectPlayback(private val context: Context, private val emit:
                     "pause" -> { pause(); null }
                     "seek" -> { seek((call.argument<Number>("position")?.toLong() ?: 0) * 1000); null }
                     "position" -> positionUs() / 1000
+                    "status" -> mapOf("token" to token, "reason" to when {
+                        failed -> "route_changed"
+                        output == null -> "idle"
+                        playing -> "active"
+                        !requireNotNull(output).volume().available && !allowFixedVolume -> "volume_unavailable"
+                        else -> "ready"
+                    })
                     "volume" -> {
                         require(call.argument<Int>("token") == token) { "Stale volume request" }
                         val audio = requireNotNull(output)
@@ -179,7 +186,8 @@ internal class UsbDirectPlayback(private val context: Context, private val emit:
             } catch (error: Exception) {
                 android.util.Log.i("UsbDirect", "Direct output unavailable: ${error.message}")
                 closeSource()
-                request.done(mapOf("reason" to if (isDsd) "dsd_unsupported" else "unsupported", "fatal" to isDsd), null)
+                request.done(mapOf("reason" to if (isDsd) "dsd_unsupported" else "unsupported",
+                    "fatal" to isDsd, "detail" to (error.message ?: "USB preparation failed")), null)
             }
         }
     }

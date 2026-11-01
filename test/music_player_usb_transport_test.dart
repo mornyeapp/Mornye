@@ -22,6 +22,8 @@ void main() {
     late bool failResume;
     late bool fatal;
     late bool volumeBlocked;
+    Map<String, dynamic>? statusReply;
+    Completer<Map<String, dynamic>>? pendingStatus;
     Map<String, dynamic>? hardwareVolume;
     late String transport;
     late Map<dynamic, dynamic> prepareArguments;
@@ -46,6 +48,8 @@ void main() {
       failResume = false;
       fatal = false;
       volumeBlocked = false;
+      statusReply = null;
+      pendingStatus = null;
       hardwareVolume = null;
       transport = 'pcm';
       prepareArguments = {};
@@ -86,6 +90,10 @@ void main() {
             };
           case 'position':
             return position;
+          case 'status':
+            return pendingStatus?.future ??
+                statusReply ??
+                {'token': token, 'reason': 'active'};
           case 'seek':
             position = (call.arguments as Map)['position'] as int;
           case 'resume':
@@ -103,6 +111,48 @@ void main() {
         playerId: 'usb-test',
         nativeAvailable: true,
       );
+    });
+
+    test(
+      'native status restores a stale display without restarting audio',
+      () async {
+        await deck.setFileSource(
+          '/one.flac',
+          preferBitPerfect: true,
+          directUsb: true,
+        );
+        await deck.resume();
+        usbAudioStatus.value = const UsbAudioStatus();
+        final before = List<String>.of(usbCalls);
+        await deck.refreshNativeStatus();
+        expect(usbAudioStatus.value.reason, 'active');
+        expect(usbAudioStatus.value.driver, 'usb_direct');
+        expect(usbCalls, [...before, 'status']);
+        expect(deck.state, PlaybackDeckState.playing);
+      },
+    );
+
+    test(
+      'native readiness does not claim active bit-perfect playback',
+      () async {
+        await deck.setFileSource('/one.flac', preferBitPerfect: true);
+        statusReply = {'token': token, 'reason': 'ready'};
+        await deck.refreshNativeStatus();
+        expect(usbAudioStatus.value.reason, 'ready');
+        expect(usbCalls, isNot(contains('resume')));
+      },
+    );
+
+    test('a late status reply cannot change the new track status', () async {
+      await deck.setFileSource('/one.flac', preferBitPerfect: true);
+      final oldToken = token;
+      pendingStatus = Completer<Map<String, dynamic>>();
+      final refreshing = deck.refreshNativeStatus();
+      await _until(() => usbCalls.contains('status'));
+      await deck.setFileSource('/two.flac', preferBitPerfect: true);
+      pendingStatus!.complete({'token': oldToken, 'reason': 'active'});
+      await refreshing;
+      expect(usbAudioStatus.value.reason, 'ready');
     });
 
     test('direct driver and DoP are explicit and passed to native', () async {

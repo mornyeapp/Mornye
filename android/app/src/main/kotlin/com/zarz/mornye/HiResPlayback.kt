@@ -56,6 +56,12 @@ internal class HiResPlayback(context: Context, private val emit: (Map<String, An
                         null
                     }
                     "position" -> positionUs() / 1000
+                    "status" -> mapOf("token" to token, "reason" to when {
+                        failed -> "route_changed"
+                        output == 0L -> "idle"
+                        playing -> "active"
+                        else -> "ready"
+                    })
                     "stop" -> { close(); null }
                     else -> error("Unknown hi-res command")
                 }
