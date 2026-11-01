@@ -8416,5 +8416,10 @@
   "audioOutputCast": "Cast ke TV",
   "audioOutputCastDescription": "Perangkat Google Cast di jaringan Wi-Fi yang sama",
   "audioOutputStopCasting": "Hentikan casting",
-  "audioOutputCastUnavailable": "Google Cast tidak dapat dibuka. Periksa Google Play services dan akses jaringan lokal."
+  "audioOutputCastUnavailable": "Google Cast tidak dapat dibuka. Periksa Google Play services dan akses jaringan lokal.",
+  "lyricsAiMode": "Mode Terjemahan",
+  "lyricsAiModeFast": "Cepat",
+  "lyricsAiModeFastDescription": "Menerjemahkan per baris tanpa timing kata. Lebih cepat dengan keluaran lebih sedikit.",
+  "lyricsAiModeSynced": "Sinkron",
+  "lyricsAiModeSyncedDescription": "Menyelaraskan terjemahan dan romanisasi dengan kata serta frasa yang dinyanyikan. Lebih lama dan memerlukan lirik dengan timing kata."
 }

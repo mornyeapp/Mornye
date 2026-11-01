@@ -347,7 +347,7 @@ class LyricsTranslationResult {
 /// Sends a song's lines in bounded batches. A malformed batch is retried
 /// once, then split; a truncated one is split straight away. Lines a batch
 /// still cannot return stay untranslated instead of failing the song.
-/// Timed requests can overlap; valid cached lines and successful reply ids
+/// Requests can overlap; valid cached lines and successful reply ids
 /// are kept while only omitted lines are retried.
 class LyricsTranslator {
   LyricsTranslator(
@@ -516,9 +516,7 @@ class LyricsTranslator {
       maxChars: maxChars,
       maxAlignmentUnits: maxAlignmentUnits,
     );
-    final workers = sourceWords.any((words) => words.isNotEmpty)
-        ? maxConcurrentRequests
-        : 1;
+    final workers = maxConcurrentRequests;
     _log.d(
       'Translating ${texts.length - settled.length} lines in ${batches.length} batches (up to $workers requests)',
     );

@@ -5,6 +5,17 @@ import 'package:mornye/models/theme_settings.dart';
 import 'package:mornye/utils/artist_utils.dart';
 
 void main() {
+  test('AI translation defaults to Fast and remembers either mode', () {
+    expect(const AppSettings().lyricsAiWordSync, isFalse);
+    expect(AppSettings.fromJson({}).lyricsAiWordSync, isFalse);
+    for (final wordSync in [false, true]) {
+      final settings = const AppSettings().copyWith(lyricsAiWordSync: wordSync);
+      final restored = AppSettings.fromJson(settings.toJson());
+      expect(restored.lyricsAiWordSync, wordSync);
+      expect(restored.copyWith(locale: 'id').lyricsAiWordSync, wordSync);
+    }
+  });
+
   test('Library sort restores every choice and tolerates old settings', () {
     expect(AppSettings.fromJson({}).historySortMode, 'latest');
     for (final invalid in [null, '', 'unsupported', 42]) {

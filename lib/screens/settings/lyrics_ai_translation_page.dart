@@ -153,6 +153,15 @@ class _LyricsAiTranslationPageState
                 },
               ),
               SettingsItem(
+                key: const ValueKey('lyrics-ai-mode'),
+                icon: Icons.speed_outlined,
+                title: l10n.lyricsAiMode,
+                subtitle: settings.lyricsAiWordSync
+                    ? l10n.lyricsAiModeSynced
+                    : l10n.lyricsAiModeFast,
+                onTap: () => _pickMode(settings.lyricsAiWordSync),
+              ),
+              SettingsItem(
                 icon: Icons.edit_note_outlined,
                 title: l10n.lyricsAiInstruction,
                 subtitle: settings.lyricsAiInstruction.isEmpty
@@ -194,6 +203,30 @@ class _LyricsAiTranslationPageState
 
   static String _keySuffix(String key) =>
       key.length > 8 ? key.substring(key.length - 4) : '••••';
+
+  void _pickMode(bool wordSync) {
+    final l10n = context.l10n;
+    showAppChoiceSheet<bool>(
+      context: context,
+      title: l10n.lyricsAiMode,
+      selected: wordSync,
+      choices: [
+        AppChoice(
+          false,
+          Icons.bolt_outlined,
+          l10n.lyricsAiModeFast,
+          subtitle: l10n.lyricsAiModeFastDescription,
+        ),
+        AppChoice(
+          true,
+          Icons.lyrics_outlined,
+          l10n.lyricsAiModeSynced,
+          subtitle: l10n.lyricsAiModeSyncedDescription,
+        ),
+      ],
+      onSelected: ref.read(settingsProvider.notifier).setLyricsAiWordSync,
+    );
+  }
 
   void _pickProvider(LyricsAiProvider current) {
     final l10n = context.l10n;

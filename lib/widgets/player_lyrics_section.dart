@@ -55,6 +55,7 @@ class PlayerLyricsSection extends ConsumerWidget {
           settings.lyricsTranslationLanguage,
           settings.locale,
           settings.lyricsAutoTranslate,
+          settings.lyricsAiWordSync,
         ),
       ),
     );

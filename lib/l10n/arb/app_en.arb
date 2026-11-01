@@ -7228,6 +7228,14 @@
   "@lyricsAiAutoTranslateSubtitle": {
     "description": "Subtitle of the automatic AI translation switch"
   },
+  "lyricsAiMode": "Translation Mode",
+  "@lyricsAiMode": {
+    "description": "Select fast line translation or slower word-synced translation"
+  },
+  "lyricsAiModeFast": "Fast",
+  "lyricsAiModeFastDescription": "Translates per line without word timing. Uses less time and output.",
+  "lyricsAiModeSynced": "Synced",
+  "lyricsAiModeSyncedDescription": "Aligns translations and romanization to sung words and phrases. Takes longer and needs word-timed lyrics.",
   "lyricsAiRomanize": "Add Romanization",
   "@lyricsAiRomanize": {
     "description": "AI translation switch that also asks for romanized lyrics"
