@@ -5,6 +5,7 @@ import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:audio_service/audio_service.dart' show MediaItem;
+import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/services/cover_store.dart';
 import 'package:mornye/services/network_storage_service.dart';
@@ -18,6 +19,16 @@ List<int> _jpeg(int version) => [
   0xE0,
   ...List.filled(60, version),
 ];
+
+final class _CoverStats extends IOOverrides {
+  final paths = <String>[];
+
+  @override
+  Future<FileStat> stat(String path) {
+    if (path.endsWith('.image')) paths.add(path);
+    return super.stat(path);
+  }
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -516,6 +527,68 @@ void main() {
       expect(restarted.indexedFile(other), isNull, reason: other);
     }
   });
+
+  test('warm-up reads cover stats off the UI isolate', () async {
+    String key(String ref) =>
+        sha256.convert(utf8.encode(ref)).toString().substring(0, 32);
+    final refs = List.generate(1000, (i) => 'network://nas/cover/$i');
+    for (final ref in refs) {
+      File(
+        p.join(directory.path, '${key(ref)}_0000000000000001.image'),
+      ).writeAsBytesSync(_jpeg(1));
+    }
+    final older = File(
+      p.join(directory.path, '${key(refs.first)}_0000000000000001.image'),
+    );
+    final newer = File(
+      p.join(directory.path, '${key(refs.first)}_0000000000000002.image'),
+    )..writeAsBytesSync(_jpeg(2));
+    await older.setLastModified(
+      DateTime.now().subtract(const Duration(days: 2)),
+    );
+    final covers = store(fetch: (_, _) async => fail('Already stored'));
+    final stats = _CoverStats();
+    await IOOverrides.runWithIOOverrides(covers.warmUp, stats);
+    expect(stats.paths, isEmpty);
+    expect(covers.indexedFile(refs.first), newer.path);
+    for (final ref in refs.skip(1)) {
+      expect(
+        covers.indexedFile(ref),
+        p.join(directory.path, '${key(ref)}_0000000000000001.image'),
+      );
+    }
+  });
+
+  test(
+    'warm-up ignores a stored-name FIFO instead of treating it as artwork',
+    () async {
+      const ref = 'network://nas/cover/fifo';
+      final key = sha256.convert(utf8.encode(ref)).toString().substring(0, 32);
+      final path = p.join(directory.path, '${key}_0000000000000001.image');
+      final result = await Process.run('mkfifo', [path]);
+      expect(result.exitCode, 0);
+      final covers = store(fetch: (_, _) async => fail('No fetch expected'));
+      await covers.warmUp();
+      expect(covers.indexedFile(ref), isNull);
+    },
+    skip: Platform.isWindows ? 'FIFO fixture requires a Unix host' : false,
+  );
+
+  test(
+    'reference lookup keeps stable paths beyond the memo capacity',
+    () async {
+      final covers = store(
+        fetch: (_, output) async => output.writeAsBytes(_jpeg(1)),
+      );
+      const first = 'network://nas/cover/first';
+      final path = await covers.file(first);
+      for (var i = 0; i < 5000; i++) {
+        expect(covers.indexedFile('network://nas/cover/$i'), isNull);
+      }
+      expect(covers.indexedFile(first), path);
+      expect(await covers.file(first), path);
+    },
+  );
 
   test(
     'an adopted cover is stored by its bytes and outlasts its copy',

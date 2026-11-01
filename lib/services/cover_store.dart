@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:collection';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:crypto/crypto.dart';
 import 'package:path/path.dart' as p;
@@ -59,6 +60,7 @@ class CoverStore {
   static const _refreshAge = Duration(days: 1);
   static const _stagingAge = Duration(hours: 1);
   static const _missingRetryDelay = Duration(hours: 1);
+  static const _maxReferenceKeys = 4096;
   static const _heifBrands = {
     'avif',
     'avis',
@@ -76,6 +78,7 @@ class CoverStore {
 
   /// The current stored file name of each reference key.
   final _index = <String, String>{};
+  final _referenceKeys = <String, String>{};
 
   /// Fetches under way and when fetches last failed, by reference key.
   final _fetches = <String, Future<String?>>{};
@@ -296,31 +299,41 @@ class CoverStore {
   Future<void> _readIndex() async {
     try {
       final root = await _directory();
-      final now = DateTime.now();
-      final newest = <String, ({String name, DateTime modified})>{};
-      if (await root.exists()) {
-        await for (final entry in root.list(followLinks: false)) {
-          if (entry is! File) continue;
-          final name = p.basename(entry.path);
-          final key = _storedName.firstMatch(name)?[1];
-          if (key == null) continue;
-          final stat = await entry.stat();
-          if (stat.type != FileSystemEntityType.file) continue;
-          final modified = _validated(stat.modified, now);
-          final known = newest[key];
-          if (known == null || modified.isAfter(known.modified)) {
-            newest[key] = (name: name, modified: modified);
-          }
-        }
-      }
-      for (final MapEntry(:key, :value) in newest.entries) {
-        _index.putIfAbsent(key, () => value.name);
+      final stored = await _readStoredIndex(root.path, DateTime.now());
+      for (final MapEntry(:key, :value) in stored.entries) {
+        _index.putIfAbsent(key, () => value);
       }
       _root = root.path;
     } catch (error) {
       _log.w('Could not read stored covers: ${error.runtimeType}');
     }
   }
+
+  static Future<Map<String, String>> _readStoredIndex(
+    String root,
+    DateTime now,
+  ) => Isolate.run(() {
+    final directory = Directory(root);
+    final newest = <String, ({String name, DateTime modified})>{};
+    if (directory.existsSync()) {
+      for (final entry in directory.listSync(followLinks: false)) {
+        if (entry is! File) continue;
+        final name = p.basename(entry.path);
+        final key = _storedName.firstMatch(name)?[1];
+        if (key == null) continue;
+        final stat = entry.statSync();
+        if (stat.type != FileSystemEntityType.file) continue;
+        final modified = _validated(stat.modified, now);
+        final known = newest[key];
+        if (known == null || modified.isAfter(known.modified)) {
+          newest[key] = (name: name, modified: modified);
+        }
+      }
+    }
+    return {
+      for (final MapEntry(:key, :value) in newest.entries) key: value.name,
+    };
+  }, debugName: 'cover-store-index');
 
   Future<String?> _fetch(
     String ref,
@@ -424,8 +437,16 @@ class CoverStore {
             _heifBrands.contains(String.fromCharCodes(head, 8, 12)));
   }
 
-  static String _key(String ref) =>
-      sha256.convert(utf8.encode(ref)).toString().substring(0, 32);
+  String _key(String ref) {
+    final known = _referenceKeys[ref];
+    if (known != null) return known;
+    final key = sha256.convert(utf8.encode(ref)).toString().substring(0, 32);
+    if (_referenceKeys.length >= _maxReferenceKeys) {
+      _referenceKeys.remove(_referenceKeys.keys.first);
+    }
+    _referenceKeys[ref] = key;
+    return key;
+  }
 
   Future<void> _takeTurn({required bool recheck}) async {
     if (_fetching < maxFetches) {
