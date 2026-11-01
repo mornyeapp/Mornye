@@ -57,6 +57,11 @@ String? _songName(String path) {
 }
 
 typedef _Answer = ({String deviceId, Completer<Map<String, dynamic>> answer});
+typedef _LyricsAnswer = ({
+  String deviceId,
+  String name,
+  Completer<String?> answer,
+});
 
 /// A song the phone is sending: the `file` it lands as, its `size`, whether
 /// it plays before it is whole, and its arrival.
@@ -85,6 +90,7 @@ class LinkPhoneSources implements NetworkLocalCopies {
     List<String> Function()? connectedDevices,
     Future<Map<String, dynamic>> Function(String path)? readTags,
     this.answerTimeout = const Duration(seconds: 15),
+    this.lyricsTimeout = const Duration(seconds: 5),
     this.progressInterval = const Duration(milliseconds: 250),
   }) : _catalogs = catalogs,
        _index = index,
@@ -97,6 +103,9 @@ class LinkPhoneSources implements NetworkLocalCopies {
 
   /// How long a phone has to start sending a song it was asked for.
   final Duration answerTimeout;
+
+  /// Wait for the original phone's embedded lyrics without fetching audio.
+  final Duration lyricsTimeout;
 
   /// How often [receive] reports the bytes of a song on its way.
   final Duration progressInterval;
@@ -123,6 +132,9 @@ class LinkPhoneSources implements NetworkLocalCopies {
 
   /// Phones asked for a song, by song name, until they answer.
   final _answers = <String, _Answer>{};
+  final _lyricsAnswers = <String, _LyricsAnswer>{};
+  final _lyricsReads = <String, Future<String?>>{};
+  bool _closed = false;
 
   /// Songs on their way to the received folder, by song name.
   final _sending = <String, _Sending>{};
@@ -350,6 +362,20 @@ class LinkPhoneSources implements NetworkLocalCopies {
   /// returns whether [message] was one of them.
   bool onMessage(String deviceId, Map<String, dynamic> message) {
     final type = message['type'];
+    if (type == LinkMessageTypes.filesLyrics) {
+      final pending = _lyricsAnswers[message['requestId']];
+      if (pending != null &&
+          pending.deviceId == deviceId &&
+          pending.name == message['name'] &&
+          !pending.answer.isCompleted) {
+        pending.answer.complete(
+          message['error'] == null
+              ? linkFileLyricsText(message['lyrics'])
+              : null,
+        );
+      }
+      return true;
+    }
     if (type != LinkMessageTypes.filesSending &&
         type != LinkMessageTypes.filesFailed) {
       return false;
@@ -366,6 +392,12 @@ class LinkPhoneSources implements NetworkLocalCopies {
 
   /// Fails the requests of phones that are no longer connected.
   void keepConnected(Set<String> deviceIds) {
+    for (final pending in _lyricsAnswers.values.toList()) {
+      if (!deviceIds.contains(pending.deviceId) &&
+          !pending.answer.isCompleted) {
+        pending.answer.complete(null);
+      }
+    }
     for (final pending in _answers.values.toList()) {
       if (!deviceIds.contains(pending.deviceId) &&
           !pending.answer.isCompleted) {
@@ -396,23 +428,76 @@ class LinkPhoneSources implements NetworkLocalCopies {
         ? null
         : await _catalogs.coverPath(id, coverKey);
     final received = (await linkReceivedFiles(_receivedDir()))[fileId];
+    var metadata = song == null
+        ? <String, dynamic>{}
+        : linkPhoneSongTags(song, coverPath: cover);
     if (received != null) {
       try {
         final tags = Map<String, dynamic>.of(await _readTags(received));
         if (tags['error']?.toString().trim().isNotEmpty != true) {
           tags.remove('cover_base64');
           if (cover != null) tags['cover_path'] = cover;
-          return tags;
+          metadata = tags;
         }
       } on Object catch (error) {
         _log.d('Could not read a received phone song: $error');
       }
     }
-    return song == null ? const {} : linkPhoneSongTags(song, coverPath: cover);
+    if (song != null &&
+        (metadata['lyrics']?.toString().trim().isEmpty ?? true)) {
+      final deviceId = _connectedDevice(id);
+      if (deviceId != null) {
+        final key = '$deviceId/$name';
+        final lyrics = await (_lyricsReads[key] ??= _askLyrics(deviceId, name)
+            .whenComplete(() {
+              _lyricsReads.remove(key);
+            }));
+        if (lyrics != null) {
+          metadata['lyrics'] = lyrics;
+          _log.d('Read phone embedded lyrics: ${lyrics.length} characters');
+        }
+      }
+    }
+    return metadata;
+  }
+
+  Future<String?> _askLyrics(String deviceId, String name) async {
+    if (_closed || _lyricsAnswers.length >= 4) return null;
+    final requestId = NetworkStorageService.newId();
+    final answer = Completer<String?>();
+    _lyricsAnswers[requestId] = (
+      deviceId: deviceId,
+      name: name,
+      answer: answer,
+    );
+    try {
+      final delivered = await _send({
+        'type': LinkMessageTypes.filesLyricsRequest,
+        'requestId': requestId,
+        'name': name,
+      }, deviceId).timeout(lyricsTimeout, onTimeout: () => 0);
+      if (delivered <= 0) return null;
+      return await answer.future.timeout(
+        lyricsTimeout,
+        onTimeout: () {
+          _log.d('The phone did not answer an embedded lyrics request');
+          return null;
+        },
+      );
+    } on Object catch (error) {
+      _log.d('Could not read embedded lyrics from the phone: $error');
+      return null;
+    } finally {
+      _lyricsAnswers.remove(requestId);
+    }
   }
 
   /// Fails every request under way.
   void close() {
+    _closed = true;
+    for (final pending in _lyricsAnswers.values.toList()) {
+      if (!pending.answer.isCompleted) pending.answer.complete(null);
+    }
     for (final pending in _answers.values.toList()) {
       if (!pending.answer.isCompleted) {
         pending.answer.completeError(

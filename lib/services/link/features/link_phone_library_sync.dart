@@ -10,6 +10,7 @@ import 'package:mornye/services/link/features/link_phone_library.dart';
 import 'package:mornye/services/link/link_client_api.dart';
 import 'package:mornye/services/link/link_cover_shrink.dart';
 import 'package:mornye/services/link/link_protocol.dart';
+import 'package:mornye/services/playback_metadata.dart';
 import 'package:mornye/utils/logger.dart';
 
 final _log = AppLogger('LinkPhoneLibrary');
@@ -274,7 +275,12 @@ class LinkPhoneFileRequests {
     required this.files,
     this.offered,
     this.maxUploads = 2,
-  });
+    Future<String> Function(String path)? readLyrics,
+  }) : _readLyrics = readLyrics ?? _embeddedLyrics;
+
+  static Future<String> _embeddedLyrics(String path) async =>
+      (await readPlaybackFileMetadataWithRetry(path))['lyrics']?.toString() ??
+      '';
 
   final LinkClientApi client;
   final LinkPhoneLibrary library;
@@ -284,6 +290,8 @@ class LinkPhoneFileRequests {
   /// the song list, so it is sent even while the list is not shared.
   final LinkPhoneFile? Function(String name)? offered;
   final int maxUploads;
+  final Future<String> Function(String path) _readLyrics;
+  final _lyricsRequests = <String>{};
 
   final _subscriptions = <StreamSubscription<Object?>>[];
   final _waiting = Queue<String>();
@@ -319,9 +327,55 @@ class LinkPhoneFileRequests {
   }
 
   void _onMessage(Map<String, dynamic> message) {
+    if (message['type'] == LinkMessageTypes.filesLyricsRequest) {
+      unawaited(_sendLyrics(message));
+      return;
+    }
     if (message['type'] != LinkMessageTypes.filesRequest) return;
     final name = message['name'];
     if (name is String && name.isNotEmpty) request(name);
+  }
+
+  Future<void> _sendLyrics(Map<String, dynamic> message) async {
+    final requestId = message['requestId'];
+    final name = message['name'];
+    if (_disposed ||
+        requestId is! String ||
+        requestId.isEmpty ||
+        requestId.length > 128 ||
+        name is! String ||
+        !RegExp(r'^[0-9a-f]{32}\.[a-z0-9]{1,10}$').hasMatch(name) ||
+        !linkUploadExtensions.contains(name.split('.').last) ||
+        _lyricsRequests.contains(requestId)) {
+      return;
+    }
+    final reply = <String, dynamic>{
+      'type': LinkMessageTypes.filesLyrics,
+      'requestId': requestId,
+      'name': name,
+    };
+    if (_lyricsRequests.length >= 2) {
+      _say({...reply, 'error': 'busy'});
+      return;
+    }
+    _lyricsRequests.add(requestId);
+    try {
+      final file = offered?.call(name) ?? await library.fileNamed(name);
+      if (file == null) {
+        _say({...reply, 'error': 'not_found'});
+        return;
+      }
+      final lyrics = linkFileLyricsText(await _readLyrics(file.source));
+      _say(
+        lyrics == null
+            ? {...reply, 'error': 'too_large'}
+            : {...reply, 'lyrics': lyrics},
+      );
+    } on Object {
+      _say({...reply, 'error': 'unavailable'});
+    } finally {
+      _lyricsRequests.remove(requestId);
+    }
   }
 
   /// Sends the song the desktop knows as [name] (`<fileId>.<suffix>`).

@@ -9,8 +9,25 @@ import 'package:mornye/services/link/desktop/link_phone_catalogs.dart';
 import 'package:mornye/services/link/desktop/link_phone_sources.dart';
 import 'package:mornye/services/link/link_host_router.dart';
 import 'package:mornye/services/link/link_protocol.dart';
+import 'package:mornye/services/link/features/link_phone_library_sync.dart';
+import 'package:mornye/services/link/features/link_phone_files.dart';
+import 'package:mornye/controllers/player_metadata_controller.dart';
+import 'package:audio_service/audio_service.dart';
+import 'package:mornye/utils/lyrics_parser.dart';
 
 import 'support/link_desktop_fakes.dart';
+import 'support/link_fakes.dart'
+    show FakeLinkClient, FakeLibraryRows, linkLocalRow;
+
+class _LyricsClient extends FakeLinkClient {
+  void Function(Map<String, dynamic>)? onReply;
+
+  @override
+  void send(Map<String, dynamic> message) {
+    super.send(message);
+    onReply?.call(message);
+  }
+}
 
 const _phone = 'phone-1';
 
@@ -27,6 +44,7 @@ void main() {
   late DesktopLinkCatalogIndex? index;
   late Map<String, Map<String, dynamic>> tags;
   late List<String> registered;
+  Future<int> Function(Map<String, dynamic>, String)? sendOverride;
   final sourceId = linkPhoneSourceId(_phone);
   final coverId = _fileId(0xc0);
 
@@ -47,6 +65,7 @@ void main() {
     delivered = 1;
     index = DesktopLinkCatalogIndex(serverId: 'server-1', songs: const []);
     tags = {};
+    sendOverride = null;
   });
 
   tearDown(() async {
@@ -55,7 +74,10 @@ void main() {
     await received.delete(recursive: true);
   });
 
-  LinkPhoneSources sources({Duration? answerTimeout}) => LinkPhoneSources(
+  LinkPhoneSources sources({
+    Duration? answerTimeout,
+    Duration lyricsTimeout = const Duration(milliseconds: 250),
+  }) => LinkPhoneSources(
     catalogs: catalogs,
     index: () => index,
     receivedDir: () => received.path,
@@ -64,12 +86,15 @@ void main() {
     connectedDevices: () => [...connected],
     send: (message, deviceId) async {
       sent.add((message: message, deviceId: deviceId));
-      return delivered;
+      return sendOverride == null
+          ? delivered
+          : sendOverride!(message, deviceId);
     },
     arriving: () => arriving,
     readTags: (path) async =>
         tags[path] ?? (throw const FileSystemException('unreadable')),
     answerTimeout: answerTimeout ?? const Duration(seconds: 15),
+    lyricsTimeout: lyricsTimeout,
   );
 
   Future<void> commit(List<LinkPhoneSong> songs) async {
@@ -457,6 +482,91 @@ void main() {
   });
 
   group('metadata', () {
+    test(
+      'phone file lyrics reach the desktop player without audio transfer',
+      () async {
+        final original = File('${root.path}/old-download.flac')
+          ..writeAsStringSync('original audio');
+        final fileId = linkFileIdFor(original.path, original.lengthSync());
+        await commit([
+          LinkPhoneSong(
+            fileId: fileId,
+            suffix: 'flac',
+            title: 'Old download',
+            artist: 'Fixture artist',
+          ),
+        ]);
+        final client = _LyricsClient();
+        addTearDown(client.close);
+        final phone = LinkPhoneFileRequests(
+          client: client,
+          library: FakeLibraryRows([linkLocalRow(original.path)]).library(),
+          files: LinkPhoneFiles(),
+          readLyrics: (path) async {
+            expect(path, original.path);
+            return '[00:01.00]Embedded before Link existed';
+          },
+        )..start();
+        addTearDown(phone.dispose);
+        final desktop = sources(lyricsTimeout: const Duration(seconds: 5));
+        addTearDown(desktop.close);
+        client.onReply = (message) => desktop.onMessage(_phone, message);
+        sendOverride = (message, _) async {
+          client.push(message);
+          return 1;
+        };
+        final controller = PlayerMetadataController(
+          readMetadata: (_) => desktop.metadata(sourceId, '$fileId.flac'),
+          parseLyrics: (text) async => LyricsParser.parse(text),
+        );
+        addTearDown(controller.dispose);
+        await controller.load(
+          MediaItem(
+            id: fileId,
+            title: 'Old download',
+            extras: {'source': 'network://$sourceId/$fileId.flac'},
+          ),
+        );
+        expect(
+          controller.lyrics.lines.single.text,
+          'Embedded before Link existed',
+        );
+        expect(client.uploads, isEmpty);
+        expect(received.listSync(), isEmpty);
+        expect(
+          sent.single.message['type'],
+          LinkMessageTypes.filesLyricsRequest,
+        );
+      },
+    );
+
+    test(
+      'asks the phone for embedded lyrics missing from the catalog',
+      () async {
+        await commit([song(1)]);
+        final phone = sources();
+        final name = '${_fileId(1)}.flac';
+        final pending = phone.metadata(sourceId, name);
+        await pumpEventQueue();
+        expect(sent, hasLength(1));
+        final request = sent.single;
+        expect(request.deviceId, _phone);
+        expect(request.message['type'], 'files.lyrics.request');
+        expect(request.message['name'], name);
+        phone.onMessage(_phone, {
+          'type': 'files.lyrics',
+          'requestId': request.message['requestId'],
+          'name': name,
+          'lyrics': '[00:01.00]Embedded in an older download',
+        });
+        expect(
+          (await pending)['lyrics'],
+          '[00:01.00]Embedded in an older download',
+        );
+        expect(received.listSync(), isEmpty);
+      },
+    );
+
     test('answers the stored song while the phone has not sent it', () async {
       await commit([song(1, cover: coverId)]);
       final metadata = await sources().metadata(sourceId, '${_fileId(1)}.flac');
@@ -468,6 +578,92 @@ void main() {
       );
       expect(await sources().metadata(sourceId, '${_fileId(9)}.flac'), isEmpty);
       expect(await sources().metadata(sourceId, 'nonsense'), isEmpty);
+    });
+
+    test(
+      'coalesces empty cached-file lyrics and rejects another phone reply',
+      () async {
+        await commit([song(1)]);
+        final name = '${_fileId(1)}.flac';
+        final cached = '${received.path}/$name';
+        File(cached).writeAsStringSync('cached audio');
+        tags[cached] = {'title': 'Cached', 'lyrics': ''};
+        final phone = sources(lyricsTimeout: const Duration(seconds: 5));
+        final first = phone.metadata(sourceId, name);
+        final second = phone.metadata(sourceId, name);
+        await pumpEventQueue();
+        expect(sent, hasLength(1));
+        final reply = {
+          'type': LinkMessageTypes.filesLyrics,
+          'requestId': sent.single.message['requestId'],
+          'name': name,
+          'lyrics': '[00:01]Original phone lyrics',
+        };
+        var complete = false;
+        unawaited(first.then((_) => complete = true));
+        phone.onMessage('another-phone', reply);
+        phone.onMessage(_phone, {...reply, 'name': '${_fileId(2)}.flac'});
+        await pumpEventQueue();
+        expect(complete, isFalse);
+        phone.onMessage(_phone, reply);
+        for (final result in await Future.wait([first, second])) {
+          expect(result['lyrics'], '[00:01]Original phone lyrics');
+          expect(result['title'], 'Cached');
+        }
+      },
+    );
+
+    test('missing lyrics replies time out and can be tried again', () async {
+      await commit([song(1)]);
+      final phone = sources(lyricsTimeout: const Duration(milliseconds: 1));
+      for (var attempt = 0; attempt < 2; attempt++) {
+        expect(
+          (await phone.metadata(sourceId, '${_fileId(1)}.flac'))['title'],
+          'Song 1',
+        );
+      }
+      expect(sent, hasLength(2));
+      expect(
+        sent.first.message['requestId'],
+        isNot(sent.last.message['requestId']),
+      );
+    });
+
+    test('oversized incoming lyrics cannot replace stored metadata', () async {
+      await commit([song(1)]);
+      final phone = sources(lyricsTimeout: const Duration(seconds: 5));
+      final name = '${_fileId(1)}.flac';
+      final pending = phone.metadata(sourceId, name);
+      await pumpEventQueue();
+      phone.onMessage(_phone, {
+        'type': LinkMessageTypes.filesLyrics,
+        'requestId': sent.single.message['requestId'],
+        'name': name,
+        'lyrics': 'あ' * (linkFileLyricsMaxBytes ~/ 2),
+      });
+      final metadata = await pending;
+      expect(metadata['title'], 'Song 1');
+      expect(metadata.containsKey('lyrics'), isFalse);
+    });
+
+    test('disconnect and close finish outstanding lyrics reads', () async {
+      await commit([song(1)]);
+      for (final close in [false, true]) {
+        final phone = sources(lyricsTimeout: const Duration(seconds: 5));
+        final pending = phone.metadata(sourceId, '${_fileId(1)}.flac');
+        await pumpEventQueue();
+        if (close) {
+          phone.close();
+        } else {
+          phone.keepConnected({});
+        }
+        expect((await pending)['title'], 'Song 1');
+        if (close) {
+          final sentBefore = sent.length;
+          await phone.metadata(sourceId, '${_fileId(1)}.flac');
+          expect(sent, hasLength(sentBefore));
+        }
+      }
     });
 
     test('reads the received file, else falls back', () async {

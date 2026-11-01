@@ -127,6 +127,30 @@ void main() {
 
   bool finished(String id) => store().byId(id)?.active == false;
 
+  test(
+    'a phone-only mirrored song retains a metadata source without a cover',
+    () async {
+      await boot();
+      final song = phoneSong();
+      final commit = await request(LinkOps.phoneCatalog, {
+        '_method': 'POST',
+        'version': 'lyrics-source',
+        'offset': 0,
+        'total': 1,
+        'songs': [song.toJson()],
+      });
+      expect(commit.error, isNull);
+      final media = await host().phoneTrackMedia(
+        'p1',
+        TrackRef(title: song.title, artist: song.artist, fileId: fileId),
+      );
+      expect(media, isNotNull);
+      expect(media!.source, 'network://$sourceId/$fileId.flac');
+      expect(media.artUri, isNull);
+      expect(Directory(backend.receivedDir).listSync(), isEmpty);
+    },
+  );
+
   test('a phone offer saves its songs as downloads', () async {
     await boot();
     received();

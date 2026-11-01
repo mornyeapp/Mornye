@@ -60,6 +60,15 @@ String linkFileIdFor(String source, int size) =>
 /// Songs per `POST phone/catalog` page.
 const linkPhoneCatalogPage = 500;
 
+/// Embedded lyrics travel separately from the catalog and audio uploads.
+const linkFileLyricsMaxBytes = 128 * 1024;
+
+/// A bounded lyrics reply. Empty text is a successful read without lyrics.
+String? linkFileLyricsText(Object? value) {
+  if (value is! String || value.length > linkFileLyricsMaxBytes) return null;
+  return utf8.encode(value).length <= linkFileLyricsMaxBytes ? value : null;
+}
+
 /// The `network://` host of a paired phone's songs in the desktop's
 /// Library: `link-phone-` and the first 16 hex characters of the SHA-256
 /// of its device id.
@@ -132,6 +141,13 @@ abstract final class LinkMessageTypes {
   /// Desktop to phone: send the song `{"name"}` (`<fileId>.<suffix>` of a
   /// [LinkPhoneSong]) to `PUT <linkFilesPath>`.
   static const filesRequest = 'files.request';
+
+  /// Desktop to phone: read embedded lyrics of a catalog song by
+  /// `{"requestId","name"}`, without transferring its audio.
+  static const filesLyricsRequest = 'files.lyrics.request';
+
+  /// Phone to desktop: `{"requestId","name","lyrics"}` or `{"error"}`.
+  static const filesLyrics = 'files.lyrics';
 
   /// Phone to desktop: the requested `name` is on its way as `file`, of
   /// `size` bytes; `streamable` is false when it plays only once whole.

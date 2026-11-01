@@ -828,17 +828,19 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
             ? null
             : await catalogs.coverPath(sourceId, coverKey)) ??
         song.coverUrl;
-    if (cover == null) return null;
+    final durationMs = ref.durationMs ?? song.durationMs;
     return PlayableMedia(
       id: 'link:${song.fileId}',
-      source: '',
+      source: NetworkStorageService.source(sourceId, song.name),
       title: ref.title,
       artist: ref.artist,
       album: ref.album ?? '',
-      artUri: normalizeArtUri(cover),
-      duration: ref.durationMs == null
-          ? null
-          : Duration(milliseconds: ref.durationMs!),
+      artUri: cover == null ? null : normalizeArtUri(cover),
+      duration: durationMs == null ? null : Duration(milliseconds: durationMs),
+      bitDepth: song.bitDepth,
+      sampleRate: song.sampleRate,
+      bitrate: song.bitRate,
+      format: song.suffix,
     );
   }
 
