@@ -1,10 +1,10 @@
 {
-  "extensionsUnsecuredStorage": "Use unsecured extension storage",
-  "extensionsUnsecuredStorageDescription": "Run extensions without a Linux keyring. The key is saved locally, so anyone with access to your app files can read extension credentials. Off uses the system keyring.",
-  "extensionsStorageKeyringRequired": "Existing extension data needs its original key. Unlock the system keyring once, then enable unsecured storage again. Your data has been preserved.",
-  "extensionsStorageKeyConflict": "The local and system keyring keys differ. Storage was not changed and both keys were preserved.",
-  "extensionsStorageKeyringUnavailable": "The system keyring is unavailable or locked. Start or unlock it before switching to secure storage. Your local key has been preserved.",
-  "linkFileActionOn": "{action} on {name}",
+  "extensionsUnsecuredStorage": "Güvenli olmayan uzantı depolaması kullan",
+  "extensionsUnsecuredStorageDescription": "Uzantıları Linux anahtarlığı olmadan çalıştırın. Anahtar yerel olarak kaydedilir, bu nedenle uygulama dosyalarınıza erişimi olan herkes uzantı kimlik bilgilerini okuyabilir. Kapalı seçeneği sistem anahtarlığını kullanır.",
+  "extensionsStorageKeyringRequired": "Mevcut uzantı verileri özgün anahtarını gerektiriyor. Sistem anahtarlığının kilidini bir kez açın, ardından güvenli olmayan depolamayı yeniden etkinleştirin. Verileriniz korundu.",
+  "extensionsStorageKeyConflict": "Yerel ve sistem anahtarlığı anahtarları farklı. Depolama değiştirilmedi ve her iki anahtar da korundu.",
+  "extensionsStorageKeyringUnavailable": "Sistem anahtarlığı kullanılamıyor veya kilitli. Güvenli depolamaya geçmeden önce başlatın veya kilidini açın. Yerel anahtarınız korundu.",
+  "linkFileActionOn": "{name} üzerinde {action}",
   "@linkFileActionOn": {
     "description": "File operation on a named linked computer",
     "placeholders": {
@@ -16,7 +16,7 @@
       }
     }
   },
-  "linkFileActionsDescription": "Changes apply to music files on {name}. Accepted work continues if this phone disconnects.",
+  "linkFileActionsDescription": "Değişiklikler {name} üzerindeki müzik dosyalarına uygulanır. Bu telefon bağlantıyı keserse kabul edilen işlem devam eder.",
   "@linkFileActionsDescription": {
     "placeholders": {
       "name": {
@@ -24,7 +24,7 @@
       }
     }
   },
-  "linkFileDeleteConfirm": "Delete {count} {count, plural, =1{music file} other{music files}} from {name}? This removes the files from that computer's storage.",
+  "linkFileDeleteConfirm": "{name} üzerinden {count} {count, plural, =1{müzik dosyası} other{müzik dosyası}} silinsin mi? Bu, dosyaları o bilgisayarın depolamasından kaldırır.",
   "@linkFileDeleteConfirm": {
     "placeholders": {
       "count": {
@@ -35,11 +35,11 @@
       }
     }
   },
-  "linkFileJobs": "File changes",
+  "linkFileJobs": "Dosya değişiklikleri",
   "@linkFileJobs": {
     "description": "Title of the list of edits, conversions and deletions the phone started on the linked computer's music files"
   },
-  "linkFileJobsSubtitle": "Edits, conversions and deletions on {name}",
+  "linkFileJobsSubtitle": "{name} üzerindeki düzenlemeler, dönüştürmeler ve silmeler",
   "@linkFileJobsSubtitle": {
     "placeholders": {
       "name": {
@@ -47,11 +47,11 @@
       }
     }
   },
-  "linkFileJobsEmpty": "No file changes yet",
-  "linkFileJobsEmptyMessage": "Edits, conversions and deletions you start on the computer's songs from this phone appear here.",
-  "linkDesktopFileJobsSubtitle": "Changes requested from your phones",
-  "linkDesktopFileJobsEmptyMessage": "Edits, conversions and deletions requested from your phones appear here.",
-  "linkFileJobRequestedBy": "From {name}",
+  "linkFileJobsEmpty": "Henüz dosya değişikliği yok",
+  "linkFileJobsEmptyMessage": "Bu telefondan bilgisayardaki şarkılarda başlattığınız düzenlemeler, dönüştürmeler ve silmeler burada görünür.",
+  "linkDesktopFileJobsSubtitle": "Telefonlarınızdan istenen değişiklikler",
+  "linkDesktopFileJobsEmptyMessage": "Telefonlarınızdan istenen düzenlemeler, dönüştürmeler ve silmeler burada görünür.",
+  "linkFileJobRequestedBy": "{name} tarafından",
   "@linkFileJobRequestedBy": {
     "placeholders": {
       "name": {
@@ -59,13 +59,13 @@
       }
     }
   },
-  "linkFileJobsView": "View",
+  "linkFileJobsView": "Görüntüle",
   "@linkFileJobsView": {
     "description": "Snackbar action that opens the file changes list to see which songs failed"
   },
-  "linkFileJobsUnsupported": "Update Mornye on your computer to manage its music files from this phone.",
-  "linkFileSelectionOneDevice": "Select songs from one linked computer at a time (up to 100 songs).",
-  "linkFileJobProgress": "{finished} of {total} {total, plural, =1{song} other{songs}}",
+  "linkFileJobsUnsupported": "Müzik dosyalarını bu telefondan yönetmek için bilgisayarınızda Mornye'yi güncelleyin.",
+  "linkFileSelectionOneDevice": "Şarkıları aynı anda tek bir bağlı bilgisayardan seçin (en fazla 100 şarkı).",
+  "linkFileJobProgress": "{finished} / {total} {total, plural, =1{şarkı} other{şarkı}}",
   "@linkFileJobProgress": {
     "placeholders": {
       "finished": {
@@ -76,7 +76,7 @@
       }
     }
   },
-  "linkFileJobFailedCount": "{count} failed",
+  "linkFileJobFailedCount": "{count} başarısız",
   "@linkFileJobFailedCount": {
     "placeholders": {
       "count": {
@@ -84,7 +84,7 @@
       }
     }
   },
-  "linkFileJobFinished": "{action} finished on {name}",
+  "linkFileJobFinished": "{name} üzerinde {action} tamamlandı",
   "@linkFileJobFinished": {
     "placeholders": {
       "action": {
@@ -95,29 +95,29 @@
       }
     }
   },
-  "linkFileDeleting": "Deleting...",
-  "linkFileReading": "Reading tags...",
-  "linkFileSavingCover": "Saving cover art...",
-  "linkFileCancelHint": "Stop after the current song",
-  "linkFileJobCancelled": "Stopped",
-  "linkFileJobQueued": "Queued",
-  "linkFileJobCompleted": "Finished",
-  "linkFileChanged": "The file changed since the preview. Preview it again before saving.",
-  "linkFileOperationFailed": "The operation could not be completed. Check the computer's logs for details.",
+  "linkFileDeleting": "Siliniyor...",
+  "linkFileReading": "Etiketler okunuyor...",
+  "linkFileSavingCover": "Albüm kapağı kaydediliyor...",
+  "linkFileCancelHint": "Geçerli şarkıdan sonra durdur",
+  "linkFileJobCancelled": "Durduruldu",
+  "linkFileJobQueued": "Sırada",
+  "linkFileJobCompleted": "Tamamlandı",
+  "linkFileChanged": "Dosya önizlemeden bu yana değişti. Kaydetmeden önce tekrar önizleyin.",
+  "linkFileOperationFailed": "İşlem tamamlanamadı. Ayrıntılar için bilgisayarın günlüklerini kontrol edin.",
   "trackBpm": "BPM",
-  "trackMood": "Mood",
-  "subsonicAddToLibrary": "Add server to Library",
-  "subsonicLibraryAdded": "Server added to Library",
-  "subsonicLibraryDescription": "Sync the server catalogue and artwork to Library. Music stays on your server. Rescan it in Local Library settings to update the catalogue.",
-  "subsonicAuthentication": "Authentication",
-  "subsonicToken": "Salted token",
-  "subsonicPasswordAuth": "Password",
-  "subsonicApiKey": "API key",
-  "subsonicUsername": "Username",
-  "subsonicPassword": "Password",
-  "subsonicSearch": "Search server music...",
-  "subsonicMoreAlbums": "More albums",
-  "subsonicErrorApi": "The server does not support this API version or authentication method. Check the server settings and the selected sign-in method.",
+  "trackMood": "Ruh hali",
+  "subsonicAddToLibrary": "Sunucuyu Kitaplığa ekle",
+  "subsonicLibraryAdded": "Sunucu Kitaplığa eklendi",
+  "subsonicLibraryDescription": "Sunucu kataloğunu ve kapak resimlerini Kitaplık ile eşitleyin. Müzik sunucunuzda kalır. Kataloğu güncellemek için Yerel Kitaplık ayarlarından yeniden tarayın.",
+  "subsonicAuthentication": "Kimlik doğrulama",
+  "subsonicToken": "Tuzlanmış token",
+  "subsonicPasswordAuth": "Parola",
+  "subsonicApiKey": "API anahtarı",
+  "subsonicUsername": "Kullanıcı adı",
+  "subsonicPassword": "Parola",
+  "subsonicSearch": "Sunucu müziğinde ara...",
+  "subsonicMoreAlbums": "Daha fazla albüm",
+  "subsonicErrorApi": "Sunucu bu API sürümünü veya kimlik doğrulama yöntemini desteklemiyor. Sunucu ayarlarını ve seçilen oturum açma yöntemini kontrol edin.",
   "networkDownloadDestination": "Ağ indirme hedefi",
   "@networkDownloadDestination": {
     "description": "Files settings item that opens network storage to choose a folder for downloaded music"
@@ -178,7 +178,7 @@
   "@networkErrorPermission": {
     "description": "Network access error when the server denies account permissions for a shared folder; distinct from the device's local network permission"
   },
-  "networkErrorLocalPermission": "Local network access is not allowed. Allow Nearby devices for Mornye in Android app settings, then try again.",
+  "networkErrorLocalPermission": "Yerel ağ erişimine izin verilmiyor. Android uygulama ayarlarından Mornye için Yakındaki cihazlar iznini verin, ardından tekrar deneyin.",
   "@networkErrorLocalPermission": {
     "description": "Network access error when Android denies local network permission; Nearby devices is the Android app permission setting"
   },
@@ -287,7 +287,7 @@
   "usbBitPerfectDescription": "Uyumlu çıkışlarda kaynağın hassasiyetini korur. Aşağıdan doğrudan USB veya AAudio özel modunu seçin; aksi halde Android USB çıkışı Android 14 veya üstünü gerektirir. AutoMix ve normalizasyon olmadan bir sonraki parçadan itibaren uygulanır. Sistem ses düzeyi doğrudan USB'yi kontrol etmeyebilir.",
   "usbHardwareVolume": "DAC donanım ses düzeyi",
   "usbVolumeWarningTitle": "Dinleme ses düzeyinizi kontrol edin",
-  "usbVolumeWarning": "Direct USB audio can be much louder than normal playback, and phone volume buttons may not control it. Lower your DAC or amplifier volume before starting. When supported, Mornye sets the DAC to at most −40 dB on connection; this does not guarantee a safe listening level on every amplifier or headphone.",
+  "usbVolumeWarning": "Doğrudan USB sesi normal oynatmadan çok daha yüksek olabilir ve telefonun ses düğmeleri bunu denetlemeyebilir. Başlamadan önce DAC veya amplifikatör sesini kısın. Desteklendiğinde Mornye, bağlantı sırasında DAC'ı en fazla −40 dB'ye ayarlar; bu, her amplifikatörde veya kulaklıkta güvenli bir dinleme seviyesi garanti etmez.",
   "usbVolumeAccept": "Anladım",
   "usbVolumeUnavailable": "Bu DAC'te doğrulanmış donanım ses kontrolü olmadığı için oynatma duraklatıldı. DAC veya amplifikatör sesini düşürün, gerekirse sabit ses düzeyli çıkışı etkinleştirin ve parçayı yeniden seçin.",
   "usbFixedVolume": "Sabit ses düzeyli USB çıkışına izin ver",
@@ -296,20 +296,20 @@
   "dapExclusive": "DAP hi-res (AAudio özel)",
   "dapExclusiveDescription": "FLAC/WAV PCM için parçanın orijinal hızında ve hassasiyetinde Oboe/AAudio kullanır. Android 8.1 veya üstü ve uyumlu donanım gerektirir. Özel erişim kontrol edilir; kullanılamayan formatlar normal oynatmayı kullanır. DSD, doğrudan USB sürücüsü gerektirir. Bir sonraki parçadan itibaren uygulanır.",
   "dapExclusiveUnavailable": "Bu parça ve mevcut çıkış için AAudio özel erişimi kullanılamıyor. Normal oynatma kullanılıyor. USB DAC için doğrudan USB sürücüsünü deneyin.",
-  "exclusiveOutputWindows": "WASAPI exclusive mode",
-  "exclusiveOutputMacos": "Exclusive access (hog mode)",
-  "exclusiveOutputLinux": "Direct ALSA output",
-  "exclusiveOutputDescriptionWindows": "Bypass the Windows mixer so the output follows each track's sample rate and bit depth. Other apps cannot play sound while Mornye holds the device. AutoMix and previews are off in this mode. For bit-perfect output, keep the volume at 100% with the equalizer and normalization off.",
-  "exclusiveOutputDescriptionMacos": "Hold the output device for Mornye alone and switch it to each track's sample rate and bit depth, so Core Audio does not resample. Other apps cannot play sound while Mornye holds the device. AutoMix and previews are off in this mode. For bit-perfect output, keep the volume at 100% with the equalizer and normalization off.",
-  "exclusiveOutputDescriptionLinux": "Play straight to an ALSA hardware device, bypassing PipeWire or PulseAudio, so the output follows each track's sample rate and bit depth. The device must be free: the sound server releases an idle card after a few seconds, or set its profile to Off. AutoMix and previews are off in this mode.",
-  "exclusiveOutputPending": "Takes the device when a track plays.",
-  "exclusiveOutputActive": "Playing in exclusive mode.",
-  "exclusiveOutputUnavailableWindows": "The device refused exclusive access, so this track plays through the Windows mixer. Close other apps using the device, or allow exclusive control in the device's Windows sound properties.",
-  "exclusiveOutputUnavailableMacos": "Another app holds the output device, so this track plays through the system mixer.",
-  "exclusiveOutputUnavailableLinux": "The ALSA device is busy, usually held by the sound server, so this track plays through it. Set the card's profile to Off in the sound settings, or choose another device.",
-  "exclusiveOutputDevice": "Output device",
-  "exclusiveOutputDeviceFirst": "First sound card",
-  "exclusiveOutputNoDevices": "No ALSA playback devices found",
+  "exclusiveOutputWindows": "WASAPI özel modu",
+  "exclusiveOutputMacos": "Özel erişim (hog modu)",
+  "exclusiveOutputLinux": "Doğrudan ALSA çıkışı",
+  "exclusiveOutputDescriptionWindows": "Çıkışın her parçanın örnekleme hızını ve bit derinliğini izlemesi için Windows mikserini atlayın. Mornye aygıtı tutarken diğer uygulamalar ses çalamaz. Bu modda AutoMix ve önizlemeler kapalıdır. Bit-perfect çıkış için sesi %100'de tutun ve ekolayzer ile normalizasyonu kapatın.",
+  "exclusiveOutputDescriptionMacos": "Çıkış aygıtını yalnızca Mornye için tutun ve her parçanın örnekleme hızına ve bit derinliğine geçirin; böylece Core Audio yeniden örnekleme yapmaz. Mornye aygıtı tutarken diğer uygulamalar ses çalamaz. Bu modda AutoMix ve önizlemeler kapalıdır. Bit-perfect çıkış için sesi %100'de tutun ve ekolayzer ile normalizasyonu kapatın.",
+  "exclusiveOutputDescriptionLinux": "PipeWire veya PulseAudio'yu atlayarak doğrudan bir ALSA donanım aygıtına çalın; böylece çıkış her parçanın örnekleme hızını ve bit derinliğini izler. Aygıt boşta olmalıdır: ses sunucusu boştaki kartı birkaç saniye sonra bırakır veya profilini Kapalı olarak ayarlayın. Bu modda AutoMix ve önizlemeler kapalıdır.",
+  "exclusiveOutputPending": "Bir parça çalındığında aygıtı alır.",
+  "exclusiveOutputActive": "Özel modda çalıyor.",
+  "exclusiveOutputUnavailableWindows": "Aygıt özel erişimi reddetti, bu nedenle bu parça Windows mikseri üzerinden çalıyor. Aygıtı kullanan diğer uygulamaları kapatın veya aygıtın Windows ses özelliklerinde özel denetime izin verin.",
+  "exclusiveOutputUnavailableMacos": "Başka bir uygulama çıkış aygıtını tutuyor, bu nedenle bu parça sistem mikseri üzerinden çalıyor.",
+  "exclusiveOutputUnavailableLinux": "ALSA aygıtı meşgul; genellikle ses sunucusu tarafından tutuluyor, bu nedenle bu parça onun üzerinden çalıyor. Ses ayarlarında kartın profilini Kapalı olarak ayarlayın veya başka bir aygıt seçin.",
+  "exclusiveOutputDevice": "Çıkış aygıtı",
+  "exclusiveOutputDeviceFirst": "İlk ses kartı",
+  "exclusiveOutputNoDevices": "ALSA oynatma aygıtı bulunamadı",
   "usbDirect": "Doğrudan USB sürücüsü",
   "usbDirectDescription": "Android USB izniyle FLAC/WAV, DSF/DFF ve WavPack DSD için özel USB sesi kullanır. Yerel DSD, tanınan uyumlu bir DAC gerektirir. Diğer PCM formatları normal oynatmayı kullanır. Bir sonraki parçadan itibaren uygulanır.",
   "usbDsdOverPcm": "DSD over PCM (DoP)",
@@ -403,15 +403,15 @@
   "@homeRecent": {
     "description": "Section header for recent searches"
   },
-  "searchRecentlySearched": "Recently Searched",
+  "searchRecentlySearched": "Son Arananlar",
   "@searchRecentlySearched": {
     "description": "Section header for recent searches on the desktop Search page"
   },
-  "searchLibraryPrompt": "Search Your Library",
+  "searchLibraryPrompt": "Kitaplığınızda Arayın",
   "@searchLibraryPrompt": {
     "description": "Shown on the desktop Search page when the Library scope has no search words yet"
   },
-  "searchBrowse": "Browse",
+  "searchBrowse": "Gözat",
   "@searchBrowse": {
     "description": "Section header for home feed tiles on the desktop Search page"
   },
@@ -432,11 +432,11 @@
   "libraryNoActiveDownloads": "Etkin indirme yok",
   "librarySearchHint": "Kitaplığınızda ara",
   "libraryEmptyCollection": "Müzikleriniz burada görünecek",
-  "libraryFolders": "Folders",
+  "libraryFolders": "Klasörler",
   "@libraryFolders": {
     "description": "Library view that browses downloaded and scanned songs by the folders their files are in"
   },
-  "libraryFolderCount": "{count, plural, =1{1 folder} other{{count} folders}}",
+  "libraryFolderCount": "{count, plural, =1{1 klasör} other{{count} klasör}}",
   "@libraryFolderCount": {
     "description": "Number of folders inside a Library folder",
     "placeholders": {
@@ -445,19 +445,19 @@
       }
     }
   },
-  "libraryFoldersEmptyTitle": "No folders yet",
+  "libraryFoldersEmptyTitle": "Henüz klasör yok",
   "@libraryFoldersEmptyTitle": {
     "description": "Title of the Folders view when the Library has no songs"
   },
-  "libraryFoldersEmptyMessage": "Download songs or add a music folder in Local Library settings to browse them by folder.",
+  "libraryFoldersEmptyMessage": "Klasörlere göre göz atmak için şarkı indirin veya Yerel Kitaplık ayarlarından bir müzik klasörü ekleyin.",
   "@libraryFoldersEmptyMessage": {
     "description": "Next step shown in the empty Folders view"
   },
-  "libraryFolderMissing": "This folder is no longer in your Library",
+  "libraryFolderMissing": "Bu klasör artık kitaplığınızda değil",
   "@libraryFolderMissing": {
     "description": "Shown on an open folder page after its songs were deleted or moved"
   },
-  "libraryFoldersLoadFailed": "Couldn't read your folders",
+  "libraryFoldersLoadFailed": "Klasörleriniz okunamadı",
   "@libraryFoldersLoadFailed": {
     "description": "Shown when the Folders view fails to load"
   },
@@ -505,23 +505,23 @@
   "@downloadFolderOrganization": {
     "description": "Title of the folder organization picker bottom sheet"
   },
-  "downloadFolderTemplate": "Custom Folder Structure",
+  "downloadFolderTemplate": "Özel Klasör Yapısı",
   "@downloadFolderTemplate": {
     "description": "Setting for editing a relative download folder template"
   },
-  "downloadFolderTemplateDescription": "Use naming tags and / for subfolders. Saving replaces the preset album and singles layout. Empty folder names use Unknown.",
+  "downloadFolderTemplateDescription": "Alt klasörler için adlandırma etiketleri ve / kullanın. Kaydetmek, hazır albüm ve tekliler düzeninin yerini alır. Boş klasör adlarında Unknown kullanılır.",
   "@downloadFolderTemplateDescription": {
     "description": "Help for custom download folder templates"
   },
-  "folderOrganizationCustom": "Custom template",
+  "folderOrganizationCustom": "Özel şablon",
   "@folderOrganizationCustom": {
     "description": "Folder organization mode using a user-defined template"
   },
-  "folderTemplateInvalid": "Enter a relative folder path with supported tags. Empty folders, . and .. are not allowed.",
+  "folderTemplateInvalid": "Desteklenen etiketlerle göreli bir klasör yolu girin. Boş klasörler, . ve .. kullanılamaz.",
   "@folderTemplateInvalid": {
     "description": "Validation error for an invalid folder template"
   },
-  "folderTemplatePreview": "Example folder path",
+  "folderTemplatePreview": "Örnek klasör yolu",
   "@folderTemplatePreview": {
     "description": "Label for a sample expanded folder template"
   },
@@ -706,15 +706,15 @@
     }
   },
   "optionsArtistTagMode": "Sanatçı Etiketi Modu",
-  "metadataSeparators": "Metadata separators",
-  "metadataSeparatorsDescription": "Choose how comma- or semicolon-separated values are joined in future downloads. Custom artist separators use a joined tag; Primary artist only still applies. Names containing & or / are preserved.",
-  "metadataSeparatorSource": "Keep source formatting",
-  "metadataSeparatorComma": "Comma (,)",
-  "metadataSeparatorSemicolon": "Semicolon (;)",
-  "metadataSeparatorSlash": "Slash (/)",
-  "metadataSeparatorCustom": "Custom separator",
+  "metadataSeparators": "Meta veri ayırıcıları",
+  "metadataSeparatorsDescription": "Virgül veya noktalı virgülle ayrılmış değerlerin gelecekteki indirmelerde nasıl birleştirileceğini seçin. Özel sanatçı ayırıcıları birleşik etiket kullanır; Yalnızca birincil sanatçı seçeneği yine de geçerlidir. & veya / içeren adlar korunur.",
+  "metadataSeparatorSource": "Kaynak biçimlendirmesini koru",
+  "metadataSeparatorComma": "Virgül (,)",
+  "metadataSeparatorSemicolon": "Noktalı virgül (;)",
+  "metadataSeparatorSlash": "Eğik çizgi (/)",
+  "metadataSeparatorCustom": "Özel ayırıcı",
   "metadataSeparatorPreview": "Önizleme",
-  "metadataSeparatorInvalid": "Use 1–16 characters without line breaks or control characters.",
+  "metadataSeparatorInvalid": "Satır sonu veya kontrol karakteri içermeyen 1–16 karakter kullanın.",
   "@optionsArtistTagMode": {
     "description": "Setting title for how artist metadata is written into files"
   },
@@ -871,11 +871,11 @@
   "@aboutMobileSource": {
     "description": "Link to mobile GitHub repo"
   },
-  "aboutLyricsWebsite": "Lyrics website",
+  "aboutLyricsWebsite": "Şarkı sözleri web sitesi",
   "@aboutLyricsWebsite": {
     "description": "Link to the Zarz-LRC website for searching and saving word-timed lyrics"
   },
-  "aboutServiceStatus": "Service status",
+  "aboutServiceStatus": "Hizmet durumu",
   "@aboutServiceStatus": {
     "description": "Link to the status page of the Mornye online services"
   },
@@ -1124,63 +1124,63 @@
   "@setupSkipForNow": {
     "description": "Skip button text"
   },
-  "setupNearbyEnable": "Allow Nearby Devices",
+  "setupNearbyEnable": "Yakındaki Cihazlara İzin Ver",
   "@setupNearbyEnable": {
     "description": "Setup step title and button for the Android Nearby devices permission; Nearby devices is the Android permission name"
   },
-  "setupNearbyDescription": "Mornye Link uses it to find your computer on the same network, and network storage needs it to reach a server at home.",
+  "setupNearbyDescription": "Mornye Link bunu aynı ağdaki bilgisayarınızı bulmak için, ağ depolaması ise evdeki bir sunucuya ulaşmak için kullanır.",
   "@setupNearbyDescription": {
     "description": "Setup step explaining why Android's Nearby devices permission is needed"
   },
-  "setupNearbyGranted": "Nearby Devices Allowed!",
+  "setupNearbyGranted": "Yakındaki Cihazlara İzin Verildi!",
   "@setupNearbyGranted": {
     "description": "Setup message after the Nearby devices permission is granted"
   },
-  "permissionNearbyDevices": "Nearby devices",
+  "permissionNearbyDevices": "Yakındaki cihazlar",
   "@permissionNearbyDevices": {
     "description": "Nearby devices permission type label; use Android's name for this permission"
   },
-  "whatsNewLinkNearbyAllow": "Allow nearby devices",
+  "whatsNewLinkNearbyAllow": "Yakındaki cihazlara izin ver",
   "@whatsNewLinkNearbyAllow": {
     "description": "Main button on the Nearby devices page of the What's New tour that asks for Android's Nearby devices permission"
   },
-  "whatsNewLinkNearbyGranted": "Nearby devices allowed",
+  "whatsNewLinkNearbyGranted": "Yakındaki cihazlara izin verildi",
   "@whatsNewLinkNearbyGranted": {
     "description": "Shown on the Nearby devices page of the What's New tour after the Nearby devices permission is granted"
   },
-  "whatsNewNearbyTitle": "Nearby devices",
+  "whatsNewNearbyTitle": "Yakındaki cihazlar",
   "@whatsNewNearbyTitle": {
     "description": "Title of the What's New page that asks for Android's Nearby devices permission; use Android's name for this permission"
   },
-  "whatsNewNearbyDesc": "Android now asks before an app can reach other devices on your network. Mornye needs this for:",
+  "whatsNewNearbyDesc": "Android artık bir uygulama ağınızdaki diğer cihazlara erişmeden önce izin istiyor. Mornye buna şunlar için ihtiyaç duyar:",
   "@whatsNewNearbyDesc": {
     "description": "Description on the Nearby devices page of the What's New tour, followed by a list of uses"
   },
-  "whatsNewNearbyLinkTitle": "Finding your computer",
+  "whatsNewNearbyLinkTitle": "Bilgisayarınızı bulma",
   "@whatsNewNearbyLinkTitle": {
     "description": "Use of the Nearby devices permission: Mornye Link finds the computer"
   },
-  "whatsNewNearbyLinkBody": "Mornye Link looks for your computer on the same Wi-Fi and stays connected to it.",
+  "whatsNewNearbyLinkBody": "Mornye Link, bilgisayarınızı aynı Wi-Fi'de arar ve bağlantıyı sürdürür.",
   "@whatsNewNearbyLinkBody": {
     "description": "Explains how Mornye Link uses the Nearby devices permission"
   },
-  "whatsNewNearbyStorageTitle": "Network storage",
+  "whatsNewNearbyStorageTitle": "Ağ depolaması",
   "@whatsNewNearbyStorageTitle": {
     "description": "Use of the Nearby devices permission: SMB and WebDAV servers at home"
   },
-  "whatsNewNearbyStorageBody": "Play music from a NAS or a server at home over SMB or WebDAV.",
+  "whatsNewNearbyStorageBody": "Evdeki bir NAS veya sunucudan SMB ya da WebDAV üzerinden müzik çalın.",
   "@whatsNewNearbyStorageBody": {
     "description": "Explains how network storage uses the Nearby devices permission"
   },
-  "whatsNewNearbyPrivateTitle": "Only your own devices",
+  "whatsNewNearbyPrivateTitle": "Yalnızca kendi cihazlarınız",
   "@whatsNewNearbyPrivateTitle": {
     "description": "Reassurance on the Nearby devices page of the What's New tour"
   },
-  "whatsNewNearbyPrivateBody": "Mornye uses it only to reach devices on your network, never to find where you are.",
+  "whatsNewNearbyPrivateBody": "Mornye bunu yalnızca ağınızdaki cihazlara ulaşmak için kullanır, konumunuzu bulmak için asla.",
   "@whatsNewNearbyPrivateBody": {
     "description": "Explains that the Nearby devices permission is not used for location"
   },
-  "whatsNewNearbyRefused": "Not allowed. Mornye Link and network storage stay off until you allow Nearby devices for Mornye in Android settings.",
+  "whatsNewNearbyRefused": "İzin verilmedi. Android ayarlarından Mornye için Yakındaki cihazlar iznini verene kadar Mornye Link ve ağ depolaması kapalı kalır.",
   "@whatsNewNearbyRefused": {
     "description": "Shown on the Nearby devices page of the What's New tour after the permission is refused"
   },
@@ -1649,11 +1649,11 @@
   "@searchPlaylists": {
     "description": "Search result category - playlists"
   },
-  "searchShowAll": "Show all",
+  "searchShowAll": "Tümünü göster",
   "@searchShowAll": {
     "description": "Button of a search result section on wide screens that shows every result of that kind"
   },
-  "searchShowAllCategory": "Show all {category}",
+  "searchShowAllCategory": "Tüm {category} öğelerini göster",
   "@searchShowAllCategory": {
     "description": "Screen reader label of the Show all button of a search result section",
     "placeholders": {
@@ -1824,27 +1824,27 @@
   "@updateDontRemind": {
     "description": "Update button - skip this version"
   },
-  "updateViewRelease": "View Release",
+  "updateViewRelease": "Sürümü Görüntüle",
   "@updateViewRelease": {
     "description": "Update button - open the release page when this install cannot update itself (deb, Flatpak, no matching package)"
   },
-  "updateStartingInstaller": "Starting the installer...",
+  "updateStartingInstaller": "Yükleyici başlatılıyor...",
   "@updateStartingInstaller": {
     "description": "Update status on Windows - the downloaded installer is starting and the app will close"
   },
-  "updateMacInstallHint": "The disk image is open in Finder. Quit Mornye, then drag Mornye from the disk image to Applications and replace the old copy.",
+  "updateMacInstallHint": "Disk görüntüsü Finder'da açıldı. Mornye'den çıkın, ardından Mornye'yi disk görüntüsünden Uygulamalar'a sürükleyip eski kopyanın yerine koyun.",
   "@updateMacInstallHint": {
     "description": "Update instructions on macOS after the downloaded disk image opens"
   },
-  "updateQuitApp": "Quit Mornye",
+  "updateQuitApp": "Mornye'den Çık",
   "@updateQuitApp": {
     "description": "Update button on macOS - quit the app so the new version can replace it"
   },
-  "updateReadyToRestart": "The update is installed. Restart Mornye to use it.",
+  "updateReadyToRestart": "Güncelleme yüklendi. Kullanmak için Mornye'yi yeniden başlatın.",
   "@updateReadyToRestart": {
     "description": "Update status on Linux after the AppImage was replaced"
   },
-  "updateRestartNow": "Restart Now",
+  "updateRestartNow": "Şimdi Yeniden Başlat",
   "@updateRestartNow": {
     "description": "Update button on Linux - restart the app after the AppImage was replaced"
   },
@@ -2610,12 +2610,12 @@
   "@downloadAutoConvert": {
     "description": "Toggle for automatic post-download audio conversion"
   },
-  "downloadAutoConvertAllFormatsSubtitle": "Convert completed downloads or limit FLAC bit depth and sample rate. The original is replaced only after conversion succeeds.",
-  "downloadAutoConvertOutputSubtitle": "Choose the output format for newly completed downloads.",
-  "downloadAutoConvertFlacSubtitle": "Lossless FLAC with quality limits. Lower bit depths and sample rates are preserved.",
-  "downloadAutoConvertMaxBitDepth": "Maximum bit depth",
-  "downloadAutoConvertMaxSampleRate": "Maximum sample rate",
-  "downloadAutoConvertFlacLimitsSubtitle": "These are upper limits. For example, a 44.1 kHz source stays at 44.1 kHz when 48 kHz is selected. Lossy sources are kept in their original format.",
+  "downloadAutoConvertAllFormatsSubtitle": "Tamamlanan indirmeleri dönüştürün veya FLAC bit derinliğini ve örnekleme hızını sınırlayın. Orijinal, yalnızca dönüştürme başarılı olduktan sonra değiştirilir.",
+  "downloadAutoConvertOutputSubtitle": "Yeni tamamlanan indirmeler için çıktı biçimini seçin.",
+  "downloadAutoConvertFlacSubtitle": "Kalite sınırlarıyla kayıpsız FLAC. Daha düşük bit derinlikleri ve örnekleme hızları korunur.",
+  "downloadAutoConvertMaxBitDepth": "Maksimum bit derinliği",
+  "downloadAutoConvertMaxSampleRate": "Maksimum örnekleme hızı",
+  "downloadAutoConvertFlacLimitsSubtitle": "Bunlar üst sınırlardır. Örneğin 48 kHz seçildiğinde 44,1 kHz kaynak 44,1 kHz'de kalır. Kayıplı kaynaklar orijinal biçimlerinde tutulur.",
   "downloadAutoConvertSubtitle": "Tamamlanan indirmeleri daha küçük, kayıplı bir biçime dönüştürür. Orijinal dosya yalnızca dönüştürme başarılı olduktan sonra değiştirilir.",
   "@downloadAutoConvertSubtitle": {
     "description": "Explanation of safe automatic post-download conversion"
@@ -3124,11 +3124,11 @@
   "@libraryRemoveFolder": {
     "description": "Action to remove one indexed library source"
   },
-  "libraryRemoveFolderMessage": "Remove this folder and its indexed tracks from Mornye? Audio files on the storage will not be deleted.",
+  "libraryRemoveFolderMessage": "Bu klasör ve dizinlenmiş parçaları Mornye'den kaldırılsın mı? Depolamadaki ses dosyaları silinmez.",
   "@libraryRemoveFolderMessage": {
     "description": "Confirmation shown before removing a library source"
   },
-  "libraryUnreadableFiles": "{count, plural, =1{1 file couldn't be read} other{{count} files couldn't be read}}",
+  "libraryUnreadableFiles": "{count, plural, =1{1 dosya okunamadı} other{{count} dosya okunamadı}}",
   "@libraryUnreadableFiles": {
     "description": "Count of files the last scan of a library folder skipped because it could not read them",
     "placeholders": {
@@ -3137,19 +3137,19 @@
       }
     }
   },
-  "libraryUnreadableFilesTitle": "Unreadable files",
+  "libraryUnreadableFilesTitle": "Okunamayan dosyalar",
   "@libraryUnreadableFilesTitle": {
     "description": "Title of the list of files a library scan could not read, and the action that opens it"
   },
-  "libraryUnreadableFilesSubtitle": "These files were left out of your library. They may be damaged, still downloading, or blocked by the storage app.",
+  "libraryUnreadableFilesSubtitle": "Bu dosyalar kitaplığınıza dahil edilmedi. Hasar görmüş, hâlâ indiriliyor veya depolama uygulaması tarafından engellenmiş olabilirler.",
   "@libraryUnreadableFilesSubtitle": {
     "description": "Explanation above the list of files a library scan could not read"
   },
-  "libraryUnreadableFilesAction": "See which files and why",
+  "libraryUnreadableFilesAction": "Hangi dosyalar ve neden",
   "@libraryUnreadableFilesAction": {
     "description": "Subtitle of the library folder action that lists unreadable files"
   },
-  "libraryUnreadableFilesMore": "{count, plural, =1{1 more file isn't listed} other{{count} more files aren't listed}}",
+  "libraryUnreadableFilesMore": "{count, plural, =1{1 dosya daha listelenmiyor} other{{count} dosya daha listelenmiyor}}",
   "@libraryUnreadableFilesMore": {
     "description": "Note below the unreadable files list when the scan skipped more files than it lists",
     "placeholders": {
@@ -3410,11 +3410,11 @@
   "@libraryFilterSortOldest": {
     "description": "Sort option - oldest first"
   },
-  "libraryFilterSortSizeLargest": "Size (Largest first)",
+  "libraryFilterSortSizeLargest": "Boyut (En büyük önce)",
   "@libraryFilterSortSizeLargest": {
     "description": "Library sort option - largest files first"
   },
-  "libraryFilterSortSizeSmallest": "Size (Smallest first)",
+  "libraryFilterSortSizeSmallest": "Boyut (En küçük önce)",
   "@libraryFilterSortSizeSmallest": {
     "description": "Library sort option - smallest files first"
   },
@@ -3456,11 +3456,11 @@
       }
     }
   },
-  "tutorialWelcomeTitle": "Welcome to Mornye!",
+  "tutorialWelcomeTitle": "Mornye'ye hoş geldiniz!",
   "@tutorialWelcomeTitle": {
     "description": "Tutorial welcome page title"
   },
-  "tutorialWelcomeDesc": "Learn how to find music with extensions, choose the quality you want, and manage downloads in Mornye.",
+  "tutorialWelcomeDesc": "Uzantılarla müzik bulmayı, istediğiniz kaliteyi seçmeyi ve Mornye'de indirmeleri yönetmeyi öğrenin.",
   "@tutorialWelcomeDesc": {
     "description": "Tutorial welcome page description"
   },
@@ -3556,7 +3556,7 @@
   "@tutorialReadyMessage": {
     "description": "Tutorial completion message"
   },
-  "whatsNewIntroTitle": "Mornye {version} is here",
+  "whatsNewIntroTitle": "Mornye {version} geldi",
   "@whatsNewIntroTitle": {
     "description": "First page of the tour shown once after updating; version is like 5.3",
     "placeholders": {
@@ -3565,60 +3565,60 @@
       }
     }
   },
-  "whatsNewIntroDesc": "Our biggest update yet. Here's a quick look at what's new.",
+  "whatsNewIntroDesc": "Şimdiye kadarki en büyük güncellememiz. Yeniliklerimize hızlıca bir göz atın.",
   "whatsNewLinkTitle": "Mornye Link",
-  "whatsNewLinkDesc": "Pair your phone and computer on the same network. Mornye Link is in beta.",
-  "whatsNewLinkPlayTitle": "Play across devices",
-  "whatsNewLinkPlayBody": "Browse your computer's library on your phone, control what it plays, and hand playback over without losing your place.",
-  "whatsNewLinkTransferTitle": "Move songs both ways",
-  "whatsNewLinkTransferBody": "Send songs to your computer or save them to your phone, right from the song menu.",
-  "whatsNewLinkSyncTitle": "Stay in sync",
-  "whatsNewLinkSyncBody": "Collections and listening history stay the same on paired devices.",
-  "whatsNewHomeTitle": "A Home that learns",
-  "whatsNewHomeDesc": "Mixes and autoplay now follow how you actually listen.",
-  "whatsNewHomeMixesTitle": "Mixes from your Library",
-  "whatsNewHomeMixesBody": "New mixes built from your own songs, including a mix for each genre.",
-  "whatsNewHomeAutoplayTitle": "Smarter autoplay",
-  "whatsNewHomeAutoplayBody": "Autoplay follows your listening session and learns from your favorites, playlists and replays.",
-  "whatsNewHomeAnalysisTitle": "Song analysis",
-  "whatsNewHomeAnalysisBody": "Mornye can analyze how your songs sound for closer picks. It stays off until you turn it on in Settings.",
-  "whatsNewPlayerTitle": "Player and lyrics",
-  "whatsNewPlayerDesc": "Smoother playback, and lyrics in any language.",
-  "whatsNewPlayerGaplessTitle": "Gapless playback",
-  "whatsNewPlayerGaplessBody": "Albums flow from one song into the next without a pause.",
-  "whatsNewPlayerTranslateTitle": "Translate lyrics",
-  "whatsNewPlayerTranslateBody": "Translate or romanize lyrics with an AI provider you set up.",
-  "whatsNewPlayerTimingTitle": "Lyrics timing",
-  "whatsNewPlayerTimingBody": "Move synced lyrics earlier or later when they drift from the song.",
+  "whatsNewLinkDesc": "Telefonunuzu ve bilgisayarınızı aynı ağda eşleştirin. Mornye Link beta aşamasındadır.",
+  "whatsNewLinkPlayTitle": "Cihazlar arasında çalın",
+  "whatsNewLinkPlayBody": "Bilgisayarınızın kitaplığına telefonunuzdan göz atın, ne çaldığını denetleyin ve kaldığınız yeri kaybetmeden oynatmayı devredin.",
+  "whatsNewLinkTransferTitle": "Şarkıları iki yönde taşıyın",
+  "whatsNewLinkTransferBody": "Şarkı menüsünden doğrudan bilgisayarınıza şarkı gönderin veya telefonunuza kaydedin.",
+  "whatsNewLinkSyncTitle": "Senkron kalın",
+  "whatsNewLinkSyncBody": "Koleksiyonlar ve dinleme geçmişi eşleştirilmiş cihazlarda aynı kalır.",
+  "whatsNewHomeTitle": "Öğrenen bir Ana sayfa",
+  "whatsNewHomeDesc": "Mix'ler ve otomatik oynatma artık gerçekte nasıl dinlediğinizi izliyor.",
+  "whatsNewHomeMixesTitle": "Kitaplığınızdan mix'ler",
+  "whatsNewHomeMixesBody": "Kendi şarkılarınızdan oluşturulan yeni mix'ler; her tür için bir mix dahil.",
+  "whatsNewHomeAutoplayTitle": "Daha akıllı otomatik oynatma",
+  "whatsNewHomeAutoplayBody": "Otomatik oynatma dinleme oturumunuzu izler ve favorilerinizden, çalma listelerinizden ve tekrarlarınızdan öğrenir.",
+  "whatsNewHomeAnalysisTitle": "Şarkı analizi",
+  "whatsNewHomeAnalysisBody": "Mornye daha isabetli seçimler için şarkılarınızın nasıl kulağa geldiğini analiz edebilir. Ayarlar'dan açana kadar kapalı kalır.",
+  "whatsNewPlayerTitle": "Oynatıcı ve şarkı sözleri",
+  "whatsNewPlayerDesc": "Daha akıcı oynatma ve her dilde şarkı sözleri.",
+  "whatsNewPlayerGaplessTitle": "Gapless oynatma",
+  "whatsNewPlayerGaplessBody": "Albümler bir şarkıdan diğerine duraklama olmadan akar.",
+  "whatsNewPlayerTranslateTitle": "Şarkı sözlerini çevir",
+  "whatsNewPlayerTranslateBody": "Ayarladığınız bir AI sağlayıcısıyla şarkı sözlerini çevirin veya romanize edin.",
+  "whatsNewPlayerTimingTitle": "Şarkı sözü zamanlaması",
+  "whatsNewPlayerTimingBody": "Senkronlu şarkı sözleri şarkıdan kaydığında öne veya geriye kaydırın.",
   "whatsNewPlayerAutoTitle": "Android Auto",
-  "whatsNewPlayerAutoBody": "Browse and play your Library from your car's screen.",
-  "whatsNewPlayerExclusiveTitle": "Exclusive output",
-  "whatsNewPlayerExclusiveBody": "Send audio straight to your output device without the system mixer.",
-  "whatsNewLibraryTitle": "Library and search",
-  "whatsNewLibraryDesc": "New ways to find and organize your music.",
-  "whatsNewLibraryFoldersTitle": "Browse by folder",
-  "whatsNewLibraryFoldersBody": "Explore your Library the way it's stored on disk.",
-  "whatsNewLibrarySuggestionsTitle": "Suggested songs",
-  "whatsNewLibrarySuggestionsBody": "Albums, singles and playlists now suggest songs that fit.",
-  "whatsNewLibraryRecognizeTitle": "Recognize music",
-  "whatsNewLibraryRecognizeBody": "Tap the microphone in Search to find out what's playing nearby.",
-  "whatsNewLibraryPlaylistsTitle": "Better playlists",
-  "whatsNewLibraryPlaylistsBody": "Reorder songs, create a playlist from a folder, or import playlist files.",
-  "whatsNewFasterTitle": "Faster everywhere",
-  "whatsNewFasterDesc": "Quicker and lighter, especially with large libraries.",
-  "whatsNewFasterLibraryTitle": "A quicker Library",
-  "whatsNewFasterLibraryBody": "Tabs and albums open faster, and scrolling stays smooth.",
-  "whatsNewFasterNetworkTitle": "Faster network music",
-  "whatsNewFasterNetworkBody": "Network shares scan many times faster, and Subsonic servers sync with far fewer requests.",
-  "whatsNewFasterQueueTitle": "Long queues that last",
-  "whatsNewFasterQueueBody": "Large queues save quickly and come back after a restart.",
-  "whatsNewFasterBackgroundTitle": "Lighter in the background",
-  "whatsNewFasterBackgroundBody": "The app starts faster and does less work while music plays.",
-  "whatsNewDone": "Start listening",
+  "whatsNewPlayerAutoBody": "Arabanızın ekranından Kitaplığınıza göz atın ve müzik çalın.",
+  "whatsNewPlayerExclusiveTitle": "Özel çıkış",
+  "whatsNewPlayerExclusiveBody": "Sesi sistem mikseri olmadan doğrudan çıkış aygıtınıza gönderin.",
+  "whatsNewLibraryTitle": "Kitaplık ve arama",
+  "whatsNewLibraryDesc": "Müziğinizi bulmanın ve düzenlemenin yeni yolları.",
+  "whatsNewLibraryFoldersTitle": "Klasöre göre göz at",
+  "whatsNewLibraryFoldersBody": "Kitaplığınızı diskte depolandığı şekilde keşfedin.",
+  "whatsNewLibrarySuggestionsTitle": "Önerilen şarkılar",
+  "whatsNewLibrarySuggestionsBody": "Albümler, tekliler ve çalma listeleri artık uygun şarkılar öneriyor.",
+  "whatsNewLibraryRecognizeTitle": "Müziği tanı",
+  "whatsNewLibraryRecognizeBody": "Yakında ne çaldığını öğrenmek için Aramada mikrofon simgesine dokunun.",
+  "whatsNewLibraryPlaylistsTitle": "Daha iyi çalma listeleri",
+  "whatsNewLibraryPlaylistsBody": "Şarkıları yeniden sıralayın, bir klasörden çalma listesi oluşturun veya çalma listesi dosyalarını içe aktarın.",
+  "whatsNewFasterTitle": "Her yerde daha hızlı",
+  "whatsNewFasterDesc": "Özellikle büyük kitaplıklarda daha hızlı ve daha hafif.",
+  "whatsNewFasterLibraryTitle": "Daha hızlı Kitaplık",
+  "whatsNewFasterLibraryBody": "Sekmeler ve albümler daha hızlı açılır, kaydırma akıcı kalır.",
+  "whatsNewFasterNetworkTitle": "Daha hızlı ağ müziği",
+  "whatsNewFasterNetworkBody": "Ağ paylaşımları çok daha hızlı taranır ve Subsonic sunucuları çok daha az istekle eşitlenir.",
+  "whatsNewFasterQueueTitle": "Uzun süre dayanan kuyruklar",
+  "whatsNewFasterQueueBody": "Büyük kuyruklar hızlı kaydedilir ve yeniden başlatmadan sonra geri gelir.",
+  "whatsNewFasterBackgroundTitle": "Arka planda daha hafif",
+  "whatsNewFasterBackgroundBody": "Uygulama daha hızlı açılır ve müzik çalarken daha az iş yapar.",
+  "whatsNewDone": "Dinlemeye başla",
   "@whatsNewDone": {
     "description": "Button on the last page of the What's New tour"
   },
-  "whatsNewAboutTitle": "What's new in {version}",
+  "whatsNewAboutTitle": "{version} sürümündeki yenilikler",
   "@whatsNewAboutTitle": {
     "description": "About page row that reopens the What's New tour; version is like 5.3",
     "placeholders": {
@@ -3725,7 +3725,7 @@
   "@libraryPlaybackNormalizationSubtitle": {
     "description": "Subtitle explaining playback volume normalization"
   },
-  "playbackNormalizationMode": "Gain mode",
+  "playbackNormalizationMode": "Kazanç modu",
   "@playbackNormalizationMode": {
     "description": "Label for choosing between track and album ReplayGain during playback"
   },
@@ -3737,11 +3737,11 @@
   "@playbackNormalizationModeAlbum": {
     "description": "Gain mode that keeps the loudness differences inside an album"
   },
-  "playbackNormalizationPreamp": "Pre-amp",
+  "playbackNormalizationPreamp": "Ön yükselteç",
   "@playbackNormalizationPreamp": {
     "description": "Label for the dB offset applied on top of ReplayGain during playback"
   },
-  "playbackNormalizationPreampValue": "{gain} dB (target {target} LUFS)",
+  "playbackNormalizationPreampValue": "{gain} dB (hedef {target} LUFS)",
   "@playbackNormalizationPreampValue": {
     "description": "Pre-amp value with the resulting target loudness",
     "placeholders": {
@@ -3755,7 +3755,7 @@
       }
     }
   },
-  "playbackNormalizationPreampHint": "Lower values play quieter. Normalization only turns tracks down, so it never clips.",
+  "playbackNormalizationPreampHint": "Düşük değerler daha kısık çalar. Normalizasyon yalnızca parçaları kısar, bu yüzden ses asla kırpılmaz.",
   "@playbackNormalizationPreampHint": {
     "description": "Hint under the normalization pre-amp slider"
   },
@@ -4631,15 +4631,15 @@
   "@lyricsProviderLyricsPlusDesc": {
     "description": "Description for LyricsPlus provider"
   },
-  "lyricsProviderZarzLrcDesc": "Word-by-word Apple Music lyrics from Zarz-LRC",
+  "lyricsProviderZarzLrcDesc": "Zarz-LRC'den kelime kelime Apple Music şarkı sözleri",
   "@lyricsProviderZarzLrcDesc": {
     "description": "Description for the first-party Zarz-LRC provider"
   },
-  "lyricsProviderLrcRedDesc": "Word-by-word Apple Music lyrics, matched by recording",
+  "lyricsProviderLrcRedDesc": "Kayda göre eşleştirilen kelime kelime Apple Music şarkı sözleri",
   "@lyricsProviderLrcRedDesc": {
     "description": "Description for lrc.red provider"
   },
-  "lyricsProviderBetterLyricsDesc": "Word-by-word Apple Music lyrics for popular songs",
+  "lyricsProviderBetterLyricsDesc": "Popüler şarkılar için kelime kelime Apple Music şarkı sözleri",
   "@lyricsProviderBetterLyricsDesc": {
     "description": "Description for BetterLyrics provider, which only answers songs it has already cached"
   },
@@ -4651,7 +4651,7 @@
   "@safMigrationTitle": {
     "description": "Title of SAF migration dialog"
   },
-  "safMigrationMessage1": "Mornye now uses Android Storage Access Framework (SAF) for downloads. This fixes \"permission denied\" errors on Android 10+.",
+  "safMigrationMessage1": "Mornye artık indirmeler için Android Depolama Erişim Çerçevesi'ni (SAF) kullanıyor. Bu, Android 10+ sürümlerindeki \"izin reddedildi\" hatalarını giderir.",
   "@safMigrationMessage1": {
     "description": "First paragraph of SAF migration dialog"
   },
@@ -4731,7 +4731,7 @@
   "@backupRestoreFailed": {
     "description": "Snackbar when restore fails"
   },
-  "backupInvalidFile": "This file is not a valid Mornye backup",
+  "backupInvalidFile": "Bu dosya geçerli bir Mornye yedeği değil",
   "@backupInvalidFile": {
     "description": "Snackbar when the chosen file is not a valid backup"
   },
@@ -4915,9 +4915,9 @@
     "description": "Subtitle shown in the download location picker sheet"
   },
   "storageAutomaticFolder": "Otomatik klasör",
-  "storageAutomaticDownloadFolder": "Uses Download/Mornye when writable, otherwise app storage",
+  "storageAutomaticDownloadFolder": "Yazılabilirse Download/Mornye kullanılır, aksi halde uygulama depolaması",
   "storageSafRecommended": "Klasör seç (Önerilen)",
-  "storageDownloadFolderHint": "In the Android folder picker, open Download and select Mornye. If it does not exist, create it using New folder, then tap Use this folder to grant access.",
+  "storageDownloadFolderHint": "Android klasör seçicide Download klasörünü açıp Mornye'yi seçin. Yoksa Yeni klasör ile oluşturun, ardından erişim vermek için Bu klasörü kullan'a dokunun.",
   "downloadFolderAccessLostTitle": "İndirme klasörü erişimi kaybedildi",
   "@downloadFolderAccessLostTitle": {
     "description": "Title of the warning banner shown in Files settings when the saved SAF folder grant is no longer valid"
@@ -5217,31 +5217,31 @@
   "@editMetadataAutoFillNoneSelected": {
     "description": "Snackbar when user taps Fetch without selecting any fields"
   },
-  "editMetadataLyricsSearch": "Find lyrics online",
+  "editMetadataLyricsSearch": "Çevrimiçi şarkı sözü bul",
   "@editMetadataLyricsSearch": {
     "description": "Button in the edit metadata lyrics section that searches every lyrics provider"
   },
-  "lyricsPickerTitle": "Choose lyrics",
+  "lyricsPickerTitle": "Şarkı sözlerini seç",
   "@lyricsPickerTitle": {
     "description": "Title of the sheet listing each lyrics provider's result"
   },
-  "lyricsPickerNeedsTitle": "Enter a title and artist first",
+  "lyricsPickerNeedsTitle": "Önce bir başlık ve sanatçı girin",
   "@lyricsPickerNeedsTitle": {
     "description": "Snackbar when searching lyrics without a title or artist"
   },
-  "lyricsPickerNoProviders": "No lyrics providers are enabled. Turn some on in Settings > Lyrics.",
+  "lyricsPickerNoProviders": "Etkin şarkı sözü sağlayıcısı yok. Ayarlar > Şarkı sözleri bölümünden bazılarını açın.",
   "@lyricsPickerNoProviders": {
     "description": "Shown in the lyrics picker when no provider is enabled"
   },
-  "lyricsPickerWordSynced": "Word-synced",
+  "lyricsPickerWordSynced": "Kelime senkronlu",
   "@lyricsPickerWordSynced": {
     "description": "Lyrics result timed word by word"
   },
-  "lyricsPickerSynced": "Synced",
+  "lyricsPickerSynced": "Senkronlu",
   "@lyricsPickerSynced": {
     "description": "Lyrics result timed line by line"
   },
-  "lyricsPickerPlain": "Plain text",
+  "lyricsPickerPlain": "Düz metin",
   "@lyricsPickerPlain": {
     "description": "Lyrics result without timing"
   },
@@ -5249,11 +5249,11 @@
   "@lyricsPickerInstrumental": {
     "description": "Lyrics result that marks the track as instrumental"
   },
-  "lyricsPickerNotFound": "No lyrics found",
+  "lyricsPickerNotFound": "Şarkı sözü bulunamadı",
   "@lyricsPickerNotFound": {
     "description": "A lyrics provider returned nothing for this track"
   },
-  "lyricsPickerLineCount": "{count, plural, =1{1 line} other{{count} lines}}",
+  "lyricsPickerLineCount": "{count, plural, =1{1 satır} other{{count} satır}}",
   "@lyricsPickerLineCount": {
     "description": "Number of lyric lines in a provider's result",
     "placeholders": {
@@ -5502,11 +5502,11 @@
   "@audioAnalysisRescan": {
     "description": "Tooltip/label for the button that re-runs the audio analysis, discarding cached results"
   },
-  "audioAnalysisSaveSpectrogram": "Save Spectrogram",
+  "audioAnalysisSaveSpectrogram": "Spektrogramı Kaydet",
   "@audioAnalysisSaveSpectrogram": {
     "description": "Tooltip for the spectrogram button that saves the plot, with its axes and legend, as a PNG image the user places in storage"
   },
-  "audioAnalysisSpectrogramSaved": "Spectrogram saved to {fileName}",
+  "audioAnalysisSpectrogramSaved": "Spektrogram {fileName} dosyasına kaydedildi",
   "@audioAnalysisSpectrogramSaved": {
     "description": "Snackbar after the spectrogram image was saved",
     "placeholders": {
@@ -5647,11 +5647,11 @@
   "@extensionsHomeFeedProvider": {
     "description": "Extensions page - label for home feed provider selector"
   },
-  "extensionsHomeFeedCountry": "Home feed country",
+  "extensionsHomeFeedCountry": "Ana sayfa akışı ülkesi",
   "@extensionsHomeFeedCountry": {
     "description": "Country picker for the active Home feed extension"
   },
-  "extensionsHomeFeedCountryDescription": "Choose a country's Home recommendations without a VPN.",
+  "extensionsHomeFeedCountryDescription": "VPN olmadan bir ülkenin Ana sayfa önerilerini seçin.",
   "@extensionsHomeFeedCountryDescription": {
     "description": "Help for choosing regional Home recommendations"
   },
@@ -5905,7 +5905,7 @@
   "@notifLibraryScanFailed": {
     "description": "Notification title when library scan fails"
   },
-  "notifLibraryScanInterruptedBody": "The previous library scan was interrupted. Scan the folder again to continue. Your indexed tracks are still available.",
+  "notifLibraryScanInterruptedBody": "Önceki kitaplık taraması kesintiye uğradı. Devam etmek için klasörü yeniden tarayın. Dizinlenmiş parçalarınız hâlâ kullanılabilir.",
   "@notifLibraryScanInterruptedBody": {
     "description": "Recovery notice after the app stops during a library scan"
   },
@@ -5930,7 +5930,7 @@
       }
     }
   },
-  "notifDownloadingUpdate": "Downloading Mornye v{version}",
+  "notifDownloadingUpdate": "Mornye v{version} indiriliyor",
   "@notifDownloadingUpdate": {
     "description": "Notification title while downloading an app update",
     "placeholders": {
@@ -5958,7 +5958,7 @@
   "@notifUpdateReady": {
     "description": "Notification title when app update download is complete"
   },
-  "notifUpdateReadyBody": "Mornye v{version} downloaded. Tap to install.",
+  "notifUpdateReadyBody": "Mornye v{version} indirildi. Yüklemek için dokunun.",
   "@notifUpdateReadyBody": {
     "description": "Notification body when app update is ready to install",
     "placeholders": {
@@ -6726,7 +6726,7 @@
   "@extensionCustomUrlHandlingSubtitle": {
     "description": "Extension detail subtitle for custom URL handling"
   },
-  "extensionCustomUrlHandlingShareHint": "Share links from these sites to Mornye and this extension will handle them.",
+  "extensionCustomUrlHandlingShareHint": "Bu sitelerdeki bağlantıları Mornye ile paylaşın; bu uzantı onları işleyecektir.",
   "@extensionCustomUrlHandlingShareHint": {
     "description": "Extension detail hint explaining share-to-app URL handling"
   },
@@ -6932,11 +6932,11 @@
   "@libraryExternalPlayerSubtitle": {
     "description": "Subtitle for external player option"
   },
-  "libraryBuiltInPreviewPlayer": "Built-in player",
+  "libraryBuiltInPreviewPlayer": "Yerleşik oynatıcı",
   "@libraryBuiltInPreviewPlayer": {
     "description": "Setting option to use the built-in preview player"
   },
-  "libraryBuiltInPreviewPlayerSubtitle": "Play your music right inside Mornye",
+  "libraryBuiltInPreviewPlayerSubtitle": "Müziğinizi doğrudan Mornye içinde çalın",
   "@libraryBuiltInPreviewPlayerSubtitle": {
     "description": "Subtitle for built-in preview player option"
   },
@@ -7036,11 +7036,11 @@
   "@nowPlayingOpenInExternalPlayer": {
     "description": "Menu item to open the current track in an external player"
   },
-  "nowPlayingHideVolume": "Hide volume",
+  "nowPlayingHideVolume": "Sesi gizle",
   "@nowPlayingHideVolume": {
     "description": "Now Playing menu item that removes the volume slider from the player"
   },
-  "nowPlayingShowVolume": "Show volume",
+  "nowPlayingShowVolume": "Sesi göster",
   "@nowPlayingShowVolume": {
     "description": "Now Playing menu item that brings the volume slider back to the player"
   },
@@ -7068,23 +7068,23 @@
   "@nowPlayingNoLyrics": {
     "description": "Empty state when the playing file has no embedded lyrics"
   },
-  "nowPlayingSearchLyricsOnline": "Search online",
+  "nowPlayingSearchLyricsOnline": "Çevrimiçi ara",
   "@nowPlayingSearchLyricsOnline": {
     "description": "Button in the player's empty lyrics state that looks up lyrics from the enabled lyrics providers"
   },
-  "nowPlayingNoLyricsOnline": "No lyrics found online",
+  "nowPlayingNoLyricsOnline": "Çevrimiçi şarkı sözü bulunamadı",
   "@nowPlayingNoLyricsOnline": {
     "description": "Empty state after an online lyrics search for the playing track found nothing"
   },
-  "nowPlayingTranslateLyrics": "Translate Lyrics",
+  "nowPlayingTranslateLyrics": "Şarkı sözlerini çevir",
   "@nowPlayingTranslateLyrics": {
     "description": "Player lyrics menu action that translates the current lyrics with the user's AI provider"
   },
-  "nowPlayingCancelTranslation": "Cancel Translation",
+  "nowPlayingCancelTranslation": "Çeviriyi iptal et",
   "@nowPlayingCancelTranslation": {
     "description": "Player lyrics menu action that stops an AI lyrics translation in progress"
   },
-  "nowPlayingTranslatingLyrics": "Translating lyrics, {percent}%",
+  "nowPlayingTranslatingLyrics": "Şarkı sözleri çevriliyor, %{percent}",
   "@nowPlayingTranslatingLyrics": {
     "description": "Tooltip and screen reader label of the lyrics menu button while an AI translation runs",
     "placeholders": {
@@ -7093,11 +7093,11 @@
       }
     }
   },
-  "lyricsTranslateSheetTitle": "Translate Into",
+  "lyricsTranslateSheetTitle": "Şu dile çevir",
   "@lyricsTranslateSheetTitle": {
     "description": "Title of the sheet that picks the language to translate the current lyrics into"
   },
-  "lyricsTranslateSheetSubtitle": "The lyrics are sent to {provider}.",
+  "lyricsTranslateSheetSubtitle": "Şarkı sözleri {provider} sağlayıcısına gönderilir.",
   "@lyricsTranslateSheetSubtitle": {
     "description": "Notice under the translate sheet title naming the AI provider that receives the lyrics",
     "placeholders": {
@@ -7106,7 +7106,7 @@
       }
     }
   },
-  "lyricsTranslatePartial": "{count, plural, =1{1 line} other{{count} lines}} could not be translated",
+  "lyricsTranslatePartial": "{count, plural, =1{1 satır} other{{count} satır}} çevrilemedi",
   "@lyricsTranslatePartial": {
     "description": "Snackbar after an AI translation that left some lines untranslated",
     "placeholders": {
@@ -7115,7 +7115,7 @@
       }
     }
   },
-  "lyricsTranslateAlreadyIn": "These lyrics are already in {language}",
+  "lyricsTranslateAlreadyIn": "Bu şarkı sözleri zaten {language} dilinde",
   "@lyricsTranslateAlreadyIn": {
     "description": "Snackbar after an AI translation returned every line unchanged; language is the target language's own name",
     "placeholders": {
@@ -7124,59 +7124,59 @@
       }
     }
   },
-  "lyricsAiTranslation": "AI Translation",
+  "lyricsAiTranslation": "AI çevirisi",
   "@lyricsAiTranslation": {
     "description": "Lyrics settings row and page title for translating lyrics with the user's own AI provider"
   },
-  "lyricsAiTranslationOff": "Not set up",
+  "lyricsAiTranslationOff": "Ayarlanmadı",
   "@lyricsAiTranslationOff": {
     "description": "Subtitle of the AI Translation settings row before a provider is configured"
   },
-  "lyricsAiTranslationNotice": "Lyrics you translate are sent to the provider you choose, using your own API key. The provider's terms and pricing apply. Translations are saved on this device and never change your lyric files.",
+  "lyricsAiTranslationNotice": "Çevirdiğiniz şarkı sözleri, kendi API anahtarınızla seçtiğiniz sağlayıcıya gönderilir. Sağlayıcının koşulları ve fiyatlandırması geçerlidir. Çeviriler bu cihazda kaydedilir ve şarkı sözü dosyalarınızı asla değiştirmez.",
   "@lyricsAiTranslationNotice": {
     "description": "Privacy notice at the top of the AI translation settings page"
   },
-  "lyricsAiSectionProvider": "Provider",
+  "lyricsAiSectionProvider": "Sağlayıcı",
   "@lyricsAiSectionProvider": {
     "description": "AI translation settings section for the provider, key and model"
   },
-  "lyricsAiSectionTranslation": "Translation",
+  "lyricsAiSectionTranslation": "Çeviri",
   "@lyricsAiSectionTranslation": {
     "description": "AI translation settings section for the target language and behavior"
   },
-  "lyricsAiProvider": "Provider",
+  "lyricsAiProvider": "Sağlayıcı",
   "@lyricsAiProvider": {
     "description": "AI translation setting that picks the AI service"
   },
-  "lyricsAiProviderCustom": "Custom Server",
+  "lyricsAiProviderCustom": "Özel Sunucu",
   "@lyricsAiProviderCustom": {
     "description": "AI provider choice for a self-hosted or other OpenAI-compatible server"
   },
-  "lyricsAiProviderCustomSubtitle": "Any OpenAI-compatible server, such as Ollama or LM Studio",
+  "lyricsAiProviderCustomSubtitle": "Ollama veya LM Studio gibi OpenAI uyumlu herhangi bir sunucu",
   "@lyricsAiProviderCustomSubtitle": {
     "description": "Subtitle of the custom AI provider choice"
   },
-  "lyricsAiBaseUrl": "Server URL",
+  "lyricsAiBaseUrl": "Sunucu URL'si",
   "@lyricsAiBaseUrl": {
     "description": "AI translation setting for the address of a custom OpenAI-compatible server"
   },
-  "lyricsAiBaseUrlInvalid": "Enter a URL that starts with http:// or https://",
+  "lyricsAiBaseUrlInvalid": "http:// veya https:// ile başlayan bir URL girin",
   "@lyricsAiBaseUrlInvalid": {
     "description": "Validation error for the custom AI server URL"
   },
-  "lyricsAiNotSet": "Not set",
+  "lyricsAiNotSet": "Ayarlanmadı",
   "@lyricsAiNotSet": {
     "description": "Subtitle of an AI translation setting that has no value yet"
   },
-  "lyricsAiApiKey": "API Key",
+  "lyricsAiApiKey": "API anahtarı",
   "@lyricsAiApiKey": {
     "description": "AI translation setting for the user's API key"
   },
-  "lyricsAiApiKeyOptional": "Optional for local servers",
+  "lyricsAiApiKeyOptional": "Yerel sunucular için isteğe bağlı",
   "@lyricsAiApiKeyOptional": {
     "description": "Subtitle of the API key setting for a custom server without a key"
   },
-  "lyricsAiApiKeySaved": "Saved, ends in {suffix}",
+  "lyricsAiApiKeySaved": "Kaydedildi, sonu {suffix}",
   "@lyricsAiApiKeySaved": {
     "description": "Subtitle of the API key setting showing only its last characters",
     "placeholders": {
@@ -7185,7 +7185,7 @@
       }
     }
   },
-  "lyricsAiApiKeyDescription": "Kept in this device's secure storage and only sent to {provider}.",
+  "lyricsAiApiKeyDescription": "Bu cihazın güvenli depolamasında tutulur ve yalnızca {provider} sağlayıcısına gönderilir.",
   "@lyricsAiApiKeyDescription": {
     "description": "Explanation in the API key sheet",
     "placeholders": {
@@ -7198,7 +7198,7 @@
   "@lyricsAiModel": {
     "description": "AI translation setting for the model id"
   },
-  "lyricsAiModelDefault": "Default ({model})",
+  "lyricsAiModelDefault": "Varsayılan ({model})",
   "@lyricsAiModelDefault": {
     "description": "Subtitle of the model setting when the provider's default model is used",
     "placeholders": {
@@ -7207,39 +7207,39 @@
       }
     }
   },
-  "lyricsAiModelHint": "Model ID",
+  "lyricsAiModelHint": "Model kimliği",
   "@lyricsAiModelHint": {
     "description": "Hint of the model id text field"
   },
-  "lyricsAiModelUseDefault": "Use Default",
+  "lyricsAiModelUseDefault": "Varsayılanı kullan",
   "@lyricsAiModelUseDefault": {
     "description": "Action in the model sheet that returns to the provider's default model"
   },
-  "lyricsAiModelLoad": "Load Models",
+  "lyricsAiModelLoad": "Modelleri yükle",
   "@lyricsAiModelLoad": {
     "description": "Button in the model sheet that lists the models the provider offers"
   },
-  "lyricsAiModelsEmpty": "The provider listed no models",
+  "lyricsAiModelsEmpty": "Sağlayıcı hiç model listelemedi",
   "@lyricsAiModelsEmpty": {
     "description": "Shown in the model sheet when the provider's model list is empty"
   },
-  "lyricsAiTestConnection": "Test Connection",
+  "lyricsAiTestConnection": "Bağlantıyı test et",
   "@lyricsAiTestConnection": {
     "description": "AI translation settings action that translates one line to check the key and model"
   },
-  "lyricsAiTestConnectionSubtitle": "Translates one line to check the key and model",
+  "lyricsAiTestConnectionSubtitle": "Anahtarı ve modeli denetlemek için bir satırı çevirir",
   "@lyricsAiTestConnectionSubtitle": {
     "description": "Subtitle of the test connection action"
   },
-  "lyricsAiTestSuccess": "The connection works",
+  "lyricsAiTestSuccess": "Bağlantı çalışıyor",
   "@lyricsAiTestSuccess": {
     "description": "Snackbar after a successful AI translation connection test"
   },
-  "lyricsAiTargetLanguage": "Translate Into",
+  "lyricsAiTargetLanguage": "Şu dile çevir",
   "@lyricsAiTargetLanguage": {
     "description": "AI translation setting for the target language"
   },
-  "lyricsAiTargetLanguageApp": "App language ({language})",
+  "lyricsAiTargetLanguageApp": "Uygulama dili ({language})",
   "@lyricsAiTargetLanguageApp": {
     "description": "Target language choice that follows the app language",
     "placeholders": {
@@ -7248,39 +7248,39 @@
       }
     }
   },
-  "lyricsAiInstruction": "Extra Instruction",
+  "lyricsAiInstruction": "Ek talimat",
   "@lyricsAiInstruction": {
     "description": "AI translation setting for optional guidance added to the translation request"
   },
-  "lyricsAiInstructionNone": "None",
+  "lyricsAiInstructionNone": "Yok",
   "@lyricsAiInstructionNone": {
     "description": "Subtitle of the extra instruction setting when it is empty"
   },
-  "lyricsAiInstructionHint": "For example: keep the rhymes where you can",
+  "lyricsAiInstructionHint": "Örneğin: kafiyeleri mümkün olduğunca koru",
   "@lyricsAiInstructionHint": {
     "description": "Hint of the extra instruction text field"
   },
-  "lyricsAiAutoTranslate": "Translate Automatically",
+  "lyricsAiAutoTranslate": "Otomatik çevir",
   "@lyricsAiAutoTranslate": {
     "description": "AI translation switch that translates lyrics as they open"
   },
-  "lyricsAiAutoTranslateSubtitle": "Translates synced lyrics that have no translation when you open them, using your provider's quota",
+  "lyricsAiAutoTranslateSubtitle": "Açtığınızda çevirisi olmayan senkronlu şarkı sözlerini sağlayıcınızın kotasını kullanarak çevirir",
   "@lyricsAiAutoTranslateSubtitle": {
     "description": "Subtitle of the automatic AI translation switch"
   },
-  "lyricsAiRomanize": "Add Romanization",
+  "lyricsAiRomanize": "Romanizasyon ekle",
   "@lyricsAiRomanize": {
     "description": "AI translation switch that also asks for romanized lyrics"
   },
-  "lyricsAiRomanizeSubtitle": "Shows how lyrics in other alphabets are sung, such as romaji for Japanese or pinyin for Chinese",
+  "lyricsAiRomanizeSubtitle": "Japonca için romaji veya Çince için pinyin gibi diğer alfabelerdeki şarkı sözlerinin nasıl söylendiğini gösterir",
   "@lyricsAiRomanizeSubtitle": {
     "description": "Subtitle of the AI romanization switch"
   },
-  "lyricsAiClearCache": "Clear Saved Translations",
+  "lyricsAiClearCache": "Kaydedilen çevirileri temizle",
   "@lyricsAiClearCache": {
     "description": "AI translation settings action that deletes saved translations"
   },
-  "lyricsAiClearCacheSubtitle": "{count, plural, =0{No saved translations} =1{1 song} other{{count} songs}}",
+  "lyricsAiClearCacheSubtitle": "{count, plural, =0{Kaydedilmiş çeviri yok} =1{1 şarkı} other{{count} şarkı}}",
   "@lyricsAiClearCacheSubtitle": {
     "description": "Subtitle of the clear saved translations action",
     "placeholders": {
@@ -7289,63 +7289,63 @@
       }
     }
   },
-  "lyricsAiClearCacheConfirm": "Clear saved translations?",
+  "lyricsAiClearCacheConfirm": "Kaydedilen çeviriler temizlensin mi?",
   "@lyricsAiClearCacheConfirm": {
     "description": "Title of the confirmation before deleting saved AI translations"
   },
-  "lyricsAiClearCacheMessage": "Songs will need to be translated again, which uses your provider's quota.",
+  "lyricsAiClearCacheMessage": "Şarkıların yeniden çevrilmesi gerekecek; bu, sağlayıcınızın kotasını kullanır.",
   "@lyricsAiClearCacheMessage": {
     "description": "Message of the confirmation before deleting saved AI translations"
   },
-  "lyricsAiClearCacheDone": "Saved translations cleared",
+  "lyricsAiClearCacheDone": "Kaydedilen çeviriler temizlendi",
   "@lyricsAiClearCacheDone": {
     "description": "Snackbar after deleting saved AI translations"
   },
-  "lyricsAiErrorNotConfigured": "Set up AI translation in Lyrics settings first",
+  "lyricsAiErrorNotConfigured": "Önce Şarkı sözleri ayarlarından AI çevirisini ayarlayın",
   "@lyricsAiErrorNotConfigured": {
     "description": "AI translation error when no provider, key or model is set"
   },
-  "lyricsAiErrorInvalidKey": "The provider did not accept the API key",
+  "lyricsAiErrorInvalidKey": "Sağlayıcı API anahtarını kabul etmedi",
   "@lyricsAiErrorInvalidKey": {
     "description": "AI translation error for a rejected API key"
   },
-  "lyricsAiErrorRateLimited": "The provider is limiting requests. Try again in a moment",
+  "lyricsAiErrorRateLimited": "Sağlayıcı istekleri sınırlıyor. Biraz sonra tekrar deneyin",
   "@lyricsAiErrorRateLimited": {
     "description": "AI translation error when the provider rate limits the requests"
   },
-  "lyricsAiErrorQuota": "Your provider account is out of credit or quota",
+  "lyricsAiErrorQuota": "Sağlayıcı hesabınızın kredisi veya kotası tükendi",
   "@lyricsAiErrorQuota": {
     "description": "AI translation error for an exhausted quota or billing problem"
   },
-  "lyricsAiErrorNetwork": "Could not reach the provider. Check your connection",
+  "lyricsAiErrorNetwork": "Sağlayıcıya ulaşılamadı. Bağlantınızı kontrol edin",
   "@lyricsAiErrorNetwork": {
     "description": "AI translation error when the provider cannot be reached"
   },
-  "lyricsAiErrorTimeout": "The provider took too long to answer",
+  "lyricsAiErrorTimeout": "Sağlayıcı yanıt vermek için çok uzun süre bekledi",
   "@lyricsAiErrorTimeout": {
     "description": "AI translation error when a request times out"
   },
-  "lyricsAiErrorModelNotFound": "The provider does not offer this model",
+  "lyricsAiErrorModelNotFound": "Sağlayıcı bu modeli sunmuyor",
   "@lyricsAiErrorModelNotFound": {
     "description": "AI translation error for an unknown model id"
   },
-  "lyricsAiErrorRefused": "The model declined to translate these lyrics",
+  "lyricsAiErrorRefused": "Model bu şarkı sözlerini çevirmeyi reddetti",
   "@lyricsAiErrorRefused": {
     "description": "AI translation error when the model refuses the request"
   },
-  "lyricsAiErrorTruncated": "The model's answer was cut off. Try another model",
+  "lyricsAiErrorTruncated": "Modelin yanıtı kesildi. Başka bir model deneyin",
   "@lyricsAiErrorTruncated": {
     "description": "AI translation error when the reply hit the output limit"
   },
-  "lyricsAiErrorBadResponse": "The model's answer could not be read. Try another model",
+  "lyricsAiErrorBadResponse": "Modelin yanıtı okunamadı. Başka bir model deneyin",
   "@lyricsAiErrorBadResponse": {
     "description": "AI translation error when the reply is not the expected JSON"
   },
-  "lyricsAiErrorService": "The provider had a problem. Try again later",
+  "lyricsAiErrorService": "Sağlayıcıda bir sorun oluştu. Daha sonra tekrar deneyin",
   "@lyricsAiErrorService": {
     "description": "AI translation error for other provider failures"
   },
-  "lyricsAiErrorNoLyrics": "These lyrics have nothing to translate",
+  "lyricsAiErrorNoLyrics": "Bu şarkı sözlerinde çevrilecek bir şey yok",
   "@lyricsAiErrorNoLyrics": {
     "description": "AI translation error when the lyrics have no translatable lines"
   },
@@ -7382,27 +7382,27 @@
   "@nowPlayingNoMetadata": {
     "description": "Empty state when track metadata cannot be loaded"
   },
-  "linkDevicesTitle": "Devices",
+  "linkDevicesTitle": "Cihazlar",
   "@linkDevicesTitle": {
     "description": "Mornye Link: title and button tooltip of the phone sheet that controls the paired desktop app"
   },
-  "linkConnectionConnected": "Connected",
+  "linkConnectionConnected": "Bağlı",
   "@linkConnectionConnected": {
     "description": "Mornye Link: the phone is connected to the paired desktop"
   },
-  "linkConnectionConnecting": "Connecting",
+  "linkConnectionConnecting": "Bağlanıyor",
   "@linkConnectionConnecting": {
     "description": "Mornye Link: the phone is connecting to the paired desktop"
   },
-  "linkConnectionDisconnected": "Not connected",
+  "linkConnectionDisconnected": "Bağlı değil",
   "@linkConnectionDisconnected": {
     "description": "Mornye Link: the paired desktop cannot be reached"
   },
-  "linkThisPhone": "This phone",
+  "linkThisPhone": "Bu telefon",
   "@linkThisPhone": {
     "description": "Mornye Link: the phone's own row in the Devices sheet; choosing it plays music here again"
   },
-  "linkPlayingOn": "Playing on {name}",
+  "linkPlayingOn": "{name} üzerinde çalıyor",
   "@linkPlayingOn": {
     "description": "Mornye Link: shown in the player while the paired desktop plays in the phone's place",
     "placeholders": {
@@ -7411,7 +7411,7 @@
       }
     }
   },
-  "linkDesktopDownloads": "Downloads on {name}",
+  "linkDesktopDownloads": "{name} üzerindeki indirmeler",
   "@linkDesktopDownloads": {
     "description": "Mornye Link: heading of the paired desktop's download queue",
     "placeholders": {
@@ -7420,7 +7420,7 @@
       }
     }
   },
-  "linkHandoffStarted": "Playing on {name}",
+  "linkHandoffStarted": "{name} üzerinde çalıyor",
   "@linkHandoffStarted": {
     "description": "Mornye Link: the paired desktop took over the phone's queue",
     "placeholders": {
@@ -7429,7 +7429,7 @@
       }
     }
   },
-  "linkHandoffSending": "Sending this song to {name}...",
+  "linkHandoffSending": "Bu şarkı {name} cihazına gönderiliyor...",
   "@linkHandoffSending": {
     "description": "Mornye Link: the phone uploads the current song, which the paired desktop lacks, before it plays there",
     "placeholders": {
@@ -7438,7 +7438,7 @@
       }
     }
   },
-  "linkHandoffMissing": "Playing on {name}. Not found there: {titles}",
+  "linkHandoffMissing": "{name} üzerinde çalıyor. Orada bulunamadı: {titles}",
   "@linkHandoffMissing": {
     "description": "Mornye Link: the paired desktop took over the phone's queue but lacks some tracks, listed by title",
     "placeholders": {
@@ -7450,7 +7450,7 @@
       }
     }
   },
-  "linkHandoffNotFound": "{name} has none of these tracks",
+  "linkHandoffNotFound": "{name} cihazında bu parçaların hiçbiri yok",
   "@linkHandoffNotFound": {
     "description": "Mornye Link: the paired desktop has none of the tracks in the phone's queue",
     "placeholders": {
@@ -7459,11 +7459,11 @@
       }
     }
   },
-  "linkHandoffNothingPlaying": "Nothing is playing on this phone",
+  "linkHandoffNothingPlaying": "Bu telefonda hiçbir şey çalmıyor",
   "@linkHandoffNothingPlaying": {
     "description": "Mornye Link: Play on desktop needs a track playing on the phone"
   },
-  "linkContinueSkipped": "Not on this phone: {titles}",
+  "linkContinueSkipped": "Bu telefonda yok: {titles}",
   "@linkContinueSkipped": {
     "description": "Mornye Link: tracks of the desktop queue the phone could not play, listed by title",
     "placeholders": {
@@ -7472,11 +7472,11 @@
       }
     }
   },
-  "linkContinueNotFound": "None of these tracks are on this phone",
+  "linkContinueNotFound": "Bu parçaların hiçbiri bu telefonda yok",
   "@linkContinueNotFound": {
     "description": "Mornye Link: the phone has none of the tracks of the desktop queue"
   },
-  "linkRequestFailed": "Could not reach {name}",
+  "linkRequestFailed": "{name} cihazına ulaşılamadı",
   "@linkRequestFailed": {
     "description": "Mornye Link: a request to the paired desktop failed",
     "placeholders": {
@@ -7485,7 +7485,7 @@
       }
     }
   },
-  "linkDownloadOnDesktop": "Download on {name}",
+  "linkDownloadOnDesktop": "{name} üzerinde indir",
   "@linkDownloadOnDesktop": {
     "description": "Mornye Link: queues a track, album or link for download in the paired desktop app",
     "placeholders": {
@@ -7494,7 +7494,7 @@
       }
     }
   },
-  "linkDownloadQueuedOnDesktop": "{count, plural, =1{Queued 1 track on {name}} other{Queued {count} tracks on {name}}}",
+  "linkDownloadQueuedOnDesktop": "{count, plural, =1{{name} üzerinde 1 parça kuyruğa alındı} other{{name} üzerinde {count} parça kuyruğa alındı}}",
   "@linkDownloadQueuedOnDesktop": {
     "description": "Mornye Link: the paired desktop queued downloads",
     "placeholders": {
@@ -7506,7 +7506,7 @@
       }
     }
   },
-  "linkOpenOnDesktop": "Open on {name}",
+  "linkOpenOnDesktop": "{name} üzerinde aç",
   "@linkOpenOnDesktop": {
     "description": "Mornye Link: opens a shared link in the paired desktop app",
     "placeholders": {
@@ -7515,7 +7515,7 @@
       }
     }
   },
-  "linkOpenedOnDesktop": "Opened on {name}",
+  "linkOpenedOnDesktop": "{name} üzerinde açıldı",
   "@linkOpenedOnDesktop": {
     "description": "Mornye Link: the paired desktop opened the link",
     "placeholders": {
@@ -7524,7 +7524,7 @@
       }
     }
   },
-  "linkSendToDesktop": "Send to {name}",
+  "linkSendToDesktop": "{name} cihazına gönder",
   "@linkSendToDesktop": {
     "description": "Mornye Link: action on a shared link that offers to open or download it on the paired desktop",
     "placeholders": {
@@ -7533,15 +7533,15 @@
       }
     }
   },
-  "linkSaveToPhone": "Save to this phone",
+  "linkSaveToPhone": "Bu telefona kaydet",
   "@linkSaveToPhone": {
     "description": "Mornye Link: downloads songs of the paired desktop's library into the phone's download folder"
   },
-  "linkSavingToPhone": "Saving to this phone",
+  "linkSavingToPhone": "Bu telefona kaydediliyor",
   "@linkSavingToPhone": {
     "description": "Mornye Link: title of the progress dialog while desktop songs are saved to the phone"
   },
-  "linkSavedToPhone": "{count, plural, =1{Saved 1 song to this phone} other{Saved {count} songs to this phone}}",
+  "linkSavedToPhone": "{count, plural, =1{Bu telefona 1 şarkı kaydedildi} other{Bu telefona {count} şarkı kaydedildi}}",
   "@linkSavedToPhone": {
     "description": "Mornye Link: desktop songs were saved to the phone",
     "placeholders": {
@@ -7550,7 +7550,7 @@
       }
     }
   },
-  "linkSaveToPhoneFailed": "{count, plural, =1{1 song could not be saved} other{{count} songs could not be saved}}",
+  "linkSaveToPhoneFailed": "{count, plural, =1{1 şarkı kaydedilemedi} other{{count} şarkı kaydedilemedi}}",
   "@linkSaveToPhoneFailed": {
     "description": "Mornye Link: some desktop songs could not be saved to the phone",
     "placeholders": {
@@ -7559,11 +7559,11 @@
       }
     }
   },
-  "linkSaveToPhoneCancelled": "Saving stopped",
+  "linkSaveToPhoneCancelled": "Kaydetme durduruldu",
   "@linkSaveToPhoneCancelled": {
     "description": "Mornye Link: the listener cancelled saving desktop songs to the phone"
   },
-  "linkTransferPhoneReceiving": "{count, plural, =1{Saving {title} from {name}} other{Saving {count} songs from {name}}}",
+  "linkTransferPhoneReceiving": "{count, plural, =1{{name} cihazından {title} kaydediliyor} other{{name} cihazından {count} şarkı kaydediliyor}}",
   "@linkTransferPhoneReceiving": {
     "description": "Mornye Link: snackbar and notification when the phone starts copying songs from the paired computer into its download folder; title is the song's title when there is one song",
     "placeholders": {
@@ -7578,7 +7578,7 @@
       }
     }
   },
-  "linkTransferPhoneOffered": "{count, plural, =1{{name} is sending {title} to this phone} other{{name} is sending {count} songs to this phone}}",
+  "linkTransferPhoneOffered": "{count, plural, =1{{name} bu telefona {title} gönderiyor} other{{name} bu telefona {count} şarkı gönderiyor}}",
   "@linkTransferPhoneOffered": {
     "description": "Mornye Link: snackbar when the paired computer starts sending songs to the phone; title is the song's title when there is one song",
     "placeholders": {
@@ -7593,11 +7593,11 @@
       }
     }
   },
-  "linkTransferPhoneView": "View",
+  "linkTransferPhoneView": "Görüntüle",
   "@linkTransferPhoneView": {
     "description": "Mornye Link: snackbar action that opens the list of song transfers"
   },
-  "linkTransferPhoneWith": "Transfer with {name}",
+  "linkTransferPhoneWith": "{name} ile aktar",
   "@linkTransferPhoneWith": {
     "description": "Mornye Link: tooltip and sheet title of a playlist's button that sends its songs to the paired computer or saves the computer's songs to the phone",
     "placeholders": {
@@ -7606,7 +7606,7 @@
       }
     }
   },
-  "linkTransferPhoneNothing": "None of these songs are on {name}",
+  "linkTransferPhoneNothing": "Bu şarkıların hiçbiri {name} cihazında yok",
   "@linkTransferPhoneNothing": {
     "description": "Mornye Link: Save to this phone found none of the chosen songs in the paired computer's library",
     "placeholders": {
@@ -7615,7 +7615,7 @@
       }
     }
   },
-  "linkSendSending": "{count, plural, =1{Sending {title} to {name}} other{Sending {count} songs to {name}}}",
+  "linkSendSending": "{count, plural, =1{{title} {name} cihazına gönderiliyor} other{{count} şarkı {name} cihazına gönderiliyor}}",
   "@linkSendSending": {
     "description": "Mornye Link: snackbar and notification when the phone starts copying its own songs to the paired computer; title is the song's title when there is one song",
     "placeholders": {
@@ -7630,7 +7630,7 @@
       }
     }
   },
-  "linkSendNothing": "None of these songs can be sent to {name}",
+  "linkSendNothing": "Bu şarkıların hiçbiri {name} cihazına gönderilemiyor",
   "@linkSendNothing": {
     "description": "Mornye Link: none of the chosen songs is a file on this phone in a format the paired computer takes",
     "placeholders": {
@@ -7639,19 +7639,19 @@
       }
     }
   },
-  "linkDownloadStatusQueued": "Waiting",
+  "linkDownloadStatusQueued": "Bekliyor",
   "@linkDownloadStatusQueued": {
     "description": "Mornye Link: a download on the paired desktop has not started"
   },
-  "linkDownloadStatusDownloading": "Downloading",
+  "linkDownloadStatusDownloading": "İndiriliyor",
   "@linkDownloadStatusDownloading": {
     "description": "Mornye Link: a download on the paired desktop is running"
   },
-  "linkDownloadStatusDone": "Done",
+  "linkDownloadStatusDone": "Tamamlandı",
   "@linkDownloadStatusDone": {
     "description": "Mornye Link: a download on the paired desktop finished"
   },
-  "linkDownloadStatusFailed": "Failed",
+  "linkDownloadStatusFailed": "Başarısız",
   "@linkDownloadStatusFailed": {
     "description": "Mornye Link: a download on the paired desktop failed"
   },
@@ -7880,11 +7880,11 @@
   "@regionCountryUS": {
     "description": "Country name for SongLink region picker"
   },
-  "regionCountryIT": "Italy",
+  "regionCountryIT": "İtalya",
   "@regionCountryIT": {
     "description": "Country name for Italy"
   },
-  "regionCountryES": "Spain",
+  "regionCountryES": "İspanya",
   "@regionCountryES": {
     "description": "Country name for Spain"
   },
@@ -7973,11 +7973,11 @@
   "@extensionVerificationHelpTitleWaiting": {
     "description": "Dialog title when verification is taking longer than expected"
   },
-  "extensionVerificationHelpMessageManual": "Mornye could not open the browser automatically. Open this link in your browser, or copy it manually.",
+  "extensionVerificationHelpMessageManual": "Mornye tarayıcıyı otomatik açamadı. Bu bağlantıyı tarayıcınızda açın veya elle kopyalayın.",
   "@extensionVerificationHelpMessageManual": {
     "description": "Dialog message when automatic browser launch for verification fails"
   },
-  "extensionVerificationHelpMessageWaiting": "If the browser did not open, or verification finished but did not return to Mornye, open this link again or copy it manually.",
+  "extensionVerificationHelpMessageWaiting": "Tarayıcı açılmadıysa veya doğrulama tamamlanıp Mornye'ye dönmediyse bu bağlantıyı tekrar açın ya da elle kopyalayın.",
   "@extensionVerificationHelpMessageWaiting": {
     "description": "Dialog message when verification may need manual browser help"
   },
@@ -7989,7 +7989,7 @@
   "@extensionVerificationCopyLink": {
     "description": "Button to copy the extension verification URL"
   },
-  "extensionVerificationPasteCallback": "Paste callback",
+  "extensionVerificationPasteCallback": "Geri çağrıyı yapıştır",
   "@extensionVerificationPasteCallback": {
     "description": "Button that completes extension verification from a callback URL in the clipboard"
   },
@@ -8093,31 +8093,31 @@
     "description": "Selected state of the compact favorite action"
   },
   "autoMixDescription": "Şarkıları vuruş eşleştirme ve perdeyi koruyan tempo ayarıyla birbirine karıştırır. Vuruşlar eşleştirilemediğinde çapraz geçiş kullanır.",
-  "gaplessPlayback": "Gapless playback",
+  "gaplessPlayback": "Gapless oynatma",
   "@gaplessPlayback": {
     "description": "Playback settings switch that starts the next song the moment one ends"
   },
-  "gaplessPlaybackDescription": "Start the next song the moment one ends, without silence between them. AutoMix replaces it while on.",
+  "gaplessPlaybackDescription": "Bir parça bittiği anda, aralarında sessizlik olmadan sonrakini başlat. Açıkken bunun yerini AutoMix alır.",
   "@gaplessPlaybackDescription": {
     "description": "Subtitle of the Gapless playback switch"
   },
-  "playerCoverStyle": "Cover art",
+  "playerCoverStyle": "Albüm kapağı",
   "@playerCoverStyle": {
     "description": "Settings section choosing how the player shows cover art"
   },
-  "landscapeLyricsArtwork": "Album art beside lyrics",
+  "landscapeLyricsArtwork": "Şarkı sözlerinin yanında albüm kapağı",
   "@landscapeLyricsArtwork": {
     "description": "Switch choosing album artwork instead of track details alongside lyrics in landscape"
   },
-  "landscapeLyricsArtworkDescription": "Show album art instead of track details in the Material landscape player",
+  "landscapeLyricsArtworkDescription": "Material yatay oynatıcıda parça ayrıntıları yerine albüm kapağını göster",
   "@landscapeLyricsArtworkDescription": {
     "description": "Subtitle explaining the Material landscape lyrics layout setting"
   },
-  "compactPlayer": "Compact player",
+  "compactPlayer": "Kompakt oynatıcı",
   "@compactPlayer": {
     "description": "Material player setting: idle lyrics shrink the player to a slim bar instead of hiding it"
   },
-  "compactPlayerDescription": "When lyrics are left alone, shrink the player to a slim bar so the lyrics get more room. A tap brings the full player back",
+  "compactPlayerDescription": "Şarkı sözleri kendi hâline bırakıldığında, şarkı sözlerine daha fazla yer açmak için oynatıcıyı ince bir çubuğa küçült. Dokunmak tam oynatıcıyı geri getirir",
   "@compactPlayerDescription": {
     "description": "Subtitle of the compact player setting"
   },
@@ -8125,35 +8125,35 @@
   "@playerCoverStyleDefault": {
     "description": "Cover art style: artwork card above the controls"
   },
-  "playerCoverStyleCard": "Card",
+  "playerCoverStyleCard": "Kart",
   "@playerCoverStyleCard": {
     "description": "Cover art style: artwork as a card above the controls (full screen is the default)"
   },
-  "playerCoverStyleDefaultDescription": "Artwork as a card above the controls",
+  "playerCoverStyleDefaultDescription": "Kontrollerin üzerinde kart olarak albüm kapağı",
   "@playerCoverStyleDefaultDescription": {
     "description": "Subtitle of the default cover art style"
   },
-  "playerCoverStyleFullScreen": "Full screen",
+  "playerCoverStyleFullScreen": "Tam ekran",
   "@playerCoverStyleFullScreen": {
     "description": "Cover art style: artwork fills the top of the player"
   },
-  "playerCoverStyleFullScreenDescription": "Artwork fills the top of the player and fades into a blur. Motion artwork is always full screen in Mornye",
+  "playerCoverStyleFullScreenDescription": "Albüm kapağı oynatıcının üst kısmını doldurur ve bulanıklığa karışır. Hareketli kapaklar Mornye'de her zaman tam ekrandır",
   "@playerCoverStyleFullScreenDescription": {
     "description": "Subtitle of the full screen cover art style"
   },
-  "musicHaptics": "Music haptics",
+  "musicHaptics": "Müzik titreşimi",
   "@musicHaptics": {
     "description": "Setting that vibrates the phone along with the music"
   },
-  "musicHapticsDescription": "Vibrate along with the beat of downloaded and local songs",
+  "musicHapticsDescription": "İndirilen ve yerel şarkıların ritmiyle titreşin",
   "@musicHapticsDescription": {
     "description": "Subtitle of the music haptics setting"
   },
-  "musicHapticsSensitivity": "Sensitivity",
+  "musicHapticsSensitivity": "Hassasiyet",
   "@musicHapticsSensitivity": {
     "description": "Slider for how many beats trigger music haptics; higher values vibrate on softer hits"
   },
-  "musicHapticsStrength": "Strength",
+  "musicHapticsStrength": "Güç",
   "@musicHapticsStrength": {
     "description": "Slider for how strongly the phone vibrates with music haptics"
   },
@@ -8167,9 +8167,9 @@
   "autoplayPersonalizationDescription": "Dinlediğiniz ve atladığınız şarkılardan bu cihazda gizlice öğrenir. Kapatıldığında öğrenme durur ve normal otomatik çalmaya dönülür.",
   "autoplayResetLearning": "Öneri öğrenmesini sıfırla",
   "autoplayResetLearningConfirmTitle": "Öneri öğrenmesini sıfırla?",
-  "autoplayResetLearningConfirmMessage": "Autoplay forgets what it learned from your listening and skips. This can't be undone.",
+  "autoplayResetLearningConfirmMessage": "Otomatik oynatma, dinleme ve atlamalarınızdan öğrendiklerini unutur. Bu işlem geri alınamaz.",
   "autoplayResetLearningConfirm": "Sıfırla",
-  "autoplayLearningProgress": "Ranking tunes to you after {minimum} Autoplay songs ({count} so far)",
+  "autoplayLearningProgress": "{minimum} Otomatik oynatma şarkısından sonra sıralama size uyarlanır (şu ana kadar {count})",
   "@autoplayLearningProgress": {
     "description": "How many Autoplay songs the listener has kept or skipped before ranking may learn from them",
     "placeholders": {
@@ -8183,11 +8183,11 @@
       }
     }
   },
-  "autoplayLearningWaiting": "Standard ranking until you both keep and skip recent Autoplay songs",
+  "autoplayLearningWaiting": "Son Otomatik oynatma şarkılarını hem tutup hem atlayana kadar standart sıralama",
   "@autoplayLearningWaiting": {
     "description": "Ranking cannot be checked yet because the latest Autoplay songs were all kept or all skipped"
   },
-  "autoplayLearningTuned": "Tuned to you: {learned}% accurate on your latest songs (standard {starting}%)",
+  "autoplayLearningTuned": "Size uyarlandı: son şarkılarınızda %{learned} isabetli (standart %{starting})",
   "@autoplayLearningTuned": {
     "description": "Autoplay uses learned ranking, which orders the latest kept and skipped songs better than the standard ranking",
     "placeholders": {
@@ -8199,7 +8199,7 @@
       }
     }
   },
-  "autoplayLearningStandard": "Standard ranking: tuning was not more accurate on your latest songs ({learned}% vs {starting}%)",
+  "autoplayLearningStandard": "Standart sıralama: uyarlama son şarkılarınızda daha isabetli olmadı (%{learned} - %{starting})",
   "@autoplayLearningStandard": {
     "description": "Autoplay keeps the standard ranking because the learned one did not order the latest songs better",
     "placeholders": {
@@ -8211,14 +8211,14 @@
       }
     }
   },
-  "songAnalysis": "Song analysis",
+  "songAnalysis": "Şarkı analizi",
   "@songAnalysis": {
     "description": "Switch that analyzes how each Library song sounds, on the device, for Autoplay"
   },
-  "songAnalysisDescription": "Learn how each Library song sounds, privately on this device, so Autoplay picks songs that sound like what you play and flow into each other.",
-  "songAnalysisOnlyWhileCharging": "Only while charging",
-  "songAnalysisOnlyWhileChargingDescription": "Analyze the Library only while this phone charges. The song playing is analyzed either way.",
-  "songAnalysisProgress": "{analyzed} of {total} songs analyzed",
+  "songAnalysisDescription": "Otomatik oynatmanın çaldığınıza benzeyen ve birbirine akıcı geçen şarkılar seçebilmesi için her kitaplık şarkısının nasıl kulağa geldiğini bu cihazda gizli olarak öğrenin.",
+  "songAnalysisOnlyWhileCharging": "Yalnızca şarj olurken",
+  "songAnalysisOnlyWhileChargingDescription": "Kitaplığı yalnızca bu telefon şarj olurken analiz et. Çalan şarkı her durumda analiz edilir.",
+  "songAnalysisProgress": "{total} şarkıdan {analyzed} tanesi analiz edildi",
   "@songAnalysisProgress": {
     "description": "How many Library songs song analysis has described so far",
     "placeholders": {
@@ -8232,10 +8232,10 @@
       }
     }
   },
-  "songAnalysisClear": "Clear song analysis",
-  "songAnalysisClearConfirmTitle": "Clear song analysis?",
-  "songAnalysisClearConfirmMessage": "Autoplay forgets how your songs sound. While song analysis is on, your Library is analyzed again.",
-  "songAnalysisClearConfirm": "Clear",
+  "songAnalysisClear": "Şarkı analizini temizle",
+  "songAnalysisClearConfirmTitle": "Şarkı analizi temizlensin mi?",
+  "songAnalysisClearConfirmMessage": "Otomatik oynatma şarkılarınızın nasıl kulağa geldiğini unutur. Şarkı analizi açıkken kitaplığınız yeniden analiz edilir.",
+  "songAnalysisClearConfirm": "Temizle",
   "profileTitle": "Profil",
   "profileSetUp": "Profilinizi oluşturun",
   "profileEdit": "Adı ve fotoğrafı düzenle",
@@ -8246,18 +8246,18 @@
   "profileRemovePhoto": "Fotoğrafı kaldır",
   "profilePhotoError": "20 MB'tan küçük geçerli bir görsel seçin.",
   "profileSaveError": "Profiliniz kaydedilemedi. Lütfen tekrar deneyin.",
-  "homeGreetingMorning1": "Good morning",
-  "homeGreetingMorning2": "Rise and shine",
-  "homeGreetingMorning3": "Fresh start",
-  "homeGreetingAfternoon1": "Good afternoon",
-  "homeGreetingAfternoon2": "Afternoon groove",
-  "homeGreetingAfternoon3": "Keep the vibe going",
-  "homeGreetingEvening1": "Good evening",
-  "homeGreetingEvening2": "Time to unwind",
-  "homeGreetingEvening3": "Golden hour",
-  "homeGreetingNight1": "Good night",
-  "homeGreetingNight2": "Late-night session",
-  "homeGreetingNight3": "Quiet hours",
+  "homeGreetingMorning1": "Günaydın",
+  "homeGreetingMorning2": "Güne enerjik başla",
+  "homeGreetingMorning3": "Yeni bir başlangıç",
+  "homeGreetingAfternoon1": "İyi günler",
+  "homeGreetingAfternoon2": "Öğleden sonra ritmi",
+  "homeGreetingAfternoon3": "Keyfi sürdür",
+  "homeGreetingEvening1": "İyi akşamlar",
+  "homeGreetingEvening2": "Rahatlamanın zamanı",
+  "homeGreetingEvening3": "Altın saat",
+  "homeGreetingNight1": "İyi geceler",
+  "homeGreetingNight2": "Gece seansı",
+  "homeGreetingNight3": "Sessiz saatler",
   "homeGreetingNamed": "{greeting}, {name}",
   "@homeGreetingNamed": {
     "description": "Home greeting followed by the first name from the user's profile",
@@ -8270,43 +8270,43 @@
       }
     }
   },
-  "homeTaglineListening": "What are we listening to?",
+  "homeTaglineListening": "Ne dinliyoruz?",
   "@homeTaglineListening": {
     "description": "Rotating Home prompt under the greeting"
   },
-  "homeTaglineLink": "Got a link? Drop it in the search",
+  "homeTaglineLink": "Bir bağlantın mı var? Aramaya bırak",
   "@homeTaglineLink": {
     "description": "Rotating Home prompt explaining that links can be pasted into search"
   },
-  "homeTaglineDiscover": "Find your next favorite album",
+  "homeTaglineDiscover": "Bir sonraki favori albümünü bul",
   "@homeTaglineDiscover": {
     "description": "Rotating Home prompt under the greeting"
   },
-  "homeContinueListening": "Continue listening",
+  "homeContinueListening": "Dinlemeye devam et",
   "@homeContinueListening": {
     "description": "Home section header for the track currently loaded in the player"
   },
-  "homeRecentlyAdded": "Recently added",
+  "homeRecentlyAdded": "Son eklenenler",
   "@homeRecentlyAdded": {
     "description": "Home section header for the newest downloaded and scanned tracks"
   },
-  "homeOnRepeat": "On repeat",
+  "homeOnRepeat": "Sürekli çalanlar",
   "@homeOnRepeat": {
     "description": "Home section header for the most played tracks of the last four weeks"
   },
-  "homeShortcuts": "Shortcuts",
+  "homeShortcuts": "Kısayollar",
   "@homeShortcuts": {
     "description": "Home section header for quick links to player tools"
   },
-  "homeMixesForYou": "Mixes for you",
+  "homeMixesForYou": "Size özel mix'ler",
   "@homeMixesForYou": {
     "description": "Home section header for daily mixes made from the user's own Library songs"
   },
-  "homeMixFavoritesTitle": "Favorites Mix",
+  "homeMixFavoritesTitle": "Favoriler Mix'i",
   "@homeMixFavoritesTitle": {
     "description": "Title of the daily mix of the user's most played songs and songs like them"
   },
-  "homeMixGenreTitle": "{genre} Mix",
+  "homeMixGenreTitle": "{genre} Mix'i",
   "@homeMixGenreTitle": {
     "description": "Title of a daily mix of one genre from the user's Library, e.g. 'Hip-Hop Mix'",
     "placeholders": {
@@ -8315,7 +8315,7 @@
       }
     }
   },
-  "homeMixArtistTitle": "{artist} Mix",
+  "homeMixArtistTitle": "{artist} Mix'i",
   "@homeMixArtistTitle": {
     "description": "Title of a daily mix built around one artist and similar songs from the user's Library",
     "placeholders": {
@@ -8324,7 +8324,7 @@
       }
     }
   },
-  "homeMixDecadeTitle": "{decade}s Mix",
+  "homeMixDecadeTitle": "{decade}'lar Mix'i",
   "@homeMixDecadeTitle": {
     "description": "Title of a daily mix of songs released in one decade, e.g. '2010s Mix'; decade is the decade's first year",
     "placeholders": {
@@ -8333,15 +8333,15 @@
       }
     }
   },
-  "homeMixFreshTitle": "New Additions Mix",
+  "homeMixFreshTitle": "Yeni Eklenenler Mix'i",
   "@homeMixFreshTitle": {
     "description": "Title of the daily mix of songs added to the user's Library in the last month"
   },
-  "homeMixRediscoverTitle": "Rediscover Mix",
+  "homeMixRediscoverTitle": "Yeniden Keşfet Mix'i",
   "@homeMixRediscoverTitle": {
     "description": "Title of the daily mix of songs the user played often months ago but not lately"
   },
-  "homeMixDiscoverTitle": "Discover Mix",
+  "homeMixDiscoverTitle": "Keşfet Mix'i",
   "@homeMixDiscoverTitle": {
     "description": "Title of the daily mix of Library songs the user has never played, from their favorite genres"
   },
@@ -8354,7 +8354,7 @@
       }
     }
   },
-  "homeMixArtistsTwo": "{first} and {second}",
+  "homeMixArtistsTwo": "{first} ve {second}",
   "@homeMixArtistsTwo": {
     "description": "Subtitle of a daily mix with two main artists, e.g. 'Tyler, The Creator and Frank Ocean'",
     "placeholders": {
@@ -8366,7 +8366,7 @@
       }
     }
   },
-  "homeMixArtistsMore": "{first}, {second} and more",
+  "homeMixArtistsMore": "{first}, {second} ve daha fazlası",
   "@homeMixArtistsMore": {
     "description": "Subtitle of a daily mix with three or more main artists, naming the first two, e.g. 'Tyler, The Creator, Frank Ocean and more'",
     "placeholders": {
@@ -8410,19 +8410,19 @@
   "@homeMixGenrePunk": {
     "description": "Genre name used in a daily mix title such as 'Punk Mix'"
   },
-  "homeMixGenreIndie": "Indie & Alternative",
+  "homeMixGenreIndie": "Indie ve Alternatif",
   "@homeMixGenreIndie": {
     "description": "Genre name used in a daily mix title such as 'Indie & Alternative Mix'"
   },
-  "homeMixGenreElectronic": "Electronic",
+  "homeMixGenreElectronic": "Elektronik",
   "@homeMixGenreElectronic": {
     "description": "Genre name used in a daily mix title such as 'Electronic Mix'"
   },
-  "homeMixGenreChill": "Chill & Lo-Fi",
+  "homeMixGenreChill": "Chill ve Lo-Fi",
   "@homeMixGenreChill": {
     "description": "Genre name (ambient, lo-fi and relaxing music) used in a daily mix title such as 'Chill & Lo-Fi Mix'"
   },
-  "homeMixGenreJazz": "Jazz",
+  "homeMixGenreJazz": "Caz",
   "@homeMixGenreJazz": {
     "description": "Genre name used in a daily mix title such as 'Jazz Mix'"
   },
@@ -8430,11 +8430,11 @@
   "@homeMixGenreBlues": {
     "description": "Genre name used in a daily mix title such as 'Blues Mix'"
   },
-  "homeMixGenreClassical": "Classical",
+  "homeMixGenreClassical": "Klasik",
   "@homeMixGenreClassical": {
     "description": "Genre name used in a daily mix title such as 'Classical Mix'"
   },
-  "homeMixGenreSoundtrack": "Soundtrack",
+  "homeMixGenreSoundtrack": "Film Müzikleri",
   "@homeMixGenreSoundtrack": {
     "description": "Genre name (film, game and TV music) used in a daily mix title such as 'Soundtrack Mix'"
   },
@@ -8442,7 +8442,7 @@
   "@homeMixGenreCountry": {
     "description": "Genre name used in a daily mix title such as 'Country Mix'"
   },
-  "homeMixGenreFolk": "Folk & Acoustic",
+  "homeMixGenreFolk": "Folk ve Akustik",
   "@homeMixGenreFolk": {
     "description": "Genre name used in a daily mix title such as 'Folk & Acoustic Mix'"
   },
@@ -8458,7 +8458,7 @@
   "@homeMixGenreAfro": {
     "description": "Genre name used in a daily mix title such as 'Afrobeats Mix'"
   },
-  "homeMixGenreGospel": "Gospel & Worship",
+  "homeMixGenreGospel": "Gospel ve İlahi",
   "@homeMixGenreGospel": {
     "description": "Genre name (Christian music) used in a daily mix title such as 'Gospel & Worship Mix'"
   },
@@ -8466,11 +8466,11 @@
   "@homeMixGenreDangdut": {
     "description": "Genre name (Indonesian popular music) used in a daily mix title such as 'Dangdut Mix'"
   },
-  "homeMixUpdatedDaily": "Made from your Library, updated daily",
+  "homeMixUpdatedDaily": "Kitaplığınızdan oluşturulur, her gün güncellenir",
   "@homeMixUpdatedDaily": {
     "description": "Note in a daily mix's header explaining where its songs come from"
   },
-  "homeMixSaveAsPlaylist": "Save as playlist",
+  "homeMixSaveAsPlaylist": "Çalma listesi olarak kaydet",
   "@homeMixSaveAsPlaylist": {
     "description": "Action that saves a daily mix's songs into one of the user's playlists"
   },
@@ -8521,11 +8521,11 @@
   "listeningStatsClear": "Dinleme istatistiklerini temizle",
   "listeningStatsClearError": "Dinleme istatistikleri temizlenemedi. Lütfen tekrar deneyin.",
   "listeningStatsClearDescription": "Bu cihazdaki tüm dinleme istatistikleri silinsin mi? Müzikleriniz ve çalma listeleriniz korunur.",
-  "libraryArtistsEmpty": "Artists appear here once you download music or scan a local library.",
-  "listeningRewind": "Rewind",
-  "listeningRewindDescription": "Relive the highlights of your recent weeks and months",
-  "listeningRewindChoosePeriod": "Choose a period",
-  "listeningRewindLastWeeks": "Last {weeks} weeks",
+  "libraryArtistsEmpty": "Müzik indirdiğinizde veya yerel bir kitaplığı taradığınızda sanatçılar burada görünür.",
+  "listeningRewind": "Geri Bakış",
+  "listeningRewindDescription": "Son haftalarınızın ve aylarınızın öne çıkanlarını yeniden yaşayın",
+  "listeningRewindChoosePeriod": "Bir dönem seçin",
+  "listeningRewindLastWeeks": "Son {weeks} hafta",
   "@listeningRewindLastWeeks": {
     "placeholders": {
       "weeks": {
@@ -8533,7 +8533,7 @@
       }
     }
   },
-  "listeningRewindLastMonths": "Last {months} months",
+  "listeningRewindLastMonths": "Son {months} ay",
   "@listeningRewindLastMonths": {
     "placeholders": {
       "months": {
@@ -8541,7 +8541,7 @@
       }
     }
   },
-  "listeningRewindThisYear": "{year} so far",
+  "listeningRewindThisYear": "{year} şu ana kadar",
   "@listeningRewindThisYear": {
     "placeholders": {
       "year": {
@@ -8549,8 +8549,8 @@
       }
     }
   },
-  "listeningRewindIntroTitle": "Your Rewind",
-  "listeningRewindIntroBody": "A look back at what you played from {start} to {end}.",
+  "listeningRewindIntroTitle": "Geri Bakışınız",
+  "listeningRewindIntroBody": "{start} ile {end} arasında çaldıklarınıza bir bakış.",
   "@listeningRewindIntroBody": {
     "placeholders": {
       "start": {
@@ -8561,8 +8561,8 @@
       }
     }
   },
-  "listeningRewindMinutesTitle": "You listened for",
-  "listeningRewindMinutesUnit": "{minutes, plural, =1{minute} other{minutes}}",
+  "listeningRewindMinutesTitle": "Dinleme süreniz",
+  "listeningRewindMinutesUnit": "{minutes, plural, =1{dakika} other{dakika}}",
   "@listeningRewindMinutesUnit": {
     "placeholders": {
       "minutes": {
@@ -8570,7 +8570,7 @@
       }
     }
   },
-  "listeningRewindHours": "{hours, plural, =1{That's about 1 hour of music} other{That's about {hours} hours of music}}",
+  "listeningRewindHours": "{hours, plural, =1{Yaklaşık 1 saatlik müzik} other{Yaklaşık {hours} saatlik müzik}}",
   "@listeningRewindHours": {
     "placeholders": {
       "hours": {
@@ -8578,7 +8578,7 @@
       }
     }
   },
-  "listeningRewindMore": "{percent}% more than the period before",
+  "listeningRewindMore": "Önceki döneme göre %{percent} daha fazla",
   "@listeningRewindMore": {
     "placeholders": {
       "percent": {
@@ -8586,7 +8586,7 @@
       }
     }
   },
-  "listeningRewindLess": "{percent}% less than the period before",
+  "listeningRewindLess": "Önceki döneme göre %{percent} daha az",
   "@listeningRewindLess": {
     "placeholders": {
       "percent": {
@@ -8594,9 +8594,9 @@
       }
     }
   },
-  "listeningRewindSame": "About the same as the period before",
-  "listeningRewindTopArtistTitle": "Your top artist",
-  "listeningRewindArtistShare": "{percent}% of your listening time",
+  "listeningRewindSame": "Önceki dönemle yaklaşık aynı",
+  "listeningRewindTopArtistTitle": "En çok dinlediğiniz sanatçı",
+  "listeningRewindArtistShare": "Dinleme sürenizin %{percent}'i",
   "@listeningRewindArtistShare": {
     "placeholders": {
       "percent": {
@@ -8604,9 +8604,9 @@
       }
     }
   },
-  "listeningRewindArtistsTitle": "Artists on rotation",
-  "listeningRewindTopTrackTitle": "Your top song",
-  "listeningRewindPlays": "{plays, plural, =1{1 play} other{{plays} plays}}",
+  "listeningRewindArtistsTitle": "Dönüşümlü sanatçılar",
+  "listeningRewindTopTrackTitle": "En çok dinlediğiniz şarkı",
+  "listeningRewindPlays": "{plays, plural, =1{1 çalma} other{{plays} çalma}}",
   "@listeningRewindPlays": {
     "placeholders": {
       "plays": {
@@ -8614,10 +8614,10 @@
       }
     }
   },
-  "listeningRewindTracksTitle": "Songs on repeat",
-  "listeningRewindTopAlbumTitle": "The album you kept coming back to",
-  "listeningRewindNewArtistsTitle": "New discoveries",
-  "listeningRewindNewArtistsBody": "{count, plural, =1{You found 1 new artist} other{You found {count} new artists}}",
+  "listeningRewindTracksTitle": "Tekrar tekrar çalan şarkılar",
+  "listeningRewindTopAlbumTitle": "Tekrar tekrar döndüğünüz albüm",
+  "listeningRewindNewArtistsTitle": "Yeni keşifler",
+  "listeningRewindNewArtistsBody": "{count, plural, =1{1 yeni sanatçı keşfettiniz} other{{count} yeni sanatçı keşfettiniz}}",
   "@listeningRewindNewArtistsBody": {
     "placeholders": {
       "count": {
@@ -8625,11 +8625,11 @@
       }
     }
   },
-  "listeningRewindRhythmTitle": "Your listening rhythm",
-  "listeningRewindPeakDay": "Biggest day",
-  "listeningRewindFavoriteDay": "Favorite day",
-  "listeningRewindStreak": "Longest streak",
-  "listeningRewindStreakDays": "{days, plural, =1{1 day} other{{days} days in a row}}",
+  "listeningRewindRhythmTitle": "Dinleme ritminiz",
+  "listeningRewindPeakDay": "En yoğun gün",
+  "listeningRewindFavoriteDay": "Favori gün",
+  "listeningRewindStreak": "En uzun seri",
+  "listeningRewindStreakDays": "{days, plural, =1{1 gün} other{üst üste {days} gün}}",
   "@listeningRewindStreakDays": {
     "placeholders": {
       "days": {
@@ -8637,8 +8637,8 @@
       }
     }
   },
-  "listeningRewindReplayTitle": "Couldn't stop playing",
-  "listeningRewindReplayBody": "You played it {plays} times on {date}",
+  "listeningRewindReplayTitle": "Dinlemeyi bırakamadınız",
+  "listeningRewindReplayBody": "{date} tarihinde {plays} kez çaldınız",
   "@listeningRewindReplayBody": {
     "placeholders": {
       "plays": {
@@ -8649,11 +8649,11 @@
       }
     }
   },
-  "listeningRewindOutroTitle": "That's your Rewind",
-  "listeningRewindOutroBody": "Keep listening. Your next Rewind is already taking shape.",
-  "listeningRewindEmpty": "Not enough listening in this period yet. Play some music with the built-in player and come back later.",
-  "listeningRewindLoadError": "Could not load your Rewind",
-  "listeningRewindSlide": "Slide {index} of {count}",
+  "listeningRewindOutroTitle": "Geri Bakışınız bu kadar",
+  "listeningRewindOutroBody": "Dinlemeye devam edin. Bir sonraki Geri Bakışınız şimdiden şekilleniyor.",
+  "listeningRewindEmpty": "Bu dönemde henüz yeterli dinleme yok. Yerleşik oynatıcıyla biraz müzik çalın ve daha sonra tekrar gelin.",
+  "listeningRewindLoadError": "Geri Bakışınız yüklenemedi",
+  "listeningRewindSlide": "Slayt {index} / {count}",
   "@listeningRewindSlide": {
     "placeholders": {
       "index": {
@@ -8665,11 +8665,11 @@
     }
   },
   "listeningRewindShare": "Paylaş",
-  "listeningRewindShareError": "Could not share your Rewind",
+  "listeningRewindShareError": "Geri Bakışınız paylaşılamadı",
   "listeningRewindNext": "Sıradaki",
-  "listeningRewindPrevious": "Previous",
-  "listeningRewindMonthlyReady": "Your last 4 weeks are ready to replay",
-  "listeningRewindYearTitle": "Your {year} in Music",
+  "listeningRewindPrevious": "Önceki",
+  "listeningRewindMonthlyReady": "Son 4 haftanız yeniden oynatılmaya hazır",
+  "listeningRewindYearTitle": "Müzikte {year} yılınız",
   "@listeningRewindYearTitle": {
     "placeholders": {
       "year": {
@@ -8677,15 +8677,15 @@
       }
     }
   },
-  "listeningRewindYearEyebrow": "Year-end Rewind",
-  "listeningRewindYearBanner": "Your top artists, songs and moments of the year",
-  "listeningRewindYearIntroBody": "Everything you played this year, from your first song to your biggest month.",
-  "listeningRewindNumbersTitle": "Your year in numbers",
+  "listeningRewindYearEyebrow": "Yıl sonu Geri Bakışı",
+  "listeningRewindYearBanner": "Yılın en iyi sanatçıları, şarkıları ve anları",
+  "listeningRewindYearIntroBody": "Bu yıl çaldığınız her şey: ilk şarkınızdan en yoğun ayınıza kadar.",
+  "listeningRewindNumbersTitle": "Sayılarla yılınız",
   "listeningRewindSongsLabel": "Şarkılar",
   "listeningRewindArtistsLabel": "Sanatçılar",
   "listeningRewindAlbumsLabel": "Albümler",
-  "listeningRewindDaysLabel": "Days with music",
-  "listeningRewindDaysShare": "Music on {percent}% of your days",
+  "listeningRewindDaysLabel": "Müzikli günler",
+  "listeningRewindDaysShare": "Günlerinizin %{percent}'inde müzik",
   "@listeningRewindDaysShare": {
     "placeholders": {
       "percent": {
@@ -8693,9 +8693,9 @@
       }
     }
   },
-  "listeningRewindMonthsTitle": "Month by month",
-  "listeningRewindBiggestMonthLabel": "Biggest month",
-  "listeningRewindBiggestMonth": "Your biggest month was {month}",
+  "listeningRewindMonthsTitle": "Ay ay",
+  "listeningRewindBiggestMonthLabel": "En yoğun ay",
+  "listeningRewindBiggestMonth": "En yoğun ayınız {month} oldu",
   "@listeningRewindBiggestMonth": {
     "placeholders": {
       "month": {
@@ -8703,9 +8703,9 @@
       }
     }
   },
-  "listeningRewindMonthlyArtistsTitle": "Artist of the month",
-  "listeningRewindLoyalTitle": "Always by your side",
-  "listeningRewindLoyalBody": "{days, plural, =1{With you on 1 day} other{With you on {days} different days}}",
+  "listeningRewindMonthlyArtistsTitle": "Ayın sanatçısı",
+  "listeningRewindLoyalTitle": "Her zaman yanınızda",
+  "listeningRewindLoyalBody": "{days, plural, =1{1 gün sizinleydi} other{{days} farklı gün sizinleydi}}",
   "@listeningRewindLoyalBody": {
     "placeholders": {
       "days": {
@@ -8713,8 +8713,8 @@
       }
     }
   },
-  "listeningRewindFirstSongTitle": "Where your year began",
-  "listeningRewindFirstSongBody": "Your most-played song on your first listening day, {date}",
+  "listeningRewindFirstSongTitle": "Yılınızın başladığı yer",
+  "listeningRewindFirstSongBody": "İlk dinleme gününüz olan {date} tarihinde en çok çaldığınız şarkı",
   "@listeningRewindFirstSongBody": {
     "placeholders": {
       "date": {
@@ -8722,7 +8722,7 @@
       }
     }
   },
-  "listeningRewindYearOutroTitle": "That was your {year}",
+  "listeningRewindYearOutroTitle": "{year} yılınız böyle geçti",
   "@listeningRewindYearOutroTitle": {
     "placeholders": {
       "year": {
@@ -8730,7 +8730,7 @@
       }
     }
   },
-  "listeningRewindYearOutroBody": "Here's to another year of great music.",
+  "listeningRewindYearOutroBody": "Harika müziklerle dolu yeni bir yıla!",
   "weeklyReleases": "Yeni çıkanlar",
   "weeklyReleasesDescription": "Favori sanatçılarınızdan yeni albümler ve single'lar; yüklü meta veri eklentileri tarafından sağlanır.",
   "weeklyReleasesEmpty": "Bu dönemde tarihli sürüm bulunamadı. Favori sanatçı ekleyin veya daha uzun bir dönem deneyin.",
@@ -8749,7 +8749,7 @@
   "discordPresenceBuildUnavailable": "Bu yapıda Discord SDK kullanılamıyor.",
   "discordPresenceAndroidHelp": "Bu telefona Discord'u yükleyip oturum açın. Discord'da etkinlik paylaşımına izin verin. Harici oynatıcılar desteklenmez.",
   "discordPresenceIosHelp": "Hesabınızı Discord üzerinden bağlayın ve etkinlik paylaşımına izin verin. Yetkilendirme başarısız olursa yeniden bağlamak için dokunun.",
-  "discordPresenceDesktopHelp": "Keep the Discord desktop app running and signed in on this computer, and allow activity sharing in Discord.",
+  "discordPresenceDesktopHelp": "Discord masaüstü uygulamasını bu bilgisayarda açık ve oturum açmış halde tutun ve Discord'da etkinlik paylaşımına izin verin.",
   "discordPresenceDisconnect": "Bağlantıyı kes ve hesabı unut",
   "autoMixSettingsTitle": "Mix geçişleri",
   "autoMixAutomaticDuration": "Otomatik süre",
@@ -8781,47 +8781,47 @@
   "appearanceCustomFontSubtitle": "Bir TTF veya OTF dosyası içe aktarın (en fazla 10 MB). Tema ve sistem yazı tipini geçersiz kılar.",
   "appearanceCustomFontInvalid": "Bu yazı tipi yüklenemedi. En fazla 10 MB boyutunda geçerli bir TTF veya OTF dosyası seçin.",
   "appearanceCustomFontReset": "Tema yazı tipini kullan",
-  "equalizerTitle": "Equalizer",
-  "equalizerDescription": "5–31 bands, tone controls, preamp and dynamics",
-  "equalizerEnable": "Enable equalizer",
-  "equalizerBands": "Bands",
-  "equalizerTone": "Tone & stereo",
-  "equalizerPreamp": "Preamp",
-  "equalizerBass": "Bass",
-  "equalizerTreble": "Treble",
-  "equalizerBalance": "Balance",
-  "equalizerDynamics": "Dynamics",
-  "equalizerHeadroom": "Automatic headroom",
-  "equalizerHeadroomDescription": "Reduce input gain to make room for boosted frequencies.",
-  "equalizerLimiter": "Peak limiter",
-  "equalizerLimiterDescription": "Keep peaks below −0.5 dBFS to reduce clipping.",
-  "equalizerCompressor": "Compressor",
-  "equalizerCompressorDescription": "Reduce the difference between quiet and loud passages.",
-  "equalizerThreshold": "Threshold",
-  "equalizerRatio": "Ratio",
-  "equalizerAttack": "Attack",
-  "equalizerRelease": "Release",
-  "equalizerPresets": "Presets",
-  "equalizerSavePreset": "Save preset",
-  "equalizerPresetName": "Preset name",
-  "equalizerImport": "Import preset",
-  "equalizerExport": "Share preset",
-  "equalizerImportInvalid": "Choose a valid Mornye equalizer preset (JSON, up to 64 KB).",
-  "equalizerSaved": "Preset saved",
-  "equalizerResetTitle": "Reset equalizer?",
-  "equalizerResetDescription": "Restore a flat curve, default tone and dynamics settings. Saved presets are kept.",
-  "equalizerBypass": "Bit-perfect, Direct USB and exclusive Hi-Res outputs bypass EQ. Disable bit-perfect output to use EQ. External players manage their own effects.",
-  "equalizerCurve": "EQ curve (estimated)",
-  "equalizerCurveDescription": "The curve shows band gains; the exact response depends on the output engine.",
-  "equalizerEffectivePreamp": "Input gain after headroom",
-  "equalizerDeletePreset": "Delete preset",
+  "equalizerTitle": "Ekolayzer",
+  "equalizerDescription": "5–31 bant, ton kontrolleri, ön yükselteç ve dinamikler",
+  "equalizerEnable": "Ekolayzeri etkinleştir",
+  "equalizerBands": "Bantlar",
+  "equalizerTone": "Ton ve stereo",
+  "equalizerPreamp": "Ön yükselteç",
+  "equalizerBass": "Bas",
+  "equalizerTreble": "Tiz",
+  "equalizerBalance": "Denge",
+  "equalizerDynamics": "Dinamikler",
+  "equalizerHeadroom": "Otomatik headroom",
+  "equalizerHeadroomDescription": "Yükseltilen frekanslara yer açmak için giriş kazancını azaltın.",
+  "equalizerLimiter": "Tepe sınırlayıcı",
+  "equalizerLimiterDescription": "Kırpılmayı azaltmak için tepeleri −0,5 dBFS'nin altında tutun.",
+  "equalizerCompressor": "Sıkıştırıcı",
+  "equalizerCompressorDescription": "Sessiz ve yüksek pasajlar arasındaki farkı azaltın.",
+  "equalizerThreshold": "Eşik",
+  "equalizerRatio": "Oran",
+  "equalizerAttack": "Atak",
+  "equalizerRelease": "Bırakma",
+  "equalizerPresets": "Ön ayarlar",
+  "equalizerSavePreset": "Ön ayarı kaydet",
+  "equalizerPresetName": "Ön ayar adı",
+  "equalizerImport": "Ön ayar içe aktar",
+  "equalizerExport": "Ön ayarı paylaş",
+  "equalizerImportInvalid": "Geçerli bir Mornye ekolayzer ön ayarı seçin (JSON, en fazla 64 KB).",
+  "equalizerSaved": "Ön ayar kaydedildi",
+  "equalizerResetTitle": "Ekolayzer sıfırlansın mı?",
+  "equalizerResetDescription": "Düz bir eğri ile varsayılan ton ve dinamik ayarlarını geri yükleyin. Kaydedilen ön ayarlar korunur.",
+  "equalizerBypass": "Bit-perfect, Doğrudan USB ve özel Hi-Res çıkışları ekolayzeri atlar. Ekolayzeri kullanmak için bit-perfect çıkışı devre dışı bırakın. Harici oynatıcılar kendi efektlerini yönetir.",
+  "equalizerCurve": "Ekolayzer eğrisi (tahmini)",
+  "equalizerCurveDescription": "Eğri, bant kazançlarını gösterir; kesin yanıt çıkış motoruna bağlıdır.",
+  "equalizerEffectivePreamp": "Headroom sonrası giriş kazancı",
+  "equalizerDeletePreset": "Ön ayarı sil",
   "equalizerCustom": "Özel",
-  "equalizerManagePresets": "Manage presets",
-  "lyricsShareTitle": "Share lyrics",
+  "equalizerManagePresets": "Ön ayarları yönet",
+  "lyricsShareTitle": "Şarkı sözlerini paylaş",
   "@lyricsShareTitle": {
     "description": "Screen that turns selected lyric lines into an image for stories"
   },
-  "lyricsShareSelectHint": "Select up to {count} lines",
+  "lyricsShareSelectHint": "En fazla {count} satır seçin",
   "@lyricsShareSelectHint": {
     "placeholders": {
       "count": {
@@ -8829,7 +8829,7 @@
       }
     }
   },
-  "lyricsShareLimit": "You can share up to {count} lines",
+  "lyricsShareLimit": "En fazla {count} satır paylaşabilirsiniz",
   "@lyricsShareLimit": {
     "placeholders": {
       "count": {
@@ -8838,31 +8838,31 @@
     }
   },
   "lyricsShareAction": "Paylaş",
-  "lyricsShareError": "Couldn't create the lyrics image",
-  "lyricsShareBackgroundArtwork": "Artwork",
-  "lyricsShareBackgroundColor": "Cover color",
+  "lyricsShareError": "Şarkı sözü görseli oluşturulamadı",
+  "lyricsShareBackgroundArtwork": "Albüm kapağı",
+  "lyricsShareBackgroundColor": "Kapak rengi",
   "lyricsShareBackgroundDark": "Koyu",
   "lyricsShareBackgroundLight": "Açık",
-  "audioInfoTitle": "Audio info",
+  "audioInfoTitle": "Ses bilgisi",
   "@audioInfoTitle": {
     "description": "Sheet with technical details of the playing track, opened from the quality badge"
   },
-  "audioInfoSource": "Source file",
-  "audioInfoSignal": "Signal",
-  "audioInfoLoudness": "Loudness",
-  "audioInfoProcessing": "Processing",
-  "audioInfoOutput": "Output",
-  "audioInfoAnalysis": "Spectrum and level analysis",
+  "audioInfoSource": "Kaynak dosya",
+  "audioInfoSignal": "Sinyal",
+  "audioInfoLoudness": "Ses yüksekliği",
+  "audioInfoProcessing": "İşleme",
+  "audioInfoOutput": "Çıkış",
+  "audioInfoAnalysis": "Spektrum ve seviye analizi",
   "audioInfoQuality": "Kalite",
-  "audioInfoHiResLossless": "Hi-Res Lossless",
+  "audioInfoHiResLossless": "Hi-Res Kayıpsız",
   "audioInfoLossless": "Kayıpsız",
   "audioInfoLossy": "Kayıplı",
   "audioInfoFormat": "Format",
   "audioInfoCodec": "Kodek",
-  "audioInfoSampleRate": "Sample rate",
-  "audioInfoBitDepth": "Bit depth",
+  "audioInfoSampleRate": "Örnekleme hızı",
+  "audioInfoBitDepth": "Bit derinliği",
   "audioInfoChannels": "Kanallar",
-  "audioInfoChannelCount": "{count, plural, =1{Mono} =2{Stereo} other{{count} channels}}",
+  "audioInfoChannelCount": "{count, plural, =1{Mono} =2{Stereo} other{{count} kanal}}",
   "@audioInfoChannelCount": {
     "placeholders": {
       "count": {
@@ -8872,9 +8872,9 @@
   },
   "audioInfoBitrate": "Bitrate",
   "audioInfoDuration": "Süre",
-  "audioInfoFileSize": "File size",
-  "audioInfoCompression": "Compression",
-  "audioInfoCompressionValue": "{percent}% of uncompressed size",
+  "audioInfoFileSize": "Dosya boyutu",
+  "audioInfoCompression": "Sıkıştırma",
+  "audioInfoCompressionValue": "Sıkıştırılmamış boyutun %{percent}'i",
   "@audioInfoCompressionValue": {
     "placeholders": {
       "percent": {
@@ -8882,11 +8882,11 @@
       }
     }
   },
-  "audioInfoLocation": "Location",
-  "audioInfoLocationLocal": "Device storage",
-  "audioInfoLocationShared": "Shared folder",
+  "audioInfoLocation": "Konum",
+  "audioInfoLocationLocal": "Cihaz depolaması",
+  "audioInfoLocationShared": "Paylaşılan klasör",
   "audioInfoLocationNetwork": "Ağ depolaması",
-  "audioInfoLocationLink": "{device} via Mornye Link",
+  "audioInfoLocationLink": "{device} (Mornye Link üzerinden)",
   "@audioInfoLocationLink": {
     "description": "Audio info location of a song played from a paired computer or phone over Mornye Link; device is that device's name",
     "placeholders": {
@@ -8895,9 +8895,9 @@
       }
     }
   },
-  "audioInfoPcmRate": "Uncompressed data rate",
-  "audioInfoFrequencyRange": "Frequency range",
-  "audioInfoFrequencyRangeValue": "Up to {frequency} (Nyquist)",
+  "audioInfoPcmRate": "Sıkıştırılmamış veri hızı",
+  "audioInfoFrequencyRange": "Frekans aralığı",
+  "audioInfoFrequencyRangeValue": "En fazla {frequency} (Nyquist)",
   "@audioInfoFrequencyRangeValue": {
     "placeholders": {
       "frequency": {
@@ -8905,13 +8905,13 @@
       }
     }
   },
-  "audioInfoDynamicRange": "Theoretical dynamic range",
-  "audioInfoTrackGain": "Track gain",
-  "audioInfoTrackPeak": "Track peak",
-  "audioInfoAlbumGain": "Album gain",
-  "audioInfoAlbumPeak": "Album peak",
-  "audioInfoNoGainTags": "No ReplayGain tags",
-  "audioInfoApplied": "Applied {gain}",
+  "audioInfoDynamicRange": "Teorik dinamik aralık",
+  "audioInfoTrackGain": "Parça kazancı",
+  "audioInfoTrackPeak": "Parça tepe değeri",
+  "audioInfoAlbumGain": "Albüm kazancı",
+  "audioInfoAlbumPeak": "Albüm tepe değeri",
+  "audioInfoNoGainTags": "ReplayGain etiketi yok",
+  "audioInfoApplied": "Uygulanan: {gain}",
   "@audioInfoApplied": {
     "placeholders": {
       "gain": {
@@ -8919,19 +8919,19 @@
       }
     }
   },
-  "audioInfoOn": "On",
+  "audioInfoOn": "Açık",
   "audioInfoOff": "Kapalı",
-  "audioInfoBypassed": "Bypassed by direct output",
+  "audioInfoBypassed": "Doğrudan çıkış tarafından atlandı",
   "audioInfoPlayer": "Oynatıcı",
-  "audioInfoPlayerValue": "Mornye built-in player",
-  "audioInfoSignalPath": "Signal path",
-  "audioInfoPathSystem": "System mixer",
-  "audioInfoPathDirect": "Direct USB, bypasses the system mixer",
-  "audioInfoPathExclusive": "Exclusive output, bypasses the system mixer",
-  "audioInfoDecoder": "Decoder",
-  "audioInfoHardware": "Hardware",
-  "audioInfoSoftware": "Software",
-  "audioInfoBands": "{count} bands",
+  "audioInfoPlayerValue": "Mornye yerleşik oynatıcısı",
+  "audioInfoSignalPath": "Sinyal yolu",
+  "audioInfoPathSystem": "Sistem mikseri",
+  "audioInfoPathDirect": "Doğrudan USB, sistem mikserini atlar",
+  "audioInfoPathExclusive": "Özel çıkış, sistem mikserini atlar",
+  "audioInfoDecoder": "Kod çözücü",
+  "audioInfoHardware": "Donanım",
+  "audioInfoSoftware": "Yazılım",
+  "audioInfoBands": "{count} bant",
   "@audioInfoBands": {
     "placeholders": {
       "count": {
@@ -8940,13 +8940,13 @@
     }
   },
   "audioInfoTempo": "Tempo",
-  "audioInfoResampling": "Resampling",
-  "audioInfoResamplingNone": "None, rates match",
+  "audioInfoResampling": "Yeniden örnekleme",
+  "audioInfoResamplingNone": "Yok, hızlar eşleşiyor",
   "audioInfoBitPerfect": "Bit-perfect",
-  "audioInfoBitPerfectActive": "Yes, unaltered samples",
-  "audioInfoBitPerfectNo": "No, mixed by the system",
-  "audioInfoDevice": "Device",
-  "audioInfoDeviceType": "{type, select, speaker{Phone speaker} earpiece{Earpiece} wired_headphones{Wired headphones} wired_headset{Wired headset} line{Line out} bluetooth{Bluetooth} bluetooth_le{Bluetooth LE Audio} usb{USB audio} usb_headset{USB headset} hdmi{HDMI} dock{Dock} cast{Cast} hearing_aid{Hearing aid} airplay{AirPlay} car{Car audio} other{Other}}",
+  "audioInfoBitPerfectActive": "Evet, değiştirilmemiş örnekler",
+  "audioInfoBitPerfectNo": "Hayır, sistem tarafından karıştırıldı",
+  "audioInfoDevice": "Cihaz",
+  "audioInfoDeviceType": "{type, select, speaker{Telefon hoparlörü} earpiece{Ahize} wired_headphones{Kablolu kulaklık} wired_headset{Kablolu kulaklık seti} line{Hat çıkışı} bluetooth{Bluetooth} bluetooth_le{Bluetooth LE Audio} usb{USB ses} usb_headset{USB kulaklık seti} hdmi{HDMI} dock{Dock} cast{Cast} hearing_aid{İşitme cihazı} airplay{AirPlay} car{Araç sesi} other{Diğer}}",
   "@audioInfoDeviceType": {
     "placeholders": {
       "type": {
@@ -8954,53 +8954,53 @@
       }
     }
   },
-  "audioInfoOutputRate": "Output sample rate",
+  "audioInfoOutputRate": "Çıkış örnekleme hızı",
   "audioInfoOutputFormat": "Çıktı biçimi",
-  "audioInfoBluetoothFormat": "Bluetooth codec format",
+  "audioInfoBluetoothFormat": "Bluetooth kodek biçimi",
   "@audioInfoBluetoothFormat": {
     "description": "Negotiated Bluetooth transport format, separate from Android PCM mixer properties"
   },
-  "audioInfoAndroidNotReported": "Not reported by Android",
-  "audioInfoSystemDefaultRate": "System default sample rate",
-  "audioInfoAndroidPcmRates": "Android PCM sample rates",
-  "audioInfoAndroidPcmFormats": "Android PCM formats",
-  "audioInfoSystemDefaultBuffer": "System default buffer",
-  "audioInfoDeviceRates": "Device sample rates",
-  "audioInfoDeviceFormats": "Device formats",
+  "audioInfoAndroidNotReported": "Android tarafından bildirilmedi",
+  "audioInfoSystemDefaultRate": "Sistem varsayılanı örnekleme hızı",
+  "audioInfoAndroidPcmRates": "Android PCM örnekleme hızları",
+  "audioInfoAndroidPcmFormats": "Android PCM biçimleri",
+  "audioInfoSystemDefaultBuffer": "Sistem varsayılanı arabellek",
+  "audioInfoDeviceRates": "Cihaz örnekleme hızları",
+  "audioInfoDeviceFormats": "Cihaz biçimleri",
   "audioInfoAnyRate": "Herhangi",
-  "audioInfoBuffer": "Mixer buffer",
-  "audioInfoLatency": "Output latency",
-  "audioInfoLowLatency": "Low-latency audio",
-  "audioInfoProAudio": "Pro audio",
-  "audioInfoSupported": "Supported",
-  "audioInfoNotSupported": "Not supported",
-  "audioInfoSpatial": "Spatial audio",
-  "audioInfoHeadTracking": "Head tracking",
-  "audioInfoUnavailable": "Unavailable",
-  "audioInfoFixedVolume": "Controlled by the device",
-  "audioInfoCopy": "Copy report",
-  "audioInfoCopied": "Audio info copied",
+  "audioInfoBuffer": "Mikser arabelleği",
+  "audioInfoLatency": "Çıkış gecikmesi",
+  "audioInfoLowLatency": "Düşük gecikmeli ses",
+  "audioInfoProAudio": "Pro ses",
+  "audioInfoSupported": "Destekleniyor",
+  "audioInfoNotSupported": "Desteklenmiyor",
+  "audioInfoSpatial": "Uzamsal ses",
+  "audioInfoHeadTracking": "Baş takibi",
+  "audioInfoUnavailable": "Kullanılamıyor",
+  "audioInfoFixedVolume": "Cihaz tarafından denetleniyor",
+  "audioInfoCopy": "Raporu kopyala",
+  "audioInfoCopied": "Ses bilgisi kopyalandı",
   "lyricsTextSize": "Şarkı sözü metin boyutu",
   "lyricsTextPreview": "Favori şarkınızın her satırını takip edin",
-  "lyricsBlur": "Lyrics blur",
+  "lyricsBlur": "Şarkı sözü bulanıklığı",
   "@lyricsBlur": {
     "description": "Mornye setting: how strongly lyric lines around the current one are blurred"
   },
-  "lyricsBlurSubtitle": "How much the lines around the current one soften",
-  "lyricsBlurOff": "Off",
+  "lyricsBlurSubtitle": "Geçerli satırın çevresindeki satırların ne kadar yumuşatılacağı",
+  "lyricsBlurOff": "Kapalı",
   "@lyricsBlurOff": {
     "description": "Value of the lyrics blur slider at zero"
   },
-  "lyricsOffset": "Lyrics timing",
+  "lyricsOffset": "Şarkı sözü zamanlaması",
   "@lyricsOffset": {
     "description": "Setting: move synced lyrics earlier or later than playback"
   },
-  "lyricsOffsetSubtitle": "Show synced lyrics later or earlier, for example when Bluetooth audio arrives late",
-  "lyricsOffsetNone": "In sync",
+  "lyricsOffsetSubtitle": "Senkronlu şarkı sözlerini daha geç veya daha erken göster; örneğin Bluetooth sesi geç geldiğinde",
+  "lyricsOffsetNone": "Senkron",
   "@lyricsOffsetNone": {
     "description": "Value of the lyrics timing slider at zero"
   },
-  "lyricsOffsetLater": "{seconds} s later",
+  "lyricsOffsetLater": "{seconds} sn geç",
   "@lyricsOffsetLater": {
     "description": "Value of the lyrics timing slider when lyrics follow playback late",
     "placeholders": {
@@ -9010,7 +9010,7 @@
       }
     }
   },
-  "lyricsOffsetEarlier": "{seconds} s earlier",
+  "lyricsOffsetEarlier": "{seconds} sn erken",
   "@lyricsOffsetEarlier": {
     "description": "Value of the lyrics timing slider when lyrics run ahead of playback",
     "placeholders": {
@@ -9020,21 +9020,21 @@
       }
     }
   },
-  "appCrashTitle": "The app previously crashed",
-  "appAnrTitle": "The app previously stopped responding",
+  "appCrashTitle": "Uygulama daha önce çöktü",
+  "appAnrTitle": "Uygulama daha önce yanıt vermeyi durdurdu",
   "@appAnrTitle": {
     "description": "Title for an Android ANR report, distinct from a crash."
   },
-  "appAnrMessage": "A diagnostic report was saved. You can copy it and send it to the developer to help investigate.",
+  "appAnrMessage": "Bir tanılama raporu kaydedildi. İncelemeye yardımcı olması için kopyalayıp geliştiriciye gönderebilirsiniz.",
   "@appAnrMessage": {
     "description": "Message shown for an Android process exit due to an ANR."
   },
-  "appCrashMessage": "A crash report was saved. Copy it and send it to the developer to help investigate.",
-  "appCrashDetails": "View error and log",
-  "appCrashCopy": "Copy report for developer",
+  "appCrashMessage": "Bir çökme raporu kaydedildi. İncelemeye yardımcı olması için kopyalayıp geliştiriciye gönderin.",
+  "appCrashDetails": "Hatayı ve günlüğü görüntüle",
+  "appCrashCopy": "Raporu geliştirici için kopyala",
   "appCrashDismiss": "Kapat",
-  "appCrashCopyFailed": "Could not copy the crash report. Please try again.",
-  "appCrashDismissFailed": "Could not dismiss the crash report. Please try again.",
+  "appCrashCopyFailed": "Çökme raporu kopyalanamadı. Lütfen tekrar deneyin.",
+  "appCrashDismissFailed": "Çökme raporu kapatılamadı. Lütfen tekrar deneyin.",
   "optionsEmbeddedCoverSizeOriginal": "Orijinal çözünürlük",
   "@optionsEmbeddedCoverSizeOriginal": {
     "description": "Option that preserves the provider artwork at its original resolution"
@@ -9051,13 +9051,13 @@
       }
     }
   },
-  "desktopPlayerIdle": "Not playing",
+  "desktopPlayerIdle": "Çalmıyor",
   "@desktopPlayerIdle": {
     "description": "Desktop player bar text when no track is loaded"
   },
-  "desktopVolumeUp": "Increase volume",
-  "desktopVolumeDown": "Decrease volume",
-  "desktopTableSortedAscending": "{column}, sorted ascending",
+  "desktopVolumeUp": "Sesi artır",
+  "desktopVolumeDown": "Sesi azalt",
+  "desktopTableSortedAscending": "{column}, artan sırada sıralandı",
   "@desktopTableSortedAscending": {
     "description": "Screen reader label of a song table column header that sorts the table A to Z",
     "placeholders": {
@@ -9066,7 +9066,7 @@
       }
     }
   },
-  "desktopTableSortedDescending": "{column}, sorted descending",
+  "desktopTableSortedDescending": "{column}, azalan sırada sıralandı",
   "@desktopTableSortedDescending": {
     "description": "Screen reader label of a song table column header that sorts the table Z to A",
     "placeholders": {
@@ -9075,19 +9075,19 @@
       }
     }
   },
-  "desktopMenuOpen": "Open",
+  "desktopMenuOpen": "Aç",
   "@desktopMenuOpen": {
     "description": "Context menu item that opens an album, artist, playlist or folder"
   },
-  "desktopMenuShowDetails": "Show details",
+  "desktopMenuShowDetails": "Ayrıntıları göster",
   "@desktopMenuShowDetails": {
     "description": "Context menu item that opens a track's metadata page"
   },
-  "desktopDropToImport": "Drop to add to your library",
+  "desktopDropToImport": "Kitaplığınıza eklemek için bırakın",
   "@desktopDropToImport": {
     "description": "Overlay shown while music files or folders are dragged over the desktop window"
   },
-  "desktopDropImported": "Adding {count} {count, plural, =1{folder} other{folders}} to your library",
+  "desktopDropImported": "{count} {count, plural, =1{klasör} other{klasör}} kitaplığınıza ekleniyor",
   "@desktopDropImported": {
     "description": "Snackbar after dropping music onto the desktop window; the folders are scanned into the library",
     "placeholders": {
@@ -9096,38 +9096,38 @@
       }
     }
   },
-  "desktopDropNothingToImport": "Drop music files or folders to add them to your library",
+  "desktopDropNothingToImport": "Kitaplığınıza eklemek için müzik dosyalarını veya klasörleri bırakın",
   "@desktopDropNothingToImport": {
     "description": "Snackbar when the dropped items contain no folders or audio files"
   },
-  "desktopAllPlaylists": "All Playlists",
+  "desktopAllPlaylists": "Tüm Çalma Listeleri",
   "@desktopAllPlaylists": {
     "description": "Desktop sidebar row that opens the list of every playlist"
   },
-  "desktopMenuSettings": "Settings…",
+  "desktopMenuSettings": "Ayarlar…",
   "@desktopMenuSettings": {
     "description": "macOS app menu item that opens Settings"
   },
-  "desktopMenuFile": "File",
-  "desktopMenuEdit": "Edit",
-  "desktopMenuView": "View",
-  "desktopWindowMode": "Window mode",
-  "desktopWindowed": "Windowed",
-  "desktopWindowFullscreen": "Full screen",
-  "desktopWindowBorderless": "Borderless",
-  "desktopExitFullscreen": "Exit full screen",
-  "desktopMinimizeWindow": "Minimize window",
-  "desktopZoomWindow": "Maximize or restore window",
-  "desktopWindowModeUnavailable": "The window mode could not be changed. Try again after the current window transition finishes.",
-  "desktopMenuControls": "Controls",
-  "desktopMenuWindow": "Window",
-  "desktopMenuHelp": "Help",
-  "desktopMenuPlayPause": "Play/Pause",
-  "desktopMenuMiniPlayer": "Mini Player",
+  "desktopMenuFile": "Dosya",
+  "desktopMenuEdit": "Düzen",
+  "desktopMenuView": "Görünüm",
+  "desktopWindowMode": "Pencere modu",
+  "desktopWindowed": "Pencereli",
+  "desktopWindowFullscreen": "Tam ekran",
+  "desktopWindowBorderless": "Kenarlıksız",
+  "desktopExitFullscreen": "Tam ekrandan çık",
+  "desktopMinimizeWindow": "Pencereyi küçült",
+  "desktopZoomWindow": "Pencereyi büyüt veya geri yükle",
+  "desktopWindowModeUnavailable": "Pencere modu değiştirilemedi. Geçerli pencere geçişi tamamlandıktan sonra tekrar deneyin.",
+  "desktopMenuControls": "Kontroller",
+  "desktopMenuWindow": "Pencere",
+  "desktopMenuHelp": "Yardım",
+  "desktopMenuPlayPause": "Çal/Duraklat",
+  "desktopMenuMiniPlayer": "Mini Oynatıcı",
   "@desktopMenuMiniPlayer": {
     "description": "Window menu item, player bar button and Keyboard Shortcuts row that shrink the window into a small player floating above other windows"
   },
-  "desktopMiniPlayerExpand": "Show Full Window",
+  "desktopMiniPlayerExpand": "Tam Pencereyi Göster",
   "@desktopMiniPlayerExpand": {
     "description": "Mini player button that returns the window to its full size"
   },
@@ -9135,15 +9135,15 @@
   "@desktopMenuRefresh": {
     "description": "View menu item and Keyboard Shortcuts row that reloads the page on screen (Home, Repo, statistics)"
   },
-  "desktopMenuProjectPage": "Project page",
+  "desktopMenuProjectPage": "Proje sayfası",
   "@desktopMenuProjectPage": {
     "description": "Help menu item that opens the app's source repository"
   },
-  "desktopDownloadsShowAll": "Show all",
+  "desktopDownloadsShowAll": "Tümünü göster",
   "@desktopDownloadsShowAll": {
     "description": "Button in the desktop downloads popover that opens the full download queue"
   },
-  "desktopDownloadsQueued": "Waiting",
+  "desktopDownloadsQueued": "Bekliyor",
   "@desktopDownloadsQueued": {
     "description": "Status of a download in the desktop downloads popover that has not started yet"
   },
@@ -9151,27 +9151,27 @@
   "@desktopDownloadsCancel": {
     "description": "Tooltip of the button that cancels one download in the desktop downloads popover"
   },
-  "linkDesktopSettingsTitle": "Mornye on your phone",
+  "linkDesktopSettingsTitle": "Telefonunuzdaki Mornye",
   "@linkDesktopSettingsTitle": {
     "description": "Desktop Settings page that shares this computer's library with the Mornye phone app over the local network"
   },
-  "linkDesktopSettingsSubtitle": "Stream your library and control playback from your phone",
+  "linkDesktopSettingsSubtitle": "Kitaplığınızı akış olarak aktarın ve oynatmayı telefonunuzdan denetleyin",
   "@linkDesktopSettingsSubtitle": {
     "description": "Subtitle of the Mornye on your phone entry in desktop Settings"
   },
-  "linkDesktopEnableTitle": "Share with Mornye on your phone",
+  "linkDesktopEnableTitle": "Telefonunuzdaki Mornye ile paylaş",
   "@linkDesktopEnableTitle": {
     "description": "Switch that turns on the local server phones connect to"
   },
-  "linkDesktopEnableSubtitle": "Your phone can browse, play and download through this computer on your local network",
+  "linkDesktopEnableSubtitle": "Telefonunuz yerel ağınızda bu bilgisayar üzerinden göz atabilir, çalabilir ve indirebilir",
   "@linkDesktopEnableSubtitle": {
     "description": "Subtitle of the switch that shares the library with phones, while it is off"
   },
-  "linkDesktopStatusStarting": "Starting",
+  "linkDesktopStatusStarting": "Başlatılıyor",
   "@linkDesktopStatusStarting": {
     "description": "Status of the phone link server while it starts"
   },
-  "linkDesktopStatusRunning": "On, {count, plural, =0{no phone connected} =1{1 phone connected} other{{count} phones connected}}",
+  "linkDesktopStatusRunning": "Açık, {count, plural, =0{telefon bağlı değil} =1{1 telefon bağlı} other{{count} telefon bağlı}}",
   "@linkDesktopStatusRunning": {
     "description": "Status of the phone link server while it runs, with the number of connected phones",
     "placeholders": {
@@ -9180,7 +9180,7 @@
       }
     }
   },
-  "linkDesktopStatusFailed": "Could not start: {error}",
+  "linkDesktopStatusFailed": "Başlatılamadı: {error}",
   "@linkDesktopStatusFailed": {
     "description": "Status of the phone link server when it failed to start",
     "placeholders": {
@@ -9189,35 +9189,35 @@
       }
     }
   },
-  "linkDesktopFirewallHint": "Your computer may ask whether Mornye can accept incoming network connections. Allow it so your phone can connect.",
+  "linkDesktopFirewallHint": "Bilgisayarınız Mornye'nin gelen ağ bağlantılarını kabul edip edemeyeceğini sorabilir. Telefonunuzun bağlanabilmesi için izin verin.",
   "@linkDesktopFirewallHint": {
     "description": "Hint shown while the phone link server is on, about the operating system firewall prompt"
   },
-  "linkDesktopSectionComputer": "This computer",
+  "linkDesktopSectionComputer": "Bu bilgisayar",
   "@linkDesktopSectionComputer": {
     "description": "Section of the phone link settings about this computer's name and address"
   },
-  "linkDesktopDeviceName": "Name",
+  "linkDesktopDeviceName": "Ad",
   "@linkDesktopDeviceName": {
     "description": "Row and field label for the name phones see for this computer"
   },
-  "linkDesktopDeviceNameHint": "Phones show this name when they find this computer",
+  "linkDesktopDeviceNameHint": "Telefonlar bu bilgisayarı bulduklarında bu adı gösterir",
   "@linkDesktopDeviceNameHint": {
     "description": "Helper text of the field that renames this computer for phones"
   },
-  "linkDesktopAddress": "Address",
+  "linkDesktopAddress": "Adres",
   "@linkDesktopAddress": {
     "description": "Row that shows the network addresses phones and Subsonic apps connect to"
   },
-  "linkDesktopSecurityCode": "Security code",
+  "linkDesktopSecurityCode": "Güvenlik kodu",
   "@linkDesktopSecurityCode": {
     "description": "Row that shows the short certificate fingerprint phones compare while pairing"
   },
-  "linkDesktopSecurityCodeHint": "Your phone shows the same code when it pairs",
+  "linkDesktopSecurityCodeHint": "Eşleştirirken telefonunuz aynı kodu gösterir",
   "@linkDesktopSecurityCodeHint": {
     "description": "Subtitle explaining the security code row"
   },
-  "linkDesktopCatalogSongs": "{count, plural, =1{1 song shared} other{{count} songs shared}}",
+  "linkDesktopCatalogSongs": "{count, plural, =1{1 şarkı paylaşılıyor} other{{count} şarkı paylaşılıyor}}",
   "@linkDesktopCatalogSongs": {
     "description": "How many Library songs phones can see",
     "placeholders": {
@@ -9226,27 +9226,27 @@
       }
     }
   },
-  "linkDesktopSectionPhones": "Phones",
+  "linkDesktopSectionPhones": "Telefonlar",
   "@linkDesktopSectionPhones": {
     "description": "Section of the phone link settings that lists paired phones"
   },
-  "linkDesktopPairPhone": "Pair a phone",
+  "linkDesktopPairPhone": "Telefon eşleştir",
   "@linkDesktopPairPhone": {
     "description": "Row and dialog title that shows a code to pair a phone with this computer"
   },
-  "linkDesktopPairPhoneSubtitle": "Show a code to enter on your phone",
+  "linkDesktopPairPhoneSubtitle": "Telefonunuzda gireceğiniz bir kod gösterin",
   "@linkDesktopPairPhoneSubtitle": {
     "description": "Subtitle of the Pair a phone row"
   },
-  "linkDesktopNoDevices": "No phones paired yet",
+  "linkDesktopNoDevices": "Henüz telefon eşleştirilmedi",
   "@linkDesktopNoDevices": {
     "description": "Shown in the paired phones list when it is empty"
   },
-  "linkDesktopDeviceConnected": "Connected",
+  "linkDesktopDeviceConnected": "Bağlı",
   "@linkDesktopDeviceConnected": {
     "description": "Status of a paired phone that is connected now"
   },
-  "linkDesktopDeviceLastSeen": "Last seen {date}",
+  "linkDesktopDeviceLastSeen": "Son görülme {date}",
   "@linkDesktopDeviceLastSeen": {
     "description": "Status of a paired phone that is not connected",
     "placeholders": {
@@ -9255,19 +9255,19 @@
       }
     }
   },
-  "linkDesktopDeviceNeverSeen": "Not connected yet",
+  "linkDesktopDeviceNeverSeen": "Henüz bağlanmadı",
   "@linkDesktopDeviceNeverSeen": {
     "description": "Status of a paired device that never connected"
   },
-  "linkDesktopSubsonicApp": "Subsonic app",
+  "linkDesktopSubsonicApp": "Subsonic uygulaması",
   "@linkDesktopSubsonicApp": {
     "description": "Label of a paired device that is a third-party Subsonic app"
   },
-  "linkDesktopRevoke": "Remove",
+  "linkDesktopRevoke": "Kaldır",
   "@linkDesktopRevoke": {
     "description": "Tooltip and confirm button that removes a paired phone or Subsonic app"
   },
-  "linkDesktopRevokeTitle": "Remove {name}?",
+  "linkDesktopRevokeTitle": "{name} kaldırılsın mı?",
   "@linkDesktopRevokeTitle": {
     "description": "Title of the dialog that confirms removing a paired device",
     "placeholders": {
@@ -9276,11 +9276,11 @@
       }
     }
   },
-  "linkDesktopRevokeMessage": "It has to pair again before it can connect to this computer.",
+  "linkDesktopRevokeMessage": "Bu bilgisayara bağlanabilmesi için yeniden eşleştirilmesi gerekir.",
   "@linkDesktopRevokeMessage": {
     "description": "Message of the dialog that confirms removing a paired device"
   },
-  "linkDesktopRevoked": "{name} removed",
+  "linkDesktopRevoked": "{name} kaldırıldı",
   "@linkDesktopRevoked": {
     "description": "Snackbar after removing a paired device",
     "placeholders": {
@@ -9289,27 +9289,27 @@
       }
     }
   },
-  "linkDesktopSectionOtherApps": "Other apps",
+  "linkDesktopSectionOtherApps": "Diğer uygulamalar",
   "@linkDesktopSectionOtherApps": {
     "description": "Section of the phone link settings for third-party Subsonic apps"
   },
-  "linkDesktopAddSubsonicApp": "Add another Subsonic app",
+  "linkDesktopAddSubsonicApp": "Başka bir Subsonic uygulaması ekle",
   "@linkDesktopAddSubsonicApp": {
     "description": "Row and dialog title that creates a key for a third-party Subsonic app"
   },
-  "linkDesktopAddSubsonicAppSubtitle": "Create a key for a Subsonic player on another device",
+  "linkDesktopAddSubsonicAppSubtitle": "Başka bir cihazdaki Subsonic oynatıcı için anahtar oluşturun",
   "@linkDesktopAddSubsonicAppSubtitle": {
     "description": "Subtitle of the Add another Subsonic app row"
   },
-  "linkDesktopAppName": "App name",
+  "linkDesktopAppName": "Uygulama adı",
   "@linkDesktopAppName": {
     "description": "Field label for the name of a third-party Subsonic app"
   },
-  "linkDesktopCreateKey": "Create key",
+  "linkDesktopCreateKey": "Anahtar oluştur",
   "@linkDesktopCreateKey": {
     "description": "Button that creates a key for a third-party Subsonic app"
   },
-  "linkDesktopAppKeyTitle": "Connect {name}",
+  "linkDesktopAppKeyTitle": "{name} bağla",
   "@linkDesktopAppKeyTitle": {
     "description": "Title of the dialog that shows the details for a new Subsonic app key",
     "placeholders": {
@@ -9318,23 +9318,23 @@
       }
     }
   },
-  "linkDesktopAppKeyMessage": "Enter these details in the app. The key is shown only now.",
+  "linkDesktopAppKeyMessage": "Bu ayrıntıları uygulamaya girin. Anahtar yalnızca şimdi gösterilir.",
   "@linkDesktopAppKeyMessage": {
     "description": "Message of the dialog that shows a new Subsonic app key"
   },
-  "linkDesktopServerAddress": "Server address",
+  "linkDesktopServerAddress": "Sunucu adresi",
   "@linkDesktopServerAddress": {
     "description": "Label of the server address a Subsonic app connects to"
   },
-  "linkDesktopUsername": "Username",
+  "linkDesktopUsername": "Kullanıcı adı",
   "@linkDesktopUsername": {
     "description": "Label of the username a Subsonic app uses"
   },
-  "linkDesktopApiKey": "Password or API key",
+  "linkDesktopApiKey": "Parola veya API anahtarı",
   "@linkDesktopApiKey": {
     "description": "Label of the key a Subsonic app uses as its password or API key"
   },
-  "linkDesktopCopy": "Copy {label}",
+  "linkDesktopCopy": "{label} kopyala",
   "@linkDesktopCopy": {
     "description": "Tooltip of a copy button next to a value",
     "placeholders": {
@@ -9343,11 +9343,11 @@
       }
     }
   },
-  "linkDesktopPairInstructions": "Open Mornye on your phone, choose this computer and enter this code.",
+  "linkDesktopPairInstructions": "Telefonunuzda Mornye'yi açın, bu bilgisayarı seçin ve bu kodu girin.",
   "@linkDesktopPairInstructions": {
     "description": "Instructions in the pairing dialog above the code"
   },
-  "linkDesktopPairCheckCode": "Check that your phone shows security code {code}.",
+  "linkDesktopPairCheckCode": "Telefonunuzun {code} güvenlik kodunu gösterdiğini kontrol edin.",
   "@linkDesktopPairCheckCode": {
     "description": "Line in the pairing dialog asking to compare the short certificate fingerprint",
     "placeholders": {
@@ -9356,7 +9356,7 @@
       }
     }
   },
-  "linkDesktopPairExpires": "The code expires in {time}",
+  "linkDesktopPairExpires": "Kod {time} içinde sona erer",
   "@linkDesktopPairExpires": {
     "description": "Countdown in the pairing dialog, as minutes and seconds",
     "placeholders": {
@@ -9365,7 +9365,7 @@
       }
     }
   },
-  "linkDesktopPaired": "Paired with {name}",
+  "linkDesktopPaired": "{name} ile eşleştirildi",
   "@linkDesktopPaired": {
     "description": "Snackbar after a phone paired",
     "placeholders": {
@@ -9374,35 +9374,35 @@
       }
     }
   },
-  "linkDesktopPairExpired": "The code expired. Pair again to get a new one.",
+  "linkDesktopPairExpired": "Kodun süresi doldu. Yeni kod için tekrar eşleştirin.",
   "@linkDesktopPairExpired": {
     "description": "Snackbar when the pairing code expired"
   },
-  "linkDesktopPairAttempts": "Too many wrong codes. Pair again to get a new one.",
+  "linkDesktopPairAttempts": "Çok fazla yanlış kod girildi. Yeni kod için tekrar eşleştirin.",
   "@linkDesktopPairAttempts": {
     "description": "Snackbar when pairing ended after too many wrong codes"
   },
-  "linkDesktopPairFailed": "Could not start pairing",
+  "linkDesktopPairFailed": "Eşleştirme başlatılamadı",
   "@linkDesktopPairFailed": {
     "description": "Snackbar when the pairing code could not be created"
   },
-  "linkDesktopDevicesTitle": "Phones",
+  "linkDesktopDevicesTitle": "Telefonlar",
   "@linkDesktopDevicesTitle": {
     "description": "Tooltip of the player bar button and title of its popover that list connected phones"
   },
-  "linkDesktopPhoneNothingPlaying": "Nothing playing",
+  "linkDesktopPhoneNothingPlaying": "Hiçbir şey çalmıyor",
   "@linkDesktopPhoneNothingPlaying": {
     "description": "Shown for a connected phone that plays nothing"
   },
-  "linkDesktopContinueOnPhone": "Continue on phone",
+  "linkDesktopContinueOnPhone": "Telefonda devam et",
   "@linkDesktopContinueOnPhone": {
     "description": "Button that moves the desktop queue and position to a phone and pauses the desktop"
   },
-  "linkDesktopOpenOnPhone": "Open a link on phone",
+  "linkDesktopOpenOnPhone": "Bağlantıyı telefonda aç",
   "@linkDesktopOpenOnPhone": {
     "description": "Button that sends a link to a phone to open"
   },
-  "linkDesktopOpenLinkTitle": "Open a link on {name}",
+  "linkDesktopOpenLinkTitle": "Bağlantıyı {name} üzerinde aç",
   "@linkDesktopOpenLinkTitle": {
     "description": "Title of the dialog that sends a link to a phone",
     "placeholders": {
@@ -9411,15 +9411,15 @@
       }
     }
   },
-  "linkDesktopOpenLinkLabel": "Link",
+  "linkDesktopOpenLinkLabel": "Bağlantı",
   "@linkDesktopOpenLinkLabel": {
     "description": "Field label for the link to open on a phone"
   },
-  "linkDesktopOpen": "Open",
+  "linkDesktopOpen": "Aç",
   "@linkDesktopOpen": {
     "description": "Button that sends the link to the phone"
   },
-  "linkDesktopSentToPhone": "Sent to {name}",
+  "linkDesktopSentToPhone": "{name} cihazına gönderildi",
   "@linkDesktopSentToPhone": {
     "description": "Snackbar after something was sent to a phone",
     "placeholders": {
@@ -9428,15 +9428,15 @@
       }
     }
   },
-  "linkDesktopNotDelivered": "The phone did not receive it",
+  "linkDesktopNotDelivered": "Telefon bunu almadı",
   "@linkDesktopNotDelivered": {
     "description": "Snackbar when a message could not reach a phone"
   },
-  "linkDesktopNothingToContinue": "Nothing is playing on this computer",
+  "linkDesktopNothingToContinue": "Bu bilgisayarda hiçbir şey çalmıyor",
   "@linkDesktopNothingToContinue": {
     "description": "Snackbar when Continue on phone is used without a current song"
   },
-  "linkTransferDesktopSendTo": "Send to {name}",
+  "linkTransferDesktopSendTo": "{name} cihazına gönder",
   "@linkTransferDesktopSendTo": {
     "description": "Mornye Link desktop: song menu action that copies this computer's songs to the connected phone {name}",
     "placeholders": {
@@ -9445,11 +9445,11 @@
       }
     }
   },
-  "linkTransferDesktopSaveHere": "Save to this computer",
+  "linkTransferDesktopSaveHere": "Bu bilgisayara kaydet",
   "@linkTransferDesktopSaveHere": {
     "description": "Mornye Link desktop: song menu action that copies a connected phone's songs into this computer's download folder"
   },
-  "linkTransferDesktopSendingSong": "Sending \"{title}\" to {name}",
+  "linkTransferDesktopSendingSong": "\"{title}\" {name} cihazına gönderiliyor",
   "@linkTransferDesktopSendingSong": {
     "description": "Mornye Link desktop: snackbar when one song starts copying to the phone {name}",
     "placeholders": {
@@ -9461,7 +9461,7 @@
       }
     }
   },
-  "linkTransferDesktopSendingSongs": "{count, plural, =1{Sending 1 song to {name}} other{Sending {count} songs to {name}}}",
+  "linkTransferDesktopSendingSongs": "{count, plural, =1{{name} cihazına 1 şarkı gönderiliyor} other{{name} cihazına {count} şarkı gönderiliyor}}",
   "@linkTransferDesktopSendingSongs": {
     "description": "Mornye Link desktop: snackbar when songs start copying to the phone {name}",
     "placeholders": {
@@ -9473,7 +9473,7 @@
       }
     }
   },
-  "linkTransferDesktopReceivingSong": "Receiving \"{title}\" from {name}",
+  "linkTransferDesktopReceivingSong": "\"{title}\" {name} cihazından alınıyor",
   "@linkTransferDesktopReceivingSong": {
     "description": "Mornye Link desktop: snackbar when one song of the phone {name} starts copying to this computer",
     "placeholders": {
@@ -9485,7 +9485,7 @@
       }
     }
   },
-  "linkTransferDesktopReceivingSongs": "{count, plural, =1{Receiving 1 song from {name}} other{Receiving {count} songs from {name}}}",
+  "linkTransferDesktopReceivingSongs": "{count, plural, =1{{name} cihazından 1 şarkı alınıyor} other{{name} cihazından {count} şarkı alınıyor}}",
   "@linkTransferDesktopReceivingSongs": {
     "description": "Mornye Link desktop: snackbar when songs of the phone {name} start copying to this computer",
     "placeholders": {
@@ -9497,147 +9497,147 @@
       }
     }
   },
-  "linkTransferDesktopView": "View",
+  "linkTransferDesktopView": "Görüntüle",
   "@linkTransferDesktopView": {
     "description": "Mornye Link desktop: snackbar action that opens the list of song transfers"
   },
-  "linkTransferDesktopNothingToSend": "None of these songs can be sent right now",
+  "linkTransferDesktopNothingToSend": "Bu şarkıların hiçbiri şu anda gönderilemiyor",
   "@linkTransferDesktopNothingToSend": {
     "description": "Mornye Link desktop: snackbar when Send to phone finds no song file on this computer to send"
   },
-  "linkTransferDesktopNothingToSave": "None of these songs can be saved right now",
+  "linkTransferDesktopNothingToSave": "Bu şarkıların hiçbiri şu anda kaydedilemiyor",
   "@linkTransferDesktopNothingToSave": {
     "description": "Mornye Link desktop: snackbar when Save to this computer finds no song of a connected phone"
   },
-  "desktopScrollBack": "Scroll back",
+  "desktopScrollBack": "Geri kaydır",
   "@desktopScrollBack": {
     "description": "Tooltip of the desktop button that scrolls a horizontal shelf of albums or artists back"
   },
-  "desktopScrollForward": "Scroll forward",
+  "desktopScrollForward": "İleri kaydır",
   "@desktopScrollForward": {
     "description": "Tooltip of the desktop button that scrolls a horizontal shelf of albums or artists forward"
   },
-  "settingsKeyboardShortcuts": "Keyboard Shortcuts",
+  "settingsKeyboardShortcuts": "Klavye Kısayolları",
   "@settingsKeyboardShortcuts": {
     "description": "Desktop Settings page that lists the app's keyboard shortcuts"
   },
-  "settingsKeyboardShortcutsSubtitle": "Keys for playback, navigation and panels",
+  "settingsKeyboardShortcutsSubtitle": "Oynatma, gezinme ve paneller için tuşlar",
   "@settingsKeyboardShortcutsSubtitle": {
     "description": "Subtitle of the Keyboard Shortcuts entry in desktop Settings"
   },
-  "desktopShortcutsNavigation": "Navigation",
+  "desktopShortcutsNavigation": "Gezinme",
   "@desktopShortcutsNavigation": {
     "description": "Keyboard Shortcuts section for moving between pages"
   },
-  "desktopShortcutDismiss": "Close dialog or page",
+  "desktopShortcutDismiss": "İletişim kutusunu veya sayfayı kapat",
   "@desktopShortcutDismiss": {
     "description": "Keyboard Shortcuts row for Escape, which leaves a text field or closes the top dialog or page"
   },
-  "desktopShortcutToggleSidebar": "Show or hide sidebar",
+  "desktopShortcutToggleSidebar": "Kenar çubuğunu göster veya gizle",
   "@desktopShortcutToggleSidebar": {
     "description": "Keyboard Shortcuts row for the shortcut that collapses or expands the desktop sidebar"
   },
-  "linkSettingsTitle": "Mornye on your computer",
+  "linkSettingsTitle": "Bilgisayarınızdaki Mornye",
   "@linkSettingsTitle": {
     "description": "Phone Settings entry that pairs the phone with the Mornye desktop app on the local network"
   },
-  "linkSettingsSubtitle": "Play and control your computer's library",
+  "linkSettingsSubtitle": "Bilgisayarınızın kitaplığını çalın ve denetleyin",
   "@linkSettingsSubtitle": {
     "description": "Subtitle of the Mornye on your computer entry in phone Settings"
   },
-  "linkPageTitle": "Computers",
+  "linkPageTitle": "Bilgisayarlar",
   "@linkPageTitle": {
     "description": "Title of the page listing computers running Mornye that the phone can pair with; kept short for the large title"
   },
-  "linkPageDescription": "Pair with Mornye on your computer to play its library on this phone and control what it plays. Both devices need to be on the same network.",
+  "linkPageDescription": "Kitaplığını bu telefonda çalmak ve ne çaldığını denetlemek için bilgisayarınızdaki Mornye ile eşleştirin. Her iki cihaz da aynı ağda olmalıdır.",
   "@linkPageDescription": {
     "description": "Introduction at the top of the computers page"
   },
-  "linkPairedSection": "Paired computers",
+  "linkPairedSection": "Eşleştirilmiş bilgisayarlar",
   "@linkPairedSection": {
     "description": "Section header for computers this phone is paired with"
   },
-  "linkPhoneSection": "This phone",
+  "linkPhoneSection": "Bu telefon",
   "@linkPhoneSection": {
     "description": "Section header for what this phone shares with and how it follows its paired computer"
   },
-  "linkShareSongsTitle": "Show songs on the computer",
+  "linkShareSongsTitle": "Şarkıları bilgisayarda göster",
   "@linkShareSongsTitle": {
     "description": "Switch title: this phone's songs appear in the paired computer's Library"
   },
-  "linkShareSongsSubtitle": "Songs on this phone appear in the computer's Library and play there while this phone is connected",
+  "linkShareSongsSubtitle": "Bu telefondaki şarkılar bilgisayarın Kitaplığında görünür ve bu telefon bağlıyken orada çalar",
   "@linkShareSongsSubtitle": {
     "description": "Switch subtitle for showing this phone's songs on the computer"
   },
-  "linkFollowDesktopTitle": "Follow the computer's playback",
+  "linkFollowDesktopTitle": "Bilgisayarın oynatmasını izle",
   "@linkFollowDesktopTitle": {
     "description": "Switch title: the phone's player shows the computer when the computer starts playing"
   },
-  "linkFollowDesktopSubtitle": "When the computer starts playing, this phone shows and controls it",
+  "linkFollowDesktopSubtitle": "Bilgisayar çalmaya başladığında bu telefon onu gösterir ve denetler",
   "@linkFollowDesktopSubtitle": {
     "description": "Switch subtitle for following the computer's playback"
   },
-  "linkNearbySection": "On this network",
+  "linkNearbySection": "Bu ağda",
   "@linkNearbySection": {
     "description": "Section header for computers running Mornye found on the local network"
   },
-  "linkSearching": "Looking for computers...",
+  "linkSearching": "Bilgisayarlar aranıyor...",
   "@linkSearching": {
     "description": "Row shown while the phone searches the local network for computers"
   },
-  "linkNoneFoundTitle": "No computers found",
+  "linkNoneFoundTitle": "Bilgisayar bulunamadı",
   "@linkNoneFoundTitle": {
     "description": "Row shown when the phone is not searching and found no computer"
   },
-  "linkNoneFound": "Open Mornye on your computer and turn on Share with Mornye on your phone in its settings.",
+  "linkNoneFound": "Bilgisayarınızda Mornye'yi açın ve ayarlarından Telefonunuzdaki Mornye ile paylaş seçeneğini açın.",
   "@linkNoneFound": {
     "description": "Hint under the search row when no computer was found yet; Share with Mornye on your phone is the name of the desktop setting"
   },
-  "linkAddManually": "Add by address",
+  "linkAddManually": "Adresle ekle",
   "@linkAddManually": {
     "description": "Button and dialog title for pairing with a computer by typing its address and port"
   },
-  "linkManualHost": "Computer address",
+  "linkManualHost": "Bilgisayar adresi",
   "@linkManualHost": {
     "description": "Field label for the computer's IP address or host name"
   },
-  "linkManualPort": "Port",
+  "linkManualPort": "Bağlantı noktası",
   "@linkManualPort": {
     "description": "Field label for the network port of the Mornye desktop server"
   },
-  "linkManualMessage": "Mornye on your computer shows its address and port where you turn on sharing.",
+  "linkManualMessage": "Bilgisayarınızdaki Mornye, paylaşımı açtığınız yerde adresini ve bağlantı noktasını gösterir.",
   "@linkManualMessage": {
     "description": "Explains where to find the address and port to type"
   },
-  "linkContinue": "Continue",
+  "linkContinue": "Devam",
   "@linkContinue": {
     "description": "Dialog action that continues to the PIN step after typing an address"
   },
-  "linkStateConnected": "Connected",
+  "linkStateConnected": "Bağlı",
   "@linkStateConnected": {
     "description": "Status of the paired computer that is connected"
   },
-  "linkStateConnecting": "Connecting...",
+  "linkStateConnecting": "Bağlanıyor...",
   "@linkStateConnecting": {
     "description": "Status of the paired computer while the phone connects to it"
   },
-  "linkStateDisconnected": "Not connected",
+  "linkStateDisconnected": "Bağlı değil",
   "@linkStateDisconnected": {
     "description": "Status of the paired computer when it cannot be reached"
   },
-  "linkStateInactive": "Tap to use this computer",
+  "linkStateInactive": "Bu bilgisayarı kullanmak için dokunun",
   "@linkStateInactive": {
     "description": "Status of a paired computer other than the one in use; tapping it makes it the one in use"
   },
-  "linkActive": "In use",
+  "linkActive": "Kullanımda",
   "@linkActive": {
     "description": "Label next to the paired computer the phone currently uses, shown when several are paired"
   },
-  "linkForget": "Forget",
+  "linkForget": "Unut",
   "@linkForget": {
     "description": "Action that unpairs a computer from this phone"
   },
-  "linkForgetTitle": "Forget {name}?",
+  "linkForgetTitle": "{name} unutulsun mu?",
   "@linkForgetTitle": {
     "description": "Title of the dialog confirming that a paired computer is forgotten",
     "placeholders": {
@@ -9646,15 +9646,15 @@
       }
     }
   },
-  "linkForgetMessage": "This phone stops connecting to it. You can pair again later.",
+  "linkForgetMessage": "Bu telefon artık ona bağlanmaz. Daha sonra yeniden eşleştirebilirsiniz.",
   "@linkForgetMessage": {
     "description": "Explanation in the forget computer dialog"
   },
-  "linkForgetRemoveLibrary": "Also remove its music from Library",
+  "linkForgetRemoveLibrary": "Müziğini de Kitaplıktan kaldır",
   "@linkForgetRemoveLibrary": {
     "description": "Switch in the forget computer dialog that also removes the computer's network connection and Library source"
   },
-  "linkPinTitle": "Pair with {name}",
+  "linkPinTitle": "{name} ile eşleştir",
   "@linkPinTitle": {
     "description": "Title of the dialog asking for the pairing PIN",
     "placeholders": {
@@ -9663,7 +9663,7 @@
       }
     }
   },
-  "linkPinMessage": "Enter the 6-digit PIN shown on your computer.",
+  "linkPinMessage": "Bilgisayarınızda gösterilen 6 haneli PIN'i girin.",
   "@linkPinMessage": {
     "description": "Instruction in the pairing PIN dialog"
   },
@@ -9671,7 +9671,7 @@
   "@linkPinField": {
     "description": "Label of the pairing PIN field"
   },
-  "linkPinCode": "Your computer shows the code {code} next to the PIN. Pair only if it matches.",
+  "linkPinCode": "Bilgisayarınız PIN'in yanında {code} kodunu gösterir. Yalnızca eşleşiyorsa eşleştirin.",
   "@linkPinCode": {
     "description": "Security check in the PIN dialog; the placeholder is 8 hexadecimal characters of the computer's certificate fingerprint, grouped as 'ab12 cd34'",
     "placeholders": {
@@ -9680,15 +9680,15 @@
       }
     }
   },
-  "linkPinNotOpen": "Pairing is not open yet. Start pairing in Mornye on your computer to show a PIN.",
+  "linkPinNotOpen": "Eşleştirme henüz açık değil. PIN göstermek için bilgisayarınızdaki Mornye'de eşleştirmeyi başlatın.",
   "@linkPinNotOpen": {
     "description": "Note in the PIN dialog when the computer reports that no pairing window is open"
   },
-  "linkPair": "Pair",
+  "linkPair": "Eşleştir",
   "@linkPair": {
     "description": "Action that sends the PIN to pair with the computer"
   },
-  "linkPaired": "Paired with {name}. Its music is being added to Library.",
+  "linkPaired": "{name} ile eşleştirildi. Müziği Kitaplığa ekleniyor.",
   "@linkPaired": {
     "description": "Message after pairing succeeded",
     "placeholders": {
@@ -9697,11 +9697,11 @@
       }
     }
   },
-  "linkPairAgain": "Pair again",
+  "linkPairAgain": "Yeniden eşleştir",
   "@linkPairAgain": {
     "description": "Action that repeats pairing with a computer that no longer accepts this phone"
   },
-  "linkTransfersTitle": "Transfers",
+  "linkTransfersTitle": "Aktarımlar",
   "@linkTransfersTitle": {
     "description": "Mornye Link: title of the list of songs copied between this device and a linked phone or computer, and of the rows that open it"
   },
