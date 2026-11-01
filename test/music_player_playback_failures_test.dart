@@ -44,6 +44,28 @@ void main() {
       await _until(() => handler.playbackState.value.queueIndex == 1);
     });
 
+    test('a media server crash plays the song again by itself', () async {
+      const died = 'MEDIA_ERROR_SERVER_DIED, MEDIA_ERROR_UNKNOWN {extra:1}';
+      await handler.setQueueAndPlay(_tracks);
+      for (var reload = 1; reload <= 2; reload++) {
+        await native.error('music-player', details: died);
+        await _until(() => native.resumedSources.length == reload + 1);
+        expect(handler.playbackState.value.errorMessage, isNull);
+        expect(handler.playbackState.value.playing, isTrue);
+        expect(handler.mediaItem.value?.id, 'one');
+      }
+
+      // A server that keeps dying fails the song as before.
+      await native.error('music-player', details: died);
+      await _until(
+        () =>
+            handler.playbackState.value.processingState ==
+            AudioProcessingState.error,
+      );
+      expect(handler.playbackState.value.playing, isFalse);
+      expect(native.resumedSources, hasLength(3));
+    });
+
     test('source failure is reported and can be retried', () async {
       native.sourceFailures.add('/one.flac');
       await handler.setQueueAndPlay(_tracks);

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mornye/providers/library_collections_provider.dart';
@@ -114,4 +116,35 @@ void main() {
     await service.load([for (var i = 0; i < 10; i++) _artist('artist-$i')]);
     expect(peak, 2);
   });
+
+  test(
+    'abandoned feed stops starting requests and does not cache late results',
+    () async {
+      var cancelled = false;
+      final started = Completer<void>();
+      final complete = Completer<void>();
+      var calls = 0;
+      final preferences = await SharedPreferences.getInstance();
+      final service = WeeklyReleaseService(
+        preferences: Future.value(preferences),
+        loadArtist: (_) async {
+          if (++calls == 2) started.complete();
+          await complete.future;
+          return (
+            providerId: 'provider-a',
+            metadata: <String, dynamic>{'albums': <Object>[]},
+          );
+        },
+      );
+      final loading = service.load([
+        for (var i = 0; i < 10; i++) _artist('artist-$i'),
+      ], isCancelled: () => cancelled);
+      await started.future;
+      cancelled = true;
+      complete.complete();
+      await loading;
+      expect(calls, 2);
+      expect(preferences.getKeys(), isEmpty);
+    },
+  );
 }

@@ -1,10 +1,13 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:path/path.dart' as p;
 import 'package:mornye/services/cover_cache_manager.dart';
+import 'package:mornye/services/cover_store.dart';
 import 'package:mornye/utils/image_cache_utils.dart';
 
 class CachedCoverImage extends StatelessWidget {
@@ -116,10 +119,11 @@ class CachedCoverImage extends StatelessWidget {
   }
 }
 
-/// Renders [url] as a local file (when it's not an http/https URL) or as a
-/// cached network image otherwise, with a shared [placeholder] used for the
-/// local error state, the local not-ready frame, and the network
-/// placeholder/error states alike.
+/// Renders a stored cover string in any form: an http(s) URL as a cached
+/// network image, an absolute path or `file://` URI from disk, and other
+/// forms as the shared [placeholder], which also serves the local error
+/// state, the local not-ready frame, and the network placeholder/error
+/// states alike.
 class LocalOrNetworkCoverImage extends StatelessWidget {
   final String url;
   final double? width;
@@ -148,34 +152,50 @@ class LocalOrNetworkCoverImage extends StatelessWidget {
     required this.placeholder,
   });
 
-  bool get _isLocal =>
-      !url.startsWith('http://') && !url.startsWith('https://');
-
   @override
   Widget build(BuildContext context) {
-    if (_isLocal) {
-      if (localCacheWidth != null) {
-        return _buildLocalImage(context, const BoxConstraints());
-      }
-      return LayoutBuilder(builder: _buildLocalImage);
+    if (isHttpCoverUrl(url)) {
+      return CachedCoverImage(
+        imageUrl: urlTransform?.call(url) ?? url,
+        width: width,
+        height: height,
+        fit: fit,
+        memCacheWidth: networkCacheWidth,
+        borderRadius: borderRadius,
+        fadeInDuration: fadeInDuration ?? Duration.zero,
+        fadeOutDuration: fadeOutDuration,
+        placeholder: (_, _) => placeholder(context),
+        errorWidget: (_, _, _) => placeholder(context),
+      );
     }
 
-    return CachedCoverImage(
-      imageUrl: urlTransform?.call(url) ?? url,
-      width: width,
-      height: height,
-      fit: fit,
-      memCacheWidth: networkCacheWidth,
-      borderRadius: borderRadius,
-      fadeInDuration: fadeInDuration ?? Duration.zero,
-      fadeOutDuration: fadeOutDuration,
-      placeholder: (_, _) => placeholder(context),
-      errorWidget: (_, _, _) => placeholder(context),
+    final path = coverFilePath(url);
+    if (path == null) {
+      return pendingCover(
+        url,
+        placeholder: _clip(placeholder(context)),
+        builder: build,
+      );
+    }
+    final file = File(path);
+    if (localCacheWidth != null) {
+      return _buildLocalImage(context, file, const BoxConstraints());
+    }
+    return LayoutBuilder(
+      builder: (context, constraints) =>
+          _buildLocalImage(context, file, constraints),
     );
   }
 
-  Widget _buildLocalImage(BuildContext context, BoxConstraints constraints) {
-    final file = File(url);
+  Widget _clip(Widget child) => borderRadius == null
+      ? child
+      : ClipRRect(borderRadius: borderRadius!, child: child);
+
+  Widget _buildLocalImage(
+    BuildContext context,
+    File file,
+    BoxConstraints constraints,
+  ) {
     final ImageProvider provider;
     if (localCacheWidth != null) {
       provider = ResizeImage(FileImage(file), width: localCacheWidth);
@@ -228,9 +248,7 @@ class LocalOrNetworkCoverImage extends StatelessWidget {
             },
       errorBuilder: (_, _, _) => placeholder(context),
     );
-    return borderRadius == null
-        ? image
-        : ClipRRect(borderRadius: borderRadius!, child: image);
+    return _clip(image);
   }
 
   static int? _localDecodeExtent(BuildContext context, double? size) {
@@ -308,6 +326,127 @@ CachedNetworkImageProvider cachedCoverImageProvider(String url) {
   );
 }
 
+/// Whether a stored cover string is an http(s) URL, which loads through
+/// [CoverCacheManager].
+bool isHttpCoverUrl(String? source) =>
+    source != null &&
+    (source.startsWith('http://') || source.startsWith('https://'));
+
+/// The local file a stored cover string names: an absolute path, a
+/// `file://` URI, or a `network://` cover the cover store holds. Null for
+/// URLs, `content://` URIs and other forms.
+String? coverFilePath(String? source) {
+  if (source == null || source.isEmpty) return null;
+  if (source.startsWith('file://')) {
+    try {
+      return Uri.parse(source).toFilePath();
+    } on FormatException {
+      return null;
+    } on UnsupportedError {
+      return null;
+    }
+  }
+  // Widgets and palettes call this during build, so a `network://` cover
+  // reads only the store's in-memory index, without file IO.
+  if (CoverStore.fetches(source)) {
+    return CoverStore.instance.indexedFile(source);
+  }
+  return p.isAbsolute(source) ? source : null;
+}
+
+/// [placeholder] for a cover string without an image, and for a `network://`
+/// cover the store ([covers], the shared one by default) does not hold yet,
+/// which it fetches: [builder] builds again once the cover is stored.
+Widget pendingCover(
+  String? source, {
+  required Widget placeholder,
+  required WidgetBuilder builder,
+  CoverStore? covers,
+}) => CoverStore.fetches(source)
+    ? _PendingCover(
+        source: source!,
+        covers: covers ?? CoverStore.instance,
+        placeholder: placeholder,
+        builder: builder,
+      )
+    : placeholder;
+
+class _PendingCover extends StatefulWidget {
+  const _PendingCover({
+    required this.source,
+    required this.covers,
+    required this.placeholder,
+    required this.builder,
+  });
+
+  final String source;
+  final CoverStore covers;
+  final Widget placeholder;
+  final WidgetBuilder builder;
+
+  @override
+  State<_PendingCover> createState() => _PendingCoverState();
+}
+
+class _PendingCoverState extends State<_PendingCover> {
+  bool _stored = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetch();
+  }
+
+  @override
+  void didUpdateWidget(covariant _PendingCover oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.source != widget.source) {
+      _stored = false;
+      _fetch();
+    }
+  }
+
+  void _fetch() {
+    final source = widget.source;
+    unawaited(
+      widget.covers.file(source).then((path) {
+        if (path != null && mounted && widget.source == source) {
+          setState(() => _stored = true);
+        }
+      }),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) =>
+      _stored ? widget.builder(context) : widget.placeholder;
+}
+
+/// What the cover widgets, precaching and palettes decode for a stored cover
+/// string: an http(s) URL as it is, a local file as its path, so every form
+/// of one cover shares its cache entries. Null when the form has no image.
+String? coverImageSource(String? source) =>
+    isHttpCoverUrl(source) ? source : coverFilePath(source);
+
+/// The image of a stored cover string in any form, keyed like the cover
+/// widgets' own decode and resized as `Image.file` does with [cacheWidth]
+/// and [cacheHeight]. Null when the form has no image.
+ImageProvider<Object>? coverImageProvider(
+  String? source, {
+  int? cacheWidth,
+  int? cacheHeight,
+}) {
+  final ImageProvider<Object> provider;
+  if (isHttpCoverUrl(source)) {
+    provider = cachedCoverImageProvider(source!);
+  } else {
+    final path = coverFilePath(source);
+    if (path == null) return null;
+    provider = FileImage(File(path));
+  }
+  return ResizeImage.resizeIfNeeded(cacheWidth, cacheHeight, provider);
+}
+
 /// Chooses one artwork source for both the Metadata foreground cover and its
 /// blurred backdrop. Embedded file artwork is authoritative for downloaded
 /// tracks; local scan artwork is next, with remote metadata only as fallback.
@@ -342,24 +481,16 @@ Future<void> precacheMetadataBackdrop(
   final normalized = source?.trim();
   if (normalized == null || normalized.isEmpty) return;
 
-  final ImageProvider provider;
-  final network =
-      normalized.startsWith('http://') || normalized.startsWith('https://');
-  if (network) {
-    provider = cachedCoverImageProvider(normalized);
-  } else if (!normalized.startsWith('content://')) {
-    final filePath = normalized.startsWith('file://')
-        ? Uri.parse(normalized).toFilePath()
-        : normalized;
-    provider = FileImage(File(filePath));
-  } else {
-    return;
-  }
-
   final extent = metadataBackdropCacheExtent(context);
+  final provider = coverImageProvider(
+    normalized,
+    cacheWidth: extent,
+    cacheHeight: isHttpCoverUrl(normalized) ? null : extent,
+  );
+  if (provider == null) return;
   try {
     await precacheImage(
-      ResizeImage(provider, width: extent, height: network ? null : extent),
+      provider,
       context,
       onError: (_, _) {},
     ).timeout(const Duration(milliseconds: 200));
@@ -367,17 +498,19 @@ Future<void> precacheMetadataBackdrop(
 }
 
 /// Pre-warms the cover cache at the metadata-screen display size so the hero
-/// transition doesn't pop in a low-res frame. Http(s) URLs only.
+/// transition doesn't pop in a low-res frame.
 void precacheCoverImage(BuildContext context, String? url) {
   if (url == null || url.isEmpty) return;
-  if (!url.startsWith('http://') && !url.startsWith('https://')) {
-    return;
-  }
+  final provider = coverImageProvider(
+    url,
+    cacheWidth: coverCacheWidthForViewport(context),
+  );
+  if (provider == null) return;
+  // A stale local path is common and its placeholder already covers it; only
+  // a failed download still reaches the app's error handler.
   precacheImage(
-    ResizeImage(
-      cachedCoverImageProvider(url),
-      width: coverCacheWidthForViewport(context),
-    ),
+    provider,
     context,
+    onError: isHttpCoverUrl(url) ? null : (_, _) {},
   );
 }

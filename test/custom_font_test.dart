@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -45,6 +47,40 @@ void main() {
         () => CustomFontService.validate(bytes.sublist(0, 32)),
         throwsFormatException,
       );
+    },
+  );
+
+  test(
+    'restore validates and hashes a large font off the UI isolate',
+    () async {
+      final directory = await Directory.systemTemp.createTemp('font-restore-');
+      addTearDown(() => directory.delete(recursive: true));
+      final font = await File('assets/fonts/InterVariable.ttf').readAsBytes();
+      // Trailing bytes keep the table directory valid.
+      final bytes = Uint8List(CustomFontService.maxBytes)..setAll(0, font);
+      final hashing = Stopwatch()..start();
+      final id = sha256.convert(bytes).toString();
+      hashing.stop();
+      await File('${directory.path}/$id.font').writeAsBytes(bytes);
+      final service = CustomFontService(
+        directory: () async => directory,
+        loadFont: (_, data) async => expect(data.length, bytes.length),
+      );
+
+      var longestStall = Duration.zero;
+      final ticks = Stopwatch()..start();
+      final timer = Timer.periodic(const Duration(milliseconds: 1), (_) {
+        if (ticks.elapsed > longestStall) longestStall = ticks.elapsed;
+        ticks.reset();
+      });
+      addTearDown(timer.cancel);
+      expect(await service.restore(id), 'ImportedFont_$id');
+      // A tick after the last stall records it.
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      timer.cancel();
+
+      // On the UI isolate the stall was the whole hash (110 of 123 ms here).
+      expect(longestStall * 3, lessThan(hashing.elapsed));
     },
   );
 

@@ -83,12 +83,30 @@ class _LazyTabViewState extends State<LazyTabView> {
             excluding: index != widget.index,
             child: TickerMode(
               enabled: index == widget.index,
-              child: _mountedTabs.contains(_tabKey(index))
-                  ? widget.children[index]
-                  : const SizedBox.shrink(),
+              child: _TabInsets(
+                hidden: index != widget.index,
+                child: _mountedTabs.contains(_tabKey(index))
+                    ? widget.children[index]
+                    : const SizedBox.shrink(),
+              ),
             ),
           ),
         ),
     ],
+  );
+}
+
+/// Keeps the keyboard inset from hidden tabs, so their scaffolds do not
+/// relayout on every keyboard frame while they are not painted.
+class _TabInsets extends StatelessWidget {
+  const _TabInsets({required this.hidden, required this.child});
+
+  final bool hidden;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => MediaQuery(
+    data: MediaQuery.of(context).removeViewInsets(removeBottom: hidden),
+    child: child,
   );
 }

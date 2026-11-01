@@ -154,6 +154,57 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('hidden tabs ignore keyboard frames until shown', (tester) async {
+    final initialized = <String, int>{};
+    final insets = <String, List<double>>{};
+    final selected = ValueNotifier(1);
+    final keyboard = ValueNotifier(0.0);
+    addTearDown(selected.dispose);
+    addTearDown(keyboard.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        builder: (context, child) => ValueListenableBuilder<double>(
+          valueListenable: keyboard,
+          builder: (context, bottom, _) => MediaQuery(
+            data: MediaQuery.of(
+              context,
+            ).copyWith(viewInsets: EdgeInsets.only(bottom: bottom)),
+            child: child!,
+          ),
+        ),
+        home: ValueListenableBuilder<int>(
+          valueListenable: selected,
+          builder: (context, index, _) => LazyTabView(
+            index: index,
+            children: [
+              for (final name in ['home', 'search'])
+                _Tab(
+                  key: ValueKey(name),
+                  name: name,
+                  initialized: initialized,
+                  insets: insets,
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+    selected.value = 0;
+    await tester.pump();
+    insets.clear();
+    for (final bottom in [100.0, 200.0, 300.0]) {
+      keyboard.value = bottom;
+      await tester.pump();
+    }
+    expect(insets, {
+      'home': [100.0, 200.0, 300.0],
+    });
+    selected.value = 1;
+    await tester.pump();
+    expect(insets['search'], [300.0]);
+    expect(initialized, {'home': 1, 'search': 1});
+  });
 }
 
 class _Tab extends StatefulWidget {
@@ -163,12 +214,16 @@ class _Tab extends StatefulWidget {
     required this.initialized,
     this.focusNode,
     this.ticks,
+    this.insets,
   });
 
   final String name;
   final Map<String, int> initialized;
   final FocusNode? focusNode;
   final Map<String, int>? ticks;
+
+  /// Keyboard insets this tab's content was built with.
+  final Map<String, List<double>>? insets;
 
   @override
   State<_Tab> createState() => _TabState();
@@ -207,7 +262,13 @@ class _TabState extends State<_Tab> with SingleTickerProviderStateMixin {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    body: TextField(controller: _text, focusNode: widget.focusNode),
+  Widget build(BuildContext context) => Builder(
+    builder: (context) {
+      final bottom = MediaQuery.viewInsetsOf(context).bottom;
+      widget.insets?.putIfAbsent(widget.name, () => []).add(bottom);
+      return Scaffold(
+        body: TextField(controller: _text, focusNode: widget.focusNode),
+      );
+    },
   );
 }

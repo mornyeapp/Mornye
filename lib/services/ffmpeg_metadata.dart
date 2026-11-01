@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
-import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:mornye/services/audio_metadata_mapper.dart';
 import 'package:mornye/services/ffmpeg_models.dart';
@@ -16,6 +16,7 @@ final _log = AppLogger('FFmpeg');
 
 /// Container-specific metadata and artwork operations, independent of encoding.
 abstract final class FFmpegMetadata {
+  @visibleForTesting
   static List<String> buildCoverResizeArguments({
     required String inputPath,
     required String outputPath,
@@ -267,37 +268,34 @@ abstract final class FFmpegMetadata {
     Map<String, String>? metadata,
     String artistTagMode = artistTagModeJoined,
     bool preserveMetadata = false,
-    Future<FFmpegResult> Function(List<String>)? execute,
+    @visibleForTesting Future<FFmpegResult> Function(List<String>)? execute,
   }) async {
     final tempOutput = await FFmpegOutput.tempPath('.opus');
-    // Opus tags are on the audio stream. Copy to output globals, override the
-    // selected values and let the muxer write globals into the output stream.
-    final arguments = <String>[
-      '-v',
-      'error',
-      '-hide_banner',
-      '-i',
-      opusPath,
-      '-map',
-      '0:a',
-      '-map_metadata',
-      preserveMetadata ? '0:s:a:0' : '-1',
-      '-map_metadata:s:a',
-      '-1',
-      '-c:a',
-      'copy',
-    ];
-    if (metadata != null) {
-      AudioMetadataMapper.appendVorbisMetadataArguments(
-        arguments,
-        metadata,
-        artistTagMode: artistTagMode,
-      );
-    }
-    if (coverPath != null) {
-      try {
+    try {
+      final arguments = <String>['-v', 'error', '-hide_banner', '-i', opusPath];
+      // Opus tags are on the audio stream. Copy to output globals, override the
+      // selected values and let the muxer write globals into the output stream.
+      arguments.addAll([
+        '-map',
+        '0:a',
+        '-map_metadata',
+        preserveMetadata ? '0:s:a:0' : '-1',
+        '-map_metadata:s:a',
+        '-1',
+        '-c:a',
+        'copy',
+      ]);
+      if (metadata != null) {
+        AudioMetadataMapper.appendVorbisMetadataArguments(
+          arguments,
+          metadata,
+          artistTagMode: artistTagMode,
+        );
+      }
+      if (coverPath != null) {
         final pictureBlock = await _createMetadataBlockPicture(coverPath);
         if (pictureBlock != null) {
+          // The shared executor moves large tag values to a metadata file.
           arguments.addAll([
             '-metadata',
             'METADATA_BLOCK_PICTURE=$pictureBlock',
@@ -308,18 +306,18 @@ abstract final class FFmpegMetadata {
         } else {
           _log.w('Failed to create METADATA_BLOCK_PICTURE, skipping cover');
         }
-      } catch (e) {
-        _log.e('Error creating METADATA_BLOCK_PICTURE: $e');
       }
+      arguments.addAll([tempOutput, '-y']);
+      _log.d('Executing FFmpeg Opus embed command');
+      return await _finish(
+        await FFmpegExecution.arguments(arguments, execute: execute),
+        tempOutput,
+        opusPath,
+        'Opus',
+      );
+    } finally {
+      await FFmpegOutput.cleanup(tempOutput);
     }
-    arguments.addAll([tempOutput, '-y']);
-    _log.d('Executing FFmpeg Opus embed command');
-    return _finish(
-      await (execute ?? FFmpegExecution.arguments)(arguments),
-      tempOutput,
-      opusPath,
-      'Opus',
-    );
   }
 
   static Future<String?> embedMetadataToM4a({
@@ -328,7 +326,7 @@ abstract final class FFmpegMetadata {
     Map<String, String>? metadata,
     String artistTagMode = artistTagModeJoined,
     bool preserveMetadata = true,
-    Future<FFmpegResult> Function(List<String>)? execute,
+    @visibleForTesting Future<FFmpegResult> Function(List<String>)? execute,
   }) async {
     if (metadata != null) {
       metadata = applyArtistTagModeToMetadata(metadata, artistTagMode);
@@ -369,7 +367,8 @@ abstract final class FFmpegMetadata {
     }
 
     _log.d('Executing FFmpeg M4A embed command');
-    final run = execute ?? FFmpegExecution.arguments;
+    Future<FFmpegResult> run(List<String> arguments) =>
+        FFmpegExecution.arguments(arguments, execute: execute);
     var result = await run(buildArgs(false));
     // MOV supports some codecs MP4 rejects (for example AC-4). Other
     // failures must retain their original error instead of trying MOV,

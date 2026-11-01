@@ -5,6 +5,9 @@ import 'package:mornye/utils/audio_format_utils.dart';
 const libraryAudioMetadataScanVersion = 4;
 const libraryLyricsMetadataScanVersion = 3;
 
+/// The path columns of one visible Library row.
+typedef LibraryFilePathRow = ({String id, String sourceId, String filePath});
+
 int libraryIncrementalSnapshotModTime({
   required int storedModTime,
   required int storedScanVersion,
@@ -188,8 +191,6 @@ class LocalLibraryItem {
     );
   }
 
-  String get matchKey =>
-      '${sqlite.normalizeLookupText(trackName)}|${sqlite.normalizeLookupText(artistName)}';
   String get albumKey =>
       '${sqlite.normalizeLookupText(albumName)}|${sqlite.normalizeLookupText(albumArtist ?? artistName)}';
 }
@@ -284,7 +285,6 @@ class IsrcDuplicateEntry {
   final String source; // 'downloaded' (history row) or 'local' (library row)
   final String trackName;
   final String artistName;
-  final String albumName;
   final String filePath;
   final int? bitDepth;
   final int? sampleRate;
@@ -296,7 +296,6 @@ class IsrcDuplicateEntry {
     required this.source,
     required this.trackName,
     required this.artistName,
-    required this.albumName,
     required this.filePath,
     this.bitDepth,
     this.sampleRate,

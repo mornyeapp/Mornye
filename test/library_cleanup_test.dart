@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:sqflite/sqflite.dart';
+import 'package:mornye/models/library_database_models.dart';
 import 'package:mornye/services/library_cleanup.dart';
 import 'package:mornye/utils/file_access.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -117,6 +118,7 @@ void main() {
       final deleted = await pruneUnreferencedLibraryCovers(
         directory,
         {'not-transferred'},
+        referenceColumns: const [],
         libraryDatabase: database,
         temporaryDirectory: directory,
         requestId: 'scan-lease',
@@ -147,6 +149,90 @@ void main() {
   );
 
   test(
+    'clearing library covers makes the next scan extract local covers again',
+    () async {
+      final root = await Directory.systemTemp.createTemp('clear-covers-');
+      addTearDown(() => root.delete(recursive: true));
+      // Settings clears the Dart spelling of the folder, while scans store
+      // their own: a canonical alias target (older Android) or backslashes.
+      final canonical = await Directory('${root.path}/data').create();
+      final alias = await Link('${root.path}/user').create(canonical.path);
+      final covers = await Directory('${alias.path}/library_covers').create();
+      final stored = '${canonical.path}/library_covers';
+      await File('${covers.path}/cover_a.jpg').writeAsBytes([1]);
+      await File('${covers.path}/network_cover_b.image').writeAsBytes([2]);
+      final database = await SqliteProcessDatabase.open(
+        path: '${root.path}/local_library.db',
+      );
+      addTearDown(database.close);
+      await database.execute(
+        'CREATE TABLE library (id TEXT PRIMARY KEY, file_path TEXT, '
+        'cover_path TEXT, file_mod_time INTEGER, '
+        'audio_metadata_scan_version INTEGER)',
+      );
+      for (final (id, path, cover, version) in [
+        ('local', '/music/a.flac', '$stored/cover_a.jpg', 4),
+        ('saf', 'content://tree/b.flac', '${covers.path}/cover_b.png', 4),
+        (
+          'windows',
+          r'C:\Music\f.flac',
+          r'\\?\C:\Users\me\AppData\Roaming\mornye\library_covers\cover_f.jpg',
+          4,
+        ),
+        ('network', 'network://nas/b.flac', '$stored/x.image', 4),
+        ('download', '/music/c.flac', '${root.path}/downloads/c.jpg', 4),
+        ('named', '/music/d.flac', null, 0),
+        ('sibling', '/music/e.flac', '${stored}_old/e.jpg', 4),
+      ]) {
+        await database.rawInsert(
+          'INSERT INTO library VALUES (?, ?, ?, 1000, ?)',
+          [id, path, cover, version],
+        );
+      }
+
+      expect(await clearLibraryCoverFiles(covers, database), 3);
+
+      expect(await covers.list().toList(), isEmpty);
+      final rows = await database.rawQuery(
+        'SELECT id, file_mod_time, audio_metadata_scan_version FROM library',
+      );
+      expect(
+        {
+          for (final row in rows)
+            row['id']: libraryIncrementalSnapshotModTime(
+              storedModTime: row['file_mod_time'] as int,
+              storedScanVersion: row['audio_metadata_scan_version'] as int,
+            ),
+        },
+        {
+          'local': -1,
+          'saf': -1,
+          'windows': -1,
+          'network': 1000,
+          'download': 1000,
+          'named': -1,
+          'sibling': 1000,
+        },
+      );
+      // Lyrics filters treat a marked song as before.
+      expect(
+        rows.where(
+          (row) =>
+              (row['audio_metadata_scan_version'] as int) <
+              libraryLyricsMetadataScanVersion,
+        ),
+        [
+          {
+            'id': 'named',
+            'file_mod_time': 1000,
+            'audio_metadata_scan_version': 0,
+          },
+        ],
+      );
+    },
+  );
+
+  test(
     'cover cleanup retains recent payloads awaiting a DB reference',
     () async {
       final directory = await Directory.systemTemp.createTemp('recent-prune-');
@@ -158,6 +244,7 @@ void main() {
         await pruneUnreferencedLibraryCovers(
           directory,
           {},
+          referenceColumns: const [],
           minimumAge: const Duration(minutes: 1),
         ),
         1,
@@ -193,7 +280,7 @@ void main() {
             await canonical.resolveSymbolicLinks(),
             '${alias.path}/legacy.jpg',
             '${alias.path}/already-missing.jpg',
-          });
+          }, referenceColumns: const []);
 
       expect(await canonical.exists(), isTrue);
       expect(await legacy.exists(), isTrue);

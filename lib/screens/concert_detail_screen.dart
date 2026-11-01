@@ -662,45 +662,38 @@ class _ConcertDetailScreenState extends State<ConcertDetailScreen> {
                   ),
                 ),
               ),
-            if (hasSetList) ...[
-              SliverToBoxAdapter(
-                child: SettingsSectionHeader(
-                  title: context.l10n.concertSetList,
-                ),
-              ),
-              SliverToBoxAdapter(
-                child: SettingsGroup(
-                  connected: true,
-                  children: [
-                    ListTile(
-                      leading: ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: SizedBox.square(
-                          dimension: 56,
-                          child: _detail.setListCover == null
-                              ? ColoredBox(
-                                  color: scheme.secondaryContainer,
-                                  child: AppIcon(
-                                    Icons.queue_music,
-                                    color: scheme.onSecondaryContainer,
-                                  ),
-                                )
-                              : CachedCoverImage(
-                                  imageUrl: _detail.setListCover!,
-                                  fit: BoxFit.cover,
+            if (hasSetList)
+              ...settingsSectionSlivers(
+                title: context.l10n.concertSetList,
+                connected: true,
+                children: [
+                  ListTile(
+                    leading: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: SizedBox.square(
+                        dimension: 56,
+                        child: _detail.setListCover == null
+                            ? ColoredBox(
+                                color: scheme.secondaryContainer,
+                                child: AppIcon(
+                                  Icons.queue_music,
+                                  color: scheme.onSecondaryContainer,
                                 ),
-                        ),
+                              )
+                            : CachedCoverImage(
+                                imageUrl: _detail.setListCover!,
+                                fit: BoxFit.cover,
+                              ),
                       ),
-                      title: Text(
-                        _detail.setListName ?? context.l10n.concertSetList,
-                      ),
-                      trailing: const AppIcon(Icons.chevron_right),
-                      onTap: _openSetList,
                     ),
-                  ],
-                ),
+                    title: Text(
+                      _detail.setListName ?? context.l10n.concertSetList,
+                    ),
+                    trailing: const AppIcon(Icons.chevron_right),
+                    onTap: _openSetList,
+                  ),
+                ],
               ),
-            ],
           ],
           const SliverToBoxAdapter(child: SizedBox(height: 24)),
           const NavBarSliverSpacer(),

@@ -39,25 +39,15 @@ class _ListeningStatisticsScreenState
   bool _clearing = false;
 
   Future<void> _clear() async {
-    final confirmed = await showAppDialog<bool>(
-      context: context,
-      builder: (context) => AppAlertDialog(
-        title: Text(context.l10n.listeningStatsClear),
-        content: Text(context.l10n.listeningStatsClearDescription),
-        actions: [
-          AppDialogAction(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text(context.l10n.dialogCancel),
-          ),
-          AppDialogAction(
-            isDestructive: true,
-            onPressed: () => Navigator.pop(context, true),
-            child: Text(context.l10n.listeningStatsClear),
-          ),
-        ],
-      ),
+    final confirmed = await showAppConfirmDialog(
+      context,
+      title: context.l10n.listeningStatsClear,
+      message: context.l10n.listeningStatsClearDescription,
+      confirmLabel: context.l10n.listeningStatsClear,
+      destructive: true,
+      filled: false,
     );
-    if (confirmed != true || !mounted) return;
+    if (!confirmed || !mounted) return;
     setState(() => _clearing = true);
     try {
       await listeningRecorder.clear(ListeningStatisticsStore.instance.clear);

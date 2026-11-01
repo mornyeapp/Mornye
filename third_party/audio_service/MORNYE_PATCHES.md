@@ -17,6 +17,13 @@ from the upstream package are not vendored.
   The app supplies its device compatibility flags in `Application.onCreate`;
   fragment shell arguments arrive too late when attaching this cached engine.
   This also covers engine creation by a background media service.
+- Android: register app channels on the shared engine through
+  `AudioServicePlugin.setFlutterEngineConfigurator`, also set in
+  `Application.onCreate`. `getFlutterEngine` calls it after creating the
+  engine and before running Dart, whichever component creates it. Android
+  Auto can start the service and engine without an Activity, so playback
+  channels registered only by the Activity would be missing. Setting it
+  after the engine exists throws.
 - Android: include custom media actions in MediaStyle notifications on Android
   12 and older. Upstream exposes them only through PlaybackState, which hides
   them on those versions. Keep custom action order and compact indices aligned.
@@ -50,12 +57,54 @@ from the upstream package are not vendored.
   service is no longer attached" when the service changed or the interface
   was destroyed; `destroy()` also clears the method handler and shuts the
   executor down.
+- Android: close the `ParcelFileDescriptor` used for content artwork after
+  decoding, including failure paths. The service listener stays attached while
+  an Activity retains its Flutter engine across service recreation; engine
+  detachment clears the listener with its handler interface.
+- Android: map queue item artwork through
+  `AudioServicePlugin.setQueueArtResolver`, set in `Application.onCreate`.
+  Android Auto's queue view loads each queue item's icon URI in its own
+  process, so an app-private `file://` cover shows nothing there; the app
+  maps covers in its cover folders to its read-only cover provider's
+  `content://` URI (the same URI the item's browse entry has). `raw2queue`
+  applies it to the `QueueItem` description only: the item's
+  `MediaMetadataCompat`, the metadata cache, the playing item, the
+  notification and the lock screen keep the original artwork. A null
+  answer, a resolver that throws, or no resolver keeps the description as
+  it was.
+- Android: bound the decoded notification art. Upstream keeps every decoded
+  cover in an `LruCache` of one eighth of the Java heap (16 to 64 MB) that
+  only `onDestroy` empties. `AudioService` now keeps the current cover and
+  the two before it in `RecentArtCache` (new, covered by
+  `RecentArtCacheTest.java` under `android/src/test`), and `onTrimMemory` at
+  `TRIM_MEMORY_RUNNING_LOW` or above (on Android 14 and later the only levels
+  sent are `TRIM_MEMORY_UI_HIDDEN` and `TRIM_MEMORY_BACKGROUND`) drops all
+  but the entry holding the current `artBitmap`. Eviction never recycles: the
+  notification and session keep what they show, and a replay of an evicted
+  cover decodes it again on the media worker. `loadArtBitmap` also scales each
+  decoded cover down to `MediaArtwork.MAX_DIMENSION` (512 px) with
+  `MediaArtwork.bound`, the same `createScaledBitmap` call `MediaArtwork.copy`
+  makes, and recycles the decoded bitmap. The session's 512 px copies keep
+  their pixels; the notification's 256 px large icon is now scaled from the
+  512 px bitmap instead of from up to 1023 px (owner-approved). The app's
+  instrumented `MediaControlMetadataTest` covers the 512 px bound.
+- Darwin: `setMediaItem` reuses the last `MPMediaItemArtwork` while its
+  `artCacheFile` has the same path, device, inode, size and modification time
+  (`artworkForFile:`), instead of reading the file into a new image and
+  artwork for each media item (two to four per song). `updateNowPlayingField`
+  treats `NSNull` and a missing field as equal: upstream counted an item
+  without an album or `isLive` (the app sends neither) as changed on every
+  call, so each call reassigned `nowPlayingInfo`. A media item that changes
+  nothing now leaves `MPNowPlayingInfoCenter` alone, and the system keeps
+  advancing the elapsed time it last got. `stopService` empties the retained
+  `nowPlayingInfo` fields together with the center's, so the next update
+  sends every field again.
 - Android build (`android/build.gradle.kts`): AGP 9.0.1 to 9.4.1, compileSdk
   35 to 37, `androidx.media:media` 1.7.0 to 1.8.0, `androidx.core:core`
   1.13.1 to 1.19.1, a `junit:junit:4.13.2` test dependency, and
   `-Xlint:deprecation` dropped (androidx.media 1.8 deprecates the whole compat
   media-session API this plugin uses). The Gradle wrapper moves from 8.7 to
-  9.8.1. These follow the app's Android toolchain.
+  9.8.2. These follow the app's Android toolchain.
 - iOS: allow the active music handler to re-publish retained Now Playing
   metadata after restoring its audio session on app lifecycle/video changes.
   Refresh keeps artwork and extrapolates elapsed time without restarting audio;
@@ -63,6 +112,20 @@ from the upstream package are not vendored.
   `lib/audio_service.dart` adds `AudioService.refreshNowPlayingInfo()`, which
   calls the new `refreshNowPlayingInfo` method in AudioServicePlugin.m;
   `lib/services/music_player_service.dart` in the app calls it.
+- Dart: `_observeQueue` in `lib/audio_service.dart` sends the queue to the
+  platform only on Android, the only plugin that reads it. The darwin plugin
+  answers `setQueue` with `@{}` and drops it, the web plugin's `setQueue` is
+  a no-op, and the app's desktop sessions (SMTC, MPRIS) inherit the no-op of
+  `NoOpAudioService`, yet each queue change mapped and encoded every item
+  (about 10 MB for 20,000 songs). `preloadArtwork` still runs on every
+  platform. On Android an idle change is sent at once; while a `setQueue` is
+  in flight, later changes keep only the newest queue, which is sent as soon
+  as the in-flight call completes or fails, so the native queue always ends
+  on the latest change and keeps its place among `setMediaItem` and
+  `setState` calls. The payload and the full queue are unchanged. The app's
+  `test/audio_service_queue_platform_test.dart` covers it. On upgrade, check
+  whether upstream now reads the queue on another platform (then widen the
+  check) or coalesces queue sends itself.
 
 Android 13+ still chooses the positions and built-in transport icons in System
 UI. We preserve real play/pause/previous/next semantics for headsets, lock screen
@@ -75,9 +138,12 @@ Compared against the pub.dev 0.18.19 package in the local pub cache:
 - `android/build.gradle.kts`, `android/gradle/wrapper/gradle-wrapper.properties`
 - `android/src/main/java/com/ryanheise/audioservice/AudioService.java`
 - `android/src/main/java/com/ryanheise/audioservice/AudioServicePlugin.java`
+- `android/src/main/java/com/ryanheise/audioservice/MediaArtwork.java` (new)
 - `android/src/main/java/com/ryanheise/audioservice/MediaButtonReceiver.java`
 - `android/src/main/java/com/ryanheise/audioservice/PinnedMetadataCache.java` (new)
+- `android/src/main/java/com/ryanheise/audioservice/RecentArtCache.java` (new)
 - `android/src/test/java/com/ryanheise/audioservice/PinnedMetadataCacheTest.java` (new)
+- `android/src/test/java/com/ryanheise/audioservice/RecentArtCacheTest.java` (new)
 - `darwin/audio_service/Sources/audio_service/AudioServicePlugin.m`
 - `lib/audio_service.dart`
 
@@ -88,9 +154,10 @@ Compared against the pub.dev 0.18.19 package in the local pub cache:
 2. Record the local patch:
    `diff -ru ~/.pub-cache/hosted/pub.dev/audio_service-0.18.19 third_party/audio_service`.
 3. Replace the runtime sources with the new upstream files, then re-apply
-   each patch above by hand. Check first whether upstream now shows custom
-   actions on Android 12 and older, bounds its metadata cache, or reuses its
-   media executor.
+   each patch above by hand. Check first whether upstream now configures
+   engines it creates, shows custom
+   actions on Android 12 and older, bounds its metadata cache or art cache,
+   reuses its media executor, or compares Now Playing fields with `NSNull`.
 4. Keep the Gradle values in step with the app's `android/app/build.gradle.kts`.
 5. Test notification controls on Android 12 or older and on Android 13+,
    Android Auto browsing, and iOS lock screen controls after a video plays.

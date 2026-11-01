@@ -10,6 +10,7 @@ import 'package:mornye/utils/logger.dart';
 
 class _Preferences implements SharedPreferences {
   final writes = <Map<String, dynamic>>[];
+  final lists = <String, List<String>>{};
   final _started = <int, Completer<void>>{};
   final _released = <int, Completer<bool>>{};
 
@@ -17,6 +18,15 @@ class _Preferences implements SharedPreferences {
       (_started[index] ??= Completer<void>()).future;
 
   Completer<bool> release(int index) => _released[index] ??= Completer<bool>();
+
+  @override
+  List<String>? getStringList(String key) => lists[key];
+
+  @override
+  Future<bool> setStringList(String key, List<String> value) async {
+    lists[key] = List.of(value);
+    return true;
+  }
 
   @override
   Future<bool> setString(String key, String value) {
@@ -46,6 +56,33 @@ class _Settings extends SettingsNotifier {
 }
 
 void main() {
+  test(
+    'changing the app folder durably remembers the old root for moved files',
+    () async {
+      SharedPreferences.setMockInitialValues({});
+      final preferences = await SharedPreferences.getInstance();
+      final container = ProviderContainer(
+        overrides: [
+          settingsProvider.overrideWith(
+            () => _Settings.withLoader(() async => preferences),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+      final notifier = container.read(settingsProvider.notifier);
+      await notifier.useAppFolderStorage('/storage/emulated/0/xxx');
+      await notifier.useAppFolderStorage('/storage/emulated/0/yyy');
+      expect(preferences.getStringList('download_previous_directories_v1'), [
+        '/storage/emulated/0/xxx',
+      ]);
+      expect(
+        (jsonDecode(preferences.getString('app_settings')!)
+            as Map)['downloadDirectory'],
+        '/storage/emulated/0/yyy',
+      );
+    },
+  );
+
   test(
     'setup completes only after folder and completion flag are durable',
     () async {

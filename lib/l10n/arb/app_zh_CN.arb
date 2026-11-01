@@ -280,10 +280,6 @@
   "@homeEmptySubtitle": {
     "description": "Subtitle shown on home when no providers are available yet"
   },
-  "homeSupports": "支持：歌曲、专辑、播放列表、艺人网址",
-  "@homeSupports": {
-    "description": "Info text about supported URL types"
-  },
   "homeRecent": "最近",
   "@homeRecent": {
     "description": "Section header for recent searches"

@@ -10,7 +10,10 @@ import 'package:mornye/widgets/desktop/track_table.dart';
 /// Wraps a child in a staggered fade-in + slide-up animation.
 ///
 /// [index] controls the stagger delay (each item delayed by [staggerDelay]).
-/// Set [animate] to false to skip the animation (e.g. when scrolling back).
+/// Set [animate] to false to skip the animation. Only the list's first
+/// reveal animates: a lazy list builds rows again as they scroll into view,
+/// and those appear at once, so no row replays it or animates while others
+/// do not.
 class StaggeredListItem extends StatelessWidget {
   static const int _maxAnimatedItems = 10;
 
@@ -31,7 +34,13 @@ class StaggeredListItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final position = Scrollable.maybeOf(context)?.position;
+    final scrolled =
+        position != null &&
+        position.hasContentDimensions &&
+        position.pixels > position.minScrollExtent;
     if (!animate ||
+        scrolled ||
         index >= _maxAnimatedItems ||
         MediaQuery.disableAnimationsOf(context)) {
       return child;
@@ -1123,21 +1132,80 @@ class _MornyeTrackSkeleton extends StatelessWidget {
   }
 }
 
+/// The loaded search layout a [HomeSearchSkeleton] stands in for.
+enum HomeSearchSkeletonLayout {
+  /// Phone rows: an Artists section of avatars, then Albums.
+  rows,
+
+  /// A wide song, album or playlist filter: a grid of covers.
+  coverGrid,
+
+  /// A wide artist filter: a grid of avatars.
+  artistGrid,
+
+  /// The wide All view: a song shelf, then an artist and an album shelf.
+  overview,
+}
+
 /// Home search skeleton – mimics the sectioned results (an Artists section of
 /// round avatars, then an Albums section of covers). The real filter chips
-/// stay visible above it, so it draws none of its own.
+/// stay visible above it, so it draws none of its own. Wide layouts mirror
+/// their cover grids and shelves instead.
 class HomeSearchSkeleton extends StatelessWidget {
-  const HomeSearchSkeleton({super.key});
+  const HomeSearchSkeleton({
+    super.key,
+    this.layout = HomeSearchSkeletonLayout.rows,
+  });
+
+  final HomeSearchSkeletonLayout layout;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _sectionSkeleton(context, 70, 2, round: true),
-        const SizedBox(height: 8),
-        _sectionSkeleton(context, 65, 4, round: false),
-      ],
+      children: switch (layout) {
+        HomeSearchSkeletonLayout.rows => [
+          _sectionSkeleton(context, 70, 2, round: true),
+          const SizedBox(height: 8),
+          _sectionSkeleton(context, 65, 4, round: false),
+        ],
+        HomeSearchSkeletonLayout.coverGrid => [
+          _headerSkeleton(context, 65),
+          _CoverGridSkeleton(round: false),
+        ],
+        HomeSearchSkeletonLayout.artistGrid => [
+          _headerSkeleton(context, 70),
+          _CoverGridSkeleton(round: true),
+        ],
+        HomeSearchSkeletonLayout.overview => [
+          _headerSkeleton(context, 60),
+          const _CoverShelfSkeleton(round: false),
+          _headerSkeleton(context, 70),
+          const _CoverShelfSkeleton(round: true),
+          _headerSkeleton(context, 65),
+          const _CoverShelfSkeleton(round: false),
+        ],
+      },
+    );
+  }
+
+  /// A section title and its trailing action, inset like the loaded header.
+  static Widget _headerSkeleton(BuildContext context, double width) {
+    return Padding(
+      padding:
+          (context.isMornye
+                  ? const EdgeInsetsDirectional.fromSTEB(20, 16, 12, 10)
+                  : const EdgeInsetsDirectional.fromSTEB(16, 8, 8, 8))
+              .add(EdgeInsets.symmetric(horizontal: wideListInset(context))),
+      child: ShimmerLoading(
+        child: Row(
+          children: [
+            SkeletonBox(width: width, height: 16, borderRadius: 4),
+            const Spacer(),
+            const SkeletonBox(width: 50, height: 14, borderRadius: 4),
+          ],
+        ),
+      ),
     );
   }
 
@@ -1194,22 +1262,7 @@ class HomeSearchSkeleton extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding:
-              (mornye
-                      ? const EdgeInsetsDirectional.fromSTEB(20, 16, 12, 10)
-                      : const EdgeInsetsDirectional.fromSTEB(16, 8, 8, 8))
-                  .add(EdgeInsets.symmetric(horizontal: inset)),
-          child: ShimmerLoading(
-            child: Row(
-              children: [
-                SkeletonBox(width: headerWidth, height: 16, borderRadius: 4),
-                const Spacer(),
-                const SkeletonBox(width: 50, height: 14, borderRadius: 4),
-              ],
-            ),
-          ),
-        ),
+        _headerSkeleton(context, headerWidth),
         if (mornye)
           Container(
             margin: EdgeInsets.symmetric(horizontal: 16 + inset),
@@ -1259,6 +1312,131 @@ class HomeSearchSkeleton extends StatelessWidget {
   }
 }
 
+/// One search result cover with its title and subtitle lines.
+class _CoverCellSkeleton extends StatelessWidget {
+  const _CoverCellSkeleton({
+    required this.extent,
+    required this.round,
+    required this.index,
+  });
+
+  final double extent;
+  final bool round;
+  final int index;
+
+  @override
+  Widget build(BuildContext context) {
+    final scaler = MediaQuery.textScalerOf(context);
+    return Column(
+      crossAxisAlignment: round
+          ? CrossAxisAlignment.center
+          : CrossAxisAlignment.start,
+      children: [
+        SkeletonBox(
+          width: extent,
+          height: extent,
+          borderRadius: round ? extent / 2 : (context.isMornye ? 8 : 12),
+        ),
+        const SizedBox(height: 8),
+        SkeletonBox(
+          width: extent * (0.6 + (index % 3) * 0.1),
+          height: scaler.scale(14),
+          borderRadius: 4,
+        ),
+        const SizedBox(height: 4),
+        SkeletonBox(
+          width: extent * 0.4,
+          height: scaler.scale(12),
+          borderRadius: 4,
+        ),
+      ],
+    );
+  }
+}
+
+/// Two rows of the search result cover grid, with its columns.
+class _CoverGridSkeleton extends StatelessWidget {
+  const _CoverGridSkeleton({required this.round});
+
+  final bool round;
+
+  @override
+  Widget build(BuildContext context) {
+    final edge = searchCoverEdge(context);
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: edge),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final columns = searchCoverGridColumns(constraints.maxWidth);
+          final extent = searchCoverGridExtent(constraints.maxWidth);
+          final height = extent + searchCoverTextHeight(context);
+          return ExcludeSemantics(
+            child: ShimmerLoading(
+              child: Column(
+                children: [
+                  for (var row = 0; row < 2; row++)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: searchCoverGap),
+                      child: SizedBox(
+                        height: height,
+                        child: Row(
+                          spacing: searchCoverGap,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            for (var column = 0; column < columns; column++)
+                              _CoverCellSkeleton(
+                                extent: extent,
+                                round: round,
+                                index: row * columns + column,
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// A search result shelf of covers.
+class _CoverShelfSkeleton extends StatelessWidget {
+  const _CoverShelfSkeleton({required this.round});
+
+  final bool round;
+
+  @override
+  Widget build(BuildContext context) {
+    final edge = searchCoverEdge(context);
+    return SizedBox(
+      height: searchCoverShelfExtent + searchCoverTextHeight(context) + 8,
+      child: ExcludeSemantics(
+        child: ShimmerLoading(
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            physics: const NeverScrollableScrollPhysics(),
+            padding: EdgeInsets.symmetric(horizontal: edge),
+            itemCount: 8,
+            separatorBuilder: (_, _) => const SizedBox(width: searchCoverGap),
+            itemBuilder: (_, index) => SizedBox(
+              width: searchCoverShelfExtent,
+              child: _CoverCellSkeleton(
+                extent: searchCoverShelfExtent,
+                round: round,
+                index: index,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// Crossfades when the child's runtime type changes — used to swap a loading
 /// skeleton for the loaded screen without a single-frame hard cut.
 class SkeletonCrossfade extends StatelessWidget {
@@ -1291,10 +1469,9 @@ class SkeletonCrossfade extends StatelessWidget {
   }
 }
 
-/// An animated selection indicator that scales in/out and crossfades the
-/// checked/unchecked state.
+/// An animated selection indicator that crossfades the checked/unchecked
+/// state.
 class AnimatedSelectionCheckbox extends StatelessWidget {
-  final bool visible;
   final bool selected;
   final ColorScheme colorScheme;
   final double size;
@@ -1304,7 +1481,6 @@ class AnimatedSelectionCheckbox extends StatelessWidget {
 
   const AnimatedSelectionCheckbox({
     super.key,
-    required this.visible,
     required this.selected,
     required this.colorScheme,
     this.size = 20,
@@ -1313,48 +1489,39 @@ class AnimatedSelectionCheckbox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scale = AppMotion.spatialFast(
-      context,
-      const AppMotionSpec(Duration(milliseconds: 200), Curves.easeOutBack),
-    );
     final fill = AppMotion.effectsFast(
       context,
       const AppMotionSpec(Duration(milliseconds: 200), Curves.linear),
     );
-    return AnimatedScale(
-      scale: visible ? 1.0 : 0.0,
-      duration: scale.duration,
-      curve: scale.curve,
-      child: AnimatedContainer(
-        duration: fill.duration,
-        curve: fill.curve,
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          color: selected
-              ? colorScheme.primary
-              : unselectedColor ?? Colors.transparent,
-          shape: BoxShape.circle,
-          border: Border.all(
-            color: selected ? colorScheme.primary : colorScheme.outline,
-            width: 2,
-          ),
+    return AnimatedContainer(
+      duration: fill.duration,
+      curve: fill.curve,
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: selected
+            ? colorScheme.primary
+            : unselectedColor ?? Colors.transparent,
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: selected ? colorScheme.primary : colorScheme.outline,
+          width: 2,
         ),
-        child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 150),
-          child: selected
-              ? Icon(
-                  Icons.check,
-                  key: const ValueKey('checked'),
-                  size: size - 6,
-                  color: colorScheme.onPrimary,
-                )
-              : SizedBox(
-                  key: const ValueKey('unchecked'),
-                  width: size - 6,
-                  height: size - 6,
-                ),
-        ),
+      ),
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 150),
+        child: selected
+            ? Icon(
+                Icons.check,
+                key: const ValueKey('checked'),
+                size: size - 6,
+                color: colorScheme.onPrimary,
+              )
+            : SizedBox(
+                key: const ValueKey('unchecked'),
+                width: size - 6,
+                height: size - 6,
+              ),
       ),
     );
   }

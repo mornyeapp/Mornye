@@ -331,6 +331,78 @@ void main() {
     );
   }
 
+  for (final liquid in [false, true]) {
+    testWidgets('Mornye mini player rests title and artist after two passes '
+        '(liquid: $liquid)', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            currentMediaItemProvider.overrideWithBuild(
+              (ref, notifier) => Stream.value(
+                const MediaItem(
+                  id: 'long-track',
+                  title: longTitle,
+                  artist: 'First artist, second artist and another artist',
+                ),
+              ),
+            ),
+            playbackStateProvider.overrideWith((ref) => const Stream.empty()),
+            deviceSupportsLiquidGlassProvider.overrideWithValue(liquid),
+            lowEndDeviceProvider.overrideWithValue(false),
+            backdropBlurEnabledProvider.overrideWithValue(false),
+          ],
+          child: MaterialApp(
+            theme: MornyeTheme.build(Brightness.dark),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: const Scaffold(
+              body: Center(child: SizedBox(width: 320, child: MiniPlayer())),
+            ),
+          ),
+        ),
+      );
+      for (var i = 0; i < 4; i++) {
+        await tester.pump();
+      }
+      final scrolls = tester
+          .widgetList<SingleChildScrollView>(
+            find.descendant(
+              of: find.byType(MiniPlayer),
+              matching: find.byType(SingleChildScrollView),
+            ),
+          )
+          .map((view) => view.controller!)
+          .toList();
+      expect(scrolls, hasLength(2));
+      // The first pass still starts after the pause at the usual speed.
+      await tester.pump(const Duration(seconds: 3));
+      await tester.pump(const Duration(seconds: 1));
+      for (final scroll in scrolls) {
+        expect(scroll.offset, closeTo(28, 1));
+      }
+      final passes = [0, 0];
+      final moving = [true, true];
+      for (var i = 0; i < 600; i++) {
+        await tester.pump(const Duration(milliseconds: 250));
+        for (var j = 0; j < scrolls.length; j++) {
+          if (scrolls[j].offset > 0) {
+            moving[j] = true;
+          } else if (moving[j]) {
+            moving[j] = false;
+            passes[j]++;
+          }
+        }
+      }
+      expect(passes, [2, 2]);
+      for (final scroll in scrolls) {
+        expect(scroll.offset, 0);
+      }
+      expect(tester.binding.transientCallbackCount, 0);
+      expect(tester.binding.hasScheduledFrame, isFalse);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
+
   for (final mornye in [false, true]) {
     for (final compact in [false, true]) {
       testWidgets(

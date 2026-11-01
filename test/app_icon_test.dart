@@ -33,7 +33,7 @@ void main() {
     ));
     expect(materialSymbolFor(Icons.delete_outline)?.filled, isFalse);
     expect(materialSymbolFor(Icons.home_outlined)?.filled, isFalse);
-    expect(materialSymbolFor(Icons.home_rounded)?.filled, isTrue);
+    expect(materialSymbolFor(Icons.album_rounded)?.filled, isTrue);
     expect(materialSymbolFor(Icons.warning_amber_rounded)?.filled, isFalse);
   });
 

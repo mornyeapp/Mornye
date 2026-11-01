@@ -107,9 +107,9 @@ void main() {
       expect(cached, isNotNull);
       expect(await cached!.file.readAsBytes(), cover);
     }
-    final repository = original.config.repo as JsonCacheInfoRepository;
+    await CoverCacheManager.flush();
     final rows =
-        jsonDecode(await File(repository.path!).readAsString())
+        jsonDecode(await File('${directory.path}/null.json').readAsString())
             as List<dynamic>;
     expect(rows.map((row) => (row as Map<String, dynamic>)['key']).toSet(), {
       pendingUrl,

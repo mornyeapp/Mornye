@@ -1,12 +1,7 @@
-// Host-only native library injection into the SMB worker isolates.
-// ignore_for_file: invalid_use_of_internal_member
-
 import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
-// ignore: implementation_imports
-import 'package:dart_smb2/src/ffi/native_lib.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/services/network_smb_client.dart';
 
@@ -14,7 +9,6 @@ void main() {
   test(
     'native negotiation offers SMB3 and never sends an SMB1 negotiate',
     () async {
-      debugLibSmb2PathOverride = Platform.environment['TEST_SMB_LIBRARY'];
       final server = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
       final received = Completer<List<int>>();
       final subscription = server.listen((socket) {
@@ -50,11 +44,9 @@ void main() {
         expect(dialects, containsAll([0x0202, 0x0210, 0x0300, 0x0302, 0x0311]));
         await failure;
       } finally {
-        debugLibSmb2PathOverride = null;
         await subscription.cancel();
         await server.close();
       }
     },
-    skip: Platform.environment['TEST_SMB_LIBRARY'] == null,
   );
 }

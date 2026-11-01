@@ -1,13 +1,15 @@
-import 'dart:io';
-
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:path/path.dart' as p;
 import 'package:mornye/services/cover_cache_manager.dart';
 import 'package:mornye/widgets/app_icon.dart';
+import 'package:mornye/widgets/cached_cover_image.dart';
 
 class PlayerArtwork extends StatelessWidget {
-  /// An HTTP(S) URL, file URI, or absolute local artwork path.
+  /// Shared decode for the mini player and the full player's blurred cover.
+  static const miniCacheWidth = 132;
+
+  /// An HTTP(S) URL, file URI, absolute local artwork path, or `network://`
+  /// cover reference.
   final String? artUri;
   final ColorScheme colorScheme;
   final int? cacheWidth;
@@ -39,11 +41,9 @@ class PlayerArtwork extends StatelessWidget {
     );
 
     final uri = artUri;
-    if (uri == null || uri.isEmpty) return placeholder;
-
-    if (uri.startsWith('http')) {
+    if (isHttpCoverUrl(uri)) {
       return CachedNetworkImage(
-        imageUrl: uri,
+        imageUrl: uri!,
         fit: BoxFit.cover,
         cacheManager: CoverCacheManager.instance,
         memCacheWidth: cacheWidth,
@@ -54,18 +54,15 @@ class PlayerArtwork extends StatelessWidget {
         errorWidget: (_, _, _) => placeholder,
       );
     }
-    if (uri.startsWith('file://') || p.isAbsolute(uri)) {
-      final path = uri.startsWith('file://')
-          ? Uri.parse(uri).toFilePath()
-          : uri;
-      return Image.file(
-        File(path),
-        fit: BoxFit.cover,
-        cacheWidth: cacheWidth,
-        gaplessPlayback: true,
-        errorBuilder: (_, _, _) => placeholder,
-      );
+    final image = coverImageProvider(uri, cacheWidth: cacheWidth);
+    if (image == null) {
+      return pendingCover(uri, placeholder: placeholder, builder: build);
     }
-    return placeholder;
+    return Image(
+      image: image,
+      fit: BoxFit.cover,
+      gaplessPlayback: true,
+      errorBuilder: (_, _, _) => placeholder,
+    );
   }
 }

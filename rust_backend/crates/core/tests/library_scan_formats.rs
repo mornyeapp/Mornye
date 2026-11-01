@@ -1,6 +1,8 @@
 //! Real-world file shapes that Library scans used to drop as unreadable.
 
-use mornye_core::tags::{extract_cover, read_file_metadata, read_library_metadata};
+use mornye_core::tags::{
+    extract_cover, read_file_metadata, read_library_metadata, rewrite_audio_tags,
+};
 use serde_json::Value;
 use std::io::{self, Cursor, Read, Seek, SeekFrom};
 
@@ -209,6 +211,185 @@ fn opus_comments_after_a_large_cover_on_small_pages_are_read() {
     assert_eq!(metadata["duration"], 10);
     let cover = extract_cover(&mut Cursor::new(data), "opus", &|| Ok(())).unwrap();
     assert_eq!(cover.data.len(), 400 * 1024);
+}
+
+#[test]
+fn opus_replaygain_after_many_comments_is_read_by_scan_and_playback() {
+    let mut comments: Vec<_> = (0..120)
+        .map(|index| format!("CUSTOM_CREDIT_{index}=Example credit"))
+        .collect();
+    comments.extend([
+        picture_comment(600 * 1024),
+        "TITLE=Normalized song".into(),
+        "r128_track_gain=-2816".into(),
+        "R128_ALBUM_GAIN=-2304".into(),
+    ]);
+    let data = opus(Some(&comments), 16);
+    let metadata = scan(&data, "Tagged.opus");
+    assert_readable(&metadata);
+    assert_eq!(metadata["replaygain_track_gain"], "-6.00 dB");
+    assert_eq!(metadata["replaygain_album_gain"], "-4.00 dB");
+    assert_eq!(metadata["trackName"], "Normalized song");
+    for hint in ["Tagged.opus", "Tagged.ogg"] {
+        let details = read_file_metadata(
+            &mut Cursor::new(&data),
+            "/proc/self/fd/42",
+            hint,
+            &|| Ok(()),
+        )
+        .unwrap();
+        assert_eq!(details["replaygain_track_gain"], "-6.00 dB");
+        assert_eq!(details["replaygain_album_gain"], "-4.00 dB");
+    }
+    let cover = extract_cover(&mut Cursor::new(&data), "opus", &|| Ok(())).unwrap();
+    assert_eq!(cover.data.len(), 600 * 1024);
+}
+
+#[test]
+fn opus_prefers_r128_over_legacy_gains_in_either_comment_order() {
+    let mut comments = vec![
+        "R128_TRACK_GAIN=-3072".into(),
+        "R128_ALBUM_GAIN=-2048".into(),
+        "REPLAYGAIN_TRACK_GAIN=-1.00 dB".into(),
+        "REPLAYGAIN_ALBUM_GAIN=-2.00 dB".into(),
+    ];
+    for _ in 0..2 {
+        let data = opus(Some(&comments), 255);
+        let details =
+            read_file_metadata(&mut Cursor::new(data), "Tagged.opus", "", &|| Ok(())).unwrap();
+        assert_eq!(details["replaygain_track_gain"], "-7.00 dB");
+        assert_eq!(details["replaygain_album_gain"], "-3.00 dB");
+        comments.reverse();
+    }
+}
+
+#[test]
+fn opus_invalid_r128_does_not_hide_valid_legacy_gain() {
+    for value in ["", "NaN", "32768", "-32769", "-3.0", "-3 dB"] {
+        let data = opus(
+            Some(&[
+                "REPLAYGAIN_TRACK_GAIN=-6.00 dB".into(),
+                format!("R128_TRACK_GAIN={value}"),
+                "r128_album_gain=+00256".into(),
+            ]),
+            255,
+        );
+        let details =
+            read_file_metadata(&mut Cursor::new(data), "Tagged.opus", "", &|| Ok(())).unwrap();
+        assert_eq!(details["replaygain_track_gain"], "-6.00 dB", "{value}");
+        assert_eq!(details["replaygain_album_gain"], "6.00 dB", "{value}");
+    }
+}
+
+#[test]
+fn opus_r128_is_additional_to_the_decoder_header_gain() {
+    let mut data = opus(Some(&["R128_TRACK_GAIN=-2816".into()]), 255);
+    let head = data
+        .windows(8)
+        .position(|bytes| bytes == b"OpusHead")
+        .unwrap();
+    data[head + 16..head + 18].copy_from_slice(&(-1536_i16).to_le_bytes());
+    let details =
+        read_file_metadata(&mut Cursor::new(&data), "Tagged.opus", "", &|| Ok(())).unwrap();
+    // The decoder already applies the -6 dB header gain. Normalization applies
+    // only the additional -6 dB at Mornye's -18 LUFS reference.
+    assert_eq!(details["replaygain_track_gain"], "-6.00 dB");
+    let mut rewritten = Vec::new();
+    rewrite_audio_tags(
+        &mut Cursor::new(&data),
+        &mut rewritten,
+        "opus",
+        &[("title".into(), "Renamed song".into())].into(),
+        None,
+        &|| Ok(()),
+    )
+    .unwrap();
+    assert_eq!(&rewritten[head..head + 19], &data[head..head + 19]);
+}
+
+#[test]
+fn opus_with_high_resolution_artwork_remains_readable() {
+    // Base64 expands an 8 MiB picture past the old 10 MiB packet limit;
+    // a 13 MiB picture also exceeds the old 16 MiB header read window.
+    for size in [8 * 1024 * 1024, 13 * 1024 * 1024] {
+        let data = opus(
+            Some(&[
+                picture_comment(size),
+                "TITLE=Converted song".into(),
+                "ARTIST=Example artist".into(),
+            ]),
+            255,
+        );
+        let metadata = scan(&data, "Converted.opus");
+        assert_readable(&metadata);
+        assert_eq!(metadata["trackName"], "Converted song");
+        assert_eq!(metadata["artistName"], "Example artist");
+        assert_eq!(metadata["duration"], 10);
+        let cover = extract_cover(&mut Cursor::new(&data), "opus", &|| Ok(())).unwrap();
+        assert_eq!(cover.data.len(), size);
+
+        // Automatic download conversion uses the native tag writer. Its
+        // completed output must be readable by the scanner too.
+        let mut rewritten = Vec::new();
+        rewrite_audio_tags(
+            &mut Cursor::new(&data),
+            &mut rewritten,
+            "opus",
+            &[("title".into(), "Retagged song".into())].into(),
+            Some(&cover.data),
+            &|| Ok(()),
+        )
+        .unwrap();
+        let metadata = scan(&rewritten, "Retagged.opus");
+        assert_readable(&metadata);
+        assert_eq!(metadata["trackName"], "Retagged song");
+        assert_eq!(metadata["artistName"], "Example artist");
+        assert_eq!(metadata["duration"], 10);
+        let details = read_file_metadata(
+            &mut Cursor::new(&rewritten),
+            "/proc/self/fd/42",
+            "Retagged.opus",
+            &|| Ok(()),
+        )
+        .unwrap();
+        assert_eq!(details["title"], "Retagged song");
+        assert_eq!(details["audio_codec"], "opus");
+    }
+}
+
+#[test]
+fn manual_opus_cover_replacement_remains_readable() {
+    let source = opus(
+        Some(&["TITLE=Original song".into(), "ARTIST=Example artist".into()]),
+        255,
+    );
+    assert_readable(&scan(&source, "Manual.opus"));
+    let mut cover = vec![0x42; 8 * 1024 * 1024];
+    cover[..2].copy_from_slice(&[0xff, 0xd8]);
+    let mut edited = Vec::new();
+    rewrite_audio_tags(
+        &mut Cursor::new(&source),
+        &mut edited,
+        "ogg",
+        &[("title".into(), "Manually edited song".into())].into(),
+        Some(&cover),
+        &|| Ok(()),
+    )
+    .unwrap();
+    let metadata = scan(&edited, "Manual.opus");
+    assert_readable(&metadata);
+    assert_eq!(metadata["trackName"], "Manually edited song");
+    assert_eq!(metadata["artistName"], "Example artist");
+    let metadata = read_file_metadata(
+        &mut Cursor::new(&edited),
+        "/proc/self/fd/42",
+        "Manual.opus",
+        &|| Ok(()),
+    )
+    .unwrap();
+    assert_eq!(metadata["title"], "Manually edited song");
+    let artwork = extract_cover(&mut Cursor::new(&edited), "opus", &|| Ok(())).unwrap();
+    assert_eq!(artwork.data, cover);
 }
 
 #[test]

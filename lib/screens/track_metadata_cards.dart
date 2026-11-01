@@ -189,7 +189,7 @@ extension _TrackMetadataCards on _TrackMetadataScreenState {
         );
       }
 
-      if (source.startsWith('http://') || source.startsWith('https://')) {
+      if (isHttpCoverUrl(source)) {
         return CachedCoverImage(
           imageUrl: source,
           fit: BoxFit.cover,
@@ -200,9 +200,8 @@ extension _TrackMetadataCards on _TrackMetadataScreenState {
         );
       }
 
-      final filePath = source.startsWith('file://')
-          ? Uri.parse(source).toFilePath()
-          : source;
+      final filePath = coverFilePath(source);
+      if (filePath == null) return Container(color: colorScheme.surface);
       return Image.file(
         File(filePath),
         fit: BoxFit.cover,

@@ -28,6 +28,8 @@ internal object AudioRouteInfo {
         return mapOf(
             "platform" to "android",
             "sdk" to Build.VERSION.SDK_INT,
+            // These are default low-latency PCM properties, not the negotiated
+            // Bluetooth codec rate, bit depth or end-to-end buffer duration.
             "mixerSampleRate" to manager.getProperty(AudioManager.PROPERTY_OUTPUT_SAMPLE_RATE)?.toIntOrNull(),
             "framesPerBuffer" to manager.getProperty(AudioManager.PROPERTY_OUTPUT_FRAMES_PER_BUFFER)?.toIntOrNull(),
             "lowLatency" to features.hasSystemFeature(PackageManager.FEATURE_AUDIO_LOW_LATENCY),

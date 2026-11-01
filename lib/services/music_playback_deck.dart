@@ -11,6 +11,13 @@ import 'package:mornye/services/playback_equalizer.dart';
 
 final _log = AppLogger('AudioOutput');
 
+/// [url] marked for the Darwin audioplayers fork as a file still arriving.
+/// The fork then prepares it without indexing its timing first, which would
+/// read to the end of a file still being written and time out (see
+/// third_party/audioplayers_darwin/MORNYE_PATCHES.md).
+@visibleForTesting
+String darwinArrivingUrl(String url) => '$url#mornye-arriving';
+
 /// Only verified native playback reports active. File metadata alone never does.
 final usbAudioStatus = ValueNotifier<UsbAudioStatus>(const UsbAudioStatus());
 
@@ -80,6 +87,35 @@ final AudioContext _musicAudioContext = AudioContext(
   ),
 );
 
+/// audioplayers' [TimerPositionUpdater], except that a tick [wanted] answers
+/// false for asks the platform nothing. The updates the plugin requests
+/// itself, after a load, seek, pause or stop, always read the position.
+class _PositionTicker extends PositionUpdater {
+  _PositionTicker({
+    required super.getPosition,
+    required this.interval,
+    this.wanted,
+  });
+
+  final Duration interval;
+  final bool Function()? wanted;
+  Timer? _timer;
+
+  @override
+  void start() {
+    _timer?.cancel();
+    _timer = Timer.periodic(interval, (_) async {
+      if (wanted?.call() ?? true) await update();
+    });
+  }
+
+  @override
+  void stop() {
+    _timer?.cancel();
+    _timer = null;
+  }
+}
+
 PlaybackDeckState _deckState(PlayerState state) => switch (state) {
   PlayerState.stopped => PlaybackDeckState.stopped,
   PlayerState.playing => PlaybackDeckState.playing,
@@ -104,6 +140,10 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
            (Platform.isAndroid ||
                Platform.isIOS ||
                (isDesktopPlatform && Platform.isMacOS)),
+       _platformChainsPlayers =
+           Platform.isAndroid ||
+           Platform.isIOS ||
+           (isDesktopPlatform && Platform.isMacOS),
        _nativeAvailable = nativeAvailable ?? Platform.isAndroid {
     playbackEqualizer.addListener(_equalizerChanged);
     playbackOutputVolume.addListener(_outputVolumeChanged);
@@ -132,12 +172,18 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
     ]);
   }
 
+  /// Forces [setNextDeck] support, for tests on any host.
+  @visibleForTesting
+  static bool? debugChainsPlayers;
+
   static const _channel = MethodChannel('com.zarz.mornye/usb_pcm');
   static const _events = EventChannel('com.zarz.mornye/usb_pcm/events');
   static Stream<dynamic>? _nativeEvents;
   static int _nextToken = 0;
   final AudioPlayer _ordinary;
   final bool _equalizerAvailable;
+  final bool _platformChainsPlayers;
+  bool get _chainsPlayers => debugChainsPlayers ?? _platformChainsPlayers;
   bool _equalizerDisposed = false;
   static const _effects = MethodChannel('xyz.luan/audioplayers');
   bool _equalizerSent = false;
@@ -203,10 +249,13 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
   AsyncError? _ordinaryError;
   StreamSubscription<dynamic>? _nativeSubscription;
   StreamSubscription<Duration>? _positionSubscription;
+  Duration _positionInterval = const Duration(milliseconds: 200);
+  bool Function()? _positionWanted;
   Timer? _timer;
   bool _polling = false;
   bool _direct = false;
   bool _preparing = false;
+  Completer<void>? _ordinaryPreparation;
   bool _disposed = false;
   int _token = 0;
   Duration? _duration;
@@ -225,6 +274,11 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
   @override
   Future<void> cancelPreparation() async {
     if (_preparing) await stop();
+    final preparation = _ordinaryPreparation;
+    if (preparation == null) return;
+    _ordinaryPreparation = null;
+    preparation.complete();
+    await _ordinary.release();
   }
 
   @override
@@ -240,9 +294,12 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
   Stream<void> get onPlayerComplete => _completions.stream;
 
   @override
-  void startPositionUpdates(Duration interval) {
-    _ordinary.positionUpdater = TimerPositionUpdater(
+  void startPositionUpdates(Duration interval, {bool Function()? wanted}) {
+    _positionInterval = interval;
+    _positionWanted = wanted;
+    _ordinary.positionUpdater = _PositionTicker(
       interval: interval,
+      wanted: wanted,
       getPosition: getCurrentPosition,
     );
     unawaited(_positionSubscription?.cancel());
@@ -282,12 +339,18 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
   }
 
   @override
-  Future<void> setNetworkSource(String url) async {
+  Future<void> setNetworkSource(String url, {bool arriving = false}) async {
     await stop();
     _source = null;
     _routeLost = false;
     _nativeStarted = false;
-    await _setOrdinarySource(UrlSource(url));
+    await _setOrdinarySource(
+      UrlSource(
+        arriving && (Platform.isMacOS || Platform.isIOS)
+            ? darwinArrivingUrl(url)
+            : url,
+      ),
+    );
   }
 
   @override
@@ -392,7 +455,17 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
     // reuse the previous MediaPlayer or its pending preparation callbacks.
     await _ordinary.release();
     _ordinaryError = null;
-    await _ordinary.setSource(source);
+    final abandoned = _ordinaryPreparation = Completer<void>();
+    try {
+      // A network source waits for its server, up to the plugin's prepare
+      // timeout; a newer song abandons it instead of queueing behind it.
+      await Future.any([_ordinary.setSource(source), abandoned.future]);
+    } finally {
+      if (identical(_ordinaryPreparation, abandoned)) {
+        _ordinaryPreparation = null;
+      }
+    }
+    if (abandoned.isCompleted) return;
     await _syncEqualizer();
   }
 
@@ -485,8 +558,8 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
     _setState(PlaybackDeckState.playing);
     usbAudioStatus.value = _preparedStatus;
     _timer?.cancel();
-    _timer = Timer.periodic(const Duration(milliseconds: 200), (_) async {
-      if (_polling || _disposed) return;
+    _timer = Timer.periodic(_positionInterval, (_) async {
+      if (_polling || _disposed || !(_positionWanted?.call() ?? true)) return;
       _polling = true;
       final token = _token;
       try {
@@ -519,6 +592,29 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
       'position': position.inMilliseconds,
     });
     if (!_disposed && token == _token && _direct) _positions.add(position);
+  }
+
+  @override
+  Future<bool> setNextDeck(PlaybackDeck? next) async {
+    // The forks chain their own players: Android with
+    // MediaPlayer.setNextMediaPlayer, Darwin from the end notification.
+    if (_direct || !_chainsPlayers) return false;
+    final player = next is AudioplayersPlaybackDeck && !next._direct
+        ? next._ordinary
+        : null;
+    if (next != null && player == null) return false;
+    try {
+      await _effects.invokeMethod<void>('setNextPlayer', {
+        'playerId': _ordinary.playerId,
+        'nextPlayerId': ?player?.playerId,
+      });
+      return player != null;
+    } on PlatformException catch (error) {
+      _log.w('Next player link unavailable: $error');
+      return false;
+    } on MissingPluginException {
+      return false;
+    }
   }
 
   @override

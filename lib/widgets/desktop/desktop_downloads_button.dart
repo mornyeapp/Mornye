@@ -20,18 +20,28 @@ List<DownloadItem> activeDesktopDownloads(List<DownloadItem> items) => [
       item,
 ];
 
-/// Overall progress of [active]: waiting items count as not started.
-double desktopDownloadsProgress(List<DownloadItem> active) {
-  if (active.isEmpty) return 0;
+/// How many of [items] are active and their overall progress: waiting items
+/// count as not started. One pass, so a progress sample allocates nothing.
+({int count, double progress}) desktopDownloadsSummary(
+  List<DownloadItem> items,
+) {
+  var count = 0;
   var total = 0.0;
-  for (final item in active) {
-    total += item.status == DownloadStatus.finalizing
+  for (final item in items) {
+    final status = item.status;
+    if (status != DownloadStatus.queued &&
+        status != DownloadStatus.downloading &&
+        status != DownloadStatus.finalizing) {
+      continue;
+    }
+    count++;
+    total += status == DownloadStatus.finalizing
         ? 1
-        : item.status == DownloadStatus.downloading
+        : status == DownloadStatus.downloading
         ? item.progress.clamp(0.0, 1.0)
         : 0;
   }
-  return total / active.length;
+  return (count: count, progress: count == 0 ? 0 : total / count);
 }
 
 /// The desktop toolbar button for downloads: a ring shows overall progress
@@ -55,9 +65,13 @@ class _DesktopDownloadsButtonState
   Widget build(BuildContext context) {
     final mornye = context.isMornye;
     final colorScheme = Theme.of(context).colorScheme;
-    final active = activeDesktopDownloads(
-      ref.watch(downloadQueueProvider.select((state) => state.items)),
+    // Rebuilds only when the count or the ring value changes.
+    final (:count, :progress) = ref.watch(
+      downloadQueueProvider.select(
+        (state) => desktopDownloadsSummary(state.items),
+      ),
     );
+    final idle = count == 0;
     final label = context.l10n.libraryDownloads;
     return MenuAnchor(
       controller: _menu,
@@ -88,7 +102,7 @@ class _DesktopDownloadsButtonState
         ),
       ],
       child: Semantics(
-        value: active.isEmpty ? null : '${active.length}',
+        value: idle ? null : '$count',
         child: AppIconButton(
           key: const ValueKey('desktop-downloads-button'),
           tooltip: label,
@@ -100,23 +114,23 @@ class _DesktopDownloadsButtonState
             child: Stack(
               alignment: Alignment.center,
               children: [
-                if (active.isNotEmpty)
+                if (!idle)
                   Positioned.fill(
                     child: AppProgressIndicator.circular(
                       key: const ValueKey('desktop-downloads-progress'),
                       wavy: false,
-                      value: desktopDownloadsProgress(active),
+                      value: progress,
                       strokeWidth: mornye ? 2 : 2.5,
                       strokeCap: StrokeCap.round,
                     ),
                   ),
                 AppIcon(
                   mornye
-                      ? (active.isEmpty
+                      ? (idle
                             ? CupertinoIcons.arrow_down_circle
                             : CupertinoIcons.arrow_down)
                       : Icons.download_rounded,
-                  size: switch ((mornye, active.isEmpty)) {
+                  size: switch ((mornye, idle)) {
                     (true, true) => 18,
                     (true, false) => 11,
                     (false, true) => 24,

@@ -143,6 +143,56 @@ void main() {
       },
     );
 
+    test(
+      'covers keep network references and drop older loopback ones',
+      () async {
+        const folder = 'network://nas/Album/cover.jpg';
+        const tags = 'network://nas/Else/song.flac#cover';
+        const firstCover = 'network://nas/First/cover.jpg';
+        const loopCover = 'network://nas/Third/song.flac#cover';
+        final rows = [
+          {
+            ..._row('2026-01-02', 'first', minutes: 3),
+            'artwork': 'http://127.0.0.1:41234/7f3a',
+          },
+          {..._row('2026-03-10', 'top', minutes: 90), 'artwork': folder},
+          {
+            ..._row('2026-03-11', 'other', artist: 'Other', album: 'Else'),
+            'artwork': tags,
+          },
+          {
+            ..._row('2026-06-01', 'loop', artist: 'Third', album: '', plays: 9),
+            'artwork': 'http://localhost:8080/cover',
+          },
+          // Played again by this build, which recorded their covers.
+          {..._row('2026-09-01', 'first'), 'artwork': firstCover},
+          {
+            ..._row('2026-09-02', 'loop', artist: 'Third', album: ''),
+            'artwork': loopCover,
+          },
+        ];
+        for (final row in rows) {
+          await db.insert('listening', row);
+        }
+        final rewind = await readListeningRewind(db, _yearRange, yearly: true);
+        expect(rewind.year?.firstPlay?.track.key, 'first');
+        expect(rewind.year?.firstPlay?.day, DateTime(2026, 1, 2));
+        expect(rewind.year?.firstPlay?.track.artwork, firstCover);
+        expect(rewind.replay?.track.key, 'loop');
+        expect(rewind.replay?.day, DateTime(2026, 6, 1));
+        expect(rewind.replay?.track.artwork, loopCover);
+        expect(
+          [for (final album in rewind.topAlbums) album.artwork],
+          [folder, tags],
+        );
+        expect(rewind.summary.artistArtwork, {
+          'Artist': folder,
+          'Other': tags,
+          'Third': loopCover,
+        });
+      },
+    );
+
     test('empty history has no invented yearly highlights', () async {
       final rewind = await readListeningRewind(db, _yearRange, yearly: true);
       expect(rewind.isEmpty, isTrue);
@@ -151,6 +201,70 @@ void main() {
       expect(rewind.year?.firstPlay, isNull);
       expect(rewind.activeDays, 0);
     });
+
+    test(
+      'yearly artist rankings merge collaborations and count distinct days',
+      () async {
+        final rows = [
+          _row('2026-01-02', 'ab', artist: 'Artist A, Artist B', minutes: 3),
+          _row('2026-01-02', 'ac', artist: 'Artist A; Artist C', minutes: 4),
+          _row('2026-01-02', 'b', artist: 'Artist B', minutes: 2),
+          _row('2026-01-03', 'a', artist: 'Artist A', minutes: 1),
+          _row('2026-01-04', 'b', artist: 'Artist B', minutes: 1),
+          _row(
+            '2026-03-01',
+            'cd',
+            artist: 'Artist C feat. Artist D',
+            minutes: 3,
+          ),
+          _row('2026-03-01', 'd', artist: 'Artist D', minutes: 4),
+        ];
+        for (final row in rows) {
+          await db.insert('listening', row);
+        }
+        final rewind = await readListeningRewind(db, _yearRange, yearly: true);
+        expect(rewind.year?.monthlyTopArtists, {1: 'Artist A', 3: 'Artist D'});
+        expect(rewind.year?.loyalArtist, 'Artist A');
+        expect(rewind.year?.loyalArtistDays, 2);
+        expect(rewind.summary.milliseconds, 18 * 60000);
+        expect(rewind.summary.plays, 7);
+        expect(rewind.topArtists.first.key, 'Artist A');
+        expect(rewind.topArtistShare, 44);
+        // Album and song credits still describe the original full credit.
+        expect(rewind.year?.firstPlay?.track.artist, 'Artist A; Artist C');
+      },
+    );
+
+    test(
+      'discoveries use each artist first heard across all credits',
+      () async {
+        final rows = [
+          _row('2026-09-01', 'old-duet', artist: 'Artist A, Artist B'),
+          _row('2026-09-02', 'old-solo', artist: 'Artist C'),
+          _row('2026-10-01', 'solo', artist: 'Artist B', minutes: 2),
+          _row(
+            '2026-10-01',
+            'new-duet',
+            artist: 'Artist C & Artist D',
+            minutes: 3,
+          ),
+          _row('2026-10-02', 'new-solo', artist: 'Artist D', minutes: 1),
+          _row('2026-09-01', 'unplayed', artist: 'Artist D', minutes: 0),
+          _row('2026-10-15', 'future', artist: 'Artist E'),
+        ];
+        for (final row in rows) {
+          await db.insert('listening', row);
+        }
+        final rewind = await readListeningRewind(db, _range);
+        expect(rewind.newArtists, ['Artist D']);
+        expect(rewind.summary.artists, {
+          'Artist B': 2 * 60000,
+          'Artist C': 3 * 60000,
+          'Artist D': 4 * 60000,
+        });
+        expect(rewind.summary.milliseconds, 6 * 60000);
+      },
+    );
   });
 
   test('the Library offers the monthly Rewind one week in four', () {

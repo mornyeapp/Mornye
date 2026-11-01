@@ -276,14 +276,58 @@ class _MiniPlayerLyrics extends ConsumerStatefulWidget {
   ConsumerState<_MiniPlayerLyrics> createState() => _MiniPlayerLyricsState();
 }
 
-class _MiniPlayerLyricsState extends ConsumerState<_MiniPlayerLyrics> {
+class _MiniPlayerLyricsState extends ConsumerState<_MiniPlayerLyrics>
+    with WidgetsBindingObserver {
   Timer? _nextLine;
   final _seekPreview = ValueNotifier<Duration?>(null);
+  bool _tickerEnabled = true;
+
+  bool get _visible =>
+      _tickerEnabled &&
+      switch (WidgetsBinding.instance.lifecycleState) {
+        null || AppLifecycleState.resumed || AppLifecycleState.inactive => true,
+        _ => false,
+      };
 
   PlayerMetadataController get metadata => widget.metadata;
 
+  List<LyricLine>? _shiftedSource;
+  int _shiftedOffsetMs = 0;
+  List<LyricLine> _shifted = const [];
+
+  /// [lines] with the lyrics timing setting applied, kept while neither
+  /// changes so word-timed lines keep their sweep across rebuilds.
+  List<LyricLine> _withOffset(List<LyricLine> lines, int offsetMs) {
+    if (!identical(lines, _shiftedSource) || offsetMs != _shiftedOffsetMs) {
+      _shiftedSource = lines;
+      _shiftedOffsetMs = offsetMs;
+      _shifted = lyricsShiftedBy(lines, Duration(milliseconds: offsetMs));
+    }
+    return _shifted;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _tickerEnabled = TickerMode.valuesOf(context).enabled;
+    if (!_visible) _nextLine?.cancel();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (!_visible) _nextLine?.cancel();
+    if (mounted) setState(() {});
+  }
+
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _nextLine?.cancel();
     _seekPreview.dispose();
     super.dispose();
@@ -293,11 +337,21 @@ class _MiniPlayerLyricsState extends ConsumerState<_MiniPlayerLyrics> {
   /// state changes, so a timer rebuilds the view when the next line starts.
   int _followPlayback(WidgetRef ref, List<LyricLine> lines) {
     _nextLine?.cancel();
-    final state = ref.watch(playbackStateProvider).value;
+    final state =
+        (_visible
+                ? ref.watch(playbackStateProvider)
+                : ref.read(playbackStateProvider))
+            .value;
     final position = state?.position ?? Duration.zero;
     final current = _sungLineAt(lines, position);
     final next = _leadLineAfter(lines, current);
-    if (state != null && state.playing && state.speed > 0 && next >= 0) {
+    if (_visible &&
+        state != null &&
+        state.playing &&
+        state.processingState == AudioProcessingState.ready &&
+        state.speed.isFinite &&
+        state.speed > 0 &&
+        next >= 0) {
       final wait = lines[next].time - position;
       _nextLine = Timer(
         Duration(microseconds: (wait.inMicroseconds / state.speed).ceil()),
@@ -342,7 +396,10 @@ class _MiniPlayerLyricsState extends ConsumerState<_MiniPlayerLyrics> {
       }
       return Consumer(
         builder: (context, ref, _) {
-          final lines = lyrics.lines;
+          final lines = _withOffset(
+            lyrics.lines,
+            ref.watch(themeProvider.select((theme) => theme.lyricsOffsetMs)),
+          );
           final current = _followPlayback(ref, lines);
           final next = _leadLineAfter(lines, current);
           return Padding(
@@ -366,10 +423,7 @@ class _MiniPlayerLyricsState extends ConsumerState<_MiniPlayerLyrics> {
                         WordTimedLyricLine(
                           line: lines[current],
                           initialPosition:
-                              ref
-                                  .watch(playbackStateProvider)
-                                  .value
-                                  ?.position ??
+                              ref.read(playbackStateProvider).value?.position ??
                               Duration.zero,
                           seekPreview: _seekPreview,
                           style: textTheme.titleLarge!.copyWith(

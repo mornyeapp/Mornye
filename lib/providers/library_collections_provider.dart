@@ -1,10 +1,13 @@
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 import 'package:mornye/models/library_collections.dart';
 import 'package:mornye/models/track.dart';
+import 'package:mornye/providers/music_player_provider.dart'
+    show musicPlayerRuntimeProvider;
+import 'package:mornye/services/autoplay_personalization.dart'
+    show AutoplayFeedbackKind, AutoplayLearningTrack;
 import 'package:mornye/services/library_collections_database.dart';
 import 'package:mornye/services/library_collections_hydration.dart';
 import 'package:mornye/services/collection_track_batch.dart';
@@ -207,14 +210,40 @@ class LibraryCollectionsNotifier extends Notifier<LibraryCollectionsState> {
     dbUpsert: _db.upsertWishlistEntry,
   );
 
-  Future<bool> toggleLoved(Track track) => _toggleTrackEntry(
-    track,
-    contains: (key) => state.containsLovedKey(key),
-    select: (state) => state.loved,
-    withList: (list) => state.copyWith(loved: list),
-    dbDelete: _db.deleteLovedEntry,
-    dbUpsert: _db.upsertLovedEntry,
-  );
+  Future<bool> toggleLoved(Track track) async {
+    final loved = await _toggleTrackEntry(
+      track,
+      contains: (key) => state.containsLovedKey(key),
+      select: (state) => state.loved,
+      withList: (list) => state.copyWith(loved: list),
+      dbDelete: _db.deleteLovedEntry,
+      dbUpsert: _db.upsertLovedEntry,
+    );
+    if (loved) _endorse([track], AutoplayFeedbackKind.loved);
+    return loved;
+  }
+
+  /// Tells autoplay learning the listener chose these songs outright. Large
+  /// selections, such as a whole album, organize more than they rate.
+  void _endorse(List<Track> tracks, AutoplayFeedbackKind kind) {
+    if (!ref.mounted || tracks.length > 3) return;
+    final learning = ref.read(musicPlayerRuntimeProvider).personalization;
+    for (final track in tracks) {
+      learning.endorse(
+        AutoplayLearningTrack(
+          source: track.id,
+          title: track.name,
+          artist: track.artistName,
+          album: track.albumName,
+          genre: track.genre ?? '',
+          duration: track.duration > 0
+              ? Duration(seconds: track.duration)
+              : null,
+        ),
+        kind,
+      );
+    }
+  }
 
   /// One selection is one mutation: mixed selections add only missing tracks,
   /// fully loved selections remove them, and observers see one committed state.
@@ -343,26 +372,6 @@ class LibraryCollectionsNotifier extends Notifier<LibraryCollectionsState> {
     dbDelete: _db.deleteFavoriteArtistEntry,
   );
 
-  @visibleForTesting
-  Future<void> removeFromWishlist(String trackKey) => _removeEntry(
-    trackKey,
-    contains: (key) => state.containsWishlistKey(key),
-    select: (state) => state.wishlist,
-    keyOf: (entry) => entry.key,
-    withList: (list) => state.copyWith(wishlist: list),
-    dbDelete: _db.deleteWishlistEntry,
-  );
-
-  @visibleForTesting
-  Future<void> removeFromLoved(String trackKey) => _removeEntry(
-    trackKey,
-    contains: (key) => state.containsLovedKey(key),
-    select: (state) => state.loved,
-    keyOf: (entry) => entry.key,
-    withList: (list) => state.copyWith(loved: list),
-    dbDelete: _db.deleteLovedEntry,
-  );
-
   Future<int> _removeTrackEntries(
     Iterable<String> trackKeys, {
     required bool Function(String key) contains,
@@ -450,19 +459,6 @@ class LibraryCollectionsNotifier extends Notifier<LibraryCollectionsState> {
         _invalidatePlaylistPickerSummaries();
       });
 
-  Future<void> deletePlaylist(String playlistId) => _mutate(() async {
-    if (state.playlistById(playlistId) == null) return;
-
-    await _db.deletePlaylist(playlistId);
-    if (!ref.mounted) return;
-    state = state.copyWith(
-      playlists: state.playlists
-          .where((playlist) => playlist.id != playlistId)
-          .toList(growable: false),
-    );
-    _invalidatePlaylistPickerSummaries();
-  });
-
   Future<int> deletePlaylists(Iterable<String> playlistIds) {
     final selected = playlistIds.toSet();
     return _mutate(() async {
@@ -513,6 +509,7 @@ class LibraryCollectionsNotifier extends Notifier<LibraryCollectionsState> {
       });
       if (!changed) return false;
       _invalidatePlaylistPickerSummaries();
+      _endorse([track], AutoplayFeedbackKind.playlisted);
       return true;
     },
   );
@@ -573,7 +570,12 @@ class LibraryCollectionsNotifier extends Notifier<LibraryCollectionsState> {
           updatedAt: now,
         );
       });
-      if (changed) _invalidatePlaylistPickerSummaries();
+      if (changed) {
+        _invalidatePlaylistPickerSummaries();
+        _endorse([
+          for (final entry in prepared.entries) entry.track,
+        ], AutoplayFeedbackKind.playlisted);
+      }
       return PlaylistAddBatchResult(
         addedCount: changed ? prepared.entries.length : 0,
         alreadyInPlaylistCount: prepared.duplicates,
@@ -582,32 +584,6 @@ class LibraryCollectionsNotifier extends Notifier<LibraryCollectionsState> {
       await prepared.dispose();
     }
   });
-
-  @visibleForTesting
-  Future<void> removeTrackFromPlaylist(String playlistId, String trackKey) =>
-      _mutate(() async {
-        var playlist = state.playlistById(playlistId);
-        if (playlist == null || !playlist.containsTrackKey(trackKey)) return;
-        await ensurePlaylistLoaded(playlistId);
-        if (!ref.mounted) return;
-        playlist = state.playlistById(playlistId);
-        if (playlist == null) return;
-
-        final now = DateTime.now();
-        await _db.deletePlaylistTrack(
-          playlistId: playlistId,
-          trackKey: trackKey,
-          playlistUpdatedAt: now.toIso8601String(),
-        );
-        _replacePlaylistById(playlistId, (playlist) {
-          final nextTracks = playlist.tracks
-              .where((entry) => entry.key != trackKey)
-              .toList(growable: false);
-          if (nextTracks.length == playlist.tracks.length) return playlist;
-          return playlist.copyWith(tracks: nextTracks, updatedAt: now);
-        });
-        _invalidatePlaylistPickerSummaries();
-      });
 
   Future<int> removeTracksFromPlaylist(
     String playlistId,
@@ -645,6 +621,110 @@ class LibraryCollectionsNotifier extends Notifier<LibraryCollectionsState> {
       return keys.length;
     });
   }
+
+  /// Puts the playlist in [orderedKeys] order, which must name every track
+  /// once. Tracks are restamped one millisecond apart from the earliest
+  /// stamp, kept before now so later additions still append.
+  Future<bool> reorderPlaylistTracks(
+    String playlistId,
+    List<String> orderedKeys,
+  ) => _mutate(() async {
+    await ensurePlaylistLoaded(playlistId);
+    if (!ref.mounted) return false;
+    final playlist = state.playlistById(playlistId);
+    if (playlist == null) return false;
+    final byKey = {for (final entry in playlist.tracks) entry.key: entry};
+    if (orderedKeys.length != byKey.length ||
+        orderedKeys.toSet().length != orderedKeys.length ||
+        !orderedKeys.every(byKey.containsKey)) {
+      return false;
+    }
+    var unchanged = true;
+    for (var i = 0; i < orderedKeys.length; i++) {
+      if (playlist.tracks[i].key != orderedKeys[i]) {
+        unchanged = false;
+        break;
+      }
+    }
+    if (unchanged) return false;
+
+    final now = DateTime.now();
+    final earliest = playlist.tracks
+        .map((entry) => entry.addedAt.toLocal())
+        .reduce((a, b) => a.isBefore(b) ? a : b);
+    final latestStart = now.subtract(
+      Duration(milliseconds: orderedKeys.length),
+    );
+    final start = earliest.isBefore(latestStart) ? earliest : latestStart;
+    final reordered = [
+      for (var i = 0; i < orderedKeys.length; i++)
+        CollectionTrackEntry(
+          key: orderedKeys[i],
+          track: byKey[orderedKeys[i]]!.track,
+          addedAt: start.add(Duration(milliseconds: i)),
+        ),
+    ];
+    await _db.reorderPlaylistTracks(
+      playlistId: playlistId,
+      addedAtByKey: {
+        for (final entry in reordered)
+          entry.key: entry.addedAt.toIso8601String(),
+      },
+      playlistUpdatedAt: now.toIso8601String(),
+    );
+    final changed = _replacePlaylistById(
+      playlistId,
+      (current) => current.copyWith(tracks: reordered, updatedAt: now),
+    );
+    if (changed) _invalidatePlaylistPickerSummaries();
+    return changed;
+  });
+
+  /// Built-in collections use descending added-at order. Keep the same
+  /// ordering contract in storage, backups and Link, with new likes first.
+  Future<bool> reorderSavedTracks(
+    LibraryTracksFolderMode mode,
+    List<String> orderedKeys,
+  ) => _mutate(() async {
+    if (mode == LibraryTracksFolderMode.playlist) return false;
+    final entries = mode == LibraryTracksFolderMode.loved
+        ? state.loved
+        : state.wishlist;
+    final byKey = {for (final entry in entries) entry.key: entry};
+    if (orderedKeys.length != byKey.length ||
+        orderedKeys.toSet().length != orderedKeys.length ||
+        !orderedKeys.every(byKey.containsKey)) {
+      return false;
+    }
+    if (orderedKeys.indexed.every((item) => entries[item.$1].key == item.$2)) {
+      return false;
+    }
+    final now = DateTime.now();
+    final latest = entries
+        .map((entry) => entry.addedAt.toLocal())
+        .reduce((a, b) => a.isAfter(b) ? a : b);
+    final end = latest.isAfter(now) ? now : latest;
+    final reordered = [
+      for (final (i, key) in orderedKeys.indexed)
+        CollectionTrackEntry(
+          key: key,
+          track: byKey[key]!.track,
+          addedAt: end.subtract(Duration(milliseconds: i)),
+        ),
+    ];
+    await _db.reorderSavedTracks(
+      mode: mode,
+      addedAtByKey: {
+        for (final entry in reordered)
+          entry.key: entry.addedAt.toIso8601String(),
+      },
+    );
+    if (!ref.mounted) return false;
+    state = mode == LibraryTracksFolderMode.loved
+        ? state.copyWith(loved: reordered)
+        : state.copyWith(wishlist: reordered);
+    return true;
+  });
 
   Future<void> setPlaylistCover(
     String playlistId,
@@ -778,6 +858,13 @@ class LibraryCollectionsNotifier extends Notifier<LibraryCollectionsState> {
     }
 
     await _db.replaceAllFromBackup(normalized);
+    await _load();
+    _invalidatePlaylistPickerSummaries();
+  });
+
+  /// Reloads every collection after another writer (Mornye Link sync)
+  /// changed the database. Queued behind pending mutations.
+  Future<void> reloadFromDatabase() => _mutate(() async {
     await _load();
     _invalidatePlaylistPickerSummaries();
   });

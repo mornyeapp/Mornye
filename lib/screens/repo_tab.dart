@@ -9,6 +9,7 @@ import 'package:mornye/theme/app_tokens.dart';
 import 'package:mornye/widgets/app_search_field.dart';
 import 'package:mornye/widgets/app_sliver_header.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mornye/controllers/clickable_metadata.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/repo_provider.dart';
@@ -95,6 +96,7 @@ class _RepoTabState extends ConsumerState<RepoTab> {
       );
     }
     final colorScheme = Theme.of(context).colorScheme;
+    final l10n = context.l10n;
     // Controls share the centered column of the extension list on tablets.
     // Desktop fills the pane with a grid instead, with the same edges as the
     // other tabs.
@@ -154,53 +156,24 @@ class _RepoTabState extends ConsumerState<RepoTab> {
                 child: _CategoryChipRow(
                   edge: edge,
                   children: [
-                    _CategoryChip(
-                      label: context.l10n.storeFilterAll,
-                      icon: Icons.apps,
-                      isSelected: selectedCategory == null,
-                      onTap: () =>
-                          ref.read(repoProvider.notifier).setCategory(null),
-                    ),
-                    _CategoryChip(
-                      label: context.l10n.storeFilterMetadata,
-                      icon: Icons.label_outline,
-                      isSelected: selectedCategory == RepoCategory.metadata,
-                      onTap: () => ref
-                          .read(repoProvider.notifier)
-                          .setCategory(RepoCategory.metadata),
-                    ),
-                    _CategoryChip(
-                      label: context.l10n.storeFilterDownload,
-                      icon: Icons.download_outlined,
-                      isSelected: selectedCategory == RepoCategory.download,
-                      onTap: () => ref
-                          .read(repoProvider.notifier)
-                          .setCategory(RepoCategory.download),
-                    ),
-                    _CategoryChip(
-                      label: context.l10n.storeFilterUtility,
-                      icon: Icons.build_outlined,
-                      isSelected: selectedCategory == RepoCategory.utility,
-                      onTap: () => ref
-                          .read(repoProvider.notifier)
-                          .setCategory(RepoCategory.utility),
-                    ),
-                    _CategoryChip(
-                      label: context.l10n.storeFilterLyrics,
-                      icon: Icons.lyrics_outlined,
-                      isSelected: selectedCategory == RepoCategory.lyrics,
-                      onTap: () => ref
-                          .read(repoProvider.notifier)
-                          .setCategory(RepoCategory.lyrics),
-                    ),
-                    _CategoryChip(
-                      label: context.l10n.storeFilterIntegration,
-                      icon: Icons.link,
-                      isSelected: selectedCategory == RepoCategory.integration,
-                      onTap: () => ref
-                          .read(repoProvider.notifier)
-                          .setCategory(RepoCategory.integration),
-                    ),
+                    for (final (category, label) in [
+                      (null, l10n.storeFilterAll),
+                      (RepoCategory.metadata, l10n.storeFilterMetadata),
+                      (RepoCategory.download, l10n.storeFilterDownload),
+                      (RepoCategory.utility, l10n.storeFilterUtility),
+                      (RepoCategory.lyrics, l10n.storeFilterLyrics),
+                      (RepoCategory.integration, l10n.storeFilterIntegration),
+                    ])
+                      _CategoryChip(
+                        label: label,
+                        icon: category == null
+                            ? Icons.apps
+                            : _getCategoryIcon(category),
+                        isSelected: selectedCategory == category,
+                        onTap: () => ref
+                            .read(repoProvider.notifier)
+                            .setCategory(category),
+                      ),
                   ],
                 ),
               ),
@@ -654,10 +627,9 @@ class _RepoTabState extends ConsumerState<RepoTab> {
   }
 
   void _showExtensionDetails(RepoExtension ext) {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (context) => ExtensionDetailsScreen(extension: ext),
-      ),
+    pushPage<void>(
+      context,
+      (context) => ExtensionDetailsScreen(extension: ext),
     );
   }
 
@@ -823,6 +795,7 @@ class _RepoListSkeleton extends StatelessWidget {
     final tokens = context.tokens;
     // Placeholders keep their contrast on the Material group surface.
     final surface = context.isMornye ? null : settingsGroupColor(context);
+    final buttonWidth = _storeButtonWidth(context);
     final rows = [
       for (var index = 0; index < _count; index++)
         ExtensionRow(
@@ -877,7 +850,7 @@ class _RepoListSkeleton extends StatelessWidget {
               ],
             ),
           ),
-          trailingBelowWhenNarrow: true,
+          trailingWidth: buttonWidth,
           trailing: ShimmerLoading(
             surface: surface,
             child: SkeletonBox(
@@ -901,6 +874,53 @@ class _RepoListSkeleton extends StatelessWidget {
   }
 }
 
+/// The widest store button in the current language and text size: the
+/// longest of the Install, Update and Installed labels, the last with its
+/// check icon, plus the buttons' side padding. Store rows and their
+/// skeleton share it, so every row puts its button in the same place.
+double _storeButtonWidth(BuildContext context) {
+  final l10n = context.l10n;
+  final style = Theme.of(context).textTheme.labelLarge;
+  final textScaler = MediaQuery.textScalerOf(context);
+  final textDirection = Directionality.of(context);
+  double labelWidth(String label) {
+    final painter = TextPainter(
+      text: TextSpan(text: label, style: style),
+      textDirection: textDirection,
+      textScaler: textScaler,
+      maxLines: 1,
+    )..layout();
+    final width = painter.width;
+    painter.dispose();
+    return width;
+  }
+
+  final widest = [
+    labelWidth(l10n.storeInstall),
+    labelWidth(l10n.storeUpdate),
+    // The check icon and its gap.
+    labelWidth(l10n.storeInstalled) + 24,
+  ].reduce((a, b) => a > b ? a : b);
+  return widest + 32;
+}
+
+IconData _getCategoryIcon(String category) {
+  switch (category) {
+    case RepoCategory.metadata:
+      return Icons.label_outline;
+    case RepoCategory.download:
+      return Icons.download_outlined;
+    case RepoCategory.utility:
+      return Icons.build_outlined;
+    case RepoCategory.lyrics:
+      return Icons.lyrics_outlined;
+    case RepoCategory.integration:
+      return Icons.link;
+    default:
+      return Icons.extension;
+  }
+}
+
 class _ExtensionItem extends StatelessWidget {
   final RepoExtension extension;
   final bool showDivider;
@@ -917,23 +937,6 @@ class _ExtensionItem extends StatelessWidget {
     required this.onUpdate,
     this.onTap,
   });
-
-  IconData _getCategoryIcon(String category) {
-    switch (category) {
-      case RepoCategory.metadata:
-        return Icons.label_outline;
-      case RepoCategory.download:
-        return Icons.download_outlined;
-      case RepoCategory.utility:
-        return Icons.build_outlined;
-      case RepoCategory.lyrics:
-        return Icons.lyrics_outlined;
-      case RepoCategory.integration:
-        return Icons.link;
-      default:
-        return Icons.extension;
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -1009,7 +1012,7 @@ class _ExtensionItem extends StatelessWidget {
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
-      trailingBelowWhenNarrow: true,
+      trailingWidth: _storeButtonWidth(context),
       trailing: isDownloading
           ? const AppLoadingIndicator(size: 24)
           : !context.isMornye

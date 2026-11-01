@@ -14,26 +14,35 @@ import 'package:mornye/widgets/expressive_button.dart';
 import 'package:mornye/widgets/re_enrich_review_sheet.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:mornye/services/deleted_library_files.dart';
 import 'package:mornye/services/file_access_check.dart';
 import 'package:mornye/services/network_storage_service.dart';
 import 'package:mornye/services/library_database.dart';
+import 'package:mornye/services/cue_split_library_service.dart';
+import 'package:mornye/services/link/features/link_save_offline.dart';
+import 'package:mornye/models/unified_library_item.dart';
 import 'package:mornye/utils/file_access.dart';
 import 'package:mornye/utils/re_enrich_result.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:mornye/providers/deleted_library_files.dart';
 import 'package:mornye/providers/download_queue_provider.dart';
 import 'package:mornye/providers/local_library_provider.dart';
 import 'package:mornye/providers/playback_provider.dart';
 import 'package:mornye/providers/music_player_provider.dart';
+import 'package:mornye/providers/player_motion_artwork_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/services/music_player_service.dart'
     show readPlaybackFileMetadataWithRetry;
 import 'package:mornye/services/downloaded_embedded_cover_resolver.dart';
-import 'package:mornye/services/ffmpeg_service.dart';
+import 'package:mornye/services/ffmpeg_conversion.dart';
+import 'package:mornye/services/ffmpeg_metadata.dart';
+import 'package:mornye/services/ffmpeg_models.dart';
+import 'package:mornye/services/ffmpeg_probe.dart';
 import 'package:mornye/services/replaygain_service.dart';
+import 'package:mornye/services/source_deletion_events.dart';
+import 'package:mornye/services/source_metadata_events.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/utils/adaptive_layout.dart';
 import 'package:mornye/utils/audio_conversion_utils.dart';
@@ -59,6 +68,10 @@ import 'package:mornye/theme/mornye_icons.dart';
 import 'package:mornye/widgets/album_detail_header.dart'
     show HeaderMetaRow, HeaderMetaItem, HeaderCircleButton, HeaderFilledButton;
 import 'package:mornye/widgets/desktop/context_menu.dart';
+import 'package:mornye/widgets/link/link_actions.dart';
+import 'package:mornye/widgets/link/link_library_actions.dart';
+import 'package:mornye/services/link/features/link_track_refs.dart';
+import 'package:mornye/services/link/link_library_jobs.dart';
 import 'package:mornye/widgets/mornye_context_menu.dart';
 import 'package:mornye/widgets/mornye_metadata_row.dart';
 import 'package:mornye/widgets/player_artwork.dart';
@@ -74,9 +87,9 @@ import 'package:mornye/widgets/settings_group.dart';
 import 'package:mornye/constants/music_services.dart';
 import 'package:mornye/controllers/batch_track_actions.dart'
     show convertLibraryTrack;
-import 'package:mornye/screens/collapsing_header_scroll_mixin.dart';
+import 'package:mornye/controllers/clickable_metadata.dart';
+import 'package:mornye/controllers/collapsing_header_scroll_mixin.dart';
 import 'package:mornye/screens/track_metadata_edit_sheet.dart';
-import 'package:mornye/utils/clickable_metadata.dart';
 
 part 'track_metadata_screen_cover.dart';
 part 'track_metadata_screen_display.dart';
@@ -194,6 +207,8 @@ class _TrackMetadataScreenState extends ConsumerState<TrackMetadataScreen>
   bool _isTrackSwipeNavigationInFlight = false;
   int _metadataLoadGeneration = 0;
   int _metadataTransitionDirection = 0;
+  late final void Function() _unsubscribeMetadata;
+  late final void Function() _unsubscribeDeletion;
   late DownloadHistoryItem? _currentDownloadItem;
   late LocalLibraryItem? _currentLocalLibraryItem;
   late int? _currentNavigationIndex;
@@ -215,11 +230,41 @@ class _TrackMetadataScreenState extends ConsumerState<TrackMetadataScreen>
     _currentDownloadItem = widget.item;
     _currentLocalLibraryItem = widget.localItem;
     _currentNavigationIndex = widget.navigationIndex;
+    _unsubscribeMetadata = SourceMetadataEvents.instance.subscribe((
+      source,
+    ) async {
+      if (!mounted || source != cleanFilePath) return;
+      setState(() {
+        _metadataLoadGeneration++;
+        _hasLoadedResolvedAudioMetadata = false;
+        _editedMetadata = null;
+        _embeddedLyricsChecked = false;
+        _lyrics = null;
+        _rawLyrics = null;
+        _lyricsError = null;
+        _lyricsLoading = false;
+      });
+      await _checkFile();
+      if (mounted && source == cleanFilePath && !_isNetworkItem) {
+        unawaited(_refreshEmbeddedCoverPreview(force: true));
+      }
+    });
+    _unsubscribeDeletion = SourceDeletionEvents.instance.subscribe((
+      source,
+    ) async {
+      if (!mounted || source != cleanFilePath) return;
+      setState(() {
+        _metadataLoadGeneration++;
+        _fileAccess = const FileAccessMissing();
+      });
+    });
     unawaited(_checkFile());
   }
 
   @override
   void dispose() {
+    _unsubscribeMetadata();
+    _unsubscribeDeletion();
     unawaited(_cleanupTempFileAndParentIfNotCached(_embeddedCoverPreviewPath));
     _lyricsScrollController.dispose();
     super.dispose();
@@ -348,6 +393,9 @@ class _TrackMetadataScreenState extends ConsumerState<TrackMetadataScreen>
       );
       final resolvedDuration = readPositiveInt(metadata['duration']);
       final resolvedAlbum = metadata['album']?.toString();
+      final resolvedCover = normalizeOptionalString(
+        metadata['cover_path']?.toString(),
+      );
       final resolvedTitle = metadata['title']?.toString();
       final resolvedArtist = metadata['artist']?.toString();
       final resolvedAlbumArtist = metadata['album_artist']?.toString();
@@ -516,6 +564,7 @@ class _TrackMetadataScreenState extends ConsumerState<TrackMetadataScreen>
           _editedMetadata = {
             ...?_editedMetadata,
             ...replayGainMetadata,
+            'cover_path': ?resolvedCover,
             'bpm': ?resolvedBpm,
             'mood': ?resolvedMood,
             // ignore: use_null_aware_elements
@@ -683,7 +732,7 @@ class _TrackMetadataScreenState extends ConsumerState<TrackMetadataScreen>
         _lyricsLoading = false;
         _lyricsError = null;
         _lyricsSource = null;
-        showTitleInAppBar = false;
+        showTitleNotifier.value = false;
         _lyricsEmbedded = false;
         _isInstrumental = false;
         _embeddedLyricsChecked = false;
@@ -730,9 +779,13 @@ class _TrackMetadataScreenState extends ConsumerState<TrackMetadataScreen>
               stretch: true,
               backgroundColor: colorScheme.surface,
               surfaceTintColor: Colors.transparent,
-              title: AnimatedOpacity(
-                duration: const Duration(milliseconds: 200),
-                opacity: showTitleInAppBar ? 1.0 : 0.0,
+              title: ValueListenableBuilder(
+                valueListenable: showTitleNotifier,
+                builder: (_, showTitle, title) => AnimatedOpacity(
+                  duration: const Duration(milliseconds: 200),
+                  opacity: showTitle ? 1.0 : 0.0,
+                  child: title,
+                ),
                 child: ExplicitTrackTitle(
                   title: trackName,
                   explicit: isExplicit,

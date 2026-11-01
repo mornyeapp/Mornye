@@ -4,6 +4,40 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/utils/lyrics_parser.dart';
 import 'package:mornye/utils/lyrics_timeline.dart';
 
+Set<int> _active(List<LyricLine> lines, Duration position, int currentIndex) =>
+    LyricTimelineIndex(lines).activeIndices(position, currentIndex);
+
+/// Reference contract: hold the latest lead until the next lead starts,
+/// including instrumental gaps. Earlier overlapping parts and backing vocals
+/// keep their timed ends.
+Set<int> _reference(
+  List<LyricLine> lines,
+  Duration position,
+  int currentIndex,
+) {
+  final active = <int>{};
+  var heldLead = -1;
+  for (var i = 0; i <= currentIndex; i++) {
+    final line = lines[i];
+    if (!line.isBackground &&
+        line.text.isNotEmpty &&
+        (heldLead < 0 || line.time != lines[heldLead].time)) {
+      heldLead = i;
+    }
+    final timedVoice =
+        (i < currentIndex || line.voice != null || line.isBackground) &&
+        line.text.isNotEmpty &&
+        line.end != null;
+    final simultaneous =
+        line.text.isNotEmpty && line.time == lines[currentIndex].time;
+    if (timedVoice ? line.end! > position : i == currentIndex || simultaneous) {
+      active.add(i);
+    }
+  }
+  if (heldLead >= 0) active.add(heldLead);
+  return active;
+}
+
 void main() {
   test('indexed active voices match the timeline contract across seeks', () {
     final random = Random(412);
@@ -26,7 +60,7 @@ void main() {
       final current = LyricsParser.activeIndex(lines, position);
       expect(
         timeline.activeIndices(position, current),
-        activeLyricIndices(lines, position, current),
+        _reference(lines, position, current),
         reason: 'Position $position, current line $current',
       );
     }
@@ -90,15 +124,11 @@ void main() {
     for (final seconds in [1, 2, 4]) {
       final position = Duration(seconds: seconds);
       expect(
-        activeLyricIndices(
-          lines,
-          position,
-          LyricsParser.activeIndex(lines, position),
-        ),
+        _active(lines, position, LyricsParser.activeIndex(lines, position)),
         {0, 1},
       );
     }
-    expect(activeLyricIndices(lines, const Duration(seconds: 5), 2), {2});
+    expect(_active(lines, const Duration(seconds: 5), 2), {2});
   });
 
   test(
@@ -110,9 +140,9 @@ void main() {
 [00:06.00]Next
 ''').lines;
       expect(LyricDisplayLayout(lines).focusForLine, [0, 0, 2]);
-      expect(activeLyricIndices(lines, const Duration(seconds: 2), 1), {0, 1});
-      expect(activeLyricIndices(lines, const Duration(seconds: 4), 1), {0});
-      expect(activeLyricIndices(lines, const Duration(seconds: 5), 1), {0});
+      expect(_active(lines, const Duration(seconds: 2), 1), {0, 1});
+      expect(_active(lines, const Duration(seconds: 4), 1), {0});
+      expect(_active(lines, const Duration(seconds: 5), 1), {0});
     },
   );
 
@@ -134,12 +164,7 @@ void main() {
     expect(layout.rowForLine, [0, 3, 1, 2]);
     expect(layout.leadForLine, [0, 1, 0, 0]);
     expect(layout.focusForLine, [0, 1, 1, 1]);
-    expect(activeLyricIndices(lines, const Duration(seconds: 5), 3), {
-      0,
-      1,
-      2,
-      3,
-    });
+    expect(_active(lines, const Duration(seconds: 5), 3), {0, 1, 2, 3});
   });
 
   test('background onset keeps focus on the lead and gaps remain separate', () {
@@ -178,8 +203,8 @@ void main() {
 [00:01.00]<00:01.00>Main<00:05.00>
 [bg:<00:02.00>Echo<00:03.00>]
 ''').lines;
-      expect(activeLyricIndices(lines, const Duration(seconds: 2), 1), {0, 1});
-      expect(activeLyricIndices(lines, const Duration(seconds: 4), 1), {0});
+      expect(_active(lines, const Duration(seconds: 2), 1), {0, 1});
+      expect(_active(lines, const Duration(seconds: 4), 1), {0});
     },
   );
 
@@ -191,7 +216,7 @@ void main() {
 ''').lines;
     Set<int> active(int seconds) {
       final position = Duration(seconds: seconds);
-      return activeLyricIndices(
+      return _active(
         lines,
         position,
         LyricsParser.activeIndex(lines, position),
@@ -220,7 +245,7 @@ void main() {
       );
       Set<int> active(int milliseconds) {
         final position = Duration(milliseconds: milliseconds);
-        return activeLyricIndices(
+        return _active(
           lines,
           position,
           LyricsParser.activeIndex(lines, position),
@@ -249,9 +274,9 @@ void main() {
 ''').lines,
     );
     expect(lines.map((line) => line.text), ['Lead', 'Echo', '', 'Next']);
-    expect(activeLyricIndices(lines, const Duration(seconds: 3), 1), {0, 1});
-    expect(activeLyricIndices(lines, const Duration(seconds: 5), 2), {0, 2});
-    expect(activeLyricIndices(lines, const Duration(seconds: 7), 3), {3});
+    expect(_active(lines, const Duration(seconds: 3), 1), {0, 1});
+    expect(_active(lines, const Duration(seconds: 5), 2), {0, 2});
+    expect(_active(lines, const Duration(seconds: 7), 3), {3});
   });
 
   List<(int, int)> gaps(String text) =>
@@ -350,5 +375,35 @@ void main() {
 '''),
       isEmpty,
     );
+  });
+
+  test('lyrics timing moves lines and words, stopping at the start', () {
+    const lines = [
+      LyricLine(
+        time: Duration(milliseconds: 200),
+        end: Duration(seconds: 2),
+        text: 'First',
+        words: [
+          LyricWord(
+            time: Duration(milliseconds: 200),
+            end: Duration(seconds: 1),
+            text: 'First',
+          ),
+        ],
+      ),
+      LyricLine(time: Duration(seconds: 3), text: 'Second'),
+    ];
+    expect(identical(lyricsShiftedBy(lines, Duration.zero), lines), isTrue);
+
+    final later = lyricsShiftedBy(lines, const Duration(milliseconds: 300));
+    expect(later.map((line) => line.time.inMilliseconds), [500, 3300]);
+    expect(later.first.end, const Duration(milliseconds: 2300));
+    expect(later.first.words.single.time, const Duration(milliseconds: 500));
+    expect(later.first.words.single.end, const Duration(milliseconds: 1300));
+
+    final earlier = lyricsShiftedBy(lines, const Duration(milliseconds: -500));
+    expect(earlier.map((line) => line.time.inMilliseconds), [0, 2500]);
+    expect(earlier.first.words.single.time, Duration.zero);
+    expect(earlier.map((line) => line.text), ['First', 'Second']);
   });
 }

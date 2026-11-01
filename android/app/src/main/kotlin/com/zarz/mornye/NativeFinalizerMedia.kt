@@ -194,27 +194,28 @@ internal fun NativeDownloadFinalizer.writeExternalLrc(context: Context, input: N
 }
 
 internal fun NativeDownloadFinalizer.resolveLyricsLrc(context: Context, input: NativeDownloadFinalizer.FinalizeInput): String {
-    val existing = input.result.optString("lyrics_lrc", "").trim()
-    if (existing.isNotEmpty()) return existing
-
-    val spotifyId = trackString(input, "id", input.request.optString("spotify_id", ""))
-    val trackName = trackString(input, "name", input.request.optString("track_name", ""))
-    val artistName = trackString(input, "artistName", input.request.optString("artist_name", ""))
-    if (trackName.isBlank() || artistName.isBlank()) return ""
-
     return try {
-        val fetched = createCoreBackend(context).getLyricsLrc(
-            spotifyId,
-            trackName,
-            artistName,
-            "",
-            lyricsDurationMs(input),
-        ).trim()
+        val fetched = NativeFinalizationPolicy.resolveLyricsContent(
+            input.result.optString("lyrics_lrc", ""),
+        ) {
+            val spotifyId = trackString(input, "id", input.request.optString("spotify_id", ""))
+            val trackName = trackString(input, "name", input.request.optString("track_name", ""))
+            val artistName = trackString(input, "artistName", input.request.optString("artist_name", ""))
+            if (trackName.isBlank() || artistName.isBlank()) return@resolveLyricsContent ""
+            createCoreBackend(context).getLyricsLrc(
+                spotifyId,
+                trackName,
+                artistName,
+                "",
+                lyricsDurationMs(input),
+            )
+        }
         if (fetched.isNotEmpty()) {
             input.result.put("lyrics_lrc", fetched)
         }
         fetched
-    } catch (_: Exception) {
+    } catch (error: Exception) {
+        Log.w(TAG, "Lyrics lookup failed during download: ${error.message}")
         ""
     }
 }

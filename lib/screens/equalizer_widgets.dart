@@ -9,7 +9,7 @@ class _Footnote extends StatelessWidget {
   @override
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, constraints) {
-      final inset = settingsHorizontalInset(constraints.maxWidth) + 16;
+      final inset = settingsHorizontalInset(context, constraints.maxWidth) + 16;
       final theme = Theme.of(context);
       return Padding(
         padding: EdgeInsets.fromLTRB(inset, 4, inset, 8),
@@ -263,7 +263,7 @@ class _PresetBar extends StatelessWidget {
     final tokens = context.tokens;
     return LayoutBuilder(
       builder: (context, constraints) {
-        final inset = settingsHorizontalInset(constraints.maxWidth);
+        final inset = settingsHorizontalInset(context, constraints.maxWidth);
         final chips = [
           for (final preset in presets)
             AppChoiceChip(
@@ -376,6 +376,7 @@ class _BandEditor extends StatelessWidget {
           labels: [for (final value in counts) '$value'],
           selectedIndex: counts.indexOf(count),
           onChanged: select,
+          samplesBackdrop: false,
         ),
       );
     }

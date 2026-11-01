@@ -1,9 +1,12 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/gestures.dart' show DragStartBehavior;
+import 'package:flutter/semantics.dart' show SemanticsRole;
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:material_3_expressive/components/progress_indicators/components/m3e_linear_progress_painter.dart';
 import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/widgets/app_icon.dart';
@@ -16,13 +19,18 @@ import 'package:mornye/providers/player_artwork_video_provider.dart';
 import 'package:mornye/providers/runtime_profile_provider.dart';
 import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/app_tokens.dart';
+import 'package:mornye/theme/cover_palette.dart';
 import 'package:mornye/theme/material_expressive.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/theme/player_artwork_theme.dart';
 import 'package:mornye/screens/now_playing_screen.dart';
+import 'package:mornye/services/link/features/link_phone_client.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/utils/string_utils.dart';
 import 'package:mornye/widgets/audio_quality_badges.dart';
+import 'package:mornye/widgets/cached_cover_image.dart';
+import 'package:mornye/widgets/decorative_phase.dart';
+import 'package:mornye/widgets/link/link_devices_sheet.dart';
 import 'package:mornye/widgets/overflow_marquee.dart';
 import 'package:mornye/widgets/player_artwork.dart';
 import 'package:mornye/widgets/settings_group.dart';
@@ -39,8 +47,68 @@ class MiniPlayer extends ConsumerStatefulWidget {
 }
 
 class _MiniPlayerState extends ConsumerState<MiniPlayer> {
+  Uri? _warmedArtUri;
+  (Uri, int)? _warmedTransition;
+
+  @override
+  void initState() {
+    super.initState();
+    ref.listenManual(
+      currentMediaItemProvider.select((item) => item.value?.artUri),
+      (_, artUri) {
+        _warmCoverColour(artUri);
+        _warmFullScreenArtwork(artUri);
+      },
+    );
+    ref.listenManual(
+      settingsProvider.select((settings) => settings.playerCoverStyle),
+      (_, _) => _warmFullScreenArtwork(
+        ref.read(currentMediaItemProvider).value?.artUri,
+      ),
+    );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _warmCoverColour(ref.read(currentMediaItemProvider).value?.artUri);
+    _warmFullScreenArtwork(ref.read(currentMediaItemProvider).value?.artUri);
+  }
+
+  void _warmFullScreenArtwork(Uri? artUri) {
+    if (context.isMornye ||
+        isDesktopPlatform ||
+        artUri == null ||
+        ref.read(settingsProvider).playerCoverStyleFor(mornye: false) !=
+            'fullscreen' ||
+        MediaQuery.orientationOf(context) != Orientation.portrait) {
+      _warmedTransition = null;
+      return;
+    }
+    final width = PlayerArtwork.transitionCacheWidth(context);
+    final inputs = (artUri, width);
+    if (inputs == _warmedTransition) return;
+    final provider = coverImageProvider(artUri.toString(), cacheWidth: width);
+    if (provider == null) return;
+    _warmedTransition = inputs;
+    // Failed warm-up uses the artwork widget's existing placeholder.
+    unawaited(precacheImage(provider, context, onError: (_, _) {}));
+  }
+
+  // The Mornye full player shades itself from the cover's source colour;
+  // resolving it with the track lets the player open on its final colour.
+  void _warmCoverColour(Uri? artUri) {
+    if (!context.isMornye || artUri == _warmedArtUri) return;
+    _warmedArtUri = artUri;
+    final source = artUri?.toString();
+    if (source != null && source.isNotEmpty) {
+      unawaited(CoverPalette.resolveSourceColor(source));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (!ref.watch(playerUiEnabledProvider)) return const SizedBox.shrink();
     final body = _MiniPlayerBody(
       compact: widget.compact,
       bottomPadding: widget.bottomPadding,
@@ -121,6 +189,12 @@ class _MiniPlayerBodyState extends ConsumerState<_MiniPlayerBody> {
     if (_dragCancelled || (travel.abs() < 48 && velocity.abs() < 550)) return;
     final direction = velocity.abs() >= 550 ? velocity : travel;
     final controller = ref.read(musicPlayerControllerProvider);
+    if (!context.isMornye &&
+        !ref.read(playbackPlayingProvider) &&
+        ref.read(activeRemotePlaybackProvider) == null) {
+      if (!ref.read(playbackLoadingProvider)) unawaited(controller.dismiss());
+      return;
+    }
     if (direction < 0) {
       controller.next();
     } else {
@@ -135,6 +209,9 @@ class _MiniPlayerBodyState extends ConsumerState<_MiniPlayerBody> {
 
     final isPlaying = ref.watch(playbackPlayingProvider);
     final isLoading = ref.watch(playbackLoadingProvider);
+    final remote = ref.watch(
+      activeRemotePlaybackProvider.select((remote) => remote != null),
+    );
 
     final controller = ref.read(musicPlayerControllerProvider);
     final colorScheme = Theme.of(context).colorScheme;
@@ -142,11 +219,11 @@ class _MiniPlayerBodyState extends ConsumerState<_MiniPlayerBody> {
     final expressive = materialExpressiveEnabled(context);
     final compact = mornye && widget.compact;
     // Frosted and flat glass levels run on constrained Android hardware. They
-    // skip keeping a paused video decoder for the full player's motion cover,
-    // and stop the title marquee after a few passes: every marquee frame
-    // re-filters the blurred chrome around it.
+    // skip keeping a paused video decoder for the full player's motion cover.
     final fullEffects = !mornye || ref.watch(mornyeLiquidGlassProvider);
-    final marqueeCycles = fullEffects ? null : 2;
+    // Every marquee frame re-filters the glass chrome around it, so Mornye
+    // stops the title after a few passes on every glass level.
+    final marqueeCycles = mornye ? 2 : null;
     if (mornye &&
         fullEffects &&
         ref.watch(settingsProvider.select((s) => s.motionArtworkEnabled)) &&
@@ -209,7 +286,7 @@ class _MiniPlayerBodyState extends ConsumerState<_MiniPlayerBody> {
                           child: PlayerArtwork(
                             artUri: mediaItem.artUri?.toString(),
                             colorScheme: colorScheme,
-                            cacheWidth: 132,
+                            cacheWidth: PlayerArtwork.miniCacheWidth,
                             iconSize: 22,
                           ),
                         ),
@@ -237,31 +314,45 @@ class _MiniPlayerBodyState extends ConsumerState<_MiniPlayerBody> {
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                          OverflowMarquee(
-                            resetKey: (mediaItem.id, mediaItem.artist),
-                            maxCycles: marqueeCycles,
-                            child: Text(
-                              mediaItem.artist ?? '',
-                              style: Theme.of(context).textTheme.bodySmall
-                                  ?.copyWith(
-                                    color: mornye
-                                        ? Color.lerp(
-                                            colorScheme.onSurfaceVariant,
-                                            colorScheme.onSurface,
-                                            colorScheme.brightness ==
-                                                    Brightness.dark
-                                                ? 0.7
-                                                : 0.6,
-                                          )
-                                        : colorScheme.onSurfaceVariant,
-                                  ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                          // Where the music plays while the paired desktop
+                          // plays in this phone's place.
+                          if (remote)
+                            LinkPlayingOnText(
+                              key: const ValueKey('mini-player-playing-on'),
+                              color: colorScheme.primary,
+                              style: Theme.of(context).textTheme.bodySmall,
+                              glyphSize: 14,
+                            )
+                          else
+                            OverflowMarquee(
+                              resetKey: (mediaItem.id, mediaItem.artist),
+                              maxCycles: marqueeCycles,
+                              child: Text(
+                                mediaItem.artist ?? '',
+                                style: Theme.of(context).textTheme.bodySmall
+                                    ?.copyWith(
+                                      color: mornye
+                                          ? Color.lerp(
+                                              colorScheme.onSurfaceVariant,
+                                              colorScheme.onSurface,
+                                              colorScheme.brightness ==
+                                                      Brightness.dark
+                                                  ? 0.7
+                                                  : 0.6,
+                                            )
+                                          : colorScheme.onSurfaceVariant,
+                                    ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
-                          ),
                         ],
                       ),
                     ),
+                    if (!compact && ref.watch(linkPhoneClientProvider) != null)
+                      LinkDevicesButton(
+                        color: mornye ? colorScheme.onSurface : null,
+                      ),
                     if (expressive)
                       AppIconButton.filled(
                         tooltip: isPlaying
@@ -331,7 +422,8 @@ class _MiniPlayerBodyState extends ConsumerState<_MiniPlayerBody> {
         ),
       ),
     );
-    // Swiping up opens the full player; sideways swipes change tracks.
+    // Swiping up opens the full player. Sideways swipes dismiss a paused
+    // local Material player; otherwise they change tracks.
     // Desktop has no touch gestures: a click opens the player instead.
     final swipeable = isDesktopPlatform
         ? surface
@@ -404,25 +496,111 @@ class _MiniPlayerProgress extends ConsumerWidget {
       context,
       const AppMotionSpec(Duration(milliseconds: 300), Curves.easeOut),
     );
-    // The wave settles flat while paused; its ticker stops once flat so an
-    // idle mini player does not repaint every frame.
+    // The wave settles flat while paused and stops moving once flat.
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
       child: TweenAnimationBuilder<double>(
         tween: Tween(end: playing ? 1 : 0),
         duration: motion.duration,
         curve: motion.curve,
-        builder: (context, amplitude, _) => TickerMode(
-          enabled: amplitude > 0,
-          child: MaterialExpressiveScope(
-            child: M3EProgressIndicator.linearWavy(
-              value: progress,
-              linearSize: M3EProgressIndicatorSize.s,
-              trackColor: backgroundColor,
-              // Taper toward both ends instead of the theme's hard cutoff.
-              amplitudeForProgress: (value) =>
-                  amplitude *
-                  (math.min(value, 1 - value) / 0.05).clamp(0.0, 1.0),
+        builder: (context, amplitude, _) => MaterialExpressiveScope(
+          child: _MiniPlayerWave(
+            progress: progress,
+            trackColor: backgroundColor,
+            amplitude: amplitude,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// `M3EProgressIndicator.linearWavy` at the small size, with the wave moved
+/// by a [DecorativePhase] instead of a ticker on every display refresh.
+class _MiniPlayerWave extends StatefulWidget {
+  const _MiniPlayerWave({
+    required this.progress,
+    required this.trackColor,
+    required this.amplitude,
+  });
+
+  final double progress;
+  final Color trackColor;
+  final double amplitude;
+
+  @override
+  State<_MiniPlayerWave> createState() => _MiniPlayerWaveState();
+}
+
+class _MiniPlayerWaveState extends State<_MiniPlayerWave> {
+  // The package's wave travels one wavelength per second.
+  final _phase = DecorativePhase(const Duration(seconds: 1));
+  bool _visible = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _visible = TickerMode.valuesOf(context).enabled;
+    _sync();
+  }
+
+  @override
+  void didUpdateWidget(_MiniPlayerWave oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _sync();
+  }
+
+  void _sync() =>
+      _visible && widget.amplitude > 0 ? _phase.start() : _phase.stop();
+
+  @override
+  void dispose() {
+    _phase.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = M3ETheme.of(context);
+    final linear = theme.progressIndicatorTheme.linear;
+    final layout = linear.resolveFlat(M3EProgressIndicatorSize.s);
+    final progress = widget.progress;
+    // Taper toward both ends instead of the theme's hard cutoff.
+    final amplitude =
+        (widget.amplitude *
+                (math.min(progress, 1 - progress) / 0.05).clamp(0.0, 1.0))
+            .clamp(0.0, 1.0);
+    return Semantics(
+      role: SemanticsRole.progressBar,
+      minValue: '0',
+      maxValue: '100',
+      value: '${(progress * 100).round()}%',
+      child: RepaintBoundary(
+        child: SizedBox(
+          height: math.max(
+            layout.trackHeight + 2 * linear.waveAmplitude * amplitude,
+            linear.wavyContainerHeight,
+          ),
+          width: double.infinity,
+          child: ValueListenableBuilder(
+            valueListenable: _phase,
+            builder: (context, phase, _) => CustomPaint(
+              painter: M3ELinearProgressPainter(
+                value: progress,
+                active: linear.activeColor(theme.colorScheme),
+                track: widget.trackColor,
+                strokeWidth: layout.trackHeight,
+                trackStrokeWidth: layout.trackHeight,
+                gap: layout.gap,
+                stopSize: layout.dotDiameter,
+                isWavy: true,
+                waveAmplitude: linear.waveAmplitude,
+                wavelength: linear.determinateWavelength,
+                phase: phase * 2 * math.pi,
+                amplitudeFactor: amplitude,
+                trailingMargin: layout.trailingMargin,
+                textDirection: Directionality.of(context),
+              ),
             ),
           ),
         ),

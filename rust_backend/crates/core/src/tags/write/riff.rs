@@ -1,5 +1,6 @@
 use super::{Fields, Section, bytes, id3, metadata_fields, seek};
 use crate::tags::{file::ObservedReader, read_audio_tags};
+use std::collections::BTreeMap;
 use std::io::{Cursor, Read, Seek, SeekFrom};
 
 pub(super) fn edit(
@@ -30,6 +31,10 @@ pub(super) fn edit(
     let mut start = 12_u64;
     let mut body_size = 4_u64;
     let mut embedded_cover = None;
+    let mut existing_wav_tag = None;
+    let replace_cover = cover.is_some();
+    let tag_fields = metadata_fields(&metadata, fields);
+    let info_fields = info_fields(fields, &tag_fields);
     let remove_gain_only = fields.len() == 4 && super::clears_replay_gain(fields);
     for _ in 0..65536 {
         check()?;
@@ -77,13 +82,18 @@ pub(super) fn edit(
                 start = end;
                 continue;
             }
-            if cover.is_none()
-                && size > 0
+            if size > 0
                 && size <= 16 * 1024 * 1024
                 && end <= length
                 && matches!(&header[..4], b"ID3 " | b"id3 ")
             {
-                embedded_cover = id3::cover(&bytes(source, size as usize)?);
+                let tag = bytes(source, size as usize)?;
+                if cover.is_none() {
+                    embedded_cover = id3::cover(&tag);
+                }
+                if !aiff {
+                    existing_wav_tag = Some(tag);
+                }
             }
             sections.push(Section {
                 start,
@@ -93,6 +103,21 @@ pub(super) fn edit(
         } else {
             if end > length {
                 return Err("unexpected EOF while copying audio".into());
+            }
+            if !aiff && !info_fields.is_empty() && &header[..4] == b"LIST" && size >= 4 {
+                let kind = bytes(source, 4)?;
+                if kind == b"INFO" {
+                    if size as usize > super::MAX_TAG_BYTES {
+                        return Err("RIFF INFO chunk exceeds 64 MiB".into());
+                    }
+                    let mut data = kind;
+                    data.extend(bytes(source, size as usize - 4)?);
+                    let data = edit_info(&data, &info_fields, check)?;
+                    body_size += data.len() as u64;
+                    sections.push(Section { start, end, data });
+                    start = end;
+                    continue;
+                }
             }
             body_size += end - start;
         }
@@ -149,7 +174,17 @@ pub(super) fn edit(
             .as_ref()
             .map(|(data, mime)| (data.as_slice(), mime.as_str()))
     };
-    let tag = id3::fresh(&metadata_fields(&metadata, fields), cover, check)?;
+    let tag = if let Some(tag) = existing_wav_tag {
+        id3::embedded_header(
+            &mut Cursor::new(tag),
+            &tag_fields,
+            if replace_cover { cover } else { None },
+            check,
+        )
+        .or_else(|_| id3::fresh(&tag_fields, cover, check))?
+    } else {
+        id3::fresh(&tag_fields, cover, check)?
+    };
     let tag_size = tag.len() as u32;
     let mut chunk = if aiff {
         b"ID3 ".to_vec()
@@ -184,4 +219,85 @@ pub(super) fn edit(
         data: chunk,
     });
     Ok(sections)
+}
+
+fn info_fields(edited: &Fields, current: &Fields) -> BTreeMap<[u8; 4], String> {
+    let mut result = BTreeMap::new();
+    for (field, kind) in [
+        ("title", *b"INAM"),
+        ("artist", *b"IART"),
+        ("album", *b"IPRD"),
+        ("date", *b"ICRD"),
+        ("genre", *b"IGNR"),
+        ("comment", *b"ICMT"),
+        ("copyright", *b"ICOP"),
+        ("composer", *b"IMUS"),
+    ] {
+        if edited.contains_key(field) {
+            result.insert(kind, current[field].clone());
+        }
+    }
+    if edited.contains_key("track_number") || edited.contains_key("track_total") {
+        result.insert(
+            *b"ITRK",
+            super::edit_index((0, 0), current, "track_number", "track_total"),
+        );
+    }
+    result
+}
+
+/// Keep legacy readers in sync with ID3 while retaining unedited INFO chunks.
+fn edit_info(
+    data: &[u8],
+    fields: &BTreeMap<[u8; 4], String>,
+    check: &dyn Fn() -> Result<(), String>,
+) -> Result<Vec<u8>, String> {
+    let mut body = b"INFO".to_vec();
+    let mut offset = 4;
+    while offset < data.len() {
+        check()?;
+        let header = data
+            .get(offset..offset + 8)
+            .ok_or("invalid RIFF INFO header")?;
+        let kind: [u8; 4] = header[..4].try_into().unwrap();
+        let size = u32::from_le_bytes(header[4..].try_into().unwrap()) as usize;
+        let end = offset
+            .checked_add(8)
+            .and_then(|offset| offset.checked_add(size))
+            .and_then(|offset| offset.checked_add(size & 1))
+            .ok_or("invalid RIFF INFO chunk size")?;
+        let entry = data
+            .get(offset..end)
+            .ok_or("invalid RIFF INFO chunk size")?;
+        let key = match &kind {
+            b"IPRT" => *b"ITRK",
+            b"IWRI" => *b"IMUS",
+            _ => kind,
+        };
+        if !fields.contains_key(&key) {
+            body.extend(entry);
+        }
+        offset = end;
+    }
+    for (kind, value) in fields {
+        check()?;
+        if value.trim().is_empty() {
+            continue;
+        }
+        let size = value.len() + 1;
+        if body.len() + 8 + size + (size & 1) > super::MAX_TAG_BYTES {
+            return Err("RIFF INFO chunk exceeds 64 MiB".into());
+        }
+        body.extend(kind);
+        body.extend((size as u32).to_le_bytes());
+        body.extend(value.as_bytes());
+        body.push(0);
+        if size & 1 == 1 {
+            body.push(0);
+        }
+    }
+    let mut chunk = b"LIST".to_vec();
+    chunk.extend((body.len() as u32).to_le_bytes());
+    chunk.extend(body);
+    Ok(chunk)
 }

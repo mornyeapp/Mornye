@@ -78,12 +78,26 @@ class SmtcAudioService extends NoOpAudioService {
   SmtcAudioService({Future<SmtcControls> Function()? create})
     : _create = create ?? _WindowsSmtcControls.create;
 
+  /// How often a playing timeline is refreshed when nothing else changes,
+  /// as Microsoft suggests for the timeline properties.
+  static const timelineInterval = Duration(seconds: 5);
+
+  /// How far a playing position may depart from the last timeline before
+  /// it counts as a jump, as in MPRIS.
+  static const jumpTolerance = Duration(seconds: 1);
+
   final Future<SmtcControls> Function() _create;
   SmtcControls? _controls;
   StreamSubscription<smtc.PressedButton>? _buttons;
   AudioHandlerCallbacks? _callbacks;
   PlaybackStateMessage? _state;
   MediaItemMessage? _item;
+
+  /// The status the controls were last given and the state their timeline
+  /// was last built from. A failed update clears its value, so the next
+  /// state sends it again.
+  smtc.PlaybackStatus? _status;
+  PlaybackStateMessage? _timeline;
 
   @override
   Future<void> configure(ConfigureRequest request) async {
@@ -136,19 +150,53 @@ class SmtcAudioService extends NoOpAudioService {
     final controls = _controls;
     if (controls == null) return;
     final state = request.state;
-    final status = state.processingState == AudioProcessingStateMessage.idle
-        ? smtc.PlaybackStatus.stopped
-        : state.playing
-        ? smtc.PlaybackStatus.playing
-        : smtc.PlaybackStatus.paused;
     await _guard(() async {
-      await controls.setStatus(status);
+      await _setStatus(controls, _statusOf(state));
       await controls.setNextPrevious(
         next: _can(MediaActionMessage.skipToNext),
         previous: _can(MediaActionMessage.skipToPrevious),
       );
-      await _publishTimeline(controls);
+      if (_timelineDue(state)) await _publishTimeline(controls);
     });
+  }
+
+  static smtc.PlaybackStatus _statusOf(PlaybackStateMessage state) =>
+      state.processingState == AudioProcessingStateMessage.idle
+      ? smtc.PlaybackStatus.stopped
+      : state.playing
+      ? smtc.PlaybackStatus.playing
+      : smtc.PlaybackStatus.paused;
+
+  Future<void> _setStatus(
+    SmtcControls controls,
+    smtc.PlaybackStatus status,
+  ) async {
+    if (_status == status) return;
+    _status = status;
+    try {
+      await controls.setStatus(status);
+    } catch (_) {
+      _status = null;
+      rethrow;
+    }
+  }
+
+  /// Whether [state] needs a new timeline: a status or speed change, a seek
+  /// or jump, or [timelineInterval] since the last one while playing. The
+  /// controls carry no rate, so between updates they show the last one or
+  /// advance it themselves.
+  bool _timelineDue(PlaybackStateMessage state) {
+    final sent = _timeline;
+    if (sent == null) return true;
+    final status = _statusOf(sent);
+    if (status != _statusOf(state) || sent.speed != state.speed) return true;
+    if (status != smtc.PlaybackStatus.playing) {
+      return state.updatePosition != sent.updatePosition;
+    }
+    final elapsed = state.updateTime.difference(sent.updateTime);
+    if (elapsed >= timelineInterval) return true;
+    final expected = sent.updatePosition + elapsed * sent.speed;
+    return (state.updatePosition - expected).abs() > jumpTolerance;
   }
 
   @override
@@ -174,21 +222,27 @@ class SmtcAudioService extends NoOpAudioService {
   Future<void> stopService(StopServiceRequest request) async {
     final controls = _controls;
     if (controls == null) return;
-    await _guard(() => controls.setStatus(smtc.PlaybackStatus.stopped));
+    await _guard(() => _setStatus(controls, smtc.PlaybackStatus.stopped));
   }
 
-  Future<void> _publishTimeline(SmtcControls controls) {
+  Future<void> _publishTimeline(SmtcControls controls) async {
+    final state = _timeline = _state;
     final length = _item?.duration ?? Duration.zero;
-    final position = _state?.updatePosition ?? Duration.zero;
-    return controls.setTimeline(
-      smtc.PlaybackTimeline(
-        startTimeMs: 0,
-        endTimeMs: length.inMilliseconds,
-        positionMs: position.inMilliseconds.clamp(0, length.inMilliseconds),
-        minSeekTimeMs: 0,
-        maxSeekTimeMs: length.inMilliseconds,
-      ),
-    );
+    final position = state?.updatePosition ?? Duration.zero;
+    try {
+      await controls.setTimeline(
+        smtc.PlaybackTimeline(
+          startTimeMs: 0,
+          endTimeMs: length.inMilliseconds,
+          positionMs: position.inMilliseconds.clamp(0, length.inMilliseconds),
+          minSeekTimeMs: 0,
+          maxSeekTimeMs: length.inMilliseconds,
+        ),
+      );
+    } catch (_) {
+      _timeline = null;
+      rethrow;
+    }
   }
 
   /// Artwork the controls can read: the file audio_service cached, or an

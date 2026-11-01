@@ -4,6 +4,7 @@ import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/models/unified_library_item.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/widgets/desktop/context_menu.dart';
+import 'package:mornye/widgets/desktop/desktop_link_transfer_actions.dart';
 import 'package:mornye/widgets/playlist_picker_sheet.dart';
 
 /// Context menu groups for library files (downloaded or scanned), acting on
@@ -11,9 +12,10 @@ import 'package:mornye/widgets/playlist_picker_sheet.dart';
 ///
 /// The playback and playlist actions match [LibrarySelectionPlaybackActions];
 /// the screen passes its own selection-bar callbacks for the rest, and omits
-/// those it does not offer. Actions that finish with the menu (play, queue,
-/// playlist, details) call [onDone] to end the selection; the bulk actions
-/// keep it and end it themselves.
+/// those it does not offer. Mornye Link adds "Send to (phone)" and "Save to
+/// this computer" while a phone is connected. Actions that finish with the
+/// menu (play, queue, playlist, transfers, details) call [onDone] to end the
+/// selection; the bulk actions keep it and end it themselves.
 List<List<ContextMenuAction>> libraryTrackMenuGroups(
   BuildContext context,
   WidgetRef ref, {
@@ -29,6 +31,7 @@ List<List<ContextMenuAction>> libraryTrackMenuGroups(
   final l10n = context.l10n;
   final root = Navigator.of(context, rootNavigator: true).context;
   final count = items.length;
+  final showPlayer = ref.read(playerUiEnabledProvider);
 
   Future<void> enqueue({required bool playNext}) async {
     await ref
@@ -48,16 +51,18 @@ List<List<ContextMenuAction>> libraryTrackMenuGroups(
             onPlay();
           },
         ),
-      ContextMenuAction(
-        icon: Icons.playlist_play,
-        label: l10n.trackPlayNext,
-        onSelected: () => enqueue(playNext: true),
-      ),
-      ContextMenuAction(
-        icon: Icons.queue_music,
-        label: l10n.trackAddToQueue,
-        onSelected: () => enqueue(playNext: false),
-      ),
+      if (showPlayer)
+        ContextMenuAction(
+          icon: Icons.playlist_play,
+          label: l10n.trackPlayNext,
+          onSelected: () => enqueue(playNext: true),
+        ),
+      if (showPlayer)
+        ContextMenuAction(
+          icon: Icons.queue_music,
+          label: l10n.trackAddToQueue,
+          onSelected: () => enqueue(playNext: false),
+        ),
     ],
     [
       ContextMenuAction(
@@ -70,6 +75,7 @@ List<List<ContextMenuAction>> libraryTrackMenuGroups(
         },
       ),
     ],
+    desktopLinkTransferActions(context, ref, items, onDone: onDone),
     [
       if (onOpenDetails != null && count == 1)
         ContextMenuAction(

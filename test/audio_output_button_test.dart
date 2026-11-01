@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -12,10 +13,18 @@ void main() {
   final messenger =
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
 
-  Widget app({ValueChanged<bool>? onChanged}) => MaterialApp(
+  Widget app({ValueChanged<bool>? onChanged, Color? background}) => MaterialApp(
     localizationsDelegates: AppLocalizations.localizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
-    home: Scaffold(body: AudioOutputButton(onPickerChanged: onChanged)),
+    home: Scaffold(
+      body: Center(
+        child: AudioOutputButton(
+          onPickerChanged: onChanged,
+          backgroundColor: background,
+          width: 56,
+        ),
+      ),
+    ),
   );
 
   tearDown(() {
@@ -104,6 +113,37 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
   }, variant: TargetPlatformVariant.only(TargetPlatform.android));
+
+  testWidgets(
+    'a filled button is a pill as wide as asked and still opens',
+    (tester) async {
+      var requests = 0;
+      messenger.setMockMethodCallHandler(channel, (_) async {
+        requests++;
+        return true;
+      });
+      messenger.setMockMethodCallHandler(
+        SystemChannels.platform_views,
+        (_) async => null,
+      );
+      await tester.pumpWidget(app(background: Colors.grey));
+      await tester.pumpAndSettle();
+      expect(
+        tester.getSize(find.byType(AudioOutputButton)),
+        const Size(56, 48),
+      );
+      if (defaultTargetPlatform == TargetPlatform.android) {
+        await tester.tap(find.byTooltip('Audio Output'));
+        await tester.pumpAndSettle();
+        expect(requests, 1);
+      }
+      await tester.pumpWidget(const SizedBox());
+    },
+    variant: TargetPlatformVariant({
+      TargetPlatform.android,
+      TargetPlatform.iOS,
+    }),
+  );
 
   testWidgets('unsupported desktop does not expose an inert control', (
     tester,

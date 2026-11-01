@@ -3,23 +3,43 @@ import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mornye/models/settings.dart';
 import 'package:mornye/models/track.dart';
 import 'package:mornye/providers/download_queue_provider.dart';
 import 'package:mornye/providers/playback_provider.dart';
+import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/services/history_database.dart';
 import 'package:mornye/services/library_database.dart';
+import 'package:mornye/services/track_file_resolver.dart';
+
+import 'support/fixed_settings.dart';
 
 class _Library extends Fake implements LibraryDatabase {
+  /// Scanned files by track name.
+  final Map<String, String> paths = {};
+
   @override
   Future<List<Map<String, dynamic>?>> findExistingBatch(
     List<LocalLibraryBatchLookupRequest> requests,
-  ) async => List.filled(requests.length, null);
+  ) async => [
+    for (final request in requests)
+      if (paths[request.trackName] case final path?)
+        {'filePath': path}
+      else
+        null,
+  ];
 }
 
 class _HistoryDatabase extends Fake implements HistoryDatabase {
   final Map<String, String> paths = {};
   final List<List<String>> deletes = [];
   bool failDelete = false;
+
+  @override
+  Future<Map<String, dynamic>?> getById(String id) async => null;
+
+  @override
+  Future<Map<String, dynamic>?> findByFilePath(String path) async => null;
 
   @override
   Future<List<Map<String, dynamic>?>> findExistingTracks(
@@ -85,18 +105,96 @@ void main() {
       ),
   ];
 
-  ProviderContainer containerFor(_HistoryDatabase history) {
+  test(
+    'a moved download is resolved before it can be removed as an orphan',
+    () async {
+      final database = _HistoryDatabase()..paths['0'] = 'content://old/song';
+      messenger.setMockMethodCallHandler(
+        channel,
+        (_) async => jsonEncode({'content://old/song': 'missing'}),
+      );
+      final result = await resolveTrackFiles(
+        tracks(1),
+        library: _Library(),
+        history: database,
+        includeLocal: false,
+        recoverDownload: (source, id) async {
+          expect(source, 'content://old/song');
+          expect(id, '0');
+          return 'content://new/song';
+        },
+      );
+      expect(result.paths, ['content://new/song']);
+      expect(result.missingHistoryIds, isEmpty);
+    },
+  );
+
+  test(
+    'recovery access errors retain the download for a later retry',
+    () async {
+      final database = _HistoryDatabase()..paths['0'] = 'content://old/song';
+      messenger.setMockMethodCallHandler(
+        channel,
+        (_) async => jsonEncode({'content://old/song': 'missing'}),
+      );
+      final result = await resolveTrackFiles(
+        tracks(1),
+        library: _Library(),
+        history: database,
+        includeLocal: false,
+        recoverDownload: (_, _) => throw StateError('Folder access denied'),
+      );
+      expect(result.paths, [null]);
+      expect(result.missingHistoryIds, isEmpty);
+    },
+  );
+
+  ProviderContainer containerFor(
+    _HistoryDatabase history, {
+    _Library? library,
+    bool localLibrary = false,
+  }) {
     final container = ProviderContainer(
       overrides: [
         playbackProvider.overrideWith(
-          () => PlaybackController(library: _Library(), history: history),
+          () => PlaybackController(
+            library: library ?? _Library(),
+            history: history,
+          ),
         ),
         downloadHistoryProvider.overrideWith(() => _History(history)),
+        settingsProvider.overrideWith(
+          () => FixedSettingsNotifier(
+            AppSettings(localLibraryEnabled: localLibrary),
+          ),
+        ),
       ],
     );
     addTearDown(container.dispose);
     return container;
   }
+
+  test('scanned files play only while Local Library is on', () async {
+    final library = _Library()..paths['Track 0'] = 'content://library/0';
+    final database = _HistoryDatabase()..paths['1'] = 'content://downloads/1';
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      final uris = List<String>.from(
+        jsonDecode((call.arguments as Map)['uris_json'] as String) as List,
+      );
+      return jsonEncode({for (final uri in uris) uri: 'found'});
+    });
+    for (final enabled in [false, true]) {
+      final paths = await containerFor(
+        database,
+        library: library,
+        localLibrary: enabled,
+      ).read(playbackProvider.notifier).resolveTrackFilePaths(tracks(2));
+      expect(paths, [
+        enabled ? 'content://library/0' : null,
+        'content://downloads/1',
+      ]);
+    }
+  });
 
   test('large SAF queues use bounded batches and deduplicate paths', () async {
     final database = _HistoryDatabase();

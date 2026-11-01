@@ -221,6 +221,11 @@ void main() {
           scrollable: find.byType(Scrollable).first,
         );
         await tester.pumpAndSettle();
+        // The picker sits on an opaque group card.
+        expect(
+          find.descendant(of: picker, matching: find.byType(BackdropFilter)),
+          findsNothing,
+        );
         await tester.tap(
           find.descendant(of: picker, matching: find.text('31')).first,
         );

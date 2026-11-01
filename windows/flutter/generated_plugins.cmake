@@ -5,6 +5,7 @@
 list(APPEND FLUTTER_PLUGIN_LIST
   app_links
   audioplayers_windows
+  bonsoir_windows
   connectivity_plus
   desktop_drop
   dynamic_color
@@ -12,13 +13,13 @@ list(APPEND FLUTTER_PLUGIN_LIST
   flutter_secure_storage_windows
   media_kit_libs_windows_audio
   permission_handler_windows
+  record_windows
   share_plus
   url_launcher_windows
   volume_controller
 )
 
 list(APPEND FLUTTER_FFI_PLUGIN_LIST
-  dart_smb2
   flutter_local_notifications_windows
   jni
   smtc_windows

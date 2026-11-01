@@ -1,7 +1,8 @@
 part of 'music_player_service.dart';
 
-/// Creates the clocks that time AutoMix fades and audio-progress checks.
-/// Only tests replace it, to run transitions on a fake clock.
+/// Creates the clocks that time AutoMix fades, audio-progress checks and the
+/// position ticks that feed them. Only tests replace it, to run transitions
+/// on a fake clock.
 Stopwatch Function() autoMixStopwatch = Stopwatch.new;
 
 /// Owns only the extra deck and transition work. The ordinary player remains
@@ -56,6 +57,8 @@ class _MusicAutoMix {
   bool get _canMix =>
       handler._settings.autoMix &&
       !handler._settings.usbBitPerfect &&
+      // A second deck cannot open a device held in exclusive mode.
+      !playbackExclusiveOutput.value &&
       !handler._player.isDirect &&
       !handler._disposed &&
       handler._sourceReady &&
@@ -65,11 +68,30 @@ class _MusicAutoMix {
       handler._repeatMode != AudioServiceRepeatMode.one &&
       handler._media.length > 1;
 
+  static bool _isUrl(String path) =>
+      const {'http', 'https'}.contains(Uri.tryParse(path)?.scheme);
+
   bool _current(int generation) =>
       generation == _generation &&
       _canMix &&
       _playGeneration == handler._playRequestGeneration &&
       _queueRevision == handler._sessionQueueRevision;
+
+  /// Whether [onPosition] would act now: a planned mix times its start from
+  /// every position, and a song not yet planned starts its analysis. Keep
+  /// in step with the early returns of [onPosition].
+  bool get wantsPosition {
+    if (!_canMix || _cancelling > 0 || _starting || _fadeTimer != null) {
+      return false;
+    }
+    if (_plan != null) return true;
+    if (_preparing) return false;
+    final duration = handler.mediaItem.value?.duration;
+    return duration != null &&
+        duration >= const Duration(seconds: 20) &&
+        _attempt !=
+            '${handler._playRequestGeneration}:${handler._sessionQueueRevision}';
+  }
 
   void onPosition(Duration position) {
     if (!_canMix || _cancelling > 0 || _starting || _fadeTimer != null) return;
@@ -106,7 +128,7 @@ class _MusicAutoMix {
     final nextIndex = index + 1 < handler._media.length
         ? index + 1
         : handler._repeatMode == AudioServiceRepeatMode.all
-        ? 0
+        ? handler._repeatPassStart()
         : -1;
     final pins = <String>{};
     _preparationPins[generation] = pins;
@@ -124,6 +146,10 @@ class _MusicAutoMix {
       pins.add(currentPath);
       final nextPath = await handler._resolveSource(next);
       if (nextPath == null || !_current(generation)) return;
+      // A song a paired phone is still sending (or sending again, its
+      // received copy gone) streams from a URL, which neither the mix deck
+      // nor the analysis opens.
+      if (_isUrl(currentPath) || _isUrl(nextPath)) return;
       pins.add(nextPath);
       deck = handler._dependencies.createDeck(
         'music-mix-$generation-${DateTime.now().microsecondsSinceEpoch}',
@@ -350,9 +376,13 @@ class _MusicAutoMix {
       _setStatus(
         plan.beatMatched ? AutoMixStatus.mixing : AutoMixStatus.crossfading,
       );
-      handler._index = _nextIndex;
+      // An index at or before the current one wraps to a new repeat-all pass.
+      final nextIndex = _nextIndex > handler._index
+          ? _nextIndex
+          : handler._beginRepeatPass(_nextIndex);
+      handler._index = nextIndex;
       handler._playRequestGeneration++;
-      handler._recordPlayHistory(_nextIndex);
+      handler._recordPlayHistory(nextIndex);
       handler._normalizationVolume = _incomingVolume;
       handler._activeResolvedPath = next.isContentUri ? _nextPath : null;
       handler._pendingRestorePosition = null;
@@ -365,6 +395,14 @@ class _MusicAutoMix {
               resolvedSource: next.isContentUri ? _nextPath : null,
             )
             .copyWith(duration: _nextDuration),
+      );
+      handler._covers
+        ..fetchFor(next)
+        ..fetchAhead();
+      // A song without a listed cover shows its embedded one, as when it
+      // starts without a mix.
+      unawaited(
+        handler._recoverEmbeddedArtwork(next, handler._playRequestGeneration),
       );
       handler._broadcastPosition(audiblePosition, force: true);
       handler._broadcastState(playerState: PlaybackDeckState.playing);

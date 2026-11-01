@@ -40,8 +40,17 @@ class M3uPlaylistService {
   /// Parses M3U/M3U8 content into tracks for the import pipeline. EXTINF
   /// display text is split on the first " - " into artist and title; path
   /// lines without EXTINF fall back to the file name stem.
-  static List<Track> parseM3u(String content, {int? idSeed}) {
-    final tracks = <Track>[];
+  static List<Track> parseM3u(String content, {int? idSeed}) => [
+    for (final entry in parseM3uEntries(content, idSeed: idSeed)) entry.track,
+  ];
+
+  /// [parseM3u] with each track's path line, which a Library import matches
+  /// against local files before falling back to the title and artist.
+  static List<({Track track, String path})> parseM3uEntries(
+    String content, {
+    int? idSeed,
+  }) {
+    final tracks = <({Track track, String path})>[];
     final lines = content.split(RegExp(r'\r\n|\r|\n'));
     final baseId = idSeed ?? DateTime.now().millisecondsSinceEpoch;
 
@@ -79,8 +88,8 @@ class M3uPlaylistService {
 
       if (title.isNotEmpty) {
         final duration = pendingDuration ?? 0;
-        tracks.add(
-          Track(
+        tracks.add((
+          track: Track(
             id: 'm3u_${baseId}_${tracks.length}',
             name: title,
             artistName: artist.isEmpty ? 'Unknown Artist' : artist,
@@ -88,7 +97,8 @@ class M3uPlaylistService {
             duration: duration > 0 ? duration : 0,
             coverUrl: null,
           ),
-        );
+          path: line,
+        ));
       }
       pendingDuration = null;
       pendingDisplay = null;

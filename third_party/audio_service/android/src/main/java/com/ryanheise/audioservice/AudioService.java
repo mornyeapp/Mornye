@@ -24,7 +24,7 @@ import android.support.v4.media.RatingCompat;
 import android.support.v4.media.session.MediaControllerCompat;
 import android.support.v4.media.session.MediaSessionCompat;
 import android.support.v4.media.session.PlaybackStateCompat;
-import android.util.LruCache;
+import android.util.Log;
 import android.util.Size;
 import android.view.KeyEvent;
 
@@ -72,6 +72,7 @@ public class AudioService extends MediaBrowserServiceCompat {
     public static final int KEYCODE_BYPASS_PLAY = KeyEvent.KEYCODE_MUTE;
     public static final int KEYCODE_BYPASS_PAUSE = KeyEvent.KEYCODE_MEDIA_RECORD;
     public static final int MAX_COMPACT_ACTIONS = 3;
+    private static final int ART_CACHE_ENTRIES = 3;
     private static final long AUTO_ENABLED_ACTIONS = PlaybackStateCompat.ACTION_STOP
             | PlaybackStateCompat.ACTION_PAUSE
             | PlaybackStateCompat.ACTION_PLAY
@@ -177,7 +178,12 @@ public class AudioService extends MediaBrowserServiceCompat {
 
     Bitmap loadArtBitmap(String artUriString, String loadThumbnailUri) {
         Bitmap bitmap = artBitmapCache.get(artUriString);
-        if (bitmap != null) return bitmap;
+        if (bitmap != null) {
+            if (!bitmap.isRecycled()) return bitmap;
+            artBitmapCache.remove(artUriString);
+            bitmap = null;
+        }
+        ParcelFileDescriptor parcelFileDescriptor = null;
         try {
             // There are 3 cases handled by this function:
             //   1. content URI with openFileDescriptor
@@ -203,7 +209,7 @@ public class AudioService extends MediaBrowserServiceCompat {
                             return null;
                         }
                     } else {
-                        ParcelFileDescriptor parcelFileDescriptor = getContentResolver().openFileDescriptor(artUri, "r");
+                        parcelFileDescriptor = getContentResolver().openFileDescriptor(artUri, "r");
                         if (parcelFileDescriptor != null) {
                             fileDescriptor = parcelFileDescriptor.getFileDescriptor();
                         } else {
@@ -242,11 +248,22 @@ public class AudioService extends MediaBrowserServiceCompat {
                     }
                 }
             }
-            artBitmapCache.put(artUriString, bitmap);
+            if (bitmap != null) {
+                bitmap = MediaArtwork.bound(bitmap);
+                artBitmapCache.put(artUriString, bitmap);
+            }
             return bitmap;
         } catch (Exception e) {
             e.printStackTrace();
             return null;
+        } finally {
+            if (parcelFileDescriptor != null) {
+                try {
+                    parcelFileDescriptor.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
         }
     }
 
@@ -269,7 +286,7 @@ public class AudioService extends MediaBrowserServiceCompat {
 
     private FlutterEngine flutterEngine;
     private AudioServiceConfig config;
-    private PowerManager.WakeLock wakeLock;
+    private PlaybackWakeLock wakeLock;
     private MediaSessionCompat mediaSession;
     private MediaSessionCallback mediaSessionCallback;
     private List<MediaControl> controls = new ArrayList<>();
@@ -279,7 +296,7 @@ public class AudioService extends MediaBrowserServiceCompat {
     private MediaMetadataCompat mediaMetadata;
     private Bitmap artBitmap;
     private String notificationChannelId;
-    private LruCache<String, Bitmap> artBitmapCache;
+    private RecentArtCache<Bitmap> artBitmapCache;
     private boolean playing = false;
     private AudioProcessingState processingState = AudioProcessingState.idle;
     private int repeatMode;
@@ -326,24 +343,12 @@ public class AudioService extends MediaBrowserServiceCompat {
         mediaSession.setQueue(queue);
 
         PowerManager pm = (PowerManager)getSystemService(Context.POWER_SERVICE);
-        wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, AudioService.class.getName());
+        wakeLock = new PlaybackWakeLock(
+                pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, AudioService.class.getName()), handler);
 
-        // Get max available VM memory, exceeding this amount will throw an
-        // OutOfMemory exception. Stored in kilobytes as LruCache takes an
-        // int in its constructor.
-        final int maxMemory = (int)(Runtime.getRuntime().maxMemory() / 1024);
-
-        // Use 1/8th of the available memory for this memory cache.
-        final int cacheSize = maxMemory / 8;
-
-        artBitmapCache = new LruCache<String, Bitmap>(cacheSize) {
-            @Override
-            protected int sizeOf(String key, Bitmap bitmap) {
-                // The cache size will be measured in kilobytes rather than
-                // number of items.
-                return bitmap.getByteCount() / 1024;
-            }
-        };
+        // The current cover and the two before it, so skipping back reuses
+        // them. Each is decoded at most MediaArtwork.MAX_DIMENSION square.
+        artBitmapCache = new RecentArtCache<>(ART_CACHE_ENTRIES);
 
         flutterEngine = AudioServicePlugin.getFlutterEngine(this);
         System.out.println("flutterEngine warmed up");
@@ -356,8 +361,19 @@ public class AudioService extends MediaBrowserServiceCompat {
     }
 
     public void stop() {
+        exitForegroundState();
         deactivateMediaSession();
         stopSelf();
+    }
+
+    @Override
+    public void onTrimMemory(int level) {
+        super.onTrimMemory(level);
+        // Earlier covers serve only a replay. The current one stays: the
+        // notification shows it and the item's next metadata update reuses it.
+        // Android 14 and later report only TRIM_MEMORY_UI_HIDDEN and
+        // TRIM_MEMORY_BACKGROUND, both above this level.
+        if (level >= TRIM_MEMORY_RUNNING_LOW) artBitmapCache.evictAllExcept(artBitmap);
     }
 
     @Override
@@ -369,7 +385,6 @@ public class AudioService extends MediaBrowserServiceCompat {
         super.onDestroy();
         if (listener != null) {
             listener.onDestroy();
-            listener = null;
         }
         mediaMetadata = null;
         artBitmap = null;
@@ -378,7 +393,8 @@ public class AudioService extends MediaBrowserServiceCompat {
         artBitmapCache.evictAll();
         compactActionIndices = null;
         releaseMediaSession();
-        ServiceCompat.stopForeground(this, config.androidResumeOnClick ? STOP_FOREGROUND_DETACH : STOP_FOREGROUND_REMOVE);
+        ServiceCompat.stopForeground(this, config.androidResumeOnClick
+                ? ServiceCompat.STOP_FOREGROUND_DETACH : ServiceCompat.STOP_FOREGROUND_REMOVE);
         // This still does not solve the Android 11 problem.
         // if (notificationCreated) {
         //     NotificationManager notificationManager = getNotificationManager();
@@ -419,10 +435,7 @@ public class AudioService extends MediaBrowserServiceCompat {
     }
 
     int getResourceId(String resource) {
-        String[] parts = resource.split("/");
-        String resourceType = parts[0];
-        String resourceName = parts[1];
-        return getResources().getIdentifier(resourceName, resourceType, getApplicationContext().getPackageName());
+        return AudioServicePlugin.resolveResourceId(getApplicationContext(), resource);
     }
 
     NotificationCompat.Action createAction(String resource, String label, long actionCode) {
@@ -585,7 +598,7 @@ public class AudioService extends MediaBrowserServiceCompat {
         if (errorCode != null && errorMessage != null)
             stateBuilder.setErrorMessage(errorCode, errorMessage);
         else if (errorMessage != null)
-            stateBuilder.setErrorMessage(-987654, errorMessage);
+            stateBuilder.setErrorMessage(PlaybackStateCompat.ERROR_CODE_UNKNOWN_ERROR, errorMessage);
 
         if (mediaMetadata != null) {
             // Update the progress bar in the browse view as content is playing as explained
@@ -670,7 +683,7 @@ public class AudioService extends MediaBrowserServiceCompat {
             if (description.getDescription() != null)
                 builder.setSubText(description.getDescription());
             if (artBitmap != null)
-                builder.setLargeIcon(artBitmap);
+                builder.setLargeIcon(MediaArtwork.copy(artBitmap, 256));
         }
         if (config.androidNotificationClickStartsActivity)
             builder.setContentIntent(mediaSession.getController().getSessionActivity());
@@ -757,11 +770,13 @@ public class AudioService extends MediaBrowserServiceCompat {
     private void exitPlayingState() {
         if (config.androidStopForegroundOnPause) {
             exitForegroundState();
+        } else {
+            releaseWakeLock();
         }
     }
 
     private void exitForegroundState() {
-        ServiceCompat.stopForeground(this, STOP_FOREGROUND_DETACH);
+        ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_DETACH);
         releaseWakeLock();
     }
 
@@ -771,13 +786,11 @@ public class AudioService extends MediaBrowserServiceCompat {
     }
 
     private void acquireWakeLock() {
-        if (!wakeLock.isHeld())
-            wakeLock.acquire();
+        if (wakeLock != null) wakeLock.acquire();
     }
 
     private void releaseWakeLock() {
-        if (wakeLock.isHeld())
-            wakeLock.release();
+        if (wakeLock != null) wakeLock.release();
     }
 
     private void activateMediaSession() {
@@ -857,12 +870,19 @@ public class AudioService extends MediaBrowserServiceCompat {
         // after the new track is already playing, so refresh the latest state
         // with its new media ID without changing playback or its position clock.
         if (destroyed || mediaSession == null) return;
+        mediaMetadata = MediaArtwork.sanitize(mediaMetadata);
+        try {
+            mediaSession.setMetadata(MediaArtwork.forSession(mediaMetadata));
+        } catch (IllegalArgumentException | IllegalStateException error) {
+            Log.w("AudioService", "Artwork rejected by media session; publishing text metadata", error);
+            mediaMetadata = MediaArtwork.withoutArtwork(mediaMetadata);
+            mediaSession.setMetadata(mediaMetadata);
+        }
         synchronized (mediaMetadataCache) {
             mediaMetadataCache.setCurrent(mediaMetadata.getString(MediaMetadataCompat.METADATA_KEY_MEDIA_ID), mediaMetadata);
         }
         this.mediaMetadata = mediaMetadata;
-        artBitmap = bitmap;
-        mediaSession.setMetadata(mediaMetadata);
+        artBitmap = bitmap != null && !bitmap.isRecycled() ? bitmap : null;
         PlaybackStateCompat state = mediaSession.getController().getPlaybackState();
         if (state != null) {
             Bundle extras = state.getExtras() == null ? new Bundle() : new Bundle(state.getExtras());

@@ -4,7 +4,7 @@ import 'dart:io';
 
 import 'package:crypto/crypto.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:mornye/services/ffmpeg_service.dart';
+import 'package:mornye/services/ffmpeg_probe.dart';
 import 'package:mornye/services/ffmpeg_support.dart';
 import 'package:mornye/services/motion_artwork_download.dart';
 import 'package:mornye/services/motion_artwork_proxy.dart';
@@ -253,7 +253,7 @@ class MotionArtworkStore {
       output,
     ], timeout: const Duration(seconds: 60));
     if (!success) return null;
-    final dimensions = await FFmpegService.probeImageDimensions(output);
+    final dimensions = await FFmpegProbe.imageDimensions(output);
     return dimensions == null ? null : dimensions.width / dimensions.height;
   }
 

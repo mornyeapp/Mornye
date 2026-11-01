@@ -103,6 +103,7 @@ pub(crate) static METHODS: &[Entry] = &[
     }),
     pool("customSearchWithExtension", extension_request),
     pool("getExtensionHomeFeed", extension_request),
+    pool("getExtensionRelatedTracks", extension_request),
     pool("initExtensionSystem", |c, a| {
         null(c.rt.backend.initialize_owner(a))
     }),
@@ -688,6 +689,29 @@ pub(crate) static METHODS: &[Entry] = &[
         c.rt.watcher.stop();
         Ok(Reply::null())
     }),
+    // Desktop only: the Mornye Link server (link.rs, LINK_CONTRACT.md 6).
+    pool("linkStart", |c, a| c.rt.link.start(&c.rt.config, a)),
+    pool("linkStop", |c, _| {
+        c.rt.link.stop();
+        Ok(Reply::null())
+    }),
+    pool("linkStatus", |c, _| {
+        Ok(c.rt.link.status(&c.rt.config).into())
+    }),
+    pool("linkSetCatalog", |c, a| c.rt.link.set_catalog(a)),
+    pool("linkBeginPairing", |c, _| c.rt.link.begin_pairing()),
+    pool("linkEndPairing", |c, _| {
+        c.rt.link.end_pairing();
+        Ok(Reply::null())
+    }),
+    pool("linkDevices", |c, _| c.rt.link.devices(&c.rt.config)),
+    pool("linkRevoke", |c, a| c.rt.link.revoke(&c.rt.config, a)),
+    pool("linkCreateKey", |c, a| c.rt.link.create_key(a)),
+    pool("linkReply", |c, a| c.rt.link.reply(a)),
+    pool("linkSend", |c, a| c.rt.link.send(a)),
+    pool("linkEmbeddedPictures", |c, a| {
+        c.rt.link.embedded_pictures(a)
+    }),
 ];
 
 fn table() -> &'static HashMap<&'static str, &'static Entry> {
@@ -792,6 +816,14 @@ fn extension_request(c: &Ctx<'_>, a: &Args) -> CallResult {
         return text(manager.custom_search_json(
             extension_id,
             a.string("query", ""),
+            a.string("options", ""),
+            Some(lease),
+        ));
+    }
+    if c.method == "getExtensionRelatedTracks" {
+        return text(manager.get_extension_related_tracks_json(
+            extension_id,
+            a.string("seeds", "[]"),
             a.string("options", ""),
             Some(lease),
         ));

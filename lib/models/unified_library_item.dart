@@ -40,21 +40,6 @@ class UnifiedLibraryItem {
   });
 
   factory UnifiedLibraryItem.fromDownloadHistory(DownloadHistoryItem item) {
-    String? quality;
-    if (item.bitrate != null && item.bitrate! > 0) {
-      quality = buildDisplayAudioQuality(
-        bitrateKbps: item.bitrate,
-        format: item.format,
-      );
-    } else if (item.bitDepth != null &&
-        item.bitDepth! > 0 &&
-        item.sampleRate != null) {
-      quality = buildDisplayAudioQuality(
-        bitDepth: item.bitDepth,
-        sampleRate: item.sampleRate,
-      );
-    }
-    quality ??= item.quality;
     return UnifiedLibraryItem(
       id: 'dl_${item.id}',
       trackName: item.trackName,
@@ -62,7 +47,14 @@ class UnifiedLibraryItem {
       albumName: item.albumName,
       coverUrl: item.coverUrl,
       filePath: item.filePath,
-      quality: quality,
+      quality:
+          buildDisplayAudioQuality(
+            bitDepth: item.bitDepth,
+            sampleRate: item.sampleRate,
+            bitrateKbps: item.bitrate,
+            format: item.format,
+          ) ??
+          item.quality,
       addedAt: item.downloadedAt,
       source: LibraryItemSource.downloaded,
       historyItem: item,
@@ -70,20 +62,6 @@ class UnifiedLibraryItem {
   }
 
   factory UnifiedLibraryItem.fromLocalLibrary(LocalLibraryItem item) {
-    String? quality;
-    if (item.bitrate != null && item.bitrate! > 0) {
-      quality = buildDisplayAudioQuality(
-        bitrateKbps: item.bitrate,
-        format: item.format,
-      );
-    } else if (item.bitDepth != null &&
-        item.bitDepth! > 0 &&
-        item.sampleRate != null) {
-      quality = buildDisplayAudioQuality(
-        bitDepth: item.bitDepth,
-        sampleRate: item.sampleRate,
-      );
-    }
     return UnifiedLibraryItem(
       id: 'local_${item.id}',
       trackName: item.trackName,
@@ -92,7 +70,12 @@ class UnifiedLibraryItem {
       coverUrl: null,
       localCoverPath: item.coverPath,
       filePath: item.filePath,
-      quality: quality,
+      quality: buildDisplayAudioQuality(
+        bitDepth: item.bitDepth,
+        sampleRate: item.sampleRate,
+        bitrateKbps: item.bitrate,
+        format: item.format,
+      ),
       addedAt: item.fileModTime != null
           ? DateTime.fromMillisecondsSinceEpoch(item.fileModTime!)
           : item.scannedAt,
@@ -100,10 +83,6 @@ class UnifiedLibraryItem {
       localItem: item,
     );
   }
-
-  bool get hasCover =>
-      coverUrl != null ||
-      (localCoverPath != null && localCoverPath!.isNotEmpty);
 
   String? qualityForMode(String mode) {
     final history = historyItem;
@@ -135,25 +114,6 @@ class UnifiedLibraryItem {
 
     return quality;
   }
-
-  String? get albumArtist => historyItem?.albumArtist ?? localItem?.albumArtist;
-
-  String? get releaseDate => historyItem?.releaseDate ?? localItem?.releaseDate;
-
-  String? get genre => historyItem?.genre ?? localItem?.genre;
-
-  int? get trackNumber => historyItem?.trackNumber ?? localItem?.trackNumber;
-
-  int? get discNumber => historyItem?.discNumber ?? localItem?.discNumber;
-
-  String? get isrc => historyItem?.isrc ?? localItem?.isrc;
-
-  String? get label => historyItem?.label ?? localItem?.label;
-
-  String get searchKey =>
-      '${trackName.toLowerCase()}|${artistName.toLowerCase()}|${albumName.toLowerCase()}';
-  String get albumKey =>
-      '${albumName.toLowerCase()}|${artistName.toLowerCase()}';
 
   /// Returns the collection key used to match this item against playlist
   /// entries: prefer ISRC, fall back to source:id.

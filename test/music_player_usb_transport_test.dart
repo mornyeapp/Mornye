@@ -292,6 +292,25 @@ void main() {
       },
     );
 
+    test('direct playback asks for a position only on wanted ticks', () async {
+      var wanted = false;
+      deck.startPositionUpdates(
+        const Duration(milliseconds: 10),
+        wanted: () => wanted,
+      );
+      await deck.setFileSource('/one.flac', preferBitPerfect: true);
+      await deck.resume();
+      int reads() => usbCalls.where((call) => call == 'position').length;
+      // Longer than the 200 ms the direct path once polled on regardless.
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+      expect(reads(), 0);
+      wanted = true;
+      await Future<void>.delayed(const Duration(milliseconds: 150));
+      // Only the 10 ms interval reads this often.
+      expect(reads(), greaterThanOrEqualTo(3));
+      await deck.pause();
+    });
+
     test('late pause reply does not pause a newly prepared source', () async {
       await deck.setFileSource('/one.flac', preferBitPerfect: true);
       await deck.resume();
@@ -387,5 +406,34 @@ void main() {
         await subscription.cancel();
       },
     );
+  });
+
+  test('the ordinary output reads a position on wanted ticks and after '
+      'a seek', () async {
+    final deck = AudioplayersPlaybackDeck(playerId: 'ticks');
+    try {
+      var wanted = false;
+      deck.startPositionUpdates(
+        const Duration(milliseconds: 10),
+        wanted: () => wanted,
+      );
+      int reads() => native.calls
+          .where(
+            (call) => call.$1 == 'ticks' && call.$2 == 'getCurrentPosition',
+          )
+          .length;
+      await deck.setFileSource('/ticks.flac');
+      await deck.resume();
+      final loaded = reads();
+      await Future<void>.delayed(const Duration(milliseconds: 60));
+      expect(reads(), loaded);
+      await deck.seek(const Duration(seconds: 5));
+      expect(reads(), loaded + 1);
+      wanted = true;
+      await _until(() => reads() > loaded + 2);
+      await deck.pause();
+    } finally {
+      await deck.dispose();
+    }
   });
 }

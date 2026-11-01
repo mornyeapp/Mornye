@@ -353,6 +353,24 @@ play counts after 30 seconds.
 </details>
 
 <details>
+<summary><b>Can I use Mornye on Android TV or Google TV?</b></summary>
+<br>
+
+Install the Android APK on an ARM TV device. Mornye appears in the TV launcher
+and opens in landscape with a persistent sidebar and larger controls. Both
+Material and Mornye styles support the remote: use the D-pad to move focus,
+OK to open or activate an item, and Back to close the current page. Playback
+keys control play, pause, previous and next. On a focused seek or volume
+slider, Left and Right adjust its value; Up and Down leave the slider.
+
+Keep the default app folder during TV setup if there is no system folder picker.
+It is stored in the app's own storage, so setup needs no shared-storage permission.
+Network storage can provide music from a NAS. Provider sign-in that opens a
+browser needs a compatible browser on the TV, just as on a phone.
+
+</details>
+
+<details>
 <summary><b>Which download folder should I choose?</b></summary>
 <br>
 
@@ -432,6 +450,12 @@ Interested in contributing? Check out the [Contributing Guide](CONTRIBUTING.md) 
   <a href="https://github.com/FlazeIGuess/unitune-api"><b>UniTune</b></a> &nbsp;·&nbsp;
   <a href="https://squigly.link"><b>Squigly</b></a>
 </p>
+
+---
+
+## Code signing policy
+
+See the [Windows code signing policy and release setup](.github/signpath/README.md#code-signing-policy).
 
 ---
 

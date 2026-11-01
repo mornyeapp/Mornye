@@ -397,7 +397,6 @@ class ExtensionNotifier extends Notifier<ExtensionState> {
       } catch (e) {
         _log.w('Failed to check extension health for $extensionId: $e');
         final status = ExtensionHealthStatus(
-          extensionId: extensionId,
           status: 'unknown',
           checkedAt: DateTime.now(),
           checks: const [],
@@ -600,12 +599,6 @@ class ExtensionNotifier extends Notifier<ExtensionState> {
       _log.e('Failed to set extension enabled: $e');
       state = state.copyWith(error: e.toString());
     }
-  }
-
-  List<Extension> searchProviders() {
-    return state.extensions
-        .where((ext) => ext.enabled && ext.hasCustomSearch)
-        .toList();
   }
 
   /// Collects the keys flagged as `secret` in an extension's manifest schema

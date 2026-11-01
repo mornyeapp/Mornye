@@ -8,27 +8,36 @@ import 'package:mornye/constants/app_info.dart';
 import 'package:mornye/screens/main_shell.dart';
 import 'package:mornye/screens/setup_screen.dart';
 import 'package:mornye/screens/tutorial_screen.dart';
+import 'package:mornye/screens/whats_new_screen.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/providers/equalizer_provider.dart';
 import 'package:mornye/services/app_navigation_service.dart';
 import 'package:mornye/services/app_orientation.dart';
+import 'package:mornye/services/link/client/link_client_controller.dart';
+import 'package:mornye/services/link/features/link_phone_features.dart';
+import 'package:mornye/services/link/sync/link_sync_runner.dart';
 import 'package:mornye/theme/dynamic_color_wrapper.dart';
 import 'package:mornye/l10n/app_localizations.dart';
 import 'package:mornye/l10n/supported_locales.dart';
 import 'package:mornye/utils/adaptive_layout.dart';
+import 'package:mornye/utils/android_tv.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/widgets/app_snack_bar.dart';
 import 'package:mornye/widgets/desktop/desktop_shortcuts.dart';
 import 'package:mornye/widgets/desktop/library_drop_target.dart';
+import 'package:mornye/widgets/link/link_actions.dart';
 import 'package:mornye/widgets/mornye_glass_preparation.dart';
 import 'package:mornye/widgets/playback_feedback.dart';
+import 'package:mornye/widgets/tv_navigation.dart';
 
 String initialLocationForAppState({
   required bool isFirstLaunch,
   required bool hasCompletedTutorial,
+  bool hasSeenWhatsNew = true,
 }) {
   if (isFirstLaunch) return '/setup';
   if (!hasCompletedTutorial) return '/tutorial';
+  if (!hasSeenWhatsNew) return '/whats-new';
   return '/';
 }
 
@@ -38,6 +47,10 @@ final _routerProvider = Provider<GoRouter>((ref) {
       (settings) => (
         isFirstLaunch: settings.isFirstLaunch,
         hasCompletedTutorial: settings.hasCompletedTutorial,
+        // Desktop shows the tour as a dialog over the shell instead.
+        hasSeenWhatsNew:
+            isDesktopPlatform ||
+            settings.whatsNewSeen == AppInfo.whatsNewRelease,
       ),
     ),
   );
@@ -45,6 +58,7 @@ final _routerProvider = Provider<GoRouter>((ref) {
   final initialLocation = initialLocationForAppState(
     isFirstLaunch: routingSettings.isFirstLaunch,
     hasCompletedTutorial: routingSettings.hasCompletedTutorial,
+    hasSeenWhatsNew: routingSettings.hasSeenWhatsNew,
   );
 
   return GoRouter(
@@ -58,45 +72,16 @@ final _routerProvider = Provider<GoRouter>((ref) {
         path: '/tutorial',
         builder: (context, state) => const TutorialScreen(),
       ),
+      GoRoute(
+        path: '/whats-new',
+        builder: (context, state) => const WhatsNewScreen(),
+      ),
     ],
     // Safety net: if a deep link URL (e.g. Spotify/Deezer) somehow reaches
     // GoRouter, redirect to home instead of showing "Page Not Found".
     errorBuilder: (context, state) => const MainShell(),
   );
 });
-
-Locale _fallbackLocale(Iterable<Locale> supportedLocales) {
-  for (final supportedLocale in supportedLocales) {
-    if (supportedLocale.languageCode == 'en') {
-      return supportedLocale;
-    }
-  }
-  return supportedLocales.first;
-}
-
-Locale _resolveSupportedLocale(
-  Locale? requestedLocale,
-  Iterable<Locale> supportedLocales,
-) {
-  if (requestedLocale == null) {
-    return _fallbackLocale(supportedLocales);
-  }
-
-  for (final supportedLocale in supportedLocales) {
-    if (supportedLocale.languageCode == requestedLocale.languageCode &&
-        supportedLocale.countryCode == requestedLocale.countryCode) {
-      return supportedLocale;
-    }
-  }
-
-  for (final supportedLocale in supportedLocales) {
-    if (supportedLocale.languageCode == requestedLocale.languageCode) {
-      return supportedLocale;
-    }
-  }
-
-  return _fallbackLocale(supportedLocales);
-}
 
 /// iOS-style fluid scroll on mobile and macOS: momentum glide + bounce instead
 /// of the Android clamping stop. Widgets that set explicit physics (queue filter
@@ -158,6 +143,10 @@ class _OrientationFadeState extends State<_OrientationFade>
     duration: const Duration(milliseconds: 300),
     value: 1,
   );
+  late final _opacity = CurvedAnimation(
+    parent: _controller,
+    curve: Curves.easeOut,
+  );
   Orientation? _lastOrientation;
   double? _lastWidth;
 
@@ -181,15 +170,80 @@ class _OrientationFadeState extends State<_OrientationFade>
 
   @override
   void dispose() {
+    _opacity.dispose();
     _controller.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return FadeTransition(
-      opacity: CurvedAnimation(parent: _controller, curve: Curves.easeOut),
-      child: widget.child,
+    return FadeTransition(opacity: _opacity, child: widget.child);
+  }
+}
+
+/// The [MaterialApp.builder] of [MornyeApp]: the app-wide layers around the
+/// router's [child].
+@visibleForTesting
+Widget buildAppContent(
+  BuildContext context,
+  Widget? child, {
+  required bool heroAnimationsEnabled,
+}) {
+  Widget appContent = _OrientationFade(
+    child: AppScaffoldMessenger(
+      child: PlaybackFeedback(
+        child: DesktopLibraryDropTarget(
+          child: child ?? const SizedBox.shrink(),
+        ),
+      ),
+    ),
+  );
+  // HeroMode only affects heroes below a *route* subtree. At this level it
+  // sits above the router's Navigator, so the controller never encounters it
+  // while collecting heroes. Removing the inherited controller disables
+  // flights on the root Navigator.
+  if (!heroAnimationsEnabled) {
+    appContent = HeroControllerScope.none(child: appContent);
+  }
+  // Above the root navigator, so shortcuts and the macOS menu bar also reach
+  // Now Playing, dialogs and pushed pages. It stays outside every conditional
+  // wrapper: remounting it would mount a second macOS menu bar before the
+  // first is gone.
+  if (isDesktopPlatform) {
+    appContent = DesktopShortcuts(child: appContent);
+  }
+  if (isAndroidTv) {
+    appContent = ColoredBox(
+      color: Theme.of(context).scaffoldBackgroundColor,
+      child: SafeArea(
+        minimum: const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
+        child: TvNavigation(child: appContent),
+      ),
+    );
+  }
+  return _AppMediaQuery(child: appContent);
+}
+
+/// Treats the display as one continuous surface so bottom sheets and dialogs
+/// stay centered on large/foldable devices. The window metrics are read here
+/// rather than in [buildAppContent], so a resize rebuilds only these layers
+/// and passes the app content through unchanged.
+class _AppMediaQuery extends StatelessWidget {
+  final Widget child;
+
+  const _AppMediaQuery({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    final mediaQuery = MediaQuery.of(context);
+    return MediaQuery(
+      data: mediaQuery.copyWith(
+        displayFeatures: const [],
+        navigationMode: isAndroidTv
+            ? NavigationMode.directional
+            : mediaQuery.navigationMode,
+      ),
+      child: MornyeGlassPreparation(child: AdaptiveUiScaler(child: child)),
     );
   }
 }
@@ -201,7 +255,16 @@ class MornyeApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    ref.watch(equalizerProvider.select((value) => value.settings.enabled));
+    // Keeps the equalizer loaded for the app's lifetime without rebuilding.
+    ref.listen(equalizerProvider, (_, _) {});
+    // On phones, keeps the link to a paired computer, its sync and the
+    // remote control features running.
+    if (ref.read(linkClientSupportedProvider)) {
+      ref.listen(linkClientControllerProvider, (_, _) {});
+      ref.listen(linkSyncRunnerProvider, (_, _) {});
+      ref.listen(linkPhoneFeaturesProvider, (_, _) {});
+      ref.listen(linkTransferOfferNoticesProvider, (_, _) {});
+    }
     final router = ref.watch(_routerProvider);
     final localeString = ref.watch(settingsProvider.select((s) => s.locale));
     final heroAnimationsEnabled = ref.watch(
@@ -211,19 +274,7 @@ class MornyeApp extends ConsumerWidget {
       disableOverscrollEffects: disableOverscrollEffects,
     );
 
-    Locale? locale;
-    if (localeString != 'system' && localeString.isNotEmpty) {
-      if (localeString.contains('_')) {
-        final parts = localeString.split('_');
-        if (parts.length == 2) {
-          locale = Locale(parts[0], parts[1]);
-        } else {
-          locale = Locale(parts[0]);
-        }
-      } else {
-        locale = Locale(localeString);
-      }
-    }
+    final locale = localeFromSetting(localeString);
 
     return DynamicColorWrapper(
       builder: (lightTheme, darkTheme, themeMode) {
@@ -236,44 +287,15 @@ class MornyeApp extends ConsumerWidget {
           scrollBehavior: scrollBehavior,
           themeAnimationDuration: const Duration(milliseconds: 300),
           themeAnimationCurve: Curves.easeInOut,
-          // Treat the display as one continuous surface so bottom sheets and
-          // dialogs stay centered on large/foldable devices.
-          builder: (context, child) {
-            final mediaQuery = MediaQuery.of(context);
-            Widget appContent = _OrientationFade(
-              child: AppScaffoldMessenger(
-                child: PlaybackFeedback(
-                  child: DesktopLibraryDropTarget(
-                    child: child ?? const SizedBox.shrink(),
-                  ),
-                ),
-              ),
-            );
-            // HeroMode only affects heroes below a *route* subtree. At this
-            // level it sits above the router's Navigator, so the controller
-            // never encounters it while collecting heroes. Removing the
-            // inherited controller disables flights on the root Navigator.
-            if (!heroAnimationsEnabled) {
-              appContent = HeroControllerScope.none(child: appContent);
-            }
-            // Above the root navigator, so shortcuts and the macOS menu bar
-            // also reach Now Playing, dialogs and pushed pages. It stays
-            // outside every conditional wrapper: remounting it would mount a
-            // second macOS menu bar before the first is gone.
-            if (isDesktopPlatform) {
-              appContent = DesktopShortcuts(child: appContent);
-            }
-            return MediaQuery(
-              data: mediaQuery.copyWith(displayFeatures: const []),
-              child: MornyeGlassPreparation(
-                child: AdaptiveUiScaler(child: appContent),
-              ),
-            );
-          },
+          builder: (context, child) => buildAppContent(
+            context,
+            child,
+            heroAnimationsEnabled: heroAnimationsEnabled,
+          ),
           routerConfig: router,
           locale: locale,
           localeResolutionCallback: (deviceLocale, supportedLocales) {
-            return _resolveSupportedLocale(
+            return resolveSupportedLocale(
               locale ?? deviceLocale,
               supportedLocales,
             );

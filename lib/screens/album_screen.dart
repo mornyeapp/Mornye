@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:mornye/theme/app_tokens.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/theme/cover_palette.dart';
-import 'package:mornye/screens/track_history_snapshot.dart';
 import 'package:mornye/widgets/collection_scaffold.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -17,21 +15,22 @@ import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/utils/image_cache_utils.dart';
 import 'package:mornye/utils/string_utils.dart';
 import 'package:mornye/utils/cover_art_utils.dart';
-import 'package:mornye/screens/collapsing_header_scroll_mixin.dart';
-import 'package:mornye/screens/selection_mode_mixin.dart';
+import 'package:mornye/controllers/clickable_metadata.dart';
+import 'package:mornye/controllers/collapsing_header_scroll_mixin.dart';
+import 'package:mornye/controllers/selection_mode_mixin.dart';
+import 'package:mornye/controllers/track_history_snapshot.dart';
 import 'package:mornye/widgets/error_card.dart';
 import 'package:mornye/widgets/album_detail_header.dart';
-import 'package:mornye/widgets/expressive_button_group.dart';
+import 'package:mornye/widgets/collection_header_actions.dart';
 import 'package:mornye/widgets/album_description.dart';
 import 'package:mornye/utils/editorial_notes.dart';
 import 'package:mornye/utils/adaptive_layout.dart';
 import 'package:mornye/utils/provider_resource_ids.dart';
 import 'package:mornye/utils/ttl_cache.dart';
 import 'package:mornye/widgets/animation_utils.dart';
-import 'package:mornye/providers/library_collections_provider.dart';
 import 'package:mornye/widgets/playlist_picker_sheet.dart';
-import 'package:mornye/utils/clickable_metadata.dart';
 import 'package:mornye/widgets/cross_extension_share_sheet.dart';
+import 'package:mornye/widgets/link/link_actions.dart';
 import 'package:mornye/widgets/track_list_tile.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/widgets/desktop/detail_header.dart';
@@ -41,7 +40,7 @@ import 'package:mornye/widgets/audio_quality_badges.dart';
 import 'package:mornye/widgets/motion_header_banner.dart';
 import 'package:mornye/widgets/track_detail_actions.dart';
 import 'package:mornye/widgets/selection_action_button.dart';
-import 'package:mornye/widgets/selection_bottom_bar.dart';
+import 'package:mornye/widgets/collection_suggestions_section.dart';
 import 'package:mornye/widgets/downloadable_cover.dart';
 import 'package:mornye/widgets/disc_separator_chip.dart';
 import 'package:mornye/widgets/mornye_artist_header.dart';
@@ -453,10 +452,11 @@ class _AlbumScreenState extends ConsumerState<AlbumScreen>
         ? MediaQuery.paddingOf(context).bottom
         : 0.0;
 
-    pruneSelection({
+    final ids = [
       for (var index = 0; index < tracks.length; index++)
         _trackSelectionId(tracks[index], index),
-    });
+    ];
+    pruneSelection(ids.toSet());
 
     final scaffold = CollectionScaffold(
       scrollController: scrollController,
@@ -467,6 +467,7 @@ class _AlbumScreenState extends ConsumerState<AlbumScreen>
         context,
         colorScheme,
         tracks,
+        ids,
         bottomPadding,
       ),
       appBar: _buildAppBar(
@@ -502,16 +503,16 @@ class _AlbumScreenState extends ConsumerState<AlbumScreen>
         if (!_isLoading && _error == null && tracks.isNotEmpty) ...[
           _buildTrackList(context, colorScheme, tracks, commonQualityTrack),
           _buildAlbumFooter(context, colorScheme, tracks),
+          if (!isSelectionMode)
+            CollectionSuggestionsSliver(
+              collectionKey: 'album:${widget.extensionId}:${widget.albumId}',
+              tracks: tracks,
+            ),
         ],
       ],
     );
     return DesktopListScope(
-      onSelectAll: tracks.isEmpty
-          ? null
-          : () => selectAll([
-              for (var index = 0; index < tracks.length; index++)
-                _trackSelectionId(tracks[index], index),
-            ]),
+      onSelectAll: ids.isEmpty ? null : () => selectAll(ids),
       onClearSelection: isSelectionMode ? exitSelectionMode : null,
       onActivate: () => _desktopActivations[selectionAnchorId]?.call(),
       child: scaffold,
@@ -570,7 +571,8 @@ class _AlbumScreenState extends ConsumerState<AlbumScreen>
       immersive: context.isMornye,
       squareArtwork: !hasMotion && headerBgUrl == coverThumbUrl,
       expandedHeight: expandedHeight,
-      showTitleInAppBar: showTitleInAppBar,
+      showTitleInAppBar: false,
+      showTitleListenable: showTitleNotifier,
       backgroundColor: pageBackgroundColor,
       background: background,
       paletteSource: coverThumbUrl,
@@ -632,69 +634,20 @@ class _AlbumScreenState extends ConsumerState<AlbumScreen>
                             : FontWeight.w600,
                       ),
                 textAlign: TextAlign.center,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
               ),
             )
           : null,
       meta: _buildHeaderMeta(context, releaseDate, commonQualityTrack),
       actions: isSelectionMode
           ? null
-          : isDesktopPlatform
-          ? Row(
-              mainAxisSize: MainAxisSize.min,
-              spacing: 10,
-              children: [
-                _buildLoveAllButton(),
-                HeaderFilledButton(
-                  icon: context.isMornye
-                      ? CupertinoIcons.arrow_down_circle_fill
-                      : Icons.download,
-                  label: context.isMornye
-                      ? context.l10n.dialogDownload
-                      : context.l10n.downloadAllCount(tracks.length),
-                  onPressed: tracks.isEmpty
-                      ? null
-                      : () => _downloadAll(context),
-                ),
-                _buildAddToPlaylistButton(context),
-              ],
-            )
-          : context.isMornye
-          ? Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _buildLoveAllButton(),
-                const SizedBox(width: 16),
-                Flexible(
-                  child: SizedBox(
-                    width: 172,
-                    child: HeaderFilledButton(
-                      icon: CupertinoIcons.arrow_down_circle_fill,
-                      label: context.l10n.dialogDownload,
-                      onPressed: tracks.isEmpty
-                          ? null
-                          : () => _downloadAll(context),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                _buildAddToPlaylistButton(context),
-              ],
-            )
-          : ExpressiveButtonGroup(
-              flexible: const {1},
-              children: [
-                _buildLoveAllButton(),
-                HeaderFilledButton(
-                  icon: Icons.download,
-                  label: context.l10n.downloadAllCount(tracks.length),
-                  onPressed: tracks.isEmpty
-                      ? null
-                      : () => _downloadAll(context),
-                ),
-                _buildAddToPlaylistButton(context),
-              ],
+          : CollectionHeaderActions(
+              tracks: tracks,
+              onLoveAll: () => loveAllTracks(this.context, ref, tracks),
+              downloadIcon: Icons.download,
+              onDownloadAll: () => _downloadAll(context),
+              addToPlaylistIcon: Icons.add,
+              onAddToPlaylist: () =>
+                  showAddTracksToPlaylistSheet(context, ref, tracks),
             ),
       appBarTitle: isSelectionMode
           ? context.l10n.selectionSelected(selectedIds.length)
@@ -709,6 +662,11 @@ class _AlbumScreenState extends ConsumerState<AlbumScreen>
       appBarActions: isSelectionMode
           ? const []
           : [
+              if (ref.watch(linkPhoneClientProvider) != null)
+                LinkDownloadOnDesktopButton(
+                  tracks: tracks,
+                  service: _recommendedDownloadService(),
+                ),
               HeaderCircleButton(
                 icon: Icons.open_in_new_rounded,
                 tooltip: context.l10n.openInOtherServices,
@@ -731,7 +689,7 @@ class _AlbumScreenState extends ConsumerState<AlbumScreen>
     Track? commonQualityTrack,
   ) {
     _historySnapshot.update(tracks);
-    final historyLookups = _historySnapshot.lookups;
+    final historyKeys = _historySnapshot.lookupKeys;
     final existingHistoryKeys = ref.watch(
       downloadHistoryVisibleBatchExistsProvider(_historySnapshot.request),
     );
@@ -748,8 +706,7 @@ class _AlbumScreenState extends ConsumerState<AlbumScreen>
         for (var i = 0; i < tracks.length; i++) _trackSelectionId(tracks[i], i),
       ];
       final inHistory = [
-        for (final lookup in historyLookups)
-          existingHistoryKeys.contains(lookup.lookupKey),
+        for (final key in historyKeys) existingHistoryKeys.contains(key),
       ];
       void activate(int index) => TrackListTile.activate(
         context,
@@ -788,9 +745,7 @@ class _AlbumScreenState extends ConsumerState<AlbumScreen>
         delegate: SliverChildBuilderDelegate((context, index) {
           final track = tracks[index];
           final selectionId = _trackSelectionId(track, index);
-          final isInHistory = existingHistoryKeys.contains(
-            historyLookups[index].lookupKey,
-          );
+          final isInHistory = existingHistoryKeys.contains(historyKeys[index]);
           final row = KeyedSubtree(
             key: ValueKey(selectionId),
             child: StaggeredListItem(
@@ -862,25 +817,12 @@ class _AlbumScreenState extends ConsumerState<AlbumScreen>
     BuildContext barContext,
     ColorScheme colorScheme,
     List<Track> tracks,
+    List<String> ids,
     double bottomPadding,
   ) {
     final selectedCount = selectedIds.length;
-    final allSelected = tracks.isNotEmpty && selectedCount == tracks.length;
-
-    return SelectionBottomBar(
-      selectedCount: selectedCount,
-      allSelected: allSelected,
-      onClose: exitSelectionMode,
-      onToggleSelectAll: () {
-        if (allSelected) {
-          exitSelectionMode();
-        } else {
-          selectAll([
-            for (var index = 0; index < tracks.length; index++)
-              _trackSelectionId(tracks[index], index),
-          ]);
-        }
-      },
+    return buildSelectionBar(
+      ids: ids,
       bottomPadding: bottomPadding,
       children: [
         SizedBox(
@@ -958,42 +900,6 @@ class _AlbumScreenState extends ConsumerState<AlbumScreen>
     );
   }
 
-  Widget _buildLoveAllButton() {
-    final tracks = _tracks;
-    return Consumer(
-      builder: (context, ref, _) {
-        ref.watch(libraryCollectionsProvider.select((state) => state.loved));
-        final collectionsState = ref.read(libraryCollectionsProvider);
-        final allLoved =
-            tracks != null &&
-            tracks.isNotEmpty &&
-            tracks.every((t) => collectionsState.isLoved(t));
-        return HeaderCircleButton(
-          icon: allLoved ? Icons.favorite : Icons.favorite_border,
-          tonal: true,
-          iconColor: allLoved ? Theme.of(context).colorScheme.error : null,
-          tooltip: allLoved
-              ? context.l10n.trackOptionRemoveFromLoved
-              : context.l10n.tooltipLoveAll,
-          onPressed: tracks == null || tracks.isEmpty
-              ? null
-              : () => _loveAll(tracks),
-        );
-      },
-    );
-  }
-
-  Widget _buildAddToPlaylistButton(BuildContext context) {
-    return HeaderCircleButton(
-      icon: Icons.add,
-      tonal: true,
-      tooltip: context.l10n.tooltipAddToPlaylist,
-      onPressed: _tracks == null || _tracks!.isEmpty
-          ? null
-          : () => showAddTracksToPlaylistSheet(context, ref, _tracks!),
-    );
-  }
-
   void _showShareSheet(
     BuildContext context,
     List<Track> tracks,
@@ -1014,7 +920,4 @@ class _AlbumScreenState extends ConsumerState<AlbumScreen>
       sourceExtensionId: sourceExtensionId,
     );
   }
-
-  Future<void> _loveAll(List<Track> tracks) =>
-      loveAllTracks(context, ref, tracks);
 }

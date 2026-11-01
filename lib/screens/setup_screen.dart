@@ -17,11 +17,14 @@ import 'package:mornye/widgets/app_loading_indicator.dart';
 import 'package:mornye/widgets/app_progress_indicator.dart';
 import 'package:mornye/widgets/expressive_button.dart';
 import 'package:mornye/widgets/app_snack_bar.dart';
+import 'package:mornye/widgets/extension_storage_setting.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:device_info_plus/device_info_plus.dart';
+import 'package:mornye/services/link/client/link_client_controller.dart';
+import 'package:mornye/services/local_network_access.dart';
 import 'package:mornye/services/setup_progress_store.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/l10n/l10n.dart';
@@ -30,6 +33,7 @@ import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/utils/adaptive_layout.dart';
 import 'package:mornye/utils/desktop_folders.dart';
 import 'package:mornye/utils/desktop_platform.dart';
+import 'package:mornye/utils/android_tv.dart';
 import 'package:mornye/utils/file_access.dart';
 import 'package:mornye/widgets/scroll_edge_fade.dart';
 import 'package:mornye/utils/logger.dart';
@@ -68,17 +72,28 @@ class _SetupScreenState extends ConsumerState<SetupScreen>
   bool _storagePermissionGranted = false;
   bool _notificationPermissionGranted = false;
   bool _notificationPermissionSkipped = false;
+  bool _nearbyGranted = false;
+
+  /// Set once Android refuses Nearby devices, so setup can go on.
+  bool _nearbyRefused = false;
   String? _selectedDirectory;
   String? _selectedDirectoryBookmark;
   String? _selectedTreeUri;
   bool _isLoading = false;
   int _androidSdkVersion = 0;
 
-  int get _totalSteps => _isDesktop
+  int get _totalSteps => _isDesktop || isAndroidTv
       ? 3
       : _androidSdkVersion >= 33
-      ? 5
+      ? (_asksNearby ? 6 : 5)
       : 4;
+
+  /// Android 17 asks for Nearby devices before LAN access, which Mornye Link
+  /// and network storage need. Earlier releases allow it without asking.
+  bool get _asksNearby =>
+      _platform == TargetPlatform.android &&
+      !isAndroidTv &&
+      _androidSdkVersion >= 37;
 
   void _setState(VoidCallback fn) => setState(fn);
 
@@ -106,8 +121,9 @@ class _SetupScreenState extends ConsumerState<SetupScreen>
     try {
       await ref.read(settingsProvider.notifier).ensureLoaded();
       if (_platform == TargetPlatform.android) {
-        final androidInfo = await DeviceInfoPlugin().androidInfo;
-        _androidSdkVersion = androidInfo.version.sdkInt;
+        _androidSdkVersion =
+            await PlatformBridge.getAndroidSdkVersion() ??
+            (await DeviceInfoPlugin().androidInfo).version.sdkInt;
       }
       final saved = await _progressStore.readDraft();
       if (!mounted) return;
@@ -119,9 +135,12 @@ class _SetupScreenState extends ConsumerState<SetupScreen>
         _selectedDirectoryBookmark = draft['bookmark'] as String?;
         _selectedTreeUri = draft['treeUri'] as String?;
         _notificationPermissionSkipped = draft['skipNotifications'] == true;
+        _nearbyRefused = draft['nearbyRefused'] == true;
       }
       if (_isDesktop) {
         _selectedDirectory ??= await resolveDesktopDefaultOutputDirectory();
+      } else if (isAndroidTv) {
+        _selectedDirectory ??= await _getDefaultDirectory();
       }
       await _checkInitialPermissions();
       if (_platform == TargetPlatform.android) await _restoreSelectedFolder();
@@ -160,6 +179,7 @@ class _SetupScreenState extends ConsumerState<SetupScreen>
       'bookmark': _selectedDirectoryBookmark,
       'treeUri': _selectedTreeUri,
       'skipNotifications': _notificationPermissionSkipped,
+      'nearbyRefused': _nearbyRefused,
     });
   }
 
@@ -185,6 +205,15 @@ class _SetupScreenState extends ConsumerState<SetupScreen>
   }
 
   Future<void> _checkInitialPermissions() async {
+    if (isAndroidTv) {
+      if (mounted) {
+        setState(() {
+          _storagePermissionGranted = true;
+          _notificationPermissionGranted = true;
+        });
+      }
+      return;
+    }
     if (_platform == TargetPlatform.iOS) {
       final notificationStatus = await Permission.notification.status;
       if (mounted) {
@@ -195,28 +224,19 @@ class _SetupScreenState extends ConsumerState<SetupScreen>
         });
       }
     } else if (_platform == TargetPlatform.android) {
-      bool storageGranted = false;
-
-      if (_androidSdkVersion >= 33) {
-        final audioStatus = await Permission.audio.status;
-        storageGranted = audioStatus.isGranted;
-      } else if (_androidSdkVersion >= 30) {
-        final manageStatus = await Permission.manageExternalStorage.status;
-        storageGranted = manageStatus.isGranted;
-      } else {
-        final storageStatus = await Permission.storage.status;
-        storageGranted = storageStatus.isGranted;
-      }
+      final storageGranted = await _hasAndroidStoragePermission();
 
       PermissionStatus notificationStatus = PermissionStatus.granted;
       if (_androidSdkVersion >= 33) {
         notificationStatus = await Permission.notification.status;
       }
+      final nearbyGranted = await LocalNetworkAccess.instance.isGranted();
 
       if (mounted) {
         setState(() {
           _storagePermissionGranted = storageGranted;
           _notificationPermissionGranted = notificationStatus.isGranted;
+          _nearbyGranted = nearbyGranted;
         });
       }
     } else {
@@ -225,6 +245,16 @@ class _SetupScreenState extends ConsumerState<SetupScreen>
         _notificationPermissionGranted = true;
       });
     }
+  }
+
+  Future<bool> _hasAndroidStoragePermission() async {
+    if (_androidSdkVersion >= 33 && await Permission.audio.isGranted) {
+      return true;
+    }
+    if (_androidSdkVersion >= 30) {
+      return Permission.manageExternalStorage.isGranted;
+    }
+    return Permission.storage.isGranted;
   }
 
   Future<void> _requestStoragePermission() async {
@@ -238,9 +268,9 @@ class _SetupScreenState extends ConsumerState<SetupScreen>
       if (_platform == TargetPlatform.iOS) {
         setState(() => _storagePermissionGranted = true);
       } else if (_platform == TargetPlatform.android) {
-        bool allGranted = false;
+        var allGranted = await _hasAndroidStoragePermission();
 
-        if (_androidSdkVersion >= 33) {
+        if (!allGranted && _androidSdkVersion >= 33) {
           var audioStatus = await Permission.audio.status;
           if (!audioStatus.isGranted) {
             audioStatus = await Permission.audio.request();
@@ -251,18 +281,18 @@ class _SetupScreenState extends ConsumerState<SetupScreen>
             await _showPermissionDeniedDialog(permissionAudio);
             return;
           }
-        } else if (_androidSdkVersion >= 30) {
+        } else if (!allGranted && _androidSdkVersion >= 30) {
           var manageStatus = await Permission.manageExternalStorage.status;
           if (!manageStatus.isGranted) {
             final shouldOpen = await _showAndroid11StorageDialog();
-            if (shouldOpen == true) {
+            if (shouldOpen) {
               await Permission.manageExternalStorage.request();
               await Future<void>.delayed(const Duration(milliseconds: 500));
               manageStatus = await Permission.manageExternalStorage.status;
             }
           }
           allGranted = manageStatus.isGranted;
-        } else {
+        } else if (!allGranted) {
           final status = await Permission.storage.request();
           allGranted = status.isGranted;
           if (status.isPermanentlyDenied) {
@@ -288,29 +318,14 @@ class _SetupScreenState extends ConsumerState<SetupScreen>
     }
   }
 
-  Future<bool?> _showAndroid11StorageDialog() {
-    return showAppDialog<bool>(
-      context: context,
-      builder: (context) => AppAlertDialog(
-        title: Text(context.l10n.setupStorageAccessRequired),
-        content: Text(
-          '${context.l10n.setupStorageAccessMessageAndroid11}\n\n'
-          '${context.l10n.setupAllowAccessToManageFiles}',
-        ),
-        actions: [
-          AppDialogAction(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text(context.l10n.dialogCancel),
-          ),
-          AppDialogAction(
-            filled: true,
-            onPressed: () => Navigator.pop(context, true),
-            child: Text(context.l10n.setupOpenSettings),
-          ),
-        ],
-      ),
-    );
-  }
+  Future<bool> _showAndroid11StorageDialog() => showAppConfirmDialog(
+    context,
+    title: context.l10n.setupStorageAccessRequired,
+    message:
+        '${context.l10n.setupStorageAccessMessageAndroid11}\n\n'
+        '${context.l10n.setupAllowAccessToManageFiles}',
+    confirmLabel: context.l10n.setupOpenSettings,
+  );
 
   Future<void> _requestNotificationPermission() async {
     if (_isLoading) return;
@@ -340,6 +355,28 @@ class _SetupScreenState extends ConsumerState<SetupScreen>
       }
     } catch (e, stack) {
       _log.e('Failed to request notification permission', e, stack);
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _requestNearbyDevices() async {
+    final permissionNearby = context.l10n.permissionNearbyDevices;
+    setState(() => _isLoading = true);
+    try {
+      await _saveProgress();
+      // Through Link, so discovery that found nothing without it starts over.
+      await ref
+          .read(linkClientControllerProvider.notifier)
+          .requestLocalNetworkAccess();
+      if (mounted) setState(() => _nearbyGranted = true);
+    } on LocalNetworkPermissionException {
+      if (!mounted) return;
+      setState(() => _nearbyRefused = true);
+      await _saveProgress();
+      if (mounted) await _showPermissionDeniedDialog(permissionNearby);
+    } catch (e, stack) {
+      _log.e('Failed to request nearby devices permission', e, stack);
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -412,27 +449,13 @@ class _SetupScreenState extends ConsumerState<SetupScreen>
         if (_selectedTreeUri == null || _selectedTreeUri!.isEmpty) {
           final defaultDir = await _getDefaultDirectory();
           if (mounted) {
-            final useDefault = await showAppDialog<bool>(
-              context: context,
-              builder: (context) => AppAlertDialog(
-                title: Text(context.l10n.setupUseDefaultFolder),
-                content: Text(
-                  '${context.l10n.setupNoFolderSelected}\n\n$defaultDir',
-                ),
-                actions: [
-                  AppDialogAction(
-                    onPressed: () => Navigator.pop(context, false),
-                    child: Text(context.l10n.dialogCancel),
-                  ),
-                  AppDialogAction(
-                    filled: true,
-                    onPressed: () => Navigator.pop(context, true),
-                    child: Text(context.l10n.setupUseDefault),
-                  ),
-                ],
-              ),
+            final useDefault = await showAppConfirmDialog(
+              context,
+              title: context.l10n.setupUseDefaultFolder,
+              message: '${context.l10n.setupNoFolderSelected}\n\n$defaultDir',
+              confirmLabel: context.l10n.setupUseDefault,
             );
-            if (useDefault == true) {
+            if (useDefault) {
               if (!mounted) return;
               setState(() {
                 _selectedTreeUri = '';
@@ -584,6 +607,10 @@ class _SetupScreenState extends ConsumerState<SetupScreen>
   }
 
   Future<String> _getDefaultDirectory() async {
+    if (isAndroidTv) {
+      final appDir = await getApplicationDocumentsDirectory();
+      return '${appDir.path}/Mornye';
+    }
     if (_platform == TargetPlatform.android) {
       final downloadDir = Directory('/storage/emulated/0/Download/Mornye');
       try {
@@ -693,8 +720,13 @@ class _SetupScreenState extends ConsumerState<SetupScreen>
 
     final logicStep = step - 2;
 
-    if (_isDesktop) return logicStep == 0 && _selectedDirectory != null;
+    if (_isDesktop || isAndroidTv) {
+      return logicStep == 0 && _selectedDirectory != null;
+    }
     if (_androidSdkVersion >= 33) {
+      // Nearby devices, when asked, comes before the folder.
+      final folderStep = _asksNearby ? 3 : 2;
+      if (logicStep == folderStep) return _selectedDirectory != null;
       switch (logicStep) {
         case 0:
           return _storagePermissionGranted;
@@ -702,7 +734,7 @@ class _SetupScreenState extends ConsumerState<SetupScreen>
           return _notificationPermissionGranted ||
               _notificationPermissionSkipped;
         case 2:
-          return _selectedDirectory != null;
+          return _nearbyGranted || _nearbyRefused;
       }
     } else {
       switch (logicStep) {
@@ -826,8 +858,10 @@ class _SetupScreenState extends ConsumerState<SetupScreen>
             children: [
               _buildWelcomeStep(colorScheme),
               _buildLanguageStep(colorScheme),
-              if (!_isDesktop) _buildStorageStep(colorScheme),
-              if (_androidSdkVersion >= 33) _buildNotificationStep(colorScheme),
+              if (!_isDesktop && !isAndroidTv) _buildStorageStep(colorScheme),
+              if (_androidSdkVersion >= 33 && !isAndroidTv)
+                _buildNotificationStep(colorScheme),
+              if (_asksNearby) _buildNearbyStep(colorScheme),
               _buildDirectoryStep(colorScheme),
             ],
           ),

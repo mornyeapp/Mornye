@@ -12,6 +12,7 @@ import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/app_icon_button.dart';
 import 'package:mornye/widgets/desktop/context_menu.dart';
 import 'package:mornye/widgets/mornye_chrome.dart';
+import 'package:mornye/widgets/sliver_layout_info_builder.dart';
 
 /// Space below a desktop detail page, so its last rows clear the floating
 /// player.
@@ -196,10 +197,10 @@ List<Widget> desktopDetailHeaderSlivers(
           : null);
 
   return [
-    SliverLayoutBuilder(
-      builder: (context, constraints) {
-        final showTitle =
-            appBarTitle != null || (!mornye && constraints.scrollOffset > 200);
+    SliverLayoutInfoBuilder(
+      select: (constraints) =>
+          appBarTitle != null || (!mornye && constraints.scrollOffset > 200),
+      builder: (context, showTitle) {
         return SliverAppBar(
           pinned: true,
           automaticallyImplyLeading: false,

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:ui' as ui;
 
 import 'package:audio_service/audio_service.dart';
+import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -232,6 +233,97 @@ void main() {
 
   for (final mornye in [false, true]) {
     final style = mornye ? 'Mornye' : 'Material';
+
+    for (final hiddenByLifecycle in [false, true]) {
+      testWidgets(
+        '$style compact lyrics suspend while hidden ($hiddenByLifecycle)',
+        (tester) async {
+          var now = DateTime(2026);
+          await withClock(Clock(() => now), () async {
+            tester.view.physicalSize = const Size(360, 248);
+            tester.view.devicePixelRatio = 1;
+            addTearDown(tester.view.resetPhysicalSize);
+            addTearDown(tester.view.resetDevicePixelRatio);
+            addTearDown(
+              () => tester.binding.handleAppLifecycleStateChanged(
+                AppLifecycleState.resumed,
+              ),
+            );
+            final playback = StreamController<PlaybackState>();
+            final visible = ValueNotifier(true);
+            addTearDown(playback.close);
+            addTearDown(visible.dispose);
+            void report(int seconds, {bool playing = false}) => playback.add(
+              PlaybackState(
+                processingState: AudioProcessingState.ready,
+                updatePosition: Duration(seconds: seconds),
+                playing: playing,
+              ),
+            );
+            report(1);
+            desktopMiniPlayerLyrics.value = true;
+            await tester.pumpWidget(
+              ProviderScope(
+                overrides: [
+                  currentMediaItemProvider.overrideWithBuild(
+                    (ref, notifier) => Stream.value(_track),
+                  ),
+                  playbackStateProvider.overrideWith((ref) => playback.stream),
+                ],
+                child: MaterialApp(
+                  theme: mornye
+                      ? MornyeTheme.build(Brightness.dark)
+                      : AppTheme.dark(),
+                  localizationsDelegates:
+                      AppLocalizations.localizationsDelegates,
+                  supportedLocales: AppLocalizations.supportedLocales,
+                  home: ValueListenableBuilder<bool>(
+                    valueListenable: visible,
+                    builder: (context, visible, child) =>
+                        TickerMode(enabled: visible, child: child!),
+                    child: DesktopMiniPlayer(
+                      metadataControllerFactory: () => PlayerMetadataController(
+                        readMetadata: (_) async => {'lyrics': _lrc},
+                        parseLyrics: (raw) async => LyricsParser.parse(raw!),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            );
+            await tester.pumpAndSettle();
+            expect(find.text('First line'), findsOneWidget);
+            report(1, playing: true);
+            await tester.pump();
+            if (hiddenByLifecycle) {
+              tester.binding.handleAppLifecycleStateChanged(
+                AppLifecycleState.paused,
+              );
+            } else {
+              visible.value = false;
+            }
+            await tester.pump();
+            now = now.add(const Duration(seconds: 11));
+            await tester.pump(const Duration(seconds: 11));
+            expect(find.text('First line'), findsOneWidget);
+            expect(find.text('Third line'), findsNothing);
+            if (hiddenByLifecycle) {
+              tester.binding.handleAppLifecycleStateChanged(
+                AppLifecycleState.resumed,
+              );
+            } else {
+              visible.value = true;
+            }
+            await tester.pump();
+            await tester.pump(const Duration(milliseconds: 500));
+            expect(find.text('First line'), findsNothing);
+            expect(find.text('Third line'), findsOneWidget);
+            expect(tester.takeException(), isNull);
+            await tester.pumpWidget(const SizedBox.shrink());
+          });
+        },
+      );
+    }
 
     testWidgets(
       '$style TTML words follow pause and seeks during panel resizing',

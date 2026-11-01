@@ -17,11 +17,15 @@ class MornyeSegmentedControl extends ConsumerWidget {
     required this.labels,
     required this.selectedIndex,
     required this.onChanged,
+    this.samplesBackdrop = true,
   });
 
   final List<String> labels;
   final int selectedIndex;
   final ValueChanged<int> onChanged;
+
+  /// See [MornyeGlass.samplesBackdrop].
+  final bool samplesBackdrop;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -41,6 +45,7 @@ class MornyeSegmentedControl extends ConsumerWidget {
         child: MornyeGlass.navigation(
           blurEnabled: ref.watch(mornyeBlurEnabledProvider),
           radius: height / 2,
+          samplesBackdrop: samplesBackdrop,
           child: MornyeSelectionPill(
             contrastBlocked: contrastBlocked,
             // The held lens follows a finger. A click never holds it, and over
@@ -83,11 +88,12 @@ class MornyeGlassPanel extends ConsumerWidget {
     this.tintOpacity,
     this.tintColor,
     this.blurEnabled = true,
+    this.samplesBackdrop = true,
     this.highlightBorder = false,
     this.smoothCorners = false,
     this.highlightIntensity = 1,
     this.glassProgress = 1,
-  }) : _composedBackdrop = false;
+  });
 
   const MornyeGlassPanel.overlay({
     super.key,
@@ -98,12 +104,12 @@ class MornyeGlassPanel extends ConsumerWidget {
     this.tintOpacity = 0.78,
     this.tintColor,
     this.blurEnabled = true,
+    this.samplesBackdrop = true,
     this.highlightBorder = false,
     this.smoothCorners = false,
     this.highlightIntensity = 1,
     this.glassProgress = 1,
-  }) : strongTint = true,
-       _composedBackdrop = true;
+  }) : strongTint = true;
 
   final Widget child;
   final double radius;
@@ -113,15 +119,17 @@ class MornyeGlassPanel extends ConsumerWidget {
   final double? tintOpacity;
   final Color? tintColor;
   final bool blurEnabled;
+
+  /// See [MornyeGlass.samplesBackdrop].
+  final bool samplesBackdrop;
   final bool highlightBorder;
   final bool smoothCorners;
   final double highlightIntensity;
   final double glassProgress;
-  final bool _composedBackdrop;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final glass = MornyeGlass.navigation(
+    return MornyeGlass.navigation(
       radius: radius,
       firstInGroup: firstInGroup,
       lastInGroup: lastInGroup,
@@ -129,6 +137,7 @@ class MornyeGlassPanel extends ConsumerWidget {
       tintOpacity: tintOpacity,
       tintColor: tintColor,
       blurEnabled: blurEnabled && ref.watch(mornyeBlurEnabledProvider),
+      samplesBackdrop: samplesBackdrop,
       highlightBorder: highlightBorder,
       smoothCorners: smoothCorners,
       highlightIntensity: highlightIntensity,
@@ -136,33 +145,12 @@ class MornyeGlassPanel extends ConsumerWidget {
       // Tile ink must paint above the glass tint rather than beneath it.
       child: Material(type: MaterialType.transparency, child: child),
     );
-    // One overlay gets its own key: the package composes blur and refraction
-    // into one backdrop read, including while the route moves. Sharing that
-    // key with the page or another overlapping menu would lose their glass.
-    return _composedBackdrop ? LiquidGlassBatch(child: glass) : glass;
   }
 }
 
 /// Bounded glass: Impeller lenses refract a blurred backdrop, while frosted
 /// surfaces share ordinary blur passes. Foreground content stays above glass.
 class MornyeGlass extends ConsumerWidget {
-  const MornyeGlass({
-    super.key,
-    required this.child,
-    required this.blurEnabled,
-    this.radius = 32,
-    this.strongTint = false,
-    this.tintOpacity,
-    this.tintColor,
-    this.highlightBorder = false,
-    this.refractionDepth = 0.30,
-    this.smoothCorners = false,
-    this.highlightIntensity = 1,
-    this.glassProgress = 1,
-  }) : firstInGroup = true,
-       lastInGroup = true,
-       samplesBackdrop = true;
-
   const MornyeGlass.navigation({
     super.key,
     required this.child,
@@ -188,6 +176,10 @@ class MornyeGlass extends ConsumerWidget {
     for (final sigma in _blurSigmas)
       ImageFilter.blur(sigmaX: sigma, sigmaY: sigma),
   ];
+
+  /// Host tests cannot run shader filters; this lets them build the lens.
+  @visibleForTesting
+  static bool? debugShaderFilterSupport;
 
   final Widget child;
   final bool blurEnabled;
@@ -232,45 +224,46 @@ class MornyeGlass extends ConsumerWidget {
       top: firstInGroup ? Radius.circular(radius) : Radius.zero,
       bottom: lastInGroup ? Radius.circular(radius) : Radius.zero,
     );
-    final artworkTint = Theme.of(
-      context,
-    ).extension<MornyeTheme>()?.chromeSurface;
-    var tintSource =
-        tintColor ?? (dark ? scheme.surfaceContainerHigh : Colors.white);
-    var opacity = tintOpacity ?? (strongTint ? 0.80 : 0.60);
-    if (tintColor == null && artworkTint != null) {
-      // The artwork color is already known; retain its hue with a richer tint
-      // instead of a saturation filter over changing page content.
-      final hsl = HSLColor.fromColor(scheme.surfaceContainerHigh);
-      final coverTint = hsl
-          .withSaturation((hsl.saturation * 1.6).clamp(0, 1))
-          .toColor();
-      tintSource = dark
-          ? coverTint
-          : Color.lerp(Colors.white, coverTint, 0.15)!;
-      opacity = opacity.clamp(0.60, 1.0);
-    }
-    // Light glass needs a white veil over saturated or dark artwork.
-    // Keep this in the existing fill so whitening adds no backdrop pass.
-    var baseTint = tintSource.withValues(
-      alpha: dark ? opacity * 0.82 : (opacity * 0.88).clamp(0.50, 1.0),
-    );
-    if (dark) {
-      // Bound bright artwork with paint instead of filtering backdrop luma.
-      baseTint = Color.alphaBlend(
+    var tint = scheme.surfaceContainerHigh;
+    if (translucent) {
+      final artworkTint = Theme.of(
+        context,
+      ).extension<MornyeTheme>()?.chromeSurface;
+      var tintSource =
+          tintColor ?? (dark ? scheme.surfaceContainerHigh : Colors.white);
+      var opacity = tintOpacity ?? (strongTint ? 0.80 : 0.60);
+      if (tintColor == null && artworkTint != null) {
+        // The artwork color is already known; retain its hue with a richer
+        // tint instead of a saturation filter over changing page content.
+        final hsl = HSLColor.fromColor(scheme.surfaceContainerHigh);
+        final coverTint = hsl
+            .withSaturation((hsl.saturation * 1.6).clamp(0, 1))
+            .toColor();
+        tintSource = dark
+            ? coverTint
+            : Color.lerp(Colors.white, coverTint, 0.15)!;
+        opacity = opacity.clamp(0.60, 1.0);
+      }
+      // Light glass needs a white veil over saturated or dark artwork.
+      // Keep this in the existing fill so whitening adds no backdrop pass.
+      var baseTint = tintSource.withValues(
+        alpha: dark ? opacity * 0.82 : (opacity * 0.88).clamp(0.50, 1.0),
+      );
+      if (dark) {
+        // Bound bright artwork with paint instead of filtering backdrop luma.
+        baseTint = Color.alphaBlend(
+          baseTint,
+          Colors.black.withValues(alpha: 0.35),
+        );
+      }
+      // Let the upper end of the clarity slider reveal more of the page. Keep
+      // the tinted endpoint opaque and the single-pass blur budget unchanged.
+      final tintStrength = (1 - clarity) * (1 - clarity);
+      tint = Color.alphaBlend(
+        scheme.surfaceContainerHigh.withValues(alpha: tintStrength),
         baseTint,
-        Colors.black.withValues(alpha: 0.35),
       );
     }
-    // Let the upper end of the clarity slider reveal more of the page. Keep
-    // the tinted endpoint opaque and the single-pass blur budget unchanged.
-    final tintStrength = (1 - clarity) * (1 - clarity);
-    final tint = translucent
-        ? Color.alphaBlend(
-            scheme.surfaceContainerHigh.withValues(alpha: tintStrength),
-            baseTint,
-          )
-        : scheme.surfaceContainerHigh;
     final insideGlass =
         context.dependOnInheritedWidgetOfExactType<_GlassBackdropScope>() !=
         null;
@@ -287,7 +280,7 @@ class MornyeGlass extends ConsumerWidget {
         firstInGroup &&
         lastInGroup &&
         level == MornyeGlassLevel.liquid &&
-        ImageFilter.isShaderFilterSupported;
+        (debugShaderFilterSupport ?? ImageFilter.isShaderFilterSupported);
     // Clear glass softens the backdrop less. Keep the mid-range fallback at
     // its small blur budget, and reuse these filters in the lens renderer too.
     final filterIndex = level == MornyeGlassLevel.frosted
@@ -324,7 +317,7 @@ class MornyeGlass extends ConsumerWidget {
             ),
           ]
         : null;
-    final backdrop = useLens
+    final lens = useLens
         ? MornyeLiquidBackdrop(
             borderRadius: shape,
             clarity: clarity,
@@ -334,6 +327,14 @@ class MornyeGlass extends ConsumerWidget {
             highlightIntensity: highlightIntensity * reveal,
             child: surface,
           )
+        : null;
+    // A batched lens composes blur and refraction into one backdrop read.
+    // Outside a batch it takes a key of its own: sharing one with the page or
+    // an overlapping menu would lose their glass.
+    final backdrop = lens != null
+        ? LiquidGlassBatch.backdropIdOf(context) == null
+              ? LiquidGlassBatch(child: lens)
+              : lens
         : sampleBackdrop
         ? BackdropFilter.grouped(filter: _blurs[filterIndex], child: surface)
         : surface;
@@ -479,16 +480,14 @@ class _MornyeGlassRim extends CustomPainter {
       dark != oldDelegate.dark;
 }
 
-/// A searchable category uses the same material as the navigation capsule.
-class MornyeFilterChip extends ConsumerWidget {
+/// A searchable category chip; callers supply any glass around it.
+class MornyeFilterChip extends StatelessWidget {
   const MornyeFilterChip({
     super.key,
     required this.label,
     required this.selected,
     required this.onTap,
     this.icon,
-    this.blurEnabled = true,
-    this.glass = true,
     this.tonal = true,
   });
 
@@ -496,24 +495,20 @@ class MornyeFilterChip extends ConsumerWidget {
   final bool selected;
   final VoidCallback? onTap;
   final IconData? icon;
-  final bool blurEnabled;
-  final bool glass;
   final bool tonal;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final content = Semantics(
       button: true,
       selected: selected,
       enabled: onTap != null,
       child: Material(
-        color: !glass && !tonal
+        color: !tonal
             ? Colors.transparent
             : selected
             ? scheme.primary.withValues(alpha: 0.12)
-            : glass
-            ? Colors.transparent
             : MornyeTheme.controlFill(context, enabled: onTap != null),
         child: InkWell(
           onTap: onTap,
@@ -539,14 +534,7 @@ class MornyeFilterChip extends ConsumerWidget {
         ),
       ),
     );
-    if (!glass) {
-      return ClipRRect(borderRadius: BorderRadius.circular(24), child: content);
-    }
-    return MornyeGlass.navigation(
-      radius: 24,
-      blurEnabled: blurEnabled && ref.watch(mornyeBlurEnabledProvider),
-      child: content,
-    );
+    return ClipRRect(borderRadius: BorderRadius.circular(24), child: content);
   }
 }
 

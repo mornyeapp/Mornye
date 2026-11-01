@@ -13,6 +13,7 @@ import 'package:mornye/screens/extension_collection_screens.dart'
 import 'package:mornye/services/shell_navigation_service.dart';
 import 'package:mornye/utils/artist_utils.dart';
 import 'package:mornye/utils/logger.dart';
+import 'package:mornye/utils/string_utils.dart';
 import 'package:mornye/widgets/app_bottom_sheet.dart';
 import 'package:mornye/widgets/app_loading_indicator.dart';
 
@@ -335,7 +336,7 @@ Future<void> navigateToTrackAlbum(BuildContext context, Track track) async {
       albumName: albumName.isNotEmpty ? albumName : context.l10n.trackAlbum,
       albumId: hasAlbumId ? albumId : null,
       artistName: _preferredAlbumArtist(track),
-      coverUrl: track.coverUrl,
+      coverUrl: _albumCover(track),
       extensionId: track.source,
     );
     return;
@@ -390,7 +391,7 @@ Future<void> navigateToTrackAlbum(BuildContext context, Track track) async {
           : context.l10n.trackAlbum,
       albumId: hasResolvedAlbumId ? resolvedAlbumId : null,
       artistName: _preferredAlbumArtist(resolvedTrack),
-      coverUrl: resolvedTrack.coverUrl ?? track.coverUrl,
+      coverUrl: resolvedTrack.coverUrl ?? _albumCover(track),
       extensionId: providerId,
     );
   } catch (e) {
@@ -400,6 +401,11 @@ Future<void> navigateToTrackAlbum(BuildContext context, Track track) async {
     _showUnavailable(context, context.l10n.trackAlbum);
   }
 }
+
+/// The cover [track] lends its album page: album pages and recents load
+/// covers over http only, so a store path or `network://` reference (a
+/// collection song of a network connection) would only fail there.
+String? _albumCover(Track track) => normalizeRemoteHttpUrl(track.coverUrl);
 
 String _preferredAlbumArtist(Track track) {
   final albumArtist = (track.albumArtist ?? '').trim();
@@ -543,6 +549,10 @@ void pushViaPreferredNavigator(
   push(activeTabNavigator);
 }
 
+/// Pushes a [MaterialPageRoute] built by [builder] onto the nearest navigator.
+Future<T?> pushPage<T>(BuildContext context, WidgetBuilder builder) =>
+    Navigator.push(context, MaterialPageRoute<T>(builder: builder));
+
 void _showLoadingSnackBar(BuildContext context, String message) {
   ScaffoldMessenger.of(context).showSnackBar(
     SnackBar(
@@ -570,8 +580,6 @@ class ClickableArtistName extends StatefulWidget {
   final String? coverUrl;
   final String? extensionId;
   final TextStyle? style;
-  final int? maxLines;
-  final TextOverflow? overflow;
   final TextAlign? textAlign;
 
   const ClickableArtistName({
@@ -581,8 +589,6 @@ class ClickableArtistName extends StatefulWidget {
     this.coverUrl,
     this.extensionId,
     this.style,
-    this.maxLines,
-    this.overflow,
     this.textAlign,
   });
 
@@ -672,8 +678,8 @@ class _ClickableArtistNameState extends State<ClickableArtistName> {
       return Text(
         widget.artistName,
         style: widget.style,
-        maxLines: widget.maxLines,
-        overflow: widget.overflow,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
         textAlign: widget.textAlign,
       );
     }
@@ -691,8 +697,8 @@ class _ClickableArtistNameState extends State<ClickableArtistName> {
         child: Text(
           target.name,
           style: widget.style,
-          maxLines: widget.maxLines,
-          overflow: widget.overflow,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
           textAlign: widget.textAlign,
         ),
       );
@@ -700,8 +706,8 @@ class _ClickableArtistNameState extends State<ClickableArtistName> {
 
     return Text.rich(
       TextSpan(style: widget.style, children: _buildMultiArtistSpans()),
-      maxLines: widget.maxLines,
-      overflow: widget.overflow ?? TextOverflow.clip,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
       textAlign: widget.textAlign ?? TextAlign.start,
     );
   }

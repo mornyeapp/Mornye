@@ -4,19 +4,23 @@ import FlutterMacOS
 @main
 class AppDelegate: FlutterAppDelegate {
   override func applicationWillFinishLaunching(_ notification: Notification) {
-    #if !DEBUG
-      // macOS only keeps one instance per app copy. With a second copy (an
-      // old download next to /Applications, a mounted dmg), a notification or
-      // URL can start it too; hand over to the running instance instead.
-      if let bundleId = Bundle.main.bundleIdentifier,
-        let running = NSRunningApplication.runningApplications(
-          withBundleIdentifier: bundleId
-        ).first(where: { $0 != NSRunningApplication.current })
-      {
-        running.activate()
-        exit(0)
-      }
-    #endif
+    // macOS only keeps one instance per app copy. With a second copy (an
+    // old download next to /Applications, a mounted dmg, a debug build next
+    // to a release one), a notification or URL can start it too, and both
+    // would share one set of databases; hand over to the running instance
+    // instead, as Windows and Linux do.
+    if let bundleId = Bundle.main.bundleIdentifier,
+      let running = NSRunningApplication.runningApplications(
+        withBundleIdentifier: bundleId
+      ).first(where: { $0 != NSRunningApplication.current })
+    {
+      FileHandle.standardError.write(
+        Data(
+          "Mornye is already running (pid \(running.processIdentifier)); quit it first.\n"
+            .utf8))
+      running.activate()
+      exit(0)
+    }
     super.applicationWillFinishLaunching(notification)
     NotificationCenter.default.addObserver(
       forName: NSApplication.didUpdateNotification, object: nil, queue: nil

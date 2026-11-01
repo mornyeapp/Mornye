@@ -1,27 +1,50 @@
+import 'dart:convert';
 import 'dart:ui' as ui;
 
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/models/settings.dart';
+import 'package:mornye/providers/settings_provider.dart';
+import 'package:mornye/screens/settings/playback_settings_page.dart';
+import 'package:mornye/theme/app_theme.dart';
+import 'package:mornye/utils/settings_search_catalog.dart';
 import 'package:mornye/widgets/material_player_backdrop.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   test('cover style and music haptics keep their defaults', () {
     final restored = AppSettings.fromJson(const {});
-    expect(restored.playerCoverStyle, 'default');
+    // Unchosen, Material shows the cover full screen and Mornye a card.
+    expect(restored.playerCoverStyle, isEmpty);
+    expect(restored.playerCoverStyleFor(mornye: false), 'fullscreen');
+    expect(restored.playerCoverStyleFor(mornye: true), 'default');
+    // A choice holds in both styles.
+    final card = restored.copyWith(playerCoverStyle: 'default');
+    expect(card.playerCoverStyleFor(mornye: false), 'default');
+    final full = restored.copyWith(playerCoverStyle: 'fullscreen');
+    expect(full.playerCoverStyleFor(mornye: true), 'fullscreen');
     expect(restored.musicHaptics, isFalse);
+    expect(restored.landscapeLyricsArtwork, isFalse);
   });
 
   test('cover style and music haptics survive a round trip', () {
     final settings = const AppSettings().copyWith(
-      playerCoverStyle: 'fullscreen',
+      playerCoverStyle: 'default',
       musicHaptics: true,
+      landscapeLyricsArtwork: true,
     );
     final restored = AppSettings.fromJson(settings.toJson());
-    expect(restored.playerCoverStyle, 'fullscreen');
+    expect(restored.playerCoverStyle, 'default');
     expect(restored.musicHaptics, isTrue);
+    expect(restored.landscapeLyricsArtwork, isTrue);
+    expect(
+      restored.copyWith(landscapeLyricsArtwork: false).landscapeLyricsArtwork,
+      isFalse,
+    );
   });
 
   test('invalid cover styles preserve the rest of the saved settings', () {
@@ -30,9 +53,60 @@ void main() {
         'playerCoverStyle': value,
         'musicHaptics': true,
       });
-      expect(restored.playerCoverStyle, 'default');
+      expect(restored.playerCoverStyle, isEmpty);
       expect(restored.musicHaptics, isTrue);
     }
+  });
+
+  testWidgets('landscape artwork is selectable, saved and searchable', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final container = ProviderContainer(
+      overrides: [
+        initialSettingsProvider.overrideWithValue(const AppSettings()),
+      ],
+    );
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: const PlaybackSettingsPage(),
+        ),
+      ),
+    );
+    final option = find.text('Album art beside lyrics');
+    await tester.scrollUntilVisible(
+      option,
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(option);
+    await tester.pumpAndSettle();
+    expect(container.read(settingsProvider).landscapeLyricsArtwork, isTrue);
+    final prefs = await SharedPreferences.getInstance();
+    final restored = AppSettings.fromJson(
+      jsonDecode(prefs.getString('app_settings')!) as Map<String, dynamic>,
+    );
+    expect(restored.landscapeLyricsArtwork, isTrue);
+    final l10n = AppLocalizations.of(tester.element(option));
+    expect(
+      SettingsSearchCatalog(l10n).playback.where(
+        (entry) =>
+            entry.title == l10n.landscapeLyricsArtwork &&
+            entry.matches(SettingsSearchQuery('landscape lyrics')),
+      ),
+      hasLength(1),
+    );
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('full-screen Material cover keeps the entire app bar readable', (

@@ -10,6 +10,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/services/saf_migration_prompt_store.dart';
 import 'package:mornye/providers/download_queue_provider.dart';
+import 'package:mornye/providers/extension_provider.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/providers/playback_notification_provider.dart';
@@ -19,12 +20,14 @@ import 'package:mornye/providers/track_provider.dart';
 import 'package:mornye/providers/user_profile_provider.dart';
 import 'package:mornye/providers/preview_player_provider.dart';
 import 'package:mornye/screens/home_tab.dart';
+import 'package:mornye/screens/library_directory_screen.dart';
 import 'package:mornye/screens/library_tracks_folder_screen.dart';
 import 'package:mornye/screens/mornye_library_screen.dart';
 import 'package:mornye/screens/repo_tab.dart';
 import 'package:mornye/screens/queue_tab.dart';
 import 'package:mornye/screens/settings/profile_settings_page.dart';
 import 'package:mornye/screens/settings/settings_tab.dart';
+import 'package:mornye/screens/whats_new_screen.dart';
 import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/services/shell_navigation_service.dart';
 import 'package:mornye/services/share_intent_service.dart';
@@ -42,19 +45,24 @@ import 'package:mornye/widgets/animation_utils.dart';
 import 'package:mornye/widgets/nav_destination_icons.dart';
 import 'package:mornye/widgets/settings_group.dart';
 import 'package:mornye/widgets/mini_player.dart';
+import 'package:mornye/widgets/tv_shell.dart';
 import 'package:mornye/widgets/lazy_tab_view.dart';
+import 'package:mornye/widgets/link/link_actions.dart';
 import 'package:mornye/widgets/expressive_navigation_bar.dart';
 import 'package:mornye/widgets/mornye_bottom_bar.dart';
 import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/app_loading_indicator.dart';
 import 'package:mornye/widgets/mornye_chrome.dart';
 import 'package:mornye/theme/mornye_theme.dart';
+import 'package:mornye/theme/player_artwork_theme.dart';
 import 'package:mornye/widgets/selection_bottom_bar.dart';
 import 'package:mornye/widgets/desktop/desktop_commands.dart';
 import 'package:mornye/widgets/desktop/desktop_inspector.dart';
+import 'package:mornye/widgets/desktop/desktop_link_transfer_actions.dart';
 import 'package:mornye/widgets/desktop/desktop_navigation.dart';
 import 'package:mornye/utils/logger.dart';
 import 'package:mornye/utils/adaptive_layout.dart';
+import 'package:mornye/utils/android_tv.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/utils/saf_download_tree.dart';
 
@@ -147,7 +155,7 @@ class _MainShellState extends ConsumerState<MainShell>
   late final _PreviewStopNavigatorObserver _searchPreviewStopObserver;
 
   /// Desktop: whether Library shows its root page, so the Mornye sidebar
-  /// returns to the Library root's link.
+  /// returns to the Library root's link and the Material rail to Library.
   late final _libraryDepthObserver = _PageDepthObserver(
     onRoot: () => desktopSidebarLink.value = null,
   );
@@ -176,7 +184,7 @@ class _MainShellState extends ConsumerState<MainShell>
           tab,
           mornye: mornye,
           showStore: showStore,
-          desktop: isDesktopPlatform,
+          desktop: isDesktopPlatform || isAndroidTv,
         ) ??
         0;
     if (index == _currentIndex) return;
@@ -188,11 +196,23 @@ class _MainShellState extends ConsumerState<MainShell>
     });
   }
 
+  /// What the services below were last configured with. Theme and media
+  /// query changes also reach [didChangeDependencies]; the services only
+  /// need a new language.
+  AppLocalizations? _servicesL10n;
+  String? _servicesLanguageTag;
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     _keepTabAcrossStyles();
     final l10n = context.l10n;
+    final languageTag = Localizations.localeOf(context).toLanguageTag();
+    if (identical(l10n, _servicesL10n) && languageTag == _servicesLanguageTag) {
+      return;
+    }
+    _servicesL10n = l10n;
+    _servicesLanguageTag = languageTag;
     NotificationService().updateStrings(l10n);
     final playback = ref.read(musicPlayerRuntimeProvider);
     playback.updateStrings(
@@ -209,11 +229,7 @@ class _MainShellState extends ConsumerState<MainShell>
     listeningRecorder.setEnabled(settings.listeningStatisticsEnabled);
     // Deezer & co. localize artist/genre names by IP unless told the app's
     // language (issue #480).
-    unawaited(
-      PlatformBridge.setMetadataLanguage(
-        Localizations.localeOf(context).toLanguageTag(),
-      ),
-    );
+    unawaited(PlatformBridge.setMetadataLanguage(languageTag));
   }
 
   @override
@@ -254,14 +270,31 @@ class _MainShellState extends ConsumerState<MainShell>
       );
       _initialSafRepairComplete = true;
       if (!mounted) return;
-      unawaited(ref.read(musicPlayerRuntimeProvider).restoreSession());
+      unawaited(_restorePlayback());
       _setupShareListener();
       await _checkSafMigration();
+      if (!mounted) return;
+      await maybeShowWhatsNewDialog(context, ref);
+      if (!mounted) return;
       final updateDialogShown = await _checkForUpdates();
       if (!updateDialogShown) {
         await _checkAppAnnouncement();
       }
     });
+  }
+
+  /// Restores the last session, then its song's cover from the file once
+  /// extensions are ready; the desktop backend reads files only then.
+  Future<void> _restorePlayback() async {
+    final runtime = ref.read(musicPlayerRuntimeProvider);
+    try {
+      await runtime.restoreSession();
+      await ref.read(extensionProvider.notifier).ensureInitialized();
+      if (!mounted) return;
+      await runtime.recoverRestoredArtwork();
+    } on Object catch (error) {
+      _log.w('Could not restore the playing song\'s cover: $error');
+    }
   }
 
   void _onUsbAudioStatusChanged() {
@@ -328,9 +361,21 @@ class _MainShellState extends ConsumerState<MainShell>
     if (!mounted) return;
     ref.read(settingsProvider.notifier).setHasSearchedBefore();
     if (mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(context.l10n.loadingSharedLink)));
+      final linkClient = ref.read(linkPhoneClientProvider);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(context.l10n.loadingSharedLink),
+          // A paired desktop can take the link instead.
+          action: linkClient == null
+              ? null
+              : SnackBarAction(
+                  label: context.l10n.linkSendToDesktop(
+                    linkDesktopName(linkClient),
+                  ),
+                  onPressed: () => showLinkSharedUrlSheet(context, ref, url),
+                ),
+        ),
+      );
     }
     await ref.read(trackProvider.notifier).fetchFromUrl(url);
     final trackState = ref.read(trackProvider);
@@ -388,9 +433,10 @@ class _MainShellState extends ConsumerState<MainShell>
     if (!context.isMornye) ref.read(trackProvider.notifier).clear();
   }
 
-  /// Mornye desktop windows show Settings as a destination after Search, in
-  /// the content pane. Phones and tablets open it as a page instead.
-  bool get _mornyeSettingsTab => context.isMornye && isDesktopPlatform;
+  /// Desktop and TV show Settings after Search in the content pane.
+  /// Phones and tablets open it as a page instead.
+  bool get _mornyeSettingsTab =>
+      context.isMornye && (isDesktopPlatform || isAndroidTv);
 
   int _settingsIndex(bool showStore) =>
       context.isMornye ? (showStore ? 4 : 3) : (showStore ? 3 : 2);
@@ -458,11 +504,11 @@ class _MainShellState extends ConsumerState<MainShell>
         showRepoTab: showStore,
         showSearchTab: context.isMornye,
       );
-      FocusManager.instance.primaryFocus?.unfocus();
+      if (!isAndroidTv) FocusManager.instance.primaryFocus?.unfocus();
       // Jump directly when skipping intermediate tabs to avoid
       // sliding through them. For those jumps, keep a short fade-in
       // so the transition still feels intentional.
-      if (context.isMornye) {
+      if (context.isMornye || isAndroidTv) {
         // The glass pill owns the tab transition. Sliding/fading the whole
         // page at the same time continuously invalidates its live backdrop.
         _tabJumpTransitionController.value = 1;
@@ -496,6 +542,13 @@ class _MainShellState extends ConsumerState<MainShell>
     }
   }
 
+  /// Reads the keyboard inset without depending on it, so keyboard frames
+  /// do not rebuild the shell.
+  bool get _keyboardVisible {
+    final media = context.getInheritedWidgetOfExactType<MediaQuery>()!;
+    return media.data.viewInsets.bottom > 0;
+  }
+
   Future<void> _handleBackPress() async {
     final rootNavigator = Navigator.of(context, rootNavigator: true);
     final handledByRootNavigator = await rootNavigator.maybePop();
@@ -520,8 +573,6 @@ class _MainShellState extends ConsumerState<MainShell>
     final trackState = ref.read(trackProvider);
     final isSearchTab =
         _currentIndex == (context.isMornye ? (showStore ? 3 : 2) : 0);
-
-    final isKeyboardVisible = MediaQuery.viewInsetsOf(context).bottom > 0;
 
     if (isSearchTab &&
         trackState.isShowingRecentAccess &&
@@ -553,7 +604,7 @@ class _MainShellState extends ConsumerState<MainShell>
       return;
     }
 
-    if (isSearchTab && isKeyboardVisible) {
+    if (isSearchTab && _keyboardVisible) {
       FocusManager.instance.primaryFocus?.unfocus();
       _lastBackPress = null;
       return;
@@ -566,6 +617,11 @@ class _MainShellState extends ConsumerState<MainShell>
     }
 
     if (isSearchTab && trackState.isLoading) {
+      return;
+    }
+
+    if (isAndroidTv) {
+      await SystemNavigator.pop();
       return;
     }
 
@@ -680,6 +736,11 @@ class _MainShellState extends ConsumerState<MainShell>
         label: l10n.searchSongs,
       ),
       DesktopSidebarLink(
+        id: 'folders',
+        icon: CupertinoIcons.folder,
+        label: l10n.libraryFolders,
+      ),
+      DesktopSidebarLink(
         id: 'downloads',
         icon: CupertinoIcons.arrow_down_circle,
         label: l10n.libraryDownloads,
@@ -688,7 +749,7 @@ class _MainShellState extends ConsumerState<MainShell>
     ];
   }
 
-  /// The page a Mornye desktop sidebar link opens in the Library tab, or
+  /// The page a desktop sidebar or rail link opens in the Library tab, or
   /// null for the Library root.
   Widget? _desktopLibraryPage(String id) {
     const playlistPrefix = 'playlist:';
@@ -713,6 +774,7 @@ class _MainShellState extends ConsumerState<MainShell>
         ),
       ),
       'songs' => const Scaffold(body: QueueTab(librarySection: 'all')),
+      'folders' => const LibraryDirectoryScreen(),
       'downloads' => const Scaffold(
         body: QueueTab(librarySection: 'downloads'),
       ),
@@ -723,22 +785,37 @@ class _MainShellState extends ConsumerState<MainShell>
     };
   }
 
-  /// Shows a Library page or playlist picked in the Mornye desktop sidebar
-  /// in the Library tab, in place of the page it showed.
+  /// Shows a Library page or playlist picked in the Mornye desktop sidebar,
+  /// or a playlist picked in the Material rail, in the Library tab, in place
+  /// of the page it showed.
   void _openDesktopLibraryLink(String id) {
-    _onShellTabRequested(ShellTab.library);
     final page = _desktopLibraryPage(id);
-    // The Library navigator mounts with the tab on its first visit.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final navigator = _libraryTabNavigatorKey.currentState;
-      if (!mounted || navigator == null) return;
+    // A link replaces the Library page at once, as in a source list, so the
+    // Library root never shows on the way from another tab.
+    void show(NavigatorState navigator) {
       navigator.popUntil((route) => route.isFirst);
       if (page != null) {
         unawaited(
-          navigator.push(MaterialPageRoute<void>(builder: (_) => page)),
+          navigator.push(
+            PageRouteBuilder<void>(
+              transitionDuration: Duration.zero,
+              reverseTransitionDuration: Duration.zero,
+              pageBuilder: (_, _, _) => page,
+            ),
+          ),
         );
       }
       desktopSidebarLink.value = page == null ? null : id;
+    }
+
+    final navigator = _libraryTabNavigatorKey.currentState;
+    if (navigator != null) show(navigator);
+    _onShellTabRequested(ShellTab.library);
+    if (navigator != null) return;
+    // The Library navigator mounts with the tab on its first visit.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final navigator = _libraryTabNavigatorKey.currentState;
+      if (mounted && navigator != null) show(navigator);
     });
     WidgetsBinding.instance.ensureVisualUpdate();
   }
@@ -798,6 +875,9 @@ class _MainShellState extends ConsumerState<MainShell>
     );
     ref.listen(settingsProvider, (_, settings) {
       ref.read(musicPlayerRuntimeProvider).configure(settings);
+    });
+    ref.listen(activeRemotePlaybackProvider, (_, remote) {
+      unawaited(ref.read(musicPlayerRuntimeProvider).showRemote(remote));
     });
     ref.listen(settingsProvider.select((s) => s.discordRichPresenceEnabled), (
       _,
@@ -942,6 +1022,11 @@ class _MainShellState extends ConsumerState<MainShell>
           icon: const Icon(CupertinoIcons.search),
           label: l10n.mornyeSearch,
         ),
+      if (context.isMornye && isAndroidTv)
+        NavigationDestination(
+          icon: const Icon(CupertinoIcons.gear_alt),
+          label: l10n.navSettings,
+        ),
     ];
 
     final maxIndex = tabs.length - 1;
@@ -972,13 +1057,15 @@ class _MainShellState extends ConsumerState<MainShell>
         !isDesktopPlatform &&
         context.isMornye &&
         !useNavigationRail &&
-        MediaQuery.viewInsetsOf(context).bottom == 0 &&
         MediaQuery.textScalerOf(context).scale(15) <= 20;
 
     Widget observeScroll(Widget child, int index) =>
         NotificationListener<ScrollNotification>(
           onNotification: (notification) {
-            if (canMinimizeChrome && index == _currentIndex) {
+            // The chrome stays expanded while the keyboard is up.
+            if (canMinimizeChrome &&
+                index == _currentIndex &&
+                !_keyboardVisible) {
               return _mornyeChrome.handleScroll(notification);
             }
             return false;
@@ -988,10 +1075,12 @@ class _MainShellState extends ConsumerState<MainShell>
 
     final pageView = KeyedSubtree(
       key: _pageViewKey,
-      child: context.isMornye
+      child: context.isMornye || isAndroidTv
           ? LazyTabView(
               index: selectedDestination,
-              preloadKeys: {const ValueKey('tab-search')},
+              preloadKeys: isAndroidTv
+                  ? const {}
+                  : {const ValueKey('tab-search')},
               children: [
                 for (var index = 0; index < tabs.length; index++)
                   KeyedSubtree(
@@ -1024,6 +1113,25 @@ class _MainShellState extends ConsumerState<MainShell>
             ),
     );
 
+    if (isAndroidTv) {
+      return DownloadQueueFeedback(
+        child: BackButtonListener(
+          onBackButtonPressed: () async {
+            await _handleBackPress();
+            return true;
+          },
+          child: Scaffold(
+            body: TvShell(
+              destinations: destinations,
+              selectedIndex: selectedDestination,
+              onSelected: _onNavTap,
+              child: SelectionOverlayHost(child: pageView),
+            ),
+          ),
+        ),
+      );
+    }
+
     if (isDesktopPlatform) {
       // Desktop windows: a rail (Material) or source-list sidebar (Mornye)
       // with a persistent player; no bottom tabs or touch gestures.
@@ -1036,18 +1144,21 @@ class _MainShellState extends ConsumerState<MainShell>
         repoUpdatesCount: repoUpdatesCount,
       );
       return DownloadQueueFeedback(
-        child: Scaffold(
-          body: DesktopShellLayout(
-            destinations: destinations,
-            selected: selectedTab,
-            onSelected: _onShellTabRequested,
-            libraryLinks: mornye
-                ? _desktopLibraryLinks(queueCount: queueState)
-                : const [],
-            onOpenLibraryLink: mornye ? _openDesktopLibraryLink : null,
-            onOpenProfile: mornye ? _openDesktopProfile : null,
-            // The selection bar floats over the pages, not the sidebar.
-            body: SelectionOverlayHost(child: pageView),
+        child: DesktopLinkTransferNotices(
+          child: Scaffold(
+            body: DesktopShellLayout(
+              destinations: destinations,
+              selected: selectedTab,
+              onSelected: _onShellTabRequested,
+              libraryLinks: mornye
+                  ? _desktopLibraryLinks(queueCount: queueState)
+                  : const [],
+              // The Material rail opens playlists alone.
+              onOpenLibraryLink: _openDesktopLibraryLink,
+              onOpenProfile: mornye ? _openDesktopProfile : null,
+              // The selection bar floats over the pages, not the sidebar.
+              body: SelectionOverlayHost(child: pageView),
+            ),
           ),
         ),
       );
@@ -1139,7 +1250,13 @@ class _MainShellState extends ConsumerState<MainShell>
                                 valueListenable: _mornyeChrome,
                                 builder: (context, collapsed, _) =>
                                     MornyeBottomBar(
-                                      collapsed: canMinimizeChrome && collapsed,
+                                      collapsed:
+                                          canMinimizeChrome &&
+                                          collapsed &&
+                                          MediaQuery.viewInsetsOf(
+                                                context,
+                                              ).bottom ==
+                                              0,
                                       destinations: destinations,
                                       selectedIndex: selectedDestination,
                                       onSelected: _onNavTap,
@@ -1156,38 +1273,58 @@ class _MainShellState extends ConsumerState<MainShell>
                   ),
                 );
               }
-              final bottomBar = Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const MiniPlayer(),
-                  // The bar's container fill separates it; no divider, so
-                  // the mini player and the bar read as one surface.
-                  if (!useNavigationRail)
-                    ExpressiveNavigationBar(
-                      selectedIndex: _currentIndex.clamp(0, maxIndex),
-                      onDestinationSelected: _onNavTap,
-                      isTablet: isTablet,
-                      backgroundColor: settingsGroupColor(
-                        context,
-                      ).withValues(alpha: 0.72),
-                      destinations: destinations,
+              final blurEnabled = ref.watch(backdropBlurEnabledProvider);
+              // The mini player and the bar read as one surface, so the bar
+              // takes the playing track's artwork scheme too; with nothing
+              // playing both keep the app scheme. Only this scope listens
+              // to the track, so a cover change does not rebuild the shell.
+              return Consumer(
+                builder: (context, ref, child) => PlayerArtworkTheme(
+                  artUri: ref.watch(
+                    currentMediaItemProvider.select(
+                      (item) => item.value?.artUri?.toString(),
                     ),
-                ],
-              );
-              // The backdrop blur re-filters everything scrolling underneath on
-              // every frame; low-end devices get an opaque base instead unless
-              // the user forces blur on in appearance settings.
-              if (!ref.watch(backdropBlurEnabledProvider)) {
-                return ColoredBox(
-                  color: settingsGroupColor(context),
-                  child: bottomBar,
-                );
-              }
-              return ClipRect(
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                  blendMode: BlendMode.src,
-                  child: bottomBar,
+                  ),
+                  child: child!,
+                ),
+                child: Builder(
+                  builder: (context) {
+                    final bottomBar = Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const MiniPlayer(),
+                        // The bar's container fill separates it; no divider,
+                        // so the mini player and the bar read as one surface.
+                        if (!useNavigationRail)
+                          ExpressiveNavigationBar(
+                            selectedIndex: _currentIndex.clamp(0, maxIndex),
+                            onDestinationSelected: _onNavTap,
+                            isTablet: isTablet,
+                            backgroundColor: settingsGroupColor(
+                              context,
+                            ).withValues(alpha: 0.72),
+                            destinations: destinations,
+                          ),
+                      ],
+                    );
+                    // The backdrop blur re-filters everything scrolling
+                    // underneath on every frame; low-end devices get an
+                    // opaque base instead unless the user forces blur on in
+                    // appearance settings.
+                    if (!blurEnabled) {
+                      return ColoredBox(
+                        color: settingsGroupColor(context),
+                        child: bottomBar,
+                      );
+                    }
+                    return ClipRect(
+                      child: BackdropFilter(
+                        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                        blendMode: BlendMode.src,
+                        child: bottomBar,
+                      ),
+                    );
+                  },
                 ),
               );
             },
@@ -1238,6 +1375,9 @@ class _TabNavigatorState extends State<_TabNavigator> {
   Widget build(BuildContext context) {
     return Navigator(
       key: widget.navigatorKey,
+      routeDirectionalTraversalEdgeBehavior: isAndroidTv
+          ? TraversalEdgeBehavior.parentScope
+          : TraversalEdgeBehavior.stop,
       observers: [
         _chromeObserver,
         if (widget.heroAnimationsEnabled) _heroController,
@@ -1245,7 +1385,10 @@ class _TabNavigatorState extends State<_TabNavigator> {
         ...widget.observers,
       ],
       onGenerateInitialRoutes: (_, _) => [
-        MaterialPageRoute<void>(builder: (_) => widget.child),
+        MaterialPageRoute<void>(
+          requestFocus: !isAndroidTv,
+          builder: (_) => widget.child,
+        ),
       ],
     );
   }

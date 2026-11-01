@@ -30,9 +30,12 @@ final weeklyReleasesProvider = FutureProvider.autoDispose
             (extension) => extension.enabled && extension.hasMetadataProvider,
           )
           .toList(growable: false);
+      var cancelled = false;
+      ref.onDispose(() => cancelled = true);
       final service = WeeklyReleaseService(
         preferences: SharedPreferences.getInstance(),
         loadArtist: (artist) async {
+          if (cancelled) throw StateError('Weekly releases request cancelled');
           final directProvider = artist.providerId;
           if (directProvider != null &&
               providers.any((p) => p.id == directProvider)) {
@@ -56,12 +59,18 @@ final weeklyReleasesProvider = FutureProvider.autoDispose
                   : 0,
             );
           for (final provider in candidates) {
+            if (cancelled) {
+              throw StateError('Weekly releases request cancelled');
+            }
             try {
               final matches = await PlatformBridge.customSearchWithExtension(
                 provider.id,
                 artist.name,
                 options: {'filter': 'artist', 'limit': 10},
               );
+              if (cancelled) {
+                throw StateError('Weekly releases request cancelled');
+              }
               for (final match in matches) {
                 if (match['name']?.toString().trim().toLowerCase() !=
                     artist.name.trim().toLowerCase()) {
@@ -85,5 +94,9 @@ final weeklyReleasesProvider = FutureProvider.autoDispose
           throw StateError('No installed provider can resolve this artist');
         },
       );
-      return service.load(collections.favoriteArtists, refresh: refresh);
+      return service.load(
+        collections.favoriteArtists,
+        refresh: refresh,
+        isCancelled: () => cancelled,
+      );
     });

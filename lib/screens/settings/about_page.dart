@@ -4,10 +4,13 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:mornye/services/cover_cache_manager.dart';
 import 'package:mornye/constants/app_info.dart';
 import 'package:mornye/l10n/l10n.dart';
+import 'package:mornye/screens/whats_new_screen.dart';
 import 'package:mornye/theme/mornye_icons.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/adaptive_layout.dart';
+import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/utils/nav_bar_inset.dart';
+import 'package:mornye/widgets/animation_utils.dart';
 import 'package:mornye/widgets/settings_group.dart';
 import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/app_sliver_header.dart';
@@ -38,36 +41,30 @@ class AboutPage extends StatelessWidget {
               ),
             ),
 
-            SliverToBoxAdapter(
-              child: SettingsSectionHeader(
-                title: context.l10n.aboutContributors,
-              ),
-            ),
-            SliverToBoxAdapter(
-              child: SettingsGroup(
-                connected: true,
-                children: [
-                  _ContributorItem(
-                    name: AppInfo.mobileAuthor,
-                    description: context.l10n.aboutMobileDeveloper,
-                    githubUsername: AppInfo.mobileAuthor,
-                    showDivider: true,
-                  ),
-                  _ContributorItem(
-                    name: 'Amonoman',
-                    description: context.l10n.aboutLogoArtist,
-                    githubUsername: 'Amonoman',
-                    showDivider: true,
-                  ),
-                  _ContributorItem(
-                    name: 'Ruubiiiii',
-                    description:
-                        'Provided many APIs and backend resources. A huge help for the project!',
-                    githubUsername: 'Ruubiiiii',
-                    showDivider: false,
-                  ),
-                ],
-              ),
+            ...settingsSectionSlivers(
+              title: context.l10n.aboutContributors,
+              connected: true,
+              children: [
+                _ContributorItem(
+                  name: AppInfo.mobileAuthor,
+                  description: context.l10n.aboutMobileDeveloper,
+                  githubUsername: AppInfo.mobileAuthor,
+                  showDivider: true,
+                ),
+                _ContributorItem(
+                  name: 'Amonoman',
+                  description: context.l10n.aboutLogoArtist,
+                  githubUsername: 'Amonoman',
+                  showDivider: true,
+                ),
+                _ContributorItem(
+                  name: 'Ruubiiiii',
+                  description:
+                      'Provided many APIs and backend resources. A huge help for the project!',
+                  githubUsername: 'Ruubiiiii',
+                  showDivider: false,
+                ),
+              ],
             ),
 
             SliverToBoxAdapter(
@@ -77,168 +74,162 @@ class AboutPage extends StatelessWidget {
             ),
             const SliverToBoxAdapter(child: _TranslatorsSection()),
 
-            SliverToBoxAdapter(
-              child: SettingsSectionHeader(
-                title: context.l10n.aboutSpecialThanks,
-              ),
-            ),
-            SliverToBoxAdapter(
-              child: SettingsGroup(
-                connected: true,
-                children: [
-                  _ContributorItem(
-                    name: 'binimum',
-                    description: context.l10n.aboutBinimumDesc,
-                    githubUsername: 'binimum',
-                    showDivider: true,
-                  ),
-                  _ContributorItem(
-                    name: 'sachinsenal0x64',
-                    description: context.l10n.aboutSachinsenalDesc,
-                    githubUsername: 'sachinsenal0x64',
-                    showDivider: true,
-                  ),
-                  _AboutSettingsItem(
-                    icon: Icons.swap_horiz_rounded,
-                    title: 'UniTune',
-                    subtitle: context.l10n.aboutUnituneDesc,
-                    onTap: () => _launchUrl(
-                      'https://github.com/FlazeIGuess/unitune-api',
-                    ),
-                    showDivider: true,
-                  ),
-                  _AboutSettingsItem(
-                    icon: Icons.library_music_outlined,
-                    title: 'MusicBrainz',
-                    subtitle: context.l10n.aboutMusicBrainzDesc,
-                    onTap: () => _launchUrl('https://musicbrainz.org'),
-                    showDivider: true,
-                  ),
-                  _AboutSettingsItem(
-                    icon: Icons.hub_outlined,
-                    title: 'Squigly',
-                    subtitle: context.l10n.aboutSquiglyDesc,
-                    onTap: () => _launchUrl('https://squigly.link'),
-                    showDivider: true,
-                  ),
-                  _AboutSettingsItem(
-                    icon: Icons.lyrics_outlined,
-                    title: 'Zarz-LRC',
-                    subtitle: context.l10n.lyricsProviderZarzLrcDesc,
-                    onTap: () =>
-                        _launchUrl('https://api.zarz.moe/apple-music/docs'),
-                    showDivider: true,
-                  ),
-                  _AboutSettingsItem(
-                    icon: Icons.lyrics_outlined,
-                    title: 'Paxsenix',
-                    subtitle: context.l10n.aboutPaxsenixSubtitle,
-                    onTap: () => _launchUrl('https://lyrics.paxsenix.org'),
-                    showDivider: false,
-                  ),
-                ],
-              ),
+            ...settingsSectionSlivers(
+              title: context.l10n.aboutSpecialThanks,
+              connected: true,
+              children: [
+                _ContributorItem(
+                  name: 'binimum',
+                  description: context.l10n.aboutBinimumDesc,
+                  githubUsername: 'binimum',
+                  showDivider: true,
+                ),
+                _ContributorItem(
+                  name: 'sachinsenal0x64',
+                  description: context.l10n.aboutSachinsenalDesc,
+                  githubUsername: 'sachinsenal0x64',
+                  showDivider: true,
+                ),
+                _AboutSettingsItem(
+                  icon: Icons.swap_horiz_rounded,
+                  title: 'UniTune',
+                  subtitle: context.l10n.aboutUnituneDesc,
+                  onTap: () =>
+                      _launchUrl('https://github.com/FlazeIGuess/unitune-api'),
+                  showDivider: true,
+                ),
+                _AboutSettingsItem(
+                  icon: Icons.library_music_outlined,
+                  title: 'MusicBrainz',
+                  subtitle: context.l10n.aboutMusicBrainzDesc,
+                  onTap: () => _launchUrl('https://musicbrainz.org'),
+                  showDivider: true,
+                ),
+                _AboutSettingsItem(
+                  icon: Icons.hub_outlined,
+                  title: 'Squigly',
+                  subtitle: context.l10n.aboutSquiglyDesc,
+                  onTap: () => _launchUrl('https://squigly.link'),
+                  showDivider: true,
+                ),
+                _AboutSettingsItem(
+                  icon: Icons.lyrics_outlined,
+                  title: 'Zarz-LRC',
+                  subtitle: context.l10n.lyricsProviderZarzLrcDesc,
+                  onTap: () =>
+                      _launchUrl('https://api.zarz.moe/apple-music/docs'),
+                  showDivider: true,
+                ),
+                _AboutSettingsItem(
+                  icon: Icons.lyrics_outlined,
+                  title: 'Paxsenix',
+                  subtitle: context.l10n.aboutPaxsenixSubtitle,
+                  onTap: () => _launchUrl('https://lyrics.paxsenix.org'),
+                  showDivider: false,
+                ),
+              ],
             ),
 
-            SliverToBoxAdapter(
-              child: SettingsSectionHeader(title: context.l10n.aboutLinks),
-            ),
-            SliverToBoxAdapter(
-              child: SettingsGroup(
-                connected: true,
-                children: [
-                  _AboutSettingsItem(
-                    icon: Icons.phone_android,
-                    title: context.l10n.aboutMobileSource,
-                    subtitle: 'github.com/${AppInfo.githubRepo}',
-                    onTap: () => _launchUrl(AppInfo.githubUrl),
-                    showDivider: true,
-                  ),
-                  _AboutSettingsItem(
-                    icon: Icons.lyrics_outlined,
-                    title: context.l10n.aboutLyricsWebsite,
-                    subtitle: 'lyrics.zarz.moe',
-                    onTap: () => _launchUrl('https://lyrics.zarz.moe'),
-                    showDivider: true,
-                  ),
-                  _AboutSettingsItem(
-                    icon: Icons.monitor_heart_outlined,
-                    title: context.l10n.aboutServiceStatus,
-                    subtitle: 'status.zarz.moe',
-                    onTap: () => _launchUrl('https://status.zarz.moe'),
-                    showDivider: true,
-                  ),
-                  _AboutSettingsItem(
-                    icon: Icons.bug_report_outlined,
-                    title: context.l10n.aboutReportIssue,
-                    subtitle: context.l10n.aboutReportIssueSubtitle,
-                    onTap: () => _launchUrl('${AppInfo.githubUrl}/issues/new'),
-                    showDivider: true,
-                  ),
-                  _AboutSettingsItem(
-                    icon: Icons.lightbulb_outline,
-                    title: context.l10n.aboutFeatureRequest,
-                    subtitle: context.l10n.aboutFeatureRequestSubtitle,
-                    onTap: () => _launchUrl('${AppInfo.githubUrl}/issues/new'),
-                    showDivider: false,
-                  ),
-                ],
-              ),
+            ...settingsSectionSlivers(
+              title: context.l10n.aboutLinks,
+              connected: true,
+              children: [
+                _AboutSettingsItem(
+                  icon: Icons.phone_android,
+                  title: context.l10n.aboutMobileSource,
+                  subtitle: 'github.com/${AppInfo.githubRepo}',
+                  onTap: () => _launchUrl(AppInfo.githubUrl),
+                  showDivider: true,
+                ),
+                _AboutSettingsItem(
+                  icon: Icons.lyrics_outlined,
+                  title: context.l10n.aboutLyricsWebsite,
+                  subtitle: 'lyrics.zarz.moe',
+                  onTap: () => _launchUrl('https://lyrics.zarz.moe'),
+                  showDivider: true,
+                ),
+                _AboutSettingsItem(
+                  icon: Icons.monitor_heart_outlined,
+                  title: context.l10n.aboutServiceStatus,
+                  subtitle: 'status.zarz.moe',
+                  onTap: () => _launchUrl('https://status.zarz.moe'),
+                  showDivider: true,
+                ),
+                _AboutSettingsItem(
+                  icon: Icons.bug_report_outlined,
+                  title: context.l10n.aboutReportIssue,
+                  subtitle: context.l10n.aboutReportIssueSubtitle,
+                  onTap: () => _launchUrl('${AppInfo.githubUrl}/issues/new'),
+                  showDivider: true,
+                ),
+                _AboutSettingsItem(
+                  icon: Icons.lightbulb_outline,
+                  title: context.l10n.aboutFeatureRequest,
+                  subtitle: context.l10n.aboutFeatureRequestSubtitle,
+                  onTap: () => _launchUrl('${AppInfo.githubUrl}/issues/new'),
+                  showDivider: false,
+                ),
+              ],
             ),
 
-            SliverToBoxAdapter(
-              child: SettingsSectionHeader(title: context.l10n.aboutSocial),
-            ),
-            SliverToBoxAdapter(
-              child: SettingsGroup(
-                connected: true,
-                children: [
-                  _AboutSettingsItem(
-                    icon: Icons.telegram,
-                    title: context.l10n.aboutTelegramChannel,
-                    subtitle: context.l10n.aboutTelegramChannelSubtitle,
-                    onTap: () => _launchUrl('https://t.me/mornyeupdates'),
-                    showDivider: true,
-                  ),
-                  _AboutSettingsItem(
-                    icon: Icons.forum_outlined,
-                    title: context.l10n.aboutTelegramChat,
-                    subtitle: context.l10n.aboutTelegramChatSubtitle,
-                    onTap: () => _launchUrl('https://t.me/mornyecommunity'),
-                    showDivider: false,
-                  ),
-                ],
-              ),
+            ...settingsSectionSlivers(
+              title: context.l10n.aboutSocial,
+              connected: true,
+              children: [
+                _AboutSettingsItem(
+                  icon: Icons.telegram,
+                  title: context.l10n.aboutTelegramChannel,
+                  subtitle: context.l10n.aboutTelegramChannelSubtitle,
+                  onTap: () => _launchUrl('https://t.me/mornyeupdates'),
+                  showDivider: true,
+                ),
+                _AboutSettingsItem(
+                  icon: Icons.forum_outlined,
+                  title: context.l10n.aboutTelegramChat,
+                  subtitle: context.l10n.aboutTelegramChatSubtitle,
+                  onTap: () => _launchUrl('https://t.me/mornyecommunity'),
+                  showDivider: false,
+                ),
+              ],
             ),
 
-            SliverToBoxAdapter(
-              child: SettingsSectionHeader(title: context.l10n.aboutApp),
-            ),
-            SliverToBoxAdapter(
-              child: SettingsGroup(
-                connected: true,
-                children: [
-                  _AboutSettingsItem(
-                    icon: Icons.info_outline,
-                    title: context.l10n.aboutVersion,
-                    subtitle:
-                        'v${AppInfo.displayVersion} (build ${AppInfo.buildNumber})',
-                    showDivider: true,
+            ...settingsSectionSlivers(
+              title: context.l10n.aboutApp,
+              connected: true,
+              children: [
+                _AboutSettingsItem(
+                  icon: Icons.info_outline,
+                  title: context.l10n.aboutVersion,
+                  subtitle:
+                      'v${AppInfo.displayVersion} (build ${AppInfo.buildNumber})',
+                  showDivider: true,
+                ),
+                _AboutSettingsItem(
+                  icon: Icons.new_releases,
+                  title: context.l10n.whatsNewAboutTitle(
+                    AppInfo.whatsNewRelease,
                   ),
-                  _AboutSettingsItem(
-                    icon: Icons.policy_outlined,
-                    title: MaterialLocalizations.of(context).licensesPageTitle,
-                    subtitle: AppInfo.license,
-                    onTap: () => showLicensePage(
-                      context: context,
-                      applicationName: AppInfo.appName,
-                      applicationVersion: AppInfo.displayVersion,
-                      applicationLegalese: AppInfo.copyright,
-                    ),
-                    showDivider: false,
+                  // Above the shell, as it shows after an update.
+                  onTap: () => isDesktopPlatform
+                      ? showWhatsNewDialog(context)
+                      : Navigator.of(context, rootNavigator: true).push(
+                          slidePageRoute<void>(page: const WhatsNewScreen()),
+                        ),
+                  showDivider: true,
+                ),
+                _AboutSettingsItem(
+                  icon: Icons.policy_outlined,
+                  title: MaterialLocalizations.of(context).licensesPageTitle,
+                  subtitle: AppInfo.license,
+                  onTap: () => showLicensePage(
+                    context: context,
+                    applicationName: AppInfo.appName,
+                    applicationVersion: AppInfo.displayVersion,
+                    applicationLegalese: AppInfo.copyright,
                   ),
-                ],
-              ),
+                  showDivider: false,
+                ),
+              ],
             ),
 
             SliverToBoxAdapter(
@@ -473,13 +464,11 @@ class _ContributorItem extends StatelessWidget {
 class _Translator {
   final String name;
   final String crowdinUsername;
-  final String language;
   final String flag;
 
   const _Translator({
     required this.name,
     required this.crowdinUsername,
-    required this.language,
     required this.flag,
   });
 }
@@ -491,91 +480,52 @@ class _TranslatorsSection extends StatelessWidget {
     _Translator(
       name: 'Pedro Marcondes',
       crowdinUsername: 'justapedro',
-      language: 'Portuguese',
       flag: '🇵🇹',
     ),
     _Translator(
       name: 'Credits 125',
       crowdinUsername: 'credits125',
-      language: 'Spanish',
       flag: '🇪🇸',
     ),
     _Translator(
       name: 'Владислав',
       crowdinUsername: 'odinokiy_kot',
-      language: 'Russian',
       flag: '🇷🇺',
     ),
-    _Translator(
-      name: 'Amonoman',
-      crowdinUsername: 'amonoman',
-      language: 'German',
-      flag: '🇩🇪',
-    ),
+    _Translator(name: 'Amonoman', crowdinUsername: 'amonoman', flag: '🇩🇪'),
     _Translator(
       name: 'Re*Index.(ot_inc)',
       crowdinUsername: 'ot_inc',
-      language: 'Japanese',
       flag: '🇯🇵',
     ),
-    _Translator(
-      name: 'unkn0wn',
-      crowdinUsername: 'rdclvi',
-      language: 'Indonesian',
-      flag: '🇮🇩',
-    ),
+    _Translator(name: 'unkn0wn', crowdinUsername: 'rdclvi', flag: '🇮🇩'),
     _Translator(
       name: 'lunching1272',
       crowdinUsername: 'lunching1272',
-      language: 'Chinese Simplified',
       flag: '🇨🇳',
     ),
     _Translator(
       name: 'Serhii Ilchenko',
       crowdinUsername: 'Sega_Mostky',
-      language: 'Ukrainian',
       flag: '🇺🇦',
     ),
     _Translator(
       name: 'Serhii Ilchenko',
       crowdinUsername: 'Sega_Mostky',
-      language: 'Russian',
       flag: '🇷🇺',
     ),
-    _Translator(
-      name: 'Girl-lass',
-      crowdinUsername: 'Girl-lass',
-      language: 'Chinese Simplified',
-      flag: '🇨🇳',
-    ),
-    _Translator(
-      name: 'Kaan',
-      crowdinUsername: 'glai',
-      language: 'Turkish',
-      flag: '🇹🇷',
-    ),
+    _Translator(name: 'Girl-lass', crowdinUsername: 'Girl-lass', flag: '🇨🇳'),
+    _Translator(name: 'Kaan', crowdinUsername: 'glai', flag: '🇹🇷'),
     _Translator(
       name: 'BedirhanGltkn',
       crowdinUsername: 'bedirhangltkn',
-      language: 'Turkish',
       flag: '🇹🇷',
     ),
-    _Translator(
-      name: 'Mickael81',
-      crowdinUsername: 'Mickael81',
-      language: 'French',
-      flag: '🇫🇷',
-    ),
-    _Translator(
-      name: 'BrandQc',
-      crowdinUsername: 'BrandQc',
-      language: 'French',
-      flag: '🇫🇷',
-    ),
+    _Translator(name: 'Mickael81', crowdinUsername: 'Mickael81', flag: '🇫🇷'),
+    _Translator(name: 'BrandQc', crowdinUsername: 'BrandQc', flag: '🇫🇷'),
     _Translator(
       name: 'blackgold8282',
       crowdinUsername: 'blackgold8282',
-      language: 'Korean',
       flag: '🇰🇷',
     ),
   ];

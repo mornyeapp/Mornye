@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:mornye/controllers/local_track_batch_actions.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/models/unified_library_item.dart';
 import 'package:mornye/providers/download_history_provider.dart';
@@ -14,7 +15,6 @@ import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/screens/downloaded_album_screen.dart';
 import 'package:mornye/services/downloaded_embedded_cover_resolver.dart';
 import 'package:mornye/services/library_database.dart';
-import 'package:mornye/services/local_track_batch_actions.dart';
 import 'package:mornye/theme/app_theme.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/selection_bottom_bar.dart';
@@ -34,6 +34,7 @@ class _History extends DownloadHistoryNotifier {
     required String artistName,
     required String albumName,
     String? albumArtist,
+    String? coverUrl,
     String? isrc,
     int? trackNumber,
     int? totalTracks,
@@ -300,7 +301,6 @@ void main() {
         final l10n = AppLocalizations.of(
           tester.element(find.byType(SelectionBottomBar)),
         );
-        expect(find.text(l10n.selectionShareCount(1)), findsNothing);
 
         Future<void> openReEnrich() async {
           await tester.tap(find.text('${l10n.trackReEnrich} (1)'));

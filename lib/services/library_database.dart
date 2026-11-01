@@ -4,12 +4,13 @@ import 'package:path/path.dart';
 import 'package:mornye/utils/logger.dart';
 import 'package:mornye/utils/audio_format_utils.dart';
 import 'package:mornye/utils/file_access.dart';
+import 'package:mornye/services/album_completeness.dart';
 import 'package:mornye/services/history_database.dart';
 import 'package:mornye/services/library_queue_store.dart';
 import 'package:mornye/services/library_file_sizes.dart';
 import 'package:mornye/services/library_cleanup.dart';
 import 'package:mornye/services/library_search.dart';
-import 'package:mornye/services/library_database_models.dart';
+import 'package:mornye/models/library_database_models.dart';
 import 'package:mornye/services/library_duplicates.dart';
 import 'package:mornye/services/network_storage_service.dart';
 import 'package:mornye/services/library_ingestion_store.dart';
@@ -19,7 +20,7 @@ import 'package:mornye/services/library_schema.dart';
 import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/services/sqlite_helpers.dart' as sqlite;
 
-export 'library_database_models.dart';
+export 'package:mornye/models/library_database_models.dart';
 
 export 'library_queue_store.dart'
     show confirmedMissingLyricsSqlPredicate, missingReplayGainSqlPredicate;
@@ -33,7 +34,6 @@ class LibraryDatabase {
   static const int schemaVersion = LibrarySchema.version;
   static const String legacySourceId = LocalLibraryItem.legacySourceId;
   static const String visibleLibraryView = LibrarySchema.visibleView;
-  static const String searchFtsTable = LibrarySchema.searchFtsTable;
   static const String lookupSummaryTable = LibrarySchema.lookupSummaryTable;
   // v4 records ReplayGain availability; older rows rescan once.
   static const int audioMetadataScanVersion = libraryAudioMetadataScanVersion;
@@ -51,6 +51,8 @@ class LibraryDatabase {
   // null means this database connection has not attempted FTS setup yet.
   // false is a completed capability/setup result and must not be retried.
   bool? _searchFtsAvailable;
+  final _shadow = sqlite.LibraryShadowSnapshot();
+  ({Database db, String stamp, LocalLibraryLookupIndex index})? _lookupIndex;
 
   LibraryDatabase._init();
 
@@ -138,18 +140,36 @@ class LibraryDatabase {
   }) async {
     final db = await database;
     await _ensureHistoryAttached(db);
-    return LibrarySearchStore(
+    // The row check runs only on the matching rows, so a search after a
+    // write keeps it rather than wait for a snapshot build.
+    return _shadowRead(
       db,
-      historyFts: HistoryDatabase.instance.searchFtsAvailable,
-      localFts: searchFtsAvailable,
-    ).search(
-      query: query,
-      kind: kind,
-      includeLocal: includeLocal,
-      limit: limit,
-      offset: offset,
+      includeLocal,
+      (snapshot) =>
+          LibrarySearchStore(
+            db,
+            historyFts: HistoryDatabase.instance.searchFtsAvailable,
+            localFts: searchFtsAvailable,
+            shadowSnapshot: snapshot,
+          ).search(
+            query: query,
+            kind: kind,
+            includeLocal: includeLocal,
+            limit: limit,
+            offset: offset,
+          ),
+      rebuild: false,
     );
   }
+
+  /// [includeLocal] reads scanned rows, which the shadow snapshot serves.
+  /// [rebuild] false keeps the row check while the snapshot is stale.
+  Future<T> _shadowRead<T>(
+    Database db,
+    bool includeLocal,
+    Future<T> Function(bool snapshot) read, {
+    bool rebuild = true,
+  }) => includeLocal ? _shadow.read(db, read, rebuild: rebuild) : read(false);
 
   Future<void> _ensureHistoryAttached(Database db) async {
     if (_historyAttached) return;
@@ -186,14 +206,6 @@ class LibraryDatabase {
     return '${normalizeLookupText(albumName)}|${normalizeLookupText(albumArtist ?? artistName)}';
   }
 
-  Future<void> upsert(Map<String, dynamic> json, {String? sourceId}) =>
-      _ingestion.upsert(json, sourceId: sourceId);
-
-  Future<void> upsertBatch(
-    List<Map<String, dynamic>> items, {
-    String? sourceId,
-  }) => _ingestion.upsertBatch(items, sourceId: sourceId);
-
   /// Removes rows from one source whose normalized path keys already exist in
   /// download History, without materializing either database's paths in Dart.
   Future<int> deleteDownloadedRowsForSource(String sourceId) =>
@@ -206,24 +218,6 @@ class LibraryDatabase {
     List<Map<String, dynamic>> items, {
     required String sourceId,
   }) => _ingestion.upsertBatchExcludingHistory(items, sourceId: sourceId);
-
-  Future<void> replaceAll(List<Map<String, dynamic>> items) =>
-      _ingestion.replaceAll(items);
-
-  /// Stages scan rows in bounded, independently committed batches, then swaps
-  /// only this source in one short transaction. Download-history exclusion is
-  /// an indexed SQLite anti-join, avoiding a full History path set in Dart.
-  Future<({int inserted, int skipped})> replaceSourceStream(
-    String sourceId,
-    Stream<Map<String, dynamic>> items, {
-    int batchSize = 300,
-    bool preserveMissing = false,
-  }) => _ingestion.replaceSourceStream(
-    sourceId,
-    items,
-    batchSize: batchSize,
-    preserveMissing: preserveMissing,
-  );
 
   Future<List<LocalLibrarySource>> getSources() async {
     final db = await database;
@@ -397,17 +391,6 @@ class LibraryDatabase {
     });
   }
 
-  Future<List<Map<String, dynamic>>> getAll({int? limit, int? offset}) async {
-    final db = await database;
-    final rows = await db.query(
-      visibleLibraryView,
-      orderBy: 'album_artist, album_name, disc_number, track_number',
-      limit: limit,
-      offset: offset,
-    );
-    return rows.map(LibraryRowMapper.decode).toList();
-  }
-
   String _orderByForSort(LocalLibrarySortMode sortMode) {
     return switch (sortMode) {
       LocalLibrarySortMode.title =>
@@ -429,29 +412,80 @@ class LibraryDatabase {
     return (await getQueueTrackPageResult(request)).rows;
   }
 
-  Future<LibraryQueueStore> _queueStore([QueueLibraryDbQuery? request]) async {
+  /// [sizes] fills file sizes first when it sorts by size.
+  Future<T> _queueRead<T>(
+    Future<T> Function(LibraryQueueStore store) read, {
+    required bool includeLocal,
+    QueueLibraryDbQuery? sizes,
+    bool rebuild = true,
+  }) async {
     final db = await database;
     await _ensureHistoryAttached(db);
-    if (request != null && isLibrarySizeSort(request.sortMode)) {
+    if (sizes != null && isLibrarySizeSort(sizes.sortMode)) {
       await (_fileSizes ??= LibraryFileSizes(db)).refresh(
-        includeLocal: request.includeLocal && request.source != 'downloaded',
-        includeHistory: request.source != 'local',
+        includeLocal: sizes.includeLocal && sizes.source != 'downloaded',
+        includeHistory: sizes.source != 'local',
       );
     }
-    return LibraryQueueStore(
+    return _shadowRead(
       db,
-      historyFts: HistoryDatabase.instance.searchFtsAvailable,
-      localFts: searchFtsAvailable,
+      includeLocal,
+      (snapshot) => read(
+        LibraryQueueStore(
+          db,
+          historyFts: HistoryDatabase.instance.searchFtsAvailable,
+          localFts: searchFtsAvailable,
+          shadowSnapshot: snapshot,
+        ),
+      ),
+      rebuild: rebuild,
     );
   }
 
+  /// After a write a page keeps the row check, at its old cost, rather than
+  /// wait for a snapshot build. An album completeness filter assesses every
+  /// album, so it builds one.
   Future<QueueLibraryDbPage> getQueueTrackPageResult(
     QueueLibraryDbQuery request,
-  ) async => (await _queueStore(request)).trackPage(request);
+  ) => _queueRead(
+    (store) => store.trackPage(request),
+    includeLocal: request.includeLocal,
+    sizes: request,
+    rebuild: isAlbumCompletenessFilter(request.metadata),
+  );
 
-  Future<QueueLibraryCounts> getQueueCounts(
-    QueueLibraryDbQuery request,
-  ) async => (await _queueStore()).counts(request);
+  Future<QueueLibraryCounts> getQueueCounts(QueueLibraryDbQuery request) =>
+      _queueRead(
+        (store) => store.counts(request),
+        includeLocal: request.includeLocal,
+      );
+
+  /// Ids, paths and covers of every Library song, for the Folders index.
+  Future<List<Map<String, Object?>>> getDirectoryEntries({
+    required bool includeLocal,
+  }) => _queueRead(
+    (store) => store.directoryEntries(includeLocal: includeLocal),
+    includeLocal: includeLocal,
+  );
+
+  /// Paths and durations of every downloaded and scanned song.
+  Future<List<Map<String, Object?>>> getSongFiles() =>
+      _queueRead((store) => store.songFiles(), includeLocal: true);
+
+  /// One page of every downloaded and scanned song's metadata, for the
+  /// Home mixes.
+  Future<List<Map<String, Object?>>> getMixSongPage({
+    required bool includeLocal,
+    required int limit,
+    required int offset,
+  }) => _queueRead(
+    (store) => store.mixSongs(
+      includeLocal: includeLocal,
+      limit: limit,
+      offset: offset,
+    ),
+    includeLocal: includeLocal,
+  );
 
   @visibleForTesting
   Future<List<Map<String, dynamic>>> getQueueAlbumPage(
@@ -462,12 +496,19 @@ class LibraryDatabase {
 
   Future<QueueLibraryDbPage> getQueueAlbumPageResult(
     QueueLibraryDbQuery request,
-  ) async => (await _queueStore(request)).albumPage(request);
+  ) => _queueRead(
+    (store) => store.albumPage(request),
+    includeLocal: request.includeLocal,
+    sizes: request,
+  );
 
   /// Album artists across downloaded and scanned music, excluding duplicate paths.
   Future<List<Map<String, dynamic>>> getQueueArtistPage(
     QueueLibraryDbQuery request,
-  ) async => (await _queueStore()).artistPage(request);
+  ) => _queueRead(
+    (store) => store.artistPage(request),
+    includeLocal: request.includeLocal,
+  );
 
   Future<List<Map<String, dynamic>>> getQueueLocalAlbumTracks(
     String albumName,
@@ -497,6 +538,40 @@ class LibraryDatabase {
           'COALESCE(disc_number, 0), COALESCE(track_number, 0), track_name',
     );
     return rows.map(LibraryRowMapper.decode).toList(growable: false);
+  }
+
+  /// The path of every visible file, for grouping by folder and matching
+  /// imported playlist entries without decoding whole rows.
+  Future<List<LibraryFilePathRow>> getFilePathRows() async {
+    final db = await database;
+    final rows = await db.query(
+      visibleLibraryView,
+      columns: const ['id', 'source_id', 'file_path'],
+    );
+    return [
+      for (final row in rows)
+        (
+          id: row['id'] as String,
+          sourceId: row['source_id'] as String? ?? '',
+          filePath: row['file_path'] as String? ?? '',
+        ),
+    ];
+  }
+
+  /// Decoded rows for [ids] in the same order; ids no longer visible are
+  /// left out.
+  Future<List<Map<String, dynamic>>> getByIds(List<String> ids) async {
+    if (ids.isEmpty) return const [];
+    final byId = <String, Map<String, dynamic>>{};
+    await sqlite.loadRowsByColumn(
+      await database,
+      table: visibleLibraryView,
+      column: 'id',
+      rawValues: ids,
+      destination: byId,
+      mapRow: LibraryRowMapper.decode,
+    );
+    return [for (final id in ids) ?byId[id]];
   }
 
   Future<Map<String, dynamic>?> getById(String id) async {
@@ -619,8 +694,18 @@ class LibraryDatabase {
         .toList(growable: false);
   }
 
+  /// Unchanged after a summary refresh that wrote nothing, such as a reload,
+  /// so it skips copying every ISRC and match key to Dart again.
   Future<LocalLibraryLookupIndex> getLookupIndex() async {
     final db = await database;
+    final stamp = await sqlite.readWriteStamp(db, const ['main']);
+    final cached = _lookupIndex;
+    if (stamp != null &&
+        cached != null &&
+        identical(cached.db, db) &&
+        cached.stamp == stamp) {
+      return cached.index;
+    }
     final rows = await db.rawQuery('''
       SELECT summary.kind, summary.value
       FROM $lookupSummaryTable summary
@@ -639,10 +724,12 @@ class LibraryDatabase {
         matchKeys.add(value);
       }
     }
-    return LocalLibraryLookupIndex(
+    final index = LocalLibraryLookupIndex(
       isrcs: Set<String>.unmodifiable(isrcs),
       matchKeys: Set<String>.unmodifiable(matchKeys),
     );
+    _lookupIndex = stamp == null ? null : (db: db, stamp: stamp, index: index);
+    return index;
   }
 
   /// Physical copies sharing one ISRC, excluding inactive NAS sources and
@@ -820,10 +907,6 @@ class LibraryDatabase {
     );
   }
 
-  Future<void> delete(String id) async {
-    await deleteByIds([id]);
-  }
-
   Future<void> deleteByIds(Iterable<String> ids) async {
     if (ids.isEmpty) return;
     await deleteLibraryItemsByIds(await database, ids);
@@ -883,6 +966,7 @@ class LibraryDatabase {
     _historyAttached = false;
     _fileSizes = null;
     _searchFtsAvailable = null;
+    _lookupIndex = null;
   }
 
   Future<Map<String, int>> getFileModTimes({String? sourceId}) async {
@@ -922,12 +1006,6 @@ class LibraryDatabase {
       );
     }
     await batch.commit(noResult: true);
-  }
-
-  Future<Set<String>> getAllFilePaths() async {
-    final db = await database;
-    final rows = await db.rawQuery('SELECT file_path FROM library');
-    return rows.map((r) => r['file_path'] as String).toSet();
   }
 
   Future<int> deleteByPaths(List<String> filePaths) async {

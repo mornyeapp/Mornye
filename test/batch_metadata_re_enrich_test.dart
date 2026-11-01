@@ -30,6 +30,22 @@ LocalLibraryItem _item({
 }
 
 void main() {
+  test('motion-only cover refresh remains available for batch review', () {
+    final changes = buildReEnrichMetadataChanges(
+      _item(),
+      {'header_video': 'https://example.invalid/motion.m3u8'},
+      [ReEnrichFields.cover],
+    );
+    expect(changes.single.field, 'header_video');
+    expect(
+      buildReEnrichMetadataChanges(
+        _item(),
+        {'header_video': 'https://example.invalid/motion.m3u8'},
+        ['isrc'],
+      ),
+      isEmpty,
+    );
+  });
   test(
     'missing mode returns granular keys and preserves populated neighbors',
     () {

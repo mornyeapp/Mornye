@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
@@ -199,9 +200,15 @@ bool settingsRowsConnected(BuildContext context) =>
 
 /// Horizontal margin of settings content on a surface [maxWidth] wide: the
 /// 16dp edge plus the wide-layout centering inset. Groups, section headers,
-/// info cards and page-level buttons share it so their edges line up.
-double settingsHorizontalInset(double maxWidth) =>
-    16 + (maxWidth.isFinite ? wideInsetForWidth(maxWidth) : 0);
+/// info cards and page-level buttons share it so their edges line up, also
+/// with page titles and cards placed by [wideListInset]: desktop pages run
+/// across the pane until the desktop reading width, as their lists do, while
+/// a narrower box such as a sheet keeps its own centering.
+double settingsHorizontalInset(BuildContext context, double maxWidth) =>
+    16 +
+    (maxWidth.isFinite
+        ? min(wideInsetForWidth(maxWidth), wideListInset(context))
+        : 0);
 
 /// Corners of one row in an expressive connected list: the card radius at the
 /// [first] and [last] ends of the run, tight corners between rows.
@@ -263,23 +270,28 @@ class SettingsGroup extends StatelessWidget {
       color: Colors.transparent,
       child: Column(mainAxisSize: MainAxisSize.min, children: children),
     );
-
-    if (glass && context.isMornye) {
-      return LayoutBuilder(
-        builder: (context, constraints) => Padding(
-          padding:
-              margin ??
-              EdgeInsets.symmetric(
-                horizontal:
-                    16 +
-                    (constraints.hasBoundedWidth
-                        ? wideInsetForWidth(constraints.maxWidth)
-                        : 0),
+    // Explicit caller margin wins as-is. Otherwise center on wide surfaces
+    // using the incoming constraint (not screen width) so groups nested in an
+    // already clamped box, e.g. a bottom sheet, are not over-inset.
+    Widget inset(Widget child) => margin != null
+        ? Padding(padding: margin!, child: child)
+        : LayoutBuilder(
+            builder: (context, constraints) => Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: settingsHorizontalInset(
+                  context,
+                  constraints.maxWidth,
+                ),
                 vertical: 4,
               ),
-          child: MornyeGlassPanel(child: child),
-        ),
-      );
+              child: child,
+            ),
+          );
+
+    if (glass && context.isMornye) {
+      // Groups scroll over the opaque page color, where a backdrop pass
+      // filters a flat color; keep the glass tint and rim without it.
+      return inset(MornyeGlassPanel(samplesBackdrop: false, child: child));
     }
 
     final expressive = materialExpressiveEnabled(context);
@@ -300,91 +312,48 @@ class SettingsGroup extends StatelessWidget {
       // a 2dp gap. The group's ends keep the card radius, inner corners stay
       // tight, and the gaps replace row dividers.
       final last = children.length - 1;
-      return LayoutBuilder(
-        builder: (context, constraints) => Padding(
-          padding:
-              margin ??
-              EdgeInsets.symmetric(
-                horizontal:
-                    16 +
-                    (constraints.hasBoundedWidth
-                        ? wideInsetForWidth(constraints.maxWidth)
-                        : 0),
-                vertical: 4,
-              ),
-          child: _ConnectedRowsScope(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                for (final (index, row) in children.indexed) ...[
-                  if (index > 0) const SizedBox(height: 2),
-                  Material(
-                    color: cardColor,
-                    clipBehavior: Clip.antiAlias,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: connectedRowRadius(
-                        context,
-                        first: index == 0,
-                        last: index == last,
-                      ),
+      return inset(
+        _ConnectedRowsScope(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (final (index, row) in children.indexed) ...[
+                if (index > 0) const SizedBox(height: 2),
+                Material(
+                  color: cardColor,
+                  clipBehavior: Clip.antiAlias,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: connectedRowRadius(
+                      context,
+                      first: index == 0,
+                      last: index == last,
                     ),
-                    child: row,
                   ),
-                ],
+                  child: row,
+                ),
               ],
-            ),
+            ],
           ),
         ),
       );
     }
 
     if (expressive) {
-      return LayoutBuilder(
-        builder: (context, constraints) => Padding(
-          padding:
-              margin ??
-              EdgeInsets.symmetric(
-                horizontal:
-                    16 +
-                    (constraints.hasBoundedWidth
-                        ? wideInsetForWidth(constraints.maxWidth)
-                        : 0),
-                vertical: 4,
-              ),
-          child: MaterialExpressiveScope(
-            child: M3ECard(
-              variant: M3ECardVariant.filled,
-              color: cardColor,
-              padding: EdgeInsets.zero,
-              borderRadius: context.tokens.borderRadiusCard,
-              child: child,
-            ),
+      return inset(
+        MaterialExpressiveScope(
+          child: M3ECard(
+            variant: M3ECardVariant.filled,
+            color: cardColor,
+            padding: EdgeInsets.zero,
+            borderRadius: context.tokens.borderRadiusCard,
+            child: child,
           ),
         ),
       );
     }
 
-    // Explicit caller margin wins as-is. Otherwise center on wide surfaces
-    // using the incoming constraint (not screen width) so groups nested in an
-    // already clamped box, e.g. a bottom sheet, are not over-inset.
-    if (margin != null) {
-      return Container(
-        margin: margin,
-        decoration: decoration,
-        clipBehavior: Clip.antiAlias,
-        child: child,
-      );
-    }
-    return LayoutBuilder(
-      builder: (context, constraints) => Container(
-        margin: EdgeInsets.symmetric(
-          horizontal:
-              16 +
-              (constraints.hasBoundedWidth
-                  ? wideInsetForWidth(constraints.maxWidth)
-                  : 0),
-          vertical: 4,
-        ),
+    return inset(
+      Container(
         decoration: decoration,
         clipBehavior: Clip.antiAlias,
         child: child,
@@ -392,6 +361,23 @@ class SettingsGroup extends StatelessWidget {
     );
   }
 }
+
+/// A [SettingsSectionHeader] sliver followed by its [SettingsGroup] sliver.
+List<Widget> settingsSectionSlivers({
+  required String title,
+  required List<Widget> children,
+  bool connected = false,
+  bool glass = false,
+}) => [
+  SliverToBoxAdapter(child: SettingsSectionHeader(title: title)),
+  SliverToBoxAdapter(
+    child: SettingsGroup(
+      connected: connected,
+      glass: glass,
+      children: children,
+    ),
+  ),
+];
 
 /// The grouped list appearance with rows built only near the viewport.
 class SliverSettingsGroup extends StatelessWidget {
@@ -730,7 +716,8 @@ class SettingsSectionHeader extends StatelessWidget {
     // Aligned with the row content of the groups below at any width.
     final content = LayoutBuilder(
       builder: (context, constraints) {
-        final inset = settingsHorizontalInset(constraints.maxWidth) + 16;
+        final inset =
+            settingsHorizontalInset(context, constraints.maxWidth) + 16;
         return Padding(
           padding: EdgeInsets.fromLTRB(inset, 24, inset, 8),
           child: Semantics(header: true, child: label),
@@ -1110,7 +1097,8 @@ class SettingsInfoCard extends StatelessWidget {
     // Wide layouts center groups; the card keeps the same edges.
     return LayoutBuilder(
       builder: (context, constraints) {
-        final wide = settingsHorizontalInset(constraints.maxWidth) - 16;
+        final wide =
+            settingsHorizontalInset(context, constraints.maxWidth) - 16;
         return Padding(
           padding: resolved.copyWith(
             left: resolved.left + wide,

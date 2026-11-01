@@ -25,6 +25,9 @@ pub use write::{
     rewrite_flac_tags_if_changed, rewrite_m4a_freeform,
 };
 
+// Readers must accept the tag blocks our native writers can produce.
+const MAX_TAG_BYTES: usize = 64 * 1024 * 1024;
+
 #[derive(Clone, Debug)]
 pub struct CoverArt {
     pub data: Vec<u8>,
@@ -61,6 +64,37 @@ fn read_container_format<'a>(
         }
     } else {
         format
+    };
+    reader
+        .seek(SeekFrom::Start(0))
+        .map_err(|error| error.to_string())?;
+    Ok(container)
+}
+
+/// The container a file's bytes begin with, for names that cannot be trusted:
+/// "flac" (also behind an ID3v2 tag, as the FLAC tag writer accepts), "m4a",
+/// "mp3", or "" for anything else.
+pub fn sniff_container(reader: &mut (impl Read + Seek)) -> Result<&'static str, String> {
+    let mut header = [0; 10];
+    let length = read_prefix(reader, 0, &mut header)?;
+    let mut start = [0; 4];
+    let found = match id3::v2_tag_length(&header[..length]) {
+        Some(tag) => read_prefix(reader, tag, &mut start)?,
+        None => {
+            let found = length.min(start.len());
+            start[..found].copy_from_slice(&header[..found]);
+            found
+        }
+    };
+    let container = if found == 4 && &start == b"fLaC" {
+        "flac"
+    } else if length >= 8 && &header[4..8] == b"ftyp" {
+        "m4a"
+    } else if found >= 2 && start[0] == 0xff && start[1] & 0xe6 == 0xe2 {
+        // MPEG audio Layer III. ADTS shares the sync word with layer 0.
+        "mp3"
+    } else {
+        ""
     };
     reader
         .seek(SeekFrom::Start(0))
@@ -311,6 +345,27 @@ mod tests {
     use super::*;
     use std::collections::BTreeMap;
     use std::io::Cursor;
+
+    #[test]
+    fn sniff_container_reads_the_bytes_instead_of_the_name() {
+        let tag = b"ID3\x04\0\0\0\0\0\x02\0\0";
+        for (bytes, expected) in [
+            (b"fLaC\x80\0\0\x22".to_vec(), "flac"),
+            ([tag.as_slice(), b"fLaC"].concat(), "flac"),
+            (b"\0\0\0\x18ftypM4A ".to_vec(), "m4a"),
+            (b"\xff\xfb\x90\x00".to_vec(), "mp3"),
+            ([tag.as_slice(), b"\xff\xf3\x90\x00"].concat(), "mp3"),
+            // ADTS AAC and text bodies are neither FLAC nor MP3.
+            (b"\xff\xf1\x50\x80".to_vec(), ""),
+            (b"<!DOCTYPE html>".to_vec(), ""),
+            (b"fL".to_vec(), ""),
+            (Vec::new(), ""),
+        ] {
+            let mut reader = Cursor::new(&bytes);
+            assert_eq!(sniff_container(&mut reader).unwrap(), expected, "{bytes:?}");
+            assert_eq!(reader.position(), 0);
+        }
+    }
 
     #[test]
     fn library_scan_preserves_replaygain_values_written_to_flac() {

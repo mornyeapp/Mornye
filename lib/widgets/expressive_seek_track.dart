@@ -1,9 +1,11 @@
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:material_3_expressive/components/sliders/components/m3e_slider_track_painter.dart';
 import 'package:material_3_expressive/material_3_expressive.dart';
+import 'package:mornye/widgets/decorative_phase.dart';
 
 /// Expressive track motion around the native slider's seeking and accessibility.
 class ExpressiveSeekTrack extends StatefulWidget {
@@ -21,11 +23,8 @@ class ExpressiveSeekTrack extends StatefulWidget {
 }
 
 class _ExpressiveSeekTrackState extends State<ExpressiveSeekTrack>
-    with TickerProviderStateMixin {
-  late final _phase = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 1800),
-  );
+    with SingleTickerProviderStateMixin {
+  final _phase = DecorativePhase(const Duration(milliseconds: 1800));
   late final _amplitude =
       AnimationController(
         vsync: this,
@@ -60,7 +59,7 @@ class _ExpressiveSeekTrackState extends State<ExpressiveSeekTrack>
       _phase.stop();
       _amplitude.value = 0;
     } else if (widget.playing) {
-      if (!_phase.isAnimating) _phase.repeat();
+      _phase.start();
       _amplitude.forward();
     } else {
       _amplitude.reverse();
@@ -93,7 +92,7 @@ class _ExpressiveSeekTrackState extends State<ExpressiveSeekTrack>
 }
 
 /// A wave tick changes paint only. In particular it must not invalidate the
-/// SliderTheme dependency of the native slider on every display frame.
+/// SliderTheme dependency of the native slider on every tick.
 class _AnimatedTrackRepaint extends SingleChildRenderObjectWidget {
   const _AnimatedTrackRepaint({required this.repaint, required super.child});
 
@@ -139,12 +138,12 @@ class _RenderAnimatedTrackRepaint extends RenderProxyBox {
 /// Uses the package's wave renderer without changing the slider gesture cycle.
 class ExpressiveSeekTrackShape extends RoundedRectSliderTrackShape {
   const ExpressiveSeekTrackShape({
-    required Animation<double> phase,
+    required ValueListenable<double> phase,
     required Animation<double> amplitude,
   }) : _phase = phase,
        _amplitude = amplitude;
 
-  final Animation<double> _phase;
+  final ValueListenable<double> _phase;
   final Animation<double> _amplitude;
 
   double get phase => _phase.value * 2 * math.pi;

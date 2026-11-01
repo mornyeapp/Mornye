@@ -91,7 +91,8 @@ extension _ArtistScreenSections on _ArtistScreenState {
         logoUrl: _headerLogoUrl ?? widget.headerLogoUrl,
         badge: _concerts.isEmpty || isSelectionMode ? null : _concertsButton(),
         listeners: listenersText,
-        showTitle: _showTitleInAppBar,
+        showTitle: false,
+        showTitleListenable: _showTitleInAppBar,
         artwork: hasMotionBanner
             ? MotionHeaderBanner(videoUrl: headerVideoUrl, fallback: artwork)
             : artwork,
@@ -297,10 +298,27 @@ extension _ArtistScreenSections on _ArtistScreenState {
       Curves.linear,
     );
     final titleFade = AppMotion.effects(context, fallbackMotion);
-    Widget toolbarTitle = AnimatedOpacity(
-      duration: titleFade.duration,
-      curve: titleFade.curve,
-      opacity: _showTitleInAppBar ? 1.0 : 0.0,
+    final titleSlide = materialExpressiveEnabled(context)
+        ? AppMotion.spatial(context, fallbackMotion)
+        : null;
+    final toolbarTitle = ValueListenableBuilder(
+      valueListenable: _showTitleInAppBar,
+      builder: (_, showTitle, text) {
+        final Widget title = AnimatedOpacity(
+          duration: titleFade.duration,
+          curve: titleFade.curve,
+          opacity: showTitle ? 1.0 : 0.0,
+          child: text,
+        );
+        return titleSlide == null
+            ? title
+            : AnimatedSlide(
+                duration: titleSlide.duration,
+                curve: titleSlide.curve,
+                offset: showTitle ? Offset.zero : const Offset(0, 0.6),
+                child: title,
+              );
+      },
       child: Text(
         widget.artistName,
         style: TextStyle(
@@ -312,15 +330,6 @@ extension _ArtistScreenSections on _ArtistScreenState {
         overflow: TextOverflow.ellipsis,
       ),
     );
-    if (materialExpressiveEnabled(context)) {
-      final titleSlide = AppMotion.spatial(context, fallbackMotion);
-      toolbarTitle = AnimatedSlide(
-        duration: titleSlide.duration,
-        curve: titleSlide.curve,
-        offset: _showTitleInAppBar ? Offset.zero : const Offset(0, 0.6),
-        child: toolbarTitle,
-      );
-    }
     return SliverAppBar(
       expandedHeight: hasDiscography ? 420 : 380,
       pinned: true,
@@ -659,7 +668,7 @@ extension _ArtistScreenSections on _ArtistScreenState {
 
     final tracks = _topTracks!;
     _historySnapshot.update(tracks);
-    final historyLookups = _historySnapshot.lookups;
+    final historyKeys = _historySnapshot.lookupKeys;
     final existingHistoryKeys = ref.watch(
       downloadHistoryVisibleBatchExistsProvider(_historySnapshot.request),
     );
@@ -703,9 +712,7 @@ extension _ArtistScreenSections on _ArtistScreenState {
                     globalIndex + 1,
                     entry.value,
                     colorScheme,
-                    existingHistoryKeys.contains(
-                      historyLookups[globalIndex].lookupKey,
-                    ),
+                    existingHistoryKeys.contains(historyKeys[globalIndex]),
                   );
                 }).toList(),
               );
@@ -1256,7 +1263,6 @@ extension _ArtistScreenSections on _ArtistScreenState {
                         top: 8,
                         end: 8,
                         child: AnimatedSelectionCheckbox(
-                          visible: true,
                           selected: isSelected,
                           colorScheme: colorScheme,
                           size: 28,
@@ -1336,28 +1342,24 @@ extension _ArtistScreenSections on _ArtistScreenState {
     ref.read(settingsProvider.notifier).setHasSearchedBefore();
 
     if (album.providerId != null && album.providerId!.isNotEmpty) {
-      Navigator.push(
+      pushPage<void>(
         context,
-        MaterialPageRoute<void>(
-          builder: (context) => ExtensionAlbumScreen(
-            extensionId: album.providerId!,
-            albumId: album.id,
-            albumName: album.name,
-            coverUrl: album.coverUrl,
-            initialAlbumType: album.albumType,
-            initialTotalTracks: album.totalTracks,
-          ),
+        (context) => ExtensionAlbumScreen(
+          extensionId: album.providerId!,
+          albumId: album.id,
+          albumName: album.name,
+          coverUrl: album.coverUrl,
+          initialAlbumType: album.albumType,
+          initialTotalTracks: album.totalTracks,
         ),
       );
     } else {
-      Navigator.push(
+      pushPage<void>(
         context,
-        MaterialPageRoute<void>(
-          builder: (context) => AlbumScreen(
-            albumId: album.id,
-            albumName: album.name,
-            coverUrl: album.coverUrl,
-          ),
+        (context) => AlbumScreen(
+          albumId: album.id,
+          albumName: album.name,
+          coverUrl: album.coverUrl,
         ),
       );
     }

@@ -201,7 +201,6 @@ void main() {
               (s) => s.copyWith(
                 healthStatuses: {
                   'provider-a': ExtensionHealthStatus(
-                    extensionId: 'provider-a',
                     status: 'healthy',
                     checkedAt: DateTime(2026),
                   ),

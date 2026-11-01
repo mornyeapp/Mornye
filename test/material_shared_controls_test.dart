@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -94,6 +95,39 @@ void main() {
     final colors = M3ETheme.of(tester.element(popup)).colorScheme;
     expect(colors.brightness, Brightness.dark);
     expect(colors.primary, localTheme.colorScheme.primary);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('desktop popup keeps only its own scrollbar', (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    await tester.pumpWidget(
+      _host(
+        AppMenuButton<String>(
+          icon: const Icon(Icons.search),
+          tooltip: 'Provider',
+          items: [
+            for (var i = 0; i < 12; i++)
+              AppMenuItem(value: '$i', label: 'Provider $i'),
+          ],
+          onSelected: (_) {},
+        ),
+      ),
+    );
+    await tester.tap(find.byTooltip('Provider'));
+    await tester.pumpAndSettle();
+    final popup = find.byWidgetPredicate(
+      (widget) => widget is M3EMenuPopup<Object>,
+    );
+    expect(
+      find.descendant(of: popup, matching: find.byType(RawScrollbar)),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: popup, matching: find.byType(Scrollbar)),
+      findsNothing,
+    );
+    debugDefaultTargetPlatformOverride = null;
     expect(tester.takeException(), isNull);
   });
 

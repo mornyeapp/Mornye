@@ -172,6 +172,30 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('a valid scanned cover builds once', (tester) async {
+    var builds = 0;
+    await tester.runAsync(() => scannedCover.writeAsBytes(png));
+    await tester.pumpWidget(
+      app(
+        LocalLibraryArtworkBuilder(
+          coverPath: scannedCover.path,
+          filePath: audio.path,
+          builder: (_, path) {
+            builds++;
+            return Text(path ?? 'placeholder');
+          },
+        ),
+      ),
+    );
+    for (var turn = 0; turn < 20; turn++) {
+      await tester.runAsync(() => scannedCover.stat());
+      await tester.pump();
+    }
+    expect(find.text(scannedCover.path), findsOneWidget);
+    expect(builds, 1);
+    expect(extractions, 0);
+  });
+
   testWidgets(
     'late scan validation cannot replace another album or update after dispose',
     (tester) async {

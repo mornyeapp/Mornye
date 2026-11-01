@@ -7,26 +7,11 @@ import 'package:mornye/l10n/l10n.dart';
 Future<bool> showDiscardChangesDialog(
   BuildContext context, {
   String? content,
-}) async {
-  final result = await showAppDialog<bool>(
-    context: context,
-    builder: (context) => AppAlertDialog(
-      title: Text(context.l10n.dialogDiscardChanges),
-      content: Text(content ?? context.l10n.dialogUnsavedChanges),
-      actions: [
-        AppDialogAction(
-          isDefault: true,
-          onPressed: () => Navigator.pop(context, false),
-          child: Text(context.l10n.dialogCancel),
-        ),
-        AppDialogAction(
-          filled: true,
-          isDestructive: true,
-          onPressed: () => Navigator.pop(context, true),
-          child: Text(context.l10n.dialogDiscard),
-        ),
-      ],
-    ),
-  );
-  return result ?? false;
-}
+}) => showAppConfirmDialog(
+  context,
+  title: context.l10n.dialogDiscardChanges,
+  message: content ?? context.l10n.dialogUnsavedChanges,
+  confirmLabel: context.l10n.dialogDiscard,
+  cancelIsDefault: true,
+  destructive: true,
+);

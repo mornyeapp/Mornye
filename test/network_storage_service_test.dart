@@ -1,13 +1,6 @@
-// Host-only native library injection into the SMB worker isolates.
-// ignore_for_file: invalid_use_of_internal_member
-
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
-
-// Host tests load the pinned native library used by the mobile plugin.
-// ignore: implementation_imports
-import 'package:dart_smb2/src/ffi/native_lib.dart';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/services/network_storage_service.dart';
@@ -27,6 +20,27 @@ NetworkConnection connection(
   username: user,
   password: password,
 );
+
+class _VirtualSources implements NetworkVirtualSources {
+  bool connected = true;
+  String? location;
+
+  @override
+  bool owns(String id) => id == 'phone';
+
+  @override
+  bool reachable(String id) => connected;
+
+  @override
+  Stream<NetworkVirtualSong> songs(String id) => const Stream.empty();
+
+  @override
+  Future<String> resolve(String id, String path) async =>
+      location ?? '/received/$id/$path';
+
+  @override
+  Future<Map<String, dynamic>> metadata(String id, String path) async => {};
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -217,12 +231,246 @@ void main() {
     },
   );
 
+  test('virtual hosts resolve through their owner, not a connection', () async {
+    String? stored;
+    final service = NetworkStorageService(
+      read: () async => stored,
+      write: (value) async => stored = value,
+    );
+    expect(service.virtualFor('phone'), isNull);
+    final sources = _VirtualSources();
+    service.virtualSources = sources;
+    expect(service.virtualFor('phone'), same(sources));
+    expect(service.virtualFor('nas'), isNull);
+    expect(
+      await service.resolve('network://phone/song.flac'),
+      '/received/phone/song.flac',
+    );
+    await expectLater(
+      service.resolve('network://phone/song.flac?x=1'),
+      throwsFormatException,
+    );
+    await expectLater(
+      service.resolve('network://nas/song.flac'),
+      throwsStateError,
+    );
+    // Saved connections never list them.
+    expect(await service.connections(), isEmpty);
+    expect(stored, isNull);
+  });
+
+  test('virtual hosts answer covers with their local files only', () async {
+    final service = NetworkStorageService(
+      read: () async => null,
+      write: (_) async {},
+    );
+    final sources = _VirtualSources();
+    service.virtualSources = sources;
+    final temp = await Directory.systemTemp.createTemp('virtual-cover-');
+    addTearDown(() => temp.delete(recursive: true));
+    const png = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+    final cover = File('${temp.path}/cover.png')..writeAsBytesSync(png);
+    for (final location in [cover.path, cover.uri.toString()]) {
+      sources.location = location;
+      final output = File('${temp.path}/copy.image');
+      await service.downloadCover('network://phone/cover.png', output);
+      expect(await output.readAsBytes(), png);
+    }
+    // A URL from a virtual source streams a song on its way.
+    sources.location = 'http://127.0.0.1:9/stream';
+    final output = File('${temp.path}/url.image');
+    await expectLater(
+      service.downloadCover('network://phone/cover.png', output),
+      throwsA(isA<HttpException>()),
+    );
+    expect(await output.exists(), isFalse);
+    await expectLater(
+      service.downloadCover('network://phone/cover.png?size=1', output),
+      throwsFormatException,
+    );
+  });
+
+  test('a malformed Content-Type never holds a pooled connection', () async {
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(() => server.close(force: true));
+    const jpeg = [0xFF, 0xD8, 0xFF, 0xE0];
+    server.listen((request) async {
+      request.response.headers.set(
+        HttpHeaders.contentTypeHeader,
+        'image/jpeg; name="x',
+      );
+      request.response.add(jpeg);
+      await request.response.close();
+    });
+    final service = NetworkStorageService(
+      read: () async => null,
+      write: (_) async {},
+      ensureAccess: (_) async {},
+    );
+    addTearDown(service.dispose);
+    final origin = 'http://127.0.0.1:${server.port}';
+    await service.save(connection('$origin/art/', id: 'web'));
+    await service.save(
+      connection('$origin/', id: 'sub', protocol: NetworkProtocol.subsonic),
+    );
+    final temp = await Directory.systemTemp.createTemp('network-cover-');
+    addTearDown(() => temp.delete(recursive: true));
+    final web = NetworkStorageService.source('web', 'cover.jpg');
+    final sub = NetworkStorageService.source('sub', subsonicCoverPath('art'));
+    // A server gets six pooled connections; a response left unread holds
+    // one for good, so the seventh request would never start.
+    for (var attempt = 0; attempt < 8; attempt++) {
+      final output = File('${temp.path}/$attempt.image');
+      await service
+          .downloadCover(web, output)
+          .timeout(const Duration(seconds: 5));
+      expect(await output.readAsBytes(), jpeg);
+      await expectLater(
+        service
+            .downloadCover(sub, File('${temp.path}/subsonic.image'))
+            .timeout(const Duration(seconds: 5)),
+        throwsA(isA<HttpException>()),
+      );
+    }
+  });
+
+  test('a rejected cover never holds a pooled connection', () async {
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(() => server.close(force: true));
+    server.listen((request) async {
+      final response = request.response;
+      switch (request.uri.pathSegments.last) {
+        case 'song.flac':
+          response.headers.contentType = ContentType('audio', 'flac');
+          response.add(List.filled(64, 1));
+        case 'page.jpg':
+          response.headers.contentType = ContentType.html;
+          response.write('<html></html>');
+        default:
+          response.statusCode = HttpStatus.notFound;
+          response.write('missing');
+      }
+      await response.close();
+    });
+    final service = NetworkStorageService(
+      read: () async => null,
+      write: (_) async {},
+      ensureAccess: (_) async {},
+    );
+    addTearDown(service.dispose);
+    await service.save(
+      connection('http://127.0.0.1:${server.port}/art/', id: 'web'),
+    );
+    final temp = await Directory.systemTemp.createTemp('network-cover-');
+    addTearDown(() => temp.delete(recursive: true));
+    // Six pooled connections: a rejected response left unread would keep
+    // the seventh request from starting.
+    for (var attempt = 0; attempt < 8; attempt++) {
+      for (final name in ['missing.jpg', 'song.flac', 'page.jpg']) {
+        await expectLater(
+          service
+              .downloadCover(
+                NetworkStorageService.source('web', name),
+                File('${temp.path}/$attempt.image'),
+              )
+              .timeout(const Duration(seconds: 5)),
+          throwsA(isA<HttpException>()),
+          reason: '$attempt $name',
+        );
+      }
+    }
+  });
+
+  test('a Subsonic 404 document reports the cover missing', () async {
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(() => server.close(force: true));
+    server.listen((request) async {
+      final missing = request.uri.queryParameters['id'] == 'missing';
+      request.response
+        ..statusCode = missing ? 404 : 200
+        ..headers.contentType = ContentType.json
+        ..write(
+          jsonEncode({
+            'subsonic-response': {
+              'status': 'failed',
+              'error': {'code': missing ? 70 : 0},
+            },
+          }),
+        );
+      await request.response.close();
+    });
+    final service = NetworkStorageService(
+      read: () async => null,
+      write: (_) async {},
+      ensureAccess: (_) async {},
+    );
+    addTearDown(service.dispose);
+    await service.save(
+      connection(
+        'http://127.0.0.1:${server.port}/',
+        id: 'sub',
+        protocol: NetworkProtocol.subsonic,
+      ),
+    );
+    final temp = await Directory.systemTemp.createTemp('network-cover-');
+    addTearDown(() => temp.delete(recursive: true));
+    for (final (id, missing) in [('missing', true), ('failed', false)]) {
+      await expectLater(
+        service.downloadCover(
+          NetworkStorageService.source('sub', subsonicCoverPath(id)),
+          File('${temp.path}/$id.image'),
+        ),
+        throwsA(
+          isA<HttpException>()
+              .having(
+                (error) => error.message,
+                'message',
+                'Subsonic media unavailable',
+              )
+              .having(
+                (error) => error is NetworkMediaUnavailable,
+                'missing',
+                missing,
+              ),
+        ),
+        reason: id,
+      );
+    }
+  });
+
+  test('a network song can play while its host is reachable', () async {
+    final service = NetworkStorageService(
+      read: () async => null,
+      write: (_) async {},
+    );
+    // A phone's songs after Link stopped belong to no host.
+    expect(await service.reachable('network://phone/song.flac'), isFalse);
+    final sources = _VirtualSources();
+    service.virtualSources = sources;
+    expect(await service.reachable('network://phone/song.flac'), isTrue);
+    sources.connected = false;
+    expect(await service.reachable('network://phone/song.flac'), isFalse);
+
+    await service.save(
+      connection(
+        'smb://server/music/',
+        id: 'nas',
+        protocol: NetworkProtocol.smb,
+      ),
+    );
+    expect(await service.reachable('network://nas/song.flac'), isTrue);
+    service.setReachable('nas', reachable: false);
+    expect(await service.reachable('network://nas/song.flac'), isFalse);
+    expect(await service.reachable('network://gone/song.flac'), isFalse);
+  });
+
   group('real HTTP transport', () {
     late HttpServer server;
     late NetworkStorageService service;
     late String origin;
     final requests = <String>[];
     List<List<int>>? listingChunks;
+    const cover = [0xFF, 0xD8, 0xFF, 0xE0, 1, 2, 3, 4];
     setUp(() async {
       requests.clear();
       listingChunks = null;
@@ -254,6 +502,36 @@ void main() {
             // The client closes the response when it exceeds the size limit.
           } on HttpException {
             // A rejected response can also fail an in-flight flush.
+          }
+          return;
+        } else if (r.uri.path.startsWith('/art/')) {
+          try {
+            final name = r.uri.pathSegments.last;
+            r.response.headers.contentType = ContentType('image', 'jpeg');
+            if (name == 'cover.jpg') {
+              r.response.add(cover);
+            } else if (name == 'page.jpg') {
+              r.response.headers.contentType = ContentType.html;
+              r.response.write('<html>Sign in</html>');
+            } else if (name == 'song.flac') {
+              r.response.headers.contentType = ContentType('audio', 'flac');
+              r.response.add(List.filled(10, 0));
+            } else if (name == 'large.jpg' || name == 'unsized.jpg') {
+              if (name == 'large.jpg') {
+                r.response.contentLength =
+                    NetworkStorageService.maxCoverBytes + 1;
+              }
+              for (var mebibyte = 0; mebibyte < 16; mebibyte++) {
+                r.response.add(Uint8List(1024 * 1024));
+                await r.response.flush();
+              }
+              r.response.add([0]);
+            } else {
+              r.response.statusCode = 404;
+            }
+            await r.response.close();
+          } on IOException {
+            // The client stops reading a cover it rejects.
           }
           return;
         } else if (r.method == 'PROPFIND') {
@@ -337,6 +615,89 @@ void main() {
       },
     );
 
+    test('a server marked out of reach fails fast until it answers', () async {
+      final closed = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+      final port = closed.port;
+      await closed.close();
+      await service.save(connection('http://127.0.0.1:$port/', id: 'gone'));
+      await service.save(connection('$origin/music/'));
+      final gone = NetworkStorageService.source('gone', 'A B.flac');
+      final back = NetworkStorageService.source('server', 'A B.flac');
+
+      service.setReachable('gone', reachable: false);
+      await expectLater(service.resolve(gone), throwsA(isA<SocketException>()));
+      service.setReachable('gone', reachable: true);
+      expect(await service.resolve(gone), startsWith('http://127.0.0.1:'));
+
+      // A server that answers again plays as usual.
+      service.setReachable('server', reachable: false);
+      expect(await service.resolve(back), startsWith('http://127.0.0.1:'));
+    });
+
+    test('covers are read over the connection, up to 16 MiB', () async {
+      final c = connection('$origin/art/', user: 'test', password: 'secret');
+      await service.save(c);
+      final temp = await Directory.systemTemp.createTemp('network-cover-');
+      addTearDown(() => temp.delete(recursive: true));
+      final output = File('${temp.path}/cover.image');
+      await service.downloadCover(
+        NetworkStorageService.source(c.id, 'cover.jpg'),
+        output,
+      );
+      expect(await output.readAsBytes(), cover);
+      expect(requests, ['GET /art/cover.jpg']);
+      // Only answers that will not change soon report the cover missing.
+      for (final (name, message, missing) in [
+        ('page.jpg', 'Network cover unavailable', false),
+        ('song.flac', 'Network cover is not an image', true),
+        ('large.jpg', 'Network cover is too large', true),
+        ('unsized.jpg', 'Network cover is too large', true),
+        ('missing.jpg', 'Server returned 404', true),
+      ]) {
+        await expectLater(
+          service.downloadCover(
+            NetworkStorageService.source(c.id, name),
+            File('${temp.path}/$name'),
+          ),
+          throwsA(
+            isA<HttpException>()
+                .having((error) => error.message, 'message', message)
+                .having(
+                  (error) => error is NetworkMediaUnavailable,
+                  'missing',
+                  missing,
+                ),
+          ),
+          reason: name,
+        );
+      }
+    });
+
+    test('a cover of a server marked out of reach fails fast', () async {
+      final closed = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+      final port = closed.port;
+      await closed.close();
+      await service.save(connection('http://127.0.0.1:$port/', id: 'gone'));
+      service.setReachable('gone', reachable: false);
+      final temp = await Directory.systemTemp.createTemp('network-cover-');
+      addTearDown(() => temp.delete(recursive: true));
+      final output = File('${temp.path}/cover.image');
+      await expectLater(
+        service.downloadCover(
+          NetworkStorageService.source('gone', 'cover.jpg'),
+          output,
+        ),
+        throwsA(
+          isA<SocketException>().having(
+            (error) => error.message,
+            'message',
+            'The server cannot be reached',
+          ),
+        ),
+      );
+      expect(await output.exists(), isFalse);
+    });
+
     test(
       'authenticated listing, proxy range seek, HEAD, and revocation',
       () async {
@@ -413,9 +774,7 @@ void main() {
   });
 
   test('SMB server browsing and byte-range streaming', () async {
-    debugLibSmb2PathOverride = Platform.environment['TEST_SMB_LIBRARY'];
     final port = Platform.environment['TEST_SMB_PORT'] ?? '1445';
-    addTearDown(() => debugLibSmb2PathOverride = null);
     final service = NetworkStorageService(
       read: () async => null,
       write: (_) async {},
@@ -520,7 +879,6 @@ void main() {
     expect((await service.list(c)).any((e) => e.name == 'A B.wav'), true);
   }, skip: Platform.environment['TEST_SMB'] != '1');
   test('SMB guest works when credentials are explicitly blank', () async {
-    debugLibSmb2PathOverride = Platform.environment['TEST_SMB_LIBRARY'];
     final port = Platform.environment['TEST_SMB_GUEST_PORT']!;
     final service = NetworkStorageService(
       read: () async => null,
@@ -533,7 +891,6 @@ void main() {
       );
       expect((await service.list(guest)).any((e) => e.name == 'A B.wav'), true);
     } finally {
-      debugLibSmb2PathOverride = null;
       await service.dispose();
     }
   }, skip: Platform.environment['TEST_SMB_GUEST_PORT'] == null);

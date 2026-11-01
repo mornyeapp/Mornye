@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'dart:ui';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/providers/runtime_profile_provider.dart';
@@ -10,6 +11,7 @@ import 'package:mornye/services/shell_navigation_service.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/widgets/album_detail_header.dart';
 import 'package:mornye/widgets/cached_cover_image.dart';
+import 'package:mornye/widgets/sliver_layout_info_builder.dart';
 
 /// Share the same artwork-derived dark surface while loading and after the
 /// artist metadata arrives, including when the app itself uses light mode.
@@ -34,6 +36,14 @@ class MornyeArtistSurface extends StatefulWidget {
 }
 
 class _MornyeArtistSurfaceState extends State<MornyeArtistSurface> {
+  // Page rebuilds reuse the derived themes while their inputs are unchanged.
+  ThemeData? _baseTheme;
+  TargetPlatform? _basePlatform;
+  late ThemeData _darkTheme;
+  late ThemeData _outerTheme;
+  (Color, Color, Color, bool)? _innerKey;
+  late ThemeData _innerTheme;
+
   @override
   void dispose() {
     ShellNavigationService.clearChromeBrightness(this);
@@ -45,22 +55,36 @@ class _MornyeArtistSurfaceState extends State<MornyeArtistSurface> {
     // Desktop album and playlist pages keep the plain pane background and
     // app accent; artist pages keep their artwork tint, as in Apple Music.
     if (isDesktopPlatform && widget.neutralActions) return widget.child;
-    final darkTheme = MornyeTheme.fromContext(
-      context,
-      brightness: Brightness.dark,
-    );
+    final baseTheme = Theme.of(context);
+    if (!identical(baseTheme, _baseTheme) ||
+        defaultTargetPlatform != _basePlatform) {
+      _baseTheme = baseTheme;
+      _basePlatform = defaultTargetPlatform;
+      _innerKey = null;
+      _darkTheme = MornyeTheme.fromContext(
+        context,
+        brightness: Brightness.dark,
+      );
+      _outerTheme = _darkTheme.copyWith(
+        colorScheme: _darkTheme.colorScheme.copyWith(primary: Colors.grey),
+      );
+    }
+    final darkTheme = _darkTheme;
     return Theme(
-      data: darkTheme.copyWith(
-        colorScheme: darkTheme.colorScheme.copyWith(primary: Colors.grey),
-      ),
+      data: _outerTheme,
       child: CoverPaletteBuilder(
         imageSource: widget.imageSource,
         builder: (context, palette) {
           final source = widget.imageSource;
+          // Album surfaces use only the source colour, which the player may
+          // already have resolved without a scheme.
           final dominant = HSLColor.fromColor(
             source == null
                 ? Colors.grey
-                : CoverPalette.sourceColor(source, Brightness.dark) ??
+                : (widget.neutralActions
+                          ? CoverPalette.peekSourceColor(source)
+                          : null) ??
+                      CoverPalette.sourceColor(source, Brightness.dark) ??
                       Colors.grey,
           );
           // Averaging a portrait mixes its highlights and foliage into gray.
@@ -117,26 +141,40 @@ class _MornyeArtistSurfaceState extends State<MornyeArtistSurface> {
                   : primaryLuminance > 0.179
                   ? Colors.black
                   : Colors.white;
-              final scheme = darkTheme.colorScheme.copyWith(
-                primary: primary,
-                onPrimary: onPrimary,
-                onSurfaceVariant: widget.neutralActions ? Colors.white70 : null,
-                surface: surface,
-                surfaceContainer: Color.alphaBlend(
-                  Colors.white.withValues(alpha: 0.08),
-                  surface,
-                ),
-                surfaceContainerHigh: Color.alphaBlend(
-                  Colors.white.withValues(alpha: 0.12),
-                  surface,
-                ),
+              final innerKey = (
+                surface,
+                primary,
+                onPrimary,
+                widget.neutralActions,
               );
-              return Theme(
-                data: darkTheme.copyWith(
+              if (innerKey != _innerKey) {
+                _innerKey = innerKey;
+                _innerTheme = darkTheme.copyWith(
                   scaffoldBackgroundColor: surface,
-                  colorScheme: scheme,
+                  colorScheme: darkTheme.colorScheme.copyWith(
+                    primary: primary,
+                    onPrimary: onPrimary,
+                    onSurfaceVariant: widget.neutralActions
+                        ? Colors.white70
+                        : null,
+                    surface: surface,
+                    surfaceContainer: Color.alphaBlend(
+                      Colors.white.withValues(alpha: 0.08),
+                      surface,
+                    ),
+                    surfaceContainerHigh: Color.alphaBlend(
+                      Colors.white.withValues(alpha: 0.12),
+                      surface,
+                    ),
+                  ),
+                );
+              }
+              return Theme(
+                data: _innerTheme,
+                child: HeaderPalette(
+                  scheme: _innerTheme.colorScheme,
+                  child: widget.child,
                 ),
-                child: HeaderPalette(scheme: scheme, child: widget.child),
               );
             },
           );
@@ -155,6 +193,7 @@ class MornyeArtistHeader extends StatelessWidget {
     required this.artwork,
     required this.actions,
     required this.showTitle,
+    this.showTitleListenable,
     this.listeners,
     this.logoUrl,
     this.badge,
@@ -164,6 +203,9 @@ class MornyeArtistHeader extends StatelessWidget {
   final Widget artwork;
   final List<Widget> actions;
   final bool showTitle;
+
+  /// Replaces [showTitle] when set; see [headerToolbarTitle].
+  final ValueListenable<bool>? showTitleListenable;
   final String? listeners;
   final String? logoUrl;
   final Widget? badge;
@@ -175,12 +217,28 @@ class MornyeArtistHeader extends StatelessWidget {
 
   List<Widget> buildSlivers(BuildContext context) {
     final surface = Theme.of(context).colorScheme.surface;
+    final back = Padding(
+      padding: EdgeInsetsDirectional.only(start: isDesktopPlatform ? 16 : 12),
+      child: Align(
+        alignment: AlignmentDirectional.centerStart,
+        widthFactor: 1,
+        child: HeaderCircleButton(
+          icon: Icons.arrow_back,
+          tooltip: MaterialLocalizations.of(context).backButtonTooltip,
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+    );
     return [
       // Keep safe-area dependencies inside this sliver: folding the shell
       // navigation must not rebuild the artist's entire discography.
-      SliverLayoutBuilder(
-        builder: (context, constraints) {
-          final width = constraints.crossAxisExtent;
+      SliverLayoutInfoBuilder(
+        select: (constraints) => (
+          constraints.crossAxisExtent,
+          isDesktopPlatform ? constraints.viewportMainAxisExtent : 0.0,
+        ),
+        builder: (context, extents) {
+          final (width, viewportHeight) = extents;
           final textWidth = (width - 48).clamp(0.0, double.infinity);
           final textScaler = MediaQuery.textScalerOf(context);
           double textHeight(String text, TextStyle style) {
@@ -220,10 +278,7 @@ class MornyeArtistHeader extends StatelessWidget {
           final expandedHeight = isDesktopPlatform
               ? math.max(
                   contentHeight + 160,
-                  (constraints.viewportMainAxisExtent * 0.82).clamp(
-                    420.0,
-                    820.0,
-                  ),
+                  (viewportHeight * 0.82).clamp(420.0, 820.0),
                 )
               : photoHeight + contentHeight;
           return SliverAppBar(
@@ -233,30 +288,21 @@ class MornyeArtistHeader extends StatelessWidget {
             backgroundColor: surface,
             surfaceTintColor: Colors.transparent,
             leadingWidth: 64,
-            leading: Padding(
-              padding: EdgeInsetsDirectional.only(
-                start: isDesktopPlatform ? 16 : 12,
-              ),
-              child: Align(
-                alignment: AlignmentDirectional.centerStart,
-                widthFactor: 1,
-                child: HeaderCircleButton(
-                  icon: Icons.arrow_back,
-                  tooltip: MaterialLocalizations.of(context).backButtonTooltip,
-                  onPressed: () => Navigator.pop(context),
-                ),
-              ),
-            ),
-            title: AnimatedOpacity(
-              opacity: showTitle ? 1 : 0,
-              duration: const Duration(milliseconds: 180),
-              child: Text(
-                name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w600,
+            leading: back,
+            title: headerToolbarTitle(
+              showTitleListenable,
+              showTitle,
+              (showTitle) => AnimatedOpacity(
+                opacity: showTitle ? 1 : 0,
+                duration: const Duration(milliseconds: 180),
+                child: Text(
+                  name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ),

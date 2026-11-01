@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:mornye/l10n/app_localizations.dart';
+import 'package:mornye/utils/desktop_platform.dart';
+import 'package:mornye/utils/exclusive_output_labels.dart';
 
 /// A control or submenu that can be discovered from the root Settings search.
 ///
@@ -265,6 +267,12 @@ class SettingsSearchCatalog {
           keywords: const ['machine learning', 'recommendation', 'personal'],
         ),
         SettingsSearchEntry(
+          icon: Icons.multitrack_audio,
+          title: l10n.songAnalysis,
+          subtitle: l10n.songAnalysisDescription,
+          keywords: const ['sound', 'tempo', 'bpm', 'key', 'recommendation'],
+        ),
+        SettingsSearchEntry(
           icon: Icons.insights_outlined,
           title: l10n.listeningStats,
           subtitle: l10n.listeningStatsDescription,
@@ -308,6 +316,18 @@ class SettingsSearchCatalog {
           keywords: const ['artwork', 'cover', 'full screen', 'immersive'],
         ),
         SettingsSearchEntry(
+          icon: Icons.splitscreen_outlined,
+          title: l10n.landscapeLyricsArtwork,
+          subtitle: l10n.landscapeLyricsArtworkDescription,
+          keywords: const ['landscape', 'lyrics', 'album art', 'details'],
+        ),
+        SettingsSearchEntry(
+          icon: Icons.short_text,
+          title: l10n.compactPlayer,
+          subtitle: l10n.compactPlayerDescription,
+          keywords: const ['lyrics', 'compact', 'controls', 'mini', 'larger'],
+        ),
+        SettingsSearchEntry(
           icon: Icons.vibration,
           title: l10n.musicHaptics,
           subtitle: l10n.musicHapticsDescription,
@@ -324,6 +344,12 @@ class SettingsSearchCatalog {
           title: l10n.playbackOnHeadphonesConnected,
           subtitle: l10n.playbackOnHeadphonesConnectedDescription,
           keywords: const ['earphone', 'headphone', 'bluetooth', 'connect'],
+        ),
+        SettingsSearchEntry(
+          icon: Icons.linear_scale,
+          title: l10n.gaplessPlayback,
+          subtitle: l10n.gaplessPlaybackDescription,
+          keywords: const ['gapless', 'gap', 'silence', 'transition', 'album'],
         ),
         SettingsSearchEntry(
           icon: Icons.compare_arrows,
@@ -354,6 +380,20 @@ class SettingsSearchCatalog {
             targetLabel: l10n.usbBitPerfect,
           ),
         ],
+        if (isDesktopPlatform)
+          SettingsSearchEntry(
+            icon: Icons.speaker_outlined,
+            title: exclusiveOutputLabels(l10n).title,
+            subtitle: exclusiveOutputLabels(l10n).description,
+            keywords: const [
+              'exclusive',
+              'wasapi',
+              'hog mode',
+              'alsa',
+              'bit-perfect',
+              'mixer',
+            ],
+          ),
       ],
       metadata = [
         SettingsSearchEntry(
@@ -416,6 +456,19 @@ class SettingsSearchCatalog {
           title: l10n.lyricsKeepScreenOn,
           subtitle: l10n.lyricsKeepScreenOnSubtitle,
           keywords: const ['screen timeout', 'awake', 'sleep', 'layar'],
+        ),
+        SettingsSearchEntry(
+          icon: Icons.auto_awesome_outlined,
+          title: l10n.lyricsAiTranslation,
+          keywords: const [
+            'translate lyrics',
+            'api key',
+            'openai',
+            'gemini',
+            'claude',
+            'openrouter',
+            'ollama',
+          ],
         ),
         SettingsSearchEntry(
           icon: Icons.subtitles_outlined,

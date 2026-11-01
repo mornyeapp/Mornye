@@ -141,25 +141,13 @@ extension _TrackMetadataConvertAndCueSplit on _TrackMetadataScreenState {
   Future<void> _removeReplayGain() async {
     if (!_fileExists) return;
     final sourcePath = cleanFilePath;
-    final confirmed = await showAppDialog<bool>(
-      context: context,
-      builder: (ctx) => AppAlertDialog(
-        title: Text(ctx.l10n.trackRemoveReplayGain),
-        content: Text(ctx.l10n.replayGainRemoveConfirmMessage(1)),
-        actions: [
-          AppDialogAction(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(ctx.l10n.dialogCancel),
-          ),
-          AppDialogAction(
-            filled: true,
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(ctx.l10n.trackRemoveReplayGain),
-          ),
-        ],
-      ),
+    final confirmed = await showAppConfirmDialog(
+      context,
+      title: context.l10n.trackRemoveReplayGain,
+      message: context.l10n.replayGainRemoveConfirmMessage(1),
+      confirmLabel: context.l10n.trackRemoveReplayGain,
     );
-    if (confirmed != true || !mounted || sourcePath != cleanFilePath) return;
+    if (!confirmed || !mounted || sourcePath != cleanFilePath) return;
     await _updateReplayGain(remove: true);
   }
 
@@ -434,6 +422,7 @@ extension _TrackMetadataConvertAndCueSplit on _TrackMetadataScreenState {
                         Navigator.pop(sheetContext);
                         _confirmAndSplitCue(
                           context: this.context,
+                          cuePath: cuePath,
                           audioPath: audioPath,
                           album: album,
                           artist: artist,
@@ -469,6 +458,7 @@ extension _TrackMetadataConvertAndCueSplit on _TrackMetadataScreenState {
 
   void _confirmAndSplitCue({
     required BuildContext context,
+    required String cuePath,
     required String audioPath,
     required String album,
     required String artist,
@@ -494,6 +484,7 @@ extension _TrackMetadataConvertAndCueSplit on _TrackMetadataScreenState {
               onPressed: () {
                 Navigator.pop(dialogContext);
                 _performCueSplit(
+                  cuePath: cuePath,
                   audioPath: audioPath,
                   album: album,
                   artist: artist,
@@ -566,6 +557,7 @@ extension _TrackMetadataConvertAndCueSplit on _TrackMetadataScreenState {
   }
 
   Future<void> _performCueSplit({
+    required String cuePath,
     required String audioPath,
     required String album,
     required String artist,
@@ -640,7 +632,7 @@ extension _TrackMetadataConvertAndCueSplit on _TrackMetadataScreenState {
         'date': date,
       };
 
-      final outputPaths = await FFmpegService.splitCueToTracks(
+      final outputPaths = await FFmpegConversion.splitCueToTracks(
         audioPath: workingAudioPath,
         outputDir: outputDir,
         tracks: tracks,
@@ -691,9 +683,26 @@ extension _TrackMetadataConvertAndCueSplit on _TrackMetadataScreenState {
         } catch (_) {}
       }
 
+      final complete =
+          finalOutputPaths != null && finalOutputPaths.length == tracks.length;
+      if (complete) {
+        await CueSplitLibraryService().publish(
+          cuePath: cuePath,
+          audioPath: audioPath,
+          tracks: tracks,
+          outputPaths: finalOutputPaths,
+          sourceId: _isLocalItem && (!isSafSource || writeBackToSaf)
+              ? _localLibraryItem?.sourceId ?? LocalLibraryItem.legacySourceId
+              : LocalLibraryItem.legacySourceId,
+        );
+        if (mounted) {
+          await ref.read(localLibraryProvider.notifier).reloadFromStorage();
+        }
+      }
+
       if (mounted) {
         ScaffoldMessenger.of(context).hideCurrentSnackBar();
-        if (finalOutputPaths != null && finalOutputPaths.isNotEmpty) {
+        if (complete) {
           _showSnackBarMessage(
             context.l10n.cueSplitSuccess(finalOutputPaths.length),
           );

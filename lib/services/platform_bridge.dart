@@ -26,6 +26,10 @@ final _log = AppLogger('PlatformBridge');
 const foregroundServiceStartNotAllowedCode =
     'foreground_service_start_not_allowed';
 
+/// The marker a forced rescan writes into the Library cover directory
+/// (`LIBRARY_COVER_REGENERATE_MARKER` in the Rust backend).
+const libraryCoverRegenerateMarker = '.regenerate';
+
 bool isForegroundServiceStartNotAllowed(Object error) {
   return error is PlatformException &&
       error.code == foregroundServiceStartNotAllowedCode;
@@ -137,6 +141,25 @@ class PlatformBridge {
     await _channel.invokeMethod<void>('setScreenAwake', {'enabled': enabled});
   }
 
+  /// Whether this Android device is on external power; false elsewhere.
+  static Future<bool> isCharging() async {
+    if (!Platform.isAndroid) return false;
+    return await _channel.invokeMethod<bool>('isCharging') ?? false;
+  }
+
+  /// Android API level without collecting unrelated device information.
+  static Future<int?> getAndroidSdkVersion() async {
+    try {
+      final sdk = await _channel.invokeMethod<int>('getAndroidSdkVersion');
+      return sdk != null && sdk > 0 ? sdk : null;
+    } on MissingPluginException {
+      return null;
+    } on PlatformException catch (e) {
+      _log.w('Android SDK version unavailable: $e');
+      return null;
+    }
+  }
+
   static const _jsonResultFileKey = '__json_file';
   static const _backgroundJsonDecodeThresholdBytes = 128 * 1024;
   static const _metadataCacheTtl = Duration(minutes: 20);
@@ -190,6 +213,16 @@ class PlatformBridge {
       StreamController<String>.broadcast();
   static final StreamController<String> _libraryFolderChangeEvents =
       StreamController<String>.broadcast();
+  static final StreamController<Map<String, dynamic>> _linkRequestEvents =
+      StreamController<Map<String, dynamic>>.broadcast();
+  static final StreamController<Map<String, dynamic>> _linkMessageEvents =
+      StreamController<Map<String, dynamic>>.broadcast();
+  static final StreamController<Map<String, dynamic>> _linkClientEvents =
+      StreamController<Map<String, dynamic>>.broadcast();
+  static final StreamController<Map<String, dynamic>> _linkPairedEvents =
+      StreamController<Map<String, dynamic>>.broadcast();
+  static final StreamController<String> _linkPairingEndedEvents =
+      StreamController<String>.broadcast();
   static bool _backendEventHandlerInstalled = false;
 
   /// The Rust backend answers on Android and iOS through the MethodChannel
@@ -199,30 +232,24 @@ class PlatformBridge {
 
   static bool get supportsExtensionSystem => supportsCoreBackend;
 
-  static Stream<ExtensionSessionGrantEvent> extensionSessionGrantEvents() {
+  static Stream<T> _events<T>(StreamController<T> controller) {
     _ensureBackendEventHandler();
-    return _extensionSessionGrantEvents.stream;
+    return controller.stream;
   }
 
-  static Stream<void> libraryStorageEvents() {
-    _ensureBackendEventHandler();
-    return _libraryStorageEvents.stream;
-  }
+  static Stream<ExtensionSessionGrantEvent> extensionSessionGrantEvents() =>
+      _events(_extensionSessionGrantEvents);
 
-  static Stream<void> verificationNotificationEvents() {
-    _ensureBackendEventHandler();
-    return _verificationNotificationEvents.stream;
-  }
+  static Stream<void> libraryStorageEvents() => _events(_libraryStorageEvents);
 
-  static Stream<void> setupFolderSelectionEvents() {
-    _ensureBackendEventHandler();
-    return _setupFolderSelectionEvents.stream;
-  }
+  static Stream<void> verificationNotificationEvents() =>
+      _events(_verificationNotificationEvents);
 
-  static Stream<void> extensionAuthCallbackEvents() {
-    _ensureBackendEventHandler();
-    return _extensionAuthCallbackEvents.stream;
-  }
+  static Stream<void> setupFolderSelectionEvents() =>
+      _events(_setupFolderSelectionEvents);
+
+  static Stream<void> extensionAuthCallbackEvents() =>
+      _events(_extensionAuthCallbackEvents);
 
   static Future<void> processPendingExtensionCallbacks() =>
       _channel.invokeMethod<void>('processPendingExtensionCallbacks');
@@ -265,10 +292,8 @@ class PlatformBridge {
   ]) => _channel.invokeMethod<T>(method, arguments);
 
   /// Desktop Discord status changes: `active` or `unavailable`.
-  static Stream<String> discordPresenceStatusEvents() {
-    _ensureBackendEventHandler();
-    return _discordPresenceStatusEvents.stream;
-  }
+  static Stream<String> discordPresenceStatusEvents() =>
+      _events(_discordPresenceStatusEvents);
 
   /// Desktop only: replaces the watched library folders. Returns the folders
   /// that are being watched.
@@ -287,18 +312,127 @@ class PlatformBridge {
   }
 
   /// Desktop watched library roots whose content changed (throttled).
-  static Stream<String> libraryFolderChangeEvents() {
-    _ensureBackendEventHandler();
-    return _libraryFolderChangeEvents.stream;
-  }
+  static Stream<String> libraryFolderChangeEvents() =>
+      _events(_libraryFolderChangeEvents);
 
   static Future<String?> consumeVerificationNotification() =>
       _channel.invokeMethod<String>('consumeVerificationNotification');
 
-  static Stream<List<String>> iosBackgroundDownloadExpirationEvents() {
-    _ensureBackendEventHandler();
-    return _iosBackgroundDownloadExpirationEvents.stream;
+  static Stream<List<String>> iosBackgroundDownloadExpirationEvents() =>
+      _events(_iosBackgroundDownloadExpirationEvents);
+
+  // Mornye Link, the desktop server phones connect to. The Rust backend owns
+  // the server; these calls and events follow the bridge table of the link
+  // contract.
+
+  /// Starts the server as [name]; returns `port`, `fingerprint`, `serverId`,
+  /// `name` and `addresses`.
+  static Future<Map<String, dynamic>> linkStart({
+    required String name,
+    int? port,
+  }) async => _linkMap(
+    await _channel.invokeMethod('linkStart', {'name': name, 'port': ?port}),
+  );
+
+  static Future<void> linkStop() => _invokeVoid('linkStop');
+
+  /// `running`, `port`, `fingerprint`, `serverId`, `name`, `addresses` and
+  /// the connected `clients`.
+  static Future<Map<String, dynamic>> linkStatus() async =>
+      _linkMap(await _channel.invokeMethod('linkStatus'));
+
+  /// Hands the NDJSON catalog at [path] to the server; returns `songs` and
+  /// `version`.
+  static Future<Map<String, dynamic>> linkSetCatalog(String path) async =>
+      _linkMap(await _channel.invokeMethod('linkSetCatalog', {'path': path}));
+
+  /// Opens a pairing window: `pin`, `expiresMs` and `fingerprint`.
+  static Future<Map<String, dynamic>> linkBeginPairing() async =>
+      _linkMap(await _channel.invokeMethod('linkBeginPairing'));
+
+  static Future<void> linkEndPairing() => _invokeVoid('linkEndPairing');
+
+  /// Paired devices and Subsonic app keys.
+  static Future<List<Map<String, dynamic>>> linkDevices() async {
+    final result = await _channel.invokeMethod<List<dynamic>>('linkDevices');
+    return [
+      for (final device in result ?? const [])
+        if (device is Map) _linkMap(device),
+    ];
   }
+
+  static Future<void> linkRevoke(String deviceId) =>
+      _invokeVoid('linkRevoke', {'deviceId': deviceId});
+
+  /// Mints a key for a third-party Subsonic app: `deviceId` and `apiKey`.
+  static Future<Map<String, dynamic>> linkCreateKey(String name) async =>
+      _linkMap(await _channel.invokeMethod('linkCreateKey', {'name': name}));
+
+  /// Answers a `linkRequest` with [result], or with [error] (`code`,
+  /// `message`).
+  static Future<void> linkReply(
+    String requestId, {
+    Object? result,
+    Map<String, dynamic>? error,
+  }) => _invokeVoid('linkReply', {
+    'requestId': requestId,
+    if (error != null) 'error': error else 'result': result,
+  });
+
+  /// Sends [message] over the WebSocket of [deviceId], or of every connected
+  /// phone when null. Returns how many received it.
+  static Future<int> linkSend(
+    Map<String, dynamic> message, {
+    String? deviceId,
+  }) async {
+    final result = _linkMap(
+      await _channel.invokeMethod('linkSend', {
+        'deviceId': ?deviceId,
+        'message': message,
+      }),
+    );
+    return (result['delivered'] as num?)?.toInt() ?? 0;
+  }
+
+  /// Whether each audio file of [paths] embeds a picture the server would
+  /// serve; null for one that is not a readable file. Works while stopped.
+  static Future<List<bool?>> linkEmbeddedPictures(List<String> paths) async {
+    final result = _linkMap(
+      await _channel.invokeMethod('linkEmbeddedPictures', {'paths': paths}),
+    );
+    final pictures = result['pictures'];
+    return [
+      for (var i = 0; i < paths.length; i++)
+        pictures is List && i < pictures.length && pictures[i] is bool
+            ? pictures[i] as bool
+            : null,
+    ];
+  }
+
+  /// Forwarded requests: `requestId`, `op`, `deviceId` and `args`.
+  static Stream<Map<String, dynamic>> linkRequestEvents() =>
+      _events(_linkRequestEvents);
+
+  /// WebSocket messages from phones: `deviceId` and `message`.
+  static Stream<Map<String, dynamic>> linkMessageEvents() =>
+      _events(_linkMessageEvents);
+
+  /// The connected phones whenever one connects or disconnects: `clients`.
+  static Stream<Map<String, dynamic>> linkClientEvents() =>
+      _events(_linkClientEvents);
+
+  /// A phone finished pairing: `deviceId`, `name` and `platform`.
+  static Stream<Map<String, dynamic>> linkPairedEvents() =>
+      _events(_linkPairedEvents);
+
+  /// Why a pairing window closed: `paired`, `expired`, `attempts` or
+  /// `cancelled`.
+  static Stream<String> linkPairingEndedEvents() =>
+      _events(_linkPairingEndedEvents);
+
+  static Map<String, dynamic> _linkMap(Object? value) => value is Map
+      ? value.map((key, value) => MapEntry(key.toString(), value))
+      : <String, dynamic>{};
 
   static void _ensureBackendEventHandler() {
     if (_backendEventHandlerInstalled) return;
@@ -346,6 +480,31 @@ class PlatformBridge {
           final root = args is Map ? args['root']?.toString() ?? '' : '';
           if (root.isNotEmpty) _libraryFolderChangeEvents.add(root);
           return null;
+        case 'linkRequest':
+          if (call.arguments is Map) {
+            _linkRequestEvents.add(_linkMap(call.arguments));
+          }
+          return null;
+        case 'linkMessage':
+          if (call.arguments is Map) {
+            _linkMessageEvents.add(_linkMap(call.arguments));
+          }
+          return null;
+        case 'linkClients':
+          if (call.arguments is Map) {
+            _linkClientEvents.add(_linkMap(call.arguments));
+          }
+          return null;
+        case 'linkPaired':
+          if (call.arguments is Map) {
+            _linkPairedEvents.add(_linkMap(call.arguments));
+          }
+          return null;
+        case 'linkPairingEnded':
+          final args = call.arguments;
+          final reason = args is Map ? args['reason']?.toString() : null;
+          _linkPairingEndedEvents.add(reason ?? 'cancelled');
+          return null;
         case 'extensionVerificationNotificationTapped':
           _verificationNotificationEvents.add(null);
           return null;
@@ -380,6 +539,19 @@ class PlatformBridge {
     final result = await _channel.invokeMethod(method, args);
     return _decodeRequiredMapResultAsync(result, method);
   }
+
+  static Future<void> _invokeVoid(String method, [dynamic args]) async {
+    await _channel.invokeMethod(method, args);
+  }
+
+  static Future<T> _invokeAs<T>(String method, [dynamic args]) async =>
+      (await _channel.invokeMethod(method, args)) as T;
+
+  static Future<T> _invokeDecoded<T>(
+    FutureOr<T> Function(dynamic result, String method) decode,
+    String method, [
+    dynamic args,
+  ]) async => decode(await _channel.invokeMethod(method, args), method);
 
   static Future<InstallationState> ensureInstallMarker() async {
     if (!Platform.isAndroid) return const InstallationState.unsupported();
@@ -764,9 +936,7 @@ class PlatformBridge {
 
   static Future<void> cancelExtensionRequest(String requestId) async {
     if (requestId.isEmpty) return;
-    await _channel.invokeMethod('cancelExtensionRequest', {
-      'request_id': requestId,
-    });
+    await _invokeVoid('cancelExtensionRequest', {'request_id': requestId});
   }
 
   static void _cancelCustomSearchInFlightForScope(
@@ -822,26 +992,20 @@ class PlatformBridge {
     return response;
   }
 
-  static Future<Map<String, dynamic>> getAllDownloadProgress() async {
-    final result = await _channel.invokeMethod('getAllDownloadProgress');
-    return _decodeMapResult(result);
-  }
+  static Future<Map<String, dynamic>> getAllDownloadProgress() async =>
+      _decodeMapResult(await _channel.invokeMethod('getAllDownloadProgress'));
 
   static Stream<Map<String, dynamic>> downloadProgressStream() {
     return _channel.downloadProgressEvents().map(_decodeMapResult);
   }
 
-  static Future<void> exitApp() async {
-    await _channel.invokeMethod('exitApp');
-  }
+  static Future<void> exitApp() => _invokeVoid('exitApp');
 
-  static Future<void> clearItemProgress(String itemId) async {
-    await _channel.invokeMethod('clearItemProgress', {'item_id': itemId});
-  }
+  static Future<void> clearItemProgress(String itemId) =>
+      _invokeVoid('clearItemProgress', {'item_id': itemId});
 
-  static Future<void> cancelDownload(String itemId) async {
-    await _channel.invokeMethod('cancelDownload', {'item_id': itemId});
-  }
+  static Future<void> cancelDownload(String itemId) =>
+      _invokeVoid('cancelDownload', {'item_id': itemId});
 
   /// Cancels the selected attempts and clears their native progress. Failures
   /// are best effort, as for individual queue cancellation; later chunks still
@@ -862,9 +1026,8 @@ class PlatformBridge {
 
   /// Drops a stale pre-registered cancel flag for an item with no active
   /// download, so a user-initiated retry does not abort instantly.
-  static Future<void> resetDownloadCancel(String itemId) async {
-    await _channel.invokeMethod('resetDownloadCancel', {'item_id': itemId});
-  }
+  static Future<void> resetDownloadCancel(String itemId) =>
+      _invokeVoid('resetDownloadCancel', {'item_id': itemId});
 
   /// Returns only IDs whose native reset succeeded. Bound each request so a
   /// large retry selection does not flood the channel or hold the native lock.
@@ -907,9 +1070,8 @@ class PlatformBridge {
     return result == true;
   }
 
-  static Future<void> setDownloadDirectory(String path) async {
-    await _channel.invokeMethod('setDownloadDirectory', {'path': path});
-  }
+  static Future<void> setDownloadDirectory(String path) =>
+      _invokeVoid('setDownloadDirectory', {'path': path});
 
   /// Holds backend access through download and finalization, including folder changes.
   static Future<String> acquireDownloadDirectory(String path) async {
@@ -922,22 +1084,19 @@ class PlatformBridge {
 
   static Future<void> releaseDownloadDirectory(String token) async {
     if (!supportsCoreBackend || token.isEmpty) return;
-    await _channel.invokeMethod('releaseDownloadDirectory', {'token': token});
+    await _invokeVoid('releaseDownloadDirectory', {'token': token});
   }
 
   static Future<void> setNetworkCompatibilityOptions({
     required bool allowHttp,
     required bool insecureTls,
-  }) async {
-    await _channel.invokeMethod('setNetworkCompatibilityOptions', {
-      'allow_http': allowHttp,
-      'insecure_tls': insecureTls,
-    });
-  }
+  }) => _invokeVoid('setNetworkCompatibilityOptions', {
+    'allow_http': allowHttp,
+    'insecure_tls': insecureTls,
+  });
 
-  static Future<void> setAllowPrivateNetwork(bool allowed) async {
-    await _channel.invokeMethod('setAllowPrivateNetwork', {'allowed': allowed});
-  }
+  static Future<void> setAllowPrivateNetwork(bool allowed) =>
+      _invokeVoid('setAllowPrivateNetwork', {'allowed': allowed});
 
   /// Reports domain ownership during native backend migration.
   static Future<Map<String, String>> getBackendImplementations({
@@ -953,30 +1112,20 @@ class PlatformBridge {
   static Future<String> buildFilename(
     String template,
     Map<String, dynamic> metadata,
-  ) async {
-    final result = await _channel.invokeMethod('buildFilename', {
-      'template': template,
-      'metadata': jsonEncode(metadata),
-    });
-    return result as String;
-  }
+  ) async => _invokeAs('buildFilename', {
+    'template': template,
+    'metadata': jsonEncode(metadata),
+  });
 
-  static Future<String> sanitizeFilename(String filename) async {
-    final result = await _channel.invokeMethod('sanitizeFilename', {
-      'filename': filename,
-    });
-    return result as String;
-  }
+  static Future<String> sanitizeFilename(String filename) =>
+      _invokeAs('sanitizeFilename', {'filename': filename});
 
-  static Future<Map<String, dynamic>?> pickSafTree({
-    bool forSetup = false,
-  }) async {
-    final result = await _channel.invokeMethod(
-      'pickSafTree',
-      forSetup ? {'for_setup': true} : null,
-    );
-    return _decodeNullableMapResult(result, 'pickSafTree');
-  }
+  static Future<Map<String, dynamic>?> pickSafTree({bool forSetup = false}) =>
+      _invokeDecoded(
+        _decodeNullableMapResult,
+        'pickSafTree',
+        forSetup ? {'for_setup': true} : null,
+      );
 
   static Future<String?> readSetupFolderSelection() =>
       _channel.invokeMethod<String>('readSetupFolderSelection');
@@ -986,10 +1135,8 @@ class PlatformBridge {
         'payload': payload,
       });
 
-  static Future<bool> safExists(String uri) async {
-    final result = await _channel.invokeMethod('safExists', {'uri': uri});
-    return result as bool;
-  }
+  static Future<bool> safExists(String uri) =>
+      _invokeAs('safExists', {'uri': uri});
 
   /// Exact-path checks. Only explicit `missing` results authorize cleanup;
   /// absent responses and permission/provider failures remain unknown.
@@ -1044,17 +1191,12 @@ class PlatformBridge {
   /// Strict SAF validation for startup and download preflight. Unlike
   /// [isSafTreeAccessible], channel failures are surfaced to the caller so a
   /// write cannot proceed on an unverified destination.
-  static Future<bool> validateSafTreeAccess(String treeUri) async {
-    final result = await _channel.invokeMethod('isSafTreeAccessible', {
-      'tree_uri': treeUri,
-    });
-    return result as bool? ?? false;
-  }
+  static Future<bool> validateSafTreeAccess(String treeUri) async =>
+      await _invokeAs<bool?>('isSafTreeAccessible', {'tree_uri': treeUri}) ??
+      false;
 
-  static Future<bool> safDelete(String uri) async {
-    final result = await _channel.invokeMethod('safDelete', {'uri': uri});
-    return result as bool;
-  }
+  static Future<bool> safDelete(String uri) =>
+      _invokeAs('safDelete', {'uri': uri});
 
   static Future<Map<String, dynamic>> safStat(String uri) {
     return _invokeMap('safStat', {'uri': uri});
@@ -1074,6 +1216,7 @@ class PlatformBridge {
 
   /// Checks and repairs many SAF file references in a single native pass.
   /// Android groups requests by tree and scans each tree no more than once.
+  /// `exact_relative_dir` restricts a request to its recorded subfolder.
   static Future<List<Map<String, dynamic>>> inspectSafFiles(
     List<Map<String, dynamic>> requests,
   ) async {
@@ -1089,10 +1232,8 @@ class PlatformBridge {
         .toList(growable: false);
   }
 
-  static Future<String?> copyContentUriToTemp(String uri) async {
-    final result = await _channel.invokeMethod('safCopyToTemp', {'uri': uri});
-    return result as String?;
-  }
+  static Future<String?> copyContentUriToTemp(String uri) =>
+      _invokeAs('safCopyToTemp', {'uri': uri});
 
   static Future<ContentUriPlaybackLease?> openContentUriPlaybackLease(
     String uri,
@@ -1128,16 +1269,25 @@ class PlatformBridge {
     required String fileName,
     required String mimeType,
     required String srcPath,
-  }) async {
-    final result = await _channel.invokeMethod('safCreateFromPath', {
-      'tree_uri': treeUri,
-      'relative_dir': relativeDir,
-      'file_name': fileName,
-      'mime_type': mimeType,
-      'src_path': srcPath,
-    });
-    return result as String?;
-  }
+  }) => _invokeAs('safCreateFromPath', {
+    'tree_uri': treeUri,
+    'relative_dir': relativeDir,
+    'file_name': fileName,
+    'mime_type': mimeType,
+    'src_path': srcPath,
+  });
+
+  static Future<String?> writeSafSidecarFromPath({
+    required String audioUri,
+    required String fileName,
+    required String mimeType,
+    required String srcPath,
+  }) => _invokeAs('safWriteSidecarFromPath', {
+    'audio_uri': audioUri,
+    'file_name': fileName,
+    'mime_type': mimeType,
+    'src_path': srcPath,
+  });
 
   static Future<Map<String, dynamic>> createSafFileIfAbsentFromPath({
     required String treeUri,
@@ -1193,20 +1343,12 @@ class PlatformBridge {
     });
   }
 
-  static Future<void> openContentUri(String uri, {String mimeType = ''}) async {
-    await _channel.invokeMethod('openContentUri', {
-      'uri': uri,
-      'mime_type': mimeType,
-    });
-  }
+  static Future<void> openContentUri(String uri, {String mimeType = ''}) =>
+      _invokeVoid('openContentUri', {'uri': uri, 'mime_type': mimeType});
 
-  static Future<bool> shareContentUri(String uri, {String title = ''}) async {
-    final result = await _channel.invokeMethod('shareContentUri', {
-      'uri': uri,
-      'title': title,
-    });
-    return result as bool? ?? false;
-  }
+  static Future<bool> shareContentUri(String uri, {String title = ''}) async =>
+      await _invokeAs<bool?>('shareContentUri', {'uri': uri, 'title': title}) ??
+      false;
 
   static Future<String> getLyricsLRC(
     String spotifyId,
@@ -1214,16 +1356,13 @@ class PlatformBridge {
     String artistName, {
     String? filePath,
     int durationMs = 0,
-  }) async {
-    final result = await _channel.invokeMethod('getLyricsLRC', {
-      'spotify_id': spotifyId,
-      'track_name': trackName,
-      'artist_name': artistName,
-      'file_path': filePath ?? '',
-      'duration_ms': durationMs,
-    });
-    return result as String;
-  }
+  }) => _invokeAs('getLyricsLRC', {
+    'spotify_id': spotifyId,
+    'track_name': trackName,
+    'artist_name': artistName,
+    'file_path': filePath ?? '',
+    'duration_ms': durationMs,
+  });
 
   static Future<Map<String, dynamic>> getLyricsLRCWithSource(
     String spotifyId,
@@ -1261,10 +1400,8 @@ class PlatformBridge {
 
   /// The enabled lyrics providers in priority order, including installed
   /// lyrics extensions as `extension:<id>`.
-  static Future<List<String>> getEnabledLyricsProviders() async {
-    final result = await _channel.invokeMethod('getEnabledLyricsProviders');
-    return _decodeStringListResult(result, 'getEnabledLyricsProviders');
-  }
+  static Future<List<String>> getEnabledLyricsProviders() =>
+      _invokeDecoded(_decodeStringListResult, 'getEnabledLyricsProviders');
 
   static Future<Map<String, dynamic>> embedLyricsToFile(
     String filePath,
@@ -1276,9 +1413,7 @@ class PlatformBridge {
     });
   }
 
-  static Future<void> cleanupConnections() async {
-    await _channel.invokeMethod('cleanupConnections');
-  }
+  static Future<void> cleanupConnections() => _invokeVoid('cleanupConnections');
 
   static Future<Map<String, dynamic>> downloadCoverToFile(
     String coverUrl,
@@ -1325,22 +1460,17 @@ class PlatformBridge {
   }
 
   /// Providers not in the list are disabled.
-  static Future<void> setLyricsProviders(List<String> providers) async {
-    final providersJSON = jsonEncode(providers);
-    await _channel.invokeMethod('setLyricsProviders', {
-      'providers_json': providersJSON,
-    });
-  }
+  static Future<void> setLyricsProviders(List<String> providers) async =>
+      _invokeVoid('setLyricsProviders', {
+        'providers_json': jsonEncode(providers),
+      });
 
   /// Sets advanced lyrics fetch options used by provider-specific integrations.
   static Future<void> setLyricsFetchOptions(
     Map<String, dynamic> options,
-  ) async {
-    final optionsJSON = jsonEncode(options);
-    await _channel.invokeMethod('setLyricsFetchOptions', {
-      'options_json': optionsJSON,
-    });
-  }
+  ) async => _invokeVoid('setLyricsFetchOptions', {
+    'options_json': jsonEncode(options),
+  });
 
   static Future<Map<String, dynamic>> reEnrichFile(
     Map<String, dynamic> request,
@@ -1519,17 +1649,14 @@ class PlatformBridge {
     String trackName = '',
     String artistName = '',
     int queueCount = 0,
-  }) async {
-    await _channel.invokeMethod('startDownloadService', {
-      'track_name': trackName,
-      'artist_name': artistName,
-      'queue_count': queueCount,
-    });
-  }
+  }) => _invokeVoid('startDownloadService', {
+    'track_name': trackName,
+    'artist_name': artistName,
+    'queue_count': queueCount,
+  });
 
-  static Future<void> stopDownloadService() async {
-    await _channel.invokeMethod('stopDownloadService');
-  }
+  static Future<void> stopDownloadService() =>
+      _invokeVoid('stopDownloadService');
 
   /// Keeps user-started work of [kind] alive with the screen off: an Android
   /// foreground service, or an iOS background-task grace period. Returns
@@ -1554,18 +1681,25 @@ class PlatformBridge {
     required String title,
     String text = '',
     int progress = -1,
-  }) async {
-    await _channel.invokeMethod('updateBackgroundWork', {
-      'kind': kind,
-      'title': title,
-      'text': text,
-      'progress': progress,
-    });
-  }
+  }) => _invokeVoid('updateBackgroundWork', {
+    'kind': kind,
+    'title': title,
+    'text': text,
+    'progress': progress,
+  });
 
-  static Future<void> stopBackgroundWork(String kind) async {
-    await _channel.invokeMethod('stopBackgroundWork', {'kind': kind});
-  }
+  static Future<void> stopBackgroundWork(String kind) =>
+      _invokeVoid('stopBackgroundWork', {'kind': kind});
+
+  /// Keeps a paired Android phone available as a Link playback target.
+  static Future<bool> startLinkConnectionService(String name) async =>
+      await _channel.invokeMethod<bool>('startLinkConnectionService', {
+        'name': name,
+      }) ??
+      false;
+
+  static Future<void> stopLinkConnectionService() =>
+      _invokeVoid('stopLinkConnectionService');
 
   static Future<void> updateDownloadServiceProgress({
     required String trackName,
@@ -1574,21 +1708,17 @@ class PlatformBridge {
     required int total,
     required int queueCount,
     String status = 'downloading',
-  }) async {
-    await _channel.invokeMethod('updateDownloadServiceProgress', {
-      'track_name': trackName,
-      'artist_name': artistName,
-      'progress': progress,
-      'total': total,
-      'queue_count': queueCount,
-      'status': status,
-    });
-  }
+  }) => _invokeVoid('updateDownloadServiceProgress', {
+    'track_name': trackName,
+    'artist_name': artistName,
+    'progress': progress,
+    'total': total,
+    'queue_count': queueCount,
+    'status': status,
+  });
 
-  static Future<bool> isDownloadServiceRunning() async {
-    final result = await _channel.invokeMethod('isDownloadServiceRunning');
-    return result as bool;
-  }
+  static Future<bool> isDownloadServiceRunning() =>
+      _invokeAs('isDownloadServiceRunning');
 
   /// iOS only: keep in-flight downloads running briefly after backgrounding.
   static Future<void> beginBackgroundDownloadTask() async {
@@ -1653,18 +1783,14 @@ class PlatformBridge {
 
   static Future<void> finishNativeDownloadWorkerPreparation({
     required String runId,
-  }) async {
-    await _channel.invokeMethod('finishNativeDownloadWorkerPreparation', {
-      'run_id': runId,
-    });
-  }
+  }) => _invokeVoid('finishNativeDownloadWorkerPreparation', {'run_id': runId});
 
   static Future<void> acknowledgeNativeDownloadWorkerItems({
     required String runId,
     required List<String> itemIds,
   }) async {
     if (runId.isEmpty || itemIds.isEmpty) return;
-    await _channel.invokeMethod('acknowledgeNativeDownloadWorkerItems', {
+    await _invokeVoid('acknowledgeNativeDownloadWorkerItems', {
       'run_id': runId,
       'item_ids_json': jsonEncode(itemIds),
     });
@@ -1698,17 +1824,14 @@ class PlatformBridge {
     } catch (_) {}
   }
 
-  static Future<void> pauseNativeDownloadWorker() async {
-    await _channel.invokeMethod('pauseNativeDownloadWorker');
-  }
+  static Future<void> pauseNativeDownloadWorker() =>
+      _invokeVoid('pauseNativeDownloadWorker');
 
-  static Future<void> resumeNativeDownloadWorker() async {
-    await _channel.invokeMethod('resumeNativeDownloadWorker');
-  }
+  static Future<void> resumeNativeDownloadWorker() =>
+      _invokeVoid('resumeNativeDownloadWorker');
 
-  static Future<void> cancelNativeDownloadWorker() async {
-    await _channel.invokeMethod('cancelNativeDownloadWorker');
-  }
+  static Future<void> cancelNativeDownloadWorker() =>
+      _invokeVoid('cancelNativeDownloadWorker');
 
   /// [sinceStateSerial]: pass the `state_serial` of the last fully-processed
   /// snapshot; when the native state hasn't advanced past it, the heavy
@@ -1716,18 +1839,15 @@ class PlatformBridge {
   /// only compact progress fields are returned.
   static Future<Map<String, dynamic>> getNativeDownloadWorkerSnapshot({
     int sinceStateSerial = 0,
-  }) async {
-    final result = await _channel.invokeMethod(
-      'getNativeDownloadWorkerSnapshot',
-      {'since_state_serial': sinceStateSerial},
-    );
-    return _decodeMapResult(result);
-  }
+  }) async => _decodeMapResult(
+    await _channel.invokeMethod('getNativeDownloadWorkerSnapshot', {
+      'since_state_serial': sinceStateSerial,
+    }),
+  );
 
   static Future<int> getTrackCacheSize() async {
     await _ensurePersistentLookupCachesLoaded();
-    final result = await _channel.invokeMethod('getTrackCacheSize');
-    return (result as int) + _lookupCacheSize();
+    return await _invokeAs<int>('getTrackCacheSize') + _lookupCacheSize();
   }
 
   static Future<void> clearTrackCache() async {
@@ -1865,9 +1985,7 @@ class PlatformBridge {
   static Future<void> removeExtension(String extensionId) async {
     _log.d('removeExtension: $extensionId');
     await _clearLookupCaches();
-    await _channel.invokeMethod('removeExtension', {
-      'extension_id': extensionId,
-    });
+    await _invokeVoid('removeExtension', {'extension_id': extensionId});
   }
 
   static Future<Map<String, dynamic>> upgradeExtension(String filePath) async {
@@ -1881,10 +1999,8 @@ class PlatformBridge {
     return _invokeMap('checkExtensionUpgrade', {'file_path': filePath});
   }
 
-  static Future<List<Map<String, dynamic>>> getInstalledExtensions() async {
-    final result = await _channel.invokeMethod('getInstalledExtensions');
-    return _decodeMapListResultAsync(result, 'getInstalledExtensions');
-  }
+  static Future<List<Map<String, dynamic>>> getInstalledExtensions() =>
+      _invokeDecoded(_decodeMapListResultAsync, 'getInstalledExtensions');
 
   static Future<void> setExtensionEnabled(
     String extensionId,
@@ -1892,7 +2008,7 @@ class PlatformBridge {
   ) async {
     _log.d('setExtensionEnabled: $extensionId = $enabled');
     await _clearLookupCaches();
-    await _channel.invokeMethod('setExtensionEnabled', {
+    await _invokeVoid('setExtensionEnabled', {
       'extension_id': extensionId,
       'enabled': enabled,
     });
@@ -1901,22 +2017,20 @@ class PlatformBridge {
   static Future<void> setProviderPriority(List<String> providerIds) async {
     _log.d('setProviderPriority: $providerIds');
     await _clearLookupCaches();
-    await _channel.invokeMethod('setProviderPriority', {
+    await _invokeVoid('setProviderPriority', {
       'priority': jsonEncode(providerIds),
     });
   }
 
-  static Future<List<String>> getProviderPriority() async {
-    final result = await _channel.invokeMethod('getProviderPriority');
-    return _decodeStringListResult(result, 'getProviderPriority');
-  }
+  static Future<List<String>> getProviderPriority() =>
+      _invokeDecoded(_decodeStringListResult, 'getProviderPriority');
 
   static Future<void> setDownloadFallbackExtensionIds(
     List<String>? extensionIds,
   ) async {
     _log.d('setDownloadFallbackExtensionIds: $extensionIds');
     await _clearLookupCaches();
-    await _channel.invokeMethod('setDownloadFallbackExtensionIds', {
+    await _invokeVoid('setDownloadFallbackExtensionIds', {
       'extension_ids': extensionIds == null ? '' : jsonEncode(extensionIds),
     });
   }
@@ -1926,15 +2040,13 @@ class PlatformBridge {
   ) async {
     _log.d('setMetadataProviderPriority: $providerIds');
     await _clearLookupCaches();
-    await _channel.invokeMethod('setMetadataProviderPriority', {
+    await _invokeVoid('setMetadataProviderPriority', {
       'priority': jsonEncode(providerIds),
     });
   }
 
-  static Future<List<String>> getMetadataProviderPriority() async {
-    final result = await _channel.invokeMethod('getMetadataProviderPriority');
-    return _decodeStringListResult(result, 'getMetadataProviderPriority');
-  }
+  static Future<List<String>> getMetadataProviderPriority() =>
+      _invokeDecoded(_decodeStringListResult, 'getMetadataProviderPriority');
 
   static Future<Map<String, dynamic>> getExtensionSettings(String extensionId) {
     return _invokeMap('getExtensionSettings', {'extension_id': extensionId});
@@ -1950,7 +2062,7 @@ class PlatformBridge {
   ) async {
     _log.d('setExtensionSettings: $extensionId');
     await _clearLookupCaches();
-    await _channel.invokeMethod('setExtensionSettings', {
+    await _invokeVoid('setExtensionSettings', {
       'extension_id': extensionId,
       'settings': jsonEncode(settings),
     });
@@ -1982,13 +2094,10 @@ class PlatformBridge {
     _log.d(
       'searchTracksWithMetadataProviders: "$query", includeExtensions=$includeExtensions',
     );
-    final result = await _channel.invokeMethod(
+    return _invokeDecoded(
+      _decodeMapListResultAsync,
       'searchTracksWithMetadataProviders',
       {'query': query, 'limit': limit, 'include_extensions': includeExtensions},
-    );
-    return _decodeMapListResultAsync(
-      result,
-      'searchTracksWithMetadataProviders',
     );
   }
 
@@ -1998,13 +2107,10 @@ class PlatformBridge {
     int limit = 20,
   }) async {
     _log.d('searchTracksWithMetadataProvider: $extensionId, query="$query"');
-    final result = await _channel.invokeMethod(
+    return _invokeDecoded(
+      _decodeMapListResultAsync,
       'searchTracksWithMetadataProvider',
       {'extension_id': extensionId, 'query': query, 'limit': limit},
-    );
-    return _decodeMapListResultAsync(
-      result,
-      'searchTracksWithMetadataProvider',
     );
   }
 
@@ -2020,11 +2126,11 @@ class PlatformBridge {
       'type': type,
       'source_extension_id': sourceExtensionId,
     });
-    final result = await _channel.invokeMethod(
+    return _invokeDecoded(
+      _decodeMapListResultAsync,
       'findCollectionAcrossExtensions',
       requestJson,
     );
-    return _decodeMapListResultAsync(result, 'findCollectionAcrossExtensions');
   }
 
   static Future<void> cleanupExtensions() async {
@@ -2034,12 +2140,9 @@ class PlatformBridge {
 
   static Future<Map<String, dynamic>?> getExtensionPendingAuth(
     String extensionId,
-  ) async {
-    final result = await _channel.invokeMethod('getExtensionPendingAuth', {
-      'extension_id': extensionId,
-    });
-    return _decodeNullableMapResult(result, 'getExtensionPendingAuth');
-  }
+  ) => _invokeDecoded(_decodeNullableMapResult, 'getExtensionPendingAuth', {
+    'extension_id': extensionId,
+  });
 
   static final Map<String, Future<bool>> _extensionSessionGrantCompletions =
       <String, Future<bool>>{};
@@ -2147,6 +2250,23 @@ class PlatformBridge {
     }
   }
 
+  /// Songs like [seeds] (track maps, most important first) from an extension
+  /// with the `relatedTracks` capability, normalized like search results.
+  static Future<List<Map<String, dynamic>>> getExtensionRelatedTracks(
+    String extensionId,
+    List<Map<String, dynamic>> seeds, {
+    int limit = 25,
+  }) async {
+    final requestId = _nextExtensionRequestId('relatedTracks', extensionId);
+    final result = await _channel.invokeMethod('getExtensionRelatedTracks', {
+      'extension_id': extensionId,
+      'seeds': jsonEncode(seeds),
+      'options': jsonEncode({'limit': limit}),
+      'request_id': requestId,
+    });
+    return _decodeMapListResultAsync(result, 'getExtensionRelatedTracks');
+  }
+
   static Future<Map<String, dynamic>?> handleURLWithExtension(
     String url,
   ) async {
@@ -2180,6 +2300,9 @@ class PlatformBridge {
           );
         }
         return decoded;
+      } on PlatformException catch (e, stack) {
+        _log.e('Extension URL metadata failed', e, stack);
+        rethrow;
       } catch (e) {
         return null;
       }
@@ -2339,10 +2462,7 @@ class PlatformBridge {
   static Future<Map<String, dynamic>?> getPendingAppCrash() async {
     if (isDesktopPlatform) return DesktopDiagnostics.instance?.pendingCrash();
     if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return null;
-    return _decodeNullableMapResult(
-      await _channel.invokeMethod('getPendingAppCrash'),
-      'getPendingAppCrash',
-    );
+    return _invokeDecoded(_decodeNullableMapResult, 'getPendingAppCrash');
   }
 
   static Future<void> dismissAppCrash(String id) async {
@@ -2354,10 +2474,7 @@ class PlatformBridge {
   static Future<Map<String, dynamic>?> getLatestAppCrash() async {
     if (isDesktopPlatform) return DesktopDiagnostics.instance?.latestCrash();
     if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return null;
-    return _decodeNullableMapResult(
-      await _channel.invokeMethod('getLatestAppCrash'),
-      'getLatestAppCrash',
-    );
+    return _invokeDecoded(_decodeNullableMapResult, 'getLatestAppCrash');
   }
 
   static Future<void> markAppCrashShown(String id) async {
@@ -2390,17 +2507,13 @@ class PlatformBridge {
     required int startedAfter,
   }) async {
     if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return null;
-    final result = await _channel.invokeMethod('getLibraryScanExitInfo', {
+    return _invokeDecoded(_decodeNullableMapResult, 'getLibraryScanExitInfo', {
       'started_after': startedAfter,
     });
-    return _decodeNullableMapResult(result, 'getLibraryScanExitInfo');
   }
 
-  static Future<void> setLibraryCoverCacheDir(String cacheDir) async {
-    await _channel.invokeMethod('setLibraryCoverCacheDir', {
-      'cache_dir': cacheDir,
-    });
-  }
+  static Future<void> setLibraryCoverCacheDir(String cacheDir) =>
+      _invokeVoid('setLibraryCoverCacheDir', {'cache_dir': cacheDir});
 
   static Future<LibraryScanNDJSONFile> scanLibraryFolderToNDJSONFile(
     String folderPath, {
@@ -2418,16 +2531,10 @@ class PlatformBridge {
   static Future<Map<String, dynamic>> scanLibraryFolderIncremental(
     String folderPath,
     Map<String, int> existingFiles,
-  ) async {
-    final result = await _channel.invokeMethod('scanLibraryFolderIncremental', {
-      'folder_path': folderPath,
-      'existing_files': jsonEncode(existingFiles),
-    });
-    return _decodeRequiredMapResultAsync(
-      result,
-      'scanLibraryFolderIncremental',
-    );
-  }
+  ) async => _invokeMap('scanLibraryFolderIncremental', {
+    'folder_path': folderPath,
+    'existing_files': jsonEncode(existingFiles),
+  });
 
   static Future<LibraryScanNDJSONFile> scanSafTreeToNDJSONFile(
     String treeUri, {
@@ -2470,12 +2577,14 @@ class PlatformBridge {
       for (final file in [output, File('${output.path}.state')]) {
         if (await file.exists()) await file.delete();
       }
-      // Preserve covers referenced by the current DB until ingestion succeeds.
-      // Fresh paths bypass native disk and Flutter image caches together.
+      // Native scans extract thumbnails older than this marker again under
+      // their stable names, so playlists and sessions keep valid paths.
       final covers = Directory('${scanDir.path}/library_covers');
       await covers.create(recursive: true);
-      final freshCovers = await covers.createTemp('full_scan_');
-      await setLibraryCoverCacheDir(freshCovers.path);
+      await File(
+        '${covers.path}/$libraryCoverRegenerateMarker',
+      ).writeAsString(DateTime.now().toIso8601String(), flush: true);
+      await setLibraryCoverCacheDir(covers.path);
     }
     if (isCancelled?.call() == true) {
       throw StateError('Library scan cancelled before native scan');
@@ -2526,11 +2635,10 @@ class PlatformBridge {
     Map<String, int> existingFiles,
   ) async {
     _ensureBackendEventHandler();
-    final result = await _channel.invokeMethod('scanSafTreeIncremental', {
+    return _invokeMap('scanSafTreeIncremental', {
       'tree_uri': treeUri,
       'existing_files': jsonEncode(existingFiles),
     });
-    return _decodeRequiredMapResultAsync(result, 'scanSafTreeIncremental');
   }
 
   static Future<Map<String, int>> getSafFileModTimes(List<String> uris) async {
@@ -2540,27 +2648,19 @@ class PlatformBridge {
     return map.map((key, value) => MapEntry(key, (value as num).toInt()));
   }
 
-  static Future<Map<String, dynamic>> getLibraryScanProgress() async {
-    final result = await _channel.invokeMethod('getLibraryScanProgress');
-    return _decodeMapResult(result);
-  }
+  static Future<Map<String, dynamic>> getLibraryScanProgress() async =>
+      _decodeMapResult(await _channel.invokeMethod('getLibraryScanProgress'));
 
   static Stream<Map<String, dynamic>> libraryScanProgressStream() {
     return _channel.libraryScanProgressEvents().map(_decodeMapResult);
   }
 
-  static Future<void> cancelLibraryScan() async {
-    await _channel.invokeMethod('cancelLibraryScan');
-  }
+  static Future<void> cancelLibraryScan() => _invokeVoid('cancelLibraryScan');
 
   /// Holds the running native scan at its next file; it keeps its position.
-  static Future<void> pauseLibraryScan() async {
-    await _channel.invokeMethod('pauseLibraryScan');
-  }
+  static Future<void> pauseLibraryScan() => _invokeVoid('pauseLibraryScan');
 
-  static Future<void> resumeLibraryScan() async {
-    await _channel.invokeMethod('resumeLibraryScan');
-  }
+  static Future<void> resumeLibraryScan() => _invokeVoid('resumeLibraryScan');
 
   static Object? _decodeJsonResult(dynamic result) {
     if (result is String) {
@@ -2825,35 +2925,31 @@ class PlatformBridge {
 
   static Future<void> initExtensionRepo(String cacheDir) async {
     _log.d('initExtensionRepo: $cacheDir');
-    await _channel.invokeMethod('initExtensionRepo', {'cache_dir': cacheDir});
+    await _invokeVoid('initExtensionRepo', {'cache_dir': cacheDir});
   }
 
   static Future<void> setRepoRegistryUrl(String registryUrl) async {
     _log.d('setRepoRegistryUrl: $registryUrl');
-    await _channel.invokeMethod('setRepoRegistryUrl', {
-      'registry_url': registryUrl,
-    });
+    await _invokeVoid('setRepoRegistryUrl', {'registry_url': registryUrl});
   }
 
   static Future<String> getRepoRegistryUrl() async {
     _log.d('getRepoRegistryUrl');
-    final result = await _channel.invokeMethod('getRepoRegistryUrl');
-    return result as String? ?? '';
+    return await _invokeAs<String?>('getRepoRegistryUrl') ?? '';
   }
 
   static Future<void> clearRepoRegistryUrl() async {
     _log.d('clearRepoRegistryUrl');
-    await _channel.invokeMethod('clearRepoRegistryUrl');
+    await _invokeVoid('clearRepoRegistryUrl');
   }
 
   static Future<List<Map<String, dynamic>>> getRepoExtensions({
     bool forceRefresh = false,
   }) async {
     _log.d('getRepoExtensions (forceRefresh: $forceRefresh)');
-    final result = await _channel.invokeMethod('getRepoExtensions', {
+    return _invokeDecoded(_decodeMapListResultAsync, 'getRepoExtensions', {
       'force_refresh': forceRefresh,
     });
-    return _decodeMapListResultAsync(result, 'getRepoExtensions');
   }
 
   static Future<String> downloadRepoExtension(
@@ -2861,11 +2957,10 @@ class PlatformBridge {
     String destDir,
   ) async {
     _log.i('downloadRepoExtension: $extensionId to $destDir');
-    final result = await _channel.invokeMethod('downloadRepoExtension', {
+    return _invokeAs('downloadRepoExtension', {
       'extension_id': extensionId,
       'dest_dir': destDir,
     });
-    return result as String;
   }
 
   static Future<Map<String, dynamic>> parseCueSheet(

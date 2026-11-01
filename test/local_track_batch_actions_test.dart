@@ -6,12 +6,12 @@ import 'package:mornye/providers/local_library_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mornye/controllers/local_track_batch_actions.dart';
 import 'package:mornye/l10n/app_localizations.dart';
 import 'package:mornye/models/settings.dart';
 import 'package:mornye/models/track.dart';
 import 'package:mornye/services/batch_metadata_re_enrich.dart';
 import 'package:mornye/services/library_database.dart';
-import 'package:mornye/services/local_track_batch_actions.dart';
 import 'package:mornye/services/local_track_redownload_service.dart';
 
 LocalLibraryItem item(String id) => LocalLibraryItem(
@@ -48,6 +48,70 @@ class _BatchLibrary extends LocalLibraryNotifier {
 }
 
 void main() {
+  test(
+    'motion is saved only after successful native or FFmpeg writes',
+    () async {
+      final events = <String>[];
+      final runner = BatchReEnrichRunner(
+        beginPhase: () async => const AppSettings(),
+        reEnrich: (request) async {
+          if (request['preview_only'] == true) {
+            return {
+              'method': 'preview',
+              'enriched_metadata': {
+                'header_video': 'https://example.invalid/motion.m3u8',
+              },
+            };
+          }
+          events.add('write:${request['file_path']}');
+          return {
+            'method': request['file_path'] == '/music/1.flac'
+                ? 'native'
+                : 'ffmpeg',
+          };
+        },
+        writeSidecar:
+            ({required audioFilePath, required reEnrichResult}) async {},
+        applyFfmpeg:
+            ({required item, required result, required artistTagMode}) async {
+              events.add('ffmpeg:${item.id}');
+              return item.id == '2';
+            },
+        saveMotionArtwork: (item, metadata) async {
+          expect(
+            metadata['header_video'],
+            'https://example.invalid/motion.m3u8',
+          );
+          events.add('motion:${item.id}');
+          if (item.id == '1') throw StateError('optional video unavailable');
+        },
+      );
+      final previews = await runner.preview(
+        [item('1'), item('2'), item('3')],
+        const ReEnrichFieldSelection(
+          mode: ReEnrichBatchMode.selectedFields,
+          fields: [ReEnrichFields.cover],
+        ),
+        shouldStop: running,
+        onProgress: progress,
+      );
+      expect(previews, hasLength(3));
+      expect(events, isEmpty);
+      expect(
+        await runner.apply(previews, shouldStop: running, onProgress: progress),
+        2,
+      );
+      expect(events, [
+        'write:/music/1.flac',
+        'motion:1',
+        'write:/music/2.flac',
+        'ffmpeg:2',
+        'motion:2',
+        'write:/music/3.flac',
+        'ffmpeg:3',
+      ]);
+    },
+  );
   test(
     'lyrics-only batch retains provider identity without metadata lookups',
     () async {
@@ -263,7 +327,6 @@ void main() {
           if (local.id == '2') throw StateError('lookup failed');
           if (local.id == '4') cancelled = true;
           return LocalTrackRedownloadResolution(
-            localItem: local,
             match: local.id == '3'
                 ? null
                 : Track(
@@ -273,8 +336,6 @@ void main() {
                     albumName: 'Album',
                     duration: 1,
                   ),
-            score: 100,
-            reason: 'fixture',
           );
         },
       );

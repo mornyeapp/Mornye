@@ -24,6 +24,20 @@ pub(crate) fn execute(request: &Value, bytes: Option<&[u8]>) -> Result<Value, St
         base.set_path(&format!("{}/", base.path()));
     }
     let base_segments = decoded_segments(&base)?;
+    let webdav = request["protocol"] == "webdav";
+    let document = if webdav {
+        mornye_core::xml::check_depth(&body)?;
+        let document = roxmltree::Document::parse(&body).map_err(|e| e.to_string())?;
+        if !named(document.root_element(), "multistatus") {
+            return Err("Server did not return a WebDAV directory listing".into());
+        }
+        Some(document)
+    } else {
+        None
+    };
+    let advertised_origin = document
+        .as_ref()
+        .and_then(|document| dav_collection_origin(document, &base, &base_segments));
     let mut entries = Vec::<Value>::new();
     let mut positions = HashMap::<String, usize>::new();
     let mut add = |href: &str,
@@ -33,7 +47,14 @@ pub(crate) fn execute(request: &Value, bytes: Option<&[u8]>) -> Result<Value, St
                    etag: Option<String>|
      -> Result<(), String> {
         let uri = base.join(&dart_href(href)).map_err(|e| e.to_string())?;
-        if uri.origin() != base.origin()
+        // A tunnel can expose a different host from the DAV collection href.
+        // Only child paths leave this parser; transport keeps the saved origin.
+        let same_server = uri.origin() == base.origin()
+            || (webdav
+                && matches!(uri.scheme(), "http" | "https")
+                && (uri.host() == base.host()
+                    || advertised_origin.as_ref() == Some(&uri.origin())));
+        if !same_server
             || uri.query().is_some()
             || uri.fragment().is_some()
             || !uri.username().is_empty()
@@ -73,23 +94,13 @@ pub(crate) fn execute(request: &Value, bytes: Option<&[u8]>) -> Result<Value, St
         }
         Ok(())
     };
-    if request["protocol"] == "webdav" {
-        mornye_core::xml::check_depth(&body)?;
-        let document = roxmltree::Document::parse(&body).map_err(|e| e.to_string())?;
+    if let Some(document) = document {
         for response in document
             .descendants()
             .filter(|node| named(*node, "response"))
         {
             let href = response.descendants().find(|node| named(*node, "href"));
-            let props: Vec<_> = response
-                .descendants()
-                .filter(|node| {
-                    named(*node, "propstat")
-                        && node.children().any(|child| {
-                            named(child, "status") && inner_text(child).contains(" 200 ")
-                        })
-                })
-                .collect();
+            let props: Vec<_> = successful_properties(response).collect();
             if let Some(href) = href.filter(|_| !props.is_empty()) {
                 let values: Vec<_> = props
                     .iter()
@@ -175,6 +186,63 @@ fn dart_href(href: &str) -> String {
 
 fn named(node: roxmltree::Node<'_, '_>, name: &str) -> bool {
     node.is_element() && node.tag_name().name() == name
+}
+
+fn successful_properties<'a, 'input>(
+    response: roxmltree::Node<'a, 'input>,
+) -> impl Iterator<Item = roxmltree::Node<'a, 'input>> {
+    response.descendants().filter(|node| {
+        named(*node, "propstat")
+            && node
+                .children()
+                .any(|child| named(child, "status") && successful_status(&inner_text(child)))
+    })
+}
+
+fn dav_collection_origin(
+    document: &roxmltree::Document<'_>,
+    base: &Url,
+    base_segments: &[String],
+) -> Option<url::Origin> {
+    let mut origin = None;
+    for response in document
+        .descendants()
+        .filter(|node| named(*node, "response"))
+    {
+        let Some(href) = response.descendants().find(|node| named(*node, "href")) else {
+            continue;
+        };
+        let Ok(uri) = base.join(&dart_href(&inner_text(href))) else {
+            continue;
+        };
+        if !matches!(uri.scheme(), "http" | "https")
+            || uri.query().is_some()
+            || uri.fragment().is_some()
+            || !uri.username().is_empty()
+            || uri.password().is_some()
+            || decoded_segments(&uri).ok().as_deref() != Some(base_segments)
+            || !successful_properties(response)
+                .flat_map(|prop| prop.descendants())
+                .any(|node| named(node, "collection"))
+        {
+            continue;
+        }
+        let next = uri.origin();
+        if origin.as_ref().is_some_and(|origin| *origin != next) {
+            return None;
+        }
+        origin = Some(next);
+    }
+    origin
+}
+
+fn successful_status(value: &str) -> bool {
+    let mut parts = value.split_whitespace();
+    parts
+        .next()
+        .and_then(|version| version.strip_prefix("HTTP/"))
+        .is_some_and(|version| !version.is_empty())
+        && parts.next() == Some("200")
 }
 
 fn inner_text(node: roxmltree::Node<'_, '_>) -> String {
@@ -298,5 +366,16 @@ mod tests {
         );
         let error = execute(&json!({"base_url":"https://nas.test/dav/", "path":"", "protocol":"webdav", "body":body}), None).unwrap_err();
         assert_eq!(error, "XML nesting exceeds 16 elements");
+    }
+
+    #[test]
+    fn non_dav_documents_are_not_empty_dav_directories() {
+        let error = execute(
+            &json!({"base_url":"http://nas.test/dav/", "path":"", "protocol":"webdav",
+                "body":"<html><body>Please sign in</body></html>"}),
+            None,
+        )
+        .unwrap_err();
+        assert_eq!(error, "Server did not return a WebDAV directory listing");
     }
 }

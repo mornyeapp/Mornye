@@ -104,15 +104,18 @@ extension _QueueTabCollectionItemWidgets on _QueueTabState {
     );
   }
 
-  Widget _buildBridgeGridItem(
+  /// A completed download pinned above the Library until its row lands.
+  Widget _buildBridgeItem(
     BuildContext context,
     DownloadItem item,
     ColorScheme colorScheme,
     DownloadHistoryItem? historyItem, {
+    required bool grid,
     List<DownloadHistoryItem>? navigationItems,
     int? navigationIndex,
   }) {
     final track = item.track;
+    final coverSize = grid ? null : _queueCoverSize();
     final radius = BorderRadius.circular(8);
     final unifiedItem = historyItem == null
         ? null
@@ -129,10 +132,28 @@ extension _QueueTabCollectionItemWidgets on _QueueTabState {
       completedItemFilePath: item.filePath,
     );
     final cover = unifiedItem != null
-        ? _buildUnifiedCoverImage(unifiedItem, colorScheme)
+        ? _buildUnifiedCoverImage(unifiedItem, colorScheme, coverSize)
         : track.coverUrl != null
-        ? CachedCoverImage(imageUrl: track.coverUrl!, borderRadius: radius)
-        : const TrackCoverPlaceholder();
+        ? CachedCoverImage(
+            imageUrl: track.coverUrl!,
+            width: coverSize,
+            height: coverSize,
+            borderRadius: radius,
+          )
+        : grid
+        ? const TrackCoverPlaceholder()
+        : Container(
+            width: coverSize,
+            height: coverSize,
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceContainerHighest,
+              borderRadius: radius,
+            ),
+            child: AppIcon(
+              Icons.music_note,
+              color: colorScheme.onSurfaceVariant,
+            ),
+          );
     final heroTag = historyItem != null
         ? 'cover_lib_dl_${historyItem.id}'
         : 'cover_${item.id}';
@@ -140,15 +161,120 @@ extension _QueueTabCollectionItemWidgets on _QueueTabState {
     final artistName = historyItem?.artistName ?? track.artistName;
     final albumName = historyItem?.albumName ?? track.albumName;
     final coverUrl = historyItem?.coverUrl ?? track.coverUrl ?? '';
+    void onTap() => historyItem != null
+        ? _navigateToHistoryMetadataScreen(
+            historyItem,
+            navigationItems: navigationItems,
+            navigationIndex: navigationIndex,
+          )
+        : _navigateToMetadataScreen(item);
+    final playback = playablePath == null
+        ? null
+        : ValueListenableBuilder<CompletionBridgePlayableResult>(
+            valueListenable: _completionBridgePlayableProbe.listenable(
+              historyFilePath: historyItem?.filePath,
+              completedItemFilePath: item.filePath,
+            ),
+            builder: (context, result, child) {
+              final resolvedPath = result.path;
+              if (result.status == CompletionBridgePlayableStatus.playable &&
+                  resolvedPath != null) {
+                return _LibraryPlaybackButton(
+                  playbackKey: (id: '', path: _cleanFilePath(resolvedPath)),
+                  playTooltip: context.l10n.a11yPlayTrackByArtist(
+                    trackName,
+                    artistName,
+                  ),
+                  onPlay: () => _openFile(
+                    resolvedPath,
+                    title: trackName,
+                    artist: artistName,
+                    album: albumName,
+                    coverUrl: coverUrl,
+                  ),
+                  grid: grid,
+                );
+              }
+              if (result.status == CompletionBridgePlayableStatus.checking) {
+                final indicator = AppLoadingIndicator(
+                  size: grid ? 14 : 18,
+                  strokeWidth: 2,
+                  color: colorScheme.primary,
+                  semanticLabel: context.l10n.queueCheckingDownloadedFile,
+                );
+                return grid
+                    ? Container(
+                        width: 28,
+                        height: 28,
+                        padding: const EdgeInsets.all(7),
+                        decoration: BoxDecoration(
+                          color: colorScheme.primaryContainer,
+                          shape: BoxShape.circle,
+                        ),
+                        child: indicator,
+                      )
+                    : SizedBox.square(
+                        dimension: context.tokens.minTouchTarget,
+                        child: Center(child: indicator),
+                      );
+              }
+              final icon = AppIcon(
+                Icons.error_outline,
+                color: colorScheme.error,
+                size: grid ? 14 : 20,
+              );
+              return Tooltip(
+                message: context.l10n.queueDownloadedFileMissing,
+                child: grid
+                    ? Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: colorScheme.errorContainer,
+                          shape: BoxShape.circle,
+                        ),
+                        child: icon,
+                      )
+                    : icon,
+              );
+            },
+          );
+    if (!grid) {
+      return TrackCard(
+        onTap: onTap,
+        leading: Hero(tag: heroTag, child: cover),
+        title: trackName,
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              artistName,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+            if (quality != null && quality.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: _buildLibraryQualityBadge(
+                  context,
+                  colorScheme,
+                  quality,
+                  listStyle: true,
+                ),
+              ),
+            ],
+          ],
+        ),
+        trailing: playback,
+      );
+    }
     return TrackGridCard(
       semanticLabel: context.l10n.a11yTrackByArtist(trackName, artistName),
-      onTap: () => historyItem != null
-          ? _navigateToHistoryMetadataScreen(
-              historyItem,
-              navigationItems: navigationItems,
-              navigationIndex: navigationIndex,
-            )
-          : _navigateToMetadataScreen(item),
+      onTap: onTap,
       cover: Hero(tag: heroTag, child: cover),
       overlays: [
         PositionedDirectional(
@@ -177,214 +303,11 @@ extension _QueueTabCollectionItemWidgets on _QueueTabState {
               child: _buildLibraryQualityBadge(context, colorScheme, quality),
             ),
           ),
-        if (playablePath != null)
-          PositionedDirectional(
-            end: 4,
-            bottom: 4,
-            child: ValueListenableBuilder<CompletionBridgePlayableResult>(
-              valueListenable: _completionBridgePlayableProbe.listenable(
-                historyFilePath: historyItem?.filePath,
-                completedItemFilePath: item.filePath,
-              ),
-              builder: (context, result, child) {
-                final resolvedPath = result.path;
-                if (result.status == CompletionBridgePlayableStatus.playable &&
-                    resolvedPath != null) {
-                  return _LibraryPlaybackButton(
-                    playbackKey: (id: '', path: _cleanFilePath(resolvedPath)),
-                    playTooltip: context.l10n.a11yPlayTrackByArtist(
-                      trackName,
-                      artistName,
-                    ),
-                    onPlay: () => _openFile(
-                      resolvedPath,
-                      title: trackName,
-                      artist: artistName,
-                      album: albumName,
-                      coverUrl: coverUrl,
-                    ),
-                    grid: true,
-                  );
-                }
-                if (result.status == CompletionBridgePlayableStatus.checking) {
-                  return Container(
-                    width: 28,
-                    height: 28,
-                    padding: const EdgeInsets.all(7),
-                    decoration: BoxDecoration(
-                      color: colorScheme.primaryContainer,
-                      shape: BoxShape.circle,
-                    ),
-                    child: AppLoadingIndicator(
-                      size: 14,
-                      strokeWidth: 2,
-                      color: colorScheme.primary,
-                      semanticLabel: context.l10n.queueCheckingDownloadedFile,
-                    ),
-                  );
-                }
-                return Tooltip(
-                  message: context.l10n.queueDownloadedFileMissing,
-                  child: Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(
-                      color: colorScheme.errorContainer,
-                      shape: BoxShape.circle,
-                    ),
-                    child: AppIcon(
-                      Icons.error_outline,
-                      color: colorScheme.error,
-                      size: 14,
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
+        if (playback != null)
+          PositionedDirectional(end: 4, bottom: 4, child: playback),
       ],
       title: trackName,
       subtitle: Text(artistName),
-    );
-  }
-
-  Widget _buildBridgeListItem(
-    BuildContext context,
-    DownloadItem item,
-    ColorScheme colorScheme,
-    DownloadHistoryItem? historyItem, {
-    List<DownloadHistoryItem>? navigationItems,
-    int? navigationIndex,
-  }) {
-    final track = item.track;
-    final coverSize = _queueCoverSize();
-    final radius = BorderRadius.circular(8);
-    final unifiedItem = historyItem == null
-        ? null
-        : UnifiedLibraryItem.fromDownloadHistory(historyItem);
-    final quality =
-        unifiedItem?.qualityForMode(_libraryQualityLabelMode) ??
-        buildCompletionBridgeFallbackQualityLabel(
-          mode: _libraryQualityLabelMode,
-          completedItemFilePath: item.filePath,
-          storedQuality: track.audioQuality,
-        );
-    final playablePath = resolveCompletionBridgePlayablePath(
-      historyFilePath: historyItem?.filePath,
-      completedItemFilePath: item.filePath,
-    );
-    final cover = unifiedItem != null
-        ? _buildUnifiedCoverImage(unifiedItem, colorScheme, coverSize)
-        : track.coverUrl != null
-        ? CachedCoverImage(
-            imageUrl: track.coverUrl!,
-            width: coverSize,
-            height: coverSize,
-            borderRadius: radius,
-          )
-        : Container(
-            width: coverSize,
-            height: coverSize,
-            decoration: BoxDecoration(
-              color: colorScheme.surfaceContainerHighest,
-              borderRadius: radius,
-            ),
-            child: AppIcon(
-              Icons.music_note,
-              color: colorScheme.onSurfaceVariant,
-            ),
-          );
-    final heroTag = historyItem != null
-        ? 'cover_lib_dl_${historyItem.id}'
-        : 'cover_${item.id}';
-    final trackName = historyItem?.trackName ?? track.name;
-    final artistName = historyItem?.artistName ?? track.artistName;
-    final albumName = historyItem?.albumName ?? track.albumName;
-    final coverUrl = historyItem?.coverUrl ?? track.coverUrl ?? '';
-    return TrackCard(
-      onTap: () => historyItem != null
-          ? _navigateToHistoryMetadataScreen(
-              historyItem,
-              navigationItems: navigationItems,
-              navigationIndex: navigationIndex,
-            )
-          : _navigateToMetadataScreen(item),
-      leading: Hero(tag: heroTag, child: cover),
-      title: trackName,
-      subtitle: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            artistName,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: colorScheme.onSurfaceVariant,
-            ),
-          ),
-          if (quality != null && quality.isNotEmpty) ...[
-            const SizedBox(height: 4),
-            Align(
-              alignment: AlignmentDirectional.centerStart,
-              child: _buildLibraryQualityBadge(
-                context,
-                colorScheme,
-                quality,
-                listStyle: true,
-              ),
-            ),
-          ],
-        ],
-      ),
-      trailing: playablePath == null
-          ? null
-          : ValueListenableBuilder<CompletionBridgePlayableResult>(
-              valueListenable: _completionBridgePlayableProbe.listenable(
-                historyFilePath: historyItem?.filePath,
-                completedItemFilePath: item.filePath,
-              ),
-              builder: (context, result, child) {
-                final resolvedPath = result.path;
-                if (result.status == CompletionBridgePlayableStatus.playable &&
-                    resolvedPath != null) {
-                  return _LibraryPlaybackButton(
-                    playbackKey: (id: '', path: _cleanFilePath(resolvedPath)),
-                    playTooltip: context.l10n.a11yPlayTrackByArtist(
-                      trackName,
-                      artistName,
-                    ),
-                    onPlay: () => _openFile(
-                      resolvedPath,
-                      title: trackName,
-                      artist: artistName,
-                      album: albumName,
-                      coverUrl: coverUrl,
-                    ),
-                  );
-                }
-                if (result.status == CompletionBridgePlayableStatus.checking) {
-                  return SizedBox.square(
-                    dimension: context.tokens.minTouchTarget,
-                    child: Center(
-                      child: AppLoadingIndicator(
-                        size: 18,
-                        strokeWidth: 2,
-                        color: colorScheme.primary,
-                        semanticLabel: context.l10n.queueCheckingDownloadedFile,
-                      ),
-                    ),
-                  );
-                }
-                return Tooltip(
-                  message: context.l10n.queueDownloadedFileMissing,
-                  child: AppIcon(
-                    Icons.error_outline,
-                    color: colorScheme.error,
-                    size: 20,
-                  ),
-                );
-              },
-            ),
     );
   }
 
@@ -438,7 +361,6 @@ extension _QueueTabCollectionItemWidgets on _QueueTabState {
     required BuildContext context,
     required ColorScheme colorScheme,
     IconData? icon,
-    Color? iconColor,
     Color? iconBgColor,
     Widget? coverWidget,
     required String title,
@@ -461,7 +383,7 @@ extension _QueueTabCollectionItemWidgets on _QueueTabState {
           child: AppIcon(
             icon ?? Icons.folder,
             color: context.isMornye
-                ? iconColor ?? Colors.white
+                ? Colors.white
                 : colorScheme.onSecondaryContainer,
             size: 28,
           ),
@@ -597,7 +519,6 @@ extension _QueueTabCollectionItemWidgets on _QueueTabState {
     required BuildContext context,
     required ColorScheme colorScheme,
     IconData? icon,
-    Color? iconColor,
     Color? iconBgColor,
     Widget? coverWidget,
     required String title,
@@ -618,7 +539,7 @@ extension _QueueTabCollectionItemWidgets on _QueueTabState {
           child: AppIcon(
             icon ?? Icons.folder,
             color: context.isMornye
-                ? iconColor ?? Colors.white
+                ? Colors.white
                 : colorScheme.onSecondaryContainer,
             size: 40,
           ),
@@ -707,6 +628,85 @@ extension _QueueTabCollectionItemWidgets on _QueueTabState {
     return entries;
   }
 
+  /// Icon, tile color, title, count and folder of a non-playlist entry.
+  (IconData, Color, String, int, VoidCallback) _specialCollection(
+    BuildContext context,
+    _CollectionEntryType type,
+    LibraryCollectionsState collectionState,
+  ) => switch (type) {
+    _CollectionEntryType.wishlist => (
+      Icons.add_circle_outline,
+      const Color(0xFF1DB954),
+      context.l10n.collectionWishlist,
+      collectionState.wishlistCount,
+      _openWishlistFolder,
+    ),
+    _CollectionEntryType.loved => (
+      Icons.favorite,
+      const Color(0xFF8C67AC),
+      context.l10n.collectionLoved,
+      collectionState.lovedCount,
+      _openLovedFolder,
+    ),
+    _ => (
+      Icons.person,
+      const Color(0xFFE91E63),
+      context.l10n.collectionFavoriteArtists,
+      collectionState.favoriteArtistCount,
+      _openFavoriteArtistsFolder,
+    ),
+  };
+
+  /// A playlist entry that accepts dragged tracks and outlines itself while
+  /// one hovers. [builder] gets the entry's tap and long-press actions.
+  Widget _playlistDropTarget(
+    BuildContext context,
+    ColorScheme colorScheme,
+    UserPlaylistCollection playlist,
+    List<UnifiedLibraryItem> filteredUnifiedItems,
+    Widget Function(
+      BuildContext context,
+      VoidCallback onTap,
+      VoidCallback onLongPress,
+    )
+    builder,
+  ) {
+    return DragTarget<UnifiedLibraryItem>(
+      onWillAcceptWithDetails: (_) => !_isPlaylistSelectionMode,
+      onAcceptWithDetails: (details) {
+        _onTrackDroppedOnPlaylist(
+          context,
+          details.data,
+          playlist.id,
+          playlist.name,
+          allItems: filteredUnifiedItems,
+        );
+      },
+      builder: (context, candidateData, rejectedData) {
+        final isHovering = candidateData.isNotEmpty;
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          decoration: isHovering
+              ? BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: colorScheme.primary, width: 2),
+                  color: colorScheme.primary.withValues(alpha: 0.1),
+                )
+              : null,
+          child: builder(
+            context,
+            _isPlaylistSelectionMode
+                ? () => _togglePlaylistSelection(playlist.id)
+                : () => _openPlaylistById(playlist.id),
+            _isPlaylistSelectionMode
+                ? () => _togglePlaylistSelection(playlist.id)
+                : () => _enterPlaylistSelectionMode(playlist.id),
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildAllTabGridCollectionItem({
     required BuildContext context,
     required ColorScheme colorScheme,
@@ -714,127 +714,77 @@ extension _QueueTabCollectionItemWidgets on _QueueTabState {
     required LibraryCollectionsState collectionState,
     List<UnifiedLibraryItem> filteredUnifiedItems = const [],
   }) {
-    switch (entry.type) {
-      case _CollectionEntryType.wishlist:
-        return _buildCollectionGridItem(
-          context: context,
-          colorScheme: colorScheme,
-          icon: Icons.add_circle_outline,
-          iconColor: Colors.white,
-          iconBgColor: const Color(0xFF1DB954),
-          title: context.l10n.collectionWishlist,
-          count: collectionState.wishlistCount,
-          onTap: _openWishlistFolder,
-        );
-      case _CollectionEntryType.loved:
-        return _buildCollectionGridItem(
-          context: context,
-          colorScheme: colorScheme,
-          icon: Icons.favorite,
-          iconColor: Colors.white,
-          iconBgColor: const Color(0xFF8C67AC),
-          title: context.l10n.collectionLoved,
-          count: collectionState.lovedCount,
-          onTap: _openLovedFolder,
-        );
-      case _CollectionEntryType.favoriteArtists:
-        return _buildCollectionGridItem(
-          context: context,
-          colorScheme: colorScheme,
-          icon: Icons.person,
-          iconColor: Colors.white,
-          iconBgColor: const Color(0xFFE91E63),
-          title: context.l10n.collectionFavoriteArtists,
-          count: collectionState.favoriteArtistCount,
-          onTap: _openFavoriteArtistsFolder,
-        );
-      case _CollectionEntryType.playlist:
-        final playlist = collectionState.playlists[entry.playlistIndex];
-        final isSelected = _selectedPlaylistIds.contains(playlist.id);
-        return DragTarget<UnifiedLibraryItem>(
-          onWillAcceptWithDetails: (_) => !_isPlaylistSelectionMode,
-          onAcceptWithDetails: (details) {
-            _onTrackDroppedOnPlaylist(
-              context,
-              details.data,
-              playlist.id,
-              playlist.name,
-              allItems: filteredUnifiedItems,
-            );
-          },
-          builder: (context, candidateData, rejectedData) {
-            final isHovering = candidateData.isNotEmpty;
-            return AnimatedContainer(
-              duration: const Duration(milliseconds: 150),
-              decoration: isHovering
-                  ? BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: colorScheme.primary, width: 2),
-                      color: colorScheme.primary.withValues(alpha: 0.1),
-                    )
-                  : null,
-              child: Stack(
-                children: [
-                  _buildCollectionGridItem(
-                    context: context,
-                    colorScheme: colorScheme,
-                    coverWidget: _buildPlaylistCover(
-                      context,
-                      playlist,
-                      colorScheme,
-                    ),
-                    title: playlist.name,
-                    count: playlist.trackCount,
-                    onTap: _isPlaylistSelectionMode
-                        ? () => _togglePlaylistSelection(playlist.id)
-                        : () => _openPlaylistById(playlist.id),
-                    onLongPress: _isPlaylistSelectionMode
-                        ? () => _togglePlaylistSelection(playlist.id)
-                        : () => _enterPlaylistSelectionMode(playlist.id),
-                    onContextMenu: (position) =>
-                        _showPlaylistMenu(context, playlist, position),
-                  ),
-                  if (_isPlaylistSelectionMode)
-                    Positioned(
-                      left: 0,
-                      top: 0,
-                      right: 0,
-                      child: IgnorePointer(
-                        child: AspectRatio(
-                          aspectRatio: 1,
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: isSelected
-                                  ? colorScheme.primary.withValues(alpha: 0.3)
-                                  : Colors.transparent,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  if (_isPlaylistSelectionMode)
-                    PositionedDirectional(
-                      top: 4,
-                      end: 4,
-                      child: IgnorePointer(
-                        child: AnimatedSelectionCheckbox(
-                          visible: true,
-                          selected: isSelected,
-                          colorScheme: colorScheme,
-                          size: 20,
-                          unselectedColor: colorScheme.surface.withValues(
-                            alpha: 0.85,
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            );
-          },
-        );
+    if (entry.type != _CollectionEntryType.playlist) {
+      final (icon, color, title, count, onTap) = _specialCollection(
+        context,
+        entry.type,
+        collectionState,
+      );
+      return _buildCollectionGridItem(
+        context: context,
+        colorScheme: colorScheme,
+        icon: icon,
+        iconBgColor: color,
+        title: title,
+        count: count,
+        onTap: onTap,
+      );
     }
+    final playlist = collectionState.playlists[entry.playlistIndex];
+    final isSelected = _selectedPlaylistIds.contains(playlist.id);
+    return _playlistDropTarget(
+      context,
+      colorScheme,
+      playlist,
+      filteredUnifiedItems,
+      (context, onTap, onLongPress) => Stack(
+        children: [
+          _buildCollectionGridItem(
+            context: context,
+            colorScheme: colorScheme,
+            coverWidget: _buildPlaylistCover(context, playlist, colorScheme),
+            title: playlist.name,
+            count: playlist.trackCount,
+            onTap: onTap,
+            onLongPress: onLongPress,
+            onContextMenu: (position) =>
+                _showPlaylistMenu(context, playlist, position),
+          ),
+          if (_isPlaylistSelectionMode)
+            Positioned(
+              left: 0,
+              top: 0,
+              right: 0,
+              child: IgnorePointer(
+                child: AspectRatio(
+                  aspectRatio: 1,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? colorScheme.primary.withValues(alpha: 0.3)
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          if (_isPlaylistSelectionMode)
+            PositionedDirectional(
+              top: 4,
+              end: 4,
+              child: IgnorePointer(
+                child: AnimatedSelectionCheckbox(
+                  selected: isSelected,
+                  colorScheme: colorScheme,
+                  size: 20,
+                  unselectedColor: colorScheme.surface.withValues(alpha: 0.85),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
   }
 
   Widget _buildAllTabListCollectionItem({
@@ -844,122 +794,78 @@ extension _QueueTabCollectionItemWidgets on _QueueTabState {
     required LibraryCollectionsState collectionState,
     List<UnifiedLibraryItem> filteredUnifiedItems = const [],
   }) {
-    switch (entry.type) {
-      case _CollectionEntryType.wishlist:
-        return _buildCollectionListItem(
-          context: context,
-          colorScheme: colorScheme,
-          icon: Icons.add_circle_outline,
-          iconColor: Colors.white,
-          iconBgColor: const Color(0xFF1DB954),
-          title: context.l10n.collectionWishlist,
-          subtitle:
-              '${context.l10n.collectionFoldersTitle} • ${collectionState.wishlistCount} ${collectionState.wishlistCount == 1 ? 'track' : 'tracks'}',
-          onTap: _openWishlistFolder,
-        );
-      case _CollectionEntryType.loved:
-        return _buildCollectionListItem(
-          context: context,
-          colorScheme: colorScheme,
-          icon: Icons.favorite,
-          iconColor: Colors.white,
-          iconBgColor: const Color(0xFF8C67AC),
-          title: context.l10n.collectionLoved,
-          subtitle:
-              '${context.l10n.collectionFoldersTitle} • ${collectionState.lovedCount} ${collectionState.lovedCount == 1 ? 'track' : 'tracks'}',
-          onTap: _openLovedFolder,
-        );
-      case _CollectionEntryType.favoriteArtists:
-        return _buildCollectionListItem(
-          context: context,
-          colorScheme: colorScheme,
-          icon: Icons.person,
-          iconColor: Colors.white,
-          iconBgColor: const Color(0xFFE91E63),
-          title: context.l10n.collectionFavoriteArtists,
-          subtitle:
-              '${context.l10n.collectionFoldersTitle} • ${context.l10n.collectionArtistCount(collectionState.favoriteArtistCount)}',
-          onTap: _openFavoriteArtistsFolder,
-        );
-      case _CollectionEntryType.playlist:
-        final playlist = collectionState.playlists[entry.playlistIndex];
-        final isSelected = _selectedPlaylistIds.contains(playlist.id);
-        return DragTarget<UnifiedLibraryItem>(
-          onWillAcceptWithDetails: (_) => !_isPlaylistSelectionMode,
-          onAcceptWithDetails: (details) {
-            _onTrackDroppedOnPlaylist(
-              context,
-              details.data,
-              playlist.id,
-              playlist.name,
-              allItems: filteredUnifiedItems,
-            );
-          },
-          builder: (context, candidateData, rejectedData) {
-            final isHovering = candidateData.isNotEmpty;
-            return AnimatedContainer(
-              duration: const Duration(milliseconds: 150),
-              decoration: isHovering
-                  ? BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: colorScheme.primary, width: 2),
-                      color: colorScheme.primary.withValues(alpha: 0.1),
-                    )
-                  : null,
-              child: Row(
-                children: [
-                  if (_isPlaylistSelectionMode)
-                    Semantics(
-                      button: true,
-                      checked: isSelected,
-                      label: playlist.name,
-                      child: GestureDetector(
-                        onTap: () => _togglePlaylistSelection(playlist.id),
-                        behavior: HitTestBehavior.opaque,
-                        child: ConstrainedBox(
-                          constraints: BoxConstraints.tightFor(
-                            width: context.tokens.minTouchTarget,
-                            height: context.tokens.minTouchTarget,
-                          ),
-                          child: Center(
-                            child: AnimatedSelectionCheckbox(
-                              visible: true,
-                              selected: isSelected,
-                              colorScheme: colorScheme,
-                              size: 24,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  Expanded(
-                    child: _buildCollectionListItem(
-                      context: context,
+    if (entry.type != _CollectionEntryType.playlist) {
+      final (icon, color, title, count, onTap) = _specialCollection(
+        context,
+        entry.type,
+        collectionState,
+      );
+      final countText = entry.type == _CollectionEntryType.favoriteArtists
+          ? context.l10n.collectionArtistCount(count)
+          : '$count ${count == 1 ? 'track' : 'tracks'}';
+      return _buildCollectionListItem(
+        context: context,
+        colorScheme: colorScheme,
+        icon: icon,
+        iconBgColor: color,
+        title: title,
+        subtitle: '${context.l10n.collectionFoldersTitle} • $countText',
+        onTap: onTap,
+      );
+    }
+    final playlist = collectionState.playlists[entry.playlistIndex];
+    final isSelected = _selectedPlaylistIds.contains(playlist.id);
+    return _playlistDropTarget(
+      context,
+      colorScheme,
+      playlist,
+      filteredUnifiedItems,
+      (context, onTap, onLongPress) => Row(
+        children: [
+          if (_isPlaylistSelectionMode)
+            Semantics(
+              button: true,
+              checked: isSelected,
+              label: playlist.name,
+              child: GestureDetector(
+                onTap: () => _togglePlaylistSelection(playlist.id),
+                behavior: HitTestBehavior.opaque,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints.tightFor(
+                    width: context.tokens.minTouchTarget,
+                    height: context.tokens.minTouchTarget,
+                  ),
+                  child: Center(
+                    child: AnimatedSelectionCheckbox(
+                      selected: isSelected,
                       colorScheme: colorScheme,
-                      coverWidget: _buildPlaylistCover(
-                        context,
-                        playlist,
-                        colorScheme,
-                        56,
-                      ),
-                      title: playlist.name,
-                      subtitle:
-                          '${playlist.trackCount} ${playlist.trackCount == 1 ? 'track' : 'tracks'}',
-                      onTap: _isPlaylistSelectionMode
-                          ? () => _togglePlaylistSelection(playlist.id)
-                          : () => _openPlaylistById(playlist.id),
-                      onLongPress: _isPlaylistSelectionMode
-                          ? () => _togglePlaylistSelection(playlist.id)
-                          : () => _enterPlaylistSelectionMode(playlist.id),
-                      onContextMenu: (position) =>
-                          _showPlaylistMenu(context, playlist, position),
+                      size: 24,
                     ),
                   ),
-                ],
+                ),
               ),
-            );
-          },
-        );
-    }
+            ),
+          Expanded(
+            child: _buildCollectionListItem(
+              context: context,
+              colorScheme: colorScheme,
+              coverWidget: _buildPlaylistCover(
+                context,
+                playlist,
+                colorScheme,
+                56,
+              ),
+              title: playlist.name,
+              subtitle:
+                  '${playlist.trackCount} ${playlist.trackCount == 1 ? 'track' : 'tracks'}',
+              onTap: onTap,
+              onLongPress: onLongPress,
+              onContextMenu: (position) =>
+                  _showPlaylistMenu(context, playlist, position),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

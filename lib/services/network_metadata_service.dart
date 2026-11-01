@@ -39,6 +39,7 @@ class NetworkMetadataService {
   final Future<Directory> Function() _directory;
   final _cache = <String, ({DateTime time, Map<String, dynamic> value})>{};
   final _pending = <String, Future<Map<String, dynamic>>>{};
+  final _refreshArtwork = <String>{};
   final List<({Future<void> tail, int pending})> _lanes;
   final _requestIds = <String>{};
   final _subsonicClients = <SubsonicClient>{};
@@ -50,6 +51,14 @@ class NetworkMetadataService {
   }) {
     if (_stopped) {
       return Future.error(StateError('Network metadata reader stopped'));
+    }
+    final uri = Uri.tryParse(source);
+    if (uri != null && uri.scheme == 'network') {
+      // Their owner answers its own reads, which may wait for a file to
+      // arrive; they must not hold up the lanes.
+      if (_storage.virtualFor(uri.host) case final virtual?) {
+        return virtual.metadata(uri.host, uri.pathSegments.join('/'));
+      }
     }
     if (forceRefresh) _cache.remove(source);
     final cached = _cache[source];
@@ -85,6 +94,23 @@ class NetworkMetadataService {
     return result;
   }
 
+  /// Retires an in-flight old read too, so it cannot refill the stale cache.
+  Future<void> invalidate(String source, {bool refreshArtwork = false}) async {
+    _cache.remove(source);
+    try {
+      await _pending[source];
+    } catch (_) {
+      // A failed old read must not prevent reading the edited file again.
+    }
+    _cache.remove(source);
+    if (refreshArtwork) {
+      if (_refreshArtwork.length >= 32) {
+        _refreshArtwork.remove(_refreshArtwork.first);
+      }
+      _refreshArtwork.add(source);
+    }
+  }
+
   /// Scan-owned readers can stop their work without cancelling playback reads.
   Future<void> cancelPending() async {
     _stopped = true;
@@ -103,6 +129,7 @@ class NetworkMetadataService {
 
   Future<Map<String, dynamic>> _load(String source, String requestId) async {
     _checkStopped();
+    final refreshArtwork = _refreshArtwork.remove(source);
     final uri = Uri.parse(source);
     if (uri.scheme != 'network') {
       throw const FormatException('Expected a network source');
@@ -116,10 +143,14 @@ class NetworkMetadataService {
         _checkStopped();
         final song = await client.song(path);
         final metadata = Map<String, dynamic>.from(song.metadata);
+        // Asked alongside the cover. Servers without the songLyrics
+        // extension fail it, which leaves the tags as they are.
+        final lyrics = client.lyrics(song).catchError((Object _) => '');
         try {
           final cover = await client.cachedCover(
             song,
             Directory('${(await _directory()).path}/network_metadata'),
+            refresh: refreshArtwork,
           );
           if (cover != null) {
             metadata['cover_path'] = cover;
@@ -128,6 +159,8 @@ class NetworkMetadataService {
         } catch (_) {
           _checkStopped();
         }
+        final text = await lyrics;
+        if (text.trim().isNotEmpty) metadata['lyrics'] = text;
         _checkStopped();
         return _remember(source, metadata);
       } finally {
@@ -237,10 +270,19 @@ Future<void> _trimNetworkMetadataCovers(Directory directory) async {
       .toList();
   final dated = <({File file, DateTime time})>[];
   for (final entry in files) {
+    if (entry.path.endsWith('.etag')) continue;
     dated.add((file: entry, time: (await entry.stat()).modified));
   }
   dated.sort((a, b) => b.time.compareTo(a.time));
   for (final old in dated.skip(32)) {
     await old.file.delete();
+  }
+  // A cover's ETag (`<cover>.etag`) goes with the cover.
+  final kept = {for (final entry in dated.take(32)) entry.file.path};
+  for (final entry in files) {
+    if (entry.path.endsWith('.etag') &&
+        !kept.contains(entry.path.substring(0, entry.path.length - 5))) {
+      await entry.delete();
+    }
   }
 }

@@ -12,6 +12,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/runtime_profile_provider.dart';
+import 'package:mornye/providers/theme_provider.dart';
 import 'package:mornye/theme/app_tokens.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/desktop_platform.dart';
@@ -19,11 +20,13 @@ import 'package:mornye/utils/lyrics_parser.dart';
 import 'package:mornye/utils/lyrics_timeline.dart';
 import 'package:mornye/utils/synced_lyrics_scroll.dart';
 import 'package:mornye/widgets/aligned_lyric_pronunciation.dart';
+import 'package:mornye/widgets/lyric_blur.dart';
 import 'package:mornye/widgets/lyric_supplement_transition.dart';
 import 'package:mornye/widgets/lyric_scroll_motion.dart';
 import 'package:mornye/widgets/lyric_gap_indicator.dart';
 import 'package:mornye/widgets/mornye_player_slider.dart';
 import 'package:mornye/widgets/lyrics_text_scale.dart';
+import 'package:mornye/widgets/tv_navigation.dart';
 
 part 'player_lyrics_line_style.dart';
 part 'player_lyrics_word_sweep.dart';
@@ -98,6 +101,10 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
   ProviderSubscription<Duration>? _positionSubscription;
   ProviderSubscription<bool>? _playingSubscription;
   ProviderSubscription<bool>? _loadingSubscription;
+  ProviderSubscription<int>? _offsetSubscription;
+
+  /// The listener's lyrics timing setting, already applied to [_lines].
+  Duration _offset = Duration.zero;
   Timer? _lineBoundaryTimer;
   Timer? _userScrollIdleTimer;
   late List<LyricLine> _lines;
@@ -220,6 +227,17 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _offsetSubscription = ref.listenManual<int>(
+      themeProvider.select((theme) => theme.lyricsOffsetMs),
+      (previous, next) {
+        setState(() {
+          _offset = Duration(milliseconds: next);
+          _resetLineKeys();
+        });
+        _syncPositionSubscription(resetUserScroll: false);
+      },
+    );
+    _offset = Duration(milliseconds: _offsetSubscription!.read());
     _resetLineKeys();
     widget.seekPreview.addListener(_previewChanged);
   }
@@ -283,7 +301,9 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
     _hasStarted = false;
     _lineExtents = null;
     _lineLayoutKey = null;
-    _lines = lyricsWithDisplayEnds(lyricsTimelineWithGaps(widget.lyrics.lines));
+    _lines = lyricsWithDisplayEnds(
+      lyricsTimelineWithGaps(lyricsShiftedBy(widget.lyrics.lines, _offset)),
+    );
     _timeline = LyricTimelineIndex(_lines);
     _rowReveal.stop();
     _revealFrom = _revealTo = [
@@ -373,6 +393,13 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
   void _endFirstScroll() {
     if (!mounted || !_awaitingFirstScroll) return;
     setState(() => _awaitingFirstScroll = false);
+  }
+
+  /// Where a line shown at [shown] is sung in the track, before the lyrics
+  /// timing setting moved it, for seeking to it and sharing it.
+  Duration _sungTime(Duration shown) {
+    final time = shown - _offset;
+    return time < Duration.zero ? Duration.zero : time;
   }
 
   Duration get _displayPosition =>
@@ -525,6 +552,7 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
     _positionSubscription?.close();
     _playingSubscription?.close();
     _loadingSubscription?.close();
+    _offsetSubscription?.close();
     _lineBoundaryTimer?.cancel();
     _userScrollIdleTimer?.cancel();
     _measurementTimer?.cancel();
@@ -862,10 +890,14 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
         : ref.read(playbackLoadingProvider);
     final mornye = context.isMornye;
     final highContrast = MediaQuery.highContrastOf(context);
+    final blurStrength = ref.watch(
+      themeProvider.select((theme) => theme.lyricsBlur),
+    );
     final blurLyrics =
         mornye &&
         !highContrast &&
-        // Every defocused line is filtered again on each playback frame.
+        blurStrength > 0 &&
+        // Defocused lines are filtered on every frame while their focus eases.
         ref.watch(mornyeLiquidGlassProvider);
     // Line emphasis eases over most of the scroll, so the new line brightens
     // as it arrives instead of switching ahead of the movement.
@@ -1057,9 +1089,7 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
                     child: SizedBox(
                       height: 24,
                       child: Align(
-                        alignment: mornye
-                            ? AlignmentDirectional.centerStart
-                            : Alignment.center,
+                        alignment: AlignmentDirectional.centerStart,
                         child:
                             isActive &&
                                 _visible &&
@@ -1125,6 +1155,9 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
                 reverseDuration: const Duration(milliseconds: 260),
                 switchInCurve: Curves.easeOutCubic,
                 switchOutCurve: Curves.easeInCubic,
+                transitionBuilder: mornye
+                    ? LyricBlur.fadeTransition
+                    : AnimatedSwitcher.defaultTransitionBuilder,
                 child: KeyedSubtree(
                   key: ValueKey(timed),
                   child: SizedBox(width: double.infinity, child: content),
@@ -1141,22 +1174,23 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
                 // progressively soften lines further from the current one.
                 final sigma = !blurLyrics || isActive || leadIndex == activeLead
                     ? 0.0
-                    : active < 0
-                    ? 4.8
-                    : distance == 1
-                    ? 2.4
-                    : distance == 2
-                    ? 3.6
-                    : 4.8;
+                    : blurStrength *
+                          (active < 0
+                              ? 4.8
+                              : distance == 1
+                              ? 2.4
+                              : distance == 2
+                              ? 3.6
+                              : 4.8);
                 content = TweenAnimationBuilder<double>(
                   tween: Tween(end: sigma),
                   duration: motion,
                   curve: Curves.easeInOutCubic,
-                  child: RepaintBoundary(child: content),
-                  builder: (context, value, child) => ImageFiltered(
-                    enabled: value > 0,
-                    imageFilter: ImageFilter.blur(sigmaX: value, sigmaY: value),
-                    child: child,
+                  child: content,
+                  builder: (context, value, child) => LyricBlur(
+                    sigma: value,
+                    settled: value == sigma,
+                    child: child!,
                   ),
                 );
                 content = FittedBox(
@@ -1179,25 +1213,30 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
                 textAlign,
                 Padding(
                   padding: _linePadding(index),
-                  child: GestureDetector(
-                    onTap: () =>
-                        ref.read(musicPlayerControllerProvider).seek(line.time),
+                  child: TvTapTarget(
+                    onTap: () => ref
+                        .read(musicPlayerControllerProvider)
+                        .seek(_sungTime(line.time)),
                     onLongPress: widget.onLongPressLine == null
                         ? null
                         : () {
                             HapticFeedback.mediumImpact();
-                            widget.onLongPressLine!(line);
+                            widget.onLongPressLine!(
+                              LyricLine(
+                                time: _sungTime(line.time),
+                                text: line.text,
+                              ),
+                            );
                           },
                     child: AnimatedScale(
                       // Focus changes paint scale, never font metrics or
                       // wrapping shared by the plain and word-timed line.
                       scale: isActive ? 1.0 : 0.96,
-                      alignment: !mornye
-                          ? Alignment.center
-                          : (textAlign == TextAlign.end
-                                    ? AlignmentDirectional.centerEnd
-                                    : AlignmentDirectional.centerStart)
-                                .resolve(Directionality.of(context)),
+                      alignment:
+                          (textAlign == TextAlign.end
+                                  ? AlignmentDirectional.centerEnd
+                                  : AlignmentDirectional.centerStart)
+                              .resolve(Directionality.of(context)),
                       duration: motion,
                       curve: Curves.easeOutCubic,
                       child: AnimatedOpacity(

@@ -11,7 +11,6 @@ import 'package:mornye/widgets/expressive_button.dart';
 import 'package:mornye/theme/mornye_icons.dart';
 import 'package:mornye/widgets/mornye_artist_header.dart';
 import 'package:mornye/widgets/mornye_chrome.dart';
-import 'package:mornye/screens/track_history_snapshot.dart';
 import 'package:mornye/widgets/album_detail_header.dart';
 import 'package:mornye/theme/cover_palette.dart';
 import 'package:mornye/widgets/app_bottom_sheet.dart';
@@ -31,6 +30,7 @@ import 'package:mornye/providers/recent_access_provider.dart';
 import 'package:mornye/providers/local_library_provider.dart';
 import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/utils/string_utils.dart';
+import 'package:mornye/utils/artist_album_sort.dart';
 import 'package:mornye/utils/adaptive_layout.dart';
 import 'package:mornye/utils/nav_bar_inset.dart';
 import 'package:mornye/utils/provider_resource_ids.dart';
@@ -38,15 +38,16 @@ import 'package:mornye/utils/ttl_cache.dart';
 import 'package:mornye/screens/album_screen.dart';
 import 'package:mornye/screens/extension_collection_screens.dart'
     show ExtensionAlbumScreen;
+import 'package:mornye/controllers/clickable_metadata.dart';
 import 'package:mornye/controllers/local_playback.dart';
+import 'package:mornye/controllers/selection_mode_mixin.dart';
+import 'package:mornye/controllers/track_history_snapshot.dart';
 import 'package:mornye/widgets/download_service_picker.dart';
 import 'package:mornye/widgets/error_card.dart';
 import 'package:mornye/widgets/selection_bottom_bar.dart';
 import 'package:mornye/widgets/in_library_badge.dart';
 import 'package:mornye/widgets/track_collection_quick_actions.dart';
 import 'package:mornye/widgets/animation_utils.dart';
-import 'package:mornye/screens/selection_mode_mixin.dart';
-import 'package:mornye/utils/clickable_metadata.dart';
 import 'package:mornye/widgets/cached_cover_image.dart';
 import 'package:mornye/widgets/playlist_picker_sheet.dart';
 import 'package:mornye/widgets/motion_header_banner.dart';
@@ -180,7 +181,7 @@ class _ArtistScreenState extends ConsumerState<ArtistScreen>
   int? _monthlyListeners;
   String? _error;
 
-  bool _showTitleInAppBar = false;
+  final _showTitleInAppBar = ValueNotifier(false);
   final ScrollController _scrollController = ScrollController();
   final PageController _popularPageController = PageController();
   final SelectionOverlayController _selectionOverlay =
@@ -237,7 +238,9 @@ class _ArtistScreenState extends ConsumerState<ArtistScreen>
     });
 
     if (widget.extensionId != null) {
-      _albums = widget.albums;
+      _albums = widget.albums == null
+          ? null
+          : sortArtistAlbumsNewestFirst(widget.albums!);
       _topTracks = widget.topTracks;
       _headerImageUrl = widget.headerImageUrl;
       _headerVideoUrl = widget.headerVideoUrl;
@@ -255,7 +258,7 @@ class _ArtistScreenState extends ConsumerState<ArtistScreen>
     final cached = _ArtistCache.get(widget.artistId);
 
     if (widget.albums != null) {
-      _albums = widget.albums;
+      _albums = sortArtistAlbumsNewestFirst(widget.albums!);
       _topTracks = widget.topTracks;
       _headerImageUrl = widget.headerImageUrl;
       _headerVideoUrl = widget.headerVideoUrl;
@@ -267,8 +270,10 @@ class _ArtistScreenState extends ConsumerState<ArtistScreen>
         _fetchDiscography();
       }
     } else if (cached != null) {
-      _albums = cached.albums;
-      _releases = cached.releases;
+      _albums = sortArtistAlbumsNewestFirst(cached.albums);
+      _releases = cached.releases == null
+          ? null
+          : sortArtistAlbumsNewestFirst(cached.releases!);
       _topTracks = cached.topTracks;
       _concerts = cached.concerts;
       _headerImageUrl = cached.headerImageUrl;
@@ -285,18 +290,14 @@ class _ArtistScreenState extends ConsumerState<ArtistScreen>
     }
   }
 
-  void _onScroll() {
-    final shouldShow = _scrollController.offset > 280;
-    if (shouldShow != _showTitleInAppBar) {
-      setState(() => _showTitleInAppBar = shouldShow);
-    }
-  }
+  void _onScroll() => _showTitleInAppBar.value = _scrollController.offset > 280;
 
   @override
   void dispose() {
     _selectionOverlay.dispose();
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
+    _showTitleInAppBar.dispose();
     _popularPageController.dispose();
     super.dispose();
   }
@@ -397,6 +398,11 @@ class _ArtistScreenState extends ConsumerState<ArtistScreen>
         }
       }
 
+      albums = sortArtistAlbumsNewestFirst(albums);
+      if (releases != null) {
+        releases = sortArtistAlbumsNewestFirst(releases);
+      }
+
       final finalHeaderImage =
           headerImage ?? _headerImageUrl ?? widget.headerImageUrl;
       final finalHeaderVideo =
@@ -495,7 +501,7 @@ class _ArtistScreenState extends ConsumerState<ArtistScreen>
       }
       final following = info['albums_next'] as String?;
       setState(() {
-        _albums = merged.values.toList();
+        _albums = sortArtistAlbumsNewestFirst(merged.values);
         _albumsNext = following == next ? null : following;
       });
       _ArtistCache.set(
@@ -827,20 +833,12 @@ class _ArtistScreenState extends ConsumerState<ArtistScreen>
     super.toggleSelection(itemId);
   }
 
-  void _deselectAll() {
-    setState(() {
-      selectedIds.clear();
-    });
-  }
-
   Widget _buildSelectionBar(
     BuildContext context,
     ColorScheme colorScheme,
     List<ArtistAlbum> allAlbums,
     double bottomPadding,
   ) {
-    final allSelected =
-        selectedIds.length == allAlbums.length && allAlbums.isNotEmpty;
     final selectedCount = selectedIds.length;
     final selectedAlbums = allAlbums
         .where((a) => selectedIds.contains(a.id))
@@ -850,13 +848,9 @@ class _ArtistScreenState extends ConsumerState<ArtistScreen>
       (sum, a) => sum + a.totalTracks,
     );
 
-    return SelectionBottomBar(
-      selectedCount: selectedCount,
-      allSelected: allSelected,
-      onClose: exitSelectionMode,
-      onToggleSelectAll: allSelected
-          ? _deselectAll
-          : () => selectAll(allAlbums.map((a) => a.id)),
+    return buildSelectionBar(
+      ids: [for (final album in allAlbums) album.id],
+      onDeselectAll: () => setState(selectedIds.clear),
       bottomPadding: bottomPadding,
       allSelectedLabel: context.l10n.tracksCount(totalTracks),
       tapToSelectLabel: selectedCount > 0

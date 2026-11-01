@@ -10,6 +10,8 @@ class TrackHistorySnapshot {
 
   List<HistoryLookupRequest> get lookups => request.tracks;
 
+  List<String> get lookupKeys => request.lookupKeys;
+
   void update(List<Track> tracks) {
     if (identical(tracks, _source)) return;
     _source = tracks;

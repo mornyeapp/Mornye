@@ -14,8 +14,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/extension_provider.dart';
 import 'package:mornye/providers/repo_provider.dart';
-import 'package:mornye/utils/extension_auth_launcher.dart';
 import 'package:mornye/controllers/extension_action_forms.dart';
+import 'package:mornye/controllers/extension_auth_launcher.dart';
 import 'package:mornye/widgets/settings_group.dart';
 import 'package:mornye/utils/extension_country_name.dart';
 import 'package:mornye/widgets/app_icon.dart';
@@ -23,6 +23,7 @@ import 'package:mornye/widgets/app_icon_button.dart';
 import 'package:mornye/widgets/app_loading_indicator.dart';
 import 'package:mornye/widgets/app_sliver_header.dart';
 import 'package:mornye/widgets/extension_health.dart';
+import 'package:mornye/widgets/sliver_layout_info_builder.dart';
 
 part 'extension_detail_page_widgets.dart';
 
@@ -107,14 +108,13 @@ class _ExtensionDetailPageState extends ConsumerState<ExtensionDetailPage> {
           slivers: [
             AppSliverHeader.page(title: extension.displayName),
 
-            SliverLayoutBuilder(
-              builder: (context, constraints) => SliverToBoxAdapter(
+            SliverLayoutInfoBuilder(
+              select: (constraints) => constraints.crossAxisExtent,
+              builder: (context, width) => SliverToBoxAdapter(
                 child: Padding(
                   // Same column as the settings groups below on wide panes.
                   padding: EdgeInsets.symmetric(
-                    horizontal: settingsHorizontalInset(
-                      constraints.crossAxisExtent,
-                    ),
+                    horizontal: settingsHorizontalInset(context, width),
                     vertical: 16,
                   ),
                   child: _ExtensionOverviewSurface(
@@ -299,200 +299,157 @@ class _ExtensionDetailPageState extends ConsumerState<ExtensionDetailPage> {
                 ),
             ],
 
-            if (extension.hasServiceHealth) ...[
-              SliverToBoxAdapter(
-                child: SettingsSectionHeader(
-                  title: context.l10n.extensionServiceStatus,
-                ),
-              ),
-              SliverToBoxAdapter(
-                child: SettingsGroup(
-                  glass: true,
-                  connected: true,
-                  children: [
-                    _HealthSummaryItem(
-                      status: healthStatus,
-                      isRefreshing: _isRefreshingHealth,
-                      onRefresh: () => _refreshHealth(force: true),
-                    ),
-                    if (healthStatus != null)
-                      ...healthStatus.checks.asMap().entries.map((entry) {
-                        final index = entry.key;
-                        final check = entry.value;
-                        return _HealthCheckItem(
-                          check: check,
-                          showDivider: index < healthStatus.checks.length - 1,
-                        );
-                      }),
-                  ],
-                ),
-              ),
-            ],
-
-            if (extension.hasURLHandler &&
-                extension.urlHandler!.patterns.isNotEmpty) ...[
-              SliverToBoxAdapter(
-                child: SettingsSectionHeader(
-                  title: context.l10n.extensionUrlHandler,
-                ),
-              ),
-              SliverToBoxAdapter(
-                child: SettingsGroup(
-                  glass: true,
-                  children: [
-                    _URLHandlerInfo(patterns: extension.urlHandler!.patterns),
-                  ],
-                ),
-              ),
-            ],
-
-            if (extension.hasDownloadProvider &&
-                extension.qualityOptions.isNotEmpty) ...[
-              SliverToBoxAdapter(
-                child: SettingsSectionHeader(
-                  title: context.l10n.extensionQualityOptions,
-                ),
-              ),
-              SliverToBoxAdapter(
-                child: SettingsGroup(
-                  glass: true,
-                  connected: true,
-                  children: extension.qualityOptions.asMap().entries.map((
-                    entry,
-                  ) {
-                    final index = entry.key;
-                    final quality = entry.value;
-                    return _QualityOptionItem(
-                      quality: quality,
-                      showDivider: index < extension.qualityOptions.length - 1,
-                    );
-                  }).toList(),
-                ),
-              ),
-            ],
-
-            if (extension.hasPostProcessing &&
-                extension.postProcessing!.hooks.isNotEmpty) ...[
-              SliverToBoxAdapter(
-                child: SettingsSectionHeader(
-                  title: context.l10n.extensionPostProcessingHooks,
-                ),
-              ),
-              SliverToBoxAdapter(
-                child: SettingsGroup(
-                  glass: true,
-                  connected: true,
-                  children: extension.postProcessing!.hooks.asMap().entries.map(
-                    (entry) {
-                      final index = entry.key;
-                      final hook = entry.value;
-                      return _PostProcessingHookItem(
-                        hook: hook,
-                        showDivider:
-                            index < extension.postProcessing!.hooks.length - 1,
-                      );
-                    },
-                  ).toList(),
-                ),
-              ),
-            ],
-
-            if (extension.permissions.isNotEmpty) ...[
-              SliverToBoxAdapter(
-                child: SettingsSectionHeader(
-                  title: context.l10n.extensionPermissions,
-                ),
-              ),
-              SliverToBoxAdapter(
-                child: SettingsGroup(
-                  glass: true,
-                  connected: true,
-                  children: extension.permissions.asMap().entries.map((entry) {
-                    final index = entry.key;
-                    final permission = entry.value;
-                    return _PermissionItem(
-                      permission: permission,
-                      showDivider: index < extension.permissions.length - 1,
-                    );
-                  }).toList(),
-                ),
-              ),
-            ],
-
-            SliverToBoxAdapter(
-              child: SettingsSectionHeader(
-                title: context.l10n.extensionCapabilities,
-              ),
-            ),
-            SliverToBoxAdapter(
-              child: SettingsGroup(
+            if (extension.hasServiceHealth)
+              ...settingsSectionSlivers(
+                title: context.l10n.extensionServiceStatus,
                 glass: true,
                 connected: true,
                 children: [
-                  _CapabilityItem(
-                    icon: Icons.search,
-                    title: context.l10n.extensionMetadataProvider,
-                    enabled: extension.hasMetadataProvider,
+                  _HealthSummaryItem(
+                    status: healthStatus,
+                    isRefreshing: _isRefreshingHealth,
+                    onRefresh: () => _refreshHealth(force: true),
                   ),
-                  _CapabilityItem(
-                    icon: Icons.download,
-                    title: context.l10n.extensionDownloadProvider,
-                    enabled: extension.hasDownloadProvider,
-                  ),
-                  _CapabilityItem(
-                    icon: Icons.lyrics,
-                    title: context.l10n.extensionLyricsProvider,
-                    enabled: extension.hasLyricsProvider,
-                  ),
-                  _CapabilityItem(
-                    icon: Icons.manage_search,
-                    title: context.l10n.extensionsSearchProvider,
-                    enabled: extension.hasCustomSearch,
-                    subtitle: extension.searchBehavior?.placeholder,
-                  ),
-                  _CapabilityItem(
-                    icon: Icons.compare_arrows,
-                    title: context.l10n.extensionCustomTrackMatching,
-                    enabled: extension.hasCustomMatching,
-                    subtitle: extension.trackMatching?.strategy != null
-                        ? context.l10n.extensionStrategy(
-                            extension.trackMatching!.strategy!,
-                          )
-                        : null,
-                  ),
-                  _CapabilityItem(
-                    icon: Icons.auto_fix_high,
-                    title: context.l10n.extensionPostProcessing,
-                    enabled: extension.hasPostProcessing,
-                    subtitle: extension.postProcessing?.hooks.isNotEmpty == true
-                        ? context.l10n.extensionHooksAvailable(
-                            extension.postProcessing!.hooks.length,
-                          )
-                        : null,
-                  ),
-                  _CapabilityItem(
-                    icon: Icons.link,
-                    title: context.l10n.extensionUrlHandler,
-                    enabled: extension.hasURLHandler,
-                    subtitle: extension.urlHandler?.patterns.isNotEmpty == true
-                        ? context.l10n.extensionPatternsCount(
-                            extension.urlHandler!.patterns.length,
-                          )
-                        : null,
-                  ),
-                  _CapabilityItem(
-                    icon: Icons.monitor_heart_outlined,
-                    title: context.l10n.extensionServiceHealth,
-                    enabled: extension.hasServiceHealth,
-                    subtitle: extension.hasServiceHealth
-                        ? context.l10n.extensionHealthChecksConfigured(
-                            extension.serviceHealth.length,
-                          )
-                        : null,
-                    showDivider: false,
-                  ),
+                  if (healthStatus != null)
+                    ...healthStatus.checks.asMap().entries.map((entry) {
+                      final index = entry.key;
+                      final check = entry.value;
+                      return _HealthCheckItem(
+                        check: check,
+                        showDivider: index < healthStatus.checks.length - 1,
+                      );
+                    }),
                 ],
               ),
+
+            if (extension.hasURLHandler &&
+                extension.urlHandler!.patterns.isNotEmpty)
+              ...settingsSectionSlivers(
+                title: context.l10n.extensionUrlHandler,
+                glass: true,
+                children: [
+                  _URLHandlerInfo(patterns: extension.urlHandler!.patterns),
+                ],
+              ),
+
+            if (extension.hasDownloadProvider &&
+                extension.qualityOptions.isNotEmpty)
+              ...settingsSectionSlivers(
+                title: context.l10n.extensionQualityOptions,
+                glass: true,
+                connected: true,
+                children: extension.qualityOptions.asMap().entries.map((entry) {
+                  final index = entry.key;
+                  final quality = entry.value;
+                  return _QualityOptionItem(
+                    quality: quality,
+                    showDivider: index < extension.qualityOptions.length - 1,
+                  );
+                }).toList(),
+              ),
+
+            if (extension.hasPostProcessing &&
+                extension.postProcessing!.hooks.isNotEmpty)
+              ...settingsSectionSlivers(
+                title: context.l10n.extensionPostProcessingHooks,
+                glass: true,
+                connected: true,
+                children: extension.postProcessing!.hooks.asMap().entries.map((
+                  entry,
+                ) {
+                  final index = entry.key;
+                  final hook = entry.value;
+                  return _PostProcessingHookItem(
+                    hook: hook,
+                    showDivider:
+                        index < extension.postProcessing!.hooks.length - 1,
+                  );
+                }).toList(),
+              ),
+
+            if (extension.permissions.isNotEmpty)
+              ...settingsSectionSlivers(
+                title: context.l10n.extensionPermissions,
+                glass: true,
+                connected: true,
+                children: extension.permissions.asMap().entries.map((entry) {
+                  final index = entry.key;
+                  final permission = entry.value;
+                  return _PermissionItem(
+                    permission: permission,
+                    showDivider: index < extension.permissions.length - 1,
+                  );
+                }).toList(),
+              ),
+
+            ...settingsSectionSlivers(
+              title: context.l10n.extensionCapabilities,
+              glass: true,
+              connected: true,
+              children: [
+                _CapabilityItem(
+                  icon: Icons.search,
+                  title: context.l10n.extensionMetadataProvider,
+                  enabled: extension.hasMetadataProvider,
+                ),
+                _CapabilityItem(
+                  icon: Icons.download,
+                  title: context.l10n.extensionDownloadProvider,
+                  enabled: extension.hasDownloadProvider,
+                ),
+                _CapabilityItem(
+                  icon: Icons.lyrics,
+                  title: context.l10n.extensionLyricsProvider,
+                  enabled: extension.hasLyricsProvider,
+                ),
+                _CapabilityItem(
+                  icon: Icons.manage_search,
+                  title: context.l10n.extensionsSearchProvider,
+                  enabled: extension.hasCustomSearch,
+                  subtitle: extension.searchBehavior?.placeholder,
+                ),
+                _CapabilityItem(
+                  icon: Icons.compare_arrows,
+                  title: context.l10n.extensionCustomTrackMatching,
+                  enabled: extension.hasCustomMatching,
+                  subtitle: extension.trackMatching?.strategy != null
+                      ? context.l10n.extensionStrategy(
+                          extension.trackMatching!.strategy!,
+                        )
+                      : null,
+                ),
+                _CapabilityItem(
+                  icon: Icons.auto_fix_high,
+                  title: context.l10n.extensionPostProcessing,
+                  enabled: extension.hasPostProcessing,
+                  subtitle: extension.postProcessing?.hooks.isNotEmpty == true
+                      ? context.l10n.extensionHooksAvailable(
+                          extension.postProcessing!.hooks.length,
+                        )
+                      : null,
+                ),
+                _CapabilityItem(
+                  icon: Icons.link,
+                  title: context.l10n.extensionUrlHandler,
+                  enabled: extension.hasURLHandler,
+                  subtitle: extension.urlHandler?.patterns.isNotEmpty == true
+                      ? context.l10n.extensionPatternsCount(
+                          extension.urlHandler!.patterns.length,
+                        )
+                      : null,
+                ),
+                _CapabilityItem(
+                  icon: Icons.monitor_heart_outlined,
+                  title: context.l10n.extensionServiceHealth,
+                  enabled: extension.hasServiceHealth,
+                  subtitle: extension.hasServiceHealth
+                      ? context.l10n.extensionHealthChecksConfigured(
+                          extension.serviceHealth.length,
+                        )
+                      : null,
+                  showDivider: false,
+                ),
+              ],
             ),
 
             SliverToBoxAdapter(
@@ -564,30 +521,19 @@ class _ExtensionDetailPageState extends ConsumerState<ExtensionDetailPage> {
   }
 
   Future<void> _confirmRemove(BuildContext context) async {
-    final colorScheme = Theme.of(context).colorScheme;
-    final confirmed = await showAppDialog<bool>(
-      context: context,
-      builder: (context) => AppAlertDialog(
-        title: Text(context.l10n.dialogRemoveExtension),
-        content: Text(context.l10n.dialogRemoveExtensionMessage),
-        actions: [
-          AppDialogAction(
-            isDefault: true,
-            onPressed: () => Navigator.pop(context, false),
-            child: Text(context.l10n.dialogCancel),
-          ),
-          AppDialogAction(
-            filled: true,
-            isDestructive: true,
-            onPressed: () => Navigator.pop(context, true),
-            style: FilledButton.styleFrom(backgroundColor: colorScheme.error),
-            child: Text(context.l10n.dialogRemove),
-          ),
-        ],
+    final confirmed = await showAppConfirmDialog(
+      context,
+      title: context.l10n.dialogRemoveExtension,
+      message: context.l10n.dialogRemoveExtensionMessage,
+      confirmLabel: context.l10n.dialogRemove,
+      cancelIsDefault: true,
+      destructive: true,
+      confirmStyle: FilledButton.styleFrom(
+        backgroundColor: Theme.of(context).colorScheme.error,
       ),
     );
 
-    if (confirmed == true && mounted) {
+    if (confirmed && mounted) {
       final success = await ref
           .read(extensionProvider.notifier)
           .removeExtension(widget.extensionId);

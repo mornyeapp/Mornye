@@ -359,8 +359,14 @@ String displayFormatForLossyFormat(String format) {
   return format == 'aac' ? 'AAC' : format.toUpperCase();
 }
 
-const List<String> autoConvertFormats = ['mp3', 'aac', 'opus'];
-const List<String> autoConvertBitrates = ['128k', '192k', '256k', '320k'];
+const List<String> autoConvertFormats = ['mp3', 'aac', 'opus', 'flac'];
+const List<String> autoConvertBitrates = [
+  '128k',
+  '160k',
+  '192k',
+  '256k',
+  '320k',
+];
 
 String normalizeAutoConvertFormat(String value) {
   final normalized = value.trim().toLowerCase();
@@ -382,6 +388,7 @@ String autoConvertFormatLabel(String format) {
   return switch (normalizeAutoConvertFormat(format)) {
     'aac' => 'M4A (AAC)',
     'opus' => 'Opus',
+    'flac' => 'FLAC',
     _ => 'MP3',
   };
 }
@@ -393,9 +400,22 @@ bool autoConversionAlreadySatisfied({
   required String targetBitrate,
   String? quality,
   int? bitrateKbps,
+  int? bitDepth,
+  int? sampleRate,
+  int? maxBitDepth,
+  int? maxSampleRate,
 }) {
   final sourceFormat = audioFormatForPath(filePath, fileName: fileName);
   final normalizedTarget = normalizeAutoConvertFormat(targetFormat);
+  if (normalizedTarget == 'flac') {
+    return sourceFormat == 'FLAC' &&
+        (maxBitDepth == null ||
+            (bitDepth != null && bitDepth > 0 && bitDepth <= maxBitDepth)) &&
+        (maxSampleRate == null ||
+            (sampleRate != null &&
+                sampleRate > 0 &&
+                sampleRate <= maxSampleRate));
+  }
   final matchesFormat = switch (normalizedTarget) {
     'aac' => sourceFormat == 'AAC' || sourceFormat == 'M4A',
     'opus' => sourceFormat == 'OPUS',

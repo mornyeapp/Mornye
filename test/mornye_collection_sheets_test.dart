@@ -83,8 +83,6 @@ PlaylistPickerSummary _playlist(String name, {bool contains = false}) =>
     PlaylistPickerSummary(
       id: name,
       name: name,
-      createdAt: DateTime(2026),
-      updatedAt: DateTime(2026),
       trackCount: 2,
       containsAllRequestedTracks: contains,
     );

@@ -7,6 +7,7 @@ import org.json.JSONObject
 import java.io.File
 import java.io.FileOutputStream
 import java.io.OutputStream
+import java.security.MessageDigest
 import java.util.Locale
 
 /**
@@ -182,7 +183,9 @@ object SafDownloadHandler {
         // write leave the old tail bytes in place (fd truncation is
         // best-effort on some providers).
         deleteStaleStagedFiles(context, targetDir, fileName, outputExt)
-        var document = createOrReuseDocumentFile(context, targetDir, stagedMimeType, stagedFileName)
+        var document = createOrReuseDocumentFile(
+            context, targetDir, stagedMimeType, stagedFileName, privateStaging = useStagedOutput,
+        )
             ?: return errorJson("Failed to create SAF file")
 
         var workingFile: File? = null
@@ -239,7 +242,8 @@ object SafDownloadHandler {
                                 context,
                                 targetDir,
                                 actualMimeType,
-                                actualStagedFileName
+                                actualStagedFileName,
+                                privateStaging = useStagedOutput,
                             ) ?: throw IllegalStateException(
                                 "failed to create SAF output with actual extension"
                             )
@@ -329,8 +333,12 @@ object SafDownloadHandler {
         return document
     }
 
-    private fun buildReplacedSafFileName(fileName: String): String {
-        return "${sanitizeFilename(fileName)}.replaced"
+    internal fun buildReplacedSafFileName(fileName: String): String {
+        val suffix = ".replaced"
+        val name = fitPrivatePublicationName(
+            fileName, MAX_SAF_DISPLAY_NAME_UTF8_BYTES - suffix.length - 1,
+        )
+        return ".$name$suffix"
     }
 
     fun copyContentUriToTemp(context: Context, uriStr: String): String? {
@@ -588,7 +596,9 @@ object SafDownloadHandler {
             val stagedName = buildStagedSafFileName(finalName)
             deleteStaleStagedFiles(context, targetDir, finalName, ext)
             trace.mark("cleanup")
-            val document = createOrReuseDocumentFile(context, targetDir, mimeType, stagedName)
+            val document = createOrReuseDocumentFile(
+                context, targetDir, mimeType, stagedName, privateStaging = true,
+            )
                 ?: return null
             trace.mark("create")
             stagedDocument = document
@@ -664,10 +674,32 @@ object SafDownloadHandler {
         return safeName + normalizedExt
     }
 
-    private fun buildStagedSafFileName(fileName: String): String {
+    internal fun buildStagedSafFileName(fileName: String): String {
         // Filesystem providers append an audio extension when it does not
-        // match the MIME. Keep that extension last on the temporary name.
-        return buildLegacyStagedSafFileName(fileName, "")
+        // match the MIME. Keep the extension and hide the staging name so
+        // MediaStore and other players cannot index unfinished audio.
+        val name = fitPrivatePublicationName(
+            fileName, MAX_SAF_DISPLAY_NAME_UTF8_BYTES - ".partial".length - 1,
+        )
+        return ".${buildLegacyStagedSafFileName(name, "")}"
+    }
+
+    private fun fitPrivatePublicationName(fileName: String, maxBytes: Int): String {
+        val safeName = sanitizeFilename(fileName)
+        if (safeName.toByteArray(Charsets.UTF_8).size <= maxBytes) return safeName
+        // Keep distinct final names distinct when reserving staging suffixes.
+        val hash = MessageDigest.getInstance("SHA-256")
+            .digest(safeName.toByteArray(Charsets.UTF_8))
+            .take(8)
+            .joinToString("") { "%02x".format(it.toInt() and 0xff) }
+        val suffix = "-$hash"
+        val fitted = truncateSafDisplayName(safeName, maxBytes - suffix.length)
+        val dot = fitted.lastIndexOf('.')
+        return if (dot > 0 && fitted.length - dot <= 10) {
+            fitted.substring(0, dot) + suffix + fitted.substring(dot)
+        } else {
+            fitted + suffix
+        }
     }
 
     private fun buildLegacyStagedSafFileName(fileName: String, outputExt: String): String {
@@ -690,7 +722,8 @@ object SafDownloadHandler {
             buildStagedSafFileName(fileName),
             "${sanitizeFilename(fileName)}.partial",
             buildLegacyStagedSafFileName(fileName, outputExt),
-            buildReplacedSafFileName(fileName)
+            buildReplacedSafFileName(fileName),
+            "${sanitizeFilename(fileName)}.replaced",
         )
         val staleDocuments = try {
             findSafChildren(context, parent, stagedNames)
@@ -827,9 +860,14 @@ object SafDownloadHandler {
         context: Context,
         parent: DocumentFile,
         mimeType: String,
-        fileName: String
+        fileName: String,
+        privateStaging: Boolean = false,
     ): DocumentFile? {
-        val safeFileName = sanitizeFilename(fileName)
+        val safeFileName = if (privateStaging) {
+            ".${truncateSafDisplayName(sanitizeFilename(fileName), MAX_SAF_DISPLAY_NAME_UTF8_BYTES - 1)}"
+        } else {
+            sanitizeFilename(fileName)
+        }
         if (safeFileName.isBlank()) return null
 
         synchronized(safDirLock) {

@@ -13,8 +13,6 @@ final _log = AppLogger('MotionHeaderBanner');
 class MotionHeaderBanner extends ConsumerStatefulWidget {
   final String videoUrl;
   final Widget fallback;
-  final BoxFit fit;
-  final Alignment alignment;
   final ValueChanged<double>? onAspectRatioChanged;
   final VoidCallback? onError;
   final VideoPlayerController? controller;
@@ -24,8 +22,6 @@ class MotionHeaderBanner extends ConsumerStatefulWidget {
     super.key,
     required this.videoUrl,
     required this.fallback,
-    this.fit = BoxFit.cover,
-    this.alignment = Alignment.topCenter,
     this.onAspectRatioChanged,
     this.onError,
     this.controller,
@@ -38,6 +34,12 @@ class MotionHeaderBanner extends ConsumerStatefulWidget {
 
 class _MotionHeaderBannerState extends ConsumerState<MotionHeaderBanner>
     with WidgetsBindingObserver {
+  /// Banners showing each borrowed controller. It plays while any of them is
+  /// visible, so an outgoing copy (a cover fading out as the player rotates)
+  /// cannot pause the video the incoming one shows.
+  static final _borrowers =
+      <VideoPlayerController, Set<_MotionHeaderBannerState>>{};
+
   VideoPlayerController? _controller;
   bool _ownsController = true;
   bool _ready = false;
@@ -91,7 +93,9 @@ class _MotionHeaderBannerState extends ConsumerState<MotionHeaderBanner>
   void _syncPlayback() {
     final controller = _controller;
     if (controller == null || !_ready) return;
-    final shouldPlay = _visible;
+    final shouldPlay = _ownsController
+        ? _visible
+        : _borrowers[controller]?.any((banner) => banner._visible) ?? false;
     if (controller.value.isPlaying == shouldPlay) return;
     if (shouldPlay) {
       controller.play();
@@ -118,6 +122,7 @@ class _MotionHeaderBannerState extends ConsumerState<MotionHeaderBanner>
     if (prepared != null && prepared.value.isInitialized) {
       _ownsController = false;
       _controller = prepared;
+      _borrowers.putIfAbsent(prepared, () => {}).add(this);
       _ready = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted || !identical(prepared, _controller)) return;
@@ -171,10 +176,17 @@ class _MotionHeaderBannerState extends ConsumerState<MotionHeaderBanner>
   void _disposeController() {
     final controller = _controller;
     _controller = null;
+    if (controller == null) return;
     if (_ownsController) {
-      controller?.dispose();
+      controller.dispose();
+      return;
+    }
+    final borrowers = _borrowers[controller]?..remove(this);
+    if (borrowers == null || borrowers.isEmpty) {
+      _borrowers.remove(controller);
+      controller.pause();
     } else {
-      controller?.pause();
+      borrowers.first._syncPlayback();
     }
   }
 
@@ -208,8 +220,8 @@ class _MotionHeaderBannerState extends ConsumerState<MotionHeaderBanner>
           duration: widget.fadeDuration,
           child: showVideo
               ? FittedBox(
-                  fit: widget.fit,
-                  alignment: widget.alignment,
+                  fit: BoxFit.cover,
+                  alignment: Alignment.topCenter,
                   clipBehavior: Clip.hardEdge,
                   child: SizedBox(
                     width: controller.value.size.width,

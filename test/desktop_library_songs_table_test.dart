@@ -12,6 +12,7 @@ import 'package:mornye/providers/library_collections_provider.dart';
 import 'package:mornye/providers/local_library_provider.dart';
 import 'package:mornye/providers/playback_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
+import 'package:mornye/screens/mornye_library_screen.dart';
 import 'package:mornye/screens/queue_tab.dart';
 import 'package:mornye/services/history_database.dart';
 import 'package:mornye/services/library_database.dart';
@@ -27,15 +28,17 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 
 class _Settings extends SettingsNotifier {
-  _Settings(this.viewMode);
+  _Settings(this.viewMode, {this.filterMode = 'all'});
 
   final String viewMode;
+  final String filterMode;
 
   // The Rewind banner animates for as long as it is shown; keep it off so
   // the page settles.
   @override
   AppSettings build() => AppSettings(
-    defaultLibraryView: 'all',
+    defaultLibraryView: filterMode,
+    historyFilterMode: filterMode,
     historyViewMode: viewMode,
     listeningStatisticsEnabled: false,
   );
@@ -68,8 +71,26 @@ class _Local extends LocalLibraryNotifier {
 }
 
 class _Collections extends LibraryCollectionsNotifier {
+  _Collections({this.withPlaylistTracks = false});
+
+  final bool withPlaylistTracks;
+
   @override
-  LibraryCollectionsState build() => LibraryCollectionsState(isLoaded: true);
+  LibraryCollectionsState build() => LibraryCollectionsState(
+    isLoaded: true,
+    playlists: [
+      if (withPlaylistTracks)
+        UserPlaylistCollection(
+          id: 'playlist',
+          name: 'Playlist',
+          createdAt: DateTime(2026),
+          updatedAt: DateTime(2026),
+          tracks: const [],
+          tracksLoaded: false,
+          trackKeys: {'example-provider:song-0', 'example-provider:song-1'},
+        ),
+    ],
+  );
 }
 
 class _Queue extends DownloadQueueNotifier {
@@ -157,10 +178,15 @@ void main() {
     required bool desktop,
     bool mornye = false,
     String viewMode = 'list',
+    String filterMode = 'all',
+    bool withPlaylistTracks = false,
+    bool root = false,
     PlaybackController? playback,
   }) async {
     debugDesktopPlatformOverride = desktop;
-    tester.view.physicalSize = const Size(1280, 900);
+    tester.view.physicalSize = desktop
+        ? const Size(1280, 900)
+        : const Size(390, 844);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
     final queue = DownloadQueueLookup.fromItems([
@@ -181,10 +207,14 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          settingsProvider.overrideWith(() => _Settings(viewMode)),
+          settingsProvider.overrideWith(
+            () => _Settings(viewMode, filterMode: filterMode),
+          ),
           downloadHistoryProvider.overrideWith(_History.new),
           localLibraryProvider.overrideWith(_Local.new),
-          libraryCollectionsProvider.overrideWith(_Collections.new),
+          libraryCollectionsProvider.overrideWith(
+            () => _Collections(withPlaylistTracks: withPlaylistTracks),
+          ),
           downloadQueueProvider.overrideWith(_Queue.new),
           downloadQueueLookupProvider.overrideWithValue(queue),
           if (playback != null) playbackProvider.overrideWith(() => playback),
@@ -196,7 +226,9 @@ void main() {
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           // Mornye opens Songs as a section page from its Library root.
-          home: Scaffold(body: QueueTab(librarySection: mornye ? 'all' : null)),
+          home: Scaffold(
+            body: QueueTab(librarySection: mornye && !root ? filterMode : null),
+          ),
         ),
       ),
     );
@@ -270,4 +302,56 @@ void main() {
     expect(find.byType(TrackCard), findsNWidgets(2));
     expect(find.text('January 2026'), findsOneWidget);
   });
+
+  for (final desktop in [false, true]) {
+    for (final mornye in [false, true]) {
+      for (final viewMode in mornye ? ['list'] : ['list', 'grid']) {
+        for (final mode in ['all', 'singles']) {
+          testWidgets(
+            'playlist members remain visible '
+            '(desktop: $desktop, mornye: $mornye, view: $viewMode, mode: $mode)',
+            (tester) async {
+              await pumpLibrary(
+                tester,
+                desktop: desktop,
+                mornye: mornye,
+                viewMode: viewMode,
+                filterMode: mode,
+                withPlaylistTracks: true,
+              );
+              expect(find.text('2 tracks'), findsWidgets);
+              expect(find.text('Alpha'), findsOneWidget);
+              expect(find.text('Bravo'), findsOneWidget);
+              expect(tester.takeException(), isNull);
+            },
+          );
+        }
+      }
+    }
+  }
+
+  testWidgets(
+    'switching from Mornye to Material keeps playlist songs visible',
+    (tester) async {
+      await pumpLibrary(
+        tester,
+        desktop: false,
+        mornye: true,
+        root: true,
+        withPlaylistTracks: true,
+      );
+      expect(find.byType(MornyeLibraryScreen), findsOneWidget);
+      await pumpLibrary(
+        tester,
+        desktop: false,
+        viewMode: 'grid',
+        withPlaylistTracks: true,
+      );
+      expect(find.byType(MornyeLibraryScreen), findsNothing);
+      expect(find.text('2 tracks'), findsOneWidget);
+      expect(find.text('Alpha'), findsOneWidget);
+      expect(find.text('Bravo'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
 }

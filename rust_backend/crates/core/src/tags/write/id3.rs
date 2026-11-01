@@ -25,8 +25,17 @@ pub(super) fn fresh(
     cover: Option<(&[u8], &str)>,
     check: &dyn Fn() -> Result<(), String>,
 ) -> Result<Vec<u8>, String> {
+    embedded_header(&mut Cursor::new(Vec::<u8>::new()), fields, cover, check)
+}
+
+pub(super) fn embedded_header(
+    source: &mut (impl Read + Seek),
+    fields: &Fields,
+    cover: Option<(&[u8], &str)>,
+    check: &dyn Fn() -> Result<(), String>,
+) -> Result<Vec<u8>, String> {
     edit_header(
-        &mut Cursor::new(Vec::<u8>::new()),
+        source,
         fields,
         cover.map(|p| p.0),
         cover.map(|p| p.1),

@@ -198,6 +198,141 @@ void main() {
         await tester.pumpWidget(const SizedBox.shrink());
       },
     );
+
+    testWidgets('word sweep follows the AutoMix playback rate ($mornye)', (
+      tester,
+    ) async {
+      final playback = StreamController<PlaybackState>.broadcast();
+      final preview = ValueNotifier<Duration?>(null);
+      addTearDown(playback.close);
+      addTearDown(preview.dispose);
+      final theme = mornye
+          ? MornyeTheme.build(Brightness.dark)
+          : ThemeData.dark();
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            playbackStateProvider.overrideWith((ref) => playback.stream),
+          ],
+          child: MaterialApp(
+            theme: theme,
+            home: Scaffold(
+              body: WordTimedLyricLine(
+                line: _lyrics.lines.single,
+                initialPosition: const Duration(seconds: 2),
+                seekPreview: preview,
+                style: theme.textTheme.titleLarge!,
+              ),
+            ),
+          ),
+        ),
+      );
+      addTearDown(() => tester.pumpWidget(const SizedBox.shrink()));
+      Duration position() {
+        final painter = tester.widget<CustomPaint>(_paint).painter!;
+        // Inspect the clock already supplied to the painter.
+        // ignore: avoid_dynamic_calls
+        return (painter as dynamic).currentPosition() as Duration;
+      }
+
+      // AutoMix changes rate while playing. No further report arrives between
+      // these samples, so the word sweep must extrapolate at that rate itself.
+      for (final speed in [2.0, 0.5]) {
+        playback.add(
+          PlaybackState(
+            playing: true,
+            processingState: AudioProcessingState.ready,
+            updatePosition: const Duration(seconds: 2),
+            speed: speed,
+          ),
+        );
+        await tester.pump();
+        final before = position();
+        final elapsed = Stopwatch()..start();
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 160)),
+        );
+        final advanced = (position() - before).inMicroseconds;
+        elapsed.stop();
+        expect(advanced, closeTo(elapsed.elapsedMicroseconds * speed, 40000));
+      }
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
+
+  for (final mornye in [false, true]) {
+    testWidgets(
+      'sung words rise in both styles, glow only in Mornye ($mornye)',
+      (tester) async {
+        final playback = StreamController<PlaybackState>.broadcast();
+        final preview = ValueNotifier<Duration?>(null);
+        addTearDown(playback.close);
+        addTearDown(preview.dispose);
+        final theme = mornye
+            ? MornyeTheme.build(Brightness.dark)
+            : ThemeData.dark();
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              playbackStateProvider.overrideWith((ref) => playback.stream),
+            ],
+            child: MaterialApp(
+              theme: theme,
+              home: Scaffold(
+                body: SyncedLyricsView(
+                  lyrics: _lyrics,
+                  seekPreview: preview,
+                  colorScheme: theme.colorScheme,
+                  isActive: true,
+                  showPronunciation: false,
+                  showTranslation: false,
+                ),
+              ),
+            ),
+          ),
+        );
+        // The first word is held, the second still waits.
+        playback.add(
+          PlaybackState(
+            processingState: AudioProcessingState.ready,
+            updatePosition: const Duration(seconds: 2),
+          ),
+        );
+        await tester.pumpAndSettle();
+        // Inspect the painter payload without adding production test hooks.
+        // ignore: avoid_dynamic_calls
+        final painter = tester.widget<CustomPaint>(_paint).painter! as dynamic;
+        // ignore: avoid_dynamic_calls
+        expect(painter.highlightLift as double, greaterThan(0));
+        // ignore: avoid_dynamic_calls
+        final glow = painter.glowSigma as double;
+        expect(glow, mornye ? greaterThan(0) : 0);
+
+        // The sung word stands above the waiting one.
+        final size = tester.getSize(_paint);
+        final pixels = await _pixels(tester);
+        final width = size.width.ceil();
+        double inkTop(int from, int to) {
+          for (var y = 0; y < size.height.ceil(); y++) {
+            for (var x = from; x < to; x++) {
+              if (pixels[(y * width + x) * 4 + 3] >= 16) return y.toDouble();
+            }
+          }
+          return double.infinity;
+        }
+
+        final boxes = _segmentBoxes(tester);
+        final first = boxes.first.first;
+        final second = boxes.last.first;
+        expect(
+          inkTop(first.left.ceil(), first.right.floor()),
+          lessThan(inkTop(second.left.ceil(), second.right.floor())),
+        );
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      },
+    );
   }
 
   testWidgets('the word sweep keeps moving behind another app window', (

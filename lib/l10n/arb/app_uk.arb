@@ -280,10 +280,6 @@
   "@homeEmptySubtitle": {
     "description": "Subtitle shown on home when no providers are available yet"
   },
-  "homeSupports": "Підтримує: URL-адреси треків, альбомів, списків відтворення, виконавців",
-  "@homeSupports": {
-    "description": "Info text about supported URL types"
-  },
   "homeRecent": "Нещодавні",
   "@homeRecent": {
     "description": "Section header for recent searches"
@@ -4181,15 +4177,6 @@
   "collectionPlaylistRemoveCover": "Видалити зображення обкладинки",
   "@collectionPlaylistRemoveCover": {
     "description": "Bottom sheet action to remove custom cover image from a playlist"
-  },
-  "selectionShareCount": "Поділитися {count} {count, plural, =1{трек} other{треків}}",
-  "@selectionShareCount": {
-    "description": "Share button text with count in selection mode",
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
   },
   "selectionConvertCount": "Конвертувати {count} {count, plural, =1{трек} other{треків}}",
   "@selectionConvertCount": {

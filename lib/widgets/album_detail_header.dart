@@ -1,7 +1,7 @@
 import 'dart:math' as math;
-import 'dart:ui';
 
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show RenderProxySliver;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -23,6 +23,8 @@ import 'package:mornye/utils/adaptive_layout.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/widgets/desktop/context_menu.dart';
 import 'package:mornye/widgets/desktop/detail_header.dart';
+import 'package:mornye/widgets/settled_blur.dart';
+import 'package:mornye/widgets/sliver_layout_info_builder.dart';
 
 /// Collapsing album-detail header shared by the album, local-album, and
 /// downloaded-album screens: full-bleed [background] (optionally blurred and
@@ -41,6 +43,7 @@ class AlbumDetailHeader extends StatelessWidget {
     required this.title,
     required this.expandedHeight,
     required this.showTitleInAppBar,
+    this.showTitleListenable,
     required this.background,
     this.paletteSource,
     this.blurAndScrimBackground = true,
@@ -63,6 +66,9 @@ class AlbumDetailHeader extends StatelessWidget {
   final String title;
   final double expandedHeight;
   final bool showTitleInAppBar;
+
+  /// Replaces [showTitleInAppBar] when set; see [headerToolbarTitle].
+  final ValueListenable<bool>? showTitleListenable;
 
   /// Full-bleed background content (cover image, motion banner, placeholder).
   final Widget background;
@@ -148,35 +154,40 @@ class AlbumDetailHeader extends StatelessWidget {
       math.max(240.0, screenSize.height * 0.55),
     );
     final details = _buildMornyeDetails(context);
+    // Built once, so toolbar rebuilds keep the same glass button element.
+    final back = Padding(
+      padding: EdgeInsetsDirectional.only(start: edgeInset),
+      child:
+          leading ??
+          HeaderCircleButton(
+            icon: CupertinoIcons.back,
+            tooltip: MaterialLocalizations.of(context).backButtonTooltip,
+            onPressed: () => Navigator.pop(context),
+          ),
+    );
     Widget toolbar({bool collapsed = true}) => SliverAppBar(
       pinned: true,
       backgroundColor: collapsed ? scheme.surface : Colors.transparent,
       surfaceTintColor: Colors.transparent,
       scrolledUnderElevation: 0,
-      title: AnimatedOpacity(
-        opacity:
-            showTitleInAppBar || appBarTitle != null || (immersive && collapsed)
-            ? 1
-            : 0,
-        duration: const Duration(milliseconds: 180),
-        child: Text(
-          appBarTitle ?? title,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+      title: headerToolbarTitle(
+        showTitleListenable,
+        showTitleInAppBar,
+        (showTitle) => AnimatedOpacity(
+          opacity: showTitle || appBarTitle != null || (immersive && collapsed)
+              ? 1
+              : 0,
+          duration: const Duration(milliseconds: 180),
+          child: Text(
+            appBarTitle ?? title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+          ),
         ),
       ),
       leadingWidth: kToolbarHeight + edgeInset,
-      leading: Padding(
-        padding: EdgeInsetsDirectional.only(start: edgeInset),
-        child:
-            leading ??
-            HeaderCircleButton(
-              icon: CupertinoIcons.back,
-              tooltip: MaterialLocalizations.of(context).backButtonTooltip,
-              onPressed: () => Navigator.pop(context),
-            ),
-      ),
+      leading: back,
       actionsPadding: EdgeInsetsDirectional.only(end: edgeInset),
       actions: appBarActions,
     );
@@ -205,15 +216,16 @@ class AlbumDetailHeader extends StatelessWidget {
       return [
         // The toolbar paints above the header without reserving a second
         // status-bar inset. Metadata still has its natural, scrollable height.
-        SliverLayoutBuilder(
-          builder: (context, constraints) {
+        Builder(
+          builder: (context) {
             final toolbarHeight =
                 kToolbarHeight + MediaQuery.paddingOf(context).top;
-            return _AlbumOverlayToolbar(
-              child: toolbar(
-                collapsed:
-                    constraints.scrollOffset >= detailsTop - toolbarHeight,
-              ),
+            final collapseOffset = detailsTop - toolbarHeight;
+            return SliverLayoutInfoBuilder(
+              select: (constraints) =>
+                  constraints.scrollOffset >= collapseOffset,
+              builder: (context, collapsed) =>
+                  _AlbumOverlayToolbar(child: toolbar(collapsed: collapsed)),
             );
           },
         ),
@@ -335,27 +347,28 @@ class AlbumDetailHeader extends StatelessWidget {
     final fallbackMotion = AppMotionSpec(tokens.motionFast, Curves.linear);
     final titleSlide = AppMotion.spatial(context, fallbackMotion);
     final titleFade = AppMotion.effects(context, fallbackMotion);
-    Widget toolbarTitle = AnimatedOpacity(
-      duration: titleFade.duration,
-      curve: titleFade.curve,
-      opacity: showTitleInAppBar ? 1.0 : 0.0,
-      child: Text(
-        appBarTitle ?? title,
-        style: TextStyle(
-          color: onHeader,
-          fontWeight: FontWeight.w600,
-          fontSize: 16,
+    Widget toolbarTitle(bool showTitle) {
+      final fading = AnimatedOpacity(
+        duration: titleFade.duration,
+        curve: titleFade.curve,
+        opacity: showTitle ? 1.0 : 0.0,
+        child: Text(
+          appBarTitle ?? title,
+          style: TextStyle(
+            color: onHeader,
+            fontWeight: FontWeight.w600,
+            fontSize: 16,
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
         ),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
-    );
-    if (expressive) {
-      toolbarTitle = AnimatedSlide(
+      );
+      if (!expressive) return fading;
+      return AnimatedSlide(
         duration: titleSlide.duration,
         curve: titleSlide.curve,
-        offset: showTitleInAppBar ? Offset.zero : const Offset(0, 0.6),
-        child: toolbarTitle,
+        offset: showTitle ? Offset.zero : const Offset(0, 0.6),
+        child: fading,
       );
     }
 
@@ -365,7 +378,11 @@ class AlbumDetailHeader extends StatelessWidget {
       stretch: true,
       backgroundColor: backgroundColor ?? headerScheme.surface,
       surfaceTintColor: Colors.transparent,
-      title: toolbarTitle,
+      title: headerToolbarTitle(
+        showTitleListenable,
+        showTitleInAppBar,
+        toolbarTitle,
+      ),
       flexibleSpace: LayoutBuilder(
         builder: (context, constraints) {
           final collapseRatio =
@@ -458,10 +475,7 @@ class AlbumDetailHeader extends StatelessWidget {
                 if (plainArtworkHeader)
                   ColoredBox(color: headerScheme.surface)
                 else if (blurAndScrimBackground)
-                  ImageFiltered(
-                    imageFilter: ImageFilter.blur(sigmaX: 32, sigmaY: 32),
-                    child: background,
-                  )
+                  SettledBlur(sigma: 32, child: background)
                 else
                   background,
                 if (!plainArtworkHeader && blurAndScrimBackground)
@@ -591,6 +605,19 @@ class _AlbumStretchArtwork extends StatelessWidget {
     );
   }
 }
+
+/// Builds a collapsing toolbar title with [showTitle], or with [listenable]'s
+/// value when one is given, so crossing the threshold rebuilds only the title.
+Widget headerToolbarTitle(
+  ValueListenable<bool>? listenable,
+  bool showTitle,
+  Widget Function(bool showTitle) builder,
+) => listenable == null
+    ? builder(showTitle)
+    : ValueListenableBuilder<bool>(
+        valueListenable: listenable,
+        builder: (_, showTitle, _) => builder(showTitle),
+      );
 
 /// Keeps the pinned toolbar above the artwork without shifting the artwork or
 /// metadata down by the toolbar's safe-area height.

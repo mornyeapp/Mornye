@@ -38,8 +38,11 @@ void main() {
           expect(await utf8.decoder.bind(request).join(), contains('propfind'));
           request.response.statusCode = 207;
           request.response.write('''<d:multistatus xmlns:d="DAV:">
-          <d:response><d:href>/music/A%20B.flac</d:href><d:propstat>
+          <d:response><d:href>http://192.168.1.20:5005/music/A%20B.flac</d:href><d:propstat>
           <d:prop><d:getcontentlength>4</d:getcontentlength></d:prop>
+          <d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>
+          <d:response><d:href>http://192.168.1.20:5005/music/</d:href><d:propstat>
+          <d:prop><d:resourcetype><d:collection/></d:resourcetype></d:prop>
           <d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>
           </d:multistatus>''');
         } else {

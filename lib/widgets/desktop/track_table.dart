@@ -132,6 +132,14 @@ class SliverTrackTable extends StatefulWidget {
 class _SliverTrackTableState extends State<SliverTrackTable> {
   TrackTableSort? _localSort;
 
+  // The shown rows, kept while the rows and the applied sort stay the same,
+  // so a selection change does not sort again.
+  List<TrackTableRow>? _source;
+  TrackTableSort? _sortedBy;
+  List<TrackTableRow> _rows = const [];
+  List<String> _orderedIds = const [];
+  bool _hasTrailing = false;
+
   TrackTableSort? get _sort => widget.onSort == null ? _localSort : widget.sort;
 
   void _sortBy(TrackTableColumn column) {
@@ -152,26 +160,26 @@ class _SliverTrackTableState extends State<SliverTrackTable> {
     }
   }
 
-  List<TrackTableRow> get _sortedRows {
-    final sort = _localSort;
-    if (widget.onSort != null || sort == null) return widget.rows;
-    final (:column, :ascending) = sort;
-    final indexed = widget.rows.indexed.toList();
-    indexed.sort((a, b) {
-      final order = compareTrackTableRows(a.$2, b.$2, column);
-      // Equal keys keep their original order in both directions.
-      if (order == 0) return a.$1.compareTo(b.$1);
-      return ascending ? order : -order;
-    });
-    return [for (final entry in indexed) entry.$2];
+  void _updateRows() {
+    final rows = widget.rows;
+    final sort = widget.onSort == null ? _localSort : null;
+    if (identical(rows, _source) && sort == _sortedBy) return;
+    _source = rows;
+    _sortedBy = sort;
+    _rows = sort == null
+        ? rows
+        : [for (final i in _sortOrder(rows, sort)) rows[i]];
+    _orderedIds = [for (final row in _rows) row.id];
+    _hasTrailing = _rows.any((row) => row.trailing != null);
   }
 
   @override
   Widget build(BuildContext context) {
-    final rows = _sortedRows;
+    _updateRows();
+    final rows = _rows;
     final sort = _sort;
-    final orderedIds = [for (final row in rows) row.id];
-    final hasTrailing = rows.any((row) => row.trailing != null);
+    final orderedIds = _orderedIds;
+    final hasTrailing = _hasTrailing;
     if (widget.albumLayout) {
       final albumArtist = widget.albumArtist?.trim().toLowerCase();
       return SliverList.builder(
@@ -272,46 +280,69 @@ int compareTrackTableRows(
   TrackTableRow a,
   TrackTableRow b,
   TrackTableColumn column,
-) {
-  int text(String? x, String? y) {
-    if (x == null || x.isEmpty) return y == null || y.isEmpty ? 0 : 1;
-    if (y == null || y.isEmpty) return -1;
-    return x.toLowerCase().compareTo(y.toLowerCase());
-  }
+) => _compareKeys(_sortKey(a, column), _sortKey(b, column));
 
-  int number(num? x, num? y) {
-    if (x == null) return y == null ? 0 : 1;
-    if (y == null) return -1;
-    return x.compareTo(y);
-  }
+/// The order of [rows] under [sort], as indexes into [rows]. Each key is
+/// computed once rather than in every comparison.
+List<int> _sortOrder(List<TrackTableRow> rows, TrackTableSort sort) {
+  final (:column, :ascending) = sort;
+  final keys = [for (final row in rows) _sortKey(row, column)];
+  return List.generate(rows.length, (i) => i)..sort((a, b) {
+    final order = _compareKeys(keys[a], keys[b]);
+    // Equal keys keep their original order in both directions.
+    if (order == 0) return a.compareTo(b);
+    return ascending ? order : -order;
+  });
+}
+
+/// The key [row] sorts by in [column]; null for a missing value.
+Comparable<Object?>? _sortKey(TrackTableRow row, TrackTableColumn column) {
+  String? text(String? value) =>
+      value == null || value.isEmpty ? null : value.toLowerCase();
 
   return switch (column) {
-    TrackTableColumn.number => number(a.number, b.number),
-    TrackTableColumn.title => text(a.title, b.title),
-    TrackTableColumn.artist => text(a.artist, b.artist),
-    TrackTableColumn.album => text(a.album, b.album),
-    TrackTableColumn.duration => number(
-      a.duration?.inMilliseconds,
-      b.duration?.inMilliseconds,
-    ),
-    TrackTableColumn.quality => _compareQuality(a.quality, b.quality),
+    TrackTableColumn.number => row.number,
+    TrackTableColumn.title => text(row.title),
+    TrackTableColumn.artist => text(row.artist),
+    TrackTableColumn.album => text(row.album),
+    TrackTableColumn.duration => row.duration?.inMilliseconds,
+    TrackTableColumn.quality => switch (row.quality) {
+      null || '' => null,
+      final label => _QualityKey(label),
+    },
   };
+}
+
+int _compareKeys(Comparable<Object?>? a, Comparable<Object?>? b) {
+  if (a == null) return b == null ? 0 : 1;
+  if (b == null) return -1;
+  return a.compareTo(b);
 }
 
 /// Compares quality labels by their numbers (bit depth, then sample rate or
 /// bitrate), so "24-bit/96kHz" sorts above "16-bit/44.1kHz".
-int _compareQuality(String? a, String? b) {
-  if (a == null || a.isEmpty) return b == null || b.isEmpty ? 0 : 1;
-  if (b == null || b.isEmpty) return -1;
-  final pattern = RegExp(r'\d+(?:\.\d+)?');
-  final x = [for (final m in pattern.allMatches(a)) double.parse(m[0]!)];
-  final y = [for (final m in pattern.allMatches(b)) double.parse(m[0]!)];
-  for (var i = 0; i < x.length && i < y.length; i++) {
-    final order = x[i].compareTo(y[i]);
-    if (order != 0) return order;
+class _QualityKey implements Comparable<_QualityKey> {
+  _QualityKey(String label)
+    : numbers = [
+        for (final m in _number.allMatches(label)) double.parse(m[0]!),
+      ],
+      text = label.toLowerCase();
+
+  static final _number = RegExp(r'\d+(?:\.\d+)?');
+
+  final List<double> numbers;
+  final String text;
+
+  @override
+  int compareTo(_QualityKey other) {
+    final y = other.numbers;
+    for (var i = 0; i < numbers.length && i < y.length; i++) {
+      final order = numbers[i].compareTo(y[i]);
+      if (order != 0) return order;
+    }
+    final order = numbers.length.compareTo(y.length);
+    return order != 0 ? order : text.compareTo(other.text);
   }
-  final order = x.length.compareTo(y.length);
-  return order != 0 ? order : a.toLowerCase().compareTo(b.toLowerCase());
 }
 
 String _formatDuration(Duration duration) {
@@ -540,8 +571,15 @@ class _TrackTableRowView extends StatefulWidget {
 }
 
 class _TrackTableRowViewState extends State<_TrackTableRowView> {
-  bool _hovered = false;
+  // Hover only fades the row actions, so it rebuilds only them.
+  final _hovered = ValueNotifier(false);
   bool _trailingFocused = false;
+
+  @override
+  void dispose() {
+    _hovered.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -576,11 +614,15 @@ class _TrackTableRowViewState extends State<_TrackTableRowView> {
             skipTraversal: true,
             onFocusChange: (focused) =>
                 setState(() => _trailingFocused = focused),
-            child: AnimatedOpacity(
-              opacity: _hovered || selected || current || _trailingFocused
-                  ? 1
-                  : 0,
-              duration: tokens.motionFast,
+            child: ValueListenableBuilder(
+              valueListenable: _hovered,
+              builder: (context, hovered, child) => AnimatedOpacity(
+                opacity: hovered || selected || current || _trailingFocused
+                    ? 1
+                    : 0,
+                duration: tokens.motionFast,
+                child: child,
+              ),
               child: row.trailing,
             ),
           );
@@ -673,7 +715,7 @@ class _TrackTableRowViewState extends State<_TrackTableRowView> {
         : colorScheme.secondaryContainer;
     final ink = InkWell(
       onTap: onTap,
-      onHover: (hovered) => setState(() => _hovered = hovered),
+      onHover: (hovered) => _hovered.value = hovered,
       // The M3 hover state layer: 8% of the row's content color.
       hoverColor: material
           ? (content ?? colorScheme.onSurface).withValues(alpha: 0.08)

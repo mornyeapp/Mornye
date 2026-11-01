@@ -1,23 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:mornye/widgets/app_alert_dialog.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mornye/controllers/confirm_and_delete_tracks.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/utils/re_enrich_result.dart';
 import 'package:mornye/models/settings.dart';
 import 'package:mornye/models/track.dart';
 import 'package:mornye/models/unified_library_item.dart';
+import 'package:mornye/providers/deleted_library_files.dart';
 import 'package:mornye/providers/download_queue_provider.dart';
 import 'package:mornye/providers/extension_provider.dart';
 import 'package:mornye/providers/local_library_provider.dart';
+import 'package:mornye/providers/player_motion_artwork_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/services/batch_metadata_re_enrich.dart';
 import 'package:mornye/services/downloaded_embedded_cover_resolver.dart';
-import 'package:mornye/services/deleted_library_files.dart';
 import 'package:mornye/services/library_database.dart';
 import 'package:mornye/services/local_track_redownload_service.dart';
 import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/services/ffmpeg_reenrich.dart';
-import 'package:mornye/utils/confirm_and_delete_tracks.dart';
 import 'package:mornye/utils/file_access.dart';
 import 'package:mornye/utils/int_utils.dart';
 import 'package:mornye/utils/lyrics_metadata_helper.dart';
@@ -27,6 +28,8 @@ import 'package:mornye/widgets/batch_progress_dialog.dart';
 import 'package:mornye/widgets/app_snack_bar.dart';
 import 'package:mornye/widgets/re_enrich_field_dialog.dart';
 import 'package:mornye/widgets/re_enrich_review_sheet.dart';
+import 'package:mornye/widgets/link/link_library_actions.dart';
+import 'package:mornye/services/link/link_library_jobs.dart';
 
 final _reEnrichLog = AppLogger('BatchReEnrich');
 
@@ -41,26 +44,14 @@ Future<void> queueLocalTracksAsFlac(
     return;
   }
 
-  final confirmed = await showAppDialog<bool>(
-    context: context,
-    builder: (ctx) => AppAlertDialog(
-      title: Text(context.l10n.queueFlacAction),
-      content: Text(context.l10n.queueFlacConfirmMessage(selected.length)),
-      actions: [
-        AppDialogAction(
-          onPressed: () => Navigator.pop(ctx, false),
-          child: Text(context.l10n.dialogCancel),
-        ),
-        AppDialogAction(
-          filled: true,
-          onPressed: () => Navigator.pop(ctx, true),
-          child: Text(context.l10n.queueFlacAction),
-        ),
-      ],
-    ),
+  final confirmed = await showAppConfirmDialog(
+    context,
+    title: context.l10n.queueFlacAction,
+    message: context.l10n.queueFlacConfirmMessage(selected.length),
+    confirmLabel: context.l10n.queueFlacAction,
   );
 
-  if (confirmed != true || !context.mounted || !isActive()) {
+  if (!confirmed || !context.mounted || !isActive()) {
     return;
   }
 
@@ -158,6 +149,25 @@ Future<void> reEnrichLibraryTracks(
   required VoidCallback onComplete,
 }) async {
   if (selected.isEmpty) return;
+  final container = ProviderScope.containerOf(context, listen: false);
+  if (hasLinkLibrarySongs(container, selected)) {
+    final root = Navigator.of(context, rootNavigator: true).context;
+    await onSelectionHide();
+    if (!root.mounted || !isActive()) return;
+    var accepted = false;
+    await runLinkLibraryAction(
+      root,
+      container,
+      selected,
+      LinkLibraryAction.reEnrich,
+      onAccepted: () {
+        accepted = true;
+        if (isActive()) onComplete();
+      },
+    );
+    if (!accepted && root.mounted && isActive()) onSelectionRestore();
+    return;
+  }
   final downloads = selected
       .map((item) => item.historyItem)
       .whereType<DownloadHistoryItem>()
@@ -259,6 +269,28 @@ Future<void> reEnrichLocalTracks(
   Map<String, String> sourceTrackIds = const {},
 }) async {
   if (selected.isEmpty) return;
+  final container = ProviderScope.containerOf(context, listen: false);
+  final items = [
+    for (final item in selected) UnifiedLibraryItem.fromLocalLibrary(item),
+  ];
+  if (hasLinkLibrarySongs(container, items)) {
+    final root = Navigator.of(context, rootNavigator: true).context;
+    await onSelectionHide();
+    if (!root.mounted || !isActive()) return;
+    var accepted = false;
+    await runLinkLibraryAction(
+      root,
+      container,
+      items,
+      LinkLibraryAction.reEnrich,
+      onAccepted: () {
+        accepted = true;
+        if (isActive()) onComplete();
+      },
+    );
+    if (!accepted && root.mounted && isActive()) onSelectionRestore();
+    return;
+  }
   // Capture a stable route context before a caller removes its overlay.
   context = Navigator.of(context, rootNavigator: true).context;
   await onSelectionHide();
@@ -273,8 +305,15 @@ Future<void> reEnrichLocalTracks(
     return;
   }
 
+  final artworkContainer = ProviderScope.containerOf(context, listen: false);
   final runner = BatchReEnrichRunner(
     sourceTrackIds: sourceTrackIds,
+    saveMotionArtwork: (item, metadata) => saveReEnrichedMotionArtwork(
+      artworkContainer,
+      metadata: metadata,
+      albumName: item.albumName,
+      artistName: item.artistName,
+    ),
     beginPhase: () async {
       final settings = ref.read(settingsProvider);
       await ref
@@ -393,6 +432,11 @@ class BatchReEnrichRunner {
     required String artistTagMode,
   })
   applyFfmpeg;
+  final Future<void> Function(
+    LocalLibraryItem item,
+    Map<String, dynamic> metadata,
+  )?
+  saveMotionArtwork;
 
   BatchReEnrichRunner({
     required this.beginPhase,
@@ -400,6 +444,7 @@ class BatchReEnrichRunner {
     this.reEnrich = PlatformBridge.reEnrichFile,
     this.writeSidecar = writeReEnrichSidecarLrc,
     this.applyFfmpeg = applyFfmpegReEnrichResult,
+    this.saveMotionArtwork,
   });
 
   Future<List<BatchReEnrichPreview>> preview(
@@ -492,6 +537,7 @@ class BatchReEnrichRunner {
               reEnrichResult: result,
             );
             successes++;
+            await _saveMotionArtwork(preview, result);
             onResult?.call(result);
           case 'ffmpeg':
             if (await applyFfmpeg(
@@ -500,6 +546,7 @@ class BatchReEnrichRunner {
               artistTagMode: settings.artistTagMode,
             )) {
               successes++;
+              await _saveMotionArtwork(preview, result);
               onResult?.call(result);
             } else {
               _reEnrichLog.w('Metadata write failed for ${preview.item.id}');
@@ -516,6 +563,24 @@ class BatchReEnrichRunner {
       }
     }
     return successes;
+  }
+
+  Future<void> _saveMotionArtwork(
+    BatchReEnrichPreview preview,
+    Map<String, dynamic> result,
+  ) async {
+    if (!preview.updateFields.contains(ReEnrichFields.cover)) return;
+    final applied = result['enriched_metadata'];
+    try {
+      await saveMotionArtwork?.call(preview.item, {
+        ...preview.enrichedMetadata,
+        if (applied is Map<String, dynamic>) ...applied,
+      });
+    } catch (error) {
+      _reEnrichLog.w(
+        'Optional artwork save failed for ${preview.item.id}: $error',
+      );
+    }
   }
 }
 
@@ -557,30 +622,31 @@ Future<void> deleteLibraryTracks(
   required VoidCallback onComplete,
 }) async {
   if (selected.isEmpty) return;
-  final confirmed = await showAppDialog<bool>(
-    context: context,
-    builder: (ctx) => AppAlertDialog(
-      title: Text(context.l10n.dialogDeleteSelectedTitle),
-      content: Text(context.l10n.dialogDeleteSelectedMessage(selected.length)),
-      actions: [
-        AppDialogAction(
-          isDefault: true,
-          onPressed: () => Navigator.pop(ctx, false),
-          child: Text(context.l10n.dialogCancel),
-        ),
-        AppDialogAction(
-          filled: true,
-          isDestructive: true,
-          onPressed: () => Navigator.pop(ctx, true),
-          style: FilledButton.styleFrom(
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
-          child: Text(context.l10n.dialogDelete),
-        ),
-      ],
+  final actionContainer = ProviderScope.containerOf(context, listen: false);
+  if (hasLinkLibrarySongs(actionContainer, selected)) {
+    await runLinkLibraryAction(
+      context,
+      actionContainer,
+      selected,
+      LinkLibraryAction.delete,
+      onAccepted: () {
+        if (isActive()) onComplete();
+      },
+    );
+    return;
+  }
+  final confirmed = await showAppConfirmDialog(
+    context,
+    title: context.l10n.dialogDeleteSelectedTitle,
+    message: context.l10n.dialogDeleteSelectedMessage(selected.length),
+    confirmLabel: context.l10n.dialogDelete,
+    destructive: true,
+    cancelIsDefault: true,
+    confirmStyle: FilledButton.styleFrom(
+      backgroundColor: Theme.of(context).colorScheme.error,
     ),
   );
-  if (confirmed != true || !isActive() || !context.mounted) return;
+  if (!confirmed || !isActive() || !context.mounted) return;
 
   final container = ProviderScope.containerOf(context, listen: false);
   final messenger = ScaffoldMessenger.of(context);

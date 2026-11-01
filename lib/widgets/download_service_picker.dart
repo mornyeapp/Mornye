@@ -158,15 +158,16 @@ class _DownloadServicePickerState extends ConsumerState<DownloadServicePicker> {
     final qualityOptions = _getQualityOptions(downloadExtensions);
     final qualityRows = [
       for (final quality in qualityOptions)
-        _QualityOption(
-          title: _localizedQualityLabel(context, quality),
-          subtitle: _localizedQualityDescription(context, quality),
-          icon: _getQualityIcon(quality.id),
-          onTap: () {
-            Navigator.pop(context);
-            widget.onSelect(quality.id, _selectedService);
-          },
-        ),
+        if (qualityOptionDisplay(context, quality) case final display)
+          _QualityOption(
+            title: display.label,
+            subtitle: display.description,
+            icon: display.icon,
+            onTap: () {
+              Navigator.pop(context);
+              widget.onSelect(quality.id, _selectedService);
+            },
+          ),
     ];
 
     return SafeArea(
@@ -272,56 +273,41 @@ class _DownloadServicePickerState extends ConsumerState<DownloadServicePicker> {
       ),
     );
   }
+}
 
-  IconData _getQualityIcon(String qualityId) {
-    final normalized = qualityId.toUpperCase();
-    if (normalized.startsWith('MP3_') || normalized == 'MP3') {
-      return Icons.audiotrack;
-    }
-    if (normalized.startsWith('OPUS_') || normalized == 'OPUS') {
-      return Icons.graphic_eq;
-    }
-
-    switch (normalized) {
-      case 'HI_RES_LOSSLESS':
-        return Icons.four_k;
-      case 'HI_RES':
-        return Icons.high_quality;
-      case 'LOSSLESS':
-        return Icons.music_note;
-      default:
-        return Icons.music_note;
-    }
-  }
-
-  String _localizedQualityLabel(BuildContext context, QualityOption quality) {
-    switch (quality.id.toUpperCase()) {
-      case 'LOSSLESS':
-        return context.l10n.qualityFlacLossless;
-      case 'HI_RES':
-        return context.l10n.qualityHiResFlac;
-      case 'HI_RES_LOSSLESS':
-        return context.l10n.qualityHiResFlacMax;
-      default:
-        return quality.label;
-    }
-  }
-
-  String _localizedQualityDescription(
-    BuildContext context,
-    QualityOption quality,
-  ) {
-    switch (quality.id.toUpperCase()) {
-      case 'LOSSLESS':
-        return context.l10n.qualityFlacLosslessSubtitle;
-      case 'HI_RES':
-        return context.l10n.qualityHiResFlacSubtitle;
-      case 'HI_RES_LOSSLESS':
-        return context.l10n.qualityHiResFlacMaxSubtitle;
-      default:
-        return quality.description ?? '';
-    }
-  }
+/// Icon, localized label and description of a download quality option.
+({IconData icon, String label, String description}) qualityOptionDisplay(
+  BuildContext context,
+  QualityOption quality,
+) {
+  final l10n = context.l10n;
+  final id = quality.id.toUpperCase();
+  return switch (id) {
+    'LOSSLESS' => (
+      icon: Icons.music_note,
+      label: l10n.qualityFlacLossless,
+      description: l10n.qualityFlacLosslessSubtitle,
+    ),
+    'HI_RES' => (
+      icon: Icons.high_quality,
+      label: l10n.qualityHiResFlac,
+      description: l10n.qualityHiResFlacSubtitle,
+    ),
+    'HI_RES_LOSSLESS' => (
+      icon: Icons.four_k,
+      label: l10n.qualityHiResFlacMax,
+      description: l10n.qualityHiResFlacMaxSubtitle,
+    ),
+    _ => (
+      icon: id.startsWith('MP3_') || id == 'MP3'
+          ? Icons.audiotrack
+          : id.startsWith('OPUS_') || id == 'OPUS'
+          ? Icons.graphic_eq
+          : Icons.music_note,
+      label: quality.label,
+      description: quality.description ?? '',
+    ),
+  };
 }
 
 class _QualityOption extends StatelessWidget {
@@ -431,6 +417,22 @@ class _ServiceChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final accessibleLabel = isRecommended ? '$label (Recommended)' : label;
+    Widget serviceIcon(Widget fallback) {
+      final cacheSize = (18 * MediaQuery.devicePixelRatioOf(context)).ceil();
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(4),
+        child: Image.file(
+          File(iconPath!),
+          width: 18,
+          height: 18,
+          cacheWidth: cacheSize,
+          cacheHeight: cacheSize,
+          fit: BoxFit.cover,
+          errorBuilder: (_, _, _) => fallback,
+        ),
+      );
+    }
+
     if (context.isMornye) {
       final foreground = isSelected
           ? colorScheme.primary
@@ -454,22 +456,11 @@ class _ServiceChip extends StatelessWidget {
                 const SizedBox(width: 8),
               ],
               if (iconPath != null) ...[
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: Image.file(
-                    File(iconPath!),
-                    width: 18,
-                    height: 18,
-                    cacheWidth: (18 * MediaQuery.devicePixelRatioOf(context))
-                        .ceil(),
-                    cacheHeight: (18 * MediaQuery.devicePixelRatioOf(context))
-                        .ceil(),
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, _, _) => Icon(
-                      CupertinoIcons.square_grid_2x2,
-                      size: 18,
-                      color: foreground,
-                    ),
+                serviceIcon(
+                  Icon(
+                    CupertinoIcons.square_grid_2x2,
+                    size: 18,
+                    color: foreground,
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -527,24 +518,13 @@ class _ServiceChip extends StatelessWidget {
             const SizedBox(width: 8),
           ],
           if (iconPath != null) ...[
-            ClipRRect(
-              borderRadius: BorderRadius.circular(4),
-              child: Image.file(
-                File(iconPath!),
-                width: 18,
-                height: 18,
-                cacheWidth: (18 * MediaQuery.devicePixelRatioOf(context))
-                    .ceil(),
-                cacheHeight: (18 * MediaQuery.devicePixelRatioOf(context))
-                    .ceil(),
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) => Icon(
-                  Icons.extension,
-                  size: 18,
-                  color: isSelected
-                      ? colorScheme.onPrimaryContainer
-                      : colorScheme.onSurfaceVariant,
-                ),
+            serviceIcon(
+              Icon(
+                Icons.extension,
+                size: 18,
+                color: isSelected
+                    ? colorScheme.onPrimaryContainer
+                    : colorScheme.onSurfaceVariant,
               ),
             ),
             const SizedBox(width: 6),

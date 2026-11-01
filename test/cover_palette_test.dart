@@ -1,8 +1,8 @@
 import 'dart:io';
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/theme/cover_palette.dart';
 
@@ -67,6 +67,10 @@ void main() {
 
         try {
           await write(Colors.blue);
+          expect(
+            (await CoverPalette.resolveSourceColor(file.path))?.toARGB32(),
+            Colors.blue.toARGB32(),
+          );
           final first = await CoverPalette.resolve(file.path, Brightness.light);
           expect(first, isNotNull);
           final oldKey = await CoverPalette.cacheKeyFor(
@@ -89,6 +93,10 @@ void main() {
           expect(
             await CoverPalette.cacheKeyFor(file.path, Brightness.light),
             isNot(oldKey),
+          );
+          expect(
+            (await CoverPalette.resolveSourceColor(file.path))?.toARGB32(),
+            Colors.red.toARGB32(),
           );
           final second = await CoverPalette.resolve(
             file.path,
@@ -152,6 +160,260 @@ void main() {
         await directory.delete(recursive: true);
       }
     });
+  });
+
+  testWidgets('a file URI and its path share one palette entry', (
+    tester,
+  ) async {
+    await tester.runAsync(() async {
+      final directory = await Directory.systemTemp.createTemp('palette-uri-');
+      final cache = PaintingBinding.instance.imageCache;
+      try {
+        final recorder = ui.PictureRecorder();
+        Canvas(recorder).drawColor(Colors.teal, BlendMode.src);
+        final picture = recorder.endRecording();
+        final image = await picture.toImage(32, 32);
+        final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+        image.dispose();
+        picture.dispose();
+        final file = File('${directory.path}/cover.png');
+        await file.writeAsBytes(bytes!.buffer.asUint8List());
+        final uri = Uri.file(file.path).toString();
+
+        expect(
+          await CoverPalette.cacheKeyFor(uri, Brightness.light),
+          await CoverPalette.cacheKeyFor(file.path, Brightness.light),
+        );
+        final scheme = await CoverPalette.resolve(uri, Brightness.light);
+        expect(scheme, isNotNull);
+        expect(CoverPalette.peek(file.path, Brightness.light), same(scheme));
+        expect(
+          (await CoverPalette.resolveSourceColor(uri))?.toARGB32(),
+          Colors.teal.toARGB32(),
+        );
+        expect(
+          CoverPalette.peekSourceColor(file.path)?.toARGB32(),
+          Colors.teal.toARGB32(),
+        );
+      } finally {
+        cache.clear();
+        cache.clearLiveImages();
+        await directory.delete(recursive: true);
+      }
+    });
+  });
+
+  testWidgets('source colour path matches the full palette bit for bit', (
+    tester,
+  ) async {
+    // Seed and source colour each cover produced before the palette pipeline
+    // moved into one background job, as (width, height, paint, seed, source).
+    final covers = <String, (int, int, void Function(Canvas), int, int)>{
+      'blue': (
+        32,
+        32,
+        (canvas) => canvas.drawColor(Colors.blue, BlendMode.src),
+        0xff2196f3,
+        0xff2196f3,
+      ),
+      'dark with one colour': (
+        100,
+        100,
+        (canvas) => canvas
+          ..drawColor(const Color(0xff050505), BlendMode.src)
+          ..drawRect(
+            const Rect.fromLTWH(0, 0, 100, 30),
+            Paint()..color = const Color(0xffd4ddac),
+          )
+          ..drawRect(
+            const Rect.fromLTWH(0, 95, 100, 5),
+            Paint()..color = const Color(0xff6a6e72),
+          ),
+        0xffd4ddac,
+        0xffd4ddac,
+      ),
+      'gray stripes': (
+        64,
+        64,
+        (canvas) {
+          const stripes = [
+            Color(0xff0a0a0a),
+            Color(0xff8a8a8a),
+            Color(0xfff2f2f2),
+          ];
+          for (var index = 0; index < stripes.length; index++) {
+            canvas.drawRect(
+              Rect.fromLTWH(index * 64 / 3, 0, 64, 64),
+              Paint()..color = stripes[index],
+            );
+          }
+        },
+        0xff4285f4,
+        0xff828282,
+      ),
+      'gray with a red detail': (
+        100,
+        100,
+        (canvas) => canvas
+          ..drawColor(const Color(0xff808080), BlendMode.src)
+          ..drawCircle(const Offset(70, 30), 12, Paint()..color = Colors.red),
+        0xfff44336,
+        0xff7f7f7f,
+      ),
+      'wide gradient': (
+        300,
+        180,
+        (canvas) => canvas.drawRect(
+          const Rect.fromLTWH(0, 0, 300, 180),
+          Paint()
+            ..shader = const LinearGradient(
+              colors: [
+                Colors.red,
+                Colors.orange,
+                Colors.yellow,
+                Colors.green,
+                Colors.blue,
+                Colors.purple,
+              ],
+            ).createShader(const Rect.fromLTWH(0, 0, 300, 180)),
+        ),
+        0xfff86321,
+        0xfffda61b,
+      ),
+      'translucent': (
+        80,
+        120,
+        (canvas) => canvas
+          ..drawRect(
+            const Rect.fromLTWH(0, 0, 80, 60),
+            Paint()..color = const Color(0x99e91e63),
+          )
+          ..drawRect(
+            const Rect.fromLTWH(0, 60, 40, 60),
+            Paint()..color = const Color(0xff1a237e),
+          ),
+        0xff8c123b,
+        0xffe91e62,
+      ),
+    };
+    const backend = MethodChannel('com.zarz.mornye/backend');
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    var paletteJobs = 0;
+    messenger.setMockMethodCallHandler(backend, (call) async {
+      if (call.method == 'runNativeDataJob') paletteJobs++;
+      // Keep the host quantizer, as without a native backend.
+      throw MissingPluginException();
+    });
+    addTearDown(() => messenger.setMockMethodCallHandler(backend, null));
+
+    await tester.runAsync(() async {
+      final directory = await Directory.systemTemp.createTemp('palette-same-');
+      try {
+        for (final MapEntry(
+              key: name,
+              value: (width, height, paint, seed, source),
+            )
+            in covers.entries) {
+          final recorder = ui.PictureRecorder();
+          paint(Canvas(recorder));
+          final picture = recorder.endRecording();
+          final image = await picture.toImage(width, height);
+          final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+          image.dispose();
+          picture.dispose();
+          final path = '${directory.path}/$name.png';
+          await File(path).writeAsBytes(bytes!.buffer.asUint8List());
+
+          final color = await CoverPalette.resolveSourceColor(path);
+          expect(color?.toARGB32(), source, reason: name);
+          expect(CoverPalette.peekSourceColor(path), color, reason: name);
+          // No quantization and no scheme for this cover yet.
+          expect(paletteJobs, 0, reason: name);
+          for (final brightness in Brightness.values) {
+            expect(CoverPalette.peek(path, brightness), isNull, reason: name);
+          }
+
+          for (final brightness in Brightness.values) {
+            expect(
+              await CoverPalette.resolve(path, brightness),
+              ColorScheme.fromSeed(
+                seedColor: Color(seed),
+                brightness: brightness,
+              ),
+              reason: '$name ${brightness.name}',
+            );
+            expect(
+              CoverPalette.sourceColor(path, brightness)?.toARGB32(),
+              source,
+              reason: name,
+            );
+          }
+          expect(
+            await CoverPalette.resolve(
+              path,
+              Brightness.dark,
+              neutralGrayscale: true,
+            ),
+            isNearGrayscaleCover(Color(source))
+                ? ColorScheme.fromSeed(
+                    seedColor: Color(source),
+                    brightness: Brightness.dark,
+                    dynamicSchemeVariant: DynamicSchemeVariant.monochrome,
+                  )
+                : same(CoverPalette.peek(path, Brightness.dark)),
+            reason: name,
+          );
+          expect(paletteJobs, 2, reason: name);
+          paletteJobs = 0;
+        }
+      } finally {
+        PaintingBinding.instance.imageCache.clear();
+        PaintingBinding.instance.imageCache.clearLiveImages();
+        await directory.delete(recursive: true);
+      }
+    });
+  });
+
+  testWidgets('source colour builder reads the cached colour', (tester) async {
+    final directory = await tester.runAsync(
+      () => Directory.systemTemp.createTemp('palette-builder-'),
+    );
+    addTearDown(() async {
+      PaintingBinding.instance.imageCache.clear();
+      PaintingBinding.instance.imageCache.clearLiveImages();
+      await tester.runAsync(() => directory!.delete(recursive: true));
+    });
+    final path = '${directory!.path}/cover.png';
+    await tester.runAsync(() async {
+      final recorder = ui.PictureRecorder();
+      Canvas(recorder).drawColor(Colors.green, BlendMode.src);
+      final picture = recorder.endRecording();
+      final image = await picture.toImage(16, 16);
+      final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+      image.dispose();
+      picture.dispose();
+      await File(path).writeAsBytes(bytes!.buffer.asUint8List());
+      await CoverPalette.resolveSourceColor(path);
+    });
+
+    for (final (source, expected) in [
+      (path, Colors.green.toARGB32()),
+      (null, null),
+      ('', null),
+    ]) {
+      Color? built;
+      await tester.pumpWidget(
+        CoverSourceColorBuilder(
+          imageSource: source,
+          builder: (context, color) {
+            built = color;
+            return const SizedBox();
+          },
+        ),
+      );
+      expect(built?.toARGB32(), expected, reason: source);
+    }
   });
 
   testWidgets('white and near-black artwork keeps a neutral source colour', (

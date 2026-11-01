@@ -28,6 +28,9 @@ bit-perfect paths bypass these effects.
 
 API reference: https://developer.android.com/reference/android/media/audiofx/DynamicsProcessing
 
+A `setNextPlayer` method links a prepared player to start the moment another
+completes, through `MediaPlayer.setNextMediaPlayer`, for gapless playback.
+
 ## Usage
 
 This package is [endorsed](https://flutter.dev/docs/development/packages-and-plugins/developing-packages#endorsed-federated-plugin),

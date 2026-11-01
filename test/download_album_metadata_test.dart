@@ -21,6 +21,61 @@ void main() {
     albumArtist: 'Artist, Guest',
   );
 
+  test(
+    'playlist tracks recover missing artwork from their own album',
+    () async {
+      final prepared = await resolveDownloadAlbumArtist(
+        solo,
+        'example-provider',
+        loadMetadata: (_, _, id) async => {
+          'album_info': {
+            'id': id,
+            'artists': solo.albumArtist,
+            'images': 'https://example.test/albums/release-1.jpg',
+          },
+        },
+      );
+      expect(prepared.coverUrl, 'https://example.test/albums/release-1.jpg');
+      expect(prepared.id, solo.id);
+      expect(prepared.albumName, solo.albumName);
+      expect(prepared.artistName, solo.artistName);
+      final embedded = buildTrackForMetadataEmbedding(
+        prepared,
+        {},
+        prepared.albumArtist,
+      );
+      expect(embedded.coverUrl, prepared.coverUrl);
+    },
+  );
+
+  test('album artwork recovery preserves an existing track cover', () async {
+    final selected = solo.copyWith(
+      coverUrl: 'https://example.test/selected.jpg',
+    );
+    final prepared = await resolveDownloadAlbumArtist(
+      selected,
+      'example-provider',
+      loadMetadata: (_, _, id) async => {
+        'album_info': {'id': id, 'cover_url': 'https://example.test/album.jpg'},
+      },
+    );
+    expect(prepared, same(selected));
+  });
+
+  test('a different release never supplies playlist track artwork', () async {
+    final prepared = await resolveDownloadAlbumArtist(
+      solo,
+      'example-provider',
+      loadMetadata: (_, _, _) async => {
+        'album_info': {
+          'id': 'other',
+          'images': 'https://example.test/other.jpg',
+        },
+      },
+    );
+    expect(prepared, same(solo));
+  });
+
   test('separate downloads use the same album credit as a batch', () async {
     Future<Map<String, dynamic>> metadata(
       String provider,

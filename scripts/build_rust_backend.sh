@@ -45,6 +45,11 @@ if [[ "$PLATFORM" == "desktop" ]]; then
       # Same default as the host build. The Flutter macOS runner's deployment
       # target must not be older than this.
       export MACOSX_DEPLOYMENT_TARGET="${MACOSX_DEPLOYMENT_TARGET:-11.0}"
+      # C dependencies (ring) need the SDK headers. Inside Xcode, `cc` is the
+      # toolchain clang rather than the /usr/bin shim, which finds no SDK on
+      # its own; naming it here also keeps Xcode and command line builds on
+      # one Cargo cache.
+      export SDKROOT="${SDKROOT:-$(xcrun --sdk macosx --show-sdk-path)}"
       DESKTOP_DIR="$CARGO_TARGET_DIR/desktop/macos"
       rustup target add aarch64-apple-darwin x86_64-apple-darwin
       for target in aarch64-apple-darwin x86_64-apple-darwin; do

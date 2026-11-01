@@ -17,6 +17,13 @@ const IconData mornyeArrowForward = IconData(
 /// ([CupertinoIcons.back], not [CupertinoIcons.chevron_back]).
 IconData mornyeIconFor(IconData icon) {
   if (icon.fontFamily == CupertinoIcons.iconFont) return icon;
+  // The switch compares each pattern in turn; rows look icons up per build.
+  return _mornyeIcons[icon] ??= _cupertinoFor(icon);
+}
+
+final _mornyeIcons = <IconData, IconData>{};
+
+IconData _cupertinoFor(IconData icon) {
   return switch (icon) {
     Icons.extension ||
     Icons.extension_outlined ||
@@ -176,6 +183,7 @@ IconData mornyeIconFor(IconData icon) {
     Icons.bug_report || Icons.bug_report_outlined => CupertinoIcons.ant,
     Icons.timer_outlined => CupertinoIcons.timer,
     Icons.timer_off_outlined => CupertinoIcons.timer,
+    Icons.mic => CupertinoIcons.mic_fill,
     Icons.bedtime_outlined => CupertinoIcons.moon_zzz,
     Icons.explore_outlined => CupertinoIcons.compass,
     Icons.vpn_key_outlined => CupertinoIcons.lock,
@@ -204,6 +212,10 @@ IconData mornyeIconFor(IconData icon) {
     Icons.computer => CupertinoIcons.desktopcomputer,
     Icons.hub_outlined => CupertinoIcons.link,
     Icons.campaign_outlined => CupertinoIcons.speaker_2,
+    Icons.drag_handle => CupertinoIcons.line_horizontal_3,
+    Icons.swap_vert => CupertinoIcons.arrow_up_arrow_down,
+    Icons.file_open_outlined => CupertinoIcons.doc,
+    Icons.directions_car => CupertinoIcons.car_detailed,
     // Preserve meaning for symbols without a Cupertino counterpart, such as
     // numbered download limits. An unrelated gear hides the action's purpose.
     _ => icon,

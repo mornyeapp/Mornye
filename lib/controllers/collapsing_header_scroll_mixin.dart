@@ -8,11 +8,11 @@ double collectionHeaderExpandedHeight(BuildContext context) {
 }
 
 /// Shared collapsing-header scroll behavior for album-style screens: owns the
-/// [ScrollController] and flips [showTitleInAppBar] once the header has
+/// [ScrollController] and flips [showTitleNotifier] once the header has
 /// scrolled out of view.
 mixin CollapsingHeaderScrollMixin<T extends StatefulWidget> on State<T> {
   final ScrollController scrollController = ScrollController();
-  bool showTitleInAppBar = false;
+  final ValueNotifier<bool> showTitleNotifier = ValueNotifier(false);
 
   @override
   void initState() {
@@ -24,6 +24,7 @@ mixin CollapsingHeaderScrollMixin<T extends StatefulWidget> on State<T> {
   void dispose() {
     scrollController.removeListener(_onHeaderScroll);
     scrollController.dispose();
+    showTitleNotifier.dispose();
     super.dispose();
   }
 
@@ -32,10 +33,7 @@ mixin CollapsingHeaderScrollMixin<T extends StatefulWidget> on State<T> {
 
   void _onHeaderScroll() {
     final expandedHeight = calculateExpandedHeight(context);
-    final shouldShow =
+    showTitleNotifier.value =
         scrollController.offset > (expandedHeight - kToolbarHeight - 20);
-    if (shouldShow != showTitleInAppBar) {
-      setState(() => showTitleInAppBar = shouldShow);
-    }
   }
 }

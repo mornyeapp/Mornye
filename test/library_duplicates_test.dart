@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mornye/services/library_database_models.dart';
+import 'package:mornye/models/library_database_models.dart';
 import 'package:mornye/services/library_duplicates.dart';
 import 'package:mornye/services/library_schema.dart';
 import 'package:mornye/services/network_storage_service.dart';

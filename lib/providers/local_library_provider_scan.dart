@@ -56,6 +56,7 @@ extension _LocalLibraryScan on LocalLibraryNotifier {
     required void Function(int processed, int errors, String name) onProgress,
   }) async {
     final scanner = NetworkLibraryScanner(
+      storage: _networkStorage,
       readCachedRows: (paths) => _db.readNetworkScanRows(sourceId, paths),
     );
     _networkScanner = scanner;
@@ -181,6 +182,7 @@ extension _LocalLibraryScan on LocalLibraryNotifier {
         }
       }
 
+      _activeScanSourceId = activeSourceId;
       final available = await _isPathAvailable(
         folderPath,
         bookmark: iosBookmark,
@@ -320,6 +322,12 @@ extension _LocalLibraryScan on LocalLibraryNotifier {
 
         if (skippedDownloads > 0) {
           _log.i('Skipped $skippedDownloads files already in download history');
+        }
+        if (forceFullScan) {
+          // A forced scan rewrites thumbnails under their existing paths.
+          PaintingBinding.instance.imageCache
+            ..clear()
+            ..clearLiveImages();
         }
 
         await _finishScan(
@@ -914,10 +922,15 @@ extension _LocalLibraryScan on LocalLibraryNotifier {
       if (!ref.mounted || _scanCancelRequested) return;
       final libraryDatabase = await _db.database;
       if (!ref.mounted || _scanCancelRequested) return;
+      // Playlists, favorites, sessions, statistics and history copy cover
+      // paths; their files stay while any of them is named.
+      final referenceColumns = await appLibraryCoverReferenceColumns();
+      if (!ref.mounted || _scanCancelRequested) return;
 
       final deletedCount = await pruneUnreferencedLibraryCovers(
         libraryCoverDir,
         const {},
+        referenceColumns: referenceColumns,
         libraryDatabase: libraryDatabase,
         requestId: _nativeLibraryRequestId,
         canPrune: () => ref.mounted && !_scanCancelRequested,

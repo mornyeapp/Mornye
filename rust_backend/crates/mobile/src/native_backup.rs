@@ -289,7 +289,6 @@ fn export(request: &Value, check: Check<'_>) -> Result<Value, String> {
             .map_err(|e| err("prepare History export", e))?;
         let columns = statement
             .column_names()
-            .into_iter()
             .map(str::to_owned)
             .collect::<Vec<_>>();
         let mut rows = statement

@@ -59,6 +59,10 @@ class HistoryBatchLookupRequest {
     Iterable<HistoryLookupRequest> tracks,
   ) = _HistoryBatchLookupSnapshot;
 
+  /// The [HistoryLookupRequest.lookupKey] of each track, in order. A
+  /// [HistoryBatchLookupRequest.snapshot] computes them once.
+  List<String> get lookupKeys => [for (final track in tracks) track.lookupKey];
+
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
@@ -81,6 +85,9 @@ class _HistoryBatchLookupSnapshot extends HistoryBatchLookupRequest {
     : super(List.unmodifiable(tracks));
 
   late final int _hash = Object.hashAll(tracks);
+
+  @override
+  late final List<String> lookupKeys = List.unmodifiable(super.lookupKeys);
 
   @override
   bool operator ==(Object other) =>
@@ -310,12 +317,6 @@ class HistoryDatabase {
     });
   }
 
-  Future<void> replaceAll(Stream<Map<String, dynamic>> items) async =>
-      replaceHistoryRows(
-        await database,
-        items.map(HistoryRowMapper.jsonToDbRow),
-      );
-
   Future<Set<String>> updateExistingBatch(
     List<Map<String, dynamic>> items,
   ) async {
@@ -357,34 +358,50 @@ class HistoryDatabase {
     return rows.map(_dbRowToJson).toList(growable: false);
   }
 
+  Future<Map<String, dynamic>?> _firstRow(
+    Database db,
+    String where,
+    List<Object?> whereArgs, {
+    List<String>? columns,
+    bool newestFirst = true,
+  }) async {
+    final rows = await db.query(
+      'history',
+      columns: columns,
+      where: where,
+      whereArgs: whereArgs,
+      orderBy: newestFirst ? 'sort_added DESC, id DESC' : null,
+      limit: 1,
+    );
+    return rows.isEmpty ? null : _dbRowToJson(rows.first);
+  }
+
   Future<Map<String, dynamic>?> findByTrackAndArtist(
     String trackName,
     String artistName,
   ) async {
     final key = matchKeyFor(trackName, artistName);
     if (key.isEmpty) return null;
-    final db = await database;
-    final rows = await db.query(
-      'history',
-      where: 'match_key = ?',
-      whereArgs: [key],
-      orderBy: 'sort_added DESC, id DESC',
-      limit: 1,
-    );
-    if (rows.isEmpty) return null;
-    return _dbRowToJson(rows.first);
+    return _firstRow(await database, 'match_key = ?', [key]);
   }
 
-  Future<Map<String, dynamic>?> getById(String id) async {
-    final db = await database;
-    final rows = await db.query(
-      'history',
-      where: 'id = ?',
-      whereArgs: [id],
-      limit: 1,
+  Future<Map<String, dynamic>?> getById(String id) async =>
+      _firstRow(await database, 'id = ?', [id], newestFirst: false);
+
+  /// Rows for [ids], keyed by id; ids no longer in the history are absent.
+  Future<Map<String, Map<String, dynamic>>> getByIds(
+    Iterable<String> ids,
+  ) async {
+    final rows = <String, Map<String, dynamic>>{};
+    await sqlite.loadRowsByColumn(
+      await database,
+      table: 'history',
+      column: 'id',
+      rawValues: ids,
+      destination: rows,
+      mapRow: _dbRowToJson,
     );
-    if (rows.isEmpty) return null;
-    return _dbRowToJson(rows.first);
+    return rows;
   }
 
   Future<Map<String, dynamic>?> findByFilePath(String filePath) async {
@@ -408,31 +425,11 @@ class HistoryDatabase {
   Future<List<String>> getPhysicalFileIds(Iterable<String> filePaths) async =>
       sqlite.findPhysicalFileRowIds(await database, 'history', filePaths);
 
-  Future<Map<String, dynamic>?> getBySpotifyId(String spotifyId) async {
-    final db = await database;
-    final rows = await db.query(
-      'history',
-      where: 'spotify_id = ?',
-      whereArgs: [spotifyId],
-      orderBy: 'sort_added DESC, id DESC',
-      limit: 1,
-    );
-    if (rows.isEmpty) return null;
-    return _dbRowToJson(rows.first);
-  }
+  Future<Map<String, dynamic>?> getBySpotifyId(String spotifyId) async =>
+      _firstRow(await database, 'spotify_id = ?', [spotifyId]);
 
-  Future<Map<String, dynamic>?> getByIsrc(String isrc) async {
-    final db = await database;
-    final rows = await db.query(
-      'history',
-      where: 'isrc = ?',
-      whereArgs: [isrc],
-      orderBy: 'sort_added DESC, id DESC',
-      limit: 1,
-    );
-    if (rows.isEmpty) return null;
-    return _dbRowToJson(rows.first);
-  }
+  Future<Map<String, dynamic>?> getByIsrc(String isrc) async =>
+      _firstRow(await database, 'isrc = ?', [isrc]);
 
   Future<Map<String, dynamic>?> findExistingTrack(
     HistoryLookupRequest request, {
@@ -445,44 +442,26 @@ class HistoryDatabase {
       final normalized = spotifyCandidates
           .map(HistoryRowMapper.normalizeSpotifyId)
           .toList();
-      final rows = await db.query(
-        'history',
+      final row = await _firstRow(
+        db,
+        'spotify_id IN ($placeholders) OR spotify_id_norm IN ($placeholders)',
+        [...spotifyCandidates, ...normalized],
         columns: columns,
-        where:
-            'spotify_id IN ($placeholders) OR spotify_id_norm IN ($placeholders)',
-        whereArgs: [...spotifyCandidates, ...normalized],
-        orderBy: 'sort_added DESC, id DESC',
-        limit: 1,
       );
-      if (rows.isNotEmpty) return _dbRowToJson(rows.first);
+      if (row != null) return row;
     }
 
     final isrcNorm = normalizeIsrc(request.isrc);
     if (isrcNorm.isNotEmpty) {
-      final rows = await db.query(
-        'history',
-        columns: columns,
-        where: 'isrc_norm = ?',
-        whereArgs: [isrcNorm],
-        orderBy: 'sort_added DESC, id DESC',
-        limit: 1,
-      );
-      if (rows.isNotEmpty) return _dbRowToJson(rows.first);
+      final row = await _firstRow(db, 'isrc_norm = ?', [
+        isrcNorm,
+      ], columns: columns);
+      if (row != null) return row;
     }
 
     final matchKey = matchKeyFor(request.trackName, request.artistName);
-    if (matchKey.isNotEmpty) {
-      final rows = await db.query(
-        'history',
-        columns: columns,
-        where: 'match_key = ?',
-        whereArgs: [matchKey],
-        orderBy: 'sort_added DESC, id DESC',
-        limit: 1,
-      );
-      if (rows.isNotEmpty) return _dbRowToJson(rows.first);
-    }
-    return null;
+    if (matchKey.isEmpty) return null;
+    return _firstRow(db, 'match_key = ?', [matchKey], columns: columns);
   }
 
   /// Batch variant used by playlist playback and bulk existence checks. A
@@ -619,34 +598,6 @@ class HistoryDatabase {
     return Sqflite.firstIntValue(result) ?? 0;
   }
 
-  Future<Map<String, dynamic>?> findExisting({
-    String? spotifyId,
-    String? isrc,
-  }) async {
-    if (spotifyId != null && spotifyId.isNotEmpty) {
-      final bySpotify = await getBySpotifyId(spotifyId);
-      if (bySpotify != null) return bySpotify;
-
-      if (spotifyId.startsWith('deezer:')) {
-        final deezerId = spotifyId.substring(7);
-        final db = await database;
-        final rows = await db.query(
-          'history',
-          where: 'spotify_id LIKE ?',
-          whereArgs: ['deezer:$deezerId'],
-          limit: 1,
-        );
-        if (rows.isNotEmpty) return _dbRowToJson(rows.first);
-      }
-    }
-
-    if (isrc != null && isrc.isNotEmpty) {
-      return await getByIsrc(isrc);
-    }
-
-    return null;
-  }
-
   Future<void> close() async {
     final db = await database;
     await db.close();
@@ -657,6 +608,8 @@ class HistoryDatabase {
   Future<bool> updateFilePath(
     String id,
     String newFilePath, {
+    String? newStorageMode,
+    String? newDownloadTreeUri,
     String? newSafFileName,
     String? newSafRelativeDir,
     String? newQuality,
@@ -670,6 +623,10 @@ class HistoryDatabase {
   }) async {
     final db = await database;
     final values = <String, dynamic>{'file_path': newFilePath};
+    if (newStorageMode != null) values['storage_mode'] = newStorageMode;
+    if (newDownloadTreeUri != null) {
+      values['download_tree_uri'] = newDownloadTreeUri;
+    }
     if (newSafFileName != null) {
       values['saf_file_name'] = newSafFileName;
     }
@@ -715,45 +672,6 @@ class HistoryDatabase {
       await batch.commit(noResult: true);
       return true;
     });
-  }
-
-  Future<void> updateAudioMetadata(
-    String id, {
-    String? newQuality,
-    int? newBitDepth,
-    int? newSampleRate,
-    bool? hasLyrics,
-    int? lyricsMetadataScanVersion,
-  }) async {
-    final db = await database;
-    final values = <String, dynamic>{};
-    if (newQuality != null) {
-      values['quality'] = newQuality;
-    }
-    if (newBitDepth != null) {
-      values['bit_depth'] = newBitDepth;
-    }
-    if (newSampleRate != null) {
-      values['sample_rate'] = newSampleRate;
-    }
-    if (hasLyrics != null) {
-      values['has_lyrics'] = hasLyrics ? 1 : 0;
-    }
-    if (lyricsMetadataScanVersion != null) {
-      values['lyrics_metadata_scan_version'] = lyricsMetadataScanVersion;
-    }
-    if (values.isEmpty) {
-      return;
-    }
-    await db.update('history', values, where: 'id = ?', whereArgs: [id]);
-  }
-
-  Future<Set<String>> getAllFilePaths() async {
-    final db = await database;
-    final rows = await db.rawQuery(
-      "SELECT file_path FROM history WHERE file_path IS NOT NULL AND file_path != ''",
-    );
-    return rows.map((r) => r['file_path'] as String).toSet();
   }
 
   Future<List<Map<String, dynamic>>> getEntriesWithPathsPage({

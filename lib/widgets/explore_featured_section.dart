@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:mornye/providers/explore_provider.dart';
+import 'package:mornye/utils/adaptive_layout.dart';
 import 'package:mornye/widgets/cached_cover_image.dart';
 import 'package:mornye/widgets/desktop/desktop_scroll_arrows.dart';
 import 'package:mornye/widgets/audio_quality_badges.dart';
@@ -20,6 +21,9 @@ class ExploreFeaturedSection extends StatelessWidget {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     final scaler = MediaQuery.textScalerOf(context);
+    // The title and first card start where Home's other shelves do; the
+    // cards still scroll edge to edge.
+    final inset = 16 + homeContentInset(context);
     return LayoutBuilder(
       builder: (context, constraints) {
         final width = (constraints.maxWidth - 48).clamp(160.0, 560.0);
@@ -32,7 +36,7 @@ class ExploreFeaturedSection extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 20, 16, 12),
+              padding: EdgeInsets.fromLTRB(inset, 20, inset, 12),
               child: Text(
                 section.title,
                 style: theme.textTheme.headlineSmall?.copyWith(
@@ -52,7 +56,7 @@ class ExploreFeaturedSection extends StatelessWidget {
                 builder: (context, controller) => ListView.separated(
                   controller: controller,
                   scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  padding: EdgeInsets.symmetric(horizontal: inset),
                   itemCount: section.items.length,
                   separatorBuilder: (_, _) => const SizedBox(width: 12),
                   itemBuilder: (context, index) {

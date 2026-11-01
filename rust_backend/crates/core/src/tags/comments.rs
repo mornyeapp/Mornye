@@ -1,42 +1,36 @@
 use super::{AudioMetadata, pair, truthy, utf8};
 use crate::matching::{lowercase, uppercase};
 
-pub(super) fn parse(data: &[u8], max_comment: usize) -> Vec<(String, String)> {
-    let Some(length) = data.get(..4) else {
-        return vec![];
-    };
-    let vendor = u32::from_le_bytes(length.try_into().unwrap()) as usize;
-    let Some(end) = vendor.checked_add(8) else {
-        return vec![];
-    };
-    let Some(count) = data.get(end - 4..end) else {
-        return vec![];
-    };
-    let count = u32::from_le_bytes(count.try_into().unwrap());
-    let mut offset = end;
-    let mut items = Vec::new();
-    let count = if max_comment == usize::MAX {
-        count
-    } else {
-        count.min(100)
-    };
-    for _ in 0..count {
-        let Some(length) = data.get(offset..offset.saturating_add(4)) else {
-            break;
-        };
-        let length = u32::from_le_bytes(length.try_into().unwrap()) as usize;
-        offset += 4;
-        let Some(value) = data.get(offset..offset.saturating_add(length)) else {
-            break;
-        };
-        offset += length;
-        if length <= max_comment
-            && let Some(index) = value.iter().position(|value| *value == b'=')
-        {
-            items.push((utf8(&value[..index]), utf8(&value[index + 1..])));
+pub(super) fn parse(
+    data: &[u8],
+    max_comment: usize,
+) -> impl Iterator<Item = (String, String)> + '_ {
+    let header = data.get(..4).and_then(|length| {
+        let vendor = u32::from_le_bytes(length.try_into().unwrap()) as usize;
+        let end = vendor.checked_add(8)?;
+        let count = data.get(end - 4..end)?;
+        Some((end, u32::from_le_bytes(count.try_into().unwrap())))
+    });
+    let (mut offset, mut count) = header.unwrap_or_default();
+    // The enclosing tag block and each comment are already byte-bounded.
+    // Gain tags may follow many repeated artist/credit or custom fields.
+    // Iterate rather than retaining every custom field in a large Opus tag.
+    std::iter::from_fn(move || {
+        while count > 0 {
+            count -= 1;
+            let length = data.get(offset..offset.saturating_add(4))?;
+            let length = u32::from_le_bytes(length.try_into().unwrap()) as usize;
+            offset += 4;
+            let value = data.get(offset..offset.saturating_add(length))?;
+            offset += length;
+            if length <= max_comment
+                && let Some(index) = value.iter().position(|value| *value == b'=')
+            {
+                return Some((utf8(&value[..index]), utf8(&value[index + 1..])));
+            }
         }
-    }
-    items
+        None
+    })
 }
 
 fn joined<'a>(items: impl Iterator<Item = &'a str>) -> String {
@@ -176,9 +170,9 @@ pub(super) fn apply(metadata: &mut AudioMetadata, key: &str, value: &str, ape: b
                 &mut metadata.replay_gain_album_gain
             };
             if target.is_empty()
-                && let Ok(value) = value.trim().parse::<i16>()
+                && let Some(value) = r128_gain(value)
             {
-                *target = format!("{:.2} dB", f64::from(value) / 256.0 + 5.0);
+                *target = value;
             }
         }
         _ => {}
@@ -221,22 +215,51 @@ pub(super) fn ape_key(key: &str) -> bool {
     )
 }
 
-pub(super) fn ogg(items: &[(String, String)]) -> AudioMetadata {
+fn r128_gain(value: &str) -> Option<String> {
+    value
+        .trim()
+        .parse::<i16>()
+        .ok()
+        .map(|value| format!("{:.2} dB", f64::from(value) / 256.0 + 5.0))
+}
+
+pub(super) fn ogg(items: impl Iterator<Item = (String, String)>, opus: bool) -> AudioMetadata {
     let mut metadata = AudioMetadata::default();
     let mut artists = Vec::new();
     let mut album_artists = Vec::new();
+    let mut track_gain = None;
+    let mut album_gain = None;
     for (key, value) in items {
-        match uppercase(key).as_str() {
-            "ARTIST" => artists.push(value.as_str()),
-            "ALBUMARTIST" | "ALBUM_ARTIST" | "ALBUM ARTIST" => album_artists.push(value.as_str()),
-            _ => apply(&mut metadata, key, value, false),
+        match uppercase(&key).as_str() {
+            "ARTIST" => artists.push(value),
+            "ALBUMARTIST" | "ALBUM_ARTIST" | "ALBUM ARTIST" => album_artists.push(value),
+            "R128_TRACK_GAIN" if opus => {
+                track_gain = track_gain.or_else(|| r128_gain(&value));
+            }
+            "R128_ALBUM_GAIN" if opus => {
+                album_gain = album_gain.or_else(|| r128_gain(&value));
+            }
+            _ => apply(&mut metadata, &key, &value, false),
         }
     }
     if !artists.is_empty() {
-        metadata.artist = joined(artists.into_iter());
+        metadata.artist = joined(artists.iter().map(String::as_str));
     }
     if !album_artists.is_empty() {
-        metadata.album_artist = joined(album_artists.into_iter());
+        metadata.album_artist = joined(album_artists.iter().map(String::as_str));
+    }
+    if opus {
+        // RFC 7845 uses R128 gains relative to the decoder's header gain.
+        // Prefer these over stale legacy tags regardless of comment order.
+        // Do not add OpusHead output gain here: the decoder already applies it.
+        for (gain, target) in [
+            (track_gain, &mut metadata.replay_gain_track_gain),
+            (album_gain, &mut metadata.replay_gain_album_gain),
+        ] {
+            if let Some(gain) = gain {
+                *target = gain;
+            }
+        }
     }
     metadata
 }

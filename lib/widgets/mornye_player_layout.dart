@@ -6,6 +6,7 @@ import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:mornye/controllers/player_metadata_controller.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/music_player_provider.dart';
+import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/routes/now_playing_route.dart';
 import 'package:mornye/utils/playback_seek_preview.dart';
 import 'package:mornye/widgets/mornye_context_menu.dart';
@@ -99,22 +100,19 @@ class MornyePlayerLayout extends ConsumerWidget {
         ? Duration.zero
         : const Duration(milliseconds: 380);
     final queue = ref.watch(playQueueProvider).value ?? const <MediaItem>[];
-    final reportedIndex = ref.watch(
-      playbackStateProvider.select((state) => state.value?.queueIndex),
+    final currentIndex = ref.watch(currentQueueIndexProvider);
+    final showVolume = ref.watch(
+      settingsProvider.select((s) => s.playerShowVolume),
     );
-    final currentIndex =
-        reportedIndex != null &&
-            reportedIndex >= 0 &&
-            reportedIndex < queue.length &&
-            queue[reportedIndex].id == mediaItem.id
-        ? reportedIndex
-        : queue.indexWhere((item) => item.id == mediaItem.id);
     final landscape =
         MediaQuery.sizeOf(context).width > MediaQuery.sizeOf(context).height;
     Widget hideControls(Widget child) => PlayerLyricsControlsVisibility(
       hidden: showLyrics && lyricsControlsHidden && !landscape,
       child: child,
     );
+    // Any rebuild below this builder, such as a position tick, lays it out
+    // and so repaints its parent; what it returns keeps its own layer (the
+    // scroll viewport has one already).
     final body = LayoutBuilder(
       builder: (context, constraints) {
         final screenSize = MediaQuery.sizeOf(context);
@@ -378,18 +376,20 @@ class MornyePlayerLayout extends ConsumerWidget {
         );
 
         if (landscape) {
-          return MornyeLandscapePlayer(
-            page: page,
-            isPlaying: ref.watch(playbackPlayingProvider),
-            controlsHeldOpen: lyricsOptionsOpen,
-            onPageChanged: onPageChanged,
-            artwork: stage(artworkOnly: true),
-            header: _trackHeader(context, colorScheme, compact: true),
-            lyrics: lyricsBuilder(true),
-            lyricsOptions: showLyrics ? lyricsOptions : null,
-            queue: MornyePlayerQueue(colorScheme: colorScheme),
-            controls: controls(),
-            volume: const PlayerVolumeControl(),
+          return RepaintBoundary(
+            child: MornyeLandscapePlayer(
+              page: page,
+              isPlaying: ref.watch(playbackPlayingProvider),
+              controlsHeldOpen: lyricsOptionsOpen,
+              onPageChanged: onPageChanged,
+              artwork: stage(artworkOnly: true),
+              header: _trackHeader(context, colorScheme, compact: true),
+              lyrics: lyricsBuilder(true),
+              lyricsOptions: showLyrics ? lyricsOptions : null,
+              queue: MornyePlayerQueue(colorScheme: colorScheme),
+              controls: controls(),
+              volume: showVolume ? const PlayerVolumeControl() : null,
+            ),
           );
         }
 
@@ -438,14 +438,16 @@ class MornyePlayerLayout extends ConsumerWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 controls(),
-                SizedBox(height: volumeGap - transportShift),
-                AnimatedBuilder(
-                  animation: artworkForeground,
-                  builder: (context, _) => PlayerVolumeControl(
-                    key: artworkKeys.volume,
-                    foreground: foreground('volume').onSurface,
+                if (showVolume) ...[
+                  SizedBox(height: volumeGap - transportShift),
+                  AnimatedBuilder(
+                    animation: artworkForeground,
+                    builder: (context, _) => PlayerVolumeControl(
+                      key: artworkKeys.volume,
+                      foreground: foreground('volume').onSurface,
+                    ),
                   ),
-                ),
+                ],
                 const SizedBox(height: 8),
               ],
             ),
@@ -460,7 +462,7 @@ class MornyePlayerLayout extends ConsumerWidget {
             child: SizedBox(height: minHeight, child: content()),
           );
         }
-        return content();
+        return RepaintBoundary(child: content());
       },
     );
     return PlayerTrackSwipe(
@@ -509,7 +511,6 @@ class MornyePlayerLayout extends ConsumerWidget {
                           mediaItem: mediaItem,
                           metadata: metadata,
                           maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontSize: 22 - 4 * progress,
                             fontWeight: FontWeight.w600,

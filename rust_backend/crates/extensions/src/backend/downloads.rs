@@ -339,6 +339,19 @@ impl Backend {
                 if stop {
                     return Ok(stopped(&id, &availability, ""));
                 }
+                let reason = text(&availability, "reason").trim();
+                last = Some(failure(
+                    &id,
+                    if reason.is_empty() {
+                        "No matching track available from this provider"
+                    } else {
+                        reason
+                    },
+                    "",
+                    availability["retry_after_seconds"]
+                        .as_i64()
+                        .unwrap_or_default(),
+                ));
                 continue;
             }
             let track_id = if direct {
@@ -838,7 +851,7 @@ impl Backend {
             self.enrich_download_extended(&mut enriched, &check)?;
         }
         let request = &enriched;
-        probe_result(
+        let container = probe_result(
             &files,
             &mut result,
             request.album_name.trim().is_empty()
@@ -849,6 +862,20 @@ impl Backend {
             return success(request, &result, &returned, true, manifest, &check)
                 .map(DownloadOutcome::Final);
         }
+        let mut response = success(request, &result, &path, false, manifest, &check)?;
+        if text(&response, "actual_extension") == ".flac" && container != "flac" {
+            // Unrecognized bytes behind a FLAC label, such as an error page,
+            // cannot take FLAC tags. Another provider may return real audio.
+            return Ok(DownloadOutcome::Retry(failure(
+                &manifest.name,
+                &format!(
+                    "provider {} returned a file that is not FLAC audio",
+                    manifest.name
+                ),
+                "file_error",
+                0,
+            )));
+        }
         if !request.item_id.is_empty() {
             let _ = environment
                 .download_state()
@@ -856,7 +883,6 @@ impl Backend {
                 .finalizing(&request.item_id);
         }
 
-        let mut response = success(request, &result, &path, false, manifest, &check)?;
         let mut resolved = request.clone();
         resolved.output_ext = text(&response, "actual_extension").to_owned();
         if !request.output_path.is_empty() {

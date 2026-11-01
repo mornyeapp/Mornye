@@ -1,9 +1,5 @@
-// Host-only injection of the same libsmb2 release shipped by the plugin.
-// ignore_for_file: invalid_use_of_internal_member
 import 'dart:io';
 
-// ignore: implementation_imports
-import 'package:dart_smb2/src/ffi/native_lib.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/services/network_smb_client.dart';
 import 'package:mornye/services/network_storage_service.dart';
@@ -14,7 +10,6 @@ void main() {
   test(
     'SMB uploads, reconciles retries and deletes only the selected file',
     () async {
-      debugLibSmb2PathOverride = Platform.environment['TEST_SMB_LIBRARY'];
       final storage = NetworkStorageService(
         read: () async => null,
         write: (_) async {},
@@ -23,7 +18,6 @@ void main() {
       addTearDown(() async {
         await storage.dispose();
         await temp.delete(recursive: true);
-        debugLibSmb2PathOverride = null;
       });
       final c = NetworkConnection(
         id: 'nas',

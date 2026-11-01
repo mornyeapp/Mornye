@@ -242,6 +242,9 @@ class Extension {
   bool get hasServiceHealth => serviceHealth.isNotEmpty;
   bool get hasHomeFeed => capabilities['homeFeed'] == true;
 
+  /// Suggests songs like given ones (`getRelatedTracks`).
+  bool get hasRelatedTracks => capabilities['relatedTracks'] == true;
+
   /// The extension owns its country choices and the setting sent to its API.
   ExtensionSetting? get homeFeedRegionSetting {
     if (!hasHomeFeed) return null;
@@ -455,34 +458,24 @@ class SearchBehavior {
       return (thumbnailWidth!.toDouble(), thumbnailHeight!.toDouble());
     }
 
-    switch (thumbnailRatio) {
-      case 'wide':
-        return (defaultSize * 16 / 9, defaultSize);
-      case 'portrait':
-        return (defaultSize * 2 / 3, defaultSize);
-      case 'square':
-      default:
-        return (defaultSize, defaultSize);
-    }
+    return switch (thumbnailRatio) {
+      'wide' => (defaultSize * 16 / 9, defaultSize),
+      'portrait' => (defaultSize * 2 / 3, defaultSize),
+      _ => (defaultSize, defaultSize),
+    };
   }
 }
 
 class TrackMatching {
   final bool customMatching;
   final String? strategy;
-  final int durationTolerance;
 
-  const TrackMatching({
-    required this.customMatching,
-    this.strategy,
-    this.durationTolerance = 3,
-  });
+  const TrackMatching({required this.customMatching, this.strategy});
 
   factory TrackMatching.fromJson(Map<String, dynamic> json) {
     return TrackMatching(
       customMatching: json['customMatching'] as bool? ?? false,
       strategy: json['strategy'] as String?,
-      durationTolerance: json['durationTolerance'] as int? ?? 3,
     );
   }
 }
@@ -522,48 +515,23 @@ class URLHandler {
 }
 
 class ExtensionServiceHealthCheck {
-  final String id;
-  final String? label;
-  final String url;
-  final String method;
-  final String? serviceKey;
-  final int? timeoutMs;
   final int? cacheTtlSeconds;
-  final bool required;
 
-  const ExtensionServiceHealthCheck({
-    required this.id,
-    this.label,
-    required this.url,
-    this.method = 'GET',
-    this.serviceKey,
-    this.timeoutMs,
-    this.cacheTtlSeconds,
-    this.required = false,
-  });
+  const ExtensionServiceHealthCheck({this.cacheTtlSeconds});
 
   factory ExtensionServiceHealthCheck.fromJson(Map<String, dynamic> json) {
     return ExtensionServiceHealthCheck(
-      id: json['id'] as String? ?? '',
-      label: json['label'] as String?,
-      url: json['url'] as String? ?? '',
-      method: json['method'] as String? ?? 'GET',
-      serviceKey: json['serviceKey'] as String?,
-      timeoutMs: json['timeoutMs'] as int?,
       cacheTtlSeconds: json['cacheTtlSeconds'] as int?,
-      required: json['required'] as bool? ?? false,
     );
   }
 }
 
 class ExtensionHealthStatus {
-  final String extensionId;
   final String status;
   final DateTime? checkedAt;
   final List<ExtensionHealthCheckStatus> checks;
 
   const ExtensionHealthStatus({
-    required this.extensionId,
     required this.status,
     this.checkedAt,
     this.checks = const [],
@@ -571,7 +539,6 @@ class ExtensionHealthStatus {
 
   factory ExtensionHealthStatus.fromJson(Map<String, dynamic> json) {
     return ExtensionHealthStatus(
-      extensionId: json['extension_id'] as String? ?? '',
       status: json['status'] as String? ?? 'unknown',
       checkedAt: DateTime.tryParse(json['checked_at'] as String? ?? ''),
       checks:
@@ -590,8 +557,6 @@ class ExtensionHealthStatus {
 class ExtensionHealthCheckStatus {
   final String id;
   final String? label;
-  final String url;
-  final String method;
   final String? serviceKey;
   final bool required;
   final String status;
@@ -599,13 +564,10 @@ class ExtensionHealthCheckStatus {
   final int latencyMs;
   final String? message;
   final String? error;
-  final DateTime? checkedAt;
 
   const ExtensionHealthCheckStatus({
     required this.id,
     this.label,
-    required this.url,
-    required this.method,
     this.serviceKey,
     this.required = false,
     required this.status,
@@ -613,15 +575,12 @@ class ExtensionHealthCheckStatus {
     this.latencyMs = 0,
     this.message,
     this.error,
-    this.checkedAt,
   });
 
   factory ExtensionHealthCheckStatus.fromJson(Map<String, dynamic> json) {
     return ExtensionHealthCheckStatus(
       id: json['id'] as String? ?? '',
       label: json['label'] as String?,
-      url: json['url'] as String? ?? '',
-      method: json['method'] as String? ?? 'GET',
       serviceKey: json['service_key'] as String?,
       required: json['required'] as bool? ?? false,
       status: json['status'] as String? ?? 'unknown',
@@ -629,7 +588,6 @@ class ExtensionHealthCheckStatus {
       latencyMs: json['latency_ms'] as int? ?? 0,
       message: json['message'] as String?,
       error: json['error'] as String?,
-      checkedAt: DateTime.tryParse(json['checked_at'] as String? ?? ''),
     );
   }
 
@@ -637,14 +595,12 @@ class ExtensionHealthCheckStatus {
 }
 
 class PostProcessingHook {
-  final String id;
   final String name;
   final String? description;
   final bool defaultEnabled;
   final List<String> supportedFormats;
 
   const PostProcessingHook({
-    required this.id,
     required this.name,
     this.description,
     this.defaultEnabled = false,
@@ -653,7 +609,6 @@ class PostProcessingHook {
 
   factory PostProcessingHook.fromJson(Map<String, dynamic> json) {
     return PostProcessingHook(
-      id: json['id'] as String? ?? '',
       name: json['name'] as String? ?? '',
       description: json['description'] as String?,
       defaultEnabled: json['defaultEnabled'] as bool? ?? false,
@@ -667,13 +622,13 @@ class QualityOption {
   final String id;
   final String label;
   final String? description;
-  final List<QualitySpecificSetting> settings;
+  final int settingsCount;
 
   const QualityOption({
     required this.id,
     required this.label,
     this.description,
-    this.settings = const [],
+    this.settingsCount = 0,
   });
 
   factory QualityOption.fromJson(Map<String, dynamic> json) {
@@ -681,49 +636,7 @@ class QualityOption {
       id: json['id'] as String? ?? '',
       label: json['label'] as String? ?? '',
       description: json['description'] as String?,
-      settings:
-          (json['settings'] as List<dynamic>?)
-              ?.map(
-                (s) =>
-                    QualitySpecificSetting.fromJson(s as Map<String, dynamic>),
-              )
-              .toList() ??
-          [],
-    );
-  }
-}
-
-class QualitySpecificSetting {
-  final String key;
-  final String label;
-  final String type;
-  final dynamic defaultValue;
-  final String? description;
-  final List<String>? options;
-  final bool required;
-  final bool secret;
-
-  const QualitySpecificSetting({
-    required this.key,
-    required this.label,
-    required this.type,
-    this.defaultValue,
-    this.description,
-    this.options,
-    this.required = false,
-    this.secret = false,
-  });
-
-  factory QualitySpecificSetting.fromJson(Map<String, dynamic> json) {
-    return QualitySpecificSetting(
-      key: json['key'] as String? ?? '',
-      label: json['label'] as String? ?? '',
-      type: json['type'] as String? ?? 'string',
-      defaultValue: json['default'],
-      description: json['description'] as String?,
-      options: (json['options'] as List<dynamic>?)?.cast<String>(),
-      required: json['required'] as bool? ?? false,
-      secret: json['secret'] as bool? ?? false,
+      settingsCount: (json['settings'] as List<dynamic>?)?.length ?? 0,
     );
   }
 }
@@ -735,7 +648,6 @@ class ExtensionSetting {
   final dynamic defaultValue;
   final String? description;
   final List<String>? options;
-  final bool required;
   final String? action;
 
   const ExtensionSetting({
@@ -745,7 +657,6 @@ class ExtensionSetting {
     this.defaultValue,
     this.description,
     this.options,
-    this.required = false,
     this.action,
   });
 
@@ -757,7 +668,6 @@ class ExtensionSetting {
       defaultValue: json['default'],
       description: json['description'] as String?,
       options: (json['options'] as List<dynamic>?)?.cast<String>(),
-      required: json['required'] as bool? ?? false,
       action: json['action'] as String?,
     );
   }

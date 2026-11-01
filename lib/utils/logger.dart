@@ -297,19 +297,6 @@ class LogBuffer extends ChangeNotifier {
     notifyListeners();
   }
 
-  String export() {
-    final buffer = StringBuffer();
-    buffer.writeln('${AppInfo.appName} Log Export');
-    buffer.writeln('Generated: ${DateTime.now().toIso8601String()}');
-    buffer.writeln('Entries: ${_entries.length}');
-    buffer.writeln('=' * 60);
-    buffer.writeln();
-    for (final entry in _entries) {
-      buffer.writeln(entry.toString());
-    }
-    return buffer.toString();
-  }
-
   Future<String> exportWithDeviceInfo() async {
     final buffer = StringBuffer();
 
@@ -394,19 +381,14 @@ class LogBuffer extends ChangeNotifier {
 
     for (final entry in _entries) {
       switch (entry.level) {
-        case 'ERROR':
-        case 'FATAL':
+        case 'ERROR' || 'FATAL':
           errorCount++;
-          break;
         case 'WARN':
           warnCount++;
-          break;
         case 'INFO':
           infoCount++;
-          break;
         case 'DEBUG':
           debugCount++;
-          break;
       }
       if (entry.isFromNative) nativeCount++;
     }
@@ -430,15 +412,11 @@ class LogBuffer extends ChangeNotifier {
     return buffer.toString();
   }
 
-  List<LogEntry> filter({String? level, String? tag, String? search}) {
-    final tagLower = tag?.toLowerCase();
+  List<LogEntry> filter({String? level, String? search}) {
     final searchLower = search?.toLowerCase();
 
     return _entries.where((entry) {
       if (level != null && level != 'ALL' && entry.level != level) {
-        return false;
-      }
-      if (tagLower != null && !entry.tag.toLowerCase().contains(tagLower)) {
         return false;
       }
       if (searchLower != null && searchLower.isNotEmpty) {
@@ -481,22 +459,14 @@ class BufferedOutput extends LogOutput {
     );
   }
 
-  String _levelToString(Level level) {
-    switch (level) {
-      case Level.debug:
-        return 'DEBUG';
-      case Level.info:
-        return 'INFO';
-      case Level.warning:
-        return 'WARN';
-      case Level.error:
-        return 'ERROR';
-      case Level.fatal:
-        return 'FATAL';
-      default:
-        return 'LOG';
-    }
-  }
+  String _levelToString(Level level) => switch (level) {
+    Level.debug => 'DEBUG',
+    Level.info => 'INFO',
+    Level.warning => 'WARN',
+    Level.error => 'ERROR',
+    Level.fatal => 'FATAL',
+    _ => 'LOG',
+  };
 }
 
 class AppLogger {

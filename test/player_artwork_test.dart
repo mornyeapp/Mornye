@@ -4,6 +4,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/player_artwork.dart';
 
 void main() {
@@ -63,4 +64,33 @@ void main() {
       await tester.pumpWidget(const SizedBox());
     },
   );
+
+  testWidgets('covers with no file show the placeholder without throwing', (
+    tester,
+  ) async {
+    for (final uri in [
+      'file://nas/covers/a.jpg',
+      'file:///covers/a.jpg?size=large',
+      'content://media/cover',
+      'covers/a.jpg',
+    ]) {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: PlayerArtwork(
+            artUri: uri,
+            colorScheme: const ColorScheme.dark(),
+          ),
+        ),
+      );
+      expect(tester.takeException(), isNull, reason: uri);
+      expect(find.byType(Image), findsNothing, reason: uri);
+      expect(
+        find.byWidgetPredicate(
+          (widget) => widget is AppIcon && widget.icon == Icons.music_note,
+        ),
+        findsOneWidget,
+        reason: uri,
+      );
+    }
+  });
 }

@@ -95,6 +95,13 @@ pub(super) fn success(
             .find(|extension| !extension.is_empty())
             .unwrap_or_default()
     });
+    // A FLAC label on other audio bytes yields to the bytes, since FLAC tags
+    // cannot be written into them.
+    let extension = if extension.trim_start_matches('.') == "flac" && !container.is_empty() {
+        container.to_lowercase()
+    } else {
+        extension
+    };
     if !extension.is_empty() {
         let extension = format!(".{}", extension.trim_start_matches('.'));
         response["actual_extension"] = if extension == ".mp4" {

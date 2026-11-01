@@ -554,6 +554,7 @@ class _ThemeModeSelector extends StatelessWidget {
           labels: labels.values.toList(),
           selectedIndex: labels.keys.toList().indexOf(currentMode),
           onChanged: (index) => onChanged(labels.keys.elementAt(index)),
+          samplesBackdrop: false,
         ),
       );
     }

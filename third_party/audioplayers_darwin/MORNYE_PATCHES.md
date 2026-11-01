@@ -47,6 +47,15 @@ from tens of seconds earlier or later. This affects both macOS and iOS,
 including lyric taps and timeline scrubbing. Preparing a variable-bitrate
 network asset can take longer because its timing must be indexed.
 
+A URL with the fragment `#mornye-arriving` is the exception: the app marks
+a song a paired phone is still sending (Mornye Link), served over loopback
+HTTP while it is written. Indexing reads to the end of the file, which
+stalls until the upload ends, and AVPlayer fails with a request timeout
+when the upload is slower than about 2 MB/s. Such an asset is created
+without the precise key, from the URL without the fragment, so it starts
+at once; its seeks may be approximate until it plays again from the whole
+file.
+
 ### Packaging
 
 - `darwin/audioplayers_darwin.podspec` adds
@@ -54,6 +63,25 @@ network asset can take longer because its timing must be indexed.
 - `pubspec.yaml` drops `resolution: workspace`; this copy is not a member of
   the upstream pub workspace.
 - `pubspec.lock` in this folder is tracked but not part of upstream.
+
+### Source lifecycle
+
+`WrappedMediaPlayer` owns the pending preparation continuation and completes it
+when a source is replaced or disposed. KVO callbacks return to the main actor
+and verify the item still belongs to the player. Queued completion notifications
+from an outgoing item cannot reset or release its replacement. The plugin treats
+cancelled preparation as a completed method call without a playback error.
+The `getDuration` branch returns after delivering its duration so the same
+method call cannot receive the default result a second time.
+
+### Next player
+
+A `setNextPlayer` method with an optional `nextPlayerId` sets
+`WrappedMediaPlayer.next` (weak) for gapless playback. Linking prerolls the
+next player's loaded item. When the current item ends, the completion
+handler resumes the next player before anything else, then reports
+completion. Replacing or releasing the current item clears the link; no
+`nextPlayerId` unlinks it.
 
 ## Tests
 
@@ -85,6 +113,18 @@ swiftc darwin/audioplayers_darwin/Sources/audioplayers_darwin/{WrappedMediaPlaye
 The same sources can be compiled with the iOS simulator SDK and run with
 `simctl spawn` to check the shared iOS implementation.
 
+`tests/SourceLifecycleTests.swift` uses a deferred AVPlayer for cancellation and
+real generated WAV files for successful preparation, failed preparation,
+stale completion delivery and a linked next player starting on completion.
+It does not need an external music fixture:
+
+```bash
+cd third_party/audioplayers_darwin
+swiftc darwin/audioplayers_darwin/Sources/audioplayers_darwin/{WrappedMediaPlayer,Utils,AudioPlayerError,EqualizerAudioTap,EqualizerDSP}.swift \
+  tests/SourceLifecycleTests.swift -o /tmp/source_lifecycle_tests
+/tmp/source_lifecycle_tests
+```
+
 ## Changed Files
 
 Compared against the pub.dev 6.5.0 package in the local pub cache:
@@ -96,6 +136,7 @@ Compared against the pub.dev 6.5.0 package in the local pub cache:
 - `darwin/audioplayers_darwin/Sources/audioplayers_darwin/EqualizerDSP.swift` (new)
 - `tests/EqualizerDSPTests.swift` (new)
 - `tests/AccurateSeekTests.swift` (new)
+- `tests/SourceLifecycleTests.swift` (new)
 - `pubspec.yaml`, `README.md`, `pubspec.lock` (new)
 
 ## Upgrading

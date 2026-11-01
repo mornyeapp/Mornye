@@ -337,18 +337,8 @@ extension _QueueTabNavigation on _QueueTabState {
     );
   }
 
-  Future<void> _showCreatePlaylistDialog(BuildContext context) async {
-    final playlistName = await promptPlaylistName(
-      context,
-      title: context.l10n.collectionCreatePlaylist,
-      confirmLabel: context.l10n.actionCreate,
-    );
-
-    if (playlistName == null || playlistName.isEmpty) return;
-    await ref
-        .read(libraryCollectionsProvider.notifier)
-        .createPlaylist(playlistName);
-  }
+  Future<void> _showCreatePlaylistDialog(BuildContext context) =>
+      showCreatePlaylistSheet(context, ref);
 
   /// Pass a finite [size] (e.g. 56) for list view, or `null` for grid view
   /// where the widget should expand to fill its parent.
@@ -366,39 +356,21 @@ extension _QueueTabNavigation on _QueueTabState {
     final placeholder = _playlistIconFallback(colorScheme, size);
 
     final customCoverPath = playlist.coverImagePath;
-    if (customCoverPath != null && customCoverPath.isNotEmpty) {
-      return ClipRRect(
-        borderRadius: borderRadius,
-        child: Image.file(
-          File(customCoverPath),
-          width: size,
-          height: size,
-          fit: BoxFit.cover,
-          cacheWidth: cacheExtent,
-          gaplessPlayback: true,
-          filterQuality: FilterQuality.low,
-          frameBuilder: (_, child, frame, wasSynchronouslyLoaded) {
-            if (wasSynchronouslyLoaded || frame != null) return child;
-            return placeholder;
-          },
-          errorBuilder: (_, _, _) => placeholder,
-        ),
-      );
-    }
+    final cover = customCoverPath != null && customCoverPath.isNotEmpty
+        ? customCoverPath
+        : playlist.tracks
+                  .where(
+                    (e) =>
+                        e.track.coverUrl != null &&
+                        e.track.coverUrl!.isNotEmpty,
+                  )
+                  .map((e) => e.track.coverUrl!)
+                  .firstOrNull ??
+              playlist.previewCover;
 
-    final firstCoverUrl =
-        playlist.tracks
-            .where(
-              (e) => e.track.coverUrl != null && e.track.coverUrl!.isNotEmpty,
-            )
-            .map((e) => e.track.coverUrl!)
-            .firstOrNull ??
-        playlist.previewCover;
-
-    if (firstCoverUrl != null) {
-      // Guard against local file paths that may have been stored as coverUrl
+    if (cover != null) {
       return LocalOrNetworkCoverImage(
-        url: firstCoverUrl,
+        url: cover,
         width: size,
         height: size,
         borderRadius: borderRadius,

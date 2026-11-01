@@ -138,9 +138,10 @@ these cases are not skipped there.
 
 Optional SMB cases are skipped unless their environment is set:
 `TEST_SMB=1` (with `scripts/smb2_fixture_server.py`) and `TEST_SMB_GUEST_PORT`
-in `network_storage_service_test.dart`; `TEST_SMB_LIBRARY` in
-`network_smb_transport_test.dart`; `TEST_SMB_UPLOAD=1` in
+in `network_storage_service_test.dart`; `TEST_SMB_UPLOAD=1` in
 `network_smb_upload_test.dart`. `TEST_SMB_PORT` overrides the fixture port.
+`network_smb_transport_test.dart` runs against a loopback server with the
+native library bundled by dart_smb2's build hook, without a library override.
 
 ## Running
 

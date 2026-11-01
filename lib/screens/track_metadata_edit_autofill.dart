@@ -4,6 +4,7 @@ class _AutoFillPreview {
   final Map<String, String> values;
   final String sourceName;
   final String? coverUrl;
+  final String? headerVideoUrl;
   final String? coverPath;
   final String? coverTempDir;
   final ({int width, int height, int bytes})? coverDetails;
@@ -12,6 +13,7 @@ class _AutoFillPreview {
     required this.values,
     required this.sourceName,
     this.coverUrl,
+    this.headerVideoUrl,
     this.coverPath,
     this.coverTempDir,
     this.coverDetails,
@@ -382,6 +384,7 @@ extension _EditMetadataSheetAutoFill on _EditMetadataSheetState {
           values: availableValues,
           sourceName: resolvedSourceName,
           coverUrl: coverUrl?.isNotEmpty == true ? coverUrl : null,
+          headerVideoUrl: result.headerVideoUrl,
           coverPath: coverPreview?.path,
           coverTempDir: coverPreview?.tempDir,
           coverDetails: coverPreview?.details,
@@ -429,6 +432,7 @@ extension _EditMetadataSheetAutoFill on _EditMetadataSheetState {
             _selectedCoverPath = coverPath;
             _selectedCoverTempDir = coverTempDir;
             _selectedCoverName = EditMetadataSheet._onlineCoverSentinel;
+            _selectedMotionArtworkUrl = preview.headerVideoUrl;
             if (coverDetails != null) {
               _coverDetails[coverPath] = coverDetails;
             } else {
@@ -544,7 +548,6 @@ extension _EditMetadataSheetAutoFill on _EditMetadataSheetState {
                 return MornyeFilterChip(
                   label: _fieldLabel(key),
                   selected: selected,
-                  glass: false,
                   icon: selected
                       ? CupertinoIcons.checkmark_circle_fill
                       : CupertinoIcons.circle,

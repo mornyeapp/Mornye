@@ -2,7 +2,7 @@ import 'dart:io';
 
 import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
-import 'package:mornye/services/library_database_models.dart';
+import 'package:mornye/models/library_database_models.dart';
 import 'package:mornye/services/library_row_mapper.dart';
 import 'package:mornye/services/sqlite_helpers.dart' as sqlite;
 import 'package:mornye/utils/ios_container_paths.dart';
@@ -12,7 +12,7 @@ final _log = AppLogger('LibraryDatabase');
 
 /// Schema lifecycle is independent of collection reads and scan transactions.
 abstract final class LibrarySchema {
-  static const version = 18;
+  static const version = 20;
   static const visibleView = 'library_visible';
   static const searchFtsTable = 'library_search_fts';
   static const lookupSummaryTable = 'library_lookup_summary';
@@ -90,6 +90,9 @@ abstract final class LibrarySchema {
     int newVersion,
   ) async {
     _log.i('Upgrading library database from v$oldVersion to v$newVersion');
+    Future<void> addColumn(String column, String type) =>
+        sqlite.addColumnIfMissing(db, 'library', column, type);
+    const notNullZero = 'INTEGER NOT NULL DEFAULT 0';
     // Keep historical defaults: older rows require a metadata rescan, while
     // freshly scanned rows are written with their actual scan version.
     for (final addition in const [
@@ -117,7 +120,7 @@ abstract final class LibrarySchema {
         'match_key',
         'album_key',
       ]) {
-        await sqlite.addColumnIfMissing(db, 'library', column, 'TEXT');
+        await addColumn(column, 'TEXT');
       }
       await _backfillNormalizedColumns(db);
       await _createNormalizedIndexes(db);
@@ -126,12 +129,7 @@ abstract final class LibrarySchema {
       await sqlite.createPathKeyTable(db, 'library_path_keys');
     }
     if (oldVersion < 9) {
-      await sqlite.addColumnIfMissing(
-        db,
-        'library',
-        'audio_metadata_scan_version',
-        'INTEGER NOT NULL DEFAULT 0',
-      );
+      await addColumn('audio_metadata_scan_version', notNullZero);
     }
     if (oldVersion < 10) {
       for (final column in const [
@@ -140,42 +138,23 @@ abstract final class LibrarySchema {
         'sort_release',
         'sort_added',
       ]) {
-        await sqlite.addColumnIfMissing(
-          db,
-          'library',
-          column,
-          column == 'sort_added' ? 'INTEGER' : 'TEXT',
-        );
+        await addColumn(column, column == 'sort_added' ? 'INTEGER' : 'TEXT');
       }
       await _backfillQueueColumns(db);
       await _createQueueIndexes(db);
     }
     if (oldVersion < 11) {
-      await sqlite.addColumnIfMissing(
-        db,
-        'library',
-        'source_id',
-        "TEXT NOT NULL DEFAULT '$_legacySourceId'",
-      );
+      await addColumn('source_id', "TEXT NOT NULL DEFAULT '$_legacySourceId'");
       await _createSources(db);
     }
-    for (final addition in const [(12, 'explicit'), (13, 'has_lyrics')]) {
+    for (final addition in const [
+      (12, 'explicit'),
+      (13, 'has_lyrics'),
+      (15, 'has_replaygain'),
+    ]) {
       if (oldVersion < addition.$1) {
-        await sqlite.addColumnIfMissing(
-          db,
-          'library',
-          addition.$2,
-          'INTEGER NOT NULL DEFAULT 0',
-        );
+        await addColumn(addition.$2, notNullZero);
       }
-    }
-    if (oldVersion < 15) {
-      await sqlite.addColumnIfMissing(
-        db,
-        'library',
-        'has_replaygain',
-        'INTEGER NOT NULL DEFAULT 0',
-      );
     }
     if (oldVersion < 16) {
       await sqlite.backfillPathKeys(db, 'library', 'library_path_keys');
@@ -185,11 +164,23 @@ abstract final class LibrarySchema {
       await _createLookupSummary(db);
     }
     if (oldVersion < 18) {
-      await sqlite.addColumnIfMissing(
-        db,
-        'library',
-        'network_file_version',
-        'TEXT',
+      await addColumn('network_file_version', 'TEXT');
+    }
+    if (oldVersion < 19) {
+      await _createCueSplits(db);
+      await _createVisibleView(db);
+    }
+    if (oldVersion < 20) {
+      // Older Ogg reads stopped after 100 comments and could miss gain tags.
+      // Re-read only local Ogg songs on the next scan, keeping lyrics known.
+      await db.rawUpdate(
+        'UPDATE library SET audio_metadata_scan_version = ? '
+        'WHERE audio_metadata_scan_version >= ? '
+        "AND file_path NOT LIKE 'network://%' "
+        "AND (LOWER(format) IN ('opus', 'ogg', 'vorbis') "
+        "OR LOWER(file_path) LIKE '%.opus' "
+        "OR LOWER(file_path) LIKE '%.ogg')",
+        [libraryLyricsMetadataScanVersion, libraryAudioMetadataScanVersion],
       );
     }
   }
@@ -228,12 +219,48 @@ abstract final class LibrarySchema {
       'enabled': 1,
       'available': 1,
     }, conflictAlgorithm: ConflictAlgorithm.ignore);
+    await _createCueSplits(db);
+    await _createVisibleView(db);
+  }
+
+  static Future<void> _createCueSplits(DatabaseExecutor db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS library_cue_split_sources (
+        file_path TEXT NOT NULL PRIMARY KEY,
+        cue_path TEXT NOT NULL
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS library_cue_split_outputs (
+        cue_path TEXT NOT NULL,
+        file_path TEXT NOT NULL,
+        PRIMARY KEY(cue_path, file_path)
+      )
+    ''');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_cue_split_sources_cue '
+      'ON library_cue_split_sources(cue_path)',
+    );
+  }
+
+  static Future<void> _createVisibleView(DatabaseExecutor db) async {
     await db.execute('DROP VIEW IF EXISTS $visibleView');
     await db.execute('''
       CREATE VIEW $visibleView AS
       SELECT l.* FROM library l
       JOIN library_sources s ON s.id = l.source_id
       WHERE s.enabled = 1 AND s.available = 1
+        AND l.file_path NOT IN (
+          SELECT c.file_path FROM library_cue_split_sources c
+          JOIN (
+            SELECT o.cue_path FROM library_cue_split_outputs o
+            LEFT JOIN library t ON t.file_path = o.file_path
+            LEFT JOIN library_sources ts ON ts.id = t.source_id
+              AND ts.enabled = 1 AND ts.available = 1
+            GROUP BY o.cue_path
+            HAVING COUNT(*) = COUNT(ts.id)
+          ) complete ON complete.cue_path = c.cue_path
+        )
     ''');
   }
 
@@ -267,69 +294,43 @@ abstract final class LibrarySchema {
     }
   }
 
-  static Future<void> _backfillNormalizedColumns(Database db) async {
-    final rows = await db.query(
-      'library',
-      columns: [
-        'id',
-        'track_name',
-        'artist_name',
-        'album_name',
-        'album_artist',
-      ],
-    );
-    final batch = db.batch();
-    for (final row in rows) {
-      batch.update(
+  static Future<void> _backfillNormalizedColumns(Database db) =>
+      sqlite.backfillRows(
+        db,
         'library',
-        LibraryRowMapper.normalized(
+        const ['track_name', 'artist_name', 'album_name', 'album_artist'],
+        (row) => LibraryRowMapper.normalized(
           trackName: row['track_name'] as String? ?? '',
           artistName: row['artist_name'] as String? ?? '',
           albumName: row['album_name'] as String? ?? '',
           albumArtist: row['album_artist'] as String?,
         ),
-        where: 'id = ?',
-        whereArgs: [row['id']],
       );
-    }
-    await batch.commit(noResult: true);
-  }
 
-  static Future<void> _backfillQueueColumns(Database db) async {
-    final rows = await db.query(
-      'library',
-      columns: [
-        'id',
-        'track_name',
-        'artist_name',
-        'album_name',
-        'album_artist',
-        'genre',
-        'release_date',
-        'file_mod_time',
-        'scanned_at',
-      ],
-    );
-    final batch = db.batch();
-    for (final row in rows) {
-      batch.update(
-        'library',
-        LibraryRowMapper.queue(
-          trackName: row['track_name'] as String?,
-          artistName: row['artist_name'] as String?,
-          albumName: row['album_name'] as String?,
-          albumArtist: row['album_artist'] as String?,
-          genre: row['genre'] as String?,
-          releaseDate: row['release_date'] as String?,
-          fileModTime: (row['file_mod_time'] as num?)?.toInt(),
-          scannedAt: row['scanned_at'] as String?,
-        ),
-        where: 'id = ?',
-        whereArgs: [row['id']],
-      );
-    }
-    await batch.commit(noResult: true);
-  }
+  static Future<void> _backfillQueueColumns(Database db) => sqlite.backfillRows(
+    db,
+    'library',
+    const [
+      'track_name',
+      'artist_name',
+      'album_name',
+      'album_artist',
+      'genre',
+      'release_date',
+      'file_mod_time',
+      'scanned_at',
+    ],
+    (row) => LibraryRowMapper.queue(
+      trackName: row['track_name'] as String?,
+      artistName: row['artist_name'] as String?,
+      albumName: row['album_name'] as String?,
+      albumArtist: row['album_artist'] as String?,
+      genre: row['genre'] as String?,
+      releaseDate: row['release_date'] as String?,
+      fileModTime: (row['file_mod_time'] as num?)?.toInt(),
+      scannedAt: row['scanned_at'] as String?,
+    ),
+  );
 
   static Future<void> _createLookupSummary(DatabaseExecutor db) async {
     await db.execute('''
@@ -465,6 +466,24 @@ abstract final class LibrarySchema {
           where: 'id = ?',
           whereArgs: [source['id']],
         );
+      }
+      for (final table in const [
+        'library_cue_split_sources',
+        'library_cue_split_outputs',
+      ]) {
+        for (final row in await txn.query(table)) {
+          final previousPath = row['file_path'] as String;
+          final previousCue = row['cue_path'] as String;
+          final path = rebaseIosSandboxPath(previousPath, documents.path);
+          final cue = rebaseIosSandboxPath(previousCue, documents.path);
+          if (path == previousPath && cue == previousCue) continue;
+          batch.update(
+            table,
+            {'file_path': path, 'cue_path': cue},
+            where: 'file_path = ? AND cue_path = ?',
+            whereArgs: [previousPath, previousCue],
+          );
+        }
       }
       await batch.commit(noResult: true);
     });

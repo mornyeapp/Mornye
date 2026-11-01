@@ -1,6 +1,8 @@
 //! File capabilities granted by the native manager, never by JavaScript.
 
 mod index;
+#[cfg(any(target_vendor = "apple", target_os = "linux", target_os = "android"))]
+mod unix;
 #[cfg(windows)]
 mod windows;
 
@@ -734,13 +736,7 @@ impl StagedFile {
         self.file.sync_all()?;
         check().map_err(io::Error::other)?;
         #[cfg(any(target_vendor = "apple", target_os = "linux", target_os = "android"))]
-        rustix::fs::renameat_with(
-            &self.parent,
-            &self.name,
-            &self.parent,
-            &self.target,
-            rustix::fs::RenameFlags::NOREPLACE,
-        )?;
+        unix::publish_new(&self.parent, &self.name, &self.target)?;
         #[cfg(windows)]
         windows::publish_new(&self.parent, &self.name, &self.target)?;
         #[cfg(not(any(

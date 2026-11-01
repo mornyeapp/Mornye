@@ -1,6 +1,7 @@
 package com.ryanheise.audioservice;
 
 import android.app.Activity;
+import android.app.Application;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
@@ -27,6 +28,7 @@ import android.support.v4.media.session.MediaControllerCompat;
 import android.support.v4.media.session.MediaSessionCompat;
 import android.support.v4.media.session.PlaybackStateCompat;
 
+import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -69,6 +71,69 @@ public class AudioServicePlugin implements FlutterPlugin, ActivityAware {
             throw new IllegalStateException("Flutter engine arguments must be set before engine creation");
         }
         flutterEngineArguments = arguments.clone();
+    }
+
+    /** Configures each shared engine after it is created and before Dart starts. */
+    public interface FlutterEngineConfigurator {
+        void configure(Context applicationContext, FlutterEngine engine);
+    }
+
+    private static FlutterEngineConfigurator flutterEngineConfigurator;
+
+    /** Maps the host's notification icon names to resource IDs kept by its shrinker. */
+    public interface ResourceResolver {
+        int resolve(String resource);
+    }
+
+    private static ResourceResolver resourceResolver;
+
+    public static void setResourceResolver(ResourceResolver resolver) {
+        resourceResolver = resolver;
+    }
+
+    /**
+     * Maps a queue item's artwork URI to one other apps can load, or answers
+     * null to keep it. Only the session queue's descriptions use the result;
+     * the item's metadata keeps its own artwork.
+     */
+    public interface QueueArtResolver {
+        Uri resolve(Uri artUri);
+    }
+
+    private static volatile QueueArtResolver queueArtResolver;
+
+    public static void setQueueArtResolver(QueueArtResolver resolver) {
+        queueArtResolver = resolver;
+    }
+
+    static int resolveResourceId(Context context, String resource) {
+        if (resource == null) return 0;
+        if (resourceResolver != null) {
+            int id = resourceResolver.resolve(resource);
+            if (id != 0) return id;
+        }
+        switch (resource) {
+        case "drawable/audio_service_stop": return R.drawable.audio_service_stop;
+        case "drawable/audio_service_pause": return R.drawable.audio_service_pause;
+        case "drawable/audio_service_play_arrow": return R.drawable.audio_service_play_arrow;
+        case "drawable/audio_service_fast_rewind": return R.drawable.audio_service_fast_rewind;
+        case "drawable/audio_service_skip_next": return R.drawable.audio_service_skip_next;
+        case "drawable/audio_service_skip_previous": return R.drawable.audio_service_skip_previous;
+        case "drawable/audio_service_fast_forward": return R.drawable.audio_service_fast_forward;
+        case "mipmap/ic_launcher": return context.getApplicationInfo().icon;
+        default: return 0;
+        }
+    }
+
+    /**
+     * Registers app channels on the shared engine whichever component creates
+     * it. A media browser can start the engine without an Activity.
+     */
+    public static synchronized void setFlutterEngineConfigurator(FlutterEngineConfigurator configurator) {
+        if (FlutterEngineCache.getInstance().get(flutterEngineId) != null) {
+            throw new IllegalStateException("The Flutter engine configurator must be set before engine creation");
+        }
+        flutterEngineConfigurator = configurator;
     }
 
     /** Must be called BEFORE any FlutterEngine is created. e.g. in Application class. */
@@ -118,6 +183,9 @@ public class AudioServicePlugin implements FlutterPlugin, ActivityAware {
                 initialRoute = "/";
             }
             flutterEngine.getNavigationChannel().setInitialRoute(initialRoute);
+            if (flutterEngineConfigurator != null) {
+                flutterEngineConfigurator.configure(context.getApplicationContext(), flutterEngine);
+            }
             flutterEngine.getDartExecutor().executeDartEntrypoint(DartExecutor.DartEntrypoint.createDefault());
             FlutterEngineCache.getInstance().put(flutterEngineId, flutterEngine);
         }
@@ -126,7 +194,7 @@ public class AudioServicePlugin implements FlutterPlugin, ActivityAware {
 
     public static synchronized void disposeFlutterEngine() {
         for (ClientInterface clientInterface : clientInterfaces) {
-            if (clientInterface.activity != null) {
+            if (clientInterface.getActivity() != null) {
                 // Don't destroy the engine if a new activity started and
                 // bound to the service in the time since the previous activity
                 // unbound from it.
@@ -228,7 +296,7 @@ public class AudioServicePlugin implements FlutterPlugin, ActivityAware {
             try {
                 MediaSessionCompat.Token token = mediaBrowser.getSessionToken();
                 mediaController = new MediaControllerCompat(applicationContext, token);
-                Activity activity = mainClientInterface != null ? mainClientInterface.activity : null;
+                Activity activity = mainClientInterface != null ? mainClientInterface.getActivity() : null;
                 if (activity != null) {
                     MediaControllerCompat.setMediaController(activity, mediaController);
                 }
@@ -301,6 +369,8 @@ public class AudioServicePlugin implements FlutterPlugin, ActivityAware {
             disconnect();
         }
         clientInterfaces.remove(clientInterface);
+        if (mainClientInterface == clientInterface) mainClientInterface = null;
+        clientInterface.setActivity(null);
         clientInterface.setContext(null);
         clientInterface = null;
         applicationContext = null;
@@ -309,6 +379,9 @@ public class AudioServicePlugin implements FlutterPlugin, ActivityAware {
             System.out.println("### destroying audio handler interface");
             audioHandlerInterface.destroy();
             audioHandlerInterface = null;
+            // The listener belongs to this engine. A service can be recreated
+            // while its Activity keeps the engine and handler alive.
+            AudioService.init(null);
         }
         flutterPluginBinding = null;
     }
@@ -328,13 +401,13 @@ public class AudioServicePlugin implements FlutterPlugin, ActivityAware {
         mainClientInterface = clientInterface;
         registerOnNewIntentListener();
         if (mediaController != null) {
-            MediaControllerCompat.setMediaController(mainClientInterface.activity, mediaController);
+            MediaControllerCompat.setMediaController(binding.getActivity(), mediaController);
         }
         if (mediaBrowser == null) {
             connect();
         }
 
-        Activity activity = mainClientInterface.activity;
+        Activity activity = binding.getActivity();
         if (clientInterface.wasLaunchedFromRecents()) {
             // We do this to avoid using the old intent.
             activity.setIntent(new Intent(Intent.ACTION_MAIN));
@@ -386,7 +459,7 @@ public class AudioServicePlugin implements FlutterPlugin, ActivityAware {
     }
 
     private void disconnect() {
-        Activity activity = mainClientInterface != null ? mainClientInterface.activity : null;
+        Activity activity = mainClientInterface != null ? mainClientInterface.getActivity() : null;
         if (activity != null) {
             // Since the activity enters paused state, we set the intent with ACTION_MAIN.
             activity.setIntent(new Intent(Intent.ACTION_MAIN));
@@ -404,23 +477,25 @@ public class AudioServicePlugin implements FlutterPlugin, ActivityAware {
 
     private void registerOnNewIntentListener() {
         activityPluginBinding.addOnNewIntentListener(newIntentListener = (intent) -> {
-            clientInterface.activity.setIntent(intent);
+            Activity activity = clientInterface.getActivity();
+            if (activity == null) return false;
+            activity.setIntent(intent);
             sendNotificationClicked();
             return true;
         });
     }
 
     private void sendNotificationClicked() {
-        Activity activity = clientInterface.activity;
-        if (audioHandlerInterface != null && activity.getIntent().getAction() != null) {
+        Activity activity = clientInterface.getActivity();
+        if (activity != null && audioHandlerInterface != null && activity.getIntent().getAction() != null) {
             boolean clicked = activity.getIntent().getAction().equals(AudioService.NOTIFICATION_CLICK_ACTION);
             audioHandlerInterface.invokeMethod("onNotificationClicked", mapOf("clicked", clicked));
         }
     }
 
     private static class ClientInterface implements MethodCallHandler {
-        private Context context;
-        private Activity activity;
+        private Application context;
+        private WeakReference<Activity> activity = new WeakReference<>(null);
         public final BinaryMessenger messenger;
         private final MethodChannel channel;
         private boolean wrongEngineDetected;
@@ -445,11 +520,15 @@ public class AudioServicePlugin implements FlutterPlugin, ActivityAware {
         }
 
         private void setContext(Context context) {
-            this.context = context;
+            this.context = context == null ? null : (Application) context.getApplicationContext();
         }
 
         private void setActivity(Activity activity) {
-            this.activity = activity;
+            this.activity = new WeakReference<>(activity);
+        }
+
+        private Activity getActivity() {
+            return activity.get();
         }
 
         public void setWrongEngineDetected(boolean value) {
@@ -462,7 +541,8 @@ public class AudioServicePlugin implements FlutterPlugin, ActivityAware {
 
         // See: https://stackoverflow.com/questions/13135545/android-activity-is-using-old-intent-if-launching-app-from-recent-task
         protected boolean wasLaunchedFromRecents() {
-            return (activity.getIntent().getFlags() & Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY) == Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY;
+            Activity activity = getActivity();
+            return activity != null && (activity.getIntent().getFlags() & Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY) == Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY;
         }
 
         @Override
@@ -493,6 +573,7 @@ public class AudioServicePlugin implements FlutterPlugin, ActivityAware {
                     config.artDownscaleWidth = configMap.get("artDownscaleWidth") != null ? (Integer)configMap.get("artDownscaleWidth") : -1;
                     config.artDownscaleHeight = configMap.get("artDownscaleHeight") != null ? (Integer)configMap.get("artDownscaleHeight") : -1;
                     config.setBrowsableRootExtras((Map<?,?>)configMap.get("androidBrowsableRootExtras"));
+                    Activity activity = getActivity();
                     if (activity != null) {
                         config.activityClassName = activity.getClass().getName();
                     }
@@ -1263,10 +1344,35 @@ public class AudioServicePlugin implements FlutterPlugin, ActivityAware {
             MediaMetadataCompat mediaMetadata = createMediaMetadata(rawMediaItem, service);
             metadata.put(mediaMetadata.getString(MediaMetadataCompat.METADATA_KEY_MEDIA_ID), mediaMetadata);
             MediaDescriptionCompat description = addExtrasToMediaDescription(mediaMetadata.getDescription(), (Map<?, ?>)rawMediaItem.get("extras"));
-            queue.add(new MediaSessionCompat.QueueItem(description, i));
+            queue.add(new MediaSessionCompat.QueueItem(withQueueArt(description), i));
             i++;
         }
         return queue;
+    }
+
+    /** A copy of a queue description with the artwork the queue art resolver maps it to. */
+    private static MediaDescriptionCompat withQueueArt(MediaDescriptionCompat description) {
+        QueueArtResolver resolver = queueArtResolver;
+        Uri art = description.getIconUri();
+        if (resolver == null || art == null) return description;
+        Uri shared;
+        try {
+            shared = resolver.resolve(art);
+        } catch (RuntimeException e) {
+            Log.w("AudioServicePlugin", "Queue artwork kept as it is", e);
+            return description;
+        }
+        if (shared == null || shared.equals(art)) return description;
+        return new MediaDescriptionCompat.Builder()
+                .setMediaId(description.getMediaId())
+                .setTitle(description.getTitle())
+                .setSubtitle(description.getSubtitle())
+                .setDescription(description.getDescription())
+                .setIconBitmap(description.getIconBitmap())
+                .setIconUri(shared)
+                .setMediaUri(description.getMediaUri())
+                .setExtras(description.getExtras())
+                .build();
     }
 
     public static Long getLong(Object o) {

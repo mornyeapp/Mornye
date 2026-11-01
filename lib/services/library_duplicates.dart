@@ -1,5 +1,5 @@
 import 'package:sqflite/sqflite.dart';
-import 'package:mornye/services/library_database_models.dart';
+import 'package:mornye/models/library_database_models.dart';
 import 'package:mornye/services/library_schema.dart';
 import 'package:mornye/services/network_storage_service.dart';
 import 'package:mornye/utils/path_match_keys.dart';
@@ -29,13 +29,13 @@ Future<List<IsrcDuplicateGroup>> readIsrcDuplicateGroups(
       )
     ), merged AS (
       SELECT h.id, 'downloaded' AS source, h.track_name, h.artist_name,
-             h.album_name, h.file_path, UPPER(TRIM(h.isrc)) AS isrc_key,
+             h.file_path, UPPER(TRIM(h.isrc)) AS isrc_key,
              h.bit_depth, h.sample_rate, h.bitrate, h.format
       FROM active_history h
       WHERE h.isrc IS NOT NULL AND TRIM(h.isrc) != ''
       UNION ALL
       SELECT l.id, 'local' AS source, l.track_name, l.artist_name,
-             l.album_name, l.file_path, UPPER(TRIM(l.isrc)) AS isrc_key,
+             l.file_path, UPPER(TRIM(l.isrc)) AS isrc_key,
              l.bit_depth, l.sample_rate, l.bitrate, l.format
       FROM ${LibrarySchema.visibleView} l
       WHERE l.isrc IS NOT NULL AND TRIM(l.isrc) != ''
@@ -79,7 +79,6 @@ Future<List<IsrcDuplicateGroup>> readIsrcDuplicateGroups(
             source: row['source'] as String,
             trackName: row['track_name'] as String? ?? '',
             artistName: row['artist_name'] as String? ?? '',
-            albumName: row['album_name'] as String? ?? '',
             filePath: path,
             bitDepth: (row['bit_depth'] as num?)?.toInt(),
             sampleRate: (row['sample_rate'] as num?)?.toInt(),

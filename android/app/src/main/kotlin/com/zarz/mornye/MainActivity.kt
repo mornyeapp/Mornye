@@ -4,9 +4,11 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.ActivityInfo
+import android.content.pm.PackageManager
+import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
-import android.os.ParcelFileDescriptor
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import io.flutter.embedding.android.FlutterFragmentActivity
@@ -60,7 +62,10 @@ class MainActivity: FlutterFragmentActivity() {
     internal var concertCalendarChannel: MethodChannel? = null
     internal val coreBackend: CoreBackend by lazy { createCoreBackend(applicationContext) }
     private val nativeBackendMethods = setOf(
+        "isAndroidTv",
+        "getAndroidSdkVersion",
         "setScreenAwake",
+        "isCharging",
         "getBackendImplementations",
         "ensureInstallMarker",
         "prepareRuntimeState",
@@ -106,6 +111,7 @@ class MainActivity: FlutterFragmentActivity() {
         "shareContentUri",
         "getSafFileModTimes",
         "safCreateFromPath",
+        "safWriteSidecarFromPath",
         "safCreateIfAbsentFromPath",
         "safCreateUniqueFromPath",
         "safCreateCollisionAwareFromPath",
@@ -126,6 +132,8 @@ class MainActivity: FlutterFragmentActivity() {
         "startBackgroundWork",
         "updateBackgroundWork",
         "stopBackgroundWork",
+        "startLinkConnectionService",
+        "stopLinkConnectionService",
         "startNativeDownloadWorker",
         "appendNativeDownloadWorkerRequests",
         "finishNativeDownloadWorkerPreparation",
@@ -154,8 +162,6 @@ class MainActivity: FlutterFragmentActivity() {
     internal var libraryScanProgressEventSink: EventChannel.EventSink? = null
     internal var lastLibraryScanProgressPayload: String? = null
     internal var flutterBackCallback: OnBackPressedCallback? = null
-    internal val playbackLeaseLock = Any()
-    internal val playbackLeases = LinkedHashMap<String, ParcelFileDescriptor>()
     @Volatile internal var safScanCancel = false
     @Volatile internal var safScanPaused = false
     @Volatile internal var safScanActive = false
@@ -362,6 +368,11 @@ class MainActivity: FlutterFragmentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        requestedOrientation = if (isTelevisionDevice()) {
+            ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+        } else {
+            ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        }
         // Ensure the shared audio_service engine exists before the activity
         // delegate looks it up by cached id (see getCachedEngineId above).
         AudioServicePlugin.getFlutterEngine(this)
@@ -370,6 +381,11 @@ class MainActivity: FlutterFragmentActivity() {
         handleExtensionOAuthIntent(intent)
         PlayerWidgetBridge.handleIntent(intent)
     }
+
+    private fun isTelevisionDevice(): Boolean =
+        resources.configuration.uiMode and Configuration.UI_MODE_TYPE_MASK == Configuration.UI_MODE_TYPE_TELEVISION ||
+            packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK) ||
+            packageManager.hasSystemFeature(PackageManager.FEATURE_TELEVISION)
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
@@ -413,13 +429,11 @@ class MainActivity: FlutterFragmentActivity() {
         // active scans/downloads on the UI thread).
         stopDownloadProgressStream()
         stopLibraryScanProgressStream()
-        closeAllSafPlaybackLeases()
         super.onDestroy()
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-        PlayerWidgetBridge.attach(this, flutterEngine)
         // Select and initialize the runtime before Flutter can dispatch a call.
         val selectedBackend = coreBackend
         sweepStaleCacheFiles()
@@ -437,20 +451,13 @@ class MainActivity: FlutterFragmentActivity() {
         onBackPressedDispatcher.addCallback(this, flutterBackCallback!!)
 
         val messenger = flutterEngine.dartExecutor.binaryMessenger
-        if (!flutterEngine.plugins.has(LocalNetworkPlugin::class.java)) {
-            flutterEngine.plugins.add(LocalNetworkPlugin())
-        }
-        if (!flutterEngine.plugins.has(UsbBitPerfectPlugin::class.java)) {
-            flutterEngine.plugins.add(UsbBitPerfectPlugin())
-        }
-        if (!flutterEngine.plugins.has(MusicHapticsPlugin::class.java)) {
-            flutterEngine.plugins.add(MusicHapticsPlugin())
-        }
         registerConcertCalendarChannel(messenger)
         registerAudioOutputChannel(messenger)
 
         registerProgressStreams(messenger)
 
+        // Replaces the playback subset the engine registered without an
+        // Activity (see SharedEngineChannels) with every backend method.
         val channel = MethodChannel(messenger, CHANNEL)
         backendChannel = channel
         registerLibraryStorageReceiver()
@@ -469,11 +476,14 @@ class MainActivity: FlutterFragmentActivity() {
                         return@launch
                     }
                     when (call.method) {
+                        "isAndroidTv" -> result.success(isTelevisionDevice())
+                        "getAndroidSdkVersion" -> result.success(Build.VERSION.SDK_INT)
                         "processPendingExtensionCallbacks" -> {
                             processPendingExtensionCallbacks()
                             result.success(null)
                         }
                         "setScreenAwake" -> handleSetScreenAwake(call, result)
+                        "isCharging" -> handleIsCharging(call, result)
                         "consumeVerificationNotification" -> handleConsumeVerificationNotification(call, result)
                         "ensureInstallMarker" -> handleEnsureInstallMarker(call, result)
                         "prepareRuntimeState" -> handlePrepareRuntimeState(call, result, selectedBackend)
@@ -502,13 +512,14 @@ class MainActivity: FlutterFragmentActivity() {
                         "safOpenPlaybackLease" -> handleSafOpenPlaybackLease(call, result)
                         "safClosePlaybackLease" -> handleSafClosePlaybackLease(call, result)
                         "safCreateFromPath" -> handleSafCreateFromPath(call, result)
+                        "safWriteSidecarFromPath" -> handleSafWriteSidecarFromPath(call, result)
                         "safCreateIfAbsentFromPath" -> handleSafCreateIfAbsentFromPath(call, result)
                         "safCreateUniqueFromPath" -> handleSafCreateUniqueFromPath(call, result)
                         "safCreateCollisionAwareFromPath" -> handleSafCreateCollisionAwareFromPath(call, result)
                         "openContentUri" -> handleOpenContentUri(call, result)
                         "shareContentUri" -> handleShareContentUri(call, result)
                         "rewriteSplitArtistTags" -> handleRewriteSplitArtistTags(call, result)
-                        "readFileMetadata" -> handleReadFileMetadata(call, result)
+                        "readFileMetadata" -> handleReadFileMetadata(call, result, selectedBackend)
                         "checkHiResAuthenticity" -> handleCheckHiResAuthenticity(call, result)
                         "editFileMetadata" -> handleEditFileMetadata(call, result)
                         "writeM4AFreeformTags" -> handleWriteM4AFreeformTags(call, result)
@@ -529,6 +540,18 @@ class MainActivity: FlutterFragmentActivity() {
                             result.success(DownloadService.isServiceRunning())
                         }
                         "startBackgroundWork" -> handleStartBackgroundWork(call, result)
+                        "startLinkConnectionService" -> {
+                            result.success(
+                                LinkConnectionService.start(
+                                    this@MainActivity,
+                                    call.argument<String>("name") ?: "Mornye",
+                                ),
+                            )
+                        }
+                        "stopLinkConnectionService" -> {
+                            LinkConnectionService.stop(this@MainActivity)
+                            result.success(null)
+                        }
                         "updateBackgroundWork" -> handleUpdateBackgroundWork(call, result)
                         "stopBackgroundWork" -> {
                             BackgroundWorkService.stop(call.argument<String>("kind") ?: "")

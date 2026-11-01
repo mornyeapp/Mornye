@@ -10,7 +10,7 @@ use Mornye names. Legacy backup and extension formats remain readable;
 cryptographic domain separators retain their original values so branding
 changes do not invalidate encrypted storage or external session protocols.
 
-The toolchain is pinned in `rust_backend/rust-toolchain.toml` (Rust 1.99.0
+The toolchain is pinned in `rust_backend/rust-toolchain.toml` (Rust 1.99.1
 with rustfmt and clippy). The workspace uses edition 2024, resolver 3, and
 denies `unsafe_code` as a workspace lint, with a few audited local
 `#[allow(unsafe_code)]` exceptions in the `extensions` and `mobile` crates.

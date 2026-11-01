@@ -5,22 +5,7 @@ version = "1.0-SNAPSHOT"
 // only bury real warnings; javac still prints a one-line deprecation note.
 val args = listOf("-Xlint:unchecked")
 
-buildscript {
-    // Uncomment when moving to Kotlin
-    // val kotlinVersion = "2.3.20"
-    val agpVersion = "9.4.1"
-    repositories {
-        google()
-        mavenCentral()
-    }
-
-    dependencies {
-        classpath("com.android.tools.build:gradle:$agpVersion")
-        // Uncomment when moving to Kotlin
-        // classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinVersion")
-    }
-}
-
+// The host app supplies the Android Gradle Plugin version for every module.
 allprojects {
     repositories {
         google()

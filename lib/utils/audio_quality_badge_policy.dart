@@ -8,6 +8,23 @@ final RegExp _bitDepthQualityPattern = RegExp(
   r'\b\d+\s*(?:-\s*)?bit\b',
   caseSensitive: false,
 );
+final RegExp _storedBitratePattern = RegExp(
+  r'\b(\d+(?:\.\d+)?)\s*(k(?:bps)?|mbps)\b',
+  caseSensitive: false,
+);
+final RegExp _storedBitDepthPattern = RegExp(
+  r'\b(\d{1,3})(?:\s*[- ]?\s*bit\b|(?=/))',
+  caseSensitive: false,
+);
+final RegExp _leadingDotPattern = RegExp(r'^\.');
+final RegExp _gridBitrateTextPattern = RegExp(
+  r'(\d+)\s*k(?:bps)?',
+  caseSensitive: false,
+);
+final RegExp _gridBitrateIdPattern = RegExp(r'_(\d+)$');
+final RegExp _highlightBitDepthPattern = RegExp(r'\b24(?:\s*[- ]?\s*bit|/)');
+final RegExp _highlightKbpsPattern = RegExp(r'\b(\d+(?:\.\d+)?)\s*k(?:bps)?\b');
+final RegExp _highlightMbpsPattern = RegExp(r'\b(\d+(?:\.\d+)?)\s*mbps\b');
 
 String normalizeLibraryQualityLabelMode(String? mode) {
   return switch (mode) {
@@ -41,7 +58,7 @@ String? _libraryFileFormatLabel(String? format) {
     'mp3' => 'MP3',
     'opus' => 'OPUS',
     'm4a' => 'M4A',
-    _ => rawFormat.replaceFirst(RegExp(r'^\.'), '').toUpperCase(),
+    _ => rawFormat.replaceFirst(_leadingDotPattern, '').toUpperCase(),
   };
 }
 
@@ -117,10 +134,7 @@ String? buildLibraryAudioQualityLabel({
 }
 
 int? _bitrateFromStoredQuality(String? quality) {
-  final match = RegExp(
-    r'\b(\d+(?:\.\d+)?)\s*(k(?:bps)?|mbps)\b',
-    caseSensitive: false,
-  ).firstMatch(quality ?? '');
+  final match = _storedBitratePattern.firstMatch(quality ?? '');
   final value = double.tryParse(match?.group(1) ?? '');
   if (value == null || value <= 0) return null;
   final unit = match?.group(2)?.toLowerCase();
@@ -128,10 +142,7 @@ int? _bitrateFromStoredQuality(String? quality) {
 }
 
 int? _bitDepthFromStoredQuality(String? quality) {
-  final match = RegExp(
-    r'\b(\d{1,3})(?:\s*[- ]?\s*bit\b|(?=/))',
-    caseSensitive: false,
-  ).firstMatch(quality ?? '');
+  final match = _storedBitDepthPattern.firstMatch(quality ?? '');
   final value = int.tryParse(match?.group(1) ?? '');
   return value != null && value > 0 ? value : null;
 }
@@ -152,15 +163,12 @@ String formatLibraryGridAudioQualityLabel(String quality) {
   final normalized = quality.trim().toLowerCase();
   if (_bitDepthQualityPattern.hasMatch(normalized)) return quality;
 
-  final bitrateTextMatch = RegExp(
-    r'(\d+)\s*k(?:bps)?',
-    caseSensitive: false,
-  ).firstMatch(quality);
+  final bitrateTextMatch = _gridBitrateTextPattern.firstMatch(quality);
   if (bitrateTextMatch != null) {
     return '${bitrateTextMatch.group(1)}k';
   }
 
-  final bitrateIdMatch = RegExp(r'_(\d+)$').firstMatch(normalized);
+  final bitrateIdMatch = _gridBitrateIdPattern.firstMatch(normalized);
   if (bitrateIdMatch != null) {
     return '${bitrateIdMatch.group(1)}k';
   }
@@ -178,21 +186,17 @@ bool isDetailedLibraryAudioQualityLabel(String quality) {
 /// also supporting newer labels that display a measured bitrate instead.
 bool shouldHighlightAudioQualityBadge(String quality) {
   final normalized = quality.trim().toLowerCase();
-  if (RegExp(r'\b24(?:\s*[- ]?\s*bit|/)').hasMatch(normalized)) {
+  if (_highlightBitDepthPattern.hasMatch(normalized)) {
     return true;
   }
 
-  final kbpsMatch = RegExp(
-    r'\b(\d+(?:\.\d+)?)\s*k(?:bps)?\b',
-  ).firstMatch(normalized);
+  final kbpsMatch = _highlightKbpsPattern.firstMatch(normalized);
   final kbps = double.tryParse(kbpsMatch?.group(1) ?? '');
   if (kbps != null) {
     return kbps > highQualityBadgeBitrateThresholdKbps;
   }
 
-  final mbpsMatch = RegExp(
-    r'\b(\d+(?:\.\d+)?)\s*mbps\b',
-  ).firstMatch(normalized);
+  final mbpsMatch = _highlightMbpsPattern.firstMatch(normalized);
   final mbps = double.tryParse(mbpsMatch?.group(1) ?? '');
   return mbps != null && mbps * 1000 > highQualityBadgeBitrateThresholdKbps;
 }

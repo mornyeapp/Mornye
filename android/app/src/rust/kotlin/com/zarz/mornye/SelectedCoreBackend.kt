@@ -269,22 +269,20 @@ internal object RustCoreBackend : CoreBackend {
             val directory = libraryCoverDirectory
             // Never key artwork by the descriptor number: Android reuses it.
             val key = cacheKey.trim().takeIf { it.isNotEmpty() }
-            val hash = key?.codePoints()?.reduce(5381) { hash, codePoint -> hash * 33 + codePoint }
-                ?.toUInt()?.toString(16)
-            val cached = if (directory != null && hash != null) {
-                listOf(File(directory, "cover_$hash.jpg"), File(directory, "cover_$hash.png"))
-                    .firstOrNull { it.isFile }
+            val slot = if (directory != null && key != null) {
+                com.mornye.backend.libraryCoverSlot(directory.path, key)
             } else null
+            val cached = slot?.cached?.let { File(it) }
             val result = com.mornye.backend.readLibraryMetadataFromDescriptor(
                 descriptor, hint, java.time.Instant.now().toString(),
-                directory != null && hash != null && cached == null, null,
+                slot != null && cached == null, null,
             )
             val metadata = JSONObject(result.metadataJson)
             var cover = cached
-            if (directory != null && hash != null && result.coverBytes.isNotEmpty()) {
+            if (directory != null && slot != null && result.coverBytes.isNotEmpty()) {
                 try {
                     val extension = if (result.coverMime.contains("png")) "png" else "jpg"
-                    val output = File(directory, "cover_$hash.$extension")
+                    val output = File(directory, "${slot.stem}.$extension")
                     val staged = File.createTempFile("cover_", ".tmp", directory)
                     try {
                         staged.writeBytes(result.coverBytes)

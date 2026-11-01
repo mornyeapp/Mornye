@@ -16,39 +16,6 @@ class _Database implements LibraryCollectionsDatabase {
   final Database owner;
 
   @override
-  Future<void> deleteWishlistEntry(String key) async {
-    await owner.delete(
-      'wishlist_tracks',
-      where: 'track_key=?',
-      whereArgs: [key],
-    );
-  }
-
-  @override
-  Future<void> deleteLovedEntry(String key) async {
-    await owner.delete('loved_tracks', where: 'track_key=?', whereArgs: [key]);
-  }
-
-  @override
-  Future<void> deletePlaylistTrack({
-    required String playlistId,
-    required String trackKey,
-    required String playlistUpdatedAt,
-  }) => owner.transaction((txn) async {
-    await txn.delete(
-      'playlist_tracks',
-      where: 'playlist_id=? AND track_key=?',
-      whereArgs: [playlistId, trackKey],
-    );
-    await txn.update(
-      'playlists',
-      {'updated_at': playlistUpdatedAt},
-      where: 'id=?',
-      whereArgs: [playlistId],
-    );
-  });
-
-  @override
   Future<void> deleteWishlistTracks(List<String> keys) =>
       LibraryCollectionsDatabase.deleteDatabaseWishlistTracks(owner, keys);
 
@@ -227,14 +194,7 @@ void main() {
                 expect(await remove(notifier, kind, keys), 2000);
               } else {
                 for (final key in keys) {
-                  switch (kind) {
-                    case 'wishlist':
-                      await notifier.removeFromWishlist(key);
-                    case 'loved':
-                      await notifier.removeFromLoved(key);
-                    case 'playlist':
-                      await notifier.removeTrackFromPlaylist('p', key);
-                  }
+                  await remove(notifier, kind, [key]);
                 }
               }
             });

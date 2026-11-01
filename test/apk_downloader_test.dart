@@ -17,6 +17,83 @@ void main() {
         .setMockMethodCallHandler(channel, null);
   });
 
+  for (final knownLength in [true, false]) {
+    test(
+      'APK progress is bounded for chunk bursts and finishes with the latest byte count ($knownLength)',
+      () async {
+        final directory = await Directory.systemTemp.createTemp(
+          'mornye-progress-test-',
+        );
+        addTearDown(() => directory.delete(recursive: true));
+        final chunks = [
+          [0x50, 0x4b, 0x03, 0x04],
+          for (var i = 1; i < 1000; i++) List<int>.filled(64, i % 256),
+        ];
+        final total = chunks.fold<int>(0, (sum, chunk) => sum + chunk.length);
+        final client = MockClient.streaming(
+          (request, body) async => http.StreamedResponse(
+            Stream<List<int>>.fromIterable(chunks),
+            200,
+            contentLength: knownLength ? total : null,
+          ),
+        );
+        addTearDown(client.close);
+        final progress = <(int, int)>[];
+        final clock = Stopwatch()..start();
+        final path = await ApkDownloader.downloadApk(
+          url: 'https://updates.example.test/update.apk',
+          version: 'burst',
+          client: client,
+          downloadDirectory: directory,
+          onProgress: (received, length) => progress.add((received, length)),
+        );
+        expect(path, isNotNull);
+        expect(progress.first, (0, knownLength ? total : 0));
+        expect(progress.last, (total, knownLength ? total : 0));
+        expect(
+          progress.length,
+          lessThanOrEqualTo(2 + clock.elapsedMilliseconds ~/ 500),
+        );
+        expect(await File(path!).length(), total);
+        final count = progress.length;
+        await Future<void>.delayed(Duration.zero);
+        expect(progress.length, count);
+      },
+    );
+  }
+
+  test(
+    'APK progress still updates while a slower stream is downloading',
+    () async {
+      final directory = await Directory.systemTemp.createTemp(
+        'mornye-progress-test-',
+      );
+      addTearDown(() => directory.delete(recursive: true));
+      Stream<List<int>> chunks() async* {
+        yield [0x50, 0x4b, 0x03, 0x04];
+        await Future<void>.delayed(const Duration(milliseconds: 550));
+        yield [1, 2, 3];
+        yield [4, 5, 6];
+      }
+
+      final client = MockClient.streaming(
+        (request, body) async =>
+            http.StreamedResponse(chunks(), 200, contentLength: 10),
+      );
+      addTearDown(client.close);
+      final progress = <int>[];
+      final path = await ApkDownloader.downloadApk(
+        url: 'https://updates.example.test/update.apk',
+        version: 'slow',
+        client: client,
+        downloadDirectory: directory,
+        onProgress: (received, _) => progress.add(received),
+      );
+      expect(path, isNotNull);
+      expect(progress, [0, 7, 10]);
+    },
+  );
+
   test('APK updater resumes a matching partial and verifies SHA-256', () async {
     final directory = await Directory.systemTemp.createTemp(
       'mornye-updater-test-',

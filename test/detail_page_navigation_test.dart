@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mornye/utils/clickable_metadata.dart';
+import 'package:mornye/controllers/clickable_metadata.dart';
 
 /// A stand-in album page that links to [linkTo].
 class _AlbumPage extends StatefulWidget {

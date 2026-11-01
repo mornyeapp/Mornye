@@ -51,10 +51,22 @@ class MornyePlayerActionsSheet extends ConsumerWidget {
     super.key,
     required this.mediaItem,
     this.sleepTimerSubtitle,
+    this.volumeShown = true,
+    this.sendToDesktop,
+    this.saveToPhone = false,
   });
 
   final MediaItem mediaItem;
   final String? sleepTimerSubtitle;
+
+  /// Whether the player shows its volume slider, which the menu toggles.
+  final bool volumeShown;
+
+  /// The paired desktop's name while this phone's song can go there.
+  final String? sendToDesktop;
+
+  /// Whether the song is the paired desktop's, which can be saved here.
+  final bool saveToPhone;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -122,6 +134,20 @@ class MornyePlayerActionsSheet extends ConsumerWidget {
               context.l10n.lyricsShareTitle,
               CupertinoIcons.quote_bubble,
             ),
+            if (sendToDesktop case final name?)
+              _action(
+                context,
+                'linkSend',
+                context.l10n.linkSendToDesktop(name),
+                CupertinoIcons.desktopcomputer,
+              ),
+            if (saveToPhone)
+              _action(
+                context,
+                'linkSave',
+                context.l10n.linkSaveToPhone,
+                CupertinoIcons.device_phone_portrait,
+              ),
           ],
           [
             _action(
@@ -129,6 +155,16 @@ class MornyePlayerActionsSheet extends ConsumerWidget {
               'equalizer',
               context.l10n.equalizerTitle,
               CupertinoIcons.slider_horizontal_3,
+            ),
+            _action(
+              context,
+              'volume',
+              volumeShown
+                  ? context.l10n.nowPlayingHideVolume
+                  : context.l10n.nowPlayingShowVolume,
+              volumeShown
+                  ? CupertinoIcons.speaker_slash
+                  : CupertinoIcons.speaker_2,
             ),
             _action(
               context,
@@ -177,17 +213,10 @@ class _MornyePlayerMenuSurface extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final art = mediaItem.artUri;
-    final source = art?.scheme == 'file' ? art!.toFilePath() : art?.toString();
-    return CoverPaletteBuilder(
-      imageSource: source,
-      builder: (context, _) {
-        final dominant = HSLColor.fromColor(
-          source == null
-              ? Colors.grey
-              : CoverPalette.sourceColor(source, Brightness.dark) ??
-                    Colors.grey,
-        );
+    return CoverSourceColorBuilder(
+      imageSource: mediaItem.artUri?.toString(),
+      builder: (context, sourceColor) {
+        final dominant = HSLColor.fromColor(sourceColor ?? Colors.grey);
         final surface = dominant
             .withSaturation(dominant.saturation.clamp(0.0, 0.34))
             .withLightness(0.28)

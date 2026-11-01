@@ -317,7 +317,6 @@ void main() {
       version: '5.3.0',
       changelog: '',
       downloadUrl: 'https://example.test/releases/$_version',
-      publishedAt: DateTime(2026, 10, 20),
       installKind: UpdateInstallKind.linuxAppImage,
       assetName: assetName,
       assetUrl: 'https://example.test/$assetName',

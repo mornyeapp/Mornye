@@ -2,10 +2,11 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:material_3_expressive/material_3_expressive.dart';
-import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/material_expressive.dart';
 import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/app_loading_indicator.dart';
+import 'package:mornye/widgets/expressive_button_group.dart';
+import 'package:mornye/widgets/expressive_icon_button.dart';
 
 /// Material 3 Expressive previous / play-pause / next row.
 ///
@@ -55,18 +56,11 @@ class ExpressivePlaybackTransport extends StatefulWidget {
 }
 
 class _ExpressivePlaybackTransportState
-    extends State<ExpressivePlaybackTransport> {
+    extends State<ExpressivePlaybackTransport>
+    with ExpressivePressSquish {
   static const _gap = 8.0;
   static const _sideActionWidth = 48.0;
   static const _minTarget = 48.0;
-  static const _squishRatio = 0.15;
-  static final _pressSpring = SpringCurve(M3EMotion.expressiveSpatialPress);
-
-  int? _pressed;
-
-  void _press(int? index) {
-    if (_pressed != index) setState(() => _pressed = index);
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -97,15 +91,15 @@ class _ExpressivePlaybackTransportState
           widths = [for (final width in restingWidths) width * scale];
         }
         final factors = [1.0, 1.0, 1.0];
-        final pressed = _pressed;
+        final pressed = pressedIndex;
         if (pressed != null) {
           // Neighbours give up exactly what the pressed button gains.
-          final growth = restingWidths[pressed] * _squishRatio;
+          final growth = restingWidths[pressed] * squishRatio;
           final neighbours = [
             pressed - 1,
             pressed + 1,
           ].where((index) => index >= 0 && index < widths.length).toList();
-          factors[pressed] += _squishRatio;
+          factors[pressed] += squishRatio;
           for (final index in neighbours) {
             factors[index] -= growth / neighbours.length / restingWidths[index];
           }
@@ -149,8 +143,8 @@ class _ExpressivePlaybackTransportState
         // directly instead of restarting a width spring on every frame.
         return TweenAnimationBuilder<_SlotWidths>(
           tween: _SlotWidthsTween(end: (factors[0], factors[1], factors[2])),
-          duration: _pressSpring.duration,
-          curve: _pressSpring,
+          duration: pressSpring.duration,
+          curve: pressSpring,
           builder: (context, slots, _) {
             var previous = widths[0] * slots.$1;
             var play = widths[1] * slots.$2;
@@ -188,15 +182,9 @@ class _ExpressivePlaybackTransportState
   }
 
   Widget _slot(int index, double width, double height, Widget child) =>
-      Listener(
-        onPointerDown: (_) => _press(index),
-        onPointerUp: (_) => _press(null),
-        onPointerCancel: (_) => _press(null),
-        child: SizedBox(
-          width: math.max(0, width),
-          height: height,
-          child: child,
-        ),
+      pressSlot(
+        index,
+        SizedBox(width: math.max(0, width), height: height, child: child),
       );
 
   Widget _button({
@@ -234,18 +222,7 @@ class _ExpressivePlaybackTransportState
             variant: M3EIconButtonVariant.filled,
             matchParentConstraints: true,
             inflateHitTarget: false,
-            decoration: M3EIconButtonDecoration(
-              foregroundColor: WidgetStateProperty.resolveWith(
-                (states) => states.contains(WidgetState.disabled)
-                    ? scheme.onSurface.withValues(alpha: 0.38)
-                    : foreground,
-              ),
-              backgroundColor: WidgetStateProperty.resolveWith(
-                (states) => states.contains(WidgetState.disabled)
-                    ? scheme.onSurface.withValues(alpha: 0.12)
-                    : background,
-              ),
-            ),
+            decoration: expressiveFill(scheme, foreground, background),
           ),
         ),
       ),

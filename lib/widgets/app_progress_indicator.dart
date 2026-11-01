@@ -84,8 +84,9 @@ class AppProgressIndicator extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final wavy = this.wavy || value == null;
     if (!_circular) {
-      return MaterialExpressiveScope(
-        child: wavy
+      return _scope(
+        value,
+        wavy
             ? M3EProgressIndicator.linearWavy(
                 value: value,
                 color: color ?? scheme.primary,
@@ -109,8 +110,9 @@ class AppProgressIndicator extends StatelessWidget {
       builder: (context, constraints) {
         final side = constraints.biggest.shortestSide;
         final size = side.isFinite ? side : null;
-        return MaterialExpressiveScope(
-          child: wavy
+        return _scope(
+          value,
+          wavy
               ? M3EProgressIndicator.circularWavy(
                   value: value,
                   size: size,
@@ -133,6 +135,25 @@ class AppProgressIndicator extends StatelessWidget {
                 ),
         );
       },
+    );
+  }
+
+  /// The theme draws determinate waves flat near either end, where the
+  /// wave phase has no visible effect, so the ticker is muted there.
+  Widget _scope(double? value, Widget indicator) {
+    return MaterialExpressiveScope(
+      child: Builder(
+        builder: (context) {
+          final theme = M3ETheme.of(context).progressIndicatorTheme;
+          final flat =
+              value != null &&
+              (_circular
+                      ? theme.circular.amplitudeForProgress(value)
+                      : theme.linear.amplitudeForProgress(value)) <=
+                  0;
+          return TickerMode(enabled: !flat, child: indicator);
+        },
+      ),
     );
   }
 }

@@ -47,11 +47,21 @@ function searchTracks(query) {
 function customSearch(query) {
     return query === "null" ? null : searchTracks(query).tracks;
 }
+function getRelatedTracks(seeds, options) {
+    if (seeds[0].name === "null") return null;
+    return Array.from({length: options.limit}, (_, i) => ({id: "related-" + i,
+        name: "Like " + seeds[0].name, artists: "Other Artist", album_name: "Album",
+        duration_ms: 1000, isrc: "EXAMPLE1000" + i}));
+}
 registerExtension({getAlbum: collection, getPlaylist: collection, getArtist, getConcert, handleUrl,
-    searchTracks, customSearch});
+    searchTracks, customSearch, getRelatedTracks});
 "#;
 
 fn fixture() -> (tempfile::TempDir, Backend) {
+    fixture_with(json!({"relatedTracks": true}))
+}
+
+fn fixture_with(capabilities: Value) -> (tempfile::TempDir, Backend) {
     let root = tempfile::tempdir().unwrap();
     let source = root.path().join("sources").join(ID);
     std::fs::create_dir_all(&source).unwrap();
@@ -60,7 +70,8 @@ fn fixture() -> (tempfile::TempDir, Backend) {
         json!({"name":ID,"displayName":"Example Metadata","version":"1",
             "description":"Generic metadata fixture","type":["metadata_provider"],
             "searchBehavior":{"enabled":true},
-            "urlHandler":{"enabled":true,"patterns":["example.invalid"]}})
+            "urlHandler":{"enabled":true,"patterns":["example.invalid"]},
+            "capabilities":capabilities})
         .to_string(),
     )
     .unwrap();
@@ -119,6 +130,51 @@ fn search_value_routes_preserve_public_json_dedup_limits_and_cancellation() {
             .manager
             .search_metadata_providers_value_with_lease("example", 2, true, "", 30_000, Some(lease))
             .is_err()
+    );
+}
+
+#[test]
+fn related_tracks_pass_seeds_and_limit_and_need_the_capability() {
+    let (_root, backend) = fixture();
+    let seeds = json!([{"id":"seed","name":"Seed","artists":"Artist"}]).to_string();
+    let related: Value = serde_json::from_str(
+        &backend
+            .get_extension_related_tracks_json(ID, &seeds, r#"{"limit":3}"#, None)
+            .unwrap(),
+    )
+    .unwrap();
+    let related = related.as_array().unwrap();
+    assert_eq!(related.len(), 3);
+    assert_eq!(related[0]["name"], "Like Seed");
+    assert_eq!(related[0]["isrc"], "EXAMPLE10000");
+    assert_eq!(related[0]["provider_id"], ID);
+    // The limit stays within 1 to 50.
+    let capped: Value = serde_json::from_str(
+        &backend
+            .get_extension_related_tracks_json(ID, &seeds, r#"{"limit":500}"#, None)
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(capped.as_array().unwrap().len(), 50);
+    let none = json!([{"name":"null","artists":"Artist"}]).to_string();
+    assert_eq!(
+        backend
+            .get_extension_related_tracks_json(ID, &none, "{}", None)
+            .unwrap(),
+        "[]"
+    );
+    assert!(
+        backend
+            .get_extension_related_tracks_json(ID, "not json", "{}", None)
+            .is_err()
+    );
+
+    let (_root, without) = fixture_with(json!({}));
+    assert!(
+        without
+            .get_extension_related_tracks_json(ID, &seeds, "{}", None)
+            .unwrap_err()
+            .contains("does not suggest related tracks")
     );
 }
 

@@ -5,7 +5,7 @@ import 'package:mornye/utils/string_utils.dart';
 
 final _log = AppLogger('DownloadAlbumMetadata');
 
-/// Resolve the release credit independently of which tracks were selected.
+/// Resolve release credits and missing artwork independently of track selection.
 /// The bridge caches album responses and coalesces concurrent album lookups.
 Future<Track> resolveDownloadAlbumArtist(
   Track track,
@@ -32,9 +32,17 @@ Future<Track> resolveDownloadAlbumArtist(
       if (value is String) artist = normalizeOptionalString(value);
       if (artist != null) break;
     }
-    return artist == null || artist == track.albumArtist
+    String? cover;
+    if (normalizeCoverReference(track.coverUrl) == null) {
+      for (final key in ['cover_url', 'images']) {
+        final value = info[key];
+        if (value is String) cover = normalizeCoverReference(value);
+        if (cover != null) break;
+      }
+    }
+    return (artist == null || artist == track.albumArtist) && cover == null
         ? track
-        : track.copyWith(albumArtist: artist);
+        : track.copyWith(albumArtist: artist, coverUrl: cover);
   } catch (error) {
     _log.w('Album credit lookup failed; keeping track metadata: $error');
     return track;

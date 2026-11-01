@@ -8,10 +8,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/controllers/player_metadata_controller.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/music_player_provider.dart';
+import 'package:mornye/providers/theme_provider.dart';
 import 'package:mornye/theme/app_tokens.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/theme/player_artwork_theme.dart';
 import 'package:mornye/utils/lyrics_parser.dart';
+import 'package:mornye/utils/lyrics_timeline.dart';
 import 'package:mornye/utils/string_utils.dart';
 import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/app_icon_button.dart';
@@ -20,7 +22,10 @@ import 'package:mornye/widgets/audio_quality_badges.dart';
 import 'package:mornye/widgets/desktop/desktop_commands.dart';
 import 'package:mornye/widgets/desktop/desktop_downloads_button.dart';
 import 'package:mornye/widgets/desktop/desktop_inspector.dart';
+import 'package:mornye/widgets/desktop/desktop_link_devices_button.dart';
 import 'package:mornye/widgets/desktop/desktop_window.dart';
+import 'package:mornye/widgets/desktop/desktop_volume_scroll.dart';
+import 'package:mornye/widgets/link/link_devices_sheet.dart';
 import 'package:mornye/widgets/mornye_chrome.dart';
 import 'package:mornye/widgets/mornye_playback_button.dart';
 import 'package:mornye/widgets/mornye_player_background.dart';
@@ -68,6 +73,7 @@ class DesktopPlayerBar extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    if (!ref.watch(playerUiEnabledProvider)) return const SizedBox.shrink();
     final mediaItem = ref.watch(currentMediaItemProvider).value;
     return context.isMornye
         ? _MornyePlayerBar(mediaItem: mediaItem)
@@ -333,6 +339,12 @@ class _TitleAndArtist extends StatelessWidget {
           ),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
+        ),
+        // While the desktop follows a phone, the bar shows and drives it.
+        LinkPlayingOnText(
+          color: colorScheme.primary,
+          style: textTheme.labelSmall,
+          glyphSize: 14,
         ),
       ],
     );
@@ -629,13 +641,13 @@ class _MornyeLcd extends StatelessWidget {
 }
 
 /// The LCD's title and "artist · album" line, left-aligned like Music's.
-class _MornyeLcdLines extends StatelessWidget {
+class _MornyeLcdLines extends ConsumerWidget {
   const _MornyeLcdLines({required this.mediaItem});
 
   final MediaItem mediaItem;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final textTheme = Theme.of(context).textTheme;
     final colorScheme = Theme.of(context).colorScheme;
     final subtitle = [
@@ -654,7 +666,17 @@ class _MornyeLcdLines extends StatelessWidget {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
-        if (subtitle.isNotEmpty)
+        // The capsule has two lines: while the desktop follows a phone,
+        // the second names it instead.
+        if (ref.watch(
+          activeRemotePlaybackProvider.select((remote) => remote != null),
+        ))
+          LinkPlayingOnText(
+            color: colorScheme.primary,
+            style: style?.copyWith(fontWeight: FontWeight.w600),
+            glyphSize: 12,
+          )
+        else if (subtitle.isNotEmpty)
           Text(
             subtitle,
             style: style?.copyWith(color: colorScheme.onSurfaceVariant),
@@ -667,10 +689,11 @@ class _MornyeLcdLines extends StatelessWidget {
 }
 
 /// Lyrics and Up Next, which toggle the trailing inspector, downloads, and
-/// volume. Material fills its third of the bar, with downloads after Up
-/// Next and the volume slider last. The Mornye capsule leads with downloads
-/// and ends with a volume button whose slider opens in a popover, as Music
-/// does.
+/// volume. Material fills its third of the bar, with phones and downloads
+/// after Up Next and the volume slider last. The Mornye capsule leads with
+/// phones and downloads and ends with a volume button whose slider opens in
+/// a popover, as Music does. The phones button shows only while a phone is
+/// connected over Mornye Link.
 class _TrailingControls extends StatelessWidget {
   const _TrailingControls({required this.enabled, this.appTheme});
 
@@ -691,7 +714,10 @@ class _TrailingControls extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.end,
       mainAxisSize: mornye ? MainAxisSize.min : MainAxisSize.max,
       children: [
-        if (mornye) const DesktopDownloadsButton(),
+        if (mornye) ...[
+          const DesktopLinkDevicesButton(),
+          const DesktopDownloadsButton(),
+        ],
         ValueListenableBuilder<DesktopInspectorPanel?>(
           valueListenable: desktopInspectorPanel,
           builder: (context, panel, _) => Row(
@@ -747,7 +773,10 @@ class _TrailingControls extends StatelessWidget {
         else ...[
           Theme(
             data: appTheme ?? Theme.of(context),
-            child: const DesktopDownloadsButton(),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [DesktopLinkDevicesButton(), DesktopDownloadsButton()],
+            ),
           ),
           // A narrow window leaves too little room for a usable slider;
           // the volume shortcuts still work there.
@@ -815,12 +844,14 @@ class _MornyeVolumeButtonState extends ConsumerState<_MornyeVolumeButton> {
           child: PlayerVolumeControl(foreground: colorScheme.onSurface),
         ),
       ],
-      child: AppIconButton(
-        key: const ValueKey('desktop-player-volume'),
-        tooltip: context.l10n.nowPlayingVolume,
-        color: colorScheme.onSurface,
-        icon: AppIcon(icon),
-        onPressed: () => _menu.isOpen ? _menu.close() : _menu.open(),
+      child: DesktopVolumeScroll(
+        child: AppIconButton(
+          key: const ValueKey('desktop-player-volume'),
+          tooltip: context.l10n.nowPlayingVolume,
+          color: colorScheme.onSurface,
+          icon: AppIcon(icon),
+          onPressed: () => _menu.isOpen ? _menu.close() : _menu.open(),
+        ),
       ),
     );
   }

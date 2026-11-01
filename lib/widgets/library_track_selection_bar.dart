@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/utils/desktop_platform.dart';
-import 'package:mornye/widgets/app_action_button.dart';
+import 'package:mornye/widgets/destructive_selection_button.dart';
 import 'package:mornye/widgets/selection_action_button.dart';
 import 'package:mornye/widgets/selection_bottom_bar.dart';
 
@@ -22,6 +22,7 @@ class LibraryTrackSelectionBar extends StatelessWidget {
     this.flacEligibleCount = 0,
     this.onQueueFlac,
     this.playbackActions,
+    this.albumDelete = false,
   });
 
   final int selectedCount;
@@ -39,9 +40,14 @@ class LibraryTrackSelectionBar extends StatelessWidget {
   final VoidCallback? onQueueFlac;
   final Widget? playbackActions;
 
+  /// Album pages keep delete the full-width button on desktop too, with the
+  /// downloaded album labels.
+  final bool albumDelete;
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final inlineDelete = isDesktopPlatform && !albumDelete;
     final hasSelection = selectedCount > 0;
     final deleteLabel = hasSelection
         ? context.l10n.selectionDeleteTracksCount(selectedCount)
@@ -92,7 +98,7 @@ class LibraryTrackSelectionBar extends StatelessWidget {
             // Desktop keeps delete a toolbar button. It shares a row with
             // the other removal, delete first, so neither wraps onto a row
             // of its own.
-            if (isDesktopPlatform)
+            if (inlineDelete)
               Row(
                 mainAxisSize: MainAxisSize.min,
                 spacing: 8,
@@ -111,28 +117,13 @@ class LibraryTrackSelectionBar extends StatelessWidget {
               replayGain(remove: true),
           ],
         ),
-        if (!isDesktopPlatform) ...[
+        if (!inlineDelete) ...[
           const SizedBox(height: 8),
-          SizedBox(
-            width: double.infinity,
-            child: AppActionButton(
-              isDestructive: true,
-              onPressed: hasSelection ? onDelete : null,
-              icon: const Icon(Icons.delete_outline),
-              label: Text(deleteLabel),
-              style: FilledButton.styleFrom(
-                backgroundColor: hasSelection
-                    ? colorScheme.error
-                    : colorScheme.surfaceContainerHighest,
-                foregroundColor: hasSelection
-                    ? colorScheme.onError
-                    : colorScheme.onSurfaceVariant,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-              ),
-            ),
+          DestructiveSelectionButton(
+            count: selectedCount,
+            colorScheme: colorScheme,
+            onPressed: onDelete,
+            label: albumDelete ? null : deleteLabel,
           ),
         ],
       ],

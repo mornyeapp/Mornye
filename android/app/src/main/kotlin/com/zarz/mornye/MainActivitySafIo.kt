@@ -412,6 +412,39 @@ internal fun Context.safParentDir(childUri: Uri): DocumentFile? {
         }
     }
 
+/** Export an already rendered sidecar using the scanned document's grant. */
+internal fun Context.writeSafSidecarFromPath(
+    audioUri: Uri,
+    fileName: String,
+    mimeType: String,
+    srcPath: String,
+): String? {
+    if (fileName.isBlank() || fileName == "." || fileName == ".." ||
+        fileName.any { it == '/' || it == '\\' || it.code < 32 }) return null
+    val source = File(srcPath)
+    if (!source.isFile || source.length() == 0L) return null
+    try {
+        val audio = DocumentFile.fromSingleUri(this, audioUri) ?: return null
+        if (fileName == audio.name) return null
+        val parent = safParentDir(audioUri) ?: return null
+        val existing = findSafChild(this, parent, fileName)
+        val target = SafDownloadHandler.createOrReuseDocumentFile(
+            this, parent, mimeType, fileName,
+        ) ?: return null
+        if (DocumentsContract.getDocumentId(target.uri) == DocumentsContract.getDocumentId(audioUri)) {
+            return null
+        }
+        if (!writeUriFromPath(target.uri, srcPath)) {
+            if (existing == null) target.delete()
+            return null
+        }
+        return target.uri.toString()
+    } catch (error: Exception) {
+        android.util.Log.w("Mornye", "Sidecar export failed: ${error.message}")
+        return null
+    }
+}
+
     /**
      * Write a ".lrc" sidecar next to a SAF audio document. The sidecar reuses
      * the audio file's base name (e.g. "Song.flac" -> "Song.lrc") and is created

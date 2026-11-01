@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:convert';
 
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/providers/music_player_provider.dart';
@@ -98,6 +100,70 @@ void main() {
     expect(deck.calls.last, 'dispose');
     await runtime.dispose();
   });
+
+  group('deferred preview links', () {
+    const backend = MethodChannel('com.zarz.mornye/backend');
+    const link = 'mornye-preview:example-provider/track%2F1';
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    tearDown(() => messenger.setMockMethodCallHandler(backend, null));
+
+    test('resolve through their extension before playback', () async {
+      final actions = <MethodCall>[];
+      messenger.setMockMethodCallHandler(backend, (call) async {
+        if (call.method != 'invokeExtensionAction') return null;
+        actions.add(call);
+        return '{"preview_url":"https://example.com/sample.mp3"}';
+      });
+      final deck = _PreviewDeck();
+      final runtime = MusicPlayerRuntime(
+        dependencies: PlaybackDependencies(createPreviewDeck: (_) => deck),
+      );
+      final container = previews(runtime);
+
+      await container.read(previewPlayerProvider.notifier).play(link);
+      final arguments = actions.single.arguments as Map;
+      expect(arguments['extension_id'], 'example-provider');
+      expect(arguments['action'], 'resolvePreview');
+      expect(jsonDecode(arguments['arguments_json'] as String), [
+        {'id': 'track/1'},
+      ]);
+      expect(deck.calls, contains('network https://example.com/sample.mp3'));
+      expect(container.read(previewPlayerProvider).isActiveUrl(link), isTrue);
+
+      container.dispose();
+      await Future<void>.delayed(Duration.zero);
+      await runtime.dispose();
+    });
+
+    test('fail before playback without a playable URL', () async {
+      messenger.setMockMethodCallHandler(backend, (call) async {
+        if (call.method != 'invokeExtensionAction') return null;
+        return '{"preview_url":""}';
+      });
+      final decks = <_PreviewDeck>[];
+      final runtime = MusicPlayerRuntime(
+        dependencies: PlaybackDependencies(
+          createPreviewDeck: (_) {
+            final deck = _PreviewDeck();
+            decks.add(deck);
+            return deck;
+          },
+        ),
+      );
+      final container = previews(runtime);
+
+      await expectLater(
+        container.read(previewPlayerProvider.notifier).play(link),
+        throwsStateError,
+      );
+      expect(decks, isEmpty);
+      expect(container.read(previewPlayerProvider).isActive, isFalse);
+
+      container.dispose();
+      await runtime.dispose();
+    });
+  });
 }
 
 class _PreviewDeck implements PlaybackDeck {
@@ -122,7 +188,8 @@ class _PreviewDeck implements PlaybackDeck {
   @override
   Stream<void> get onPlayerComplete => completions.stream;
   @override
-  void startPositionUpdates(Duration interval) => calls.add('positions');
+  void startPositionUpdates(Duration interval, {bool Function()? wanted}) =>
+      calls.add('positions');
   @override
   Future<void> configureOutput() async => calls.add('configure');
   @override
@@ -130,7 +197,8 @@ class _PreviewDeck implements PlaybackDeck {
   @override
   Future<void> setPlaybackRate(double rate) async => calls.add('rate $rate');
   @override
-  Future<void> setNetworkSource(String url) async => calls.add('network $url');
+  Future<void> setNetworkSource(String url, {bool arriving = false}) async =>
+      calls.add('network $url');
   @override
   Future<void> setFileSource(
     String path, {
@@ -151,6 +219,8 @@ class _PreviewDeck implements PlaybackDeck {
   Future<void> seek(Duration position) async => calls.add('seek');
   @override
   Future<void> stop() async => calls.add('stop');
+  @override
+  Future<bool> setNextDeck(PlaybackDeck? next) async => false;
   @override
   Future<Duration?> getCurrentPosition() async => Duration.zero;
   @override

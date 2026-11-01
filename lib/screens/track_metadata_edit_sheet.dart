@@ -7,9 +7,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
+import 'package:mornye/controllers/extension_auth_launcher.dart';
 import 'package:mornye/controllers/metadata_editor_controller.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/extension_provider.dart';
+import 'package:mornye/providers/player_motion_artwork_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/services/metadata_cover_resources.dart';
 import 'package:mornye/services/metadata_autofill_service.dart';
@@ -18,7 +20,6 @@ import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/theme/mornye_icons.dart';
 import 'package:mornye/utils/artist_utils.dart';
-import 'package:mornye/utils/extension_auth_launcher.dart';
 import 'package:mornye/utils/logger.dart';
 import 'package:mornye/widgets/app_action_button.dart';
 import 'package:mornye/widgets/app_bottom_sheet.dart';
@@ -47,6 +48,11 @@ class EditMetadataSheet extends StatefulWidget {
   final int durationMs;
   final String artistTagMode;
 
+  /// Saves the tags somewhere other than [filePath], such as the copy on a
+  /// linked computer: null once saved, else why it failed. The cover editor
+  /// and the online autofill, which work on the local file, are left out.
+  final Future<String?> Function(Map<String, String> metadata)? saveTags;
+
   const EditMetadataSheet({
     super.key,
     required this.colorScheme,
@@ -55,6 +61,7 @@ class EditMetadataSheet extends StatefulWidget {
     this.sourceTrackId,
     required this.durationMs,
     required this.artistTagMode,
+    this.saveTags,
   });
 
   @override
@@ -74,6 +81,7 @@ class _EditMetadataSheetState extends State<EditMetadataSheet> {
   String? _selectedCoverPath;
   String? _selectedCoverTempDir;
   String? _selectedCoverName;
+  String? _selectedMotionArtworkUrl;
   String? _currentCoverPath;
   String? _currentCoverTempDir;
   bool _loadingCurrentCover = false;
@@ -270,7 +278,7 @@ class _EditMetadataSheetState extends State<EditMetadataSheet> {
   void initState() {
     super.initState();
     _form = MetadataEditorController(widget.initialValues);
-    unawaited(_loadCurrentCoverPreview());
+    if (widget.saveTags == null) unawaited(_loadCurrentCoverPreview());
   }
 
   @override
@@ -282,6 +290,25 @@ class _EditMetadataSheetState extends State<EditMetadataSheet> {
 
   Future<void> _save() async {
     if (_saving || _fetching || _fetchingMusicBrainz) return;
+    if (widget.saveTags case final saveTags?) {
+      setState(() => _saving = true);
+      final error = await saveTags(
+        _form.saveMetadata(artistTagMode: widget.artistTagMode)
+          ..remove('artist_tag_mode'),
+      );
+      if (!mounted) return;
+      if (error == null) {
+        Navigator.pop(context, true);
+        return;
+      }
+      setState(() => _saving = false);
+      if (error.isNotEmpty) _showSheetSnackBar(error);
+      return;
+    }
+    final container = ProviderScope.containerOf(context, listen: false);
+    final artworkUrl = _selectedMotionArtworkUrl;
+    final artworkAlbum = _form['album']!.text.trim();
+    final artworkArtist = _form['artist']!.text.trim();
     setState(() => _saving = true);
     try {
       final result = await _persistence.save(
@@ -294,11 +321,18 @@ class _EditMetadataSheetState extends State<EditMetadataSheet> {
           coverMaxDimension: _coverMaxDimension,
         ),
       );
-      if (!mounted) return;
       if (result.failure == null) {
+        await saveReEnrichedMotionArtwork(
+          container,
+          metadata: {'header_video': artworkUrl},
+          albumName: artworkAlbum,
+          artistName: artworkArtist,
+        );
+        if (!mounted) return;
         Navigator.pop(context, true);
         return;
       }
+      if (!mounted) return;
       final l10n = context.l10n;
       _showSheetSnackBar(switch (result.failure!) {
         MetadataSaveFailure.backend => context.friendlyError(
@@ -398,8 +432,10 @@ class _EditMetadataSheetState extends State<EditMetadataSheet> {
                     controller: scrollController,
                     padding: const EdgeInsets.fromLTRB(20, 6, 20, 24),
                     children: [
-                      _buildCoverEditor(cs),
-                      _buildAutoFillSection(cs),
+                      if (widget.saveTags == null) ...[
+                        _buildCoverEditor(cs),
+                        _buildAutoFillSection(cs),
+                      ],
                       MetadataEditorSectionCard(
                         colorScheme: widget.colorScheme,
                         icon: Icons.info_outline,

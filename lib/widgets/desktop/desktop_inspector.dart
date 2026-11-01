@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/controllers/player_metadata_controller.dart';
 import 'package:mornye/l10n/l10n.dart';
+import 'package:mornye/providers/lyrics_translation_provider.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/mornye_theme.dart';
@@ -15,6 +16,7 @@ import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/app_icon_button.dart';
 import 'package:mornye/widgets/desktop/desktop_window.dart'
     show desktopWindowFullScreen;
+import 'package:mornye/widgets/lyrics_options_button.dart';
 import 'package:mornye/widgets/mornye_player_background.dart';
 import 'package:mornye/widgets/mornye_player_queue.dart';
 import 'package:mornye/widgets/player_lyrics_section.dart';
@@ -412,10 +414,12 @@ class _InspectorLyricsState extends ConsumerState<_InspectorLyrics> {
   final _metadata = PlayerMetadataController();
   final _seekPreview = PlaybackSeekPreview();
   ProviderSubscription<AsyncValue<MediaItem?>>? _mediaItemSub;
+  late final LyricsTranslationController _lyricsTranslation;
 
   @override
   void initState() {
     super.initState();
+    _lyricsTranslation = ref.read(lyricsTranslationProvider.notifier);
     _mediaItemSub = ref.listenManual<AsyncValue<MediaItem?>>(
       currentMediaItemProvider,
       (previous, next) {
@@ -431,6 +435,7 @@ class _InspectorLyricsState extends ConsumerState<_InspectorLyrics> {
   @override
   void dispose() {
     _mediaItemSub?.close();
+    _lyricsTranslation.cancel(owner: this);
     _metadata.dispose();
     _seekPreview.dispose();
     super.dispose();
@@ -442,6 +447,11 @@ class _InspectorLyricsState extends ConsumerState<_InspectorLyrics> {
     seekPreview: _seekPreview,
     colorScheme: widget.colorScheme,
     isActive: true,
+    options: LyricsOptionsButton(
+      metadata: _metadata,
+      colorScheme: widget.colorScheme,
+      translationOwner: this,
+    ),
   );
 }
 

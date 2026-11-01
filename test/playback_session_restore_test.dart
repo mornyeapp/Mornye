@@ -15,6 +15,41 @@ Map<String, dynamic> _media(int index, {String? artwork, String? source}) =>
 
 void main() {
   test(
+    'an unavailable new folder does not abort restore of other songs',
+    () async {
+      final result = await prepareRestoredPlaybackMedia(
+        [_media(0, source: '/xxx/Song.flac'), _media(1)],
+        fileExists: (path) async => path == '/music/1.flac',
+        recoverSource: (_) => throw StateError('Folder not mounted'),
+        loadLibraryCoverPath: (_) async => null,
+      );
+      expect(result.items.map((item) => item.source), [
+        '/xxx/Song.flac',
+        '/music/1.flac',
+      ]);
+      expect(result.keptOriginalIndices, [0, 1]);
+    },
+  );
+
+  test(
+    'a moved download is repaired before restore drops its missing path',
+    () async {
+      final result = await prepareRestoredPlaybackMedia(
+        [_media(0, source: '/xxx/Artist/Album/Song.flac')],
+        fileExists: (_) async => false,
+        recoverSource: (media) async {
+          expect(media.source, '/xxx/Artist/Album/Song.flac');
+          return '/yyy/Artist/Album/Song.flac';
+        },
+        loadLibraryCoverPath: (_) async => null,
+      );
+      expect(result.items.single.source, '/yyy/Artist/Album/Song.flac');
+      expect(result.sourceRelocated, isTrue);
+      expect(result.keptOriginalIndices, [0]);
+    },
+  );
+
+  test(
     'iOS restore validates rebased artwork and requests a queue rewrite',
     () async {
       const oldContainer =
@@ -203,6 +238,34 @@ void main() {
       expect(result.keptOriginalIndices, [2, 3]);
       expect(result.items.map((item) => item.id), ['2', '3']);
       expect(result.artworkRelocated, isFalse);
+    },
+  );
+
+  test(
+    'restore drops loopback and temporary covers of older sessions',
+    () async {
+      final result = await prepareRestoredPlaybackMedia(
+        [
+          _media(0, artwork: 'http://127.0.0.1:41234/2f6d1c'),
+          _media(
+            1,
+            artwork:
+                '/data/user/0/app/cache/network_metadata/subsonic_ab.image',
+          ),
+          _media(2, artwork: 'https://example.test/cover.jpg'),
+          _media(3, artwork: 'network://nas/Album/cover.jpg'),
+        ],
+        fileExists: (_) async => true,
+        loadLibraryCoverPath: (_) async => null,
+      );
+      expect(result.items.map((item) => item.artUri), [
+        null,
+        null,
+        'https://example.test/cover.jpg',
+        'network://nas/Album/cover.jpg',
+      ]);
+      // The next save writes the queue without them.
+      expect(result.artworkRelocated, isTrue);
     },
   );
 }

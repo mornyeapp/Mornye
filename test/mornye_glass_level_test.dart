@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:liquid_glass_easy/liquid_glass_easy.dart';
 import 'package:mornye/models/settings.dart';
 import 'package:mornye/models/theme_settings.dart';
 import 'package:mornye/providers/runtime_profile_provider.dart';
@@ -185,7 +186,7 @@ void main() {
           home: Scaffold(
             body: Column(
               children: [
-                const MornyeGlass(
+                const MornyeGlass.navigation(
                   blurEnabled: true,
                   child: SizedBox(width: 200, height: 50),
                 ),
@@ -360,21 +361,33 @@ void main() {
       ProviderScope(
         child: MaterialApp(
           theme: MornyeTheme.build(Brightness.dark),
-          home: const Scaffold(
+          home: Scaffold(
             body: Column(
               children: [
-                MornyeGlass.navigation(
+                const MornyeGlass.navigation(
                   key: ValueKey('sampled'),
                   blurEnabled: true,
                   child: SizedBox(width: 200, height: 40),
                 ),
-                MornyeGlass.navigation(
+                const MornyeGlass.navigation(
                   key: ValueKey('plain-page'),
                   blurEnabled: true,
                   samplesBackdrop: false,
                   child: SizedBox(width: 200, height: 40),
                 ),
-                ExtensionRepoCard(child: SizedBox(width: 200, height: 40)),
+                const ExtensionRepoCard(
+                  child: SizedBox(width: 200, height: 40),
+                ),
+                const MornyeGlassPanel.overlay(
+                  samplesBackdrop: false,
+                  child: SizedBox(width: 200, height: 40),
+                ),
+                MornyeSegmentedControl(
+                  labels: const ['One', 'Two'],
+                  selectedIndex: 0,
+                  onChanged: (_) {},
+                  samplesBackdrop: false,
+                ),
               ],
             ),
           ),
@@ -393,13 +406,19 @@ void main() {
       find.descendant(of: plain, matching: find.byType(BackdropFilter)),
       findsNothing,
     );
-    expect(
-      find.descendant(
-        of: find.byType(ExtensionRepoCard),
-        matching: find.byType(BackdropFilter),
-      ),
-      findsNothing,
-    );
+    for (final type in [
+      ExtensionRepoCard,
+      MornyeGlassPanel,
+      MornyeSegmentedControl,
+    ]) {
+      expect(
+        find.descendant(
+          of: find.byType(type),
+          matching: find.byType(BackdropFilter),
+        ),
+        findsNothing,
+      );
+    }
     // Same translucent material, so the page looks identical behind it.
     expect(tintOf(plain), tintOf(sampled));
     expect(tintOf(plain)!.a, lessThan(1));
@@ -416,7 +435,7 @@ void main() {
           home: Scaffold(
             body: Column(
               children: [
-                const MornyeGlass(
+                const MornyeGlass.navigation(
                   blurEnabled: true,
                   child: SizedBox(width: 200, height: 50),
                 ),
@@ -438,6 +457,74 @@ void main() {
       ),
       findsNothing,
     );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('every lens composes into exactly one batch read', (
+    tester,
+  ) async {
+    MornyeGlass.debugShaderFilterSupport = true;
+    addTearDown(() => MornyeGlass.debugShaderFilterSupport = null);
+    Widget glass(String key, {Widget? child}) => MornyeGlass.navigation(
+      key: ValueKey(key),
+      blurEnabled: true,
+      child: child ?? const SizedBox(width: 80, height: 40),
+    );
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          mornyeGlassLevelProvider.overrideWithValue(MornyeGlassLevel.liquid),
+        ],
+        child: MaterialApp(
+          theme: MornyeTheme.build(Brightness.dark),
+          home: Scaffold(
+            body: Column(
+              children: [
+                // Overlapping standalone glass must not share a backdrop.
+                Stack(children: [glass('back'), glass('front')]),
+                glass('outer', child: glass('inner')),
+                MornyeGlassPanel.overlay(child: const SizedBox(height: 40)),
+                MornyeSegmentedControl(
+                  labels: const ['One', 'Two'],
+                  selectedIndex: 0,
+                  onChanged: (_) {},
+                ),
+                LiquidGlassBatch(
+                  child: Row(children: [glass('chip-a'), glass('chip-b')]),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final lenses = find.byType(LiquidGlassLens).evaluate().toList();
+    // The nested glass paints on its parent's surface without a lens.
+    expect(lenses, hasLength(7));
+    for (final lens in lenses) {
+      expect(
+        find.ancestor(
+          of: find.byWidget(lens.widget),
+          matching: find.byType(LiquidGlassBatch),
+        ),
+        findsOneWidget,
+      );
+    }
+    int keyOf(String glass) => LiquidGlassBatch.backdropIdOf(
+      tester.element(
+        find.descendant(
+          of: find.byKey(ValueKey(glass)),
+          matching: find.byType(LiquidGlassLens),
+        ),
+      ),
+    )!;
+    expect(keyOf('chip-a'), keyOf('chip-b'));
+    final keys = {
+      for (final lens in lenses) LiquidGlassBatch.backdropIdOf(lens)!,
+    };
+    expect(keys, hasLength(6));
+    expect(keyOf('back'), isNot(keyOf('front')));
     expect(tester.takeException(), isNull);
   });
 }

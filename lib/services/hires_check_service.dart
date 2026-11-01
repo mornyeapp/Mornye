@@ -44,10 +44,6 @@ class HiResCheckResult {
   /// analog tape transfer), so [cutoffFrequencyHz] is where noise ends.
   final bool ultrasonicNoiseOnly;
 
-  /// With [ultrasonicNoiseOnly]: the lowest standard rate that holds all
-  /// the music. Otherwise the declared rate.
-  final int usefulSampleRate;
-
   const HiResCheckResult({
     required this.supported,
     this.verdict = '',
@@ -64,7 +60,6 @@ class HiResCheckResult {
     this.redownloadSafe = false,
     this.musicCutoffHz = 0,
     this.ultrasonicNoiseOnly = false,
-    this.usefulSampleRate = 0,
   });
 
   factory HiResCheckResult.fromJson(Map<String, dynamic> json) {
@@ -85,7 +80,6 @@ class HiResCheckResult {
       redownloadSafe: json['redownload_safe'] == true,
       musicCutoffHz: (json['music_cutoff_hz'] as num?)?.toDouble() ?? 0,
       ultrasonicNoiseOnly: json['ultrasonic_noise_only'] == true,
-      usefulSampleRate: (json['useful_sample_rate'] as num?)?.toInt() ?? 0,
     );
   }
 

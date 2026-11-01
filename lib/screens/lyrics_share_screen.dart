@@ -104,12 +104,6 @@ class _LyricsShareScreenState extends State<LyricsShareScreen> {
   LyricsCardBackground _background = LyricsCardBackground.artwork;
   bool _sharing = false;
 
-  String? get _artSource {
-    final art = widget.mediaItem.artUri;
-    if (art == null) return null;
-    return art.scheme == 'file' ? art.toFilePath() : art.toString();
-  }
-
   @override
   void dispose() {
     _list.dispose();
@@ -184,7 +178,6 @@ class _LyricsShareScreenState extends State<LyricsShareScreen> {
     final colors = theme.colorScheme;
     final tokens = context.tokens;
     final l10n = context.l10n;
-    final source = _artSource;
     return Scaffold(
       appBar: AppBar(
         leading: AppIconButton(
@@ -220,9 +213,9 @@ class _LyricsShareScreenState extends State<LyricsShareScreen> {
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(28),
                         child: FittedBox(
-                          child: CoverPaletteBuilder(
-                            imageSource: source,
-                            builder: (context, _) => RepaintBoundary(
+                          child: CoverSourceColorBuilder(
+                            imageSource: widget.mediaItem.artUri?.toString(),
+                            builder: (context, coverColor) => RepaintBoundary(
                               key: _cardKey,
                               child: LyricsShareCard(
                                 title: widget.mediaItem.title,
@@ -230,12 +223,7 @@ class _LyricsShareScreenState extends State<LyricsShareScreen> {
                                 artUri: widget.mediaItem.artUri?.toString(),
                                 lines: _quoted,
                                 background: _background,
-                                coverColor: source == null
-                                    ? null
-                                    : CoverPalette.sourceColor(
-                                        source,
-                                        Theme.of(context).brightness,
-                                      ),
+                                coverColor: coverColor,
                                 placeholder: l10n.lyricsShareSelectHint(
                                   lyricsShareMaxLines,
                                 ),

@@ -15,14 +15,9 @@ import 'package:mornye/services/platform_bridge.dart';
 
 class GeneratedSpectrogram {
   final ui.Image image;
-  final Uint8List rgba;
   final double? cutoffFrequencyHz;
 
-  const GeneratedSpectrogram({
-    required this.image,
-    required this.rgba,
-    this.cutoffFrequencyHz,
-  });
+  const GeneratedSpectrogram({required this.image, this.cutoffFrequencyHz});
 }
 
 class AudioAnalysisRunResult {
@@ -402,7 +397,6 @@ class AudioAnalysisRunner {
       );
       return GeneratedSpectrogram(
         image: await completer.future,
-        rgba: rgba,
         cutoffFrequencyHz: cutoffFrequencyHz,
       );
     } finally {

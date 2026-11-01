@@ -1,6 +1,7 @@
 #import "./include/audio_service/AudioServicePlugin.h"
 #import <AVFoundation/AVFoundation.h>
 #import <MediaPlayer/MediaPlayer.h>
+#import <sys/stat.h>
 
 // If you'd like to help, please see the TODO comments below, then open a
 // GitHub issue to announce your intention to work on a particular feature, and
@@ -27,6 +28,9 @@ static NSNumber *shuffleMode = nil;
 static NSNumber *fastForwardInterval = nil;
 static NSNumber *rewindInterval = nil;
 static MPMediaItemArtwork* artwork = nil;
+// The file artwork was read from, reused while that file is unchanged.
+static NSString *artworkPath = nil;
+static struct stat artworkFile;
 static NSMutableDictionary *nowPlayingInfo = nil;
 
 @implementation AudioServicePlugin {
@@ -195,30 +199,14 @@ static NSMutableDictionary *nowPlayingInfo = nil;
         NSDictionary *args = (NSDictionary *)call.arguments;
         mediaItem = args[@"mediaItem"];
         NSString* artUri = mediaItem[@"artUri"];
-        artwork = nil;
+        NSString* artCacheFilePath = (NSString *)[NSNull null];
         if (![artUri isEqual: [NSNull null]]) {
-            NSString* artCacheFilePath = (NSString *)[NSNull null];
             NSDictionary* extras = mediaItem[@"extras"];
             if (![extras isEqual: [NSNull null]]) {
                 artCacheFilePath = extras[@"artCacheFile"];
             }
-            if (![artCacheFilePath isEqual: [NSNull null]]) {
-#if TARGET_OS_IPHONE
-                UIImage* artImage = [UIImage imageWithContentsOfFile:artCacheFilePath];
-#else
-                NSImage* artImage = [[NSImage alloc] initWithContentsOfFile:artCacheFilePath];
-#endif
-                if (artImage != nil) {
-#if TARGET_OS_IPHONE
-                    artwork = [[MPMediaItemArtwork alloc] initWithImage: artImage];
-#else
-                    artwork = [[MPMediaItemArtwork alloc] initWithBoundsSize:artImage.size requestHandler:^NSImage* _Nonnull(CGSize aSize) {
-                        return artImage;
-                    }];
-#endif
-                }
-            }
         }
+        artwork = [self artworkForFile:artCacheFilePath];
         [self updateNowPlayingInfo];
         result(@{});
     } else if ([@"setPlaybackInfo" isEqualToString:call.method]) {
@@ -241,6 +229,8 @@ static NSMutableDictionary *nowPlayingInfo = nil;
         [commandCenter.togglePlayPauseCommand setEnabled:NO];
         [commandCenter.togglePlayPauseCommand removeTarget:nil];
         [MPNowPlayingInfoCenter defaultCenter].nowPlayingInfo = nil;
+        // The center holds none of these fields now; the next update sends all.
+        [nowPlayingInfo removeAllObjects];
         processingState = ApsIdle;
         actionBits = 0;
         [self updateControls];
@@ -263,9 +253,50 @@ static NSMutableDictionary *nowPlayingInfo = nil;
     return MPRemoteCommandHandlerStatusSuccess;
 }
 
+// Each artwork object is a new Now Playing value, so a media item that
+// changes only its duration or tags would read and republish the cover.
+- (MPMediaItemArtwork *)artworkForFile:(NSString *)path {
+    if (![path isKindOfClass:[NSString class]]) {
+        artworkPath = nil;
+        return nil;
+    }
+    char cPath[PATH_MAX];
+    struct stat file;
+    BOOL known = [path getFileSystemRepresentation:cPath maxLength:sizeof(cPath)] &&
+        stat(cPath, &file) == 0;
+    if (known && artwork != nil && [path isEqualToString:artworkPath] &&
+        file.st_dev == artworkFile.st_dev && file.st_ino == artworkFile.st_ino &&
+        file.st_size == artworkFile.st_size &&
+        file.st_mtimespec.tv_sec == artworkFile.st_mtimespec.tv_sec &&
+        file.st_mtimespec.tv_nsec == artworkFile.st_mtimespec.tv_nsec) {
+        return artwork;
+    }
+    artworkPath = nil;
+#if TARGET_OS_IPHONE
+    UIImage* artImage = [UIImage imageWithContentsOfFile:path];
+#else
+    NSImage* artImage = [[NSImage alloc] initWithContentsOfFile:path];
+#endif
+    if (artImage == nil) return nil;
+    if (known) {
+        artworkPath = path;
+        artworkFile = file;
+    }
+#if TARGET_OS_IPHONE
+    return [[MPMediaItemArtwork alloc] initWithImage: artImage];
+#else
+    return [[MPMediaItemArtwork alloc] initWithBoundsSize:artImage.size requestHandler:^NSImage* _Nonnull(CGSize aSize) {
+        return artImage;
+    }];
+#endif
+}
+
 - (BOOL)updateNowPlayingField:(NSString *)field value:(id)value {
-    if (![value isEqual:nowPlayingInfo[field]]) {
-        if (value != nil && value != [NSNull null]) {
+    // A null value matches a missing field ([nil isEqual:] is always NO), so
+    // an item without an album or live flag does not republish every call.
+    if (value == [NSNull null]) value = nil;
+    if (value == nil ? nowPlayingInfo[field] != nil : ![value isEqual:nowPlayingInfo[field]]) {
+        if (value != nil) {
             //NSLog(@"### %@ = '%@'", field, value);
             nowPlayingInfo[field] = value;
         } else {

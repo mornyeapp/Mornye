@@ -83,16 +83,28 @@ List<int> availableLosslessSampleRateOptions(int? sourceSampleRate) {
       .toList();
 }
 
-int? lowestKnownPositiveInt(Iterable<int?> values) {
-  int? lowest;
+/// Offer every cap that can reduce a file in the batch. Unknown sources leave
+/// the options open; the converter inspects each file before applying a cap.
+int? conversionSourceMaximum(Iterable<int?> values) {
+  int? highest;
   for (final value in values) {
-    if (value == null || value <= 0) continue;
-    if (lowest == null || value < lowest) {
-      lowest = value;
+    if (value == null || value <= 0) return null;
+    if (highest == null || value > highest) {
+      highest = value;
     }
   }
-  return lowest;
+  return highest;
 }
+
+int normalizeAutoConvertBitDepth(int value) =>
+    value == 0 || losslessConversionBitDepthOptions.contains(value)
+    ? value
+    : 16;
+
+int normalizeAutoConvertSampleRate(int value) =>
+    value == 0 || losslessConversionSampleRateOptions.contains(value)
+    ? value
+    : 48000;
 
 class LosslessConversionQuality {
   final int? maxBitDepth;
@@ -126,19 +138,11 @@ bool isLosslessConversionTarget(String targetFormat) {
       normalized == 'aif';
 }
 
-bool isLosslessConversionSource(String sourceFormat) {
-  switch (sourceFormat.trim().toUpperCase()) {
-    case 'FLAC':
-    case 'ALAC':
-    case 'M4A':
-    case 'WAV':
-    case 'AIFF':
-    case 'AIF':
-      return true;
-    default:
-      return false;
-  }
-}
+bool isLosslessConversionSource(String sourceFormat) =>
+    switch (sourceFormat.trim().toUpperCase()) {
+      'FLAC' || 'ALAC' || 'M4A' || 'WAV' || 'AIFF' || 'AIF' => true,
+      _ => false,
+    };
 
 bool canConvertAudioFormat({
   required String sourceFormat,
@@ -184,41 +188,20 @@ String? _convertibleAudioFormatLabel(String? rawFormat) {
   final format = rawFormat?.trim().toLowerCase();
   if (format == null || format.isEmpty) return null;
 
-  switch (format) {
-    case 'flac':
-      return 'FLAC';
-    case 'alac':
-      return 'ALAC';
-    case 'wav':
-    case 'wave':
-      return 'WAV';
-    case 'aiff':
-    case 'aif':
-    case 'aifc':
-      return 'AIFF';
-    case 'm4a':
-    case 'mp4':
-      return 'M4A';
-    case 'aac':
-    case 'mp4a':
-      return 'AAC';
-    case 'mp3':
-      return 'MP3';
-    case 'opus':
-    case 'ogg':
-      return 'Opus';
-    case 'eac3':
-    case 'ec-3':
-      return 'EAC3';
-    case 'ac3':
-    case 'ac-3':
-      return 'AC3';
-    case 'ac4':
-    case 'ac-4':
-      return 'AC4';
-    default:
-      return null;
-  }
+  return switch (format) {
+    'flac' => 'FLAC',
+    'alac' => 'ALAC',
+    'wav' || 'wave' => 'WAV',
+    'aiff' || 'aif' || 'aifc' => 'AIFF',
+    'm4a' || 'mp4' => 'M4A',
+    'aac' || 'mp4a' => 'AAC',
+    'mp3' => 'MP3',
+    'opus' || 'ogg' => 'Opus',
+    'eac3' || 'ec-3' => 'EAC3',
+    'ac3' || 'ac-3' => 'AC3',
+    'ac4' || 'ac-4' => 'AC4',
+    _ => null,
+  };
 }
 
 class LosslessConversionLabels {
@@ -241,25 +224,18 @@ extension LosslessConversionLabelsL10n on AppLocalizations {
         lossless: trackConvertLosslessSuffix,
       );
 
-  String losslessDitherOptionLabel(String dither) {
-    switch (dither.trim().toLowerCase()) {
-      case 'triangular':
-        return trackConvertDitherTriangular;
-      case 'triangular_hp':
-        return trackConvertDitherTriangularHp;
-      default:
-        return trackConvertDitherNone;
-    }
-  }
+  String losslessDitherOptionLabel(String dither) =>
+      switch (dither.trim().toLowerCase()) {
+        'triangular' => trackConvertDitherTriangular,
+        'triangular_hp' => trackConvertDitherTriangularHp,
+        _ => trackConvertDitherNone,
+      };
 
-  String losslessResamplerOptionLabel(String resampler) {
-    switch (resampler.trim().toLowerCase()) {
-      case 'soxr':
-        return trackConvertResamplerSoxr;
-      default:
-        return trackConvertResamplerSwr;
-    }
-  }
+  String losslessResamplerOptionLabel(String resampler) =>
+      switch (resampler.trim().toLowerCase()) {
+        'soxr' => trackConvertResamplerSoxr,
+        _ => trackConvertResamplerSwr,
+      };
 }
 
 String losslessBitDepthLabel(int? bitDepth, {required String originalLabel}) {
@@ -329,24 +305,15 @@ String normalizedConvertedAudioFormat(String targetFormat) {
 /// Returns the output file extension (with dot) and MIME type for a conversion
 /// target format. Used when creating the converted file via SAF so WAV/AIFF and
 /// the other formats get the correct extension + MIME.
-({String ext, String mime}) convertTargetExtAndMime(String targetFormat) {
-  switch (targetFormat.trim().toLowerCase()) {
-    case 'opus':
-      return (ext: '.opus', mime: 'audio/opus');
-    case 'alac':
-    case 'aac':
-      return (ext: '.m4a', mime: 'audio/mp4');
-    case 'flac':
-      return (ext: '.flac', mime: 'audio/flac');
-    case 'wav':
-      return (ext: '.wav', mime: 'audio/wav');
-    case 'aiff':
-    case 'aif':
-      return (ext: '.aiff', mime: 'audio/aiff');
-    default:
-      return (ext: '.mp3', mime: 'audio/mpeg');
-  }
-}
+({String ext, String mime}) convertTargetExtAndMime(String targetFormat) =>
+    switch (targetFormat.trim().toLowerCase()) {
+      'opus' => (ext: '.opus', mime: 'audio/opus'),
+      'alac' || 'aac' => (ext: '.m4a', mime: 'audio/mp4'),
+      'flac' => (ext: '.flac', mime: 'audio/flac'),
+      'wav' => (ext: '.wav', mime: 'audio/wav'),
+      'aiff' || 'aif' => (ext: '.aiff', mime: 'audio/aiff'),
+      _ => (ext: '.mp3', mime: 'audio/mpeg'),
+    };
 
 String convertedOutputFileName({
   required String originalFileName,

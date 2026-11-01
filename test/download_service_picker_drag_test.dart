@@ -36,12 +36,7 @@ class _Extensions extends ExtensionNotifier {
           status: 'loaded',
           hasDownloadProvider: true,
           serviceHealth: hasHealth
-              ? const [
-                  ExtensionServiceHealthCheck(
-                    id: 'health',
-                    url: 'https://example.com/health',
-                  ),
-                ]
+              ? const [ExtensionServiceHealthCheck()]
               : const [],
           qualityOptions: List.generate(
             _qualityCount,
@@ -58,12 +53,7 @@ class _Extensions extends ExtensionNotifier {
           enabled: true,
           status: 'loaded',
           hasMetadataProvider: true,
-          serviceHealth: [
-            ExtensionServiceHealthCheck(
-              id: 'health',
-              url: 'https://example.com/health',
-            ),
-          ],
+          serviceHealth: [ExtensionServiceHealthCheck()],
         ),
     ],
   );
@@ -74,7 +64,7 @@ class _Extensions extends ExtensionNotifier {
   void publishHealth(String id, String status) => state = state.copyWith(
     healthStatuses: {
       ...state.healthStatuses,
-      id: ExtensionHealthStatus(extensionId: id, status: status),
+      id: ExtensionHealthStatus(status: status),
     },
   );
 

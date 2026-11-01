@@ -280,10 +280,6 @@
   "@homeEmptySubtitle": {
     "description": "Subtitle shown on home when no providers are available yet"
   },
-  "homeSupports": "Desteklenen linkler: Şarkı, Albüm, Çalma Listesi, Sanatçı linkleri",
-  "@homeSupports": {
-    "description": "Info text about supported URL types"
-  },
   "homeRecent": "En son",
   "@homeRecent": {
     "description": "Section header for recent searches"

@@ -14,6 +14,7 @@ import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/services/library_database.dart';
 import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/services/notification_service.dart';
+import 'package:mornye/services/network_storage_service.dart';
 import 'package:mornye/utils/local_library_scan_prefs.dart';
 
 class _Settings extends SettingsNotifier {
@@ -22,6 +23,22 @@ class _Settings extends SettingsNotifier {
 
   @override
   Future<void> ensureLoaded() async {}
+}
+
+class _ListingStorage extends NetworkStorageService {
+  _ListingStorage() : super(read: () async => null, write: (_) async {});
+
+  final started = Completer<void>();
+  final listing = Completer<List<NetworkEntry>>();
+
+  @override
+  Future<List<NetworkEntry>> list(
+    NetworkConnection connection, [
+    String path = '',
+  ]) {
+    if (!started.isCompleted) started.complete();
+    return listing.future;
+  }
 }
 
 class _Database implements LibraryDatabase {
@@ -135,6 +152,7 @@ void main() {
   late List<String> calls;
   late List<MethodCall> notificationCalls;
   var completeOnCancel = false;
+  late _ListingStorage storage;
 
   setUp(() async {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
@@ -158,6 +176,7 @@ void main() {
     calls = [];
     notificationCalls = [];
     completeOnCancel = false;
+    storage = _ListingStorage();
     messenger.setMockMethodCallHandler(paths, (_) async => directory.path);
     messenger.setMockMethodCallHandler(notifications, (call) async {
       notificationCalls.add(call);
@@ -183,6 +202,7 @@ void main() {
         localLibraryProvider.overrideWith(
           () => LocalLibraryNotifier(
             database: database,
+            networkStorage: storage,
             availabilityProbe: (path, {bookmark}) =>
                 probe(path, bookmark: bookmark),
           ),
@@ -195,6 +215,10 @@ void main() {
 
   tearDown(() async {
     container.dispose();
+    if (storage.started.isCompleted && !storage.listing.isCompleted) {
+      storage.listing.complete([]);
+    }
+    await storage.dispose();
     for (final (_, response) in scans) {
       if (!response.isCompleted) response.complete('{"cancelled":true}');
     }
@@ -219,6 +243,7 @@ void main() {
         localLibraryProvider.overrideWith(
           () => LocalLibraryNotifier(
             database: database,
+            networkStorage: storage,
             availabilityProbe: probe,
           ),
         ),
@@ -227,6 +252,74 @@ void main() {
     library = container.read(localLibraryProvider.notifier);
     await _waitFor(() => !container.read(localLibraryProvider).isLoading);
   }
+
+  test(
+    'removing a NAS cancels its blocked listing and retains its offline index',
+    () async {
+      const connection = NetworkConnection(
+        id: 'nas',
+        name: 'NAS',
+        protocol: NetworkProtocol.smb,
+        address: 'smb://nas.test/music/',
+      );
+      await storage.save(connection);
+      const path = 'network://nas/';
+      database.sources[0] = LocalLibrarySource(
+        id: 'active',
+        path: path,
+        displayName: 'NAS',
+        available: true,
+      );
+      available[path] = true;
+      final scan = library.startSourceScan('active', forceFullScan: true);
+      await storage.started.future.timeout(const Duration(seconds: 5));
+      expect(container.read(localLibraryProvider).isScanning, isTrue);
+
+      available[path] = false;
+      await storage.remove('nas').timeout(const Duration(seconds: 1));
+      await scan;
+      final state = container.read(localLibraryProvider);
+      expect(state.isScanning, isFalse);
+      expect(state.scanWasCancelled, isTrue);
+      expect(
+        state.sources.firstWhere((s) => s.id == 'active').available,
+        isFalse,
+      );
+      expect(
+        storage.listing.isCompleted,
+        isFalse,
+        reason: 'Cancellation must not wait for the old NAS response',
+      );
+      storage.listing.completeError(
+        const SocketException('Old connection closed'),
+      );
+      await Future<void>.delayed(Duration.zero);
+    },
+  );
+
+  test(
+    'removing the active library source waits for its scan to stop',
+    () async {
+      completeOnCancel = true;
+      final scan = library.startSourceScan('active');
+      await _waitFor(() => scans.isNotEmpty);
+      await library.removeSource('active').timeout(const Duration(seconds: 1));
+      await scan;
+      expect(calls, contains('cancelLibraryScan'));
+      expect(container.read(localLibraryProvider).isScanning, isFalse);
+      expect(database.sources.any((s) => s.id == 'active'), isFalse);
+    },
+  );
+
+  test('removing another connection keeps the active scan running', () async {
+    final scan = library.startSourceScan('active');
+    await _waitFor(() => scans.isNotEmpty);
+    await storage.remove('another-nas');
+    expect(calls, isNot(contains('cancelLibraryScan')));
+    expect(container.read(localLibraryProvider).isScanning, isTrue);
+    scans.single.$2.complete('{"cancelled":true}');
+    await scan;
+  });
 
   test(
     'Android crash details are recovered and retained without manual logs',

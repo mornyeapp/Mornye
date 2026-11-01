@@ -135,7 +135,6 @@ class RemoteAnnouncement {
 class DonateConfig {
   final bool enabled;
   final String title;
-  final String message;
   final List<DonateMethod> methods;
   final List<String> supporters;
   final List<String> notices;
@@ -144,7 +143,6 @@ class DonateConfig {
   const DonateConfig({
     required this.enabled,
     required this.title,
-    required this.message,
     required this.methods,
     required this.supporters,
     required this.notices,
@@ -164,9 +162,6 @@ class DonateConfig {
       title: _readString(json['title']).isEmpty
           ? 'Support ${AppInfo.appName}'
           : _mobileDonationText(_readString(json['title'])),
-      message: _readString(json['message']).isEmpty
-          ? 'Optional support helps cover tools, testing devices, and hosting.'
-          : _readString(json['message']),
       methods: methods.isEmpty ? DonateConfig.fallback().methods : methods,
       supporters: _readStringList(
         json['supporters'] ?? json['recent_supporters'],
@@ -186,7 +181,6 @@ class DonateConfig {
     return const DonateConfig(
       enabled: true,
       title: 'Support ${AppInfo.appName}',
-      message: 'Optional support helps cover dev tools and testing devices.',
       methods: [
         DonateMethod(
           id: 'kofi',
@@ -312,20 +306,11 @@ class MonthlyDonationGoal {
 
 class MonthlyDonationSource {
   final double? amount;
-  final int supporterCount;
 
-  const MonthlyDonationSource({
-    required this.amount,
-    required this.supporterCount,
-  });
+  const MonthlyDonationSource({required this.amount});
 
   factory MonthlyDonationSource.fromJson(Map<String, dynamic> json) =>
-      MonthlyDonationSource(
-        amount: _readFiniteNumber(json['amount']),
-        supporterCount: (_readFiniteNumber(json['supporter_count']) ?? 0)
-            .clamp(0, double.maxFinite)
-            .toInt(),
-      );
+      MonthlyDonationSource(amount: _readFiniteNumber(json['amount']));
 }
 
 class DonateMethod {

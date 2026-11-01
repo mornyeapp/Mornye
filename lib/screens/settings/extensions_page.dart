@@ -6,6 +6,7 @@ import 'package:mornye/widgets/extension_row.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path/path.dart' as p;
+import 'package:mornye/controllers/clickable_metadata.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/models/settings.dart';
 import 'package:mornye/providers/extension_provider.dart';
@@ -16,6 +17,7 @@ import 'package:mornye/screens/settings/extension_detail_page.dart';
 import 'package:mornye/screens/settings/metadata_provider_priority_page.dart';
 import 'package:mornye/screens/settings/provider_priority_page.dart';
 import 'package:mornye/theme/mornye_theme.dart';
+import 'package:mornye/utils/adaptive_layout.dart';
 import 'package:mornye/widgets/app_action_button.dart';
 import 'package:mornye/widgets/app_bottom_sheet.dart';
 import 'package:mornye/widgets/app_icon.dart';
@@ -23,6 +25,7 @@ import 'package:mornye/widgets/app_loading_indicator.dart';
 import 'package:mornye/widgets/mornye_chrome.dart';
 import 'package:mornye/widgets/settings_group.dart';
 import 'package:mornye/widgets/home_feed_region_setting.dart';
+import 'package:mornye/widgets/extension_storage_setting.dart';
 import 'package:mornye/widgets/app_sliver_header.dart';
 import 'package:mornye/widgets/extension_health.dart';
 
@@ -78,6 +81,8 @@ class _ExtensionsPageState extends ConsumerState<ExtensionsPage> {
           slivers: [
             AppSliverHeader.page(title: context.l10n.extensionsTitle),
 
+            const SliverToBoxAdapter(child: ExtensionStorageSetting()),
+
             if (extState.isLoading)
               const SliverToBoxAdapter(
                 child: Padding(
@@ -126,9 +131,9 @@ class _ExtensionsPageState extends ConsumerState<ExtensionsPage> {
               child: SettingsGroup(
                 connected: true,
                 children: [
-                  _DownloadPriorityItem(),
-                  _DownloadFallbackItem(),
-                  _MetadataPriorityItem(),
+                  _ExtensionPriorityLink(_PriorityLink.download),
+                  _ExtensionPriorityLink(_PriorityLink.fallback),
+                  _ExtensionPriorityLink(_PriorityLink.metadata),
                   _SearchProviderSelector(),
                   _HomeFeedProviderSelector(),
                   HomeFeedRegionSetting(),
@@ -145,7 +150,9 @@ class _ExtensionsPageState extends ConsumerState<ExtensionsPage> {
             if (extState.extensions.isEmpty && !extState.isLoading)
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 16 + wideListInset(context),
+                  ),
                   child: Container(
                     padding: const EdgeInsets.all(24),
                     decoration: BoxDecoration(
@@ -191,12 +198,9 @@ class _ExtensionsPageState extends ConsumerState<ExtensionsPage> {
                       extension: ext,
                       healthStatus: extState.healthStatuses[ext.id],
                       showDivider: index < extState.extensions.length - 1,
-                      onTap: () => Navigator.push(
+                      onTap: () => pushPage<void>(
                         context,
-                        MaterialPageRoute<void>(
-                          builder: (_) =>
-                              ExtensionDetailPage(extensionId: ext.id),
-                        ),
+                        (_) => ExtensionDetailPage(extensionId: ext.id),
                       ),
                       onToggle: (enabled) => ref
                           .read(extensionProvider.notifier)
@@ -212,12 +216,16 @@ class _ExtensionsPageState extends ConsumerState<ExtensionsPage> {
                 child: LayoutBuilder(
                   builder: (context, constraints) {
                     // Same edges as the extension group above.
-                    final inset = settingsHorizontalInset(constraints.maxWidth);
+                    final inset = settingsHorizontalInset(
+                      context,
+                      constraints.maxWidth,
+                    );
                     return Padding(
                       padding: EdgeInsets.fromLTRB(inset, 16, inset, 16),
                       child: context.isMornye
                           ? MornyeGlassPanel.overlay(
                               radius: 28,
+                              samplesBackdrop: false,
                               child: installButton,
                             )
                           : installButton,

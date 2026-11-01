@@ -11,6 +11,7 @@ use std::collections::BTreeMap;
 pub struct Request {
     pub file_path: String,
     pub cover_url: String,
+    pub header_video: String,
     pub cover_max_dimension: isize,
     pub embed_lyrics: bool,
     pub lyrics_mode: String,
@@ -37,7 +38,7 @@ pub struct Request {
     pub replace_release_metadata: bool,
 }
 lenient_deserialize!(Request {
-    "file_path" => file_path, "cover_url" => cover_url,
+    "file_path" => file_path, "cover_url" => cover_url, "header_video" => header_video,
     "cover_max_dimension" => cover_max_dimension, "embed_lyrics" => embed_lyrics,
     "lyrics_mode" => lyrics_mode, "artist_tag_mode" => artist_tag_mode,
     "spotify_id" => spotify_id, "track_name" => track_name, "artist_name" => artist_name,
@@ -163,11 +164,15 @@ impl Request {
         parts.join(" ").trim().into()
     }
 
-    pub fn apply(&mut self, track: &Value) {
-        let same_release = self.replace_release_metadata
+    pub fn same_release(&self, track: &Value) -> bool {
+        self.replace_release_metadata
             || placeholder(&self.album_name)
             || text(track, "album_name").trim().is_empty()
-            || titles_match(&self.album_name, text(track, "album_name"));
+            || titles_match(&self.album_name, text(track, "album_name"))
+    }
+
+    pub fn apply(&mut self, track: &Value) {
+        let same_release = self.same_release(track);
         for (key, prefix) in [
             ("spotify_id", ""),
             ("deezer_id", "deezer:"),
@@ -245,13 +250,14 @@ impl Request {
                 *target = value as isize;
             }
         }
-        if same_release
-            && selected("cover", "cover")
-            && let Some(cover) = [text(track, "cover_url"), text(track, "images")]
+        if same_release && selected("cover", "cover") {
+            if let Some(cover) = [text(track, "cover_url"), text(track, "images")]
                 .into_iter()
                 .find(|value| !value.is_empty())
-        {
-            self.cover_url = cover.into();
+            {
+                self.cover_url = cover.into();
+            }
+            self.header_video = text(track, "header_video").trim().into();
         }
         if number(track, "duration_ms") > 0 {
             self.duration_ms = number(track, "duration_ms");
@@ -325,6 +331,9 @@ impl Request {
             if self.selected(group, tag) {
                 result[key] = value;
             }
+        }
+        if self.selected("cover", "cover") && !self.header_video.is_empty() {
+            result["header_video"] = json!(self.header_video);
         }
         result
     }

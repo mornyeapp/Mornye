@@ -8,6 +8,7 @@ import 'package:mornye/models/download_history.dart';
 import 'package:mornye/models/track.dart';
 import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/services/history_database.dart';
+import 'package:mornye/services/download_file_recovery.dart';
 import 'package:mornye/services/history_maintenance.dart';
 import 'package:mornye/utils/logger.dart';
 import 'package:mornye/utils/file_access.dart';
@@ -73,6 +74,57 @@ bool historyItemsReferToSameStoredFile(
   ).any((key) => firstKeys.contains(key));
 }
 
+/// Compares every field [DownloadHistoryItem.toJson] persists.
+bool _sameHistoryItem(DownloadHistoryItem a, DownloadHistoryItem b) =>
+    identical(a, b) ||
+    (a.id == b.id &&
+        a.trackName == b.trackName &&
+        a.artistName == b.artistName &&
+        a.albumName == b.albumName &&
+        a.albumArtist == b.albumArtist &&
+        a.coverUrl == b.coverUrl &&
+        a.filePath == b.filePath &&
+        a.storageMode == b.storageMode &&
+        a.downloadTreeUri == b.downloadTreeUri &&
+        a.safRelativeDir == b.safRelativeDir &&
+        a.safFileName == b.safFileName &&
+        a.safRepaired == b.safRepaired &&
+        a.service == b.service &&
+        a.downloadedAt.isAtSameMomentAs(b.downloadedAt) &&
+        a.isrc == b.isrc &&
+        a.spotifyId == b.spotifyId &&
+        a.trackNumber == b.trackNumber &&
+        a.totalTracks == b.totalTracks &&
+        a.discNumber == b.discNumber &&
+        a.totalDiscs == b.totalDiscs &&
+        a.duration == b.duration &&
+        a.releaseDate == b.releaseDate &&
+        a.quality == b.quality &&
+        a.bitDepth == b.bitDepth &&
+        a.sampleRate == b.sampleRate &&
+        a.bitrate == b.bitrate &&
+        a.format == b.format &&
+        a.genre == b.genre &&
+        a.composer == b.composer &&
+        a.label == b.label &&
+        a.copyright == b.copyright &&
+        a.explicit == b.explicit &&
+        a.hasLyrics == b.hasLyrics &&
+        a.lyricsMetadataScanVersion == b.lyricsMetadataScanVersion &&
+        a.hasReplayGain == b.hasReplayGain &&
+        a.replayGainMetadataScanVersion == b.replayGainMetadataScanVersion);
+
+bool _sameHistoryItems(
+  List<DownloadHistoryItem> current,
+  List<DownloadHistoryItem> loaded,
+) {
+  if (current.length != loaded.length) return false;
+  for (var i = 0; i < current.length; i++) {
+    if (!_sameHistoryItem(current[i], loaded[i])) return false;
+  }
+  return true;
+}
+
 String? resolvePersistedHistoryQuality({
   required String? incoming,
   required String? existing,
@@ -111,6 +163,7 @@ class DownloadHistoryNotifier extends Notifier<DownloadHistoryState> {
   bool _startupMaintenanceScheduled = false;
   Future<void> _historyWriteChain = Future<void>.value();
   Future<void>? _reloadFuture;
+  Future<void>? _refreshFuture;
   Timer? _indexBumpTimer;
   DateTime? _lastIndexBumpAt;
   static const _indexBumpWindow = Duration(seconds: 1);
@@ -118,6 +171,11 @@ class DownloadHistoryNotifier extends Notifier<DownloadHistoryState> {
   @override
   DownloadHistoryState build() {
     ref.onDispose(() => _indexBumpTimer?.cancel());
+    ref.onDispose(
+      DownloadFileRecovery.subscribe(() {
+        unawaited(refreshFromStorage());
+      }),
+    );
     _scheduleLoadFromDatabase();
     return DownloadHistoryState();
   }
@@ -130,15 +188,16 @@ class DownloadHistoryNotifier extends Notifier<DownloadHistoryState> {
     });
   }
 
-  Future<void> _loadFromDatabase() async {
+  Future<void> _loadFromDatabase({bool publishUnchanged = true}) async {
     try {
       final migrated = await _db.migrateFromSharedPreferences();
       if (migrated) {
         _historyLog.i('Migrated history from SharedPreferences to SQLite');
       }
 
+      var pathsMigrated = false;
       if (Platform.isIOS) {
-        final pathsMigrated = await _db.migrateIosContainerPaths();
+        pathsMigrated = await _db.migrateIosContainerPaths();
         if (pathsMigrated) {
           _historyLog.i('Migrated iOS container paths after app update');
         }
@@ -151,12 +210,17 @@ class DownloadHistoryNotifier extends Notifier<DownloadHistoryState> {
           .toList();
       final totalCount = await countFuture;
 
-      state = state.copyWith(
-        items: items,
-        totalCount: totalCount,
-        loadedIndexVersion: state.loadedIndexVersion + 1,
-        lookupItems: items,
-      );
+      if (publishUnchanged ||
+          migrated ||
+          pathsMigrated ||
+          !_holdsLoadedSnapshot(items, totalCount)) {
+        state = state.copyWith(
+          items: items,
+          totalCount: totalCount,
+          loadedIndexVersion: state.loadedIndexVersion + 1,
+          lookupItems: items,
+        );
+      }
       _historyLog.i(
         'Loaded ${items.length}/$totalCount recent history items from SQLite database',
       );
@@ -170,6 +234,24 @@ class DownloadHistoryNotifier extends Notifier<DownloadHistoryState> {
       _enqueueHistoryWrite(_loadFromDatabase).whenComplete(() {
         _reloadFuture = null;
       });
+
+  /// Reloads history another writer may have changed, such as a native
+  /// download that finished while the app was suspended. Unlike
+  /// [reloadFromStorage], an unchanged snapshot publishes nothing, so Library
+  /// views and the Link catalog keep their revision.
+  Future<void> refreshFromStorage() =>
+      _reloadFuture ??
+      (_refreshFuture ??=
+          _enqueueHistoryWrite(
+            () => _loadFromDatabase(publishUnchanged: false),
+          ).whenComplete(() {
+            _refreshFuture = null;
+          }));
+
+  bool _holdsLoadedSnapshot(List<DownloadHistoryItem> items, int totalCount) =>
+      state.totalCount == totalCount &&
+      _sameHistoryItems(state.items, items) &&
+      _sameHistoryItems(state.lookupItems, items);
 
   void _bumpHistoryRevision() {
     state = state.copyWith(loadedIndexVersion: state.loadedIndexVersion + 1);
@@ -273,10 +355,10 @@ class DownloadHistoryNotifier extends Notifier<DownloadHistoryState> {
       );
       _historyLog.d('Updated existing history entry: ${item.trackName}');
     } else {
-      state = state.copyWith(
+      state = state.copyWithPrependedLookup(
+        item,
         items: [item, ...state.items],
         totalCount: state.totalCount + 1,
-        lookupItems: [item, ...state.lookupItems],
       );
       _historyLog.d('Added new history entry: ${item.trackName}');
     }
@@ -411,15 +493,21 @@ class DownloadHistoryNotifier extends Notifier<DownloadHistoryState> {
       item,
       ...state.items.where((existing) => existing.id != item.id),
     ];
-    final lookupItems = [
-      item,
-      ...state.lookupItems.where((existing) => existing.id != item.id),
-    ];
-    state = state.copyWith(
-      items: items,
-      totalCount: isReplacement ? state.totalCount : state.totalCount + 1,
-      lookupItems: lookupItems,
-    );
+    final totalCount = isReplacement ? state.totalCount : state.totalCount + 1;
+    state = state.lookupItems.any((existing) => existing.id == item.id)
+        ? state.copyWith(
+            items: items,
+            totalCount: totalCount,
+            lookupItems: [
+              item,
+              ...state.lookupItems.where((existing) => existing.id != item.id),
+            ],
+          )
+        : state.copyWithPrependedLookup(
+            item,
+            items: items,
+            totalCount: totalCount,
+          );
     _historyLog.d('Added independent history variant: ${item.trackName}');
     return item;
   }
@@ -463,14 +551,6 @@ class DownloadHistoryNotifier extends Notifier<DownloadHistoryState> {
           .toList(growable: false),
       loadedIndexVersion: state.loadedIndexVersion + 1,
     );
-  }
-
-  DownloadHistoryItem? getBySpotifyId(String spotifyId) {
-    return state.getBySpotifyId(spotifyId);
-  }
-
-  DownloadHistoryItem? getByIsrc(String isrc) {
-    return state.getByIsrc(isrc);
   }
 
   Future<DownloadHistoryItem?> getBySpotifyIdAsync(String spotifyId) async {
@@ -641,6 +721,7 @@ class DownloadHistoryNotifier extends Notifier<DownloadHistoryState> {
     required String trackName,
     required String artistName,
     required String albumName,
+    String? coverUrl,
     String? albumArtist,
     String? isrc,
     int? trackNumber,
@@ -667,6 +748,7 @@ class DownloadHistoryNotifier extends Notifier<DownloadHistoryState> {
       trackName: trackName,
       artistName: artistName,
       albumName: albumName,
+      coverUrl: coverUrl,
       albumArtist: albumArtist,
       isrc: isrc,
       trackNumber: trackNumber,
@@ -775,6 +857,12 @@ class DownloadHistoryNotifier extends Notifier<DownloadHistoryState> {
           try {
             if (await fileExists(filePath)) return MapEntry(id, true);
 
+            final moved = Platform.isAndroid
+                ? await DownloadFileRecovery(
+                    history: _db,
+                  ).recover(filePath, historyId: id, knownMissing: true)
+                : null;
+            if (moved != null) return MapEntry(id, true);
             final sibling = await _findConvertedSibling(filePath);
             if (sibling != null) {
               _historyLog.i(
@@ -835,6 +923,19 @@ class DownloadHistoryNotifier extends Notifier<DownloadHistoryState> {
           final result = resultsById[id];
           final status = result?['status'] as String? ?? 'unknown';
           if (status == 'missing') {
+            try {
+              final moved = await DownloadFileRecovery(history: _db).recover(
+                entry['file_path'] as String,
+                historyId: id,
+                knownMissing: true,
+              );
+              if (moved != null) continue;
+            } catch (error) {
+              _historyLog.w(
+                'Retaining download while its new folder is unavailable: $error',
+              );
+              continue;
+            }
             orphanedIds.add(id);
             _historyLog.d(
               'Found orphaned SAF entry: $id (${pathById[id] ?? ''})',
@@ -1126,12 +1227,6 @@ class DownloadHistoryNotifier extends Notifier<DownloadHistoryState> {
     }
   }
 
-  /// Replaces all download history with [items] (each in the
-  /// [DownloadHistoryItem.toJson] shape) from a restored backup, then reloads
-  /// the in-memory state from storage.
-  Future<void> restoreFromBackup(List<Map<String, dynamic>> items) =>
-      restoreFromBackupStream(Stream.fromIterable(items));
-
   /// Serializes backup replacement with existing history writes. Repair iOS
   /// paths before publishing the restored history to Library and maintenance.
   Future<void> restoreFromBackupOperation(Future<void> Function() restore) =>
@@ -1140,11 +1235,6 @@ class DownloadHistoryNotifier extends Notifier<DownloadHistoryState> {
         await _db.migrateIosContainerPaths(force: true);
         await _loadFromDatabase();
       });
-
-  /// Restores a large v2 backup without retaining the complete history in
-  /// Dart memory. SQLite writes are grouped to keep JNI/channel overhead low.
-  Future<void> restoreFromBackupStream(Stream<Map<String, dynamic>> items) =>
-      restoreFromBackupOperation(() => _db.replaceAll(items));
 }
 
 final downloadHistoryProvider =
@@ -1177,43 +1267,74 @@ final downloadHistoryBatchExistsProvider = FutureProvider.autoDispose
       };
     });
 
+/// The in-memory index keys of one lookup, derived once per request.
+typedef _MemoryLookupKeys = ({
+  List<String> spotifyIds,
+  String isrc,
+  String trackArtist,
+});
+
+_MemoryLookupKeys _memoryLookupKeys(HistoryLookupRequest request) => (
+  spotifyIds: HistoryDatabase.spotifyLookupCandidates(request.spotifyId),
+  isrc: request.isrc?.trim() ?? '',
+  trackArtist: DownloadHistoryState.trackArtistKey(
+    request.trackName,
+    request.artistName,
+  ),
+);
+
 bool _historyLookupExistsInMemory(
   DownloadHistoryState state,
-  HistoryLookupRequest request,
+  _MemoryLookupKeys keys,
 ) {
-  for (final candidate in HistoryDatabase.spotifyLookupCandidates(
-    request.spotifyId,
-  )) {
+  for (final candidate in keys.spotifyIds) {
     if (state.getBySpotifyId(candidate) != null) return true;
   }
 
-  final isrc = request.isrc?.trim();
-  if (isrc != null && isrc.isNotEmpty && state.getByIsrc(isrc) != null) {
+  if (keys.isrc.isNotEmpty && state.getByIsrc(keys.isrc) != null) {
     return true;
   }
 
-  return state.findByTrackAndArtist(request.trackName, request.artistName) !=
-      null;
+  return state.findByTrackArtistKey(keys.trackArtist) != null;
+}
+
+Set<String> _mergeVisibleHistoryKeys(
+  DownloadHistoryState state,
+  List<_MemoryLookupKeys> memoryKeys,
+  List<String> lookupKeys,
+  Set<String> persistedKeys,
+) {
+  final keys = <String>{...persistedKeys};
+  for (var i = 0; i < memoryKeys.length; i++) {
+    if (_historyLookupExistsInMemory(state, memoryKeys[i])) {
+      keys.add(lookupKeys[i]);
+    }
+  }
+  return keys;
 }
 
 Set<String> mergeVisibleHistoryLookupKeys({
   required DownloadHistoryState state,
   required HistoryBatchLookupRequest request,
   required Set<String> persistedKeys,
-}) {
-  final keys = <String>{...persistedKeys};
-  for (final track in request.tracks) {
-    if (_historyLookupExistsInMemory(state, track)) {
-      keys.add(track.lookupKey);
-    }
-  }
-  return keys;
-}
+}) => _mergeVisibleHistoryKeys(
+  state,
+  request.tracks.map(_memoryLookupKeys).toList(growable: false),
+  request.lookupKeys,
+  persistedKeys,
+);
 
 class _VisibleHistoryBatchExistsNotifier extends Notifier<Set<String>> {
   _VisibleHistoryBatchExistsNotifier(this.request);
 
   final HistoryBatchLookupRequest request;
+  late final List<String> _lookupKeys = request.lookupKeys;
+  late final List<_MemoryLookupKeys> _memoryKeys = request.tracks
+      .map(_memoryLookupKeys)
+      .toList(growable: false);
+  List<DownloadHistoryItem>? _mergedLookupItems;
+  Set<String>? _mergedPersistedKeys;
+  Set<String> _merged = const <String>{};
 
   @override
   Set<String> build() {
@@ -1226,11 +1347,21 @@ class _VisibleHistoryBatchExistsNotifier extends Notifier<Set<String>> {
           data: (keys) => keys,
           orElse: () => const <String>{},
         );
-    return mergeVisibleHistoryLookupKeys(
-      state: history,
-      request: request,
-      persistedKeys: persistedKeys,
+    // The lookup indexes live and change with lookupItems, so revision bumps
+    // and count refreshes cannot change which tracks are held in memory.
+    if (identical(history.lookupItems, _mergedLookupItems) &&
+        identical(persistedKeys, _mergedPersistedKeys)) {
+      return _merged;
+    }
+    _merged = _mergeVisibleHistoryKeys(
+      history,
+      _memoryKeys,
+      _lookupKeys,
+      persistedKeys,
     );
+    _mergedLookupItems = history.lookupItems;
+    _mergedPersistedKeys = persistedKeys;
+    return _merged;
   }
 
   @override

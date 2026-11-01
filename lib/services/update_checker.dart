@@ -162,8 +162,6 @@ class UpdateInfo {
   final String downloadUrl;
   final String? apkDownloadUrl;
   final String? apkSha256;
-  final DateTime publishedAt;
-  final bool isPrerelease;
 
   /// How many stable (non-prerelease) releases are newer than the installed
   /// version. Drives the forced-update flow.
@@ -189,8 +187,6 @@ class UpdateInfo {
     required this.downloadUrl,
     this.apkDownloadUrl,
     this.apkSha256,
-    required this.publishedAt,
-    this.isPrerelease = false,
     this.releasesBehind = 0,
     UpdateInstallKind? installKind,
     this.assetName,
@@ -391,9 +387,6 @@ class UpdateChecker {
       final htmlUrl =
           releaseData['html_url'] as String? ??
           'https://github.com/$_releaseRepo/releases';
-      final publishedAt =
-          DateTime.tryParse(releaseData['published_at'] as String? ?? '') ??
-          DateTime.now();
 
       final releaseAssets = _collectReleaseAssets(
         releaseData['assets'] as List<dynamic>? ?? const [],
@@ -413,8 +406,6 @@ class UpdateChecker {
           version: latestVersion,
           changelog: body,
           downloadUrl: htmlUrl,
-          publishedAt: publishedAt,
-          isPrerelease: isPrerelease,
           releasesBehind: releasesBehind,
           installKind: installKind,
           assetName: asset?.name,
@@ -443,8 +434,6 @@ class UpdateChecker {
         downloadUrl: htmlUrl,
         apkDownloadUrl: apkUrl,
         apkSha256: selectedAsset?.sha256,
-        publishedAt: publishedAt,
-        isPrerelease: isPrerelease,
         releasesBehind: releasesBehind,
       );
     } catch (e) {
@@ -484,8 +473,6 @@ class UpdateChecker {
       return false;
     }
   }
-
-  static String get currentVersion => AppInfo.version;
 
   static List<ReleaseAsset> _collectReleaseAssets(List<dynamic> assets) {
     final releaseAssets = <ReleaseAsset>[];

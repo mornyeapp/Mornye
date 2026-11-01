@@ -271,31 +271,17 @@ extension _QueueTabSelectionActions on _QueueTabState {
       return;
     }
 
-    final confirmed = await showAppDialog<bool>(
-      context: context,
-      builder: (ctx) => AppAlertDialog(
-        title: Text(ctx.l10n.dialogDownloadAllTitle),
-        content: Text(
-          ctx.l10n.dialogDownloadPlaylistsMessage(
-            totalTracks,
-            selectedPlaylists.length,
-          ),
-        ),
-        actions: [
-          AppDialogAction(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(ctx.l10n.dialogCancel),
-          ),
-          AppDialogAction(
-            filled: true,
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(ctx.l10n.dialogDownload),
-          ),
-        ],
+    final confirmed = await showAppConfirmDialog(
+      context,
+      title: context.l10n.dialogDownloadAllTitle,
+      message: context.l10n.dialogDownloadPlaylistsMessage(
+        totalTracks,
+        selectedPlaylists.length,
       ),
+      confirmLabel: context.l10n.dialogDownload,
     );
 
-    if (confirmed != true || !context.mounted) return;
+    if (!confirmed || !context.mounted) return;
 
     await ref
         .read(libraryCollectionsProvider.notifier)
@@ -368,31 +354,19 @@ extension _QueueTabSelectionActions on _QueueTabState {
 
   Future<void> _deleteSelectedPlaylists(BuildContext context) async {
     final count = _selectedPlaylistIds.length;
-    final confirmed = await showAppDialog<bool>(
-      context: context,
-      builder: (ctx) => AppAlertDialog(
-        title: Text(ctx.l10n.collectionDeletePlaylist),
-        content: Text(ctx.l10n.collectionDeletePlaylistsMessage(count)),
-        actions: [
-          AppDialogAction(
-            isDefault: true,
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(ctx.l10n.dialogCancel),
-          ),
-          AppDialogAction(
-            filled: true,
-            isDestructive: true,
-            onPressed: () => Navigator.pop(ctx, true),
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.error,
-            ),
-            child: Text(ctx.l10n.dialogDelete),
-          ),
-        ],
+    final confirmed = await showAppConfirmDialog(
+      context,
+      title: context.l10n.collectionDeletePlaylist,
+      message: context.l10n.collectionDeletePlaylistsMessage(count),
+      confirmLabel: context.l10n.dialogDelete,
+      destructive: true,
+      cancelIsDefault: true,
+      confirmStyle: FilledButton.styleFrom(
+        backgroundColor: Theme.of(context).colorScheme.error,
       ),
     );
 
-    if (confirmed != true || !context.mounted) return;
+    if (!confirmed || !context.mounted) return;
 
     final notifier = ref.read(libraryCollectionsProvider.notifier);
     await notifier.deletePlaylists(_selectedPlaylistIds);

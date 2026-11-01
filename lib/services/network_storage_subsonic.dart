@@ -20,6 +20,31 @@ String _decodeSubsonicId(String encoded) {
   return utf8.decode(base64Url.decode(base64Url.normalize(encoded)));
 }
 
+/// The library path of the Subsonic song [id]: `subsonic/song/<id>.<format>`.
+String subsonicSongPath(String id, String format) =>
+    'subsonic/song/${_subsonicId(id)}.$format';
+
+/// The library path of the Subsonic cover art [id]:
+/// `subsonic/cover/<id>.image`.
+String subsonicCoverPath(String id) =>
+    'subsonic/cover/${_subsonicId(id)}.image';
+
+/// The Subsonic song id behind a [subsonicSongPath], or null for any other
+/// path.
+String? subsonicSongIdFromPath(String path) {
+  final segments = path.split('/');
+  if (segments.length != 3 ||
+      segments.first != 'subsonic' ||
+      segments[1] != 'song') {
+    return null;
+  }
+  try {
+    return _decodeSubsonicId(segments.last.split('.').first);
+  } on FormatException {
+    return null;
+  }
+}
+
 Uri _subsonicTarget(
   NetworkConnection connection,
   String method,
@@ -129,9 +154,8 @@ class SubsonicSong {
     };
   }
 
-  String get path => 'subsonic/song/${_subsonicId(id)}.$format';
-  String? get coverPath =>
-      coverId.isEmpty ? null : 'subsonic/cover/${_subsonicId(coverId)}.image';
+  String get path => subsonicSongPath(id, format);
+  String? get coverPath => coverId.isEmpty ? null : subsonicCoverPath(coverId);
   NetworkEntry get entry => NetworkEntry(
     path,
     '$title.$format',
@@ -347,15 +371,16 @@ class SubsonicClient {
     throw const FormatException('Invalid Subsonic folder');
   }
 
-  Future<List<Map<String, dynamic>>> _albums(int offset) async => _subsonicList(
-    _subsonicMap(
-      (await request('getAlbumList2', {
-        'type': 'alphabeticalByName',
-        'size': '200',
-        'offset': '$offset',
-      }))['albumList2'],
-    )['album'],
+  Future<List<Map<String, dynamic>>> _albums(int offset) async =>
+      _albumPage(await _albumList(offset));
+
+  Future<Map<String, dynamic>> _albumList(int offset) => request(
+    'getAlbumList2',
+    {'type': 'alphabeticalByName', 'size': '200', 'offset': '$offset'},
   );
+
+  static List<Map<String, dynamic>> _albumPage(Map<String, dynamic> response) =>
+      _subsonicList(_subsonicMap(response['albumList2'])['album']);
 
   Future<List<SubsonicSong>> _songs(String albumId) async => _subsonicList(
     _subsonicMap((await request('getAlbum', {'id': albumId}))['album'])['song'],
@@ -390,14 +415,72 @@ class SubsonicClient {
     );
   }
 
+  /// The lyrics of [song] from the OpenSubsonic songLyrics extension, as
+  /// LRC or plain text; empty when the server has none. A Mornye desktop
+  /// also sends the stored text (`mornyeRaw`), which keeps word timing.
+  /// Throws when the server lacks the extension.
+  Future<String> lyrics(SubsonicSong song) async {
+    final result = await request('getLyricsBySongId', {'id': song.id});
+    final entries = _subsonicList(
+      _subsonicMap(result['lyricsList'])['structuredLyrics'],
+    );
+    for (final entry in entries) {
+      if (entry['mornyeRaw'] case final String raw when raw.trim().isNotEmpty) {
+        return raw;
+      }
+    }
+    final main = entries.where((entry) => (entry['kind'] ?? 'main') == 'main');
+    final entry =
+        main.where((entry) => entry['synced'] == true).firstOrNull ??
+        main.firstOrNull;
+    if (entry == null) return '';
+    final lines = _subsonicList(entry['line']);
+    if (entry['synced'] != true) {
+      return lines.map((line) => _subsonicText(line, 'value')).join('\n');
+    }
+    // A positive offset shows the lines sooner.
+    final offset = (entry['offset'] as num?)?.toInt() ?? 0;
+    return [
+      for (final line in lines)
+        if (line['start'] case final num start)
+          '[${_lrcTime(start.toInt() - offset)}]${_subsonicText(line, 'value')}',
+    ].join('\n');
+  }
+
+  static String _lrcTime(int milliseconds) {
+    final time = milliseconds < 0 ? 0 : milliseconds;
+    String two(int value) => value.toString().padLeft(2, '0');
+    return '${two(time ~/ 60000)}:${two(time ~/ 1000 % 60)}.${two(time % 1000 ~/ 10)}';
+  }
+
+  /// Every song of the server once. A Mornye desktop (`type: "mornye"`)
+  /// pages them through an empty `search3` query, which answers the same
+  /// song objects as `getAlbum`; other servers are walked album by album.
   Stream<SubsonicSong> catalog({
     required Future<void> Function() checkpoint,
   }) async* {
+    await checkpoint();
+    final first = await _albumList(0);
+    _catalogNewestFirst = first['type'] == 'mornye';
+    yield* _catalogNewestFirst
+        ? _searchCatalog(checkpoint)
+        : _albumCatalog(first, checkpoint);
+  }
+
+  /// Whether [catalog] lists songs newest first: a Mornye desktop pages them
+  /// in its export order, its Library's latest sort. Known by the first song.
+  bool get catalogNewestFirst => _catalogNewestFirst;
+  bool _catalogNewestFirst = false;
+
+  Stream<SubsonicSong> _albumCatalog(
+    Map<String, dynamic> first,
+    Future<void> Function() checkpoint,
+  ) async* {
     final albums = <String>{};
     final songs = <String>{};
     for (var offset = 0; offset <= 1000000; offset += 200) {
-      await checkpoint();
-      final page = await _albums(offset);
+      if (offset > 0) await checkpoint();
+      final page = offset == 0 ? _albumPage(first) : await _albums(offset);
       await checkpoint();
       var newAlbums = 0;
       for (final album in page) {
@@ -422,6 +505,51 @@ class SubsonicClient {
     throw const HttpException('Subsonic library is too large');
   }
 
+  Stream<SubsonicSong> _searchCatalog(
+    Future<void> Function() checkpoint,
+  ) async* {
+    final songs = <String>{};
+    final videos = <String>{};
+    var offset = 0;
+    while (offset <= 1000000) {
+      await checkpoint();
+      final page = _subsonicList(
+        _subsonicMap(
+          (await request('search3', {
+            'query': '',
+            'artistCount': '0',
+            'albumCount': '0',
+            'songCount': '500',
+            'songOffset': '$offset',
+          }))['searchResult3'],
+        )['song'],
+      );
+      await checkpoint();
+      // A server may cap pages below songCount, so only an empty page ends.
+      if (page.isEmpty) return;
+      var advanced = false;
+      for (final value in page) {
+        await checkpoint();
+        if (value['isVideo'] == true) {
+          advanced |= videos.add(_subsonicText(value, 'id'));
+          continue;
+        }
+        final song = SubsonicSong(value);
+        if (!songs.add(song.id)) continue;
+        advanced = true;
+        yield song;
+        if (songs.length > 500000) {
+          throw const HttpException('Subsonic library is too large');
+        }
+      }
+      if (!advanced) {
+        throw const HttpException('Subsonic pagination did not advance');
+      }
+      offset += page.length;
+    }
+    throw const HttpException('Subsonic library is too large');
+  }
+
   Future<String?> cachedCover(
     SubsonicSong song,
     Directory directory, {
@@ -432,35 +560,201 @@ class SubsonicClient {
     final hash = sha256.convert(
       utf8.encode('${connection.id}/${song.coverId}'),
     );
-    final target = File('${directory.path}/subsonic_$hash.image');
+    final base = File('${directory.path}/subsonic_$hash.image');
+    final current = File('${base.path}.current');
+    var target = base;
+    try {
+      final name = await current.readAsString();
+      final prefix = 'subsonic_${hash}_';
+      if (name.startsWith(prefix) &&
+          name.endsWith('.image') &&
+          RegExp(
+            r'^[a-f0-9]{48}$',
+          ).hasMatch(name.substring(prefix.length, name.length - 6))) {
+        target = File('${directory.path}/$name');
+      }
+    } on FileSystemException {
+      // Older caches have only the original image path.
+    }
     final stat = await target.stat();
+    final published = stat.type == FileSystemEntityType.file;
     if (!refresh &&
-        stat.type == FileSystemEntityType.file &&
+        published &&
         stat.size > 0 &&
         DateTime.now().difference(stat.modified) < const Duration(days: 1)) {
       return target.path;
     }
-    final staged = File('${target.path}.${NetworkStorageService.newId()}.tmp');
+    final staged = File('${base.path}.${NetworkStorageService.newId()}.tmp');
+    File? pointer;
     try {
-      await saveCover(song, staged);
-      await staged.rename(target.path);
+      final etag = !refresh && published && stat.size > 0
+          ? await _storedEtag(target, stat.size)
+          : null;
+      final fetched = await _protectTransport(
+        () => _saveCover(song, staged, etag: etag),
+      );
+      if (fetched.unchanged ||
+          (published && await _sameBytes(staged, target))) {
+        // Unchanged artwork keeps its path, so decoded sizes stay valid.
+        try {
+          await target.setLastModified(DateTime.now());
+        } on FileSystemException {
+          // A 304 cannot restore an image removed since the check.
+          if (fetched.unchanged && !await target.exists()) rethrow;
+          // The next lookup asks the server again.
+        }
+        if (!fetched.unchanged) {
+          await _storeEtag(target, fetched.etag, fetched.size);
+        }
+        return target.path;
+      }
+      if (published || target.path != base.path) {
+        // A new path invalidates every decoded size of the old artwork.
+        // Existing Library rows keep their old image until the scan commits.
+        final name = 'subsonic_${hash}_${NetworkStorageService.newId()}.image';
+        target = File('${directory.path}/$name');
+        await staged.rename(target.path);
+        await _storeEtag(target, fetched.etag, fetched.size);
+        pointer = File('${current.path}.${NetworkStorageService.newId()}.tmp');
+        await pointer.writeAsString(name, flush: true);
+        await pointer.rename(current.path);
+      } else {
+        await staged.rename(target.path);
+        await _storeEtag(target, fetched.etag, fetched.size);
+      }
       return target.path;
     } finally {
       if (await staged.exists()) await staged.delete();
+      if (pointer != null && await pointer.exists()) await pointer.delete();
     }
   }
 
-  Future<void> saveCover(SubsonicSong song, File output) =>
-      _protectTransport(() => _saveCover(song, output));
+  static Future<bool> _sameBytes(File a, File b) async =>
+      await a.length() == await b.length() &&
+      listEquals(await a.readAsBytes(), await b.readAsBytes());
 
-  Future<void> _saveCover(SubsonicSong song, File output) async {
-    if (song.coverPath == null) return;
+  static final _etag = RegExp(r'^[\x21-\x7e]{1,512}$');
+
+  /// The ETag the server sent with [image], kept in `<image>.etag` with the
+  /// image length; null when unknown or when the image changed since.
+  static Future<String?> _storedEtag(File image, int size) async {
+    try {
+      if ((await File('${image.path}.etag').readAsString()).split('\n') case [
+        final etag,
+        final length,
+      ] when length == '$size' && _etag.hasMatch(etag)) {
+        return etag;
+      }
+    } on FileSystemException {
+      // Older caches and servers without ETags keep no validator.
+    } on FormatException {
+      // An unreadable validator is ignored like a missing one.
+    }
+    return null;
+  }
+
+  static Future<void> _storeEtag(File image, String? etag, int size) async {
+    final validator = File('${image.path}.etag');
+    try {
+      if (etag == null || !_etag.hasMatch(etag)) {
+        if (await validator.exists()) await validator.delete();
+        return;
+      }
+      final staged = File(
+        '${validator.path}.${NetworkStorageService.newId()}.tmp',
+      );
+      try {
+        await staged.writeAsString('$etag\n$size');
+        await staged.rename(validator.path);
+      } finally {
+        if (await staged.exists()) await staged.delete();
+      }
+    } on FileSystemException {
+      // Without a validator the next check downloads the image again.
+    }
+  }
+
+  /// Saves the original file of the song [id] (the `download` method) to
+  /// [output]. [progress] receives the bytes written and the size the server
+  /// announced; [checkpoint] may throw between chunks to cancel.
+  Future<void> download(
+    String id,
+    File output, {
+    void Function()? checkpoint,
+    void Function(int received, int? total)? progress,
+  }) => _protectTransport(
+    () => _download(id, output, checkpoint: checkpoint, progress: progress),
+  );
+
+  Future<void> _download(
+    String id,
+    File output, {
+    void Function()? checkpoint,
+    void Function(int received, int? total)? progress,
+  }) async {
+    if (_closed) throw StateError('Subsonic request cancelled');
+    final response = await _storage._request(
+      _http,
+      connection,
+      'GET',
+      _subsonicTarget(connection, 'download', {'id': id}),
+    );
+    if (response.statusCode != 200 ||
+        const {
+          'application/json',
+          'application/xml',
+          'text/xml',
+        }.contains(response.headers.contentType?.mimeType)) {
+      await _storage._discardResponse(response);
+      throw HttpException(
+        response.statusCode == 200
+            ? 'Subsonic media unavailable'
+            : 'Server returned ${response.statusCode}',
+      );
+    }
+    final total = response.contentLength >= 0 ? response.contentLength : null;
+    final writer = output.openWrite();
+    var received = 0;
+    try {
+      // Let file writes pause the HTTP stream instead of queueing the entire
+      // download in the sink when storage is slower than the connection.
+      await writer.addStream(
+        response.timeout(NetworkStorageService.timeout).map((chunk) {
+          if (_closed) throw StateError('Subsonic request cancelled');
+          checkpoint?.call();
+          received += chunk.length;
+          progress?.call(received, total);
+          return chunk;
+        }),
+      );
+      if (total != null && received != total) {
+        throw const HttpException('Subsonic download ended early');
+      }
+    } finally {
+      await writer.close();
+    }
+  }
+
+  /// Saves the artwork of [song] to [output] and returns the ETag the server
+  /// sent with it. With [etag], a server that still has that image answers
+  /// 304 instead and nothing is written ([unchanged]).
+  Future<({bool unchanged, String? etag, int size})> _saveCover(
+    SubsonicSong song,
+    File output, {
+    String? etag,
+  }) async {
+    if (song.coverPath == null) return (unchanged: false, etag: null, size: 0);
     final response = await _storage._request(
       _http,
       connection,
       'GET',
       _subsonicMediaTarget(connection, song.coverPath!),
+      headers: {HttpHeaders.ifNoneMatchHeader: ?etag},
     );
+    if (etag != null && response.statusCode == 304) {
+      await response.drain<void>().timeout(NetworkStorageService.timeout);
+      return (unchanged: true, etag: etag, size: 0);
+    }
     if (response.statusCode != 200 ||
         !(response.headers.contentType?.mimeType.startsWith('image/') ??
             false)) {
@@ -474,7 +768,7 @@ class SubsonicClient {
         NetworkStorageService.timeout,
       )) {
         size += chunk.length;
-        if (size > 16 * 1024 * 1024) {
+        if (size > NetworkStorageService.maxCoverBytes) {
           throw const HttpException('Subsonic artwork is too large');
         }
         writer.add(chunk);
@@ -484,5 +778,11 @@ class SubsonicClient {
     } finally {
       await writer.close();
     }
+    final tags = response.headers[HttpHeaders.etagHeader];
+    return (
+      unchanged: false,
+      etag: tags != null && tags.length == 1 ? tags.single : null,
+      size: size,
+    );
   }
 }

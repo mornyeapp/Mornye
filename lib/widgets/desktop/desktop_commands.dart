@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/services/shell_navigation_service.dart';
 import 'package:mornye/utils/desktop_platform.dart';
@@ -141,6 +144,19 @@ const _destinationKeys = [
   LogicalKeyboardKey.digit5,
 ];
 
+/// Includes the native menu shortcut and any additional keyboard bindings.
+List<SingleActivator> desktopCommandShortcuts(
+  DesktopCommand command, [
+  TargetPlatform? platform,
+]) {
+  final target = platform ?? defaultTargetPlatform;
+  return [
+    ?desktopCommandShortcut(command, target),
+    if (command == DesktopCommand.fullScreen && _usesCommandKey(target))
+      const SingleActivator(LogicalKeyboardKey.f11),
+  ];
+}
+
 /// The shortcut that selects the [position]th (1-based) destination.
 SingleActivator desktopDestinationShortcut(
   int position, [
@@ -148,19 +164,23 @@ SingleActivator desktopDestinationShortcut(
 ]) =>
     _primary(_destinationKeys[position - 1], platform ?? defaultTargetPlatform);
 
-/// Every desktop key binding.
+final _shortcutBindings = <TargetPlatform, Map<ShortcutActivator, Intent>>{};
+
+/// Every desktop key binding. Each platform gets one unmodifiable map, so
+/// [Shortcuts] keeps its index when the shortcut layer rebuilds.
 Map<ShortcutActivator, Intent> desktopShortcutBindings([
   TargetPlatform? platform,
 ]) {
   final target = platform ?? defaultTargetPlatform;
-  return {
+  return _shortcutBindings[target] ??= Map.unmodifiable({
     for (final command in DesktopCommand.values)
-      ?desktopCommandShortcut(command, target): DesktopCommandIntent(command),
+      for (final shortcut in desktopCommandShortcuts(command, target))
+        shortcut: DesktopCommandIntent(command),
     for (var position = 1; position <= _destinationKeys.length; position++)
       desktopDestinationShortcut(position, target): DesktopDestinationIntent(
         position,
       ),
-  };
+  });
 }
 
 /// Human-readable form of [activator]: "⌘→" on macOS, "Ctrl+Right" elsewhere.
@@ -231,9 +251,27 @@ List<ShellTab> desktopDestinationTabs({
   ShellTab.settings,
 ];
 
-/// Whether the Material desktop rail is collapsed, as it starts. Kept for the
-/// app session; the sidebar shortcut toggles it.
-final desktopSidebarCollapsed = ValueNotifier<bool>(true);
+const _sidebarCollapsedKey = 'desktop_sidebar_collapsed';
+
+/// Whether the Material desktop rail is collapsed. Wide windows start with
+/// it expanded; the sidebar shortcut toggles it and the choice is kept.
+final desktopSidebarCollapsed = ValueNotifier<bool>(false);
+
+/// Restores the rail state [toggleDesktopSidebar] last saved.
+void restoreDesktopSidebar(SharedPreferences prefs) =>
+    desktopSidebarCollapsed.value =
+        prefs.getBool(_sidebarCollapsedKey) ?? false;
+
+/// Collapses or expands the Material rail and remembers the choice.
+void toggleDesktopSidebar() {
+  final collapsed = desktopSidebarCollapsed.value =
+      !desktopSidebarCollapsed.value;
+  unawaited(
+    SharedPreferences.getInstance().then(
+      (prefs) => prefs.setBool(_sidebarCollapsedKey, collapsed),
+    ),
+  );
+}
 
 /// Opens Now Playing in the content pane. Lyrics and Up Next live in the
 /// trailing inspector, toggled with [toggleDesktopInspector].

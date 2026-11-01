@@ -142,9 +142,9 @@ void main() {
             moreOrLessEquals(tester.getSize(titleRow).width, epsilon: 1),
           );
           await tester.ensureVisible(find.text('Embed Lyrics'));
-          await tester.tap(find.text('Embed Lyrics'));
-          // Allow real filesystem cleanup after the mocked native boundary.
+          // Start the file work outside the fake clock so its cleanup can finish.
           await tester.runAsync(() async {
+            await tester.tap(find.text('Embed Lyrics'));
             for (var i = 0; i < 100 && embedArguments == null; i++) {
               await Future<void>.delayed(const Duration(milliseconds: 10));
             }

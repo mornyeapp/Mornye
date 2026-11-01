@@ -28,6 +28,8 @@ class DownloadRequestPayload {
   final bool autoConvertDownloads;
   final String autoConvertFormat;
   final String autoConvertBitrate;
+  final int autoConvertMaxBitDepth;
+  final int autoConvertMaxSampleRate;
   final int trackNumber;
   final int playlistPosition;
   final int discNumber;
@@ -92,6 +94,8 @@ class DownloadRequestPayload {
     this.autoConvertDownloads = false,
     this.autoConvertFormat = 'mp3',
     this.autoConvertBitrate = '320k',
+    this.autoConvertMaxBitDepth = 16,
+    this.autoConvertMaxSampleRate = 48000,
     this.trackNumber = 0,
     this.playlistPosition = 0,
     this.discNumber = 0,
@@ -160,6 +164,8 @@ class DownloadRequestPayload {
       'auto_convert_downloads': autoConvertDownloads,
       'auto_convert_format': autoConvertFormat,
       'auto_convert_bitrate': autoConvertBitrate,
+      'auto_convert_max_bit_depth': autoConvertMaxBitDepth,
+      'auto_convert_max_sample_rate': autoConvertMaxSampleRate,
       'track_number': trackNumber,
       'playlist_position': playlistPosition,
       'disc_number': discNumber,
@@ -230,6 +236,8 @@ class DownloadRequestPayload {
       autoConvertDownloads: autoConvertDownloads,
       autoConvertFormat: autoConvertFormat,
       autoConvertBitrate: autoConvertBitrate,
+      autoConvertMaxBitDepth: autoConvertMaxBitDepth,
+      autoConvertMaxSampleRate: autoConvertMaxSampleRate,
       trackNumber: trackNumber,
       playlistPosition: playlistPosition,
       discNumber: discNumber,

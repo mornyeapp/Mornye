@@ -1,10 +1,11 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mornye/services/ffmpeg_service.dart';
+import 'package:mornye/services/ffmpeg_models.dart';
+import 'package:mornye/services/ffmpeg_replaygain.dart';
 
 void main() {
   test('missing decoder reports unsupported and rejects a default summary', () {
     var unsupported = false;
-    final result = FFmpegService.parseReplayGainScan(
+    final result = FFmpegReplayGain.parseScan(
       FFmpegResult(
         success: false,
         returnCode: 1,
@@ -20,7 +21,7 @@ void main() {
 
   test('failed decoding cannot use a partial loudness measurement', () {
     var unsupported = false;
-    final result = FFmpegService.parseReplayGainScan(
+    final result = FFmpegReplayGain.parseScan(
       FFmpegResult(
         success: false,
         returnCode: 1,
@@ -35,7 +36,7 @@ void main() {
   });
 
   test('completed analysis uses the final summary and highest peak', () {
-    final result = FFmpegService.parseReplayGainScan(
+    final result = FFmpegReplayGain.parseScan(
       FFmpegResult(
         success: true,
         returnCode: 0,

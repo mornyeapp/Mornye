@@ -40,6 +40,7 @@ AppSettings _$AppSettingsFromJson(Map<String, dynamic> json) => AppSettings(
   pauseOnMute: json['pauseOnMute'] as bool? ?? true,
   playOnHeadphonesConnected:
       json['playOnHeadphonesConnected'] as bool? ?? false,
+  gaplessPlayback: json['gaplessPlayback'] as bool? ?? true,
   autoMix: json['autoMix'] as bool? ?? false,
   autoMixDuration: json['autoMixDuration'] == null
       ? 0
@@ -66,8 +67,13 @@ AppSettings _$AppSettingsFromJson(Map<String, dynamic> json) => AppSettings(
   usbDsdOverPcm: json['usbDsdOverPcm'] as bool? ?? false,
   usbAllowFixedVolume: json['usbAllowFixedVolume'] as bool? ?? false,
   dapExclusive: json['dapExclusive'] as bool? ?? false,
+  exclusiveOutput: json['exclusiveOutput'] as bool? ?? false,
+  exclusiveOutputDevice: json['exclusiveOutputDevice'] as String? ?? '',
   autoplay: json['autoplay'] as bool? ?? false,
   autoplayPersonalization: json['autoplayPersonalization'] as bool? ?? true,
+  songAnalysis: json['songAnalysis'] as bool? ?? false,
+  songAnalysisOnlyWhileCharging:
+      json['songAnalysisOnlyWhileCharging'] as bool? ?? true,
   musicHaptics: json['musicHaptics'] as bool? ?? false,
   musicHapticsSensitivity: json['musicHapticsSensitivity'] == null
       ? 0.5
@@ -76,8 +82,10 @@ AppSettings _$AppSettingsFromJson(Map<String, dynamic> json) => AppSettings(
       ? 0.5
       : musicHapticsLevelFromJson(json['musicHapticsStrength']),
   playerCoverStyle: json['playerCoverStyle'] == null
-      ? 'default'
+      ? ''
       : playerCoverStyleFromJson(json['playerCoverStyle']),
+  landscapeLyricsArtwork: json['landscapeLyricsArtwork'] as bool? ?? false,
+  compactPlayer: json['compactPlayer'] as bool? ?? false,
   isFirstLaunch: json['isFirstLaunch'] as bool? ?? true,
   checkForUpdates: json['checkForUpdates'] as bool? ?? true,
   updateChannel: json['updateChannel'] as String? ?? 'stable',
@@ -105,6 +113,7 @@ AppSettings _$AppSettingsFromJson(Map<String, dynamic> json) => AppSettings(
           .toList(),
   searchProvider: json['searchProvider'] as String?,
   defaultSearchTab: json['defaultSearchTab'] as String? ?? 'all',
+  searchViewMode: json['searchViewMode'] as String? ?? 'list',
   homeFeedProvider: json['homeFeedProvider'] as String?,
   separateSingles: json['separateSingles'] as bool? ?? false,
   singleFilenameFormat:
@@ -126,6 +135,10 @@ AppSettings _$AppSettingsFromJson(Map<String, dynamic> json) => AppSettings(
   redownloadFakeHiRes: json['redownloadFakeHiRes'] as bool? ?? false,
   autoConvertFormat: json['autoConvertFormat'] as String? ?? 'mp3',
   autoConvertBitrate: json['autoConvertBitrate'] as String? ?? '320k',
+  autoConvertMaxBitDepth:
+      (json['autoConvertMaxBitDepth'] as num?)?.toInt() ?? 16,
+  autoConvertMaxSampleRate:
+      (json['autoConvertMaxSampleRate'] as num?)?.toInt() ?? 48000,
   useAllFilesAccess: json['useAllFilesAccess'] as bool? ?? false,
   autoExportFailedDownloads:
       json['autoExportFailedDownloads'] as bool? ?? false,
@@ -143,6 +156,7 @@ AppSettings _$AppSettingsFromJson(Map<String, dynamic> json) => AppSettings(
       json['localLibraryShowDuplicates'] as bool? ?? true,
   localLibraryAutoScan: json['localLibraryAutoScan'] as String? ?? 'off',
   hasCompletedTutorial: json['hasCompletedTutorial'] as bool? ?? false,
+  whatsNewSeen: json['whatsNewSeen'] as String? ?? '',
   lyricsProviders:
       (json['lyricsProviders'] as List<dynamic>?)
           ?.map((e) => e as String)
@@ -156,6 +170,13 @@ AppSettings _$AppSettingsFromJson(Map<String, dynamic> json) => AppSettings(
       json['lyricsMultiPersonWordByWord'] as bool? ?? true,
   lyricsAppleElrcWordSync: json['lyricsAppleElrcWordSync'] as bool? ?? true,
   musixmatchLanguage: json['musixmatchLanguage'] as String? ?? '',
+  lyricsAiProvider: json['lyricsAiProvider'] as String? ?? 'openai',
+  lyricsAiBaseUrl: json['lyricsAiBaseUrl'] as String? ?? '',
+  lyricsAiModel: json['lyricsAiModel'] as String? ?? '',
+  lyricsTranslationLanguage: json['lyricsTranslationLanguage'] as String? ?? '',
+  lyricsAiInstruction: json['lyricsAiInstruction'] as String? ?? '',
+  lyricsAutoTranslate: json['lyricsAutoTranslate'] as bool? ?? false,
+  lyricsAiRomanize: json['lyricsAiRomanize'] as bool? ?? true,
   lastSeenVersion: json['lastSeenVersion'] as String? ?? '',
   deduplicateDownloads: json['deduplicateDownloads'] as bool? ?? true,
   allowQualityVariants: json['allowQualityVariants'] as bool? ?? false,
@@ -163,6 +184,7 @@ AppSettings _$AppSettingsFromJson(Map<String, dynamic> json) => AppSettings(
   playerMode: json['playerMode'] as String? ?? 'internal',
   playerShowPronunciation: json['playerShowPronunciation'] as bool? ?? true,
   playerShowTranslation: json['playerShowTranslation'] as bool? ?? true,
+  playerShowVolume: json['playerShowVolume'] as bool? ?? true,
 );
 
 Map<String, dynamic> _$AppSettingsToJson(
@@ -189,6 +211,7 @@ Map<String, dynamic> _$AppSettingsToJson(
   'playbackNormalizationMode': instance.playbackNormalizationMode,
   'pauseOnMute': instance.pauseOnMute,
   'playOnHeadphonesConnected': instance.playOnHeadphonesConnected,
+  'gaplessPlayback': instance.gaplessPlayback,
   'autoMix': instance.autoMix,
   'autoMixDuration': instance.autoMixDuration,
   'autoMixEffect': _$AutoMixEffectEnumMap[instance.autoMixEffect]!,
@@ -202,12 +225,18 @@ Map<String, dynamic> _$AppSettingsToJson(
   'usbDsdOverPcm': instance.usbDsdOverPcm,
   'usbAllowFixedVolume': instance.usbAllowFixedVolume,
   'dapExclusive': instance.dapExclusive,
+  'exclusiveOutput': instance.exclusiveOutput,
+  'exclusiveOutputDevice': instance.exclusiveOutputDevice,
   'autoplay': instance.autoplay,
   'autoplayPersonalization': instance.autoplayPersonalization,
+  'songAnalysis': instance.songAnalysis,
+  'songAnalysisOnlyWhileCharging': instance.songAnalysisOnlyWhileCharging,
   'musicHaptics': instance.musicHaptics,
   'musicHapticsSensitivity': instance.musicHapticsSensitivity,
   'musicHapticsStrength': instance.musicHapticsStrength,
   'playerCoverStyle': instance.playerCoverStyle,
+  'landscapeLyricsArtwork': instance.landscapeLyricsArtwork,
+  'compactPlayer': instance.compactPlayer,
   'isFirstLaunch': instance.isFirstLaunch,
   'checkForUpdates': instance.checkForUpdates,
   'updateChannel': instance.updateChannel,
@@ -229,6 +258,7 @@ Map<String, dynamic> _$AppSettingsToJson(
   'downloadFallbackExtensionIds': instance.downloadFallbackExtensionIds,
   'searchProvider': instance.searchProvider,
   'defaultSearchTab': instance.defaultSearchTab,
+  'searchViewMode': instance.searchViewMode,
   'homeFeedProvider': instance.homeFeedProvider,
   'separateSingles': instance.separateSingles,
   'singleFilenameFormat': instance.singleFilenameFormat,
@@ -246,6 +276,8 @@ Map<String, dynamic> _$AppSettingsToJson(
   'redownloadFakeHiRes': instance.redownloadFakeHiRes,
   'autoConvertFormat': instance.autoConvertFormat,
   'autoConvertBitrate': instance.autoConvertBitrate,
+  'autoConvertMaxBitDepth': instance.autoConvertMaxBitDepth,
+  'autoConvertMaxSampleRate': instance.autoConvertMaxSampleRate,
   'useAllFilesAccess': instance.useAllFilesAccess,
   'autoExportFailedDownloads': instance.autoExportFailedDownloads,
   'downloadNetworkMode': instance.downloadNetworkMode,
@@ -260,12 +292,20 @@ Map<String, dynamic> _$AppSettingsToJson(
   'localLibraryShowDuplicates': instance.localLibraryShowDuplicates,
   'localLibraryAutoScan': instance.localLibraryAutoScan,
   'hasCompletedTutorial': instance.hasCompletedTutorial,
+  'whatsNewSeen': instance.whatsNewSeen,
   'lyricsProviders': instance.lyricsProviders,
   'lyricsIncludeTranslationNetease': instance.lyricsIncludeTranslationNetease,
   'lyricsIncludeRomanizationNetease': instance.lyricsIncludeRomanizationNetease,
   'lyricsMultiPersonWordByWord': instance.lyricsMultiPersonWordByWord,
   'lyricsAppleElrcWordSync': instance.lyricsAppleElrcWordSync,
   'musixmatchLanguage': instance.musixmatchLanguage,
+  'lyricsAiProvider': instance.lyricsAiProvider,
+  'lyricsAiBaseUrl': instance.lyricsAiBaseUrl,
+  'lyricsAiModel': instance.lyricsAiModel,
+  'lyricsTranslationLanguage': instance.lyricsTranslationLanguage,
+  'lyricsAiInstruction': instance.lyricsAiInstruction,
+  'lyricsAutoTranslate': instance.lyricsAutoTranslate,
+  'lyricsAiRomanize': instance.lyricsAiRomanize,
   'lastSeenVersion': instance.lastSeenVersion,
   'deduplicateDownloads': instance.deduplicateDownloads,
   'allowQualityVariants': instance.allowQualityVariants,
@@ -273,6 +313,7 @@ Map<String, dynamic> _$AppSettingsToJson(
   'playerMode': instance.playerMode,
   'playerShowPronunciation': instance.playerShowPronunciation,
   'playerShowTranslation': instance.playerShowTranslation,
+  'playerShowVolume': instance.playerShowVolume,
 };
 
 const _$AutoMixEffectEnumMap = {

@@ -65,9 +65,6 @@ extension _QueueTabFilterWidgets on _QueueTabState {
               .reversed
               .toList(growable: false);
 
-    final libIdSet = <String>{
-      for (final item in allFilteredUnifiedItems) item.id,
-    };
     final bridgeHistoryById = <String, DownloadHistoryItem?>{
       for (final entry in _completionBridge.entries)
         entry.key: _historyItemForCompletionBridge(
@@ -79,6 +76,7 @@ extension _QueueTabFilterWidgets on _QueueTabState {
     if (hasQueueItems &&
         filterMode != 'albums' &&
         _completionBridge.isNotEmpty) {
+      final libIdSet = _loadedSongs(filterMode, allFilteredUnifiedItems).ids;
       final now = DateTime.now();
       final stale = <String>[];
       final pending = <String>[];
@@ -154,10 +152,7 @@ extension _QueueTabFilterWidgets on _QueueTabState {
               if (coverUrl != null && coverUrl.isNotEmpty) {
                 precacheImage(
                   ResizeImage(
-                    CachedNetworkImageProvider(
-                      coverUrl,
-                      cacheManager: CoverCacheManager.instance,
-                    ),
+                    cachedCoverImageProvider(coverUrl),
                     width: targetSize,
                     height: targetSize,
                   ),
@@ -177,51 +172,40 @@ extension _QueueTabFilterWidgets on _QueueTabState {
       final pinnedHistoryIds = <String>{
         for (final id in bridgeIds) 'dl_${bridgeHistoryById[id]?.id ?? id}',
       };
-      filteredUnifiedItems = allFilteredUnifiedItems
-          .where((item) => !pinnedHistoryIds.contains(item.id))
-          .toList(growable: false);
-    }
-
-    final downloadedNavigationItems = <DownloadHistoryItem>[];
-    final downloadedNavigationIndexByUnifiedId = <String, int>{};
-    final localNavigationItems = <LocalLibraryItem>[];
-    final localNavigationIndexByUnifiedId = <String, int>{};
-
-    for (final item in filteredUnifiedItems) {
-      final historyItem = item.historyItem;
-      if (historyItem != null) {
-        downloadedNavigationIndexByUnifiedId[item.id] =
-            downloadedNavigationItems.length;
-        downloadedNavigationItems.add(historyItem);
-      }
-
-      final localItem = item.localItem;
-      if (localItem != null) {
-        localNavigationIndexByUnifiedId[item.id] = localNavigationItems.length;
-        localNavigationItems.add(localItem);
+      final loaded = _loadedSongs(filterMode, allFilteredUnifiedItems);
+      final unpinned = loaded.unpinned;
+      if (unpinned != null && setEquals(unpinned.$1, pinnedHistoryIds)) {
+        filteredUnifiedItems = unpinned.$2;
+      } else {
+        filteredUnifiedItems = allFilteredUnifiedItems
+            .where((item) => !pinnedHistoryIds.contains(item.id))
+            .toList(growable: false);
+        loaded.unpinned = (pinnedHistoryIds, filteredUnifiedItems);
       }
     }
 
     // Completion-bridge tracks are hidden from filteredUnifiedItems, so weave
     // them into the front of the swipe-navigation list (matching their pinned
-    // lead-zone position) — otherwise a just-downloaded track opens with no
+    // lead-zone position); otherwise a just-downloaded track opens with no
     // swipe navigation at all until its row lands in the library query.
     final bridgeNavigationIndexById = <String, int>{};
-    if (bridgeIds.isNotEmpty) {
-      final bridgeHistoryItems = <DownloadHistoryItem>[];
-      for (final id in bridgeIds) {
-        final historyItem = bridgeHistoryById[id];
-        if (historyItem == null) continue;
-        bridgeNavigationIndexById[id] = bridgeHistoryItems.length;
-        bridgeHistoryItems.add(historyItem);
-      }
-      if (bridgeHistoryItems.isNotEmpty) {
-        downloadedNavigationItems.insertAll(0, bridgeHistoryItems);
-        downloadedNavigationIndexByUnifiedId.updateAll(
-          (_, index) => index + bridgeHistoryItems.length,
-        );
-      }
+    final bridgeHistoryItems = <DownloadHistoryItem>[];
+    for (final id in bridgeIds) {
+      final historyItem = bridgeHistoryById[id];
+      if (historyItem == null) continue;
+      bridgeNavigationIndexById[id] = bridgeHistoryItems.length;
+      bridgeHistoryItems.add(historyItem);
     }
+    final (
+      downloaded: downloadedNavigationItems,
+      downloadedIndexById: downloadedNavigationIndexByUnifiedId,
+      local: localNavigationItems,
+      localIndexById: localNavigationIndexByUnifiedId,
+    ) = _libraryNavigation(
+      filterMode,
+      filteredUnifiedItems,
+      bridgeHistoryItems,
+    );
 
     final leadCount = activeDownloadIds.length + bridgeIds.length;
     // The tab-root Library keeps Songs to songs: collections live on the
@@ -279,11 +263,12 @@ extension _QueueTabFilterWidgets on _QueueTabState {
       final bridgeId = bridgeIds[index - activeDownloadIds.length];
       return KeyedSubtree(
         key: ValueKey('dlgrid_bridge_$bridgeId'),
-        child: _buildBridgeGridItem(
+        child: _buildBridgeItem(
           context,
           _completionBridge[bridgeId]!,
           colorScheme,
           bridgeHistoryById[bridgeId],
+          grid: true,
           navigationItems: downloadedNavigationItems,
           navigationIndex: bridgeNavigationIndexById[bridgeId],
         ),
@@ -316,16 +301,68 @@ extension _QueueTabFilterWidgets on _QueueTabState {
         key: ValueKey('dllist_bridge_$bridgeId'),
         index: index,
         count: runLength,
-        child: _buildBridgeListItem(
+        child: _buildBridgeItem(
           context,
           _completionBridge[bridgeId]!,
           colorScheme,
           bridgeHistoryById[bridgeId],
+          grid: false,
           navigationItems: downloadedNavigationItems,
           navigationIndex: bridgeNavigationIndexById[bridgeId],
         ),
       );
     }
+
+    // Songs drag onto playlists; singles do not.
+    final playlistDrag = filterMode == 'all';
+    Widget trackTile(UnifiedLibraryItem item, {required bool grid}) {
+      final tile = (grid ? _buildUnifiedGridItem : _buildUnifiedLibraryItem)(
+        context,
+        item,
+        colorScheme,
+        downloadedNavigationItems: downloadedNavigationItems,
+        downloadedNavigationIndex:
+            downloadedNavigationIndexByUnifiedId[item.id],
+        localNavigationItems: localNavigationItems,
+        localNavigationIndex: localNavigationIndexByUnifiedId[item.id],
+        libraryItems: filteredUnifiedItems,
+        playlistDragEnabled: playlistDrag,
+      );
+      if (!playlistDrag) return tile;
+      return LibraryPlaylistDragSource<UnifiedLibraryItem>(
+        data: item,
+        onSelect: () => _selectDraggedTrack(item, filteredUnifiedItems),
+        onDragStarted: _startLibraryTrackDrag,
+        onDragEnd: _endLibraryTrackDrag,
+        feedbackBuilder: (context) =>
+            _buildDragFeedback(context, item, colorScheme),
+        child: tile,
+      );
+    }
+
+    Widget trackCountHeader() => SliverToBoxAdapter(
+      child: _countHeaderRow(
+        context,
+        context.l10n.queueTrackCount(totalTrackCount),
+        [
+          if (rootLibrary && !_isSelectionMode)
+            ..._buildLibraryTools(context, viewMode: historyViewMode)
+          else if (!_isSelectionMode)
+            _buildFilterButton(context),
+          // The root Library creates playlists from the Playlists page.
+          if (!rootLibrary &&
+              !_isSelectionMode &&
+              filteredUnifiedItems.isNotEmpty)
+            ExpressiveButton(
+              text: true,
+              onPressed: () => _showCreatePlaylistDialog(context),
+              icon: const Icon(Icons.add, size: 20),
+              style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+              child: Text(context.l10n.collectionCreatePlaylist),
+            ),
+        ],
+      ),
+    );
 
     final content = CustomScrollView(
       slivers: [
@@ -347,32 +384,7 @@ extension _QueueTabFilterWidgets on _QueueTabState {
             ),
           ),
 
-        if (totalTrackCount > 0 && filterMode == 'all')
-          SliverToBoxAdapter(
-            child: _countHeaderRow(
-              context,
-              context.l10n.queueTrackCount(totalTrackCount),
-              [
-                if (rootLibrary && !_isSelectionMode)
-                  ..._buildLibraryTools(context, viewMode: historyViewMode)
-                else if (!_isSelectionMode)
-                  _buildFilterButton(context),
-                // The root Library creates playlists from the Playlists page.
-                if (!rootLibrary &&
-                    !_isSelectionMode &&
-                    filteredUnifiedItems.isNotEmpty)
-                  ExpressiveButton(
-                    text: true,
-                    onPressed: () => _showCreatePlaylistDialog(context),
-                    icon: const Icon(Icons.add, size: 20),
-                    style: TextButton.styleFrom(
-                      visualDensity: VisualDensity.compact,
-                    ),
-                    child: Text(context.l10n.collectionCreatePlaylist),
-                  ),
-              ],
-            ),
-          ),
+        if (totalTrackCount > 0 && filterMode == 'all') trackCountHeader(),
 
         if ((filteredGroupedAlbums.isNotEmpty ||
                 filteredGroupedLocalAlbums.isNotEmpty) &&
@@ -406,23 +418,7 @@ extension _QueueTabFilterWidgets on _QueueTabState {
             ),
           ),
 
-        if (filterMode == 'all' &&
-            totalTrackCount == 0 &&
-            !showFilteringIndicator &&
-            (_activeFilterCount > 0 || unifiedItems.isNotEmpty))
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: EdgeInsets.fromLTRB(edge, 8, edge, 8),
-              child: Row(
-                children: [
-                  const Spacer(),
-                  if (!_isSelectionMode) _buildFilterButton(context),
-                ],
-              ),
-            ),
-          ),
-
-        if (filterMode == 'singles' &&
+        if ((filterMode == 'all' || filterMode == 'singles') &&
             totalTrackCount == 0 &&
             !showFilteringIndicator &&
             (_activeFilterCount > 0 || unifiedItems.isNotEmpty))
@@ -569,7 +565,15 @@ extension _QueueTabFilterWidgets on _QueueTabState {
           ),
         ],
 
-        if (filterMode == 'all') ...[
+        if (filterMode == 'singles') ...[
+          trackCountHeader(),
+          _buildQueueHeaderSliver(context, colorScheme),
+        ],
+
+        // Songs list collections first; singles hide an empty track list.
+        if (filterMode == 'all' ||
+            (filterMode == 'singles' &&
+                (filteredUnifiedItems.isNotEmpty || leadCount > 0)))
           if (historyViewMode == 'grid')
             SliverPadding(
               padding: EdgeInsets.symmetric(horizontal: edge),
@@ -599,29 +603,7 @@ extension _QueueTabFilterWidgets on _QueueTabState {
                       final item = filteredUnifiedItems[trackIndex];
                       return KeyedSubtree(
                         key: ValueKey(item.id),
-                        child: LibraryPlaylistDragSource<UnifiedLibraryItem>(
-                          data: item,
-                          onSelect: () =>
-                              _selectDraggedTrack(item, filteredUnifiedItems),
-                          onDragStarted: _startLibraryTrackDrag,
-                          onDragEnd: _endLibraryTrackDrag,
-                          feedbackBuilder: (context) =>
-                              _buildDragFeedback(context, item, colorScheme),
-                          child: _buildUnifiedGridItem(
-                            context,
-                            item,
-                            colorScheme,
-                            downloadedNavigationItems:
-                                downloadedNavigationItems,
-                            downloadedNavigationIndex:
-                                downloadedNavigationIndexByUnifiedId[item.id],
-                            localNavigationItems: localNavigationItems,
-                            localNavigationIndex:
-                                localNavigationIndexByUnifiedId[item.id],
-                            libraryItems: filteredUnifiedItems,
-                            playlistDragEnabled: true,
-                          ),
-                        ),
+                        child: trackTile(item, grid: true),
                       );
                     }
                     return const SizedBox.shrink();
@@ -635,10 +617,11 @@ extension _QueueTabFilterWidgets on _QueueTabState {
               (filteredUnifiedItems.isNotEmpty ||
                   leadCount > 0 ||
                   collectionCount > 0))
-            // Desktop lists songs in the sortable table, as the singles view
-            // does, with the collections and active downloads leading it.
+            // Desktop lists songs in the sortable table, with the collections
+            // and active downloads leading it.
             _buildLibrarySongTable(
               context,
+              filterMode: filterMode,
               items: filteredUnifiedItems,
               leadCount: collectionCount + leadCount,
               leadBuilder: (index) => index < collectionCount
@@ -665,31 +648,8 @@ extension _QueueTabFilterWidgets on _QueueTabState {
               items: filteredUnifiedItems,
               leadCount: leadCount,
               leadBuilder: leadListCell,
-              rowBuilder: (index) {
-                final item = filteredUnifiedItems[index];
-                return LibraryPlaylistDragSource<UnifiedLibraryItem>(
-                  data: item,
-                  onSelect: () =>
-                      _selectDraggedTrack(item, filteredUnifiedItems),
-                  onDragStarted: _startLibraryTrackDrag,
-                  onDragEnd: _endLibraryTrackDrag,
-                  feedbackBuilder: (context) =>
-                      _buildDragFeedback(context, item, colorScheme),
-                  child: _buildUnifiedLibraryItem(
-                    context,
-                    item,
-                    colorScheme,
-                    downloadedNavigationItems: downloadedNavigationItems,
-                    downloadedNavigationIndex:
-                        downloadedNavigationIndexByUnifiedId[item.id],
-                    localNavigationItems: localNavigationItems,
-                    localNavigationIndex:
-                        localNavigationIndexByUnifiedId[item.id],
-                    libraryItems: filteredUnifiedItems,
-                    playlistDragEnabled: true,
-                  ),
-                );
-              },
+              rowBuilder: (index) =>
+                  trackTile(filteredUnifiedItems[index], grid: false),
             )
           else
             SliverPadding(
@@ -717,29 +677,7 @@ extension _QueueTabFilterWidgets on _QueueTabState {
                         key: ValueKey(item.id),
                         index: afterCollections,
                         count: leadCount + filteredUnifiedItems.length,
-                        child: LibraryPlaylistDragSource<UnifiedLibraryItem>(
-                          data: item,
-                          onSelect: () =>
-                              _selectDraggedTrack(item, filteredUnifiedItems),
-                          onDragStarted: _startLibraryTrackDrag,
-                          onDragEnd: _endLibraryTrackDrag,
-                          feedbackBuilder: (context) =>
-                              _buildDragFeedback(context, item, colorScheme),
-                          child: _buildUnifiedLibraryItem(
-                            context,
-                            item,
-                            colorScheme,
-                            downloadedNavigationItems:
-                                downloadedNavigationItems,
-                            downloadedNavigationIndex:
-                                downloadedNavigationIndexByUnifiedId[item.id],
-                            localNavigationItems: localNavigationItems,
-                            localNavigationIndex:
-                                localNavigationIndexByUnifiedId[item.id],
-                            libraryItems: filteredUnifiedItems,
-                            playlistDragEnabled: true,
-                          ),
-                        ),
+                        child: trackTile(item, grid: false),
                       );
                     }
                     return const SizedBox.shrink();
@@ -749,141 +687,6 @@ extension _QueueTabFilterWidgets on _QueueTabState {
                 ),
               ),
             ),
-        ],
-
-        if (filterMode == 'singles')
-          SliverToBoxAdapter(
-            child: _countHeaderRow(
-              context,
-              context.l10n.queueTrackCount(totalTrackCount),
-              [
-                if (rootLibrary && !_isSelectionMode)
-                  ..._buildLibraryTools(context, viewMode: historyViewMode)
-                else if (!_isSelectionMode)
-                  _buildFilterButton(context),
-                // The root Library creates playlists from the Playlists page.
-                if (!rootLibrary &&
-                    !_isSelectionMode &&
-                    filteredUnifiedItems.isNotEmpty)
-                  ExpressiveButton(
-                    text: true,
-                    onPressed: () => _showCreatePlaylistDialog(context),
-                    icon: const Icon(Icons.add, size: 20),
-                    style: TextButton.styleFrom(
-                      visualDensity: VisualDensity.compact,
-                    ),
-                    child: Text(context.l10n.collectionCreatePlaylist),
-                  ),
-              ],
-            ),
-          ),
-
-        if (filterMode == 'singles')
-          _buildQueueHeaderSliver(context, colorScheme),
-
-        if ((filteredUnifiedItems.isNotEmpty || leadCount > 0) &&
-            filterMode == 'singles')
-          historyViewMode == 'grid'
-              ? SliverPadding(
-                  padding: EdgeInsets.symmetric(horizontal: edge),
-                  sliver: AnimatedLibrarySliverGrid(
-                    maxCrossAxisExtent:
-                        _QueueTabState._libraryGridDefaultExtent,
-                    extentListenable: _libraryGridExtent,
-                    mainAxisSpacing: 8,
-                    crossAxisSpacing: 8,
-                    childAspectRatio: 0.66,
-                    delegate: SliverChildBuilderDelegate((context, index) {
-                      if (index < leadCount) {
-                        return leadGridCell(index);
-                      }
-                      final item = filteredUnifiedItems[index - leadCount];
-                      return KeyedSubtree(
-                        key: ValueKey(item.id),
-                        child: _buildUnifiedGridItem(
-                          context,
-                          item,
-                          colorScheme,
-                          downloadedNavigationItems: downloadedNavigationItems,
-                          downloadedNavigationIndex:
-                              downloadedNavigationIndexByUnifiedId[item.id],
-                          localNavigationItems: localNavigationItems,
-                          localNavigationIndex:
-                              localNavigationIndexByUnifiedId[item.id],
-                          libraryItems: filteredUnifiedItems,
-                        ),
-                      );
-                    }, childCount: leadCount + filteredUnifiedItems.length),
-                  ),
-                )
-              : isDesktopPlatform
-              ? _buildLibrarySongTable(
-                  context,
-                  items: filteredUnifiedItems,
-                  leadCount: leadCount,
-                  leadBuilder: leadListCell,
-                  openAction: (item) => _libraryItemOpenAction(
-                    item,
-                    downloadedNavigationItems: downloadedNavigationItems,
-                    downloadedNavigationIndex:
-                        downloadedNavigationIndexByUnifiedId[item.id],
-                    localNavigationItems: localNavigationItems,
-                    localNavigationIndex:
-                        localNavigationIndexByUnifiedId[item.id],
-                  ),
-                )
-              : sectioned
-              ? _buildSectionedTrackSlivers(
-                  context: context,
-                  items: filteredUnifiedItems,
-                  leadCount: leadCount,
-                  leadBuilder: leadListCell,
-                  rowBuilder: (index) {
-                    final item = filteredUnifiedItems[index];
-                    return _buildUnifiedLibraryItem(
-                      context,
-                      item,
-                      colorScheme,
-                      downloadedNavigationItems: downloadedNavigationItems,
-                      downloadedNavigationIndex:
-                          downloadedNavigationIndexByUnifiedId[item.id],
-                      localNavigationItems: localNavigationItems,
-                      localNavigationIndex:
-                          localNavigationIndexByUnifiedId[item.id],
-                      libraryItems: filteredUnifiedItems,
-                    );
-                  },
-                )
-              : SliverPadding(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: wideListInset(context),
-                  ),
-                  sliver: SliverList(
-                    delegate: SliverChildBuilderDelegate((context, index) {
-                      if (index < leadCount) {
-                        return leadListCell(index);
-                      }
-                      final item = filteredUnifiedItems[index - leadCount];
-                      return TrackCardSegment.at(
-                        key: ValueKey(item.id),
-                        index: index,
-                        count: leadCount + filteredUnifiedItems.length,
-                        child: _buildUnifiedLibraryItem(
-                          context,
-                          item,
-                          colorScheme,
-                          downloadedNavigationItems: downloadedNavigationItems,
-                          downloadedNavigationIndex:
-                              downloadedNavigationIndexByUnifiedId[item.id],
-                          localNavigationItems: localNavigationItems,
-                          localNavigationIndex:
-                              localNavigationIndexByUnifiedId[item.id],
-                          libraryItems: filteredUnifiedItems,
-                        ),
-                      );
-                    }, childCount: leadCount + filteredUnifiedItems.length),
-                  ),
-                ),
 
         if (!hasQueueItems &&
             totalTrackCount == 0 &&
@@ -1120,8 +923,6 @@ extension _QueueTabFilterWidgets on _QueueTabState {
                   memCacheHeight: 300,
                 )
               : null,
-          badgeColor: colorScheme.surfaceContainerHighest,
-          badgeTextColor: colorScheme.onSurfaceVariant,
           badgeIcon: Icons.music_note,
           coverUrl: album.coverUrl,
           onTap: () => _navigateToDownloadedAlbum(album),
@@ -1158,8 +959,6 @@ extension _QueueTabFilterWidgets on _QueueTabState {
                     _albumPlaceholder(colorScheme),
               )
             : null,
-        badgeColor: colorScheme.surfaceContainerHighest,
-        badgeTextColor: colorScheme.onSurfaceVariant,
         badgeIcon: Icons.folder,
         onTap: () => _navigateToLocalAlbum(album),
         onPlay: () => _playLocalAlbum(album),
@@ -1187,8 +986,6 @@ extension _QueueTabFilterWidgets on _QueueTabState {
     required int trackCount,
     required ColorScheme colorScheme,
     required Widget? coverWidget,
-    required Color badgeColor,
-    required Color badgeTextColor,
     required IconData badgeIcon,
     required VoidCallback onTap,
     VoidCallback? onPlay,
@@ -1236,116 +1033,130 @@ extension _QueueTabFilterWidgets on _QueueTabState {
             ],
           ],
         ),
-        child: _buildAlbumGridCell(
-          context: context,
-          albumName: albumName,
-          artistName: artistName,
-          trackCount: trackCount,
-          colorScheme: colorScheme,
-          coverWidget: coverWidget,
-          badgeColor: badgeColor,
-          badgeTextColor: badgeTextColor,
-          badgeIcon: badgeIcon,
+        child: GestureDetector(
           onTap: onTap,
-          onPlay: onPlay,
-          coverUrl: coverUrl,
-          completeness: completeness,
-          completenessLabel: completenessLabel,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Stack(
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: coverWidget ?? _albumPlaceholder(colorScheme),
+                    ),
+                    PositionedDirectional(
+                      end: 8,
+                      bottom: 8,
+                      child: Tooltip(
+                        message:
+                            completenessLabel ??
+                            context.l10n.tracksCount(trackCount),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: colorScheme.surfaceContainerHighest,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              AppIcon(
+                                badgeIcon,
+                                size: 12,
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                completeness?.badge ?? '$trackCount',
+                                style: TextStyle(
+                                  color: colorScheme.onSurfaceVariant,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    DesktopHoverPlayButton(
+                      tooltip: context.l10n.tooltipPlay,
+                      onPlay: onPlay,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                albumName,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+              ),
+              ClickableArtistName(
+                artistName: artistName,
+                coverUrl: coverUrl,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildAlbumGridCell({
-    required BuildContext context,
-    required String albumName,
-    required String artistName,
-    required int trackCount,
-    required ColorScheme colorScheme,
-    required Widget? coverWidget,
-    required Color badgeColor,
-    required Color badgeTextColor,
-    required IconData badgeIcon,
-    required VoidCallback onTap,
-    required VoidCallback? onPlay,
-    required String? coverUrl,
-    required AlbumCompleteness? completeness,
-    required String? completenessLabel,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: Stack(
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: coverWidget ?? _albumPlaceholder(colorScheme),
-                ),
-                PositionedDirectional(
-                  end: 8,
-                  bottom: 8,
-                  child: Tooltip(
-                    message:
-                        completenessLabel ??
-                        context.l10n.tracksCount(trackCount),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: badgeColor,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          AppIcon(badgeIcon, size: 12, color: badgeTextColor),
-                          const SizedBox(width: 4),
-                          Text(
-                            completeness?.badge ?? '$trackCount',
-                            style: TextStyle(
-                              color: badgeTextColor,
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                DesktopHoverPlayButton(
-                  tooltip: context.l10n.tooltipPlay,
-                  onPlay: onPlay,
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            albumName,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(
-              context,
-            ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-          ),
-          ClickableArtistName(
-            artistName: artistName,
-            coverUrl: coverUrl,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ],
-      ),
+  _LoadedSongs _loadedSongs(String filterMode, List<UnifiedLibraryItem> items) {
+    final cached = _loadedSongsByMode[filterMode];
+    if (cached != null && identical(cached.items, items)) return cached;
+    return _loadedSongsByMode[filterMode] = _LoadedSongs(items);
+  }
+
+  /// The swipe-navigation lists over [items], [bridgeHistoryItems] first,
+  /// kept while the songs and the pinned downloads stay the same.
+  _LibraryNavigation _libraryNavigation(
+    String filterMode,
+    List<UnifiedLibraryItem> items,
+    List<DownloadHistoryItem> bridgeHistoryItems,
+  ) {
+    final cached = _navigationByMode[filterMode];
+    if (cached != null &&
+        identical(cached.$1, items) &&
+        listEquals(cached.$2, bridgeHistoryItems)) {
+      return cached.$3;
+    }
+    final downloaded = <DownloadHistoryItem>[...bridgeHistoryItems];
+    final downloadedIndexById = <String, int>{};
+    final local = <LocalLibraryItem>[];
+    final localIndexById = <String, int>{};
+    for (final item in items) {
+      final historyItem = item.historyItem;
+      if (historyItem != null) {
+        downloadedIndexById[item.id] = downloaded.length;
+        downloaded.add(historyItem);
+      }
+
+      final localItem = item.localItem;
+      if (localItem != null) {
+        localIndexById[item.id] = local.length;
+        local.add(localItem);
+      }
+    }
+    final navigation = (
+      downloaded: downloaded,
+      downloadedIndexById: downloadedIndexById,
+      local: local,
+      localIndexById: localIndexById,
     );
+    _navigationByMode[filterMode] = (items, bridgeHistoryItems, navigation);
+    return navigation;
   }
 
   List<UnifiedLibraryItem> _selectedItemsFromAll(
@@ -1364,3 +1175,23 @@ extension _QueueTabFilterWidgets on _QueueTabState {
         selectedItems.every((item) => item.localItem != null);
   }
 }
+
+/// What a Library page derives from one list of loaded songs.
+class _LoadedSongs {
+  _LoadedSongs(this.items);
+
+  final List<UnifiedLibraryItem> items;
+  late final Set<String> ids = {for (final item in items) item.id};
+
+  /// The songs without the pinned download rows, by the pinned row ids.
+  (Set<String>, List<UnifiedLibraryItem>)? unpinned;
+}
+
+/// Swipe-navigation lists over a Library page's songs, with each song's
+/// position in them.
+typedef _LibraryNavigation = ({
+  List<DownloadHistoryItem> downloaded,
+  Map<String, int> downloadedIndexById,
+  List<LocalLibraryItem> local,
+  Map<String, int> localIndexById,
+});

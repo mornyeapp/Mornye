@@ -1,5 +1,5 @@
 final RegExp _artistNameSplitPattern = RegExp(
-  r'\s*(?:,|;|&|\bx\b)\s*|\s+\b(?:feat(?:uring|ured|ure)?|ft|with)\.?(?=\s|$)\s*',
+  r'\s*(?:,|;|&)\s*|\s+x\s+|\s+\b(?:feat(?:uring|ured|ure)?|ft|with)\.?(?=\s|$)\s*',
   caseSensitive: false,
 );
 
@@ -14,8 +14,8 @@ const artistTagModes = {
 };
 
 // Same separator set as the Rust tag writer and the Android finalizer, so
-// every write path stores the same primary artist. Unlike the display split
-// above, a standalone "x" needs spaces on both sides ("Malcolm X" stays).
+// every write path stores the same primary artist. A standalone "x" needs
+// spaces on both sides ("Malcolm X" stays).
 final RegExp _primaryArtistSeparator = RegExp(
   r'\s*[,;&]\s*|\s+x\s+|\s+(?:feat(?:uring|ured|ure)?|ft|with)\.?(?:\s+|$)',
   caseSensitive: false,

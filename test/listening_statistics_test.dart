@@ -1,7 +1,11 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/services/listening_statistics.dart';
+
+import 'support/link_sync_support.dart';
+import 'support/sqlite_process_database.dart';
 
 const _one = ListeningTrack(
   key: 'one',
@@ -174,6 +178,73 @@ void main() {
   });
 
   test(
+    'stored collaborations credit each artist without inflating totals',
+    () async {
+      final db = await SqliteProcessDatabase.open();
+      addTearDown(db.close);
+      await db.execute('''
+        CREATE TABLE listening (
+          day TEXT, track_key TEXT, title TEXT, artist TEXT, album TEXT,
+          artwork TEXT, milliseconds INTEGER, plays INTEGER,
+          PRIMARY KEY(day, track_key)
+        )
+      ''');
+      final rows = <Map<String, Object?>>[
+        {
+          'day': '2026-10-01',
+          'track_key': 'collaboration',
+          'title': 'Collaboration',
+          'artist': 'Artist A, Artist B; artist a',
+          'album': 'Album',
+          'artwork': 'https://example.com/collaboration.jpg',
+          'milliseconds': 180000,
+          'plays': 1,
+        },
+        {
+          'day': '2026-10-02',
+          'track_key': 'solo',
+          'title': 'Solo',
+          'artist': 'Artist A',
+          'album': 'Solo Album',
+          'artwork': null,
+          'milliseconds': 120000,
+          'plays': 1,
+        },
+      ];
+      for (final row in rows) {
+        await db.insert('listening', row);
+      }
+      final summaries = [
+        ListeningSummary.fromRows(rows),
+        await readListeningSummary(db, DateTime(2026), DateTime(2027)),
+      ];
+      for (final summary in summaries) {
+        expect(summary.artists, {'Artist A': 300000, 'Artist B': 180000});
+        expect(summary.milliseconds, 300000);
+        expect(summary.plays, 2);
+        expect(summary.days, {'2026-10-01': 180000, '2026-10-02': 120000});
+        expect(summary.tracks.length, 2);
+        expect(
+          summary.tracks.first.track.artist,
+          'Artist A, Artist B; artist a',
+        );
+        expect(summary.tracks.first.milliseconds, 180000);
+        expect(summary.artistArtwork, {
+          'Artist A': 'https://example.com/collaboration.jpg',
+          'Artist B': 'https://example.com/collaboration.jpg',
+        });
+      }
+      // Reading old credits corrects the presentation without rewriting history.
+      final stored = await db.query(
+        'listening',
+        where: 'track_key = ?',
+        whereArgs: ['collaboration'],
+      );
+      expect(stored.single['artist'], 'Artist A, Artist B; artist a');
+    },
+  );
+
+  test(
     'artist artwork uses the most listened track with an available cover',
     () {
       final summary = ListeningSummary(
@@ -205,9 +276,9 @@ void main() {
             const ListeningTrack(
               key: 'more',
               title: 'More',
-              artist: 'Artist',
+              artist: 'Artist, Collaborator',
               album: 'Album',
-              artwork: ' file:///covers/album.jpg ',
+              artwork: 'file:///covers/album.jpg',
             ),
             120000,
             2,
@@ -216,6 +287,7 @@ void main() {
       );
       expect(summary.artistArtwork, {
         'Artist': 'file:///covers/album.jpg',
+        'Collaborator': 'file:///covers/album.jpg',
         'Other Artist': 'https://example.com/other.jpg',
       });
       expect(
@@ -226,4 +298,132 @@ void main() {
       );
     },
   );
+
+  test(
+    'older loopback and temporary covers read as none, references stay',
+    () async {
+      const kept = {
+        'network': 'network://nas/Album/cover.jpg',
+        'tags': 'network://nas/Album/song.flac#cover',
+        'web': 'https://example.com/cover.jpg',
+        'file': '/data/user/0/app/files/covers/a.image',
+      };
+      final dropped = [
+        'http://127.0.0.1:41234/7f3a',
+        'http://localhost:8080/cover',
+        '/data/user/0/app/cache/network_metadata/a1.jpg',
+        '/var/mobile/Containers/Data/Application/X/tmp/'
+            'download_cover_preview_x1/cover_preview.jpg',
+        '${Directory.systemTemp.path}/cover.jpg',
+      ];
+      final rows = [
+        for (final (key, artwork) in [
+          ...kept.entries.map((entry) => (entry.key, entry.value)),
+          ...dropped.indexed.map((entry) => ('old${entry.$1}', entry.$2)),
+        ])
+          {
+            'day': '2026-10-20',
+            'track_key': key,
+            'title': key,
+            'artist': key,
+            'album': 'Album',
+            'artwork': artwork,
+            'milliseconds': 60000,
+            'plays': 1,
+          },
+      ];
+      final db = await SqliteProcessDatabase.open();
+      addTearDown(db.close);
+      await db.execute('''
+        CREATE TABLE listening (
+          day TEXT, track_key TEXT, title TEXT, artist TEXT, album TEXT,
+          artwork TEXT, milliseconds INTEGER, plays INTEGER,
+          PRIMARY KEY(day, track_key)
+        )
+      ''');
+      for (final row in rows) {
+        await db.insert('listening', row);
+      }
+      for (final summary in [
+        ListeningSummary.fromRows(rows),
+        await readListeningSummary(db, DateTime(2026), DateTime(2027)),
+      ]) {
+        expect(
+          {
+            for (final total in summary.tracks)
+              total.track.key: total.track.artwork,
+          },
+          {...kept, for (var i = 0; i < dropped.length; i++) 'old$i': null},
+        );
+        expect(summary.artistArtwork, kept);
+      }
+    },
+  );
+
+  test('a later play replaces a broken cover; one without keeps it', () async {
+    final db = await openLinkListeningDatabase(
+      await linkSyncTempDirectory(),
+      'covers',
+    );
+    const reference = 'network://nas/Album/cover.jpg';
+    ListeningDelta play(String? artwork, {String day = '2026-10-20'}) =>
+        ListeningDelta(
+          day,
+          ListeningTrack(
+            key: 'network://nas/Album/song.flac',
+            title: 'Song',
+            artist: 'Artist',
+            album: 'Album',
+            artwork: artwork,
+          ),
+          5000,
+          0,
+        );
+    Future<Map<String, Object?>> stored(String day) async => (await db.query(
+      'listening',
+      where: 'day = ?',
+      whereArgs: [day],
+    )).single;
+    Future<String?> shown() async => (await readListeningSummary(
+      db,
+      DateTime(2026, 10, 20),
+      DateTime(2026, 10, 22),
+    )).tracks.single.track.artwork;
+
+    // Recorded by an older build.
+    await db.insert('listening', {
+      'day': '2026-10-20',
+      'track_key': 'network://nas/Album/song.flac',
+      'title': 'Song',
+      'artist': 'Artist',
+      'album': 'Album',
+      'artwork': 'http://127.0.0.1:41234/7f3a',
+      'milliseconds': 5000,
+      'plays': 0,
+    });
+    expect(await shown(), isNull);
+    await writeListeningDeltas(db, [play(null)]);
+    expect(await shown(), isNull);
+    await writeListeningDeltas(db, [play(reference)]);
+    expect(await shown(), reference);
+    for (final artwork in [
+      null,
+      'http://127.0.0.1:41234/8b2c',
+      '/data/user/0/app/cache/network_metadata/a1.jpg',
+    ]) {
+      await writeListeningDeltas(db, [play(artwork)]);
+      expect((await stored('2026-10-20'))['artwork'], reference);
+    }
+    expect((await stored('2026-10-20'))['milliseconds'], 30000);
+    await writeListeningDeltas(db, [
+      play('http://127.0.0.1:41234/8b2c', day: '2026-10-21'),
+    ]);
+    expect((await stored('2026-10-21'))['artwork'], isNull);
+    // A later day without a cover still shows the one recorded before.
+    expect(await shown(), reference);
+    await writeListeningDeltas(db, [
+      play('https://example.com/new.jpg', day: '2026-10-21'),
+    ]);
+    expect(await shown(), 'https://example.com/new.jpg');
+  });
 }

@@ -8,6 +8,7 @@ void main() {
   ) async {
     final binding = tester.binding;
     binding.handleAppLifecycleStateChanged(AppLifecycleState.detached);
+    expect(isActivityAttached(binding), isFalse);
     var attached = false;
     final waiting = waitForActivityAttachment(
       binding,
@@ -18,6 +19,7 @@ void main() {
     binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
     await waiting;
     expect(attached, isTrue);
+    expect(isActivityAttached(binding), isTrue);
   });
 
   testWidgets('an attached Activity does not delay startup', (tester) async {

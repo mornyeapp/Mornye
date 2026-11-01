@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:mornye/widgets/desktop/desktop_selection.dart';
+import 'package:mornye/widgets/selection_bottom_bar.dart';
 
 /// Shared multi-select state for list screens: enter/exit selection mode,
 /// toggle individual items, select all, and prune ids that fell out of the
@@ -103,6 +104,32 @@ mixin SelectionModeMixin<T extends StatefulWidget> on State<T> {
       selectedIds.addAll(ids);
       if (selectedIds.isNotEmpty) isSelectionMode = true;
     });
+  }
+
+  /// The selection bar over [ids], every selectable item in display order.
+  /// Toggling with everything selected calls [onDeselectAll], which exits
+  /// selection mode by default.
+  Widget buildSelectionBar({
+    required List<String> ids,
+    required double bottomPadding,
+    required List<Widget> children,
+    VoidCallback? onDeselectAll,
+    String? allSelectedLabel,
+    String? tapToSelectLabel,
+  }) {
+    final allSelected = ids.isNotEmpty && selectedIds.length == ids.length;
+    return SelectionBottomBar(
+      selectedCount: selectedIds.length,
+      allSelected: allSelected,
+      onClose: exitSelectionMode,
+      onToggleSelectAll: allSelected
+          ? onDeselectAll ?? exitSelectionMode
+          : () => selectAll(ids),
+      bottomPadding: bottomPadding,
+      allSelectedLabel: allSelectedLabel,
+      tapToSelectLabel: tapToSelectLabel,
+      children: children,
+    );
   }
 
   /// Drops ids no longer present in [validIds]; call from build() with the

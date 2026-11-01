@@ -888,28 +888,14 @@ extension _DownloadQueueNativeWorker on DownloadQueueNotifier {
     final rawOutputDir = isSafMode
         ? _buildRelativeOutputDir(
             item.track,
-            settings.folderOrganization,
-            separateSingles: settings.separateSingles,
-            albumFolderStructure: settings.albumFolderStructure,
+            settings,
             customFolderPath: customFolderPath,
-            createPlaylistFolder: settings.createPlaylistFolder,
-            useAlbumArtistForFolders: settings.useAlbumArtistForFolders,
-            usePrimaryArtistOnly: settings.usePrimaryArtistOnly,
-            filterContributingArtistsInAlbumArtist:
-                settings.filterContributingArtistsInAlbumArtist,
             playlistName: item.playlistName,
           )
         : await _buildOutputDir(
             item.track,
-            settings.folderOrganization,
-            separateSingles: settings.separateSingles,
-            albumFolderStructure: settings.albumFolderStructure,
+            settings,
             customFolderPath: customFolderPath,
-            createPlaylistFolder: settings.createPlaylistFolder,
-            useAlbumArtistForFolders: settings.useAlbumArtistForFolders,
-            usePrimaryArtistOnly: settings.usePrimaryArtistOnly,
-            filterContributingArtistsInAlbumArtist:
-                settings.filterContributingArtistsInAlbumArtist,
             playlistName: item.playlistName,
           );
     final outputDir = isSafMode
@@ -1409,10 +1395,10 @@ extension _DownloadQueueNativeWorker on DownloadQueueNotifier {
       result.fileName = autoConvertOutcome.fileName;
     }
     if (autoConvertOutcome.converted) {
-      actualBitDepth = null;
-      actualSampleRate = null;
+      actualBitDepth = result.actualBitDepth;
+      actualSampleRate = result.actualSampleRate;
       actualFormat = normalizeAutoConvertFormat(settings.autoConvertFormat);
-      actualBitrate = autoConvertBitrateKbps(settings.autoConvertBitrate);
+      actualBitrate = result.bitrateKbps;
     } else if (settings.embedMetadata &&
         _isMp4Container(result['file_name']?.toString() ?? filePath)) {
       // Native lossy containers still need tags and lyrics even though their

@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:mornye/models/download_result.dart';
 import 'package:mornye/services/download_saf_file_replacer.dart';
 import 'package:mornye/services/ffmpeg_models.dart';
+import 'package:mornye/services/ffmpeg_probe.dart';
 import 'package:mornye/utils/audio_conversion_utils.dart';
 import 'package:mornye/utils/audio_format_utils.dart';
 import 'package:mornye/utils/file_access.dart';
@@ -21,6 +22,7 @@ typedef ConvertDownloadAudio =
       required String targetFormat,
       required String bitrate,
       required bool deleteOriginal,
+      required LosslessConversionQuality losslessQuality,
     });
 
 enum DownloadDecryptionFailure { safAccess, decrypt, safWrite }
@@ -51,6 +53,7 @@ class DownloadFileFinalizer {
   const DownloadFileFinalizer({
     required this.decryptFile,
     required this.probeCodec,
+    this.probeProperties = FFmpegProbe.audioProperties,
     required this.repairAc4,
     required this.convertAudio,
     required this.replaceSafFile,
@@ -60,6 +63,7 @@ class DownloadFileFinalizer {
 
   final DecryptDownloadFile decryptFile;
   final Future<String?> Function(String) probeCodec;
+  final Future<PrimaryAudioProperties> Function(String) probeProperties;
   final Future<void> Function(String path, String encryptedPath) repairAc4;
   final ConvertDownloadAudio convertAudio;
   final ReplaceSafDownloadFile replaceSafFile;
@@ -193,6 +197,10 @@ class DownloadFileFinalizer {
     required String targetFormat,
     required String targetBitrate,
     required bool useSaf,
+    LosslessConversionQuality losslessQuality = const LosslessConversionQuality(
+      maxBitDepth: 16,
+      maxSampleRate: 48000,
+    ),
     String? treeUri,
     String relativeDir = '',
     Future<void> Function(String path, String format)? embedMetadata,
@@ -206,15 +214,17 @@ class DownloadFileFinalizer {
     if (!enabled) return original;
     targetFormat = normalizeAutoConvertFormat(targetFormat);
     targetBitrate = normalizeAutoConvertBitrate(targetBitrate);
-    final bitrateKbps = autoConvertBitrateKbps(targetBitrate);
-    if (autoConversionAlreadySatisfied(
-      filePath: filePath,
-      fileName: fileName,
-      targetFormat: targetFormat,
-      targetBitrate: targetBitrate,
-      quality: quality,
-      bitrateKbps: result.bitrateKbps,
-    )) {
+    final lossless = targetFormat == 'flac';
+    final bitrateKbps = lossless ? null : autoConvertBitrateKbps(targetBitrate);
+    if (!lossless &&
+        autoConversionAlreadySatisfied(
+          filePath: filePath,
+          fileName: fileName,
+          targetFormat: targetFormat,
+          targetBitrate: targetBitrate,
+          quality: quality,
+          bitrateKbps: result.bitrateKbps,
+        )) {
       return original;
     }
     final baseName = fileName?.trim().isNotEmpty == true
@@ -228,12 +238,68 @@ class DownloadFileFinalizer {
       try {
         await embedMetadata?.call(
           path,
-          metadataFormatForLossyFormat(targetFormat),
+          lossless ? 'flac' : metadataFormatForLossyFormat(targetFormat),
         );
       } catch (e) {
         warn('Automatic conversion metadata embed failed: $e');
         result['auto_conversion_metadata_warning'] = e.toString();
       }
+    }
+
+    var skipped = false;
+    PrimaryAudioProperties? convertedProperties;
+    Future<String?> convert(
+      String input, {
+      required bool deleteOriginal,
+    }) async {
+      PrimaryAudioProperties? source;
+      if (lossless) {
+        source = await probeProperties(input);
+        if (!isLosslessAudioCodec(source.codec) ||
+            (source.codec?.toLowerCase() == 'flac' &&
+                autoConversionAlreadySatisfied(
+                  filePath: input,
+                  targetFormat: targetFormat,
+                  targetBitrate: targetBitrate,
+                  bitDepth: source.bitDepth,
+                  sampleRate: source.sampleRate,
+                  maxBitDepth: losslessQuality.maxBitDepth,
+                  maxSampleRate: losslessQuality.maxSampleRate,
+                ))) {
+          skipped = true;
+          return null;
+        }
+        if ((losslessQuality.maxBitDepth != null && source.bitDepth == null) ||
+            (losslessQuality.maxSampleRate != null &&
+                source.sampleRate == null)) {
+          throw StateError('Cannot inspect source quality for FLAC conversion');
+        }
+      }
+      final output = await convertAudio(
+        inputPath: input,
+        targetFormat: targetFormat,
+        bitrate: targetBitrate,
+        deleteOriginal: deleteOriginal,
+        losslessQuality: losslessQuality,
+      );
+      if (lossless && output != null) {
+        PrimaryAudioProperties measured;
+        try {
+          measured = await probeProperties(output);
+        } catch (_) {
+          measured = const PrimaryAudioProperties();
+        }
+        convertedProperties = PrimaryAudioProperties(
+          codec: 'flac',
+          bitDepth:
+              measured.bitDepth ??
+              losslessQuality.effectiveBitDepth(source?.bitDepth),
+          sampleRate:
+              measured.sampleRate ??
+              losslessQuality.effectiveSampleRate(source?.sampleRate),
+        );
+      }
+      return output;
     }
 
     try {
@@ -251,12 +317,7 @@ class DownloadFileFinalizer {
           avoidOverwrite: convertedName.toLowerCase() != baseName.toLowerCase(),
           onPublishedFileName: (value) => publishedName = value,
           op: (tempPath, addCleanup) async {
-            final output = await convertAudio(
-              inputPath: tempPath,
-              targetFormat: targetFormat,
-              bitrate: targetBitrate,
-              deleteOriginal: false,
-            );
+            final output = await convert(tempPath, deleteOriginal: false);
             if (output == null) return null;
             addCleanup(output);
             await embed(output);
@@ -264,12 +325,7 @@ class DownloadFileFinalizer {
           },
         );
       } else {
-        convertedPath = await convertAudio(
-          inputPath: filePath,
-          targetFormat: targetFormat,
-          bitrate: targetBitrate,
-          deleteOriginal: true,
-        );
+        convertedPath = await convert(filePath, deleteOriginal: true);
         if (convertedPath != null) {
           // Deferred SAF outputs keep their logical name while in cache.
           if (!useSaf) {
@@ -278,6 +334,7 @@ class DownloadFileFinalizer {
           await embed(convertedPath);
         }
       }
+      if (skipped) return original;
       if (convertedPath == null || convertedPath.isEmpty) {
         throw StateError('FFmpeg returned no automatic conversion output');
       }
@@ -286,15 +343,24 @@ class DownloadFileFinalizer {
         name: publishedName,
         format: targetFormat,
         bitrateKbps: bitrateKbps,
+        bitDepth: convertedProperties?.bitDepth,
+        sampleRate: convertedProperties?.sampleRate,
       );
-      info(
-        'Automatic conversion completed: ${autoConvertFormatLabel(targetFormat)} @ $targetBitrate',
-      );
+      final convertedQuality = lossless
+          ? resolveDisplayQuality(
+                  filePath: convertedPath,
+                  fileName: publishedName,
+                  detectedFormat: 'flac',
+                  bitDepth: convertedProperties?.bitDepth,
+                  sampleRate: convertedProperties?.sampleRate,
+                ) ??
+                'FLAC'
+          : '${displayFormatForLossyFormat(targetFormat)} ${bitrateKbps}kbps';
+      info('Automatic conversion completed: $convertedQuality');
       return DownloadConversionOutcome(
         filePath: convertedPath,
         fileName: publishedName,
-        quality:
-            '${displayFormatForLossyFormat(targetFormat)} ${bitrateKbps}kbps',
+        quality: convertedQuality,
         converted: true,
       );
     } catch (e) {

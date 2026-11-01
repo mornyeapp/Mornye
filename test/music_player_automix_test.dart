@@ -14,6 +14,18 @@ import 'support/music_player_automix_harness.dart';
 const _tracks = testTracks;
 const _until = waitUntil;
 
+/// Enough songs that a reshuffled pass repeats the previous order only about
+/// once in 360,000 draws.
+final _passTracks = [
+  for (var i = 0; i < 10; i++)
+    PlayableMedia(
+      id: 'song-$i',
+      source: '/song-$i.flac',
+      title: 'Song $i',
+      artist: 'Artist',
+    ),
+];
+
 void main() {
   setUpMusicPlayerHarness();
 
@@ -312,6 +324,20 @@ void main() {
     expect(native.resumedSources, ['/two.flac']);
   });
 
+  test('a song still preparing does not hold up the next one', () async {
+    // A server that never answers keeps the first song preparing.
+    final gate = Completer<void>();
+    native.sourceGates['/one.flac'] = gate;
+    final first = handler.setQueueAndPlay(_tracks);
+    await _until(() => native.calls.any((c) => c.$2 == 'setSourceUrl'));
+    await handler.skipToNext();
+    await first;
+    expect(handler.mediaItem.value?.id, 'two');
+    expect(native.sources['music-player'], '/two.flac');
+    expect(native.resumedSources, ['/two.flac']);
+    gate.complete();
+  });
+
   for (final stop in [false, true]) {
     test(
       'a pending prepare cannot resume after ${stop ? 'stop' : 'pause'}',
@@ -329,6 +355,29 @@ void main() {
         if (stop) expect(handler.mediaItem.value, isNull);
       },
     );
+  }
+
+  for (final action in ['pause', 'stop', 'dispose']) {
+    test('$action cancels a source that never finishes preparing', () async {
+      final gate = Completer<void>();
+      native.sourceGates['/one.flac'] = gate;
+      final first = handler.setQueueAndPlay(_tracks);
+      await _until(() => native.calls.any((c) => c.$2 == 'setSourceUrl'));
+      final cancel = switch (action) {
+        'pause' => handler.pause(),
+        'stop' => handler.stop(),
+        _ => handler.dispose(),
+      };
+      try {
+        await cancel.timeout(const Duration(seconds: 1));
+        await first;
+        expect(native.resumedSources, isEmpty);
+        expect(native.playing, isEmpty);
+      } finally {
+        gate.complete();
+        await Future.wait([first, cancel]);
+      }
+    });
   }
 
   test('notification actions survive theme changes', () async {
@@ -524,6 +573,37 @@ void main() {
       expect(handler.queue.value.map((item) => item.id), planned);
     },
   );
+
+  test('repeat all plays each shuffled pass in a new order', () async {
+    await handler.setQueueAndPlay(_passTracks);
+    await handler.setShuffleMode(AudioServiceShuffleMode.all);
+    await handler.setRepeatMode(AudioServiceRepeatMode.all);
+    final planned = handler.queue.value.map((item) => item.id).toList();
+    bool ready() =>
+        handler.playbackState.value.processingState ==
+        AudioProcessingState.ready;
+    for (var i = 1; i < planned.length; i++) {
+      await native.event('music-player', 'audio.onComplete');
+      await _until(() => handler.mediaItem.value?.id == planned[i] && ready());
+    }
+    await native.event('music-player', 'audio.onComplete');
+    await _until(
+      () =>
+          handler.playbackState.value.queueIndex == 0 &&
+          handler.mediaItem.value?.id != planned.last &&
+          ready(),
+    );
+    final pass = handler.queue.value.map((item) => item.id).toList();
+    expect(handler.mediaItem.value?.id, pass.first);
+    expect(pass.toSet(), planned.toSet());
+    expect(pass, isNot(orderedEquals(planned)));
+    await handler.skipToPrevious();
+    expect(handler.mediaItem.value?.id, planned.last);
+    await handler.setShuffleMode(AudioServiceShuffleMode.none);
+    expect(handler.queue.value.map((item) => item.id), [
+      for (final track in _passTracks) track.id,
+    ]);
+  });
 
   test(
     'shuffle restoration retains duplicate entries and explicit queue edits',
@@ -776,6 +856,32 @@ void main() {
       await _until(() => handler.mediaItem.value?.id == planned[1]);
       expect(handler.queue.value.map((item) => item.id), planned);
       expect(handler.playbackState.value.queueIndex, 1);
+    },
+  );
+
+  test(
+    'AutoMix into a repeat-all wrap opens the newly shuffled pass',
+    () async {
+      await handler.setShuffleMode(AudioServiceShuffleMode.all);
+      await handler.setRepeatMode(AudioServiceRepeatMode.all);
+      await handler.setQueueAndPlay(_passTracks);
+      final planned = handler.queue.value.map((item) => item.id).toList();
+      await handler.skipToQueueItem(planned.length - 1);
+      setAutoMixEnabled(true);
+      await _until(
+        () => native.calls.any(
+          (call) => call.$1 != 'music-player' && call.$2 == 'setPlaybackRate',
+        ),
+      );
+      final opener = native.sources[native.prepared];
+      expect(opener, isNot('/${planned.last}.flac'));
+      native.positions['music-player'] = 55000;
+      await _until(() => handler.playbackState.value.queueIndex == 0);
+      final pass = handler.queue.value.map((item) => item.id).toList();
+      expect('/${pass.first}.flac', opener);
+      expect(handler.mediaItem.value?.id, pass.first);
+      expect(pass.toSet(), planned.toSet());
+      expect(pass, isNot(orderedEquals(planned)));
     },
   );
 
@@ -1219,6 +1325,23 @@ void main() {
       );
     },
   );
+
+  fakeTimeTest('a next song still arriving is not mixed in', () async {
+    // A paired phone still sends it, or sends it again after the received
+    // folder pruned it.
+    final arrived = Completer<void>();
+    addTearDown(arrived.complete);
+    musicPlayerRuntime.streamWhileArriving(
+      '/two.flac',
+      url: 'http://127.0.0.1:1/two.flac',
+      done: arrived.future,
+    );
+    setAutoMixEnabled(true);
+    await handler.setQueueAndPlay(_tracks);
+    await Future<void>.delayed(const Duration(milliseconds: 400));
+    expect(native.live, {'music-player'});
+    expect(analyzer.calls, isEmpty);
+  });
 
   fakeTimeTest('repeat one never prepares another deck', () async {
     setAutoMixEnabled(true);

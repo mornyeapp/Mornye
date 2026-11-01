@@ -11,11 +11,15 @@ class DestructiveSelectionButton extends StatelessWidget {
     required this.count,
     required this.colorScheme,
     required this.onPressed,
+    this.label,
   });
 
   final int count;
   final ColorScheme colorScheme;
   final VoidCallback onPressed;
+
+  /// Replaces the downloaded album delete label.
+  final String? label;
 
   @override
   Widget build(BuildContext context) {
@@ -26,9 +30,10 @@ class DestructiveSelectionButton extends StatelessWidget {
         onPressed: count > 0 ? onPressed : null,
         icon: const Icon(Icons.delete_outline),
         label: Text(
-          count > 0
-              ? context.l10n.downloadedAlbumDeleteCount(count)
-              : context.l10n.downloadedAlbumSelectToDelete,
+          label ??
+              (count > 0
+                  ? context.l10n.downloadedAlbumDeleteCount(count)
+                  : context.l10n.downloadedAlbumSelectToDelete),
         ),
         style: FilledButton.styleFrom(
           backgroundColor: count > 0

@@ -26,28 +26,118 @@ class AutoplayLearningTrack {
   final Duration? duration;
 }
 
+/// What a learning observation came from.
+enum AutoplayFeedbackKind {
+  /// Played on, through at least half of the song.
+  listened,
+
+  /// Skipped early, or after a short part of the song.
+  skipped,
+
+  /// Played again on purpose and kept playing.
+  replayed,
+
+  /// Added to the loved songs.
+  loved,
+
+  /// Added to a playlist.
+  playlisted,
+}
+
+/// One observation the model learns from. [weight] scales how far it moves
+/// the model: an explicit choice, such as loving a song, counts more than
+/// letting it play.
+class AutoplayFeedback {
+  const AutoplayFeedback({
+    required this.kind,
+    required this.track,
+    required this.previous,
+    required this.at,
+    required this.reward,
+    this.weight = 1,
+  });
+
+  final AutoplayFeedbackKind kind;
+  final AutoplayLearningTrack track;
+  final AutoplayLearningTrack? previous;
+  final DateTime at;
+  final double reward, weight;
+}
+
 String _text(String value) {
   final normalized = value.trim().toLowerCase();
   return normalized.length > 160 ? normalized.substring(0, 160) : normalized;
 }
 
+/// Stable FNV-1a, rather than String.hashCode (not stable across runtimes).
+int _hash(String token) {
+  var hash = 2166136261;
+  for (final unit in token.codeUnits) {
+    hash = ((hash ^ unit) * 16777619) & 0xffffffff;
+  }
+  return hash;
+}
+
+Set<String> _genres(String value) => value
+    .split(RegExp(r'[,;/]'))
+    .map(_text)
+    .where((value) => value.isNotEmpty)
+    .take(3)
+    .toSet();
+
 /// Online logistic regression with AdaGrad and hashed context interactions.
 /// Two fixed arrays occupy 64 KiB regardless of Library/listening-history size.
 /// The prior ranker supplies cold-start relevance; this model learns engagement.
+///
+/// Beside it, Thompson-sampling arms keep each artist's and genre's outcomes
+/// as a Beta distribution, keyed by a hash so no names are stored. They react
+/// within a few songs, and sampling them gives artists the listener has not
+/// heard much a fair chance while skipped ones rarely return.
 class AutoplayPreferenceModel {
   static const int dimensions = 4096;
+
+  /// The most artists and genres the arms remember; the least known go first.
+  static const int maxArms = 2048;
   final Float64List _weights = Float64List(dimensions);
   final Float64List _gradientSquares = Float64List(dimensions);
+  // Hash of an artist or genre to its weighted (hits, misses).
+  final Map<int, (double, double)> _arms = {};
   int _observations = 0;
   DateTime? _updatedAt;
 
   int get observations => _observations;
 
+  int get arms => _arms.length;
+
   AutoplayPreferenceModel snapshot() {
     final copy = AutoplayPreferenceModel();
     copy._weights.setAll(0, _weights);
+    copy._arms.addAll(_arms);
     copy._observations = _observations;
     return copy;
+  }
+
+  static int _artistArm(String artist) => _hash('arm:artist:$artist');
+  static int _genreArm(String genre) => _hash('arm:genre:$genre');
+
+  /// One Thompson sample of the arms, drawn for one refill.
+  AutoplayExploration explore(Random random) =>
+      AutoplayExploration._(this, random);
+
+  void _reward(int arm, double reward, double weight) {
+    final (hits, misses) = _arms.remove(arm) ?? (0.0, 0.0);
+    // Re-inserted last, so the map keeps the latest arms at its end.
+    _arms[arm] = (hits + weight * reward, misses + weight * (1 - reward));
+    if (_arms.length <= maxArms) return;
+    var least = _arms.keys.first;
+    var evidence = double.infinity;
+    for (final MapEntry(:key, value: (hits, misses)) in _arms.entries) {
+      if (hits + misses < evidence) {
+        least = key;
+        evidence = hits + misses;
+      }
+    }
+    _arms.remove(least);
   }
 
   Map<int, double> _features(
@@ -56,15 +146,14 @@ class AutoplayPreferenceModel {
     DateTime at,
   ) {
     final artist = _text(track.artist), album = _text(track.album);
-    final genres = track.genre
-        .split(RegExp(r'[,;/]'))
-        .map(_text)
-        .where((value) => value.isNotEmpty)
-        .take(3)
-        .toSet();
+    final genres = _genres(track.genre);
     final previousArtist = _text(previous?.artist ?? '');
     final previousGenre = _text(previous?.genre ?? '');
     final period = at.hour ~/ 6;
+    // Whether a song continues the previous one's artist or genre, so the
+    // model learns how much variety the listener keeps playing through.
+    final sameArtist = artist.isNotEmpty && artist == previousArtist;
+    final sameGenre = genres.isNotEmpty && genres.contains(previousGenre);
     final tokens = <String>[
       if (artist.isNotEmpty) 'artist:$artist',
       if (artist.isNotEmpty && album.isNotEmpty) 'album:$artist|$album',
@@ -76,16 +165,16 @@ class AutoplayPreferenceModel {
         'transition:$previousArtist|$artist',
       for (final genre in genres)
         if (previousGenre.isNotEmpty) 'transition:$previousGenre|$genre',
+      if (previousArtist.isNotEmpty && artist.isNotEmpty)
+        sameArtist ? 'flow:same-artist' : 'flow:new-artist',
+      if (previousGenre.isNotEmpty && genres.isNotEmpty)
+        sameGenre ? 'flow:same-genre' : 'flow:new-genre',
       if (track.duration != null && track.duration! > Duration.zero)
         'duration:${min(5, track.duration!.inSeconds ~/ 90)}',
     ];
     final features = <int, double>{};
     for (final token in tokens) {
-      // Stable FNV-1a, rather than String.hashCode (not stable across runtimes).
-      var hash = 2166136261;
-      for (final unit in token.codeUnits) {
-        hash = ((hash ^ unit) * 16777619) & 0xffffffff;
-      }
+      final hash = _hash(token);
       final index = hash & (dimensions - 1);
       final sign = (hash & 0x80000000) == 0 ? 1.0 : -1.0;
       features[index] = (features[index] ?? 0) + sign;
@@ -123,8 +212,9 @@ class AutoplayPreferenceModel {
     AutoplayLearningTrack? previous,
     required DateTime at,
     required double reward,
+    double weight = 1,
   }) {
-    if (!reward.isFinite) return;
+    if (!reward.isFinite || !weight.isFinite || weight <= 0) return;
     final features = _features(track, previous, at);
     if (features.isEmpty) return;
     final last = _updatedAt;
@@ -136,9 +226,18 @@ class AutoplayPreferenceModel {
           _weights[i] *= decay;
           _gradientSquares[i] *= decay;
         }
+        _arms.updateAll((_, arm) => (arm.$1 * decay, arm.$2 * decay));
+        _arms.removeWhere((_, arm) => arm.$1 + arm.$2 < 0.05);
       }
     }
-    final error = _probability(features) - reward.clamp(0.0, 1.0);
+    final target = reward.clamp(0.0, 1.0);
+    final strength = min(weight, 4.0);
+    final artist = _text(track.artist);
+    if (artist.isNotEmpty) _reward(_artistArm(artist), target, strength);
+    for (final genre in _genres(track.genre)) {
+      _reward(_genreArm(genre), target, strength);
+    }
+    final error = (_probability(features) - target) * strength;
     for (final entry in features.entries) {
       final i = entry.key;
       final gradient = error * entry.value + 0.001 * _weights[i];
@@ -157,28 +256,47 @@ class AutoplayPreferenceModel {
       data.setFloat64(i * 16, _weights[i], Endian.little);
       data.setFloat64(i * 16 + 8, _gradientSquares[i], Endian.little);
     }
+    // Each arm: its hash, then weighted hits and misses, oldest first.
+    final arms = ByteData(_arms.length * 12);
+    var offset = 0;
+    for (final MapEntry(:key, value: (hits, misses)) in _arms.entries) {
+      arms.setUint32(offset, key, Endian.little);
+      arms.setFloat32(offset + 4, hits, Endian.little);
+      arms.setFloat32(offset + 8, misses, Endian.little);
+      offset += 12;
+    }
     return jsonEncode({
-      'version': 1,
+      'version': 2,
       'observations': _observations,
       'updatedAt': _updatedAt?.millisecondsSinceEpoch,
       'parameters': base64Encode(data.buffer.asUint8List()),
+      'arms': base64Encode(arms.buffer.asUint8List()),
     });
   }
 
   static AutoplayPreferenceModel decode(String? raw) {
     final empty = AutoplayPreferenceModel();
-    if (raw == null || raw.length > 100000) return empty;
+    if (raw == null || raw.length > 140000) return empty;
     try {
       final decoded = jsonDecode(raw);
-      if (decoded is! Map || decoded['version'] != 1) return empty;
+      if (decoded is! Map) return empty;
+      // Version 1 predates the arms; its learning carries over.
+      final version = decoded['version'];
+      if (version != 1 && version != 2) return empty;
       final count = decoded['observations'];
       final parameters = decoded['parameters'];
       final updated = decoded['updatedAt'];
+      final arms = version == 2 ? decoded['arms'] : '';
       if (count is! int ||
           count < 0 ||
           count > 1000000 ||
           parameters is! String ||
+          arms is! String ||
           (updated != null && updated is! int)) {
+        return empty;
+      }
+      final armBytes = base64Decode(arms);
+      if (armBytes.length % 12 != 0 || armBytes.length > maxArms * 12) {
         return empty;
       }
       final bytes = base64Decode(parameters);
@@ -198,6 +316,19 @@ class AutoplayPreferenceModel {
         model._weights[i] = weight;
         model._gradientSquares[i] = square;
       }
+      final armData = ByteData.sublistView(armBytes);
+      for (var offset = 0; offset < armBytes.length; offset += 12) {
+        final hits = armData.getFloat32(offset + 4, Endian.little);
+        final misses = armData.getFloat32(offset + 8, Endian.little);
+        if (!hits.isFinite ||
+            !misses.isFinite ||
+            hits < 0 ||
+            misses < 0 ||
+            hits + misses > 1e6) {
+          return empty;
+        }
+        model._arms[armData.getUint32(offset, Endian.little)] = (hits, misses);
+      }
       model._observations = count;
       if (updated is int) {
         model._updatedAt = DateTime.fromMillisecondsSinceEpoch(updated);
@@ -210,6 +341,68 @@ class AutoplayPreferenceModel {
   }
 }
 
+/// A Thompson sample of the model's arms for one refill: each artist and
+/// genre draws one plausible rate of being enjoyed from its Beta
+/// distribution, the same for all of its songs. Little-heard artists draw
+/// widely, so they sometimes rank high; often skipped ones rarely do.
+class AutoplayExploration {
+  AutoplayExploration._(this._model, this._random);
+
+  final AutoplayPreferenceModel _model;
+  final Random _random;
+  final _draws = <int, double>{};
+
+  /// Up to ±2.5 for the artist and ±1 for the genres, growing with the
+  /// model's observations as its learned preference does.
+  double adjustment(AutoplayLearningTrack track) {
+    final confidence = min(1.0, _model._observations / 20);
+    if (confidence == 0) return 0;
+    var total = 0.0;
+    final artist = _text(track.artist);
+    if (artist.isNotEmpty) {
+      total += 5 * (_draw(AutoplayPreferenceModel._artistArm(artist)) - 0.5);
+    }
+    final genres = _genres(track.genre);
+    if (genres.isNotEmpty) {
+      var sum = 0.0;
+      for (final genre in genres) {
+        sum += _draw(AutoplayPreferenceModel._genreArm(genre));
+      }
+      total += 2 * (sum / genres.length - 0.5);
+    }
+    return confidence * total;
+  }
+
+  double _draw(int arm) => _draws[arm] ??= () {
+    final (hits, misses) = _model._arms[arm] ?? (0.0, 0.0);
+    final a = _gamma(1 + hits), b = _gamma(1 + misses);
+    return a / (a + b);
+  }();
+
+  // Marsaglia and Tsang's method, for the shapes of at least 1 used here.
+  double _gamma(double shape) {
+    final d = shape - 1 / 3, c = 1 / sqrt(9 * d);
+    while (true) {
+      double x, v;
+      do {
+        x = _normal();
+        v = 1 + c * x;
+      } while (v <= 0);
+      v = v * v * v;
+      final u = _random.nextDouble();
+      if (u < 1 - 0.0331 * x * x * x * x ||
+          log(u) < 0.5 * x * x + d * (1 - v + log(v))) {
+        return d * v;
+      }
+    }
+  }
+
+  // Box-Muller.
+  double _normal() =>
+      sqrt(-2 * log(1 - _random.nextDouble())) *
+      cos(2 * pi * _random.nextDouble());
+}
+
 class _LearningSession {
   _LearningSession(this.track, this.previous, this.at);
   AutoplayLearningTrack track;
@@ -218,6 +411,7 @@ class _LearningSession {
   Duration listened = Duration.zero;
   Duration? lastElapsed;
   bool playing = false;
+  bool replayed = false;
 }
 
 /// Independent of listening-statistics opt-in. This explicitly enabled feature
@@ -244,9 +438,16 @@ class AutoplayPersonalization {
   Timer? _saveTimer;
   _LearningSession? _session;
   AutoplayLearningTrack? _previous;
-  final _pending = <(_LearningSession, double)>[];
+  final _pending = <AutoplayFeedback>[];
+  final _feedback = StreamController<AutoplayFeedback>.broadcast();
 
   int get observations => _model.observations;
+
+  /// Whether learning is on, by its setting and the player mode.
+  bool get enabled => _enabled && !_disposed;
+
+  /// Each observation as the model learns it, only while learning is on.
+  Stream<AutoplayFeedback> get feedback => _feedback.stream;
 
   AutoplayPreferenceModel? get rankingSnapshot =>
       _enabled && _loaded && !_disposed && _model.observations > 0
@@ -275,8 +476,8 @@ class AutoplayPersonalization {
     // Feedback completed before disposal still belongs in the saved model.
     // Opt-out clears this buffer and prevents its application.
     if (_enabled) {
-      for (final (session, reward) in _pending) {
-        _learn(session, reward);
+      for (final feedback in _pending) {
+        _learn(feedback);
       }
     }
     _pending.clear();
@@ -351,30 +552,93 @@ class AutoplayPersonalization {
     final fraction = duration != null && duration > 0
         ? session.listened.inMilliseconds / duration
         : null;
-    double? reward;
-    if (skipped && seconds < 30 && (fraction == null || fraction < 0.25)) {
+    final AutoplayFeedbackKind kind;
+    final double reward;
+    var weight = 1.0;
+    if (session.replayed && seconds >= 30) {
+      kind = AutoplayFeedbackKind.replayed;
+      reward = 1;
+      weight = 1.5;
+    } else if (skipped &&
+        seconds < 30 &&
+        (fraction == null || fraction < 0.25)) {
+      // Skipping a song in its first seconds says the most.
+      kind = AutoplayFeedbackKind.skipped;
       reward = 0;
+      weight = seconds < 10 ? 1.5 : 1;
+    } else if (skipped && fraction != null && fraction < 0.5) {
+      kind = AutoplayFeedbackKind.skipped;
+      reward = 0.25;
+      weight = 0.5;
     } else if (fraction != null && fraction >= 0.5) {
-      reward = (0.5 + fraction.clamp(0.0, 1.0) / 2).clamp(0.0, 1.0);
+      kind = AutoplayFeedbackKind.listened;
+      reward = !skipped && fraction >= 0.9
+          ? 1
+          : (0.5 + fraction.clamp(0.0, 1.0) / 2).clamp(0.0, 1.0);
     } else if (fraction == null && seconds >= 120) {
+      kind = AutoplayFeedbackKind.listened;
       reward = 0.75;
+    } else {
+      return;
     }
-    if (reward == null) return;
+    _record(
+      AutoplayFeedback(
+        kind: kind,
+        track: session.track,
+        previous: session.previous,
+        at: session.at,
+        reward: reward,
+        weight: weight,
+      ),
+    );
+  }
+
+  /// The listener went back to hear the current song again. It counts once
+  /// they keep listening to it.
+  void replayed() {
+    if (!_enabled || _disposed) return;
+    _session?.replayed = true;
+  }
+
+  /// The listener chose [track] outright, such as by loving it: a stronger
+  /// signal than letting it play. The current song keeps its context.
+  void endorse(AutoplayLearningTrack track, AutoplayFeedbackKind kind) {
+    if (!_enabled || _disposed) return;
+    final session = _session;
+    final current =
+        session != null &&
+        _text(session.track.artist) == _text(track.artist) &&
+        _text(session.track.title) == _text(track.title);
+    _record(
+      AutoplayFeedback(
+        kind: kind,
+        track: current ? session.track : track,
+        previous: current ? session.previous : null,
+        at: _now(),
+        reward: 1,
+        weight: kind == AutoplayFeedbackKind.loved ? 2 : 1.5,
+      ),
+    );
+  }
+
+  void _record(AutoplayFeedback feedback) {
     if (_loaded) {
-      _learn(session, reward);
+      _learn(feedback);
     } else {
       if (_pending.length == 32) _pending.removeAt(0);
-      _pending.add((session, reward));
+      _pending.add(feedback);
     }
   }
 
-  void _learn(_LearningSession session, double reward) {
+  void _learn(AutoplayFeedback feedback) {
     _model.learn(
-      session.track,
-      previous: session.previous,
-      at: session.at,
-      reward: reward,
+      feedback.track,
+      previous: feedback.previous,
+      at: feedback.at,
+      reward: feedback.reward,
+      weight: feedback.weight,
     );
+    if (!_feedback.isClosed) _feedback.add(feedback);
     _dirty = true;
     if (!_disposed) {
       _saveTimer ??= Timer(
@@ -424,6 +688,7 @@ class AutoplayPersonalization {
     _disposed = true;
     await _loading;
     await flush();
+    await _feedback.close();
   }
 }
 

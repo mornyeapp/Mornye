@@ -97,6 +97,7 @@ class WeeklyReleaseService {
     List<CollectionArtistEntry> artists, {
     bool refresh = false,
     DateTime? now,
+    bool Function()? isCancelled,
   }) async {
     final date = now ?? DateTime.now();
     final prefs = await preferences;
@@ -104,7 +105,7 @@ class WeeklyReleaseService {
     final unavailable = <String>[];
     var next = 0;
     Future<void> worker() async {
-      while (next < artists.length) {
+      while (next < artists.length && isCancelled?.call() != true) {
         final artist = artists[next++];
         final key = 'weekly_releases_v1:${artist.key}';
         var cached = <WeeklyRelease>[];
@@ -130,6 +131,7 @@ class WeeklyReleaseService {
             final result = await loadArtist(
               artist,
             ).timeout(const Duration(seconds: 25));
+            if (isCancelled?.call() == true) return;
             final metadata = result.metadata;
             // Missing catalogs mean unsupported, rather than an empty result
             // that silently replaces a previously successful cache.

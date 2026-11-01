@@ -96,12 +96,12 @@ class ExtensionRow extends StatelessWidget {
     required this.showDivider,
     this.trailing,
     this.onTap,
-    this.trailingBelowWhenNarrow = false,
+    this.trailingWidth,
   });
 
-  /// Narrowest text column, in logical pixels at the default text size,
-  /// that keeps a wide [trailing] beside the text.
-  static const double sideBySideMinTextWidth = 360;
+  /// Narrowest title, in logical pixels at the default text size, that a
+  /// [trailing] beside the text may leave.
+  static const double minTitleWidth = 140;
 
   final Widget? avatar;
 
@@ -113,17 +113,19 @@ class ExtensionRow extends StatelessWidget {
   final Widget? trailing;
   final VoidCallback? onTap;
 
-  /// [trailing] is a labelled button that would squeeze the title on a
-  /// phone or with large text, so below [sideBySideMinTextWidth] it moves
-  /// under the subtitle. The choice depends on the row width alone, so
-  /// every row of a list lays out alike whatever its button says.
-  final bool trailingBelowWhenNarrow;
+  /// The widest [trailing] of the list, such as its longest button label in
+  /// the current language and text size. When set, [trailing] moves under
+  /// the subtitle on a row where a control this wide would leave the title
+  /// narrower than [minTitleWidth]. Rows of a list share the width, so they
+  /// lay out alike whatever their own button says.
+  final double? trailingWidth;
 
   @override
   Widget build(BuildContext context) {
     final tokens = context.tokens;
     final colorScheme = Theme.of(context).colorScheme;
     final trailing = this.trailing;
+    final trailingWidth = this.trailingWidth;
 
     Widget text({Widget? below}) => Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -150,7 +152,7 @@ class ExtensionRow extends StatelessWidget {
         Expanded(child: text(below: trailingBelow ? trailing : null)),
         if (!trailingBelow && trailing != null) ...[
           // A button carries no gap of its own, since it may sit below.
-          if (trailingBelowWhenNarrow) SizedBox(width: tokens.gapMd),
+          if (trailingWidth != null) SizedBox(width: tokens.gapMd),
           trailing,
         ],
       ],
@@ -166,19 +168,21 @@ class ExtensionRow extends StatelessWidget {
               horizontal: tokens.gapLg,
               vertical: tokens.gapMd,
             ),
-            child: trailing == null || !trailingBelowWhenNarrow
+            child: trailing == null || trailingWidth == null
                 ? content(false)
                 : LayoutBuilder(
                     builder: (context, constraints) {
-                      final textWidth =
+                      final titleWidth =
                           constraints.maxWidth -
                           (avatar == null
                               ? 0
-                              : ExtensionAvatar.size + tokens.gapLg);
+                              : ExtensionAvatar.size + tokens.gapLg) -
+                          trailingWidth -
+                          tokens.gapMd;
                       final minWidth = MediaQuery.textScalerOf(
                         context,
-                      ).scale(sideBySideMinTextWidth);
-                      return content(textWidth < minWidth);
+                      ).scale(minTitleWidth);
+                      return content(titleWidth < minWidth);
                     },
                   ),
           ),

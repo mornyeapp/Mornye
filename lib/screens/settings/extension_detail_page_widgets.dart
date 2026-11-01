@@ -8,7 +8,11 @@ class _ExtensionOverviewSurface extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final content = Padding(padding: const EdgeInsets.all(20), child: child);
-    if (context.isMornye) return MornyeGlassPanel(child: content);
+    if (context.isMornye) {
+      // The card scrolls over the plain page background, so a backdrop pass
+      // would only filter a flat color.
+      return MornyeGlassPanel(samplesBackdrop: false, child: content);
+    }
     return DecoratedBox(
       decoration: BoxDecoration(
         color: Theme.of(
@@ -365,7 +369,13 @@ class _PermissionItem extends StatelessWidget {
     IconData icon = Icons.security;
     String description = permission;
 
-    if (permission.startsWith('network:')) {
+    if (permission == 'network:*') {
+      icon = Icons.language;
+      description = 'Network access to: all domains';
+    } else if (permission == 'network:http') {
+      icon = Icons.warning_amber_outlined;
+      description = 'Unencrypted HTTP connections allowed';
+    } else if (permission.startsWith('network:')) {
       icon = Icons.language;
       description = 'Network access to: ${permission.substring(8)}';
     } else if (permission.startsWith('storage:')) {
@@ -687,6 +697,68 @@ class _PostProcessingHookItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    return _ExtensionFeatureRow(
+      cupertinoIcon: CupertinoIcons.wand_stars,
+      materialIcon: Icons.auto_fix_high,
+      title: hook.name,
+      description: hook.description,
+      extra: hook.supportedFormats.isEmpty
+          ? null
+          : Wrap(
+              spacing: 4,
+              children: hook.supportedFormats.map((format) {
+                return Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    format.toUpperCase(),
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+      pill: hook.defaultEnabled ? context.l10n.extensionsHomeFeedAuto : null,
+      pillColor: colorScheme.primaryContainer,
+      pillTextColor: colorScheme.onPrimaryContainer,
+      showDivider: showDivider,
+    );
+  }
+}
+
+class _ExtensionFeatureRow extends StatelessWidget {
+  const _ExtensionFeatureRow({
+    required this.cupertinoIcon,
+    required this.materialIcon,
+    required this.title,
+    this.description,
+    this.extra,
+    this.pill,
+    required this.pillColor,
+    required this.pillTextColor,
+    required this.showDivider,
+  });
+
+  final IconData cupertinoIcon;
+  final IconData materialIcon;
+  final String title;
+  final String? description;
+  final Widget? extra;
+  final String? pill;
+  final Color pillColor;
+  final Color pillTextColor;
+  final bool showDivider;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -705,9 +777,7 @@ class _PostProcessingHookItem extends StatelessWidget {
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: AppIcon(
-                  context.isMornye
-                      ? CupertinoIcons.wand_stars
-                      : Icons.auto_fix_high,
+                  context.isMornye ? cupertinoIcon : materialIcon,
                   color: context.isMornye
                       ? colorScheme.primary
                       : colorScheme.onSecondaryContainer,
@@ -720,63 +790,39 @@ class _PostProcessingHookItem extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      hook.name,
+                      title,
                       style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                         fontWeight: FontWeight.w500,
                       ),
                     ),
-                    if (hook.description != null) ...[
+                    if (description != null) ...[
                       const SizedBox(height: 2),
                       Text(
-                        hook.description!,
+                        description!,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: colorScheme.onSurfaceVariant,
                         ),
                       ),
                     ],
-                    if (hook.supportedFormats.isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Wrap(
-                        spacing: 4,
-                        children: hook.supportedFormats.map((format) {
-                          return Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: colorScheme.surfaceContainerHighest,
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              format.toUpperCase(),
-                              style: Theme.of(context).textTheme.labelSmall
-                                  ?.copyWith(
-                                    color: colorScheme.onSurfaceVariant,
-                                  ),
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                    ],
+                    if (extra != null) ...[const SizedBox(height: 4), extra!],
                   ],
                 ),
               ),
-              if (hook.defaultEnabled)
+              if (pill != null)
                 Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 8,
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: colorScheme.primaryContainer,
+                    color: pillColor,
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
-                    context.l10n.extensionsHomeFeedAuto,
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: colorScheme.onPrimaryContainer,
-                    ),
+                    pill!,
+                    style: Theme.of(
+                      context,
+                    ).textTheme.labelSmall?.copyWith(color: pillTextColor),
                   ),
                 ),
             ],
@@ -920,91 +966,27 @@ class _QualityOptionItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: context.isMornye
-                      ? Colors.transparent
-                      : colorScheme.secondaryContainer,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: AppIcon(
-                  context.isMornye
-                      ? CupertinoIcons.waveform
-                      : Icons.high_quality,
-                  color: context.isMornye
-                      ? colorScheme.primary
-                      : colorScheme.onSecondaryContainer,
-                  size: 20,
-                ),
+    final description = quality.description;
+    return _ExtensionFeatureRow(
+      cupertinoIcon: CupertinoIcons.waveform,
+      materialIcon: Icons.high_quality,
+      title: quality.label,
+      description: description?.isNotEmpty == true ? description : null,
+      extra: context.isMornye
+          ? null
+          : Text(
+              quality.id,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: colorScheme.primary,
+                fontFamily: 'monospace',
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      quality.label,
-                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    if (quality.description != null &&
-                        quality.description!.isNotEmpty) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        quality.description!,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                    if (!context.isMornye) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        quality.id,
-                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: colorScheme.primary,
-                          fontFamily: 'monospace',
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              if (quality.settings.isNotEmpty)
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: colorScheme.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    context.l10n.extensionSettingsCount(
-                      quality.settings.length,
-                    ),
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ),
-        if (showDivider) const _ExtensionDivider(indent: 72),
-      ],
+            ),
+      pill: quality.settingsCount > 0
+          ? context.l10n.extensionSettingsCount(quality.settingsCount)
+          : null,
+      pillColor: colorScheme.surfaceContainerHighest,
+      pillTextColor: colorScheme.onSurfaceVariant,
+      showDivider: showDivider,
     );
   }
 }

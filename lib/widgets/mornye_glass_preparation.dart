@@ -2,8 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mornye/controllers/mornye_glass_warmup.dart';
 import 'package:mornye/providers/runtime_profile_provider.dart';
-import 'package:mornye/services/mornye_glass_warmup.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 
 /// Starts the one-time preparation when the full glass theme is enabled,

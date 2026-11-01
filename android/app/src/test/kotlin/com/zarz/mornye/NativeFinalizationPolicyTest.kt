@@ -170,6 +170,38 @@ class NativeFinalizationPolicyTest {
     }
 
     @Test
+    fun downloadLyricsFallBackWhenProviderContentContainsNoLyrics() {
+        for (supplied in listOf(null, "", "  ", "[ar:Artist]\n[ti:Title]", "[00:01.00]\n<00:01.10>\nv1:")) {
+            var calls = 0
+            val resolved = NativeFinalizationPolicy.resolveLyricsContent(supplied) {
+                calls++
+                "  [00:01.00]Recovered lyric  "
+            }
+            assertEquals(1, calls)
+            assertEquals("[00:01.00]Recovered lyric", resolved)
+        }
+    }
+
+    @Test
+    fun downloadLyricsReuseRealLyricsAndInstrumentalMarkersWithoutFetching() {
+        for (supplied in listOf("[00:01.00]Existing lyric", "Plain lyric", "[instrumental:true]")) {
+            assertEquals(
+                supplied,
+                NativeFinalizationPolicy.resolveLyricsContent("  $supplied  ") {
+                    error("Usable provider content must not trigger another lookup")
+                },
+            )
+        }
+    }
+
+    @Test
+    fun downloadLyricsRejectUnusableFallbackContent() {
+        for (fetched in listOf("", "[ar:Artist]\n[ti:Title]", "[00:01.00]")) {
+            assertEquals("", NativeFinalizationPolicy.resolveLyricsContent(null) { fetched })
+        }
+    }
+
+    @Test
     fun automaticConversionSettingsAreNormalizedAndComparable() {
         val target = checkNotNull(
             NativeFinalizationPolicy.autoConversionTarget(
@@ -181,6 +213,7 @@ class NativeFinalizationPolicyTest {
         assertEquals("aac", target.codec)
         assertEquals(".m4a", target.extension)
         assertEquals(256, target.bitrateKbps)
+        assertEquals(160, NativeFinalizationPolicy.autoConversionTarget(true, "opus", "160k")?.bitrateKbps)
         assertTrue(
             NativeFinalizationPolicy.autoConversionAlreadySatisfied(
                 target,
@@ -202,6 +235,26 @@ class NativeFinalizationPolicyTest {
                 bitrate = "128k",
             ),
         )
+    }
+
+    @Test
+    fun flacAutomaticConversionCapsQualityWithoutUpsampling() {
+        val target = checkNotNull(NativeFinalizationPolicy.autoConversionTarget(true, "flac", ""))
+        assertEquals(16, target.maxBitDepth)
+        assertEquals(48000, target.maxSampleRate)
+        assertEquals(".flac", target.extension)
+        assertTrue(NativeFinalizationPolicy.autoConversionAlreadySatisfied(target, "flac", null, 16, 44100))
+        assertFalse(NativeFinalizationPolicy.autoConversionAlreadySatisfied(target, "flac", null, 24, 96000))
+        assertFalse(NativeFinalizationPolicy.autoConversionAlreadySatisfied(target, "flac", null))
+        assertFalse(NativeFinalizationPolicy.autoConversionAlreadySatisfied(target, "aac", null, 16, 44100))
+
+        val highResolution = NativeFinalizationPolicy.flacAutoConversionArguments(target, "in.flac", "out.flac", 24, 96000)
+        assertTrue(highResolution.contains("aresample=resampler=swr:osr=48000:osf=s16"))
+        val lowerRate = NativeFinalizationPolicy.flacAutoConversionArguments(target, "in.flac", "out.flac", 24, 44100)
+        assertTrue(lowerRate.contains("aresample=resampler=swr:osf=s16"))
+        assertFalse(lowerRate.any { it.contains("osr=") })
+        val original = checkNotNull(NativeFinalizationPolicy.autoConversionTarget(true, "flac", "", 0, 0))
+        assertTrue(NativeFinalizationPolicy.autoConversionAlreadySatisfied(original, "flac", null, 24, 96000))
     }
 
     @Test

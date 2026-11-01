@@ -8,14 +8,20 @@ import 'package:mornye/utils/logger.dart';
 
 final _log = AppLogger('LibraryDatabase');
 
+/// Temp tables holding staged Library rows and their path keys.
+typedef _ScanStage = ({String rows, String keys});
+
 /// Scan and incremental ingestion writes. The connection and the lazy
 /// History attachment stay owned by LibraryDatabase and are passed in.
 class LibraryIngestionStore {
-  static const String _scanStageTable = 'library_scan_stage';
-  static const String _scanStagePathKeysTable = 'library_scan_path_keys_stage';
-  static const String _incrementalStageTable = 'library_incremental_stage';
-  static const String _incrementalStagePathKeysTable =
-      'library_incremental_path_keys_stage';
+  static const _ScanStage _scanStage = (
+    rows: 'library_scan_stage',
+    keys: 'library_scan_path_keys_stage',
+  );
+  static const _ScanStage _incrementalStage = (
+    rows: 'library_incremental_stage',
+    keys: 'library_incremental_path_keys_stage',
+  );
   static const String _downloadedLibraryIdsStageTable =
       'library_downloaded_ids_stage';
 
@@ -124,52 +130,6 @@ class LibraryIngestionStore {
     );
   }
 
-  void _putPathKeysInBatch(Batch batch, String id, String? filePath) =>
-      sqlite.putPathKeysInBatch(batch, 'library_path_keys', id, filePath);
-
-  Future<void> upsert(Map<String, dynamic> json, {String? sourceId}) async {
-    final db = await database;
-    await sqlite.transactionWithBusyRetry(db, (txn) async {
-      await txn.insert(
-        'library',
-        LibraryRowMapper.encode(json, sourceId: sourceId),
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
-      final batch = txn.batch();
-      _putPathKeysInBatch(
-        batch,
-        json['id'] as String,
-        json['filePath'] as String?,
-      );
-      await batch.commit(noResult: true);
-    });
-  }
-
-  Future<void> upsertBatch(
-    List<Map<String, dynamic>> items, {
-    String? sourceId,
-  }) async {
-    if (items.isEmpty) return;
-    final db = await database;
-    await sqlite.transactionWithBusyRetry(db, (txn) async {
-      final batch = txn.batch();
-      for (final json in items) {
-        batch.insert(
-          'library',
-          LibraryRowMapper.encode(json, sourceId: sourceId),
-          conflictAlgorithm: ConflictAlgorithm.replace,
-        );
-        _putPathKeysInBatch(
-          batch,
-          json['id'] as String,
-          json['filePath'] as String?,
-        );
-      }
-      await batch.commit(noResult: true);
-    });
-    _log.i('Batch inserted ${items.length} items');
-  }
-
   /// Removes rows from one source whose normalized path keys already exist in
   /// download History, without materializing either database's paths in Dart.
   Future<int> deleteDownloadedRowsForSource(String sourceId) async {
@@ -227,132 +187,128 @@ class LibraryIngestionStore {
     if (items.isEmpty) return (upserted: 0, skipped: 0);
     final db = await database;
     await _ensureHistoryAttached(db);
-    await db.execute('DROP TABLE IF EXISTS $_incrementalStageTable');
-    await db.execute('DROP TABLE IF EXISTS $_incrementalStagePathKeysTable');
+    await _createScanStage(db, _incrementalStage);
+    try {
+      final batch = db.batch();
+      final stagedIds = <String>{};
+      for (final json in items) {
+        _stageScanRow(batch, _incrementalStage, json, sourceId, stagedIds);
+      }
+      await batch.commit(noResult: true);
+      final (:staged, :skipped) = await _mergeStageExcludingHistory(
+        db,
+        _incrementalStage,
+      );
+      return (upserted: staged - skipped, skipped: skipped);
+    } finally {
+      await db.execute('DROP TABLE IF EXISTS ${_incrementalStage.keys}');
+      await db.execute('DROP TABLE IF EXISTS ${_incrementalStage.rows}');
+    }
+  }
+
+  Future<void> _createScanStage(Database db, _ScanStage stage) async {
+    await db.execute('DROP TABLE IF EXISTS ${stage.rows}');
+    await db.execute('DROP TABLE IF EXISTS ${stage.keys}');
     await db.execute(
-      'CREATE TEMP TABLE $_incrementalStageTable '
-      'AS SELECT * FROM library WHERE 0',
+      'CREATE TEMP TABLE ${stage.rows} AS SELECT * FROM library WHERE 0',
     );
     await db.execute(
-      'CREATE UNIQUE INDEX idx_${_incrementalStageTable}_id '
-      'ON $_incrementalStageTable(id)',
+      'CREATE UNIQUE INDEX idx_${stage.rows}_id ON ${stage.rows}(id)',
     );
     await db.execute(
-      'CREATE UNIQUE INDEX idx_${_incrementalStageTable}_path '
-      'ON $_incrementalStageTable(file_path)',
+      'CREATE UNIQUE INDEX idx_${stage.rows}_path ON ${stage.rows}(file_path)',
     );
     await db.execute('''
-      CREATE TEMP TABLE $_incrementalStagePathKeysTable (
+      CREATE TEMP TABLE ${stage.keys} (
         item_id TEXT NOT NULL,
         path_key TEXT NOT NULL,
         PRIMARY KEY (item_id, path_key)
       )
     ''');
     await db.execute(
-      'CREATE INDEX idx_${_incrementalStagePathKeysTable}_key '
-      'ON $_incrementalStagePathKeysTable(path_key)',
+      'CREATE INDEX idx_${stage.keys}_key ON ${stage.keys}(path_key)',
     );
-
-    try {
-      final batch = db.batch();
-      final stagedIds = <String>{};
-      for (final json in items) {
-        final id = json['id'] as String?;
-        if (id == null || id.trim().isEmpty) {
-          throw const FormatException('Library scan row has no valid id');
-        }
-        batch.insert(
-          _incrementalStageTable,
-          LibraryRowMapper.encode(json, sourceId: sourceId),
-          conflictAlgorithm: ConflictAlgorithm.replace,
-        );
-        sqlite.putPathKeysInBatch(
-          batch,
-          _incrementalStagePathKeysTable,
-          id,
-          json['filePath'] as String?,
-          // The stage starts empty: only a repeated id has keys to replace.
-          replaceExisting: !stagedIds.add(id),
-        );
-      }
-      await batch.commit(noResult: true);
-
-      const historyMatch =
-          '''
-        EXISTS (
-          SELECT 1
-          FROM $_incrementalStagePathKeysTable sk
-          JOIN history_db.history_path_keys hk ON hk.path_key = sk.path_key
-          WHERE sk.item_id = s.id
-        )
-      ''';
-      final skippedRows = await db.rawQuery(
-        'SELECT COUNT(*) AS count FROM $_incrementalStageTable s '
-        'WHERE $historyMatch',
-      );
-      final skipped = Sqflite.firstIntValue(skippedRows) ?? 0;
-      final stagedRows = await db.rawQuery(
-        'SELECT COUNT(*) AS count FROM $_incrementalStageTable',
-      );
-      final staged = Sqflite.firstIntValue(stagedRows) ?? 0;
-      final columns = (await db.rawQuery(
-        'PRAGMA table_info(library)',
-      )).map((row) => row['name'] as String).toList(growable: false);
-      final columnList = columns.join(', ');
-      final selectedColumns = columns.map((column) => 's.$column').join(', ');
-
-      await sqlite.transactionWithBusyRetry(db, (txn) async {
-        await txn.rawDelete('''
-          DELETE FROM library_path_keys
-          WHERE item_id IN (
-            SELECT s.id FROM $_incrementalStageTable s WHERE NOT $historyMatch
-          )
-        ''');
-        await txn.rawInsert('''
-          INSERT OR REPLACE INTO library ($columnList)
-          SELECT $selectedColumns FROM $_incrementalStageTable s
-          WHERE NOT $historyMatch
-        ''');
-        await txn.rawInsert('''
-          INSERT OR IGNORE INTO library_path_keys(item_id, path_key)
-          SELECT sk.item_id, sk.path_key
-          FROM $_incrementalStagePathKeysTable sk
-          JOIN $_incrementalStageTable s ON s.id = sk.item_id
-          WHERE NOT $historyMatch
-        ''');
-      });
-      return (upserted: staged - skipped, skipped: skipped);
-    } finally {
-      await db.execute('DROP TABLE IF EXISTS $_incrementalStagePathKeysTable');
-      await db.execute('DROP TABLE IF EXISTS $_incrementalStageTable');
-    }
   }
 
-  Future<void> replaceAll(List<Map<String, dynamic>> items) async {
-    final db = await database;
-    await sqlite.transactionWithBusyRetry(db, (txn) async {
-      await txn.delete('library_path_keys');
-      await txn.delete('library');
-      if (items.isEmpty) {
-        return;
-      }
+  void _stageScanRow(
+    Batch batch,
+    _ScanStage stage,
+    Map<String, dynamic> json,
+    String sourceId,
+    Set<String> stagedIds,
+  ) {
+    final id = json['id'] as String?;
+    if (id == null || id.trim().isEmpty) {
+      throw const FormatException('Library scan row has no valid id');
+    }
+    batch.insert(
+      stage.rows,
+      LibraryRowMapper.encode(json, sourceId: sourceId),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+    sqlite.putPathKeysInBatch(
+      batch,
+      stage.keys,
+      id,
+      json['filePath'] as String?,
+      // The stage starts empty: only a repeated id has keys to replace.
+      replaceExisting: !stagedIds.add(id),
+    );
+  }
 
-      final batch = txn.batch();
-      for (final json in items) {
-        batch.insert(
-          'library',
-          LibraryRowMapper.encode(json),
-          conflictAlgorithm: ConflictAlgorithm.replace,
-        );
-        _putPathKeysInBatch(
-          batch,
-          json['id'] as String,
-          json['filePath'] as String?,
-        );
-      }
-      await batch.commit(noResult: true);
+  /// Counts the staged rows, then merges those without a History file into
+  /// the Library in one transaction, after [beforeMerge] when given.
+  Future<({int staged, int skipped})> _mergeStageExcludingHistory(
+    Database db,
+    _ScanStage stage, {
+    Future<void> Function(Transaction txn)? beforeMerge,
+  }) async {
+    final historyMatch =
+        '''
+      EXISTS (
+        SELECT 1
+        FROM ${stage.keys} sk
+        JOIN history_db.history_path_keys hk ON hk.path_key = sk.path_key
+        WHERE sk.item_id = s.id
+      )
+    ''';
+    final skippedRows = await db.rawQuery(
+      'SELECT COUNT(*) AS count FROM ${stage.rows} s '
+      'WHERE $historyMatch',
+    );
+    final skipped = Sqflite.firstIntValue(skippedRows) ?? 0;
+    final stagedRows = await db.rawQuery(
+      'SELECT COUNT(*) AS count FROM ${stage.rows}',
+    );
+    final staged = Sqflite.firstIntValue(stagedRows) ?? 0;
+    final columns = (await db.rawQuery(
+      'PRAGMA table_info(library)',
+    )).map((row) => row['name'] as String).toList(growable: false);
+    final columnList = columns.join(', ');
+    final selectedColumns = columns.map((column) => 's.$column').join(', ');
+
+    await sqlite.transactionWithBusyRetry(db, (txn) async {
+      if (beforeMerge != null) await beforeMerge(txn);
+      await txn.rawDelete('''
+        DELETE FROM library_path_keys
+        WHERE item_id IN (
+          SELECT s.id FROM ${stage.rows} s WHERE NOT $historyMatch
+        )
+      ''');
+      await txn.rawInsert('''
+        INSERT OR REPLACE INTO library ($columnList)
+        SELECT $selectedColumns FROM ${stage.rows} s
+        WHERE NOT $historyMatch
+      ''');
+      await txn.rawInsert('''
+        INSERT OR IGNORE INTO library_path_keys(item_id, path_key)
+        SELECT sk.item_id, sk.path_key
+        FROM ${stage.keys} sk
+        JOIN ${stage.rows} s ON s.id = sk.item_id
+        WHERE NOT $historyMatch
+      ''');
     });
-    _log.i('Replaced library with ${items.length} items');
+    return (staged: staged, skipped: skipped);
   }
 
   /// Stages scan rows in bounded, independently committed batches, then swaps
@@ -370,31 +326,7 @@ class LibraryIngestionStore {
     }
     final db = await database;
     await _ensureHistoryAttached(db);
-    await db.execute('DROP TABLE IF EXISTS $_scanStageTable');
-    await db.execute('DROP TABLE IF EXISTS $_scanStagePathKeysTable');
-    await db.execute(
-      'CREATE TEMP TABLE $_scanStageTable AS SELECT * FROM library WHERE 0',
-    );
-    await db.execute(
-      'CREATE UNIQUE INDEX idx_${_scanStageTable}_id '
-      'ON $_scanStageTable(id)',
-    );
-    await db.execute(
-      'CREATE UNIQUE INDEX idx_${_scanStageTable}_path '
-      'ON $_scanStageTable(file_path)',
-    );
-    await db.execute('''
-      CREATE TEMP TABLE $_scanStagePathKeysTable (
-        item_id TEXT NOT NULL,
-        path_key TEXT NOT NULL,
-        PRIMARY KEY (item_id, path_key)
-      )
-    ''');
-    await db.execute(
-      'CREATE INDEX idx_${_scanStagePathKeysTable}_key '
-      'ON $_scanStagePathKeysTable(path_key)',
-    );
-
+    await _createScanStage(db, _scanStage);
     var streamed = 0;
     try {
       var batch = db.batch();
@@ -408,80 +340,23 @@ class LibraryIngestionStore {
 
       final stagedIds = <String>{};
       await for (final json in items) {
-        final id = json['id'] as String?;
-        if (id == null || id.trim().isEmpty) {
-          throw const FormatException('Library scan row has no valid id');
-        }
-        batch.insert(
-          _scanStageTable,
-          LibraryRowMapper.encode(json, sourceId: sourceId),
-          conflictAlgorithm: ConflictAlgorithm.replace,
-        );
-        sqlite.putPathKeysInBatch(
-          batch,
-          _scanStagePathKeysTable,
-          id,
-          json['filePath'] as String?,
-          // The stage starts empty: only a repeated id has keys to replace.
-          replaceExisting: !stagedIds.add(id),
-        );
+        _stageScanRow(batch, _scanStage, json, sourceId, stagedIds);
         streamed++;
         pending++;
         if (pending >= batchSize) await flush();
       }
       await flush();
-
-      const historyMatch =
-          '''
-        EXISTS (
-          SELECT 1
-          FROM $_scanStagePathKeysTable sk
-          JOIN history_db.history_path_keys hk ON hk.path_key = sk.path_key
-          WHERE sk.item_id = s.id
-        )
-      ''';
-      final skippedRows = await db.rawQuery(
-        'SELECT COUNT(*) AS count FROM $_scanStageTable s '
-        'WHERE $historyMatch',
-      );
-      final skipped = Sqflite.firstIntValue(skippedRows) ?? 0;
-      final stagedRows = await db.rawQuery(
-        'SELECT COUNT(*) AS count FROM $_scanStageTable',
-      );
-      final staged = Sqflite.firstIntValue(stagedRows) ?? 0;
-      final columns = (await db.rawQuery(
-        'PRAGMA table_info(library)',
-      )).map((row) => row['name'] as String).toList(growable: false);
-      final columnList = columns.join(', ');
-      final selectedColumns = columns.map((column) => 's.$column').join(', ');
-
-      await sqlite.transactionWithBusyRetry(db, (txn) async {
-        await deleteReplacedLibraryScanRows(
+      final (:staged, :skipped) = await _mergeStageExcludingHistory(
+        db,
+        _scanStage,
+        beforeMerge: (txn) => deleteReplacedLibraryScanRows(
           txn,
           sourceId,
-          stageTable: _scanStageTable,
+          stageTable: _scanStage.rows,
           preserveMissing: preserveMissing,
           preserveMissingPaths: preserveMissingPaths,
-        );
-        await txn.rawDelete('''
-          DELETE FROM library_path_keys
-          WHERE item_id IN (
-            SELECT s.id FROM $_scanStageTable s WHERE NOT $historyMatch
-          )
-        ''');
-        await txn.rawInsert('''
-          INSERT OR REPLACE INTO library ($columnList)
-          SELECT $selectedColumns FROM $_scanStageTable s
-          WHERE NOT $historyMatch
-        ''');
-        await txn.rawInsert('''
-          INSERT OR IGNORE INTO library_path_keys(item_id, path_key)
-          SELECT sk.item_id, sk.path_key
-          FROM $_scanStagePathKeysTable sk
-          JOIN $_scanStageTable s ON s.id = sk.item_id
-          WHERE NOT $historyMatch
-        ''');
-      });
+        ),
+      );
       final inserted = staged - skipped;
       _log.i(
         'Streamed $streamed rows, staged $staged unique rows, and swapped '
@@ -490,8 +365,8 @@ class LibraryIngestionStore {
       );
       return (inserted: inserted, skipped: skipped);
     } finally {
-      await db.execute('DROP TABLE IF EXISTS $_scanStagePathKeysTable');
-      await db.execute('DROP TABLE IF EXISTS $_scanStageTable');
+      await db.execute('DROP TABLE IF EXISTS ${_scanStage.keys}');
+      await db.execute('DROP TABLE IF EXISTS ${_scanStage.rows}');
     }
   }
 }

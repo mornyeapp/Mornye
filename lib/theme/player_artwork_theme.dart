@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:path/path.dart' as p;
 import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/cover_palette.dart';
+import 'package:mornye/widgets/cached_cover_image.dart';
 
 /// Cover schemes for [PlayerArtworkTheme]: [CoverPalette] with the neutral
 /// scheme for black and white covers.
@@ -45,18 +45,6 @@ class PlayerArtworkTheme extends StatefulWidget {
   @visibleForTesting
   static set debugPalette(PlayerArtworkPalette? palette) =>
       _palette = palette ?? const PlayerArtworkPalette();
-
-  /// The [CoverPalette] source for [artUri]: the URL, or the local path of
-  /// a file. Other artwork, such as a content URI, has no palette.
-  @visibleForTesting
-  static String? paletteSource(String? artUri) {
-    if (artUri == null || artUri.isEmpty) return null;
-    if (artUri.startsWith('http://') || artUri.startsWith('https://')) {
-      return artUri;
-    }
-    if (artUri.startsWith('file://')) return Uri.parse(artUri).toFilePath();
-    return p.isAbsolute(artUri) ? artUri : null;
-  }
 
   @override
   State<PlayerArtworkTheme> createState() => _PlayerArtworkThemeState();
@@ -105,7 +93,7 @@ class _PlayerArtworkThemeState extends State<PlayerArtworkTheme>
 
   /// Starts one palette job when the cover or the brightness changes.
   void _sync() {
-    final source = PlayerArtworkTheme.paletteSource(widget.artUri);
+    final source = coverImageSource(widget.artUri);
     final brightness = Theme.of(context).brightness;
     if (source == _source && brightness == _brightness) return;
     // The first frame and a brightness change have no scheme worth keeping.

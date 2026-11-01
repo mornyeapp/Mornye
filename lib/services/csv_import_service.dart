@@ -56,7 +56,6 @@ class CsvImportService {
 
   /// Native parsing consumes bytes directly. Old native binaries and test
   /// hosts retain the same parser in an isolate, never the Flutter frame.
-  @visibleForTesting
   static Future<List<Track>> parsePlaylistInBackground(
     Uint8List bytes, {
     required String format,

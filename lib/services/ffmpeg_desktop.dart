@@ -49,9 +49,6 @@ class DesktopFFmpegTools {
   /// The tools of this process, located once.
   static Future<DesktopFFmpegTools> get shared => _shared ??= locate();
 
-  @visibleForTesting
-  static set debugShared(Future<DesktopFFmpegTools>? tools) => _shared = tools;
-
   /// Folders searched for the tools, in order.
   static List<String> searchDirectories({
     required String operatingSystem,

@@ -8,6 +8,7 @@ import 'package:mornye/widgets/app_icon_button.dart';
 import 'package:mornye/widgets/collection_scaffold.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/widgets/desktop/context_menu.dart';
+import 'package:mornye/widgets/desktop/desktop_link_transfer_actions.dart';
 import 'package:mornye/widgets/desktop/desktop_selection.dart';
 import 'package:mornye/widgets/desktop/track_list_table.dart';
 import 'package:mornye/widgets/expressive_button.dart';
@@ -36,16 +37,22 @@ import 'package:mornye/providers/local_library_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/utils/adaptive_layout.dart';
 import 'package:mornye/utils/cover_art_utils.dart';
-import 'package:mornye/screens/collapsing_header_scroll_mixin.dart';
-import 'package:mornye/screens/selection_mode_mixin.dart';
+import 'package:mornye/controllers/collapsing_header_scroll_mixin.dart';
 import 'package:mornye/controllers/library_tracks_folder_data.dart';
+import 'package:mornye/controllers/selection_mode_mixin.dart';
+import 'package:mornye/widgets/collection_reorder_sliver.dart';
+import 'package:mornye/widgets/discard_changes_dialog.dart';
 import 'package:mornye/screens/track_metadata_screen.dart';
 import 'package:mornye/widgets/selection_action_button.dart';
-import 'package:mornye/widgets/selection_bottom_bar.dart';
 import 'package:mornye/widgets/in_library_badge.dart';
+import 'package:mornye/widgets/link/link_actions.dart';
 import 'package:mornye/widgets/playlist_picker_sheet.dart';
+import 'package:mornye/widgets/collection_suggestions_section.dart';
 import 'package:mornye/widgets/animation_utils.dart';
 import 'package:mornye/widgets/track_detail_actions.dart';
+
+export 'package:mornye/models/library_collections.dart'
+    show LibraryTracksFolderMode;
 
 String? _resolveRawCoverUrl(Track track) {
   final rawCover = track.coverUrl?.trim();
@@ -79,6 +86,75 @@ class _LibraryTracksFolderScreenState
         CollapsingHeaderScrollMixin<LibraryTracksFolderScreen> {
   UserPlaylistCollection? playlist;
   final _folderData = LibraryTracksFolderData();
+  List<CollectionTrackEntry>? _orderDraft;
+  List<String> _orderBefore = const [];
+  bool _savingOrder = false;
+  bool _draggingOrder = false;
+  bool _confirmingDiscard = false;
+
+  bool get _editingOrder => _orderDraft != null;
+  bool get _orderChanged =>
+      _orderDraft?.indexed.any(
+        (item) => item.$2.key != _orderBefore[item.$1],
+      ) ??
+      false;
+
+  void _editOrder(List<CollectionTrackEntry> entries) {
+    exitSelectionMode();
+    setState(() {
+      _orderDraft = [...entries];
+      _orderBefore = [for (final entry in entries) entry.key];
+      _draggingOrder = false;
+    });
+  }
+
+  Future<void> _cancelOrder() async {
+    if (_savingOrder || _confirmingDiscard) return;
+    _confirmingDiscard = true;
+    try {
+      if (_orderChanged && !await showDiscardChangesDialog(context)) return;
+      if (mounted) {
+        setState(() {
+          _orderDraft = null;
+          _draggingOrder = false;
+        });
+      }
+    } finally {
+      _confirmingDiscard = false;
+    }
+  }
+
+  Future<void> _saveOrder() async {
+    final draft = _orderDraft;
+    if (draft == null || _savingOrder || _draggingOrder) return;
+    setState(() => _savingOrder = true);
+    try {
+      final keys = [for (final entry in draft) entry.key];
+      final notifier = ref.read(libraryCollectionsProvider.notifier);
+      final saved = widget.mode == LibraryTracksFolderMode.playlist
+          ? await notifier.reorderPlaylistTracks(widget.playlistId!, keys)
+          : await notifier.reorderSavedTracks(widget.mode, keys);
+      if (!mounted) return;
+      setState(() => _orderDraft = null);
+      showAppSnackBar(
+        context,
+        content: Text(
+          saved
+              ? context.l10n.collectionOrderSaved
+              : context.l10n.collectionOrderChanged,
+        ),
+      );
+    } on Object {
+      if (mounted) {
+        showAppSnackBar(
+          context,
+          content: Text(context.l10n.collectionOrderSaveFailed),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _savingOrder = false);
+    }
+  }
 
   @override
   void initState() {
@@ -255,7 +331,7 @@ class _LibraryTracksFolderScreenState
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     ref.watch(localLibraryProvider.select((s) => s.loadedIndexVersion));
-    final List<CollectionTrackEntry> entries;
+    List<CollectionTrackEntry> entries;
 
     switch (widget.mode) {
       case LibraryTracksFolderMode.wishlist:
@@ -283,6 +359,7 @@ class _LibraryTracksFolderScreenState
         break;
     }
 
+    entries = _orderDraft ?? entries;
     _folderData.update(entries);
     pruneSelection(_folderData.keys);
 
@@ -311,9 +388,13 @@ class _LibraryTracksFolderScreenState
     };
     final folderTracks = _folderData.tracks;
     final historyLookups = _folderData.historyRequest.tracks;
-    final existingHistoryKeys = ref.watch(
-      downloadHistoryVisibleBatchExistsProvider(_folderData.historyRequest),
-    );
+    final existingHistoryKeys = _editingOrder
+        ? const <String>{}
+        : ref.watch(
+            downloadHistoryVisibleBatchExistsProvider(
+              _folderData.historyRequest,
+            ),
+          );
 
     final bottomPadding = isSelectionMode
         ? MediaQuery.paddingOf(context).bottom
@@ -323,6 +404,7 @@ class _LibraryTracksFolderScreenState
       for (final lookup in historyLookups)
         existingHistoryKeys.contains(lookup.lookupKey),
     ];
+    final ids = [for (final entry in entries) entry.key];
     final scaffold = CollectionScaffold(
       scrollController: scrollController,
       isSelectionMode: showsSelectionBar,
@@ -331,10 +413,23 @@ class _LibraryTracksFolderScreenState
         context,
         colorScheme,
         entries,
+        ids,
         bottomPadding,
       ),
       appBar: _buildAppBar(context, colorScheme, title, entries, playlist),
       slivers: [
+        if (_editingOrder)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(
+                16 + wideListInset(context),
+                16,
+                16 + wideListInset(context),
+                12,
+              ),
+              child: Text(context.l10n.playlistEditOrderDescription),
+            ),
+          ),
         if (entries.isEmpty)
           SliverFillRemaining(
             hasScrollBody: false,
@@ -343,10 +438,26 @@ class _LibraryTracksFolderScreenState
               subtitle: emptySubtitle,
             ),
           )
+        else if (_editingOrder)
+          CollectionReorderSliver(
+            entries: entries,
+            enabled: !_savingOrder,
+            onDraggingChanged: (dragging) {
+              if (mounted) setState(() => _draggingOrder = dragging);
+            },
+            onReorder: (oldIndex, newIndex) {
+              if (_orderDraft == null || _savingOrder) return;
+              setState(() {
+                final next = [..._orderDraft!];
+                next.insert(newIndex, next.removeAt(oldIndex));
+                _orderDraft = next;
+              });
+            },
+          )
         else if (isDesktopPlatform)
           TrackListTable(
             tracks: folderTracks,
-            ids: [for (final entry in entries) entry.key],
+            ids: ids,
             isInHistory: inHistory,
             selectedIds: selectedIds,
             onSelect: applyDesktopClick,
@@ -383,7 +494,6 @@ class _LibraryTracksFolderScreenState
                     child: _CollectionTrackTile(
                       entry: entry,
                       mode: widget.mode,
-                      playlistId: widget.playlistId,
                       folderTracks: folderTracks,
                       trackIndex: index,
                       isInHistory: isInHistory,
@@ -401,23 +511,49 @@ class _LibraryTracksFolderScreenState
               }, childCount: entries.length),
             ),
           ),
+        if (playlist case final playlist?
+            when playlist.tracks.isNotEmpty &&
+                !showsSelectionBar &&
+                !_editingOrder)
+          CollectionSuggestionsSliver(
+            collectionKey: 'playlist:${playlist.id}',
+            // The newest additions say most about where the playlist goes.
+            tracks: [
+              for (final entry in [
+                ...playlist.tracks,
+              ]..sort((a, b) => b.addedAt.compareTo(a.addedAt)))
+                entry.track,
+            ],
+            playlistId: playlist.id,
+          ),
       ],
     );
-    return DesktopListScope(
-      onSelectAll: entries.isEmpty
-          ? null
-          : () => selectAll(entries.map((entry) => entry.key)),
-      onClearSelection: isSelectionMode ? exitSelectionMode : null,
-      onDelete: isSelectionMode ? () => _removeSelected(entries) : null,
-      onActivate: () {
-        final index = entries.indexWhere(
-          (entry) => entry.key == selectionAnchorId,
-        );
-        if (index >= 0) {
-          _activateEntry(entries, folderTracks, inHistory, index);
-        }
+    return PopScope(
+      canPop: !_editingOrder,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && _editingOrder) _cancelOrder();
       },
-      child: scaffold,
+      child: DesktopListScope(
+        onSelectAll: entries.isEmpty || _editingOrder
+            ? null
+            : () => selectAll(ids),
+        onClearSelection: _editingOrder
+            ? _cancelOrder
+            : isSelectionMode
+            ? exitSelectionMode
+            : null,
+        onDelete: isSelectionMode ? () => _removeSelected(entries) : null,
+        onActivate: () {
+          if (_editingOrder) return;
+          final index = entries.indexWhere(
+            (entry) => entry.key == selectionAnchorId,
+          );
+          if (index >= 0) {
+            _activateEntry(entries, folderTracks, inHistory, index);
+          }
+        },
+        child: scaffold,
+      ),
     );
   }
 
@@ -500,6 +636,11 @@ class _LibraryTracksFolderScreenState
             onSelected: () => _addSelectedToPlaylist(entries),
           ),
         ],
+        if (widget.mode != LibraryTracksFolderMode.wishlist)
+          desktopLinkTransferTrackActions(context, ref, [
+            for (final entry in entries)
+              if (selectedIds.contains(entry.key)) entry.track,
+          ], onDone: exitSelectionMode),
         [
           ContextMenuAction(
             icon: Icons.remove_circle_outline,
@@ -517,23 +658,14 @@ class _LibraryTracksFolderScreenState
     BuildContext context,
     ColorScheme colorScheme,
     List<CollectionTrackEntry> entries,
+    List<String> ids,
     double bottomPadding,
   ) {
     final selectedCount = selectedIds.length;
-    final allSelected = selectedCount == entries.length && entries.isNotEmpty;
     final isWishlist = widget.mode == LibraryTracksFolderMode.wishlist;
 
-    return SelectionBottomBar(
-      selectedCount: selectedCount,
-      allSelected: allSelected,
-      onClose: exitSelectionMode,
-      onToggleSelectAll: () {
-        if (allSelected) {
-          exitSelectionMode();
-        } else {
-          selectAll(entries.map((e) => e.key));
-        }
-      },
+    return buildSelectionBar(
+      ids: ids,
       bottomPadding: bottomPadding,
       children: [
         Row(
@@ -673,6 +805,12 @@ class _LibraryTracksFolderScreenState
     final hasCustomCover =
         customCoverPath != null && customCoverPath.isNotEmpty;
     final hasCoverUrl = coverUrl != null;
+    // Desktop: Mornye Link transfers of the whole collection while a phone
+    // is connected.
+    final linkTransfers =
+        widget.mode != LibraryTracksFolderMode.wishlist &&
+        entries.isNotEmpty &&
+        watchDesktopLinkPhones(ref);
 
     final dpr = MediaQuery.devicePixelRatioOf(context);
     final cacheWidth = (MediaQuery.sizeOf(context).width * dpr).round().clamp(
@@ -689,19 +827,11 @@ class _LibraryTracksFolderScreenState
     );
 
     final Widget background = hasCustomCover
-        ? Image.file(
-            File(customCoverPath),
-            fit: BoxFit.cover,
-            cacheWidth: cacheWidth,
-            filterQuality: FilterQuality.low,
-            gaplessPlayback: true,
-            frameBuilder: (_, child, frame, wasSynchronouslyLoaded) {
-              if (wasSynchronouslyLoaded || frame != null) {
-                return child;
-              }
-              return coverFallback;
-            },
-            errorBuilder: (_, _, _) => coverFallback,
+        ? LocalOrNetworkCoverImage(
+            url: customCoverPath,
+            localCacheWidth: cacheWidth,
+            fadeInDuration: Duration.zero,
+            placeholder: (_) => coverFallback,
           )
         : hasCoverUrl
         ? LocalOrNetworkCoverImage(
@@ -717,11 +847,14 @@ class _LibraryTracksFolderScreenState
 
     return AlbumDetailHeader(
       title: title,
-      appBarTitle: isSelectionMode
+      appBarTitle: _editingOrder
+          ? context.l10n.playlistEditOrder
+          : isSelectionMode
           ? context.l10n.selectionSelected(selectedIds.length)
           : title,
       expandedHeight: expandedHeight,
-      showTitleInAppBar: showTitleInAppBar,
+      showTitleInAppBar: false,
+      showTitleListenable: showTitleNotifier,
       background: background,
       paletteSource: coverUrl,
       blurAndScrimBackground: hasCustomCover || hasCoverUrl,
@@ -762,7 +895,7 @@ class _LibraryTracksFolderScreenState
             )
           : null,
       // Play is the one wide action, between Download All and Shuffle.
-      actions: entries.isNotEmpty
+      actions: entries.isNotEmpty && !_editingOrder
           ? ExpressiveButtonGroup(
               flexible: const {1},
               spacing: 8,
@@ -782,45 +915,86 @@ class _LibraryTracksFolderScreenState
             )
           : null,
       appBarActions: [
-        if (!isSelectionMode && entries.isNotEmpty)
-          HeaderCircleButton(
-            icon: Icons.ios_share,
-            iconSize: 20,
-            tooltip: context.l10n.collectionExportM3u,
-            onPressed: () => _exportAsM3u8(context, title, entries),
+        if (_editingOrder)
+          ExpressiveButton(
+            key: const ValueKey('collection-order-save'),
+            text: true,
+            onPressed: !_orderChanged || _savingOrder || _draggingOrder
+                ? null
+                : _saveOrder,
+            child: Text(context.l10n.dialogSave),
           ),
-        if (isPlaylistMode && !isSelectionMode) ...[
-          const SizedBox(width: 8),
-          HeaderCircleButton(
-            icon: Icons.edit_outlined,
-            iconSize: 20,
-            tooltip: context.l10n.collectionRenamePlaylist,
-            onPressed: () {
-              final id = widget.playlistId ?? playlist?.id;
-              if (id == null || id.isEmpty) return;
-              _showRenamePlaylistDialog(context, id, playlist?.name ?? title);
-            },
-          ),
-          const SizedBox(width: 8),
-          Builder(
-            builder: (buttonContext) => HeaderCircleButton(
-              icon: Icons.camera_alt_outlined,
+        if (!_editingOrder) ...[
+          if (!isSelectionMode && entries.isNotEmpty)
+            HeaderCircleButton(
+              icon: Icons.ios_share,
               iconSize: 20,
-              tooltip: context.l10n.collectionPlaylistChangeCover,
-              onPressed: () =>
-                  _showCoverOptionsSheet(buttonContext, hasCustomCover),
+              tooltip: context.l10n.collectionExportM3u,
+              onPressed: () => _exportAsM3u8(context, title, entries),
             ),
-          ),
+          if (isPlaylistMode &&
+              !isSelectionMode &&
+              entries.isNotEmpty &&
+              ref.watch(linkPhoneClientProvider) != null) ...[
+            const SizedBox(width: 8),
+            LinkTrackTransferButton(
+              tracks: entries.map((e) => e.track).toList(growable: false),
+            ),
+          ],
+          if (!isSelectionMode && entries.length > 1) ...[
+            const SizedBox(width: 8),
+            HeaderCircleButton(
+              key: const ValueKey('collection-edit-order'),
+              icon: Icons.swap_vert,
+              iconSize: 20,
+              tooltip: context.l10n.playlistEditOrder,
+              onPressed: () => _editOrder(entries),
+            ),
+          ],
+          if (isPlaylistMode && !isSelectionMode) ...[
+            const SizedBox(width: 8),
+            HeaderCircleButton(
+              icon: Icons.edit_outlined,
+              iconSize: 20,
+              tooltip: context.l10n.collectionRenamePlaylist,
+              onPressed: () {
+                final id = widget.playlistId ?? playlist?.id;
+                if (id == null || id.isEmpty) return;
+                _showRenamePlaylistDialog(context, id, playlist?.name ?? title);
+              },
+            ),
+            const SizedBox(width: 8),
+            Builder(
+              builder: (buttonContext) => HeaderCircleButton(
+                icon: Icons.camera_alt_outlined,
+                iconSize: 20,
+                tooltip: context.l10n.collectionPlaylistChangeCover,
+                onPressed: () =>
+                    _showCoverOptionsSheet(buttonContext, hasCustomCover),
+              ),
+            ),
+          ],
         ],
       ],
+      moreMenu: linkTransfers && !isSelectionMode && !_editingOrder
+          ? () => [
+              desktopLinkTransferTrackActions(context, ref, [
+                for (final entry in entries) entry.track,
+              ]),
+            ]
+          : null,
       // Centered so the tight leading slot cannot stretch it.
       leading: Center(
         child: HeaderCircleButton(
-          icon: isSelectionMode ? Icons.close : Icons.arrow_back,
-          tooltip: isSelectionMode
+          icon: isSelectionMode || _editingOrder
+              ? Icons.close
+              : Icons.arrow_back,
+          tooltip: isSelectionMode || _editingOrder
               ? MaterialLocalizations.of(context).closeButtonTooltip
               : MaterialLocalizations.of(context).backButtonTooltip,
-          onPressed: isSelectionMode
+          onPressed: _editingOrder
+              ? _cancelOrder
+              : isSelectionMode
               ? exitSelectionMode
               : () => Navigator.pop(context),
         ),
@@ -1039,7 +1213,6 @@ class _LibraryTracksFolderScreenState
 class _CollectionTrackTile extends ConsumerWidget {
   final CollectionTrackEntry entry;
   final LibraryTracksFolderMode mode;
-  final String? playlistId;
   final List<Track> folderTracks;
   final int trackIndex;
   final bool isInHistory;
@@ -1051,7 +1224,6 @@ class _CollectionTrackTile extends ConsumerWidget {
   const _CollectionTrackTile({
     required this.entry,
     required this.mode,
-    required this.playlistId,
     required this.folderTracks,
     required this.trackIndex,
     required this.isInHistory,
@@ -1064,7 +1236,6 @@ class _CollectionTrackTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final track = entry.track;
-    final colorScheme = Theme.of(context).colorScheme;
     final rawCoverUrl = _resolveRawCoverUrl(track);
     final localCoverUrl = rawCoverUrl == null
         ? ref
@@ -1154,7 +1325,6 @@ class _CollectionTrackTile extends ConsumerWidget {
               track.artistName,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(color: colorScheme.onSurfaceVariant),
             ),
           ),
           if (isInLocalLibrary || isInHistory) ...[
@@ -1163,26 +1333,33 @@ class _CollectionTrackTile extends ConsumerWidget {
           ],
         ],
       ),
+      // The button reads its colours inside the row, which follow the fill
+      // of the current track.
       trailing: isInHistory || isInLocalLibrary
-          ? AppIconButton(
-              tooltip: isPlaying
-                  ? context.l10n.actionPause
-                  : context.l10n.tooltipPlay,
-              onPressed: isCurrent
-                  ? () => ref
-                        .read(musicPlayerControllerProvider)
-                        .togglePlayPause(isPlaying)
-                  : () => _playFromHere(context, ref),
-              icon: Icon(
-                isPlaying ? Icons.pause : Icons.play_arrow,
-                color: colorScheme.primary,
-              ),
-              style: IconButton.styleFrom(
-                minimumSize: Size.square(context.tokens.minTouchTarget),
-                backgroundColor: colorScheme.primaryContainer.withValues(
-                  alpha: 0.3,
-                ),
-              ),
+          ? Builder(
+              builder: (context) {
+                final colorScheme = Theme.of(context).colorScheme;
+                return AppIconButton(
+                  tooltip: isPlaying
+                      ? context.l10n.actionPause
+                      : context.l10n.tooltipPlay,
+                  onPressed: isCurrent
+                      ? () => ref
+                            .read(musicPlayerControllerProvider)
+                            .togglePlayPause(isPlaying)
+                      : () => _playFromHere(context, ref),
+                  icon: Icon(
+                    isPlaying ? Icons.pause : Icons.play_arrow,
+                    color: colorScheme.primary,
+                  ),
+                  style: IconButton.styleFrom(
+                    minimumSize: Size.square(context.tokens.minTouchTarget),
+                    backgroundColor: colorScheme.primaryContainer.withValues(
+                      alpha: 0.3,
+                    ),
+                  ),
+                );
+              },
             )
           : null,
       onTap: isSelectionMode
@@ -1278,13 +1455,15 @@ Future<void> _openCollectionTrack(
     return;
   }
 
-  final localItem = await ref
-      .read(localLibraryProvider.notifier)
-      .findExistingAsync(
-        isrc: track.isrc,
-        trackName: track.name,
-        artistName: track.artistName,
-      );
+  final localItem = ref.read(settingsProvider).localLibraryEnabled
+      ? await ref
+            .read(localLibraryProvider.notifier)
+            .findExistingAsync(
+              isrc: track.isrc,
+              trackName: track.name,
+              artistName: track.artistName,
+            )
+      : null;
   if (!context.mounted) return;
 
   if (localItem != null) {
@@ -1339,5 +1518,3 @@ class _EmptyFolderState extends StatelessWidget {
     );
   }
 }
-
-enum LibraryTracksFolderMode { wishlist, loved, playlist }

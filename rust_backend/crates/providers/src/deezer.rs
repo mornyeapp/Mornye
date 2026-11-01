@@ -139,12 +139,14 @@ impl MetadataLookup for DeezerClient {
             &format!("https://api.deezer.com/2.0/track/isrc:{isrc}"),
             check,
         );
-        match track {
-            Ok(track) if track.id != 0 => Ok(track.metadata()),
-            Ok(_) => Err(ResolverError::Failed(format!(
-                "no track found for ISRC: {isrc}"
-            ))),
-            Err(error @ ResolverError::Cancelled(_)) => Err(error),
+        let track = match track {
+            Ok(track) if track.id != 0 => track,
+            Ok(_) => {
+                return Err(ResolverError::Failed(format!(
+                    "no track found for ISRC: {isrc}"
+                )));
+            }
+            Err(error @ ResolverError::Cancelled(_)) => return Err(error),
             Err(_) => {
                 let tracks: Tracks = self.get_json(
                     &format!("https://api.deezer.com/2.0/search/track?q=isrc:{isrc}&limit=1"),
@@ -152,15 +154,64 @@ impl MetadataLookup for DeezerClient {
                 )?;
                 tracks
                     .data
-                    .as_deref()
                     .unwrap_or_default()
-                    .first()
-                    .map(Track::metadata)
+                    .into_iter()
+                    .next()
                     .ok_or_else(|| {
                         ResolverError::Failed(format!("no track found for ISRC: {isrc}"))
-                    })
+                    })?
+            }
+        };
+        Ok(self.playable_release(track, isrc, check)?.metadata())
+    }
+}
+
+impl DeezerClient {
+    /// Deezer can answer an ISRC with a release nobody can play, such as a
+    /// withdrawn compilation, and which one it picks differs by region.
+    /// Download providers resolve the song through this ID, so a release of
+    /// the same recording that plays is looked for by title and artist.
+    fn playable_release(
+        &self,
+        track: Track,
+        isrc: &str,
+        check: &Check<'_>,
+    ) -> Result<Track, ResolverError> {
+        if track.readable != Some(false) {
+            return Ok(track);
+        }
+        let mut url = url::Url::parse("https://api.deezer.com/2.0/search/track")
+            .expect("static Deezer search URL");
+        url.query_pairs_mut()
+            .append_pair("q", &format!("{} {}", track.artist.name, track.title))
+            .append_pair("limit", "10");
+        let found = match self.get_json::<Tracks>(url.as_str(), check) {
+            Ok(found) => found,
+            Err(error @ ResolverError::Cancelled(_)) => return Err(error),
+            Err(_) => return Ok(track),
+        };
+        let candidates = found
+            .data
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|candidate| candidate.id != track.id && candidate.readable == Some(true));
+        // Search results carry no ISRC, so each candidate is confirmed.
+        for candidate in candidates.take(5) {
+            match self.get_json::<Track>(
+                &format!("https://api.deezer.com/2.0/track/{}", candidate.id),
+                check,
+            ) {
+                Ok(release)
+                    if release.isrc.eq_ignore_ascii_case(isrc)
+                        && release.readable != Some(false) =>
+                {
+                    return Ok(release);
+                }
+                Err(error @ ResolverError::Cancelled(_)) => return Err(error),
+                _ => {}
             }
         }
+        Ok(track)
     }
 }
 

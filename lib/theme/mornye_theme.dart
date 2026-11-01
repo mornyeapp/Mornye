@@ -125,6 +125,7 @@ class MornyeTheme extends ThemeExtension<MornyeTheme> {
         (TargetPlatform, Brightness, Color?, MornyeAccent, bool, String?),
         ThemeData
       >{};
+  static final _glassVariants = Expando<ThemeData>();
 
   static ThemeData build(
     Brightness brightness, {
@@ -143,18 +144,24 @@ class MornyeTheme extends ThemeExtension<MornyeTheme> {
       useSystemFont,
       fontFamily,
     );
-    final cached = _themeCache.remove(key);
-    if (cached != null) {
-      _themeCache[key] = cached;
-      return _withGlassPreferences(cached, glassClarity, glassOutlines);
-    }
-    final theme = _build(
-      brightness,
-      chromeSurface: chromeSurface,
-      selectedAccent: accent,
-      useSystemFont: useSystemFont,
-      fontFamily: fontFamily,
-    );
+    var theme = _themeCache.remove(key);
+    // Artwork chrome only tints a few roles, so derive it from the base theme.
+    theme ??= chromeSurface == null
+        ? _build(
+            brightness,
+            selectedAccent: accent,
+            useSystemFont: useSystemFont,
+            fontFamily: fontFamily,
+          )
+        : _withChromeSurface(
+            build(
+              brightness,
+              accent: accent,
+              useSystemFont: useSystemFont,
+              fontFamily: fontFamily,
+            ),
+            chromeSurface,
+          );
     if (_themeCache.length >= 16) {
       _themeCache.remove(_themeCache.keys.first);
     }
@@ -162,20 +169,45 @@ class MornyeTheme extends ThemeExtension<MornyeTheme> {
     return _withGlassPreferences(theme, glassClarity, glassOutlines);
   }
 
+  static ThemeData _withChromeSurface(ThemeData theme, Color chromeSurface) {
+    final scheme = theme.colorScheme.copyWith(
+      surfaceContainerHigh: Color.lerp(chromeSurface, Colors.black, 0.16),
+    );
+    return theme.copyWith(
+      colorScheme: scheme,
+      buttonTheme: theme.buttonTheme.copyWith(colorScheme: scheme),
+      snackBarTheme: theme.snackBarTheme.copyWith(
+        backgroundColor: scheme.surfaceContainerHigh,
+      ),
+      extensions: [
+        for (final extension in theme.extensions.values)
+          if (extension is MornyeTheme)
+            extension.copyWith(chromeSurface: chromeSurface)
+          else
+            extension,
+      ],
+    );
+  }
+
   // Moving the clarity slider only changes the material, not typography or
-  // seeded colors. Keep the expensive base theme cached independently.
+  // seeded colors. Keep the expensive base theme cached independently, and
+  // reuse the last variant so equal preferences keep the same theme identity.
   static ThemeData _withGlassPreferences(
     ThemeData theme,
     double value,
     bool outlines,
   ) {
     final clarity = normalizeMornyeGlassClarity(value);
-    final preferences = theme.extension<MornyeTheme>()!;
-    if (preferences.glassClarity == clarity &&
-        preferences.glassOutlines == outlines) {
-      return theme;
+    bool matches(ThemeData? candidate) {
+      final preferences = candidate?.extension<MornyeTheme>();
+      return preferences?.glassClarity == clarity &&
+          preferences?.glassOutlines == outlines;
     }
-    return theme.copyWith(
+
+    if (matches(theme)) return theme;
+    final variant = _glassVariants[theme];
+    if (matches(variant)) return variant!;
+    return _glassVariants[theme] = theme.copyWith(
       extensions: [
         for (final extension in theme.extensions.values)
           if (extension is MornyeTheme)
@@ -207,7 +239,6 @@ class MornyeTheme extends ThemeExtension<MornyeTheme> {
 
   static ThemeData _build(
     Brightness brightness, {
-    Color? chromeSurface,
     required MornyeAccent selectedAccent,
     required bool useSystemFont,
     String? fontFamily,
@@ -238,9 +269,7 @@ class MornyeTheme extends ThemeExtension<MornyeTheme> {
           surfaceContainerLowest: surface,
           surfaceContainerLow: grouped,
           surfaceContainer: grouped,
-          surfaceContainerHigh: chromeSurface == null
-              ? (dark ? const Color(0xff2c2c2e) : grouped)
-              : Color.lerp(chromeSurface, Colors.black, 0.16),
+          surfaceContainerHigh: dark ? const Color(0xff2c2c2e) : grouped,
           surfaceContainerHighest: dark
               ? const Color(0xff3a3a3c)
               : const Color(0xffe5e5ea),
@@ -322,7 +351,6 @@ class MornyeTheme extends ThemeExtension<MornyeTheme> {
       splashFactory: NoSplash.splashFactory,
       extensions: <ThemeExtension<dynamic>>[
         MornyeTheme(
-          chromeSurface: chromeSurface,
           accent: selectedAccent,
           useSystemFont: useSystemFont,
           fontFamily: fontFamily,
@@ -449,6 +477,26 @@ class MornyeTheme extends ThemeExtension<MornyeTheme> {
         ? glassOutlines
         : other?.glassOutlines ?? glassOutlines,
   );
+
+  @override
+  bool operator ==(Object other) =>
+      other is MornyeTheme &&
+      other.chromeSurface == chromeSurface &&
+      other.accent == accent &&
+      other.useSystemFont == useSystemFont &&
+      other.fontFamily == fontFamily &&
+      other.glassClarity == glassClarity &&
+      other.glassOutlines == glassOutlines;
+
+  @override
+  int get hashCode => Object.hash(
+    chromeSurface,
+    accent,
+    useSystemFont,
+    fontFamily,
+    glassClarity,
+    glassOutlines,
+  );
 }
 
 extension MornyeThemeContext on BuildContext {
@@ -462,6 +510,9 @@ class MornyeSettingsTheme extends StatelessWidget {
 
   final Widget child;
 
+  // Reusing the derived theme keeps rebuilds from notifying the whole page.
+  static final _themes = Expando<ThemeData>();
+
   @override
   Widget build(BuildContext context) {
     if (!context.isMornye) return child;
@@ -470,7 +521,7 @@ class MornyeSettingsTheme extends StatelessWidget {
     final background = dark ? Colors.black : const Color(0xfff2f2f7);
     final group = dark ? const Color(0xff1c1c1e) : Colors.white;
     return Theme(
-      data: theme.copyWith(
+      data: _themes[theme] ??= theme.copyWith(
         scaffoldBackgroundColor: background,
         extensions: [
           for (final extension in theme.extensions.values)

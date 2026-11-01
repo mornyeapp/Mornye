@@ -1,5 +1,6 @@
 import 'package:mornye/models/settings.dart';
 import 'package:mornye/services/library_database.dart';
+import 'package:mornye/utils/string_utils.dart';
 
 /// Field group keys understood by the native re-enrich backend.
 class ReEnrichFields {
@@ -247,6 +248,17 @@ List<ReEnrichMetadataChange> buildReEnrichMetadataChanges(
         field: field,
         oldValue: oldValue,
         newValue: newValue,
+      ),
+    );
+  }
+  if (updateFields.contains(ReEnrichFields.cover) &&
+      normalizeRemoteHttpUrl(enrichedMetadata['header_video']?.toString()) !=
+          null) {
+    changes.add(
+      const ReEnrichMetadataChange(
+        field: 'header_video',
+        oldValue: '',
+        newValue: '__refresh_online__',
       ),
     );
   }

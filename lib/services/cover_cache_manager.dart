@@ -1,10 +1,13 @@
 import 'dart:async';
 import 'dart:io';
-import 'package:flutter/foundation.dart';
-import 'package:flutter/painting.dart';
+import 'dart:isolate';
+import 'dart:ui' show AppExitResponse;
+import 'package:flutter/widgets.dart';
+import 'package:flutter_cache_manager/file.dart' as cache_file;
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
+import 'package:mornye/services/cover_cache_info_repository.dart';
 import 'package:mornye/utils/cache_byte_budget.dart';
 import 'package:mornye/utils/periodic_async_task.dart';
 
@@ -24,58 +27,71 @@ class CoverCacheManager {
   static const int _sweepTargetBytes = 120 << 20;
 
   static CacheManager? _instance;
+  static CoverCacheInfoRepository? _repository;
+  static Future<void>? _initialization;
   static bool _initialized = false;
+  static AppLifecycleListener? _lifecycle;
   static Future<void> _cacheWork = Future<void>.value();
   static final _maintenance = PeriodicAsyncTask(
     interval: const Duration(minutes: 15),
-    run: () => _serializeCacheWork(() async {
-      final cachePath = _cachePath;
-      if (cachePath == null) return;
-      final deleted = await trimCacheToByteBudget(
-        Directory(cachePath),
-        maxBytes: _maxCacheBytes,
-        targetBytes: _sweepTargetBytes,
-      );
-      if (deleted > 0) {
-        debugPrint('CoverCacheManager: Trimmed $deleted cached covers');
-      }
-    }),
+    run: () => _serializeCacheWork(
+      () => _trim(maxBytes: _maxCacheBytes, targetBytes: _sweepTargetBytes),
+    ),
     onError: (error, _) =>
         debugPrint('CoverCacheManager: Sweep failed: $error'),
   );
   static String? _cachePath;
 
-  static CacheManager get instance {
-    if (!_initialized || _instance == null) {
-      debugPrint(
-        'CoverCacheManager: Not initialized, using DefaultCacheManager',
-      );
-      return DefaultCacheManager();
-    }
-    return _instance!;
-  }
+  /// The one cover cache. It works before [initialize] completes: its
+  /// directory and index resolve on first use.
+  static CacheManager get instance => _instance ??= _createManager();
 
-  static bool get isInitialized => _initialized && _instance != null;
+  static bool get isInitialized => _initialized;
 
-  static Future<void> initialize() async {
-    if (_initialized) return;
+  static Future<void> initialize() => _initialization ??= _initialize();
 
+  static Future<void> _initialize() async {
     try {
-      final appDir = await getApplicationSupportDirectory();
-      _cachePath = p.join(appDir.path, 'cover_cache');
+      final cachePath = await _resolveCachePath();
 
-      await Directory(_cachePath!).create(recursive: true);
+      await Directory(cachePath).create(recursive: true);
 
-      debugPrint('CoverCacheManager: Initializing at $_cachePath');
+      debugPrint('CoverCacheManager: Initializing at $cachePath');
 
-      _instance = _createManager(_cachePath!);
+      _instance ??= _createManager();
+      _lifecycle ??= AppLifecycleListener(
+        onPause: _flushInBackground,
+        onDetach: _flushInBackground,
+        onExitRequested: _flushBeforeExit,
+      );
 
       _initialized = true;
       debugPrint('CoverCacheManager: Initialized successfully');
     } catch (e) {
+      _initialization = null;
       debugPrint('CoverCacheManager: Failed to initialize: $e');
     }
   }
+
+  /// Writes pending cover index changes now.
+  static Future<void> flush() => _repository?.flush() ?? Future<void>.value();
+
+  static void _flushInBackground() => unawaited(flush());
+
+  static Future<AppExitResponse> _flushBeforeExit() async {
+    await flush().timeout(const Duration(seconds: 2), onTimeout: () {});
+    return AppExitResponse.exit;
+  }
+
+  static Future<String> _resolveCachePath() async => _cachePath ??= p.join(
+    (await getApplicationSupportDirectory()).path,
+    'cover_cache',
+  );
+
+  // The package names its JSON file after a database name; passing the cache
+  // directory as the path left none, so the index has always been here.
+  static Future<File> _indexFile() async =>
+      File(p.join(p.dirname(await _resolveCachePath()), 'null.json'));
 
   /// Runs after startup and periodically thereafter. The next sweep is
   /// scheduled after completion, so even slow storage cannot overlap sweeps.
@@ -97,17 +113,66 @@ class CoverCacheManager {
     return next;
   }
 
+  /// Runs the byte budget sweep with a test budget.
+  @visibleForTesting
+  static Future<void> trimForTesting({
+    required int maxBytes,
+    required int targetBytes,
+  }) => _serializeCacheWork(
+    () => _trim(maxBytes: maxBytes, targetBytes: targetBytes),
+  );
+
+  static Future<void> _trim({
+    required int maxBytes,
+    required int targetBytes,
+  }) async {
+    final cachePath = _cachePath;
+    if (cachePath == null) return;
+    final deleted = await trimCacheToByteBudget(
+      Directory(cachePath),
+      maxBytes: maxBytes,
+      targetBytes: targetBytes,
+    );
+    if (deleted > 0) {
+      debugPrint('CoverCacheManager: Trimmed $deleted cached covers');
+      await _forgetDeletedFiles(cachePath);
+    }
+  }
+
+  /// The sweep deletes files behind the cache manager; drop their index
+  /// entries and memory hits.
+  static Future<void> _forgetDeletedFiles(String cachePath) async {
+    final instance = _instance;
+    final repository = _repository;
+    if (instance == null || repository == null) return;
+    final objects = await repository.getAllObjects();
+    final paths = [
+      for (final object in objects) p.join(cachePath, object.relativePath),
+    ];
+    final missing = await Isolate.run(() => _missingFileIndexes(paths));
+    for (final index in missing) {
+      // Checks the file again: a download may have replaced it since.
+      await instance.store.retrieveCacheData(
+        objects[index].key,
+        ignoreMemCache: true,
+      );
+    }
+  }
+
+  static List<int> _missingFileIndexes(List<String> paths) => [
+    for (var i = 0; i < paths.length; i++)
+      if (!File(paths[i]).existsSync()) i,
+  ];
+
   static Future<void> clearCache() => _serializeCacheWork(_clearCache);
 
   static Future<void> _clearCache() async {
-    if (!_initialized || _instance == null || _cachePath == null) {
-      await initialize();
-    }
+    if (!_initialized) await initialize();
 
     final instance = _instance;
     final cachePath = _cachePath;
 
-    if (instance == null || cachePath == null) return;
+    if (!_initialized || instance == null || cachePath == null) return;
 
     try {
       await instance.emptyCache();
@@ -123,23 +188,18 @@ class CoverCacheManager {
     // Pending downloads publish into this manager when their files finish.
     // Preserve their unindexed files and the single repository writer.
     instance.store.emptyMemoryCache();
+    await flush();
   }
 
   static Future<CacheStats> getStats() async {
-    if (_cachePath == null) {
-      try {
-        final appDir = await getApplicationSupportDirectory();
-        _cachePath = p.join(appDir.path, 'cover_cache');
-      } catch (_) {
-        return const CacheStats(fileCount: 0, totalSizeBytes: 0);
-      }
-    }
-
-    if (_cachePath == null) {
+    final String cachePath;
+    try {
+      cachePath = await _resolveCachePath();
+    } catch (_) {
       return const CacheStats(fileCount: 0, totalSizeBytes: 0);
     }
 
-    final cacheDir = Directory(_cachePath!);
+    final cacheDir = Directory(cachePath);
 
     if (!await cacheDir.exists()) {
       return const CacheStats(fileCount: 0, totalSizeBytes: 0);
@@ -162,14 +222,15 @@ class CoverCacheManager {
     return CacheStats(fileCount: fileCount, totalSizeBytes: totalSize);
   }
 
-  static CacheManager _createManager(String cachePath) {
-    return CacheManager(
+  static CacheManager _createManager() {
+    final repository = _repository = CoverCacheInfoRepository(_indexFile);
+    return _CoverCache(
       Config(
         _cacheKey,
         stalePeriod: _maxCacheAge,
         maxNrOfCacheObjects: _maxCacheObjects,
-        repo: JsonCacheInfoRepository(path: cachePath),
-        fileSystem: IOFileSystem(cachePath),
+        repo: repository,
+        fileSystem: _CoverCacheFileSystem(_resolveCachePath),
         fileService: HttpFileService(),
       ),
     );
@@ -198,6 +259,32 @@ class CoverCacheManager {
     try {
       await directory.create(recursive: true);
     } catch (_) {}
+  }
+}
+
+/// The byte budget sweep deletes files behind the cache manager, so a memory
+/// hit counts only while its file exists.
+class _CoverCache extends CacheManager {
+  _CoverCache(super.config);
+
+  @override
+  Future<FileInfo?> getFileFromMemory(String key) async {
+    final info = await super.getFileFromMemory(key);
+    return info != null && await info.file.exists() ? info : null;
+  }
+}
+
+/// [IOFileSystem] in a directory resolved on first use.
+class _CoverCacheFileSystem implements FileSystem {
+  _CoverCacheFileSystem(this._resolveDirectory);
+
+  final Future<String> Function() _resolveDirectory;
+  IOFileSystem? _files;
+
+  @override
+  Future<cache_file.File> createFile(String name) async {
+    final directory = await _resolveDirectory();
+    return (_files ??= IOFileSystem(directory)).createFile(name);
   }
 }
 

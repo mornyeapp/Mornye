@@ -10,6 +10,7 @@ import 'package:mornye/providers/local_library_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/utils/adaptive_layout.dart';
 import 'package:mornye/utils/logger.dart';
+import 'package:mornye/utils/string_utils.dart';
 import 'package:mornye/widgets/download_service_picker.dart';
 import 'package:mornye/widgets/app_snack_bar.dart';
 import 'package:mornye/widgets/view_queue_snackbar_action.dart';
@@ -39,7 +40,8 @@ void downloadSingleTrack(
       context,
       trackName: track.name,
       artistName: track.artistName,
-      coverUrl: track.coverUrl,
+      // The picker loads its cover over http only.
+      coverUrl: normalizeRemoteHttpUrl(track.coverUrl),
       recommendedService: recommendedService,
       onSelect: (quality, service) {
         container

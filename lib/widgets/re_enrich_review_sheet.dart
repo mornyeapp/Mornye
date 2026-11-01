@@ -89,6 +89,8 @@ class _ReEnrichReviewContent extends StatelessWidget {
         return context.l10n.editMetadataFieldCopyright;
       case 'cover_url':
         return context.l10n.editMetadataFieldCover;
+      case 'header_video':
+        return context.l10n.motionArtwork;
       case 'lyrics':
         return context.l10n.trackReEnrichFieldLyrics;
       default:
@@ -100,7 +102,7 @@ class _ReEnrichReviewContent extends StatelessWidget {
     if (change.field == 'cover_url' && change.oldValue.isNotEmpty) {
       return context.l10n.trackCoverCurrent;
     }
-    return change.oldValue.isEmpty ? '—' : change.oldValue;
+    return change.oldValue.isEmpty ? '-' : change.oldValue;
   }
 
   String _newValue(BuildContext context, ReEnrichMetadataChange change) {
@@ -148,10 +150,13 @@ class _ReEnrichReviewContent extends StatelessWidget {
                   ),
                   for (final change in preview.changes) ...[
                     const Divider(height: 1, indent: 56),
+                    // Full width: a connected group centers rows narrower
+                    // than itself.
                     Semantics(
                       label:
                           '${_fieldLabel(context, change.field)}: ${_oldValue(context, change)}, ${_newValue(context, change)}',
-                      child: Padding(
+                      child: Container(
+                        width: double.infinity,
                         padding: const EdgeInsetsDirectional.fromSTEB(
                           56,
                           10,

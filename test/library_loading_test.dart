@@ -172,6 +172,23 @@ void main() {
     await music.delete(recursive: true);
   });
 
+  test('disposed startup skips the deferred library load', () async {
+    final transient = ProviderContainer(
+      overrides: [
+        localLibraryProvider.overrideWith(
+          () => LocalLibraryNotifier(database: database),
+        ),
+      ],
+    );
+    transient.read(localLibraryProvider);
+    transient.dispose();
+
+    await Future<void>.delayed(Duration.zero);
+    expect(database.sourceReads, 0);
+    expect(database.countReads, 0);
+    expect(database.indexReads, 0);
+  });
+
   test(
     'upgrade waits for saved settings before migrating the old folder',
     () async {

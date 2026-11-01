@@ -19,6 +19,8 @@ import 'package:mornye/providers/player_motion_artwork_provider.dart';
 import 'package:mornye/services/motion_artwork_store.dart';
 import 'package:mornye/services/downloaded_embedded_cover_resolver.dart';
 import 'package:mornye/services/explore_cache_store.dart';
+import 'package:mornye/services/library_cleanup.dart';
+import 'package:mornye/services/library_database.dart';
 import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/utils/string_utils.dart';
 import 'package:mornye/widgets/settings_group.dart';
@@ -115,9 +117,7 @@ class _CacheManagementPageState extends ConsumerState<CacheManagementPage> {
     final trackCacheEntries = await trackCacheEntriesFuture;
 
     return _CacheOverview(
-      appCachePath: appCachePath,
       appCacheStats: appCacheStats,
-      tempPath: tempIsSameAsAppCache ? null : tempPath,
       tempStats: tempStats,
       tempIsSameAsAppCache: tempIsSameAsAppCache,
       coverStats: coverStats,
@@ -161,7 +161,10 @@ class _CacheManagementPageState extends ConsumerState<CacheManagementPage> {
   Future<void> _clearLibraryCoverCache() async {
     final appSupportDir = await getApplicationSupportDirectory();
     final libraryCoverDir = Directory('${appSupportDir.path}/library_covers');
-    await CacheMaintenanceService.clearDirectoryContents(libraryCoverDir.path);
+    await clearLibraryCoverFiles(
+      libraryCoverDir,
+      await LibraryDatabase.instance.database,
+    );
   }
 
   Future<void> _clearAudioAnalysisCache() async {
@@ -192,53 +195,15 @@ class _CacheManagementPageState extends ConsumerState<CacheManagementPage> {
     await _clearTrackCache();
   }
 
-  Future<bool> _confirmClear(String target) async {
-    final confirm = await showAppDialog<bool>(
-      context: context,
-      builder: (context) => AppAlertDialog(
-        title: Text(context.l10n.cacheClearConfirmTitle),
-        content: Text(context.l10n.cacheClearConfirmMessage(target)),
-        actions: [
-          AppDialogAction(
-            isDefault: true,
-            onPressed: () => Navigator.pop(context, false),
-            child: Text(context.l10n.dialogCancel),
-          ),
-          AppDialogAction(
-            filled: true,
-            isDestructive: true,
-            onPressed: () => Navigator.pop(context, true),
-            child: Text(context.l10n.dialogClear),
-          ),
-        ],
-      ),
-    );
-    return confirm == true;
-  }
-
-  Future<bool> _confirmClearAll() async {
-    final confirm = await showAppDialog<bool>(
-      context: context,
-      builder: (context) => AppAlertDialog(
-        title: Text(context.l10n.cacheClearAllConfirmTitle),
-        content: Text(context.l10n.cacheClearAllConfirmMessage),
-        actions: [
-          AppDialogAction(
-            isDefault: true,
-            onPressed: () => Navigator.pop(context, false),
-            child: Text(context.l10n.dialogCancel),
-          ),
-          AppDialogAction(
-            filled: true,
-            isDestructive: true,
-            onPressed: () => Navigator.pop(context, true),
-            child: Text(context.l10n.dialogClear),
-          ),
-        ],
-      ),
-    );
-    return confirm == true;
-  }
+  Future<bool> _confirmClear(String title, String message) =>
+      showAppConfirmDialog(
+        context,
+        title: title,
+        message: message,
+        confirmLabel: context.l10n.dialogClear,
+        cancelIsDefault: true,
+        destructive: true,
+      );
 
   Future<void> _runAction(
     String actionKey,
@@ -276,7 +241,10 @@ class _CacheManagementPageState extends ConsumerState<CacheManagementPage> {
     required String targetLabel,
     required Future<void> Function() action,
   }) async {
-    final confirmed = await _confirmClear(targetLabel);
+    final confirmed = await _confirmClear(
+      context.l10n.cacheClearConfirmTitle,
+      context.l10n.cacheClearConfirmMessage(targetLabel),
+    );
     if (!confirmed) return;
 
     if (!mounted) return;
@@ -313,19 +281,37 @@ class _CacheManagementPageState extends ConsumerState<CacheManagementPage> {
     });
   }
 
-  String _formatDirectorySize(DirectoryStats stats) {
-    if (stats.fileCount == 0 || stats.totalSizeBytes == 0) {
-      return context.l10n.cacheNoData;
-    }
+  String _sizeLabel(int fileCount, int totalSizeBytes) {
+    if (fileCount == 0 || totalSizeBytes == 0) return context.l10n.cacheNoData;
     return context.l10n.cacheSizeWithFiles(
-      formatBytes(stats.totalSizeBytes),
-      stats.fileCount,
+      formatBytes(totalSizeBytes),
+      fileCount,
     );
   }
 
-  String _buildSubtitle(String description, String sizeInfo) {
-    return '$description\n$sizeInfo';
-  }
+  /// A cache row whose clear button confirms with [title] as the target.
+  Widget _clearRow(
+    IconData icon,
+    String title,
+    String description,
+    String sizeInfo,
+    String actionKey,
+    Future<void> Function() action, {
+    bool showDivider = true,
+  }) => SettingsItem(
+    icon: icon,
+    title: title,
+    subtitle: '$description\n$sizeInfo',
+    trailing: _buildClearTrailing(
+      actionKey,
+      () => _confirmAndRunAction(
+        actionKey: actionKey,
+        targetLabel: title,
+        action: action,
+      ),
+    ),
+    showDivider: showDivider,
+  );
 
   Widget _buildClearTrailing(String actionKey, VoidCallback onPressed) {
     if (_busyAction == actionKey) {
@@ -433,7 +419,10 @@ class _CacheManagementPageState extends ConsumerState<CacheManagementPage> {
                               ? null
                               : () async {
                                   final l10n = context.l10n;
-                                  final confirmed = await _confirmClearAll();
+                                  final confirmed = await _confirmClear(
+                                    l10n.cacheClearAllConfirmTitle,
+                                    l10n.cacheClearAllConfirmMessage,
+                                  );
                                   if (!confirmed) return;
                                   if (!mounted) return;
                                   await _runAction(
@@ -461,202 +450,117 @@ class _CacheManagementPageState extends ConsumerState<CacheManagementPage> {
               ),
             ),
 
-            SliverToBoxAdapter(
-              child: SettingsSectionHeader(
-                title: context.l10n.cacheSectionStorage,
-              ),
-            ),
-            SliverToBoxAdapter(
-              child: SettingsGroup(
-                children: [
-                  SettingsItem(
-                    icon: Icons.folder_outlined,
-                    title: context.l10n.cacheAppDirectory,
-                    subtitle: _buildSubtitle(
-                      context.l10n.cacheAppDirectoryDesc,
-                      _formatDirectorySize(overview.appCacheStats),
-                    ),
-                    trailing: _buildClearTrailing(
-                      'clear_app_cache',
-                      () => _confirmAndRunAction(
-                        actionKey: 'clear_app_cache',
-                        targetLabel: context.l10n.cacheAppDirectory,
-                        action: _clearAppCache,
-                      ),
-                    ),
+            ...settingsSectionSlivers(
+              title: context.l10n.cacheSectionStorage,
+              children: [
+                _clearRow(
+                  Icons.folder_outlined,
+                  context.l10n.cacheAppDirectory,
+                  context.l10n.cacheAppDirectoryDesc,
+                  _sizeLabel(
+                    overview.appCacheStats.fileCount,
+                    overview.appCacheStats.totalSizeBytes,
                   ),
-                  if (!overview.tempIsSameAsAppCache &&
-                      overview.tempStats != null)
-                    SettingsItem(
-                      icon: Icons.timer_outlined,
-                      title: context.l10n.cacheTempDirectory,
-                      subtitle: _buildSubtitle(
-                        context.l10n.cacheTempDirectoryDesc,
-                        _formatDirectorySize(overview.tempStats!),
-                      ),
-                      trailing: _buildClearTrailing(
-                        'clear_temp_cache',
-                        () => _confirmAndRunAction(
-                          actionKey: 'clear_temp_cache',
-                          targetLabel: context.l10n.cacheTempDirectory,
-                          action: _clearTempCache,
-                        ),
-                      ),
+                  'clear_app_cache',
+                  _clearAppCache,
+                ),
+                if (!overview.tempIsSameAsAppCache &&
+                    overview.tempStats != null)
+                  _clearRow(
+                    Icons.timer_outlined,
+                    context.l10n.cacheTempDirectory,
+                    context.l10n.cacheTempDirectoryDesc,
+                    _sizeLabel(
+                      overview.tempStats!.fileCount,
+                      overview.tempStats!.totalSizeBytes,
                     ),
-                  SettingsItem(
-                    icon: Icons.image_outlined,
-                    title: context.l10n.cacheCoverImage,
-                    subtitle: _buildSubtitle(
-                      context.l10n.cacheCoverImageDesc,
-                      overview.coverStats.fileCount > 0 &&
-                              overview.coverStats.totalSizeBytes > 0
-                          ? context.l10n.cacheSizeWithFiles(
-                              formatBytes(overview.coverStats.totalSizeBytes),
-                              overview.coverStats.fileCount,
-                            )
-                          : context.l10n.cacheNoData,
-                    ),
-                    trailing: _buildClearTrailing(
-                      'clear_cover_cache',
-                      () => _confirmAndRunAction(
-                        actionKey: 'clear_cover_cache',
-                        targetLabel: context.l10n.cacheCoverImage,
-                        action: _clearCoverCache,
-                      ),
-                    ),
+                    'clear_temp_cache',
+                    _clearTempCache,
                   ),
-                  SettingsItem(
-                    icon: Icons.library_music_outlined,
-                    title: context.l10n.cacheLibraryCover,
-                    subtitle: _buildSubtitle(
-                      context.l10n.cacheLibraryCoverDesc,
-                      overview.libraryCoverStats.fileCount > 0 &&
-                              overview.libraryCoverStats.totalSizeBytes > 0
-                          ? context.l10n.cacheSizeWithFiles(
-                              formatBytes(
-                                overview.libraryCoverStats.totalSizeBytes,
-                              ),
-                              overview.libraryCoverStats.fileCount,
-                            )
-                          : context.l10n.cacheNoData,
-                    ),
-                    trailing: _buildClearTrailing(
-                      'clear_library_cover_cache',
-                      () => _confirmAndRunAction(
-                        actionKey: 'clear_library_cover_cache',
-                        targetLabel: context.l10n.cacheLibraryCover,
-                        action: _clearLibraryCoverCache,
-                      ),
-                    ),
+                _clearRow(
+                  Icons.image_outlined,
+                  context.l10n.cacheCoverImage,
+                  context.l10n.cacheCoverImageDesc,
+                  _sizeLabel(
+                    overview.coverStats.fileCount,
+                    overview.coverStats.totalSizeBytes,
                   ),
-                  SettingsItem(
-                    icon: Icons.graphic_eq_outlined,
-                    title: context.l10n.cacheAudioAnalysis,
-                    subtitle: _buildSubtitle(
-                      context.l10n.cacheAudioAnalysisDesc,
-                      overview.audioAnalysisStats.fileCount > 0 &&
-                              overview.audioAnalysisStats.totalSizeBytes > 0
-                          ? context.l10n.cacheSizeWithFiles(
-                              formatBytes(
-                                overview.audioAnalysisStats.totalSizeBytes,
-                              ),
-                              overview.audioAnalysisStats.fileCount,
-                            )
-                          : context.l10n.cacheNoData,
-                    ),
-                    trailing: _buildClearTrailing(
-                      'clear_audio_analysis_cache',
-                      () => _confirmAndRunAction(
-                        actionKey: 'clear_audio_analysis_cache',
-                        targetLabel: context.l10n.cacheAudioAnalysis,
-                        action: _clearAudioAnalysisCache,
-                      ),
-                    ),
+                  'clear_cover_cache',
+                  _clearCoverCache,
+                ),
+                _clearRow(
+                  Icons.library_music_outlined,
+                  context.l10n.cacheLibraryCover,
+                  context.l10n.cacheLibraryCoverDesc,
+                  _sizeLabel(
+                    overview.libraryCoverStats.fileCount,
+                    overview.libraryCoverStats.totalSizeBytes,
                   ),
-                  SettingsItem(
-                    icon: Icons.video_library_outlined,
-                    title: context.l10n.cacheMotionArtwork,
-                    subtitle: _buildSubtitle(
-                      context.l10n.cacheMotionArtworkDesc,
-                      overview.motionStats.totalSizeBytes > 0
-                          ? formatBytes(overview.motionStats.totalSizeBytes)
-                          : context.l10n.cacheNoData,
-                    ),
-                    trailing: _buildClearTrailing(
-                      'clear_motion_artwork',
-                      () => _confirmAndRunAction(
-                        actionKey: 'clear_motion_artwork',
-                        targetLabel: context.l10n.cacheMotionArtwork,
-                        action: _clearMotionArtwork,
-                      ),
-                    ),
+                  'clear_library_cover_cache',
+                  _clearLibraryCoverCache,
+                ),
+                _clearRow(
+                  Icons.graphic_eq_outlined,
+                  context.l10n.cacheAudioAnalysis,
+                  context.l10n.cacheAudioAnalysisDesc,
+                  _sizeLabel(
+                    overview.audioAnalysisStats.fileCount,
+                    overview.audioAnalysisStats.totalSizeBytes,
                   ),
-                  SettingsItem(
-                    icon: Icons.explore_outlined,
-                    title: context.l10n.cacheExploreFeed,
-                    subtitle: _buildSubtitle(
-                      context.l10n.cacheExploreFeedDesc,
-                      overview.hasExploreCache
-                          ? context.l10n.cacheSizeOnly(
-                              formatBytes(overview.exploreCacheBytes),
-                            )
-                          : context.l10n.cacheNoData,
-                    ),
-                    trailing: _buildClearTrailing(
-                      'clear_explore_cache',
-                      () => _confirmAndRunAction(
-                        actionKey: 'clear_explore_cache',
-                        targetLabel: context.l10n.cacheExploreFeed,
-                        action: _clearExploreCache,
-                      ),
-                    ),
-                  ),
-                  SettingsItem(
-                    icon: Icons.memory_outlined,
-                    title: context.l10n.cacheTrackLookup,
-                    subtitle: _buildSubtitle(
-                      context.l10n.cacheTrackLookupDesc,
-                      overview.trackCacheEntries > 0
-                          ? context.l10n.cacheEntries(
-                              overview.trackCacheEntries,
-                            )
-                          : context.l10n.cacheNoData,
-                    ),
-                    trailing: _buildClearTrailing(
-                      'clear_track_cache',
-                      () => _confirmAndRunAction(
-                        actionKey: 'clear_track_cache',
-                        targetLabel: context.l10n.cacheTrackLookup,
-                        action: _clearTrackCache,
-                      ),
-                    ),
-                    showDivider: false,
-                  ),
-                ],
-              ),
+                  'clear_audio_analysis_cache',
+                  _clearAudioAnalysisCache,
+                ),
+                _clearRow(
+                  Icons.video_library_outlined,
+                  context.l10n.cacheMotionArtwork,
+                  context.l10n.cacheMotionArtworkDesc,
+                  overview.motionStats.totalSizeBytes > 0
+                      ? formatBytes(overview.motionStats.totalSizeBytes)
+                      : context.l10n.cacheNoData,
+                  'clear_motion_artwork',
+                  _clearMotionArtwork,
+                ),
+                _clearRow(
+                  Icons.explore_outlined,
+                  context.l10n.cacheExploreFeed,
+                  context.l10n.cacheExploreFeedDesc,
+                  overview.hasExploreCache
+                      ? context.l10n.cacheSizeOnly(
+                          formatBytes(overview.exploreCacheBytes),
+                        )
+                      : context.l10n.cacheNoData,
+                  'clear_explore_cache',
+                  _clearExploreCache,
+                ),
+                _clearRow(
+                  Icons.memory_outlined,
+                  context.l10n.cacheTrackLookup,
+                  context.l10n.cacheTrackLookupDesc,
+                  overview.trackCacheEntries > 0
+                      ? context.l10n.cacheEntries(overview.trackCacheEntries)
+                      : context.l10n.cacheNoData,
+                  'clear_track_cache',
+                  _clearTrackCache,
+                  showDivider: false,
+                ),
+              ],
             ),
 
-            SliverToBoxAdapter(
-              child: SettingsSectionHeader(
-                title: context.l10n.cacheSectionMaintenance,
-              ),
-            ),
-            SliverToBoxAdapter(
-              child: SettingsGroup(
-                children: [
-                  SettingsItem(
-                    icon: Icons.cleaning_services_outlined,
-                    title: context.l10n.cacheCleanupUnused,
-                    subtitle:
-                        '${context.l10n.cacheCleanupUnusedDesc}\n${context.l10n.cacheCleanupUnusedSubtitle}',
-                    trailing: _buildClearTrailing(
-                      'cleanup_unused',
-                      _cleanupUnusedData,
-                    ),
-                    showDivider: false,
+            ...settingsSectionSlivers(
+              title: context.l10n.cacheSectionMaintenance,
+              children: [
+                SettingsItem(
+                  icon: Icons.cleaning_services_outlined,
+                  title: context.l10n.cacheCleanupUnused,
+                  subtitle:
+                      '${context.l10n.cacheCleanupUnusedDesc}\n${context.l10n.cacheCleanupUnusedSubtitle}',
+                  trailing: _buildClearTrailing(
+                    'cleanup_unused',
+                    _cleanupUnusedData,
                   ),
-                ],
-              ),
+                  showDivider: false,
+                ),
+              ],
             ),
 
             const SliverToBoxAdapter(child: SizedBox(height: 24)),
@@ -668,9 +572,7 @@ class _CacheManagementPageState extends ConsumerState<CacheManagementPage> {
 }
 
 class _CacheOverview {
-  final String appCachePath;
   final DirectoryStats appCacheStats;
-  final String? tempPath;
   final DirectoryStats? tempStats;
   final bool tempIsSameAsAppCache;
   final CacheStats coverStats;
@@ -682,9 +584,7 @@ class _CacheOverview {
   final int trackCacheEntries;
 
   const _CacheOverview({
-    required this.appCachePath,
     required this.appCacheStats,
-    this.tempPath,
     this.tempStats,
     required this.tempIsSameAsAppCache,
     required this.coverStats,

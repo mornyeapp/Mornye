@@ -11,6 +11,7 @@ import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -48,9 +49,49 @@ class SafPublicationMimeTest {
                     assertArrayEquals(bytes, context.contentResolver.openInputStream(published)?.use { it.readBytes() })
                     assertNull(findSafChild(context, parent, "$name.partial"))
                     assertNull(findSafChild(context, parent, name.removeSuffix(".$extension") + ".partial.$extension"))
+                    assertNull(findSafChild(context, parent, SafDownloadHandler.buildStagedSafFileName(name)))
+                    val stats = requireNotNull(context.contentResolver.call(
+                        Uri.parse("content://$authority.control"), "lookup.stats", null, null,
+                    ))
+                    val created = requireNotNull(stats.getStringArrayList("createdNames"))
+                    assertTrue(
+                        "$extension/$mode: $created",
+                        created.isNotEmpty() && created.all { it.startsWith(".") },
+                    )
                     assertNotNull(source.takeIf { it.exists() })
                 }
             }
+        } finally { source.delete() }
+    }
+
+    @Test
+    fun replacementHidesBackupAndRemovesLegacyTemporaryFiles() {
+        val parent = reset()
+        val legacy = listOf("Song.partial.flac", "Song.flac.partial", "Song.flac.replaced")
+        for (name in legacy) requireNotNull(parent.createFile("audio/flac", name))
+        context.contentResolver.call(
+            Uri.parse("content://$authority.control"), "lookup.clearCounters", null, null,
+        )
+        val bytes = ByteArray(16384) { (it % 251).toByte() }
+        val source = File(context.cacheDir, "publish-replacement-${System.nanoTime()}.tmp")
+            .apply { writeBytes(bytes) }
+        try {
+            val uri = requireNotNull(SafDownloadHandler.writeFileToSaf(
+                context, treeUri.toString(), "", "Song.flac", "audio/flac", source.path,
+            ))
+            assertArrayEquals(bytes, context.contentResolver.openInputStream(Uri.parse(uri))?.use { it.readBytes() })
+            assertEquals("audio/flac", context.contentResolver.getType(Uri.parse(uri)))
+            for (name in legacy + listOf(".Song.partial.flac", ".Song.flac.replaced")) {
+                assertNull(name, findSafChild(context, parent, name))
+            }
+            val stats = requireNotNull(context.contentResolver.call(
+                Uri.parse("content://$authority.control"), "lookup.stats", null, null,
+            ))
+            assertEquals(listOf(".Song.partial.flac"), stats.getStringArrayList("createdNames"))
+            assertEquals(
+                listOf(".Song.flac.replaced", "Song.flac"),
+                stats.getStringArrayList("renamedNames"),
+            )
         } finally { source.delete() }
     }
 }

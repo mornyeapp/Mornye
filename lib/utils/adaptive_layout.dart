@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/desktop_platform.dart';
+import 'package:mornye/utils/android_tv.dart';
 
 /// Keeps touch-first tablets on the bottom navigation used by phones. A rail
 /// is reserved for genuinely desktop-width windows; the old 600dp threshold
@@ -63,7 +64,7 @@ class AdaptiveUiScaler extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final mediaQuery = MediaQuery.of(context);
-    final scale = adaptiveUiScaleForSize(mediaQuery.size);
+    final scale = isAndroidTv ? 1.15 : adaptiveUiScaleForSize(mediaQuery.size);
     if (scale == 1) return child;
 
     final scaledSize = Size(
@@ -129,6 +130,13 @@ double wideListInset(BuildContext context, {double? contentMaxWidth}) =>
               : defaultWideContentMaxWidth),
     );
 
+/// The Home tab's extra side inset. Material desktop runs Home across the
+/// whole pane, as M3 panes do, with the 24dp margin of expanded and larger
+/// windows (the 16dp phone edge plus 8), so its cover shelves reach the
+/// edge; elsewhere Home centers with [wideListInset].
+double homeContentInset(BuildContext context) =>
+    isDesktopPlatform && !context.isMornye ? 8 : wideListInset(context);
+
 const double desktopContentMaxWidth = 1600;
 
 /// The M3 large window class starts at 1200dp; the extra 80dp leaves room
@@ -146,6 +154,53 @@ double artistAlbumSectionHeight(BuildContext context) =>
     artistAlbumTileSize(context) +
     64 +
     ((effectiveTextScale(context) - 1) * 14);
+
+/// Search results trade phone rows for cover grids and shelves once their
+/// content is this wide (Material's expanded window class).
+const double searchCoverLayoutMinWidth = 840;
+
+/// The smallest cover of a search result grid: a wider pane adds columns
+/// rather than growing covers far past it.
+const double searchCoverMinExtent = 160;
+
+/// The cover side of a search result shelf.
+const double searchCoverShelfExtent = 176;
+
+/// The space between search result covers.
+const double searchCoverGap = 16;
+
+/// Columns of a search result grid [width] wide.
+int searchCoverGridColumns(double width) =>
+    ((width + searchCoverGap) / (searchCoverMinExtent + searchCoverGap))
+        .floor()
+        .clamp(2, 12);
+
+/// The cover side of a search result grid [width] wide.
+double searchCoverGridExtent(double width) {
+  final columns = searchCoverGridColumns(width);
+  return (width - searchCoverGap * (columns - 1)) / columns;
+}
+
+/// The title and subtitle under a search result cover, grown with the text
+/// size so neither line clips.
+double searchCoverTextHeight(BuildContext context) {
+  final textTheme = Theme.of(context).textTheme;
+  final scaler = MediaQuery.textScalerOf(context);
+  double line(TextStyle? style, double fallback) =>
+      scaler.scale(style?.fontSize ?? fallback) * (style?.height ?? 1.3);
+  // The cover gap, both lines with the gap between them, and slack for
+  // fonts whose line box runs past their nominal height.
+  return 8 +
+      line(textTheme.bodyMedium, 14) +
+      2 +
+      line(textTheme.bodySmall, 12) +
+      4;
+}
+
+/// The side margin of search result grids and shelves: the section titles'
+/// inset, so covers line up under them.
+double searchCoverEdge(BuildContext context) =>
+    (context.isMornye ? 20 : 16) + homeContentInset(context);
 
 /// Scales fixed sizes with the shortest screen side, clamped to [min]..[max].
 double responsiveScale({

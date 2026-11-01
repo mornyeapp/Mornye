@@ -161,6 +161,42 @@ void main() {
     );
   });
 
+  test('learns how much variety the listener plays through', () {
+    final model = AutoplayPreferenceModel();
+    AutoplayLearningTrack song(String artist, int i, {String genre = 'Pop'}) =>
+        AutoplayLearningTrack(
+          source: '/$artist$i',
+          title: '$artist $i',
+          artist: artist,
+          genre: genre,
+        );
+    // The listener skips a second song by the same artist and keeps
+    // listening when another artist follows.
+    for (var round = 0; round < 30; round++) {
+      for (var a = 0; a < 6; a++) {
+        final first = song('Artist $a', round);
+        model.learn(
+          song('Artist $a', round + 100),
+          previous: first,
+          at: _at,
+          reward: 0,
+        );
+        model.learn(
+          song('Artist ${a + 6}', round),
+          previous: first,
+          at: _at,
+          reward: 1,
+        );
+      }
+    }
+    // Artists it never heard follow the same habit.
+    final heard = song('Unheard', 0);
+    expect(
+      model.preference(song('Unheard', 1), previous: heard, at: _at),
+      lessThan(model.preference(song('Other', 0), previous: heard, at: _at)),
+    );
+  });
+
   test(
     'learned rank changes recommendations but preserves queue exclusions',
     () {
@@ -249,6 +285,78 @@ void main() {
     },
   );
 
+  test('Thompson sampling explores little-heard artists, not skipped ones', () {
+    final model = AutoplayPreferenceModel();
+    AutoplayLearningTrack song(String artist, int i) => AutoplayLearningTrack(
+      source: '/$artist$i',
+      title: '$i',
+      artist: artist,
+    );
+    for (var i = 0; i < 6; i++) {
+      model.learn(song('Skipped', i), at: _at, reward: 0, weight: 1.5);
+      model.learn(song('Liked', i), at: _at, reward: 1);
+    }
+    for (var i = 0; i < 8; i++) {
+      model.learn(song('Other $i', i), at: _at, reward: 0.75);
+    }
+    (double, double) spread(String artist) {
+      final draws = [
+        for (var i = 0; i < 400; i++)
+          model.explore(Random(i)).adjustment(song(artist, 99)),
+      ];
+      final mean = draws.reduce((a, b) => a + b) / draws.length;
+      final variance =
+          draws.map((d) => (d - mean) * (d - mean)).reduce((a, b) => a + b) /
+          draws.length;
+      return (mean, sqrt(variance));
+    }
+
+    final (skipped, _) = spread('Skipped');
+    final (liked, likedSpread) = spread('Liked');
+    final (unheard, unheardSpread) = spread('Unheard');
+    expect(skipped, lessThan(-1.5));
+    expect(liked, greaterThan(1.5));
+    expect(unheard.abs(), lessThan(0.3));
+    // An unheard artist sometimes outranks a liked one.
+    expect(unheardSpread, greaterThan(2 * likedSpread));
+    // One draw per artist and refill.
+    final exploration = model.explore(Random(1));
+    expect(
+      exploration.adjustment(song('Unheard', 1)),
+      exploration.adjustment(song('unheard ', 2)),
+    );
+  });
+
+  test('the arms are bounded, persisted and read from older models', () {
+    final model = AutoplayPreferenceModel();
+    for (var i = 0; i < AutoplayPreferenceModel.maxArms + 100; i++) {
+      model.learn(
+        AutoplayLearningTrack(source: '/$i', title: '$i', artist: 'Artist $i'),
+        at: _at,
+        reward: i.isEven ? 1 : 0,
+      );
+    }
+    expect(model.arms, AutoplayPreferenceModel.maxArms);
+    final raw = model.encode();
+    expect(raw.length, lessThan(140000));
+    final restored = AutoplayPreferenceModel.decode(raw);
+    expect(restored.arms, model.arms);
+    expect(restored.encode(), raw);
+    final older = jsonDecode(raw) as Map<String, dynamic>
+      ..['version'] = 1
+      ..remove('arms');
+    final upgraded = AutoplayPreferenceModel.decode(jsonEncode(older));
+    expect(upgraded.observations, model.observations);
+    expect(upgraded.arms, 0);
+    expect(
+      upgraded.preference(_jazz, previous: _rock, at: _at),
+      model.preference(_jazz, previous: _rock, at: _at),
+    );
+    final bad = jsonDecode(raw) as Map<String, dynamic>;
+    bad['arms'] = base64Encode(Uint8List(13));
+    expect(AutoplayPreferenceModel.decode(jsonEncode(bad)).observations, 0);
+  });
+
   test(
     'elapsed listening excludes pauses, loading, rapid taps and seeks',
     () async {
@@ -285,6 +393,85 @@ void main() {
       expect(service.observations, 1);
     },
   );
+
+  test('each kind of feedback carries its reward and weight', () async {
+    var elapsed = Duration.zero;
+    final service = AutoplayPersonalization(
+      load: () async => null,
+      save: (_) async {},
+      elapsed: () => elapsed,
+      now: () => _at,
+    );
+    addTearDown(service.dispose);
+    final feedback = <AutoplayFeedback>[];
+    service.feedback.listen(feedback.add);
+    service.setEnabled(true);
+    await service.ensureLoaded();
+    void listen(int seconds, {bool skipped = false, bool replay = false}) {
+      service.begin(_rock);
+      service.updatePlayback(source: _rock.source, playing: true);
+      if (replay) service.replayed();
+      elapsed += Duration(seconds: seconds);
+      service.finish(skipped: skipped);
+    }
+
+    listen(5, skipped: true);
+    listen(20, skipped: true);
+    listen(45, skipped: true);
+    listen(115);
+    listen(70, skipped: true);
+    listen(40, skipped: true, replay: true);
+    listen(10, skipped: true, replay: true);
+    service.endorse(_jazz, AutoplayFeedbackKind.loved);
+    await pumpEventQueue();
+    expect(
+      [for (final item in feedback) (item.kind, item.reward, item.weight)],
+      [
+        (AutoplayFeedbackKind.skipped, 0, 1.5),
+        (AutoplayFeedbackKind.skipped, 0, 1),
+        (AutoplayFeedbackKind.skipped, 0.25, 0.5),
+        (AutoplayFeedbackKind.listened, 1, 1),
+        (AutoplayFeedbackKind.listened, 0.5 + 70 / 120 / 2, 1),
+        (AutoplayFeedbackKind.replayed, 1, 1.5),
+        // A replay left within seconds is a skip.
+        (AutoplayFeedbackKind.skipped, 0, 1),
+        (AutoplayFeedbackKind.loved, 1, 2),
+      ],
+    );
+    // A loved song that is not playing carries no transition.
+    expect(feedback.last.previous, isNull);
+    expect(service.observations, feedback.length);
+  });
+
+  test('loving the current song keeps its context, only while on', () async {
+    final service = AutoplayPersonalization(
+      load: () async => null,
+      save: (_) async {},
+      now: () => _at,
+    );
+    addTearDown(service.dispose);
+    final feedback = <AutoplayFeedback>[];
+    service.feedback.listen(feedback.add);
+    service.endorse(_rock, AutoplayFeedbackKind.loved);
+    service.setEnabled(true);
+    await service.ensureLoaded();
+    service.begin(_jazz);
+    service.begin(_rock);
+    service.endorse(
+      const AutoplayLearningTrack(
+        source: 'catalog-id',
+        title: ' ROCK ',
+        artist: 'rock artist',
+      ),
+      AutoplayFeedbackKind.playlisted,
+    );
+    await pumpEventQueue();
+    expect(feedback, hasLength(1));
+    expect(feedback.single.kind, AutoplayFeedbackKind.playlisted);
+    expect(feedback.single.track.source, _rock.source);
+    expect(feedback.single.previous?.source, _jazz.source);
+    expect(feedback.single.weight, 1.5);
+  });
 
   test('duration updates and long listening yield positive feedback', () async {
     var elapsed = Duration.zero;

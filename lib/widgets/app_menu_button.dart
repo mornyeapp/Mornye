@@ -189,7 +189,18 @@ class _ExpressiveMenuAnchorState<T extends Object>
       onRemove: _removeMenu,
     );
     _entry = OverlayEntry(
-      builder: (_) => themes.wrap(MaterialExpressiveScope(child: popup)),
+      builder: (context) => themes.wrap(
+        MaterialExpressiveScope(
+          // The popup draws its own scrollbar; the app's desktop scroll
+          // behavior would stack a second one beside it.
+          child: ScrollConfiguration(
+            behavior: ScrollConfiguration.of(
+              context,
+            ).copyWith(scrollbars: false),
+            child: popup,
+          ),
+        ),
+      ),
     );
     overlay.insert(_entry!);
   }

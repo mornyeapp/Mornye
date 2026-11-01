@@ -9,7 +9,7 @@ import 'package:mornye/providers/download_history_provider.dart';
 import 'package:mornye/providers/local_library_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/services/conversion_library_service.dart';
-import 'package:mornye/services/ffmpeg_service.dart';
+import 'package:mornye/services/ffmpeg_conversion.dart';
 import 'package:mornye/services/library_database.dart';
 import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/services/replaygain_service.dart';
@@ -19,6 +19,8 @@ import 'package:mornye/utils/int_utils.dart';
 import 'package:mornye/utils/lyrics_metadata_helper.dart';
 import 'package:mornye/utils/logger.dart';
 import 'package:mornye/widgets/batch_convert_sheet.dart';
+import 'package:mornye/widgets/link/link_library_actions.dart';
+import 'package:mornye/services/link/link_library_jobs.dart';
 import 'package:mornye/widgets/app_alert_dialog.dart';
 import 'package:mornye/widgets/app_bottom_sheet.dart';
 import 'package:mornye/widgets/batch_progress_dialog.dart';
@@ -77,6 +79,26 @@ Future<void> showBatchConvertSheet(
   VoidCallback? onSheetOpen,
   Future<void> Function(bool didStartConversion)? onSheetClosed,
 }) async {
+  final container = ProviderScope.containerOf(context, listen: false);
+  if (hasLinkLibrarySongs(container, selectedItems)) {
+    final root = Navigator.of(context, rootNavigator: true).context;
+    onSheetOpen?.call();
+    var accepted = false;
+    await runLinkLibraryAction(
+      root,
+      container,
+      selectedItems,
+      LinkLibraryAction.convert,
+      onAccepted: () {
+        accepted = true;
+        if (ref.context.mounted) onExitSelectionMode();
+      },
+    );
+    if (root.mounted && ref.context.mounted) {
+      await onSheetClosed?.call(accepted);
+    }
+    return;
+  }
   final sourceFormats = <String>{};
   final sourceBitDepths = <int?>[];
   final sourceSampleRates = <int?>[];
@@ -131,8 +153,8 @@ Future<void> showBatchConvertSheet(
       formats: formats,
       title: sheetTitle,
       confirmLabel: sheetConfirmLabel,
-      sourceBitDepth: lowestKnownPositiveInt(sourceBitDepths),
-      sourceSampleRate: lowestKnownPositiveInt(sourceSampleRates),
+      sourceBitDepth: conversionSourceMaximum(sourceBitDepths),
+      sourceSampleRate: conversionSourceMaximum(sourceSampleRates),
       onConvert:
           (format, bitrate, losslessQuality, losslessProcessing, keepOriginal) {
             didStartConversion = true;
@@ -195,53 +217,39 @@ Future<void> _performBatchConversion(
 
   final isLossless = isLosslessConversionTarget(targetFormat);
   final losslessLabels = context.l10n.losslessConversionLabels;
-  final confirmed = await showAppDialog<bool>(
-    context: context,
-    builder: (ctx) => AppAlertDialog(
-      title: Text(context.l10n.selectionBatchConvertConfirmTitle),
-      content: Text(
-        keepOriginal
-            ? context.l10n.selectionBatchConvertConfirmKeepOriginal(
-                convertibleItems.length,
-                targetFormat,
-              )
-            : isLossless && losslessQuality.hasCaps
-            ? context.l10n.selectionBatchConvertConfirmMessageLosslessCapped(
-                convertibleItems.length,
-                targetFormat,
-                losslessQualityLabel(
-                  losslessQuality,
-                  originalLabel: losslessLabels.original,
-                  originalQualityLabel: losslessLabels.originalQuality,
-                ),
-              )
-            : isLossless
-            ? context.l10n.selectionBatchConvertConfirmMessageLossless(
-                convertibleItems.length,
-                targetFormat,
-              )
-            : context.l10n.selectionBatchConvertConfirmMessage(
-                convertibleItems.length,
-                targetFormat,
-                bitrate,
-              ),
-      ),
-      actions: [
-        AppDialogAction(
-          onPressed: () => Navigator.pop(ctx, false),
-          child: Text(context.l10n.dialogCancel),
-        ),
-        AppDialogAction(
-          filled: true,
-          isDefault: true,
-          onPressed: () => Navigator.pop(ctx, true),
-          child: Text(context.l10n.trackConvertFormat),
-        ),
-      ],
-    ),
+  final confirmed = await showAppConfirmDialog(
+    context,
+    title: context.l10n.selectionBatchConvertConfirmTitle,
+    message: keepOriginal
+        ? context.l10n.selectionBatchConvertConfirmKeepOriginal(
+            convertibleItems.length,
+            targetFormat,
+          )
+        : isLossless && losslessQuality.hasCaps
+        ? context.l10n.selectionBatchConvertConfirmMessageLosslessCapped(
+            convertibleItems.length,
+            targetFormat,
+            losslessQualityLabel(
+              losslessQuality,
+              originalLabel: losslessLabels.original,
+              originalQualityLabel: losslessLabels.originalQuality,
+            ),
+          )
+        : isLossless
+        ? context.l10n.selectionBatchConvertConfirmMessageLossless(
+            convertibleItems.length,
+            targetFormat,
+          )
+        : context.l10n.selectionBatchConvertConfirmMessage(
+            convertibleItems.length,
+            targetFormat,
+            bitrate,
+          ),
+    confirmLabel: context.l10n.trackConvertFormat,
+    confirmIsDefault: true,
   );
 
-  if (confirmed != true || !context.mounted) return;
+  if (!confirmed || !context.mounted) return;
 
   int successCount = 0;
   final failures = <String>[];
@@ -392,8 +400,28 @@ Future<LibraryTrackConversionResult> convertLibraryTrack({
   }
 
   try {
+    String workingPath = filePath;
+    final isSaf = isContentUri(filePath);
+    if (isSaf) {
+      failureStage = 'read SAF source';
+      safTempPath = await ConversionLibraryService.copySafSourceToTemp(
+        filePath,
+      );
+      if (safTempPath == null ||
+          (treatEmptySafTempPathAsFailure && safTempPath.isEmpty)) {
+        throw const _BatchConversionFailure(
+          'read SAF source',
+          'temporary copy was not created',
+        );
+      }
+      workingPath = safTempPath;
+    }
+
+    // Reuse the conversion copy for tags and artwork. Pipe-backed SAF
+    // providers otherwise download the whole source again for each read.
+    failureStage = 'metadata';
     try {
-      final result = await PlatformBridge.readFileMetadata(filePath);
+      final result = await PlatformBridge.readFileMetadata(workingPath);
       if (result['error'] == null) {
         mergePlatformMetadataForTagEmbed(target: metadata, source: result);
       } else {
@@ -419,7 +447,7 @@ Future<LibraryTrackConversionResult> convertLibraryTrack({
       final coverOutput =
           '${tempDir.path}${Platform.pathSeparator}$coverTempPrefix${DateTime.now().millisecondsSinceEpoch}.jpg';
       final coverResult = await PlatformBridge.extractCoverToFile(
-        filePath,
+        workingPath,
         coverOutput,
       );
       if (coverResult['error'] == null) {
@@ -427,26 +455,8 @@ Future<LibraryTrackConversionResult> convertLibraryTrack({
       }
     } catch (_) {}
 
-    String workingPath = filePath;
-    final isSaf = isContentUri(filePath);
-
-    if (isSaf) {
-      failureStage = 'read SAF source';
-      safTempPath = await ConversionLibraryService.copySafSourceToTemp(
-        filePath,
-      );
-      if (safTempPath == null ||
-          (treatEmptySafTempPathAsFailure && safTempPath.isEmpty)) {
-        throw const _BatchConversionFailure(
-          'read SAF source',
-          'temporary copy was not created',
-        );
-      }
-      workingPath = safTempPath;
-    }
-
     failureStage = 'FFmpeg conversion';
-    final newPath = await FFmpegService.convertAudioFormat(
+    final newPath = await FFmpegConversion.convertAudioFormat(
       inputPath: workingPath,
       targetFormat: targetFormat.toLowerCase(),
       bitrate: bitrate,
@@ -671,43 +681,43 @@ Future<void> runBatchReplayGain(
   // The selection overlay can disappear when opening the confirmation dialog.
   final context = Navigator.of(sourceContext, rootNavigator: true).context;
 
+  if (hasLinkLibrarySongs(container, selectedItems)) {
+    onConfirmOpen?.call();
+    var accepted = false;
+    await runLinkLibraryAction(
+      context,
+      container,
+      selectedItems,
+      remove
+          ? LinkLibraryAction.removeReplayGain
+          : LinkLibraryAction.replayGain,
+      onAccepted: () {
+        accepted = true;
+        if (sourceContext.mounted) onExitSelectionMode();
+      },
+    );
+    if (context.mounted) await onConfirmClosed?.call(accepted);
+    return;
+  }
+
   onConfirmOpen?.call();
 
-  final confirmed = await showAppDialog<bool>(
-    context: context,
-    builder: (ctx) => AppAlertDialog(
-      title: Text(
-        remove
-            ? ctx.l10n.trackRemoveReplayGain
-            : ctx.l10n.replayGainBatchConfirmTitle,
-      ),
-      content: Text(
-        remove
-            ? ctx.l10n.replayGainRemoveConfirmMessage(selectedItems.length)
-            : ctx.l10n.replayGainBatchConfirmMessage(selectedItems.length),
-      ),
-      actions: [
-        AppDialogAction(
-          onPressed: () => Navigator.pop(ctx, false),
-          child: Text(ctx.l10n.dialogCancel),
-        ),
-        AppDialogAction(
-          filled: true,
-          isDefault: true,
-          onPressed: () => Navigator.pop(ctx, true),
-          child: Text(
-            remove
-                ? ctx.l10n.trackRemoveReplayGain
-                : ctx.l10n.replayGainBatchConfirmTitle,
-          ),
-        ),
-      ],
-    ),
+  final title = remove
+      ? context.l10n.trackRemoveReplayGain
+      : context.l10n.replayGainBatchConfirmTitle;
+  final confirmed = await showAppConfirmDialog(
+    context,
+    title: title,
+    message: remove
+        ? context.l10n.replayGainRemoveConfirmMessage(selectedItems.length)
+        : context.l10n.replayGainBatchConfirmMessage(selectedItems.length),
+    confirmLabel: title,
+    confirmIsDefault: true,
   );
 
-  await onConfirmClosed?.call(confirmed == true);
+  await onConfirmClosed?.call(confirmed);
 
-  if (confirmed != true || !context.mounted) return;
+  if (!confirmed || !context.mounted) return;
 
   var cancelled = false;
   int successCount = 0;

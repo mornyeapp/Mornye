@@ -42,6 +42,16 @@ Dart caller is `lib/services/music_playback_deck.dart` in the app.
   relying on `setPlaybackParams` (or, before API 23, `setRate(1.0)`) to start
   output.
 
+### Next player
+
+A `setNextPlayer` method with an optional `nextPlayerId` links two players
+for gapless playback. `WrappedPlayer.setNext` requires both to hold a
+prepared source and calls `MediaPlayer.setNextMediaPlayer`, so the platform
+starts the next player as the current one completes. `onCompletion` then
+marks the next player as playing before reporting completion, so a later
+`resume` from Dart confirms its state without restarting it. A new source
+or a release drops the link; no `nextPlayerId` unlinks it.
+
 ### Error state
 
 `WrappedPlayer.onError` now marks the player as not prepared and not playing,
@@ -51,10 +61,15 @@ prepared) with the `what` and `extra` codes as details, and returns `true`.
 Upstream returns `false`, which makes MediaPlayer also call the completion
 listener, so the app's queue advanced after a playback failure.
 
+`MediaPlayerWrapper` retires its callbacks before resetting and releasing the
+native player. A late error, prepared, seek or completion callback from a
+cancelled network source cannot change the replacement source's shared
+`WrappedPlayer` state or report its error as a failure of the new song.
+
 ### Build
 
 `android/build.gradle`: Kotlin 1.7.10 to 2.4.21, coroutines 1.6.4 to 1.11.0,
-AGP 7.3.1 to 9.4.1, android-junit5 1.7.1.1 to 2.0.1, compileSdk 36 to 37,
+AGP 7.3.1 to 9.4.1, android-junit5 1.7.1.1 to 2.0.2, compileSdk 36 to 37,
 `androidx.core:core-ktx` 1.9.0 to 1.19.1, `kotlin-stdlib-jdk7` replaced by
 `kotlin-stdlib`, and newer JUnit Jupiter and AssertJ test dependencies.
 `CHANGELOG.md` differs only by removed trailing whitespace.

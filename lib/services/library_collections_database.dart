@@ -7,7 +7,9 @@ import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:mornye/models/library_collections.dart';
+import 'package:mornye/models/track.dart';
 import 'package:mornye/services/collection_restore_codec.dart';
+import 'package:mornye/services/link/sync/link_collection_sync_schema.dart';
 import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/services/collection_track_batch.dart';
 import 'package:mornye/services/sqlite_helpers.dart' as sqlite;
@@ -17,7 +19,14 @@ import 'package:mornye/utils/logger.dart';
 final _log = AppLogger('LibraryCollectionsDb');
 
 const _dbFileName = 'library_collections.db';
-const _dbVersion = 2;
+
+/// v3 adds Mornye Link change tracking (tables and triggers) beside the
+/// unchanged collection tables.
+const _dbVersion = 3;
+
+/// Native jobs read and write private copies holding only the collection
+/// tables, whose schema is still the one they validate as v2.
+const _nativeSchemaVersion = 2;
 
 const _tableWishlist = 'wishlist_tracks';
 const _tableLoved = 'loved_tracks';
@@ -74,10 +83,38 @@ class LibraryCollectionsDatabase {
       sqlite.SingleFlightInitializer<Database>();
 
   final Future<SharedPreferences> _prefs = SharedPreferences.getInstance();
+  final Database? _databaseOverride;
 
-  LibraryCollectionsDatabase._init();
+  LibraryCollectionsDatabase._init() : _databaseOverride = null;
+
+  /// Uses an already open [database] (tests open it with
+  /// [openWithFactory]).
+  @visibleForTesting
+  LibraryCollectionsDatabase.withDatabase(Database database)
+    : _databaseOverride = database;
+
+  /// Opens [path] with the app schema and connection settings through
+  /// [factory], for host tests that use FFI.
+  @visibleForTesting
+  static Future<Database> openWithFactory(
+    DatabaseFactory factory,
+    String path,
+  ) => factory.openDatabase(
+    path,
+    options: OpenDatabaseOptions(
+      version: _dbVersion,
+      onConfigure: (db) async {
+        await db.execute('PRAGMA foreign_keys = ON');
+        await db.execute('PRAGMA recursive_triggers = ON');
+      },
+      onCreate: _createDb,
+      onUpgrade: _upgradeDb,
+    ),
+  );
 
   Future<Database> get database {
+    final override = _databaseOverride;
+    if (override != null) return Future.value(override);
     return _database.getOrCreate(
       () => sqlite.openAppDatabase(
         _dbFileName,
@@ -89,9 +126,14 @@ class LibraryCollectionsDatabase {
     );
   }
 
-  Future<void> _createDb(Database db, int version) async {
+  static Future<void> _createDb(Database db, int version) async {
     _log.i('Creating collections database schema v$version');
+    await _createCollectionTables(db);
+    await createLinkCollectionSyncSchema(db);
+  }
 
+  /// The collection tables alone, as native jobs expect them (v2).
+  static Future<void> _createCollectionTables(Database db) async {
     await db.execute('''
       CREATE TABLE $_tableWishlist (
         track_key TEXT PRIMARY KEY,
@@ -148,14 +190,21 @@ class LibraryCollectionsDatabase {
     );
   }
 
-  Future<void> _upgradeDb(Database db, int oldVersion, int newVersion) async {
+  static Future<void> _upgradeDb(
+    Database db,
+    int oldVersion,
+    int newVersion,
+  ) async {
     _log.i('Upgrading collections database from v$oldVersion to v$newVersion');
     if (oldVersion < 2) {
       await _createFavoriteArtistsTable(db);
     }
+    if (oldVersion < 3) {
+      await createLinkCollectionSyncSchema(db);
+    }
   }
 
-  Future<void> _createFavoriteArtistsTable(Database db) async {
+  static Future<void> _createFavoriteArtistsTable(Database db) async {
     await db.execute('''
       CREATE TABLE IF NOT EXISTS $_tableFavoriteArtists (
         artist_key TEXT PRIMARY KEY,
@@ -344,23 +393,6 @@ class LibraryCollectionsDatabase {
         favoriteArtistRows: favoriteArtistRows,
       );
     });
-  }
-
-  @visibleForTesting
-  Future<List<Map<String, dynamic>>> loadPlaylistTracks(
-    String playlistId,
-  ) async {
-    final db = await database;
-    return db.transaction(
-      (txn) => _readDateOrderedRows(
-        txn,
-        _tablePlaylistTracks,
-        'added_at',
-        ascending: true,
-        where: 'playlist_id=?',
-        whereArgs: [playlistId],
-      ),
-    );
   }
 
   Future<LibraryPlaylistTracksSnapshot> loadPlaylistTracksSnapshot(
@@ -558,7 +590,7 @@ class LibraryCollectionsDatabase {
             where.contains('?') ? [playlistId] : const [],
           );
         }
-        await txn.execute('PRAGMA $alias.user_version=$_dbVersion');
+        await txn.execute('PRAGMA $alias.user_version=$_nativeSchemaVersion');
         await txn.execute(
           'CREATE INDEX $alias.collection_read_members '
           'ON $_tablePlaylistTracks(playlist_id)',
@@ -582,6 +614,77 @@ class LibraryCollectionsDatabase {
   Future<List<PlaylistPickerSummary>> loadPlaylistPickerSummaries(
     List<String> requestedTrackKeys,
   ) async => readPlaylistPickerSummaries(await database, requestedTrackKeys);
+
+  // Media browsers read bounded lists straight from SQLite: the snapshot's
+  // native job needs the backend channel an Activity registers.
+
+  /// Loved songs, the most recently loved first.
+  Future<List<Track>> loadLovedTracks({int limit = 500}) async => _decodeTracks(
+    await (await database).rawQuery(
+      'SELECT track_json FROM $_tableLoved '
+      'ORDER BY added_at DESC, rowid DESC LIMIT ?',
+      [limit],
+    ),
+  );
+
+  Future<bool> containsLovedTrack(String trackKey) async =>
+      (await (await database).rawQuery(
+        'SELECT 1 FROM $_tableLoved WHERE track_key = ? LIMIT 1',
+        [trackKey],
+      )).isNotEmpty;
+
+  /// Playlists, the newest first, with their song count and the artwork URL
+  /// of their first song.
+  Future<List<({String id, String name, int trackCount, String? coverUrl})>>
+  loadPlaylistSummaries() async {
+    final rows = await (await database).rawQuery('''
+      SELECT p.id, p.name,
+        (SELECT COUNT(*) FROM $_tablePlaylistTracks pt
+          WHERE pt.playlist_id = p.id) AS track_count,
+        (SELECT pt.track_json FROM $_tablePlaylistTracks pt
+          WHERE pt.playlist_id = p.id
+          ORDER BY pt.added_at ASC, pt.rowid ASC LIMIT 1) AS first_track_json
+      FROM $_tablePlaylists p
+      ORDER BY p.created_at DESC, p.rowid DESC
+    ''');
+    return [
+      for (final row in rows)
+        (
+          id: row['id'] as String,
+          name: row['name'] as String? ?? '',
+          trackCount: (row['track_count'] as num?)?.toInt() ?? 0,
+          coverUrl: _decodeTrack(row['first_track_json'])?.coverUrl,
+        ),
+    ];
+  }
+
+  /// A playlist's songs in playlist order.
+  Future<List<Track>> loadPlaylistTracks(
+    String playlistId, {
+    int limit = 500,
+  }) async => _decodeTracks(
+    await (await database).rawQuery(
+      'SELECT track_json FROM $_tablePlaylistTracks WHERE playlist_id = ? '
+      'ORDER BY added_at ASC, rowid ASC LIMIT ?',
+      [playlistId, limit],
+    ),
+  );
+
+  static List<Track> _decodeTracks(List<Map<String, Object?>> rows) => [
+    for (final row in rows) ?_decodeTrack(row['track_json']),
+  ];
+
+  static Track? _decodeTrack(Object? json) {
+    if (json is! String || json.isEmpty) return null;
+    try {
+      final decoded = jsonDecode(json);
+      return decoded is Map
+          ? Track.fromJson(Map<String, dynamic>.from(decoded))
+          : null;
+    } catch (_) {
+      return null;
+    }
+  }
 
   Future<void> _upsertEntry(
     String table,
@@ -779,11 +882,6 @@ class LibraryCollectionsDatabase {
     );
   }
 
-  Future<void> deletePlaylist(String playlistId) async {
-    final db = await database;
-    await db.delete(_tablePlaylists, where: 'id = ?', whereArgs: [playlistId]);
-  }
-
   Future<void> deletePlaylists(List<String> playlistIds) async {
     if (playlistIds.isEmpty) return;
     await deleteDatabasePlaylists(await database, playlistIds);
@@ -895,27 +993,6 @@ class LibraryCollectionsDatabase {
     expectedCount: expectedCount,
   );
 
-  Future<void> deletePlaylistTrack({
-    required String playlistId,
-    required String trackKey,
-    required String playlistUpdatedAt,
-  }) async {
-    final db = await database;
-    await db.transaction((txn) async {
-      await txn.delete(
-        _tablePlaylistTracks,
-        where: 'playlist_id = ? AND track_key = ?',
-        whereArgs: [playlistId, trackKey],
-      );
-      await txn.update(
-        _tablePlaylists,
-        {'updated_at': playlistUpdatedAt},
-        where: 'id = ?',
-        whereArgs: [playlistId],
-      );
-    });
-  }
-
   Future<void> deletePlaylistTracks({
     required String playlistId,
     required List<String> trackKeys,
@@ -950,6 +1027,73 @@ class LibraryCollectionsDatabase {
         where: 'id = ?',
         whereArgs: [playlistId],
       );
+    });
+  }
+
+  /// Playlist order is the `added_at` order, which Link sync also carries,
+  /// so a reorder rewrites those stamps instead of adding a position column.
+  Future<void> reorderPlaylistTracks({
+    required String playlistId,
+    required Map<String, String> addedAtByKey,
+    required String playlistUpdatedAt,
+  }) async {
+    if (addedAtByKey.isEmpty) return;
+    final db = await database;
+    await sqlite.transactionWithBusyRetry(db, (txn) async {
+      var batch = txn.batch();
+      var pending = 0;
+      for (final MapEntry(:key, :value) in addedAtByKey.entries) {
+        batch.update(
+          _tablePlaylistTracks,
+          {'added_at': value},
+          where: 'playlist_id = ? AND track_key = ?',
+          whereArgs: [playlistId, key],
+        );
+        if (++pending == 128) {
+          await batch.commit(noResult: true);
+          batch = txn.batch();
+          pending = 0;
+        }
+      }
+      batch.update(
+        _tablePlaylists,
+        {'updated_at': playlistUpdatedAt},
+        where: 'id = ?',
+        whereArgs: [playlistId],
+      );
+      await batch.commit(noResult: true);
+    });
+  }
+
+  /// Updates only ordering stamps, retaining membership and track metadata.
+  /// The existing collection triggers publish the change to Link atomically.
+  Future<void> reorderSavedTracks({
+    required LibraryTracksFolderMode mode,
+    required Map<String, String> addedAtByKey,
+  }) async {
+    final table = switch (mode) {
+      LibraryTracksFolderMode.loved => _tableLoved,
+      LibraryTracksFolderMode.wishlist => _tableWishlist,
+      LibraryTracksFolderMode.playlist => throw ArgumentError.value(mode),
+    };
+    if (addedAtByKey.isEmpty) return;
+    await sqlite.transactionWithBusyRetry(await database, (txn) async {
+      var batch = txn.batch();
+      var pending = 0;
+      for (final MapEntry(:key, :value) in addedAtByKey.entries) {
+        batch.update(
+          table,
+          {'added_at': value},
+          where: 'track_key = ?',
+          whereArgs: [key],
+        );
+        if (++pending == 128) {
+          await batch.commit(noResult: true);
+          batch = txn.batch();
+          pending = 0;
+        }
+      }
+      if (pending > 0) await batch.commit(noResult: true);
     });
   }
 
@@ -995,11 +1139,13 @@ class LibraryCollectionsDatabase {
         // into the live database, preserving its WAL and connection caches.
         final stagedPath = '${temporary.path}/$_dbFileName';
         sqlite.ensureAppDatabaseFactory();
+        // Staging holds only the collection tables: the live database's
+        // triggers record the published rows.
         final stagedDatabase = await openDatabase(
           stagedPath,
-          version: _dbVersion,
+          version: _nativeSchemaVersion,
           onConfigure: (staged) => staged.execute('PRAGMA foreign_keys=ON'),
-          onCreate: instance._createDb,
+          onCreate: (staged, _) => _createCollectionTables(staged),
         );
         detached = false;
         await stagedDatabase.close();
@@ -1132,8 +1278,6 @@ Future<List<PlaylistPickerSummary>> readPlaylistPickerSummaries(
         p.id,
         p.name,
         p.cover_image_path,
-        p.created_at,
-        p.updated_at,
         COUNT(pt.track_key) AS track_count,
         CASE WHEN p.cover_image_path IS NULL OR p.cover_image_path = '' THEN (
           SELECT preview.track_json
@@ -1174,11 +1318,6 @@ Future<List<PlaylistPickerSummary>> readPlaylistPickerSummaries(
   return playlistRows
       .map((row) {
         final id = row['id']?.toString() ?? '';
-        final createdAt =
-            DateTime.tryParse(row['created_at']?.toString() ?? '') ??
-            DateTime.now();
-        final updatedAt =
-            DateTime.tryParse(row['updated_at']?.toString() ?? '') ?? createdAt;
         String? previewCover;
         final previewJson = row['preview_track_json'] as String?;
         if (previewJson != null && previewJson.isNotEmpty) {
@@ -1195,8 +1334,6 @@ Future<List<PlaylistPickerSummary>> readPlaylistPickerSummaries(
           name: row['name']?.toString() ?? '',
           coverImagePath: row['cover_image_path'] as String?,
           previewCover: previewCover,
-          createdAt: createdAt,
-          updatedAt: updatedAt,
           trackCount: (row['track_count'] as num?)?.toInt() ?? 0,
           containsAllRequestedTracks:
               uniqueTrackKeys.isNotEmpty &&

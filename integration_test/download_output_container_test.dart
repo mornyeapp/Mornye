@@ -12,7 +12,7 @@ import 'package:mornye/models/settings.dart';
 import 'package:mornye/models/track.dart';
 import 'package:mornye/services/download_metadata_embedding.dart';
 import 'package:mornye/services/download_request_payload.dart';
-import 'package:mornye/services/ffmpeg_service.dart';
+import 'package:mornye/services/ffmpeg_probe.dart';
 import 'package:mornye/services/platform_bridge.dart';
 
 void main() {
@@ -156,10 +156,7 @@ registerExtension({
             expect(await File('${output.path}/$stem.flac').exists(), false);
           }
           final audioCodec = format == 'mp3' ? 'mp3' : codec;
-          expect(
-            await FFmpegService.probePrimaryAudioCodec(downloaded.path),
-            audioCodec,
-          );
+          expect(await FFmpegProbe.audioCodec(downloaded.path), audioCodec);
           // The same tag writer used by the foreground queue must preserve
           // the native stream while embedding source credits into its container.
           await DownloadMetadataEmbedding(onReplayGain: (_, _, _) {}).embed(
@@ -181,10 +178,7 @@ registerExtension({
           expect(metadata['title'], 'Track');
           expect(metadata['artist'], 'Artist & Guest');
           expect(metadata['album'], 'Album');
-          expect(
-            await FFmpegService.probePrimaryAudioCodec(downloaded.path),
-            audioCodec,
-          );
+          expect(await FFmpegProbe.audioCodec(downloaded.path), audioCodec);
         },
       );
     }

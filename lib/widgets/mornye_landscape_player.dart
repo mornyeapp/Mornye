@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/widgets/audio_output_button.dart';
+import 'package:mornye/utils/android_tv.dart';
 
 /// Landscape opens on the player. Lyrics can hide their bottom actions until
 /// the user touches the player, while the cover and header stay in place.
@@ -16,7 +17,7 @@ class MornyeLandscapePlayer extends StatefulWidget {
     required this.lyrics,
     required this.queue,
     required this.controls,
-    required this.volume,
+    this.volume,
     required this.page,
     required this.isPlaying,
     required this.onPageChanged,
@@ -29,7 +30,9 @@ class MornyeLandscapePlayer extends StatefulWidget {
   final Widget lyrics;
   final Widget queue;
   final Widget controls;
-  final Widget volume;
+
+  /// Null when the person hid the volume from the player menu.
+  final Widget? volume;
   final int page;
   final bool isPlaying;
   final bool controlsHeldOpen;
@@ -48,7 +51,7 @@ class _MornyeLandscapePlayerState extends State<MornyeLandscapePlayer> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (MediaQuery.accessibleNavigationOf(context)) {
+    if (isAndroidTv || MediaQuery.accessibleNavigationOf(context)) {
       _actionsVisible = true;
       _hideTimer?.cancel();
     } else {
@@ -71,6 +74,7 @@ class _MornyeLandscapePlayerState extends State<MornyeLandscapePlayer> {
   void _scheduleHide() {
     _hideTimer?.cancel();
     if (widget.page != 1 ||
+        isAndroidTv ||
         !widget.isPlaying ||
         widget.controlsHeldOpen ||
         !_actionsVisible ||
@@ -155,7 +159,7 @@ class _MornyeLandscapePlayerState extends State<MornyeLandscapePlayer> {
                                           MainAxisAlignment.spaceEvenly,
                                       children: [
                                         widget.controls,
-                                        widget.volume,
+                                        ?widget.volume,
                                         const SizedBox(height: 48),
                                       ],
                                     ),

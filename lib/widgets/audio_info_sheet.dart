@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
 
@@ -9,7 +10,9 @@ import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/models/equalizer_settings.dart';
 import 'package:mornye/models/settings.dart';
 import 'package:mornye/services/audio_route_info.dart';
+import 'package:mornye/services/link/link_source_names.dart';
 import 'package:mornye/services/music_playback_deck.dart';
+import 'package:mornye/services/playback_deck.dart';
 import 'package:mornye/services/music_player_service.dart';
 import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/services/playback_equalizer.dart';
@@ -25,29 +28,43 @@ import 'package:mornye/widgets/hires_check_card.dart';
 import 'package:mornye/widgets/settings_group.dart';
 
 /// Technical details of the playing track, from the file through the
-/// processing chain to the output device.
+/// processing chain to the output device. [linkSources] names the Mornye
+/// Link devices behind network sources (`linkSourceNamesProvider`).
 Future<void> showAudioInfoSheet(
   BuildContext context, {
   required PlayerMetadataController metadata,
-}) => showAppScrollableBottomSheet<void>(
-  context: context,
-  title: context.l10n.audioInfoTitle,
-  subtitle: metadata.qualityLabel,
-  builder: (context, controller) =>
-      _AudioInfoSheet(metadata: metadata, controller: controller),
-);
+  Map<String, String> linkSources = const {},
+}) {
+  unawaited(metadata.ensureFileMetadata());
+  return showAppScrollableBottomSheet<void>(
+    context: context,
+    title: context.l10n.audioInfoTitle,
+    subtitle: metadata.qualityLabel,
+    builder: (context, controller) => _AudioInfoSheet(
+      metadata: metadata,
+      controller: controller,
+      linkSources: linkSources,
+    ),
+  );
+}
 
 class _AudioInfoSheet extends StatefulWidget {
-  const _AudioInfoSheet({required this.metadata, required this.controller});
+  const _AudioInfoSheet({
+    required this.metadata,
+    required this.controller,
+    required this.linkSources,
+  });
 
   final PlayerMetadataController metadata;
   final ScrollController controller;
+  final Map<String, String> linkSources;
 
   @override
   State<_AudioInfoSheet> createState() => _AudioInfoSheetState();
 }
 
-class _AudioInfoSheetState extends State<_AudioInfoSheet> {
+class _AudioInfoSheetState extends State<_AudioInfoSheet>
+    with WidgetsBindingObserver {
   AudioRouteInfo? _route;
   int? _fileSize;
   String? _loadedPath;
@@ -57,19 +74,26 @@ class _AudioInfoSheetState extends State<_AudioInfoSheet> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     widget.metadata.addListener(_load);
     _load();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     widget.metadata.removeListener(_load);
     super.dispose();
   }
 
-  Future<void> _load() async {
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) unawaited(_load(force: true));
+  }
+
+  Future<void> _load({bool force = false}) async {
     final path = widget.metadata.filePath;
-    if (path == _loadedPath && (_loading || _route != null)) return;
+    if (!force && path == _loadedPath && (_loading || _route != null)) return;
     final generation = ++_loadGeneration;
     _loadedPath = path;
     _loading = true;
@@ -112,6 +136,7 @@ class _AudioInfoSheetState extends State<_AudioInfoSheet> {
       final facts = _AudioFacts(
         l10n: context.l10n,
         metadata: widget.metadata.metadata ?? const {},
+        loading: widget.metadata.loading,
         path: widget.metadata.filePath,
         fileSize: _fileSize,
         route: _route,
@@ -119,6 +144,10 @@ class _AudioInfoSheetState extends State<_AudioInfoSheet> {
         equalizer: playbackEqualizer.value,
         processing: musicPlayerRuntime.handler?.processing,
         settings: musicPlayerRuntime.settings,
+        linkDevice: linkSourceName(
+          widget.linkSources,
+          widget.metadata.filePath,
+        ),
       );
       final sections = facts.sections();
       final path = widget.metadata.filePath;
@@ -328,6 +357,7 @@ class _AudioFacts {
   _AudioFacts({
     required this.l10n,
     required this.metadata,
+    required this.loading,
     required this.path,
     required this.fileSize,
     required this.route,
@@ -335,10 +365,12 @@ class _AudioFacts {
     required this.equalizer,
     required this.processing,
     required this.settings,
+    this.linkDevice,
   });
 
   final AppLocalizations l10n;
   final Map<String, dynamic> metadata;
+  final bool loading;
   final String? path;
   final int? fileSize;
   final AudioRouteInfo? route;
@@ -346,6 +378,9 @@ class _AudioFacts {
   final EqualizerSettings equalizer;
   final PlaybackProcessing? processing;
   final AppSettings settings;
+
+  /// The paired computer or phone the network song plays from.
+  final String? linkDevice;
 
   late final String format = (metadata['format'] ?? '').toString().trim();
   late final String codec = (metadata['audio_codec'] ?? '').toString().trim();
@@ -429,7 +464,12 @@ class _AudioFacts {
   String? get _location {
     final path = this.path;
     if (path == null || path.isEmpty) return null;
-    if (path.startsWith('network://')) return l10n.audioInfoLocationNetwork;
+    if (path.startsWith('network://')) {
+      final device = linkDevice;
+      return device == null
+          ? l10n.audioInfoLocationNetwork
+          : l10n.audioInfoLocationLink(device);
+    }
     if (path.startsWith('content://')) return l10n.audioInfoLocationShared;
     if (path.startsWith('/')) return l10n.audioInfoLocationLocal;
     return null;
@@ -474,7 +514,10 @@ class _AudioFacts {
     }
     return [
       if (facts.isEmpty)
-        _Fact(l10n.audioInfoTrackGain, l10n.audioInfoNoGainTags),
+        _Fact(
+          l10n.audioInfoTrackGain,
+          loading ? l10n.linkFileReading : l10n.audioInfoNoGainTags,
+        ),
       ...facts,
       _Fact(l10n.libraryPlaybackNormalization, normalization),
     ];
@@ -485,7 +528,8 @@ class _AudioFacts {
     final String signalPath;
     if (direct && usb.driver == 'usb_direct') {
       signalPath = l10n.audioInfoPathDirect;
-    } else if (direct && usb.driver == 'aaudio_exclusive') {
+    } else if ((direct && usb.driver == 'aaudio_exclusive') ||
+        playbackExclusiveStatus.value == ExclusiveOutputStatus.active) {
       signalPath = l10n.audioInfoPathExclusive;
     } else {
       signalPath = l10n.audioInfoPathSystem;
@@ -518,7 +562,9 @@ class _AudioFacts {
       _Fact(l10n.equalizerTitle, eq),
       _Fact(
         'AutoMix',
-        settings.autoMix && !settings.usbBitPerfect
+        settings.autoMix &&
+                !settings.usbBitPerfect &&
+                !playbackExclusiveOutput.value
             ? l10n.audioInfoOn
             : l10n.audioInfoOff,
       ),
@@ -538,12 +584,17 @@ class _AudioFacts {
   // A preferred mixer format is configuration, not proof of active playback.
   bool get _bitPerfect => direct;
 
+  bool get _bluetoothFormatUnreported =>
+      !direct && route?.bluetoothFormatUnreported == true;
+
   int? get _outputRate {
     if (direct) return usb.sampleRate;
+    if (_bluetoothFormatUnreported) return null;
     return route?.device?.mixerSampleRate ?? route?.mixerSampleRate;
   }
 
   String? get _resampling {
+    if (_bluetoothFormatUnreported) return l10n.audioInfoAndroidNotReported;
     final source = sampleRate, output = _outputRate;
     if (source == null || output == null) return null;
     if (_bitPerfect || source == output) return l10n.audioInfoResamplingNone;
@@ -569,6 +620,11 @@ class _AudioFacts {
         ),
       if (_outputRate case final rate?)
         _Fact(l10n.audioInfoOutputRate, _khz(rate)),
+      if (_bluetoothFormatUnreported) ...[
+        _Fact(l10n.audioInfoBluetoothFormat, l10n.audioInfoAndroidNotReported),
+        if (route?.mixerSampleRate case final rate?)
+          _Fact(l10n.audioInfoSystemDefaultRate, _khz(rate)),
+      ],
       if (direct && usb.bitDepth != null)
         _Fact(
           l10n.audioInfoOutputFormat,
@@ -577,18 +633,23 @@ class _AudioFacts {
             if (usb.transport != 'pcm') usb.transport.toUpperCase(),
           ].join(' · '),
         )
-      else if (device?.mixerBitDepth case final bits?)
+      else if (device?.mixerBitDepth case final bits?
+          when !_bluetoothFormatUnreported)
         _Fact(l10n.audioInfoOutputFormat, '$bits-bit'),
       if (device != null && route?.platform == 'android')
         _Fact(
-          l10n.audioInfoDeviceRates,
+          _bluetoothFormatUnreported
+              ? l10n.audioInfoAndroidPcmRates
+              : l10n.audioInfoDeviceRates,
           device.sampleRates.isEmpty
               ? l10n.audioInfoAnyRate
               : device.sampleRates.map(_khz).join(', '),
         ),
       if (device != null && (device.bitDepths.isNotEmpty || device.floatOutput))
         _Fact(
-          l10n.audioInfoDeviceFormats,
+          _bluetoothFormatUnreported
+              ? l10n.audioInfoAndroidPcmFormats
+              : l10n.audioInfoDeviceFormats,
           [
             for (final bits in device.bitDepths)
               if (bits != 32 || !device.floatOutput) '$bits-bit',
@@ -599,7 +660,9 @@ class _AudioFacts {
         _Fact(l10n.audioInfoChannels, l10n.audioInfoChannelCount(count)),
       if (bufferMs != null)
         _Fact(
-          l10n.audioInfoBuffer,
+          _bluetoothFormatUnreported
+              ? l10n.audioInfoSystemDefaultBuffer
+              : l10n.audioInfoBuffer,
           [
             '${bufferMs.toStringAsFixed(1)} ms',
             if (route?.framesPerBuffer case final frames?) '$frames frames',

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -11,6 +12,7 @@ import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/models/settings.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/screens/setup_screen.dart';
+import 'package:mornye/utils/android_tv.dart';
 
 class _Settings extends SettingsNotifier {
   @override
@@ -47,6 +49,8 @@ void main() {
   var permissionRequests = 0;
   var audioGranted = true;
   var notificationsGranted = true;
+  var allFilesGranted = false;
+  int? nativeSdkVersion;
 
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
@@ -54,6 +58,8 @@ void main() {
     retainedSelection = null;
     pickerCalls = permissionRequests = 0;
     audioGranted = notificationsGranted = true;
+    allFilesGranted = false;
+    nativeSdkVersion = null;
     messenger.setMockMethodCallHandler(
       _device,
       (_) async => {
@@ -93,16 +99,27 @@ void main() {
       if (call.method == 'checkPermissionStatus') {
         final granted = call.arguments == Permission.notification.value
             ? notificationsGranted
+            : call.arguments == Permission.manageExternalStorage.value
+            ? allFilesGranted
             : audioGranted;
         return granted
             ? PermissionStatus.granted.index
             : PermissionStatus.denied.index;
       }
-      if (call.method == 'requestPermissions') permissionRequests++;
+      if (call.method == 'requestPermissions') {
+        permissionRequests++;
+        return {
+          for (final permission
+              in (call.arguments as List<Object?>).cast<int>())
+            permission: PermissionStatus.denied.index,
+        };
+      }
       throw StateError('Unexpected permission request: ${call.method}');
     });
     messenger.setMockMethodCallHandler(_backend, (call) async {
       switch (call.method) {
+        case 'getAndroidSdkVersion':
+          return nativeSdkVersion;
         case 'pickSafTree':
           picker = Completer<String?>();
           pickerCalls++;
@@ -150,6 +167,36 @@ void main() {
     }
     expect(find.text('5/5'), findsOneWidget);
   }
+
+  testWidgets(
+    'TV setup uses writable app storage without permission or picker',
+    (tester) async {
+      debugAndroidTvOverride = true;
+      addTearDown(() => debugAndroidTvOverride = null);
+      final directory = Directory.systemTemp.createTempSync('mornye-tv-setup-');
+      addTearDown(() => directory.deleteSync(recursive: true));
+      const paths = MethodChannel('plugins.flutter.io/path_provider');
+      messenger.setMockMethodCallHandler(paths, (_) async => directory.path);
+      addTearDown(() => messenger.setMockMethodCallHandler(paths, null));
+      audioGranted = notificationsGranted = false;
+      tester.view.physicalSize = const Size(960, 540);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(_setup());
+      await tester.pumpAndSettle();
+      expect(find.text('1/3'), findsOneWidget);
+      for (var step = 0; step < 2; step++) {
+        await tester.tap(find.text('Next'));
+        await tester.pumpAndSettle();
+      }
+      expect(find.text('3/3'), findsOneWidget);
+      expect(find.text('${directory.path}/Mornye'), findsOneWidget);
+      expect(find.text('Get Started'), findsOneWidget);
+      expect(permissionRequests, 0);
+      expect(pickerCalls, 0);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('normal picker return saves folder without restarting setup', (
     tester,
@@ -249,6 +296,84 @@ void main() {
     expect(find.text('Storage Permission Granted!'), findsOneWidget);
     expect(permissionRequests, 0);
     expect(find.text('3/5'), findsOneWidget);
+  });
+
+  testWidgets('Android 17 accepts existing all-files access during setup', (
+    tester,
+  ) async {
+    nativeSdkVersion = 37;
+    audioGranted = false;
+    allFilesGranted = true;
+    await prefs.setString('setup_progress_v1', '{"step":2}');
+    await tester.pumpWidget(_setup());
+    await tester.pumpAndSettle();
+    expect(find.text('Storage Permission Granted!'), findsOneWidget);
+    expect(find.text('3/6'), findsOneWidget);
+    await tester.tap(find.text('Next'));
+    await tester.pumpAndSettle();
+    expect(find.text('4/6'), findsOneWidget);
+    expect(permissionRequests, 0);
+  });
+
+  testWidgets('returning from settings recognises all-files access', (
+    tester,
+  ) async {
+    audioGranted = false;
+    await prefs.setString('setup_progress_v1', '{"step":2}');
+    await tester.pumpWidget(_setup());
+    await tester.pumpAndSettle();
+    expect(find.text('Grant Permission'), findsOneWidget);
+    binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    allFilesGranted = true;
+    binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pumpAndSettle();
+    expect(find.text('Storage Permission Granted!'), findsOneWidget);
+    expect(permissionRequests, 0);
+  });
+
+  testWidgets('Grant Permission rechecks existing all-files access first', (
+    tester,
+  ) async {
+    audioGranted = false;
+    await prefs.setString('setup_progress_v1', '{"step":2}');
+    await tester.pumpWidget(_setup());
+    await tester.pumpAndSettle();
+    allFilesGranted = true;
+    await tester.tap(find.text('Grant Permission'));
+    await tester.pumpAndSettle();
+    expect(find.text('Storage Permission Granted!'), findsOneWidget);
+    expect(permissionRequests, 0);
+  });
+
+  testWidgets('denied storage access still prevents continuing setup', (
+    tester,
+  ) async {
+    audioGranted = false;
+    await prefs.setString('setup_progress_v1', '{"step":2}');
+    await tester.pumpWidget(_setup());
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Grant Permission'));
+    await tester.pumpAndSettle();
+    expect(find.text('Storage Permission Required'), findsOneWidget);
+    expect(permissionRequests, 1);
+    await tester.tap(find.text('Next'));
+    await tester.pumpAndSettle();
+    expect(find.text('3/5'), findsOneWidget);
+  });
+
+  testWidgets('SDK detection survives unavailable full device information', (
+    tester,
+  ) async {
+    nativeSdkVersion = 37;
+    messenger.setMockMethodCallHandler(_device, (_) async {
+      throw PlatformException(code: 'device_info_unavailable');
+    });
+    await prefs.setString('setup_progress_v1', '{"step":2}');
+    await tester.pumpWidget(_setup());
+    await tester.pumpAndSettle();
+    expect(find.text('3/6'), findsOneWidget);
+    expect(find.text('Storage Permission Granted!'), findsOneWidget);
+    expect(permissionRequests, 0);
   });
 
   testWidgets('skipping notifications survives reopening setup', (

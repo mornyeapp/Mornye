@@ -44,6 +44,34 @@ Stream<double> playbackOutputVolumeChanges() =>
       listener.onCancel = () => playbackOutputVolume.removeListener(changed);
     });
 
+/// Desktop exclusive output, from the `exclusiveOutput` setting, always
+/// through libmpv: WASAPI exclusive on Windows, Core Audio hog mode on macOS
+/// (see `ExclusiveOutputDeck`), an ALSA `hw:` device on Linux. AutoMix and
+/// previews stay off while it is on, so only the main player opens the
+/// device.
+final playbackExclusiveOutput = ValueNotifier<bool>(false);
+
+/// Linux: the ALSA device [playbackExclusiveOutput] opens, as an mpv device
+/// name. Empty until one is known; the output stays shared meanwhile.
+final playbackExclusiveDevice = ValueNotifier<String>('');
+
+/// Whether [playbackExclusiveOutput] took the device for the current track.
+enum ExclusiveOutputStatus {
+  /// Off, or no track has opened the output since it was turned on.
+  pending,
+
+  /// The current track plays in exclusive mode.
+  active,
+
+  /// The device refused exclusive access (another app holds it, or exclusive
+  /// control is disallowed); the track plays through the system mixer.
+  unavailable,
+}
+
+final playbackExclusiveStatus = ValueNotifier<ExclusiveOutputStatus>(
+  ExclusiveOutputStatus.pending,
+);
+
 /// One audio player owned by the music runtime. The main player and each
 /// AutoMix deck are separate instances created through
 /// `PlaybackDependencies.createDeck`.
@@ -72,7 +100,8 @@ abstract interface class PlaybackDeck {
 
   /// Emits [onPositionChanged] every [interval] while playing. Updates must
   /// not depend on rendered frames: AutoMix runs with the display asleep.
-  void startPositionUpdates(Duration interval);
+  /// A tick [wanted] answers false for is skipped without asking the engine.
+  void startPositionUpdates(Duration interval, {bool Function()? wanted});
 
   /// Applies the platform's music output configuration (audio focus, usage,
   /// keeping the source after completion). Called before each new source.
@@ -82,7 +111,9 @@ abstract interface class PlaybackDeck {
   Future<void> setVolume(double volume);
   Future<void> setPlaybackRate(double rate);
 
-  Future<void> setNetworkSource(String url);
+  /// Loads [url]. [arriving] marks a file still being written behind it (a
+  /// song a paired phone is sending), which must start before it is whole.
+  Future<void> setNetworkSource(String url, {bool arriving = false});
 
   /// Loads a local file. The output flags request Android's native USB and
   /// exclusive paths; other decks ignore them, except that [requiresDsd]
@@ -104,6 +135,13 @@ abstract interface class PlaybackDeck {
   Future<void> pause();
   Future<void> seek(Duration position);
   Future<void> stop();
+
+  /// Has the engine start [next], a paused deck holding a loaded source, the
+  /// moment this deck's source ends, so the two songs join without a gap.
+  /// [resume] on [next] afterwards only confirms the state. Returns false
+  /// when the engine cannot chain these decks; [next] then waits for
+  /// [resume]. Null unlinks a deck set earlier.
+  Future<bool> setNextDeck(PlaybackDeck? next);
 
   Future<Duration?> getCurrentPosition();
   Future<Duration?> getDuration();

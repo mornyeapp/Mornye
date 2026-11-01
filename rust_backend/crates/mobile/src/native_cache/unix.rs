@@ -324,6 +324,12 @@ fn references(
             ));
         }
     }
+    let companions: Vec<_> = paths
+        .iter()
+        .filter_map(|path| subsonic_companions(path))
+        .flatten()
+        .collect();
+    paths.extend(companions);
     let mut canonical = Vec::new();
     for path in &paths {
         check()?;
@@ -333,6 +339,21 @@ fn references(
     }
     paths.extend(canonical);
     Ok(paths)
+}
+
+/// A Subsonic cover (`subsonic_<hash>.image`, or `subsonic_<hash>_<id>.image`
+/// after a refresh) is found again through `subsonic_<hash>.image.current`.
+/// Its ETag stays beside it in `<cover>.etag`.
+fn subsonic_companions(path: &Path) -> Option<[PathBuf; 2]> {
+    let name = path.file_name()?.to_str()?;
+    let hash = name.strip_prefix("subsonic_")?.strip_suffix(".image")?;
+    let hash = hash.split_once('_').map_or(hash, |(hash, _)| hash);
+    (hash.len() == 64 && hash.bytes().all(|byte| byte.is_ascii_hexdigit())).then(|| {
+        [
+            path.with_file_name(format!("subsonic_{hash}.image.current")),
+            path.with_file_name(format!("{name}.etag")),
+        ]
+    })
 }
 
 fn prune(request: &Value, check: Check<'_>) -> Result<Value, String> {

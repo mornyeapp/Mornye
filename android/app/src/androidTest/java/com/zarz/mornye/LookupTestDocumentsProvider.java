@@ -43,6 +43,8 @@ public final class LookupTestDocumentsProvider extends DocumentsProvider {
     private int childQueries;
     private int documentQueries;
     private int closedCursors;
+    private final ArrayList<String> createdNames = new ArrayList<>();
+    private final ArrayList<String> renamedNames = new ArrayList<>();
     private String projectionMode = "normal";
     private boolean failFinalRename;
 
@@ -110,6 +112,8 @@ public final class LookupTestDocumentsProvider extends DocumentsProvider {
                 stats.putInt("children", childQueries);
                 stats.putInt("documents", documentQueries);
                 stats.putInt("closed", closedCursors);
+                stats.putStringArrayList("createdNames", new ArrayList<>(createdNames));
+                stats.putStringArrayList("renamedNames", new ArrayList<>(renamedNames));
                 return stats;
             default:
                 return super.call(method, arg, extras);
@@ -120,6 +124,8 @@ public final class LookupTestDocumentsProvider extends DocumentsProvider {
         childQueries = 0;
         documentQueries = 0;
         closedCursors = 0;
+        createdNames.clear();
+        renamedNames.clear();
     }
 
     private Entry add(String id, String parent, String name, String mime) {
@@ -236,6 +242,7 @@ public final class LookupTestDocumentsProvider extends DocumentsProvider {
 
     @Override
     public String createDocument(String parentId, String mimeType, String displayName) {
+        createdNames.add(displayName);
         String id = "created:" + sequence++;
         add(id, parentId, displayName, mimeType);
         return id;
@@ -250,6 +257,7 @@ public final class LookupTestDocumentsProvider extends DocumentsProvider {
             throw new FileNotFoundException("Injected publish rename failure");
         }
         String newId = "renamed:" + sequence++;
+        renamedNames.add(displayName);
         entries.remove(documentId);
         entries.put(newId, new Entry(newId, entry.parent, displayName, entry.mime, entry.file));
         return newId;

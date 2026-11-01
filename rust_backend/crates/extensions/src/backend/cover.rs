@@ -8,18 +8,41 @@ use mornye_core::tags::{CoverArt, extract_cover};
 use mornye_network::{
     HttpRequest, NetworkService, NetworkSession, random_user_agent, url::UrlParts,
 };
+use sha2::{Digest, Sha256};
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::io::{Read, Write};
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::Path;
 use std::sync::{Arc, Condvar, Mutex};
-use std::time::{Duration, Instant, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 type Check<'a> = dyn Fn() -> Result<(), String> + 'a;
 type Outcome = Result<Arc<[u8]>, String>;
 const CACHE_TTL: Duration = Duration::from_secs(15 * 60);
 const SIZE_ERROR: &str = "cover download exceeds 24 MiB limit";
+
+/// A forced rescan touches this file in the Library cover directory.
+/// Thumbnails older than it are extracted again under the same name, so
+/// playlists, sessions and statistics keep valid paths.
+pub const LIBRARY_COVER_REGENERATE_MARKER: &str = ".regenerate";
+
+/// File stem of the Library thumbnail cached under `key`. 128 bits of
+/// SHA-256 make reuse by name safe: two songs never share a thumbnail.
+pub fn library_cover_stem(key: &str) -> String {
+    let digest = Sha256::digest(key.as_bytes());
+    let hex: String = digest[..16]
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect();
+    format!("cover_{hex}")
+}
+
+/// Whether a thumbnail written at `modified` may be reused after the
+/// directory's regenerate marker was touched at `regenerate`.
+pub fn library_cover_is_current(modified: SystemTime, regenerate: Option<SystemTime>) -> bool {
+    regenerate.is_none_or(|marker| modified >= marker)
+}
 
 struct Entry {
     data: Arc<[u8]>,
@@ -330,18 +353,25 @@ impl Backend {
         } else {
             audio_path.into()
         };
-        let hash = key.chars().fold(5381_u32, |hash, value| {
-            hash.wrapping_mul(33).wrapping_add(value as u32)
-        });
-        let path =
-            |extension| Path::new(cache_directory).join(format!("cover_{hash:x}.{extension}"));
-        let jpg = files.resolve_legacy(&path("jpg").to_string_lossy())?;
-        let png = files.resolve_legacy(&path("png").to_string_lossy())?;
-        for cached in [&jpg, &png] {
-            cached.native_display()?;
-            if reusable_cached_cover(cached) {
-                return Ok(cached.display());
-            }
+        let stem = library_cover_stem(&key);
+        let path = |name: &str| Path::new(cache_directory).join(name);
+        let jpg = files.resolve_legacy(&path(&format!("{stem}.jpg")).to_string_lossy())?;
+        let png = files.resolve_legacy(&path(&format!("{stem}.png")).to_string_lossy())?;
+        let regenerate = files
+            .resolve_legacy(&path(LIBRARY_COVER_REGENERATE_MARKER).to_string_lossy())
+            .ok()
+            .and_then(|marker| marker.metadata().ok())
+            .and_then(|metadata| metadata.modified().ok())
+            .map(|modified| modified.into_std());
+        jpg.native_display()?;
+        png.native_display()?;
+        // A regenerated thumbnail can change format; the newer file wins.
+        if let Some((_, cached)) = [&jpg, &png]
+            .into_iter()
+            .filter_map(|cached| Some((reusable_cached_cover(cached, regenerate)?, cached)))
+            .max_by_key(|(modified, _)| *modified)
+        {
+            return Ok(cached.display());
         }
         let mut format = extension(audio_path);
         if format.is_empty() {
@@ -380,7 +410,7 @@ impl Backend {
         check()?;
         let output = if cover.mime.contains("png") { png } else { jpg };
         let _lock = files.lock(&output, &check)?;
-        if reusable_cached_cover(&output) {
+        if reusable_cached_cover(&output, regenerate).is_some() {
             return Ok(output.display());
         }
         output
@@ -454,17 +484,27 @@ fn read_cover(
     extract_cover(&mut file, format, check)
 }
 
-fn reusable_cached_cover(path: &crate::files::FilePath) -> bool {
-    if !path.metadata().is_ok_and(|metadata| metadata.is_file()) {
-        return false;
+/// The modification time of a cached thumbnail that may be reused.
+fn reusable_cached_cover(
+    path: &crate::files::FilePath,
+    regenerate: Option<SystemTime>,
+) -> Option<SystemTime> {
+    let metadata = path.metadata().ok().filter(|metadata| metadata.is_file())?;
+    let modified = metadata
+        .modified()
+        .map_or(UNIX_EPOCH, |modified| modified.into_std());
+    if !library_cover_is_current(modified, regenerate) {
+        return None;
     }
     // Re-extract legacy ID3 JPEG caches written with a leading NUL. Keep
     // other existing formats under the original cache reuse policy.
     let mut header = [0; 4];
-    path.open(OpenOptions::new().read(true))
+    let padded = path
+        .open(OpenOptions::new().read(true))
         .and_then(|mut file| file.read_exact(&mut header))
-        .is_err()
-        || header != [0, 0xff, 0xd8, 0xff]
+        .is_ok()
+        && header == [0, 0xff, 0xd8, 0xff];
+    (!padded).then_some(modified)
 }
 
 fn output_permissions(
@@ -521,19 +561,18 @@ mod tests {
         Cover::new(&NetworkService::new().unwrap(), "1".into())
     }
 
-    #[test]
-    fn padded_id3_cache_is_replaced_without_changing_the_audio() {
-        let directory = tempfile::tempdir().unwrap();
-        let data = directory.path().join("data");
-        let backend = Backend::new(
-            &directory.path().join("sources"),
-            &data,
+    fn backend(directory: &Path) -> Backend {
+        Backend::new(
+            &directory.join("sources"),
+            &directory.join("data"),
             "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
             "1",
             crate::RuntimeLimits::default(),
         )
-        .unwrap();
-        let jpeg = b"\xff\xd8\xff\xe0";
+        .unwrap()
+    }
+
+    fn id3_audio(jpeg: &[u8]) -> Vec<u8> {
         let mut picture = b"\0image/jpeg\0\x03\0\0".to_vec();
         picture.extend(jpeg);
         let mut frame = b"APIC".to_vec();
@@ -543,6 +582,86 @@ mod tests {
         let mut audio = b"ID3\x03\0\0\0\0\0".to_vec();
         audio.push(frame.len() as u8);
         audio.extend(frame);
+        audio
+    }
+
+    #[test]
+    fn keys_that_collided_under_the_old_hash_get_separate_thumbnails() {
+        let directory = tempfile::tempdir().unwrap();
+        let backend = backend(directory.path());
+        let data = directory.path().join("data");
+        let cache = data.join("covers");
+        // The old 32-bit name gave "song|AB" and "song|B!" one file.
+        let mut cached = Vec::new();
+        for (key, jpeg) in [
+            ("song|AB", b"\xff\xd8\xff\xe0one".as_slice()),
+            ("song|B!", b"\xff\xd8\xff\xe0two".as_slice()),
+        ] {
+            let source = data.join(format!("{}.mp3", cached.len()));
+            std::fs::write(&source, id3_audio(jpeg)).unwrap();
+            let path = backend
+                .save_cover_to_cache_with_hint_and_key(
+                    source.to_str().unwrap(),
+                    "",
+                    cache.to_str().unwrap(),
+                    key,
+                    &|| Ok(()),
+                )
+                .unwrap();
+            assert_eq!(std::fs::read(&path).unwrap(), jpeg);
+            cached.push(path);
+        }
+        assert_ne!(cached[0], cached[1]);
+        assert_eq!(
+            Path::new(&cached[0]).file_name().unwrap(),
+            format!("{}.jpg", library_cover_stem("song|AB")).as_str()
+        );
+    }
+
+    #[test]
+    fn a_forced_rescan_regenerates_thumbnails_under_the_same_name() {
+        let directory = tempfile::tempdir().unwrap();
+        let backend = backend(directory.path());
+        let data = directory.path().join("data");
+        let cache = data.join("covers");
+        let source = data.join("track.mp3");
+        let save = |jpeg: &[u8]| {
+            std::fs::write(&source, id3_audio(jpeg)).unwrap();
+            backend
+                .save_cover_to_cache_with_hint_and_key(
+                    source.to_str().unwrap(),
+                    "",
+                    cache.to_str().unwrap(),
+                    "content://provider/document/track",
+                    &|| Ok(()),
+                )
+                .unwrap()
+        };
+        let cached = save(b"\xff\xd8\xff\xe0old");
+        // A key without a timestamp keeps its thumbnail until a forced rescan.
+        assert_eq!(save(b"\xff\xd8\xff\xe0new"), cached);
+        assert_eq!(std::fs::read(&cached).unwrap(), b"\xff\xd8\xff\xe0old");
+        std::fs::File::options()
+            .write(true)
+            .open(&cached)
+            .unwrap()
+            .set_modified(SystemTime::now() - Duration::from_secs(60))
+            .unwrap();
+        std::fs::write(cache.join(LIBRARY_COVER_REGENERATE_MARKER), "").unwrap();
+        assert_eq!(save(b"\xff\xd8\xff\xe0new"), cached);
+        assert_eq!(std::fs::read(&cached).unwrap(), b"\xff\xd8\xff\xe0new");
+        // Thumbnails written after the marker are reused again.
+        assert_eq!(save(b"\xff\xd8\xff\xe0later"), cached);
+        assert_eq!(std::fs::read(&cached).unwrap(), b"\xff\xd8\xff\xe0new");
+    }
+
+    #[test]
+    fn padded_id3_cache_is_replaced_without_changing_the_audio() {
+        let directory = tempfile::tempdir().unwrap();
+        let data = directory.path().join("data");
+        let backend = backend(directory.path());
+        let jpeg = b"\xff\xd8\xff\xe0";
+        let audio = id3_audio(jpeg);
         let source = data.join("track.mp3");
         std::fs::write(&source, &audio).unwrap();
         let cache = data.join("covers");

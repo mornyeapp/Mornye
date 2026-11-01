@@ -8,6 +8,7 @@ import 'package:mornye/services/apk_downloader.dart';
 import 'package:mornye/services/desktop_diagnostics.dart';
 import 'package:mornye/services/desktop_updater.dart';
 import 'package:mornye/services/notification_service.dart';
+import 'package:mornye/services/update_progress_notifications.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/utils/string_utils.dart';
 import 'package:mornye/widgets/app_alert_dialog.dart';
@@ -99,6 +100,13 @@ class _UpdateDialogState extends State<UpdateDialog> {
     await notificationService.beginUpdateDownloadWork(
       version: widget.updateInfo.version,
     );
+    final progressNotifications = UpdateProgressNotifications(
+      (received, total) => notificationService.showUpdateDownloadProgress(
+        version: widget.updateInfo.version,
+        received: received,
+        total: total,
+      ),
+    );
     final String? filePath;
     try {
       filePath = await ApkDownloader.downloadApk(
@@ -114,14 +122,11 @@ class _UpdateDialogState extends State<UpdateDialog> {
               _statusText = '$receivedMB / $totalMB MB';
             });
           }
-          notificationService.showUpdateDownloadProgress(
-            version: widget.updateInfo.version,
-            received: received,
-            total: total,
-          );
+          progressNotifications.update(received, total);
         },
       );
     } finally {
+      await progressNotifications.finish();
       await notificationService.endBackgroundWork(
         NotificationService.updateDownloadWorkKind,
       );

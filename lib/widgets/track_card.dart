@@ -110,16 +110,23 @@ class TrackCard extends StatelessWidget {
   });
 
   /// Track number, cover art, or anything else that identifies the row.
+  /// `Text` without a colour takes the row's supporting colour, like
+  /// [subtitle].
   final Widget leading;
 
   final String title;
 
   /// Secondary line. A widget rather than a string because callers mix in
-  /// clickable artist names, quality badges and status text.
+  /// clickable artist names, quality badges and status text. `Text` without
+  /// a colour takes the row's supporting colour: `onSurfaceVariant`, or the
+  /// content colour of a filled current or selected row, so leave text
+  /// uncoloured rather than reading a colour from outside the row.
   final Widget? subtitle;
 
   /// Hidden while [isSelectionMode] is active, so the row cannot be acted on
-  /// while the user is picking items.
+  /// while the user is picking items. On a filled Material row it reads a
+  /// scheme whose `primary`, `onSurface` and `onSurfaceVariant` are the
+  /// fill's content colour, so build its colours inside it.
   final Widget? trailing;
 
   /// Painted behind the content, clipped to the card. Used for the queue's
@@ -217,6 +224,23 @@ class TrackCard extends StatelessWidget {
       cardColor = theme.cardTheme.color;
       contentColor = null;
     }
+    // Text without a colour of its own in the leading slot or the subtitle
+    // takes the row's supporting colour, so it stays readable on any fill.
+    final supportingStyle = TextStyle(
+      color: contentColor ?? colorScheme.onSurfaceVariant,
+    );
+    // Trailing controls sit directly on the fill: their content roles take
+    // its content colour, and a filled control inverts against it.
+    final trailingTheme = contentColor == null || cardColor == null
+        ? theme
+        : theme.copyWith(
+            colorScheme: colorScheme.copyWith(
+              primary: contentColor,
+              onPrimary: cardColor,
+              onSurface: contentColor,
+              onSurfaceVariant: contentColor,
+            ),
+          );
 
     // The current row's shapes morph on the spatial spring; reduced motion
     // switches them in place. A clip applies only while the row is, or is
@@ -283,7 +307,6 @@ class TrackCard extends StatelessWidget {
                         ? context.l10n.a11yDeselectTrack
                         : context.l10n.a11ySelectTrack,
                     child: AnimatedSelectionCheckbox(
-                      visible: true,
                       selected: isSelected,
                       colorScheme: colorScheme,
                       size: 24,
@@ -291,7 +314,10 @@ class TrackCard extends StatelessWidget {
                   ),
                   SizedBox(width: tokens.gapMd),
                 ],
-                rowLeading,
+                DefaultTextStyle.merge(
+                  style: supportingStyle,
+                  child: rowLeading,
+                ),
                 SizedBox(width: tokens.gapMd),
                 Expanded(
                   child: Column(
@@ -311,7 +337,10 @@ class TrackCard extends StatelessWidget {
                       ),
                       if (subtitle != null) ...[
                         const SizedBox(height: 2),
-                        subtitle!,
+                        DefaultTextStyle.merge(
+                          style: supportingStyle,
+                          child: subtitle!,
+                        ),
                       ],
                     ],
                   ),
@@ -322,7 +351,12 @@ class TrackCard extends StatelessWidget {
                 ],
                 if (trailing != null && !isSelectionMode) ...[
                   SizedBox(width: tokens.gapSm),
-                  trailing!,
+                  // Mornye rows never fill with a content colour and keep
+                  // their ambient theme.
+                  if (material)
+                    Theme(data: trailingTheme, child: trailing!)
+                  else
+                    trailing!,
                 ],
               ],
             ),

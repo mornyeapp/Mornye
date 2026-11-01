@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:liquid_glass_easy/liquid_glass_easy.dart';
 import 'package:mornye/widgets/mornye_selection_pill.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/music_player_provider.dart';
@@ -180,6 +181,62 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  for (final withPlayer in [true, false]) {
+    testWidgets(
+      'liquid side capsules join the bar read only at rest (player: $withPlayer)',
+      (tester) async {
+        MornyeGlass.debugShaderFilterSupport = true;
+        addTearDown(() => MornyeGlass.debugShaderFilterSupport = null);
+        await pumpShell(tester, blur: true, withPlayer: withPlayer);
+        // Every painted lens carries a batch key, so each takes the single
+        // composed pass, and lenses with the same key share one read.
+        List<Element> lenses() => find
+            .descendant(
+              of: find.byType(MornyeBottomBar),
+              matching: find.byType(LiquidGlassLens),
+            )
+            .evaluate()
+            .toList();
+        List<int> keys(List<Element> lenses) => [
+          for (final lens in lenses) LiquidGlassBatch.backdropIdOf(lens)!,
+        ];
+
+        final expanded = keys(lenses());
+        expect(expanded, hasLength(withPlayer ? 2 : 1));
+        expect(expanded.toSet(), hasLength(1));
+
+        chrome.value = true;
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 190));
+        final folding = lenses();
+        final foldingKeys = keys(folding);
+        expect(foldingKeys, hasLength(withPlayer ? 4 : 3));
+        // The capsules cross the tabs, so each samples on its own.
+        expect(foldingKeys.toSet(), hasLength(3));
+        expect(
+          foldingKeys.where(expanded.contains),
+          hasLength(folding.length - 2),
+        );
+
+        await tester.pumpAndSettle();
+        final resting = lenses();
+        expect(resting, hasLength(withPlayer ? 3 : 2));
+        expect(keys(resting).toSet(), expanded.toSet());
+        // Switching batches reparents the capsule lenses instead of
+        // rebuilding them.
+        expect(resting.every(folding.contains), isTrue);
+
+        chrome.expand();
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 190));
+        expect(keys(lenses()).toSet(), hasLength(3));
+        await tester.pumpAndSettle();
+        expect(keys(lenses()), expanded);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 
   for (final liquidGlass in [false, true]) {
     testWidgets(

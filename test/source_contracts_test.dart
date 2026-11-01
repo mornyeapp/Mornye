@@ -15,8 +15,8 @@ void main() {
       'lib/services/app_state_database.dart',
     ).readAsStringSync();
 
-    test('v4 normalizes playback queue and scalar state', () {
-      expect(source, contains('const _dbVersion = 4;'));
+    test('current schema retains v4 playback queue and scalar state', () {
+      expect(source, contains('const _dbVersion = 5;'));
       expect(source, contains('await _migratePlaybackSessionToV4(db);'));
       expect(source, contains('media_json TEXT NOT NULL'));
       expect(source, contains('position_ms INTEGER NOT NULL DEFAULT 0'));

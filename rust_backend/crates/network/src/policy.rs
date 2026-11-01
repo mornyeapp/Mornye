@@ -10,11 +10,13 @@ pub struct NetworkPermissions {
 }
 
 impl NetworkPermissions {
+    /// `*` admits every host; scheme and private-network checks still apply.
     pub fn allows_domain(&self, domain: &str) -> bool {
         let domain = domain.trim().to_lowercase();
         self.domains.iter().any(|allowed| {
             let allowed = allowed.trim().to_lowercase();
-            allowed == domain
+            allowed == "*"
+                || allowed == domain
                 || allowed.strip_prefix("*.").is_some_and(|suffix| {
                     domain.len() > suffix.len() + 1 && domain.ends_with(&format!(".{suffix}"))
                 })
@@ -200,6 +202,57 @@ mod tests {
             permissions
                 .validate("https://localhost", true, false)
                 .is_ok()
+        );
+    }
+
+    #[test]
+    fn any_domain_wildcard_keeps_scheme_and_private_checks() {
+        let mut permissions = NetworkPermissions {
+            domains: vec![" * ".into()],
+            allow_http: false,
+        };
+        for input in [
+            "https://media.example.test/x",
+            "https://example.org",
+            "https://203.0.113.5:8920/x",
+        ] {
+            assert!(permissions.validate(input, false, false).is_ok(), "{input}");
+        }
+        assert!(
+            permissions
+                .validate("https://192.168.178.20:8920", false, false)
+                .unwrap_err()
+                .contains("private/local")
+        );
+        assert!(
+            permissions
+                .validate("https://server.local", false, false)
+                .unwrap_err()
+                .contains("private/local")
+        );
+        assert_eq!(
+            permissions
+                .validate("http://192.168.178.20:8096", true, false)
+                .unwrap_err(),
+            "network access denied: only https is allowed"
+        );
+        permissions.allow_http = true;
+        for input in [
+            "http://192.168.178.20:8096/System/Info",
+            "http://server.local:8096",
+            "http://media.example.test",
+        ] {
+            assert!(permissions.validate(input, true, false).is_ok(), "{input}");
+        }
+        assert!(
+            permissions
+                .validate("http://192.168.178.20:8096", false, false)
+                .is_err()
+        );
+        assert!(
+            permissions
+                .validate("http://user:secret@192.168.178.20", true, false)
+                .is_err()
         );
     }
 }

@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/providers/download_queue_provider.dart';
 
@@ -353,6 +355,122 @@ void main() {
       expect(cleared.isDownloaded('replacement'), isFalse);
       expect(cleared.getByIsrc('REPLACEMENT'), isNull);
       expect(cleared.findByTrackAndArtist('replacement', 'new artist'), isNull);
+    });
+
+    test('prepended lookup keeps existing keys without rereading them', () {
+      final existing = _CountingHistoryItem(
+        _historyItem(
+          id: 'existing',
+          filePath: '/music/Same Song.flac',
+          downloadedAt: DateTime.utc(2026, 7, 22),
+        ),
+      );
+      final state = DownloadHistoryState(items: [existing], totalCount: 1);
+      final initialReads = existing.keyReads;
+      final added = _historyItem(
+        id: 'added',
+        filePath: '/music/Other/Same Song.flac',
+        downloadedAt: DateTime.utc(2026, 7, 23),
+      ).copyWith(isrc: 'OTHERISRC');
+
+      final prepended = state.copyWithPrependedLookup(
+        added,
+        items: [added, ...state.items],
+        totalCount: 2,
+      );
+
+      expect(existing.keyReads, initialReads);
+      expect(prepended.lookupItems, [added, existing]);
+      expect(() => prepended.lookupItems.clear(), throwsUnsupportedError);
+      expect(prepended.items, [added, existing]);
+      expect(prepended.totalCount, 2);
+      expect(prepended.loadedIndexVersion, state.loadedIndexVersion);
+      expect(prepended.getBySpotifyId('source-track-same'), same(added));
+      expect(prepended.getByIsrc('OTHERISRC'), same(added));
+      expect(prepended.getByIsrc('SAMEISRC'), same(existing));
+      expect(
+        prepended.findByTrackAndArtist('Same Song', 'Same Artist'),
+        same(added),
+      );
+      expect(state.lookupItems, [existing]);
+      expect(state.getBySpotifyId('source-track-same'), same(existing));
+      expect(state.getByIsrc('OTHERISRC'), isNull);
+    });
+
+    test('incremental lookups match a full rebuild after mixed edits', () {
+      final random = Random(20261023);
+      const spotifyIds = [null, '', 'sp-a', 'sp-b', 'sp-c'];
+      const isrcs = [null, '', 'ISRC-A', 'ISRC-B'];
+      const tracks = ['', ' ', 'Song A', ' song a ', 'SONG B'];
+      const artists = ['', 'Artist', ' ARTIST ', 'Other'];
+      T pick<T>(List<T> values) => values[random.nextInt(values.length)];
+
+      var state = DownloadHistoryState();
+      var nextId = 0;
+      for (var step = 0; step < 600; step++) {
+        final lookup = state.lookupItems;
+        final operation = lookup.isEmpty ? 0 : random.nextInt(4);
+        if (operation <= 1) {
+          final item = DownloadHistoryItem(
+            id: 'item-${nextId++}',
+            trackName: pick(tracks),
+            artistName: pick(artists),
+            albumName: 'Album',
+            filePath: '/music/$nextId.flac',
+            service: 'test',
+            downloadedAt: DateTime.utc(2026, 7, 23),
+            spotifyId: pick(spotifyIds),
+            isrc: pick(isrcs),
+          );
+          state = state.copyWithPrependedLookup(
+            item,
+            items: [item, ...state.items],
+            totalCount: state.totalCount + 1,
+          );
+        } else if (operation == 2) {
+          final target = lookup[random.nextInt(lookup.length)];
+          final updated = target.copyWith(
+            spotifyId: pick(spotifyIds),
+            isrc: pick(isrcs),
+            trackName: pick(tracks),
+          );
+          state = state.copyWith(
+            lookupItems: [
+              updated,
+              ...lookup.where((item) => item.id != target.id),
+            ],
+          );
+        } else {
+          final removedId = lookup[random.nextInt(lookup.length)].id;
+          state = state.copyWith(
+            lookupItems: [
+              for (final item in lookup)
+                if (item.id != removedId) item,
+            ],
+          );
+        }
+
+        final rebuilt = DownloadHistoryState(
+          items: state.items,
+          lookupItems: List.of(state.lookupItems),
+        );
+        expect(state.lookupItems, rebuilt.lookupItems);
+        for (final id in spotifyIds.whereType<String>()) {
+          expect(state.isDownloaded(id), rebuilt.isDownloaded(id));
+          expect(state.getBySpotifyId(id), same(rebuilt.getBySpotifyId(id)));
+        }
+        for (final isrc in isrcs.whereType<String>()) {
+          expect(state.getByIsrc(isrc), same(rebuilt.getByIsrc(isrc)));
+        }
+        for (final track in tracks) {
+          for (final artist in artists) {
+            expect(
+              state.findByTrackAndArtist(track, artist),
+              same(rebuilt.findByTrackAndArtist(track, artist)),
+            );
+          }
+        }
+      }
     });
   });
 

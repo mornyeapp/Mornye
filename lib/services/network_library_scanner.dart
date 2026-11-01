@@ -6,7 +6,7 @@ import 'dart:isolate';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:mornye/services/library_database_models.dart';
+import 'package:mornye/models/library_database_models.dart';
 import 'package:mornye/services/network_metadata_service.dart';
 import 'package:mornye/services/network_storage_service.dart';
 import 'package:mornye/services/platform_bridge.dart';
@@ -14,6 +14,7 @@ import 'package:mornye/utils/lyrics_metadata_helper.dart';
 import 'package:mornye/utils/logger.dart';
 
 part 'network_library_scanner_subsonic.dart';
+part 'network_library_scanner_virtual.dart';
 
 final _log = AppLogger('LocalLibrary');
 
@@ -51,12 +52,42 @@ class NetworkLibraryScanner {
   SubsonicClient? _activeSubsonic;
   bool _running = false;
   bool _cancelled = false;
+  Completer<List<NetworkEntry>>? _pendingListing;
 
   /// Stop scan-owned native reads even while scan() is awaiting their result.
   Future<void> cancelPending() async {
     _cancelled = true;
+    final listing = _pendingListing;
+    if (listing != null && !listing.isCompleted) {
+      listing.completeError(StateError('Network library scan cancelled'));
+    }
     _activeSubsonic?.close();
     await _activeMetadata?.cancelPending();
+  }
+
+  Future<List<NetworkEntry>> _list(
+    NetworkConnection connection,
+    String path,
+  ) async {
+    if (_cancelled) throw StateError('Network library scan cancelled');
+    final listing = _pendingListing = Completer<List<NetworkEntry>>();
+    // A directory read has its own transport timeout. Stop waiting on it
+    // immediately when cancelled, and consume any late result or error.
+    unawaited(
+      Future.sync(() => _storage.list(connection, path)).then<void>(
+        (entries) {
+          if (!listing.isCompleted) listing.complete(entries);
+        },
+        onError: (Object error, StackTrace stack) {
+          if (!listing.isCompleted) listing.completeError(error, stack);
+        },
+      ),
+    );
+    try {
+      return await listing.future;
+    } finally {
+      if (identical(_pendingListing, listing)) _pendingListing = null;
+    }
   }
 
   Future<LibraryScanNDJSONFile> scan(
@@ -101,6 +132,17 @@ class NetworkLibraryScanner {
         uri.userInfo.isNotEmpty) {
       throw const FormatException('Invalid network library source');
     }
+    if (_storage.virtualFor(uri.host) case final virtual?) {
+      if (uri.pathSegments.any((segment) => segment.isNotEmpty)) {
+        throw const FormatException('Expected a library root');
+      }
+      return _scanVirtual(
+        virtual,
+        uri.host,
+        checkpoint: checkpoint,
+        onProgress: onProgress,
+      );
+    }
     final connection = await _storage.connection(uri.host);
     if (connection.protocol == NetworkProtocol.subsonic) {
       if (uri.pathSegments.any((segment) => segment.isNotEmpty)) {
@@ -122,7 +164,7 @@ class NetworkLibraryScanner {
     }
     await checkpoint();
     // Fail before creating scan output if the root cannot be listed.
-    List<NetworkEntry>? first = await _storage.list(connection, root);
+    List<NetworkEntry>? first = await _list(connection, root);
     await checkpoint();
     List<String>? preserveMissingPaths = [];
     void preserve(String path) {
@@ -192,13 +234,12 @@ class NetworkLibraryScanner {
         }
         List<NetworkEntry>? entries;
         try {
-          entries = folder == root
-              ? first!
-              : await _storage.list(connection, folder);
+          entries = folder == root ? first! : await _list(connection, folder);
           // The first listing can be very large. Release it before descending
           // into children instead of retaining it for the entire scan.
           first = null;
         } catch (error) {
+          await checkpoint();
           errors++;
           preserve(folder);
           _log.e('Network folder listing failed [$folder]', error);

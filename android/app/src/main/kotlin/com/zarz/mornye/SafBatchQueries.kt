@@ -1,5 +1,6 @@
 package com.zarz.mornye
 
+import android.content.Context
 import android.net.Uri
 import android.provider.DocumentsContract
 import androidx.documentfile.provider.DocumentFile
@@ -8,7 +9,7 @@ import org.json.JSONObject
 
 // A failed DocumentsProvider query must never be mistaken for a missing file.
 // Unlike DocumentFile.exists(), this keeps null cursors/exceptions inconclusive.
-internal fun MainActivity.safExistsBatch(urisJson: String): String {
+internal fun Context.safExistsBatch(urisJson: String): String {
     val result = JSONObject()
     val uris = JSONArray(urisJson)
     val accessibleTrees = mutableMapOf<String, Boolean>()

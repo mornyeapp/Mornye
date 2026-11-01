@@ -11,11 +11,15 @@ import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mornye/app.dart';
 import 'package:mornye/constants/app_info.dart';
+import 'package:mornye/controllers/extension_auth_launcher.dart';
+import 'package:mornye/l10n/supported_locales.dart';
 import 'package:mornye/models/library_database_models.dart';
 import 'package:mornye/models/settings.dart';
+import 'package:mornye/models/theme_settings.dart';
 import 'package:mornye/providers/download_queue_provider.dart';
 import 'package:mornye/providers/extension_provider.dart';
 import 'package:mornye/providers/local_library_provider.dart';
+import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/runtime_profile_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/providers/theme_provider.dart';
@@ -28,16 +32,25 @@ import 'package:mornye/services/app_navigation_service.dart';
 import 'package:mornye/services/app_orientation.dart';
 import 'package:mornye/services/activity_attachment.dart';
 import 'package:mornye/services/app_crash_service.dart';
+import 'package:mornye/services/background_favorites.dart';
 import 'package:mornye/services/desktop_deep_links.dart';
 import 'package:mornye/services/desktop_diagnostics.dart';
 import 'package:mornye/services/desktop_library_watcher.dart';
+import 'package:mornye/services/link/desktop/link_desktop_host.dart';
+import 'package:mornye/services/link/desktop/link_phone_playback.dart';
+import 'package:mornye/services/link/features/link_phone_features.dart';
+import 'package:mornye/services/link/features/link_remote_playback.dart';
+import 'package:mornye/services/link/link_client_api.dart';
 import 'package:mornye/services/music_player_service.dart';
+import 'package:mornye/services/playback_notification.dart';
 import 'package:mornye/services/player_widget_service.dart';
 import 'package:mornye/screens/now_playing_screen.dart';
 import 'package:mornye/utils/desktop_platform.dart';
+import 'package:mornye/utils/android_tv.dart';
 import 'package:mornye/utils/local_library_scan_prefs.dart';
 import 'package:mornye/utils/logger.dart';
-import 'package:mornye/utils/extension_auth_launcher.dart';
+import 'package:mornye/widgets/desktop/desktop_commands.dart'
+    show restoreDesktopSidebar;
 import 'package:mornye/widgets/desktop/desktop_inspector.dart'
     show bindDesktopFullScreenLyrics;
 import 'package:mornye/widgets/desktop/desktop_window.dart'
@@ -55,16 +68,28 @@ void main() {
   runZonedGuarded(
     () async {
       final binding = WidgetsFlutterBinding.ensureInitialized();
+      // The preferences plugin answers without an Activity, so on Android
+      // the load overlaps the Activity's creation.
+      final preferences = SharedPreferences.getInstance();
       if (Platform.isAndroid) {
         // A media service can start the engine before MainActivity registers
         // the backend and platform channels. Calls made earlier would fail or
-        // never be answered, leaving extensions uninitialized.
+        // never be answered, leaving extensions uninitialized. Playback has
+        // its channels on the engine, so a car's media browser that started
+        // the app can browse and play at once.
+        if (!isActivityAttached(binding)) {
+          unawaited(_startBackgroundPlayback());
+        }
         await waitForActivityAttachment(binding);
       }
+      // Asked after attachment, so an app a media browser started long
+      // before it opens still reads the current wallpaper colors.
+      final dynamicColors = DynamicColors.request();
+      // Awaited before runApp, which reports a failure once.
+      final orientation = _initializeOrientation()..ignore();
       // Desktop: log files and the unclean-exit marker, before the error
       // hooks below start writing to them.
       await DesktopDiagnostics.initialize();
-      await setAppOrientation();
       LicenseRegistry.addLicense(() async* {
         yield LicenseEntryWithLineBreaks(
           const [AppInfo.appName],
@@ -132,16 +157,27 @@ void main() {
         return true;
       };
 
-      final prefs = await SharedPreferences.getInstance();
-      await _prepareAndroidInstallationState(prefs);
-      final bootstrapSettings = loadBootstrapSettings(prefs);
+      final prefs = await preferences;
+      var bootstrapSettings = loadBootstrapSettings(prefs);
+      // The SAF check overlaps the install marker read. An installation
+      // reset rewrites the settings, so its result is then replaced.
+      var safValidation = _startSafTreeValidation(bootstrapSettings);
+      if (await _prepareAndroidInstallationState(prefs)) {
+        bootstrapSettings = loadBootstrapSettings(prefs);
+        safValidation = _startSafTreeValidation(bootstrapSettings);
+      }
       musicPlayerRuntime.configure(bootstrapSettings);
+      if (isDesktopPlatform) restoreDesktopSidebar(prefs);
       final bootstrapTheme = loadBootstrapThemeSettings(prefs);
       final initialSafAccessLost = await _detectInitialSafAccessLoss(
-        bootstrapSettings,
+        safValidation,
       );
       final runtimeProfile = await _resolveRuntimeProfile(prefs);
       _configureImageCache(runtimeProfile);
+      await orientation;
+      // Usually answered by now. The first frame then has the final theme,
+      // with no fade from the seed colors; a late answer still applies.
+      await dynamicColors.settle(const Duration(milliseconds: 100));
 
       runApp(
         ProviderScope(
@@ -162,6 +198,22 @@ void main() {
               initialSafAccessLost,
             ),
             initialThemeSettingsProvider.overrideWithValue(bootstrapTheme),
+            initialDynamicColorsProvider.overrideWithValue(dynamicColors),
+            // While the paired desktop plays in the phone's place, the
+            // player screens show and drive it; on the desktop, the phone
+            // it follows.
+            activeRemotePlaybackProvider.overrideWith(
+              (ref) =>
+                  ref.watch(linkRemotePlaybackProvider) ??
+                  ref.watch(linkFollowedPhonePlaybackProvider),
+            ),
+            // Also while songs transfer, so the computer can still ask for
+            // this phone's files and hear how a transfer stands.
+            linkKeepConnectedProvider.overrideWith(
+              (ref) =>
+                  ref.watch(linkRemotePlaybackProvider) != null ||
+                  ref.watch(linkPhoneTransfersActiveProvider),
+            ),
           ],
           child: EagerInitialization(
             child: MornyeApp(
@@ -170,6 +222,10 @@ void main() {
           ),
         ),
       );
+      musicPlayerRuntime.prepareCovers();
+      // Waits until startup settles, then analyzes how songs sound for
+      // Autoplay. Media browsers that start without the app shell skip it.
+      musicPlayerRuntime.startSongAnalysis();
       if (Platform.isAndroid || Platform.isIOS) {
         unawaited(
           PlayerWidgetService.instance.initialize((command) async {
@@ -273,11 +329,65 @@ class _StartupBenchmark {
   }
 }
 
+/// The player, its saved session and the media controls, from the stored
+/// settings, for a media browser such as Android Auto that starts the app
+/// without an Activity. The app shell takes the controls over once it opens.
+Future<void> _startBackgroundPlayback() async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    // An Activity that attached meanwhile runs the full startup instead.
+    if (isActivityAttached(WidgetsBinding.instance)) return;
+    final settings = loadBootstrapSettings(prefs);
+    final runtime = musicPlayerRuntime
+      ..configure(settings)
+      ..prepareCovers();
+    final l10n = appLocalizationsFor(settings.locale);
+    runtime.updateStrings(
+      unknownTitle: l10n.unknownTitle,
+      unknownArtist: l10n.unknownArtist,
+    );
+    final dependencies = runtime.dependencies;
+    runtime.configureBackgroundNotification(
+      presentation: PlaybackNotification(
+        mornye: loadBootstrapThemeSettings(prefs).style == AppThemeStyle.mornye,
+        favoriteLabel: l10n.trackOptionAddToLoved,
+        unfavoriteLabel: l10n.trackOptionRemoveFromLoved,
+        shuffleOnLabel: l10n.nowPlayingShuffleOn,
+        shuffleOffLabel: l10n.nowPlayingPlayInOrder,
+      ),
+      favorites: BackgroundFavorites(
+        library: dependencies.libraryDatabase,
+        history: dependencies.historyDatabase,
+        collections: dependencies.collectionsDatabase,
+        covers: dependencies.coverStore,
+      ),
+    );
+    await runtime.restoreSession();
+    await runtime.initialize();
+  } catch (error, stack) {
+    _log.e('Failed to start playback without the app open', error, stack);
+  }
+}
+
+/// Resolves Android TV, then the orientation, alongside the other startup
+/// calls.
+Future<void> _initializeOrientation() async {
+  await initializeAndroidTv();
+  // MainActivity.onCreate already asks phones for portrait, the request
+  // below, and the router observer repeats it on the first page. TV gets
+  // fixed landscape there and the user landscape here.
+  if (Platform.isAndroid && !isAndroidTv) return;
+  await setAppOrientation();
+}
+
 const _runtimeProfileTierKey = 'runtime_profile_tier_v1';
 
-Future<void> _prepareAndroidInstallationState(SharedPreferences prefs) async {
-  if (!Platform.isAndroid) return;
+/// Returns whether a restored-installation reset started, which may have
+/// rewritten the stored settings.
+Future<bool> _prepareAndroidInstallationState(SharedPreferences prefs) async {
+  if (!Platform.isAndroid) return false;
 
+  var resetStarted = false;
   try {
     final hasPersistedSettings = hasPersistedAppSettings(prefs);
     final installState = await PlatformBridge.ensureInstallMarker();
@@ -285,8 +395,9 @@ Future<void> _prepareAndroidInstallationState(SharedPreferences prefs) async {
       hasPersistedSettings: hasPersistedSettings,
       installState: installState,
     );
-    if (!shouldReset) return;
+    if (!shouldReset) return false;
 
+    resetStarted = true;
     _log.w(
       'Android restored state into a fresh installation; resetting '
       'installation-bound settings',
@@ -300,26 +411,38 @@ Future<void> _prepareAndroidInstallationState(SharedPreferences prefs) async {
     // bridge implementation prevents install-marker inspection.
     _log.w('Failed to inspect restored installation state: $e');
   }
+  return resetStarted;
 }
 
-Future<bool> _detectInitialSafAccessLoss(AppSettings settings) async {
+/// Starts the startup SAF grant check for [settings]. A failure is captured
+/// with the result, so a check that is replaced never reports an error.
+Future<(bool, Object?)>? _startSafTreeValidation(AppSettings settings) {
   if (!Platform.isAndroid ||
       settings.isFirstLaunch ||
       settings.storageMode != 'saf' ||
       settings.downloadTreeUri.isEmpty) {
-    return false;
+    return null;
   }
 
-  try {
-    return !await PlatformBridge.validateSafTreeAccess(
-      settings.downloadTreeUri,
-    ).timeout(const Duration(seconds: 2));
-  } catch (e) {
+  return PlatformBridge.validateSafTreeAccess(settings.downloadTreeUri)
+      .timeout(const Duration(seconds: 2))
+      .then<(bool, Object?)>(
+        (accessible) => (accessible, null),
+        onError: (Object error) => (true, error),
+      );
+}
+
+Future<bool> _detectInitialSafAccessLoss(
+  Future<(bool, Object?)>? validation,
+) async {
+  if (validation == null) return false;
+  final (accessible, error) = await validation;
+  if (error != null) {
     // A transient bridge failure must not trap the user at launch. Download
     // preflight validates strictly again before any write starts.
-    _log.w('Failed to validate SAF access during startup: $e');
-    return false;
+    _log.w('Failed to validate SAF access during startup: $error');
   }
+  return !accessible;
 }
 
 Future<_RuntimeProfile> _resolveRuntimeProfile(SharedPreferences prefs) async {
@@ -455,6 +578,8 @@ class _EagerInitializationState extends ConsumerState<EagerInitialization>
         _desktopDeepLinks = DesktopDeepLinks()..start();
         listenDesktopWindowFullScreen();
         bindDesktopFullScreenLyrics();
+        // Starts the Mornye Link server when the owner turned it on.
+        ref.read(linkDesktopHostProvider);
       }
       _initializeAppServices();
       _initializeExtensions();
@@ -487,7 +612,7 @@ class _EagerInitializationState extends ConsumerState<EagerInitialization>
       // persisted history even when no queued item remains to reconcile.
       if (ref.exists(downloadHistoryProvider)) {
         unawaited(
-          ref.read(downloadHistoryProvider.notifier).reloadFromStorage(),
+          ref.read(downloadHistoryProvider.notifier).refreshFromStorage(),
         );
       }
       _maybeAutoScanLocalLibrary();

@@ -96,42 +96,40 @@ class _PlaybackSeekSliderState extends State<PlaybackSeekSlider> {
           .toDouble();
       String percentage(double milliseconds) =>
           '${(milliseconds / maxMs * 100).clamp(0, 100).round()}%';
-      return LayoutBuilder(
-        builder: (context, constraints) => Semantics(
-          slider: true,
-          enabled: enabled,
-          excludeSemantics: true,
-          value: percentage(currentMs),
-          increasedValue: enabled
-              ? percentage((currentMs + 5000).clamp(0, maxMs).toDouble())
-              : null,
-          decreasedValue: enabled
-              ? percentage((currentMs - 5000).clamp(0, maxMs).toDouble())
-              : null,
-          onIncrease: enabled
-              ? () => _adjust((currentMs + 5000).clamp(0, maxMs).toDouble())
-              : null,
-          onDecrease: enabled
-              ? () => _adjust((currentMs - 5000).clamp(0, maxMs).toDouble())
-              : null,
-          child: IgnorePointer(
-            ignoring: !enabled,
-            child: MornyePlayerSlider(
-              activeColor:
-                  SliderTheme.of(context).activeTrackColor ?? Colors.white,
-              inactiveColor:
-                  SliderTheme.of(context).inactiveTrackColor ?? Colors.white12,
-              value: enabled ? currentMs : 0,
-              max: maxMs,
-              trackHeight: widget.hairline ? 2 : 6,
-              height: widget.hairline ? 10 : 44,
-              inset: widget.hairline || widget.edgeAligned
-                  ? 0
-                  : MornyePlayerSlider.horizontalInset,
-              onChangeStart: _start,
-              onChanged: _preview,
-              onChangeEnd: _commit,
-            ),
+      return Semantics(
+        slider: true,
+        enabled: enabled,
+        excludeSemantics: true,
+        value: percentage(currentMs),
+        increasedValue: enabled
+            ? percentage((currentMs + 5000).clamp(0, maxMs).toDouble())
+            : null,
+        decreasedValue: enabled
+            ? percentage((currentMs - 5000).clamp(0, maxMs).toDouble())
+            : null,
+        onIncrease: enabled
+            ? () => _adjust((currentMs + 5000).clamp(0, maxMs).toDouble())
+            : null,
+        onDecrease: enabled
+            ? () => _adjust((currentMs - 5000).clamp(0, maxMs).toDouble())
+            : null,
+        child: IgnorePointer(
+          ignoring: !enabled,
+          child: MornyePlayerSlider(
+            activeColor:
+                SliderTheme.of(context).activeTrackColor ?? Colors.white,
+            inactiveColor:
+                SliderTheme.of(context).inactiveTrackColor ?? Colors.white12,
+            value: enabled ? currentMs : 0,
+            max: maxMs,
+            trackHeight: widget.hairline ? 2 : 6,
+            height: widget.hairline ? 10 : 44,
+            inset: widget.hairline || widget.edgeAligned
+                ? 0
+                : MornyePlayerSlider.horizontalInset,
+            onChangeStart: _start,
+            onChanged: _preview,
+            onChangeEnd: _commit,
           ),
         ),
       );

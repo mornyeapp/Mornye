@@ -143,7 +143,7 @@ extension _MainShellStartupPrompts on _MainShellState {
   static const _safMigrationPromptStore = SafMigrationPromptStore();
 
   Future<void> _checkSafMigration() async {
-    if (!Platform.isAndroid) return;
+    if (!Platform.isAndroid || isAndroidTv) return;
 
     final settings = ref.read(settingsProvider);
     if (settings.storageMode == 'saf') return;

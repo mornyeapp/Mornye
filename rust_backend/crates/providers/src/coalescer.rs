@@ -44,8 +44,8 @@ impl<V, T> Flight<V, T> {
         self.waiters.load(Ordering::Acquire)
     }
 
-    /// Registers one more waiter under the service lock. Create the matching
-    /// [`Waiter`] guard once that lock is released.
+    /// Registers the first waiter of a new flight under the service lock.
+    /// Existing flights use [`Coalescer::try_join`] to avoid reviving abandoned work.
     pub(crate) fn join(&self) {
         self.waiters.fetch_add(1, Ordering::AcqRel);
     }
@@ -125,19 +125,6 @@ impl<K: Ord, V, T> Coalescer<K, V, T> {
 
     pub(crate) fn is_full(&self) -> bool {
         self.active >= MAX_FLIGHTS
-    }
-
-    /// A flight for `key` that still has waiters. The caller registers itself
-    /// with [`Flight::join`] while still holding the service lock.
-    pub(crate) fn existing<Q>(&self, key: &Q) -> Option<Arc<Flight<V, T>>>
-    where
-        K: Borrow<Q>,
-        Q: Ord + ?Sized,
-    {
-        self.flights
-            .get(key)
-            .filter(|flight| flight.waiters() > 0)
-            .cloned()
     }
 
     /// Joins a flight for `key` only while its waiter count is still nonzero,
@@ -250,17 +237,17 @@ mod tests {
                 if let Some(value) = state.cache.get(key) {
                     return Ok(*value);
                 }
-                let (flight, start) = if let Some(flight) = state.flights.existing(key) {
+                let (flight, start) = if let Some(flight) = state.flights.try_join(key) {
                     (flight, false)
                 } else {
                     if state.flights.is_full() {
                         return Err("busy".into());
                     }
                     let flight = Flight::new(());
+                    flight.join();
                     state.flights.insert(key.into(), Arc::clone(&flight));
                     (flight, true)
                 };
-                flight.join();
                 (flight, start)
             };
             let _waiter = Waiter::new(Arc::clone(&flight));
@@ -405,7 +392,6 @@ mod tests {
         let mut flights: Coalescer<String, Outcome> = Coalescer::default();
         let stale = Flight::new(());
         flights.insert("key".into(), Arc::clone(&stale));
-        assert!(flights.existing("key").is_none());
         assert!(flights.try_join("key").is_none());
         assert_eq!(stale.waiters(), 0);
         let current = Flight::new(());
@@ -421,6 +407,27 @@ mod tests {
         flights.finish("key", &current, Ok(2), &idle);
         assert!(flights.get("key").is_none());
         assert_eq!(flights.active(), 0);
+    }
+
+    #[test]
+    fn last_waiter_can_leave_while_the_service_lock_is_held() {
+        let flight: Arc<Flight<Outcome>> = Flight::new(());
+        flight.join();
+        let waiter = Waiter::new(Arc::clone(&flight));
+        let mut flights: Coalescer<String, Outcome> = Coalescer::default();
+        flights.insert("key".into(), Arc::clone(&flight));
+        let table = Mutex::new(flights);
+        let locked = table.lock().unwrap();
+        // Holding the service lock does not keep a lookup's observed waiter
+        // count live: cancellation releases its guard independently.
+        assert_eq!(locked.get("key").unwrap().waiters(), 1);
+        std::thread::spawn(move || drop(waiter)).join().unwrap();
+        assert_eq!(
+            flight.check(&AtomicBool::new(false), "closed", "cancelled"),
+            Err("cancelled".into())
+        );
+        assert!(locked.try_join("key").is_none());
+        assert_eq!(flight.waiters(), 0);
     }
 
     #[test]

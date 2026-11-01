@@ -106,6 +106,22 @@ class LyricLine {
   });
 
   bool get hasWordTiming => words.isNotEmpty;
+
+  /// This line showing [translation] instead of its own, and [romanization]
+  /// when one is given.
+  LyricLine withTranslation(String? translation, {String? romanization}) =>
+      LyricLine(
+        time: time,
+        end: end,
+        text: text,
+        words: words,
+        romanization: romanization ?? this.romanization,
+        romanizationWords: romanization == null ? romanizationWords : const [],
+        translation: translation,
+        voice: voice,
+        isBackground: isBackground,
+        vocalGroup: vocalGroup,
+      );
 }
 
 class ParsedLyrics {

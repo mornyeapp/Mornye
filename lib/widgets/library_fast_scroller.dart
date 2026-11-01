@@ -233,7 +233,12 @@ class _LibraryFastScrollerState extends State<LibraryFastScroller> {
         onNotification: _onNotification,
         child: Stack(
           children: [
-            widget.child,
+            ScrollConfiguration(
+              behavior: ScrollConfiguration.of(
+                context,
+              ).copyWith(scrollbars: _long ? false : null),
+              child: widget.child,
+            ),
             if (_long)
               PositionedDirectional(
                 top: topPadding,

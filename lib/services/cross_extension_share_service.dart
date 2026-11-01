@@ -7,8 +7,6 @@ class CrossExtensionShareResult {
   final bool found;
   final String? url;
   final String? itemName;
-  final String? itemArtists;
-  final String? error;
 
   const CrossExtensionShareResult({
     required this.extensionId,
@@ -16,8 +14,6 @@ class CrossExtensionShareResult {
     required this.found,
     this.url,
     this.itemName,
-    this.itemArtists,
-    this.error,
   });
 
   factory CrossExtensionShareResult.fromJson(Map<String, dynamic> json) {
@@ -27,8 +23,6 @@ class CrossExtensionShareResult {
       found: json['found'] as bool? ?? false,
       url: json['url'] as String?,
       itemName: json['item_name'] as String?,
-      itemArtists: json['item_artists'] as String?,
-      error: json['error'] as String?,
     );
   }
 }

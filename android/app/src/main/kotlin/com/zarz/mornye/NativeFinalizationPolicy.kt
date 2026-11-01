@@ -75,21 +75,33 @@ internal object NativeFinalizationPolicy {
         return false
     }
 
+    fun resolveLyricsContent(existing: String?, fetch: () -> String): String {
+        val supplied = existing.orEmpty().trim()
+        if (hasUsableLyricsContent(supplied)) return supplied
+        val fetched = fetch().trim()
+        return if (hasUsableLyricsContent(fetched)) fetched else ""
+    }
+
     data class AutoConversionTarget(
         val codec: String,
         val extension: String,
         val bitrateKbps: Int,
+        val maxBitDepth: Int? = null,
+        val maxSampleRate: Int? = null,
     )
 
     fun autoConversionTarget(
         enabled: Boolean,
         format: String?,
         bitrate: String?,
+        maxBitDepth: Int = 16,
+        maxSampleRate: Int = 48000,
     ): AutoConversionTarget? {
         if (!enabled) return null
         val codec = when (format?.trim()?.lowercase(Locale.ROOT)) {
             "aac", "m4a" -> "aac"
             "opus" -> "opus"
+            "flac" -> "flac"
             else -> "mp3"
         }
         val normalizedBitrate = Regex("(\\d+)")
@@ -97,23 +109,71 @@ internal object NativeFinalizationPolicy {
             ?.groupValues
             ?.getOrNull(1)
             ?.toIntOrNull()
-            ?.takeIf { it in setOf(128, 192, 256, 320) }
+            ?.takeIf { it in setOf(128, 160, 192, 256, 320) }
             ?: 320
         val extension = when (codec) {
             "aac" -> ".m4a"
             "opus" -> ".opus"
+            "flac" -> ".flac"
             else -> ".mp3"
         }
-        return AutoConversionTarget(codec, extension, normalizedBitrate)
+        return AutoConversionTarget(
+            codec,
+            extension,
+            if (codec == "flac") 0 else normalizedBitrate,
+            if (codec == "flac" && maxBitDepth != 0) {
+                maxBitDepth.takeIf { it in setOf(16, 24) } ?: 16
+            } else null,
+            if (codec == "flac" && maxSampleRate != 0) {
+                maxSampleRate.takeIf { it in setOf(44100, 48000, 96000, 192000) } ?: 48000
+            } else null,
+        )
     }
 
     fun autoConversionAlreadySatisfied(
         target: AutoConversionTarget,
         audioCodec: String?,
         bitrateKbps: Int?,
+        bitDepth: Int? = null,
+        sampleRate: Int? = null,
     ): Boolean {
+        if (target.codec == "flac") {
+            return normalizeAudioCodec(audioCodec) == "flac" &&
+                (target.maxBitDepth == null || bitDepth != null && bitDepth > 0 && bitDepth <= target.maxBitDepth) &&
+                (target.maxSampleRate == null || sampleRate != null && sampleRate > 0 && sampleRate <= target.maxSampleRate)
+        }
         return normalizeAudioCodec(audioCodec) == target.codec &&
             bitrateKbps == target.bitrateKbps
+    }
+
+    fun flacAutoConversionArguments(
+        target: AutoConversionTarget,
+        input: String,
+        output: String,
+        bitDepth: Int?,
+        sampleRate: Int?,
+    ): List<String> {
+        require(target.codec == "flac")
+        val depth = target.maxBitDepth?.takeIf { bitDepth == null || bitDepth > it }
+        val rate = target.maxSampleRate?.takeIf { sampleRate == null || sampleRate > it }
+        val arguments = mutableListOf(
+            "-v", "error", "-hide_banner", "-i", input,
+            "-map", "0:a:0", "-map", "0:v?", "-map_metadata", "0",
+            "-c:a", "flac", "-c:v", "copy", "-disposition:v", "attached_pic",
+            "-compression_level", "5",
+        )
+        if (depth != null || rate != null) {
+            val options = mutableListOf("resampler=swr")
+            if (rate != null) options.add("osr=$rate")
+            if (depth != null) options.add("osf=${if (depth <= 16) "s16" else "s32"}")
+            arguments.addAll(listOf("-af", "aresample=${options.joinToString(":")}"))
+        }
+        if (depth != null) {
+            arguments.addAll(listOf("-sample_fmt", if (depth <= 16) "s16" else "s32"))
+            if (depth > 16) arguments.addAll(listOf("-bits_per_raw_sample", "24"))
+        }
+        arguments.addAll(listOf("-f", "flac", output, "-y"))
+        return arguments
     }
 
     fun normalizeAudioCodec(codec: String?): String? {

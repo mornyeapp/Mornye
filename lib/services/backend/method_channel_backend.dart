@@ -4,23 +4,19 @@ import 'package:mornye/services/backend/backend_channel.dart';
 
 /// The Android and iOS backend: the host platform channels, unchanged.
 class MethodChannelBackend extends BackendChannel {
-  const MethodChannelBackend(
-    this.channel, {
-    this.downloadProgressChannel = const EventChannel(
-      'com.zarz.mornye/download_progress_stream',
-    ),
-    this.libraryScanProgressChannel = const EventChannel(
-      'com.zarz.mornye/library_scan_progress_stream',
-    ),
-  });
+  const MethodChannelBackend(this.channel);
 
   static const shared = MethodChannelBackend(
     MethodChannel('com.zarz.mornye/backend'),
   );
+  static const _downloadProgressChannel = EventChannel(
+    'com.zarz.mornye/download_progress_stream',
+  );
+  static const _libraryScanProgressChannel = EventChannel(
+    'com.zarz.mornye/library_scan_progress_stream',
+  );
 
   final MethodChannel channel;
-  final EventChannel downloadProgressChannel;
-  final EventChannel libraryScanProgressChannel;
 
   @override
   @optionalTypeArgs
@@ -39,9 +35,9 @@ class MethodChannelBackend extends BackendChannel {
 
   @override
   Stream<dynamic> downloadProgressEvents() =>
-      downloadProgressChannel.receiveBroadcastStream();
+      _downloadProgressChannel.receiveBroadcastStream();
 
   @override
   Stream<dynamic> libraryScanProgressEvents() =>
-      libraryScanProgressChannel.receiveBroadcastStream();
+      _libraryScanProgressChannel.receiveBroadcastStream();
 }

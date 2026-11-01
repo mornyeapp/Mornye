@@ -8,7 +8,7 @@ use std::io::Read;
 const MAX_PCM_BYTES: usize = 11_025 * 2 * 25;
 const MAX_SPECTRAL_BYTES: usize = 4 << 20;
 
-fn read_bounded(
+pub(crate) fn read_bounded(
     path: &str,
     maximum: usize,
     check: &dyn Fn() -> Result<(), String>,

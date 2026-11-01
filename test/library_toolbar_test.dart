@@ -21,6 +21,7 @@ import 'package:mornye/theme/app_theme.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/widgets/app_search_field.dart';
+import 'package:mornye/widgets/library_directory_view.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 
@@ -343,6 +344,14 @@ void main() {
           '(desktop: $desktop, Mornye: $mornye)', (tester) async {
         await pumpLibrary(tester, desktop: desktop, mornye: mornye);
         final l10n = l10nOf(tester);
+        // The search field scrolls with the page over its plain background.
+        expect(
+          find.descendant(
+            of: find.byType(AppSearchField),
+            matching: find.byType(BackdropFilter),
+          ),
+          findsNothing,
+        );
         await tester.tap(
           find
               .text(
@@ -399,6 +408,29 @@ void main() {
     expect(find.text(l10n.libraryFilterTitle), findsOneWidget);
   });
 
+  testWidgets('the Folders tab browses the Library by folder', (tester) async {
+    await pumpLibrary(tester);
+    final l10n = l10nOf(tester);
+
+    await tester.tap(
+      find.descendant(
+        of: find.byType(TabBar),
+        matching: find.text(l10n.libraryFolders),
+      ),
+    );
+    for (var i = 0; i < 20; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+
+    expect(find.byType(LibraryDirectoryView), findsOneWidget);
+    // The mocked database has no songs.
+    expect(find.text(l10n.libraryFoldersEmptyTitle), findsOneWidget);
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(QueueTab)),
+    );
+    expect(container.read(settingsProvider).historyFilterMode, 'folders');
+  });
+
   testWidgets('Mornye keeps its filter button', (tester) async {
     await pumpLibrary(tester, mornye: true);
     final l10n = l10nOf(tester);
@@ -426,5 +458,36 @@ void main() {
       expect(tester.getSemantics(header), isSemantics(isHeader: true));
     }
     handle.dispose();
+  });
+
+  testWidgets('a rebuild with unchanged rows reuses the month sections', (
+    tester,
+  ) async {
+    await pumpLibrary(
+      tester,
+      dates: [
+        for (var day = 1; day <= 6; day++) DateTime(2026, 3, day),
+        DateTime(2025, 12, 24),
+      ],
+    );
+    final sectionList = find.byWidgetPredicate(
+      (widget) => widget.runtimeType.toString() == '_LibrarySectionList',
+    );
+    // Read the private list's sections without adding a test hook.
+    List<Object?> sections() =>
+        // ignore: avoid_dynamic_calls
+        (tester.widget(sectionList) as dynamic).sections as List<Object?>;
+    final widgetBefore = tester.widget(sectionList);
+    final before = sections();
+    expect(before, hasLength(2));
+
+    // Badge text is display-only: the Library rebuilds with the same rows.
+    ProviderScope.containerOf(tester.element(find.byType(QueueTab)))
+        .read(settingsProvider.notifier)
+        .setLibraryQualityLabelMode(AppSettings.libraryQualityLabelFileFormat);
+    await tester.pump();
+
+    expect(tester.widget(sectionList), isNot(same(widgetBefore)));
+    expect(sections(), same(before));
   });
 }

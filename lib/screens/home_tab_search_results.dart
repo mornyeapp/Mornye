@@ -219,7 +219,6 @@ extension _HomeTabSearchResultsUI on _HomeTabState {
                         return MornyeFilterChip(
                           label: _sortOptionLabel(option),
                           selected: tempSort == option,
-                          glass: false,
                           onTap: () => setSheetState(() => tempSort = option),
                         );
                       }
@@ -306,6 +305,7 @@ extension _HomeTabSearchResultsUI on _HomeTabState {
     required String? searchExtensionId,
     required bool showLocalLibraryIndicator,
     required Map<String, (double, double)> thumbnailSizesByExtensionId,
+    bool toolsBesideFilters = false,
   }) {
     final hasActualData = tracks.isNotEmpty;
 
@@ -327,7 +327,83 @@ extension _HomeTabSearchResultsUI on _HomeTabState {
     final sortedTracks = sortedTrackResults.tracks;
     final sortedTrackIndexes = sortedTrackResults.indexes;
 
-    final slivers = <Widget>[
+    final slivers = _searchStatusSlivers(
+      error: error,
+      isLoading: isLoading,
+      showEmptyResult: showEmptySearchResult && !hasActualData,
+      colorScheme: colorScheme,
+    );
+
+    // Phone results sort from the first section.
+    bool sortButtonShown = toolsBesideFilters;
+
+    for (final (items, kind, title, open) in [
+      (
+        artistItems,
+        'artist',
+        context.l10n.searchArtists,
+        _navigateToExtensionArtist,
+      ),
+      (
+        albumItems,
+        'album',
+        context.l10n.searchAlbums,
+        _navigateToExtensionAlbum,
+      ),
+      (
+        playlistItems,
+        'playlist',
+        context.l10n.searchPlaylists,
+        _navigateToExtensionPlaylist,
+      ),
+    ]) {
+      if (items.isEmpty) continue;
+      slivers.addAll(
+        _buildVirtualizedResultSection(
+          title: title,
+          itemCount: items.length,
+          colorScheme: colorScheme,
+          showSortButton: !sortButtonShown,
+          itemBuilder: (index, showDivider) => _CollectionItemWidget(
+            key: ValueKey('$kind-${items[index].id}'),
+            item: items[index],
+            showDivider: showDivider,
+            onTap: () => open(items[index]),
+            onSaveCover: () => _saveSearchResultCover(items[index]),
+          ),
+        ),
+      );
+      sortButtonShown = true;
+    }
+
+    if (sortedTracks.isNotEmpty) {
+      slivers.addAll(
+        _buildSearchSongRows(
+          resultsRef: resultsRef,
+          tracks: sortedTracks,
+          indexes: sortedTrackIndexes,
+          colorScheme: colorScheme,
+          showSortButton: !sortButtonShown,
+          searchExtensionId: searchExtensionId,
+          showLocalLibraryIndicator: showLocalLibraryIndicator,
+          thumbnailSizesByExtensionId: thumbnailSizesByExtensionId,
+        ),
+      );
+    }
+
+    slivers.add(const SliverToBoxAdapter(child: SizedBox(height: 16)));
+    return slivers;
+  }
+
+  /// The error, the progress bar of a refresh, and the empty result, above
+  /// the result sections.
+  List<Widget> _searchStatusSlivers({
+    required String? error,
+    required bool isLoading,
+    required bool showEmptyResult,
+    required ColorScheme colorScheme,
+  }) {
+    return <Widget>[
       if (error != null)
         SliverToBoxAdapter(
           child: Padding(
@@ -342,7 +418,7 @@ extension _HomeTabSearchResultsUI on _HomeTabState {
             child: AppProgressIndicator.linear(),
           ),
         ),
-      if (showEmptySearchResult && !hasActualData)
+      if (showEmptyResult)
         SliverFillRemaining(
           hasScrollBody: false,
           child: Center(
@@ -353,101 +429,57 @@ extension _HomeTabSearchResultsUI on _HomeTabState {
           ),
         ),
     ];
+  }
 
-    bool sortButtonShown = false;
+  /// Whether each of [tracks], by index, is in the download history, from
+  /// one batch lookup instead of a query per row.
+  bool Function(int index) _watchSearchHistory(
+    WidgetRef resultsRef,
+    List<Track> tracks,
+  ) {
+    _historySnapshot.update(tracks);
+    final historyLookups = _historySnapshot.lookups;
+    final existingHistoryKeys = resultsRef.watch(
+      downloadHistoryVisibleBatchExistsProvider(_historySnapshot.request),
+    );
+    return (index) =>
+        existingHistoryKeys.contains(historyLookups[index].lookupKey);
+  }
 
-    if (artistItems.isNotEmpty) {
-      slivers.addAll(
-        _buildVirtualizedResultSection(
-          title: context.l10n.searchArtists,
-          itemCount: artistItems.length,
-          colorScheme: colorScheme,
-          showSortButton: !sortButtonShown,
-          itemBuilder: (index, showDivider) => _CollectionItemWidget(
-            key: ValueKey('artist-${artistItems[index].id}'),
-            item: artistItems[index],
-            showDivider: showDivider,
-            onTap: () => _navigateToExtensionArtist(artistItems[index]),
-            onSaveCover: () => _saveSearchResultCover(artistItems[index]),
-          ),
+  /// The Songs section as phone rows, limited to the first [itemCount] of
+  /// [tracks] when given.
+  List<Widget> _buildSearchSongRows({
+    required WidgetRef resultsRef,
+    required List<Track> tracks,
+    required List<int> indexes,
+    required ColorScheme colorScheme,
+    required bool showSortButton,
+    required String? searchExtensionId,
+    required bool showLocalLibraryIndicator,
+    required Map<String, (double, double)> thumbnailSizesByExtensionId,
+    int? itemCount,
+  }) {
+    final isInHistory = _watchSearchHistory(resultsRef, tracks);
+    return _buildVirtualizedResultSection(
+      title: context.l10n.searchSongs,
+      itemCount: itemCount ?? tracks.length,
+      colorScheme: colorScheme,
+      showSortButton: showSortButton,
+      itemBuilder: (index, showDivider) => _TrackItemWithStatus(
+        key: ValueKey(tracks[index].id),
+        track: tracks[index],
+        showDivider: showDivider,
+        onDownload: ({bool forceQualityPicker = false}) => _downloadTrack(
+          indexes[index],
+          forceQualityPicker: forceQualityPicker,
         ),
-      );
-      sortButtonShown = true;
-    }
-
-    if (albumItems.isNotEmpty) {
-      slivers.addAll(
-        _buildVirtualizedResultSection(
-          title: context.l10n.searchAlbums,
-          itemCount: albumItems.length,
-          colorScheme: colorScheme,
-          showSortButton: !sortButtonShown,
-          itemBuilder: (index, showDivider) => _CollectionItemWidget(
-            key: ValueKey('album-${albumItems[index].id}'),
-            item: albumItems[index],
-            showDivider: showDivider,
-            onTap: () => _navigateToExtensionAlbum(albumItems[index]),
-            onSaveCover: () => _saveSearchResultCover(albumItems[index]),
-          ),
-        ),
-      );
-      sortButtonShown = true;
-    }
-
-    if (playlistItems.isNotEmpty) {
-      slivers.addAll(
-        _buildVirtualizedResultSection(
-          title: context.l10n.searchPlaylists,
-          itemCount: playlistItems.length,
-          colorScheme: colorScheme,
-          showSortButton: !sortButtonShown,
-          itemBuilder: (index, showDivider) => _CollectionItemWidget(
-            key: ValueKey('playlist-${playlistItems[index].id}'),
-            item: playlistItems[index],
-            showDivider: showDivider,
-            onTap: () => _navigateToExtensionPlaylist(playlistItems[index]),
-            onSaveCover: () => _saveSearchResultCover(playlistItems[index]),
-          ),
-        ),
-      );
-      sortButtonShown = true;
-    }
-
-    if (sortedTracks.isNotEmpty) {
-      _historySnapshot.update(sortedTracks);
-      final historyLookups = _historySnapshot.lookups;
-      final existingHistoryKeys = resultsRef.watch(
-        downloadHistoryVisibleBatchExistsProvider(_historySnapshot.request),
-      );
-      slivers.addAll(
-        _buildVirtualizedResultSection(
-          title: context.l10n.searchSongs,
-          itemCount: sortedTracks.length,
-          colorScheme: colorScheme,
-          showSortButton: !sortButtonShown,
-          itemBuilder: (index, showDivider) => _TrackItemWithStatus(
-            key: ValueKey(sortedTracks[index].id),
-            track: sortedTracks[index],
-            index: sortedTrackIndexes[index],
-            showDivider: showDivider,
-            onDownload: ({bool forceQualityPicker = false}) => _downloadTrack(
-              sortedTrackIndexes[index],
-              forceQualityPicker: forceQualityPicker,
-            ),
-            searchExtensionId: searchExtensionId,
-            showLocalLibraryIndicator: showLocalLibraryIndicator,
-            thumbnailSizesByExtensionId: thumbnailSizesByExtensionId,
-            isInHistory: existingHistoryKeys.contains(
-              historyLookups[index].lookupKey,
-            ),
-            onSaveCover: () => _saveSearchResultCover(sortedTracks[index]),
-          ),
-        ),
-      );
-    }
-
-    slivers.add(const SliverToBoxAdapter(child: SizedBox(height: 16)));
-    return slivers;
+        searchExtensionId: searchExtensionId,
+        showLocalLibraryIndicator: showLocalLibraryIndicator,
+        thumbnailSizesByExtensionId: thumbnailSizesByExtensionId,
+        isInHistory: isInHistory(index),
+        onSaveCover: () => _saveSearchResultCover(tracks[index]),
+      ),
+    );
   }
 
   List<Widget> _buildVirtualizedResultSection({
@@ -462,69 +494,13 @@ extension _HomeTabSearchResultsUI on _HomeTabState {
     final mornye = context.isMornye;
 
     return [
-      SliverToBoxAdapter(
-        child: Padding(
-          // Aligned with the clamped result list below on wide screens.
-          padding:
-              (mornye
-                      ? const EdgeInsetsDirectional.fromSTEB(20, 16, 12, 10)
-                      : const EdgeInsetsDirectional.fromSTEB(16, 8, 8, 8))
-                  .add(
-                    EdgeInsets.symmetric(horizontal: wideListInset(context)),
-                  ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  title,
-                  style: mornye
-                      ? Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w700,
-                          color: colorScheme.onSurface,
-                        )
-                      : Theme.of(context).textTheme.titleSmall?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
-                        ),
-                ),
-              ),
-              // Keeps ExpressiveButton's 48dp minimum touch target.
-              if (showSortButton)
-                ExpressiveButton(
-                  text: true,
-                  onPressed: () => _showSortOptions(colorScheme),
-                  icon: mornye
-                      ? null
-                      : Icon(
-                          Icons.swap_vert,
-                          size: 18,
-                          color:
-                              _searchSortOption !=
-                                  HomeSearchSortOption.defaultOrder
-                              ? colorScheme.primary
-                              : colorScheme.onSurfaceVariant,
-                        ),
-                  style: TextButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                  ),
-                  child: Text(
-                    _searchSortOption != HomeSearchSortOption.defaultOrder
-                        ? _sortOptionLabel(_searchSortOption)
-                        : context.l10n.libraryFilterSort,
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color:
-                          _searchSortOption != HomeSearchSortOption.defaultOrder
-                          ? colorScheme.primary
-                          : colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ),
+      _buildResultSectionHeader(
+        title: title,
+        colorScheme: colorScheme,
+        showSortButton: showSortButton,
       ),
       SliverPadding(
-        padding: EdgeInsets.symmetric(horizontal: wideListInset(context)),
+        padding: EdgeInsets.symmetric(horizontal: homeContentInset(context)),
         sliver: SliverList(
           delegate: SliverChildBuilderDelegate((context, index) {
             final isFirst = index == 0;
@@ -568,18 +544,152 @@ extension _HomeTabSearchResultsUI on _HomeTabState {
     ];
   }
 
-  void _navigateToExtensionAlbum(Track albumItem) async {
-    final extensionId = albumItem.source;
+  /// Sort, then the [viewToggle] when given. Material groups them as Library
+  /// pages do; Mornye keeps a text Sort and an icon button.
+  List<Widget> _buildSearchResultTools(
+    ColorScheme colorScheme, {
+    required bool showSortButton,
+    ToolButton? viewToggle,
+  }) {
+    final mornye = context.isMornye;
+    final sorted = _searchSortOption != HomeSearchSortOption.defaultOrder;
+    final sortLabel = sorted
+        ? _sortOptionLabel(_searchSortOption)
+        : context.l10n.libraryFilterSort;
+    return [
+      if (!mornye && (showSortButton || viewToggle != null))
+        ToolButtonGroup(
+          tools: [
+            if (showSortButton)
+              ToolButton(
+                icon: const AppIcon(Icons.sort),
+                label: sortLabel,
+                onPressed: (_) => _showSortOptions(colorScheme),
+              ),
+            ?viewToggle,
+          ],
+        ),
+      // Keeps ExpressiveButton's 48dp minimum touch target.
+      if (mornye && showSortButton)
+        ExpressiveButton(
+          text: true,
+          onPressed: () => _showSortOptions(colorScheme),
+          style: TextButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+          ),
+          child: Text(
+            sortLabel,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: sorted
+                  ? colorScheme.primary
+                  : colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+      if (mornye && viewToggle != null)
+        AppIconButton(
+          tooltip: viewToggle.tooltip,
+          icon: IconTheme(
+            data: IconThemeData(size: 20, color: colorScheme.onSurfaceVariant),
+            child: viewToggle.icon,
+          ),
+          onPressed: () => viewToggle.onPressed(context),
+        ),
+    ];
+  }
+
+  /// A result section's title, with Sort on the first section of phone
+  /// results and, on wide screens, the [onShowAll] that switches to the
+  /// section's own filter.
+  Widget _buildResultSectionHeader({
+    required String title,
+    required ColorScheme colorScheme,
+    required bool showSortButton,
+    VoidCallback? onShowAll,
+  }) {
+    final mornye = context.isMornye;
+    return SliverToBoxAdapter(
+      child: Padding(
+        // Aligned with the clamped result list below on wide screens.
+        padding:
+            (mornye
+                    ? const EdgeInsetsDirectional.fromSTEB(20, 16, 12, 10)
+                    : const EdgeInsetsDirectional.fromSTEB(16, 8, 8, 8))
+                .add(
+                  EdgeInsets.symmetric(horizontal: homeContentInset(context)),
+                ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                title,
+                style: mornye
+                    ? Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                        color: colorScheme.onSurface,
+                      )
+                    : Theme.of(context).textTheme.titleSmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+              ),
+            ),
+            if (onShowAll != null) _buildShowAllButton(title, onShowAll),
+            ..._buildSearchResultTools(
+              colorScheme,
+              showSortButton: showSortButton,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Switches wide results between the phone rows and the cover layout, as
+  /// the Library's view button does. [grid] is the layout on screen.
+  ToolButton _buildSearchViewToggle({required bool grid}) {
+    return ToolButton(
+      tooltip: grid
+          ? context.l10n.appearanceHistoryViewList
+          : context.l10n.appearanceHistoryViewGrid,
+      icon: AppIcon(grid ? Icons.view_list : Icons.grid_view),
+      onPressed: (_) => ref
+          .read(settingsProvider.notifier)
+          .setSearchViewMode(grid ? 'list' : 'grid'),
+    );
+  }
+
+  /// Show all, read out with the section it belongs to.
+  Widget _buildShowAllButton(String title, VoidCallback onPressed) {
+    return ExpressiveButton(
+      text: true,
+      onPressed: onPressed,
+      style: TextButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+      ),
+      child: Text(
+        context.l10n.searchShowAll,
+        semanticsLabel: context.l10n.searchShowAllCategory(title),
+      ),
+    );
+  }
+
+  String? _extensionSourceOrWarn(Track item, String kind) {
+    final extensionId = item.source;
     if (extensionId == null || extensionId.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(context.l10n.errorMissingExtensionSource('album')),
-        ),
+        SnackBar(content: Text(context.l10n.errorMissingExtensionSource(kind))),
       );
-      return;
+      return null;
     }
 
     ref.read(settingsProvider.notifier).setHasSearchedBefore();
+    return extensionId;
+  }
+
+  void _navigateToExtensionAlbum(Track albumItem) async {
+    final extensionId = _extensionSourceOrWarn(albumItem, 'album');
+    if (extensionId == null) return;
 
     ref
         .read(recentAccessProvider.notifier)
@@ -591,33 +701,22 @@ extension _HomeTabSearchResultsUI on _HomeTabState {
           providerId: extensionId,
         );
 
-    Navigator.push(
+    pushPage<void>(
       context,
-      MaterialPageRoute<void>(
-        builder: (context) => ExtensionAlbumScreen(
-          extensionId: extensionId,
-          albumId: albumItem.id,
-          albumName: albumItem.name,
-          coverUrl: albumItem.coverUrl,
-          initialAlbumType: albumItem.albumType,
-          initialTotalTracks: albumItem.totalTracks,
-        ),
+      (context) => ExtensionAlbumScreen(
+        extensionId: extensionId,
+        albumId: albumItem.id,
+        albumName: albumItem.name,
+        coverUrl: albumItem.coverUrl,
+        initialAlbumType: albumItem.albumType,
+        initialTotalTracks: albumItem.totalTracks,
       ),
     );
   }
 
   void _navigateToExtensionPlaylist(Track playlistItem) async {
-    final extensionId = playlistItem.source;
-    if (extensionId == null || extensionId.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(context.l10n.errorMissingExtensionSource('playlist')),
-        ),
-      );
-      return;
-    }
-
-    ref.read(settingsProvider.notifier).setHasSearchedBefore();
+    final extensionId = _extensionSourceOrWarn(playlistItem, 'playlist');
+    if (extensionId == null) return;
 
     ref
         .read(recentAccessProvider.notifier)
@@ -629,31 +728,20 @@ extension _HomeTabSearchResultsUI on _HomeTabState {
           providerId: extensionId,
         );
 
-    Navigator.push(
+    pushPage<void>(
       context,
-      MaterialPageRoute<void>(
-        builder: (context) => ExtensionPlaylistScreen(
-          extensionId: extensionId,
-          playlistId: playlistItem.id,
-          playlistName: playlistItem.name,
-          coverUrl: playlistItem.coverUrl,
-        ),
+      (context) => ExtensionPlaylistScreen(
+        extensionId: extensionId,
+        playlistId: playlistItem.id,
+        playlistName: playlistItem.name,
+        coverUrl: playlistItem.coverUrl,
       ),
     );
   }
 
   void _navigateToExtensionArtist(Track artistItem) {
-    final extensionId = artistItem.source;
-    if (extensionId == null || extensionId.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(context.l10n.errorMissingExtensionSource('artist')),
-        ),
-      );
-      return;
-    }
-
-    ref.read(settingsProvider.notifier).setHasSearchedBefore();
+    final extensionId = _extensionSourceOrWarn(artistItem, 'artist');
+    if (extensionId == null) return;
 
     ref
         .read(recentAccessProvider.notifier)
@@ -664,15 +752,13 @@ extension _HomeTabSearchResultsUI on _HomeTabState {
           providerId: extensionId,
         );
 
-    Navigator.push(
+    pushPage<void>(
       context,
-      MaterialPageRoute<void>(
-        builder: (context) => ExtensionArtistScreen(
-          extensionId: extensionId,
-          artistId: artistItem.id,
-          artistName: artistItem.name,
-          coverUrl: artistItem.coverUrl,
-        ),
+      (context) => ExtensionArtistScreen(
+        extensionId: extensionId,
+        artistId: artistItem.id,
+        artistName: artistItem.name,
+        coverUrl: artistItem.coverUrl,
       ),
     );
   }
@@ -703,16 +789,16 @@ extension _HomeTabSearchResultsUI on _HomeTabState {
     return context.l10n.homeSearchHintDefault;
   }
 
+  /// The filter chips, with [tools] at the end of the row. Without
+  /// [filters] only the tools show.
   Widget _buildSearchFilterBar(
     List<SearchFilter> filters,
     String? selectedFilter,
-    ColorScheme colorScheme,
-  ) {
+    ColorScheme colorScheme, {
+    Widget? tools,
+  }) {
     Widget filterChip(String id, String label, {IconData? icon}) {
-      void select() {
-        ref.read(trackProvider.notifier).setSearchFilter(id);
-        _triggerSearchWithFilter(id);
-      }
+      void select() => _selectSearchFilter(id);
 
       return context.isMornye
           ? MornyeGlassPanel.overlay(
@@ -721,7 +807,6 @@ extension _HomeTabSearchResultsUI on _HomeTabState {
                 label: label,
                 selected: selectedFilter == id,
                 icon: icon == null ? null : mornyeIconFor(icon),
-                glass: false,
                 tonal: selectedFilter == id,
                 onTap: select,
               ),
@@ -736,7 +821,7 @@ extension _HomeTabSearchResultsUI on _HomeTabState {
     }
 
     final chips = [
-      filterChip('all', context.l10n.historyFilterAll),
+      if (filters.isNotEmpty) filterChip('all', context.l10n.historyFilterAll),
       for (final filter in filters)
         filterChip(
           filter.id,
@@ -744,8 +829,8 @@ extension _HomeTabSearchResultsUI on _HomeTabState {
           icon: filter.icon == null ? null : _getFilterIcon(filter.icon!),
         ),
     ];
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 16 + wideListInset(context)),
+    // The chips never overlap, so their glass shares one backdrop read.
+    final chipRow = LiquidGlassBatch(
       // A mouse cannot swipe a clipped row, so desktop windows wrap every
       // filter onto view.
       child: isDesktopPlatform
@@ -753,6 +838,18 @@ extension _HomeTabSearchResultsUI on _HomeTabState {
           : SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(spacing: 8, children: chips),
+            ),
+    );
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 16 + homeContentInset(context)),
+      child: tools == null
+          ? chipRow
+          : Row(
+              spacing: 8,
+              children: [
+                Expanded(child: chipRow),
+                tools,
+              ],
             ),
     );
   }
@@ -776,6 +873,12 @@ extension _HomeTabSearchResultsUI on _HomeTabState {
       default:
         return Icons.search;
     }
+  }
+
+  /// Selects the filter chip [id] and searches again with it.
+  void _selectSearchFilter(String id) {
+    ref.read(trackProvider.notifier).setSearchFilter(id);
+    _triggerSearchWithFilter(id);
   }
 
   void _triggerSearchWithFilter(String? filter) {
@@ -845,10 +948,33 @@ extension _HomeTabSearchResultsUI on _HomeTabState {
               tooltip: context.l10n.actionPaste,
             ),
           ],
+          if (!hasText)
+            AppIconButton(
+              icon: const AppIcon.adaptive(Icons.mic),
+              onPressed: _openMusicRecognition,
+              tooltip: context.l10n.recognizeSearchTooltip,
+            ),
         ],
       ),
       onSubmitted: (_) => _onSearchSubmitted(),
     );
+  }
+
+  /// Identifies a song nearby; searches for it when it is not in Mornye.
+  Future<void> _openMusicRecognition() async {
+    _searchFocusNode.unfocus();
+    final query = await pushPage<String>(
+      context,
+      (_) => const MusicRecognitionScreen(),
+    );
+    if (!mounted || query == null || query.trim().isEmpty) return;
+    _urlController.text = query;
+    // The song is not in the library, so the search goes online.
+    if (_searchesLibrary) {
+      _setSearchScope(library: false);
+    } else {
+      _onSearchSubmitted();
+    }
   }
 
   void _onSearchSubmitted() {

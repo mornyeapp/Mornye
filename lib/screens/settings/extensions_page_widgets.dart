@@ -88,23 +88,46 @@ String _extensionHealthLabel(BuildContext context, String status) {
   }
 }
 
-class _ExtensionPriorityLink extends StatelessWidget {
-  const _ExtensionPriorityLink({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.enabled,
-    required this.onTap,
-  });
+enum _PriorityLink { download, fallback, metadata }
 
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final bool enabled;
-  final VoidCallback onTap;
+class _ExtensionPriorityLink extends ConsumerWidget {
+  const _ExtensionPriorityLink(this.kind);
+
+  final _PriorityLink kind;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = context.l10n;
+    final metadata = kind == _PriorityLink.metadata;
+    final enabled = ref
+        .watch(extensionProvider)
+        .extensions
+        .any(
+          (e) =>
+              e.enabled &&
+              (metadata ? e.hasMetadataProvider : e.hasDownloadProvider),
+        );
+    final (icon, title, subtitle, page) = switch (kind) {
+      _PriorityLink.download => (
+        Icons.download,
+        l10n.extensionsDownloadPriority,
+        l10n.extensionsDownloadPrioritySubtitle,
+        const ProviderPriorityPage(),
+      ),
+      _PriorityLink.fallback => (
+        Icons.alt_route,
+        l10n.extensionsFallbackTitle,
+        l10n.extensionsFallbackSubtitle,
+        const DownloadFallbackExtensionsPage(),
+      ),
+      _PriorityLink.metadata => (
+        Icons.search,
+        l10n.extensionsMetadataPriority,
+        l10n.extensionsMetadataPrioritySubtitle,
+        const MetadataProviderPriorityPage(),
+      ),
+    };
+
     // The standard row keeps these links in line with the other settings
     // rows of the group in both styles.
     return Opacity(
@@ -112,89 +135,12 @@ class _ExtensionPriorityLink extends StatelessWidget {
       child: SettingsItem(
         icon: icon,
         title: title,
-        subtitle: subtitle,
-        onTap: enabled ? onTap : null,
-      ),
-    );
-  }
-}
-
-class _DownloadPriorityItem extends ConsumerWidget {
-  const _DownloadPriorityItem();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final extState = ref.watch(extensionProvider);
-    final hasDownloadExtensions = extState.extensions.any(
-      (e) => e.enabled && e.hasDownloadProvider,
-    );
-
-    return _ExtensionPriorityLink(
-      icon: Icons.download,
-      title: context.l10n.extensionsDownloadPriority,
-      subtitle: hasDownloadExtensions
-          ? context.l10n.extensionsDownloadPrioritySubtitle
-          : context.l10n.extensionsNoDownloadProvider,
-      enabled: hasDownloadExtensions,
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute<void>(builder: (_) => const ProviderPriorityPage()),
-      ),
-    );
-  }
-}
-
-class _MetadataPriorityItem extends ConsumerWidget {
-  const _MetadataPriorityItem();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final extState = ref.watch(extensionProvider);
-
-    final hasMetadataExtensions = extState.extensions.any(
-      (e) => e.enabled && e.hasMetadataProvider,
-    );
-
-    return _ExtensionPriorityLink(
-      icon: Icons.search,
-      title: context.l10n.extensionsMetadataPriority,
-      subtitle: hasMetadataExtensions
-          ? context.l10n.extensionsMetadataPrioritySubtitle
-          : context.l10n.extensionsNoMetadataProvider,
-      enabled: hasMetadataExtensions,
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute<void>(
-          builder: (_) => const MetadataProviderPriorityPage(),
-        ),
-      ),
-    );
-  }
-}
-
-class _DownloadFallbackItem extends ConsumerWidget {
-  const _DownloadFallbackItem();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final extState = ref.watch(extensionProvider);
-
-    final hasDownloadExtensions = extState.extensions.any(
-      (e) => e.enabled && e.hasDownloadProvider,
-    );
-
-    return _ExtensionPriorityLink(
-      icon: Icons.alt_route,
-      title: context.l10n.extensionsFallbackTitle,
-      subtitle: hasDownloadExtensions
-          ? context.l10n.extensionsFallbackSubtitle
-          : context.l10n.extensionsNoDownloadProvider,
-      enabled: hasDownloadExtensions,
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute<void>(
-          builder: (_) => const DownloadFallbackExtensionsPage(),
-        ),
+        subtitle: enabled
+            ? subtitle
+            : metadata
+            ? l10n.extensionsNoMetadataProvider
+            : l10n.extensionsNoDownloadProvider,
+        onTap: enabled ? () => pushPage<void>(context, (_) => page) : null,
       ),
     );
   }

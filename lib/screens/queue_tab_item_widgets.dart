@@ -139,8 +139,6 @@ extension _QueueTabItemWidgets on _QueueTabState {
                   artistId: item.track.artistId,
                   coverUrl: item.track.coverUrl,
                   extensionId: item.track.source,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: colorScheme.onSurfaceVariant,
                   ),
@@ -885,13 +883,18 @@ extension _QueueTabItemWidgets on _QueueTabState {
   /// sort modes.
   Widget _buildLibrarySongTable(
     BuildContext context, {
+    required String filterMode,
     required List<UnifiedLibraryItem> items,
     required int leadCount,
     required Widget Function(int index) leadBuilder,
     required VoidCallback Function(UnifiedLibraryItem item) openAction,
   }) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final byId = {for (final item in items) item.id: item};
+    final table = _librarySongTableRows(
+      filterMode,
+      items,
+      Theme.of(context).colorScheme,
+    );
+    final byId = table.byId;
     final sort = switch (_sortMode) {
       'a-z' => (column: TrackTableColumn.title, ascending: true),
       'z-a' => (column: TrackTableColumn.title, ascending: false),
@@ -915,27 +918,7 @@ extension _QueueTabItemWidgets on _QueueTabState {
         SliverPadding(
           padding: inset,
           sliver: SliverTrackTable(
-            rows: [
-              for (final item in items)
-                TrackTableRow(
-                  id: item.id,
-                  title: item.trackName,
-                  artist: item.artistName,
-                  album: item.albumName,
-                  quality: item.qualityForMode(_libraryQualityLabelMode),
-                  duration: switch (item.historyItem?.duration ??
-                      item.localItem?.duration) {
-                    final seconds? when seconds > 0 => Duration(
-                      seconds: seconds,
-                    ),
-                    _ => null,
-                  },
-                  leading: _buildUnifiedCoverImage(item, colorScheme, 32),
-                  playback: mediaItemPlaybackUiProvider(
-                    _libraryPlaybackKey(item),
-                  ),
-                ),
-            ],
+            rows: table.rows,
             columns: const [
               TrackTableColumn.title,
               TrackTableColumn.artist,
@@ -994,6 +977,56 @@ extension _QueueTabItemWidgets on _QueueTabState {
     );
   }
 
+  /// The Songs table rows for [items], kept while the songs, the quality
+  /// label mode and [colorScheme] stay the same. A new list, such as one
+  /// with another page loaded, reuses the rows of the songs it keeps.
+  _LibrarySongTableRows _librarySongTableRows(
+    String filterMode,
+    List<UnifiedLibraryItem> items,
+    ColorScheme colorScheme,
+  ) {
+    final qualityMode = _libraryQualityLabelMode;
+    final cached = _songTableByMode[filterMode];
+    final reusable =
+        cached != null &&
+        cached.qualityMode == qualityMode &&
+        cached.colorScheme == colorScheme;
+    if (reusable && identical(cached.items, items)) return cached;
+    final previous = reusable ? cached.rowByItem : null;
+    final rows = <TrackTableRow>[];
+    final rowByItem = Map<UnifiedLibraryItem, TrackTableRow>.identity();
+    final byId = <String, UnifiedLibraryItem>{};
+    for (final item in items) {
+      final row =
+          previous?[item] ??
+          TrackTableRow(
+            id: item.id,
+            title: item.trackName,
+            artist: item.artistName,
+            album: item.albumName,
+            quality: item.qualityForMode(qualityMode),
+            duration: switch (item.historyItem?.duration ??
+                item.localItem?.duration) {
+              final seconds? when seconds > 0 => Duration(seconds: seconds),
+              _ => null,
+            },
+            leading: _buildUnifiedCoverImage(item, colorScheme, 32),
+            playback: mediaItemPlaybackUiProvider(_libraryPlaybackKey(item)),
+          );
+      rows.add(row);
+      rowByItem[item] = row;
+      byId[item.id] = item;
+    }
+    return _songTableByMode[filterMode] = _LibrarySongTableRows(
+      items: items,
+      qualityMode: qualityMode,
+      colorScheme: colorScheme,
+      rows: rows,
+      rowByItem: rowByItem,
+      byId: byId,
+    );
+  }
+
   Widget _buildUnifiedLibraryItem(
     BuildContext context,
     UnifiedLibraryItem item,
@@ -1037,62 +1070,67 @@ extension _QueueTabItemWidgets on _QueueTabState {
         context.tokens.coverList,
       ),
     );
-    final subtitle = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        // The history service is where the audio was downloaded from;
-        // artist lookups use the user's search provider instead.
-        ClickableArtistName(
-          artistName: item.artistName,
-          coverUrl: item.coverUrl,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: Theme.of(
-            context,
-          ).textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
-        ),
-        const SizedBox(height: 2),
-        Row(
+    // The text reads the row's supporting colour, which follows the fill of
+    // the current track; the badges keep their own surfaces.
+    final subtitle = Builder(
+      builder: (context) {
+        final textColor = DefaultTextStyle.of(context).style.color;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              padding: context.tokens.badgePadding,
-              decoration: BoxDecoration(
-                color: sourceColor,
-                borderRadius: context.tokens.borderRadiusBadge,
-              ),
-              child: Text(
-                sourceLabel,
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: sourceTextColor,
-                  fontSize: context.tokens.badgeFontSize,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Flexible(
-              child: Text(
-                dateStr,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ),
-            if (quality != null && quality.isNotEmpty) ...[
-              const SizedBox(width: 8),
-              _buildLibraryQualityBadge(
+            // The history service is where the audio was downloaded from;
+            // artist lookups use the user's search provider instead.
+            ClickableArtistName(
+              artistName: item.artistName,
+              coverUrl: item.coverUrl,
+              style: Theme.of(
                 context,
-                colorScheme,
-                quality,
-                listStyle: true,
-              ),
-            ],
+              ).textTheme.bodySmall?.copyWith(color: textColor),
+            ),
+            const SizedBox(height: 2),
+            Row(
+              children: [
+                Container(
+                  padding: context.tokens.badgePadding,
+                  decoration: BoxDecoration(
+                    color: sourceColor,
+                    borderRadius: context.tokens.borderRadiusBadge,
+                  ),
+                  child: Text(
+                    sourceLabel,
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: sourceTextColor,
+                      fontSize: context.tokens.badgeFontSize,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    dateStr,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(
+                      context,
+                    ).textTheme.labelSmall?.copyWith(color: textColor),
+                  ),
+                ),
+                if (quality != null && quality.isNotEmpty) ...[
+                  const SizedBox(width: 8),
+                  _buildLibraryQualityBadge(
+                    context,
+                    colorScheme,
+                    quality,
+                    listStyle: true,
+                  ),
+                ],
+              ],
+            ),
           ],
-        ),
-      ],
+        );
+      },
     );
     final trailing = ValueListenableBuilder<bool>(
       valueListenable: fileExistsListenable,
@@ -1300,7 +1338,6 @@ extension _QueueTabItemWidgets on _QueueTabState {
             end: 4,
             top: 4,
             child: AnimatedSelectionCheckbox(
-              visible: true,
               selected: isSelected,
               colorScheme: colorScheme,
               size: 24,
@@ -1313,8 +1350,6 @@ extension _QueueTabItemWidgets on _QueueTabState {
       subtitle: ClickableArtistName(
         artistName: item.artistName,
         coverUrl: item.coverUrl,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
         style: Theme.of(
           context,
         ).textTheme.labelSmall?.copyWith(color: colorScheme.onSurfaceVariant),
@@ -1382,4 +1417,24 @@ class _LibraryPlaybackButton extends ConsumerWidget {
       ),
     );
   }
+}
+
+/// The desktop Songs table rows of one song list, with the inputs they were
+/// built from.
+class _LibrarySongTableRows {
+  const _LibrarySongTableRows({
+    required this.items,
+    required this.qualityMode,
+    required this.colorScheme,
+    required this.rows,
+    required this.rowByItem,
+    required this.byId,
+  });
+
+  final List<UnifiedLibraryItem> items;
+  final String qualityMode;
+  final ColorScheme colorScheme;
+  final List<TrackTableRow> rows;
+  final Map<UnifiedLibraryItem, TrackTableRow> rowByItem;
+  final Map<String, UnifiedLibraryItem> byId;
 }

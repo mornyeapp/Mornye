@@ -157,11 +157,11 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      await _tapVisible(tester, find.text('AAC'));
-      await _tapVisible(tester, find.text('128k'));
+      await _tapVisible(tester, find.text('Opus'));
+      await _tapVisible(tester, find.text('160k'));
       await _tapVisible(tester, find.byType(AppSwitch));
       await _tapVisible(tester, find.text('Convert tracks'));
-      expect(result, ('AAC', '128k', true));
+      expect(result, ('Opus', '160k', true));
       expect(tester.takeException(), isNull);
     });
   }

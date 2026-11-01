@@ -19,12 +19,16 @@ pub struct Track {
     pub artist: Artist,
     pub album: Album,
     pub contributors: Option<Vec<Artist>>,
+    /// Whether Deezer lets this release be played; absent from some
+    /// responses, where it is unknown.
+    pub readable: Option<bool>,
 }
 lenient_deserialize!(Track {
     "id" => id, "title" => title, "duration" => duration, "track_position" => track_position,
     "disk_number" => disk_number, "isrc" => isrc, "link" => link, "release_date" => release_date,
     "explicit_lyrics" => explicit_lyrics, "explicit_content_lyrics" => explicit_content_lyrics,
     "artist" => artist, "album" => album, "contributors" => contributors,
+    "readable" => readable,
 });
 
 #[derive(Clone, Debug, Default)]

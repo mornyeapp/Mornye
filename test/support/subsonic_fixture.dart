@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:mornye/services/network_storage_service.dart';
 
@@ -28,6 +29,7 @@ class SubsonicFixture {
   final authorizations = <String?>[];
   final ranges = <String?>[];
   final salts = <String>[];
+  final ifNoneMatch = <String?>[];
   final held = Completer<void>();
   final release = Completer<void>();
   String? blockMethod;
@@ -40,6 +42,23 @@ class SubsonicFixture {
   bool repeatPage = false;
   String? redirect;
   List<int>? audio;
+  List<int>? cover;
+
+  /// The OpenSubsonic `type` of every response (`mornye` for a desktop).
+  String? type;
+
+  /// Sent with the cover; a request naming it in If-None-Match gets 304.
+  String? coverEtag;
+
+  /// Songs with an `albumId`, served instead of [song]: getAlbumList2 lists
+  /// their album ids in order, getAlbum and search3 (by `songOffset`, at
+  /// most [searchPage] a page) list songs in this order.
+  List<Map<String, dynamic>>? library;
+  int searchPage = 500;
+
+  /// The `lyricsList` answered by getLyricsBySongId; without one the server
+  /// lacks the songLyrics extension.
+  Map<String, dynamic>? lyricsList;
   final song = <String, dynamic>{
     'id': 'song / 日本語?&',
     'title': 'A song',
@@ -81,6 +100,7 @@ class SubsonicFixture {
     methods.add(request.method);
     authorizations.add(request.headers.value('authorization'));
     ranges.add(request.headers.value('range'));
+    ifNoneMatch.add(request.headers.value('if-none-match'));
     final salt = request.uri.queryParameters['s'];
     if (salt != null) salts.add(salt);
     final method = request.uri.pathSegments.last.replaceFirst('.view', '');
@@ -113,14 +133,25 @@ class SubsonicFixture {
             },
           }),
         );
-      } else if ((method == 'stream' || method == 'getCoverArt') &&
+      } else if (method == 'getCoverArt' &&
+          coverEtag != null &&
+          request.headers.value('if-none-match') == coverEtag) {
+        response.statusCode = 304;
+        response.headers.set('etag', coverEtag!);
+      } else if ((method == 'stream' ||
+              method == 'download' ||
+              method == 'getCoverArt') &&
           !mediaError) {
+        final isAudio = method != 'getCoverArt';
         response.headers.contentType = ContentType.parse(
-          method == 'stream' ? song['contentType'] as String : 'image/png',
+          isAudio ? song['contentType'] as String : 'image/png',
         );
+        if (!isAudio && coverEtag != null) {
+          response.headers.set('etag', coverEtag!);
+        }
         final range = request.headers.value('range');
         response.statusCode = range == null ? 200 : 206;
-        final media = method == 'stream' ? audio ?? [0, 1, 2, 3] : [0, 1, 2, 3];
+        final media = (isAudio ? audio : cover) ?? [0, 1, 2, 3];
         final part = networkByteRange(range, media.length);
         if (range != null) {
           response.headers.set(
@@ -133,7 +164,35 @@ class SubsonicFixture {
         response.contentLength = bytes.length;
         response.add(bytes);
       } else {
+        final query = request.uri.queryParameters;
+        final songs = library;
         final payload = switch (method) {
+          'getAlbumList2' when songs != null => {
+            'albumList2': {
+              'album': [
+                for (final id in {
+                  for (final song in songs) song['albumId'],
+                }.skip(int.parse(query['offset']!)).take(200))
+                  {'id': id, 'name': id},
+              ],
+            },
+          },
+          'getAlbum' when songs != null => {
+            'album': {
+              'song': [
+                for (final song in songs)
+                  if (song['albumId'] == query['id']) song,
+              ],
+            },
+          },
+          'search3' when songs != null => {
+            'searchResult3': {
+              'song': songs
+                  .skip(repeatPage ? 0 : int.parse(query['songOffset']!))
+                  .take(min(int.parse(query['songCount']!), searchPage))
+                  .toList(),
+            },
+          },
           'ping' => <String, dynamic>{},
           'getArtists' => {
             'artists': {
@@ -184,6 +243,9 @@ class SubsonicFixture {
             },
           },
           'getSong' => {'song': song},
+          'getLyricsBySongId' when lyricsList != null => {
+            'lyricsList': lyricsList,
+          },
           'search3' => {
             'searchResult3': {
               'song': [song],
@@ -198,6 +260,7 @@ class SubsonicFixture {
           jsonEncode({
             'subsonic-response': {
               'status': payload.containsKey('error') ? 'failed' : 'ok',
+              'type': ?type,
               ...payload,
             },
           }),

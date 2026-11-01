@@ -51,6 +51,8 @@ void main() {
                 size: size,
                 modified: date,
                 created: date,
+                accessed: date,
+                changed: date,
               ),
             ),
         ],

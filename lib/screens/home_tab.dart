@@ -4,7 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:mornye/widgets/app_snack_bar.dart';
-import 'package:mornye/screens/track_history_snapshot.dart';
+import 'package:mornye/widgets/tv_navigation.dart';
 import 'package:mornye/theme/app_tokens.dart';
 import 'package:mornye/theme/cover_palette.dart';
 import 'package:mornye/theme/mornye_theme.dart';
@@ -20,6 +20,7 @@ import 'package:mornye/widgets/app_shape.dart';
 import 'package:mornye/widgets/expressive_button.dart';
 import 'package:mornye/widgets/app_icon_button.dart';
 import 'package:mornye/widgets/app_menu_button.dart';
+import 'package:mornye/widgets/tool_button_group.dart';
 import 'package:mornye/theme/mornye_icons.dart';
 import 'package:mornye/widgets/mornye_chrome.dart';
 import 'package:mornye/widgets/mornye_context_menu.dart';
@@ -29,8 +30,10 @@ import 'package:mornye/screens/mornye_library_screen.dart';
 import 'package:mornye/widgets/app_bottom_sheet.dart';
 import 'package:mornye/widgets/app_alert_dialog.dart';
 import 'package:mornye/widgets/app_sliver_header.dart';
+import 'package:mornye/widgets/sliver_layout_info_builder.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:liquid_glass_easy/liquid_glass_easy.dart' show LiquidGlassBatch;
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/models/settings.dart';
 import 'package:mornye/models/track.dart';
@@ -43,11 +46,14 @@ import 'package:mornye/providers/explore_provider.dart';
 import 'package:mornye/providers/user_profile_provider.dart';
 import 'package:mornye/widgets/desktop/desktop_scroll_arrows.dart';
 import 'package:mornye/widgets/explore_featured_section.dart';
+import 'package:mornye/providers/library_mixes_provider.dart';
 import 'package:mornye/providers/local_library_provider.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/models/unified_library_item.dart';
 import 'package:mornye/screens/equalizer_screen.dart';
+import 'package:mornye/screens/library_mix_screen.dart';
 import 'package:mornye/screens/listening_statistics_screen.dart';
+import 'package:mornye/screens/music_recognition_screen.dart';
 import 'package:mornye/screens/network_storage_screen.dart';
 import 'package:mornye/screens/now_playing_screen.dart';
 import 'package:mornye/services/library_database.dart';
@@ -57,7 +63,9 @@ import 'package:mornye/screens/track_metadata_screen.dart';
 import 'package:mornye/screens/album_screen.dart';
 import 'package:mornye/screens/artist_screen.dart';
 import 'package:mornye/screens/extension_collection_screens.dart';
+import 'package:mornye/controllers/clickable_metadata.dart';
 import 'package:mornye/controllers/home_search_logic.dart';
+import 'package:mornye/controllers/track_history_snapshot.dart';
 import 'package:mornye/services/csv_import_service.dart';
 import 'package:mornye/services/cover_download_service.dart';
 import 'package:mornye/services/downloaded_embedded_cover_resolver.dart';
@@ -75,9 +83,9 @@ import 'package:mornye/widgets/download_service_picker.dart';
 import 'package:mornye/widgets/track_collection_quick_actions.dart';
 import 'package:mornye/widgets/desktop/context_menu.dart';
 import 'package:mornye/widgets/animation_utils.dart';
-import 'package:mornye/utils/clickable_metadata.dart';
 import 'package:mornye/widgets/audio_quality_badges.dart';
 import 'package:mornye/widgets/cached_cover_image.dart';
+import 'package:mornye/widgets/library_mix_cover.dart';
 import 'package:mornye/widgets/player_artwork.dart';
 import 'package:mornye/widgets/error_card.dart';
 import 'package:mornye/widgets/in_library_badge.dart';
@@ -97,6 +105,7 @@ part 'home_tab_recent.dart';
 part 'home_tab_import.dart';
 part 'home_tab_intro.dart';
 part 'home_tab_search_results.dart';
+part 'home_tab_search_wide.dart';
 part 'home_tab_widgets.dart';
 
 enum HomeTabMode { combined, browse, search }
@@ -664,17 +673,15 @@ class _HomeTabState extends ConsumerState<HomeTab>
         trackState.albumName != null &&
         trackState.tracks.isNotEmpty) {
       final extensionId = trackState.searchExtensionId;
-      Navigator.push(
+      pushPage<void>(
         context,
-        MaterialPageRoute<void>(
-          builder: (context) => AlbumScreen(
-            albumId: trackState.albumId!,
-            albumName: trackState.albumName!,
-            description: trackState.albumDescription,
-            coverUrl: trackState.coverUrl,
-            tracks: trackState.tracks,
-            extensionId: extensionId,
-          ),
+        (context) => AlbumScreen(
+          albumId: trackState.albumId!,
+          albumName: trackState.albumName!,
+          description: trackState.albumDescription,
+          coverUrl: trackState.coverUrl,
+          tracks: trackState.tracks,
+          extensionId: extensionId,
         ),
       );
       ref.read(trackProvider.notifier).clear();
@@ -693,18 +700,16 @@ class _HomeTabState extends ConsumerState<HomeTab>
             providerId: playlistProviderId,
           );
 
-      Navigator.push(
+      pushPage<void>(
         context,
-        MaterialPageRoute<void>(
-          builder: (context) => PlaylistScreen(
-            playlistName: trackState.playlistName!,
-            coverUrl: trackState.coverUrl,
-            tracks: trackState.tracks,
-            playlistId: trackState.playlistId,
-            metadataProviderId: playlistProviderId,
-            recommendedService:
-                trackState.searchExtensionId ?? trackState.searchSource,
-          ),
+        (context) => PlaylistScreen(
+          playlistName: trackState.playlistName!,
+          coverUrl: trackState.coverUrl,
+          tracks: trackState.tracks,
+          playlistId: trackState.playlistId,
+          metadataProviderId: playlistProviderId,
+          recommendedService:
+              trackState.searchExtensionId ?? trackState.searchSource,
         ),
       );
       ref.read(trackProvider.notifier).clear();
@@ -716,22 +721,20 @@ class _HomeTabState extends ConsumerState<HomeTab>
         trackState.artistName != null &&
         trackState.artistAlbums != null) {
       final extensionId = trackState.searchExtensionId;
-      Navigator.push(
+      pushPage<void>(
         context,
-        MaterialPageRoute<void>(
-          builder: (context) => ArtistScreen(
-            artistId: trackState.artistId!,
-            artistName: trackState.artistName!,
-            coverUrl: trackState.coverUrl,
-            headerImageUrl: trackState.headerImageUrl,
-            headerVideoUrl: trackState.headerVideoUrl,
-            headerLogoUrl: trackState.headerLogoUrl,
-            concerts: trackState.artistConcerts,
-            albumsNext: trackState.artistAlbumsNext,
-            albums: trackState.artistAlbums!,
-            topTracks: trackState.artistTopTracks,
-            extensionId: extensionId,
-          ),
+        (context) => ArtistScreen(
+          artistId: trackState.artistId!,
+          artistName: trackState.artistName!,
+          coverUrl: trackState.coverUrl,
+          headerImageUrl: trackState.headerImageUrl,
+          headerVideoUrl: trackState.headerVideoUrl,
+          headerLogoUrl: trackState.headerLogoUrl,
+          concerts: trackState.artistConcerts,
+          albumsNext: trackState.artistAlbumsNext,
+          albums: trackState.artistAlbums!,
+          topTracks: trackState.artistTopTracks,
+          extensionId: extensionId,
         ),
       );
       ref.read(trackProvider.notifier).clear();
@@ -1135,14 +1138,13 @@ class _HomeTabState extends ConsumerState<HomeTab>
     return LibrarySearchResults(
       query: _libraryQuery,
       shelves: true,
-      onOpenArtist: (artist) => Navigator.of(context).push(
-        MaterialPageRoute<void>(
-          builder: (_) => Scaffold(
-            body: MornyeLibraryScreen(
-              page: MornyeLibraryPage.albums,
-              artist: artist,
-              onOpenSection: (_) {},
-            ),
+      onOpenArtist: (artist) => pushPage<void>(
+        context,
+        (_) => Scaffold(
+          body: MornyeLibraryScreen(
+            page: MornyeLibraryPage.albums,
+            artist: artist,
+            onOpenSection: (_) {},
           ),
         ),
       ),
@@ -1152,6 +1154,7 @@ class _HomeTabState extends ConsumerState<HomeTab>
   Widget _buildHeaderSliver({required String? greeting}) {
     return AppSliverHeader.tabRoot(
       alignToContent: true,
+      contentInset: homeContentInset(context),
       title: widget.mode == HomeTabMode.search
           ? context.l10n.mornyeSearch
           : greeting ?? context.l10n.homeTitle,
@@ -1198,13 +1201,13 @@ class _HomeTabState extends ConsumerState<HomeTab>
       child: Padding(
         // Centered with the search results on tablets.
         padding: EdgeInsets.fromLTRB(
-          16 + wideListInset(context),
+          16 + homeContentInset(context),
           (hasResults || showExplore)
               ? 8
               : greetsInHeader
               ? 20
               : 32,
-          16 + wideListInset(context),
+          16 + homeContentInset(context),
           (hasResults || showExplore) ? 8 : 16,
         ),
         child: _buildSearchBar(),
@@ -1216,38 +1219,58 @@ class _HomeTabState extends ConsumerState<HomeTab>
     required ColorScheme colorScheme,
     required String defaultSearchTab,
   }) {
-    return Consumer(
-      builder: (context, ref, _) {
-        final currentSearchProvider = ref.watch(
-          settingsProvider.select((s) => s.searchProvider),
-        );
-        final extensions = ref.watch(
-          extensionProvider.select((s) => s.extensions),
-        );
-        final selectedSearchFilter = ref.watch(
-          trackProvider.select((s) => s.selectedSearchFilter),
-        );
-        final searchFilters = _resolveSearchFilters(
-          context,
-          currentSearchProvider,
-          extensions,
-        );
-        if (searchFilters.isEmpty) {
-          return const SliverToBoxAdapter(child: SizedBox.shrink());
-        }
-        return SliverToBoxAdapter(
-          child: _buildSearchFilterBar(
-            searchFilters,
-            HomeSearchProviderPolicy.displayFilterSelection(
-              selectedSearchFilter,
-              defaultSearchTab,
-              currentSearchProvider,
-              extensions,
+    return _buildSearchWidthSliver(
+      (context, wide) => Consumer(
+        builder: (context, ref, _) {
+          final currentSearchProvider = ref.watch(
+            settingsProvider.select((s) => s.searchProvider),
+          );
+          final extensions = ref.watch(
+            extensionProvider.select((s) => s.extensions),
+          );
+          final selectedSearchFilter = ref.watch(
+            trackProvider.select((s) => s.selectedSearchFilter),
+          );
+          // Wide results keep Sort and the view button here, clear of each
+          // section's Show all.
+          final showTools =
+              wide &&
+              ref.watch(trackProvider.select((s) => s.tracks.isNotEmpty));
+          final grid =
+              ref.watch(settingsProvider.select((s) => s.searchViewMode)) ==
+              'grid';
+          final searchFilters = _resolveSearchFilters(
+            context,
+            currentSearchProvider,
+            extensions,
+          );
+          if (searchFilters.isEmpty && !showTools) {
+            return const SliverToBoxAdapter(child: SizedBox.shrink());
+          }
+          return SliverToBoxAdapter(
+            child: _buildSearchFilterBar(
+              searchFilters,
+              HomeSearchProviderPolicy.displayFilterSelection(
+                selectedSearchFilter,
+                defaultSearchTab,
+                currentSearchProvider,
+                extensions,
+              ),
+              colorScheme,
+              tools: showTools
+                  ? Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: _buildSearchResultTools(
+                        colorScheme,
+                        showSortButton: true,
+                        viewToggle: _buildSearchViewToggle(grid: grid),
+                      ),
+                    )
+                  : null,
             ),
-            colorScheme,
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 
@@ -1269,6 +1292,10 @@ class _HomeTabState extends ConsumerState<HomeTab>
   }) {
     return SliverToBoxAdapter(
       child: AnimatedSize(
+        // Sections stay where they are while the space below them opens or
+        // closes; centered, they would sink and rise as a section comes or
+        // goes (such as Continue listening when the player hides).
+        alignment: AlignmentDirectional.topStart,
         duration: sectionMotion.duration,
         curve: sectionMotion.curve,
         child:
@@ -1278,7 +1305,7 @@ class _HomeTabState extends ConsumerState<HomeTab>
                 showExplore ||
                 showEmptyHomeState)
             ? const SizedBox.shrink()
-            : _HomeSections(inset: 16 + wideListInset(context)),
+            : _HomeSections(inset: 16 + homeContentInset(context)),
       ),
     );
   }
@@ -1326,8 +1353,49 @@ class _HomeTabState extends ConsumerState<HomeTab>
     required bool hasActiveSearchSurface,
     required bool showEmptySearchResult,
   }) {
+    return _buildSearchWidthSliver(
+      (context, wide) => _buildSearchResultsConsumer(
+        colorScheme: colorScheme,
+        hasActiveSearchSurface: hasActiveSearchSurface,
+        showEmptySearchResult: showEmptySearchResult,
+        wide: wide,
+      ),
+    );
+  }
+
+  /// Builds a search sliver with whether the results are wide enough for
+  /// covers, where Sort and the view button sit beside the filters.
+  Widget _buildSearchWidthSliver(
+    Widget Function(BuildContext context, bool wide) builder,
+  ) {
+    // Phones keep their rows in landscape too. Read here, since the select
+    // below runs during layout.
+    final coverLayoutAllowed =
+        isDesktopPlatform || MediaQuery.sizeOf(context).shortestSide >= 600;
+    final inset = homeContentInset(context);
+    // Rebuilds only when the layout crosses the breakpoint, not on every
+    // scroll frame.
+    return SliverLayoutInfoBuilder<bool>(
+      select: (constraints) =>
+          coverLayoutAllowed &&
+          constraints.crossAxisExtent - 2 * inset >= searchCoverLayoutMinWidth,
+      builder: builder,
+    );
+  }
+
+  /// [wide] offers the cover layout; the user's view mode picks it.
+  Widget _buildSearchResultsConsumer({
+    required ColorScheme colorScheme,
+    required bool hasActiveSearchSurface,
+    required bool showEmptySearchResult,
+    required bool wide,
+  }) {
     return Consumer(
       builder: (context, ref, _) {
+        final coverLayout =
+            wide &&
+            ref.watch(settingsProvider.select((s) => s.searchViewMode)) ==
+                'grid';
         final tracks = ref.watch(trackProvider.select((s) => s.tracks));
         final isLoading = ref.watch(trackProvider.select((s) => s.isLoading));
         final error = ref.watch(trackProvider.select((s) => s.error));
@@ -1354,18 +1422,31 @@ class _HomeTabState extends ConsumerState<HomeTab>
             hasActiveSearchSurface;
 
         return SliverMainAxisGroup(
-          slivers: _buildSearchResults(
-            resultsRef: ref,
-            tracks: tracks,
-            isLoading: isLoading,
-            error: error,
-            colorScheme: colorScheme,
-            hasResults: hasResults,
-            showEmptySearchResult: showEmptySearchResult,
-            searchExtensionId: searchExtensionId,
-            showLocalLibraryIndicator: showLocalLibraryIndicator,
-            thumbnailSizesByExtensionId: thumbnailSizesByExtensionId,
-          ),
+          slivers: coverLayout
+              ? _buildWideSearchResults(
+                  resultsRef: ref,
+                  tracks: tracks,
+                  isLoading: isLoading,
+                  error: error,
+                  colorScheme: colorScheme,
+                  hasResults: hasResults,
+                  showEmptySearchResult: showEmptySearchResult,
+                  showLocalLibraryIndicator: showLocalLibraryIndicator,
+                  extensions: extensions,
+                )
+              : _buildSearchResults(
+                  resultsRef: ref,
+                  tracks: tracks,
+                  isLoading: isLoading,
+                  error: error,
+                  colorScheme: colorScheme,
+                  hasResults: hasResults,
+                  showEmptySearchResult: showEmptySearchResult,
+                  searchExtensionId: searchExtensionId,
+                  showLocalLibraryIndicator: showLocalLibraryIndicator,
+                  thumbnailSizesByExtensionId: thumbnailSizesByExtensionId,
+                  toolsBesideFilters: wide,
+                ),
         );
       },
     );
@@ -1422,7 +1503,7 @@ class _HomeTabState extends ConsumerState<HomeTab>
 
     // The header carries the greeting; prompts take turns beneath it.
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 24 + wideListInset(context)),
+      padding: EdgeInsets.symmetric(horizontal: 24 + homeContentInset(context)),
       child: const Align(
         alignment: AlignmentDirectional.centerStart,
         child: _HomeTagline(),

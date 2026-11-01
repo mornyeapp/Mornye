@@ -356,12 +356,10 @@ void main() {
         const Duration(milliseconds: 1),
         (_) => ticks++,
       );
-      final pending = exportLibraryCollectionsState(state);
+      final pending = exportLibraryCollectionsJson(state);
       final newer = state.copyWith(wishlist: const [], playlists: const []);
-      final actual = await pending;
+      final json = await pending;
       timer.cancel();
-      expect(jsonEncode(actual), expected);
-      final json = await exportLibraryCollectionsJson(state);
       expect(json, expected);
       expect(jsonDecode(json), jsonDecode(expected));
       expect(newer.wishlistCount, 0);

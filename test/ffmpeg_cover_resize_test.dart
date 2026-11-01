@@ -1,9 +1,10 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mornye/services/ffmpeg_service.dart';
+import 'package:mornye/services/ffmpeg_metadata.dart';
+import 'package:mornye/services/ffmpeg_probe.dart';
 
 void main() {
   test('cover resize uses safe arguments and preserves aspect ratio', () {
-    final arguments = FFmpegService.buildCoverResizeArguments(
+    final arguments = FFmpegMetadata.buildCoverResizeArguments(
       inputPath: '/tmp/input cover.jpg',
       outputPath: '/tmp/output cover.jpg',
       maxDimension: 1500,
@@ -23,7 +24,7 @@ void main() {
 
   test('cover resize rejects unreasonable dimensions', () {
     expect(
-      () => FFmpegService.buildCoverResizeArguments(
+      () => FFmpegMetadata.buildCoverResizeArguments(
         inputPath: 'input.jpg',
         outputPath: 'output.jpg',
         maxDimension: 0,
@@ -34,19 +35,16 @@ void main() {
 
   test('cover dimensions require positive width and height', () {
     expect(
-      FFmpegService.imageDimensionsFromProperties({
+      FFmpegProbe.imageDimensionsFromProperties({
         'width': '1900',
         'height': 1500,
       }),
       (width: 1900, height: 1500),
     );
     expect(
-      FFmpegService.imageDimensionsFromProperties({'width': 0, 'height': 1500}),
+      FFmpegProbe.imageDimensionsFromProperties({'width': 0, 'height': 1500}),
       isNull,
     );
-    expect(
-      FFmpegService.imageDimensionsFromProperties({'width': 1500}),
-      isNull,
-    );
+    expect(FFmpegProbe.imageDimensionsFromProperties({'width': 1500}), isNull);
   });
 }

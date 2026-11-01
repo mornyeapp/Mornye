@@ -158,7 +158,6 @@ class _LyricsProviderPriorityPageState
                 );
                 return _DisabledProviderItem(
                   key: ValueKey(id),
-                  providerId: id,
                   info: info,
                   onToggle: () => _enableProvider(id),
                 );
@@ -304,13 +303,11 @@ class _LyricsProviderPriorityPageState
 }
 
 class _DisabledProviderItem extends StatelessWidget {
-  final String providerId;
   final _LyricsProviderInfo info;
   final VoidCallback onToggle;
 
   const _DisabledProviderItem({
     super.key,
-    required this.providerId,
     required this.info,
     required this.onToggle,
   });

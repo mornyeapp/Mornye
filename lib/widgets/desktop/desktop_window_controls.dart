@@ -63,8 +63,8 @@ class DesktopWindowModeSetting extends StatelessWidget {
       );
 }
 
-/// Keeps native replacement controls above the root navigator, including
-/// Now Playing and modal routes. The mini player supplies its own controls.
+/// Borderless window controls stay above pages and dialogs. Fullscreen keeps
+/// the entire surface for content; the mini player supplies its own controls.
 class DesktopWindowFrame extends StatelessWidget {
   const DesktopWindowFrame({
     super.key,
@@ -102,11 +102,8 @@ class DesktopWindowFrame extends StatelessWidget {
               children: [
                 Column(
                   children: [
-                    if (showControls && mode != DesktopWindowMode.windowed)
-                      _WindowControls(
-                        mode: mode,
-                        onChooseMode: _chooseWindowMode,
-                      )
+                    if (showControls && mode == DesktopWindowMode.borderless)
+                      _BorderlessWindowControls(onChooseMode: _chooseWindowMode)
                     else
                       const SizedBox.shrink(),
                     Expanded(child: child!),
@@ -144,21 +141,19 @@ class DesktopWindowFrame extends StatelessWidget {
   }
 }
 
-class _WindowControls extends StatelessWidget {
-  const _WindowControls({required this.mode, required this.onChooseMode});
+class _BorderlessWindowControls extends StatelessWidget {
+  const _BorderlessWindowControls({required this.onChooseMode});
 
-  final DesktopWindowMode mode;
   final VoidCallback onChooseMode;
 
   @override
   Widget build(BuildContext context) {
-    final fullscreen = mode == DesktopWindowMode.fullscreen;
     final title = SizedBox(
       height: context.tokens.minTouchTarget,
       child: Align(
         alignment: AlignmentDirectional.centerStart,
         child: Text(
-          desktopWindowModeLabel(context, mode),
+          desktopWindowModeLabel(context, DesktopWindowMode.borderless),
           style: Theme.of(context).textTheme.labelLarge,
         ),
       ),
@@ -170,13 +165,11 @@ class _WindowControls extends StatelessWidget {
         child: Row(
           children: [
             Expanded(
-              child: fullscreen
-                  ? title
-                  : DesktopWindowDragArea(
-                      frameless: true,
-                      zoomOnDoubleClick: true,
-                      child: title,
-                    ),
+              child: DesktopWindowDragArea(
+                frameless: true,
+                zoomOnDoubleClick: true,
+                child: title,
+              ),
             ),
             AppIconButton(
               tooltip: context.l10n.desktopWindowMode,
@@ -186,35 +179,27 @@ class _WindowControls extends StatelessWidget {
             AppIconButton(
               tooltip: desktopTooltip(
                 context,
-                fullscreen
-                    ? context.l10n.desktopExitFullscreen
-                    : context.l10n.desktopWindowed,
-                fullscreen
-                    ? DesktopCommand.fullScreen
-                    : DesktopCommand.borderless,
+                context.l10n.desktopWindowed,
+                DesktopCommand.borderless,
               ),
-              icon: AppIcon(
-                fullscreen ? Icons.fullscreen_exit : Icons.filter_none,
-              ),
+              icon: const AppIcon(Icons.filter_none),
               onPressed: () => unawaited(leaveDesktopWindowMode()),
             ),
-            if (!fullscreen) ...[
-              AppIconButton(
-                tooltip: context.l10n.desktopMinimizeWindow,
-                icon: const AppIcon(Icons.minimize),
-                onPressed: minimizeDesktopWindow,
-              ),
-              AppIconButton(
-                tooltip: context.l10n.desktopZoomWindow,
-                icon: const AppIcon(Icons.crop_square),
-                onPressed: zoomDesktopWindow,
-              ),
-              AppIconButton(
-                tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
-                icon: const AppIcon(Icons.close),
-                onPressed: closeDesktopWindow,
-              ),
-            ],
+            AppIconButton(
+              tooltip: context.l10n.desktopMinimizeWindow,
+              icon: const AppIcon(Icons.minimize),
+              onPressed: minimizeDesktopWindow,
+            ),
+            AppIconButton(
+              tooltip: context.l10n.desktopZoomWindow,
+              icon: const AppIcon(Icons.crop_square),
+              onPressed: zoomDesktopWindow,
+            ),
+            AppIconButton(
+              tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
+              icon: const AppIcon(Icons.close),
+              onPressed: closeDesktopWindow,
+            ),
           ],
         ),
       ),

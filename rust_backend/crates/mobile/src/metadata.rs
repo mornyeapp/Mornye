@@ -38,6 +38,23 @@ impl ExtensionManager {
             .map_err(ExtensionManagerError::Operation)
     }
 
+    pub fn get_extension_related_tracks_json(
+        &self,
+        extension_id: String,
+        seeds_json: String,
+        options_json: String,
+        lease: Option<Arc<RequestLease>>,
+    ) -> Result<String, ExtensionManagerError> {
+        self.inner
+            .get_extension_related_tracks_json(
+                &extension_id,
+                &seeds_json,
+                &options_json,
+                lease.map(|lease| Arc::clone(&lease.inner)),
+            )
+            .map_err(ExtensionManagerError::Operation)
+    }
+
     pub fn get_extension_home_feed_json(
         &self,
         extension_id: String,

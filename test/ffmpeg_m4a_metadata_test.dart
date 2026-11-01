@@ -3,7 +3,8 @@ import 'dart:io';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mornye/services/ffmpeg_service.dart';
+import 'package:mornye/services/ffmpeg_metadata.dart';
+import 'package:mornye/services/ffmpeg_models.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -93,7 +94,7 @@ void main() {
       var calls = 0;
 
       expect(
-        await FFmpegService.embedMetadataToM4a(
+        await FFmpegMetadata.embedMetadataToM4a(
           m4aPath: input.path,
           execute: (arguments) async {
             calls++;
@@ -118,7 +119,7 @@ void main() {
       var calls = 0;
       String? outputPath;
 
-      final result = await FFmpegService.embedMetadataToM4a(
+      final result = await FFmpegMetadata.embedMetadataToM4a(
         m4aPath: input.path,
         execute: (arguments) async {
           calls++;
@@ -166,7 +167,7 @@ void main() {
       String? outputPath;
 
       expect(
-        await FFmpegService.embedMetadataToM4a(
+        await FFmpegMetadata.embedMetadataToM4a(
           m4aPath: input.path,
           execute: (arguments) async {
             calls++;
@@ -260,7 +261,7 @@ void main() {
         final beforeHash = await streamHash(path, '0:a:0');
         var calls = 0;
         expect(
-          await FFmpegService.embedMetadataToM4a(
+          await FFmpegMetadata.embedMetadataToM4a(
             m4aPath: path,
             coverPath:
                 replacementCover ??

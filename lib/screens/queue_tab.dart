@@ -1,13 +1,11 @@
 import 'dart:async';
 import 'dart:io';
-import 'package:flutter/foundation.dart' show ValueListenable, clampDouble;
+import 'package:flutter/foundation.dart'
+    show ValueListenable, listEquals, setEquals;
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart'
-    show BoxHitTestResult, BoxParentData, RenderShiftedBox;
 import 'package:mornye/widgets/app_alert_dialog.dart';
 import 'package:mornye/widgets/app_choice_chip.dart';
 import 'package:mornye/widgets/app_content_card.dart';
-import 'package:mornye/services/local_track_batch_actions.dart';
 import 'package:mornye/services/shell_navigation_service.dart';
 import 'package:mornye/widgets/error_card.dart';
 import 'package:mornye/widgets/settings_group.dart';
@@ -27,13 +25,15 @@ import 'package:mornye/widgets/app_sliver_header.dart';
 import 'package:mornye/widgets/expressive_button.dart';
 import 'package:mornye/widgets/app_search_field.dart';
 import 'package:mornye/widgets/app_snack_bar.dart';
+import 'package:mornye/widgets/library_directory_view.dart';
 import 'package:mornye/widgets/library_search_results.dart';
 import 'package:mornye/widgets/library_track_selection_bar.dart';
 import 'package:mornye/widgets/library_selection_playback_actions.dart';
 import 'package:mornye/widgets/local_library_artwork_builder.dart';
 import 'package:mornye/widgets/library_playlist_drag_source.dart';
-import 'package:mornye/widgets/mornye_chrome.dart';
 import 'package:mornye/widgets/playlist_picker_sheet.dart';
+import 'package:mornye/widgets/create_playlist_sheet.dart';
+import 'package:mornye/widgets/tool_button_group.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart' show DateFormat;
@@ -67,7 +67,6 @@ import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/providers/local_library_provider.dart';
 import 'package:mornye/providers/playback_provider.dart';
 import 'package:mornye/providers/music_player_provider.dart';
-import 'package:mornye/providers/runtime_profile_provider.dart';
 import 'package:mornye/services/music_player_service.dart';
 import 'package:mornye/services/library_database.dart';
 import 'package:mornye/services/album_completeness.dart';
@@ -79,22 +78,20 @@ import 'package:mornye/screens/listening_rewind_screen.dart';
 import 'package:mornye/screens/favorite_artists_screen.dart';
 import 'package:mornye/screens/downloaded_album_screen.dart';
 import 'package:mornye/widgets/cached_cover_image.dart';
-import 'package:cached_network_image/cached_network_image.dart';
-import 'package:mornye/services/cover_cache_manager.dart';
 import 'package:mornye/screens/library_tracks_folder_screen.dart';
 import 'package:mornye/screens/local_album_screen.dart';
 import 'package:mornye/screens/mornye_library_screen.dart';
+import 'package:mornye/controllers/clickable_metadata.dart';
 import 'package:mornye/controllers/completion_bridge_tracker.dart';
+import 'package:mornye/controllers/local_track_batch_actions.dart';
 import 'package:mornye/controllers/queue_library_pager.dart';
 import 'package:mornye/controllers/queue_library_refresh_policy.dart';
-import 'package:mornye/utils/clickable_metadata.dart';
 import 'package:mornye/utils/string_utils.dart';
 import 'package:mornye/widgets/download_service_picker.dart';
 import 'package:mornye/widgets/animated_library_sliver_grid.dart';
 import 'package:mornye/widgets/animation_utils.dart';
 import 'package:mornye/widgets/selection_bottom_bar.dart';
 import 'package:mornye/widgets/smoothed_progress.dart';
-import 'package:mornye/widgets/scroll_edge_fade.dart';
 import 'package:mornye/widgets/two_finger_pinch_listener.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/widgets/desktop/context_menu.dart';
@@ -169,9 +166,15 @@ class _QueueTabState extends ConsumerState<QueueTab> {
 
   PageController? _filterPageController;
 
-  /// Pages of the Library pager: Songs, Albums, Artists and Playlists.
-  /// Singles share the Albums page behind [_albumsShowSingles].
-  final List<String> _filterModes = ['all', 'albums', 'artists', 'playlists'];
+  /// Pages of the Library pager: Songs, Albums, Artists, Playlists and
+  /// Folders. Singles share the Albums page behind [_albumsShowSingles].
+  final List<String> _filterModes = [
+    'all',
+    'albums',
+    'artists',
+    'playlists',
+    'folders',
+  ];
   bool _albumsShowSingles = false;
 
   int _pageIndexFor(String mode) =>
@@ -210,6 +213,29 @@ class _QueueTabState extends ConsumerState<QueueTab> {
   String? _sectionSort;
   String? _sectionLocale;
   List<_LibrarySection> _cachedTrackSections = const [];
+
+  /// In-memory History snapshots and counts, regrouped only when the
+  /// (immutable) History list changes.
+  List<DownloadHistoryItem>? _snapshotHistory;
+  final Map<(String, int), _QueueLibraryPageData> _historySnapshots = {};
+  final Map<int, QueueLibraryCounts> _historySnapshotCountsByTotal = {};
+
+  /// Filter data per mode with the page and totals it came
+  /// from, so an unchanged page keeps its filtered rows across rebuilds.
+  final Map<String, (_QueueLibraryPageData, int?, int?, _FilterContentData)>
+  _filterDataByMode = {};
+
+  /// Per mode, what the page derives from its loaded songs: their ids, the
+  /// songs without the pinned download rows, their navigation lists and the
+  /// desktop table rows. Each is kept while its inputs stay the same, so a
+  /// click or a resize does not walk every loaded song.
+  final Map<String, _LoadedSongs> _loadedSongsByMode = {};
+  final Map<
+    String,
+    (List<UnifiedLibraryItem>, List<DownloadHistoryItem>, _LibraryNavigation)
+  >
+  _navigationByMode = {};
+  final Map<String, _LibrarySongTableRows> _songTableByMode = {};
 
   final QueueLibraryPager<
     _QueueLibraryCountsRequest,
@@ -492,10 +518,9 @@ class _QueueTabState extends ConsumerState<QueueTab> {
   Widget build(BuildContext context) {
     if (context.isMornye && widget.librarySection == null) {
       return MornyeLibraryScreen(
-        onOpenSection: (section) => Navigator.of(context).push(
-          MaterialPageRoute<void>(
-            builder: (_) => Scaffold(body: QueueTab(librarySection: section)),
-          ),
+        onOpenSection: (section) => pushPage<void>(
+          context,
+          (_) => Scaffold(body: QueueTab(librarySection: section)),
         ),
       );
     }
@@ -641,14 +666,22 @@ class _QueueTabState extends ConsumerState<QueueTab> {
             ),
           )
         : ref.watch(_queueLibraryCountsProvider(countsRequest));
+    if (!identical(_snapshotHistory, inMemoryHistoryItems)) {
+      _snapshotHistory = inMemoryHistoryItems;
+      _historySnapshots.clear();
+      _historySnapshotCountsByTotal.clear();
+    }
     final historySnapshotFallbackEnabled =
         hasQueueItems &&
         inMemoryHistoryItems.isNotEmpty &&
         countsRequest.allowsInMemoryHistoryFallback;
     final historySnapshotCounts = historySnapshotFallbackEnabled
-        ? _historySnapshotCounts(
-            inMemoryHistoryItems,
-            persistedTotalCount: historyTotalCount,
+        ? _historySnapshotCountsByTotal.putIfAbsent(
+            historyTotalCount,
+            () => _historySnapshotCounts(
+              inMemoryHistoryItems,
+              persistedTotalCount: historyTotalCount,
+            ),
           )
         : null;
     final queueCounts = _pager.resolveCounts(
@@ -692,49 +725,72 @@ class _QueueTabState extends ConsumerState<QueueTab> {
     }
 
     final activePageRequest = pageRequest(historyFilterMode);
-    // The Artists page browses its own query.
-    final activePageValue = searchingLibrary || historyFilterMode == 'artists'
+    // The Artists and Folders pages browse their own queries.
+    final activePageValue =
+        searchingLibrary ||
+            historyFilterMode == 'artists' ||
+            historyFilterMode == 'folders'
         ? const AsyncData(_QueueLibraryPageData())
         : ref.watch(_queueLibraryPageProvider(activePageRequest));
 
     // The in-memory snapshot regroups every history item. It is only needed
     // when a page is still empty, so build it on demand and at most once per
-    // mode for this build's (immutable) history list.
-    final historySnapshots = <(String, int), _QueueLibraryPageData>{};
-    _QueueLibraryPageData pageData(String filterMode) {
-      final request = filterMode == historyFilterMode
-          ? activePageRequest
-          : pageRequest(filterMode);
-      final historySnapshotAvailable =
-          hasQueueItems &&
-          inMemoryHistoryItems.isNotEmpty &&
-          request.allowsInMemoryHistoryFallback;
-      return _pager.resolvePageData(
-        filterMode == historyFilterMode ? activePageValue : null,
-        request,
-        nonEmptyFallback: historySnapshotAvailable
-            ? () => historySnapshots.putIfAbsent(
-                (request.filterMode, request.limit),
-                () => _QueueLibraryPageData.fromHistorySnapshot(
-                  inMemoryHistoryItems,
-                  filterMode: request.filterMode,
-                  limit: request.limit,
-                ),
-              )
-            : null,
-      );
-    }
+    // mode for the (immutable) history list. Each mode resolves once per
+    // build; the page view and the selection overlay share the result.
+    final pageDataByMode = <String, _QueueLibraryPageData>{};
+    _QueueLibraryPageData pageData(String filterMode) =>
+        pageDataByMode.putIfAbsent(filterMode, () {
+          final request = filterMode == historyFilterMode
+              ? activePageRequest
+              : pageRequest(filterMode);
+          final historySnapshotAvailable =
+              hasQueueItems &&
+              inMemoryHistoryItems.isNotEmpty &&
+              request.allowsInMemoryHistoryFallback;
+          return _pager.resolvePageData(
+            filterMode == historyFilterMode ? activePageValue : null,
+            request,
+            nonEmptyFallback: historySnapshotAvailable
+                ? () => _historySnapshots.putIfAbsent(
+                    (request.filterMode, request.limit),
+                    () => _QueueLibraryPageData.fromHistorySnapshot(
+                      inMemoryHistoryItems,
+                      filterMode: request.filterMode,
+                      limit: request.limit,
+                    ),
+                  )
+                : null,
+          );
+        });
 
     _FilterContentData getFilterData(String filterMode) {
-      return pageData(filterMode).toFilterContentData(
-        collectionState,
-        totalTrackCount: switch (filterMode) {
-          'singles' => queueCounts.singleTrackCount,
-          'albums' || 'playlists' => 0,
-          _ => queueCounts.allTrackCount,
-        },
-        totalAlbumCount: filterMode == 'albums' ? queueCounts.albumCount : null,
+      final page = pageData(filterMode);
+      final totalTrackCount = switch (filterMode) {
+        'singles' => queueCounts.singleTrackCount,
+        'albums' || 'playlists' => 0,
+        _ => queueCounts.allTrackCount,
+      };
+      final totalAlbumCount = filterMode == 'albums'
+          ? queueCounts.albumCount
+          : null;
+      final cached = _filterDataByMode[filterMode];
+      if (cached != null &&
+          identical(cached.$1, page) &&
+          cached.$2 == totalTrackCount &&
+          cached.$3 == totalAlbumCount) {
+        return cached.$4;
+      }
+      final data = page.toFilterContentData(
+        totalTrackCount: totalTrackCount,
+        totalAlbumCount: totalAlbumCount,
       );
+      _filterDataByMode[filterMode] = (
+        page,
+        totalTrackCount,
+        totalAlbumCount,
+        data,
+      );
+      return data;
     }
 
     final currentPageData = pageData(historyFilterMode);
@@ -745,7 +801,7 @@ class _QueueTabState extends ConsumerState<QueueTab> {
     final currentTotalCount = switch (historyFilterMode) {
       'albums' => queueCounts.albumCount,
       'singles' => queueCounts.singleTrackCount,
-      'playlists' || 'artists' => 0,
+      'playlists' || 'artists' || 'folders' => 0,
       _ => queueCounts.allTrackCount,
     };
     final hasMoreLibrary = currentLoadedCount < currentTotalCount;
@@ -849,6 +905,7 @@ class _QueueTabState extends ConsumerState<QueueTab> {
                           focusNode: _searchFocusNode,
                           hintText: context.l10n.librarySearchHint,
                           clearTooltip: context.l10n.dialogClear,
+                          samplesBackdrop: false,
                           onChanged: _onSearchChanged,
                           onClear: () {
                             _clearSearch();
@@ -870,93 +927,26 @@ class _QueueTabState extends ConsumerState<QueueTab> {
                         16 + listInset,
                         4,
                       ),
-                      child: LayoutBuilder(
-                        builder: (context, constraints) {
-                          final activePage = _pageIndexFor(historyFilterMode);
-                          final playlistCount = _getVisibleCollectionEntries(
-                            collectionState,
-                          ).length;
-                          if (!context.isMornye) {
-                            return _LibraryPageTabs(
-                              selectedIndex: activePage,
-                              onSelected: _animateToFilterPage,
-                              tabs: [
-                                (
-                                  context.l10n.searchSongs,
-                                  queueCounts.allTrackCount,
-                                ),
-                                (
-                                  context.l10n.historyFilterAlbums,
-                                  queueCounts.albumCount,
-                                ),
-                                // Artist totals need a full scan; the tab
-                                // shows none rather than a guess.
-                                (context.l10n.searchArtists, null),
-                                (context.l10n.searchPlaylists, playlistCount),
-                              ],
-                            );
-                          }
-                          Widget tab(
-                            int index,
-                            IconData icon,
-                            String label,
-                            int? count,
-                          ) => _FilterChip(
-                            label: label,
-                            icon: icon,
-                            count: count,
-                            isSelected: activePage == index,
-                            onTap: () => _animateToFilterPage(index),
-                          );
-                          return ScrollEdgeFade(
-                            axis: Axis.horizontal,
-                            size: 48,
-                            child: SingleChildScrollView(
-                              scrollDirection: Axis.horizontal,
-                              padding: const EdgeInsets.symmetric(vertical: 4),
-                              child: ConstrainedBox(
-                                constraints: BoxConstraints(
-                                  minWidth: constraints.maxWidth,
-                                ),
-                                child: Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    tab(
-                                      0,
-                                      Icons.music_note_outlined,
-                                      context.l10n.searchSongs,
-                                      queueCounts.allTrackCount,
-                                    ),
-                                    const SizedBox(width: 8),
-                                    tab(
-                                      1,
-                                      Icons.album_outlined,
-                                      context.l10n.historyFilterAlbums,
-                                      queueCounts.albumCount,
-                                    ),
-                                    const SizedBox(width: 8),
-                                    // Artist totals need a full scan; the
-                                    // tab shows none rather than a guess.
-                                    tab(
-                                      2,
-                                      Icons.person_outline,
-                                      context.l10n.searchArtists,
-                                      null,
-                                    ),
-                                    const SizedBox(width: 8),
-                                    tab(
-                                      3,
-                                      Icons.queue_music_outlined,
-                                      context.l10n.searchPlaylists,
-                                      playlistCount,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          );
-                        },
+                      child: _LibraryPageTabs(
+                        selectedIndex: _pageIndexFor(historyFilterMode),
+                        onSelected: _animateToFilterPage,
+                        tabs: [
+                          (context.l10n.searchSongs, queueCounts.allTrackCount),
+                          (
+                            context.l10n.historyFilterAlbums,
+                            queueCounts.albumCount,
+                          ),
+                          // Artist totals need a full scan; the tab shows
+                          // none rather than a guess.
+                          (context.l10n.searchArtists, null),
+                          (
+                            context.l10n.searchPlaylists,
+                            _getVisibleCollectionEntries(
+                              collectionState,
+                            ).length,
+                          ),
+                          (context.l10n.libraryFolders, null),
+                        ],
                       ),
                     ),
                   ),
@@ -967,14 +957,13 @@ class _QueueTabState extends ConsumerState<QueueTab> {
                       slivers: [
                         LibrarySearchResults(
                           query: _searchQuery,
-                          onOpenArtist: (artist) => Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (_) => Scaffold(
-                                body: MornyeLibraryScreen(
-                                  page: MornyeLibraryPage.albums,
-                                  artist: artist,
-                                  onOpenSection: (_) {},
-                                ),
+                          onOpenArtist: (artist) => pushPage<void>(
+                            context,
+                            (_) => Scaffold(
+                              body: MornyeLibraryScreen(
+                                page: MornyeLibraryPage.albums,
+                                artist: artist,
+                                onOpenSection: (_) {},
                               ),
                             ),
                           ),
@@ -1003,6 +992,9 @@ class _QueueTabState extends ConsumerState<QueueTab> {
                       itemBuilder: (context, index) {
                         if (_filterModes[index] == 'artists') {
                           return _buildArtistsPage(context, colorScheme);
+                        }
+                        if (_filterModes[index] == 'folders') {
+                          return const LibraryDirectoryView(showHeader: false);
                         }
                         final filterMode = _modeForPage(index);
                         final filterData = getFilterData(filterMode);

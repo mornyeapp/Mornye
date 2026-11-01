@@ -280,10 +280,6 @@
   "@homeEmptySubtitle": {
     "description": "Subtitle shown on home when no providers are available yet"
   },
-  "homeSupports": "Prise en charge : URL de titres, d’albums, de playlists et d’artistes",
-  "@homeSupports": {
-    "description": "Info text about supported URL types"
-  },
   "homeRecent": "Récent",
   "@homeRecent": {
     "description": "Section header for recent searches"
@@ -4181,15 +4177,6 @@
   "collectionPlaylistRemoveCover": "Supprimer l'image de couverture",
   "@collectionPlaylistRemoveCover": {
     "description": "Bottom sheet action to remove custom cover image from a playlist"
-  },
-  "selectionShareCount": "Partager {count} {count, plural, =1{titre} other{titres}}",
-  "@selectionShareCount": {
-    "description": "Share button text with count in selection mode",
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
   },
   "selectionConvertCount": "Convertir {count} {count, plural, =1{titre} other{titres}}",
   "@selectionConvertCount": {

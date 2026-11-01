@@ -1,6 +1,6 @@
 import 'dart:async';
-import 'dart:io' show Platform;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:mornye/l10n/l10n.dart';
@@ -506,11 +506,10 @@ Future<void> _completeSessionGrantFromClipboard(
   }
 }
 
-/// Opens an extension auth/verification page. On iOS this prefers an
-/// ASWebAuthenticationSession, which captures the mornye:// callback
-/// in-process — required for environments where the app's URL scheme is not
-/// registered with the OS (sideload containers like LiveContainer) and nicer
-/// everywhere else (the sheet closes itself once the challenge completes).
+/// Opens an extension auth/verification page using the browser preference.
+/// In-app HTTPS verification on iOS uses ASWebAuthenticationSession to capture
+/// the mornye:// callback even when the app's URL scheme is not registered
+/// with the OS (sideload containers like LiveContainer).
 Future<bool> launchExtensionAuthUrl(Uri uri, {required String browserMode}) {
   return _launchVerificationUrl(uri, browserMode);
 }
@@ -524,17 +523,6 @@ Future<bool> _launchVerificationUrl(
   if (cancellationSignal != null) {
     unawaited(cancellationSignal.then((_) => cancelled = true));
   }
-  if (Platform.isIOS && uri.scheme == 'https') {
-    try {
-      if (await PlatformBridge.startIosWebAuthSession(uri.toString())) {
-        return true;
-      }
-      _log.w('Web auth session did not start, falling back to browser');
-    } catch (e) {
-      _log.w('Web auth session failed, falling back to browser: $e');
-    }
-  }
-
   // Desktop has no in-app browser or web auth session: the system browser
   // opens the page and returns through the registered mornye:// scheme
   // (DesktopDeepLinks hands the callback to the backend).
@@ -558,6 +546,19 @@ Future<bool> _launchVerificationUrl(
 
   for (final mode in [firstMode, fallbackMode]) {
     if (cancelled) return false;
+    if (mode == LaunchMode.inAppBrowserView &&
+        defaultTargetPlatform == TargetPlatform.iOS &&
+        uri.scheme == 'https') {
+      try {
+        if (await PlatformBridge.startIosWebAuthSession(uri.toString())) {
+          return true;
+        }
+        _log.w('Web auth session did not start, falling back to browser');
+      } catch (e) {
+        _log.w('Web auth session failed, falling back to browser: $e');
+      }
+      if (cancelled) return false;
+    }
     try {
       if (await launchUrl(uri, mode: mode)) return true;
     } on PlatformException catch (error) {

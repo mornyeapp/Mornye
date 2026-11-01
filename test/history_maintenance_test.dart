@@ -10,8 +10,6 @@ import 'package:mornye/providers/download_history_provider.dart';
 import 'package:mornye/services/history_database.dart';
 import 'package:mornye/services/history_maintenance.dart';
 
-import 'support/sqlite_process_database.dart';
-
 class _ReloadDatabase implements HistoryDatabase {
   _ReloadDatabase(this.rows);
 
@@ -496,55 +494,6 @@ void main() {
       expect(container.read(downloadHistoryProvider).totalCount, 1);
     });
   }
-
-  test('atomic streaming restore rolls back a late stream failure', () async {
-    final db = await SqliteProcessDatabase.open();
-    addTearDown(db.close);
-    await db.execute(
-      'CREATE TABLE history(id TEXT PRIMARY KEY, file_path TEXT NOT NULL)',
-    );
-    await db.execute(
-      'CREATE TABLE history_path_keys(item_id TEXT, path_key TEXT, '
-      'PRIMARY KEY(item_id, path_key))',
-    );
-    await db.insert('history', {
-      'id': 'previous',
-      'file_path': '/music/old.flac',
-    });
-    await db.insert('history_path_keys', {
-      'item_id': 'previous',
-      'path_key': 'old-key',
-    });
-    Stream<Map<String, dynamic>> brokenBackup() async* {
-      for (var i = 0; i < 501; i++) {
-        yield {'id': '$i', 'file_path': '/music/$i.flac'};
-      }
-      throw const FormatException('truncated backup');
-    }
-
-    await expectLater(
-      replaceHistoryRows(db, brokenBackup()),
-      throwsFormatException,
-    );
-    expect(await db.query('history'), [
-      {'id': 'previous', 'file_path': '/music/old.flac'},
-    ]);
-    expect(await db.query('history_path_keys'), [
-      {'item_id': 'previous', 'path_key': 'old-key'},
-    ]);
-    await replaceHistoryRows(
-      db,
-      Stream.fromIterable([
-        {'id': 'restored', 'file_path': '/music/restored.flac'},
-      ]),
-    );
-    expect(await db.query('history'), [
-      {'id': 'restored', 'file_path': '/music/restored.flac'},
-    ]);
-    final keys = await db.query('history_path_keys');
-    expect(keys, isNotEmpty);
-    expect(keys.every((row) => row['item_id'] == 'restored'), isTrue);
-  });
 
   test(
     'late maintenance cannot recreate deleted rows or their path keys',

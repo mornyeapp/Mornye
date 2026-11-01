@@ -1,5 +1,6 @@
 package com.zarz.mornye
 
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.provider.DocumentsContract
@@ -11,7 +12,7 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.File
 
-internal suspend fun MainActivity.handleSafExists(call: MethodCall, result: MethodChannel.Result) {
+internal suspend fun Context.handleSafExists(call: MethodCall, result: MethodChannel.Result) {
     val uriStr = call.argument<String>("uri") ?: ""
     val exists = withContext(Dispatchers.IO) {
         val uri = Uri.parse(uriStr)
@@ -20,7 +21,7 @@ internal suspend fun MainActivity.handleSafExists(call: MethodCall, result: Meth
     result.success(exists)
 }
 
-internal suspend fun MainActivity.handleSafExistsBatch(call: MethodCall, result: MethodChannel.Result) {
+internal suspend fun Context.handleSafExistsBatch(call: MethodCall, result: MethodChannel.Result) {
     val urisJson = call.argument<String>("uris_json") ?: "[]"
     val response = withContext(Dispatchers.IO) {
         safExistsBatch(urisJson)
@@ -149,18 +150,29 @@ internal suspend fun MainActivity.handleSafCopyToTemp(call: MethodCall, result: 
     result.success(tempPath)
 }
 
-internal suspend fun MainActivity.handleSafOpenPlaybackLease(call: MethodCall, result: MethodChannel.Result) {
+internal suspend fun Context.handleSafOpenPlaybackLease(call: MethodCall, result: MethodChannel.Result) {
     val uriStr = call.argument<String>("uri") ?: ""
     val lease = withContext(Dispatchers.IO) {
-        openSafPlaybackLease(uriStr)
+        SafPlaybackLeases.open(this@handleSafOpenPlaybackLease, uriStr)
     }
     result.success(lease)
 }
 
-internal fun MainActivity.handleSafClosePlaybackLease(call: MethodCall, result: MethodChannel.Result) {
+internal fun handleSafClosePlaybackLease(call: MethodCall, result: MethodChannel.Result) {
     val token = call.argument<String>("token") ?: ""
-    closeSafPlaybackLease(token)
+    SafPlaybackLeases.close(token)
     result.success(null)
+}
+
+internal suspend fun Context.handleSafWriteSidecarFromPath(call: MethodCall, result: MethodChannel.Result) {
+    val audioUri = call.argument<String>("audio_uri") ?: ""
+    val fileName = call.argument<String>("file_name") ?: ""
+    val mimeType = call.argument<String>("mime_type") ?: "application/octet-stream"
+    val srcPath = call.argument<String>("src_path") ?: ""
+    val uri = withContext(Dispatchers.IO) {
+        writeSafSidecarFromPath(Uri.parse(audioUri), fileName, mimeType, srcPath)
+    }
+    result.success(uri)
 }
 
 internal suspend fun MainActivity.handleSafCreateFromPath(call: MethodCall, result: MethodChannel.Result) {

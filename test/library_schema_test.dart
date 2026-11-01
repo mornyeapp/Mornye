@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite/sqflite.dart';
-import 'package:mornye/services/library_database_models.dart';
+import 'package:mornye/models/library_database_models.dart';
 import 'package:mornye/services/library_row_mapper.dart';
 import 'package:mornye/services/library_schema.dart';
 
@@ -29,6 +29,65 @@ void main() {
     await db.execute('PRAGMA recursive_triggers = ON');
   });
   tearDown(() => db.close());
+
+  test(
+    'v19 upgrade rescans local Ogg gain tags while preserving indexed fields',
+    () async {
+      await LibrarySchema.create(db, 19);
+      final songs = [
+        ('opus', 'content://media/audio/1', 'opus', 4, 3),
+        ('vorbis', '/music/song.ogg', 'vorbis', 4, 3),
+        ('suffix', '/music/song.OPUS', null, 4, 3),
+        ('remote', 'network://peer/song.opus', 'opus', 4, 4),
+        ('flac', '/music/song.flac', 'flac', 4, 4),
+        ('legacy', '/music/legacy.opus', 'opus', 0, 0),
+      ];
+      for (final (id, path, format, version, _) in songs) {
+        await db.insert('library', {
+          ...LibraryRowMapper.encode(_track(id)),
+          'file_path': path,
+          'format': format,
+          'file_mod_time': 1234,
+          'audio_metadata_scan_version': version,
+        });
+      }
+      await LibrarySchema.upgrade(db, 19, LibrarySchema.version);
+      for (final (id, path, _, _, version) in songs) {
+        final row = (await db.query(
+          'library',
+          where: 'id = ?',
+          whereArgs: [id],
+        )).single;
+        expect(row['audio_metadata_scan_version'], version, reason: id);
+        expect(row['file_path'], path, reason: id);
+        expect(row['file_mod_time'], 1234, reason: id);
+        expect(row['has_lyrics'], 1, reason: id);
+        expect(row['has_replaygain'], 1, reason: id);
+        expect(
+          libraryIncrementalSnapshotModTime(
+            storedModTime: 1234,
+            storedScanVersion: version,
+          ),
+          version < libraryAudioMetadataScanVersion ? -1 : 1234,
+          reason: id,
+        );
+      }
+      // A completed scan writes the current version, so later upgrades do not
+      // repeatedly invalidate these songs.
+      await db.update('library', {'audio_metadata_scan_version': 4});
+      await LibrarySchema.upgrade(
+        db,
+        LibrarySchema.version,
+        LibrarySchema.version,
+      );
+      expect(
+        (await db.query(
+          'library',
+        )).every((row) => row['audio_metadata_scan_version'] == 4),
+        isTrue,
+      );
+    },
+  );
 
   test(
     'fresh schema maintains lookup counts across replace, source move and deletion',
