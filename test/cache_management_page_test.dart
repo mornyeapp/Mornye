@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/screens/settings/cache_management_page.dart';
+import 'package:mornye/services/explore_cache_store.dart';
 import 'package:mornye/theme/app_theme.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/string_utils.dart';
@@ -168,6 +169,60 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(AppAlertDialog), findsNothing);
       expect(File('${root.path}/cache/a.bin').existsSync(), isTrue);
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('unrelated_setting', true);
+      await tester.runAsync(
+        () => ExploreCacheStore(prefs).write('{"sections":[]}'),
+      );
+      final exploreFile = File(
+        '${root.path}/support/preference_blobs/explore_feed.json',
+      );
+      final bytes = await tester.runAsync(exploreFile.length);
+      SettingsItem? exploreRow() => tester
+          .widgetList<SettingsItem>(find.byType(SettingsItem))
+          .where((row) => row.title == l10n.cacheExploreFeed)
+          .firstOrNull;
+      await tester.runAsync(() async {
+        await tester.tap(find.byTooltip(l10n.cacheRefresh));
+        for (var i = 0; i < 100; i++) {
+          await Future<void>.delayed(const Duration(milliseconds: 10));
+          await tester.pump();
+          if (exploreRow()?.subtitle?.contains(
+                l10n.cacheSizeOnly(formatBytes(bytes!)),
+              ) ==
+              true) {
+            break;
+          }
+        }
+      });
+      expect(
+        exploreRow()?.subtitle,
+        contains(l10n.cacheSizeOnly(formatBytes(bytes!))),
+      );
+      await tester.tap(
+        find.descendant(
+          of: find.byWidget(exploreRow()!),
+          matching: find.byType(ExpressiveButton),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.runAsync(() async {
+        await tester.tap(find.text(l10n.dialogClear).hitTestable());
+        for (var i = 0; i < 100; i++) {
+          await Future<void>.delayed(const Duration(milliseconds: 10));
+          await tester.pump();
+          if (!await exploreFile.exists() &&
+              exploreRow()?.subtitle?.contains(l10n.cacheNoData) == true) {
+            break;
+          }
+        }
+      });
+      await tester.pumpAndSettle();
+      expect(await tester.runAsync(exploreFile.exists), isFalse);
+      expect(prefs.getBool('unrelated_setting'), isTrue);
+      expect(prefs.containsKey('explore_home_feed_cache'), isFalse);
+      expect(exploreRow()?.subtitle, contains(l10n.cacheNoData));
       expect(tester.takeException(), isNull);
     });
   }

@@ -1,12 +1,16 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mornye/models/settings.dart';
 import 'package:mornye/services/autoplay_personalization.dart';
 import 'package:mornye/services/music_player_service.dart';
+
+import 'support/preference_blob_fixture.dart';
 
 final _at = DateTime(2026, 10, 11, 9);
 const _rock = AutoplayLearningTrack(
@@ -25,6 +29,93 @@ const _jazz = AutoplayLearningTrack(
 );
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  group('file persistence', () {
+    late PreferenceBlobFixture files;
+    setUp(() async {
+      files = await PreferenceBlobFixture.create();
+      SharedPreferences.setMockInitialValues({});
+    });
+    tearDown(() => files.close());
+
+    test(
+      'migrates learning, persists new feedback and resets without legacy copies',
+      () async {
+        final model = AutoplayPreferenceModel()
+          ..learn(_jazz, previous: _rock, at: _at, reward: 1);
+        final encoded = model.encode();
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('autoplay_learning_model_v1', encoded);
+        await prefs.setBool('unrelated_setting', true);
+        var elapsed = Duration.zero;
+        final service = AutoplayPersonalization(
+          elapsed: () => elapsed,
+          now: () => _at,
+        );
+        service.setEnabled(true);
+        await service.ensureLoaded();
+        expect(service.observations, 1);
+        expect(prefs.containsKey('autoplay_learning_model_v1'), isFalse);
+        final file = File(
+          '${files.root.path}/preference_blobs/autoplay_model_v1.json',
+        );
+        expect(
+          (jsonDecode(await file.readAsString())
+              as Map)['autoplay_learning_model_v1'],
+          encoded,
+        );
+        service.begin(_jazz);
+        service.updatePlayback(source: _jazz.source, playing: true);
+        elapsed += const Duration(seconds: 10);
+        service.finish(skipped: true);
+        await service.flush();
+        expect(service.observations, 2);
+        final reopened = AutoplayPersonalization();
+        await reopened.ensureLoaded();
+        expect(reopened.observations, 2);
+        await reopened.dispose();
+        await service.reset();
+        expect(service.observations, 0);
+        await service.dispose();
+        final reset = AutoplayPersonalization();
+        await reset.ensureLoaded();
+        expect(reset.observations, 0);
+        await reset.dispose();
+        expect(prefs.getKeys(), {'unrelated_setting'});
+      },
+    );
+
+    test(
+      'failed migration and save retain learning until a successful retry',
+      () async {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(
+          'autoplay_learning_model_v1',
+          (AutoplayPreferenceModel()..learn(_jazz, at: _at, reward: 1))
+              .encode(),
+        );
+        final blocked = Directory(
+          '${files.root.path}/preference_blobs/autoplay_model_v1.json',
+        );
+        await blocked.create(recursive: true);
+        final service = AutoplayPersonalization();
+        await service.ensureLoaded();
+        expect(service.observations, 1);
+        expect(prefs.containsKey('autoplay_learning_model_v1'), isTrue);
+        await service.reset();
+        expect(prefs.containsKey('autoplay_learning_model_v1'), isTrue);
+        await blocked.delete();
+        await service.flush();
+        expect(prefs.containsKey('autoplay_learning_model_v1'), isFalse);
+        final reopened = AutoplayPersonalization();
+        await reopened.ensureLoaded();
+        expect(reopened.observations, 0);
+        await reopened.dispose();
+        await service.dispose();
+      },
+    );
+  });
+
   test(
     'disposal persists completed feedback even while initial loading is pending',
     () async {

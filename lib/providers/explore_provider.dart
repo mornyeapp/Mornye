@@ -338,7 +338,8 @@ class ExploreNotifier extends Notifier<ExploreState> {
 
       final prefs = await SharedPreferences.getInstance();
       if (!_isCacheRestoreValid(generation)) return;
-      final snapshot = ExploreCacheStore(prefs).read();
+      final snapshot = await ExploreCacheStore(prefs).read();
+      if (!_isCacheRestoreValid(generation)) return;
       final cached = snapshot.payload;
       final cachedTs = snapshot.timestampMs;
       if (cached == null || cached.isEmpty) return;

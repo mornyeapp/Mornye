@@ -11,10 +11,13 @@ import 'package:mornye/models/settings.dart';
 import 'package:mornye/providers/explore_provider.dart';
 import 'package:mornye/providers/extension_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
+import 'package:mornye/services/explore_cache_store.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/app_snack_bar.dart';
 import 'package:mornye/widgets/home_feed_region_setting.dart';
 import 'package:mornye/widgets/settings_group.dart';
+
+import 'support/preference_blob_fixture.dart';
 
 const _extension = Extension(
   id: 'example.feed',
@@ -93,8 +96,10 @@ void main() {
   late List<Map<String, dynamic>> writes;
   late bool failSave;
   Completer<String>? pendingFeed;
+  late PreferenceBlobFixture blobs;
 
-  setUp(() {
+  setUp(() async {
+    blobs = await PreferenceBlobFixture.create();
     SharedPreferences.setMockInitialValues({});
     settings = {'market': 'us', 'otherSetting': 'preserved'};
     writes = [];
@@ -120,7 +125,10 @@ void main() {
       return null;
     });
   });
-  tearDown(() => messenger.setMockMethodCallHandler(channel, null));
+  tearDown(() async {
+    messenger.setMockMethodCallHandler(channel, null);
+    await blobs.close();
+  });
 
   ProviderContainer container({bool coldStart = false}) {
     final result = ProviderContainer(
@@ -185,11 +193,14 @@ void main() {
       );
       expect(writes.single, {'market': 'jp', 'otherSetting': 'preserved'});
       final prefs = await SharedPreferences.getInstance();
-      await _until(
-        () =>
-            prefs.getString('explore_home_feed_cache')?.contains('"JP"') ==
-            true,
-      );
+      String? cached;
+      for (var i = 0; i < 100; i++) {
+        cached = (await ExploreCacheStore(prefs).read()).payload;
+        if (cached?.contains('"JP"') == true) break;
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      }
+      expect(cached, contains('"JP"'));
+      expect(prefs.containsKey('explore_home_feed_cache'), isFalse);
     },
   );
 

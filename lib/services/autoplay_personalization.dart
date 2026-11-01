@@ -5,10 +5,14 @@ import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:mornye/services/preference_blob_store.dart';
 import 'package:mornye/utils/logger.dart';
 
 final _log = AppLogger('AutoplayLearning');
 const _modelKey = 'autoplay_learning_model_v1';
+const _modelStore = PreferenceBlobStore('autoplay_model_v1', {
+  _modelKey: String,
+});
 
 /// Metadata only: signed URLs, credentials, artwork and audio never enter the
 /// model. Source is used by the live session, not persisted as a feature.
@@ -455,15 +459,15 @@ class AutoplayPersonalization {
       : null;
 
   static Future<String?> _loadPreferences() async =>
-      (await SharedPreferences.getInstance()).getString(_modelKey);
+      (await _modelStore.read(
+            await SharedPreferences.getInstance(),
+          )).values[_modelKey]
+          as String?;
 
   static Future<void> _savePreferences(String value) async {
-    if (!await (await SharedPreferences.getInstance()).setString(
-      _modelKey,
-      value,
-    )) {
-      throw StateError('Could not save autoplay learning');
-    }
+    await _modelStore.write(await SharedPreferences.getInstance(), {
+      _modelKey: value,
+    });
   }
 
   Future<void> ensureLoaded() => _loading ??= () async {

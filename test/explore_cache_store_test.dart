@@ -1,17 +1,31 @@
-import 'dart:convert';
+import 'dart:io';
 
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mornye/services/explore_cache_store.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  late Directory root;
+  const paths = MethodChannel('plugins.flutter.io/path_provider');
+  final messenger =
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+  File cacheFile() => File('${root.path}/preference_blobs/explore_feed.json');
+  setUp(() async {
+    root = await Directory.systemTemp.createTemp('explore-blob-');
+    messenger.setMockMethodCallHandler(paths, (_) async => root.path);
+  });
+  tearDown(() async {
+    messenger.setMockMethodCallHandler(paths, null);
+    await root.delete(recursive: true);
+  });
 
   test('missing cache has an empty snapshot', () async {
     SharedPreferences.setMockInitialValues({});
     final prefs = await SharedPreferences.getInstance();
 
-    final snapshot = ExploreCacheStore(prefs).read();
+    final snapshot = await ExploreCacheStore(prefs).read();
 
     expect(snapshot.payload, isNull);
     expect(snapshot.timestampMs, isNull);
@@ -27,35 +41,46 @@ void main() {
 
     await store.write(payload);
     final afterWrite = DateTime.now().millisecondsSinceEpoch;
-    final snapshot = store.read();
+    final snapshot = await store.read();
 
     expect(snapshot.payload, payload);
     expect(snapshot.timestampMs, inInclusiveRange(beforeWrite, afterWrite));
-    expect(snapshot.sizeBytes, utf8.encode(payload).length + 8);
-    expect(prefs.getString('explore_home_feed_cache'), payload);
-    expect(prefs.getInt('explore_home_feed_ts'), snapshot.timestampMs);
+    expect(snapshot.sizeBytes, await cacheFile().length());
+    expect(prefs.getString('explore_home_feed_cache'), isNull);
+    expect(prefs.getInt('explore_home_feed_ts'), isNull);
   });
 
-  test('timestamp-only cache occupies eight bytes', () async {
+  test(
+    'saves go directly to a file without retaining preference blobs',
+    () async {
+      SharedPreferences.setMockInitialValues({'unrelated_setting': true});
+      final prefs = await SharedPreferences.getInstance();
+      await ExploreCacheStore(prefs).write('{"sections":[]}');
+      expect(prefs.getKeys(), {'unrelated_setting'});
+      expect(await cacheFile().exists(), isTrue);
+    },
+  );
+
+  test('timestamp-only cache migrates and reports its file length', () async {
     SharedPreferences.setMockInitialValues({'explore_home_feed_ts': 123});
     final prefs = await SharedPreferences.getInstance();
 
-    final snapshot = ExploreCacheStore(prefs).read();
+    final snapshot = await ExploreCacheStore(prefs).read();
 
     expect(snapshot.payload, isNull);
     expect(snapshot.timestampMs, 123);
-    expect(snapshot.sizeBytes, 8);
+    expect(snapshot.sizeBytes, await cacheFile().length());
   });
 
-  test('empty payload without a timestamp occupies no bytes', () async {
+  test('empty payload without a timestamp is preserved in the file', () async {
     SharedPreferences.setMockInitialValues({'explore_home_feed_cache': ''});
     final prefs = await SharedPreferences.getInstance();
 
-    final snapshot = ExploreCacheStore(prefs).read();
+    final snapshot = await ExploreCacheStore(prefs).read();
 
     expect(snapshot.payload, '');
     expect(snapshot.timestampMs, isNull);
-    expect(snapshot.sizeBytes, 0);
+    expect(snapshot.sizeBytes, await cacheFile().length());
   });
 
   test(
@@ -71,7 +96,7 @@ void main() {
 
       await store.clear();
 
-      final snapshot = store.read();
+      final snapshot = await store.read();
       expect(snapshot.payload, isNull);
       expect(snapshot.timestampMs, isNull);
       expect(snapshot.sizeBytes, 0);

@@ -9,6 +9,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mornye/services/desktop_updater.dart';
 import 'package:mornye/services/update_checker.dart';
 
+import 'support/preference_blob_fixture.dart';
+
 const _version = 'v5.3.0';
 
 const _desktopAssetNames = [
@@ -195,7 +197,12 @@ void main() {
   });
 
   group('checkForUpdate on desktop', () {
-    setUp(() => SharedPreferences.setMockInitialValues({}));
+    late PreferenceBlobFixture blobs;
+    setUp(() async {
+      blobs = await PreferenceBlobFixture.create();
+      SharedPreferences.setMockInitialValues({});
+    });
+    tearDown(() => blobs.close());
 
     Map<String, Object?> release() => {
       'tag_name': _version,

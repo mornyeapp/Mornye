@@ -14,10 +14,15 @@ import 'package:mornye/widgets/explore_featured_section.dart';
 import 'package:mornye/widgets/audio_quality_badges.dart';
 import 'package:mornye/l10n/app_localizations.dart';
 
+import 'support/preference_blob_fixture.dart';
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('home feed cache ownership', () {
+    late PreferenceBlobFixture blobs;
+    setUp(() async => blobs = await PreferenceBlobFixture.create());
+    tearDown(() => blobs.close());
     const channel = MethodChannel('com.zarz.mornye/backend');
     final messenger =
         TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;

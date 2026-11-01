@@ -5,6 +5,7 @@ import 'package:device_info_plus/device_info_plus.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mornye/constants/app_info.dart';
+import 'package:mornye/services/preference_blob_store.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/utils/logger.dart';
 
@@ -250,15 +251,22 @@ class UpdateChecker {
   static const String _cachedAtKey = 'update_checker_releases_fetched_at';
   static const String _cachedEtagKey = 'update_checker_releases_etag';
   static const String _cachedRepoKey = 'update_checker_releases_repo';
+  static const _cache = PreferenceBlobStore('update_releases', {
+    _cachedBodyKey: String,
+    _cachedAtKey: int,
+    _cachedEtagKey: String,
+    _cachedRepoKey: String,
+  });
 
   Future<({String body, bool verified})?> _fetchReleasesBody() async {
     final prefs = await SharedPreferences.getInstance();
+    final cached = (await _cache.read(prefs)).values;
     final repo = _releaseRepo;
     // A list saved before the desktop repository split (no repo recorded) is
     // the main repository's.
-    final cachedRepo = prefs.getString(_cachedRepoKey) ?? AppInfo.githubRepo;
+    final cachedRepo = cached[_cachedRepoKey] as String? ?? AppInfo.githubRepo;
     var cachedBody = cachedRepo == repo
-        ? prefs.getString(_cachedBodyKey)
+        ? cached[_cachedBodyKey] as String?
         : null;
     if (cachedBody != null) {
       try {
@@ -269,7 +277,7 @@ class UpdateChecker {
       }
     }
 
-    final cachedEtag = prefs.getString(_cachedEtagKey);
+    final cachedEtag = cached[_cachedEtagKey] as String?;
     try {
       final response = await (_client?.get ?? http.get)(
         Uri.parse('https://api.github.com/repos/$repo/releases?per_page=30'),
@@ -283,7 +291,13 @@ class UpdateChecker {
 
       if (response.statusCode == 304 && cachedBody != null) {
         _log.i('Release list revalidated by GitHub (304)');
-        await prefs.setInt(_cachedAtKey, DateTime.now().millisecondsSinceEpoch);
+        await _cache.update(
+          prefs,
+          (current) => {
+            ...current,
+            _cachedAtKey: DateTime.now().millisecondsSinceEpoch,
+          },
+        );
         return (body: cachedBody, verified: true);
       }
       if (response.statusCode != 200) {
@@ -294,15 +308,13 @@ class UpdateChecker {
 
       // Invalid responses must not overwrite a usable offline snapshot.
       _parseReleases(response.body);
-      await prefs.setString(_cachedBodyKey, response.body);
-      await prefs.setString(_cachedRepoKey, repo);
       final etag = response.headers['etag'];
-      if (etag != null) {
-        await prefs.setString(_cachedEtagKey, etag);
-      } else {
-        await prefs.remove(_cachedEtagKey);
-      }
-      await prefs.setInt(_cachedAtKey, DateTime.now().millisecondsSinceEpoch);
+      await _cache.write(prefs, {
+        _cachedBodyKey: response.body,
+        _cachedRepoKey: repo,
+        _cachedEtagKey: ?etag,
+        _cachedAtKey: DateTime.now().millisecondsSinceEpoch,
+      });
       _log.i('Fetched current release list from GitHub (200)');
       return (body: response.body, verified: true);
     } catch (error) {

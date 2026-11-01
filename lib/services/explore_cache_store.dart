@@ -1,6 +1,5 @@
-import 'dart:convert';
-
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:mornye/services/preference_blob_store.dart';
 
 class ExploreCacheSnapshot {
   const ExploreCacheSnapshot({
@@ -19,27 +18,28 @@ class ExploreCacheStore {
 
   static const _cacheKey = 'explore_home_feed_cache';
   static const _cacheTsKey = 'explore_home_feed_ts';
+  static const _blobs = PreferenceBlobStore('explore_feed', {
+    _cacheKey: String,
+    _cacheTsKey: int,
+  });
 
   final SharedPreferences _prefs;
 
-  ExploreCacheSnapshot read() {
-    final payload = _prefs.getString(_cacheKey);
-    final timestampMs = _prefs.getInt(_cacheTsKey);
-    final payloadBytes = payload == null ? 0 : utf8.encode(payload).length;
+  Future<ExploreCacheSnapshot> read() async {
+    final snapshot = await _blobs.read(_prefs);
     return ExploreCacheSnapshot(
-      payload: payload,
-      timestampMs: timestampMs,
-      sizeBytes: payloadBytes + (timestampMs == null ? 0 : 8),
+      payload: snapshot.values[_cacheKey] as String?,
+      timestampMs: snapshot.values[_cacheTsKey] as int?,
+      sizeBytes: snapshot.sizeBytes,
     );
   }
 
   Future<void> write(String payload) async {
-    await _prefs.setString(_cacheKey, payload);
-    await _prefs.setInt(_cacheTsKey, DateTime.now().millisecondsSinceEpoch);
+    await _blobs.write(_prefs, {
+      _cacheKey: payload,
+      _cacheTsKey: DateTime.now().millisecondsSinceEpoch,
+    });
   }
 
-  Future<void> clear() async {
-    await _prefs.remove(_cacheKey);
-    await _prefs.remove(_cacheTsKey);
-  }
+  Future<void> clear() => _blobs.clear(_prefs);
 }
