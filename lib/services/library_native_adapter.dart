@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
+import 'package:mornye/services/history_database.dart';
 import 'package:mornye/services/library_cleanup.dart';
 import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/services/library_schema.dart';
@@ -162,7 +163,9 @@ class LibraryNativeAdapter {
         'item_id TEXT NOT NULL, path_key TEXT NOT NULL, '
         'PRIMARY KEY(item_id, path_key))',
       );
-      await database.execute('PRAGMA $alias.user_version = 15');
+      await database.execute(
+        'PRAGMA $alias.user_version = ${HistoryDatabase.schemaVersion}',
+      );
     });
   }
 

@@ -2,11 +2,27 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mornye/services/history_database.dart';
 import 'package:mornye/services/library_row_mapper.dart';
 import 'package:mornye/services/library_schema.dart';
 import 'package:mornye/utils/path_match_keys.dart';
 
 void main() {
+  test('native History writers accept the current Dart History schema', () {
+    final kotlin = File(
+      'android/app/src/main/kotlin/com/zarz/mornye/NativeHistoryStore.kt',
+    ).readAsStringSync();
+    final nativeVersion = RegExp(
+      r'HISTORY_SCHEMA_VERSION = (\d+)',
+    ).firstMatch(kotlin);
+    expect(int.parse(nativeVersion!.group(1)!), HistoryDatabase.schemaVersion);
+    final rust = File(
+      'rust_backend/crates/mobile/src/native_backup.rs',
+    ).readAsStringSync();
+    final backupVersion = RegExp(r'if version != (\d+)').firstMatch(rust);
+    expect(int.parse(backupVersion!.group(1)!), HistoryDatabase.schemaVersion);
+  });
+
   test('mobile native ingestion accepts the current Dart Library schema', () {
     final source = File(
       'rust_backend/crates/mobile/src/native_library.rs',

@@ -89,9 +89,9 @@ fn open(request: &Value, writable: bool) -> Result<Connection, String> {
     let version: i64 = db
         .pragma_query_value(None, "user_version", |row| row.get(0))
         .map_err(|e| err("History schema", e))?;
-    if version != 15 {
+    if version != 16 {
         return Err(format!(
-            "History schema v{version} is incompatible with native v15"
+            "History schema v{version} is incompatible with native v16"
         ));
     }
     db.execute_batch("PRAGMA recursive_triggers=ON; PRAGMA synchronous=NORMAL;")

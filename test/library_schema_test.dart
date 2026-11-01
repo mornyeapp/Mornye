@@ -31,6 +31,63 @@ void main() {
   tearDown(() => db.close());
 
   test(
+    'v20 index migration preserves rows and can run again after a downgrade',
+    () async {
+      await LibrarySchema.create(db, LibrarySchema.version);
+      const removed = {
+        'idx_library_track_artist': 'track_name, artist_name',
+        'idx_library_album': 'album_name, album_artist',
+        'idx_library_track_norm': 'track_name_norm',
+        'idx_library_artist_norm': 'artist_name_norm',
+        'idx_library_album_norm': 'album_name_norm',
+        'idx_library_scanned_at': 'scanned_at',
+      };
+      await db.execute('DROP INDEX idx_library_album_artist_norm');
+      await db.execute('DROP TABLE ${LibrarySchema.stateTable}');
+      for (final MapEntry(:key, :value) in removed.entries) {
+        await db.execute('CREATE INDEX $key ON library($value)');
+      }
+      await db.insert('library', LibraryRowMapper.encode(_track('persisted')));
+      final rows = await db.query('library');
+      final summary = await db.query(LibrarySchema.lookupSummaryTable);
+
+      for (var attempt = 0; attempt < 2; attempt++) {
+        await LibrarySchema.upgrade(db, 20, LibrarySchema.version);
+        expect(await db.query('library'), rows);
+        expect(await db.query(LibrarySchema.lookupSummaryTable), summary);
+        expect(
+          (await db.rawQuery(
+            "SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'library'",
+          )).map((row) => row['name']),
+          isNot(anyElement(isIn(removed.keys))),
+        );
+        final plan = await db.rawQuery(
+          'EXPLAIN QUERY PLAN SELECT id FROM library WHERE album_artist_norm = ?',
+          ['artist'],
+        );
+        expect(
+          plan.single['detail'],
+          contains('idx_library_album_artist_norm'),
+        );
+        // Released network ingestion names this index explicitly.
+        expect(
+          await db.rawQuery(
+            'SELECT id FROM library INDEXED BY idx_library_file_path WHERE file_path = ?',
+            ['/music/persisted.flac'],
+          ),
+          [
+            {'id': 'persisted'},
+          ],
+        );
+        expect(await db.query(LibrarySchema.stateTable), isEmpty);
+        for (final MapEntry(:key, :value) in removed.entries) {
+          await db.execute('CREATE INDEX $key ON library($value)');
+        }
+      }
+    },
+  );
+
+  test(
     'v19 upgrade rescans local Ogg gain tags while preserving indexed fields',
     () async {
       await LibrarySchema.create(db, 19);

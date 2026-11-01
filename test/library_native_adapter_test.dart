@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite/sqflite.dart';
+import 'package:mornye/services/history_database.dart';
 import 'package:mornye/services/library_native_adapter.dart';
 import 'package:mornye/services/library_row_mapper.dart';
 import 'package:mornye/services/library_schema.dart';
@@ -76,6 +77,12 @@ class _NativeHarness {
           path: request['history_path'] as String,
         );
         try {
+          expect(
+            (await history.rawQuery(
+              'PRAGMA user_version',
+            )).single['user_version'],
+            HistoryDatabase.schemaVersion,
+          );
           expect(await history.query('history_path_keys'), isEmpty);
         } finally {
           await history.close();

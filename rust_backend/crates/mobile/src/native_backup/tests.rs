@@ -118,7 +118,7 @@ impl Fixture {
             })
             .collect::<Vec<_>>()
             .join(",");
-        db.execute_batch(&format!("PRAGMA journal_mode=WAL;PRAGMA user_version=15;PRAGMA recursive_triggers=ON;CREATE TABLE history({columns});CREATE TABLE history_path_keys(item_id TEXT,path_key TEXT,PRIMARY KEY(item_id,path_key));CREATE VIRTUAL TABLE history_search_fts USING fts5(search_text,content='history',content_rowid='rowid',tokenize='trigram');CREATE TRIGGER history_fts_ai AFTER INSERT ON history BEGIN INSERT INTO history_search_fts(rowid,search_text) VALUES(new.rowid,new.search_text);END;CREATE TRIGGER history_fts_ad AFTER DELETE ON history BEGIN INSERT INTO history_search_fts(history_search_fts,rowid,search_text) VALUES('delete',old.rowid,old.search_text);END;")).unwrap();
+        db.execute_batch(&format!("PRAGMA journal_mode=WAL;PRAGMA user_version=16;PRAGMA recursive_triggers=ON;CREATE TABLE history({columns});CREATE TABLE history_path_keys(item_id TEXT,path_key TEXT,PRIMARY KEY(item_id,path_key));CREATE VIRTUAL TABLE history_search_fts USING fts5(search_text,content='history',content_rowid='rowid',tokenize='trigram');CREATE TRIGGER history_fts_ai AFTER INSERT ON history BEGIN INSERT INTO history_search_fts(rowid,search_text) VALUES(new.rowid,new.search_text);END;CREATE TRIGGER history_fts_ad AFTER DELETE ON history BEGIN INSERT INTO history_search_fts(history_search_fts,rowid,search_text) VALUES('delete',old.rowid,old.search_text);END;")).unwrap();
         let request = json!({"history_path":path.to_str().unwrap(),"platform":"ios"});
         Self { dir, db, request }
     }
