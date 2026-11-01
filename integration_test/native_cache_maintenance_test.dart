@@ -155,6 +155,7 @@ void main() {
           await pruneUnreferencedLibraryCovers(
             Directory(alias.path),
             {},
+            referenceColumns: const [],
             libraryDatabase: db,
             temporaryDirectory: root,
             minimumAge: const Duration(minutes: 1),
@@ -216,6 +217,7 @@ void main() {
           await pruneUnreferencedLibraryCovers(
             covers,
             const {},
+            referenceColumns: const [],
             libraryDatabase: db,
             temporaryDirectory: root,
             minimumAge: const Duration(minutes: 1),
@@ -302,6 +304,7 @@ void main() {
                 deleted = await pruneUnreferencedLibraryCovers(
                   covers,
                   {},
+                  referenceColumns: const [],
                   libraryDatabase: db,
                   temporaryDirectory: root,
                 );

@@ -16,7 +16,7 @@ Add `--dart-define=NAME=value` for the gated suites below. Android Gradle
 builds the Rust backend automatically; for iOS run
 `bash scripts/build_rust_backend.sh ios` and `(cd ios && pod install)` first.
 
-Avoid `flutter test integration_test` for the whole folder: the three
+Avoid `flutter test integration_test` for the whole folder: the
 aggregate files import other suites, so those suites run twice.
 
 ### Performance Driver
@@ -48,6 +48,13 @@ MORNYE_PERFORMANCE_REPORT=build/perf/mornye.json \
   Mornye suites, plus seek playback, dragging and paused idle in both styles.
 - Use `player_performance_test.dart` to compare lyrics, artwork and seek in
   both styles in a single build.
+- Use `pipeline_performance_test.dart` on an isolated macOS profile build
+  for Library, download, playback and both lyrics styles with synthetic files and
+  local HTTP fixtures. Its stage timelines include persistence and idle
+  work; each report states which setup and platform features are excluded.
+  Use a separate bundle identifier while another Mornye copy is running.
+  Keep the measured window visible and avoid accessibility inspection during
+  the run, which can change semantics work and invalidate the test teardown.
 
 ### Emulators and Fixtures
 
@@ -88,6 +95,7 @@ Aggregates (each runs other suites as groups):
 | `mornye_performance_test.dart` | The rendering, screens, artwork and lyrics Mornye performance suites; driver target |
 | `material_performance_test.dart` | Material lyrics/artwork and shared seek scenarios in both styles; driver target |
 | `player_performance_test.dart` | Shared lyrics, artwork and seek scenarios for Material and Mornye; driver target |
+| `pipeline_performance_test.dart` | Library, foreground download, native playback and both lyrics styles with isolated fixtures; macOS profile driver target |
 | `remaining_optimization_test.dart` | Collection restore, history staging, library staging, cache maintenance, collection workers, queue workers, backup archive |
 
 Support files (not tests): `performance_driver.dart` (host driver) and
@@ -108,6 +116,7 @@ Suites:
 | `download_cancel_dispatch_test.dart` | Native cancel and clear of queued IDs; invalid batches |
 | `download_lossless_container_test.dart` | Foreground queue finalizes lossless M4A without provider hints |
 | `download_output_container_test.dart` | Foreground queue handles each returned container and extension |
+| `download_pipeline_performance_test.dart` | Native loopback downloads through conversion, metadata, durable history and notification; cancel/retry latency and FFmpeg process counts |
 | `download_queue_access_failure_test.dart` | A denied output folder fails only the queued requests |
 | `download_queue_selection_test.dart` | Enqueuing large track and playlist selections; persistence rollback |
 | `download_queue_workers_test.dart` | Queue restore with bounded real sqflite reads |
@@ -116,6 +125,9 @@ Suites:
 | `extension_storage_recovery_test.dart` | Unreadable extension settings; secure storage written with old defaults |
 | `library_collections_workers_test.dart` | Large playlist search pages and metadata-only playlist copies |
 | `library_paging_performance_test.dart` | Long-scroll Library paging on real SQLite (performance) |
+| `library_pipeline_performance_test.dart` | Native SQLite startup, retained Library pages, artwork scrolling, scan ingestion and large collections with isolated fixtures |
+| `logs_performance_test.dart` | Production logs scrolling, log bursts and idle in both styles with 500 synthetic entries (performance) |
+| `playback_pipeline_performance_test.dart` | Native local and HTTP playback, metadata, seek, rapid source replacement, cancellation and paused idle with private storage |
 | `loved_batch_write_test.dart` | Love All add and remove on real SQLite |
 | `lyrics_file_access_test.dart` | Embedding, sidecar and export of lyrics outside Downloads |
 | `lyrics_timing_test.dart` | Native lyrics parser timing cases |

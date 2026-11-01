@@ -112,7 +112,11 @@ void main() {
         () => Future<void>.delayed(const Duration(milliseconds: 20)),
       );
       await tester.pump();
-      if (row.evaluate().isNotEmpty &&
+      // Invalidation retains the previous value while the filesystem reread
+      // runs, so an enabled row alone does not mean its value is current.
+      final storage = container.read(unsecuredExtensionStorageProvider);
+      if (!storage.isLoading &&
+          row.evaluate().isNotEmpty &&
           tester.widget<SettingsSwitchItem>(row).enabled) {
         await tester.pumpAndSettle();
         return;

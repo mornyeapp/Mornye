@@ -33,10 +33,34 @@ class AppStateDatabase {
       sqlite.SingleFlightInitializer<Database>();
 
   final Future<SharedPreferences> _prefs = SharedPreferences.getInstance();
+  final Database? _databaseOverride;
 
-  AppStateDatabase._init();
+  AppStateDatabase._init() : _databaseOverride = null;
 
-  Future<Database> get database => _database.getOrCreate(_initDb);
+  /// Keeps scoped playback fixtures on their own native SQLite connection.
+  @visibleForTesting
+  AppStateDatabase.withDatabase(Database database)
+    : _databaseOverride = database;
+
+  /// Opens a private file with the same state and resume schemas as the app.
+  @visibleForTesting
+  static Future<Database> openWithFactory(
+    DatabaseFactory factory,
+    String path,
+  ) => factory.openDatabase(
+    path,
+    options: OpenDatabaseOptions(
+      version: _dbVersion,
+      onCreate: _createDb,
+      onUpgrade: _upgradeDb,
+    ),
+  );
+
+  Future<Database> get database {
+    final override = _databaseOverride;
+    if (override != null) return Future.value(override);
+    return _database.getOrCreate(_initDb);
+  }
 
   Future<Database> _initDb() {
     return sqlite.openAppDatabase(
@@ -48,7 +72,7 @@ class AppStateDatabase {
     );
   }
 
-  Future<void> _createDb(Database db, int version) async {
+  static Future<void> _createDb(Database db, int version) async {
     _log.i('Creating app state database schema v$version');
 
     await db.execute('''
@@ -90,7 +114,11 @@ class AppStateDatabase {
     await PlaybackResumeStore.createSchema(db);
   }
 
-  Future<void> _upgradeDb(Database db, int oldVersion, int newVersion) async {
+  static Future<void> _upgradeDb(
+    Database db,
+    int oldVersion,
+    int newVersion,
+  ) async {
     _log.i('Upgrading app state database from v$oldVersion to v$newVersion');
     if (oldVersion < 3) {
       await _createRecentStateTable(db);

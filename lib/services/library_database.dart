@@ -53,10 +53,25 @@ class LibraryDatabase {
   bool? _searchFtsAvailable;
   final _shadow = sqlite.LibraryShadowSnapshot();
   ({Database db, String stamp, LocalLibraryLookupIndex index})? _lookupIndex;
+  final Database? _databaseOverride;
 
-  LibraryDatabase._init();
+  LibraryDatabase._init() : _databaseOverride = null;
+
+  /// Keeps integration fixtures on a private connection while exercising the
+  /// same summary, search and browse routes as the application.
+  @visibleForTesting
+  LibraryDatabase.withDatabase(
+    Database database, {
+    bool historyAttached = false,
+    bool searchFtsAvailable = false,
+  }) : _databaseOverride = database {
+    _historyAttached = historyAttached;
+    _searchFtsAvailable = searchFtsAvailable;
+  }
 
   Future<Database> get database {
+    final override = _databaseOverride;
+    if (override != null) return Future.value(override);
     return _database.getOrCreate(() async {
       final db = await sqlite.openAppDatabase(
         'local_library.db',
@@ -962,7 +977,7 @@ class LibraryDatabase {
   Future<void> close() async {
     final db = await database;
     await db.close();
-    _database.reset();
+    if (_databaseOverride == null) _database.reset();
     _historyAttached = false;
     _fileSizes = null;
     _searchFtsAvailable = null;

@@ -71,6 +71,35 @@ void main() {
     await store.clearPlaybackResume();
   });
 
+  test(
+    'injected session connections keep playback and resume private',
+    () async {
+      final privateDb = await AppStateDatabase.openWithFactory(
+        databaseFactoryFfi,
+        '${root.path}/private_state.db',
+      );
+      final privateStore = AppStateDatabase.withDatabase(privateDb);
+      try {
+        final media = _song(7);
+        await privateStore.savePlaybackSession(
+          mediaJson: utf8.encode(_legacyJson([media])),
+          index: 0,
+          positionMs: 4200,
+          shuffle: false,
+          repeatMode: 'none',
+        );
+        expect(await store.getPlaybackSession(), isNull);
+        expect((await privateStore.getPlaybackSession())?['positionMs'], 4200);
+        await privateStore.archivePlaybackSession(media.toJson());
+        expect(await privateStore.getPlaybackSession(), isNull);
+        expect(await privateStore.getPlaybackResumeSession(), isNotNull);
+        expect(await store.getPlaybackResumeSession(), isNull);
+      } finally {
+        await privateDb.close();
+      }
+    },
+  );
+
   test('a session this build saves is the text earlier builds read', () async {
     final songs = [for (var i = 0; i < 300; i++) _song(i)];
     final order = [for (var i = 0; i < songs.length; i++) (i * 7) % 300];

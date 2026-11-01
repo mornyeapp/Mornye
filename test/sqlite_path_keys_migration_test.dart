@@ -193,6 +193,7 @@ void main() {
       CREATE TABLE library(
         id TEXT PRIMARY KEY, file_path TEXT,
         source_id TEXT NOT NULL DEFAULT 'legacy', isrc TEXT,
+        format TEXT, audio_metadata_scan_version INTEGER NOT NULL DEFAULT 0,
         match_key TEXT DEFAULT 'song|artist'
       )
     ''');
@@ -213,7 +214,7 @@ void main() {
     await expectLater(
       db.transaction((_) async {
         await LibrarySchema.upgrade(db, 14, LibrarySchema.version);
-        await db.execute('PRAGMA user_version = 17');
+        await db.execute('PRAGMA user_version = ${LibrarySchema.version}');
       }),
       throwsA(isA<StateError>()),
     );
@@ -232,9 +233,12 @@ void main() {
     await db.execute('DROP TRIGGER fail_later_page');
     await db.transaction((_) async {
       await LibrarySchema.upgrade(db, 14, LibrarySchema.version);
-      await db.execute('PRAGMA user_version = 17');
+      await db.execute('PRAGMA user_version = ${LibrarySchema.version}');
     });
-    expect((await db.rawQuery('PRAGMA user_version')).single.values.single, 17);
+    expect(
+      (await db.rawQuery('PRAGMA user_version')).single.values.single,
+      LibrarySchema.version,
+    );
     expect(
       (await db.rawQuery(
         'SELECT COUNT(DISTINCT item_id) FROM library_path_keys',
