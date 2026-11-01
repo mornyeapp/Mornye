@@ -1719,6 +1719,77 @@ void main() {
     );
   }
 
+  for (final size in [const Size(852, 393), const Size(960, 432)]) {
+    for (final reducedMotion in [false, true]) {
+      testWidgets('immersive Material landscape centers within safe insets '
+          '($size, reduced motion: $reducedMotion)', (tester) async {
+        const insets = EdgeInsets.fromLTRB(20, 24, 0, 16);
+        metadataOverrides['lyrics'] =
+            '[00:00.00]First lyric\n[01:00.00]Second line';
+        await pumpNowPlaying(
+          tester,
+          theme: AppTheme.light(),
+          size: size,
+          playback: PlaybackState(playing: true),
+          wrapPlayer: (player) => Builder(
+            builder: (context) => MediaQuery(
+              data: MediaQuery.of(context).copyWith(
+                padding: insets,
+                viewPadding: insets,
+                disableAnimations: reducedMotion,
+              ),
+              child: player,
+            ),
+          ),
+        );
+        mediaItems.add(item('many'));
+        await settlePlayer(tester);
+        ProviderScope.containerOf(
+          tester.element(find.byType(NowPlayingScreen)),
+        ).read(settingsProvider.notifier).setLandscapeLyricsArtwork(true);
+        await settlePlayer(tester);
+        final toggle = find.byKey(const ValueKey('material-lyrics-toggle'));
+        await tester.tap(toggle);
+        await tester.pump();
+        await completeLyrics(tester);
+        final layout = find.byKey(
+          const ValueKey('material-landscape-artwork-lyrics'),
+        );
+        final spacer = find.byKey(
+          const ValueKey('material-landscape-toolbar-space'),
+        );
+        expect(
+          tester.getRect(layout).top,
+          closeTo(insets.top + kToolbarHeight, 1),
+        );
+        await tester.pump(const Duration(seconds: 5));
+        await settlePlayer(tester);
+        expect(toggle.hitTestable(), findsNothing);
+        expect(tester.getSize(spacer).height, closeTo(0, 0.01));
+        expect(tester.getRect(layout).top, closeTo(insets.top, 1));
+        final cover = find.descendant(
+          of: layout,
+          matching: find.byType(PlayerArtwork),
+        );
+        expect(
+          tester.getCenter(cover).dy,
+          closeTo((size.height + insets.top - insets.bottom) / 2, 1),
+        );
+        final lyrics = tester.getRect(find.byType(ListView));
+        expect(lyrics.bottom, lessThanOrEqualTo(size.height - insets.bottom));
+        await tester.tapAt(Offset(lyrics.right - 6, lyrics.top + 10));
+        await settlePlayer(tester);
+        expect(toggle.hitTestable(), findsOneWidget);
+        expect(tester.getSize(spacer).height, closeTo(kToolbarHeight, 1));
+        expect(
+          tester.getRect(layout).top,
+          closeTo(insets.top + kToolbarHeight, 1),
+        );
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
+
   testWidgets('Material landscape artwork beside lyrics hides idle controls', (
     tester,
   ) async {

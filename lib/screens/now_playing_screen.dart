@@ -449,7 +449,13 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
         : MediaQuery.orientationOf(context) == Orientation.landscape
         ? 0
         : 36;
+    final materialLandscapeArtwork =
+        !mornye &&
+        !widget.embedded &&
+        MediaQuery.orientationOf(context) == Orientation.landscape &&
+        ref.watch(settingsProvider.select((s) => s.landscapeLyricsArtwork));
     final player = Scaffold(
+      extendBodyBehindAppBar: materialLandscapeArtwork,
       backgroundColor: mornye || materialBackdrop
           ? Colors.transparent
           : colorScheme.surface,
@@ -529,9 +535,18 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
       body: FadeTransition(
         opacity: contentOpacity,
         child: SafeArea(
+          top: !materialLandscapeArtwork,
           bottom: homeIndicatorBelowRow == null,
           child: Column(
             children: [
+              if (materialLandscapeArtwork) ...[
+                SizedBox(height: MediaQuery.viewPaddingOf(context).top),
+                PlayerLyricsControlsCollapse(
+                  key: const ValueKey('material-landscape-toolbar-space'),
+                  hidden: _lyricsImmersive,
+                  child: const SizedBox(height: kToolbarHeight),
+                ),
+              ],
               Expanded(
                 child: mornye
                     ? NotificationListener<ScrollUpdateNotification>(
