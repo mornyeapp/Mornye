@@ -18,8 +18,20 @@ class _RuleTarget {
   final String fileName;
 }
 
+/// What the rules need about one stored track, from either source.
+class _TrackFacts {
+  const _TrackFacts(this.track, {this.service = '', this.quality = ''});
+  final Track track;
+  final String service;
+  final String quality;
+}
+
+/// The Local Library scan names a file with no artist tag "Unknown Artist".
+const _untaggedArtist = 'unknown artist';
+
 /// Re-applies the Files settings (folder organization and filename format)
-/// to tracks that were already downloaded, not only to new downloads.
+/// to tracks already on disk, not only to new downloads: Mornye's downloads
+/// and the files the Local Library scan found inside the download folder.
 extension DownloadQueueLibraryReorganization on DownloadQueueNotifier {
   /// Moving files while the queue writes into the same folders could race
   /// with a download that is resolving its own destination.
@@ -30,8 +42,11 @@ extension DownloadQueueLibraryReorganization on DownloadQueueNotifier {
         item.status == DownloadStatus.finalizing,
   );
 
-  /// Works out where every downloaded track would be stored under the
-  /// current rules. Nothing is moved; see [applyLibraryReorganization].
+  /// Works out where every track in the download folder would be stored
+  /// under the current rules. Downloads come from history; other files come
+  /// from the Local Library scan, so a folder must be scanned as a Local
+  /// Library source for its files to be included. Nothing is moved; see
+  /// [applyLibraryReorganization].
   ///
   /// Throws [FormatException] when the custom folder template is invalid.
   Future<LibraryReorganizationPlan> planLibraryReorganization({
@@ -60,12 +75,57 @@ extension DownloadQueueLibraryReorganization on DownloadQueueNotifier {
         !keepsPlaylistFolders && settings.createPlaylistFolder;
 
     final movesBySource = <String, LibraryReorganizationMove>{};
+    // Every file already accounted for, keyed by [_pathKey]. For downloads
+    // the value collects the history rows that point at the file.
     final idsBySource = <String, List<String>>{};
     final occupied = <String>[];
     var alreadyOrganized = 0;
     var outside = 0;
     var missing = 0;
+    var untagged = 0;
     var scanned = 0;
+
+    Future<void> consider({
+      required String key,
+      required String filePath,
+      required _StoredLocation location,
+      required _TrackFacts facts,
+      required List<String> historyIds,
+    }) async {
+      final target = await _reorganizationTarget(
+        facts,
+        settings,
+        location,
+        safMode: safMode,
+        keepCurrentFolder: keepsPlaylistFolders,
+      );
+      final sameDir = _sameStoredName(
+        target.relativeDir,
+        location.relativeDir,
+        ignoreCase: safMode,
+      );
+      final sameName = _sameStoredName(
+        target.fileName,
+        location.fileName,
+        ignoreCase: safMode,
+      );
+      if (sameDir && sameName) {
+        alreadyOrganized++;
+        occupied.add(
+          joinRelativeLibraryPath(location.relativeDir, location.fileName),
+        );
+        return;
+      }
+      movesBySource[key] = LibraryReorganizationMove(
+        historyIds: historyIds,
+        trackName: facts.track.name,
+        sourcePath: filePath,
+        sourceRelativeDir: location.relativeDir,
+        sourceFileName: location.fileName,
+        targetRelativeDir: target.relativeDir,
+        targetFileName: target.fileName,
+      );
+    }
 
     const pageSize = 500;
     for (var offset = 0; ; offset += pageSize) {
@@ -83,8 +143,8 @@ extension DownloadQueueLibraryReorganization on DownloadQueueNotifier {
           _log.w('Skipping unreadable history row during reorganize: $e');
           continue;
         }
-        final sourceKey = item.filePath;
-        final sharedIds = idsBySource[sourceKey];
+        final key = _pathKey(item.filePath, safMode: safMode);
+        final sharedIds = idsBySource[key];
         if (sharedIds != null) {
           // Another history row already accounts for this file.
           sharedIds.add(item.id);
@@ -100,40 +160,72 @@ extension DownloadQueueLibraryReorganization on DownloadQueueNotifier {
           missing++;
           continue;
         }
+        final historyIds = idsBySource[key] = [item.id];
+        await consider(
+          key: key,
+          filePath: item.filePath,
+          location: location,
+          facts: _TrackFacts(
+            _trackFromHistory(item),
+            service: item.service,
+            quality: item.quality ?? '',
+          ),
+          historyIds: historyIds,
+        );
+      }
+      onScanned?.call(scanned);
+      if (rows.length < pageSize) break;
+    }
 
-        final target = await _reorganizationTarget(
-          item,
-          settings,
-          location,
-          safMode: safMode,
-          keepCurrentFolder: keepsPlaylistFolders,
-        );
-        final sameDir = _sameStoredName(
-          target.relativeDir,
-          location.relativeDir,
-          ignoreCase: safMode,
-        );
-        final sameName = _sameStoredName(
-          target.fileName,
-          location.fileName,
-          ignoreCase: safMode,
-        );
-        idsBySource[sourceKey] = [item.id];
-        if (sameDir && sameName) {
-          alreadyOrganized++;
-          occupied.add(
-            joinRelativeLibraryPath(location.relativeDir, location.fileName),
-          );
+    for (var offset = 0; ; offset += pageSize) {
+      final rows = await LibraryDatabase.instance.getPage(
+        limit: pageSize,
+        offset: offset,
+      );
+      if (rows.isEmpty) break;
+      for (final row in rows) {
+        scanned++;
+        final LocalLibraryItem item;
+        try {
+          item = LocalLibraryItem.fromJson(row);
+        } catch (e) {
+          _log.w('Skipping unreadable library row during reorganize: $e');
           continue;
         }
-        movesBySource[sourceKey] = LibraryReorganizationMove(
-          historyIds: idsBySource[sourceKey]!,
-          trackName: item.trackName,
-          sourcePath: item.filePath,
-          sourceRelativeDir: location.relativeDir,
-          sourceFileName: location.fileName,
-          targetRelativeDir: target.relativeDir,
-          targetFileName: target.fileName,
+        // A CUE track is a slice of a shared file, not a file of its own.
+        if (isCueVirtualPath(item.filePath)) continue;
+        final key = _pathKey(item.filePath, safMode: safMode);
+        // Downloads were planned above with their richer history metadata.
+        if (idsBySource.containsKey(key)) continue;
+        idsBySource[key] = const [];
+
+        final location = _libraryLocation(
+          item.filePath,
+          root: root,
+          safMode: safMode,
+        );
+        if (location == null) {
+          outside++;
+          continue;
+        }
+        final artist = item.artistName.trim();
+        if (item.trackName.trim().isEmpty ||
+            artist.isEmpty ||
+            artist.toLowerCase() == _untaggedArtist) {
+          // Without tags the rules would only file it under "Unknown".
+          untagged++;
+          continue;
+        }
+        if (!safMode && !await File(item.filePath).exists()) {
+          missing++;
+          continue;
+        }
+        await consider(
+          key: key,
+          filePath: item.filePath,
+          location: location,
+          facts: _TrackFacts(_trackFromLibrary(item)),
+          historyIds: const [],
         );
       }
       onScanned?.call(scanned);
@@ -159,7 +251,8 @@ extension DownloadQueueLibraryReorganization on DownloadQueueNotifier {
     }
     _log.i(
       'Reorganize plan: ${moves.length} to move, $alreadyOrganized organized, '
-      '$outside outside download folder, $missing missing',
+      '$outside outside download folder, $missing missing, '
+      '$untagged untagged',
     );
     return LibraryReorganizationPlan(
       root: root,
@@ -168,6 +261,7 @@ extension DownloadQueueLibraryReorganization on DownloadQueueNotifier {
       alreadyOrganized: alreadyOrganized,
       outsideDownloadFolder: outside,
       missing: missing,
+      untagged: untagged,
       keepsPlaylistFolders: keepsPlaylistFolders,
       dropsPlaylistFolders: dropsPlaylistFolders,
     );
@@ -209,6 +303,15 @@ extension DownloadQueueLibraryReorganization on DownloadQueueNotifier {
   bool _sameStoredName(String a, String b, {required bool ignoreCase}) =>
       ignoreCase ? a.toLowerCase() == b.toLowerCase() : a == b;
 
+  /// Identity of a stored file across history and the Local Library.
+  /// Windows paths ignore case, as the file system does.
+  String _pathKey(String path, {required bool safMode}) {
+    final trimmed = path.trim();
+    if (safMode || isContentUri(trimmed)) return trimmed;
+    final normalized = p.normalize(trimmed);
+    return Platform.isWindows ? normalized.toLowerCase() : normalized;
+  }
+
   /// Where [item] currently lives relative to the download folder, or null
   /// when it is stored elsewhere (another folder, another SAF tree, network).
   _StoredLocation? _storedLocation(
@@ -231,6 +334,32 @@ extension DownloadQueueLibraryReorganization on DownloadQueueNotifier {
         fileName,
       );
     }
+    return _localLocation(path, root);
+  }
+
+  /// Like [_storedLocation] for a Local Library row, which knows only its
+  /// path. A SAF row counts when its document is inside the download tree.
+  _StoredLocation? _libraryLocation(
+    String filePath, {
+    required String root,
+    required bool safMode,
+  }) {
+    final path = filePath.trim();
+    if (path.isEmpty) return null;
+    if (safMode) {
+      final document = resolveSafDocumentLocation(path);
+      if (document == null || !_sameSafTree(document.treeUri, root)) {
+        return null;
+      }
+      return _StoredLocation(
+        normalizeRelativeLibraryDir(document.relativeDir),
+        document.fileName,
+      );
+    }
+    return _localLocation(path, root);
+  }
+
+  _StoredLocation? _localLocation(String path, String root) {
     if (isContentUri(path) || root.isEmpty) return null;
     final normalized = p.normalize(path);
     if (!p.isWithin(root, normalized)) return null;
@@ -239,6 +368,19 @@ extension DownloadQueueLibraryReorganization on DownloadQueueNotifier {
       normalizeRelativeLibraryDir(relativeDir == '.' ? '' : relativeDir),
       p.basename(normalized),
     );
+  }
+
+  /// Tree URIs differ in percent-encoding depending on who built them.
+  bool _sameSafTree(String a, String b) {
+    String canonical(String uri) {
+      try {
+        return Uri.decodeFull(uri).toLowerCase();
+      } catch (_) {
+        return uri.toLowerCase();
+      }
+    }
+
+    return canonical(a) == canonical(b);
   }
 
   Track _trackFromHistory(DownloadHistoryItem item) => Track(
@@ -262,23 +404,43 @@ extension DownloadQueueLibraryReorganization on DownloadQueueNotifier {
     explicit: item.explicit,
   );
 
-  /// History does not keep the release type, so single/album is inferred
+  Track _trackFromLibrary(LocalLibraryItem item) => Track(
+    id: item.id,
+    name: item.trackName,
+    artistName: item.artistName,
+    albumName: item.albumName,
+    albumArtist: item.albumArtist,
+    isrc: item.isrc,
+    duration: item.duration ?? 0,
+    trackNumber: item.trackNumber,
+    discNumber: item.discNumber,
+    totalDiscs: item.totalDiscs,
+    releaseDate: item.releaseDate,
+    totalTracks: item.totalTracks,
+    composer: item.composer,
+    genre: item.genre,
+    label: item.label,
+    copyright: item.copyright,
+    explicit: item.explicit,
+  );
+
+  /// Neither source keeps the release type, so single/album is inferred
   /// from the track count. When that guess would put the track in a different
   /// folder than the other classification, and the file already sits in the
   /// other one's folder (say a 3-track EP filed under Singles), the existing
   /// placement wins. Filenames alone are never used as evidence: they are
   /// exactly what a changed filename rule is meant to replace.
   Future<_RuleTarget> _reorganizationTarget(
-    DownloadHistoryItem item,
+    _TrackFacts facts,
     AppSettings settings,
     _StoredLocation current, {
     required bool safMode,
     required bool keepCurrentFolder,
   }) async {
-    final track = _trackFromHistory(item);
+    final track = facts.track;
     Future<_RuleTarget> targetFor(Track candidate) => _ruleTargetFor(
       candidate,
-      item,
+      facts,
       settings,
       current,
       safMode: safMode,
@@ -306,14 +468,17 @@ extension DownloadQueueLibraryReorganization on DownloadQueueNotifier {
 
   Future<_RuleTarget> _ruleTargetFor(
     Track track,
-    DownloadHistoryItem item,
+    _TrackFacts facts,
     AppSettings settings,
     _StoredLocation current, {
     required bool safMode,
     required bool keepCurrentFolder,
   }) async {
-    final providerTrackId = _knownProviderTrackId(track, item.service);
-    final quality = item.quality ?? '';
+    final service = facts.service;
+    final providerTrackId = service.isEmpty
+        ? ''
+        : _knownProviderTrackId(track, service);
+    final quality = facts.quality;
 
     final String relativeDir;
     if (keepCurrentFolder) {
@@ -324,7 +489,7 @@ extension DownloadQueueLibraryReorganization on DownloadQueueNotifier {
           ? await FolderPathTemplate.expand(settings.folderPathTemplate, {
               ..._filenameMetadataForTrack(
                 track,
-                provider: item.service,
+                provider: service,
                 providerTrackId: providerTrackId,
                 quality: quality,
               ),
@@ -335,8 +500,8 @@ extension DownloadQueueLibraryReorganization on DownloadQueueNotifier {
               'playlist': '',
             })
           : null;
-      // No playlistName: history does not record the source playlist, so
-      // no playlist folder prefix is added.
+      // No playlistName: the source playlist is not recorded, so no
+      // playlist folder prefix is added.
       final raw = _buildRelativeOutputDir(
         track,
         settings,
@@ -362,7 +527,7 @@ extension DownloadQueueLibraryReorganization on DownloadQueueNotifier {
       format,
       _filenameMetadataForTrack(
         track,
-        provider: item.service,
+        provider: service,
         providerTrackId: providerTrackId,
         quality: quality,
       ),

@@ -14,6 +14,7 @@ import 'package:mornye/providers/extension_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/services/app_state_database.dart';
 import 'package:mornye/services/history_database.dart';
+import 'package:mornye/services/library_database.dart';
 import 'package:mornye/services/library_reorganizer.dart';
 
 import 'support/fixed_settings.dart';
@@ -55,16 +56,38 @@ Map<String, Object?> _historyRow(
   'total_tracks': totalTracks,
 };
 
+Map<String, Object?> _libraryRow(
+  String id,
+  String filePath, {
+  required String title,
+  String artist = 'Artist',
+  String album = 'Album',
+  int? trackNumber,
+  int? totalTracks,
+}) => {
+  'id': id,
+  'source_id': 'music',
+  'track_name': title,
+  'artist_name': artist,
+  'album_name': album,
+  'file_path': filePath,
+  'scanned_at': '2026-01-01T00:00:00.000Z',
+  'track_number': trackNumber,
+  'total_tracks': totalTracks,
+};
+
 void main() {
   final messenger =
       TestWidgetsFlutterBinding.ensureInitialized().defaultBinaryMessenger;
 
   late Directory root;
   late List<Map<String, Object?>> historyRows;
+  late List<Map<String, Object?>> libraryRows;
 
   setUp(() async {
     root = await Directory.systemTemp.createTemp('library-reorganize-plan-');
     historyRows = [];
+    libraryRows = [];
     addTearDown(() => root.delete(recursive: true));
   });
 
@@ -99,8 +122,11 @@ void main() {
       final args = (call.arguments as Map?) ?? {};
       if (call.method == 'openDatabase') {
         final id = versions.length + 1;
-        versions[id] = (args['path'] as String).endsWith('history.db')
+        final path = args['path'] as String;
+        versions[id] = path.endsWith('history.db')
             ? HistoryDatabase.schemaVersion
+            : path.endsWith('local_library.db')
+            ? LibraryDatabase.schemaVersion
             : 4;
         return {'id': id};
       }
@@ -123,6 +149,13 @@ void main() {
             int.tryParse(RegExp(r'offset (\d+)').firstMatch(sql)?[1] ?? '') ??
             0;
         rows = historyRows.skip(offset).toList();
+      } else if (sql.startsWith(
+        'select * from ${LibraryDatabase.visibleLibraryView}',
+      )) {
+        final offset =
+            int.tryParse(RegExp(r'offset (\d+)').firstMatch(sql)?[1] ?? '') ??
+            0;
+        rows = libraryRows.skip(offset).toList();
       }
       final columns = <String>{for (final row in rows) ...row.keys}.toList();
       return {
@@ -242,7 +275,7 @@ void main() {
                 updated[id] = newFilePath;
                 return true;
               },
-          forgetLibraryPath: (_) async {},
+          relinkLibraryPath: (_, _) async => true,
         ),
       );
       final target = p.join(
@@ -312,4 +345,100 @@ void main() {
     expect(plan.keepsPlaylistFolders, isTrue);
     expect(plan.moves.single.targetDisplayPath, 'Road Trip/Artist - Song.flac');
   });
+
+  test(
+    'files from the Local Library scan are organized by their tags too',
+    () async {
+      final downloaded = await write('Song A - Artist.flac');
+      final scanned = await write('incoming/04 Other Song.mp3');
+      final untagged = await write('incoming/voice memo.m4a');
+      final organized = await write('Band/LP/Band - Kept.flac');
+      historyRows = [
+        _historyRow('a', downloaded.path, title: 'Song A', totalTracks: 10),
+      ];
+      libraryRows = [
+        // The same file as the download: history metadata wins.
+        _libraryRow('lib_a', downloaded.path, title: 'Wrong', totalTracks: 10),
+        _libraryRow(
+          'lib_b',
+          scanned.path,
+          title: 'Other Song',
+          artist: 'Band',
+          album: 'LP',
+          trackNumber: 4,
+          totalTracks: 9,
+        ),
+        _libraryRow(
+          'lib_c',
+          untagged.path,
+          title: 'voice memo',
+          artist: 'Unknown Artist',
+          album: 'Unknown Album',
+        ),
+        _libraryRow(
+          'lib_d',
+          organized.path,
+          title: 'Kept',
+          artist: 'Band',
+          album: 'LP',
+          totalTracks: 9,
+        ),
+        _libraryRow('lib_cue', '${scanned.path}#track03', title: 'Cue'),
+      ];
+      final queue = await queueWith(
+        AppSettings(
+          downloadDirectory: root.path,
+          folderOrganization: 'artist_album',
+          filenameFormat: '{artist} - {title}',
+        ),
+      );
+      final plan = await queue.planLibraryReorganization();
+
+      expect(plan.untagged, 1);
+      expect(plan.missing, 0); // The CUE track is skipped, not missing.
+      expect(plan.alreadyOrganized, 1);
+      expect(
+        {for (final m in plan.moves) m.sourceDisplayPath: m.targetDisplayPath},
+        {
+          'Song A - Artist.flac': 'Artist/Album/Artist - Song A.flac',
+          'incoming/04 Other Song.mp3': 'Band/LP/Band - Other Song.mp3',
+        },
+      );
+      final scannedMove = plan.moves.firstWhere(
+        (m) => m.sourceFileName == '04 Other Song.mp3',
+      );
+      expect(scannedMove.historyIds, isEmpty);
+
+      final relinked = <String, String>{};
+      final result = await queue.applyLibraryReorganization(
+        plan,
+        reorganizer: LibraryReorganizer(
+          updateHistoryPath:
+              (
+                id,
+                newFilePath, {
+                newSafFileName,
+                newSafRelativeDir,
+                required expectedFilePath,
+              }) async => true,
+          relinkLibraryPath: (oldPath, newPath) async {
+            relinked[oldPath] = newPath;
+            return true;
+          },
+        ),
+      );
+      expect(result.moved, 2);
+      expect(
+        await File(
+          p.join(root.path, 'Band', 'LP', 'Band - Other Song.mp3'),
+        ).exists(),
+        isTrue,
+      );
+      expect(await untagged.exists(), isTrue);
+      expect(
+        relinked[scanned.path],
+        p.join(root.path, 'Band', 'LP', 'Band - Other Song.mp3'),
+      );
+    },
+  );
 }

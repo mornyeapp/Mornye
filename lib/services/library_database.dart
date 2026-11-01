@@ -771,6 +771,69 @@ class LibraryDatabase {
     });
   }
 
+  /// Decoded visible rows in a stable order, for passes over the whole
+  /// library such as reorganizing files.
+  Future<List<Map<String, dynamic>>> getPage({
+    required int limit,
+    int offset = 0,
+  }) async {
+    final db = await database;
+    final rows = await db.query(
+      visibleLibraryView,
+      orderBy: 'id',
+      limit: limit,
+      offset: offset,
+    );
+    return rows.map(LibraryRowMapper.decode).toList(growable: false);
+  }
+
+  /// Points the row for [oldPath] at [newPath] after the file was moved. The
+  /// id is derived from the new path, as a scan of that location would, so a
+  /// later rescan updates this row instead of adding a duplicate. Returns
+  /// false when no row has [oldPath].
+  Future<bool> relinkMovedFile(String oldPath, String newPath) async {
+    final db = await database;
+    final newId = _generateLibraryId(newPath);
+    return sqlite.transactionWithBusyRetry(db, (txn) async {
+      final rows = await txn.query(
+        'library',
+        columns: ['id'],
+        where: 'file_path = ?',
+        whereArgs: [oldPath],
+        limit: 1,
+      );
+      if (rows.isEmpty) return false;
+      final oldId = rows.first['id'] as String;
+      // A stale row can still claim the destination path or its id.
+      final stale = await txn.query(
+        'library',
+        columns: ['id'],
+        where: '(file_path = ? OR id = ?) AND id != ?',
+        whereArgs: [newPath, newId, oldId],
+      );
+      for (final id in [oldId, for (final row in stale) row['id'] as String]) {
+        await txn.delete(
+          'library_path_keys',
+          where: 'item_id = ?',
+          whereArgs: [id],
+        );
+      }
+      for (final row in stale) {
+        await txn.delete('library', where: 'id = ?', whereArgs: [row['id']]);
+      }
+      await txn.update(
+        'library',
+        {'id': newId, 'file_path': newPath},
+        where: 'id = ?',
+        whereArgs: [oldId],
+      );
+      final batch = txn.batch();
+      _putPathKeysInBatch(batch, newId, newPath);
+      await batch.commit(noResult: true);
+      return true;
+    });
+  }
+
   Future<void> replaceWithConvertedItem({
     required LocalLibraryItem item,
     required String newFilePath,

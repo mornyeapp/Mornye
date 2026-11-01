@@ -26,7 +26,8 @@ class LibraryReorganizationMove {
     required this.targetFileName,
   });
 
-  /// Every history row that points at [sourcePath].
+  /// Every download history row that points at [sourcePath]. Empty for a
+  /// file known only from the Local Library scan.
   final List<String> historyIds;
   final String trackName;
 
@@ -62,6 +63,7 @@ class LibraryReorganizationPlan {
     this.alreadyOrganized = 0,
     this.outsideDownloadFolder = 0,
     this.missing = 0,
+    this.untagged = 0,
     this.keepsPlaylistFolders = false,
     this.dropsPlaylistFolders = false,
   });
@@ -72,10 +74,15 @@ class LibraryReorganizationPlan {
   final List<LibraryReorganizationMove> moves;
   final int alreadyOrganized;
 
-  /// Tracks stored somewhere other than the current download folder. The
-  /// rules are relative to that folder, so these are left alone.
+  /// Tracks stored somewhere other than the current download folder,
+  /// downloads or scanned files. The rules are relative to that folder, so
+  /// these are left alone.
   final int outsideDownloadFolder;
   final int missing;
+
+  /// Scanned files without an artist tag. The rules would only file them
+  /// under "Unknown", so they are left alone.
+  final int untagged;
 
   /// The folder rule needs the source playlist, which history does not keep;
   /// files stay in their current folder and only the filename rule applies.
@@ -237,22 +244,24 @@ String _audioMimeType(String fileName) =>
     ? 'audio/ogg'
     : audioMimeTypeForPath(fileName);
 
-/// Moves stored downloads to the paths in a [LibraryReorganizationPlan] and
-/// points the history rows at the new locations. A file is only reported as
-/// moved once its history row was updated; otherwise a local move is undone.
+/// Moves stored tracks to the paths in a [LibraryReorganizationPlan] and
+/// points the download history and Local Library rows at the new locations.
+/// A file is only reported as moved once the row that knows it was updated;
+/// otherwise a local move is undone.
 class LibraryReorganizer {
   LibraryReorganizer({
     UpdateHistoryFilePath? updateHistoryPath,
-    Future<void> Function(String path)? forgetLibraryPath,
+    Future<bool> Function(String oldPath, String newPath)? relinkLibraryPath,
     this.saf = LibraryReorganizerSafOps.platform,
   }) : updateHistoryPath = updateHistoryPath ?? _updateHistoryPath,
-       forgetLibraryPath =
-           forgetLibraryPath ?? LibraryDatabase.instance.deleteByPath;
+       relinkLibraryPath =
+           relinkLibraryPath ?? LibraryDatabase.instance.relinkMovedFile;
 
   final UpdateHistoryFilePath updateHistoryPath;
 
-  /// Drops a stale scanned-library row for a path that no longer exists.
-  final Future<void> Function(String path) forgetLibraryPath;
+  /// Points a scanned Local Library row at the file's new path; false when
+  /// no row had the old path.
+  final Future<bool> Function(String oldPath, String newPath) relinkLibraryPath;
   final LibraryReorganizerSafOps saf;
 
   static Future<bool> _updateHistoryPath(
@@ -325,32 +334,47 @@ class LibraryReorganizer {
     );
   }
 
+  /// Updates the rows that know [move]'s file. Download history is the
+  /// record for downloads; the Local Library row is the record for a file
+  /// found only by a scan. Returns whether that record now has [newPath].
   Future<bool> _recordNewPath(
     LibraryReorganizationMove move,
     String newPath, {
     String? safFileName,
     String? safRelativeDir,
   }) async {
+    if (move.historyIds.isEmpty) {
+      try {
+        return await relinkLibraryPath(move.sourcePath, newPath);
+      } catch (e) {
+        _log.w('Could not update library row for ${move.sourcePath}: $e');
+        return false;
+      }
+    }
     var recorded = false;
     for (final id in move.historyIds) {
-      final updated = await updateHistoryPath(
-        id,
-        newPath,
-        newSafFileName: safFileName,
-        newSafRelativeDir: safRelativeDir,
-        expectedFilePath: move.sourcePath,
-      );
-      recorded = recorded || updated;
+      try {
+        final updated = await updateHistoryPath(
+          id,
+          newPath,
+          newSafFileName: safFileName,
+          newSafRelativeDir: safRelativeDir,
+          expectedFilePath: move.sourcePath,
+        );
+        recorded = recorded || updated;
+      } catch (e) {
+        _log.w('Could not update history row $id: $e');
+      }
+    }
+    if (recorded) {
+      // A download can also have a scanned row; keep it pointing at the file.
+      try {
+        await relinkLibraryPath(move.sourcePath, newPath);
+      } catch (e) {
+        _log.w('Could not update library row for ${move.sourcePath}: $e');
+      }
     }
     return recorded;
-  }
-
-  Future<void> _forget(String path) async {
-    try {
-      await forgetLibraryPath(path);
-    } catch (e) {
-      _log.w('Could not drop library row for moved file $path: $e');
-    }
   }
 
   // ---------------------------------------------------------------------------
@@ -400,9 +424,9 @@ class LibraryReorganizer {
     }
 
     if (!await _recordNewPath(move, newPath)) {
-      // The history row changed underneath us; put everything back so the
-      // stored path stays valid.
-      _log.w('History changed while moving ${move.sourcePath}; reverting');
+      // The row changed underneath us; put everything back so the stored
+      // path stays valid.
+      _log.w('Library changed while moving ${move.sourcePath}; reverting');
       try {
         await _renameOrCopy(File(newPath), source.path);
         if (movedLyricsPath != null) {
@@ -411,10 +435,11 @@ class LibraryReorganizer {
       } catch (e) {
         _log.e('Could not revert move of ${move.sourcePath}: $e');
       }
+      // Drop the destination folders created for this file if now empty.
+      vacatedDirs.add(p.dirname(newPath));
       return _Outcome.failed;
     }
 
-    await _forget(move.sourcePath);
     vacatedDirs.add(p.dirname(source.path));
     return _Outcome.moved;
   }
@@ -534,12 +559,11 @@ class LibraryReorganizer {
       safRelativeDir: move.targetRelativeDir,
     )) {
       _log.w(
-        'History changed while moving ${move.sourcePath}; the file now lives '
+        'Library changed while moving ${move.sourcePath}; the file now lives '
         'at ${joinRelativeLibraryPath(move.targetRelativeDir, newName)}',
       );
       return _Outcome.failed;
     }
-    await _forget(move.sourcePath);
     return _Outcome.moved;
   }
 

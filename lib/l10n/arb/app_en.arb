@@ -10060,7 +10060,7 @@
   "@collectionSuggestionsAddHere": {
     "description": "Tooltip of the button that adds a suggested song to the user's playlist shown above"
   },
-  "sectionExistingDownloads": "Existing Downloads",
+  "sectionExistingDownloads": "Existing Files",
   "@sectionExistingDownloads": {
     "description": "Files settings section header for actions on already-downloaded files"
   },
@@ -10068,11 +10068,11 @@
   "@reorganizeLibraryTitle": {
     "description": "Files settings action that moves and renames already-downloaded tracks to match the current folder and filename rules"
   },
-  "reorganizeLibrarySubtitle": "Move and rename downloaded tracks so they follow the folder and filename rules above",
+  "reorganizeLibrarySubtitle": "Move and rename downloads and Local Library files in your download folder so they follow the folder and filename rules above",
   "@reorganizeLibrarySubtitle": {
     "description": "Subtitle of the apply-rules-to-existing-files action"
   },
-  "reorganizeLibraryScanning": "Checking your downloads…",
+  "reorganizeLibraryScanning": "Checking your files…",
   "@reorganizeLibraryScanning": {
     "description": "Shown while Mornye works out which downloaded files need to move"
   },
@@ -10084,7 +10084,7 @@
   "@reorganizeLibraryNothingTitle": {
     "description": "Dialog title when every downloaded file already follows the rules"
   },
-  "reorganizeLibraryNothingMessage": "{count, plural, =0{There are no downloaded tracks in your download folder to reorganize.} =1{The downloaded track in your download folder already follows the current rules.} other{All {count} downloaded tracks in your download folder already follow the current rules.}}",
+  "reorganizeLibraryNothingMessage": "{count, plural, =0{There are no tracks in your download folder to reorganize. Files Mornye did not download are included once the folder is added and scanned in Local Library.} =1{The track in your download folder already follows the current rules.} other{All {count} tracks in your download folder already follow the current rules.}}",
   "@reorganizeLibraryNothingMessage": {
     "description": "Dialog message when there is nothing to move",
     "placeholders": {
@@ -10102,7 +10102,7 @@
       }
     }
   },
-  "reorganizeLibraryConfirmMessage": "These downloads will be moved or renamed to match your current Files settings. Lyrics (.lrc) files next to them move too, and folders left empty are removed.",
+  "reorganizeLibraryConfirmMessage": "These tracks will be moved or renamed to match your current Files settings, using their tags. Lyrics (.lrc) files next to them move too, and folders left empty are removed.",
   "@reorganizeLibraryConfirmMessage": {
     "description": "Confirmation dialog body before moving files"
   },
@@ -10145,6 +10145,19 @@
         "type": "int"
       }
     }
+  },
+  "reorganizeLibraryUntagged": "{count} {count, plural, =1{file has} other{files have}} no artist tag and will be left alone.",
+  "@reorganizeLibraryUntagged": {
+    "description": "Note in the reorganize confirmation dialog about scanned files without tags",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "reorganizeLibraryScanHint": "Files Mornye did not download are only included after their folder is added and scanned in Local Library.",
+  "@reorganizeLibraryScanHint": {
+    "description": "Hint in the reorganize confirmation dialog about which files are covered"
   },
   "reorganizeLibraryKeepsPlaylistFolders": "Your folder rule uses the playlist name, which Mornye doesn't keep for past downloads, so files stay in their current folder and are only renamed.",
   "@reorganizeLibraryKeepsPlaylistFolders": {

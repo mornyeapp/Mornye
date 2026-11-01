@@ -66,6 +66,8 @@ Future<void> _reorganizeExistingDownloads(
               ),
             if (ready.missing > 0)
               ctx.l10n.reorganizeLibraryMissing(ready.missing),
+            if (ready.untagged > 0)
+              ctx.l10n.reorganizeLibraryUntagged(ready.untagged),
           ].join('\n\n'),
         ),
         actions: [
@@ -178,6 +180,8 @@ class _ReorganizeConfirmDialog extends StatelessWidget {
       if (plan.outsideDownloadFolder > 0)
         l10n.reorganizeLibraryOutsideFolder(plan.outsideDownloadFolder),
       if (plan.missing > 0) l10n.reorganizeLibraryMissing(plan.missing),
+      if (plan.untagged > 0) l10n.reorganizeLibraryUntagged(plan.untagged),
+      l10n.reorganizeLibraryScanHint,
     ];
     final warnings = <String>[
       if (plan.keepsPlaylistFolders) l10n.reorganizeLibraryKeepsPlaylistFolders,

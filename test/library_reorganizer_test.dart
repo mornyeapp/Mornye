@@ -28,7 +28,8 @@ LibraryReorganizationMove _move(
 void main() {
   late Directory root;
   late Map<String, String> recorded;
-  late List<String> forgotten;
+  late Map<String, String> relinked;
+  late bool libraryHasRow;
   late bool historyAcceptsUpdates;
 
   LibraryReorganizer reorganizer() => LibraryReorganizer(
@@ -44,13 +45,18 @@ void main() {
           recorded[id] = newFilePath;
           return true;
         },
-    forgetLibraryPath: (path) async => forgotten.add(path),
+    relinkLibraryPath: (oldPath, newPath) async {
+      if (!libraryHasRow) return false;
+      relinked[oldPath] = newPath;
+      return true;
+    },
   );
 
   setUp(() async {
     root = await Directory.systemTemp.createTemp('library-reorganizer-');
     recorded = {};
-    forgotten = [];
+    relinked = {};
+    libraryHasRow = true;
     historyAcceptsUpdates = true;
   });
   tearDown(() => root.delete(recursive: true));
@@ -89,7 +95,7 @@ void main() {
       '[00:01.00]hi',
     );
     expect(recorded, {'h1': target, 'h2': target});
-    expect(forgotten, [move.sourcePath]);
+    expect(relinked, {move.sourcePath: target});
     expect(await Directory(p.join(root.path, 'Old')).exists(), isFalse);
     expect(await root.exists(), isTrue);
   });
@@ -167,8 +173,8 @@ void main() {
     expect(result.failed, 1);
     expect(await File(p.join(root.path, 'C.flac')).exists(), isTrue);
     expect(await File(p.join(root.path, 'C.lrc')).exists(), isTrue);
-    expect(await File(p.join(root.path, 'Artist', 'C.flac')).exists(), isFalse);
-    expect(forgotten, isEmpty);
+    expect(await Directory(p.join(root.path, 'Artist')).exists(), isFalse);
+    expect(relinked, isEmpty);
   });
 
   test('reports missing files and honours cancellation', () async {
@@ -227,6 +233,57 @@ void main() {
       'Artist/song (2).flac',
       'Artist/Other (2).flac',
     ]);
+  });
+
+  test(
+    'a file known only from the library scan relinks its library row',
+    () async {
+      await write('Loose/Track.mp3');
+      final move = _move(
+        root.path,
+        sourceDir: 'Loose',
+        sourceName: 'Track.mp3',
+        targetDir: 'Band/Record',
+        targetName: '01 - Track.mp3',
+        ids: const [],
+      );
+      final result = await reorganizer().run(
+        LibraryReorganizationPlan(
+          root: root.path,
+          safMode: false,
+          moves: [move],
+        ),
+      );
+      final target = p.join(root.path, 'Band', 'Record', '01 - Track.mp3');
+      expect(result.moved, 1);
+      expect(await File(target).exists(), isTrue);
+      expect(recorded, isEmpty);
+      expect(relinked, {move.sourcePath: target});
+    },
+  );
+
+  test('a scanned file is put back when its library row is gone', () async {
+    await write('Loose/Gone.mp3');
+    libraryHasRow = false;
+    final result = await reorganizer().run(
+      LibraryReorganizationPlan(
+        root: root.path,
+        safMode: false,
+        moves: [
+          _move(
+            root.path,
+            sourceDir: 'Loose',
+            sourceName: 'Gone.mp3',
+            targetDir: 'Band',
+            targetName: 'Gone.mp3',
+            ids: const [],
+          ),
+        ],
+      ),
+    );
+    expect(result.failed, 1);
+    expect(await File(p.join(root.path, 'Loose', 'Gone.mp3')).exists(), isTrue);
+    expect(await Directory(p.join(root.path, 'Band')).exists(), isFalse);
   });
 
   test('relative folder helpers', () {
@@ -295,7 +352,7 @@ void main() {
                 ];
                 return true;
               },
-          forgetLibraryPath: (_) async {},
+          relinkLibraryPath: (_, _) async => false,
         ).run(
           LibraryReorganizationPlan(
             root: 'content://tree',
