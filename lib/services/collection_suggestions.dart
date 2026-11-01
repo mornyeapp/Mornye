@@ -125,21 +125,79 @@ List<Track> filterCollectionSuggestions(
   Iterable<Track> candidates,
   Iterable<Track> collection, {
   int limit = collectionSuggestionCount,
-}) {
+}) => _filterByKeys(candidates, collectionSuggestionKeys(collection), limit);
+
+/// What identifies the songs of [collection], as
+/// [filterCollectionSuggestions] matches them.
+Set<String> collectionSuggestionKeys(Iterable<Track> collection) => {
+  for (final track in collection) ..._trackKeys(track),
+};
+
+List<Track> _filterByKeys(
+  Iterable<Track> candidates,
+  Set<String> collectionKeys,
+  int limit,
+) {
   final seen = <String>{};
-  for (final track in collection) {
-    seen.addAll(_trackKeys(track));
-  }
   final result = <Track>[];
   for (final track in candidates) {
     if (result.length == limit) break;
     if (track.name.trim().isEmpty) continue;
     final keys = _trackKeys(track);
-    if (keys.any(seen.contains)) continue;
+    if (keys.any((key) => collectionKeys.contains(key) || seen.contains(key))) {
+      continue;
+    }
     seen.addAll(keys);
     result.add(track);
   }
   return result;
+}
+
+/// [filterCollectionSuggestions] for a page that rebuilds: keeps the
+/// collection's keys while its songs' titles, artists and ISRCs stay the
+/// same, and the result while the candidate tracks and order stay the same.
+class CollectionSuggestionFilter {
+  List<Track> _collection = const [];
+  Set<String>? _keys;
+  List<Track>? _candidates;
+  List<Track> _result = const [];
+
+  List<Track> call(List<Track> candidates, List<Track> collection) {
+    var keys = _keys;
+    if (keys == null || !_sameMatchFields(_collection, collection)) {
+      _collection = List.of(collection, growable: false);
+      keys = _keys = collectionSuggestionKeys(collection);
+      _candidates = null;
+    }
+    if (!_sameCandidates(_candidates, candidates)) {
+      _candidates = List.of(candidates, growable: false);
+      _result = _filterByKeys(candidates, keys, collectionSuggestionCount);
+    }
+    return _result;
+  }
+
+  static bool _sameCandidates(List<Track>? previous, List<Track> next) {
+    if (previous == null || previous.length != next.length) return false;
+    for (var i = 0; i < next.length; i++) {
+      if (!identical(previous[i], next[i])) return false;
+    }
+    return true;
+  }
+
+  static bool _sameMatchFields(List<Track> previous, List<Track> next) {
+    if (previous.length != next.length) return false;
+    for (var i = 0; i < next.length; i++) {
+      final a = previous[i];
+      final b = next[i];
+      if (identical(a, b)) continue;
+      if (a.name != b.name ||
+          a.artistName != b.artistName ||
+          a.isrc != b.isrc) {
+        return false;
+      }
+    }
+    return true;
+  }
 }
 
 /// Takes one song from each list in turn, so no artist's search fills the

@@ -387,7 +387,6 @@ class _LibraryTracksFolderScreenState
         context.l10n.collectionPlaylistEmptySubtitle,
     };
     final folderTracks = _folderData.tracks;
-    final historyLookups = _folderData.historyRequest.tracks;
     final existingHistoryKeys = _editingOrder
         ? const <String>{}
         : ref.watch(
@@ -400,10 +399,7 @@ class _LibraryTracksFolderScreenState
         ? MediaQuery.paddingOf(context).bottom
         : 0.0;
 
-    final inHistory = [
-      for (final lookup in historyLookups)
-        existingHistoryKeys.contains(lookup.lookupKey),
-    ];
+    final inHistory = _folderData.inHistory(existingHistoryKeys);
     final ids = [for (final entry in entries) entry.key];
     final scaffold = CollectionScaffold(
       scrollController: scrollController,
@@ -484,9 +480,7 @@ class _LibraryTracksFolderScreenState
               delegate: SliverChildBuilderDelegate((context, index) {
                 final entry = entries[index];
                 final isSelected = selectedIds.contains(entry.key);
-                final isInHistory = existingHistoryKeys.contains(
-                  historyLookups[index].lookupKey,
-                );
+                final isInHistory = inHistory[index];
                 return KeyedSubtree(
                   key: ValueKey(entry.key),
                   child: StaggeredListItem(
@@ -518,12 +512,7 @@ class _LibraryTracksFolderScreenState
           CollectionSuggestionsSliver(
             collectionKey: 'playlist:${playlist.id}',
             // The newest additions say most about where the playlist goes.
-            tracks: [
-              for (final entry in [
-                ...playlist.tracks,
-              ]..sort((a, b) => b.addedAt.compareTo(a.addedAt)))
-                entry.track,
-            ],
+            tracks: _folderData.newestFirstTracks,
             playlistId: playlist.id,
           ),
       ],

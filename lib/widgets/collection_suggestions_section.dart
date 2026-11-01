@@ -51,6 +51,22 @@ class _CollectionSuggestionsSliverState
     extends ConsumerState<CollectionSuggestionsSliver> {
   var _round = 0;
   var _selectedIds = const <String>{};
+  final _filter = CollectionSuggestionFilter();
+  List<Track> _entryTracks = const [];
+
+  List<Track> _tracksForEntries(List<CollectionTrackEntry> entries) {
+    if (entries.length == _entryTracks.length) {
+      var unchanged = true;
+      for (var i = 0; i < entries.length; i++) {
+        if (!identical(entries[i].track, _entryTracks[i])) {
+          unchanged = false;
+          break;
+        }
+      }
+      if (unchanged) return _entryTracks;
+    }
+    return _entryTracks = [for (final entry in entries) entry.track];
+  }
 
   Future<void> _add(Track track) async {
     final playlistId = widget.playlistId;
@@ -108,10 +124,10 @@ class _CollectionSuggestionsSliverState
           );
     final collection = entries == null
         ? widget.tracks
-        : [for (final entry in entries) entry.track];
+        : _tracksForEntries(entries);
     final tracks = suggestions == null
         ? const <Track>[]
-        : filterCollectionSuggestions(suggestions.tracks, collection);
+        : _filter(suggestions.tracks, collection);
     if (suggestions == null || tracks.isEmpty) {
       return const SliverToBoxAdapter(child: SizedBox.shrink());
     }
