@@ -225,6 +225,66 @@ double _meanDifference(Uint8List a, Uint8List b) {
 }
 
 void main() {
+  final binding = TestWidgetsFlutterBinding.ensureInitialized();
+  setUp(() {
+    binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+  });
+
+  for (final state in AppLifecycleState.values) {
+    if (state == AppLifecycleState.resumed) continue;
+    testWidgets('releases the snapshot while $state and rebuilds on resume', (
+      tester,
+    ) async {
+      addTearDown(
+        () => tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.resumed,
+        ),
+      );
+      final before = await _settle(tester, _scene(const _Pattern()));
+
+      tester.binding.handleAppLifecycleStateChanged(state);
+      expect(before.debugDisposed, isTrue);
+      for (var frame = 0; frame < 3; frame++) {
+        tester.binding.scheduleForcedFrame();
+        await tester.pump();
+        expect(_image(tester), isNull);
+      }
+      expect(tester.binding.hasScheduledFrame, isFalse);
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pump();
+      final after = await _settleFrames(tester);
+      expect(after, isNot(same(before)));
+      expect(after.debugDisposed, isFalse);
+    });
+  }
+
+  testWidgets('a pending snapshot check stops when focus is lost mid-frame', (
+    tester,
+  ) async {
+    addTearDown(
+      () => tester.binding.handleAppLifecycleStateChanged(
+        AppLifecycleState.resumed,
+      ),
+    );
+    tester.binding.addPostFrameCallback((_) {
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    });
+    await tester.pumpWidget(_scene(const _Pattern()));
+    for (var frame = 0; frame < 3; frame++) {
+      await _frame(tester);
+      expect(_image(tester), isNull);
+    }
+    expect(tester.binding.hasScheduledFrame, isFalse);
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+    await _settleFrames(tester);
+    await tester.pumpWidget(const SizedBox());
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('blurs live, then draws one image once a frame shows it '
       'unchanged', (tester) async {
     final image = await _settle(tester, _scene(const _Pattern()));

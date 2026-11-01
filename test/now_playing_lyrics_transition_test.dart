@@ -2364,6 +2364,7 @@ void main() {
   testWidgets(
     'Mornye lyrics keep the active line sharp with bold leading-aligned text',
     (tester) async {
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
       await pumpNowPlaying(
         tester,
         theme: MornyeTheme.build(Brightness.light),

@@ -18,6 +18,20 @@ class ImpellerCompatibilityTest {
     }
 
     @Test
+    fun sonySnapshotCrashUsesFallbackOnTheReportedDeviceAndAndroidVersion() {
+        assertTrue(hasKnownImpellerRasterCrash(33, "Sony", "SOG04"))
+        assertTrue(hasKnownImpellerRasterCrash(33, "SONY", "sog04"))
+    }
+
+    @Test
+    fun sonyFallbackDoesNotIncludeOtherDevicesOrAndroidVersions() {
+        assertFalse(hasKnownImpellerRasterCrash(32, "Sony", "SOG04"))
+        assertFalse(hasKnownImpellerRasterCrash(34, "Sony", "SOG04"))
+        assertFalse(hasKnownImpellerRasterCrash(33, "Sony", "SOG05"))
+        assertFalse(hasKnownImpellerRasterCrash(33, "Other", "SOG04"))
+    }
+
+    @Test
     fun samsungFallbackDoesNotIncludeOtherDevicesOrAndroidVersions() {
         assertFalse(hasKnownImpellerRasterCrash(35, "samsung", "SM-S711B"))
         assertFalse(hasKnownImpellerRasterCrash(37, "samsung", "SM-S711B"))

@@ -60,7 +60,7 @@ class SettledBlur extends SingleChildRenderObjectWidget {
 /// Paints its child blurred by [sigma]: live while the child changes, then
 /// from one image with [pixelRatio] image pixels per logical pixel. With a
 /// zero [sigma] it is a plain repaint boundary.
-class RenderSettledBlur extends RenderProxyBox {
+class RenderSettledBlur extends RenderProxyBox with WidgetsBindingObserver {
   RenderSettledBlur({
     required double sigma,
     required double pixelRatio,
@@ -103,6 +103,9 @@ class RenderSettledBlur extends RenderProxyBox {
   @visibleForTesting
   ui.Image? get debugImage => _image;
 
+  bool get _canSnapshot =>
+      WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
+
   // Keeps the blur on its own layer, so moving it reuses that layer.
   @override
   bool get isRepaintBoundary => true;
@@ -142,7 +145,7 @@ class RenderSettledBlur extends RenderProxyBox {
   }
 
   void _scheduleCheck() {
-    if (_checkScheduled) return;
+    if (_checkScheduled || !_canSnapshot) return;
     _checkScheduled = true;
     SchedulerBinding.instance.addPostFrameCallback(_check);
   }
@@ -153,7 +156,7 @@ class RenderSettledBlur extends RenderProxyBox {
   void _check(Duration _) {
     _checkScheduled = false;
     final live = _live.layer;
-    if (!attached || live == null || _image != null) return;
+    if (!attached || !_canSnapshot || live == null || _image != null) return;
     if (!live.attached) {
       // Off screen: it paints live again, and settles, once it is back.
       markNeedsPaint();
@@ -202,12 +205,21 @@ class RenderSettledBlur extends RenderProxyBox {
   @override
   void attach(PipelineOwner owner) {
     super.attach(owner);
+    WidgetsBinding.instance.addObserver(this);
     // Moved boxes repaint, as their old layer may hold an unchecked live blur.
     markNeedsPaint();
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // A hidden surface may lose its GPU context. Rebuild its cache on resume.
+    _live.layer = null;
+    markNeedsPaint();
+  }
+
+  @override
   void detach() {
+    WidgetsBinding.instance.removeObserver(this);
     _live.layer = null;
     _disposeImage();
     super.detach();

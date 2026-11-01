@@ -79,7 +79,8 @@ class _BlurSnapshot extends SingleChildRenderObjectWidget {
 /// Paints its child blurred by [sigma], from a cached image once the child
 /// has not changed for a frame. With a zero [sigma] it is a plain repaint
 /// boundary.
-class RenderLyricBlurSnapshot extends RenderProxyBox {
+class RenderLyricBlurSnapshot extends RenderProxyBox
+    with WidgetsBindingObserver {
   RenderLyricBlurSnapshot(this._sigma, this._devicePixelRatio, this._source);
 
   double _sigma;
@@ -114,6 +115,9 @@ class RenderLyricBlurSnapshot extends RenderProxyBox {
   @visibleForTesting
   ui.Image? get debugSnapshot => _snapshot;
 
+  bool get _canSnapshot =>
+      WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
+
   // Keeps the line on its own layer, like the boundary a live blur needs.
   @override
   bool get isRepaintBoundary => true;
@@ -141,7 +145,7 @@ class RenderLyricBlurSnapshot extends RenderProxyBox {
       (_sigma * 3 * _devicePixelRatio).ceil() / _devicePixelRatio,
     );
     final live = _live.layer;
-    if (_snapshot == null && _unchanged && live != null) {
+    if (_canSnapshot && _snapshot == null && _unchanged && live != null) {
       // The previous frame's live layer still holds the same, unchanged line.
       _snapshot = live.toImageSync(bounds, pixelRatio: _devicePixelRatio);
       _live.layer = null;
@@ -158,9 +162,12 @@ class RenderLyricBlurSnapshot extends RenderProxyBox {
     final layer = _live.layer ??= ImageFilterLayer();
     layer.imageFilter = ui.ImageFilter.blur(sigmaX: _sigma, sigmaY: _sigma);
     context.pushLayer(layer, super.paint, offset);
+    if (!_canSnapshot) return;
     _unchanged = true;
     SchedulerBinding.instance.addPostFrameCallback((_) {
-      if (!attached || !_unchanged || _snapshot != null) return;
+      if (!attached || !_canSnapshot || !_unchanged || _snapshot != null) {
+        return;
+      }
       _repaintingForSnapshot = true;
       markNeedsPaint();
       _repaintingForSnapshot = false;
@@ -173,7 +180,22 @@ class RenderLyricBlurSnapshot extends RenderProxyBox {
   }
 
   @override
+  void attach(PipelineOwner owner) {
+    super.attach(owner);
+    WidgetsBinding.instance.addObserver(this);
+    markNeedsPaint();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // A hidden surface may lose its GPU context. Rebuild its cache on resume.
+    _live.layer = null;
+    markNeedsPaint();
+  }
+
+  @override
   void detach() {
+    WidgetsBinding.instance.removeObserver(this);
     _unchanged = false;
     _live.layer = null;
     _disposeSnapshot();
