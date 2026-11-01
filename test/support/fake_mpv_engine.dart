@@ -17,6 +17,7 @@ class FakeMpvEngine implements MpvEngine {
   /// Duration reported when a source opens, or an error line instead.
   Duration? openDuration = const Duration(seconds: 90);
   MpvLogError? openError;
+  Completer<void>? openBarrier;
   bool rejectFilters = false;
 
   /// The device refuses exclusive access: a source opened while
@@ -36,6 +37,7 @@ class FakeMpvEngine implements MpvEngine {
   @override
   Future<void> open(String source) async {
     calls.add(['open', source]);
+    if (openBarrier case final barrier?) await barrier.future;
     scheduleMicrotask(() {
       if (openError case final error?) {
         errorEvents.add(error);

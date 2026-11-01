@@ -99,13 +99,33 @@ class _PositionTicker extends PositionUpdater {
 
   final Duration interval;
   final bool Function()? wanted;
+  final _positions = StreamController<Duration>.broadcast();
   Timer? _timer;
+  bool _polling = false;
+  bool _disposed = false;
+
+  @override
+  Stream<Duration> get positionStream => _positions.stream;
+
+  @override
+  Future<void> update() async {
+    final position = await getPosition();
+    // A retired updater has already closed its stream when a slow reply
+    // arrives. Check immediately before publishing it.
+    if (!_disposed && position != null) _positions.add(position);
+  }
 
   @override
   void start() {
     _timer?.cancel();
     _timer = Timer.periodic(interval, (_) async {
-      if (wanted?.call() ?? true) await update();
+      if (_polling || !(wanted?.call() ?? true)) return;
+      _polling = true;
+      try {
+        await update();
+      } finally {
+        _polling = false;
+      }
     });
   }
 
@@ -113,6 +133,13 @@ class _PositionTicker extends PositionUpdater {
   void stop() {
     _timer?.cancel();
     _timer = null;
+  }
+
+  @override
+  Future<void> dispose() async {
+    _disposed = true;
+    await super.dispose();
+    await _positions.close();
   }
 }
 

@@ -455,6 +455,29 @@ void main() {
       expect(errors, hasLength(1));
     });
 
+    test(
+      'pausing during shared output recovery keeps playback paused',
+      () async {
+        playbackExclusiveOutput.value = true;
+        await deck.configureOutput();
+        await deck.setFileSource('/song.flac');
+        await deck.resume();
+        final reopened = Completer<void>();
+        engine.openBarrier = reopened;
+        engine.errorEvents.add((
+          prefix: 'cplayer',
+          text: 'Could not open/initialize audio device -> no sound.',
+        ));
+        await Future<void>.delayed(Duration.zero);
+        expect(engine.calls.where((call) => call[0] == 'open'), hasLength(2));
+        await deck.pause();
+        reopened.complete();
+        await _settle();
+        expect(deck.state, PlaybackDeckState.paused);
+        expect(engine.calls.where((call) => call[0] == 'play'), hasLength(1));
+      },
+    );
+
     group('on Linux', () {
       const device = 'alsa/hw:CARD=PCH,DEV=0';
       setUp(() {

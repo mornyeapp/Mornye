@@ -459,7 +459,8 @@ class MediaKitPlaybackDeck implements PlaybackDeck {
     await _engine.open(source);
     if (_disposed || token != _token) return;
     if (position > Duration.zero) await _engine.seek(position);
-    if (playing) await _engine.play();
+    if (_disposed || token != _token) return;
+    if (playing && _state == PlaybackDeckState.playing) await _engine.play();
   }
 
   // mpv's volume is cubic: 100 * cbrt(linear gain). The equalizer gain may

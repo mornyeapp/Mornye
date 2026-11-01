@@ -103,6 +103,7 @@ class AudioNative {
   final rates = <String, double>{};
   final ignoredSeeks = <String>{};
   final missingPositions = <String>{};
+  final positionReplies = <String, Completer<int?>>{};
   final nextPlayers = <String, String>{};
   bool emitsDuration = true;
 
@@ -212,6 +213,7 @@ class AudioNative {
           case 'getDuration':
             return 60000;
           case 'getCurrentPosition':
+            if (positionReplies[id] case final reply?) return reply.future;
             if (missingPositions.contains(id)) return null;
             return currentPosition(id);
         }

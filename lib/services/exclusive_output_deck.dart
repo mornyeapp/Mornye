@@ -45,6 +45,9 @@ class ExclusiveOutputDeck implements PlaybackDeck {
 
   /// Switches run one at a time, in order.
   Future<void> _switching = Future.value();
+  int _transportRevision = 0;
+  int _stopRevision = 0;
+  PlaybackDeckState? _requestedState;
   bool _disposed = false;
 
   void _attach(PlaybackDeck deck) {
@@ -80,8 +83,12 @@ class ExclusiveOutputDeck implements PlaybackDeck {
     );
   }
 
-  Future<void> _queueSwitch({bool reload = false}) =>
-      _switching = _switching.then((_) => _switchTo(reload: reload));
+  Future<void> _queueSwitch({bool reload = false}) {
+    final operation = _switching.then((_) => _switchTo(reload: reload));
+    // Keep later output changes available after a failed switch.
+    _switching = operation.catchError((Object _) {});
+    return operation;
+  }
 
   Future<void> _switchTo({required bool reload}) async {
     if (_disposed) return;
@@ -96,7 +103,10 @@ class ExclusiveOutputDeck implements PlaybackDeck {
       target = _shared;
     }
     final state = previous.state;
+    final transportRevision = _transportRevision;
+    final stopRevision = _stopRevision;
     final position = await previous.getCurrentPosition();
+    if (_disposed) return;
     _active = target;
     await target.setVolume(_volume);
     await target.setPlaybackRate(_rate);
@@ -114,18 +124,31 @@ class ExclusiveOutputDeck implements PlaybackDeck {
       await previous.dispose();
     }
     final source = _source;
-    if (!reload ||
+    if (_disposed ||
+        stopRevision != _stopRevision ||
+        !reload ||
         source == null ||
         (state != PlaybackDeckState.playing &&
             state != PlaybackDeckState.paused)) {
       return;
     }
     await target.configureOutput();
+    if (_disposed || stopRevision != _stopRevision) return;
     await source(target);
+    if (_disposed) return;
+    if (stopRevision != _stopRevision) {
+      await target.stop();
+      return;
+    }
     if (position != null && position > Duration.zero) {
       await target.seek(position);
     }
-    if (state == PlaybackDeckState.playing) await target.resume();
+    if (_disposed || stopRevision != _stopRevision) return;
+    if (transportRevision == _transportRevision) {
+      if (state == PlaybackDeckState.playing) await target.resume();
+    } else if (_requestedState == PlaybackDeckState.paused) {
+      await target.pause();
+    }
   }
 
   @override
@@ -197,15 +220,38 @@ class ExclusiveOutputDeck implements PlaybackDeck {
   }
 
   @override
-  Future<void> cancelPreparation() => _active.cancelPreparation();
+  Future<void> cancelPreparation() {
+    _transportRevision++;
+    _stopRevision++;
+    return _active.cancelPreparation();
+  }
+
   @override
-  Future<void> resume() => _active.resume();
+  Future<void> resume() async {
+    final revision = ++_transportRevision;
+    _requestedState = PlaybackDeckState.playing;
+    await _switching;
+    if (_disposed || revision != _transportRevision) return;
+    await _active.resume();
+  }
+
   @override
-  Future<void> pause() => _active.pause();
+  Future<void> pause() {
+    _transportRevision++;
+    _requestedState = PlaybackDeckState.paused;
+    return _active.pause();
+  }
+
   @override
   Future<void> seek(Duration position) => _active.seek(position);
   @override
-  Future<void> stop() => _active.stop();
+  Future<void> stop() {
+    _transportRevision++;
+    _stopRevision++;
+    _requestedState = PlaybackDeckState.stopped;
+    return _active.stop();
+  }
+
   @override
   Future<bool> setNextDeck(PlaybackDeck? next) =>
       _active.setNextDeck(next is ExclusiveOutputDeck ? next._active : next);
@@ -219,6 +265,7 @@ class ExclusiveOutputDeck implements PlaybackDeck {
     if (_disposed) return;
     _disposed = true;
     playbackExclusiveOutput.removeListener(_exclusiveChanged);
+    await _switching;
     for (final subscriptions in _subscriptions.values) {
       for (final subscription in subscriptions) {
         await subscription.cancel();
