@@ -9705,27 +9705,27 @@
   "@linkTransfersTitle": {
     "description": "Mornye Link: title of the list of songs copied between this device and a linked phone or computer, and of the rows that open it"
   },
-  "linkTransfersInProgress": "In progress",
+  "linkTransfersInProgress": "Devam edenler",
   "@linkTransfersInProgress": {
     "description": "Section of the Transfers list for transfers that are running or waiting their turn"
   },
-  "linkTransfersFinished": "Finished",
+  "linkTransfersFinished": "Tamamlananlar",
   "@linkTransfersFinished": {
     "description": "Section of the Transfers list for transfers that stopped: done, stopped by someone or failed"
   },
-  "linkTransfersClearFinished": "Clear finished",
+  "linkTransfersClearFinished": "Tamamlananları temizle",
   "@linkTransfersClearFinished": {
     "description": "Action that removes the finished transfers from the Transfers list; the copied songs stay"
   },
-  "linkTransfersEmptyTitle": "No transfers yet",
+  "linkTransfersEmptyTitle": "Henüz aktarım yok",
   "@linkTransfersEmptyTitle": {
     "description": "Title of the empty Transfers list, also the status of the row that opens it while there is none"
   },
-  "linkTransfersEmptyMessage": "Send or save songs from a song's menu, an album or a selection.",
+  "linkTransfersEmptyMessage": "Şarkıları bir şarkının menüsünden, bir albümden veya bir seçimden gönderin ya da kaydedin.",
   "@linkTransfersEmptyMessage": {
     "description": "Hint under the empty Transfers list naming where a transfer starts (the Send to and Save to this device actions)"
   },
-  "linkTransfersSending": "Sending {count, plural, =1{1 song} other{{count} songs}} to {name}",
+  "linkTransfersSending": "{name} cihazına {count, plural, =1{1 şarkı} other{{count} şarkı}} gönderiliyor",
   "@linkTransfersSending": {
     "description": "Title of a running or waiting transfer that copies this device's songs to a linked device",
     "placeholders": {
@@ -9737,7 +9737,7 @@
       }
     }
   },
-  "linkTransfersReceiving": "Receiving {count, plural, =1{1 song} other{{count} songs}} from {name}",
+  "linkTransfersReceiving": "{name} cihazından {count, plural, =1{1 şarkı} other{{count} şarkı}} alınıyor",
   "@linkTransfersReceiving": {
     "description": "Title of a running or waiting transfer that copies a linked device's songs to this device",
     "placeholders": {
@@ -9749,7 +9749,7 @@
       }
     }
   },
-  "linkTransfersSendingSong": "Sending {title} to {name}",
+  "linkTransfersSendingSong": "{title} {name} cihazına gönderiliyor",
   "@linkTransfersSendingSong": {
     "description": "Title of a running or waiting transfer of one song from this device; the placeholder is the song's title",
     "placeholders": {
@@ -9761,7 +9761,7 @@
       }
     }
   },
-  "linkTransfersReceivingSong": "Receiving {title} from {name}",
+  "linkTransfersReceivingSong": "{title} {name} cihazından alınıyor",
   "@linkTransfersReceivingSong": {
     "description": "Title of a running or waiting transfer of one song to this device; the placeholder is the song's title",
     "placeholders": {
@@ -9773,7 +9773,7 @@
       }
     }
   },
-  "linkTransfersSongsTo": "{count, plural, =1{1 song} other{{count} songs}} to {name}",
+  "linkTransfersSongsTo": "{name} cihazına {count, plural, =1{1 şarkı} other{{count} şarkı}}",
   "@linkTransfersSongsTo": {
     "description": "Title of a finished transfer from this device to a linked one; its outcome shows below",
     "placeholders": {
@@ -9785,7 +9785,7 @@
       }
     }
   },
-  "linkTransfersSongsFrom": "{count, plural, =1{1 song} other{{count} songs}} from {name}",
+  "linkTransfersSongsFrom": "{name} cihazından {count, plural, =1{1 şarkı} other{{count} şarkı}}",
   "@linkTransfersSongsFrom": {
     "description": "Title of a finished transfer from a linked device to this one; its outcome shows below",
     "placeholders": {
@@ -9797,7 +9797,7 @@
       }
     }
   },
-  "linkTransfersSongTo": "{title} to {name}",
+  "linkTransfersSongTo": "{title} → {name}",
   "@linkTransfersSongTo": {
     "description": "Title of a finished transfer of one song from this device; the placeholder is the song's title",
     "placeholders": {
@@ -9809,7 +9809,7 @@
       }
     }
   },
-  "linkTransfersSongFrom": "{title} from {name}",
+  "linkTransfersSongFrom": "{title} ← {name}",
   "@linkTransfersSongFrom": {
     "description": "Title of a finished transfer of one song to this device; the placeholder is the song's title",
     "placeholders": {
@@ -9821,7 +9821,7 @@
       }
     }
   },
-  "linkTransfersPosition": "{position} of {total}",
+  "linkTransfersPosition": "{position} / {total}",
   "@linkTransfersPosition": {
     "description": "Which song of a running transfer is being copied, for example '3 of 12'",
     "placeholders": {
@@ -9833,7 +9833,7 @@
       }
     }
   },
-  "linkTransfersPercent": "{percent}%",
+  "linkTransfersPercent": "%{percent}",
   "@linkTransfersPercent": {
     "description": "How much of a transfer or song has been copied, as a percentage",
     "placeholders": {
@@ -9842,11 +9842,11 @@
       }
     }
   },
-  "linkTransfersWaiting": "Waiting",
+  "linkTransfersWaiting": "Bekliyor",
   "@linkTransfersWaiting": {
     "description": "Status of a transfer or song that waits for the ones before it"
   },
-  "linkTransfersSavedCount": "{count, plural, other{{count} saved}}",
+  "linkTransfersSavedCount": "{count, plural, other{{count} kaydedildi}}",
   "@linkTransfersSavedCount": {
     "description": "Outcome of a finished transfer: how many songs were copied",
     "placeholders": {
@@ -9855,7 +9855,7 @@
       }
     }
   },
-  "linkTransfersAlreadyThereCount": "{count, plural, other{{count} already there}}",
+  "linkTransfersAlreadyThereCount": "{count, plural, other{{count} zaten oradaydı}}",
   "@linkTransfersAlreadyThereCount": {
     "description": "Outcome of a finished transfer: how many songs the receiving device already had, so they were not copied again",
     "placeholders": {
@@ -9864,7 +9864,7 @@
       }
     }
   },
-  "linkTransfersFailedCount": "{count, plural, other{{count} failed}}",
+  "linkTransfersFailedCount": "{count, plural, other{{count} başarısız}}",
   "@linkTransfersFailedCount": {
     "description": "Outcome of a finished transfer: how many songs could not be copied",
     "placeholders": {
@@ -9873,7 +9873,7 @@
       }
     }
   },
-  "linkTransfersStopped": "{done, plural, =0{Stopped} other{Stopped after {done} of {total}}}",
+  "linkTransfersStopped": "{done, plural, =0{Durduruldu} other{{total} şarkıdan {done} tanesinden sonra durduruldu}}",
   "@linkTransfersStopped": {
     "description": "Outcome of a transfer someone stopped, with how many of its songs were finished",
     "placeholders": {
@@ -9885,15 +9885,15 @@
       }
     }
   },
-  "linkTransfersReasonDisconnected": "Connection lost",
+  "linkTransfersReasonDisconnected": "Bağlantı kesildi",
   "@linkTransfersReasonDisconnected": {
     "description": "Why a transfer failed: the devices lost their connection"
   },
-  "linkTransfersReasonNoFolder": "Choose a download folder first",
+  "linkTransfersReasonNoFolder": "Önce bir indirme klasörü seçin",
   "@linkTransfersReasonNoFolder": {
     "description": "Why a transfer to this device failed: no download folder is set"
   },
-  "linkTransfersReasonNoFolderPeer": "{name} has no download folder",
+  "linkTransfersReasonNoFolderPeer": "{name} cihazında indirme klasörü yok",
   "@linkTransfersReasonNoFolderPeer": {
     "description": "Why a transfer to the linked device failed: that device has no download folder set",
     "placeholders": {
@@ -9902,39 +9902,39 @@
       }
     }
   },
-  "linkTransfersReasonBusy": "Busy, try again later",
+  "linkTransfersReasonBusy": "Meşgul, daha sonra tekrar deneyin",
   "@linkTransfersReasonBusy": {
     "description": "Why a transfer failed: the receiving device could not take it now"
   },
-  "linkTransfersReasonError": "Something went wrong",
+  "linkTransfersReasonError": "Bir sorun oluştu",
   "@linkTransfersReasonError": {
     "description": "Why a transfer failed, when there is no more specific reason"
   },
-  "linkTransfersSongSaved": "Saved",
+  "linkTransfersSongSaved": "Kaydedildi",
   "@linkTransfersSongSaved": {
     "description": "State of one song in a transfer: it was copied"
   },
-  "linkTransfersSongAlreadyThere": "Already there",
+  "linkTransfersSongAlreadyThere": "Zaten orada",
   "@linkTransfersSongAlreadyThere": {
     "description": "State of one song in a transfer: the receiving device already had it"
   },
-  "linkTransfersSongFailed": "Failed",
+  "linkTransfersSongFailed": "Başarısız",
   "@linkTransfersSongFailed": {
     "description": "State of one song in a transfer: it could not be copied"
   },
-  "linkTransfersSongCopying": "Copying",
+  "linkTransfersSongCopying": "Kopyalanıyor",
   "@linkTransfersSongCopying": {
     "description": "State of the song a transfer copies right now"
   },
-  "linkTransfersSongNotCopied": "Not copied",
+  "linkTransfersSongNotCopied": "Kopyalanmadı",
   "@linkTransfersSongNotCopied": {
     "description": "State of a song a stopped or failed transfer did not reach"
   },
-  "linkTransfersStop": "Stop transfer",
+  "linkTransfersStop": "Aktarımı durdur",
   "@linkTransfersStop": {
     "description": "Tooltip of the button that stops a running or waiting transfer; songs already copied stay"
   },
-  "linkTransfersActiveCount": "{count, plural, =1{1 transfer} other{{count} transfers}}",
+  "linkTransfersActiveCount": "{count, plural, =1{1 aktarım} other{{count} aktarım}}",
   "@linkTransfersActiveCount": {
     "description": "Status of the row that opens the Transfers list while several transfers run, followed by their progress",
     "placeholders": {
@@ -9943,7 +9943,7 @@
       }
     }
   },
-  "linkTransfersFinishedCount": "{count, plural, =1{1 transfer finished} other{{count} transfers finished}}",
+  "linkTransfersFinishedCount": "{count, plural, =1{1 aktarım tamamlandı} other{{count} aktarım tamamlandı}}",
   "@linkTransfersFinishedCount": {
     "description": "Status of the row that opens the Transfers list when none runs: how many finished since the app opened",
     "placeholders": {
@@ -9952,67 +9952,67 @@
       }
     }
   },
-  "linkErrorBadPin": "That PIN is not right. Check the PIN on your computer and try again.",
+  "linkErrorBadPin": "Bu PIN doğru değil. Bilgisayarınızdaki PIN'i kontrol edip tekrar deneyin.",
   "@linkErrorBadPin": {
     "description": "Pairing error when the PIN is wrong"
   },
-  "linkErrorPairingClosed": "Pairing is not open on your computer. Start pairing there, then try again.",
+  "linkErrorPairingClosed": "Bilgisayarınızda eşleştirme açık değil. Orada eşleştirmeyi başlatın, sonra tekrar deneyin.",
   "@linkErrorPairingClosed": {
     "description": "Pairing error when the computer has no pairing window open"
   },
-  "linkErrorTooManyAttempts": "Too many attempts. Wait a moment, then try again.",
+  "linkErrorTooManyAttempts": "Çok fazla deneme. Biraz bekleyip tekrar deneyin.",
   "@linkErrorTooManyAttempts": {
     "description": "Pairing error when the computer rate limits pairing attempts"
   },
-  "linkErrorCertificateTitle": "Computer not verified",
+  "linkErrorCertificateTitle": "Bilgisayar doğrulanmadı",
   "@linkErrorCertificateTitle": {
     "description": "Title of the warning shown when the computer's certificate does not match what it reported"
   },
-  "linkErrorCertificate": "The computer's security certificate does not match what it reported. Someone on this network may be intercepting the connection, so pairing stopped.",
+  "linkErrorCertificate": "Bilgisayarın güvenlik sertifikası bildirdiğiyle eşleşmiyor. Bu ağdaki biri bağlantıyı kesiyor olabilir, bu yüzden eşleştirme durduruldu.",
   "@linkErrorCertificate": {
     "description": "Warning shown when the certificate seen during the connection differs from the computer's reported fingerprint"
   },
-  "linkErrorIncompatible": "This computer runs a Mornye version that cannot pair with this phone. Update Mornye on both devices.",
+  "linkErrorIncompatible": "Bu bilgisayar, bu telefonla eşleşemeyen bir Mornye sürümü çalıştırıyor. Mornye'yi her iki cihazda da güncelleyin.",
   "@linkErrorIncompatible": {
     "description": "Pairing error when the computer is not a compatible Mornye desktop"
   },
-  "linkErrorUnreachable": "The computer could not be reached. Check that Mornye is open on it and that both devices are on the same network.",
+  "linkErrorUnreachable": "Bilgisayara ulaşılamadı. Mornye'nin açık olduğunu ve iki cihazın da aynı ağda olduğunu kontrol edin.",
   "@linkErrorUnreachable": {
     "description": "Pairing error when the computer cannot be reached"
   },
-  "linkErrorTimeout": "The computer did not answer in time. Try again.",
+  "linkErrorTimeout": "Bilgisayar zamanında yanıt vermedi. Tekrar deneyin.",
   "@linkErrorTimeout": {
     "description": "Pairing error when the computer does not answer"
   },
-  "linkErrorInvalidAddress": "Enter a valid address and port, such as 192.168.1.20 and 47710.",
+  "linkErrorInvalidAddress": "192.168.1.20 ve 47710 gibi geçerli bir adres ve bağlantı noktası girin.",
   "@linkErrorInvalidAddress": {
     "description": "Error for an address or port that cannot be used"
   },
-  "linkErrorFailed": "Pairing failed. Try again.",
+  "linkErrorFailed": "Eşleştirme başarısız oldu. Tekrar deneyin.",
   "@linkErrorFailed": {
     "description": "Generic pairing error"
   },
-  "linkLocalNetworkTitle": "Local network access needed",
+  "linkLocalNetworkTitle": "Yerel ağ erişimi gerekli",
   "@linkLocalNetworkTitle": {
     "description": "Title of the notice shown when the phone is not allowed to use the local network"
   },
-  "linkLocalNetworkMessage": "Mornye needs local network access to find your computer and connect to it.",
+  "linkLocalNetworkMessage": "Mornye'nin bilgisayarınızı bulmak ve ona bağlanmak için yerel ağ erişimine ihtiyacı var.",
   "@linkLocalNetworkMessage": {
     "description": "Explains why local network access is needed"
   },
-  "linkLocalNetworkAllow": "Allow access",
+  "linkLocalNetworkAllow": "Erişime izin ver",
   "@linkLocalNetworkAllow": {
     "description": "Button that asks for local network access again"
   },
-  "linkWifiOffTitle": "Not on Wi-Fi",
+  "linkWifiOffTitle": "Wi-Fi'de değilsiniz",
   "@linkWifiOffTitle": {
     "description": "Title of the notice shown when the phone is not connected to Wi-Fi or Ethernet"
   },
-  "linkWifiOffMessage": "Connect this phone to the same Wi-Fi network as your computer.",
+  "linkWifiOffMessage": "Bu telefonu bilgisayarınızla aynı Wi-Fi ağına bağlayın.",
   "@linkWifiOffMessage": {
     "description": "Explains that the phone must join the computer's Wi-Fi network"
   },
-  "linkIssueUnauthorized": "{name} no longer accepts this phone. Pair again to reconnect.",
+  "linkIssueUnauthorized": "{name} bu telefonu artık kabul etmiyor. Yeniden bağlanmak için tekrar eşleştirin.",
   "@linkIssueUnauthorized": {
     "description": "Notice when the paired computer refuses the phone's key",
     "placeholders": {
@@ -10021,7 +10021,7 @@
       }
     }
   },
-  "linkIssueCertificate": "{name} presented a different security certificate. Pair again only if you reinstalled or reset Mornye on that computer.",
+  "linkIssueCertificate": "{name} farklı bir güvenlik sertifikası sundu. Yalnızca o bilgisayarda Mornye'yi yeniden yüklediyseniz veya sıfırladıysanız tekrar eşleştirin.",
   "@linkIssueCertificate": {
     "description": "Warning when a paired computer's certificate changed",
     "placeholders": {
@@ -10030,7 +10030,7 @@
       }
     }
   },
-  "linkIssueIncompatible": "Update Mornye on this phone and on {name} to connect.",
+  "linkIssueIncompatible": "Bağlanmak için Mornye'yi bu telefonda ve {name} cihazında güncelleyin.",
   "@linkIssueIncompatible": {
     "description": "Notice when the paired computer speaks another protocol version",
     "placeholders": {
@@ -10039,58 +10039,58 @@
       }
     }
   },
-  "playlistEditOrder": "Edit order",
+  "playlistEditOrder": "Sırayı düzenle",
   "@playlistEditOrder": {
     "description": "Playlist header action and page title for reordering the playlist's tracks"
   },
-  "playlistEditOrderDescription": "Drag a track by its handle, or touch and hold it, to move it.",
+  "playlistEditOrderDescription": "Bir parçayı tutamacından sürükleyin veya dokunup basılı tutarak taşıyın.",
   "@playlistEditOrderDescription": {
     "description": "Explanation at the top of the playlist reorder page"
   },
-  "playlistEditOrderSaved": "Playlist order saved",
-  "collectionOrderSaved": "Song order saved",
-  "collectionOrderChanged": "This collection changed while editing. Please reorder it again.",
-  "collectionOrderSaveFailed": "Could not save the song order. Try again.",
+  "playlistEditOrderSaved": "Çalma listesi sırası kaydedildi",
+  "collectionOrderSaved": "Şarkı sırası kaydedildi",
+  "collectionOrderChanged": "Bu koleksiyon düzenleme sırasında değişti. Lütfen yeniden sıralayın.",
+  "collectionOrderSaveFailed": "Şarkı sırası kaydedilemedi. Tekrar deneyin.",
   "@playlistEditOrderSaved": {
     "description": "Snackbar after saving a new playlist track order"
   },
-  "playlistCreateEmpty": "Empty playlist",
+  "playlistCreateEmpty": "Boş çalma listesi",
   "@playlistCreateEmpty": {
     "description": "Create playlist option that starts with no tracks"
   },
-  "playlistCreateEmptySubtitle": "Add tracks later from any list",
+  "playlistCreateEmptySubtitle": "Parçaları daha sonra herhangi bir listeden ekleyin",
   "@playlistCreateEmptySubtitle": {
     "description": "Subtitle of the empty playlist option"
   },
-  "playlistCreateFromFolder": "From a folder",
+  "playlistCreateFromFolder": "Bir klasörden",
   "@playlistCreateFromFolder": {
     "description": "Create playlist option that uses the tracks of one Library folder"
   },
-  "playlistCreateFromFolderSubtitle": "Every track in one folder of your Library",
+  "playlistCreateFromFolderSubtitle": "Kitaplığınızdaki tek bir klasördeki tüm parçalar",
   "@playlistCreateFromFolderSubtitle": {
     "description": "Subtitle of the create playlist from folder option"
   },
-  "playlistImportFile": "Import playlist file",
+  "playlistImportFile": "Çalma listesi dosyası içe aktar",
   "@playlistImportFile": {
     "description": "Create playlist option that imports an M3U or CSV file"
   },
-  "playlistImportFileSubtitle": "M3U, M3U8 or CSV, matched to files on this device",
+  "playlistImportFileSubtitle": "M3U, M3U8 veya CSV; bu cihazdaki dosyalarla eşleştirilir",
   "@playlistImportFileSubtitle": {
     "description": "Subtitle of the import playlist file option"
   },
-  "playlistFolderPickerTitle": "Choose a folder",
+  "playlistFolderPickerTitle": "Bir klasör seçin",
   "@playlistFolderPickerTitle": {
     "description": "Title of the sheet listing Library folders to turn into a playlist"
   },
-  "playlistFolderPickerEmptyTitle": "No folders yet",
+  "playlistFolderPickerEmptyTitle": "Henüz klasör yok",
   "@playlistFolderPickerEmptyTitle": {
     "description": "Title of the empty folder picker when no Library folder has tracks"
   },
-  "playlistFolderPickerEmpty": "No scanned tracks yet. Add a Library folder and scan it first.",
+  "playlistFolderPickerEmpty": "Henüz taranmış parça yok. Önce bir Kitaplık klasörü ekleyip tarayın.",
   "@playlistFolderPickerEmpty": {
     "description": "Shown when no Library folder has tracks to create a playlist from"
   },
-  "playlistCreatedWithTracks": "Created {name} with {count, plural, =1{1 track} other{{count} tracks}}",
+  "playlistCreatedWithTracks": "{count, plural, =1{1 parça} other{{count} parça}} ile {name} oluşturuldu",
   "@playlistCreatedWithTracks": {
     "description": "Snackbar after creating a playlist from a folder",
     "placeholders": {
@@ -10102,7 +10102,7 @@
       }
     }
   },
-  "playlistImportResult": "Imported {count, plural, =1{1 track} other{{count} tracks}} into {name}, {matched} matched to files on this device",
+  "playlistImportResult": "{name} listesine {count, plural, =1{1 parça} other{{count} parça}} içe aktarıldı; {matched} tanesi bu cihazdaki dosyalarla eşleşti",
   "@playlistImportResult": {
     "description": "Snackbar after importing a playlist file; matched counts tracks linked to a local file",
     "placeholders": {
@@ -10117,159 +10117,159 @@
       }
     }
   },
-  "playlistImportNoTracks": "No tracks found in this file",
+  "playlistImportNoTracks": "Bu dosyada parça bulunamadı",
   "@playlistImportNoTracks": {
     "description": "Snackbar when an imported playlist file has no entries"
   },
-  "playlistImportFailed": "Could not read this playlist file",
+  "playlistImportFailed": "Bu çalma listesi dosyası okunamadı",
   "@playlistImportFailed": {
     "description": "Snackbar when reading or parsing an imported playlist file fails"
   },
-  "recognizeTitle": "Identify Song",
+  "recognizeTitle": "Şarkıyı tanı",
   "@recognizeTitle": {
     "description": "Title of the screen that identifies a song playing nearby through the microphone (keep short)"
   },
-  "recognizeSearchTooltip": "Identify a song playing nearby",
+  "recognizeSearchTooltip": "Yakında çalan bir şarkıyı tanı",
   "@recognizeSearchTooltip": {
     "description": "Tooltip of the microphone button in the search field that opens song identification"
   },
-  "recognizeIdleTitle": "What's playing?",
+  "recognizeIdleTitle": "Ne çalıyor?",
   "@recognizeIdleTitle": {
     "description": "Headline of the song identification screen before listening starts"
   },
-  "recognizeIdleMessage": "Hold your device near the music, then tap to listen.",
+  "recognizeIdleMessage": "Cihazınızı müziğe yakın tutun, sonra dinlemek için dokunun.",
   "@recognizeIdleMessage": {
     "description": "Hint under the headline before listening starts"
   },
-  "recognizeStartListening": "Start listening",
+  "recognizeStartListening": "Dinlemeye başla",
   "@recognizeStartListening": {
     "description": "Accessible name of the large microphone button that starts listening"
   },
-  "recognizeServiceNote": "A sound fingerprint is sent to Shazam to find the song. The recording stays on your device.",
+  "recognizeServiceNote": "Şarkıyı bulmak için Shazam'a bir ses parmak izi gönderilir. Kayıt cihazınızda kalır.",
   "@recognizeServiceNote": {
     "description": "Privacy note on the identification screen; Shazam is the recognition service and must not be translated"
   },
-  "recognizeListening": "Listening…",
+  "recognizeListening": "Dinleniyor…",
   "@recognizeListening": {
     "description": "Status while the microphone listens for a song"
   },
-  "recognizeListeningMessage": "Keep the music playing near your device.",
+  "recognizeListeningMessage": "Müziği cihazınızın yakınında çalmaya devam ettirin.",
   "@recognizeListeningMessage": {
     "description": "Hint while the microphone listens"
   },
-  "recognizeSearching": "Searching…",
+  "recognizeSearching": "Aranıyor…",
   "@recognizeSearching": {
     "description": "Status after listening stops while the last answer is on its way"
   },
-  "recognizeNoMatchTitle": "No match found",
+  "recognizeNoMatchTitle": "Eşleşme bulunamadı",
   "@recognizeNoMatchTitle": {
     "description": "Title when the recognition service did not know the song"
   },
-  "recognizeNoMatchMessage": "Try again closer to the music, or when it's louder.",
+  "recognizeNoMatchMessage": "Müziğe daha yakın veya daha yüksekken tekrar deneyin.",
   "@recognizeNoMatchMessage": {
     "description": "Hint when no song was found"
   },
-  "recognizeTryAgain": "Try Again",
+  "recognizeTryAgain": "Tekrar Dene",
   "@recognizeTryAgain": {
     "description": "Button that starts listening again after no match or an error"
   },
-  "recognizeQuietTitle": "Couldn't hear the music",
+  "recognizeQuietTitle": "Müzik duyulamadı",
   "@recognizeQuietTitle": {
     "description": "Title when the microphone captured too little or too quiet audio to identify"
   },
-  "recognizeQuietMessage": "Move closer to the music and try again.",
+  "recognizeQuietMessage": "Müziğe yaklaşın ve tekrar deneyin.",
   "@recognizeQuietMessage": {
     "description": "Hint when the captured audio was too quiet or short"
   },
-  "recognizeNetworkTitle": "No connection",
+  "recognizeNetworkTitle": "Bağlantı yok",
   "@recognizeNetworkTitle": {
     "description": "Title when identification failed because the network is unreachable"
   },
-  "recognizeNetworkMessage": "Check your internet connection and try again.",
+  "recognizeNetworkMessage": "İnternet bağlantınızı kontrol edip tekrar deneyin.",
   "@recognizeNetworkMessage": {
     "description": "Hint when identification failed because of the network"
   },
-  "recognizeRateLimitedTitle": "Too many tries",
+  "recognizeRateLimitedTitle": "Çok fazla deneme",
   "@recognizeRateLimitedTitle": {
     "description": "Title when the recognition service asked to slow down"
   },
-  "recognizeRateLimitedMessage": "Wait a minute, then try again.",
+  "recognizeRateLimitedMessage": "Bir dakika bekleyip tekrar deneyin.",
   "@recognizeRateLimitedMessage": {
     "description": "Hint when the recognition service rate limited the app"
   },
-  "recognizeUnavailableTitle": "Identification unavailable",
+  "recognizeUnavailableTitle": "Tanımlama kullanılamıyor",
   "@recognizeUnavailableTitle": {
     "description": "Title when the recognition service failed or answered unexpectedly"
   },
-  "recognizeUnavailableMessage": "The recognition service didn't answer. Try again later.",
+  "recognizeUnavailableMessage": "Tanımlama hizmeti yanıt vermedi. Daha sonra tekrar deneyin.",
   "@recognizeUnavailableMessage": {
     "description": "Hint when the recognition service failed"
   },
-  "recognizeMicrophoneTitle": "Microphone unavailable",
+  "recognizeMicrophoneTitle": "Mikrofon kullanılamıyor",
   "@recognizeMicrophoneTitle": {
     "description": "Title when the microphone could not record"
   },
-  "recognizeMicrophoneMessage": "No microphone is available, or another app is using it.",
+  "recognizeMicrophoneMessage": "Kullanılabilir mikrofon yok veya başka bir uygulama onu kullanıyor.",
   "@recognizeMicrophoneMessage": {
     "description": "Hint when the microphone could not record"
   },
-  "recognizePermissionTitle": "Microphone access is off",
+  "recognizePermissionTitle": "Mikrofon erişimi kapalı",
   "@recognizePermissionTitle": {
     "description": "Title when microphone permission was denied"
   },
-  "recognizePermissionMessage": "Mornye uses the microphone only while you identify a song.",
+  "recognizePermissionMessage": "Mornye mikrofonu yalnızca bir şarkıyı tanımlarken kullanır.",
   "@recognizePermissionMessage": {
     "description": "Explanation when microphone permission was denied"
   },
-  "recognizePermissionAllow": "Allow Microphone",
+  "recognizePermissionAllow": "Mikrofona İzin Ver",
   "@recognizePermissionAllow": {
     "description": "Button that asks for microphone permission again"
   },
-  "recognizePlay": "Play in Mornye",
+  "recognizePlay": "Mornye'de çal",
   "@recognizePlay": {
     "description": "Button that plays the identified song from the downloads or library"
   },
-  "recognizeSearch": "Search in Mornye",
+  "recognizeSearch": "Mornye'de ara",
   "@recognizeSearch": {
     "description": "Button that searches for the identified song when it is not in the library"
   },
-  "recognizeOpenInShazam": "Open in Shazam",
+  "recognizeOpenInShazam": "Shazam'da aç",
   "@recognizeOpenInShazam": {
     "description": "Button that opens the identified song on the Shazam website; Shazam must not be translated"
   },
-  "recognizeListenAgain": "Listen Again",
+  "recognizeListenAgain": "Tekrar Dinle",
   "@recognizeListenAgain": {
     "description": "Button that starts a new identification from a result"
   },
-  "recognizeHistory": "Recently Identified",
+  "recognizeHistory": "Son Tanımlananlar",
   "@recognizeHistory": {
     "description": "Section header for the list of songs identified before"
   },
-  "recognizeClearHistory": "Clear identified songs",
+  "recognizeClearHistory": "Tanımlanan şarkıları temizle",
   "@recognizeClearHistory": {
     "description": "Tooltip of the header button that clears the identification history"
   },
-  "recognizeClearHistoryMessage": "Remove every song from this list?",
+  "recognizeClearHistoryMessage": "Bu listedeki tüm şarkılar kaldırılsın mı?",
   "@recognizeClearHistoryMessage": {
     "description": "Confirmation message before clearing the identification history"
   },
-  "collectionSuggestionsTitle": "Suggested songs",
+  "collectionSuggestionsTitle": "Önerilen şarkılar",
   "@collectionSuggestionsTitle": {
     "description": "Heading of the songs suggested below an album, single or playlist"
   },
-  "collectionSuggestionsRelated": "Based on the songs above",
+  "collectionSuggestionsRelated": "Yukarıdaki şarkılara göre",
   "@collectionSuggestionsRelated": {
     "description": "Line under the suggestions heading when an extension suggested songs like the album's or playlist's"
   },
-  "collectionSuggestionsByArtists": "More from these artists",
+  "collectionSuggestionsByArtists": "Bu sanatçılardan daha fazlası",
   "@collectionSuggestionsByArtists": {
     "description": "Line under the suggestions heading when the songs were found by searching the album's or playlist's artists"
   },
-  "collectionSuggestionsRefresh": "Suggest other songs",
+  "collectionSuggestionsRefresh": "Başka şarkılar öner",
   "@collectionSuggestionsRefresh": {
     "description": "Tooltip of the button that loads other suggestions"
   },
-  "collectionSuggestionsAddHere": "Add to this playlist",
+  "collectionSuggestionsAddHere": "Bu çalma listesine ekle",
   "@collectionSuggestionsAddHere": {
     "description": "Tooltip of the button that adds a suggested song to the user's playlist shown above"
   }
