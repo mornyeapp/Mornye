@@ -42,6 +42,7 @@ void main() {
       expect(initialized, {'home': 1});
       animation.stop();
       await tester.pump(const Duration(milliseconds: 1));
+      await tester.pump();
       expect(initialized, {'home': 1, 'search': 1});
       expect(find.byType(TextField).hitTestable(), findsOneWidget);
       expect(searchFocus.canRequestFocus, isFalse);
@@ -205,6 +206,148 @@ void main() {
     expect(insets['search'], [300.0]);
     expect(initialized, {'home': 1, 'search': 1});
   });
+
+  testWidgets('preloading waits on frames without queueing idle tasks', (
+    tester,
+  ) async {
+    final initialized = <String, int>{};
+    final animation = AnimationController(vsync: tester)
+      ..repeat(period: const Duration(seconds: 1));
+    addTearDown(animation.dispose);
+    final oldStrategy = tester.binding.schedulingStrategy;
+    var idleTasks = 0;
+    tester.binding.schedulingStrategy =
+        ({required priority, required scheduler}) {
+          idleTasks++;
+          return true;
+        };
+    addTearDown(() => tester.binding.schedulingStrategy = oldStrategy);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: LazyTabView(
+          index: 0,
+          preloadKeys: {const ValueKey('search')},
+          children: [
+            for (final name in ['home', 'search'])
+              _Tab(key: ValueKey(name), name: name, initialized: initialized),
+          ],
+        ),
+      ),
+    );
+    for (var frame = 0; frame < 60; frame++) {
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    expect(idleTasks, 0);
+    expect(initialized, {'home': 1});
+    animation.stop();
+    await tester.pumpAndSettle();
+    expect(initialized, {'home': 1, 'search': 1});
+    expect(tester.binding.hasScheduledFrame, isFalse);
+    expect(tester.binding.handleEventLoopCallback(), isFalse);
+  });
+
+  testWidgets('pending preload is harmless after removal and disposal', (
+    tester,
+  ) async {
+    final initialized = <String, int>{};
+    final animation = AnimationController(vsync: tester)
+      ..repeat(period: const Duration(seconds: 1));
+    addTearDown(animation.dispose);
+    final preload = ValueNotifier(true);
+    addTearDown(preload.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ValueListenableBuilder<bool>(
+          valueListenable: preload,
+          builder: (context, enabled, _) => LazyTabView(
+            index: 0,
+            preloadKeys: enabled ? {const ValueKey('search')} : {},
+            children: [
+              for (final name in ['home', 'search'])
+                _Tab(key: ValueKey(name), name: name, initialized: initialized),
+            ],
+          ),
+        ),
+      ),
+    );
+    preload.value = false;
+    await tester.pump();
+    animation.stop();
+    await tester.pumpAndSettle();
+    expect(initialized, {'home': 1});
+    animation.repeat(period: const Duration(seconds: 1));
+    preload.value = true;
+    await tester.pump();
+    await tester.pumpWidget(const SizedBox.shrink());
+    animation.stop();
+    await tester.pumpAndSettle();
+    expect(initialized, {'home': 1});
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'hidden resize freezes size but retains scroll and accessibility',
+    (tester) async {
+      final selected = ValueNotifier(1);
+      final media = ValueNotifier(const MediaQueryData(size: Size(1000, 800)));
+      final scroll = ScrollController();
+      addTearDown(selected.dispose);
+      addTearDown(media.dispose);
+      addTearDown(scroll.dispose);
+      final samples = <(Size, double)>[];
+      final children = [
+        const SizedBox(key: ValueKey('home')),
+        Builder(
+          key: const ValueKey('search'),
+          builder: (context) {
+            final size = MediaQuery.sizeOf(context);
+            final scale = MediaQuery.textScalerOf(context).scale(14);
+            samples.add((size, scale));
+            return ListView.builder(
+              controller: scroll,
+              itemCount: 100,
+              itemExtent: 50,
+              itemBuilder: (_, index) => Text('Song $index'),
+            );
+          },
+        ),
+      ];
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ValueListenableBuilder<MediaQueryData>(
+            valueListenable: media,
+            builder: (context, data, child) =>
+                MediaQuery(data: data, child: child!),
+            child: ValueListenableBuilder<int>(
+              valueListenable: selected,
+              builder: (context, index, _) =>
+                  LazyTabView(index: index, children: children),
+            ),
+          ),
+        ),
+      );
+      scroll.jumpTo(1000);
+      await tester.pump();
+      selected.value = 0;
+      await tester.pump();
+      samples.clear();
+      for (var frame = 0; frame < 10; frame++) {
+        media.value = media.value.copyWith(size: Size(1010 + frame * 10, 800));
+        await tester.pump();
+      }
+      expect(samples, isEmpty);
+      expect(scroll.offset, 1000);
+      media.value = media.value.copyWith(textScaler: TextScaler.linear(2));
+      await tester.pump();
+      expect(samples, [(const Size(1000, 800), 28.0)]);
+      samples.clear();
+      selected.value = 1;
+      await tester.pump();
+      expect(samples, [(const Size(1100, 800), 28.0)]);
+      expect(scroll.offset, 1000);
+      expect(tester.takeException(), isNull);
+    },
+  );
 }
 
 class _Tab extends StatefulWidget {
