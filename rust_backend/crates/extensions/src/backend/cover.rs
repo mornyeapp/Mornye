@@ -24,8 +24,8 @@ const CACHE_TTL: Duration = Duration::from_secs(15 * 60);
 const SIZE_ERROR: &str = "cover download exceeds 24 MiB limit";
 
 /// A forced rescan touches this file in the Library cover directory.
-/// Thumbnails older than it are extracted again under the same name, so
-/// playlists, sessions and statistics keep valid paths.
+/// Thumbnails older than it are extracted again. Android publishes changed
+/// bytes under a new name; old references keep their previous file.
 pub const LIBRARY_COVER_REGENERATE_MARKER: &str = ".regenerate";
 
 /// File stem of the Library thumbnail cached under `key`. 128 bits of
@@ -40,9 +40,9 @@ pub fn library_cover_stem(key: &str) -> String {
 }
 
 /// Songs that embed the same picture share one stored thumbnail through hard
-/// links on desktop and iOS; every song keeps its own name. Android keeps a
-/// file per song (content-addressed names there are a separate change), and
-/// so does Windows, where a reader's sharing mode covers every name of a file.
+/// links on desktop and iOS; every song keeps its own name. Android uses
+/// content names. Windows keeps copies because a reader's sharing mode
+/// covers every name of a file.
 const LINK_THUMBNAILS: bool = cfg!(any(target_vendor = "apple", target_os = "linux"));
 
 /// Whether a thumbnail written at `modified` may be reused after the
@@ -292,6 +292,7 @@ impl Backend {
             None,
             read_cover,
             None,
+            cfg!(target_os = "android"),
             check,
         )
     }
@@ -321,6 +322,7 @@ impl Backend {
             format,
             read,
             batch,
+            cfg!(target_os = "android"),
             check,
         )
     }
@@ -335,6 +337,7 @@ impl Backend {
         format_override: Option<&str>,
         read: impl FnOnce(&crate::files::FilePath, &str, &Check<'_>) -> Result<CoverArt, String>,
         batch: Option<&SyncBatch>,
+        content_addressed: bool,
         check: &Check<'_>,
     ) -> Result<String, String> {
         let _operation = self.enter()?;
@@ -379,10 +382,12 @@ impl Backend {
         jpg.native_display()?;
         png.native_display()?;
         // A regenerated thumbnail can change format; the newer file wins.
-        if let Some((_, cached)) = [&jpg, &png]
+        let cached = [&jpg, &png]
             .into_iter()
             .filter_map(|cached| Some((reusable_cached_cover(cached, regenerate)?, cached)))
-            .max_by_key(|(modified, _)| *modified)
+            .max_by_key(|(modified, _)| *modified);
+        if let Some((_, cached)) = cached
+            && !content_addressed
         {
             return Ok(cached.display());
         }
@@ -393,10 +398,12 @@ impl Backend {
         if let Some(value) = format_override {
             format = value.into();
         }
-        if !matches!(
-            format.as_str(),
-            "flac" | "m4a" | "mp3" | "ogg" | "opus" | "wav" | "aiff" | "aif" | "aifc"
-        ) {
+        if cached.is_none()
+            && !matches!(
+                format.as_str(),
+                "flac" | "m4a" | "mp3" | "ogg" | "opus" | "wav" | "aiff" | "aif" | "aifc"
+            )
+        {
             return Err(format!(
                 "unsupported format: {}",
                 if format.is_empty() {
@@ -406,7 +413,30 @@ impl Backend {
                 }
             ));
         }
-        let mut cover = read(&input, &format, &check)?;
+        let mut cover = if let Some((_, cached)) = cached {
+            let mut data = Vec::new();
+            cached
+                .open(OpenOptions::new().read(true))
+                .map_err(|error| error.to_string())?
+                .take(MAX_DOWNLOAD_BYTES as u64 + 1)
+                .read_to_end(&mut data)
+                .map_err(|error| error.to_string())?;
+            if data.len() > MAX_DOWNLOAD_BYTES {
+                check()?;
+                return Ok(cached.display());
+            }
+            CoverArt {
+                data,
+                mime: if cached.display().ends_with(".png") {
+                    "image/png"
+                } else {
+                    "image/jpeg"
+                }
+                .into(),
+            }
+        } else {
+            read(&input, &format, &check)?
+        };
         let mut stored = None;
         if let Ok(thumbnail) = mornye_core::cover::library_thumbnail_entry(&cover.data, &check) {
             let resized = thumbnail.data;
@@ -419,14 +449,47 @@ impl Backend {
             }
             .into();
             cover.data = resized.to_vec();
-            stored = LINK_THUMBNAILS.then_some(thumbnail.stored);
+            stored = (LINK_THUMBNAILS && !content_addressed).then_some(thumbnail.stored);
         }
         // Library caching may retain unsupported image bytes, but must never
         // swallow cancellation while attempting the optional resize.
         check()?;
-        let output = if cover.mime.contains("png") { png } else { jpg };
+        if content_addressed && cover.data.is_empty() {
+            return Err("empty library artwork".into());
+        }
+        let output = if content_addressed {
+            let stem = mornye_core::cover::library_content_stem(&cover.data);
+            let extension = if cover.data.starts_with(b"\x89PNG") {
+                "png"
+            } else if cover.data.starts_with(b"\xff\xd8") {
+                "jpg"
+            } else if cover.mime.contains("png") {
+                "png"
+            } else {
+                "jpg"
+            };
+            files.resolve_legacy(&path(&format!("{stem}.{extension}")).to_string_lossy())?
+        } else if cover.mime.contains("png") {
+            png
+        } else {
+            jpg
+        };
         let _lock = files.lock(&output, &check)?;
-        if reusable_cached_cover(&output, regenerate).is_some() {
+        if content_addressed && output.metadata().is_ok() {
+            let mut existing = Vec::new();
+            output
+                .open(OpenOptions::new().read(true))
+                .map_err(|error| error.to_string())?
+                .take(cover.data.len() as u64 + 1)
+                .read_to_end(&mut existing)
+                .map_err(|error| error.to_string())?;
+            check()?;
+            if existing != cover.data {
+                return Err("content-addressed library artwork differs from its name".into());
+            }
+            return Ok(output.display());
+        }
+        if !content_addressed && reusable_cached_cover(&output, regenerate).is_some() {
             return Ok(output.display());
         }
         output
@@ -734,6 +797,103 @@ pub(super) mod tests {
         audio.push(frame.len() as u8);
         audio.extend(frame);
         audio
+    }
+
+    #[test]
+    fn android_names_share_one_file_per_picture_and_keep_legacy_references() {
+        let directory = tempfile::tempdir().unwrap();
+        let backend = backend(directory.path());
+        let data = directory.path().join("data");
+        let cache = data.join("covers");
+        let pictures = [artwork(101, 32), artwork(102, 32)];
+        let mut paths = Vec::new();
+        for index in 0..12 {
+            let audio = data.join(format!("{index}.flac"));
+            std::fs::write(&audio, flac_with_picture(&pictures[index % 2])).unwrap();
+            let path = backend
+                .cache_cover(
+                    audio.to_str().unwrap(),
+                    "",
+                    cache.to_str().unwrap(),
+                    &format!("song-{index}"),
+                    None,
+                    read_cover,
+                    None,
+                    true,
+                    &|| Ok(()),
+                )
+                .unwrap();
+            paths.push(path);
+        }
+        assert_eq!(std::fs::read_dir(&cache).unwrap().count(), 2);
+        assert_ne!(paths[0], paths[1]);
+        for index in 2..12 {
+            assert_eq!(paths[index], paths[index % 2]);
+        }
+        assert_eq!(std::fs::read(&paths[0]).unwrap(), pictures[0]);
+        let before = std::fs::metadata(&paths[0]).unwrap().modified().unwrap();
+        let legacy = cache.join(format!("{}.jpg", library_cover_stem("legacy")));
+        std::fs::write(&legacy, &pictures[0]).unwrap();
+        let path = backend
+            .cache_cover(
+                data.join("0.flac").to_str().unwrap(),
+                "",
+                cache.to_str().unwrap(),
+                "legacy",
+                None,
+                |_, _, _| panic!("legacy hit must not reread audio"),
+                None,
+                true,
+                &|| Ok(()),
+            )
+            .unwrap();
+        assert_eq!(path, paths[0]);
+        assert_eq!(
+            std::fs::metadata(&path).unwrap().modified().unwrap(),
+            before
+        );
+        assert_eq!(std::fs::read(&legacy).unwrap(), pictures[0]);
+
+        std::fs::write(cache.join(LIBRARY_COVER_REGENERATE_MARKER), "").unwrap();
+        let replacement = backend
+            .cache_cover(
+                data.join("0.flac").to_str().unwrap(),
+                "",
+                cache.to_str().unwrap(),
+                "legacy",
+                None,
+                |_, _, _| {
+                    Ok(CoverArt {
+                        data: pictures[1].clone(),
+                        mime: "image/jpeg".into(),
+                    })
+                },
+                None,
+                true,
+                &|| Ok(()),
+            )
+            .unwrap();
+        assert_eq!(replacement, paths[1]);
+        assert_eq!(std::fs::read(&paths[0]).unwrap(), pictures[0]);
+        assert_eq!(std::fs::read(&legacy).unwrap(), pictures[0]);
+
+        std::fs::write(&paths[1], b"unrelated bytes").unwrap();
+        assert!(
+            backend
+                .cache_cover(
+                    data.join("1.flac").to_str().unwrap(),
+                    "",
+                    cache.to_str().unwrap(),
+                    "fresh",
+                    None,
+                    read_cover,
+                    None,
+                    true,
+                    &|| Ok(()),
+                )
+                .is_err()
+        );
+        assert_eq!(std::fs::read(&paths[1]).unwrap(), b"unrelated bytes");
     }
 
     #[test]

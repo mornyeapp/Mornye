@@ -281,23 +281,16 @@ internal object RustCoreBackend : CoreBackend {
             val slot = if (directory != null && key != null) {
                 com.mornye.backend.libraryCoverSlot(directory.path, key)
             } else null
-            val cached = slot?.cached?.let { File(it) }
+            val cached = slot?.cached?.let { File(it) }?.takeIf { it.length() > 0 }
             val result = com.mornye.backend.readLibraryMetadataFromDescriptor(
                 descriptor, hint, java.time.Instant.now().toString(),
                 slot != null && cached == null, null,
             )
             val metadata = JSONObject(result.metadataJson)
             var cover = cached
-            if (directory != null && slot != null && result.coverBytes.isNotEmpty()) {
+            if (directory != null && slot != null) {
                 try {
-                    val extension = if (result.coverMime.contains("png")) "png" else "jpg"
-                    val output = File(directory, "${slot.stem}.$extension")
-                    val staged = File.createTempFile("cover_", ".tmp", directory)
-                    try {
-                        staged.writeBytes(result.coverBytes)
-                        check(staged.renameTo(output)) { "Could not publish library artwork" }
-                        cover = output
-                    } finally { staged.delete() }
+                    cover = AndroidLibraryCovers.cache(directory, cached, result.coverBytes, result.coverMime)
                 } catch (error: Exception) {
                     android.util.Log.w("Mornye", "Could not cache document artwork", error)
                 }

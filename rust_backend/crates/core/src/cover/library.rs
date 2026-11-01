@@ -1,5 +1,6 @@
 //! Bounded thumbnail reuse for tracks that embed the same album artwork.
 
+use sha2::{Digest, Sha256};
 use std::collections::{VecDeque, hash_map::DefaultHasher};
 use std::hash::{Hash, Hasher};
 use std::sync::{Arc, Mutex, OnceLock, TryLockError};
@@ -8,6 +9,16 @@ use std::time::Duration;
 const MAX_BYTES: usize = 8 << 20;
 const MAX_ENTRIES: usize = 32;
 static CACHE: OnceLock<Mutex<Cache>> = OnceLock::new();
+
+/// Android Library names identify the final thumbnail bytes, independently
+/// of the song, source, and original image encoding.
+pub fn library_content_stem(data: &[u8]) -> String {
+    let hex: String = Sha256::digest(data)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect();
+    format!("cover_content_{hex}")
+}
 
 struct Entry {
     hash: u64,
@@ -132,6 +143,15 @@ mod tests {
     use super::*;
     use image::{ImageBuffer, ImageFormat, Rgb};
     use std::io::Cursor;
+
+    #[test]
+    fn android_content_names_use_the_complete_sha256() {
+        assert_eq!(
+            library_content_stem(b"abc"),
+            "cover_content_ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
+        assert_ne!(library_content_stem(b"abc"), library_content_stem(b"abd"));
+    }
 
     #[test]
     fn repeated_artwork_reuses_pixels_and_checks_cancellation_on_hits() {

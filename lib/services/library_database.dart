@@ -18,6 +18,7 @@ import 'package:mornye/services/library_ingestion_store.dart';
 import 'package:mornye/services/library_native_adapter.dart';
 import 'package:mornye/services/library_row_mapper.dart';
 import 'package:mornye/services/library_schema.dart';
+import 'package:mornye/services/library_android_covers.dart';
 import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/services/sqlite_helpers.dart' as sqlite;
 
@@ -81,7 +82,10 @@ class LibraryDatabase {
           _searchFtsAvailable = await LibrarySchema.create(db, version);
         },
         onUpgrade: LibrarySchema.upgrade,
-        onOpen: LibrarySchema.migrateIosContainerPaths,
+        onOpen: (db) async {
+          await LibrarySchema.migrateIosContainerPaths(db);
+          await migrateAndroidLibraryCovers(db);
+        },
       );
       // Library upserts use INSERT OR REPLACE. Recursive triggers ensure the
       // implicit delete also decrements materialized lookup ref-counts.
