@@ -17,11 +17,20 @@ import 'package:mornye/utils/logger.dart';
 import 'package:mornye/utils/lyrics_metadata_helper.dart';
 import 'package:mornye/utils/string_utils.dart';
 
+class _DownloadCover {
+  _DownloadCover(this.path);
+
+  final Future<String?> path;
+  int users = 0;
+  bool evicted = false;
+  bool cleanupStarted = false;
+}
+
 /// Embeds tags into a local working file; the queue owns publication and state.
 class DownloadMetadataEmbedding {
   static final _log = AppLogger('DownloadEmbedding');
   static const _coverCacheMax = 8;
-  final Map<String, Future<String?>> _coverCache = {};
+  final Map<String, _DownloadCover> _coverCache = {};
   final void Function(Track, String, ReplayGainResult) onReplayGain;
   final Future<String?> Function(String, int) _loadCover;
   final Future<String> Function(Track) _loadLyrics;
@@ -114,9 +123,9 @@ class DownloadMetadataEmbedding {
     );
     // Start artwork before fetching lyrics so both network round trips overlap.
     final coverUrl = normalizeRemoteHttpUrl(track.coverUrl);
-    final coverFuture = coverUrl == null || coverUrl.isEmpty
+    final cover = coverUrl == null || coverUrl.isEmpty
         ? null
-        : _sharedCover(coverUrl, settings.embeddedCoverMaxDimension);
+        : _acquireCover(coverUrl, settings.embeddedCoverMaxDimension);
     String? lrcContent;
     try {
       final formattedFields = formatDownloadTagFields(
@@ -182,7 +191,7 @@ class DownloadMetadataEmbedding {
           _log.w('Failed to scan ReplayGain for $format: $error');
         }
       }
-      final coverPath = coverFuture == null ? null : await coverFuture;
+      final coverPath = await cover?.path;
       final validCover = coverPath != null && await File(coverPath).exists()
           ? coverPath
           : null;
@@ -290,6 +299,11 @@ class DownloadMetadataEmbedding {
       }
     } catch (error) {
       _log.e('Failed to embed metadata to $format: $error');
+    } finally {
+      if (cover != null) {
+        cover.users--;
+        _cleanUpCover(cover);
+      }
     }
     // The cache owns artwork until eviction or queue drain, allowing reuse.
     return lrcContent;
@@ -440,27 +454,32 @@ class DownloadMetadataEmbedding {
     ),
   };
 
-  Future<String?> _sharedCover(String url, int maxDimension) {
+  _DownloadCover _acquireCover(String url, int maxDimension) {
     final key = '$maxDimension\u0000$url';
     final existing = _coverCache.remove(key);
     if (existing != null) {
       _coverCache[key] = existing;
+      existing.users++;
       return existing;
     }
+    late final _DownloadCover cover;
     final fetch = Future<String?>.sync(() => _loadCover(url, maxDimension))
         .catchError((Object error) {
           _log.w('Failed to load cover for embedding: $error');
           return null;
         })
         .then((path) {
-          if (path == null) _coverCache.remove(key);
+          if (path == null && identical(_coverCache[key], cover)) {
+            _evictCover(key);
+          }
           return path;
         });
-    _coverCache[key] = fetch;
+    cover = _DownloadCover(fetch)..users = 1;
+    _coverCache[key] = cover;
     while (_coverCache.length > _coverCacheMax) {
       _evictCover(_coverCache.keys.first);
     }
-    return fetch;
+    return cover;
   }
 
   static Future<String?> _downloadCover(String url, int maxDimension) async {
@@ -488,7 +507,18 @@ class DownloadMetadataEmbedding {
   }
 
   void _evictCover(String key) {
-    _coverCache.remove(key)?.then((path) {
+    final cover = _coverCache.remove(key);
+    if (cover == null) return;
+    cover.evicted = true;
+    _cleanUpCover(cover);
+  }
+
+  void _cleanUpCover(_DownloadCover cover) {
+    // An evicted cover can still be in use by slow lyrics, ReplayGain or a
+    // metadata writer. Keep the file until every embedding operation finishes.
+    if (!cover.evicted || cover.users > 0 || cover.cleanupStarted) return;
+    cover.cleanupStarted = true;
+    cover.path.then((path) {
       if (path != null) File(path).delete().catchError((_) => File(path));
     });
   }

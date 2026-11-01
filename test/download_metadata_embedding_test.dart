@@ -522,6 +522,96 @@ void main() {
   );
 
   test(
+    'mixed playlist artwork survives eviction while lyrics are pending',
+    () async {
+      final lyricsStarted = Completer<void>();
+      final lyricsReady = Completer<String>();
+      final paths = <String, String>{};
+      final harness = EmbeddingHarness(
+        loadCover: (url, _) async {
+          final path = '${directory.path}/playlist-cover-${paths.length}.jpg';
+          paths[url] = path;
+          await File(path).writeAsBytes([1, 2, 3]);
+          return path;
+        },
+        loadLyrics: (_) {
+          lyricsStarted.complete();
+          return lyricsReady.future;
+        },
+      );
+      final first = harness.service.embed(
+        '${directory.path}/slow.flac',
+        track.copyWith(coverUrl: 'https://example.test/cover-0'),
+        settings: const AppSettings(),
+        extensionState: const ExtensionState(),
+        format: 'flac',
+      );
+      await lyricsStarted.future;
+      for (var index = 1; index < 12; index++) {
+        await harness.service.embed(
+          '${directory.path}/song-$index.flac',
+          track.copyWith(coverUrl: 'https://example.test/cover-$index'),
+          settings: const AppSettings(embedLyrics: false),
+          extensionState: const ExtensionState(),
+          format: 'flac',
+        );
+      }
+      lyricsReady.complete('[00:01.00]Line');
+      await first;
+      expect(
+        harness.nativeWrites.last['cover_path'],
+        paths['https://example.test/cover-0'],
+      );
+      harness.service.clearCoverCache();
+      await _expectDeleted(paths.values);
+    },
+  );
+
+  test('queue cache cleanup waits for every active cover writer', () async {
+    final cover = await File(
+      '${directory.path}/shared.jpg',
+    ).writeAsBytes([1, 2, 3]);
+    final started = Completer<void>();
+    final gates = {'first': Completer<void>(), 'second': Completer<void>()};
+    var writers = 0;
+    var downloads = 0;
+    final stillPresent = <bool>[];
+    final service = DownloadMetadataEmbedding(
+      onReplayGain: (_, _, _) {},
+      loadCover: (_, _) async {
+        downloads++;
+        return cover.path;
+      },
+      editMetadata: (path, fields) async {
+        expect(fields['cover_path'], cover.path);
+        if (++writers == 2) started.complete();
+        await gates[path]!.future;
+        stillPresent.add(await cover.exists());
+        return {'success': true, 'method': 'rust'};
+      },
+    );
+    Future<String?> embed(String path) => service.embed(
+      path,
+      track.copyWith(coverUrl: 'https://example.test/shared.jpg'),
+      settings: const AppSettings(embedLyrics: false),
+      extensionState: const ExtensionState(),
+      format: 'flac',
+    );
+    final first = embed('first');
+    final second = embed('second');
+    await started.future;
+    service.clearCoverCache();
+    gates['first']!.complete();
+    await first;
+    expect(await cover.exists(), isTrue);
+    gates['second']!.complete();
+    await second;
+    expect(downloads, 1);
+    expect(stillPresent, [true, true]);
+    await _expectDeleted([cover.path]);
+  });
+
+  test(
     'failed covers retry and cache dimensions select separate artwork',
     () async {
       final requests = <int>[];
