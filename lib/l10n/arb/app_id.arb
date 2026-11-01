@@ -1026,6 +1026,15 @@
   "permissionNearbyDevices": "Perangkat di sekitar",
   "whatsNewLinkNearbyAllow": "Izinkan perangkat di sekitar",
   "whatsNewLinkNearbyGranted": "Perangkat di sekitar diizinkan",
+  "whatsNewNearbyTitle": "Perangkat di sekitar",
+  "whatsNewNearbyDesc": "Android kini meminta izin sebelum aplikasi bisa menjangkau perangkat lain di jaringanmu. Mornye memerlukannya untuk:",
+  "whatsNewNearbyLinkTitle": "Menemukan komputermu",
+  "whatsNewNearbyLinkBody": "Mornye Link mencari komputermu di Wi-Fi yang sama dan tetap terhubung dengannya.",
+  "whatsNewNearbyStorageTitle": "Penyimpanan jaringan",
+  "whatsNewNearbyStorageBody": "Putar musik dari NAS atau server di rumah lewat SMB atau WebDAV.",
+  "whatsNewNearbyPrivateTitle": "Hanya perangkatmu sendiri",
+  "whatsNewNearbyPrivateBody": "Mornye memakainya hanya untuk menjangkau perangkat di jaringanmu, tidak pernah untuk mengetahui lokasimu.",
+  "whatsNewNearbyRefused": "Tidak diizinkan. Mornye Link dan penyimpanan jaringan tidak aktif sampai kamu mengizinkan Perangkat di sekitar untuk Mornye di pengaturan Android.",
   "setupNext": "Lanjut",
   "@setupNext": {
     "description": "Next button text"

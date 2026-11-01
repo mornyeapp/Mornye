@@ -1,7 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show LogicalKeyboardKey;
+import 'package:flutter/services.dart' show LogicalKeyboardKey, MethodChannel;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -11,6 +11,7 @@ import 'package:mornye/l10n/app_localizations.dart';
 import 'package:mornye/models/settings.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/screens/whats_new_screen.dart';
+import 'package:mornye/services/local_network_access.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 
 class _Preferences implements SharedPreferences {
@@ -43,6 +44,44 @@ class _Settings extends SettingsNotifier {
 }
 
 const _updated = AppSettings(isFirstLaunch: false, hasCompletedTutorial: true);
+
+/// Opens the tour as Android 17 without Nearby devices; Android answers a
+/// request with [allow].
+Future<void> _openNearbyTour(WidgetTester tester, {required bool allow}) async {
+  tester.view.physicalSize = const Size(390, 844);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.reset);
+  const channel = MethodChannel('com.zarz.mornye/local_network');
+  final messenger = tester.binding.defaultBinaryMessenger;
+  var granted = false;
+  messenger.setMockMethodCallHandler(channel, (call) async {
+    if (call.method == 'request') granted = allow;
+    return granted;
+  });
+  addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+  final container = ProviderContainer(
+    overrides: [
+      settingsProvider.overrideWith(() => _Settings(_updated, _Preferences())),
+    ],
+  );
+  addTearDown(container.dispose);
+  await tester.pumpWidget(
+    UncontrolledProviderScope(
+      container: container,
+      child: MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: WhatsNewScreen(
+          localNetworkAccess: LocalNetworkAccess(
+            isAndroid: true,
+            channel: channel,
+          ),
+        ),
+      ),
+    ),
+  );
+  await tester.pumpAndSettle();
+}
 
 void main() {
   test('only an update shows the tour, after setup and the tutorial', () {
@@ -126,21 +165,19 @@ void main() {
     final iPhone = titles(androidPhone: false, desktop: false);
     expect(iPhone, isNot(contains(l10n.whatsNewPlayerAutoTitle)));
     expect(iPhone, isNot(contains(l10n.whatsNewPlayerExclusiveTitle)));
-    // Only Android phones ask for Nearby devices, on the Link page.
-    List<String> asking({required bool androidPhone, required bool desktop}) =>
-        [
-          for (final page in whatsNewHighlights(
-            l10n,
-            androidPhone: androidPhone,
-            desktop: desktop,
-          ))
-            if (page.asksNearbyDevices) page.title,
-        ];
-    expect(asking(androidPhone: true, desktop: false), [
-      l10n.whatsNewLinkTitle,
-    ]);
-    expect(asking(androidPhone: false, desktop: true), isEmpty);
-    expect(asking(androidPhone: false, desktop: false), isEmpty);
+    // The Nearby devices page follows Mornye Link only when asked for, and
+    // the overview leaves it out.
+    final asking = whatsNewHighlights(l10n, nearbyDevices: true);
+    expect(asking[1].title, l10n.whatsNewLinkTitle);
+    expect(asking[2].nearbyDevices, isTrue);
+    expect(asking.where((page) => page.nearbyDevices), hasLength(1));
+    expect([
+      for (final feature in asking.first.features) feature.title,
+    ], isNot(contains(l10n.whatsNewNearbyTitle)));
+    expect(
+      whatsNewHighlights(l10n).where((page) => page.nearbyDevices),
+      isEmpty,
+    );
 
     // The opening page names every section that follows it.
     final pages = whatsNewHighlights(l10n, androidPhone: true, desktop: false);
@@ -154,6 +191,49 @@ void main() {
       pages.skip(1).every((page) => page.features.every((f) => f.body != null)),
       isTrue,
     );
+  });
+
+  testWidgets('Skip stops at Nearby devices, which waits for an answer', (
+    tester,
+  ) async {
+    await _openNearbyTour(tester, allow: false);
+    final skip = find.text('Skip for now').hitTestable();
+
+    await tester.tap(skip);
+    await tester.pumpAndSettle();
+    expect(find.text('Nearby devices'), findsOne);
+    // No Skip, no Continue and no swiping on until Android answers.
+    expect(skip, findsNothing);
+    expect(find.text('Continue'), findsNothing);
+    await tester.drag(find.byType(PageView), const Offset(-300, 0));
+    await tester.pumpAndSettle();
+    expect(find.text('Nearby devices'), findsOne);
+
+    await tester.tap(find.text('Allow nearby devices'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Not allowed.'), findsOne);
+    expect(skip, findsOne);
+    await tester.tap(find.text('Continue'));
+    await tester.pumpAndSettle();
+    expect(find.text('A Home that learns'), findsOne);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('allowing Nearby devices confirms it and moves on', (
+    tester,
+  ) async {
+    await _openNearbyTour(tester, allow: true);
+    await tester.tap(find.text('Continue'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Continue'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Allow nearby devices'));
+    await tester.pumpAndSettle();
+    expect(find.text('Nearby devices allowed'), findsOne);
+    await tester.tap(find.text('Continue'));
+    await tester.pumpAndSettle();
+    expect(find.text('A Home that learns'), findsOne);
   });
 
   for (final mornye in [false, true]) {

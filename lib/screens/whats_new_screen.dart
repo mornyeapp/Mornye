@@ -32,7 +32,10 @@ import 'package:mornye/widgets/expressive_button.dart';
 /// 5.2 rebrand tour; pages list only what this device can use. Desktop uses
 /// [showWhatsNewDialog] instead.
 class WhatsNewScreen extends ConsumerStatefulWidget {
-  const WhatsNewScreen({super.key});
+  const WhatsNewScreen({super.key, this.localNetworkAccess});
+
+  /// Replaces [LocalNetworkAccess.instance] in tests.
+  final LocalNetworkAccess? localNetworkAccess;
 
   @override
   ConsumerState<WhatsNewScreen> createState() => _WhatsNewScreenState();
@@ -41,6 +44,26 @@ class WhatsNewScreen extends ConsumerStatefulWidget {
 class _WhatsNewScreenState extends ConsumerState<WhatsNewScreen> {
   final _pages = PageController();
   int _page = 0;
+
+  /// Whether the tour asks for Nearby devices: Android 17 without it.
+  /// Decided once, so the page stays after it is answered.
+  bool _asksNearby = false;
+
+  /// Null until Android answers the request; true when allowed.
+  bool? _nearbyAllowed;
+  bool _askingNearby = false;
+
+  LocalNetworkAccess get _localNetwork =>
+      widget.localNetworkAccess ?? LocalNetworkAccess.instance;
+
+  @override
+  void initState() {
+    super.initState();
+    if (isAndroidTv) return;
+    _localNetwork.isGranted().then((granted) {
+      if (mounted && !granted) setState(() => _asksNearby = true);
+    }, onError: (_) {});
+  }
 
   @override
   void dispose() {
@@ -66,15 +89,33 @@ class _WhatsNewScreenState extends ConsumerState<WhatsNewScreen> {
     if (_page > 0) _goTo(_page - 1);
   }
 
-  /// Skip never passes the Nearby devices request while Android still needs
-  /// it: Link cannot find a computer on Android 17 without it.
-  Future<void> _skip(List<WhatsNewHighlight> pages) async {
-    final asks = pages.indexWhere((page) => page.asksNearbyDevices);
-    if (asks > _page && !await LocalNetworkAccess.instance.isGranted()) {
-      if (mounted) _goTo(asks);
-      return;
+  /// Skip never passes an unanswered Nearby devices page: Link cannot find a
+  /// computer on Android 17 without it.
+  void _skip(int nearbyPage) {
+    if (nearbyPage > _page && _nearbyAllowed == null) {
+      _goTo(nearbyPage);
+    } else {
+      _finish();
     }
-    if (mounted) _finish();
+  }
+
+  Future<void> _allowNearby() async {
+    setState(() => _askingNearby = true);
+    try {
+      await _localNetwork.ensureGranted();
+      // Discovery that found nothing without it starts over.
+      if (ref.read(linkClientSupportedProvider)) {
+        ref
+            .read(linkClientControllerProvider.notifier)
+            .requestLocalNetworkAccess()
+            .ignore();
+      }
+      if (mounted) setState(() => _nearbyAllowed = true);
+    } on LocalNetworkPermissionException {
+      if (mounted) setState(() => _nearbyAllowed = false);
+    } finally {
+      if (mounted) setState(() => _askingNearby = false);
+    }
   }
 
   /// Done and Skip both mark the tour seen. Opened from About, the tour
@@ -94,8 +135,13 @@ class _WhatsNewScreenState extends ConsumerState<WhatsNewScreen> {
     final l10n = context.l10n;
     final scheme = Theme.of(context).colorScheme;
     final mornye = context.isMornye;
-    final pages = whatsNewHighlights(l10n);
+    final pages = whatsNewHighlights(l10n, nearbyDevices: _asksNearby);
     final last = _page == pages.length - 1;
+    final nearbyPage = pages.indexWhere((page) => page.nearbyDevices);
+    // Until Android answers, the Nearby devices page is the end of the tour:
+    // no Skip, no Continue and no swiping past it.
+    final awaitingNearby = nearbyPage >= 0 && _nearbyAllowed == null;
+    final gated = awaitingNearby && _page == nearbyPage;
     // Back steps through the pages, then leaves the tour as Skip does.
     return PopScope(
       canPop: false,
@@ -145,16 +191,23 @@ class _WhatsNewScreenState extends ConsumerState<WhatsNewScreen> {
                           ),
                         ),
                         // Capped so large text cannot push it off screen;
-                        // the dots keep the rest of the row.
-                        ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 160),
-                          child: ExpressiveButton(
-                            text: true,
-                            onPressed: () => _skip(pages),
-                            child: Text(
-                              l10n.setupSkip,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                        // the dots keep the rest of the row. Hidden in place
+                        // while gated, so the dots do not move.
+                        Visibility(
+                          visible: !gated,
+                          maintainSize: true,
+                          maintainAnimation: true,
+                          maintainState: true,
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 160),
+                            child: ExpressiveButton(
+                              text: true,
+                              onPressed: () => _skip(nearbyPage),
+                              child: Text(
+                                l10n.setupSkip,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
                           ),
                         ),
@@ -164,10 +217,15 @@ class _WhatsNewScreenState extends ConsumerState<WhatsNewScreen> {
                   Expanded(
                     child: PageView.builder(
                       controller: _pages,
-                      itemCount: pages.length,
+                      itemCount: awaitingNearby ? nearbyPage + 1 : pages.length,
                       onPageChanged: (page) => setState(() => _page = page),
-                      itemBuilder: (context, index) =>
-                          _TourPage(index: index, highlight: pages[index]),
+                      itemBuilder: (context, index) => _TourPage(
+                        index: index,
+                        highlight: pages[index],
+                        status: pages[index].nearbyDevices
+                            ? _NearbyStatus(allowed: _nearbyAllowed)
+                            : null,
+                      ),
                     ),
                   ),
                   Padding(
@@ -175,8 +233,13 @@ class _WhatsNewScreenState extends ConsumerState<WhatsNewScreen> {
                     child: SizedBox(
                       width: double.infinity,
                       child: ExpressiveButton(
-                        onPressed: () => _next(pages.length),
-                        icon: last
+                        // Gated, the main button asks instead of moving on.
+                        onPressed: gated
+                            ? (_askingNearby ? null : _allowNearby)
+                            : () => _next(pages.length),
+                        icon: gated
+                            ? Icon(context.adaptiveIcon(Icons.wifi))
+                            : last
                             ? null
                             : Icon(
                                 mornye
@@ -193,7 +256,11 @@ class _WhatsNewScreenState extends ConsumerState<WhatsNewScreen> {
                           textStyle: Theme.of(context).textTheme.titleMedium,
                         ),
                         child: Text(
-                          last ? l10n.whatsNewDone : l10n.upgradeIntroContinue,
+                          gated
+                              ? l10n.whatsNewLinkNearbyAllow
+                              : last
+                              ? l10n.whatsNewDone
+                              : l10n.upgradeIntroContinue,
                         ),
                       ),
                     ),
@@ -469,7 +536,7 @@ class WhatsNewHighlight {
     required this.title,
     required this.description,
     required this.features,
-    this.asksNearbyDevices = false,
+    this.nearbyDevices = false,
   });
 
   final IconData icon;
@@ -477,9 +544,9 @@ class WhatsNewHighlight {
   final String description;
   final List<WhatsNewFeature> features;
 
-  /// Ends the page with a request for Android's Nearby devices permission,
-  /// which Mornye Link needs to find a computer from Android 17.
-  final bool asksNearbyDevices;
+  /// The page that asks for Android's Nearby devices permission, which
+  /// Mornye Link and network storage need from Android 17.
+  final bool nearbyDevices;
 }
 
 @visibleForTesting
@@ -494,22 +561,22 @@ class WhatsNewFeature {
 }
 
 /// The tour for [AppInfo.whatsNewRelease]: an overview, then one page per
-/// area. Android Auto, exclusive output and the Nearby devices request
-/// appear only where they exist.
+/// area. Android Auto and exclusive output appear only where they exist;
+/// [nearbyDevices] adds the Nearby devices page right after Mornye Link.
 @visibleForTesting
 List<WhatsNewHighlight> whatsNewHighlights(
   AppLocalizations l10n, {
   bool? androidPhone,
   bool? desktop,
+  bool nearbyDevices = false,
 }) {
-  final onAndroidPhone = androidPhone ?? (Platform.isAndroid && !isAndroidTv);
+  final showAndroidAuto = androidPhone ?? (Platform.isAndroid && !isAndroidTv);
   final showExclusiveOutput = desktop ?? isDesktopPlatform;
   final sections = [
     WhatsNewHighlight(
       icon: Icons.computer,
       title: l10n.whatsNewLinkTitle,
       description: l10n.whatsNewLinkDesc,
-      asksNearbyDevices: onAndroidPhone,
       features: [
         WhatsNewFeature(
           Icons.play_circle,
@@ -570,7 +637,7 @@ List<WhatsNewHighlight> whatsNewHighlights(
           l10n.whatsNewPlayerTimingTitle,
           l10n.whatsNewPlayerTimingBody,
         ),
-        if (onAndroidPhone)
+        if (showAndroidAuto)
           WhatsNewFeature(
             Icons.directions_car,
             l10n.whatsNewPlayerAutoTitle,
@@ -649,7 +716,33 @@ List<WhatsNewHighlight> whatsNewHighlights(
           WhatsNewFeature(section.icon, section.title),
       ],
     ),
-    ...sections,
+    sections.first,
+    // A setup step rather than a highlight, so the overview leaves it out.
+    if (nearbyDevices)
+      WhatsNewHighlight(
+        icon: Icons.wifi,
+        title: l10n.whatsNewNearbyTitle,
+        description: l10n.whatsNewNearbyDesc,
+        nearbyDevices: true,
+        features: [
+          WhatsNewFeature(
+            Icons.computer,
+            l10n.whatsNewNearbyLinkTitle,
+            l10n.whatsNewNearbyLinkBody,
+          ),
+          WhatsNewFeature(
+            Icons.dns,
+            l10n.whatsNewNearbyStorageTitle,
+            l10n.whatsNewNearbyStorageBody,
+          ),
+          WhatsNewFeature(
+            Icons.lock,
+            l10n.whatsNewNearbyPrivateTitle,
+            l10n.whatsNewNearbyPrivateBody,
+          ),
+        ],
+      ),
+    ...sections.skip(1),
   ];
 }
 
@@ -706,10 +799,13 @@ class _PageIndicator extends StatelessWidget {
 }
 
 class _TourPage extends StatelessWidget {
-  const _TourPage({required this.index, required this.highlight});
+  const _TourPage({required this.index, required this.highlight, this.status});
 
   final int index;
   final WhatsNewHighlight highlight;
+
+  /// Shown under the description, above the rows, so it needs no scrolling.
+  final Widget? status;
 
   @override
   Widget build(BuildContext context) {
@@ -754,8 +850,7 @@ class _TourPage extends StatelessWidget {
               color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
-          // Above the rows, so it shows without scrolling.
-          if (highlight.asksNearbyDevices) const _NearbyDevicesPrompt(),
+          ?status,
           const SizedBox(height: 28),
           _FeatureList(features: highlight.features),
         ],
@@ -764,100 +859,40 @@ class _TourPage extends StatelessWidget {
   }
 }
 
-/// Asks for Nearby devices where Android requires it and it is not yet
-/// allowed; shows nothing otherwise, and a confirmation once allowed here.
-class _NearbyDevicesPrompt extends ConsumerStatefulWidget {
-  const _NearbyDevicesPrompt();
+/// Android's answer on the Nearby devices page, under its description;
+/// nothing until it answers.
+class _NearbyStatus extends StatelessWidget {
+  const _NearbyStatus({required this.allowed});
 
-  @override
-  ConsumerState<_NearbyDevicesPrompt> createState() =>
-      _NearbyDevicesPromptState();
-}
-
-class _NearbyDevicesPromptState extends ConsumerState<_NearbyDevicesPrompt> {
-  /// Null until the first check answers.
-  bool? _neededAtStart;
-  bool _granted = false;
-  bool _refused = false;
-  bool _asking = false;
-
-  @override
-  void initState() {
-    super.initState();
-    LocalNetworkAccess.instance.isGranted().then((granted) {
-      if (mounted) setState(() => _neededAtStart = !granted);
-    }, onError: (_) {});
-  }
-
-  Future<void> _allow() async {
-    setState(() {
-      _asking = true;
-      _refused = false;
-    });
-    try {
-      // Through Link, so discovery that found nothing without it starts over.
-      await ref
-          .read(linkClientControllerProvider.notifier)
-          .requestLocalNetworkAccess();
-      if (mounted) setState(() => _granted = true);
-    } on LocalNetworkPermissionException {
-      if (mounted) setState(() => _refused = true);
-    } finally {
-      if (mounted) setState(() => _asking = false);
-    }
-  }
+  final bool? allowed;
 
   @override
   Widget build(BuildContext context) {
-    if (_neededAtStart != true) return const SizedBox.shrink();
+    final allowed = this.allowed;
+    if (allowed == null) return const SizedBox.shrink();
     final l10n = context.l10n;
     final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    if (_granted) {
-      return Padding(
-        padding: const EdgeInsets.only(top: 20),
-        child: Row(
-          children: [
-            Icon(
-              context.adaptiveIcon(Icons.check_circle),
-              color: scheme.primary,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                l10n.whatsNewLinkNearbyGranted,
-                style: theme.textTheme.titleSmall?.copyWith(
-                  color: scheme.primary,
-                ),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
+    final color = allowed
+        ? theme.colorScheme.primary
+        : theme.colorScheme.onSurfaceVariant;
     return Padding(
       padding: const EdgeInsets.only(top: 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          ExpressiveButton(
-            tonal: true,
-            onPressed: _asking ? null : _allow,
-            icon: Icon(context.adaptiveIcon(Icons.wifi)),
-            style: FilledButton.styleFrom(
-              minimumSize: const Size.fromHeight(48),
-            ),
-            child: Text(l10n.whatsNewLinkNearbyAllow),
+          Icon(
+            context.adaptiveIcon(allowed ? Icons.check_circle : Icons.info),
+            color: color,
           ),
-          if (_refused) ...[
-            const SizedBox(height: 8),
-            Text(
-              l10n.networkErrorLocalPermission,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: scheme.onSurfaceVariant,
-              ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              allowed
+                  ? l10n.whatsNewLinkNearbyGranted
+                  : l10n.whatsNewNearbyRefused,
+              style: theme.textTheme.titleSmall?.copyWith(color: color),
             ),
-          ],
+          ),
         ],
       ),
     );
