@@ -271,8 +271,8 @@ class _WordHighlightedLyricLineState
   }
 
   void _updateVisualEnd() {
-    final decorativeMotion =
-        context.isMornye && !MediaQuery.disableAnimationsOf(context);
+    final decorativeMotion = !MediaQuery.disableAnimationsOf(context);
+    final glow = context.isMornye;
     var end = Duration.zero;
     for (final words in [
       widget.line.words,
@@ -281,10 +281,10 @@ class _WordHighlightedLyricLineState
     ]) {
       for (var index = 0; index < words.length; index++) {
         var wordEnd = _segmentEnd(words, index);
-        if (decorativeMotion) {
+        if (decorativeMotion && identical(words, widget.line.words)) {
           // Glow fades for 500ms after a held word; short-word lift may finish
           // later than the color sweep (start + 540ms).
-          wordEnd += const Duration(milliseconds: 500);
+          if (glow) wordEnd += const Duration(milliseconds: 500);
           final liftEnd = words[index].time + const Duration(milliseconds: 540);
           if (liftEnd > wordEnd) wordEnd = liftEnd;
         }
