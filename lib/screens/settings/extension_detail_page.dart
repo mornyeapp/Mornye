@@ -24,6 +24,7 @@ import 'package:mornye/widgets/app_loading_indicator.dart';
 import 'package:mornye/widgets/app_sliver_header.dart';
 import 'package:mornye/widgets/extension_health.dart';
 import 'package:mornye/widgets/sliver_layout_info_builder.dart';
+import 'package:mornye/widgets/extension_icon_image.dart';
 
 part 'extension_detail_page_widgets.dart';
 
@@ -139,16 +140,18 @@ class _ExtensionDetailPageState extends ConsumerState<ExtensionDetailPage> {
                                       extension.iconPath!.isNotEmpty
                                   ? ClipRRect(
                                       borderRadius: BorderRadius.circular(16),
-                                      child: Image.file(
-                                        File(extension.iconPath!),
+                                      child: Image(
+                                        image: ExtensionIconImage(
+                                          FileImage(File(extension.iconPath!)),
+                                          extent:
+                                              (56 *
+                                                      MediaQuery.devicePixelRatioOf(
+                                                        context,
+                                                      ))
+                                                  .ceil(),
+                                        ),
                                         width: 56,
                                         height: 56,
-                                        cacheWidth:
-                                            (56 *
-                                                    MediaQuery.devicePixelRatioOf(
-                                                      context,
-                                                    ))
-                                                .round(),
                                         fit: BoxFit.cover,
                                         errorBuilder:
                                             (

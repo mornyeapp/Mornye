@@ -14,6 +14,7 @@ import 'package:mornye/widgets/app_alert_dialog.dart';
 import 'package:mornye/widgets/app_icon_button.dart';
 import 'package:mornye/widgets/app_loading_indicator.dart';
 import 'package:mornye/widgets/expressive_button.dart';
+import 'package:mornye/widgets/extension_icon_image.dart';
 
 class ExtensionDetailsScreen extends ConsumerStatefulWidget {
   final RepoExtension extension;
@@ -120,11 +121,12 @@ class _ExtensionDetailsScreenState
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(24),
                 child: ext.iconUrl != null && ext.iconUrl!.isNotEmpty
-                    ? Image.network(
-                        ext.iconUrl!,
-                        cacheWidth:
-                            (100 * MediaQuery.devicePixelRatioOf(context))
-                                .round(),
+                    ? Image(
+                        image: ExtensionIconImage(
+                          NetworkImage(ext.iconUrl!),
+                          extent: (100 * MediaQuery.devicePixelRatioOf(context))
+                              .ceil(),
+                        ),
                         fit: BoxFit.cover,
                         errorBuilder: (context, error, stackTrace) =>
                             _buildFallbackIcon(ext, colorScheme, 50),

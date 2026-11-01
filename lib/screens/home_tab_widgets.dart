@@ -80,12 +80,14 @@ class _SearchProviderDropdown extends ConsumerWidget {
             if (iconPath != null && iconPath.isNotEmpty)
               ClipRRect(
                 borderRadius: BorderRadius.circular(4),
-                child: Image.file(
-                  File(iconPath),
+                child: Image(
+                  image: ExtensionIconImage(
+                    FileImage(File(iconPath)),
+                    extent: (20 * MediaQuery.devicePixelRatioOf(context))
+                        .ceil(),
+                  ),
                   width: 20,
                   height: 20,
-                  cacheWidth: (20 * MediaQuery.devicePixelRatioOf(context))
-                      .round(),
                   fit: BoxFit.cover,
                   errorBuilder: (_, e, st) => Icon(displayIcon, size: 20),
                 ),
@@ -116,13 +118,14 @@ class _SearchProviderDropdown extends ConsumerWidget {
               leading: ext.iconPath != null && ext.iconPath!.isNotEmpty
                   ? ClipRRect(
                       borderRadius: BorderRadius.circular(4),
-                      child: Image.file(
-                        File(ext.iconPath!),
+                      child: Image(
+                        image: ExtensionIconImage(
+                          FileImage(File(ext.iconPath!)),
+                          extent: (20 * MediaQuery.devicePixelRatioOf(context))
+                              .ceil(),
+                        ),
                         width: 20,
                         height: 20,
-                        cacheWidth:
-                            (20 * MediaQuery.devicePixelRatioOf(context))
-                                .round(),
                         fit: BoxFit.cover,
                         errorBuilder: (_, e, st) => Icon(
                           _getIconFromName(ext.searchBehavior?.icon),

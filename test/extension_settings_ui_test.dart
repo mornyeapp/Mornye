@@ -14,6 +14,7 @@ import 'package:mornye/screens/settings/extensions_page.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/mornye_chrome.dart';
 import 'package:mornye/widgets/settings_group.dart';
+import 'package:mornye/widgets/extension_icon_image.dart';
 
 import 'support/fixed_settings.dart';
 
@@ -103,10 +104,9 @@ void main() {
       );
       await tester.pumpAndSettle();
       final image = tester.widget<Image>(find.byType(Image));
-      expect(image.image, isA<ResizeImage>());
-      final resized = image.image as ResizeImage;
-      expect(resized.width, (56 * density).round());
-      expect(resized.height, isNull);
+      expect(image.image, isA<ExtensionIconImage>());
+      final fitted = image.image as ExtensionIconImage;
+      expect(fitted.extent, (56 * density).ceil());
       expect(tester.getSize(find.byType(Image)), const Size(56, 56));
       expect(tester.takeException(), isNull);
     }
