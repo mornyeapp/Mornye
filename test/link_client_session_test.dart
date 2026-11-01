@@ -175,6 +175,63 @@ void main() {
       expect(request.headers.value('accept'), 'application/json');
     });
 
+    for (final upload in [false, true]) {
+      test(
+        '${upload ? 'upload' : 'GET'} cannot reopen a disposed session after permission resolves',
+        () async {
+          final permission = Completer<void>();
+          final checkingPermission = Completer<void>();
+          final clients = <HttpClient>[];
+          final delayed = LinkClientSession(
+            server: session.server,
+            apiKey: 'key-1',
+            device: _device,
+            httpClient: (_) {
+              final client = HttpClient();
+              clients.add(client);
+              return client;
+            },
+            ensureAccess: (_) {
+              checkingPermission.complete();
+              return permission.future;
+            },
+          );
+          addTearDown(() async {
+            await delayed.dispose();
+            for (final client in clients) {
+              client.close(force: true);
+            }
+          });
+          final directory = await Directory.systemTemp.createTemp(
+            'link-close-',
+          );
+          addTearDown(() => directory.delete(recursive: true));
+          final file = await File(
+            '${directory.path}/song.flac',
+          ).writeAsString('fLaC data');
+          final pending = upload
+              ? delayed.upload('${linkFileIdFor(file.path, 9)}.flac', file)
+              : delayed.get(LinkOps.state);
+          final rejected = expectLater(
+            pending,
+            throwsA(
+              isA<LinkException>().having(
+                (error) => error.code,
+                'code',
+                'unavailable',
+              ),
+            ),
+          );
+          await checkingPermission.future;
+          await delayed.dispose();
+          permission.complete();
+          await rejected;
+          expect(clients, isEmpty);
+          expect(requests, isEmpty);
+        },
+      );
+    }
+
     test('POST sends a JSON body to a nested op', () async {
       final result = await session.post(LinkOps.handoffPlay, {
         'index': 1,

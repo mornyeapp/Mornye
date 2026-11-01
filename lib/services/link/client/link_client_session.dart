@@ -179,7 +179,10 @@ class LinkClientSession implements LinkSession {
   @override
   LinkSessionIssue? get issue => _issue;
 
-  HttpClient get _client => _http ??= _createHttpClient(_server);
+  HttpClient get _client {
+    _ensureOpen();
+    return _http ??= _createHttpClient(_server);
+  }
 
   Uri get _origin => Uri.parse(_server.address);
 

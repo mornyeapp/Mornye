@@ -16,6 +16,7 @@ class NetworkEditFixture {
   bool rejectWrites = false;
   bool rejectPublish = false;
   bool losePublishReply = false;
+  void Function(String from, String to)? beforeMove;
   int openHandles = 0;
   int openSessions = 0;
   HttpServer? _server;
@@ -59,6 +60,7 @@ class NetworkEditFixture {
 
   void move(String from, String to) {
     methods.add('MOVE $from $to');
+    beforeMove?.call(from, to);
     if (rejectPublish && _publish(from, to)) {
       throw const Smb2Exception(
         'Write denied',

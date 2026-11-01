@@ -146,7 +146,20 @@ Future<LinkHttpResponse> linkHttpUpload(
   Duration timeout = linkRequestTimeout,
 }) async {
   final size = await file.length();
-  final request = await client.openUrl('PUT', uri).timeout(timeout);
+  var expired = false;
+  final request = await client
+      .openUrl('PUT', uri)
+      .then((request) {
+        if (expired) request.abort();
+        return request;
+      })
+      .timeout(
+        timeout,
+        onTimeout: () {
+          expired = true;
+          throw TimeoutException('The computer did not answer in time');
+        },
+      );
   final HttpClientResponse response;
   try {
     request.followRedirects = false;

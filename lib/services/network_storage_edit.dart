@@ -56,6 +56,7 @@ extension NetworkStorageEdit on NetworkStorageService {
     final staging = '$parent.mornye-edit-$token.part';
     final backup = '$parent.mornye-original-$token.part';
     final stagingSource = NetworkStorageService.source(connection.id, staging);
+    final backupSource = NetworkStorageService.source(connection.id, backup);
     final editedLength = await edited.length();
     if (editedLength <= 0) throw StateError('Edited audio file is empty');
     bool movedOriginal = false;
@@ -93,6 +94,16 @@ extension NetworkStorageEdit on NetworkStorageService {
         // A server can finish a rename before its connection drops.
         movedOriginal = await exists(backup) && !await exists(path);
         if (!movedOriginal) rethrow;
+      }
+      // Verify what the rename actually moved, since another editor can write
+      // after the source check. Roll back instead of deleting that new version.
+      if (!await _matchesUpload(
+        backupSource,
+        original,
+        await original.length(),
+        () {},
+      )) {
+        throw StateError('The network file changed while it was being edited');
       }
       try {
         await _moveEditedFile(connection, staging, path);

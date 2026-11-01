@@ -147,6 +147,20 @@ void main() {
         expect(changes, isEmpty);
       });
 
+      test('a remote change during the original rename is restored', () async {
+        final external = utf8.encode(
+          jsonEncode({...original, 'title': 'Other editor'}),
+        );
+        nas.beforeMove = (from, to) {
+          if (from == 'song.flac' && to.startsWith('.mornye-original-')) {
+            nas.files[from] = external;
+          }
+        };
+        expect((await save()).failure, isNotNull);
+        expect(nas.files, {'song.flac': external});
+        expect(changes, isEmpty);
+      });
+
       test('a lost final rename response is verified by content', () async {
         nas.losePublishReply = true;
         expect((await save()).failure, isNull);
