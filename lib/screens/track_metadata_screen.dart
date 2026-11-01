@@ -16,6 +16,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/services/file_access_check.dart';
 import 'package:mornye/services/network_storage_service.dart';
+import 'package:mornye/services/network_library_scanner.dart';
+import 'package:mornye/services/metadata_cover_resources.dart';
+import 'package:mornye/services/metadata_persistence_service.dart';
 import 'package:mornye/services/library_database.dart';
 import 'package:mornye/services/cue_split_library_service.dart';
 import 'package:mornye/services/link/features/link_save_offline.dart';
@@ -181,6 +184,8 @@ class _TrackMetadataScreenState extends ConsumerState<TrackMetadataScreen>
   bool get _isNetworkItem => cleanFilePath.startsWith('network://');
   bool _networkFileDeletable = false;
   bool get _canDeleteFile => !_isNetworkItem || _networkFileDeletable;
+  bool get _canEditMetadataFile =>
+      _fileExists && (!_isNetworkItem || _networkFileDeletable);
   bool _isDeleting = false;
   int? get _fileSize => switch (_fileAccess) {
     FileAccessFound(:final stat) => stat.size,

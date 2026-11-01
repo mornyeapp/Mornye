@@ -368,26 +368,10 @@ class NetworkLibraryScanner {
                 // Identical embedded artwork shares an immutable file, including
                 // across albums/sources. Cleanup retains all DB cover references.
                 try {
-                  try {
-                    if (!PlatformBridge.supportsCoreBackend) {
-                      coverPath = await _promoteCoverInBackground(
-                        cover,
-                        covers.path,
-                      );
-                    } else {
-                      final promoted = await PlatformBridge.runNativeDataJob({
-                        'operation': 'promote_network_cover',
-                        'path': cover,
-                        'directory': covers.path,
-                      });
-                      coverPath = promoted['cover_path'] as String;
-                    }
-                  } on MissingPluginException {
-                    coverPath = await _promoteCoverInBackground(
-                      cover,
-                      covers.path,
-                    );
-                  }
+                  coverPath = await promoteNetworkLibraryCover(
+                    cover,
+                    covers.path,
+                  );
                 } catch (_) {}
               }
               await checkpoint();
@@ -520,6 +504,27 @@ String? _networkFileVersion(NetworkConnection connection, NetworkEntry entry) {
 // output handle or the buffering closures, which are not isolate-sendable.
 Future<String?> _promoteCoverInBackground(String cover, String directory) =>
     Isolate.run(() => _promoteCover(cover, directory));
+
+/// Retains edited and scanned NAS artwork beyond the bounded metadata cache.
+Future<String?> promoteNetworkLibraryCover(
+  String cover,
+  String directory,
+) async {
+  await Directory(directory).create(recursive: true);
+  try {
+    if (PlatformBridge.supportsCoreBackend) {
+      final promoted = await PlatformBridge.runNativeDataJob({
+        'operation': 'promote_network_cover',
+        'path': cover,
+        'directory': directory,
+      });
+      return promoted['cover_path'] as String;
+    }
+  } on MissingPluginException {
+    // Unsupported hosts retain the same content-addressed Dart fallback.
+  }
+  return _promoteCoverInBackground(cover, directory);
+}
 
 Future<String?> _promoteCover(String cover, String directory) async {
   final digest = await sha256.bind(File(cover).openRead()).first;

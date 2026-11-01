@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:mornye/services/ffmpeg_metadata.dart';
 import 'package:mornye/services/metadata_cover_resources.dart';
+import 'package:mornye/services/network_file_editor.dart';
 import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/utils/artist_utils.dart';
 
@@ -61,6 +62,7 @@ class MetadataPersistenceService {
   final Future<Map<String, dynamic>> Function(String) read;
   final MetadataEmbed embed;
   final Future<bool> Function(String, String) writeBack;
+  final NetworkFileEditor? networkEditor;
 
   const MetadataPersistenceService({
     required this.covers,
@@ -68,10 +70,37 @@ class MetadataPersistenceService {
     this.read = PlatformBridge.readFileMetadata,
     this.embed = _embed,
     this.writeBack = PlatformBridge.writeTempToSaf,
+    this.networkEditor,
   });
 
   Future<MetadataSaveResult> save(MetadataSaveRequest request) async {
     final releaseLease = covers.retain();
+    try {
+      if (request.filePath.startsWith('network://')) {
+        return await (networkEditor ?? NetworkFileEditor.instance).edit(
+          request.filePath,
+          (path) => _saveLocal(
+            MetadataSaveRequest(
+              filePath: path,
+              metadata: request.metadata,
+              artistTagMode: request.artistTagMode,
+              selectedCoverPath: request.selectedCoverPath,
+              currentCoverPath: request.currentCoverPath,
+              coverMaxDimension: request.coverMaxDimension,
+            ),
+          ),
+          succeeded: (result) => result.failure == null,
+        );
+      }
+      return await _saveLocal(request);
+    } catch (error) {
+      return MetadataSaveResult.failed(MetadataSaveFailure.unexpected, error);
+    } finally {
+      await releaseLease();
+    }
+  }
+
+  Future<MetadataSaveResult> _saveLocal(MetadataSaveRequest request) async {
     String? resizedCoverDir;
     String? extractedCoverDir;
     String? stagedPath;
@@ -161,7 +190,6 @@ class MetadataPersistenceService {
       }
       await covers.release(extractedCoverDir);
       await covers.release(resizedCoverDir);
-      await releaseLease();
     }
   }
 

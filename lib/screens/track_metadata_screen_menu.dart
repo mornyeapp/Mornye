@@ -93,7 +93,7 @@ extension _TrackMetadataMenu on _TrackMetadataScreenState {
         dividerAbove: _fileExists,
         onTap: () => _copyToClipboard(screenContext, cleanFilePath),
       ),
-      if (canEditFile)
+      if (_canEditMetadataFile)
         _MetadataOption(
           icon: Icons.edit_outlined,
           label: l10n.trackEditMetadata,

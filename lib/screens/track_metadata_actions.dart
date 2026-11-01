@@ -6,53 +6,29 @@ extension _TrackMetadataFileActions on _TrackMetadataScreenState {
     WidgetRef ref,
     ColorScheme colorScheme,
   ) async {
+    final sourcePath = cleanFilePath;
     Map<String, dynamic>? fileMetadata;
     try {
-      final result = await PlatformBridge.readFileMetadata(cleanFilePath);
+      final result = await readPlaybackFileMetadataWithRetry(sourcePath);
       if (result['error'] == null) {
         fileMetadata = result;
       }
     } catch (e) {
+      if (sourcePath.startsWith('network://')) {
+        if (context.mounted && sourcePath == cleanFilePath) {
+          showAppSnackBar(context, content: Text(context.friendlyError(e)));
+        }
+        return;
+      }
       debugPrint('readFileMetadata failed, using item data: $e');
     }
 
-    String val(String key, String? fallback) {
-      final v = fileMetadata?[key]?.toString();
-      return (v != null && v.isNotEmpty) ? v : (fallback ?? '');
-    }
-
-    final initialValues = <String, String>{
-      'title': val('title', trackName),
-      'artist': val('artist', artistName),
-      'album': val('album', albumName),
-      'album_artist': val('album_artist', albumArtist),
-      'date': val('date', releaseDate),
-      'track_number': (fileMetadata?['track_number'] ?? trackNumber ?? '')
-          .toString(),
-      'total_tracks': (fileMetadata?['total_tracks'] ?? totalTracks ?? '')
-          .toString(),
-      'disc_number': (fileMetadata?['disc_number'] ?? discNumber ?? '')
-          .toString(),
-      'total_discs': (fileMetadata?['total_discs'] ?? totalDiscs ?? '')
-          .toString(),
-      'genre': val('genre', genre),
-      'isrc': val('isrc', isrc),
-      'label': val('label', label),
-      'copyright': val('copyright', copyright),
-      'composer': val('composer', composer),
-      'comment': fileMetadata?['comment']?.toString() ?? '',
-      'album_type': val('album_type', albumType),
-      'explicit': (parseExplicitFlag(fileMetadata?['explicit']) ?? isExplicit)
-          ? '1'
-          : '0',
-      'upc': val('upc', upc),
-      'lyrics': fileMetadata?['lyrics']?.toString() ?? '',
-    };
+    final initialValues = _metadataEditorValues(fileMetadata);
 
     final initialDurationSeconds =
         readPositiveInt(fileMetadata?['duration']) ?? duration ?? 0;
 
-    if (!context.mounted) return;
+    if (!context.mounted || sourcePath != cleanFilePath) return;
 
     final saved = await showAppModalBottomSheet<bool>(
       context: context,
@@ -62,7 +38,7 @@ extension _TrackMetadataFileActions on _TrackMetadataScreenState {
       builder: (sheetContext) => EditMetadataSheet(
         colorScheme: colorScheme,
         initialValues: initialValues,
-        filePath: cleanFilePath,
+        filePath: sourcePath,
         sourceTrackId: _spotifyId,
         durationMs: initialDurationSeconds > 0
             ? initialDurationSeconds * 1000
@@ -74,12 +50,13 @@ extension _TrackMetadataFileActions on _TrackMetadataScreenState {
       ),
     );
 
-    if (saved == true && mounted) {
+    if (saved == true && mounted && sourcePath == cleanFilePath) {
       ScaffoldMessenger.of(this.context).showSnackBar(
         SnackBar(content: Text(this.context.l10n.snackbarMetadataSaved)),
       );
       try {
-        final refreshed = await PlatformBridge.readFileMetadata(cleanFilePath);
+        final refreshed = await readPlaybackFileMetadataWithRetry(sourcePath);
+        if (!mounted || sourcePath != cleanFilePath) return;
         final refreshedLyrics = refreshed['lyrics']?.toString().trim() ?? '';
         final refreshedInstrumental = isInstrumentalLyricsMarker(
           refreshedLyrics,
@@ -107,13 +84,77 @@ extension _TrackMetadataFileActions on _TrackMetadataScreenState {
             _lyricsEmbedded = false;
           }
         });
+        if (_isNetworkItem) await _syncNetworkLibraryMetadata(refreshed);
       } catch (_) {
-        _setState(() {});
+        if (mounted && sourcePath == cleanFilePath) _setState(() {});
       }
-      await _refreshEmbeddedCoverPreview(force: true);
+      if (!mounted || sourcePath != cleanFilePath) return;
+      if (!_isNetworkItem) await _refreshEmbeddedCoverPreview(force: true);
       _markMetadataChanged();
       await _syncDownloadHistoryMetadata();
     }
+  }
+
+  Map<String, String> _metadataEditorValues(Map<String, dynamic>? metadata) {
+    String val(String key, String? fallback) =>
+        metadata?[key]?.toString() ?? fallback ?? '';
+
+    return {
+      'title': val('title', trackName),
+      'artist': val('artist', artistName),
+      'album': val('album', albumName),
+      'album_artist': val('album_artist', albumArtist),
+      'date': val('date', releaseDate),
+      'track_number': val('track_number', trackNumber?.toString()),
+      'total_tracks': val('total_tracks', totalTracks?.toString()),
+      'disc_number': val('disc_number', discNumber?.toString()),
+      'total_discs': val('total_discs', totalDiscs?.toString()),
+      'genre': val('genre', genre),
+      'isrc': val('isrc', isrc),
+      'label': val('label', label),
+      'copyright': val('copyright', copyright),
+      'composer': val('composer', composer),
+      'comment': val('comment', null),
+      'album_type': val('album_type', albumType),
+      'explicit': (parseExplicitFlag(metadata?['explicit']) ?? isExplicit)
+          ? '1'
+          : '0',
+      'upc': val('upc', upc),
+      'lyrics': val('lyrics', null),
+    };
+  }
+
+  Future<void> _syncNetworkLibraryMetadata(
+    Map<String, dynamic> metadata,
+  ) async {
+    final item = _localLibraryItem;
+    if (item == null || !_isNetworkItem) return;
+    final name = Uri.parse(item.filePath).pathSegments.last;
+    var coverPath = item.coverPath;
+    final cover = metadata['cover_path'];
+    if (cover is String && cover.isNotEmpty) {
+      try {
+        coverPath = await promoteNetworkLibraryCover(
+          cover,
+          '${(await getApplicationSupportDirectory()).path}/library_covers',
+        );
+      } catch (error) {
+        _log.w('Could not retain the edited network cover: $error');
+      }
+    }
+    final row = {
+      ...item.toJson(),
+      ...networkLibraryRow(item.filePath, NetworkEntry(name, name), metadata),
+      'coverPath': coverPath,
+      // Force the next scan to verify the newly written remote file.
+      'networkFileVersion': null,
+    };
+    await LibraryDatabase.instance.upsertBatchExcludingHistory([
+      row,
+    ], sourceId: item.sourceId);
+    if (!mounted || cleanFilePath != item.filePath) return;
+    _setState(() => _currentLocalLibraryItem = LocalLibraryItem.fromJson(row));
+    await ref.read(localLibraryProvider.notifier).reloadFromStorage();
   }
 
   Future<void> _confirmDelete(

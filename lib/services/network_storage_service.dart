@@ -21,6 +21,7 @@ import 'package:xml/xml.dart';
 
 part 'network_storage_upload.dart';
 part 'network_storage_delete.dart';
+part 'network_storage_edit.dart';
 part 'network_storage_subsonic.dart';
 
 typedef _SmbListingInput = ({
@@ -690,7 +691,7 @@ class NetworkStorageService {
             domain: c.domain,
             timeout: timeout,
           )
-        : NetworkSmbClient.connect(
+        : _smbSessions.connect(
             target,
             username: c.username,
             password: c.password,

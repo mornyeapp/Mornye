@@ -69,8 +69,10 @@ void main() {
         if (protocol == NetworkProtocol.http ||
             protocol == NetworkProtocol.subsonic) {
           expect(find.text('Delete'), findsNothing);
+          expect(find.text('Edit Metadata'), findsNothing);
         } else {
           expect(find.text('Delete'), findsWidgets);
+          expect(find.text('Edit Metadata'), findsWidgets);
           await tester.ensureVisible(find.text('Delete').last);
           await tester.tap(find.text('Delete').last);
           await tester.pump();

@@ -285,6 +285,31 @@ class NetworkSmbSessions {
   final _current = <_SmbSessionKey, _SmbSession>{};
   final _live = <_SmbSession>{};
 
+  /// A dedicated session for writes, using the same transport as read leases.
+  Future<NetworkSmbClient> connect(
+    Uri target, {
+    required String username,
+    required String password,
+    required String domain,
+    required Duration timeout,
+  }) async {
+    final (:login, :path) = NetworkSmbClient._target(
+      target,
+      username: username,
+      password: password,
+      domain: domain,
+      timeout: timeout,
+    );
+    final share = await NetworkSmbClient._native.synchronized(
+      () => _open(login),
+    );
+    return NetworkSmbClient._(
+      share,
+      path,
+      () => NetworkSmbClient._native.synchronized(share.disconnect),
+    );
+  }
+
   /// A client for [target] on the shared session of connection [id] and
   /// this login, opened when there is none. Close it to hand it back.
   Future<NetworkSmbClient> lease(

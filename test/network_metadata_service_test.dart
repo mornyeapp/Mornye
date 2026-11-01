@@ -230,6 +230,30 @@ void main() {
     },
   );
 
+  test('an edited embedded cover gets a new immutable cache path', () async {
+    var cover = [1, 2, 3];
+    final reader = NetworkMetadataService(
+      storage: storage,
+      cacheDirectory: () async => directory,
+      reader: (_, _) async => {
+        'title': 'Song',
+        'cover_base64': base64Encode(cover),
+      },
+    );
+    final source = NetworkStorageService.source('nas', 'song.flac');
+    final before = (await reader.read(source))['cover_path'] as String;
+    cover = [4, 5, 6];
+    await reader.invalidate(source, refreshArtwork: true);
+    final after = (await reader.read(source))['cover_path'] as String;
+    expect(after, isNot(before));
+    expect(await File(before).readAsBytes(), [1, 2, 3]);
+    expect(await File(after).readAsBytes(), [4, 5, 6]);
+    expect(
+      (await reader.read(source, forceRefresh: true))['cover_path'],
+      after,
+    );
+  });
+
   test('rescans can refresh tags without reusing the playback cache', () async {
     var calls = 0;
     final reader = NetworkMetadataService(

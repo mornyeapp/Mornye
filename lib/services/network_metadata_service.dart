@@ -248,11 +248,22 @@ Future<Map<String, dynamic>> _cacheNetworkMetadata(
     try {
       final directory = Directory(job['directory'] as String);
       await directory.create(recursive: true);
-      final file = File(
-        '${directory.path}/${sha256.convert(utf8.encode(job['source'] as String))}.image',
-      );
-      await file.writeAsBytes(base64Decode(cover), flush: true);
+      final bytes = base64Decode(cover);
+      final digest = sha256.convert(bytes).toString();
+      final file = File('${directory.path}/network_cover_$digest.image');
+      if (!await file.exists() || await file.length() != bytes.length) {
+        final staged = File(
+          '${file.path}.${NetworkStorageService.newId()}.part',
+        );
+        try {
+          await staged.writeAsBytes(bytes, flush: true);
+          await staged.rename(file.path);
+        } finally {
+          if (await staged.exists()) await staged.delete();
+        }
+      }
       metadata['cover_path'] = file.path;
+      metadata['cover_sha256'] = digest;
       await _trimNetworkMetadataCovers(directory);
     } catch (_) {}
   }
