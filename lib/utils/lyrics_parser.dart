@@ -114,6 +114,7 @@ class LyricLine {
   LyricLine withTranslation(
     String? translation, {
     String? romanization,
+    List<LyricWord>? romanizationWords,
     List<LyricWord>? translationWords,
   }) => LyricLine(
     time: time,
@@ -121,7 +122,11 @@ class LyricLine {
     text: text,
     words: words,
     romanization: romanization ?? this.romanization,
-    romanizationWords: romanization == null ? romanizationWords : const [],
+    romanizationWords:
+        romanizationWords ??
+        (romanization == null || romanization == this.romanization
+            ? this.romanizationWords
+            : const []),
     translation: translation,
     translationWords:
         translationWords ??

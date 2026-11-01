@@ -162,6 +162,7 @@ ParsedLyrics applyLyricsTranslation(
   List<String?> translations, {
   List<String?> romanizations = const [],
   List<List<LyricsTranslationChunk>> alignments = const [],
+  List<List<LyricsTranslationChunk>> romanizationAlignments = const [],
 }) {
   String? at(List<String?> values, int? segment) =>
       segment != null && segment < values.length ? values[segment] : null;
@@ -190,27 +191,38 @@ ParsedLyrics applyLyricsTranslation(
       lines.add(line);
       continue;
     }
-    final alignment = segment != null && segment < alignments.length
-        ? alignments[segment]
-        : const <LyricsTranslationChunk>[];
-    final translatedWords = translation == null || alignment.isEmpty
-        ? null
-        : timedLyricsTranslation(
-            line,
-            source.words[segment!],
-            alignment,
-            nextLine: lyrics.lines
-                .skip(i + 1)
-                .where((next) => next.time > line.time)
-                .firstOrNull
-                ?.time,
-          );
+    List<LyricWord>? timedSupplement(
+      String? text,
+      List<List<LyricsTranslationChunk>> mappings,
+    ) {
+      if (text == null ||
+          segment == null ||
+          segment >= mappings.length ||
+          mappings[segment].isEmpty) {
+        return null;
+      }
+      return timedLyricsTranslation(
+        line,
+        source.words[segment],
+        mappings[segment],
+        nextLine: lyrics.lines
+            .skip(i + 1)
+            .where((next) => next.time > line.time)
+            .firstOrNull
+            ?.time,
+      );
+    }
+
     changed = true;
     lines.add(
       line.withTranslation(
         translation ?? line.translation,
         romanization: romanization,
-        translationWords: translatedWords,
+        romanizationWords: timedSupplement(
+          romanization,
+          romanizationAlignments,
+        ),
+        translationWords: timedSupplement(translation, alignments),
       ),
     );
   }
@@ -306,6 +318,7 @@ class LyricsTranslationResult {
     this.translations, {
     this.romanizations = const [],
     this.alignments = const [],
+    this.romanizationAlignments = const [],
   });
 
   final List<String?> translations;
@@ -313,8 +326,11 @@ class LyricsTranslationResult {
   /// Indexed like [translations]; empty when none was asked for.
   final List<String?> romanizations;
   final List<List<LyricsTranslationChunk>> alignments;
+  final List<List<LyricsTranslationChunk>> romanizationAlignments;
 
   bool get wordSynced => alignments.any((line) => line.isNotEmpty);
+  bool get romanizationWordSynced =>
+      romanizationAlignments.any((line) => line.isNotEmpty);
 
   int get missing => translations.where((value) => value == null).length;
 
@@ -347,6 +363,10 @@ class LyricsTranslator {
       texts.length,
       const [],
     );
+    final romanizationAlignments = List<List<LyricsTranslationChunk>>.filled(
+      texts.length,
+      const [],
+    );
     final items = [
       for (var i = 0; i < texts.length; i++)
         LyricsAiItem(
@@ -373,6 +393,12 @@ class LyricsTranslator {
                 (chunk) => chunk.source < items[id].words.length,
               )) {
             alignments[id] = line.alignment;
+          }
+          if (items[id].words.isNotEmpty &&
+              line.romanizationAlignment.every(
+                (chunk) => chunk.source < items[id].words.length,
+              )) {
+            romanizationAlignments[id] = line.romanizationAlignment;
           }
         });
         done += batch.length;
@@ -412,6 +438,10 @@ class LyricsTranslator {
           : const [],
       alignments: alignments.any((line) => line.isNotEmpty)
           ? alignments
+          : const [],
+      romanizationAlignments:
+          romanizationAlignments.any((line) => line.isNotEmpty)
+          ? romanizationAlignments
           : const [],
     );
   }
@@ -477,6 +507,10 @@ class LyricsTranslationCache {
           for (final line in result.alignments)
             List<LyricsTranslationChunk>.unmodifiable(line),
         ]),
+        romanizationAlignments: List.unmodifiable([
+          for (final line in result.romanizationAlignments)
+            List<LyricsTranslationChunk>.unmodifiable(line),
+        ]),
       ),
       DateTime.now().millisecondsSinceEpoch,
     );
@@ -539,6 +573,9 @@ class _CacheEntry {
         alignments:
             readLyricsTranslationAlignments(json['w'], strings(list)) ??
             const [],
+        romanizationAlignments:
+            readLyricsTranslationAlignments(json['rw'], strings(json['r'])) ??
+            const [],
       ),
       (json['at'] as num?)?.toInt() ?? 0,
     );
@@ -550,6 +587,11 @@ class _CacheEntry {
     if (result.wordSynced)
       'w': [
         for (final line in result.alignments)
+          [for (final chunk in line) chunk.toJson()],
+      ],
+    if (result.romanizationWordSynced)
+      'rw': [
+        for (final line in result.romanizationAlignments)
           [for (final chunk in line) chunk.toJson()],
       ],
     'at': usedAt,

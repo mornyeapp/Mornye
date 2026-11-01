@@ -35,6 +35,11 @@ class SharedLyricsTranslation {
         for (final line in result.alignments)
           [for (final chunk in line) chunk.toJson()],
       ],
+    if (result.romanizationWordSynced)
+      'romanizationAlignments': [
+        for (final line in result.romanizationAlignments)
+          [for (final chunk in line) chunk.toJson()],
+      ],
     'updatedMs': updatedMs,
   };
 
@@ -66,7 +71,12 @@ class SharedLyricsTranslation {
       value['alignments'],
       texts,
     );
+    final romanizationAlignments = readLyricsTranslationAlignments(
+      value['romanizationAlignments'],
+      readings,
+    );
     if (alignments == null ||
+        romanizationAlignments == null ||
         texts.isEmpty ||
         texts.every((line) => line == null || line.isEmpty) ||
         (readings.isNotEmpty && readings.length != texts.length)) {
@@ -79,6 +89,7 @@ class SharedLyricsTranslation {
         List.unmodifiable(texts),
         romanizations: List.unmodifiable(readings),
         alignments: alignments,
+        romanizationAlignments: romanizationAlignments,
       ),
       updatedMs: updated,
     );

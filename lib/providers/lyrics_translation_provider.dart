@@ -270,6 +270,7 @@ class LyricsTranslationController extends Notifier<LyricsTranslationState> {
       result.translations,
       romanizations: result.romanizations,
       alignments: result.alignments,
+      romanizationAlignments: result.romanizationAlignments,
     );
     _merged[lyrics] = (result, merged);
     return merged;
@@ -400,8 +401,17 @@ class LyricsTranslationController extends Notifier<LyricsTranslationState> {
       // An explicit translation can upgrade older line-only cache entries.
       final romanize =
           settings.lyricsAiRomanize && lyricsNeedRomanization(lyrics);
+      final timedRomanize =
+          romanize &&
+          lyrics.lines.any(
+            (line) =>
+                line.hasWordTiming &&
+                line.romanization?.trim().isNotEmpty != true &&
+                lyricNeedsRomanization(line.text),
+          );
       if (cached != null &&
           (!romanize || cached.romanized) &&
+          (!timedRomanize || cached.romanizationWordSynced) &&
           (!source.wordSynced || cached.wordSynced)) {
         _finish(id, key, cached);
         _publish(source.hash, target.code, cached);

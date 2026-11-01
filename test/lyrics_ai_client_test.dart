@@ -235,16 +235,19 @@ void main() {
             text: 'Love',
             romanization: 'ai',
             alignment: const <LyricsTranslationChunk>[],
+            romanizationAlignment: const <LyricsTranslationChunk>[],
           ),
           1: (
             text: 'Hi',
             romanization: null,
             alignment: const <LyricsTranslationChunk>[],
+            romanizationAlignment: const <LyricsTranslationChunk>[],
           ),
           2: (
             text: 'Yes',
             romanization: null,
             alignment: const <LyricsTranslationChunk>[],
+            romanizationAlignment: const <LyricsTranslationChunk>[],
           ),
         },
       );
@@ -498,6 +501,7 @@ void main() {
           text: 'Uno',
           romanization: null,
           alignment: const <LyricsTranslationChunk>[],
+          romanizationAlignment: const <LyricsTranslationChunk>[],
         ),
       });
       expect(waits, [const Duration(seconds: 2)]);
@@ -544,6 +548,7 @@ void main() {
           text: 'Dos',
           romanization: null,
           alignment: const <LyricsTranslationChunk>[],
+          romanizationAlignment: const <LyricsTranslationChunk>[],
         ),
       });
       expect(bodies, hasLength(2));

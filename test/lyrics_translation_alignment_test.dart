@@ -45,12 +45,222 @@ ParsedLyrics _lyrics(List<LyricLine> lines) => ParsedLyrics(
   plainText: 'Hello world',
 );
 
+ParsedLyrics _japanese({int offset = 0, bool providerReading = false}) =>
+    _lyrics([
+      LyricLine(
+        time: Duration(seconds: offset),
+        end: Duration(seconds: offset + 2),
+        text: '君を',
+        words: [
+          LyricWord(
+            time: Duration(seconds: offset),
+            end: Duration(seconds: offset + 1),
+            text: '君',
+          ),
+          LyricWord(
+            time: Duration(seconds: offset + 1),
+            end: Duration(seconds: offset + 2),
+            text: 'を',
+          ),
+        ],
+        romanization: providerReading ? 'Original reading' : null,
+        romanizationWords: providerReading
+            ? [
+                LyricWord(
+                  time: Duration(seconds: offset),
+                  end: Duration(seconds: offset + 2),
+                  text: 'Original reading',
+                ),
+              ]
+            : const [],
+      ),
+    ]);
+
+const _readingChunks = [
+  LyricsTranslationChunk('kimi ', 0),
+  LyricsTranslationChunk('o', 1),
+];
+
 const _chunks = [
   LyricsTranslationChunk('Halo ', 0),
   LyricsTranslationChunk('dunia', 1),
 ];
 
 void main() {
+  test(
+    'AI pronunciation uses original timing and preserves provider readings',
+    () {
+      for (final providerReading in [false, true]) {
+        final lyrics = _japanese(offset: 10, providerReading: providerReading);
+        final result = applyLyricsTranslation(
+          lyrics,
+          LyricsTranslationSource.of(lyrics),
+          ['Untukmu'],
+          romanizations: ['kimi o'],
+          romanizationAlignments: [_readingChunks],
+        );
+        final line = result.lines.single;
+        expect(line.translation, 'Untukmu');
+        if (providerReading) {
+          expect(line.romanization, 'Original reading');
+          expect(
+            line.romanizationWords,
+            same(lyrics.lines.single.romanizationWords),
+          );
+        } else {
+          expect(line.romanization, 'kimi o');
+          expect(line.romanizationWords.map((word) => word.time.inSeconds), [
+            10,
+            11,
+          ]);
+          expect(line.romanizationWords.last.end!.inSeconds, 12);
+        }
+      }
+    },
+  );
+
+  test(
+    'changing pronunciation without new alignment clears stale word times',
+    () {
+      final line = _japanese(providerReading: true).lines.single;
+      expect(
+        line.withTranslation('You', romanization: 'new').romanizationWords,
+        isEmpty,
+      );
+      expect(
+        line
+            .withTranslation('You', romanization: line.romanization)
+            .romanizationWords,
+        same(line.romanizationWords),
+      );
+    },
+  );
+
+  test(
+    'malformed pronunciation alignment keeps the reading without invented timing',
+    () {
+      final reply = parseLyricsTranslationReply(
+        '{"lines":[{"id":0,"text":"Untukmu",'
+        '"romanization":"kimi o","romanizationAlignment":[{"text":"wrong","source":0}]}]}',
+        {0},
+      )[0]!;
+      expect(reply.romanization, 'kimi o');
+      expect(reply.romanizationAlignment, isEmpty);
+      final lyrics = _japanese();
+      final displayed = applyLyricsTranslation(
+        lyrics,
+        LyricsTranslationSource.of(lyrics),
+        ['Untukmu'],
+        romanizations: [reply.romanization],
+        romanizationAlignments: [reply.romanizationAlignment],
+      );
+      expect(displayed.lines.single.romanization, 'kimi o');
+      expect(displayed.lines.single.romanizationWords, isEmpty);
+    },
+  );
+
+  test(
+    'AI pronunciation alignment survives cache and Link with peer-local timestamps',
+    () async {
+      final client = MockClient((request) async {
+        final body = jsonDecode(request.body) as Map;
+        final messages = body['messages'] as List;
+        expect(
+          (messages.first as Map)['content'],
+          contains('romanizationAlignment'),
+        );
+        return http.Response(
+          jsonEncode({
+            'choices': [
+              {
+                'message': {
+                  'content': jsonEncode({
+                    'lines': [
+                      {
+                        'id': 0,
+                        'text': 'Untukmu',
+                        'romanization': 'kimi o',
+                        'romanizationAlignment': [
+                          for (final chunk in _readingChunks) chunk.toJson(),
+                        ],
+                      },
+                    ],
+                  }),
+                },
+              },
+            ],
+          }),
+          200,
+        );
+      });
+      addTearDown(client.close);
+      final result =
+          await LyricsTranslator(
+            LyricsAiClient(
+              const LyricsAiConfig(
+                provider: LyricsAiProvider.custom,
+                model: 'fixture',
+                baseUrl: 'http://localhost/v1',
+              ),
+              client: client,
+            ),
+          ).translate(
+            ['君を'],
+            sourceWords: [
+              ['君', 'を'],
+            ],
+            systemPrompt: lyricsTranslationSystemPrompt(
+              languageName: 'Indonesian',
+              languageCode: 'id',
+              wordSync: true,
+              romanize: true,
+            ),
+          );
+      expect(result.romanizationWordSynced, isTrue);
+      final directory = await Directory.systemTemp.createTemp(
+        'romaji-alignment-',
+      );
+      addTearDown(() => directory.delete(recursive: true));
+      await LyricsTranslationCache(
+        directory: () async => directory,
+      ).write('fixture', result);
+      final cached = (await LyricsTranslationCache(
+        directory: () async => directory,
+      ).read('fixture'))!;
+      final shared = SharedLyricsTranslation.fromJson(
+        SharedLyricsTranslation(
+          sourceHash: 'a' * 64,
+          language: 'id',
+          result: cached,
+          updatedMs: 1,
+        ).toJson(),
+      )!;
+      final peer = _japanese(offset: 20);
+      final displayed = applyLyricsTranslation(
+        peer,
+        LyricsTranslationSource.of(peer),
+        shared.result.translations,
+        romanizations: shared.result.romanizations,
+        romanizationAlignments: shared.result.romanizationAlignments,
+      );
+      expect(
+        displayed.lines.single.romanizationWords.map(
+          (word) => word.time.inSeconds,
+        ),
+        [20, 21],
+      );
+      final malformed = {
+        ...shared.toJson(),
+        'romanizationAlignments': [
+          [
+            {'text': 'other', 'source': 0},
+          ],
+        ],
+      };
+      expect(SharedLyricsTranslation.fromJson(malformed), isNull);
+    },
+  );
+
   test('projects one alignment onto repeated lines and peer timing', () {
     final lyrics = _lyrics([_line(), _line(offset: 10)]);
     final source = LyricsTranslationSource.of(lyrics);

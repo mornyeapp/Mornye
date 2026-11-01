@@ -87,6 +87,11 @@ http.Response _reply(http.Request request) {
                       'id': item['id'],
                       'text': 'es:${item['text']}',
                       if (romanize) 'romanization': 'r:${item['text']}',
+                      if (romanize &&
+                          (item['words'] as List?)?.isNotEmpty == true)
+                        'romanizationAlignment': [
+                          {'text': 'r:${item['text']}', 'source': 0},
+                        ],
                       if ((item['words'] as List?)?.isNotEmpty == true)
                         'alignment': [
                           {'text': 'es:${item['text']}', 'source': 0},
@@ -253,6 +258,65 @@ void main() {
           .lines
           .single;
       expect(peerLine.translationWords.last.time.inSeconds, 12);
+      expect(requests, hasLength(1));
+    },
+  );
+
+  test(
+    'upgrades cached AI pronunciation to word timing and publishes it',
+    () async {
+      const lyrics = ParsedLyrics(
+        synced: true,
+        wordSynced: true,
+        plainText: '君を',
+        lines: [
+          LyricLine(
+            time: Duration(seconds: 10),
+            end: Duration(seconds: 14),
+            text: '君を',
+            words: [
+              LyricWord(
+                time: Duration(seconds: 10),
+                end: Duration(seconds: 12),
+                text: '君',
+              ),
+              LyricWord(
+                time: Duration(seconds: 12),
+                end: Duration(seconds: 14),
+                text: 'を',
+              ),
+            ],
+          ),
+        ],
+      );
+      final cache = LyricsTranslationCache(directory: () async => directory);
+      await cache.write(
+        lyricsTranslationCacheKey(
+          sourceHash: LyricsTranslationSource.of(lyrics).hash,
+          language: 'es',
+          config: lyricsAiConfigFor(_settings),
+        ),
+        const LyricsTranslationResult(
+          ['Old translation'],
+          romanizations: ['kimi o'],
+          alignments: [
+            [LyricsTranslationChunk('Old translation', 0)],
+          ],
+        ),
+      );
+      final container = await containerFor();
+      final controller = container.read(lyricsTranslationProvider.notifier);
+      final outgoing = container
+          .read(lyricsTranslationSharingProvider)
+          .outgoing
+          .first;
+      expect((await controller.translate(lyrics)).error, isNull);
+      expect(requests, hasLength(1));
+      final displayed = controller.display(lyrics).lines.single;
+      expect(displayed.romanizationWords.single.time.inSeconds, 10);
+      expect(displayed.romanizationWords.single.end!.inSeconds, 14);
+      expect((await outgoing).result.romanizationWordSynced, isTrue);
+      await controller.translate(lyrics);
       expect(requests, hasLength(1));
     },
   );

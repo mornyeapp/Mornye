@@ -12,6 +12,9 @@ SharedLyricsTranslation update({int version = 1}) => SharedLyricsTranslation(
   result: LyricsTranslationResult(
     ['Terjemahan $version'],
     romanizations: const ['Reading'],
+    romanizationAlignments: const [
+      [LyricsTranslationChunk('Reading', 0)],
+    ],
     alignments: [
       [LyricsTranslationChunk('Terjemahan $version', 0)],
     ],
@@ -76,6 +79,10 @@ void main() {
         0,
       );
       expect(messages, hasLength(1));
+      expect(
+        phone.receivedFor(update().sourceHash)?.result.romanizationWordSynced,
+        isTrue,
+      );
       phone.publish(update(version: 2));
       await flush();
       expect(desktop.receivedFor(update().sourceHash)?.result.translations, [

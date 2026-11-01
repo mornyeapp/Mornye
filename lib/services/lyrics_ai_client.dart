@@ -158,6 +158,7 @@ typedef LyricsAiLine = ({
   String text,
   String? romanization,
   List<LyricsTranslationChunk> alignment,
+  List<LyricsTranslationChunk> romanizationAlignment,
 });
 
 /// An HTTP request before it is sent, so tests can inspect each provider's
@@ -257,6 +258,13 @@ String lyricsTranslationSystemPrompt({
           'nearest meaningful source word without changing natural phrasing. '
           'Several chunks may refer to one source unit. Never invent '
           'timestamps. Omit alignment when the input has no "words".',
+    if (wordSync && romanize)
+      'For each romanization with input "words", also add '
+          '"romanizationAlignment" using the same chunk format. Its chunks '
+          'must join exactly to "romanization", including spaces. Map the '
+          'pronunciation of the original words to their source indices, '
+          'never to the translated words. Keep indices nondecreasing and '
+          'omit this alignment when romanization or input words are absent.',
     if (extra.isNotEmpty) 'Additional preference from the listener: $extra',
   ].join('\n');
 }
@@ -530,6 +538,12 @@ Map<int, LyricsAiLine> parseLyricsTranslationReply(String reply, Set<int> ids) {
       romanization: romanized.isEmpty ? null : romanized,
       alignment:
           readLyricsTranslationChunks(entry['alignment'], translation) ??
+          const [],
+      romanizationAlignment:
+          readLyricsTranslationChunks(
+            entry['romanizationAlignment'],
+            romanized,
+          ) ??
           const [],
     );
   }
