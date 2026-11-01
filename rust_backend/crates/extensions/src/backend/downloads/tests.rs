@@ -14,6 +14,83 @@ const RECORDING: &str = r#"{"recordings":[{"tags":[{"name":"rock","count":1}],"r
 const CATALOG: &str = r#"{"id":7,"album":{"id":9},"genres":{"data":[{"name":"Jazz"}]},"label":"Label","copyright":"Copyright"}"#;
 
 #[test]
+fn contributor_annotations_allow_verified_cross_catalog_durations() {
+    let request = DownloadRequest {
+        track_name: "Signal (with Guest Artist)".into(),
+        artist_name: "Lead Artist".into(),
+        isrc: "USAAA2600001".into(),
+        duration_ms: 200_000,
+        ..Default::default()
+    };
+    let mut result = json!({"title":"Signal","artist":"Lead Artist", "isrc":"USAAA2600001", "duration_ms":220_000});
+    assert!(matches_track(&request, &result, false));
+    result["duration_ms"] = 30_000.into();
+    assert!(!matches_track(&request, &result, false));
+    result["duration_ms"] = 220_000.into();
+    result["title"] = "Signal (Live)".into();
+    assert!(!matches_track(&request, &result, false));
+}
+
+#[test]
+fn availability_metadata_preserves_the_catalog_owner() {
+    let request = DownloadRequest {
+        source: "example.catalog".into(),
+        spotify_id: "12345678901".into(),
+        track_name: "Signal".into(),
+        ..Default::default()
+    };
+    assert_eq!(host_track(&request)["provider_id"], "example.catalog");
+}
+
+#[test]
+fn unavailable_catalog_match_reports_the_provider_reason() {
+    let directory = tempfile::tempdir().unwrap();
+    let sources = directory.path().join("sources");
+    let provider = sources.join("example.audio");
+    std::fs::create_dir_all(&provider).unwrap();
+    std::fs::write(
+        provider.join("manifest.json"),
+        json!({
+            "name":"example.audio", "version":"1", "description":"Generic catalog fixture",
+            "type":["download_provider"], "permissions":{"storage":true,"file":true}
+        })
+        .to_string(),
+    )
+    .unwrap();
+    std::fs::write(
+        provider.join("index.js"),
+        r#"registerExtension({
+        checkAvailability(){return {available:false,reason:'No verified track match found'};},
+        download(){throw new Error('unverified track must not download');}
+    });"#,
+    )
+    .unwrap();
+    let backend = Backend::new(
+        &sources,
+        &directory.path().join("data"),
+        "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+        "1",
+        RuntimeLimits::default(),
+    )
+    .unwrap();
+    backend.load_all().unwrap();
+    backend.set_enabled("example.audio", true).unwrap();
+    backend
+        .set_provider_priority("download", vec!["example.audio".into()])
+        .unwrap();
+    let response = backend.download_by_strategy(&json!({
+        "service":"example.audio", "use_extensions":true, "use_fallback":true,
+        "output_dir":directory.path().join("output"), "track_name":"Signal", "quality":"best"
+    }).to_string(), &|| Ok(())).unwrap();
+    let result: Value = serde_json::from_str(&response).unwrap();
+    assert_eq!(result["service"], "example.audio");
+    assert_eq!(result["error_type"], "not_found");
+    assert!(text(&result, "error").contains("No verified track match found"));
+    assert!(!text(&result, "error").contains("No extension download providers"));
+    backend.shutdown();
+}
+
+#[test]
 fn source_enrichment_upgrades_artwork_without_supplemental_artwork_overrides() {
     let mut request = DownloadRequest {
         cover_url: "https://example.test/selected/300.jpg".into(),

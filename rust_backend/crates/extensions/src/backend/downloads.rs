@@ -339,6 +339,19 @@ impl Backend {
                 if stop {
                     return Ok(stopped(&id, &availability, ""));
                 }
+                let reason = text(&availability, "reason").trim();
+                last = Some(failure(
+                    &id,
+                    if reason.is_empty() {
+                        "No matching track available from this provider"
+                    } else {
+                        reason
+                    },
+                    "",
+                    availability["retry_after_seconds"]
+                        .as_i64()
+                        .unwrap_or_default(),
+                ));
                 continue;
             }
             let track_id = if direct {

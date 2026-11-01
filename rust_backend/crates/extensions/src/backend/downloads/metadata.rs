@@ -38,6 +38,7 @@ pub(super) fn host_track(request: &DownloadRequest) -> Value {
     object.insert("id".into(), request.provider_track_id.clone().into());
     object.insert("name".into(), request.track_name.clone().into());
     object.insert("artists".into(), request.artist_name.clone().into());
+    object.insert("provider_id".into(), request.source.clone().into());
     track
 }
 

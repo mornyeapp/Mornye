@@ -280,9 +280,22 @@ pub fn track_identity_title(value: &str) -> String {
 
 fn track_title_without_annotations(value: &str) -> std::borrow::Cow<'_, str> {
     static ANNOTATION: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
-        regex::Regex::new(r#"(?i)[(\[][\t\n\f\r ]*(?:(?:feat\.?|ft\.?|featuring)[\t\n\f\r ]+[^)\]]+|from[\t\n\f\r ]+["“][^)\]]+["”][\t\n\f\r ]*)[)\]]"#).unwrap()
+        regex::Regex::new(r#"(?i)[(\[][\t\n\f\r ]*(?:(feat\.?|ft\.?|featuring|with)[\t\n\f\r ]+[^)\]]+|from[\t\n\f\r ]+["“][^)\]]+["”][\t\n\f\r ]*)[)\]]"#).unwrap()
     });
-    ANNOTATION.replace_all(value, " ")
+    static VERSION: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
+        regex::Regex::new(r"(?i)\b(?:mix|remix|live|acoustic|demo|instrumental|karaoke|edit|extended|slowed|sped)\b").unwrap()
+    });
+    ANNOTATION.replace_all(value, |captures: &regex::Captures<'_>| {
+        if captures
+            .get(1)
+            .is_some_and(|credit| credit.as_str().eq_ignore_ascii_case("with"))
+            && VERSION.is_match(&captures[0])
+        {
+            captures[0].to_owned()
+        } else {
+            " ".to_owned()
+        }
+    })
 }
 
 pub fn track_titles_match(expected: &str, found: &str) -> bool {
@@ -324,6 +337,22 @@ pub fn track_titles_match(expected: &str, found: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn contributor_annotations_keep_the_recording_identity() {
+        assert_eq!(
+            track_identity_title("Signal (with Guest Artist)"),
+            track_identity_title("Signal")
+        );
+        assert!(track_titles_match("Signal (with Guest Artist)", "Signal"));
+        for version in ["[Live]", "(Club Mix)", "(Acoustic)"] {
+            assert!(!track_titles_match(
+                &format!("Signal (with Guest Artist) {version}"),
+                "Signal"
+            ));
+        }
+        assert!(!track_titles_match("Signal (with Live Band)", "Signal"));
+    }
 
     #[test]
     fn repeated_maps_merge_but_null_resets_and_nested_structs_retain_fields() {
