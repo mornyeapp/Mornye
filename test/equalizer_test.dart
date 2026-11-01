@@ -15,6 +15,7 @@ import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/app_slider.dart';
 import 'package:mornye/widgets/mornye_chrome.dart';
 import 'package:mornye/widgets/mornye_level_slider.dart';
+import 'package:mornye/widgets/slider_value_header.dart';
 
 class _CountedSettings extends EqualizerSettings {
   _CountedSettings(double preamp, this.serialized) : super(preamp: preamp);
@@ -142,6 +143,39 @@ void main() {
         expect(settings.gains.first, 5);
         expect(settings.bass, 3);
         expect(playbackEqualizer.value, same(settings));
+        notifier.update(const EqualizerSettings());
+        await tester.pumpAndSettle();
+        notifier.importPreset(
+          jsonEncode({
+            'format': 'mornye-equalizer',
+            'version': 1,
+            'name': 'Signed zero',
+            'settings': EqualizerSettings(
+              gains: List.filled(10, -0.0),
+              preamp: -0.0,
+              bass: -0.0,
+              treble: -0.0,
+              balance: -0.0,
+            ).toJson(),
+          }),
+        );
+        await tester.pumpAndSettle();
+        final headers = tester.widgetList<SliderValueHeader>(
+          find.byType(SliderValueHeader),
+        );
+        for (final title in ['Preamp', 'Bass', 'Treble', 'Balance']) {
+          expect(
+            headers.firstWhere((header) => header.title == title).value,
+            title == 'Balance' ? '−0%' : '−0.0 dB',
+          );
+        }
+        final bandValue = mornye
+            ? tester
+                  .widgetList<MornyeLevelSlider>(find.byType(MornyeLevelSlider))
+                  .first
+                  .value
+            : tester.widgetList<AppSlider>(find.byType(AppSlider)).first.value;
+        expect(bandValue.isNegative, isTrue);
         expect(tester.takeException(), isNull);
         await tester.pumpWidget(const SizedBox.shrink());
         await tester.pump(const Duration(milliseconds: 350));

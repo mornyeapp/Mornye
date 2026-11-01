@@ -451,20 +451,24 @@ class _BandEditor extends ConsumerWidget {
                     SizedBox(
                       width: width,
                       child: Consumer(
-                        builder: (context, ref, _) => _BandFader(
-                          frequency: frequencies[i],
-                          gain: ref.watch(
-                            equalizerProvider.select(
-                              (state) => i < state.settings.gains.length
+                        builder: (context, ref, _) {
+                          final (gain, _) = ref.watch(
+                            equalizerProvider.select((state) {
+                              final value = i < state.settings.gains.length
                                   ? state.settings.gains[i]
-                                  : 0.0,
-                            ),
-                          ),
-                          width: width,
-                          height: _faderHeight,
-                          resetLabel: l10n.libraryFilterReset,
-                          onChanged: (v) => _setGain(ref, i, v),
-                        ),
+                                  : 0.0;
+                              return (value, value.isNegative);
+                            }),
+                          );
+                          return _BandFader(
+                            frequency: frequencies[i],
+                            gain: gain,
+                            width: width,
+                            height: _faderHeight,
+                            resetLabel: l10n.libraryFilterReset,
+                            onChanged: (v) => _setGain(ref, i, v),
+                          );
+                        },
                       ),
                     ),
                 ],
@@ -698,13 +702,14 @@ class _SliderTile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final (value, inputGain) = ref.watch(
-      equalizerProvider.select(
-        (state) => (
-          control.value(state.settings),
-          control == _ToneControl.preamp ? state.settings.inputGain : 0.0,
-        ),
-      ),
+    final (value, inputGain, _, _) = ref.watch(
+      equalizerProvider.select((state) {
+        final value = control.value(state.settings);
+        final gain = control == _ToneControl.preamp
+            ? state.settings.inputGain
+            : 0.0;
+        return (value, gain, value.isNegative, gain.isNegative);
+      }),
     );
     final subtitle = control == _ToneControl.preamp
         ? '${context.l10n.equalizerEffectivePreamp}: ${_signed(inputGain)} dB'
