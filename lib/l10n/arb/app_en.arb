@@ -7826,5 +7826,147 @@
   "desktopShortcutToggleSidebar": "Show or hide sidebar",
   "@desktopShortcutToggleSidebar": {
     "description": "Keyboard Shortcuts row for the shortcut that collapses or expands the desktop sidebar"
+  },
+  "sectionExistingDownloads": "Existing Downloads",
+  "@sectionExistingDownloads": {
+    "description": "Files settings section header for actions on already-downloaded files"
+  },
+  "reorganizeLibraryTitle": "Apply Rules to Existing Files",
+  "@reorganizeLibraryTitle": {
+    "description": "Files settings action that moves and renames already-downloaded tracks to match the current folder and filename rules"
+  },
+  "reorganizeLibrarySubtitle": "Move and rename downloaded tracks so they follow the folder and filename rules above",
+  "@reorganizeLibrarySubtitle": {
+    "description": "Subtitle of the apply-rules-to-existing-files action"
+  },
+  "reorganizeLibraryScanning": "Checking your downloads…",
+  "@reorganizeLibraryScanning": {
+    "description": "Shown while Mornye works out which downloaded files need to move"
+  },
+  "reorganizeLibraryBusy": "Wait for active downloads to finish before reorganizing files",
+  "@reorganizeLibraryBusy": {
+    "description": "Snackbar when the user tries to reorganize files while downloads are running"
+  },
+  "reorganizeLibraryNothingTitle": "Already Organized",
+  "@reorganizeLibraryNothingTitle": {
+    "description": "Dialog title when every downloaded file already follows the rules"
+  },
+  "reorganizeLibraryNothingMessage": "{count, plural, =0{There are no downloaded tracks in your download folder to reorganize.} =1{The downloaded track in your download folder already follows the current rules.} other{All {count} downloaded tracks in your download folder already follow the current rules.}}",
+  "@reorganizeLibraryNothingMessage": {
+    "description": "Dialog message when there is nothing to move",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "reorganizeLibraryConfirmTitle": "Reorganize {count} {count, plural, =1{file} other{files}}?",
+  "@reorganizeLibraryConfirmTitle": {
+    "description": "Confirmation dialog title before moving files",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "reorganizeLibraryConfirmMessage": "These downloads will be moved or renamed to match your current Files settings. Lyrics (.lrc) files next to them move too, and folders left empty are removed.",
+  "@reorganizeLibraryConfirmMessage": {
+    "description": "Confirmation dialog body before moving files"
+  },
+  "reorganizeLibraryExamples": "For example:",
+  "@reorganizeLibraryExamples": {
+    "description": "Label above a few sample moves in the reorganize confirmation dialog"
+  },
+  "reorganizeLibraryMoreChanges": "…and {count} more",
+  "@reorganizeLibraryMoreChanges": {
+    "description": "Shown under the sample moves when more files will be moved",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "reorganizeLibraryAlreadyOrganized": "{count} {count, plural, =1{track already matches} other{tracks already match}} and will stay where {count, plural, =1{it is} other{they are}}.",
+  "@reorganizeLibraryAlreadyOrganized": {
+    "description": "Note in the reorganize confirmation dialog",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "reorganizeLibraryOutsideFolder": "{count} {count, plural, =1{track is} other{tracks are}} stored outside the current download folder and will be left alone.",
+  "@reorganizeLibraryOutsideFolder": {
+    "description": "Note in the reorganize confirmation dialog",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "reorganizeLibraryMissing": "{count} {count, plural, =1{file} other{files}} could not be found and will be skipped.",
+  "@reorganizeLibraryMissing": {
+    "description": "Note in the reorganize confirmation dialog",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "reorganizeLibraryKeepsPlaylistFolders": "Your folder rule uses the playlist name, which Mornye doesn't keep for past downloads, so files stay in their current folder and are only renamed.",
+  "@reorganizeLibraryKeepsPlaylistFolders": {
+    "description": "Warning in the reorganize confirmation dialog when the folder rule depends on the playlist"
+  },
+  "reorganizeLibraryDropsPlaylistFolders": "Mornye doesn't keep which playlist a past download came from, so tracks inside playlist folders will be moved out of them.",
+  "@reorganizeLibraryDropsPlaylistFolders": {
+    "description": "Warning in the reorganize confirmation dialog when playlist folders are enabled"
+  },
+  "reorganizeLibrarySafNote": "Your download folder was picked through Android's folder picker, so each file is copied to its new place and then removed. This can take a while for a large library.",
+  "@reorganizeLibrarySafNote": {
+    "description": "Note in the reorganize confirmation dialog in Android SAF storage mode"
+  },
+  "reorganizeLibraryConfirmAction": "Move Files",
+  "@reorganizeLibraryConfirmAction": {
+    "description": "Confirm button of the reorganize dialog"
+  },
+  "reorganizeLibraryMoving": "Moving files",
+  "@reorganizeLibraryMoving": {
+    "description": "Title of the progress dialog while files are moved"
+  },
+  "reorganizeLibraryDone": "Moved {moved} of {total} {total, plural, =1{file} other{files}}",
+  "@reorganizeLibraryDone": {
+    "description": "Snackbar after reorganizing files",
+    "placeholders": {
+      "moved": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "reorganizeLibraryDoneWithFailures": "Moved {moved} of {total} {total, plural, =1{file} other{files}} · {failed} failed",
+  "@reorganizeLibraryDoneWithFailures": {
+    "description": "Snackbar after reorganizing files when some moves failed",
+    "placeholders": {
+      "moved": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      },
+      "failed": {
+        "type": "int"
+      }
+    }
+  },
+  "reorganizeLibraryFailed": "Couldn't check your downloads: {error}",
+  "@reorganizeLibraryFailed": {
+    "description": "Snackbar when planning the reorganization fails",
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
   }
 }
