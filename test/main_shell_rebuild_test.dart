@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -39,14 +40,20 @@ void main() {
   const backend = MethodChannel('com.zarz.mornye/backend');
   final messenger =
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+  late SchedulingStrategy schedulingStrategy;
 
   setUp(() {
+    schedulingStrategy = SchedulerBinding.instance.schedulingStrategy;
+    // Idle tab preloads otherwise poll between frames under fake time.
+    SchedulerBinding.instance.schedulingStrategy =
+        ({required priority, required scheduler}) => true;
     SharedPreferences.setMockInitialValues({});
     messenger.setMockMethodCallHandler(backend, (_) async => null);
     desktopSidebarCollapsed.value = false;
     desktopSidebarLink.value = null;
   });
   tearDown(() {
+    SchedulerBinding.instance.schedulingStrategy = schedulingStrategy;
     messenger.setMockMethodCallHandler(backend, null);
     debugDesktopPlatformOverride = null;
     debugDesktopTitleBarInContentOverride = null;
@@ -109,9 +116,6 @@ void main() {
         ),
       ),
     );
-    // A second frame before any time passes: Mornye's tab preload waits as
-    // an idle task, and the scheduler re-arms it with zero-delay timers
-    // while a frame callback is pending, which fake time never gets past.
     await tester.pump();
     await settle(tester);
   }
