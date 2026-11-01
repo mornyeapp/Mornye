@@ -89,6 +89,7 @@ void main() {
     debugDesktopTitleBarInContentOverride = null;
     desktopMiniPlayerOpen.value = false;
     desktopMiniPlayerLyrics.value = false;
+    desktopPlayerDismissed.value = false;
   });
 
   test('shrinks the window and returns it', () async {
@@ -117,8 +118,10 @@ void main() {
 
   test('shrinks the framed Windows and Linux window too', () async {
     debugDesktopTitleBarInContentOverride = false;
+    desktopPlayerDismissed.value = true;
     await setDesktopMiniPlayer(open: true);
     expect(desktopMiniPlayerOpen.value, isTrue);
+    expect(desktopPlayerDismissed.value, isFalse);
     expect(calls.single.method, 'openMiniPlayer');
   });
 

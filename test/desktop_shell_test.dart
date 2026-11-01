@@ -15,6 +15,7 @@ import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/providers/system_volume_provider.dart';
 import 'package:mornye/services/playback_deck.dart';
+import 'package:mornye/services/remote_playback.dart';
 import 'package:mornye/services/shell_navigation_service.dart';
 import 'package:mornye/services/user_profile_store.dart';
 import 'package:mornye/theme/app_theme.dart';
@@ -37,6 +38,13 @@ import 'support/fixed_settings.dart';
 
 class _FakeController implements MusicPlayerController {
   final calls = <String>[];
+  VoidCallback? onDismiss;
+
+  @override
+  Future<void> dismiss() async {
+    calls.add('dismiss');
+    onDismiss?.call();
+  }
 
   @override
   Future<void> togglePlayPause(bool isPlaying) async =>
@@ -50,6 +58,20 @@ class _FakeController implements MusicPlayerController {
 
   @override
   Future<void> seek(Duration position) async => calls.add('seek');
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _RemotePlayback implements RemotePlayback {
+  @override
+  String get name => 'Phone';
+
+  @override
+  Stream<RemoteTransfer?> get transfers => const Stream.empty();
+
+  @override
+  Stream<double> get volumes => Stream.value(0.5);
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
@@ -102,6 +124,7 @@ void main() {
     debugDesktopTitleBarInContentOverride = false;
     desktopSidebarCollapsed.value = false;
     desktopSidebarLink.value = null;
+    desktopPlayerDismissed.value = false;
     controller = _FakeController();
     volumeWrites = [];
     selections = [];
@@ -112,11 +135,15 @@ void main() {
     debugDesktopTitleBarInContentOverride = null;
     desktopSidebarCollapsed.value = false;
     desktopSidebarLink.value = null;
+    desktopPlayerDismissed.value = false;
   });
 
   List<Override> overrides({
     MediaItem? item = _track,
+    Stream<MediaItem?>? mediaItems,
     bool playing = false,
+    bool loading = false,
+    RemotePlayback? remote,
     String playerMode = 'internal',
     UserProfile profile = const UserProfile(name: 'Ada Lovelace'),
   }) => [
@@ -124,11 +151,19 @@ void main() {
       () => FixedSettingsNotifier(AppSettings(playerMode: playerMode)),
     ),
     currentMediaItemProvider.overrideWithBuild(
-      (ref, notifier) => Stream.value(item),
+      (ref, notifier) => mediaItems ?? Stream.value(item),
     ),
     playbackStateProvider.overrideWith(
-      (ref) => Stream.value(PlaybackState(playing: playing)),
+      (ref) => Stream.value(
+        PlaybackState(
+          playing: playing,
+          processingState: loading
+              ? AudioProcessingState.buffering
+              : AudioProcessingState.ready,
+        ),
+      ),
     ),
+    activeRemotePlaybackProvider.overrideWithValue(remote),
     musicPlayerControllerProvider.overrideWithValue(controller),
     systemVolumeProvider.overrideWith((ref) => Stream.value(0.5)),
     systemVolumeWriterProvider.overrideWithValue((value) async {
@@ -144,6 +179,10 @@ void main() {
     required double width,
     ShellTab selected = ShellTab.home,
     MediaItem? item = _track,
+    Stream<MediaItem?>? mediaItems,
+    bool playing = false,
+    bool loading = false,
+    RemotePlayback? remote,
     String playerMode = 'internal',
     List<DesktopSidebarLink> libraryLinks = const [],
     ValueChanged<String>? onOpenLibraryLink,
@@ -158,6 +197,10 @@ void main() {
       ProviderScope(
         overrides: overrides(
           item: item,
+          mediaItems: mediaItems,
+          playing: playing,
+          loading: loading,
+          remote: remote,
           profile: profile,
           playerMode: playerMode,
         ),
@@ -181,7 +224,12 @@ void main() {
         ),
       ),
     );
-    await tester.pumpAndSettle();
+    if (loading) {
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+    } else {
+      await tester.pumpAndSettle();
+    }
   }
 
   /// The page shown in the content pane.
@@ -197,6 +245,64 @@ void main() {
   }
 
   for (final mornye in [false, true]) {
+    testWidgets('paused desktop player dismisses and returns for a new song '
+        '($mornye)', (tester) async {
+      final items = StreamController<MediaItem?>();
+      addTearDown(items.close);
+      controller.onDismiss = () => items.add(null);
+      await pumpShell(
+        tester,
+        mornye: mornye,
+        width: 900,
+        mediaItems: items.stream,
+      );
+      items.add(_track);
+      await tester.pumpAndSettle();
+      expect(find.byTooltip('Dismiss'), findsOneWidget);
+      desktopInspectorPanel.value = DesktopInspectorPanel.upNext;
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('desktop-player-dismiss')));
+      await tester.pumpAndSettle();
+
+      expect(controller.calls, ['dismiss']);
+      expect(find.byType(DesktopPlayerBar), findsNothing);
+      expect(desktopInspectorPanel.value, isNull);
+      expect(desktopNowPlayingOpen.value, isFalse);
+      expect(tester.getSize(contentPage()).height, 800);
+      expect(
+        MediaQuery.paddingOf(tester.element(find.text('content'))).bottom,
+        0,
+      );
+
+      items.add(_track.copyWith(id: 'next', title: 'Another song'));
+      await tester.pumpAndSettle();
+      expect(find.byType(DesktopPlayerBar), findsOneWidget);
+      expect(find.text('Another song'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    for (final state in ['playing', 'loading', 'remote', 'idle']) {
+      testWidgets('desktop player cannot dismiss $state playback ($mornye)', (
+        tester,
+      ) async {
+        await pumpShell(
+          tester,
+          mornye: mornye,
+          width: 900,
+          item: state == 'idle' ? null : _track,
+          playing: state == 'playing',
+          loading: state == 'loading',
+          remote: state == 'remote' ? _RemotePlayback() : null,
+        );
+        expect(
+          find.byKey(const ValueKey('desktop-player-dismiss')),
+          findsNothing,
+        );
+        expect(controller.calls, isEmpty);
+        expect(tester.takeException(), isNull);
+      });
+    }
+
     testWidgets('external mode removes desktop player surfaces ($mornye)', (
       tester,
     ) async {

@@ -36,9 +36,13 @@ import 'package:mornye/widgets/playback_seek_slider.dart';
 
 part 'desktop_mini_player.dart';
 
-/// The persistent desktop player. It replaces the mobile mini player: no
+/// An explicit dismiss hides the idle bar. Any active track shows it again.
+final desktopPlayerDismissed = ValueNotifier<bool>(false);
+
+/// The desktop player. It replaces the mobile mini player: no
 /// swipe gestures, with transport, seek, volume, lyrics, Up Next and
-/// downloads always in reach. Clicking the artwork or title shows Now
+/// downloads in reach. Paused local playback offers a dismiss button.
+/// Clicking the artwork or title shows Now
 /// Playing in the content pane; lyrics and Up Next toggle the trailing
 /// inspector.
 ///
@@ -690,11 +694,12 @@ class _MornyeLcdLines extends ConsumerWidget {
 
 /// Lyrics and Up Next, which toggle the trailing inspector, downloads, and
 /// volume. Material fills its third of the bar, with phones and downloads
-/// after Up Next and the volume slider last. The Mornye capsule leads with
+/// after Up Next and then the volume slider. The Mornye capsule leads with
 /// phones and downloads and ends with a volume button whose slider opens in
 /// a popover, as Music does. The phones button shows only while a phone is
-/// connected over Mornye Link.
-class _TrailingControls extends StatelessWidget {
+/// connected over Mornye Link. Paused local playback adds a dismiss button
+/// at the end in both styles.
+class _TrailingControls extends ConsumerWidget {
   const _TrailingControls({required this.enabled, this.appTheme});
 
   /// Narrowest room in which the Material bar keeps its volume slider.
@@ -706,10 +711,15 @@ class _TrailingControls extends StatelessWidget {
   final ThemeData? appTheme;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final mornye = context.isMornye;
     final colorScheme = Theme.of(context).colorScheme;
     final l10n = context.l10n;
+    final canDismiss =
+        enabled &&
+        !ref.watch(playbackPlayingProvider) &&
+        !ref.watch(playbackLoadingProvider) &&
+        ref.watch(activeRemotePlaybackProvider) == null;
     return Row(
       mainAxisAlignment: MainAxisAlignment.end,
       mainAxisSize: mornye ? MainAxisSize.min : MainAxisSize.max,
@@ -794,6 +804,19 @@ class _TrailingControls extends StatelessWidget {
             ),
           ),
         ],
+        if (canDismiss)
+          AppIconButton(
+            key: const ValueKey('desktop-player-dismiss'),
+            tooltip: l10n.actionDismiss,
+            color: mornye ? colorScheme.onSurface : null,
+            icon: const AppIcon.adaptive(Icons.close),
+            onPressed: () async {
+              await ref.read(musicPlayerControllerProvider).dismiss();
+              desktopPlayerDismissed.value = true;
+              desktopInspectorPanel.value = null;
+              closeDesktopNowPlaying();
+            },
+          ),
       ],
     );
   }

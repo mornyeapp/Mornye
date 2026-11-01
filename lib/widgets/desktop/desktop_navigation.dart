@@ -147,8 +147,17 @@ class DesktopShellLayout extends ConsumerWidget {
   /// the last full window size, so its pages keep their layout and state
   /// while the window is small.
   @override
-  Widget build(BuildContext context, WidgetRef ref) =>
-      _window(ref.watch(playerUiEnabledProvider));
+  Widget build(BuildContext context, WidgetRef ref) {
+    final enabled = ref.watch(playerUiEnabledProvider);
+    final hasTrack = ref.watch(
+      currentMediaItemProvider.select((state) => state.value != null),
+    );
+    return ValueListenableBuilder<bool>(
+      valueListenable: desktopPlayerDismissed,
+      builder: (context, dismissed, _) =>
+          _window(enabled && (!dismissed || hasTrack)),
+    );
+  }
 
   Widget _window(bool show) => ValueListenableBuilder<bool>(
     valueListenable: desktopMiniPlayerOpen,

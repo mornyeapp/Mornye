@@ -37,6 +37,7 @@ Future<void> setDesktopMiniPlayer({required bool open}) async {
   _miniPlayerBusy = true;
   try {
     if (open) {
+      desktopPlayerDismissed.value = false;
       desktopMiniPlayerOpen.value = true;
       final opened = await openDesktopMiniPlayerWindow(desktopMiniPlayerSize);
       if (!opened) desktopMiniPlayerOpen.value = false;
