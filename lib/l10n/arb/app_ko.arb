@@ -445,7 +445,7 @@
       }
     }
   },
-  "libraryFoldersEmptyTitle": "No folders yet",
+  "libraryFoldersEmptyTitle": "아직 폴더가 없습니다",
   "@libraryFoldersEmptyTitle": {
     "description": "Title of the Folders view when the Library has no songs"
   },
@@ -457,7 +457,7 @@
   "@libraryFolderMissing": {
     "description": "Shown on an open folder page after its songs were deleted or moved"
   },
-  "libraryFoldersLoadFailed": "Couldn't read your folders",
+  "libraryFoldersLoadFailed": "폴더를 읽을 수 없습니다",
   "@libraryFoldersLoadFailed": {
     "description": "Shown when the Folders view fails to load"
   },
@@ -1132,23 +1132,23 @@
   "@setupNearbyDescription": {
     "description": "Setup step explaining why Android's Nearby devices permission is needed"
   },
-  "setupNearbyGranted": "Nearby Devices Allowed!",
+  "setupNearbyGranted": "주변 기기가 허용됨!",
   "@setupNearbyGranted": {
     "description": "Setup message after the Nearby devices permission is granted"
   },
-  "permissionNearbyDevices": "Nearby devices",
+  "permissionNearbyDevices": "주변 기기",
   "@permissionNearbyDevices": {
     "description": "Nearby devices permission type label; use Android's name for this permission"
   },
-  "whatsNewLinkNearbyAllow": "Allow nearby devices",
+  "whatsNewLinkNearbyAllow": "주변 기기 허용",
   "@whatsNewLinkNearbyAllow": {
     "description": "Main button on the Nearby devices page of the What's New tour that asks for Android's Nearby devices permission"
   },
-  "whatsNewLinkNearbyGranted": "Nearby devices allowed",
+  "whatsNewLinkNearbyGranted": "주변 기기가 허용됨",
   "@whatsNewLinkNearbyGranted": {
     "description": "Shown on the Nearby devices page of the What's New tour after the Nearby devices permission is granted"
   },
-  "whatsNewNearbyTitle": "Nearby devices",
+  "whatsNewNearbyTitle": "주변 기기",
   "@whatsNewNearbyTitle": {
     "description": "Title of the What's New page that asks for Android's Nearby devices permission; use Android's name for this permission"
   },
@@ -3602,19 +3602,19 @@
   "whatsNewLibrarySuggestionsBody": "Albums, singles and playlists now suggest songs that fit.",
   "whatsNewLibraryRecognizeTitle": "Recognize music",
   "whatsNewLibraryRecognizeBody": "Tap the microphone in Search to find out what's playing nearby.",
-  "whatsNewLibraryPlaylistsTitle": "Better playlists",
+  "whatsNewLibraryPlaylistsTitle": "더 나은 재생목록",
   "whatsNewLibraryPlaylistsBody": "Reorder songs, create a playlist from a folder, or import playlist files.",
-  "whatsNewFasterTitle": "Faster everywhere",
+  "whatsNewFasterTitle": "어디서든 더 빠르게",
   "whatsNewFasterDesc": "Quicker and lighter, especially with large libraries.",
-  "whatsNewFasterLibraryTitle": "A quicker Library",
+  "whatsNewFasterLibraryTitle": "더 빠른 라이브러리",
   "whatsNewFasterLibraryBody": "Tabs and albums open faster, and scrolling stays smooth.",
-  "whatsNewFasterNetworkTitle": "Faster network music",
+  "whatsNewFasterNetworkTitle": "더 빠른 네트워크 음악",
   "whatsNewFasterNetworkBody": "Network shares scan many times faster, and Subsonic servers sync with far fewer requests.",
   "whatsNewFasterQueueTitle": "Long queues that last",
   "whatsNewFasterQueueBody": "Large queues save quickly and come back after a restart.",
   "whatsNewFasterBackgroundTitle": "Lighter in the background",
   "whatsNewFasterBackgroundBody": "The app starts faster and does less work while music plays.",
-  "whatsNewDone": "Start listening",
+  "whatsNewDone": "듣기 시작",
   "@whatsNewDone": {
     "description": "Button on the last page of the What's New tour"
   },
@@ -7036,11 +7036,11 @@
   "@nowPlayingOpenInExternalPlayer": {
     "description": "Menu item to open the current track in an external player"
   },
-  "nowPlayingHideVolume": "Hide volume",
+  "nowPlayingHideVolume": "볼륨 숨기기",
   "@nowPlayingHideVolume": {
     "description": "Now Playing menu item that removes the volume slider from the player"
   },
-  "nowPlayingShowVolume": "Show volume",
+  "nowPlayingShowVolume": "볼륨 보이기",
   "@nowPlayingShowVolume": {
     "description": "Now Playing menu item that brings the volume slider back to the player"
   },
@@ -7076,15 +7076,15 @@
   "@nowPlayingNoLyricsOnline": {
     "description": "Empty state after an online lyrics search for the playing track found nothing"
   },
-  "nowPlayingTranslateLyrics": "Translate Lyrics",
+  "nowPlayingTranslateLyrics": "가사 번역",
   "@nowPlayingTranslateLyrics": {
     "description": "Player lyrics menu action that translates the current lyrics with the user's AI provider"
   },
-  "nowPlayingCancelTranslation": "Cancel Translation",
+  "nowPlayingCancelTranslation": "번역 취소",
   "@nowPlayingCancelTranslation": {
     "description": "Player lyrics menu action that stops an AI lyrics translation in progress"
   },
-  "nowPlayingTranslatingLyrics": "Translating lyrics, {percent}%",
+  "nowPlayingTranslatingLyrics": "가사를 번역하는 중, {percent}%",
   "@nowPlayingTranslatingLyrics": {
     "description": "Tooltip and screen reader label of the lyrics menu button while an AI translation runs",
     "placeholders": {
@@ -7093,7 +7093,7 @@
       }
     }
   },
-  "lyricsTranslateSheetTitle": "Translate Into",
+  "lyricsTranslateSheetTitle": "번역 대상",
   "@lyricsTranslateSheetTitle": {
     "description": "Title of the sheet that picks the language to translate the current lyrics into"
   },
@@ -7115,7 +7115,7 @@
       }
     }
   },
-  "lyricsTranslateAlreadyIn": "These lyrics are already in {language}",
+  "lyricsTranslateAlreadyIn": "이 가사는 이미 {language}로 번역되어 있습니다",
   "@lyricsTranslateAlreadyIn": {
     "description": "Snackbar after an AI translation returned every line unchanged; language is the target language's own name",
     "placeholders": {
@@ -7124,7 +7124,7 @@
       }
     }
   },
-  "lyricsAiTranslation": "AI Translation",
+  "lyricsAiTranslation": "AI 번역",
   "@lyricsAiTranslation": {
     "description": "Lyrics settings row and page title for translating lyrics with the user's own AI provider"
   },
@@ -7136,19 +7136,19 @@
   "@lyricsAiTranslationNotice": {
     "description": "Privacy notice at the top of the AI translation settings page"
   },
-  "lyricsAiSectionProvider": "Provider",
+  "lyricsAiSectionProvider": "제공자",
   "@lyricsAiSectionProvider": {
     "description": "AI translation settings section for the provider, key and model"
   },
-  "lyricsAiSectionTranslation": "Translation",
+  "lyricsAiSectionTranslation": "번역",
   "@lyricsAiSectionTranslation": {
     "description": "AI translation settings section for the target language and behavior"
   },
-  "lyricsAiProvider": "Provider",
+  "lyricsAiProvider": "제공자",
   "@lyricsAiProvider": {
     "description": "AI translation setting that picks the AI service"
   },
-  "lyricsAiProviderCustom": "Custom Server",
+  "lyricsAiProviderCustom": "사용자 정의 서버",
   "@lyricsAiProviderCustom": {
     "description": "AI provider choice for a self-hosted or other OpenAI-compatible server"
   },
@@ -7168,15 +7168,15 @@
   "@lyricsAiNotSet": {
     "description": "Subtitle of an AI translation setting that has no value yet"
   },
-  "lyricsAiApiKey": "API Key",
+  "lyricsAiApiKey": "API 키",
   "@lyricsAiApiKey": {
     "description": "AI translation setting for the user's API key"
   },
-  "lyricsAiApiKeyOptional": "Optional for local servers",
+  "lyricsAiApiKeyOptional": "로컬 서버용 선택 사항",
   "@lyricsAiApiKeyOptional": {
     "description": "Subtitle of the API key setting for a custom server without a key"
   },
-  "lyricsAiApiKeySaved": "Saved, ends in {suffix}",
+  "lyricsAiApiKeySaved": "저장됨, '{suffix}'로 끝남",
   "@lyricsAiApiKeySaved": {
     "description": "Subtitle of the API key setting showing only its last characters",
     "placeholders": {
@@ -7194,11 +7194,11 @@
       }
     }
   },
-  "lyricsAiModel": "Model",
+  "lyricsAiModel": "모델",
   "@lyricsAiModel": {
     "description": "AI translation setting for the model id"
   },
-  "lyricsAiModelDefault": "Default ({model})",
+  "lyricsAiModelDefault": "기본값 ({model})",
   "@lyricsAiModelDefault": {
     "description": "Subtitle of the model setting when the provider's default model is used",
     "placeholders": {
@@ -7207,27 +7207,27 @@
       }
     }
   },
-  "lyricsAiModelHint": "Model ID",
+  "lyricsAiModelHint": "모델 ID",
   "@lyricsAiModelHint": {
     "description": "Hint of the model id text field"
   },
-  "lyricsAiModelUseDefault": "Use Default",
+  "lyricsAiModelUseDefault": "기본값 사용",
   "@lyricsAiModelUseDefault": {
     "description": "Action in the model sheet that returns to the provider's default model"
   },
-  "lyricsAiModelLoad": "Load Models",
+  "lyricsAiModelLoad": "모델 불러오기",
   "@lyricsAiModelLoad": {
     "description": "Button in the model sheet that lists the models the provider offers"
   },
-  "lyricsAiModelsEmpty": "The provider listed no models",
+  "lyricsAiModelsEmpty": "제공자에 모델이 없습니다",
   "@lyricsAiModelsEmpty": {
     "description": "Shown in the model sheet when the provider's model list is empty"
   },
-  "lyricsAiTestConnection": "Test Connection",
+  "lyricsAiTestConnection": "연결 테스트",
   "@lyricsAiTestConnection": {
     "description": "AI translation settings action that translates one line to check the key and model"
   },
-  "lyricsAiTestConnectionSubtitle": "Translates one line to check the key and model",
+  "lyricsAiTestConnectionSubtitle": "키와 모델을 확인하기 위해 한 줄을 번역합니다",
   "@lyricsAiTestConnectionSubtitle": {
     "description": "Subtitle of the test connection action"
   },
@@ -7386,23 +7386,23 @@
   "@linkDevicesTitle": {
     "description": "Mornye Link: title and button tooltip of the phone sheet that controls the paired desktop app"
   },
-  "linkConnectionConnected": "Connected",
+  "linkConnectionConnected": "연결됨",
   "@linkConnectionConnected": {
     "description": "Mornye Link: the phone is connected to the paired desktop"
   },
-  "linkConnectionConnecting": "Connecting",
+  "linkConnectionConnecting": "연결하는 중",
   "@linkConnectionConnecting": {
     "description": "Mornye Link: the phone is connecting to the paired desktop"
   },
-  "linkConnectionDisconnected": "Not connected",
+  "linkConnectionDisconnected": "연결되지 않음",
   "@linkConnectionDisconnected": {
     "description": "Mornye Link: the paired desktop cannot be reached"
   },
-  "linkThisPhone": "This phone",
+  "linkThisPhone": "이 휴대폰",
   "@linkThisPhone": {
     "description": "Mornye Link: the phone's own row in the Devices sheet; choosing it plays music here again"
   },
-  "linkPlayingOn": "Playing on {name}",
+  "linkPlayingOn": "{name}에서 재생 중",
   "@linkPlayingOn": {
     "description": "Mornye Link: shown in the player while the paired desktop plays in the phone's place",
     "placeholders": {
@@ -7411,7 +7411,7 @@
       }
     }
   },
-  "linkDesktopDownloads": "Downloads on {name}",
+  "linkDesktopDownloads": "{name}에서 다운로드",
   "@linkDesktopDownloads": {
     "description": "Mornye Link: heading of the paired desktop's download queue",
     "placeholders": {
@@ -7420,7 +7420,7 @@
       }
     }
   },
-  "linkHandoffStarted": "Playing on {name}",
+  "linkHandoffStarted": "{name}에서 재생 중",
   "@linkHandoffStarted": {
     "description": "Mornye Link: the paired desktop took over the phone's queue",
     "placeholders": {
@@ -7429,7 +7429,7 @@
       }
     }
   },
-  "linkHandoffSending": "Sending this song to {name}...",
+  "linkHandoffSending": "이 노래를 '{name}'에게 전송 중...",
   "@linkHandoffSending": {
     "description": "Mornye Link: the phone uploads the current song, which the paired desktop lacks, before it plays there",
     "placeholders": {
@@ -7438,7 +7438,7 @@
       }
     }
   },
-  "linkHandoffMissing": "Playing on {name}. Not found there: {titles}",
+  "linkHandoffMissing": "{name}에서 재생 중입니다. 찾을 수 없음: {titles}",
   "@linkHandoffMissing": {
     "description": "Mornye Link: the paired desktop took over the phone's queue but lacks some tracks, listed by title",
     "placeholders": {
@@ -7450,7 +7450,7 @@
       }
     }
   },
-  "linkHandoffNotFound": "{name} has none of these tracks",
+  "linkHandoffNotFound": "'{name}'에는 이러한 트랙이 없습니다",
   "@linkHandoffNotFound": {
     "description": "Mornye Link: the paired desktop has none of the tracks in the phone's queue",
     "placeholders": {
@@ -7459,11 +7459,11 @@
       }
     }
   },
-  "linkHandoffNothingPlaying": "Nothing is playing on this phone",
+  "linkHandoffNothingPlaying": "이 휴대폰에서 재생 중인 음악이 없습니다",
   "@linkHandoffNothingPlaying": {
     "description": "Mornye Link: Play on desktop needs a track playing on the phone"
   },
-  "linkContinueSkipped": "Not on this phone: {titles}",
+  "linkContinueSkipped": "이 휴대폰에 없음: {titles}",
   "@linkContinueSkipped": {
     "description": "Mornye Link: tracks of the desktop queue the phone could not play, listed by title",
     "placeholders": {
@@ -7472,11 +7472,11 @@
       }
     }
   },
-  "linkContinueNotFound": "None of these tracks are on this phone",
+  "linkContinueNotFound": "이 휴대폰에는 이러한 트랙이 없음",
   "@linkContinueNotFound": {
     "description": "Mornye Link: the phone has none of the tracks of the desktop queue"
   },
-  "linkRequestFailed": "Could not reach {name}",
+  "linkRequestFailed": "{name}에 연결할 수 없음",
   "@linkRequestFailed": {
     "description": "Mornye Link: a request to the paired desktop failed",
     "placeholders": {
@@ -7485,7 +7485,7 @@
       }
     }
   },
-  "linkDownloadOnDesktop": "Download on {name}",
+  "linkDownloadOnDesktop": "{name}에서 다운로드",
   "@linkDownloadOnDesktop": {
     "description": "Mornye Link: queues a track, album or link for download in the paired desktop app",
     "placeholders": {
@@ -7506,7 +7506,7 @@
       }
     }
   },
-  "linkOpenOnDesktop": "Open on {name}",
+  "linkOpenOnDesktop": "{name}에서 열기",
   "@linkOpenOnDesktop": {
     "description": "Mornye Link: opens a shared link in the paired desktop app",
     "placeholders": {
@@ -7515,7 +7515,7 @@
       }
     }
   },
-  "linkOpenedOnDesktop": "Opened on {name}",
+  "linkOpenedOnDesktop": "{name}에서 열림",
   "@linkOpenedOnDesktop": {
     "description": "Mornye Link: the paired desktop opened the link",
     "placeholders": {
@@ -7651,7 +7651,7 @@
   "@linkDownloadStatusDone": {
     "description": "Mornye Link: a download on the paired desktop finished"
   },
-  "linkDownloadStatusFailed": "Failed",
+  "linkDownloadStatusFailed": "실패",
   "@linkDownloadStatusFailed": {
     "description": "Mornye Link: a download on the paired desktop failed"
   },
@@ -8093,7 +8093,7 @@
     "description": "Selected state of the compact favorite action"
   },
   "autoMixDescription": "곡을 비트에 맞춰 믹싱하고, 음정은 유지한 채 템포를 조절합니다. 비트를 맞출 수 없는 경우에는 크로스페이드를 사용합니다",
-  "gaplessPlayback": "Gapless playback",
+  "gaplessPlayback": "끊김 없는 재생",
   "@gaplessPlayback": {
     "description": "Playback settings switch that starts the next song the moment one ends"
   },
@@ -8113,7 +8113,7 @@
   "@landscapeLyricsArtworkDescription": {
     "description": "Subtitle explaining the Material landscape lyrics layout setting"
   },
-  "compactPlayer": "Compact player",
+  "compactPlayer": "소형 플레이어",
   "@compactPlayer": {
     "description": "Material player setting: idle lyrics shrink the player to a slim bar instead of hiding it"
   },
@@ -8125,7 +8125,7 @@
   "@playerCoverStyleDefault": {
     "description": "Cover art style: artwork card above the controls"
   },
-  "playerCoverStyleCard": "Card",
+  "playerCoverStyleCard": "카드",
   "@playerCoverStyleCard": {
     "description": "Cover art style: artwork as a card above the controls (full screen is the default)"
   },
@@ -8211,7 +8211,7 @@
       }
     }
   },
-  "songAnalysis": "Song analysis",
+  "songAnalysis": "노래 분석",
   "@songAnalysis": {
     "description": "Switch that analyzes how each Library song sounds, on the device, for Autoplay"
   },
