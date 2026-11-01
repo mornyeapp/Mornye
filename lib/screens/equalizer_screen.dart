@@ -44,6 +44,10 @@ class EqualizerScreen extends ConsumerStatefulWidget {
 
 enum _PresetAction { manage, import, export }
 
+final _selectedEqualizerPresetProvider = Provider<EqualizerPreset?>(
+  (ref) => _matchingPreset(ref.watch(equalizerProvider)),
+);
+
 class _EqualizerScreenState extends ConsumerState<EqualizerScreen> {
   bool _busy = false;
 
@@ -205,21 +209,29 @@ class _EqualizerScreenState extends ConsumerState<EqualizerScreen> {
   );
 
   Widget _buildPage(BuildContext context) {
-    final state = ref.watch(equalizerProvider);
-    final settings = state.settings;
+    final settings = ref.watch(
+      equalizerProvider.select(
+        (state) => (
+          enabled: state.settings.enabled,
+          autoHeadroom: state.settings.autoHeadroom,
+          limiter: state.settings.limiter,
+          compressor: state.settings.compressor,
+          error: state.error,
+        ),
+      ),
+    );
     final notifier = ref.read(equalizerProvider.notifier);
     final l10n = context.l10n;
     final mornye = context.isMornye;
-    final selectedPreset = _matchingPreset(state);
-    final presetName = selectedPreset?.name ?? l10n.equalizerCustom;
     void update(EqualizerSettings next) => notifier.update(next);
-    void setEnabled(bool v) => update(settings.copyWith(enabled: v));
+    void setEnabled(bool v) =>
+        update(ref.read(equalizerProvider).settings.copyWith(enabled: v));
     Widget section(Widget child) => SliverToBoxAdapter(child: child);
     final error = section(
       ValueListenableBuilder<String?>(
         valueListenable: playbackEqualizerError,
         builder: (context, error, _) {
-          final message = error ?? state.error;
+          final message = error ?? settings.error;
           return message == null
               ? const SizedBox.shrink()
               : SettingsInfoCard(
@@ -253,16 +265,7 @@ class _EqualizerScreenState extends ConsumerState<EqualizerScreen> {
             ),
             section(_Footnote(l10n.equalizerBypass)),
             error,
-            section(
-              SettingsGroup(
-                children: [
-                  _EqualizerOverview(
-                    settings: settings,
-                    presetName: presetName,
-                  ),
-                ],
-              ),
-            ),
+            section(SettingsGroup(children: [const _EqualizerOverview()])),
             // The value cell names the group, so it needs no header.
             const SliverToBoxAdapter(child: SizedBox(height: 28)),
             section(
@@ -270,7 +273,12 @@ class _EqualizerScreenState extends ConsumerState<EqualizerScreen> {
                 children: [
                   SettingsItem(
                     title: l10n.equalizerPresets,
-                    trailing: _DetailValue(presetName),
+                    trailing: Consumer(
+                      builder: (context, ref, _) => _DetailValue(
+                        ref.watch(_selectedEqualizerPresetProvider)?.name ??
+                            context.l10n.equalizerCustom,
+                      ),
+                    ),
                     onTap: _presets,
                   ),
                   _ActionRow(
@@ -292,13 +300,7 @@ class _EqualizerScreenState extends ConsumerState<EqualizerScreen> {
           ] else ...[
             section(
               SettingsGroup(
-                children: [
-                  _EqualizerOverview(
-                    settings: settings,
-                    presetName: presetName,
-                    onEnabledChanged: setEnabled,
-                  ),
-                ],
+                children: [_EqualizerOverview(onEnabledChanged: setEnabled)],
               ),
             ),
             error,
@@ -311,8 +313,6 @@ class _EqualizerScreenState extends ConsumerState<EqualizerScreen> {
             section(SettingsSectionHeader(title: l10n.equalizerPresets)),
             section(
               _PresetBar(
-                presets: [...EqualizerPreset.builtIn, ...state.presets],
-                selected: selectedPreset,
                 busy: _busy,
                 onApply: notifier.applyPreset,
                 onSave: _savePreset,
@@ -326,11 +326,7 @@ class _EqualizerScreenState extends ConsumerState<EqualizerScreen> {
             ),
           ],
           section(SettingsSectionHeader(title: l10n.equalizerBands)),
-          section(
-            SettingsGroup(
-              children: [_BandEditor(settings: settings, onChanged: update)],
-            ),
-          ),
+          section(SettingsGroup(children: [const _BandEditor()])),
           section(SettingsSectionHeader(title: l10n.equalizerTone)),
           section(
             SettingsGroup(
@@ -339,48 +335,42 @@ class _EqualizerScreenState extends ConsumerState<EqualizerScreen> {
                 _SliderTile(
                   icon: Icons.volume_up_outlined,
                   title: l10n.equalizerPreamp,
-                  subtitle:
-                      '${l10n.equalizerEffectivePreamp}: ${_signed(settings.inputGain)} dB',
-                  value: settings.preamp,
+                  control: _ToneControl.preamp,
                   min: -24,
                   max: 12,
                   step: 0.5,
                   unit: 'dB',
-                  onChanged: (v) => update(settings.copyWith(preamp: v)),
                 ),
                 _SliderTile(
                   icon: Icons.speaker_outlined,
                   title: l10n.equalizerBass,
-                  value: settings.bass,
+                  control: _ToneControl.bass,
                   min: -12,
                   max: 12,
                   step: 0.5,
                   unit: 'dB',
                   centered: true,
-                  onChanged: (v) => update(settings.copyWith(bass: v)),
                 ),
                 _SliderTile(
                   icon: Icons.music_note_outlined,
                   title: l10n.equalizerTreble,
-                  value: settings.treble,
+                  control: _ToneControl.treble,
                   min: -12,
                   max: 12,
                   step: 0.5,
                   unit: 'dB',
                   centered: true,
-                  onChanged: (v) => update(settings.copyWith(treble: v)),
                 ),
                 _SliderTile(
                   icon: Icons.surround_sound_outlined,
                   title: l10n.equalizerBalance,
-                  value: settings.balance * 100,
+                  control: _ToneControl.balance,
                   min: -100,
                   max: 100,
                   step: 1,
                   unit: '%',
                   centered: true,
                   last: true,
-                  onChanged: (v) => update(settings.copyWith(balance: v / 100)),
                 ),
               ],
             ),
@@ -395,67 +385,75 @@ class _EqualizerScreenState extends ConsumerState<EqualizerScreen> {
                   title: l10n.equalizerHeadroom,
                   subtitle: l10n.equalizerHeadroomDescription,
                   value: settings.autoHeadroom,
-                  onChanged: (v) => update(settings.copyWith(autoHeadroom: v)),
+                  onChanged: (v) => update(
+                    ref
+                        .read(equalizerProvider)
+                        .settings
+                        .copyWith(autoHeadroom: v),
+                  ),
                 ),
                 SettingsSwitchItem(
                   icon: Icons.health_and_safety_outlined,
                   title: l10n.equalizerLimiter,
                   subtitle: l10n.equalizerLimiterDescription,
                   value: settings.limiter,
-                  onChanged: (v) => update(settings.copyWith(limiter: v)),
+                  onChanged: (v) => update(
+                    ref.read(equalizerProvider).settings.copyWith(limiter: v),
+                  ),
                 ),
                 SettingsSwitchItem(
                   icon: Icons.compress,
                   title: l10n.equalizerCompressor,
                   subtitle: l10n.equalizerCompressorDescription,
                   value: settings.compressor,
-                  onChanged: (v) => update(settings.copyWith(compressor: v)),
+                  onChanged: (v) => update(
+                    ref
+                        .read(equalizerProvider)
+                        .settings
+                        .copyWith(compressor: v),
+                  ),
                   showDivider: settings.compressor,
                 ),
                 if (settings.compressor) ...[
                   _SliderTile(
                     title: l10n.equalizerThreshold,
                     indented: true,
-                    value: settings.threshold,
+                    control: _ToneControl.threshold,
                     min: -60,
                     max: 0,
                     step: 0.5,
                     unit: 'dB',
-                    onChanged: (v) => update(settings.copyWith(threshold: v)),
                   ),
                   _SliderTile(
                     title: l10n.equalizerRatio,
                     indented: true,
-                    value: settings.ratio,
+                    control: _ToneControl.ratio,
                     min: 1,
                     max: 20,
                     step: 0.5,
                     unit: ':1',
                     signed: false,
-                    onChanged: (v) => update(settings.copyWith(ratio: v)),
                   ),
                   _SliderTile(
                     title: l10n.equalizerAttack,
                     indented: true,
-                    value: settings.attack,
+                    control: _ToneControl.attack,
                     min: 1,
                     max: 100,
                     step: 1,
                     unit: 'ms',
                     signed: false,
-                    onChanged: (v) => update(settings.copyWith(attack: v)),
                   ),
                   _SliderTile(
                     title: l10n.equalizerRelease,
                     indented: true,
-                    value: settings.release,
+                    control: _ToneControl.release,
                     min: 20,
                     max: 1000,
                     step: 10,
                     unit: 'ms',
                     signed: false,
                     last: true,
-                    onChanged: (v) => update(settings.copyWith(release: v)),
                   ),
                 ],
               ],
@@ -486,13 +484,20 @@ class _EqualizerScreenState extends ConsumerState<EqualizerScreen> {
   }
 }
 
-/// The preset whose curve, tone and dynamics match the current settings.
+/// The preset whose curve and tone match the current settings.
 EqualizerPreset? _matchingPreset(EqualizerState state) {
-  // Matches when applying the preset would change nothing.
-  String key(EqualizerSettings settings) => jsonEncode(settings.toJson());
-  final current = key(state.settings);
+  bool same(double left, double right) =>
+      left == right && (left != 0 || left.isNegative == right.isNegative);
+  final current = state.settings;
   for (final preset in [...EqualizerPreset.builtIn, ...state.presets]) {
-    if (key(state.settings.withToneOf(preset.settings)) == current) {
+    final tone = preset.settings;
+    if (same(current.preamp, tone.preamp) &&
+        same(current.bass, tone.bass) &&
+        same(current.treble, tone.treble) &&
+        current.gains.length == tone.gains.length &&
+        Iterable<int>.generate(
+          current.gains.length,
+        ).every((i) => same(current.gains[i], tone.gains[i]))) {
       return preset;
     }
   }

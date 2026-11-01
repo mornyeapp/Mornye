@@ -25,7 +25,7 @@ class EqualizerController extends Notifier<EqualizerState> {
   static const storageKey = 'playback_equalizer_v1';
   int _revision = 0;
   bool _disposed = false;
-  String? _pending;
+  EqualizerState? _pending;
   bool _saving = false;
   Timer? _saveTimer;
   late Future<void> _loading;
@@ -73,7 +73,7 @@ class EqualizerController extends Notifier<EqualizerState> {
           settings: state.settings,
           presets: merged.values.take(100).toList(),
         );
-        _pending = _serialize();
+        _pending = state;
       }
       playbackEqualizer.value = state.settings;
     } catch (_) {
@@ -148,10 +148,12 @@ class EqualizerController extends Notifier<EqualizerState> {
     _revision++;
     state = EqualizerState(
       settings: settings,
-      presets: List.unmodifiable(presets),
+      presets: identical(presets, state.presets)
+          ? presets
+          : List.unmodifiable(presets),
     );
     playbackEqualizer.value = settings;
-    _pending = _serialize();
+    _pending = state;
     _saveTimer?.cancel();
     _saveTimer = Timer(const Duration(milliseconds: 350), () {
       if (!_saving) unawaited(_save());
@@ -164,7 +166,7 @@ class EqualizerController extends Notifier<EqualizerState> {
       await _loading;
       final prefs = await SharedPreferences.getInstance();
       while (_pending != null) {
-        final value = _pending!;
+        final value = _serialize(_pending!);
         _pending = null;
         if (!await prefs.setString(storageKey, value)) {
           throw StateError('Write failed');
@@ -183,8 +185,8 @@ class EqualizerController extends Notifier<EqualizerState> {
     }
   }
 
-  String _serialize() => jsonEncode({
-    'settings': state.settings.toJson(),
-    'presets': state.presets.map((v) => v.toJson()).toList(),
+  String _serialize(EqualizerState snapshot) => jsonEncode({
+    'settings': snapshot.settings.toJson(),
+    'presets': snapshot.presets.map((v) => v.toJson()).toList(),
   });
 }

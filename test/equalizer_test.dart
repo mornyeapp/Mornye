@@ -16,12 +16,138 @@ import 'package:mornye/widgets/app_slider.dart';
 import 'package:mornye/widgets/mornye_chrome.dart';
 import 'package:mornye/widgets/mornye_level_slider.dart';
 
+class _CountedSettings extends EqualizerSettings {
+  _CountedSettings(double preamp, this.serialized) : super(preamp: preamp);
+
+  final VoidCallback serialized;
+
+  @override
+  Map<String, dynamic> toJson() {
+    serialized();
+    return super.toJson();
+  }
+}
+
 void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues({});
     playbackEqualizer.value = const EqualizerSettings();
     playbackEqualizerError.value = null;
   });
+
+  testWidgets('slider bursts serialize only the final persisted snapshot', (
+    tester,
+  ) async {
+    final container = ProviderContainer();
+    final notifier = container.read(equalizerProvider.notifier);
+    await tester.pump();
+    var serializations = 0;
+    final presets = container.read(equalizerProvider).presets;
+    for (var i = 0; i < 100; i++) {
+      notifier.update(_CountedSettings(-i / 10, () => serializations++));
+    }
+    expect(serializations, 0);
+    expect(container.read(equalizerProvider).presets, same(presets));
+    expect(playbackEqualizer.value.preamp, -9.9);
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.runAsync(() async => Future<void>.delayed(Duration.zero));
+    await tester.pump();
+    expect(serializations, 1);
+    final prefs = await SharedPreferences.getInstance();
+    Object? savedPreamp() {
+      final stored =
+          jsonDecode(prefs.getString(EqualizerController.storageKey)!)
+              as Map<String, dynamic>;
+      return (stored['settings'] as Map<String, dynamic>)['preamp'];
+    }
+
+    expect(savedPreamp(), -9.9);
+    notifier.update(_CountedSettings(-5, () => serializations++));
+    container.dispose();
+    await tester.runAsync(() async => Future<void>.delayed(Duration.zero));
+    await tester.pump();
+    expect(serializations, 2);
+    expect(savedPreamp(), -5);
+  });
+
+  for (final mornye in [false, true]) {
+    testWidgets(
+      'EQ drags retain unrelated controls and current edits ($mornye)',
+      (tester) async {
+        tester.view.physicalSize = const Size(1200, 3000);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        final container = ProviderContainer();
+        addTearDown(container.dispose);
+        await tester.pumpWidget(
+          UncontrolledProviderScope(
+            container: container,
+            child: MaterialApp(
+              theme: mornye
+                  ? MornyeTheme.build(Brightness.dark)
+                  : AppTheme.light(),
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              home: const EqualizerScreen(),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final notifier = container.read(equalizerProvider.notifier);
+        notifier.update(
+          container.read(equalizerProvider).settings.copyWith(preamp: -1),
+        );
+        await tester.pumpAndSettle();
+        final page = tester.widget<Scaffold>(find.byType(Scaffold));
+        final picker = find.byType(
+          mornye ? MornyeSegmentedControl : M3EButtonGroup,
+        );
+        final bandPicker = tester.widget(picker);
+        Widget bass() => mornye
+            ? tester
+                  .widgetList<MornyeLevelSlider>(find.byType(MornyeLevelSlider))
+                  .firstWhere((slider) => slider.semanticLabel == 'Bass')
+            : tester
+                  .widgetList<AppSlider>(find.byType(AppSlider))
+                  .firstWhere((slider) => slider.semanticLabel == 'Bass');
+        final bassSlider = bass();
+        final gainSlider = mornye
+            ? tester
+                  .widgetList<MornyeLevelSlider>(find.byType(MornyeLevelSlider))
+                  .first
+            : tester.widgetList<AppSlider>(find.byType(AppSlider)).first;
+        for (var i = 1; i <= 20; i++) {
+          notifier.update(
+            container.read(equalizerProvider).settings.copyWith(preamp: -i / 2),
+          );
+          await tester.pump(const Duration(milliseconds: 16));
+          expect(tester.widget<Scaffold>(find.byType(Scaffold)), same(page));
+          expect(tester.widget(picker), same(bandPicker));
+          expect(bass(), same(bassSlider));
+        }
+        if (gainSlider is MornyeLevelSlider) {
+          gainSlider.onChanged!(5);
+        } else {
+          (gainSlider as AppSlider).onChanged!(5);
+        }
+        await tester.pump();
+        if (bassSlider is MornyeLevelSlider) {
+          bassSlider.onChanged!(3);
+        } else {
+          (bassSlider as AppSlider).onChanged!(3);
+        }
+        await tester.pump();
+        final settings = container.read(equalizerProvider).settings;
+        expect(settings.preamp, -10);
+        expect(settings.gains.first, 5);
+        expect(settings.bass, 3);
+        expect(playbackEqualizer.value, same(settings));
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pump(const Duration(milliseconds: 350));
+      },
+    );
+  }
 
   test('band resampling preserves flat curves and center gains', () {
     for (final count in EqualizerSettings.bandCounts) {

@@ -117,22 +117,21 @@ class _ActionRow extends StatelessWidget {
 }
 
 /// Status, master switch and the estimated response of the whole chain.
-class _EqualizerOverview extends StatelessWidget {
-  const _EqualizerOverview({
-    required this.settings,
-    required this.presetName,
-    this.onEnabledChanged,
-  });
-
-  final EqualizerSettings settings;
-  final String presetName;
+class _EqualizerOverview extends ConsumerWidget {
+  const _EqualizerOverview({this.onEnabledChanged});
 
   /// Shows the master switch beside the title; Mornye keeps it in its own
   /// row above.
   final ValueChanged<bool>? onEnabledChanged;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final settings = ref.watch(
+      equalizerProvider.select((state) => state.settings),
+    );
+    final presetName =
+        ref.watch(_selectedEqualizerPresetProvider)?.name ??
+        context.l10n.equalizerCustom;
     final l10n = context.l10n;
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
@@ -238,10 +237,8 @@ class _EqualizerOverview extends StatelessWidget {
 }
 
 /// Quick-apply chips for every preset, plus save, reset and overflow actions.
-class _PresetBar extends StatelessWidget {
+class _PresetBar extends ConsumerWidget {
   const _PresetBar({
-    required this.presets,
-    required this.selected,
     required this.busy,
     required this.onApply,
     required this.onSave,
@@ -249,8 +246,6 @@ class _PresetBar extends StatelessWidget {
     required this.onAction,
   });
 
-  final List<EqualizerPreset> presets;
-  final EqualizerPreset? selected;
   final bool busy;
   final ValueChanged<EqualizerPreset> onApply;
   final VoidCallback onSave;
@@ -258,7 +253,12 @@ class _PresetBar extends StatelessWidget {
   final ValueChanged<_PresetAction> onAction;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final custom = ref.watch(
+      equalizerProvider.select((state) => state.presets),
+    );
+    final presets = [...EqualizerPreset.builtIn, ...custom];
+    final selected = ref.watch(_selectedEqualizerPresetProvider);
     final l10n = context.l10n;
     final tokens = context.tokens;
     return LayoutBuilder(
@@ -350,25 +350,29 @@ class _PresetBar extends StatelessWidget {
 }
 
 /// Band count picker and one vertical gain fader per band.
-class _BandEditor extends StatelessWidget {
-  const _BandEditor({required this.settings, required this.onChanged});
-
-  final EqualizerSettings settings;
-  final ValueChanged<EqualizerSettings> onChanged;
+class _BandEditor extends ConsumerWidget {
+  const _BandEditor();
 
   static const _minColumnWidth = 32.0;
   static const _faderHeight = 208.0;
 
-  void _setGain(int index, double value) {
+  void _setGain(WidgetRef ref, int index, double value) {
+    final settings = ref.read(equalizerProvider).settings;
+    if (index >= settings.gains.length) return;
     final gains = [...settings.gains];
     gains[index] = value;
-    onChanged(settings.copyWith(gains: gains));
+    ref
+        .read(equalizerProvider.notifier)
+        .update(settings.copyWith(gains: gains));
   }
 
-  Widget _countPicker(BuildContext context) {
-    final count = settings.gains.length;
+  Widget _countPicker(BuildContext context, WidgetRef ref, int count) {
     const counts = EqualizerSettings.bandCounts;
-    void select(int index) => onChanged(settings.withBandCount(counts[index]));
+    void select(int index) => ref
+        .read(equalizerProvider.notifier)
+        .update(
+          ref.read(equalizerProvider).settings.withBandCount(counts[index]),
+        );
     if (context.isMornye) {
       return Semantics(
         label: context.l10n.equalizerBands,
@@ -414,12 +418,15 @@ class _BandEditor extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final tokens = context.tokens;
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     final l10n = context.l10n;
-    final count = settings.gains.length;
+    final count = ref.watch(
+      equalizerProvider.select((state) => state.settings.gains.length),
+    );
+    final frequencies = ref.read(equalizerProvider).settings.frequencies;
     return Padding(
       padding: EdgeInsets.symmetric(vertical: tokens.gapLg),
       child: Column(
@@ -429,7 +436,7 @@ class _BandEditor extends StatelessWidget {
             padding: EdgeInsets.symmetric(horizontal: tokens.gapLg),
             child: SizedBox(
               width: double.infinity,
-              child: _countPicker(context),
+              child: _countPicker(context, ref, count),
             ),
           ),
           SizedBox(height: tokens.gapLg),
@@ -443,13 +450,21 @@ class _BandEditor extends StatelessWidget {
                   for (var i = 0; i < count; i++)
                     SizedBox(
                       width: width,
-                      child: _BandFader(
-                        frequency: settings.frequencies[i],
-                        gain: settings.gains[i],
-                        width: width,
-                        height: _faderHeight,
-                        resetLabel: l10n.libraryFilterReset,
-                        onChanged: (v) => _setGain(i, v),
+                      child: Consumer(
+                        builder: (context, ref, _) => _BandFader(
+                          frequency: frequencies[i],
+                          gain: ref.watch(
+                            equalizerProvider.select(
+                              (state) => i < state.settings.gains.length
+                                  ? state.settings.gains[i]
+                                  : 0.0,
+                            ),
+                          ),
+                          width: width,
+                          height: _faderHeight,
+                          resetLabel: l10n.libraryFilterReset,
+                          onChanged: (v) => _setGain(ref, i, v),
+                        ),
                       ),
                     ),
                 ],
@@ -611,17 +626,49 @@ class _BandFader extends StatelessWidget {
 }
 
 /// A labelled slider row with its live value in a tonal badge.
-class _SliderTile extends StatelessWidget {
+enum _ToneControl {
+  preamp,
+  bass,
+  treble,
+  balance,
+  threshold,
+  ratio,
+  attack,
+  release;
+
+  double value(EqualizerSettings settings) => switch (this) {
+    preamp => settings.preamp,
+    bass => settings.bass,
+    treble => settings.treble,
+    balance => settings.balance * 100,
+    threshold => settings.threshold,
+    ratio => settings.ratio,
+    attack => settings.attack,
+    release => settings.release,
+  };
+
+  EqualizerSettings change(EqualizerSettings settings, double value) =>
+      switch (this) {
+        preamp => settings.copyWith(preamp: value),
+        bass => settings.copyWith(bass: value),
+        treble => settings.copyWith(treble: value),
+        balance => settings.copyWith(balance: value / 100),
+        threshold => settings.copyWith(threshold: value),
+        ratio => settings.copyWith(ratio: value),
+        attack => settings.copyWith(attack: value),
+        release => settings.copyWith(release: value),
+      };
+}
+
+class _SliderTile extends ConsumerWidget {
   const _SliderTile({
     required this.title,
-    required this.value,
+    required this.control,
     required this.min,
     required this.max,
     required this.step,
     required this.unit,
-    required this.onChanged,
     this.icon,
-    this.subtitle,
     this.centered = false,
     this.signed = true,
     this.indented = false,
@@ -630,8 +677,8 @@ class _SliderTile extends StatelessWidget {
 
   final IconData? icon;
   final String title;
-  final String? subtitle;
-  final double value, min, max, step;
+  final _ToneControl control;
+  final double min, max, step;
   final String unit;
   final bool centered, signed;
 
@@ -640,7 +687,6 @@ class _SliderTile extends StatelessWidget {
 
   /// Ends a Mornye group, which separates rows with hairlines.
   final bool last;
-  final ValueChanged<double> onChanged;
 
   String _format(double v) {
     final digits = step < 1 ? 1 : 0;
@@ -651,7 +697,21 @@ class _SliderTile extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final (value, inputGain) = ref.watch(
+      equalizerProvider.select(
+        (state) => (
+          control.value(state.settings),
+          control == _ToneControl.preamp ? state.settings.inputGain : 0.0,
+        ),
+      ),
+    );
+    final subtitle = control == _ToneControl.preamp
+        ? '${context.l10n.equalizerEffectivePreamp}: ${_signed(inputGain)} dB'
+        : null;
+    void onChanged(double value) => ref
+        .read(equalizerProvider.notifier)
+        .update(control.change(ref.read(equalizerProvider).settings, value));
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     final tokens = context.tokens;
