@@ -6,6 +6,7 @@ import 'package:mornye/controllers/local_track_batch_actions.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/models/unified_library_item.dart';
 import 'package:mornye/providers/library_search_provider.dart';
+import 'package:mornye/providers/library_lyrics_search_provider.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/playback_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
@@ -61,6 +62,7 @@ class LibrarySearchResults extends ConsumerStatefulWidget {
 
 class _LibrarySearchResultsState extends ConsumerState<LibrarySearchResults> {
   LibrarySearchKind? _kind;
+  bool _lyricsSearch = false;
   int _pages = 1;
 
   // Long-pressed songs, keyed by UnifiedLibraryItem.id in selection order.
@@ -315,7 +317,14 @@ class _LibrarySearchResultsState extends ConsumerState<LibrarySearchResults> {
   };
 
   void _select(LibrarySearchKind? kind) => setState(() {
+    _lyricsSearch = false;
     _kind = kind;
+    _pages = 1;
+  });
+
+  void _selectLyrics() => setState(() {
+    _lyricsSearch = true;
+    _kind = LibrarySearchKind.songs;
     _pages = 1;
   });
 
@@ -758,14 +767,14 @@ class _LibrarySearchResultsState extends ConsumerState<LibrarySearchResults> {
     }
 
     final slivers = <Widget>[
-      if (!widget.shelves || _kind != null)
-        SliverToBoxAdapter(
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-            child: Row(
-              spacing: 8,
-              children: [
+      SliverToBoxAdapter(
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          child: Row(
+            spacing: 8,
+            children: [
+              if (!widget.shelves || _kind != null)
                 for (final kind in [null, ...LibrarySearchKind.values])
                   AppChoiceChip(
                     label: Text(
@@ -773,18 +782,68 @@ class _LibrarySearchResultsState extends ConsumerState<LibrarySearchResults> {
                           ? context.l10n.historyFilterAll
                           : _label(kind),
                     ),
-                    selected: _kind == kind,
+                    selected: !_lyricsSearch && _kind == kind,
                     singleChoice: true,
                     onSelected: (_) => _select(kind),
+                  ),
+              AppChoiceChip(
+                label: Text(context.l10n.trackLyrics),
+                selected: _lyricsSearch,
+                singleChoice: true,
+                onSelected: (_) => _selectLyrics(),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ];
+    var hasResults = false;
+    var loading = false;
+    var failed = false;
+    if (_lyricsSearch) {
+      final progress = ref.watch(libraryLyricsIndexProvider);
+      loading = !progress.hasError && progress.value?.complete != true;
+      failed = progress.hasError || (progress.value?.failed ?? 0) > 0;
+      slivers.add(
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(context.l10n.libraryLyricsSearchDescription),
+                if (loading)
+                  Text(
+                    context.l10n.libraryLyricsIndexing(
+                      progress.value?.checked ?? 0,
+                    ),
+                  ),
+                if (failed) Text(context.l10n.libraryLyricsSearchIncomplete),
+                if (!loading)
+                  ExpressiveButton(
+                    text: true,
+                    icon: const Icon(Icons.refresh),
+                    onPressed: () async {
+                      try {
+                        final store = await ref.read(
+                          libraryLyricsSearchStoreProvider.future,
+                        );
+                        await store.clear();
+                        if (mounted) ref.invalidate(libraryLyricsIndexProvider);
+                      } catch (_) {
+                        if (mounted) {
+                          ref.invalidate(libraryLyricsSearchStoreProvider);
+                        }
+                      }
+                    },
+                    child: Text(context.l10n.libraryLyricsRefresh),
                   ),
               ],
             ),
           ),
         ),
-    ];
-    var hasResults = false;
-    var loading = false;
-    var failed = false;
+      );
+    }
     final visibleSongs = <LibrarySearchHit>[];
     final kinds = _kind != null
         ? [_kind!]
@@ -817,7 +876,11 @@ class _LibrarySearchResultsState extends ConsumerState<LibrarySearchResults> {
           limit: pageSize + 1,
           offset: page * pageSize,
         );
-        final result = ref.watch(librarySearchProvider(request));
+        final result = ref.watch(
+          _lyricsSearch
+              ? libraryLyricsSearchProvider(request)
+              : librarySearchProvider(request),
+        );
         loading |= result.isLoading;
         failed |= result.hasError;
         final hits = result.value ?? const <LibrarySearchHit>[];
@@ -878,8 +941,14 @@ class _LibrarySearchResultsState extends ConsumerState<LibrarySearchResults> {
                 child: ExpressiveButton(
                   text: true,
                   icon: const Icon(Icons.refresh),
-                  onPressed: () =>
-                      ref.invalidate(librarySearchProvider(request)),
+                  onPressed: () {
+                    if (_lyricsSearch) {
+                      ref.invalidate(libraryLyricsIndexProvider);
+                      ref.invalidate(libraryLyricsSearchProvider(request));
+                    } else {
+                      ref.invalidate(librarySearchProvider(request));
+                    }
+                  },
                   child: Text('${_label(kind)} · ${context.l10n.dialogRetry}'),
                 ),
               ),

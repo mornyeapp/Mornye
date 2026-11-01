@@ -10,6 +10,7 @@ import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/services/history_database.dart';
 import 'package:mornye/services/download_file_recovery.dart';
 import 'package:mornye/services/history_maintenance.dart';
+import 'package:mornye/services/source_metadata_events.dart';
 import 'package:mornye/utils/logger.dart';
 import 'package:mornye/utils/file_access.dart';
 import 'package:mornye/utils/string_utils.dart';
@@ -779,6 +780,11 @@ class DownloadHistoryNotifier extends Notifier<DownloadHistoryState> {
       lookupItems: _lookupItemsWithUpdates([updated]),
     );
     _bumpHistoryRevision();
+    if (hasLyrics != null) {
+      // Listeners can enqueue a metadata probe themselves. Publish after the
+      // history write without waiting inside its serialized write queue.
+      unawaited(SourceMetadataEvents.instance.publish(updated.filePath));
+    }
   });
 
   static const _audioExtensions = [

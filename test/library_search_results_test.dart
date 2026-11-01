@@ -11,12 +11,16 @@ import 'package:mornye/l10n/app_localizations.dart';
 import 'package:mornye/models/unified_library_item.dart';
 import 'package:mornye/providers/download_history_provider.dart';
 import 'package:mornye/providers/library_search_provider.dart';
+import 'package:mornye/providers/library_lyrics_search_provider.dart';
 import 'package:mornye/providers/playback_provider.dart';
 import 'package:mornye/screens/track_metadata_screen.dart';
 import 'package:mornye/services/library_database.dart';
 import 'package:mornye/services/library_search.dart';
+import 'package:mornye/services/library_lyrics_search.dart';
 import 'package:mornye/services/music_player_service.dart';
 import 'package:mornye/theme/mornye_theme.dart';
+import 'package:mornye/utils/desktop_platform.dart';
+import 'package:mornye/widgets/app_choice_chip.dart';
 import 'package:mornye/widgets/library_search_results.dart';
 import 'package:mornye/widgets/track_card.dart';
 
@@ -46,6 +50,94 @@ LibrarySearchHit _hit(
 );
 
 void main() {
+  for (final desktop in [false, true]) {
+    for (final mornye in [false, true]) {
+      testWidgets(
+        'Lyrics filter is explicit, reuses indexing while typing, and cancels on exit ($desktop/$mornye)',
+        (tester) async {
+          debugDesktopPlatformOverride = desktop;
+          addTearDown(() => debugDesktopPlatformOverride = null);
+          tester.view.physicalSize = Size(desktop ? 1280 : 390, 900);
+          tester.view.devicePixelRatio = 1;
+          addTearDown(tester.view.reset);
+          SharedPreferences.setMockInitialValues({});
+          final query = ValueNotifier('moonlight');
+          addTearDown(query.dispose);
+          var started = 0;
+          var stopped = 0;
+          final progress = StreamController<LibraryLyricsIndexProgress>();
+          addTearDown(progress.close);
+          final queries = <String>[];
+          await tester.pumpWidget(
+            ProviderScope(
+              overrides: [
+                librarySearchProvider.overrideWith((ref, request) async => []),
+                libraryLyricsIndexProvider.overrideWith((ref) {
+                  started++;
+                  ref.onDispose(() => stopped++);
+                  return progress.stream;
+                }),
+                libraryLyricsSearchProvider.overrideWith((ref, request) async {
+                  queries.add(request.query);
+                  return [_hit(LibrarySearchKind.songs, 0, query: 'Matching')];
+                }),
+              ],
+              child: MaterialApp(
+                theme: mornye
+                    ? MornyeTheme.build(Brightness.light)
+                    : ThemeData(),
+                localizationsDelegates: AppLocalizations.localizationsDelegates,
+                supportedLocales: AppLocalizations.supportedLocales,
+                home: Scaffold(
+                  body: ValueListenableBuilder<String>(
+                    valueListenable: query,
+                    builder: (context, value, _) => CustomScrollView(
+                      slivers: [
+                        LibrarySearchResults(
+                          query: value,
+                          shelves: mornye,
+                          onOpenArtist: (_) {},
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+          expect(started, 0);
+          expect(queries, isEmpty);
+          final lyrics = find.widgetWithText(AppChoiceChip, 'Lyrics');
+          await tester.ensureVisible(lyrics);
+          await tester.pumpAndSettle();
+          await tester.tap(lyrics);
+          await tester.pump();
+          await tester.pump();
+          progress.add(const LibraryLyricsIndexProgress(checked: 8));
+          await tester.pump();
+          await tester.pump();
+          expect(started, 1);
+          expect(find.textContaining('8 songs checked'), findsOneWidget);
+          expect(find.text('Matching songs 0'), findsOneWidget);
+          query.value = 'dancing';
+          await tester.pump();
+          await tester.pump();
+          expect(queries, ['moonlight', 'dancing']);
+          expect(started, 1);
+          final all = find.widgetWithText(AppChoiceChip, 'All');
+          await tester.ensureVisible(all);
+          await tester.pump(const Duration(milliseconds: 300));
+          await tester.tap(all);
+          await tester.pumpAndSettle();
+          expect(stopped, 1);
+          expect(find.textContaining('songs checked'), findsNothing);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  }
+
   for (final mornye in [false, true]) {
     for (final local in [false, true]) {
       testWidgets(

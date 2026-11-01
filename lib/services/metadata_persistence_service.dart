@@ -4,6 +4,7 @@ import 'package:mornye/services/ffmpeg_metadata.dart';
 import 'package:mornye/services/metadata_cover_resources.dart';
 import 'package:mornye/services/network_file_editor.dart';
 import 'package:mornye/services/platform_bridge.dart';
+import 'package:mornye/services/source_metadata_events.dart';
 import 'package:mornye/utils/artist_utils.dart';
 
 enum MetadataSaveFailure {
@@ -95,7 +96,11 @@ class MetadataPersistenceService {
           succeeded: (result) => result.failure == null,
         );
       }
-      return await _saveLocal(request);
+      final saved = await _saveLocal(request);
+      if (saved.failure == null && request.metadata.containsKey('lyrics')) {
+        await SourceMetadataEvents.instance.publish(request.filePath);
+      }
+      return saved;
     } catch (error) {
       return MetadataSaveResult.failed(MetadataSaveFailure.unexpected, error);
     } finally {

@@ -1,4 +1,9 @@
 {
+  "libraryLyricsSearchDescription": "Search lyrics saved in your songs. The first search may take a while; you can switch filters to stop it.",
+  "libraryLyricsIndexing": "Preparing lyrics search: {count} songs checked",
+  "@libraryLyricsIndexing": {"placeholders": {"count": {"type": "int"}}},
+  "libraryLyricsSearchIncomplete": "Some songs could not be read. Results may be incomplete.",
+  "libraryLyricsRefresh": "Refresh lyrics search",
   "networkErrorListing": "The server responded, but its folder listing could not be read. For WebDAV, use the WebDAV endpoint. For HTTP, use a directory listing or direct audio URL.",
   "networkErrorStorage": "The server was reached, but this device could not save the connection. Check the app log and retry.",
   "extensionsUnsecuredStorage": "Use unsecured extension storage",

@@ -10,6 +10,7 @@ import 'package:mornye/services/library_queue_store.dart';
 import 'package:mornye/services/library_file_sizes.dart';
 import 'package:mornye/services/library_cleanup.dart';
 import 'package:mornye/services/library_search.dart';
+import 'package:mornye/services/library_lyrics_search.dart';
 import 'package:mornye/models/library_database_models.dart';
 import 'package:mornye/services/library_duplicates.dart';
 import 'package:mornye/services/network_storage_service.dart';
@@ -175,6 +176,18 @@ class LibraryDatabase {
           ),
       rebuild: false,
     );
+  }
+
+  /// Lyrics keeps a disposable cache beside the authoritative song indexes.
+  Future<Database> openLyricsSearchDatabase() async {
+    final db = await database;
+    await _ensureHistoryAttached(db);
+    return db;
+  }
+
+  Future<void> invalidateLyricsSearch(String path) async {
+    final db = await openLyricsSearchDatabase();
+    await LibraryLyricsSearchStore.invalidateStored(db, path);
   }
 
   /// [includeLocal] reads scanned rows, which the shadow snapshot serves.

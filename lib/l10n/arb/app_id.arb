@@ -1,4 +1,9 @@
 {
+  "libraryLyricsSearchDescription": "Cari lirik yang tersimpan di lagu. Pencarian pertama bisa memerlukan waktu; ganti filter untuk menghentikannya.",
+  "libraryLyricsIndexing": "Menyiapkan pencarian lirik: {count} lagu diperiksa",
+  "@libraryLyricsIndexing": {"placeholders": {"count": {"type": "int"}}},
+  "libraryLyricsSearchIncomplete": "Beberapa lagu tidak dapat dibaca. Hasil mungkin belum lengkap.",
+  "libraryLyricsRefresh": "Perbarui pencarian lirik",
   "networkErrorListing": "Server merespons, tetapi daftar foldernya tidak dapat dibaca. Untuk WebDAV, gunakan endpoint WebDAV. Untuk HTTP, gunakan daftar direktori atau URL audio langsung.",
   "networkErrorStorage": "Server berhasil diakses, tetapi perangkat ini tidak dapat menyimpan koneksi. Periksa log aplikasi lalu coba lagi.",
   "extensionsUnsecuredStorage": "Gunakan penyimpanan extension tanpa keyring",
