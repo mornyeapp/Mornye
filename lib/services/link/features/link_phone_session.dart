@@ -18,7 +18,8 @@ typedef LinkOpenUrl = void Function(String url);
 
 /// The phone's side of a session with the paired desktop while it lasts:
 /// it reports this phone's player as `player.state` (250 ms after a change
-/// and every 15 s), and obeys the desktop's `command` and `open` messages.
+/// and every 15 s while connected and playing), and obeys the desktop's
+/// `command` and `open` messages.
 class LinkPhoneSession {
   LinkPhoneSession({
     required this.client,
@@ -70,7 +71,10 @@ class LinkPhoneSession {
             lyricsTranslations?.connected();
             _lastSent = null;
             _schedule();
+          } else {
+            _debounceTimer?.cancel();
           }
+          _restartHeartbeat();
         }),
       );
     if (client.connectionState == LinkConnectionState.connected) {
@@ -93,20 +97,25 @@ class LinkPhoneSession {
 
   void _restartHeartbeat() {
     _heartbeatTimer?.cancel();
-    if (_disposed) return;
-    _heartbeatTimer = Timer.periodic(heartbeat, (_) => pushState());
+    _heartbeatTimer = null;
+    if (_disposed || !_connected || !player.snapshot.playing) return;
+    _heartbeatTimer = Timer(heartbeat, pushState);
   }
 
+  bool get _connected =>
+      client.connectionState == LinkConnectionState.connected;
+
   void _schedule() {
-    if (_disposed) return;
+    if (_disposed || !_connected) return;
     _debounceTimer?.cancel();
     _debounceTimer = Timer(debounce, pushState);
   }
 
   void _onPlayerChanged() {
-    if (_disposed) return;
+    if (_disposed || !_connected) return;
     final last = _lastSent;
     final snapshot = player.snapshot;
+    if (!snapshot.playing) _restartHeartbeat();
     if (last == null ||
         !identical(snapshot.queue, _sentQueue) ||
         _differs(last, snapshot)) {
@@ -162,7 +171,7 @@ class LinkPhoneSession {
 
   /// Sends this phone's player now.
   void pushState() {
-    if (_disposed) return;
+    if (_disposed || !_connected) return;
     _debounceTimer?.cancel();
     final snapshot = player.snapshot;
     final built = _build(snapshot);

@@ -2,8 +2,9 @@
 //! key, JSON text frames. The first client frame must be `hello` for the
 //! key's device (else close 4401); the server answers `welcome`, reports the
 //! client list as `linkClients`, forwards later frames as `linkMessage`,
-//! pings every 20 s and drops clients silent for 60 s. One connection per
-//! device: a newer one replaces the older (close 4409).
+//! checks for silence every 20 s, pings after 20 s without a client frame,
+//! and drops clients silent for 60 s. One connection per device: a newer one
+//! replaces the older (close 4409).
 
 use crate::server::State;
 use crate::store::{DeviceRecord, now_ms};
@@ -316,10 +317,13 @@ where
                         Some(Err(_)) | None => return None,
                     },
                     _ = ping.tick() => {
-                        if last_heard.elapsed() >= timeout {
+                        let silence = last_heard.elapsed();
+                        if silence >= timeout {
                             return Some((CLOSE_GOING_AWAY, "idle"));
                         }
-                        if !send(&mut socket, Message::Ping(Bytes::new()), timeout).await {
+                        if silence >= period
+                            && !send(&mut socket, Message::Ping(Bytes::new()), timeout).await
+                        {
                             return None;
                         }
                     }

@@ -29,11 +29,15 @@ struct Fixture {
 
 impl Fixture {
     async fn new(idle_timeout: Duration) -> Self {
-        let dir = tempfile::tempdir().unwrap();
-        let tuning = Tuning {
+        Self::with(Tuning {
             idle_timeout,
             ..Tuning::default()
-        };
+        })
+        .await
+    }
+
+    async fn with(tuning: Tuning) -> Self {
+        let dir = tempfile::tempdir().unwrap();
         let store = Store::open(dir.path()).unwrap();
         let device = store.upsert("phone", "Phone", "android", false).unwrap();
         let state = Arc::new(State {
@@ -109,6 +113,61 @@ impl Fixture {
             .unwrap();
         assert!(!self.state.clients.is_connected("phone"));
     }
+}
+
+#[tokio::test(start_paused = true)]
+async fn recent_client_pings_suppress_server_pings_and_keep_the_session_alive() {
+    let mut fixture = Fixture::with(Tuning {
+        ping_interval: Duration::from_millis(100),
+        idle_timeout: Duration::from_millis(300),
+        ..Tuning::default()
+    })
+    .await;
+    fixture.welcome().await;
+    for _ in 0..5 {
+        tokio::time::advance(Duration::from_millis(50)).await;
+        fixture
+            .socket
+            .send(Message::Ping(Bytes::new()))
+            .await
+            .unwrap();
+        assert!(matches!(
+            fixture.socket.next().await,
+            Some(Ok(Message::Pong(_)))
+        ));
+        tokio::time::advance(Duration::from_millis(50)).await;
+        tokio::task::yield_now().await;
+    }
+    assert!(fixture.state.clients.is_connected("phone"));
+    fixture.state.shutdown.cancel();
+    fixture.finished().await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn silent_clients_are_pinged_then_closed_at_the_idle_deadline() {
+    let mut fixture = Fixture::with(Tuning {
+        ping_interval: Duration::from_millis(100),
+        idle_timeout: Duration::from_millis(300),
+        ..Tuning::default()
+    })
+    .await;
+    fixture.welcome().await;
+    tokio::time::advance(Duration::from_millis(100)).await;
+    // Read the empty ping without tungstenite queuing a pong for it.
+    let mut ping = [0; 2];
+    fixture
+        .socket
+        .get_mut()
+        .read_exact(&mut ping)
+        .await
+        .unwrap();
+    assert_eq!(ping, [0x89, 0]);
+    tokio::time::advance(Duration::from_millis(200)).await;
+    assert!(matches!(
+        fixture.socket.next().await,
+        Some(Ok(Message::Close(Some(frame)))) if u16::from(frame.code) == CLOSE_GOING_AWAY
+    ));
+    fixture.finished().await;
 }
 
 #[tokio::test]

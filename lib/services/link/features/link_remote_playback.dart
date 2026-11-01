@@ -169,7 +169,12 @@ final linkRemotePlaybackProvider = Provider<LinkRemotePlayback?>((ref) {
   }
 
   // Listening keeps the desktop's state alive while it plays for the phone.
-  ref.listen(linkDesktopRemoteProvider, (_, next) => update(next));
+  ref.listen(
+    linkDesktopRemoteProvider.select(
+      (state) => (state.player, state.connection, state.loading),
+    ),
+    (_, _) => update(ref.read(linkDesktopRemoteProvider)),
+  );
   ref.listen(settingsProvider.select((s) => (s.autoplay, s.autoMix)), (_, _) {
     unawaited(
       preferences.updateLocal().catchError((Object error) {

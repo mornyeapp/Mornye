@@ -68,7 +68,7 @@ typedef LinkTimerFactory = Timer Function(Duration delay, void Function() run);
 
 class _WebSocketLinkSocket implements LinkSocket {
   _WebSocketLinkSocket(this._socket) {
-    // The desktop pings every 20 s; pinging back finds a vanished desktop.
+    // Pinging every 20 s finds a vanished desktop, even while paused.
     _socket.pingInterval = const Duration(seconds: 20);
   }
 

@@ -310,16 +310,25 @@ void main() {
     await tester.pump(const Duration(seconds: 1));
     expect(pushed(), hasLength(2));
 
-    // The heartbeat repeats the state every 15 s.
-    await tester.pump(const Duration(seconds: 15));
+    // A paused position does not need the periodic heartbeat.
+    await tester.pump(const Duration(seconds: 60));
+    expect(pushed(), hasLength(2));
+
+    player.emit(snapshot());
+    await tester.pump(const Duration(milliseconds: 250));
     expect(pushed(), hasLength(3));
+    expect((pushed().last['state'] as Map)['playing'], isTrue);
+    await tester.pump(const Duration(milliseconds: 14749));
+    expect(pushed(), hasLength(3));
+    await tester.pump(const Duration(milliseconds: 1));
+    expect(pushed(), hasLength(4));
 
     // Without phones the heartbeat and pushes stop.
     backend.connect(const []);
     await tester.pump();
     player.emit(snapshot(playing: true, positionMs: 5));
     await tester.pump(const Duration(seconds: 16));
-    expect(pushed(), hasLength(3));
+    expect(pushed(), hasLength(4));
     await shutdown(tester);
   });
 

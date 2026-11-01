@@ -124,6 +124,66 @@ void main() {
       await tester.pump(const Duration(seconds: 30));
       expect(client.sentStates, hasLength(2));
     });
+
+    testWidgets('disconnected sessions do not build or resolve player state', (
+      tester,
+    ) async {
+      final lookup = FakeLibraryLookup();
+      client.setConnection(LinkConnectionState.disconnected);
+      final linked = session(lookup)..start();
+      linked.pushState();
+      player.update(playing(index: 1));
+      await tester.pump(const Duration(seconds: 60));
+      expect(linked.lastSent, isNull);
+      expect(lookup.queries, isEmpty);
+      expect(client.sentStates, isEmpty);
+
+      client.setConnection(LinkConnectionState.connected);
+      await tester.pump(const Duration(milliseconds: 250));
+      expect(client.sentStates, hasLength(1));
+      expect(client.sentStates.single.index, 1);
+      final last = linked.lastSent;
+      final queries = lookup.queries.length;
+      await player.pause();
+      client.setConnection(LinkConnectionState.disconnected);
+      linked.pushState();
+      await tester.pump(const Duration(seconds: 60));
+      expect(linked.lastSent, same(last));
+      expect(lookup.queries, hasLength(queries));
+
+      client.setConnection(LinkConnectionState.connected);
+      await tester.pump(const Duration(milliseconds: 250));
+      expect(client.sentStates, hasLength(2));
+      expect(client.sentStates.last.playing, isFalse);
+      linked.dispose();
+    });
+
+    testWidgets('paused players send changes without periodic heartbeats', (
+      tester,
+    ) async {
+      final linked = session()..start();
+      await tester.pump(const Duration(milliseconds: 250));
+      await player.pause();
+      await tester.pump(const Duration(milliseconds: 250));
+      expect(client.sentStates, hasLength(2));
+      expect(client.sentStates.last.playing, isFalse);
+      await tester.pump(const Duration(seconds: 60));
+      expect(client.sentStates, hasLength(2));
+
+      await player.seek(const Duration(seconds: 12));
+      await tester.pump(const Duration(milliseconds: 250));
+      expect(client.sentStates, hasLength(3));
+      expect(client.sentStates.last.positionMs, 12000);
+      await player.play();
+      await tester.pump(const Duration(milliseconds: 250));
+      expect(client.sentStates, hasLength(4));
+      expect(client.sentStates.last.playing, isTrue);
+      await tester.pump(const Duration(milliseconds: 14999));
+      expect(client.sentStates, hasLength(4));
+      await tester.pump(const Duration(milliseconds: 1));
+      expect(client.sentStates, hasLength(5));
+      linked.dispose();
+    });
   });
 
   group('incoming messages', () {

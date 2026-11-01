@@ -781,6 +781,7 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
   void _onLocalPlaying(bool playing) {
     if (playing == _localPlaying) return;
     _localPlaying = playing;
+    _updateHeartbeat();
     if (playing) {
       if (state.followedPhone != null) {
         state = state.copyWith(followedPhone: null);
@@ -932,7 +933,7 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
   }
 
   void _updateHeartbeat() {
-    final wanted = state.running && state.clients.isNotEmpty;
+    final wanted = state.running && state.clients.isNotEmpty && _localPlaying;
     if (!wanted) {
       _heartbeat?.cancel();
       _heartbeat = null;

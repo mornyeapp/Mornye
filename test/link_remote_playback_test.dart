@@ -27,7 +27,7 @@ import 'support/link_fakes.dart';
 
 /// The phone's player with its playback states pushed by the test.
 class _Runtime extends MusicPlayerRuntime {
-  _Runtime(this.states);
+  _Runtime(this.states, {super.dependencies});
 
   final StreamController<PlaybackState> states;
 
@@ -156,6 +156,80 @@ void main() {
 
   String desktopCover(String songId) =>
       linkDesktopCoverSource(linkTestServer, songId);
+
+  test(
+    'download updates leave the active paused playback stream quiet',
+    () async {
+      client.onGet = (op, _) =>
+          op == LinkOps.state ? _state(playing: false)['state'] : null;
+      final localStates = StreamController<PlaybackState>.broadcast();
+      addTearDown(localStates.close);
+      final phone = ProviderContainer(
+        overrides: [
+          linkPhoneClientProvider.overrideWithValue(client),
+          musicPlayerRuntimeProvider.overrideWithValue(
+            _Runtime(
+              localStates,
+              dependencies: PlaybackDependencies(coverStore: covers),
+            ),
+          ),
+          settingsProvider.overrideWith(_PlaybackSettings.new),
+          linkHandoffProvider.overrideWithValue(
+            LinkHandoff(
+              client: client,
+              player: FakePhonePlayer(),
+              refs: LinkTrackRefCache(lookup: lookup, server: client.server),
+              resolver: LinkTrackResolver(
+                lookup: lookup,
+                server: client.server,
+              ),
+            ),
+          ),
+        ],
+      );
+      addTearDown(phone.dispose);
+      phone.listen(linkRemotePlaybackProvider, (_, _) {});
+      phone.read(linkPlaysOnDesktopProvider.notifier).set(true);
+      await settle();
+      final active = phone.read(linkRemotePlaybackProvider)!;
+      await active.mediaItems
+          .firstWhere((item) => item?.artUri != null)
+          .timeout(const Duration(seconds: 2));
+      final states = <PlaybackState>[];
+      final subscription = active.playbackStates.listen(states.add);
+      addTearDown(subscription.cancel);
+      await settle();
+      expect(states.single.playing, isFalse);
+      states.clear();
+      for (var i = 1; i <= 3; i++) {
+        client.push({
+          'type': LinkMessageTypes.downloadsChanged,
+          'items': [
+            {
+              'id': 'download',
+              'title': 'Song',
+              'status': 'downloading',
+              'progress': i / 4,
+            },
+          ],
+        });
+        await settle();
+      }
+      expect(
+        phone.read(linkDesktopRemoteProvider).downloads.single.progress,
+        0.75,
+      );
+      expect(states, isEmpty);
+
+      client.push(_state());
+      await settle();
+      expect(states.last.playing, isTrue);
+      states.clear();
+      client.setConnection(LinkConnectionState.disconnected);
+      await settle();
+      expect(states, isNotEmpty);
+    },
+  );
 
   test(
     'active remote preferences stay synchronized through reconnection',

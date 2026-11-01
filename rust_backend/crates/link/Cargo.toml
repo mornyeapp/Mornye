@@ -39,6 +39,7 @@ mornye-core.workspace = true
 [dev-dependencies]
 tempfile.workspace = true
 roxmltree.workspace = true
+tokio = { workspace = true, features = ["test-util"] }
 
 [lints]
 workspace = true
