@@ -4,6 +4,7 @@ import 'package:mornye/models/library_database_models.dart';
 import 'package:mornye/models/track.dart';
 import 'package:mornye/services/cover_store.dart';
 import 'package:mornye/services/music_player_runtime.dart';
+import 'package:mornye/services/playback_metadata.dart';
 import 'package:mornye/utils/file_access.dart' show isContentUri;
 import 'package:mornye/utils/int_utils.dart';
 import 'package:mornye/utils/ios_container_paths.dart';
@@ -25,6 +26,7 @@ class PlayableMedia {
   final bool explicit;
   final String? genre;
   final bool autoplay;
+  final Map<String, dynamic> displayMetadata;
 
   const PlayableMedia({
     required this.id,
@@ -42,6 +44,7 @@ class PlayableMedia {
     this.explicit = false,
     this.genre,
     this.autoplay = false,
+    this.displayMetadata = const {},
   });
 
   /// The `network://` cover the cover store keeps for this song:
@@ -72,6 +75,7 @@ class PlayableMedia {
     if (explicit) 'explicit': true,
     if (genre != null) 'genre': genre,
     if (autoplay) 'autoplay': true,
+    if (displayMetadata.isNotEmpty) 'displayMetadata': displayMetadata,
   };
 
   static PlayableMedia? fromJson(
@@ -115,6 +119,7 @@ class PlayableMedia {
       explicit: parseExplicitFlag(json['explicit']) == true,
       genre: json['genre'] as String?,
       autoplay: json['autoplay'] == true,
+      displayMetadata: playbackDisplayMetadata(json['displayMetadata']),
     );
   }
 
@@ -156,6 +161,7 @@ class PlayableMedia {
           : null,
       extras: {
         'source': source,
+        if (displayMetadata.isNotEmpty) 'displayMetadata': displayMetadata,
         if (resolvedSource != null && resolvedSource.isNotEmpty)
           'resolvedSource': resolvedSource,
         'artworkRef': ?reference,

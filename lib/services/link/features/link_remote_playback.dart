@@ -15,6 +15,7 @@ import 'package:mornye/services/link/features/link_track_refs.dart';
 import 'package:mornye/services/link/features/link_track_resolver.dart';
 import 'package:mornye/services/link/link_client_api.dart';
 import 'package:mornye/services/link/link_mirrored_playback.dart';
+import 'package:mornye/services/link/link_playback_details.dart';
 import 'package:mornye/services/link/link_protocol.dart';
 import 'package:mornye/services/playable_media.dart';
 import 'package:mornye/services/source_metadata_events.dart';
@@ -190,6 +191,12 @@ final linkRemotePlaybackProvider = Provider<LinkRemotePlayback?>((ref) {
     covers: runtime.dependencies.coverStore,
     initialItem: ref.read(localMediaItemProvider).value,
     initialState: runtime.handler?.playbackState.value,
+    details: (track, local) => readLinkPlaybackDetails(
+      client: client,
+      track: track,
+      local: local,
+      covers: runtime.dependencies.coverStore,
+    ),
   );
   update(ref.read(linkDesktopRemoteProvider));
   ref.onDispose(
@@ -235,6 +242,7 @@ class LinkRemotePlayback extends LinkMirroredPlayback {
     required LinkDesktopRemote remote,
     required LinkHandoff handoff,
     required super.covers,
+    Future<PlayableMedia?> Function(TrackRef, PlayableMedia?)? details,
     super.extractArtwork,
     super.initialItem,
     super.initialState,
@@ -242,10 +250,12 @@ class LinkRemotePlayback extends LinkMirroredPlayback {
     super.seekTimeout,
     super.nowMs,
   }) : _remote = remote,
-       _handoff = handoff;
+       _handoff = handoff,
+       _details = details;
 
   final LinkDesktopRemote _remote;
   final LinkHandoff _handoff;
+  final Future<PlayableMedia?> Function(TrackRef, PlayableMedia?)? _details;
   LinkConnectionState? _connection;
 
   /// Shows the desktop's [state].
@@ -268,8 +278,11 @@ class LinkRemotePlayback extends LinkMirroredPlayback {
 
   /// The phone's file for [ref], else the desktop's song with its cover.
   @override
-  Future<PlayableMedia?> resolvePlayable(TrackRef ref) =>
-      _handoff.resolver.resolve(ref);
+  Future<PlayableMedia?> resolvePlayable(TrackRef ref) {
+    final local = _handoff.resolver.resolve(ref);
+    if (ref.songId != null || _details == null) return local;
+    return local.then((media) => _details(ref, media));
+  }
 
   @override
   Future<void> playAll(List<PlayableMedia> items, {int initialIndex = 0}) =>

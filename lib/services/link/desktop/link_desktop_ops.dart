@@ -10,6 +10,7 @@ import 'package:mornye/services/link/desktop/link_catalog_index.dart';
 import 'package:mornye/services/link/desktop/link_downloads.dart';
 import 'package:mornye/services/link/desktop/link_player.dart';
 import 'package:mornye/services/link/link_host_router.dart';
+import 'package:mornye/services/link/link_playback_details.dart';
 import 'package:mornye/services/link/link_protocol.dart';
 import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/services/playable_media.dart';
@@ -161,6 +162,7 @@ class LinkDesktopOps {
     void Function(bool)? setAutoplay,
     void Function(bool)? setAutoMix,
     int Function()? nowMs,
+    LinkPlaybackDetails? playbackDetails,
   }) : _player = player,
        _downloads = downloads,
        _downloadItems = downloadItems,
@@ -175,7 +177,8 @@ class LinkDesktopOps {
        _autoMix = autoMix,
        _setAutoplay = setAutoplay,
        _setAutoMix = setAutoMix,
-       _nowMs = nowMs ?? (() => DateTime.now().millisecondsSinceEpoch);
+       _nowMs = nowMs ?? (() => DateTime.now().millisecondsSinceEpoch),
+       _playbackDetails = playbackDetails ?? LinkPlaybackDetails();
 
   /// The longest play queue the Subsonic `getPlayQueue` answer carries.
   static const maxPlayQueue = 1000;
@@ -200,6 +203,7 @@ class LinkDesktopOps {
   final void Function(bool)? _setAutoplay;
   final void Function(bool)? _setAutoMix;
   final int Function() _nowMs;
+  final LinkPlaybackDetails _playbackDetails;
   final _random = math.Random();
 
   /// The queue the last `handoff/play` started, which `handoff/append`
@@ -215,6 +219,27 @@ class LinkDesktopOps {
   void register(LinkHostRouter router) {
     router
       ..register(LinkOps.state, (_) async => state().toJson())
+      ..register(LinkOps.playbackDetails, (request) async {
+        final track = TrackRef.fromJson(request.args['track']);
+        if (track == null) throw _invalid('Missing playback track');
+        final snapshot = _player.snapshot();
+        final current = snapshot.current;
+        final window = linkQueueWindow(snapshot.queue.length, snapshot.index);
+        final candidates = [
+          ?current,
+          ...snapshot.queue.getRange(window.start, window.end),
+        ];
+        final index = _index();
+        for (final item in candidates) {
+          if (linkTrackRef(item, index: index) == track) {
+            return _playbackDetails.read(item);
+          }
+        }
+        throw const LinkException(
+          'unavailable',
+          'The track left the play queue',
+        );
+      })
       ..register(LinkOps.command, _command)
       ..register(LinkOps.handoffPlay, (request) => playHandoff(request.args))
       ..register(

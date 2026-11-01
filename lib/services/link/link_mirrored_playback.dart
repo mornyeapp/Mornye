@@ -385,7 +385,7 @@ abstract class LinkMirroredPlayback implements RemotePlayback {
     source: media?.source ?? '',
     title: ref.title,
     artist: ref.artist,
-    album: ref.album ?? media?.album ?? '',
+    album: ref.album?.isNotEmpty == true ? ref.album! : media?.album ?? '',
     artUri: media?.artUri,
     networkArtworkSource: media?.networkArtworkSource,
     duration: ref.durationMs == null
@@ -398,6 +398,7 @@ abstract class LinkMirroredPlayback implements RemotePlayback {
     explicit: media?.explicit ?? false,
     genre: media?.genre,
     autoplay: media?.autoplay ?? false,
+    displayMetadata: media?.displayMetadata ?? const {},
   );
 
   /// Looks [ref] up once, with its cover: the one embedded in a local file,

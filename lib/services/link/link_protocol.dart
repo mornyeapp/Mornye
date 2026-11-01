@@ -103,6 +103,9 @@ abstract final class LinkOps {
   static const downloads = 'downloads';
   static const open = 'open';
   static const resolve = 'resolve';
+
+  /// Display tags and a bounded thumbnail for an entry in the host's queue.
+  static const playbackDetails = 'player/details';
   static const libraryJobs = 'library/jobs';
   static const collections = 'collections';
   static const history = 'history';

@@ -160,6 +160,20 @@ class PlayerMetadataController extends ChangeNotifier {
   }) async {
     if (_disposed) return;
     final source = item?.extras?['source']?.toString() ?? '';
+    if (item != null &&
+        source.isEmpty &&
+        item.extras?['displayMetadata'] is Map) {
+      _generation++;
+      _probePending = false;
+      _resetOnlineSearch();
+      _item = null;
+      _requestKey = (item.id, source, null);
+      _loadedPath = null;
+      _fallback = Map.unmodifiable(playbackAudioMetadataFromMediaItem(item));
+      final pending = _replaceMetadata(_fallback);
+      if (pending != null) await pending;
+      return;
+    }
     if (item == null || source.isEmpty) {
       _item = null;
       if (_requestKey == null) return;

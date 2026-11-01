@@ -7,6 +7,7 @@ import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/services/link/desktop/link_catalog_index.dart';
 import 'package:mornye/services/link/link_protocol.dart';
 import 'package:mornye/services/music_player_runtime.dart';
+import 'package:mornye/services/playback_metadata.dart';
 import 'package:mornye/services/playable_media.dart';
 import 'package:mornye/services/playback_deck.dart';
 
@@ -20,6 +21,9 @@ class LinkPlayerItem {
     required this.artist,
     this.album,
     this.durationMs,
+    this.artwork,
+    this.metadataSource,
+    this.audioMetadata = const {},
   });
 
   factory LinkPlayerItem.fromMediaItem(MediaItem item) => LinkPlayerItem(
@@ -29,6 +33,9 @@ class LinkPlayerItem {
     artist: item.artist ?? '',
     album: item.album,
     durationMs: item.duration?.inMilliseconds,
+    artwork: item.artUri?.toString(),
+    metadataSource: item.extras?['resolvedSource']?.toString(),
+    audioMetadata: playbackAudioMetadataFromMediaItem(item),
   );
 
   /// The media id: a Library or history row id, or a path.
@@ -40,6 +47,9 @@ class LinkPlayerItem {
   final String artist;
   final String? album;
   final int? durationMs;
+  final String? artwork;
+  final String? metadataSource;
+  final Map<String, dynamic> audioMetadata;
 }
 
 /// The desktop player at one moment.
@@ -129,6 +139,9 @@ class RuntimeLinkPlayerPort implements LinkPlayerPort {
   final MusicPlayerController _controller;
   List<MediaItem>? _mappedQueue;
   List<LinkPlayerItem> _mapped = const [];
+  MediaItem? _mappedCurrent;
+  List<LinkPlayerItem>? _currentBase;
+  List<LinkPlayerItem> _currentItems = const [];
 
   @override
   LinkPlayerSnapshot snapshot() {
@@ -158,6 +171,21 @@ class RuntimeLinkPlayerPort implements LinkPlayerPort {
         items = [LinkPlayerItem.fromMediaItem(current)];
         index = 0;
       }
+    }
+    if (current != null &&
+        index >= 0 &&
+        index < queue.length &&
+        !identical(current, queue[index])) {
+      if (!identical(current, _mappedCurrent) ||
+          !identical(items, _currentBase)) {
+        _mappedCurrent = current;
+        _currentBase = items;
+        _currentItems = List.unmodifiable([
+          for (var i = 0; i < items.length; i++)
+            i == index ? LinkPlayerItem.fromMediaItem(current) : items[i],
+        ]);
+      }
+      items = _currentItems;
     }
     return LinkPlayerSnapshot(
       queue: items,

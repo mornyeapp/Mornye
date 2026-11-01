@@ -4,13 +4,56 @@ import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/utils/int_utils.dart';
 import 'package:mornye/utils/string_utils.dart';
 
-/// Technical audio metadata carried with a queue item. This is available
+/// Bounded display tags. Transport and filesystem fields never belong here.
+Map<String, dynamic> playbackDisplayMetadata(Object? value) {
+  if (value is! Map) return {};
+  const keys = {
+    'title',
+    'artist',
+    'album',
+    'album_artist',
+    'genre',
+    'date',
+    'year',
+    'release_date',
+    'track',
+    'disc',
+    'track_number',
+    'disc_number',
+    'label',
+    'copyright',
+    'composer',
+    'isrc',
+    'duration',
+    'channels',
+    'format',
+    'bit_depth',
+    'sample_rate',
+    'bitrate',
+    'replaygain_track_gain',
+    'replaygain_track_peak',
+    'replaygain_album_gain',
+    'replaygain_album_peak',
+    'lyrics',
+  };
+  return {
+    for (final key in keys)
+      if (value[key] case final Object field
+          when (field is String &&
+                  field.length <= (key == 'lyrics' ? 256 * 1024 : 4096)) ||
+              (field is num && field.isFinite) ||
+              field is bool)
+        key: field,
+  };
+}
+
+/// Display tags and audio quality carried with a queue item. This is available
 /// immediately when tracks change, before a fresh file probe completes.
 Map<String, dynamic> playbackAudioMetadataFromMediaItem(MediaItem item) {
   final extras = item.extras;
   if (extras == null || extras.isEmpty) return const {};
 
-  final metadata = <String, dynamic>{};
+  final metadata = playbackDisplayMetadata(extras['displayMetadata']);
   final bitDepth = readPositiveInt(extras['bit_depth']);
   final sampleRate = readPositiveInt(extras['sample_rate']);
   final bitrate = readPositiveInt(extras['bitrate']);
