@@ -26,11 +26,12 @@ class LocalNetworkAccess {
   final MethodChannel _channel;
   final Future<List<InternetAddress>> Function(String) _lookup;
   Future<void>? _pending;
+  Future<bool>? _checking;
 
   Future<void> ensureAccess(Uri target) async {
     if (!_isAndroid) return;
     // Also returns true on older Android releases. Recheck after revocation.
-    if (await _channel.invokeMethod<bool>('isGranted') == true) return;
+    if (await isGranted()) return;
     if (!await _isLocalTarget(target)) return;
     await (_pending ??= _request().whenComplete(() => _pending = null));
   }
@@ -44,8 +45,13 @@ class LocalNetworkAccess {
 
   /// Whether LAN access is allowed. Always true off Android and before
   /// Android 17, which have no such permission.
-  Future<bool> isGranted() async =>
-      !_isAndroid || await _channel.invokeMethod<bool>('isGranted') == true;
+  Future<bool> isGranted() {
+    if (!_isAndroid) return Future.value(true);
+    return _checking ??= _channel
+        .invokeMethod<bool>('isGranted')
+        .then((value) => value == true)
+        .whenComplete(() => _checking = null);
+  }
 
   Future<void> _request() async {
     if (await _channel.invokeMethod<bool>('request') != true) {

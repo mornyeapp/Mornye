@@ -110,6 +110,26 @@ void main() {
     expect(requests, 0);
   });
 
+  test(
+    'concurrent grant checks share one call and later calls recheck',
+    () async {
+      granted = true;
+      final access = LocalNetworkAccess(isAndroid: true);
+      await Future.wait([
+        for (var i = 0; i < 100; i++)
+          access.ensureAccess(Uri.parse('smb://nas.local/music/')),
+      ]);
+      expect(checks, 1);
+      granted = false;
+      allowRequest = false;
+      await expectLater(
+        access.ensureGranted(),
+        throwsA(isA<LocalNetworkPermissionException>()),
+      );
+      expect(checks, 2);
+    },
+  );
+
   test('ensureGranted requests without a target and reports denial', () async {
     final access = LocalNetworkAccess(
       isAndroid: true,

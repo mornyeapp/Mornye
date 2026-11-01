@@ -43,28 +43,36 @@ const linkMaxFetchedCoverBytes = 24 * 1024 * 1024;
 
 /// Fetches a cover of at most [linkMaxFetchedCoverBytes]. With [allow],
 /// redirects are followed by hand, at most 5, and every address must pass
-/// [allow]. With [deadline], the request is closed once it passes.
+/// [allow]. With [deadline], the request is closed once it passes. A supplied
+/// [client] stays open for other requests and remains owned by the caller.
 Future<Uint8List?> fetchLinkCover(
   Uri url, {
   bool Function(Uri url)? allow,
   Duration? deadline,
+  HttpClient? client,
 }) async {
   const timeout = Duration(seconds: 20);
-  final client = HttpClient()..connectionTimeout = const Duration(seconds: 10);
+  final connection =
+      client ?? (HttpClient()..connectionTimeout = const Duration(seconds: 10));
+  HttpClientRequest? active;
+  StreamIterator<List<int>>? body;
   var expired = false;
-  final timer = deadline == null
-      ? null
-      : Timer(deadline, () {
-          expired = true;
-          client.close(force: true);
-        });
-  try {
+  Future<Uint8List?> read() async {
     var target = url;
     for (var redirects = 0; ; redirects++) {
       if (allow != null && !allow(target)) return null;
-      final request = await client.getUrl(target);
+      final request = await connection.getUrl(target);
+      active = request;
+      if (expired) {
+        request.abort();
+        return null;
+      }
       if (allow != null) request.followRedirects = false;
       final response = await request.close().timeout(timeout);
+      if (expired) {
+        await response.listen(null).cancel();
+        return null;
+      }
       if (allow != null && response.isRedirect) {
         final location = response.headers.value(HttpHeaders.locationHeader);
         unawaited(response.listen(null).cancel());
@@ -72,17 +80,30 @@ Future<Uint8List?> fetchLinkCover(
         target = target.resolve(location);
         continue;
       }
-      if (response.statusCode != HttpStatus.ok) return null;
+      if (response.statusCode != HttpStatus.ok) {
+        await response.listen(null).cancel();
+        return null;
+      }
       final bytes = BytesBuilder(copy: false);
-      await for (final chunk in response.timeout(timeout)) {
-        bytes.add(chunk);
+      final chunks = body = StreamIterator(response.timeout(timeout));
+      while (await chunks.moveNext()) {
+        bytes.add(chunks.current);
         if (bytes.length > linkMaxFetchedCoverBytes) return null;
       }
       return expired ? null : bytes.takeBytes();
     }
+  }
+
+  try {
+    final result = read();
+    return await (deadline == null
+        ? result
+        : result.timeout(deadline, onTimeout: () => null));
   } finally {
-    timer?.cancel();
-    client.close(force: true);
+    expired = true;
+    active?.abort();
+    await body?.cancel();
+    if (client == null) connection.close(force: true);
   }
 }
 
@@ -91,7 +112,13 @@ Future<Uint8List?> fetchLinkCover(
 Future<Uint8List?> fetchLinkWebCover(
   Uri url, {
   Duration deadline = LinkWebCovers.fetchTimeout,
-}) => fetchLinkCover(url, allow: isLinkWebCoverUrl, deadline: deadline);
+  HttpClient? client,
+}) => fetchLinkCover(
+  url,
+  allow: isLinkWebCoverUrl,
+  deadline: deadline,
+  client: client,
+);
 
 /// Whether the desktop fetches a web cover from [url]: `https`, and not
 /// `localhost` or a loopback, link-local or private address literal.
@@ -191,7 +218,7 @@ class LinkWebCovers {
     this.maxStore = 1024 * 1024 * 1024,
   }) : _folder = folder,
        _probe = probe,
-       _fetch = fetchCover ?? fetchLinkWebCover,
+       _fetch = fetchCover,
        _shrink = shrinkCover ?? shrinkLinkCover,
        _now = now ?? DateTime.now;
 
@@ -219,7 +246,7 @@ class LinkWebCovers {
 
   final Future<Directory> Function() _folder;
   final LinkPictureProbe _probe;
-  final LinkCoverFetcher _fetch;
+  final LinkCoverFetcher? _fetch;
   final LinkCoverShrinker _shrink;
   final DateTime Function() _now;
   final _added = StreamController<void>.broadcast();
@@ -403,6 +430,7 @@ class LinkWebCovers {
 
   Future<void> _run() async {
     final songs = _songs;
+    HttpClient? client;
     var changed = false;
     try {
       if (songs.isEmpty) {
@@ -432,6 +460,9 @@ class LinkWebCovers {
             (id: key, url: value),
       ];
       if (due.isEmpty) return;
+      if (_fetch == null) {
+        client = HttpClient()..connectionTimeout = const Duration(seconds: 10);
+      }
       final folder = (await _folder()).path;
       await Directory(folder).create(recursive: true);
       var stored = 0;
@@ -454,7 +485,7 @@ class LinkWebCovers {
             if (_wanted.containsKey(cover.id)) cover,
         ];
         final images = await Future.wait([
-          for (final cover in batch) _image(cover.url),
+          for (final cover in batch) _image(cover.url, client),
         ]);
         for (var i = 0; i < batch.length; i++) {
           final id = batch[i].id;
@@ -478,6 +509,7 @@ class LinkWebCovers {
     } on Object catch (error) {
       _log.w('Could not fetch the web covers: $error');
     } finally {
+      client?.close(force: true);
       if (changed && !_added.isClosed) _added.add(null);
     }
   }
@@ -527,9 +559,14 @@ class LinkWebCovers {
   }
 
   /// The image at [url], shrunk when large; null when it cannot be had.
-  Future<({String ext, Uint8List bytes})?> _image(Uri url) async {
+  Future<({String ext, Uint8List bytes})?> _image(
+    Uri url,
+    HttpClient? client,
+  ) async {
     try {
-      var bytes = await _fetch(url).timeout(fetchTimeout);
+      var bytes =
+          await (_fetch?.call(url) ?? fetchLinkWebCover(url, client: client))
+              .timeout(fetchTimeout);
       // Stores often serve covers at full size, several megabytes.
       if (bytes != null && bytes.length > maxCoverBytes) {
         bytes = await _shrink(bytes);

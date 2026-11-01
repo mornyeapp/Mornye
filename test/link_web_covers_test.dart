@@ -25,6 +25,44 @@ List<LinkWebCoverSong> _songs(Iterable<String> names) => [
   for (final name in names) _song(name),
 ];
 
+class _CoverHttpOverrides extends HttpOverrides {
+  _CoverHttpOverrides(this.origin);
+
+  final Uri origin;
+  int clients = 0;
+  int closed = 0;
+
+  @override
+  HttpClient createHttpClient(SecurityContext? context) {
+    clients++;
+    return _CoverHttpClient(super.createHttpClient(context), this);
+  }
+}
+
+class _CoverHttpClient implements HttpClient {
+  _CoverHttpClient(this.client, this.owner);
+
+  final HttpClient client;
+  final _CoverHttpOverrides owner;
+
+  @override
+  set connectionTimeout(Duration? timeout) =>
+      client.connectionTimeout = timeout;
+
+  @override
+  Future<HttpClientRequest> getUrl(Uri url) =>
+      client.getUrl(owner.origin.resolve(url.path));
+
+  @override
+  void close({bool force = false}) {
+    owner.closed++;
+    client.close(force: force);
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
 void main() {
   late Directory temp;
   late Directory folder;
@@ -569,10 +607,13 @@ void main() {
 
   group('fetchLinkCover', () {
     late HttpServer server;
+    final ports = <int>{};
 
     setUp(() async {
       server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      ports.clear();
       server.listen((request) async {
+        ports.add(request.connectionInfo!.remotePort);
         final response = request.response;
         try {
           switch (request.uri.path) {
@@ -589,6 +630,11 @@ void main() {
             case '/slow.jpg':
               await Future<void>.delayed(const Duration(seconds: 2));
               response.add(_jpeg);
+            case '/slow-body.jpg':
+              response.add(_jpeg.sublist(0, 2));
+              await response.flush();
+              await Future<void>.delayed(const Duration(seconds: 2));
+              response.add(_jpeg.sublist(2));
             default:
               response.statusCode = HttpStatus.notFound;
           }
@@ -602,6 +648,46 @@ void main() {
     tearDown(() => server.close(force: true));
 
     Uri at(String path) => Uri.parse('http://127.0.0.1:${server.port}$path');
+
+    test(
+      'one catalog run shares its client across all fetch batches',
+      () async {
+        final overrides = _CoverHttpOverrides(at('/'));
+        await HttpOverrides.runWithHttpOverrides(() async {
+          final covers = LinkWebCovers(
+            folder: () async => folder,
+            probe: (paths) async => [for (final _ in paths) false],
+          );
+          addTearDown(covers.close);
+          covers.fetch([
+            for (var i = 0; i < 12; i++)
+              _song('$i', url: 'https://images.example.com/cover.jpg?image=$i'),
+          ]);
+          await covers.idle();
+          expect(await covers.held(), hasLength(12));
+        }, overrides);
+        expect(overrides.clients, 1);
+        expect(overrides.closed, 1);
+        expect(ports.length, lessThanOrEqualTo(LinkWebCovers.fetchesAtOnce));
+      },
+    );
+
+    for (final path in ['/slow.jpg', '/slow-body.jpg']) {
+      test('deadline for $path does not close other pooled requests', () async {
+        final client = HttpClient();
+        addTearDown(() => client.close(force: true));
+        final watch = Stopwatch()..start();
+        final slow = fetchLinkCover(
+          at(path),
+          client: client,
+          deadline: const Duration(milliseconds: 100),
+        );
+        expect(await fetchLinkCover(at('/cover.jpg'), client: client), _jpeg);
+        expect(await slow, isNull);
+        expect(watch.elapsed, lessThan(const Duration(seconds: 1)));
+        expect(await fetchLinkCover(at('/cover.jpg'), client: client), _jpeg);
+      });
+    }
 
     test('takes a cover and refuses a missing or oversized one', () async {
       expect(await fetchLinkCover(at('/cover.jpg')), _jpeg);
