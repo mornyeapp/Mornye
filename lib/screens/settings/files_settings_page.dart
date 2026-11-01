@@ -365,32 +365,26 @@ class _FilesSettingsPageState extends ConsumerState<FilesSettingsPage> {
             ),
 
             if (Platform.isAndroid && _androidSdkVersion >= 33) ...[
-              SliverToBoxAdapter(
-                child: SettingsSectionHeader(
-                  title: context.l10n.sectionStorageAccess,
-                ),
-              ),
-              SliverToBoxAdapter(
-                child: SettingsGroup(
-                  children: [
-                    SettingsSwitchItem(
-                      icon: Icons.folder_special_outlined,
-                      title: context.l10n.allFilesAccess,
-                      subtitle: _hasAllFilesAccess
-                          ? context.l10n.allFilesAccessEnabledSubtitle
-                          : context.l10n.allFilesAccessDisabledSubtitle,
-                      value: _hasAllFilesAccess && settings.useAllFilesAccess,
-                      onChanged: (value) {
-                        if (value) {
-                          _requestAllFilesAccess();
-                        } else {
-                          _disableAllFilesAccess();
-                        }
-                      },
-                      showDivider: false,
-                    ),
-                  ],
-                ),
+              ...settingsSectionSlivers(
+                title: context.l10n.sectionStorageAccess,
+                children: [
+                  SettingsSwitchItem(
+                    icon: Icons.folder_special_outlined,
+                    title: context.l10n.allFilesAccess,
+                    subtitle: _hasAllFilesAccess
+                        ? context.l10n.allFilesAccessEnabledSubtitle
+                        : context.l10n.allFilesAccessDisabledSubtitle,
+                    value: _hasAllFilesAccess && settings.useAllFilesAccess,
+                    onChanged: (value) {
+                      if (value) {
+                        _requestAllFilesAccess();
+                      } else {
+                        _disableAllFilesAccess();
+                      }
+                    },
+                    showDivider: false,
+                  ),
+                ],
               ),
               SliverToBoxAdapter(
                 child: Padding(

@@ -328,31 +328,19 @@ extension DownloadQueueLibraryReorganization on DownloadQueueNotifier {
                 providerTrackId: providerTrackId,
                 quality: quality,
               ),
-              'artist': _folderArtistForTrack(
-                track,
-                useAlbumArtistForFolders: settings.useAlbumArtistForFolders,
-                usePrimaryArtistOnly: settings.usePrimaryArtistOnly,
-                filterContributingArtistsInAlbumArtist:
-                    settings.filterContributingArtistsInAlbumArtist,
-              ),
+              'artist': _folderArtistForTrack(track, settings),
               'album_artist':
                   normalizeOptionalString(track.albumArtist) ??
                   track.artistName,
               'playlist': '',
             })
           : null;
+      // No playlistName: history does not record the source playlist, so
+      // no playlist folder prefix is added.
       final raw = _buildRelativeOutputDir(
         track,
-        settings.folderOrganization,
-        separateSingles: settings.separateSingles,
-        albumFolderStructure: settings.albumFolderStructure,
+        settings,
         customFolderPath: customFolderPath,
-        // The source playlist is not recorded in history.
-        createPlaylistFolder: false,
-        useAlbumArtistForFolders: settings.useAlbumArtistForFolders,
-        usePrimaryArtistOnly: settings.usePrimaryArtistOnly,
-        filterContributingArtistsInAlbumArtist:
-            settings.filterContributingArtistsInAlbumArtist,
       );
       relativeDir = normalizeRelativeLibraryDir(
         safMode ? _sanitizeSafRelativeDir(raw) : raw,
