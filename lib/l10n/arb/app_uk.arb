@@ -1,8 +1,8 @@
 {
-  "extensionsUnsecuredStorage": "Use unsecured extension storage",
-  "extensionsUnsecuredStorageDescription": "Run extensions without a Linux keyring. The key is saved locally, so anyone with access to your app files can read extension credentials. Off uses the system keyring.",
-  "extensionsStorageKeyringRequired": "Existing extension data needs its original key. Unlock the system keyring once, then enable unsecured storage again. Your data has been preserved.",
-  "extensionsStorageKeyConflict": "The local and system keyring keys differ. Storage was not changed and both keys were preserved.",
+  "extensionsUnsecuredStorage": "Використовувати незахищене сховище розширень",
+  "extensionsUnsecuredStorageDescription": "Запускайте розширення без зв'язки ключів Linux. Ключ зберігається локально, тому будь-хто з доступом до файлів додатка зможе прочитати облікові дані розширень. Якщо опцію вимкнено, використовується системна зв'язка ключів.",
+  "extensionsStorageKeyringRequired": "Для наявних даних розширень потрібен оригінальний ключ. Розблокуйте системну зв'язку ключів один раз, а потім знову увімкніть незахищене сховище. Ваші дані збережено.",
+  "extensionsStorageKeyConflict": "Локальний ключ і ключ системної зв'язки ключів не збігаються. Налаштування сховища не змінилися, обидва ключі збережено.",
   "extensionsStorageKeyringUnavailable": "The system keyring is unavailable or locked. Start or unlock it before switching to secure storage. Your local key has been preserved.",
   "linkFileActionOn": "{action} on {name}",
   "@linkFileActionOn": {
@@ -7006,7 +7006,7 @@
       }
     }
   },
-  "nowPlayingSleepTimerMinutes": "{minutes, plural, =1{1 хвилина} other{{minutes} хвилини}}",
+  "nowPlayingSleepTimerMinutes": "{minutes, plural, =1{1 хвилина} other{{minutes} хвилин}}",
   "@nowPlayingSleepTimerMinutes": {
     "description": "Duration choice for the playback sleep timer",
     "placeholders": {
