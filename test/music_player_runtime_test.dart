@@ -652,6 +652,25 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test(
+    'playback instances survive pause and seek but change for repeated songs',
+    () async {
+      final handler = await _runtime().initialize();
+      await handler.setQueueAndPlay([_track, _track]);
+      final first = handler.mediaItem.value!.extras!['playbackInstance'];
+      await handler.pause();
+      await handler.play();
+      await handler.seek(Duration.zero);
+      expect(handler.mediaItem.value!.extras!['playbackInstance'], first);
+      await handler.skipToQueueItem(1);
+      expect(handler.mediaItem.value!.id, _track.id);
+      expect(
+        handler.mediaItem.value!.extras!['playbackInstance'],
+        isNot(first),
+      );
+    },
+  );
+
+  test(
     'Android updates every queued copy before playing a moved download',
     () async {
       final decks = <_Deck>[];

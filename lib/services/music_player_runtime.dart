@@ -21,6 +21,7 @@ import 'package:mornye/services/download_file_recovery.dart';
 import 'package:mornye/services/library_collections_database.dart';
 import 'package:mornye/services/library_database.dart';
 import 'package:mornye/services/listening_statistics.dart';
+import 'package:mornye/services/lastfm/lastfm_service.dart';
 import 'package:mornye/services/media_kit_playback_deck.dart';
 import 'package:mornye/services/media_library_browser.dart';
 import 'package:mornye/services/media_session_art_cache.dart';
@@ -255,6 +256,8 @@ class MusicPlayerRuntime {
   }) : _settings = settings;
 
   final PlaybackDependencies dependencies;
+  LastfmService? _lastfm;
+  LastfmService get lastfm => _lastfm ??= LastfmService();
   AutoplayPersonalization? _personalization;
   // What learning observes also teaches [taste] what plays together and
   // [ranker] how much each part of a score counts.
@@ -490,6 +493,7 @@ class MusicPlayerRuntime {
 
   void detach(MusicPlayerHandler handler) {
     if (!identical(_handler, handler)) return;
+    _lastfm?.bind(null);
     _unsubscribeSourceDeletion?.call();
     _unsubscribeSourceDeletion = null;
     _unsubscribeSourceMetadata?.call();
@@ -535,6 +539,13 @@ class MusicPlayerRuntime {
       // Desktop presence goes through the Rust IPC client instead of the SDK.
       if (dependencies.isAndroid || dependencies.isIOS || isDesktopPlatform) {
         DiscordPresenceService.instance.bind(handler);
+      }
+      if (isDesktopPlatform) {
+        lastfm.bind(
+          handler,
+          unknownTitle: () => unknownTitle,
+          unknownArtist: () => unknownArtist,
+        );
       }
       return handler;
     } catch (error, stack) {
@@ -627,6 +638,7 @@ class MusicPlayerRuntime {
     _remoteSession?.dispose();
     _remoteSession = null;
     await _handler?.dispose();
+    await _lastfm?.close();
     try {
       await _initFuture;
     } catch (_) {

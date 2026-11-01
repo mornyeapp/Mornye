@@ -10,6 +10,10 @@ on:
       - "lib/widgets/duplicate_review_sheet.dart"
       - "test/duplicate_review_sheet_test.dart"
       - "test/settings_bottom_inset_test.dart"
+      - "lib/services/lastfm/**"
+      - "lib/widgets/lastfm_settings.dart"
+      - "test/lastfm*_test.dart"
+      - "test/support/lastfm_fakes.dart"
       - "rust_backend/**"
       - "third_party/**"
       - "scripts/build_rust_backend.sh"
@@ -101,6 +105,7 @@ jobs:
         run: |
           dart scripts/prepare_flutter_sdk.dart
           flutter test --no-pub test/semantics_geometry_regression_test.dart
+          flutter test --no-pub test/lastfm_api_test.dart test/lastfm_listening_test.dart test/lastfm_service_test.dart test/lastfm_store_test.dart test/lastfm_settings_test.dart
 
       # The Xcode "Embed Rust Backend" and "Embed FFmpeg" phases embed the
       # library and the FFmpeg tools built above.
@@ -108,8 +113,12 @@ jobs:
         env:
           MORNYE_SKIP_RUST_BUILD: "1"
           MORNYE_REQUIRE_FFMPEG: "1"
+          LASTFM_API_KEY: ${{ secrets.LASTFM_API_KEY }}
+          LASTFM_API_SECRET: ${{ secrets.LASTFM_API_SECRET }}
         run: |
           flutter build macos --release --target lib/main.dart \
+            --dart-define="LASTFM_API_KEY=$LASTFM_API_KEY" \
+            --dart-define="LASTFM_API_SECRET=$LASTFM_API_SECRET" \
             --dart-define="GIT_COMMIT=$(git rev-parse --short=8 HEAD)"
 
       - name: Verify and package macOS app
@@ -244,8 +253,13 @@ jobs:
         run: flutter test --reporter expanded test/duplicate_review_sheet_test.dart test/desktop_updater_test.dart test/settings_bottom_inset_test.dart test/semantics_geometry_regression_test.dart
 
       - name: Build Linux bundle
+        env:
+          LASTFM_API_KEY: ${{ secrets.LASTFM_API_KEY }}
+          LASTFM_API_SECRET: ${{ secrets.LASTFM_API_SECRET }}
         run: |
           flutter build linux --release --target lib/main.dart \
+            --dart-define="LASTFM_API_KEY=$LASTFM_API_KEY" \
+            --dart-define="LASTFM_API_SECRET=$LASTFM_API_SECRET" \
             --dart-define="GIT_COMMIT=$(git rev-parse --short=8 HEAD)"
 
       - name: Verify and package Linux bundle
@@ -361,9 +375,12 @@ jobs:
         run: flutter test --reporter expanded test/duplicate_review_sheet_test.dart test/desktop_updater_test.dart test/settings_bottom_inset_test.dart test/semantics_geometry_regression_test.dart
 
       - name: Build Windows app
+        env:
+          LASTFM_API_KEY: ${{ secrets.LASTFM_API_KEY }}
+          LASTFM_API_SECRET: ${{ secrets.LASTFM_API_SECRET }}
         run: |
           $commit = git rev-parse --short=8 HEAD
-          flutter build windows --release --target lib/main.dart --dart-define="GIT_COMMIT=$commit"
+          flutter build windows --release --target lib/main.dart --dart-define="GIT_COMMIT=$commit" --dart-define="LASTFM_API_KEY=$env:LASTFM_API_KEY" --dart-define="LASTFM_API_SECRET=$env:LASTFM_API_SECRET"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Verify and package Windows app

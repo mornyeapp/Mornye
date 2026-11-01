@@ -141,6 +141,7 @@ class MusicPlayerHandler extends BaseAudioHandler
   final List<StreamSubscription<dynamic>> _subscriptions = [];
   int _index = -1;
   int _playRequestGeneration = 0;
+  int _playbackInstance = 0;
   final _metadataChanges = <String, Object>{};
   String? _activeResolvedPath;
   bool _disposed = false;
@@ -318,13 +319,17 @@ class MusicPlayerHandler extends BaseAudioHandler
     }
   }
 
-  MediaItem _toMediaItem(PlayableMedia media, {String? resolvedSource}) =>
-      media.toMediaItem(
-        resolvedSource: resolvedSource,
-        unknownTitle: _runtime.unknownTitle,
-        unknownArtist: _runtime.unknownArtist,
-        covers: _dependencies.coverStore,
-      );
+  MediaItem _toMediaItem(PlayableMedia media, {String? resolvedSource}) {
+    final item = media.toMediaItem(
+      resolvedSource: resolvedSource,
+      unknownTitle: _runtime.unknownTitle,
+      unknownArtist: _runtime.unknownArtist,
+      covers: _dependencies.coverStore,
+    );
+    return item.copyWith(
+      extras: {...?item.extras, 'playbackInstance': _playbackInstance},
+    );
+  }
 
   void _init() {
     if (_initialized) return;
@@ -1637,6 +1642,7 @@ class MusicPlayerHandler extends BaseAudioHandler
       duration: media.duration,
     );
     _runtime.personalization.begin(_learningTrack(media));
+    _playbackInstance++;
     mediaItem.add(_toMediaItem(media));
     _lastBroadcastPosition = Duration.zero;
     _lastPositionBroadcastAt = null;

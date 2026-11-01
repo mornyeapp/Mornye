@@ -10061,6 +10061,30 @@
   "@collectionSuggestionsRefresh": {
     "description": "Tooltip of the button that loads other suggestions"
   },
+  "lastfmDescription": "Track your listening and show what is playing on Last.fm.",
+  "lastfmConnect": "Connect Last.fm",
+  "lastfmConnecting": "Connecting to Last.fm...",
+  "lastfmFinishConnection": "Finish connecting",
+  "lastfmAuthorizeHelp": "Approve access in your browser, then return here and choose Finish connecting.",
+  "lastfmScrobbling": "Scrobbling",
+  "lastfmScrobblingDescription": "Send songs you listen to in the built-in player to Last.fm.",
+  "lastfmNowPlaying": "Show Now Playing",
+  "lastfmNowPlayingDescription": "Show the current song on your Last.fm profile.",
+  "lastfmDisconnect": "Disconnect Last.fm",
+  "lastfmConnectionError": "Last.fm could not be reached. Saved scrobbles will be retried automatically.",
+  "lastfmStorageError": "Last.fm settings could not be saved. Check access to this device's secure storage and try again.",
+  "lastfmAuthorizationPending": "Access has not been approved yet. Finish authorizing Mornye in your browser.",
+  "lastfmAuthorizationExpired": "This connection request expired. Connect again to continue.",
+  "lastfmReauthenticate": "Your Last.fm connection expired. Connect again to resume scrobbling.",
+  "lastfmUnavailable": "Last.fm is unavailable in this build.",
+  "lastfmRejected": "Last.fm rejected a scrobble. Check the song's title and artist tags.",
+  "lastfmPending": "{count, plural, =1{1 scrobble waiting to sync} other{{count} scrobbles waiting to sync}}",
+  "@lastfmPending": {
+    "description": "Number of saved Last.fm scrobbles awaiting submission",
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
   "collectionSuggestionsAddHere": "Add to this playlist",
   "@collectionSuggestionsAddHere": {
     "description": "Tooltip of the button that adds a suggested song to the user's playlist shown above"

@@ -137,6 +137,28 @@ SHA-256 hashes, Dart symbols, and R8 mapping, identified by run and attempt.
 Archive it before its 90-day retention expires and match the reported APK hash
 when choosing symbols; equal version numbers do not guarantee a match.
 
+### Last.fm Desktop Integration
+
+Create a Last.fm API account for Mornye at
+<https://www.last.fm/api/account/create>. Desktop authorization uses a request
+token and a browser approval, so no callback URL is needed. Put its API key
+and shared secret in the Git-ignored `.env.lastfm` file:
+
+```dotenv
+LASTFM_API_KEY=your_application_key
+LASTFM_API_SECRET=your_application_shared_secret
+```
+
+Pass `--dart-define-from-file=.env.lastfm` to `fvm flutter run` or a desktop
+Flutter build. Desktop CI and release jobs read the repository secrets
+`LASTFM_API_KEY` and `LASTFM_API_SECRET`; fork builds omit the integration's
+credentials. Never commit real values. Each listener's session is stored
+separately in the OS secure storage and is not part of the offline queue.
+
+The controls are in Settings > Playback > Last.fm. Only the local built-in
+player is observed, including music a paired device asks it to play. A Link
+remote session and catalog previews do not submit listening history.
+
 ## Project Boundaries
 
 ```text

@@ -213,6 +213,7 @@ class _MusicGapless {
     handler._activeResolvedPath = _nextIsCopy ? path : null;
     handler._pendingRestorePosition = null;
     handler._runtime.personalization.begin(_learningTrack(next));
+    handler._playbackInstance++;
     handler.mediaItem.add(
       handler
           ._toMediaItem(next, resolvedSource: _nextIsCopy ? path : null)
