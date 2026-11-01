@@ -158,6 +158,7 @@ void main() {
             libraryDatabase: db,
             temporaryDirectory: root,
             minimumAge: const Duration(minutes: 1),
+            referenceColumns: const [],
           ),
           1,
         );
@@ -219,6 +220,7 @@ void main() {
             libraryDatabase: db,
             temporaryDirectory: root,
             minimumAge: const Duration(minutes: 1),
+            referenceColumns: const [],
             nativeJobRunner: (request, {requestId}) async {
               nativeCalls++;
               final privatePath = request['library_path'] as String;
@@ -304,6 +306,7 @@ void main() {
                   {},
                   libraryDatabase: db,
                   temporaryDirectory: root,
+                  referenceColumns: const [],
                 );
               } else {
                 final references = <String>{};
