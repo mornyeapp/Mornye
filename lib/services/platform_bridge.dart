@@ -95,7 +95,7 @@ class PlatformBridge {
     final states = _nativeDataJobs.putIfAbsent(id, () => {});
     states.add(state);
     try {
-      final encoded = await compute(_encodeJsonInBackground, request);
+      final encoded = await _encodeNativeDataJobRequest(request);
       if (state.cancelled) {
         throw PlatformException(
           code: 'CANCELLED',
@@ -993,10 +993,12 @@ class PlatformBridge {
   }
 
   static Future<Map<String, dynamic>> getAllDownloadProgress() async =>
-      _decodeMapResult(await _channel.invokeMethod('getAllDownloadProgress'));
+      _decodeProgressMapAsync(
+        await _channel.invokeMethod('getAllDownloadProgress'),
+      );
 
   static Stream<Map<String, dynamic>> downloadProgressStream() {
-    return _channel.downloadProgressEvents().map(_decodeMapResult);
+    return _channel.downloadProgressEvents().asyncMap(_decodeProgressMapAsync);
   }
 
   static Future<void> exitApp() => _invokeVoid('exitApp');
@@ -1839,7 +1841,7 @@ class PlatformBridge {
   /// only compact progress fields are returned.
   static Future<Map<String, dynamic>> getNativeDownloadWorkerSnapshot({
     int sinceStateSerial = 0,
-  }) async => _decodeMapResult(
+  }) async => _decodeProgressMapAsync(
     await _channel.invokeMethod('getNativeDownloadWorkerSnapshot', {
       'since_state_serial': sinceStateSerial,
     }),
@@ -2805,6 +2807,16 @@ class PlatformBridge {
       }
     }
     return const <String, dynamic>{};
+  }
+
+  static Future<Map<String, dynamic>> _decodeProgressMapAsync(
+    dynamic result,
+  ) async {
+    if (result is! String || result.isEmpty) return _decodeMapResult(result);
+    final decoded = await _decodeJsonStringAsync(result);
+    return decoded is Map
+        ? decoded.cast<String, dynamic>()
+        : const <String, dynamic>{};
   }
 
   /// Present the native iOS folder picker. The security-scoped bookmark is

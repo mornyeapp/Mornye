@@ -9,6 +9,8 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.concurrent.atomic.AtomicReference
+import org.json.JSONObject
+import org.json.JSONTokener
 
 private val DOWNLOAD_PROGRESS_STREAM_CHANNEL =
     "com.zarz.mornye/download_progress_stream"
@@ -54,12 +56,15 @@ internal fun MainActivity.registerProgressStreams(messenger: BinaryMessenger) {
     )
 }
 
-private fun MainActivity.updateDownloadProgressSeq(progress: Any?) {
-    val objectValue = progress as? Map<*, *> ?: return
-    val seq = (objectValue["seq"] as? Number)?.toLong() ?: lastDownloadProgressSeq
-    if (objectValue["reset"] == true || seq > lastDownloadProgressSeq) {
-        lastDownloadProgressSeq = seq
+internal fun downloadProgressSequence(payload: String, previous: Long): Long {
+    if (payload.isEmpty()) return previous
+    val progress = try {
+        JSONTokener(payload).nextValue() as? JSONObject ?: return previous
+    } catch (_: Exception) {
+        return previous
     }
+    val seq = (progress.opt("seq") as? Number)?.toLong() ?: previous
+    return if (progress.opt("reset") == true || seq > previous) seq else previous
 }
 
 private fun MainActivity.startDownloadProgressStream(sink: EventChannel.EventSink) {
@@ -73,19 +78,17 @@ private fun MainActivity.startDownloadProgressStream(sink: EventChannel.EventSin
         try {
             while (isActive && downloadProgressConnection === connection) {
                 try {
-                    // Decode once on IO. Reset snapshots of large queues
-                    // previously parsed twice on the UI thread.
-                    val (payload, progress) = withContext(Dispatchers.IO) {
+                    val (payload, sequence) = withContext(Dispatchers.IO) {
                         val reader = connection.get() ?: coreBackend.openDownloadProgress().also { connection.set(it) }
                         ensureActive()
                         val payload = reader.waitDelta(lastDownloadProgressSeq, 15_000L)
-                        payload to if (payload.isEmpty()) null else parseJsonPayload(payload)
+                        payload to downloadProgressSequence(payload, lastDownloadProgressSeq)
                     }
                     if (!isActive || downloadProgressConnection !== connection) break
                     if (payload.isNotEmpty() && payload != lastDownloadProgressPayload) {
-                        updateDownloadProgressSeq(progress)
+                        lastDownloadProgressSeq = sequence
                         lastDownloadProgressPayload = payload
-                        sink.success(progress)
+                        sink.success(payload)
                         delay(250L)
                     }
                 } catch (e: Exception) {

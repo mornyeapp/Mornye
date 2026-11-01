@@ -110,14 +110,11 @@ internal fun MainActivity.handleAcknowledgeNativeDownloadWorkerItems(call: Metho
 internal suspend fun MainActivity.handleGetNativeDownloadWorkerSnapshot(call: MethodCall, result: MethodChannel.Result) {
     val sinceStateSerial =
         (call.argument<Number>("since_state_serial") ?: 0L).toLong()
-    // The snapshot can be megabytes late in a large
-    // batch; read and parse it off the main thread.
+    // Keep large snapshots as JSON rather than re-encoding a map on Main.
     val payload = withContext(Dispatchers.IO) {
-        parseJsonPayload(
-            DownloadService.getNativeWorkerSnapshot(
-                this@handleGetNativeDownloadWorkerSnapshot,
-                sinceStateSerial
-            )
+        DownloadService.getNativeWorkerSnapshot(
+            this@handleGetNativeDownloadWorkerSnapshot,
+            sinceStateSerial
         )
     }
     result.success(payload)
