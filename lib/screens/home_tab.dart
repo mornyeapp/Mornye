@@ -46,6 +46,7 @@ import 'package:mornye/providers/explore_provider.dart';
 import 'package:mornye/providers/user_profile_provider.dart';
 import 'package:mornye/widgets/desktop/desktop_scroll_arrows.dart';
 import 'package:mornye/widgets/explore_featured_section.dart';
+import 'package:mornye/providers/library_counts_provider.dart';
 import 'package:mornye/providers/library_mixes_provider.dart';
 import 'package:mornye/providers/local_library_provider.dart';
 import 'package:mornye/providers/music_player_provider.dart';

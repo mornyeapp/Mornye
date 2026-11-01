@@ -45,6 +45,7 @@ import 'package:material_3_expressive/material_3_expressive.dart'
         M3EButtonSize,
         M3EButtonStyle;
 import 'package:mornye/providers/library_browse_provider.dart';
+import 'package:mornye/providers/library_counts_provider.dart';
 import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/widgets/app_shape.dart';
 import 'package:mornye/widgets/library_fast_scroller.dart';
@@ -238,7 +239,7 @@ class _QueueTabState extends ConsumerState<QueueTab> {
   final Map<String, _LibrarySongTableRows> _songTableByMode = {};
 
   final QueueLibraryPager<
-    _QueueLibraryCountsRequest,
+    LibraryCountsRequest,
     _QueueLibraryPageRequest,
     _QueueLibraryPageData
   >
@@ -644,7 +645,7 @@ class _QueueTabState extends ConsumerState<QueueTab> {
       settingsProvider.select((s) => s.libraryQualityLabelMode),
     );
     final colorScheme = Theme.of(context).colorScheme;
-    final countsRequest = _QueueLibraryCountsRequest(
+    final countsRequest = LibraryCountsRequest(
       searchQuery: _searchQuery,
       filterSource: _filterSource,
       filterQuality: _filterQuality,
@@ -665,7 +666,7 @@ class _QueueTabState extends ConsumerState<QueueTab> {
               singleTrackCount: 0,
             ),
           )
-        : ref.watch(_queueLibraryCountsProvider(countsRequest));
+        : ref.watch(libraryCountsProvider(countsRequest));
     if (!identical(_snapshotHistory, inMemoryHistoryItems)) {
       _snapshotHistory = inMemoryHistoryItems;
       _historySnapshots.clear();

@@ -334,6 +334,7 @@ class LocalLibraryNotifier extends Notifier<LocalLibraryState> {
           trackKeySet: lookupIndex.matchKeys,
           isrcSet: lookupIndex.isrcs,
         );
+        ref.read(localLibraryIndexRevisionProvider.notifier)._bump();
         _log.i(
           'Loaded local library summary: $count items, lastScannedAt: '
           '$lastScannedAt, excludedDownloadedCount: $excludedDownloadedCount',
@@ -764,3 +765,18 @@ final localLibraryProvider =
     NotifierProvider<LocalLibraryNotifier, LocalLibraryState>(
       LocalLibraryNotifier.new,
     );
+
+/// Moves with [LocalLibraryState.loadedIndexVersion] without creating the
+/// Library notifier, so a view can refresh when the index changes and leave
+/// loading it to the startup warmup.
+final localLibraryIndexRevisionProvider =
+    NotifierProvider<LocalLibraryIndexRevision, int>(
+      LocalLibraryIndexRevision.new,
+    );
+
+class LocalLibraryIndexRevision extends Notifier<int> {
+  @override
+  int build() => 0;
+
+  void _bump() => state++;
+}

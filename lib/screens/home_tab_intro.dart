@@ -4,105 +4,276 @@ const _homeShelfLimit = 10;
 const _homeShelfCoverSize = 120.0;
 const _homeMixCoverSize = 152.0;
 
-/// The newest downloaded and scanned tracks, with the Library's track count
-/// for the shortcut at the end of the shelf.
-final _homeRecentlyAddedProvider =
-    FutureProvider.autoDispose<
-      ({List<UnifiedLibraryItem> items, int trackCount})
-    >((ref) async {
-      final includeLocal = ref.watch(
-        settingsProvider.select((s) => s.localLibraryEnabled),
-      );
-      // Reload when a download lands or a scan rebuilds the index.
-      ref.watch(downloadHistoryProvider.select((s) => s.items.length));
-      ref.watch(localLibraryProvider.select((s) => s.loadedIndexVersion));
-      final database = LibraryDatabase.instance;
-      final rows = await database.getQueueTrackPage(
-        QueueLibraryDbQuery(includeLocal: includeLocal, limit: _homeShelfLimit),
-      );
-      final counts = await database.getQueueCounts(
-        QueueLibraryDbQuery(includeLocal: includeLocal),
-      );
-      final items = <UnifiedLibraryItem>[];
-      for (final row in rows) {
-        final json = Map<String, dynamic>.from(row['item'] as Map);
-        switch (row['source']) {
-          case 'local':
-            items.add(
-              UnifiedLibraryItem.fromLocalLibrary(
-                LocalLibraryItem.fromJson(json),
-              ),
-            );
-          case 'downloaded':
-            items.add(
-              UnifiedLibraryItem.fromDownloadHistory(
-                DownloadHistoryItem.fromJson(json),
-              ),
-            );
-        }
-      }
-      return (items: items, trackCount: counts.allTrackCount);
-    });
+typedef HomeRecentlyAdded = ({List<UnifiedLibraryItem> items, int trackCount});
 
-typedef _HomeRepeatTrack = ({ListeningTrack track, UnifiedLibraryItem? item});
+/// The newest downloaded and scanned tracks, with the Library's track count
+/// for the shortcut at the end of the shelf. A reload that finds the same
+/// songs keeps the same list, so Home does not rebuild for it.
+final homeRecentlyAddedProvider = FutureProvider.autoDispose<HomeRecentlyAdded>(
+  (ref) async {
+    final includeLocal = ref.watch(
+      settingsProvider.select((s) => s.localLibraryEnabled),
+    );
+    // Reload when a download lands or a scan rebuilds the index. Downloads
+    // in a batch arrive coalesced, at most one revision a second.
+    ref.watch(downloadHistoryProvider.select((s) => s.loadedIndexVersion));
+    if (includeLocal) ref.watch(localLibraryIndexRevisionProvider);
+    final memo = ref.read(_homeShelfMemoProvider);
+    final (rows, counts) = await (
+      LibraryDatabase.instance.getQueueTrackPage(
+        QueueLibraryDbQuery(includeLocal: includeLocal, limit: _homeShelfLimit),
+      ),
+      // The Library tab's badges count the same Library; one count serves
+      // both.
+      ref.watch(
+        libraryCountsProvider(
+          LibraryCountsRequest.all(localLibraryEnabled: includeLocal),
+        ).future,
+      ),
+    ).wait;
+    final last = memo.recentlyAdded;
+    if (last != null && _sameQueueRows(last.rows, rows)) {
+      return (items: last.items, trackCount: counts.allTrackCount);
+    }
+    final items = <UnifiedLibraryItem>[];
+    for (final row in rows) {
+      final json = Map<String, dynamic>.from(row['item'] as Map);
+      switch (row['source']) {
+        case 'local':
+          items.add(
+            UnifiedLibraryItem.fromLocalLibrary(
+              LocalLibraryItem.fromJson(json),
+            ),
+          );
+        case 'downloaded':
+          items.add(
+            UnifiedLibraryItem.fromDownloadHistory(
+              DownloadHistoryItem.fromJson(json),
+            ),
+          );
+      }
+    }
+    memo.recentlyAdded = (rows: rows, items: items);
+    return (items: items, trackCount: counts.allTrackCount);
+  },
+);
+
+bool _sameQueueRows(
+  List<Map<String, dynamic>> first,
+  List<Map<String, dynamic>> second,
+) {
+  if (first.length != second.length) return false;
+  for (var index = 0; index < first.length; index++) {
+    final (a, b) = (first[index], second[index]);
+    if (a['source'] != b['source'] ||
+        !mapEquals(a['item'] as Map?, b['item'] as Map?)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+typedef HomeRepeatTrack = ({ListeningTrack track, UnifiedLibraryItem? item});
+
+/// Candidates read from the statistics at a time; most shelves fill from
+/// the first page.
+const _homeRepeatPage = 40;
 
 /// The most played files of the last four weeks, matched to their current
 /// Library entry. Statistics keep the artwork seen at play time, which may
 /// since have been evicted from a cache or rescanned away.
-final _homeOnRepeatProvider =
-    FutureProvider.autoDispose<List<_HomeRepeatTrack>>((ref) async {
-      // A new track means the previous one may have just earned a play.
-      ref.watch(currentMediaItemProvider.select((s) => s.value?.id));
-      // A deleted download or a rescan can remove a track from the shelf.
-      ref.watch(downloadHistoryProvider.select((s) => s.items.length));
-      ref.watch(localLibraryProvider.select((s) => s.loadedIndexVersion));
-      final includeLocal = ref.watch(
-        settingsProvider.select((s) => s.localLibraryEnabled),
+final homeOnRepeatProvider = FutureProvider.autoDispose<List<HomeRepeatTrack>>((
+  ref,
+) async {
+  // A track that ends may have just earned a play. One that starts after
+  // none, such as a restored session's, follows no play.
+  ref.listen(currentMediaItemProvider.select((s) => s.value?.id), (
+    previous,
+    _,
+  ) {
+    if (previous != null) ref.invalidateSelf();
+  });
+  // A deleted download or a rescan can remove a track from the shelf.
+  final historyVersion = ref.watch(
+    downloadHistoryProvider.select((s) => s.loadedIndexVersion),
+  );
+  final localRevision = ref.watch(localLibraryIndexRevisionProvider);
+  final includeLocal = ref.watch(
+    settingsProvider.select((s) => s.localLibraryEnabled),
+  );
+  final history = ref.read(downloadHistoryProvider.notifier);
+  final memo = ref.read(_homeShelfMemoProvider);
+  // Library matches hold until the Library changes, so a new track only
+  // reads the statistics again.
+  final library = (historyVersion, localRevision, includeLocal);
+  if (memo.repeatLibrary != library) {
+    // A new map, so a load still running for the old Library keeps its own.
+    memo
+      ..repeatLibrary = library
+      ..repeatMatches = {};
+  }
+  final matches = memo.repeatMatches;
+  await listeningRecorder.flush();
+  final now = DateTime.now();
+  final start = DateTime(now.year, now.month, now.day - 27);
+  final end = DateTime(now.year, now.month, now.day + 1);
+  final tracks = <HomeRepeatTrack>[];
+  for (var offset = 0; ; offset += _homeRepeatPage) {
+    // Played files and network songs only: remote sources cannot be
+    // replayed from their recorded key.
+    final totals = await ListeningStatisticsStore.instance.loadReplayableTracks(
+      start,
+      end,
+      limit: _homeRepeatPage,
+      offset: offset,
+    );
+    // Matched in rounds of the songs still missing, so no more songs are
+    // looked up than one at a time would.
+    var next = 0;
+    while (tracks.length < _homeShelfLimit && next < totals.length) {
+      final round = totals
+          .skip(next)
+          .take(_homeShelfLimit - tracks.length)
+          .toList();
+      next += round.length;
+      tracks.addAll(
+        await _homeRepeatTracks(
+          round,
+          history: history,
+          includeLocal: includeLocal,
+          matches: matches,
+        ),
       );
-      await listeningRecorder.flush();
-      final now = DateTime.now();
-      final summary = await ListeningStatisticsStore.instance.load(
-        DateTime(now.year, now.month, now.day - 27),
-        DateTime(now.year, now.month, now.day + 1),
-      );
-      final history = ref.read(downloadHistoryProvider.notifier);
-      final database = LibraryDatabase.instance;
-      final tracks = <_HomeRepeatTrack>[];
-      for (final total in summary.tracks) {
-        if (tracks.length == _homeShelfLimit) break;
-        final key = total.track.key;
-        // Remote sources cannot be replayed from their recorded key.
-        if (total.plays <= 0 ||
-            key.startsWith('http://') ||
-            key.startsWith('https://')) {
-          continue;
-        }
-        final downloaded = await history.getByFilePathAsync(key);
-        if (downloaded != null) {
-          tracks.add((
-            track: total.track,
-            item: UnifiedLibraryItem.fromDownloadHistory(downloaded),
-          ));
-          continue;
-        }
-        final ids = await database.getPhysicalFileIds([key]);
-        // With Local Library off its songs stay off Home as well.
-        if (ids.isNotEmpty && !includeLocal) continue;
-        final row = ids.isEmpty ? null : await database.getById(ids.first);
-        if (row != null) {
-          tracks.add((
-            track: total.track,
-            item: UnifiedLibraryItem.fromLocalLibrary(
-              LocalLibraryItem.fromJson(row),
-            ),
-          ));
-          continue;
-        }
-        // Files played from outside the Library stay while they still exist.
-        if (await fileExists(key)) tracks.add((track: total.track, item: null));
+    }
+    if (tracks.length == _homeShelfLimit || totals.length < _homeRepeatPage) {
+      break;
+    }
+  }
+  final last = memo.onRepeat;
+  if (last != null && _sameRepeatTracks(last, tracks)) return last;
+  return memo.onRepeat = tracks;
+});
+
+/// A played key's Library entry: a download or a scanned file, or none.
+/// [hidden] is a scanned file while Local Library is off.
+typedef _HomeRepeatMatch = ({UnifiedLibraryItem? item, bool hidden});
+
+/// [totals] that can still play, in order, matched to their Library entry
+/// as a download first, then as a scanned file. All lookups of a round run
+/// together; [matches] keeps them while the Library stays the same.
+Future<List<HomeRepeatTrack>> _homeRepeatTracks(
+  List<ListeningTotal> totals, {
+  required DownloadHistoryNotifier history,
+  required bool includeLocal,
+  required Map<String, _HomeRepeatMatch> matches,
+}) async {
+  final missing = [
+    for (final total in totals)
+      if (!matches.containsKey(total.track.key)) total.track.key,
+  ];
+  if (missing.isNotEmpty) {
+    final database = LibraryDatabase.instance;
+    final downloads = await Future.wait([
+      for (final key in missing) history.getByFilePathAsync(key),
+    ]);
+    final scannedKeys = [
+      for (final (index, key) in missing.indexed)
+        if (downloads[index] == null) key,
+    ];
+    final scannedIds = await Future.wait([
+      for (final key in scannedKeys) database.getPhysicalFileIds([key]),
+    ]);
+    // With Local Library off its songs stay off Home as well.
+    final rows = includeLocal
+        ? {
+            for (final row in await database.getByIds([
+              for (final ids in scannedIds)
+                if (ids.isNotEmpty) ids.first,
+            ]))
+              row['id']: row,
+          }
+        : const <Object?, Map<String, dynamic>>{};
+    for (final (index, key) in missing.indexed) {
+      if (downloads[index] case final downloaded?) {
+        matches[key] = (
+          item: UnifiedLibraryItem.fromDownloadHistory(downloaded),
+          hidden: false,
+        );
       }
-      return tracks;
-    });
+    }
+    for (final (index, key) in scannedKeys.indexed) {
+      final ids = scannedIds[index];
+      final row = ids.isEmpty ? null : rows[ids.first];
+      matches[key] = (
+        item: row == null
+            ? null
+            : UnifiedLibraryItem.fromLocalLibrary(
+                LocalLibraryItem.fromJson(row),
+              ),
+        hidden: ids.isNotEmpty && !includeLocal,
+      );
+    }
+  }
+  // Files played from outside the Library stay while they still exist,
+  // checked each time since they can go at any moment.
+  final outside = [
+    for (final total in totals)
+      if (matches[total.track.key] case (item: null, hidden: false))
+        total.track.key,
+  ];
+  final present = await Future.wait(outside.map(fileExists));
+  final exists = {
+    for (final (index, key) in outside.indexed) key: present[index],
+  };
+  return [
+    for (final total in totals)
+      if (matches[total.track.key]! case (
+        :final item,
+        :final hidden,
+      ) when !hidden && (item != null || exists[total.track.key]!))
+        (track: total.track, item: item),
+  ];
+}
+
+bool _sameRepeatTracks(
+  List<HomeRepeatTrack> first,
+  List<HomeRepeatTrack> second,
+) {
+  if (first.length != second.length) return false;
+  for (var index = 0; index < first.length; index++) {
+    final (a, b) = (first[index], second[index]);
+    if (a.track.key != b.track.key ||
+        a.track.title != b.track.title ||
+        a.track.artist != b.track.artist ||
+        a.track.album != b.track.album ||
+        a.track.artwork != b.track.artwork ||
+        !_sameLibraryItem(a.item, b.item)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+bool _sameLibraryItem(UnifiedLibraryItem? first, UnifiedLibraryItem? second) =>
+    identical(first, second) ||
+    first != null &&
+        second != null &&
+        mapEquals(first.historyItem?.toJson(), second.historyItem?.toJson()) &&
+        mapEquals(first.localItem?.toJson(), second.localItem?.toJson());
+
+/// What the Home shelves read last, kept for the app's lifetime, so a reload
+/// that finds the same songs returns the same value.
+class _HomeShelfMemo {
+  ({List<Map<String, dynamic>> rows, List<UnifiedLibraryItem> items})?
+  recentlyAdded;
+  (int, int, bool)? repeatLibrary;
+  Map<String, _HomeRepeatMatch> repeatMatches = {};
+  List<HomeRepeatTrack>? onRepeat;
+}
+
+final _homeShelfMemoProvider = Provider<_HomeShelfMemo>(
+  (ref) => _HomeShelfMemo(),
+);
 
 /// The prompt under the Home greeting, picked again on each launch.
 class _HomeTagline extends StatelessWidget {
@@ -134,11 +305,17 @@ class _HomeSections extends ConsumerWidget {
     final hasMediaItem =
         showPlayer &&
         ref.watch(currentMediaItemProvider.select((s) => s.value != null));
+    // Only values: a reload's loading state shows the previous one.
     final hasResume =
-        showPlayer && ref.watch(playbackResumeProvider).value != null;
-    final recentlyAdded = ref.watch(_homeRecentlyAddedProvider).value;
-    final onRepeat = ref.watch(_homeOnRepeatProvider).value ?? const [];
-    final mixes = ref.watch(libraryMixesProvider).value ?? const [];
+        showPlayer &&
+        ref.watch(playbackResumeProvider.select((s) => s.value != null));
+    final recentlyAdded = ref.watch(
+      homeRecentlyAddedProvider.select((s) => s.value),
+    );
+    final onRepeat =
+        ref.watch(homeOnRepeatProvider.select((s) => s.value)) ?? const [];
+    final mixes =
+        ref.watch(libraryMixesProvider.select((s) => s.value)) ?? const [];
 
     final sections = <Widget>[
       if (hasMediaItem || hasResume)
@@ -431,13 +608,18 @@ class _HomeContinueListeningProgress extends ConsumerWidget {
     final progress = durationMs > 0
         ? (positionMs / durationMs).clamp(0.0, 1.0)
         : 0.0;
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(2),
-      child: LinearProgressIndicator(
-        value: progress,
-        minHeight: 4,
-        color: colorScheme.primary,
-        backgroundColor: colorScheme.onPrimaryContainer.withValues(alpha: 0.16),
+    // Repaints on every position tick without repainting the sections.
+    return RepaintBoundary(
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(2),
+        child: LinearProgressIndicator(
+          value: progress,
+          minHeight: 4,
+          color: colorScheme.primary,
+          backgroundColor: colorScheme.onPrimaryContainer.withValues(
+            alpha: 0.16,
+          ),
+        ),
       ),
     );
   }
@@ -696,7 +878,7 @@ class _HomeLibraryTile extends StatelessWidget {
 class _HomeOnRepeatShelf extends ConsumerWidget {
   const _HomeOnRepeatShelf({required this.tracks, required this.inset});
 
-  final List<_HomeRepeatTrack> tracks;
+  final List<HomeRepeatTrack> tracks;
   final double inset;
 
   @override

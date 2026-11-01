@@ -3,6 +3,7 @@ import 'package:mornye/providers/library_mixes_provider.dart';
 import 'package:mornye/services/library_mixes.dart';
 import 'package:mornye/services/library_queue_store.dart';
 import 'package:mornye/services/library_schema.dart';
+import 'package:mornye/services/library_shadow_sql.dart';
 import 'package:mornye/services/playable_media.dart';
 
 import 'support/sqlite_process_database.dart';
@@ -580,16 +581,8 @@ void main() {
     test(
       'pages hold downloads and the scanned files they do not shadow',
       () async {
-        final first = await store.mixSongs(
-          includeLocal: true,
-          limit: 1,
-          offset: 0,
-        );
-        final second = await store.mixSongs(
-          includeLocal: true,
-          limit: 1,
-          offset: 1,
-        );
+        final first = await store.mixSongs(source: 'downloaded', limit: 1);
+        final second = await store.mixSongs(source: 'local', limit: 10);
         expect(
           [...first, ...second],
           [
@@ -631,14 +624,128 @@ void main() {
           libraryMixAddedAt(second.single),
           DateTime.fromMillisecondsSinceEpoch(1700000000000),
         );
-        final off = await store.mixSongs(
-          includeLocal: false,
-          limit: 10,
-          offset: 0,
+        // A pending download without a file is no song.
+        expect(
+          await store.mixSongs(
+            source: 'downloaded',
+            afterId: 'download',
+            limit: 10,
+          ),
+          isEmpty,
         );
-        expect([for (final row in off) row['id']], ['download']);
       },
     );
+
+    test('keyset pages list the songs OFFSET pages did, in order', () async {
+      // Ids out of insertion order, scanned copies a download shadows,
+      // files without a path and a source that is offline.
+      await db.insert('library_sources', {
+        'id': 'offline',
+        'path': '/offline',
+        'display_name': 'Offline',
+        'enabled': 1,
+        'available': 0,
+      });
+      for (var index = 0; index < 23; index++) {
+        final id = 'h${(index * 7) % 23}';
+        await db.insert('history_db.history', {
+          'id': id,
+          'file_path': index % 9 == 4 ? '' : '/music/$id.flac',
+          'track_name': 'Download $index',
+          'artist_name': 'Artist ${index % 3}',
+          'album_name': 'Album',
+          'genre': 'Rap',
+          'duration': 200 + index,
+          'release_date': '2019',
+          'downloaded_at': '2026-10-20T10:00:00.000',
+        });
+        if (index % 4 == 0) {
+          await db.insert('history_db.history_path_keys', {
+            'item_id': id,
+            'path_key': 'shadow-$index',
+          });
+        }
+      }
+      for (var index = 0; index < 31; index++) {
+        final id = 's${(index * 11) % 31}';
+        await db.insert('library', {
+          'id': id,
+          'source_id': index % 10 == 3 ? 'offline' : 'legacy',
+          'track_name': 'Scanned $index',
+          'artist_name': 'Artist ${index % 5}',
+          'album_name': 'Album $index',
+          'album_key': 'album$index|artist',
+          'file_path': index == 6 ? '' : '/music/$id.flac',
+          'scanned_at': '2026-10-27T00:00:00Z',
+          'genre': 'Jazz',
+          'duration': 180 + index,
+          'release_date': '${1990 + index}',
+          'file_mod_time': 1700000000000 + index,
+        });
+        await db.insert('library_path_keys', {
+          'item_id': id,
+          'path_key': index.isEven && index < 23
+              ? 'shadow-$index'
+              : 'own-$index',
+        });
+      }
+
+      Future<List<Map<String, Object?>>> offsetPages(bool includeLocal) async {
+        final rows = <Map<String, Object?>>[];
+        for (var offset = 0; ; offset += 5) {
+          final page = await db.rawQuery(
+            '''
+            SELECT * FROM (
+              SELECT 'downloaded' AS source, h.id, h.file_path, h.track_name,
+                h.artist_name, h.album_name, h.genre, h.duration,
+                h.release_date, h.downloaded_at AS added_at,
+                NULL AS file_mod_time
+              FROM history_db.history h
+              WHERE COALESCE(h.file_path, '') != ''
+              ${includeLocal ? '''
+              UNION ALL
+              SELECT 'local' AS source, l.id, l.file_path, l.track_name,
+                l.artist_name, l.album_name, l.genre, l.duration,
+                l.release_date, l.scanned_at AS added_at, l.file_mod_time
+              FROM ${LibrarySchema.visibleView} l
+              WHERE COALESCE(l.file_path, '') != ''
+                AND ${libraryNotShadowedSql('l')}
+              ''' : ''}
+            )
+            ORDER BY source, id
+            LIMIT ? OFFSET ?
+            ''',
+            [5, offset],
+          );
+          rows.addAll(page);
+          if (page.length < 5) return rows;
+        }
+      }
+
+      Future<List<Map<String, Object?>>> keysetPages(bool includeLocal) async {
+        final rows = <Map<String, Object?>>[];
+        for (final source in ['downloaded', if (includeLocal) 'local']) {
+          String? afterId;
+          while (true) {
+            final page = await store.mixSongs(
+              source: source,
+              afterId: afterId,
+              limit: 5,
+            );
+            rows.addAll(page);
+            afterId = page.lastOrNull?['id'] as String?;
+            if (page.length < 5 || afterId == null) break;
+          }
+        }
+        return rows;
+      }
+
+      for (final includeLocal in [true, false]) {
+        final expected = await offsetPages(includeLocal);
+        expect(expected, hasLength(includeLocal ? 43 : 21));
+        expect(await keysetPages(includeLocal), expected);
+      }
+    });
   });
 
   group('cached mixes', () {

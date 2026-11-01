@@ -346,6 +346,19 @@ class ListeningStatisticsStore {
     return readListeningSummary(db, start, end);
   }
 
+  Future<List<ListeningTotal>> loadReplayableTracks(
+    DateTime start,
+    DateTime end, {
+    required int limit,
+    int offset = 0,
+  }) async => readReplayableListeningTracks(
+    await _open(),
+    start,
+    end,
+    limit: limit,
+    offset: offset,
+  );
+
   /// Runs a read-only aggregate against the statistics database.
   Future<T> read<T>(Future<T> Function(DatabaseExecutor db) query) async =>
       query(await _open());
@@ -402,6 +415,31 @@ Future<void> writeListeningDeltas(
   });
 }
 
+/// One row per song of the window, most listened first. A song shows its
+/// latest day's details, and the latest cover recorded in the window when
+/// that day has none.
+String _listeningTracksSql({
+  String where = '',
+  String having = '',
+  String tail = '',
+}) =>
+    '''
+    SELECT totals.track_key, details.title, details.artist, details.album,
+      COALESCE(details.artwork, covered.artwork) AS artwork,
+      totals.milliseconds, totals.plays
+    FROM (
+      SELECT track_key, SUM(milliseconds) AS milliseconds, SUM(plays) AS plays,
+        MAX(day) AS last_day,
+        MAX(CASE WHEN artwork IS NOT NULL THEN day END) AS cover_day
+      FROM listening WHERE day >= ? AND day < ?$where GROUP BY track_key$having
+    ) AS totals
+    JOIN listening AS details ON details.track_key = totals.track_key
+      AND details.day = totals.last_day
+    LEFT JOIN listening AS covered ON covered.track_key = totals.track_key
+      AND covered.day = totals.cover_day
+    ORDER BY totals.milliseconds DESC$tail
+  ''';
+
 /// Aggregate in SQLite so an annual recap transfers one row per song, artist
 /// and day, rather than every daily song record into the Flutter heap.
 /// A song shows its latest day's details, and the latest cover recorded in
@@ -412,22 +450,7 @@ Future<ListeningSummary> readListeningSummary(
   DateTime end,
 ) async {
   final arguments = [listeningDay(start), listeningDay(end)];
-  final rows = await db.rawQuery('''
-    SELECT totals.track_key, details.title, details.artist, details.album,
-      COALESCE(details.artwork, covered.artwork) AS artwork,
-      totals.milliseconds, totals.plays
-    FROM (
-      SELECT track_key, SUM(milliseconds) AS milliseconds, SUM(plays) AS plays,
-        MAX(day) AS last_day,
-        MAX(CASE WHEN artwork IS NOT NULL THEN day END) AS cover_day
-      FROM listening WHERE day >= ? AND day < ? GROUP BY track_key
-    ) AS totals
-    JOIN listening AS details ON details.track_key = totals.track_key
-      AND details.day = totals.last_day
-    LEFT JOIN listening AS covered ON covered.track_key = totals.track_key
-      AND covered.day = totals.cover_day
-    ORDER BY totals.milliseconds DESC
-  ''', arguments);
+  final rows = await db.rawQuery(_listeningTracksSql(), arguments);
   final artistRows = await db.rawQuery('''
     SELECT artist, SUM(milliseconds) AS milliseconds
     FROM listening WHERE day >= ? AND day < ? GROUP BY artist
@@ -462,6 +485,37 @@ Future<ListeningSummary> readListeningSummary(
         row['day'] as String: row['milliseconds'] as int,
     },
   );
+}
+
+/// The tracks of [readListeningSummary] in its order, [limit] from
+/// [offset], that can be played again from their key: played at least once
+/// and not recorded under a stream URL. Equal listening times keep the
+/// summary's order, by key.
+Future<List<ListeningTotal>> readReplayableListeningTracks(
+  DatabaseExecutor db,
+  DateTime start,
+  DateTime end, {
+  required int limit,
+  int offset = 0,
+}) async {
+  final rows = await db.rawQuery(
+    _listeningTracksSql(
+      where:
+          " AND track_key NOT GLOB 'http://*'"
+          " AND track_key NOT GLOB 'https://*'",
+      having: ' HAVING SUM(plays) > 0',
+      tail: ', totals.track_key LIMIT ? OFFSET ?',
+    ),
+    [listeningDay(start), listeningDay(end), limit, offset],
+  );
+  return [
+    for (final row in rows)
+      ListeningTotal(
+        ListeningTrack.fromRow(row),
+        row['milliseconds'] as int,
+        row['plays'] as int,
+      ),
+  ];
 }
 
 final _listeningClock = Stopwatch()..start();

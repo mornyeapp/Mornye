@@ -150,33 +150,39 @@ class LibraryQueueStore {
 
   /// One page of the metadata Home mixes group songs by, over the same set
   /// as [directoryEntries]: only the columns ranking, decades and the New
-  /// Additions mix read, so a large Library arrives in small rows.
+  /// Additions mix read, so a large Library arrives in small rows. Pages of
+  /// [source] ('downloaded' or 'local') run by id after [afterId], so each
+  /// seeks its primary key; downloads, then scanned files, each by id, is
+  /// the order of the whole set.
   Future<List<Map<String, Object?>>> mixSongs({
-    required bool includeLocal,
+    required String source,
+    String? afterId,
     required int limit,
-    required int offset,
-  }) => _db.rawQuery(
-    '''
-    SELECT * FROM (
-      SELECT 'downloaded' AS source, h.id, h.file_path, h.track_name,
-        h.artist_name, h.album_name, h.genre, h.duration, h.release_date,
-        h.downloaded_at AS added_at, NULL AS file_mod_time
-      FROM history_db.history h
-      WHERE COALESCE(h.file_path, '') != ''
-      ${includeLocal ? '''
-      UNION ALL
-      SELECT 'local' AS source, l.id, l.file_path, l.track_name,
-        l.artist_name, l.album_name, l.genre, l.duration, l.release_date,
-        l.scanned_at AS added_at, l.file_mod_time
-      FROM ${LibrarySchema.visibleView} l
-      WHERE COALESCE(l.file_path, '') != '' AND ${_notShadowedByHistory('l')}
-      ''' : ''}
-    )
-    ORDER BY source, id
-    LIMIT ? OFFSET ?
-  ''',
-    [limit, offset],
-  );
+  }) {
+    final after = afterId == null ? '' : 'AND song.id > ?';
+    final sql = switch (source) {
+      'downloaded' =>
+        '''
+        SELECT 'downloaded' AS source, song.id, song.file_path,
+          song.track_name, song.artist_name, song.album_name, song.genre,
+          song.duration, song.release_date, song.downloaded_at AS added_at,
+          NULL AS file_mod_time
+        FROM history_db.history song
+        WHERE COALESCE(song.file_path, '') != '' $after
+        ''',
+      'local' =>
+        '''
+        SELECT 'local' AS source, song.id, song.file_path, song.track_name,
+          song.artist_name, song.album_name, song.genre, song.duration,
+          song.release_date, song.scanned_at AS added_at, song.file_mod_time
+        FROM ${LibrarySchema.visibleView} song
+        WHERE COALESCE(song.file_path, '') != ''
+          AND ${_notShadowedByHistory('song')} $after
+        ''',
+      _ => throw ArgumentError.value(source, 'source'),
+    };
+    return _db.rawQuery('$sql ORDER BY song.id LIMIT ?', [?afterId, limit]);
+  }
 
   Future<QueueLibraryCounts> counts(QueueLibraryDbQuery request) async {
     final fastCounts = await _getUnfilteredQueueCounts(request);

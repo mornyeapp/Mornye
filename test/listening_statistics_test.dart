@@ -244,6 +244,80 @@ void main() {
     },
   );
 
+  test('replayable pages keep the summary order of played file keys', () async {
+    final db = await SqliteProcessDatabase.open();
+    addTearDown(db.close);
+    await db.execute('''
+      CREATE TABLE listening (
+        day TEXT, track_key TEXT, title TEXT, artist TEXT, album TEXT,
+        artwork TEXT, milliseconds INTEGER, plays INTEGER,
+        PRIMARY KEY(day, track_key)
+      )
+    ''');
+    // Few distinct listening times, so many songs tie; stream URLs, an
+    // upper-case scheme the old prefix check kept, and songs never played.
+    String key(int song) => switch (song % 11) {
+      0 => 'https://stream.example/$song',
+      1 => 'http://stream.example/$song',
+      2 => 'HTTP://stream.example/$song',
+      3 => 'network://nas/$song.flac',
+      _ => '/music/${(song * 37) % 101}.flac',
+    };
+    for (var day = 1; day <= 6; day++) {
+      for (var song = day; song < 90; song += 2) {
+        await db.insert('listening', {
+          'day': '2026-10-0$day',
+          'track_key': key(song),
+          'title': 'Song $song',
+          'artist': 'Artist ${song % 4}',
+          'album': 'Album',
+          'artwork': (song + day) % 3 == 0 ? 'cover://$song/$day' : null,
+          'milliseconds': 1000 * (1 + (song * day) % 3),
+          'plays': (song + day) % 4 == 0 ? 0 : 1,
+        });
+      }
+    }
+    final start = DateTime(2026, 10, 2), end = DateTime(2026, 10, 6);
+    List<Object?> describe(Iterable<ListeningTotal> totals) => [
+      for (final total in totals)
+        [
+          total.track.key,
+          total.track.title,
+          total.track.artwork,
+          total.milliseconds,
+          total.plays,
+        ],
+    ];
+    final expected = describe(
+      (await readListeningSummary(db, start, end)).tracks.where(
+        (total) =>
+            total.plays > 0 &&
+            !total.track.key.startsWith('http://') &&
+            !total.track.key.startsWith('https://'),
+      ),
+    );
+    expect(expected.length, greaterThan(30));
+    // Equal listening times, ordered by key as the summary orders them.
+    expect(
+      {for (final total in expected) (total as List)[3]}.length,
+      lessThan(expected.length ~/ 2),
+    );
+    final pages = <ListeningTotal>[];
+    for (var offset = 0; ; offset += 7) {
+      final page = await readReplayableListeningTracks(
+        db,
+        start,
+        end,
+        limit: 7,
+        offset: offset,
+      );
+      expect(describe(page), expected.skip(offset).take(7).toList());
+      pages.addAll(page);
+      if (page.length < 7) break;
+    }
+    expect(describe(pages), expected);
+  });
+
   test(
     'artist artwork uses the most listened track with an available cover',
     () {

@@ -116,6 +116,7 @@ extension _LocalLibrarySources on LocalLibraryNotifier {
       trackKeySet: index.matchKeys,
       isrcSet: index.isrcs,
     );
+    ref.read(localLibraryIndexRevisionProvider.notifier)._bump();
     _hasLoadedFromDatabase = true;
     _isLoaded = true;
   }

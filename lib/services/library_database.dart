@@ -487,19 +487,15 @@ class LibraryDatabase {
   Future<List<Map<String, Object?>>> getSongFiles() =>
       _queueRead((store) => store.songFiles(), includeLocal: true);
 
-  /// One page of every downloaded and scanned song's metadata, for the
-  /// Home mixes.
+  /// One page of the downloaded ('downloaded') or scanned ('local') songs'
+  /// metadata by id after [afterId], for the Home mixes.
   Future<List<Map<String, Object?>>> getMixSongPage({
-    required bool includeLocal,
+    required String source,
+    String? afterId,
     required int limit,
-    required int offset,
   }) => _queueRead(
-    (store) => store.mixSongs(
-      includeLocal: includeLocal,
-      limit: limit,
-      offset: offset,
-    ),
-    includeLocal: includeLocal,
+    (store) => store.mixSongs(source: source, afterId: afterId, limit: limit),
+    includeLocal: source == 'local',
   );
 
   @visibleForTesting

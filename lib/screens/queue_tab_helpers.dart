@@ -182,61 +182,6 @@ class _QueueLibraryPageRequest
   );
 }
 
-class _QueueLibraryCountsRequest {
-  final String searchQuery;
-  final String? filterSource;
-  final String? filterQuality;
-  final String? filterFormat;
-  final String? filterMetadata;
-  final bool localLibraryEnabled;
-
-  const _QueueLibraryCountsRequest({
-    required this.searchQuery,
-    required this.filterSource,
-    required this.filterQuality,
-    required this.filterFormat,
-    required this.filterMetadata,
-    required this.localLibraryEnabled,
-  });
-
-  QueueLibraryDbQuery toDbQuery() => QueueLibraryDbQuery(
-    searchQuery: searchQuery,
-    source: filterSource,
-    quality: filterQuality,
-    format: filterFormat,
-    metadata: filterMetadata,
-    includeLocal: localLibraryEnabled,
-  );
-
-  bool get allowsInMemoryHistoryFallback =>
-      searchQuery.trim().isEmpty &&
-      filterSource != 'local' &&
-      filterQuality == null &&
-      filterFormat == null &&
-      filterMetadata == null;
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is _QueueLibraryCountsRequest &&
-          searchQuery == other.searchQuery &&
-          filterSource == other.filterSource &&
-          filterQuality == other.filterQuality &&
-          filterFormat == other.filterFormat &&
-          filterMetadata == other.filterMetadata &&
-          localLibraryEnabled == other.localLibraryEnabled;
-
-  @override
-  int get hashCode => Object.hash(
-    searchQuery,
-    filterSource,
-    filterQuality,
-    filterFormat,
-    filterMetadata,
-    localLibraryEnabled,
-  );
-}
-
 class _QueueLibraryPageData implements QueueLibraryPageContent {
   final List<UnifiedLibraryItem> items;
   final List<DownloadHistoryItem> historyItems;
@@ -495,20 +440,4 @@ final _queueLibraryPageProvider = FutureProvider.autoDispose
         localItems: localItems,
         nextCursor: page.nextCursor,
       );
-    });
-
-final _queueLibraryCountsProvider = FutureProvider.autoDispose
-    .family<QueueLibraryCounts, _QueueLibraryCountsRequest>((
-      ref,
-      request,
-    ) async {
-      ref.watch(
-        downloadHistoryProvider.select((state) => state.loadedIndexVersion),
-      );
-      if (request.localLibraryEnabled) {
-        ref.watch(
-          localLibraryProvider.select((state) => state.loadedIndexVersion),
-        );
-      }
-      return LibraryDatabase.instance.getQueueCounts(request.toDbQuery());
     });

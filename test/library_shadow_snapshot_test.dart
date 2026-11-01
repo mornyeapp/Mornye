@@ -287,11 +287,10 @@ Future<Map<String, Object?>> _reads(
   }
   reads['folders'] = await store.directoryEntries(includeLocal: true);
   reads['files'] = await store.songFiles();
-  reads['mixes'] = await store.mixSongs(
-    includeLocal: true,
-    limit: 1000,
-    offset: 0,
-  );
+  reads['mixes'] = [
+    for (final source in ['downloaded', 'local'])
+      ...await store.mixSongs(source: source, limit: 1000),
+  ];
   for (final kind in [
     LibrarySearchKind.songs,
     LibrarySearchKind.albums,
@@ -365,11 +364,13 @@ Future<void> _expectCurrent(String step) async {
     await rowCheck.songFiles(),
     reason: '$step files',
   );
-  expect(
-    await library.getMixSongPage(includeLocal: true, limit: 1000, offset: 0),
-    await rowCheck.mixSongs(includeLocal: true, limit: 1000, offset: 0),
-    reason: '$step mixes',
-  );
+  for (final source in ['downloaded', 'local']) {
+    expect(
+      await library.getMixSongPage(source: source, limit: 1000),
+      await rowCheck.mixSongs(source: source, limit: 1000),
+      reason: '$step $source mixes',
+    );
+  }
   expect(
     _hits(
       await library.searchLibrary(

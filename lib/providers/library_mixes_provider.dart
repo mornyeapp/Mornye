@@ -1,12 +1,14 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart' show compute, visibleForTesting;
+import 'package:flutter/foundation.dart'
+    show compute, mapEquals, visibleForTesting;
 import 'package:flutter/scheduler.dart' show SchedulerBinding;
 import 'package:flutter/widgets.dart' show WidgetsBinding;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/models/unified_library_item.dart';
 import 'package:mornye/providers/download_history_provider.dart';
+import 'package:mornye/providers/library_counts_provider.dart';
 import 'package:mornye/providers/local_library_provider.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/recent_access_provider.dart'
@@ -148,14 +150,21 @@ final libraryMixesProvider = FutureProvider<List<LibraryMixView>>((ref) async {
   }
   // A download or a rescan may change what the mixes can hold. The Local
   // Library is only read once startup has settled, so it keeps its own
-  // deferred warmup.
-  ref.watch(downloadHistoryProvider.select((s) => s.items.length));
+  // deferred warmup. Downloads in a batch arrive coalesced, at most one
+  // revision a second.
+  ref.watch(downloadHistoryProvider.select((s) => s.loadedIndexVersion));
   if (includeLocal) {
     ref.watch(localLibraryProvider.select((s) => s.loadedIndexVersion));
     if (ref.watch(localLibraryProvider.select((s) => s.isScanning))) {
       return _cachedViews(includeLocal);
     }
   }
+  // The Library tab and Home count the same Library; one count serves all.
+  final counts = ref.watch(
+    libraryCountsProvider(
+      LibraryCountsRequest.all(localLibraryEnabled: includeLocal),
+    ).future,
+  );
   final now = DateTime.now();
   // New mixes at midnight while Home stays open.
   final midnight = Timer(
@@ -169,6 +178,7 @@ final libraryMixesProvider = FutureProvider<List<LibraryMixView>>((ref) async {
       includeLocal: includeLocal,
       now: now,
       runtime: ref.read(musicPlayerRuntimeProvider),
+      count: (await counts).allTrackCount,
     );
     return await _resolve(mixes, includeLocal);
   } on Object catch (error, stack) {
@@ -211,15 +221,21 @@ class _LibraryMixes {
     required bool includeLocal,
     required DateTime now,
     required MusicPlayerRuntime runtime,
+    required int count,
   }) async {
     final pending = _building;
     if (pending != null) {
       if (_buildingIncludeLocal == includeLocal) return pending;
       // Local Library was switched: the next load starts after this one.
       await pending.then((_) {}, onError: (_) {});
-      return load(includeLocal: includeLocal, now: now, runtime: runtime);
+      return load(
+        includeLocal: includeLocal,
+        now: now,
+        runtime: runtime,
+        count: count,
+      );
     }
-    final operation = _load(includeLocal, now, runtime);
+    final operation = _load(includeLocal, now, runtime, count);
     _building = operation;
     _buildingIncludeLocal = includeLocal;
     try {
@@ -233,11 +249,9 @@ class _LibraryMixes {
     bool includeLocal,
     DateTime now,
     MusicPlayerRuntime runtime,
+    int count,
   ) async {
     final prefs = await SharedPreferences.getInstance();
-    final count = (await LibraryDatabase.instance.getQueueCounts(
-      QueueLibraryDbQuery(includeLocal: includeLocal),
-    )).allTrackCount;
     final day = listeningDay(now);
     final cached = _decode(prefs.getString(_cacheKey));
     if (cached != null &&
@@ -267,9 +281,24 @@ class _LibraryMixes {
     return mixes;
   }
 
+  /// The cache as last decoded, so an unchanged cache is not decoded again
+  /// and keeps the same mixes.
+  static String? _decodedValue;
+  static ({String day, bool includeLocal, int count, List<LibraryMix> mixes})?
+  _decoded;
+
   static ({String day, bool includeLocal, int count, List<LibraryMix> mixes})?
   _decode(String? value) {
     if (value == null) return null;
+    if (value == _decodedValue) return _decoded;
+    final decoded = _decodeJson(value);
+    _decodedValue = value;
+    _decoded = decoded;
+    return decoded;
+  }
+
+  static ({String day, bool includeLocal, int count, List<LibraryMix> mixes})?
+  _decodeJson(String value) {
     try {
       final json = jsonDecode(value);
       if (json is! Map) return null;
@@ -349,35 +378,38 @@ class _LibraryMixes {
     final songs = <PlayableMedia>[];
     final years = <String, int>{};
     final added = <String, DateTime>{};
-    for (var offset = 0; ; offset += _pageSize) {
-      final rows = await LibraryDatabase.instance.getMixSongPage(
-        includeLocal: includeLocal,
-        limit: _pageSize,
-        offset: offset,
-      );
-      for (final row in rows) {
-        final seconds = readPositiveInt(row['duration']);
-        final id = '${row['source'] == 'local' ? 'local' : 'dl'}_${row['id']}';
-        if (libraryMixReleaseYear(row['release_date']) case final year?) {
-          years[id] = year;
-        }
-        if (libraryMixAddedAt(row) case final at?) added[id] = at;
-        songs.add(
-          PlayableMedia(
-            id: id,
-            source: row['file_path'] as String? ?? '',
-            title: row['track_name'] as String? ?? '',
-            artist: row['artist_name'] as String? ?? '',
-            album: row['album_name'] as String? ?? '',
-            genre: row['genre'] as String?,
-            duration: seconds == null ? null : Duration(seconds: seconds),
-          ),
+    for (final source in ['downloaded', if (includeLocal) 'local']) {
+      String? afterId;
+      while (true) {
+        final rows = await LibraryDatabase.instance.getMixSongPage(
+          source: source,
+          afterId: afterId,
+          limit: _pageSize,
         );
-      }
-      if (rows.length < _pageSize) {
-        return (songs: songs, years: years, added: added);
+        for (final row in rows) {
+          final seconds = readPositiveInt(row['duration']);
+          final id = '${source == 'local' ? 'local' : 'dl'}_${row['id']}';
+          if (libraryMixReleaseYear(row['release_date']) case final year?) {
+            years[id] = year;
+          }
+          if (libraryMixAddedAt(row) case final at?) added[id] = at;
+          songs.add(
+            PlayableMedia(
+              id: id,
+              source: row['file_path'] as String? ?? '',
+              title: row['track_name'] as String? ?? '',
+              artist: row['artist_name'] as String? ?? '',
+              album: row['album_name'] as String? ?? '',
+              genre: row['genre'] as String?,
+              duration: seconds == null ? null : Duration(seconds: seconds),
+            ),
+          );
+        }
+        afterId = rows.lastOrNull?['id'] as String?;
+        if (rows.length < _pageSize || afterId == null) break;
       }
     }
+    return (songs: songs, years: years, added: added);
   }
 
   /// Loved songs, Autoplay's learning log while learning is on, the saved
@@ -513,6 +545,16 @@ Future<List<LibraryMixView>> _resolve(
     HistoryDatabase.instance.getByIds(downloaded),
     LibraryDatabase.instance.getByIds(local.toList()),
   ).wait;
+  // Most Library changes leave the mixes' songs as they were: keep the
+  // views, so Home neither decodes them again nor rebuilds the shelf.
+  final last = _lastResolved;
+  if (last != null &&
+      identical(last.mixes, mixes) &&
+      last.includeLocal == includeLocal &&
+      _sameRowsById(last.history, history) &&
+      _sameRows(last.scanned, scanned)) {
+    return last.views;
+  }
   final items = <String, UnifiedLibraryItem>{
     for (final MapEntry(:key, :value) in history.entries)
       'dl_$key': UnifiedLibraryItem.fromDownloadHistory(
@@ -523,10 +565,46 @@ Future<List<LibraryMixView>> _resolve(
         LocalLibraryItem.fromJson(row),
       ),
   };
-  return [
+  final views = [
     for (final mix in mixes)
       if ([for (final id in mix.songIds) ?items[id]] case final songs
           when songs.length >= _minVisibleSongs)
         LibraryMixView(mix: mix, items: songs),
   ];
+  _lastResolved = (
+    mixes: mixes,
+    includeLocal: includeLocal,
+    history: history,
+    scanned: scanned,
+    views: views,
+  );
+  return views;
 }
+
+/// The last [_resolve] and the rows it read.
+({
+  List<LibraryMix> mixes,
+  bool includeLocal,
+  Map<String, Map<String, dynamic>> history,
+  List<Map<String, dynamic>> scanned,
+  List<LibraryMixView> views,
+})?
+_lastResolved;
+
+bool _sameRows(
+  List<Map<String, dynamic>> first,
+  List<Map<String, dynamic>> second,
+) {
+  if (first.length != second.length) return false;
+  for (var index = 0; index < first.length; index++) {
+    if (!mapEquals(first[index], second[index])) return false;
+  }
+  return true;
+}
+
+bool _sameRowsById(
+  Map<String, Map<String, dynamic>> first,
+  Map<String, Map<String, dynamic>> second,
+) =>
+    first.length == second.length &&
+    first.entries.every((entry) => mapEquals(entry.value, second[entry.key]));
