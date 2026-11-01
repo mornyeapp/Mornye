@@ -86,6 +86,9 @@ void main() {
     await ffmpeg(['-i', wav, '-c:a', 'flac', input]);
     final originalHash = await pcmHash(input, 24);
     final folder = await Directory('${directory.path}/split').create();
+    final existing = await File(
+      '${folder.path}/01 - First.flac',
+    ).writeAsString('existing split');
     final paths = await FFmpegConversion.splitCueToTracks(
       audioPath: input,
       outputDir: folder.path,
@@ -108,11 +111,13 @@ void main() {
       albumMetadata: {'album': 'Album', 'artist': 'Artist'},
     );
     expect(paths, hasLength(2));
+    expect(paths!.first, '${folder.path}/01 - First (2).flac');
+    expect(await existing.readAsString(), 'existing split');
     expect(await File(input).exists(), isTrue);
     expect(await pcmHash(input, 24), originalHash);
     final combinedHash = await ffmpeg([
       '-i',
-      paths![0],
+      paths[0],
       '-i',
       paths[1],
       '-filter_complex',

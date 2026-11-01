@@ -241,6 +241,107 @@ void main() {
     }
   }
 
+  test('individual retry clears stale transfer counters', () async {
+    final container = ProviderContainer(
+      overrides: [
+        settingsProvider.overrideWith(
+          () => FixedSettingsNotifier(
+            const AppSettings(downloadDirectory: '/fixture/output'),
+          ),
+        ),
+        downloadQueueProvider.overrideWith(
+          () => _Queue([
+            _item('song', DownloadStatus.failed, DownloadErrorType.network),
+          ]),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+    final queue = container.read(downloadQueueProvider.notifier);
+    await queue.flushQueuePersistence();
+    messenger.setMockMethodCallHandler(backend, (call) async {
+      expect(call.method, 'resetDownloadCancel');
+      expect((call.arguments as Map)['item_id'], 'song');
+      return null;
+    });
+
+    await queue.retryItem('song');
+
+    final item = container.read(downloadQueueProvider).items.single;
+    expect(item.status, DownloadStatus.queued);
+    expect([
+      item.progress,
+      item.speedMBps,
+      item.bytesReceived,
+      item.bytesTotal,
+    ], everyElement(0));
+    expect([item.error, item.errorType, item.filePath], everyElement(isNull));
+    await queue.flushQueuePersistence();
+  });
+
+  for (final bulkFirst in [false, true]) {
+    test(
+      'concurrent retries reset each item once (bulk: $bulkFirst)',
+      () async {
+        final container = ProviderContainer(
+          overrides: [
+            settingsProvider.overrideWith(
+              () => FixedSettingsNotifier(
+                const AppSettings(downloadDirectory: '/fixture/output'),
+              ),
+            ),
+            downloadQueueProvider.overrideWith(
+              () => _Queue([
+                _item(
+                  'song',
+                  DownloadStatus.skipped,
+                  DownloadErrorType.network,
+                ),
+              ]),
+            ),
+          ],
+        );
+        addTearDown(container.dispose);
+        final queue = container.read(downloadQueueProvider.notifier);
+        await queue.flushQueuePersistence();
+        final started = Completer<void>();
+        final release = Completer<void>();
+        var resets = 0;
+        messenger.setMockMethodCallHandler(backend, (call) async {
+          expect(
+            call.method,
+            bulkFirst ? 'resetDownloadCancels' : 'resetDownloadCancel',
+          );
+          resets++;
+          started.complete();
+          await release.future;
+          return null;
+        });
+
+        final first = bulkFirst
+            ? queue.retryAllFailed()
+            : queue.retryItem('song');
+        await started.future;
+        await Future.wait([
+          queue.retryItem('song'),
+          queue.retryAllFailed(),
+          queue.retryItem('song'),
+        ]);
+        expect(resets, 1);
+        release.complete();
+        await first;
+        expect(
+          container.read(downloadQueueProvider).items.single.status,
+          DownloadStatus.queued,
+        );
+        await queue.retryItem('song');
+        await queue.retryAllFailed();
+        expect(resets, 1);
+        await queue.flushQueuePersistence();
+      },
+    );
+  }
+
   for (final outcome in ['failed', 'changed', 'disposed']) {
     test('pending reset respects $outcome outcome', () async {
       final initial = [

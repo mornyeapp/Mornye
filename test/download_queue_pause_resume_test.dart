@@ -110,9 +110,14 @@ void main() {
   });
 
   for (final beforeTransfer in [true, false]) {
-    for (final immediateResume in [false, true]) {
+    for (final (immediateResume, retry) in [
+      (false, false),
+      (true, false),
+      (false, true),
+      (true, true),
+    ]) {
       test(
-        'resume restarts after pause (before transfer: $beforeTransfer, immediate: $immediateResume)',
+        '${retry ? "retry" : "resume"} waits for old attempt (before transfer: $beforeTransfer, immediate or bulk: $immediateResume)',
         () async {
           final directory = await Directory.systemTemp.createTemp(
             'queue-resume-',
@@ -172,6 +177,12 @@ void main() {
               resetIds.add((call.arguments as Map)['item_id'] as String);
               cancelled = false;
             }
+            if (call.method == 'resetDownloadCancels') {
+              resetIds.addAll(
+                List<String>.from((call.arguments as Map)['item_ids'] as List),
+              );
+              cancelled = false;
+            }
             if (call.method != 'downloadByStrategy') return null;
             final request = jsonDecode(call.arguments as String) as Map;
             expect(request['item_id'], 'song');
@@ -194,13 +205,23 @@ void main() {
               settingsProvider.overrideWith(() => _Settings(directory.path)),
               extensionProvider.overrideWith(_Extensions.new),
               downloadQueueProvider.overrideWith(
-                () => _Queue('album-$beforeTransfer-$immediateResume'),
+                () => _Queue('album-$beforeTransfer-$immediateResume-$retry'),
               ),
             ],
           );
           addTearDown(container.dispose);
           var finished = Completer<void>();
+          final reachedProvider = Completer<void>();
           container.listen(downloadQueueProvider, (previous, next) {
+            if (previous?.isProcessing != true &&
+                next.isProcessing &&
+                finished.isCompleted) {
+              finished = Completer<void>();
+            }
+            if (next.items.single.errorType == DownloadErrorType.notFound &&
+                !reachedProvider.isCompleted) {
+              reachedProvider.complete();
+            }
             if (previous?.isProcessing == true &&
                 !next.isProcessing &&
                 !finished.isCompleted) {
@@ -211,23 +232,53 @@ void main() {
           await queue.flushQueuePersistence();
           queue.resumeQueue();
           await started.future.timeout(const Duration(seconds: 5));
-          queue.pauseQueue();
+          Future<void>? retried;
+          if (retry) {
+            queue.cancelItem('song');
+            retried = immediateResume
+                ? queue.retryAllFailed()
+                : queue.retryItem('song');
+          } else {
+            queue.pauseQueue();
+          }
           await cancelRequested.future;
           expect(
             container.read(downloadQueueProvider).items.single.progress,
             0,
           );
-          if (immediateResume) queue.resumeQueue();
-          releaseAttempt.complete();
+          if (immediateResume && !retry) queue.resumeQueue();
+          if (retry && !beforeTransfer) {
+            releaseCancel.complete();
+          } else {
+            releaseAttempt.complete();
+          }
           await Future<void>.delayed(const Duration(milliseconds: 25));
           final attemptsBeforeCancel = attempts;
-          releaseCancel.complete();
-          if (!immediateResume) {
+          expect(
+            resetIds,
+            isEmpty,
+            reason: 'The old attempt or cancellation is still in flight',
+          );
+          if (retry && !beforeTransfer) {
+            releaseAttempt.complete();
+          } else {
+            releaseCancel.complete();
+          }
+          if (!immediateResume && !retry) {
             await finished.future.timeout(const Duration(seconds: 5));
             finished = Completer<void>();
             queue.resumeQueue();
           }
-          await finished.future.timeout(const Duration(seconds: 5));
+          if (retried != null) await retried;
+          await reachedProvider.future.timeout(
+            const Duration(seconds: 5),
+            onTimeout: () =>
+                fail('The retried provider result was not published'),
+          );
+          await finished.future.timeout(
+            const Duration(seconds: 5),
+            onTimeout: () => fail('The queue did not finish processing'),
+          );
           expect(
             attemptsBeforeCancel,
             beforeTransfer ? 0 : 1,

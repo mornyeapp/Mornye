@@ -237,9 +237,24 @@ extension _DownloadQueueVerificationGate on DownloadQueueNotifier {
       errorType: DownloadErrorType.rateLimit,
     );
 
-    await Future<void>.delayed(delay);
-    final current = _findItemById(item.id);
+    // A synchronous state listener may already have cancelled or paused when
+    // the backoff status was published. Do not register a new wait afterward.
+    if (!ref.mounted) return true;
+    var current = _findItemById(item.id);
     if (current == null || _isLocallyCancelled(item.id, item: current)) {
+      return true;
+    }
+    if (!_isPausePending(item.id)) {
+      await _rateLimitBackoff.wait(item.id, delay);
+    }
+    if (!ref.mounted) return true;
+    current = _findItemById(item.id);
+    if (current == null || _isLocallyCancelled(item.id, item: current)) {
+      return true;
+    }
+    if (_isPausePending(item.id)) {
+      _requeueItemForPause(item.id);
+      await _finishPausedDownload(item.id);
       return true;
     }
     updateItemStatus(

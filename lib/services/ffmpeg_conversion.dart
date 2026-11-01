@@ -538,6 +538,7 @@ abstract final class FFmpegConversion {
     required Map<String, String> albumMetadata,
     String? coverPath,
     void Function(int current, int total)? onProgress,
+    @visibleForTesting Future<FFmpegResult> Function(List<String>)? execute,
   }) async {
     if (tracks.isEmpty) {
       _log.e('No tracks to split');
@@ -557,7 +558,6 @@ abstract final class FFmpegConversion {
           .trim();
       final outputName =
           '${track.number.toString().padLeft(2, '0')} - $title.$outputExt';
-      final outputPath = '$outputDir${Platform.pathSeparator}$outputName';
       final arguments = <String>[
         '-v',
         'error',
@@ -589,16 +589,39 @@ abstract final class FFmpegConversion {
         'COMPOSER': track.composer,
       }..removeWhere((_, value) => value.isEmpty);
       AudioMetadataMapper.appendMappedMetadataArguments(arguments, metadata);
-      arguments.addAll([outputPath, '-y']);
-      _log.d('CUE split track ${track.number}');
-      final result = await FFmpegExecution.arguments(arguments);
-      if (!result.success) {
-        _log.e('CUE split failed for track ${track.number}: ${result.output}');
-        continue;
+      String? outputPath;
+      try {
+        outputPath = await FFmpegOutput.reserve(
+          '$outputDir${Platform.pathSeparator}$outputName',
+        );
+        arguments.addAll([outputPath, '-y']);
+        _log.d('CUE split track ${track.number}');
+        final result = await (execute ?? FFmpegExecution.arguments)(arguments);
+        if (!result.success) {
+          _log.e(
+            'CUE split failed for track ${track.number}: ${result.output}',
+          );
+          continue;
+        }
+        final finalized = await FFmpegOutput.finalize(
+          plan: FFmpegOutputPlan(
+            workingPath: outputPath,
+            finalPath: outputPath,
+          ),
+          inputPath: audioPath,
+          deleteOriginal: false,
+        );
+        if (finalized == null) continue;
+        outputPaths.add(finalized);
+        outputPath = null;
+        _log.i(
+          'CUE split: track ${track.number} -> ${finalized.split(Platform.pathSeparator).last}',
+        );
+      } catch (error) {
+        _log.e('CUE split failed for track ${track.number}: $error');
+      } finally {
+        if (outputPath != null) await FFmpegOutput.cleanup(outputPath);
       }
-      outputPaths.add(outputPath);
-      FFmpegProbe.invalidate(outputPath);
-      _log.i('CUE split: track ${track.number} -> $outputName');
     }
     if (outputPaths.isEmpty) {
       _log.e('CUE split: no tracks were successfully extracted');
