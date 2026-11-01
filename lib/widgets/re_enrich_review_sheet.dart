@@ -129,7 +129,7 @@ class _ReEnrichReviewContent extends StatelessWidget {
         children: [
           Flexible(
             child: ListView.builder(
-              shrinkWrap: true,
+              shrinkWrap: visible.length <= 12,
               padding: const EdgeInsets.only(bottom: 8),
               itemCount: visible.length,
               itemBuilder: (context, index) {

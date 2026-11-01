@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:mornye/widgets/app_alert_dialog.dart';
 import 'package:mornye/widgets/app_bottom_sheet.dart';
 import 'package:mornye/widgets/app_content_card.dart';
@@ -14,6 +15,7 @@ import 'package:mornye/widgets/app_icon_button.dart';
 import 'package:mornye/widgets/app_menu_button.dart';
 import 'package:mornye/widgets/app_sliver_header.dart';
 import 'package:mornye/widgets/app_search_field.dart';
+import 'package:mornye/widgets/sliver_layout_info_builder.dart';
 import 'package:mornye/utils/ordered_range_selection.dart';
 
 part 'log_screen_widgets.dart';
@@ -34,6 +36,8 @@ class _LogScreenState extends State<LogScreen> {
   bool _selectionMode = false;
   final Set<LogEntry> _selectedEntries = <LogEntry>{};
   LogEntry? _selectionAnchor;
+  int? _logUpdateFrame;
+  int _scrollGeneration = 0;
 
   final List<String> _levels = ['ALL', 'DEBUG', 'INFO', 'WARN', 'ERROR'];
 
@@ -42,19 +46,27 @@ class _LogScreenState extends State<LogScreen> {
     super.initState();
     LogBuffer().addListener(_onLogUpdate);
     LogBuffer().startNativeLogPolling();
+    _scrollController.addListener(_onScroll);
   }
 
   @override
   void dispose() {
     LogBuffer().removeListener(_onLogUpdate);
     LogBuffer().stopNativeLogPolling();
+    final frame = _logUpdateFrame;
+    if (frame != null) WidgetsBinding.instance.cancelFrameCallbackWithId(frame);
     _scrollController.dispose();
     _searchController.dispose();
     super.dispose();
   }
 
   void _onLogUpdate() {
-    if (mounted) {
+    if (_logUpdateFrame != null) return;
+    // A burst of Dart logs can notify once per entry. Read the final buffer
+    // once before the next frame, including selection pruning and tailing.
+    _logUpdateFrame = WidgetsBinding.instance.scheduleFrameCallback((_) {
+      _logUpdateFrame = null;
+      if (!mounted) return;
       if (_selectionMode) {
         final currentEntries = LogBuffer().entries.toSet();
         _selectedEntries.removeWhere(
@@ -69,16 +81,35 @@ class _LogScreenState extends State<LogScreen> {
       }
       setState(() {});
       if (_autoScroll && _scrollController.hasClients) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (_scrollController.hasClients) {
-            _scrollController.animateTo(
-              _scrollController.position.maxScrollExtent,
-              duration: const Duration(milliseconds: 100),
-              curve: Curves.easeOut,
-            );
-          }
-        });
+        _scrollToLatest(++_scrollGeneration);
       }
+    });
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.userScrollDirection !=
+        ScrollDirection.idle) {
+      _scrollGeneration++;
+    }
+  }
+
+  Future<void> _scrollToLatest(int generation) async {
+    await WidgetsBinding.instance.endOfFrame;
+    while (mounted &&
+        generation == _scrollGeneration &&
+        _autoScroll &&
+        !_selectionMode &&
+        _scrollController.hasClients) {
+      final position = _scrollController.position;
+      if (position.extentAfter <= 0.5) return;
+      await position.animateTo(
+        position.maxScrollExtent,
+        duration: const Duration(milliseconds: 100),
+        curve: Curves.easeOut,
+      );
+      // A lazy list refines its extent as new multiline rows are laid out.
+      // Follow that estimate until the final row is actually visible.
+      await WidgetsBinding.instance.endOfFrame;
     }
   }
 
@@ -494,25 +525,28 @@ class _LogScreenState extends State<LogScreen> {
                       ],
                     ),
                   )
-                : SliverToBoxAdapter(
-                    child: SettingsGroup(
-                      children: [
-                        ...logs.asMap().entries.map((entry) {
-                          final index = entry.key;
-                          final log = entry.value;
-                          return _LogEntryTile(
-                            entry: log,
-                            levelColor: _getLevelColor(log.level, colorScheme),
-                            showDivider: index < logs.length - 1,
-                            selectionMode: _selectionMode,
-                            selected: _selectedEntries.contains(log),
-                            onTap: () => _toggleEntrySelection(log),
-                            onLongPress: () => _selectionMode
-                                ? _selectRangeTo(log)
-                                : _enterSelectionMode(log),
-                          );
-                        }),
-                      ],
+                : SliverLayoutInfoBuilder<double>(
+                    select: (constraints) => constraints.crossAxisExtent,
+                    builder: (context, width) => SliverSettingsGroup(
+                      margin: EdgeInsets.symmetric(
+                        horizontal: settingsHorizontalInset(context, width),
+                        vertical: 4,
+                      ),
+                      itemCount: logs.length,
+                      itemBuilder: (context, index) {
+                        final log = logs[index];
+                        return _LogEntryTile(
+                          entry: log,
+                          levelColor: _getLevelColor(log.level, colorScheme),
+                          showDivider: index < logs.length - 1,
+                          selectionMode: _selectionMode,
+                          selected: _selectedEntries.contains(log),
+                          onTap: () => _toggleEntrySelection(log),
+                          onLongPress: () => _selectionMode
+                              ? _selectRangeTo(log)
+                              : _enterSelectionMode(log),
+                        );
+                      },
                     ),
                   ),
 
