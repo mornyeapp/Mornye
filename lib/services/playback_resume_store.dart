@@ -75,4 +75,35 @@ class PlaybackResumeStore {
   }
 
   Future<void> clear() => database.delete(_table);
+
+  /// Relinks active and dismissed queues atomically without changing their order
+  /// or playback position. JSON stays inside SQLite, including large queues.
+  Future<void> relocateSource(String previous, String replacement) async {
+    await database.transaction((txn) async {
+      for (final table in ['playback_session', _table]) {
+        await txn.rawUpdate(
+          '''
+          UPDATE $table SET media_json = (
+            SELECT json_group_array(json(item)) FROM (
+              SELECT CASE WHEN json_extract(value, '\$.source') = ?
+                THEN json_set(value, '\$.source', ?) ELSE value END AS item
+              FROM json_each($table.media_json) ORDER BY CAST(key AS INTEGER)
+            )
+          ) WHERE EXISTS (
+            SELECT 1 FROM json_each($table.media_json)
+            WHERE json_extract(value, '\$.source') = ?
+          )
+        ''',
+          [previous, replacement, previous],
+        );
+      }
+      await txn.rawUpdate(
+        '''
+        UPDATE $_table SET preview_json = json_set(preview_json, '\$.source', ?)
+        WHERE json_extract(preview_json, '\$.source') = ?
+      ''',
+        [replacement, previous],
+      );
+    });
+  }
 }

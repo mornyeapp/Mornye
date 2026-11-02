@@ -690,6 +690,17 @@ class SettingsSearchCatalog {
           keywords: const ['featured artist folder'],
         ),
         SettingsSearchEntry(
+          icon: Icons.drive_file_move_outlined,
+          title: l10n.reorganizeLibraryTitle,
+          subtitle: l10n.reorganizeLibrarySubtitle,
+          keywords: const [
+            'reorganize library',
+            'move files',
+            'rename files',
+            'existing downloads',
+          ],
+        ),
+        SettingsSearchEntry(
           icon: Icons.folder_special_outlined,
           title: l10n.allFilesAccess,
           subtitle: l10n.allFilesAccessDescription,

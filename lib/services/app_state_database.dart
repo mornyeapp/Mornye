@@ -514,6 +514,12 @@ class AppStateDatabase {
   Future<void> clearPlaybackResume() async =>
       PlaybackResumeStore(await database).clear();
 
+  Future<void> relocatePlaybackSource(
+    String previous,
+    String replacement,
+  ) async =>
+      PlaybackResumeStore(await database).relocateSource(previous, replacement);
+
   Future<void> applyPendingDownloadQueueChanges({
     required List<Map<String, dynamic>> upserts,
     required List<String> deletedIds,
