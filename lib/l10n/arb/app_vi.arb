@@ -1,18 +1,123 @@
 {
+  "extensionsUnsecuredStorage": "Use unsecured extension storage",
+  "extensionsUnsecuredStorageDescription": "Run extensions without a Linux keyring. The key is saved locally, so anyone with access to your app files can read extension credentials. Off uses the system keyring.",
+  "extensionsStorageKeyringRequired": "Existing extension data needs its original key. Unlock the system keyring once, then enable unsecured storage again. Your data has been preserved.",
+  "extensionsStorageKeyConflict": "The local and system keyring keys differ. Storage was not changed and both keys were preserved.",
+  "extensionsStorageKeyringUnavailable": "The system keyring is unavailable or locked. Start or unlock it before switching to secure storage. Your local key has been preserved.",
+  "linkFileActionOn": "{action} on {name}",
+  "@linkFileActionOn": {
+    "description": "File operation on a named linked computer",
+    "placeholders": {
+      "action": {
+        "type": "String"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkFileActionsDescription": "Changes apply to music files on {name}. Accepted work continues if this phone disconnects.",
+  "@linkFileActionsDescription": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkFileDeleteConfirm": "Delete {count} {count, plural, =1{music file} other{music files}} from {name}? This removes the files from that computer's storage.",
+  "@linkFileDeleteConfirm": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkFileJobs": "File changes",
+  "@linkFileJobs": {
+    "description": "Title of the list of edits, conversions and deletions the phone started on the linked computer's music files"
+  },
+  "linkFileJobsSubtitle": "Edits, conversions and deletions on {name}",
+  "@linkFileJobsSubtitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkFileJobsEmpty": "No file changes yet",
+  "linkFileJobsEmptyMessage": "Edits, conversions and deletions you start on the computer's songs from this phone appear here.",
+  "linkDesktopFileJobsSubtitle": "Changes requested from your phones",
+  "linkDesktopFileJobsEmptyMessage": "Edits, conversions and deletions requested from your phones appear here.",
+  "linkFileJobRequestedBy": "From {name}",
+  "@linkFileJobRequestedBy": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkFileJobsView": "View",
+  "@linkFileJobsView": {
+    "description": "Snackbar action that opens the file changes list to see which songs failed"
+  },
+  "linkFileJobsUnsupported": "Update Mornye on your computer to manage its music files from this phone.",
+  "linkFileSelectionOneDevice": "Select songs from one linked computer at a time (up to 100 songs).",
+  "linkFileJobProgress": "{finished} of {total} {total, plural, =1{song} other{songs}}",
+  "@linkFileJobProgress": {
+    "placeholders": {
+      "finished": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "linkFileJobFailedCount": "{count} failed",
+  "@linkFileJobFailedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "linkFileJobFinished": "{action} finished on {name}",
+  "@linkFileJobFinished": {
+    "placeholders": {
+      "action": {
+        "type": "String"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkFileDeleting": "Deleting...",
+  "linkFileReading": "Reading tags...",
+  "linkFileSavingCover": "Saving cover art...",
+  "linkFileCancelHint": "Stop after the current song",
+  "linkFileJobCancelled": "Stopped",
+  "linkFileJobQueued": "Queued",
+  "linkFileJobCompleted": "Finished",
+  "linkFileChanged": "The file changed since the preview. Preview it again before saving.",
+  "linkFileOperationFailed": "The operation could not be completed. Check the computer's logs for details.",
   "trackBpm": "BPM",
-  "trackMood": "Mood",
-  "subsonicAddToLibrary": "Add server to Library",
-  "subsonicLibraryAdded": "Server added to Library",
-  "subsonicLibraryDescription": "Sync the server catalogue and artwork to Library. Music stays on your server. Rescan it in Local Library settings to update the catalogue.",
-  "subsonicAuthentication": "Authentication",
-  "subsonicToken": "Salted token",
-  "subsonicPasswordAuth": "Password",
-  "subsonicApiKey": "API key",
-  "subsonicUsername": "Username",
-  "subsonicPassword": "Password",
-  "subsonicSearch": "Search server music...",
-  "subsonicMoreAlbums": "More albums",
-  "subsonicErrorApi": "The server does not support this API version or authentication method. Check the server settings and the selected sign-in method.",
+  "trackMood": "Tâm trạng",
+  "subsonicAddToLibrary": "Thêm máy chủ vào Thư viện",
+  "subsonicLibraryAdded": "Đã thêm máy chủ vào Thư viện",
+  "subsonicLibraryDescription": "Đồng bộ danh mục và ảnh bìa từ máy chủ vào Thư viện. Nhạc vẫn được lưu trên máy chủ của bạn. Quét lại trong cài đặt Thư viện cục bộ để cập nhật danh mục.",
+  "subsonicAuthentication": "Xác thực",
+  "subsonicToken": "Token có salt",
+  "subsonicPasswordAuth": "Mật khẩu",
+  "subsonicApiKey": "Khóa API",
+  "subsonicUsername": "Tên người dùng",
+  "subsonicPassword": "Mật khẩu",
+  "subsonicSearch": "Tìm kiếm nhạc trên máy chủ...",
+  "subsonicMoreAlbums": "Xem thêm album",
+  "subsonicErrorApi": "Máy chủ không hỗ trợ phiên bản API hoặc phương thức xác thực này. Hãy kiểm tra lại cài đặt máy chủ và phương thức đăng nhập đã chọn.",
   "networkDownloadDestination": "Điểm đến tải xuống từ mạng",
   "@networkDownloadDestination": {
     "description": "Files settings item that opens network storage to choose a folder for downloaded music"
@@ -73,7 +178,7 @@
   "@networkErrorPermission": {
     "description": "Network access error when the server denies account permissions for a shared folder; distinct from the device's local network permission"
   },
-  "networkErrorLocalPermission": "Local network access is not allowed. Allow Nearby devices for Mornye in Android app settings, then try again.",
+  "networkErrorLocalPermission": "Không được phép truy cập mạng cục bộ. Vui lòng cấp quyền \"Thiết bị ở gần\" cho Mornye trong cài đặt ứng dụng Android, sau đó thử lại.",
   "@networkErrorLocalPermission": {
     "description": "Network access error when Android denies local network permission; Nearby devices is the Android app permission setting"
   },
@@ -182,7 +287,7 @@
   "usbBitPerfectDescription": "Giữ nguyên độ chính xác gốc của nguồn nhạc trên các đầu ra tương thích. Hãy chọn Direct USB hoặc AAudio độc quyền bên dưới; nếu không, đầu ra USB chuẩn của Android yêu cầu Android 14 trở lên. Áp dụng từ bài tiếp theo, không dùng AutoMix hay chuẩn hóa âm lượng. Phím âm lượng hệ thống có thể không điều chỉnh được Direct USB.",
   "usbHardwareVolume": "Âm lượng phần cứng DAC",
   "usbVolumeWarningTitle": "Kiểm tra âm lượng nghe của bạn",
-  "usbVolumeWarning": "Direct USB audio can be much louder than normal playback, and phone volume buttons may not control it. Lower your DAC or amplifier volume before starting. When supported, Mornye sets the DAC to at most −40 dB on connection; this does not guarantee a safe listening level on every amplifier or headphone.",
+  "usbVolumeWarning": "Âm thanh truyền trực tiếp qua USB có thể lớn hơn nhiều so với trình phát thông thường, các nút âm lượng trên điện thoại có thể không điều chỉnh được mức âm thanh này. Hãy giảm âm lượng trên DAC hoặc bộ khuếch đại ​​trước khi bắt đầu. Khi tương thíc, SpotiFLAC sẽ tự động thiết lập mức âm lượng của DAC về tối đa là −40 dB ngay khi kết nối; tuy nhiên, điều này không đảm bảo mức âm lượng sẽ an toàn cho mọi loại thiết bị, bộ khuếch đại hoặc tai nghe.",
   "usbVolumeAccept": "Tôi đã hiểu",
   "usbVolumeUnavailable": "Đã tạm dừng phát vì DAC này không có bộ chỉnh âm lượng phần cứng được xác nhận. Hãy giảm âm lượng trên DAC hoặc ampli trước, sau đó bật đầu ra âm lượng cố định nếu cần rồi chọn phát lại bài hát.",
   "usbFixedVolume": "Cho phép đầu ra USB âm lượng cố định",
@@ -191,6 +296,20 @@
   "dapExclusive": "DAP Hi-Res (AAudio độc quyền)",
   "dapExclusiveDescription": "Sử dụng Oboe/AAudio ở đúng tần số lấy mẫu và độ sâu bit gốc của bản nhạc cho tệp FLAC/WAV PCM. Yêu cầu Android 8.1 trở lên và phần cứng tương thích. Ứng dụng sẽ ưu tiên kiểm tra chế độ truy cập độc quyền (Exclusive); các định dạng không hỗ trợ sẽ phát bình thường. Nhạc DSD cần trình điều khiển Direct USB. Áp dụng từ bài hát tiếp theo.",
   "dapExclusiveUnavailable": "Chế độ AAudio độc quyền không khả dụng cho bài hát và đầu ra hiện tại. Đang phát ở chế độ thông thường. Nếu dùng USB DAC, hãy thử bật trình điều khiển Direct USB.",
+  "exclusiveOutputWindows": "WASAPI exclusive mode",
+  "exclusiveOutputMacos": "Exclusive access (hog mode)",
+  "exclusiveOutputLinux": "Direct ALSA output",
+  "exclusiveOutputDescriptionWindows": "Bypass the Windows mixer so the output follows each track's sample rate and bit depth. Other apps cannot play sound while Mornye holds the device. AutoMix and previews are off in this mode. For bit-perfect output, keep the volume at 100% with the equalizer and normalization off.",
+  "exclusiveOutputDescriptionMacos": "Hold the output device for Mornye alone and switch it to each track's sample rate and bit depth, so Core Audio does not resample. Other apps cannot play sound while Mornye holds the device. AutoMix and previews are off in this mode. For bit-perfect output, keep the volume at 100% with the equalizer and normalization off.",
+  "exclusiveOutputDescriptionLinux": "Play straight to an ALSA hardware device, bypassing PipeWire or PulseAudio, so the output follows each track's sample rate and bit depth. The device must be free: the sound server releases an idle card after a few seconds, or set its profile to Off. AutoMix and previews are off in this mode.",
+  "exclusiveOutputPending": "Takes the device when a track plays.",
+  "exclusiveOutputActive": "Playing in exclusive mode.",
+  "exclusiveOutputUnavailableWindows": "The device refused exclusive access, so this track plays through the Windows mixer. Close other apps using the device, or allow exclusive control in the device's Windows sound properties.",
+  "exclusiveOutputUnavailableMacos": "Another app holds the output device, so this track plays through the system mixer.",
+  "exclusiveOutputUnavailableLinux": "The ALSA device is busy, usually held by the sound server, so this track plays through it. Set the card's profile to Off in the sound settings, or choose another device.",
+  "exclusiveOutputDevice": "Output device",
+  "exclusiveOutputDeviceFirst": "First sound card",
+  "exclusiveOutputNoDevices": "No ALSA playback devices found",
   "usbDirect": "Trình điều khiển Direct USB",
   "usbDirectDescription": "Sử dụng chế độ âm thanh USB độc quyền cho FLAC/WAV, DSF/DFF và WavPack DSD thông qua quyền USB của Android. Phát Native DSD yêu cầu DAC tương thích được nhận diện. Các định dạng PCM khác sẽ phát ở chế độ thông thường. Áp dụng từ bài hát tiếp theo.",
   "usbDsdOverPcm": "DSD over PCM (DoP)",
@@ -280,19 +399,15 @@
   "@homeEmptySubtitle": {
     "description": "Subtitle shown on home when no providers are available yet"
   },
-  "homeSupports": "Hỗ trợ: Các đường dẫn đến bài hát, album, danh sách phát, nghệ sĩ",
-  "@homeSupports": {
-    "description": "Info text about supported URL types"
-  },
   "homeRecent": "Gần đây",
   "@homeRecent": {
     "description": "Section header for recent searches"
   },
-  "searchRecentlySearched": "Recently Searched",
+  "searchRecentlySearched": "Đã tìm kiếm gần đây",
   "@searchRecentlySearched": {
     "description": "Section header for recent searches on the desktop Search page"
   },
-  "searchLibraryPrompt": "Search Your Library",
+  "searchLibraryPrompt": "Tìm trong Thư viện của bạn",
   "@searchLibraryPrompt": {
     "description": "Shown on the desktop Search page when the Library scope has no search words yet"
   },
@@ -317,6 +432,35 @@
   "libraryNoActiveDownloads": "Không có lượt tải nào đang chạy",
   "librarySearchHint": "Tìm trong thư viện của bạn",
   "libraryEmptyCollection": "Nhạc của bạn sẽ xuất hiện tại đây",
+  "libraryFolders": "Folders",
+  "@libraryFolders": {
+    "description": "Library view that browses downloaded and scanned songs by the folders their files are in"
+  },
+  "libraryFolderCount": "{count, plural, =1{1 folder} other{{count} folders}}",
+  "@libraryFolderCount": {
+    "description": "Number of folders inside a Library folder",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "libraryFoldersEmptyTitle": "No folders yet",
+  "@libraryFoldersEmptyTitle": {
+    "description": "Title of the Folders view when the Library has no songs"
+  },
+  "libraryFoldersEmptyMessage": "Download songs or add a music folder in Local Library settings to browse them by folder.",
+  "@libraryFoldersEmptyMessage": {
+    "description": "Next step shown in the empty Folders view"
+  },
+  "libraryFolderMissing": "This folder is no longer in your Library",
+  "@libraryFolderMissing": {
+    "description": "Shown on an open folder page after its songs were deleted or moved"
+  },
+  "libraryFoldersLoadFailed": "Couldn't read your folders",
+  "@libraryFoldersLoadFailed": {
+    "description": "Shown when the Folders view fails to load"
+  },
   "settingsTitle": "Cài đặt",
   "@settingsTitle": {
     "description": "Settings screen title"
@@ -349,11 +493,11 @@
   "@downloadFilenameFormat": {
     "description": "Setting for output filename pattern"
   },
-  "downloadSingleFilenameFormat": "Định dạng tên tệp Đĩa đơn (Single)",
+  "downloadSingleFilenameFormat": "Định dạng tên tệp Đĩa đơn",
   "@downloadSingleFilenameFormat": {
     "description": "Setting for output filename pattern for singles/EPs"
   },
-  "downloadSingleFilenameFormatDescription": "Mẫu đặt tên tệp cho đĩa đơn (Single) và EP. Sử dụng cùng hệ thống tag với định dạng album.",
+  "downloadSingleFilenameFormatDescription": "Mẫu đặt tên tệp cho đĩa đơn và EP. Sử dụng cùng hệ thống tag với định dạng album.",
   "@downloadSingleFilenameFormatDescription": {
     "description": "Subtitle description for single filename format setting"
   },
@@ -361,23 +505,23 @@
   "@downloadFolderOrganization": {
     "description": "Title of the folder organization picker bottom sheet"
   },
-  "downloadFolderTemplate": "Custom Folder Structure",
+  "downloadFolderTemplate": "Cấu trúc thư mục tải về tùy chỉnh",
   "@downloadFolderTemplate": {
     "description": "Setting for editing a relative download folder template"
   },
-  "downloadFolderTemplateDescription": "Use naming tags and / for subfolders. Saving replaces the preset album and singles layout. Empty folder names use Unknown.",
+  "downloadFolderTemplateDescription": "Người dùng tự đặt các thẻ và/hoặc các thư mục con. Lưu sẽ ghi đè tùy chỉnh gốc của các album và nghệ sĩ. Thư mục trống sẽ được đặt là \"Unknown\".",
   "@downloadFolderTemplateDescription": {
     "description": "Help for custom download folder templates"
   },
-  "folderOrganizationCustom": "Custom template",
+  "folderOrganizationCustom": "Mẫu tùy chỉnh",
   "@folderOrganizationCustom": {
     "description": "Folder organization mode using a user-defined template"
   },
-  "folderTemplateInvalid": "Enter a relative folder path with supported tags. Empty folders, . and .. are not allowed.",
+  "folderTemplateInvalid": "Nhập đường dẫn thư mục tương đối kèm theo các thẻ được hỗ trợ. Không được phép sử dụng các thư mục trống, ký hiệu . hoặc .",
   "@folderTemplateInvalid": {
     "description": "Validation error for an invalid folder template"
   },
-  "folderTemplatePreview": "Example folder path",
+  "folderTemplatePreview": "Đường dẫn thư mục ví dụ",
   "@folderTemplatePreview": {
     "description": "Label for a sample expanded folder template"
   },
@@ -569,7 +713,7 @@
   "metadataSeparatorSemicolon": "Dấu chấm phẩy (;)",
   "metadataSeparatorSlash": "Dấu gạch chéo (/)",
   "metadataSeparatorCustom": "Ký tự phân tách tùy chỉnh",
-  "metadataSeparatorPreview": "Thử nghiệm (Preview)",
+  "metadataSeparatorPreview": "Thử nghiệm",
   "metadataSeparatorInvalid": "Sử dụng từ 1–16 ký tự, không chứa dấu xuống dòng hoặc ký tự điều khiển.",
   "@optionsArtistTagMode": {
     "description": "Setting title for how artist metadata is written into files"
@@ -606,7 +750,7 @@
   "@optionsExtensionStore": {
     "description": "Show/hide repo tab"
   },
-  "optionsExtensionStoreSubtitle": "Hiện tab Kho tiện ích (Repo) trên thanh điều hướng",
+  "optionsExtensionStoreSubtitle": "Hiện tab Kho tiện ích trên thanh điều hướng",
   "@optionsExtensionStoreSubtitle": {
     "description": "Subtitle for extension repo toggle"
   },
@@ -622,15 +766,15 @@
   "@optionsUpdateChannel": {
     "description": "Stable vs preview releases"
   },
-  "optionsUpdateChannelStable": "Chỉ nhận bản phát hành ổn định (Stable)",
+  "optionsUpdateChannelStable": "Chỉ nhận bản phát hành ổn định",
   "@optionsUpdateChannelStable": {
     "description": "Only stable updates"
   },
-  "optionsUpdateChannelPreview": "Nhận các bản phát hành thử nghiệm (Preview)",
+  "optionsUpdateChannelPreview": "Nhận các bản phát hành thử nghiệm",
   "@optionsUpdateChannelPreview": {
     "description": "Include beta/preview updates"
   },
-  "optionsUpdateChannelWarning": "Bản thử nghiệm (Preview) có thể chứa lỗi hoặc tính năng chưa hoàn thiện",
+  "optionsUpdateChannelWarning": "Bản thử nghiệm có thể chứa lỗi hoặc tính năng chưa hoàn thiện",
   "@optionsUpdateChannelWarning": {
     "description": "Warning about preview channel"
   },
@@ -811,7 +955,7 @@
   "@artistSingles": {
     "description": "Section header for singles/EPs"
   },
-  "artistCompilations": "Tuyển tập (Compilations)",
+  "artistCompilations": "Tuyển tập",
   "@artistCompilations": {
     "description": "Section header for compilations"
   },
@@ -904,7 +1048,7 @@
   "@setupDownloadLocationTitle": {
     "description": "Download location dialog title"
   },
-  "setupDownloadLocationIosMessage": "Trên iOS, các tệp tải xuống được lưu trong thư mục Documents của ứng dụng. Bạn có thể truy cập chúng thông qua ứng dụng Tệp (Files).",
+  "setupDownloadLocationIosMessage": "Trên iOS, các tệp tải xuống được lưu trong thư mục Documents của ứng dụng. Bạn có thể truy cập chúng thông qua ứng dụng Tệp.",
   "@setupDownloadLocationIosMessage": {
     "description": "iOS-specific folder info"
   },
@@ -944,7 +1088,7 @@
   "@setupStorageRequired": {
     "description": "Title when storage permission needed"
   },
-  "setupStorageDescription": "Mornye needs storage permission to save your downloaded music files.",
+  "setupStorageDescription": "Mornye cần quyền truy cập bộ nhớ để lưu các tệp nhạc đã tải về.",
   "@setupStorageDescription": {
     "description": "Explanation for storage permission"
   },
@@ -979,6 +1123,66 @@
   "setupSkipForNow": "Bỏ qua lúc này",
   "@setupSkipForNow": {
     "description": "Skip button text"
+  },
+  "setupNearbyEnable": "Allow Nearby Devices",
+  "@setupNearbyEnable": {
+    "description": "Setup step title and button for the Android Nearby devices permission; Nearby devices is the Android permission name"
+  },
+  "setupNearbyDescription": "Mornye Link uses it to find your computer on the same network, and network storage needs it to reach a server at home.",
+  "@setupNearbyDescription": {
+    "description": "Setup step explaining why Android's Nearby devices permission is needed"
+  },
+  "setupNearbyGranted": "Nearby Devices Allowed!",
+  "@setupNearbyGranted": {
+    "description": "Setup message after the Nearby devices permission is granted"
+  },
+  "permissionNearbyDevices": "Nearby devices",
+  "@permissionNearbyDevices": {
+    "description": "Nearby devices permission type label; use Android's name for this permission"
+  },
+  "whatsNewLinkNearbyAllow": "Allow nearby devices",
+  "@whatsNewLinkNearbyAllow": {
+    "description": "Main button on the Nearby devices page of the What's New tour that asks for Android's Nearby devices permission"
+  },
+  "whatsNewLinkNearbyGranted": "Nearby devices allowed",
+  "@whatsNewLinkNearbyGranted": {
+    "description": "Shown on the Nearby devices page of the What's New tour after the Nearby devices permission is granted"
+  },
+  "whatsNewNearbyTitle": "Nearby devices",
+  "@whatsNewNearbyTitle": {
+    "description": "Title of the What's New page that asks for Android's Nearby devices permission; use Android's name for this permission"
+  },
+  "whatsNewNearbyDesc": "Android now asks before an app can reach other devices on your network. Mornye needs this for:",
+  "@whatsNewNearbyDesc": {
+    "description": "Description on the Nearby devices page of the What's New tour, followed by a list of uses"
+  },
+  "whatsNewNearbyLinkTitle": "Finding your computer",
+  "@whatsNewNearbyLinkTitle": {
+    "description": "Use of the Nearby devices permission: Mornye Link finds the computer"
+  },
+  "whatsNewNearbyLinkBody": "Mornye Link looks for your computer on the same Wi-Fi and stays connected to it.",
+  "@whatsNewNearbyLinkBody": {
+    "description": "Explains how Mornye Link uses the Nearby devices permission"
+  },
+  "whatsNewNearbyStorageTitle": "Network storage",
+  "@whatsNewNearbyStorageTitle": {
+    "description": "Use of the Nearby devices permission: SMB and WebDAV servers at home"
+  },
+  "whatsNewNearbyStorageBody": "Play music from a NAS or a server at home over SMB or WebDAV.",
+  "@whatsNewNearbyStorageBody": {
+    "description": "Explains how network storage uses the Nearby devices permission"
+  },
+  "whatsNewNearbyPrivateTitle": "Only your own devices",
+  "@whatsNewNearbyPrivateTitle": {
+    "description": "Reassurance on the Nearby devices page of the What's New tour"
+  },
+  "whatsNewNearbyPrivateBody": "Mornye uses it only to reach devices on your network, never to find where you are.",
+  "@whatsNewNearbyPrivateBody": {
+    "description": "Explains that the Nearby devices permission is not used for location"
+  },
+  "whatsNewNearbyRefused": "Not allowed. Mornye Link and network storage stay off until you allow Nearby devices for Mornye in Android settings.",
+  "@whatsNewNearbyRefused": {
+    "description": "Shown on the Nearby devices page of the What's New tour after the permission is refused"
   },
   "setupNext": "Tiếp theo",
   "@setupNext": {
@@ -1114,11 +1318,11 @@
       }
     }
   },
-  "dialogImportPlaylistTitle": "Nhập Playlist",
+  "dialogImportPlaylistTitle": "Nhập danh sách phát",
   "@dialogImportPlaylistTitle": {
     "description": "Dialog title - import CSV playlist"
   },
-  "dialogImportPlaylistMessage": "Tìm thấy {count} bài hát trong tệp playlist. Bạn có muốn thêm vào hàng chờ tải xuống không?",
+  "dialogImportPlaylistMessage": "Tìm thấy {count} bài hát trong tệp danh sách phát. Bạn có muốn thêm vào hàng chờ tải xuống không?",
   "csvImportTracks": "{count} bản nhạc từ CSV",
   "@csvImportTracks": {
     "description": "Label shown in quality picker for CSV import",
@@ -1301,7 +1505,7 @@
   "@snackbarFileNotFound": {
     "description": "Snackbar - file doesn't exist"
   },
-  "snackbarSelectExtFile": "Please select a .mornye-ext file",
+  "snackbarSelectExtFile": "Vui lòng chọn một tệp .mornye-ext",
   "@snackbarSelectExtFile": {
     "description": "Snackbar - wrong file type selected"
   },
@@ -1339,7 +1543,7 @@
   "@snackbarFailedToUpdate": {
     "description": "Snackbar - extension update error"
   },
-  "errorRateLimited": "Tạm giới hạn truy vấn (Rate Limited)",
+  "errorRateLimited": "Tạm giới hạn truy vấn",
   "@errorRateLimited": {
     "description": "Error title - too many requests"
   },
@@ -1441,9 +1645,23 @@
   "@searchAlbums": {
     "description": "Search result category - albums"
   },
-  "searchPlaylists": "Playlist",
+  "searchPlaylists": "Danh sách phát",
   "@searchPlaylists": {
     "description": "Search result category - playlists"
+  },
+  "searchShowAll": "Show all",
+  "@searchShowAll": {
+    "description": "Button of a search result section on wide screens that shows every result of that kind"
+  },
+  "searchShowAllCategory": "Show all {category}",
+  "@searchShowAllCategory": {
+    "description": "Screen reader label of the Show all button of a search result section",
+    "placeholders": {
+      "category": {
+        "type": "String",
+        "example": "Albums"
+      }
+    }
   },
   "searchSortTitle": "Sắp xếp kết quả",
   "@searchSortTitle": {
@@ -1505,11 +1723,11 @@
   "@folderOrganizationNone": {
     "description": "Folder option - flat structure"
   },
-  "folderOrganizationByPlaylist": "Theo Playlist",
+  "folderOrganizationByPlaylist": "Theo danh sách phát",
   "@folderOrganizationByPlaylist": {
     "description": "Folder option - playlist folders"
   },
-  "folderOrganizationByPlaylistSubtitle": "Tạo thư mục riêng cho từng playlist",
+  "folderOrganizationByPlaylistSubtitle": "Tạo thư mục riêng cho từng danh sách phát",
   "@folderOrganizationByPlaylistSubtitle": {
     "description": "Subtitle for playlist folder option"
   },
@@ -1606,27 +1824,27 @@
   "@updateDontRemind": {
     "description": "Update button - skip this version"
   },
-  "updateViewRelease": "View Release",
+  "updateViewRelease": "Xem bản phát hành",
   "@updateViewRelease": {
     "description": "Update button - open the release page when this install cannot update itself (deb, Flatpak, no matching package)"
   },
-  "updateStartingInstaller": "Starting the installer...",
+  "updateStartingInstaller": "Đang khởi chạy trình cài đặt...",
   "@updateStartingInstaller": {
     "description": "Update status on Windows - the downloaded installer is starting and the app will close"
   },
-  "updateMacInstallHint": "The disk image is open in Finder. Quit Mornye, then drag Mornye from the disk image to Applications and replace the old copy.",
+  "updateMacInstallHint": "Tệp ảnh đĩa đã mở trong Finder. Hãy thoát Mornye, sau đó kéo Mornye từ ảnh đĩa vào Applications và thay thế bản cũ.",
   "@updateMacInstallHint": {
     "description": "Update instructions on macOS after the downloaded disk image opens"
   },
-  "updateQuitApp": "Quit Mornye",
+  "updateQuitApp": "Thoát Mornye",
   "@updateQuitApp": {
     "description": "Update button on macOS - quit the app so the new version can replace it"
   },
-  "updateReadyToRestart": "The update is installed. Restart Mornye to use it.",
+  "updateReadyToRestart": "Bản cập nhật đã được cài đặt. Hãy khởi động lại Mornye để sử dụng.",
   "@updateReadyToRestart": {
     "description": "Update status on Linux after the AppImage was replaced"
   },
-  "updateRestartNow": "Restart Now",
+  "updateRestartNow": "Khởi động lại ngay",
   "@updateRestartNow": {
     "description": "Update button on Linux - restart the app after the AppImage was replaced"
   },
@@ -1666,7 +1884,7 @@
   "@metadataProviderPriorityInfo": {
     "description": "Info tip about rate limits"
   },
-  "logTitle": "Nhật ký (Logs)",
+  "logTitle": "Nhật ký",
   "@logTitle": {
     "description": "Logs screen title"
   },
@@ -1732,11 +1950,11 @@
       }
     }
   },
-  "channelStable": "Ổn định (Stable)",
+  "channelStable": "Ổn định",
   "@channelStable": {
     "description": "Update channel - stable releases"
   },
-  "channelPreview": "Thử nghiệm (Preview)",
+  "channelPreview": "Thử nghiệm",
   "@channelPreview": {
     "description": "Update channel - beta/preview releases"
   },
@@ -1760,7 +1978,7 @@
   "@sectionData": {
     "description": "Settings section header"
   },
-  "sectionDebug": "Gỡ lỗi (Debug)",
+  "sectionDebug": "Gỡ lỗi",
   "@sectionDebug": {
     "description": "Settings section header"
   },
@@ -1888,7 +2106,7 @@
   "@trackLoadLyrics": {
     "description": "Action - fetch lyrics"
   },
-  "trackMetadata": "Metadata",
+  "trackMetadata": "Siêu dữ liệu",
   "@trackMetadata": {
     "description": "Tab title - track metadata"
   },
@@ -1932,11 +2150,11 @@
   "@trackAlbum": {
     "description": "Metadata label - album name"
   },
-  "trackTrackNumber": "Số thứ tự bài (Track number)",
+  "trackTrackNumber": "Số thứ tự bài",
   "@trackTrackNumber": {
     "description": "Metadata label - track number"
   },
-  "trackDiscNumber": "Số thứ tự đĩa (Disc)",
+  "trackDiscNumber": "Số thứ tự đĩa",
   "@trackDiscNumber": {
     "description": "Metadata label - disc number"
   },
@@ -1976,7 +2194,7 @@
   "@trackGenre": {
     "description": "Metadata label - music genre"
   },
-  "trackLabel": "Hãng đĩa (Label)",
+  "trackLabel": "Hãng đĩa",
   "@trackLabel": {
     "description": "Metadata label - record label"
   },
@@ -2029,7 +2247,7 @@
   "@trackLyricsEmbedded": {
     "description": "Snackbar - lyrics saved to file"
   },
-  "trackInstrumental": "Bản nhạc không lời (Instrumental)",
+  "trackInstrumental": "Bản nhạc không lời",
   "@trackInstrumental": {
     "description": "Message when track is instrumental (no lyrics)"
   },
@@ -2117,7 +2335,7 @@
   "@storeClearFilters": {
     "description": "Button to clear all filters"
   },
-  "storeAddRepoTitle": "Thêm kho tiện ích mở rộng (Repo)",
+  "storeAddRepoTitle": "Thêm kho tiện ích mở rộng",
   "@storeAddRepoTitle": {
     "description": "Store setup screen - heading when no repo is configured"
   },
@@ -2125,7 +2343,7 @@
   "@storeAddRepoDescription": {
     "description": "Store setup screen - explanatory text"
   },
-  "storeRepoUrlLabel": "URL kho tiện ích (Repo)",
+  "storeRepoUrlLabel": "URL kho tiện ích",
   "@storeRepoUrlLabel": {
     "description": "Label for the repository URL input field"
   },
@@ -2137,11 +2355,11 @@
   "@storeAddRepoButton": {
     "description": "Button to submit a new repository URL"
   },
-  "storeChangeRepoTooltip": "Đổi kho tiện ích (Repo)",
+  "storeChangeRepoTooltip": "Đổi kho tiện ích",
   "@storeChangeRepoTooltip": {
     "description": "Tooltip for the change-repository icon button in the app bar"
   },
-  "storeRepoDialogTitle": "Kho tiện ích (Repo)",
+  "storeRepoDialogTitle": "Kho tiện ích",
   "@storeRepoDialogTitle": {
     "description": "Title of the change/remove repository dialog"
   },
@@ -2149,11 +2367,11 @@
   "@storeRepoDialogCurrent": {
     "description": "Label shown above the current repository URL in the dialog"
   },
-  "storeNewRepoUrlLabel": "URL kho tiện ích (Repo) mới",
+  "storeNewRepoUrlLabel": "URL kho tiện ích mới",
   "@storeNewRepoUrlLabel": {
     "description": "Label for the new repository URL field inside the dialog"
   },
-  "storeLoadError": "Không thể tải kho tiện ích (Repo)",
+  "storeLoadError": "Không thể tải kho tiện ích",
   "@storeLoadError": {
     "description": "Error heading when the store cannot be loaded"
   },
@@ -2197,7 +2415,7 @@
   "@extensionQualityOptions": {
     "description": "Capability - quality selection"
   },
-  "extensionPostProcessingHooks": "Hook hậu xử lý (Post-Processing)",
+  "extensionPostProcessingHooks": "Móc nối xử lý hậu kỳ",
   "@extensionPostProcessingHooks": {
     "description": "Capability - post-processing"
   },
@@ -2225,7 +2443,7 @@
   "@extensionCustomTrackMatching": {
     "description": "Capability - custom track matching algorithm"
   },
-  "extensionPostProcessing": "Hậu xử lý (Post-Processing)",
+  "extensionPostProcessing": "Xử lý hậu kỳ",
   "@extensionPostProcessing": {
     "description": "Capability - post-download processing"
   },
@@ -2238,7 +2456,7 @@
       }
     }
   },
-  "extensionPatternsCount": "{count} mẫu (pattern)",
+  "extensionPatternsCount": "{count} mẫu",
   "@extensionPatternsCount": {
     "description": "URL patterns count",
     "placeholders": {
@@ -2268,7 +2486,7 @@
   "@extensionsNoExtensions": {
     "description": "Empty state - no extensions"
   },
-  "extensionsNoExtensionsSubtitle": "Install .mornye-ext files to add new providers",
+  "extensionsNoExtensionsSubtitle": "Cài đặt các tệp .mornye-ext để thêm nhà cung cấp nguồn mới",
   "@extensionsNoExtensionsSubtitle": {
     "description": "Empty state subtitle"
   },
@@ -2384,7 +2602,7 @@
   "@qualityHiResFlacMaxSubtitle": {
     "description": "Technical spec for hi-res max"
   },
-  "downloadLossyFormat": "Định dạng Lossy",
+  "downloadLossyFormat": "Định dạng nén mất dữ liệu",
   "@downloadLossyFormat": {
     "description": "Setting title to pick output format for lossy downloads"
   },
@@ -2392,7 +2610,13 @@
   "@downloadAutoConvert": {
     "description": "Toggle for automatic post-download audio conversion"
   },
-  "downloadAutoConvertSubtitle": "Tự động chuyển các bài vừa tải xong sang định dạng nén (Lossy) gọn nhẹ hơn. Tệp gốc chỉ bị thay thế sau khi chuyển đổi thành công.",
+  "downloadAutoConvertAllFormatsSubtitle": "Convert completed downloads or limit FLAC bit depth and sample rate. The original is replaced only after conversion succeeds.",
+  "downloadAutoConvertOutputSubtitle": "Choose the output format for newly completed downloads.",
+  "downloadAutoConvertFlacSubtitle": "Lossless FLAC with quality limits. Lower bit depths and sample rates are preserved.",
+  "downloadAutoConvertMaxBitDepth": "Maximum bit depth",
+  "downloadAutoConvertMaxSampleRate": "Maximum sample rate",
+  "downloadAutoConvertFlacLimitsSubtitle": "These are upper limits. For example, a 44.1 kHz source stays at 44.1 kHz when 48 kHz is selected. Lossy sources are kept in their original format.",
+  "downloadAutoConvertSubtitle": "Tự động chuyển các bài vừa tải xong sang định dạng nén gọn nhẹ hơn. Tệp gốc chỉ bị thay thế sau khi chuyển đổi thành công.",
   "@downloadAutoConvertSubtitle": {
     "description": "Explanation of safe automatic post-download conversion"
   },
@@ -2400,7 +2624,7 @@
   "@downloadAutoConvertFormat": {
     "description": "Automatic conversion output format setting"
   },
-  "downloadAutoConvertFormatSubtitle": "Chọn định dạng nén (Lossy) sẽ dùng cho các bản nhạc tải xong mới.",
+  "downloadAutoConvertFormatSubtitle": "Chọn định dạng nén sẽ dùng cho các bản nhạc tải xong mới.",
   "@downloadAutoConvertFormatSubtitle": {
     "description": "Automatic conversion format picker explanation"
   },
@@ -2432,7 +2656,7 @@
   "@downloadDirectory": {
     "description": "Setting - download folder"
   },
-  "downloadSeparateSinglesFolder": "Tách riêng thư mục Đĩa đơn (Singles)",
+  "downloadSeparateSinglesFolder": "Tách riêng thư mục Đĩa đơn",
   "@downloadSeparateSinglesFolder": {
     "description": "Setting - separate folder for singles"
   },
@@ -2444,7 +2668,7 @@
   "@albumFolderStructureDescription": {
     "description": "Album folder structure picker description"
   },
-  "downloadUseAlbumArtistForFolders": "Dùng Nghệ sĩ album (Album Artist) để đặt tên thư mục",
+  "downloadUseAlbumArtistForFolders": "Dùng Nghệ sĩ album để đặt tên thư mục",
   "@downloadUseAlbumArtistForFolders": {
     "description": "Setting - choose whether artist folders use Album Artist or Track Artist"
   },
@@ -2452,7 +2676,7 @@
   "@downloadUsePrimaryArtistOnly": {
     "description": "Setting - strip featured artists from folder name"
   },
-  "downloadUsePrimaryArtistOnlyEnabled": "Lược bỏ tên nghệ sĩ góp giọng (Feat.) khỏi tên thư mục (ví dụ: Justin Bieber, Quavo → Justin Bieber)",
+  "downloadUsePrimaryArtistOnlyEnabled": "Lược bỏ tên nghệ sĩ góp giọng khỏi tên thư mục (ví dụ: Justin Bieber, Quavo → Justin Bieber)",
   "@downloadUsePrimaryArtistOnlyEnabled": {
     "description": "Subtitle when primary artist only is enabled"
   },
@@ -2472,7 +2696,7 @@
   "@appearanceAmoledDark": {
     "description": "Theme option - pure black"
   },
-  "appearanceAmoledDarkSubtitle": "Nền đen tuyệt đối (AMOLED)",
+  "appearanceAmoledDarkSubtitle": "Nền đen tuyệt đối",
   "@appearanceAmoledDarkSubtitle": {
     "description": "Subtitle for AMOLED dark"
   },
@@ -2484,7 +2708,7 @@
   "@appearanceHeroAnimationsSubtitle": {
     "description": "Subtitle for the Hero animations toggle"
   },
-  "appearanceForceBlur": "Luôn bật hiệu ứng làm mờ (Blur)",
+  "appearanceForceBlur": "Luôn bật hiệu ứng làm mờ",
   "@appearanceForceBlur": {
     "description": "Toggle that forces backdrop blur on even when the device profile disabled it"
   },
@@ -2532,7 +2756,7 @@
   "@settingsConcurrentDownloadsSubtitle": {
     "description": "Subtitle explaining the concurrent downloads picker"
   },
-  "concurrentDownloadsOne": "Từng bài một (1 bài mỗi lần)",
+  "concurrentDownloadsOne": "Xử lý tuần tự từng bài",
   "@concurrentDownloadsOne": {
     "description": "Concurrent downloads option - sequential"
   },
@@ -2654,7 +2878,7 @@
   "@recentTypeSong": {
     "description": "Recent access item type - song/track"
   },
-  "recentTypePlaylist": "Playlist",
+  "recentTypePlaylist": "Danh sách phát",
   "@recentTypePlaylist": {
     "description": "Recent access item type - playlist"
   },
@@ -2680,7 +2904,7 @@
       }
     }
   },
-  "discographyDownload": "Tải toàn bộ sự nghiệp (Discography)",
+  "discographyDownload": "Tải toàn bộ sự nghiệp",
   "@discographyDownload": {
     "description": "Button - download artist discography"
   },
@@ -2716,11 +2940,11 @@
       }
     }
   },
-  "discographySinglesOnly": "Chỉ Đĩa đơn (Single) & EP",
+  "discographySinglesOnly": "Chỉ Đĩa đơn & EP",
   "@discographySinglesOnly": {
     "description": "Option - download only singles"
   },
-  "discographySinglesOnlySubtitle": "{count} bài hát từ {albumCount} đĩa đơn (Singles)",
+  "discographySinglesOnlySubtitle": "{count} bài hát từ {albumCount} đĩa đơn",
   "@discographySinglesOnlySubtitle": {
     "description": "Subtitle showing singles tracks count",
     "placeholders": {
@@ -2900,11 +3124,11 @@
   "@libraryRemoveFolder": {
     "description": "Action to remove one indexed library source"
   },
-  "libraryRemoveFolderMessage": "Remove this folder and its indexed tracks from Mornye? Audio files on the storage will not be deleted.",
+  "libraryRemoveFolderMessage": "Xóa thư mục này và các bài hát đã lập chỉ mục khỏi Mornye? Các tệp âm thanh trong bộ nhớ sẽ không bị xóa.",
   "@libraryRemoveFolderMessage": {
     "description": "Confirmation shown before removing a library source"
   },
-  "libraryUnreadableFiles": "{count, plural, =1{1 file couldn't be read} other{{count} files couldn't be read}}",
+  "libraryUnreadableFiles": "{count, plural, =1{Không thể đọc 1 tệp} other{Không thể đọc {count} tệp}}",
   "@libraryUnreadableFiles": {
     "description": "Count of files the last scan of a library folder skipped because it could not read them",
     "placeholders": {
@@ -2913,19 +3137,19 @@
       }
     }
   },
-  "libraryUnreadableFilesTitle": "Unreadable files",
+  "libraryUnreadableFilesTitle": "Tệp không đọc được",
   "@libraryUnreadableFilesTitle": {
     "description": "Title of the list of files a library scan could not read, and the action that opens it"
   },
-  "libraryUnreadableFilesSubtitle": "These files were left out of your library. They may be damaged, still downloading, or blocked by the storage app.",
+  "libraryUnreadableFilesSubtitle": "Các tệp này đã bị bỏ qua khỏi thư viện của bạn. Chúng có thể bị hỏng, đang trong quá trình tải xuống hoặc bị ứng dụng lưu trữ chặn.",
   "@libraryUnreadableFilesSubtitle": {
     "description": "Explanation above the list of files a library scan could not read"
   },
-  "libraryUnreadableFilesAction": "See which files and why",
+  "libraryUnreadableFilesAction": "Xem danh sách tệp và lý do",
   "@libraryUnreadableFilesAction": {
     "description": "Subtitle of the library folder action that lists unreadable files"
   },
-  "libraryUnreadableFilesMore": "{count, plural, =1{1 more file isn't listed} other{{count} more files aren't listed}}",
+  "libraryUnreadableFilesMore": "{count, plural, =1{Còn 1 tệp khác chưa được liệt kê} other{Còn {count} tệp khác chưa được liệt kê}}",
   "@libraryUnreadableFilesMore": {
     "description": "Note below the unreadable files list when the scan skipped more files than it lists",
     "placeholders": {
@@ -3090,7 +3314,7 @@
   "@libraryStorageAccessRequired": {
     "description": "Dialog title for storage permission"
   },
-  "libraryStorageAccessMessage": "Mornye needs storage access to scan your music library. Please grant permission in settings.",
+  "libraryStorageAccessMessage": "Mornye cần quyền truy cập bộ nhớ để quét thư viện nhạc của bạn. Vui lòng cấp quyền trong phần cài đặt.",
   "@libraryStorageAccessMessage": {
     "description": "Dialog message for storage permission"
   },
@@ -3105,6 +3329,22 @@
   "libraryFilterAll": "Tất cả",
   "@libraryFilterAll": {
     "description": "Filter chip - show all library items"
+  },
+  "libraryReEnrichAll": "Re-enrich All Tracks",
+  "@libraryReEnrichAll": {
+    "description": "Library settings action - re-enrich the metadata of every track in the Library"
+  },
+  "libraryReEnrichAllSubtitle": "Look up and fill in metadata for every track in your Library, then review the changes",
+  "@libraryReEnrichAllSubtitle": {
+    "description": "Subtitle for the Re-enrich All Tracks action"
+  },
+  "libraryReEnrichAllEmpty": "No tracks to re-enrich. Tracks from network connections are not included.",
+  "@libraryReEnrichAllEmpty": {
+    "description": "Snackbar when the Library has no tracks Re-enrich can write to"
+  },
+  "libraryReEnrichAllBusy": "Wait for the Library scan to finish, then try again.",
+  "@libraryReEnrichAllBusy": {
+    "description": "Snackbar when Re-enrich All is started during a Library scan"
   },
   "libraryFilterDownloaded": "Đã tải xuống",
   "@libraryFilterDownloaded": {
@@ -3142,7 +3382,7 @@
   "@libraryFilterQualityCD": {
     "description": "Filter option - CD quality audio"
   },
-  "libraryFilterQualityLossy": "Lossy",
+  "libraryFilterQualityLossy": "Nén mất dữ liệu",
   "@libraryFilterQualityLossy": {
     "description": "Filter option - lossy compressed audio"
   },
@@ -3186,11 +3426,11 @@
   "@libraryFilterSortOldest": {
     "description": "Sort option - oldest first"
   },
-  "libraryFilterSortSizeLargest": "Size (Largest first)",
+  "libraryFilterSortSizeLargest": "Dung lượng (Lớn nhất trước)",
   "@libraryFilterSortSizeLargest": {
     "description": "Library sort option - largest files first"
   },
-  "libraryFilterSortSizeSmallest": "Size (Smallest first)",
+  "libraryFilterSortSizeSmallest": "Dung lượng (Nhỏ nhất trước)",
   "@libraryFilterSortSizeSmallest": {
     "description": "Library sort option - smallest files first"
   },
@@ -3232,11 +3472,11 @@
       }
     }
   },
-  "tutorialWelcomeTitle": "Welcome to Mornye!",
+  "tutorialWelcomeTitle": "Chào mừng bạn đến với Mornye!",
   "@tutorialWelcomeTitle": {
     "description": "Tutorial welcome page title"
   },
-  "tutorialWelcomeDesc": "Learn how to find music with extensions, choose the quality you want, and manage downloads in Mornye.",
+  "tutorialWelcomeDesc": "Tìm hiểu cách tìm nhạc bằng các tiện ích mở rộng, chọn chất lượng mong muốn và quản lý tải xuống trong Mornye.",
   "@tutorialWelcomeDesc": {
     "description": "Tutorial welcome page description"
   },
@@ -3284,7 +3524,7 @@
   "@tutorialLibraryTip2": {
     "description": "Tutorial library tip 2"
   },
-  "tutorialLibraryTip3": "Duyệt xem bài hát, album và playlist dưới dạng danh sách hoặc dạng lưới",
+  "tutorialLibraryTip3": "Duyệt xem bài hát, album và danh sách phát dưới dạng danh sách hoặc dạng lưới",
   "@tutorialLibraryTip3": {
     "description": "Tutorial library tip 3"
   },
@@ -3296,7 +3536,7 @@
   "@tutorialExtensionsDesc": {
     "description": "Tutorial extensions page description"
   },
-  "tutorialExtensionsTip1": "Duyệt tab Kho tiện ích (Repo) để khám phá các tiện ích mở rộng hữu ích",
+  "tutorialExtensionsTip1": "Duyệt tab Kho tiện ích để khám phá các tiện ích mở rộng hữu ích",
   "@tutorialExtensionsTip1": {
     "description": "Tutorial extensions tip 1"
   },
@@ -3331,6 +3571,77 @@
   "tutorialReadyMessage": "Mọi thứ đã sẵn sàng! Hãy chọn tiện ích mở rộng, sau đó tìm kiếm bài hát hoặc dán liên kết nhạc bạn muốn tải.",
   "@tutorialReadyMessage": {
     "description": "Tutorial completion message"
+  },
+  "whatsNewIntroTitle": "Mornye {version} is here",
+  "@whatsNewIntroTitle": {
+    "description": "First page of the tour shown once after updating; version is like 5.3",
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "whatsNewIntroDesc": "Our biggest update yet. Here's a quick look at what's new.",
+  "whatsNewLinkTitle": "Mornye Link",
+  "whatsNewLinkDesc": "Pair your phone and computer on the same network. Mornye Link is in beta.",
+  "whatsNewLinkPlayTitle": "Play across devices",
+  "whatsNewLinkPlayBody": "Browse your computer's library on your phone, control what it plays, and hand playback over without losing your place.",
+  "whatsNewLinkTransferTitle": "Move songs both ways",
+  "whatsNewLinkTransferBody": "Send songs to your computer or save them to your phone, right from the song menu.",
+  "whatsNewLinkSyncTitle": "Stay in sync",
+  "whatsNewLinkSyncBody": "Collections and listening history stay the same on paired devices.",
+  "whatsNewHomeTitle": "A Home that learns",
+  "whatsNewHomeDesc": "Mixes and autoplay now follow how you actually listen.",
+  "whatsNewHomeMixesTitle": "Mixes from your Library",
+  "whatsNewHomeMixesBody": "New mixes built from your own songs, including a mix for each genre.",
+  "whatsNewHomeAutoplayTitle": "Smarter autoplay",
+  "whatsNewHomeAutoplayBody": "Autoplay follows your listening session and learns from your favorites, playlists and replays.",
+  "whatsNewHomeAnalysisTitle": "Song analysis",
+  "whatsNewHomeAnalysisBody": "Mornye can analyze how your songs sound for closer picks. It stays off until you turn it on in Settings.",
+  "whatsNewPlayerTitle": "Player and lyrics",
+  "whatsNewPlayerDesc": "Smoother playback, and lyrics in any language.",
+  "whatsNewPlayerGaplessTitle": "Gapless playback",
+  "whatsNewPlayerGaplessBody": "Albums flow from one song into the next without a pause.",
+  "whatsNewPlayerTranslateTitle": "Translate lyrics",
+  "whatsNewPlayerTranslateBody": "Translate or romanize lyrics with an AI provider you set up.",
+  "whatsNewPlayerTimingTitle": "Lyrics timing",
+  "whatsNewPlayerTimingBody": "Move synced lyrics earlier or later when they drift from the song.",
+  "whatsNewPlayerAutoTitle": "Android Auto",
+  "whatsNewPlayerAutoBody": "Browse and play your Library from your car's screen.",
+  "whatsNewPlayerExclusiveTitle": "Exclusive output",
+  "whatsNewPlayerExclusiveBody": "Send audio straight to your output device without the system mixer.",
+  "whatsNewLibraryTitle": "Library and search",
+  "whatsNewLibraryDesc": "New ways to find and organize your music.",
+  "whatsNewLibraryFoldersTitle": "Browse by folder",
+  "whatsNewLibraryFoldersBody": "Explore your Library the way it's stored on disk.",
+  "whatsNewLibrarySuggestionsTitle": "Suggested songs",
+  "whatsNewLibrarySuggestionsBody": "Albums, singles and playlists now suggest songs that fit.",
+  "whatsNewLibraryRecognizeTitle": "Recognize music",
+  "whatsNewLibraryRecognizeBody": "Tap the microphone in Search to find out what's playing nearby.",
+  "whatsNewLibraryPlaylistsTitle": "Better playlists",
+  "whatsNewLibraryPlaylistsBody": "Reorder songs, create a playlist from a folder, or import playlist files.",
+  "whatsNewFasterTitle": "Faster everywhere",
+  "whatsNewFasterDesc": "Quicker and lighter, especially with large libraries.",
+  "whatsNewFasterLibraryTitle": "A quicker Library",
+  "whatsNewFasterLibraryBody": "Tabs and albums open faster, and scrolling stays smooth.",
+  "whatsNewFasterNetworkTitle": "Faster network music",
+  "whatsNewFasterNetworkBody": "Network shares scan many times faster, and Subsonic servers sync with far fewer requests.",
+  "whatsNewFasterQueueTitle": "Long queues that last",
+  "whatsNewFasterQueueBody": "Large queues save quickly and come back after a restart.",
+  "whatsNewFasterBackgroundTitle": "Lighter in the background",
+  "whatsNewFasterBackgroundBody": "The app starts faster and does less work while music plays.",
+  "whatsNewDone": "Start listening",
+  "@whatsNewDone": {
+    "description": "Button on the last page of the What's New tour"
+  },
+  "whatsNewAboutTitle": "What's new in {version}",
+  "@whatsNewAboutTitle": {
+    "description": "About page row that reopens the What's New tour; version is like 5.3",
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
   },
   "libraryForceFullScan": "Buộc quét lại toàn bộ",
   "@libraryForceFullScan": {
@@ -3422,15 +3733,15 @@
   "@cacheLibraryCoverDesc": {
     "description": "Description of what library cover cache contains"
   },
-  "libraryPlaybackNormalization": "Chuẩn hóa âm lượng (Normalization)",
+  "libraryPlaybackNormalization": "Chuẩn hóa âm lượng",
   "@libraryPlaybackNormalization": {
     "description": "Toggle title for ReplayGain playback normalization in the built-in player"
   },
-  "libraryPlaybackNormalizationSubtitle": "Cân bằng độ lớn âm lượng giữa các bài hát dựa trên tag ReplayGain hoặc R128 (nếu có)",
+  "libraryPlaybackNormalizationSubtitle": "Cân bằng độ lớn âm lượng giữa các bài hát dựa trên tag ReplayGain hoặc R128 nếu có",
   "@libraryPlaybackNormalizationSubtitle": {
     "description": "Subtitle explaining playback volume normalization"
   },
-  "playbackNormalizationMode": "Gain mode",
+  "playbackNormalizationMode": "Chế độ khuếch đại",
   "@playbackNormalizationMode": {
     "description": "Label for choosing between track and album ReplayGain during playback"
   },
@@ -3442,11 +3753,11 @@
   "@playbackNormalizationModeAlbum": {
     "description": "Gain mode that keeps the loudness differences inside an album"
   },
-  "playbackNormalizationPreamp": "Pre-amp",
+  "playbackNormalizationPreamp": "Tiền khuếch đại",
   "@playbackNormalizationPreamp": {
     "description": "Label for the dB offset applied on top of ReplayGain during playback"
   },
-  "playbackNormalizationPreampValue": "{gain} dB (target {target} LUFS)",
+  "playbackNormalizationPreampValue": "{gain} dB (mục tiêu {target} LUFS)",
   "@playbackNormalizationPreampValue": {
     "description": "Pre-amp value with the resulting target loudness",
     "placeholders": {
@@ -3460,7 +3771,7 @@
       }
     }
   },
-  "playbackNormalizationPreampHint": "Lower values play quieter. Normalization only turns tracks down, so it never clips.",
+  "playbackNormalizationPreampHint": "Giá trị thấp hơn sẽ phát nhỏ hơn. Tính năng chuẩn hóa âm lượng chỉ giảm mức âm của bài hát nên sẽ không bao giờ bị vỡ tiếng.",
   "@playbackNormalizationPreampHint": {
     "description": "Hint under the normalization pre-amp slider"
   },
@@ -3468,7 +3779,7 @@
   "@cacheAudioAnalysis": {
     "description": "Cache item title for saved audio analysis results"
   },
-  "cacheAudioAnalysisDesc": "Ảnh phổ âm thanh (Spectrogram) và kết quả phân tích đã lưu. Sẽ phân tích lại ở lần mở tiếp theo.",
+  "cacheAudioAnalysisDesc": "Ảnh phổ âm thanh và kết quả phân tích đã lưu. Sẽ phân tích lại ở lần mở tiếp theo.",
   "@cacheAudioAnalysisDesc": {
     "description": "Description of what audio analysis cache contains"
   },
@@ -3596,7 +3907,7 @@
   "@trackSaveLyricsProgress": {
     "description": "Snackbar while saving lyrics to file"
   },
-  "trackReEnrich": "Làm giàu lại dữ liệu",
+  "trackReEnrich": "Tái làm giàu dữ liệu",
   "@trackReEnrich": {
     "description": "Menu action - re-embed metadata into audio file"
   },
@@ -3636,7 +3947,7 @@
   "@trackReEnrichModeIsrc": {
     "description": "Batch metadata mode that only writes ISRC"
   },
-  "trackReEnrichModeIsrcSubtitle": "Tìm và bổ sung mã định danh bản thu (ISRC) mà không làm thay đổi các tag khác",
+  "trackReEnrichModeIsrcSubtitle": "Tìm và bổ sung mã định danh bản thu mà không làm thay đổi các tag khác",
   "@trackReEnrichModeIsrcSubtitle": {
     "description": "Explanation for the ISRC-only batch metadata mode"
   },
@@ -3747,7 +4058,7 @@
     "description": "Progress message while preparing manual batch metadata changes"
   },
   "trackReEnrichSuccess": "Đã làm giàu lại metadata thành công",
-  "trackReEnrichMetadataSaved": "Lược bỏ tên nghệ sĩ góp giọng (Feat.) khỏi tên thư mục (ví dụ: Justin Bieber, Quavo → Justin Bieber)",
+  "trackReEnrichMetadataSaved": "Lược bỏ tên nghệ sĩ góp giọng khỏi tên thư mục (ví dụ: Justin Bieber, Quavo → Justin Bieber)",
   "trackReEnrichLyricsUpdated": "Đã cập nhật lời bài hát",
   "trackReEnrichLyricsPreserved": "Không tìm thấy lời bài hát mới; giữ nguyên lời hiện tại",
   "trackReEnrichLyricsDisabled": "Chưa cập nhật lời bài hát: tính năng tải lời bài hát đang tắt trong Cài đặt",
@@ -3808,7 +4119,7 @@
   "@trackConvertTargetFormat": {
     "description": "Label for format selection"
   },
-  "trackConvertBitrate": "Bitrate",
+  "trackConvertBitrate": "Tốc độ bit",
   "@trackConvertBitrate": {
     "description": "Label for bitrate selection"
   },
@@ -3972,7 +4283,7 @@
   "@collectionFoldersTitle": {
     "description": "Library section title for custom folders"
   },
-  "collectionWishlist": "Danh sách chờ (Wishlist)",
+  "collectionWishlist": "Danh sách chờ",
   "@collectionWishlist": {
     "description": "Custom folder for saved tracks to download later"
   },
@@ -3984,19 +4295,19 @@
   "@collectionFavoriteArtists": {
     "description": "Custom folder for favorite artists"
   },
-  "collectionPlaylist": "Playlist",
+  "collectionPlaylist": "Danh sách phát",
   "@collectionPlaylist": {
     "description": "Single playlist label"
   },
-  "collectionAddToPlaylist": "Thêm vào playlist",
+  "collectionAddToPlaylist": "Thêm vào danh sách phát",
   "@collectionAddToPlaylist": {
     "description": "Action to add a track to user playlist"
   },
-  "collectionCreatePlaylist": "Tạo playlist",
+  "collectionCreatePlaylist": "Tạo danh sách phát",
   "@collectionCreatePlaylist": {
     "description": "Action to create a new playlist"
   },
-  "collectionNoPlaylistsYet": "Chưa có playlist nào",
+  "collectionNoPlaylistsYet": "Chưa có danh sách phát nào",
   "@collectionNoPlaylistsYet": {
     "description": "Empty state title when user has no playlists"
   },
@@ -4036,27 +4347,27 @@
       }
     }
   },
-  "collectionPlaylistNameHint": "Tên playlist",
+  "collectionPlaylistNameHint": "Tên danh sách phát",
   "@collectionPlaylistNameHint": {
     "description": "Hint text for playlist name input"
   },
-  "collectionPlaylistNameRequired": "Vui lòng nhập tên playlist",
+  "collectionPlaylistNameRequired": "Vui lòng nhập tên danh sách phát",
   "@collectionPlaylistNameRequired": {
     "description": "Validation error for empty playlist name"
   },
-  "collectionRenamePlaylist": "Đổi tên playlist",
+  "collectionRenamePlaylist": "Đổi tên danh sách phát",
   "@collectionRenamePlaylist": {
     "description": "Action to rename playlist"
   },
-  "collectionDeletePlaylist": "Xóa playlist",
+  "collectionDeletePlaylist": "Xóa danh sách phát",
   "@collectionDeletePlaylist": {
     "description": "Action to delete playlist"
   },
-  "collectionPlaylistRenamed": "Đã đổi tên playlist",
+  "collectionPlaylistRenamed": "Đã đổi tên danh sách phát",
   "@collectionPlaylistRenamed": {
     "description": "Snackbar after renaming playlist"
   },
-  "collectionWishlistEmptyTitle": "Danh sách chờ (Wishlist) đang trống",
+  "collectionWishlistEmptyTitle": "Danh sách chờ đang trống",
   "@collectionWishlistEmptyTitle": {
     "description": "Wishlist empty state title"
   },
@@ -4080,7 +4391,7 @@
   "@collectionFavoriteArtistsEmptySubtitle": {
     "description": "Favorite artists empty state subtitle"
   },
-  "collectionPlaylistEmptyTitle": "Playlist đang trống",
+  "collectionPlaylistEmptyTitle": "Danh sách phát đang trống",
   "@collectionPlaylistEmptyTitle": {
     "description": "Playlist empty state title"
   },
@@ -4088,7 +4399,7 @@
   "@collectionPlaylistEmptySubtitle": {
     "description": "Playlist empty state subtitle"
   },
-  "collectionRemoveFromPlaylist": "Xóa khỏi playlist",
+  "collectionRemoveFromPlaylist": "Xóa khỏi danh sách phát",
   "@collectionRemoveFromPlaylist": {
     "description": "Tooltip for removing track from playlist"
   },
@@ -4123,7 +4434,7 @@
       }
     }
   },
-  "collectionRemovedFromWishlist": "“{trackName}\" đã được xóa khỏi Danh sách chờ (Wishlist)",
+  "collectionRemovedFromWishlist": "“{trackName}\" đã được xóa khỏi Danh sách chờ",
   "@collectionRemovedFromWishlist": {
     "description": "Snackbar after removing track from wishlist",
     "placeholders": {
@@ -4158,11 +4469,11 @@
   "@trackOptionRemoveFromLoved": {
     "description": "Bottom sheet action label - remove track from loved folder"
   },
-  "trackOptionAddToWishlist": "Thêm vào Danh sách chờ (Wishlist)",
+  "trackOptionAddToWishlist": "Thêm vào Danh sách chờ",
   "@trackOptionAddToWishlist": {
     "description": "Bottom sheet action label - add track to wishlist"
   },
-  "trackOptionRemoveFromWishlist": "Xóa khỏi Danh sách chờ (Wishlist)",
+  "trackOptionRemoveFromWishlist": "Xóa khỏi Danh sách chờ",
   "@trackOptionRemoveFromWishlist": {
     "description": "Bottom sheet action label - remove track from wishlist"
   },
@@ -4181,15 +4492,6 @@
   "collectionPlaylistRemoveCover": "Xóa ảnh bìa",
   "@collectionPlaylistRemoveCover": {
     "description": "Bottom sheet action to remove custom cover image from a playlist"
-  },
-  "selectionShareCount": "Chia sẻ {count} {count, plural, =1{track} other{tracks}}",
-  "@selectionShareCount": {
-    "description": "Share button text with count in selection mode",
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
   },
   "selectionConvertCount": "Chuyển đổi {count} {count, plural, =1{track} other{tracks}}",
   "@selectionConvertCount": {
@@ -4271,11 +4573,11 @@
       }
     }
   },
-  "downloadUseAlbumArtistForFoldersAlbumSubtitle": "Đặt tên thư mục theo tag Nghệ sĩ album (Album Artist)",
+  "downloadUseAlbumArtistForFoldersAlbumSubtitle": "Đặt tên thư mục theo tag Nghệ sĩ album",
   "@downloadUseAlbumArtistForFoldersAlbumSubtitle": {
     "description": "Subtitle when album artist is used for folder names"
   },
-  "downloadUseAlbumArtistForFoldersTrackSubtitle": "Đặt tên thư mục theo tag Nghệ sĩ bài hát (Track Artist)",
+  "downloadUseAlbumArtistForFoldersTrackSubtitle": "Đặt tên thư mục theo tag Nghệ sĩ bài hát",
   "@downloadUseAlbumArtistForFoldersTrackSubtitle": {
     "description": "Subtitle when track artist is used for folder names"
   },
@@ -4365,7 +4667,7 @@
   "@safMigrationTitle": {
     "description": "Title of SAF migration dialog"
   },
-  "safMigrationMessage1": "Mornye now uses Android Storage Access Framework (SAF) for downloads. This fixes \"permission denied\" errors on Android 10+.",
+  "safMigrationMessage1": "Mornye hiện sử dụng Android Storage Access Framework (SAF) cho các lượt tải xuống. Điều này giúp khắc phục lỗi \"permission denied\" trên Android 10 trở lên.",
   "@safMigrationMessage1": {
     "description": "First paragraph of SAF migration dialog"
   },
@@ -4401,7 +4703,7 @@
   "@backupExportSectionTitle": {
     "description": "Section title for the export/backup card"
   },
-  "backupExportSectionDescription": "Lưu toàn bộ cài đặt, lịch sử tải nhạc, bài hát yêu thích, danh sách chờ (Wishlist), nghệ sĩ yêu thích và playlist vào một tệp duy nhất để cất giữ hoặc chuyển sang điện thoại khác.",
+  "backupExportSectionDescription": "Lưu toàn bộ cài đặt, lịch sử tải nhạc, bài hát yêu thích, danh sách chờ, nghệ sĩ yêu thích và danh sách phát vào một tệp duy nhất để cất giữ hoặc chuyển sang điện thoại khác.",
   "@backupExportSectionDescription": {
     "description": "Description of what a backup contains"
   },
@@ -4445,7 +4747,7 @@
   "@backupRestoreFailed": {
     "description": "Snackbar when restore fails"
   },
-  "backupInvalidFile": "This file is not a valid Mornye backup",
+  "backupInvalidFile": "Tệp này không phải là bản sao lưu Mornye hợp lệ",
   "@backupInvalidFile": {
     "description": "Snackbar when the chosen file is not a valid backup"
   },
@@ -4460,7 +4762,7 @@
   "backupSettingsOnly": "Chỉ cài đặt ứng dụng",
   "backupSelectHistory": "Lịch sử tải xuống",
   "backupSelectCollections": "Bộ sưu tập thư viện",
-  "backupSelectCollectionsDescription": "Bài hát yêu thích, danh sách chờ (Wishlist), nghệ sĩ yêu thích, playlist và ảnh bìa playlist.",
+  "backupSelectCollectionsDescription": "Bài hát yêu thích, danh sách chờ, nghệ sĩ yêu thích, danh sách phát và ảnh bìa danh sách phát.",
   "backupSelectExtensions": "Tiện ích mở rộng và cài đặt của chúng",
   "backupSelectedExportDescription": "Lưu các danh mục đã chọn vào một tệp sao lưu. Không bao gồm các tệp âm thanh.",
   "backupSelectAtLeastOne": "Hãy chọn ít nhất một danh mục để tạo bản sao lưu.",
@@ -4544,7 +4846,7 @@
   "@tooltipLoveAll": {
     "description": "Tooltip for the Love All button on album/playlist screens"
   },
-  "tooltipAddToPlaylist": "Thêm vào Playlist",
+  "tooltipAddToPlaylist": "Thêm vào danh sách phát",
   "@tooltipAddToPlaylist": {
     "description": "Tooltip for the Add to Playlist button"
   },
@@ -4629,9 +4931,9 @@
     "description": "Subtitle shown in the download location picker sheet"
   },
   "storageAutomaticFolder": "Thư mục tự động",
-  "storageAutomaticDownloadFolder": "Uses Download/Mornye when writable, otherwise app storage",
+  "storageAutomaticDownloadFolder": "Sử dụng thư mục Download/Mornye khi có quyền ghi, nếu không sẽ dùng bộ nhớ của ứng dụng",
   "storageSafRecommended": "Tự chọn thư mục (Khuyên dùng)",
-  "storageDownloadFolderHint": "In the Android folder picker, open Download and select Mornye. If it does not exist, create it using New folder, then tap Use this folder to grant access.",
+  "storageDownloadFolderHint": "Trong trình chọn thư mục của Android, hãy mở thư mục Download và chọn Mornye. Nếu chưa có, hãy tạo mới bằng nút \"Thư mục mới\", sau đó nhấn \"Dùng thư mục này\" để cấp quyền truy cập.",
   "downloadFolderAccessLostTitle": "Mất quyền truy cập thư mục tải xuống",
   "@downloadFolderAccessLostTitle": {
     "description": "Title of the warning banner shown in Files settings when the saved SAF folder grant is no longer valid"
@@ -4660,11 +4962,11 @@
   "@downloadFilenameInsertTag": {
     "description": "Label above filename tag chips"
   },
-  "downloadSeparateSinglesEnabled": "Lưu đĩa đơn (Single) và EP vào thư mục riêng",
+  "downloadSeparateSinglesEnabled": "Lưu đĩa đơn và EP vào thư mục riêng",
   "@downloadSeparateSinglesEnabled": {
     "description": "Subtitle when separate singles folder is on"
   },
-  "downloadSeparateSinglesDisabled": "Lưu chung đĩa đơn (Single) và album trong cùng một thư mục",
+  "downloadSeparateSinglesDisabled": "Lưu chung đĩa đơn và album trong cùng một thư mục",
   "@downloadSeparateSinglesDisabled": {
     "description": "Subtitle when separate singles folder is off"
   },
@@ -4672,11 +4974,11 @@
   "@downloadArtistNameFilters": {
     "description": "Setting title for artist folder filter options"
   },
-  "downloadCreatePlaylistSourceFolder": "Thư mục nguồn tạo Playlist",
+  "downloadCreatePlaylistSourceFolder": "Thư mục nguồn tạo danh sách phát",
   "@downloadCreatePlaylistSourceFolder": {
     "description": "Setting to create a subfolder per playlist source"
   },
-  "downloadCreatePlaylistSourceFolderEnabled": "Tạo một thư mục con riêng cho mỗi playlist",
+  "downloadCreatePlaylistSourceFolderEnabled": "Tạo một thư mục con riêng cho mỗi danh sách phát",
   "@downloadCreatePlaylistSourceFolderEnabled": {
     "description": "Subtitle when playlist folder is enabled"
   },
@@ -4704,7 +5006,7 @@
   "@downloadNetworkCompatibilityModeDisabled": {
     "description": "Subtitle when network compatibility mode is off"
   },
-  "downloadAllowLocalNetwork": "Cho phép truy cập mạng nội bộ (LAN)",
+  "downloadAllowLocalNetwork": "Cho phép truy cập mạng nội bộ",
   "@downloadAllowLocalNetwork": {
     "description": "Setting title for allowing requests to private/local network targets"
   },
@@ -4740,7 +5042,7 @@
   "@downloadNeteaseIncludeRomanization": {
     "description": "Setting to include romanized lyrics from Netease"
   },
-  "downloadNeteaseIncludeRomanizationEnabled": "Bao gồm dòng phiên âm Latinh (Romanization)",
+  "downloadNeteaseIncludeRomanizationEnabled": "Bao gồm dòng phiên âm Latinh",
   "@downloadNeteaseIncludeRomanizationEnabled": {
     "description": "Subtitle when Netease romanization is on"
   },
@@ -4756,7 +5058,7 @@
   "@downloadAppleQqMultiPersonEnabled": {
     "description": "Subtitle when multi-person lyrics is on"
   },
-  "downloadAppleQqMultiPersonDisabled": "Lời bài hát tiêu chuẩn (không kèm tên người hát)",
+  "downloadAppleQqMultiPersonDisabled": "Chỉ có nội dung lời bài hát, không kèm tên người hát hay chú thích",
   "@downloadAppleQqMultiPersonDisabled": {
     "description": "Subtitle when multi-person lyrics is off"
   },
@@ -4764,11 +5066,11 @@
   "@downloadAppleElrcWordSync": {
     "description": "Setting for preserving Apple Music word-by-word eLRC timestamps"
   },
-  "downloadAppleElrcWordSyncEnabled": "Giữ nguyên mốc thời gian từng chữ (word-by-word) gốc",
+  "downloadAppleElrcWordSyncEnabled": "Giữ nguyên mốc thời gian từng chữ gốc",
   "@downloadAppleElrcWordSyncEnabled": {
     "description": "Subtitle when Apple Music eLRC word sync is enabled"
   },
-  "downloadAppleElrcWordSyncDisabled": "Lời bài hát theo từng dòng từ Apple Music (ổn định hơn)",
+  "downloadAppleElrcWordSyncDisabled": "Lời bài hát theo từng dòng từ Apple Music",
   "@downloadAppleElrcWordSyncDisabled": {
     "description": "Subtitle when Apple Music eLRC word sync is disabled"
   },
@@ -4780,15 +5082,15 @@
   "@downloadMusixmatchLanguageAuto": {
     "description": "Subtitle when no language is set"
   },
-  "downloadFilterContributing": "Lọc nghệ sĩ góp giọng (Feat.)",
+  "downloadFilterContributing": "Lọc nghệ sĩ góp giọng",
   "@downloadFilterContributing": {
     "description": "Setting to strip contributing artists from Album Artist folder name"
   },
-  "downloadFilterContributingEnabled": "Đã lược bỏ nghệ sĩ góp giọng (Feat.) khỏi tên thư mục Nghệ sĩ album",
+  "downloadFilterContributingEnabled": "Đã lược bỏ nghệ sĩ góp giọng khỏi tên thư mục Nghệ sĩ album",
   "@downloadFilterContributingEnabled": {
     "description": "Subtitle when contributing artist filter is on"
   },
-  "downloadFilterContributingDisabled": "Sử dụng nguyên chuỗi Nghệ sĩ album (Album Artist) đầy đủ",
+  "downloadFilterContributingDisabled": "Sử dụng nguyên chuỗi Nghệ sĩ album đầy đủ",
   "@downloadFilterContributingDisabled": {
     "description": "Subtitle when contributing artist filter is off"
   },
@@ -4853,11 +5155,11 @@
       }
     }
   },
-  "bulkDownloadSelectPlaylists": "Chọn playlist muốn tải xuống",
+  "bulkDownloadSelectPlaylists": "Chọn danh sách phát muốn tải xuống",
   "@bulkDownloadSelectPlaylists": {
     "description": "Button label when no playlists are selected for download"
   },
-  "snackbarSelectedPlaylistsEmpty": "Playlist đã chọn không có bài hát nào",
+  "snackbarSelectedPlaylistsEmpty": "Danh sách phát đã chọn không có bài hát nào",
   "@snackbarSelectedPlaylistsEmpty": {
     "description": "Snackbar when selected playlists contain no tracks"
   },
@@ -4931,43 +5233,43 @@
   "@editMetadataAutoFillNoneSelected": {
     "description": "Snackbar when user taps Fetch without selecting any fields"
   },
-  "editMetadataLyricsSearch": "Find lyrics online",
+  "editMetadataLyricsSearch": "Tìm lời bài hát trực tuyến",
   "@editMetadataLyricsSearch": {
     "description": "Button in the edit metadata lyrics section that searches every lyrics provider"
   },
-  "lyricsPickerTitle": "Choose lyrics",
+  "lyricsPickerTitle": "Chọn lời bài hát",
   "@lyricsPickerTitle": {
     "description": "Title of the sheet listing each lyrics provider's result"
   },
-  "lyricsPickerNeedsTitle": "Enter a title and artist first",
+  "lyricsPickerNeedsTitle": "Vui lòng nhập tên bài hát và nghệ sĩ trước",
   "@lyricsPickerNeedsTitle": {
     "description": "Snackbar when searching lyrics without a title or artist"
   },
-  "lyricsPickerNoProviders": "No lyrics providers are enabled. Turn some on in Settings > Lyrics.",
+  "lyricsPickerNoProviders": "Chưa bật nguồn cung cấp lời bài hát nào. Hãy bật trong Cài đặt > Lời bài hát.",
   "@lyricsPickerNoProviders": {
     "description": "Shown in the lyrics picker when no provider is enabled"
   },
-  "lyricsPickerWordSynced": "Word-synced",
+  "lyricsPickerWordSynced": "Đồng bộ từng từ",
   "@lyricsPickerWordSynced": {
     "description": "Lyrics result timed word by word"
   },
-  "lyricsPickerSynced": "Synced",
+  "lyricsPickerSynced": "Đồng bộ",
   "@lyricsPickerSynced": {
     "description": "Lyrics result timed line by line"
   },
-  "lyricsPickerPlain": "Plain text",
+  "lyricsPickerPlain": "Văn bản thuần tuý",
   "@lyricsPickerPlain": {
     "description": "Lyrics result without timing"
   },
-  "lyricsPickerInstrumental": "Nhạc không lời (Instrumental)",
+  "lyricsPickerInstrumental": "Nhạc không lời",
   "@lyricsPickerInstrumental": {
     "description": "Lyrics result that marks the track as instrumental"
   },
-  "lyricsPickerNotFound": "No lyrics found",
+  "lyricsPickerNotFound": "Không tìm thấy lời bài hát",
   "@lyricsPickerNotFound": {
     "description": "A lyrics provider returned nothing for this track"
   },
-  "lyricsPickerLineCount": "{count, plural, =1{1 line} other{{count} lines}}",
+  "lyricsPickerLineCount": "{count, plural, =1{1 dòng} other{{count} dòng}}",
   "@lyricsPickerLineCount": {
     "description": "Number of lyric lines in a provider's result",
     "placeholders": {
@@ -5012,7 +5314,7 @@
   "@editMetadataFieldIsrc": {
     "description": "Chip label for ISRC field in auto-fill selector"
   },
-  "editMetadataFieldLabel": "Hãng đĩa (Label)",
+  "editMetadataFieldLabel": "Hãng đĩa",
   "@editMetadataFieldLabel": {
     "description": "Chip label for label field in auto-fill selector"
   },
@@ -5088,7 +5390,7 @@
       }
     }
   },
-  "queueEmptyPlaylistsSubtitle": "Tạo playlist mới để sắp xếp các bài hát của bạn",
+  "queueEmptyPlaylistsSubtitle": "Tạo danh sách phát mới để sắp xếp các bài hát của bạn",
   "@queueEmptyPlaylistsSubtitle": {
     "description": "Empty state subtitle for the playlists library view"
   },
@@ -5108,15 +5410,15 @@
   "@queueEmptyHistorySubtitle": {
     "description": "Empty state subtitle for download history"
   },
-  "selectionAllPlaylistsSelected": "Đã chọn tất cả playlist",
+  "selectionAllPlaylistsSelected": "Đã chọn tất cả danh sách phát",
   "@selectionAllPlaylistsSelected": {
     "description": "Shown when all playlists are selected in selection mode"
   },
-  "selectionTapPlaylistsToSelect": "Chạm vào playlist để chọn",
+  "selectionTapPlaylistsToSelect": "Chạm vào danh sách phát để chọn",
   "@selectionTapPlaylistsToSelect": {
     "description": "Hint shown in playlist selection mode"
   },
-  "selectionSelectPlaylistsToDelete": "Chọn playlist cần xóa",
+  "selectionSelectPlaylistsToDelete": "Chọn danh sách phát cần xóa",
   "@selectionSelectPlaylistsToDelete": {
     "description": "Hint shown when no playlists are selected for deletion"
   },
@@ -5132,7 +5434,7 @@
   "@audioAnalysisAnalyzing": {
     "description": "Loading text while analyzing audio"
   },
-  "audioAnalysisSampleRate": "Sample Rate (Tần số lấy mẫu)",
+  "audioAnalysisSampleRate": "Tần số lấy mẫu",
   "@audioAnalysisSampleRate": {
     "description": "Sample rate metric label"
   },
@@ -5148,11 +5450,11 @@
   "@audioAnalysisDecodedFormat": {
     "description": "Decoded sample format metric label"
   },
-  "audioAnalysisBitDepth": "Bit Depth",
+  "audioAnalysisBitDepth": "Độ sâu bit",
   "@audioAnalysisBitDepth": {
     "description": "Bit depth metric label"
   },
-  "audioAnalysisChannels": "Bit Depth",
+  "audioAnalysisChannels": "Kênh",
   "@audioAnalysisChannels": {
     "description": "Channels metric label"
   },
@@ -5160,7 +5462,7 @@
   "@audioAnalysisDuration": {
     "description": "Duration metric label"
   },
-  "audioAnalysisNyquist": "Nyquist",
+  "audioAnalysisNyquist": "Tần số Nyquist",
   "@audioAnalysisNyquist": {
     "description": "Nyquist frequency metric label"
   },
@@ -5168,11 +5470,11 @@
   "@audioAnalysisFileSize": {
     "description": "File size metric label"
   },
-  "audioAnalysisDynamicRange": "Dải động (Dynamic Range)",
+  "audioAnalysisDynamicRange": "Dải động",
   "@audioAnalysisDynamicRange": {
     "description": "Dynamic range metric label"
   },
-  "audioAnalysisPeak": "Peak (Đỉnh)",
+  "audioAnalysisPeak": "Đỉnh",
   "@audioAnalysisPeak": {
     "description": "Peak amplitude metric label"
   },
@@ -5184,7 +5486,7 @@
   "@audioAnalysisLufs": {
     "description": "Integrated loudness metric label"
   },
-  "audioAnalysisTruePeak": "True Peak (Đỉnh thực)",
+  "audioAnalysisTruePeak": "Đỉnh thực",
   "@audioAnalysisTruePeak": {
     "description": "True peak metric label"
   },
@@ -5192,11 +5494,11 @@
   "@audioAnalysisClipping": {
     "description": "Clipping metric label"
   },
-  "audioAnalysisNoClipping": "Không bị vỡ tiếng (No clipping)",
+  "audioAnalysisNoClipping": "Không bị vỡ tiếng",
   "@audioAnalysisNoClipping": {
     "description": "Displayed when no clipped samples were detected"
   },
-  "audioAnalysisSpectralCutoff": "Tần số cắt phổ (Spectral Cutoff)",
+  "audioAnalysisSpectralCutoff": "Ngưỡng cắt tần số ước tính",
   "@audioAnalysisSpectralCutoff": {
     "description": "Estimated spectral cutoff metric label"
   },
@@ -5208,7 +5510,7 @@
   "@audioAnalysisChannelStats": {
     "description": "Per-channel audio analysis section label"
   },
-  "audioAnalysisSamples": "Mẫu (Samples)",
+  "audioAnalysisSamples": "Số lượng mẫu",
   "@audioAnalysisSamples": {
     "description": "Total samples metric label"
   },
@@ -5216,11 +5518,11 @@
   "@audioAnalysisRescan": {
     "description": "Tooltip/label for the button that re-runs the audio analysis, discarding cached results"
   },
-  "audioAnalysisSaveSpectrogram": "Save Spectrogram",
+  "audioAnalysisSaveSpectrogram": "Lưu phổ âm thanh",
   "@audioAnalysisSaveSpectrogram": {
     "description": "Tooltip for the spectrogram button that saves the plot, with its axes and legend, as a PNG image the user places in storage"
   },
-  "audioAnalysisSpectrogramSaved": "Spectrogram saved to {fileName}",
+  "audioAnalysisSpectrogramSaved": "Đã lưu phổ vào {fileName}",
   "@audioAnalysisSpectrogramSaved": {
     "description": "Snackbar after the spectrogram image was saved",
     "placeholders": {
@@ -5237,23 +5539,23 @@
   "@downloadRedownloadFakeHiResSubtitle": {
     "description": "Setting subtitle for the fake Hi-Res re-download toggle"
   },
-  "hiResCheckVerdictFakeCertain": "Hi-Res giả (Upsampled)",
+  "hiResCheckVerdictFakeCertain": "Hi-Res giả",
   "@hiResCheckVerdictFakeCertain": {
     "description": "Verdict: an exact fingerprint (padded bits or upsampling pattern) proves the file is not real Hi-Res"
   },
-  "hiResCheckReasonSampleHold": "Mỗi mẫu âm thanh đều bị lặp lại: đã bị nâng tần số (upsample) bằng cách nhân bản",
+  "hiResCheckReasonSampleHold": "Mỗi mẫu âm thanh đều bị lặp lại: đã bị nâng tần số bằng cách nhân bản",
   "@hiResCheckReasonSampleHold": {
     "description": "Reason: sample-and-hold upsampling detected"
   },
-  "hiResCheckReasonInterpolation": "Các mẫu âm thanh ở giữa được nội suy tuyến tính (nâng tần số giả)",
+  "hiResCheckReasonInterpolation": "Các mẫu nằm giữa được nội suy tuyến tính",
   "@hiResCheckReasonInterpolation": {
     "description": "Reason: linear-interpolation upsampling detected"
   },
-  "hiResCheckTitle": "Kiểm định chuẩn Hi-Res",
+  "hiResCheckTitle": "Xác thực chất lượng Hi-Res",
   "@hiResCheckTitle": {
     "description": "Title of the fake Hi-Res check card"
   },
-  "hiResCheckSummary": "Kiểm tra phổ tần số và độ sâu bit (Bit depth) thực tế để phát hiện nhạc nâng tần số giả (upsample) hoặc độn bit (padding).",
+  "hiResCheckSummary": "Kiểm tra phổ tần số và độ sâu bit thực tế để phát hiện nhạc nâng tần số giả hoặc độn bit.",
   "@hiResCheckSummary": {
     "description": "Introductory text for the sampled Hi-Res analysis"
   },
@@ -5261,19 +5563,19 @@
   "@hiResCheckLimitedBandwidth": {
     "description": "Neutral finding: a limited spectrum alone does not prove upsampling"
   },
-  "hiResCheckNoEvidence": "Không phát hiện nâng tần số giả (upsampling) hay độn bit (padding)",
+  "hiResCheckNoEvidence": "Không phát hiện nâng tần số giả hay độn bit",
   "@hiResCheckNoEvidence": {
     "description": "No evidence was detected; this does not certify the master"
   },
-  "hiResCheckEstimatedCutoff": "Tần số cắt (Cutoff) ước tính",
+  "hiResCheckEstimatedCutoff": "Tần số cắt ước tính",
   "@hiResCheckEstimatedCutoff": {
     "description": "Estimated upper spectral edge at the analysis threshold"
   },
-  "hiResCheckActiveBits": "Số bit thực tế / lưu trữ",
+  "hiResCheckActiveBits": "Bit thực tế / bit lưu trữ",
   "@hiResCheckActiveBits": {
     "description": "Active integer bit depth versus the container depth in the sampled segment"
   },
-  "hiResCheckBandwidthExplanation": "Tần số cắt (cutoff) thấp hơn cũng có thể do quá trình mastering gốc của bản thu, chứ không hẳn là nhạc bị nâng tần số giả (upsample).",
+  "hiResCheckBandwidthExplanation": "Tần số cắt thấp hơn cũng có thể do quá trình mastering gốc của bản thu, chứ không hẳn là nhạc bị nâng tần số giả.",
   "@hiResCheckBandwidthExplanation": {
     "description": "Explains why the limited-bandwidth finding is neutral"
   },
@@ -5286,7 +5588,7 @@
       }
     }
   },
-  "hiResCheckImagingEvidence": "Phổ tần số xuất hiện các dải phản chiếu đối xứng — dấu hiệu đặc trưng của việc nâng tần số giả (upsampling).",
+  "hiResCheckImagingEvidence": "Phổ tần số chứa các dải phản chiếu phù hợp với việc tăng tần số lấy mẫu.",
   "@hiResCheckImagingEvidence": {
     "description": "Spectral imaging is suggestive evidence rather than proof"
   },
@@ -5316,7 +5618,7 @@
   "@hiResCheckChecking": {
     "description": "Loading text while the Hi-Res check runs"
   },
-  "hiResCheckVerdictFake": "Khả năng cao là Hi-Res giả (Upsampled)",
+  "hiResCheckVerdictFake": "Khả năng cao là Hi-Res giả",
   "@hiResCheckVerdictFake": {
     "description": "Verdict: the file claims Hi-Res but does not measure as it"
   },
@@ -5635,7 +5937,7 @@
   "@notifLibraryScanPaused": {
     "description": "Notification title when the user pauses a library scan"
   },
-  "notifLibraryScanPausedBody": "Vui lòng nhập tên playlist",
+  "notifLibraryScanPausedBody": "Đã quét {count} tệp. Tiếp tục quét trong phần cài đặt Thư viện cục bộ để bắt đầu lại từ đây.",
   "@notifLibraryScanPausedBody": {
     "description": "Notification body for a paused library scan - files scanned so far",
     "placeholders": {
@@ -5644,7 +5946,7 @@
       }
     }
   },
-  "notifDownloadingUpdate": "Downloading Mornye v{version}",
+  "notifDownloadingUpdate": "Đang tải xuống Mornye v{version}",
   "@notifDownloadingUpdate": {
     "description": "Notification title while downloading an app update",
     "placeholders": {
@@ -5672,7 +5974,7 @@
   "@notifUpdateReady": {
     "description": "Notification title when app update download is complete"
   },
-  "notifUpdateReadyBody": "Mornye v{version} downloaded. Tap to install.",
+  "notifUpdateReadyBody": "Đã tải xuống Mornye v{version}. Nhấn để cài đặt.",
   "@notifUpdateReadyBody": {
     "description": "Notification body when app update is ready to install",
     "placeholders": {
@@ -5693,7 +5995,7 @@
   "@searchTracks": {
     "description": "Search filter label - tracks"
   },
-  "homeSearchHintDefault": "Search or paste a supported URL...",
+  "homeSearchHintDefault": "Tìm kiếm hoặc dán URL được hỗ trợ...",
   "@homeSearchHintDefault": {
     "description": "Default placeholder for the main search field on Home"
   },
@@ -5706,7 +6008,7 @@
       }
     }
   },
-  "homeImportCsvTooltip": "Nhập playlist (CSV, M3U)",
+  "homeImportCsvTooltip": "Nhập danh sách phát (CSV, M3U)",
   "@homeImportCsvTooltip": {
     "description": "Tooltip for importing a CSV or M3U playlist file into Home search"
   },
@@ -5888,11 +6190,11 @@
   "@logClearSearch": {
     "description": "Tooltip for clearing the log search field"
   },
-  "logIssueIspBlockingLabel": "PHÁT HIỆN NHÀ MẠNG (ISP) CHẶN KẾT NỐI",
+  "logIssueIspBlockingLabel": "PHÁT HIỆN NHÀ MẠNG CHẶN KẾT NỐI",
   "@logIssueIspBlockingLabel": {
     "description": "Diagnostic badge label when ISP blocking is detected"
   },
-  "logIssueIspBlockingDescription": "Nhà mạng (ISP) của bạn có thể đang chặn truy cập tới các dịch vụ tải nhạc",
+  "logIssueIspBlockingDescription": "Nhà mạng của bạn có thể đang chặn truy cập tới các dịch vụ tải nhạc",
   "@logIssueIspBlockingDescription": {
     "description": "Diagnostic badge description for ISP blocking"
   },
@@ -5900,7 +6202,7 @@
   "@logIssueIspBlockingSuggestion": {
     "description": "Diagnostic badge suggestion for ISP blocking"
   },
-  "logIssueRateLimitedLabel": "GIỚI HẠN TRUY VẤN (RATE LIMITED)",
+  "logIssueRateLimitedLabel": "GIỚI HẠN TRUY VẤN",
   "@logIssueRateLimitedLabel": {
     "description": "Diagnostic badge label when the service rate limits requests"
   },
@@ -5949,7 +6251,7 @@
       }
     }
   },
-  "extensionDetailsTags": "Thẻ (Tags)",
+  "extensionDetailsTags": "Thẻ",
   "@extensionDetailsTags": {
     "description": "Section title for extension tags"
   },
@@ -6162,7 +6464,7 @@
   "@trackAlbumType": {
     "description": "Label for an album or release type metadata value"
   },
-  "editMetadataFieldAlbumTypeHint": "Album, đĩa đơn (Single), EP, tuyển tập...",
+  "editMetadataFieldAlbumTypeHint": "Album, đĩa đơn, EP, tuyển tập...",
   "@editMetadataFieldAlbumTypeHint": {
     "description": "Hint for the release type metadata field"
   },
@@ -6194,7 +6496,7 @@
   "@libraryFilterMetadataMissingTrackNumber": {
     "description": "Filter option - items missing track number"
   },
-  "libraryFilterMetadataMissingDiscNumber": "Thiếu số thứ tự đĩa (Disc)",
+  "libraryFilterMetadataMissingDiscNumber": "Thiếu số thứ tự đĩa",
   "@libraryFilterMetadataMissingDiscNumber": {
     "description": "Filter option - items missing disc number"
   },
@@ -6210,7 +6512,7 @@
   "@libraryFilterMetadataMissingIsrc": {
     "description": "Filter option - items without any ISRC tag"
   },
-  "libraryFilterMetadataMissingLabel": "Thiếu hãng đĩa (Label)",
+  "libraryFilterMetadataMissingLabel": "Thiếu hãng đĩa",
   "@libraryFilterMetadataMissingLabel": {
     "description": "Filter option - items missing record label"
   },
@@ -6390,7 +6692,7 @@
       }
     }
   },
-  "downloadNativeWorker": "Tiến trình tải xuống gốc (Native worker)",
+  "downloadNativeWorker": "Tiến trình tải xuống gốc",
   "@downloadNativeWorker": {
     "description": "Setting title for Android native download worker"
   },
@@ -6440,7 +6742,7 @@
   "@extensionCustomUrlHandlingSubtitle": {
     "description": "Extension detail subtitle for custom URL handling"
   },
-  "extensionCustomUrlHandlingShareHint": "Share links from these sites to Mornye and this extension will handle them.",
+  "extensionCustomUrlHandlingShareHint": "Chia sẻ liên kết từ các trang này tới Mornye và tiện ích mở rộng này sẽ xử lý chúng.",
   "@extensionCustomUrlHandlingShareHint": {
     "description": "Extension detail hint explaining share-to-app URL handling"
   },
@@ -6650,7 +6952,7 @@
   "@libraryBuiltInPreviewPlayer": {
     "description": "Setting option to use the built-in preview player"
   },
-  "libraryBuiltInPreviewPlayerSubtitle": "Play your music right inside Mornye",
+  "libraryBuiltInPreviewPlayerSubtitle": "Phát nhạc của bạn ngay trong Mornye",
   "@libraryBuiltInPreviewPlayerSubtitle": {
     "description": "Subtitle for built-in preview player option"
   },
@@ -6685,8 +6987,8 @@
     }
   },
   "concertGetTickets": "Mua vé",
-  "concertSetList": "Danh sách bài biểu diễn (Setlist)",
-  "concertSetListButton": "Danh sách bài biểu diễn (Setlist)",
+  "concertSetList": "Danh sách bài biểu diễn",
+  "concertSetListButton": "Danh sách bài biểu diễn",
   "concertAddToCalendar": "Thêm vào Lịch",
   "concertOpenMaps": "Mở Bản đồ",
   "concertDetailsUnavailable": "Hiện chưa có thông tin chi tiết về buổi biểu diễn.",
@@ -6750,6 +7052,14 @@
   "@nowPlayingOpenInExternalPlayer": {
     "description": "Menu item to open the current track in an external player"
   },
+  "nowPlayingHideVolume": "Hide volume",
+  "@nowPlayingHideVolume": {
+    "description": "Now Playing menu item that removes the volume slider from the player"
+  },
+  "nowPlayingShowVolume": "Show volume",
+  "@nowPlayingShowVolume": {
+    "description": "Now Playing menu item that brings the volume slider back to the player"
+  },
   "nowPlayingTabPlayer": "Trình phát nhạc",
   "@nowPlayingTabPlayer": {
     "description": "Tab label for the player view"
@@ -6759,7 +7069,7 @@
     "description": "Tab label for the lyrics view"
   },
   "nowPlayingNoLyrics": "Không có lời bài hát trong tệp này",
-  "nowPlayingInstrumental": "Nhạc không lời (Instrumental)",
+  "nowPlayingInstrumental": "Nhạc không lời",
   "@nowPlayingInstrumental": {
     "description": "Accessibility label for the three-dot countdown during an instrumental break before lyrics resume"
   },
@@ -6781,6 +7091,279 @@
   "nowPlayingNoLyricsOnline": "Không tìm thấy lời bài hát trực tuyến",
   "@nowPlayingNoLyricsOnline": {
     "description": "Empty state after an online lyrics search for the playing track found nothing"
+  },
+  "nowPlayingTranslateLyrics": "Translate Lyrics",
+  "@nowPlayingTranslateLyrics": {
+    "description": "Player lyrics menu action that translates the current lyrics with the user's AI provider"
+  },
+  "nowPlayingCancelTranslation": "Cancel Translation",
+  "@nowPlayingCancelTranslation": {
+    "description": "Player lyrics menu action that stops an AI lyrics translation in progress"
+  },
+  "nowPlayingTranslatingLyrics": "Translating lyrics, {percent}%",
+  "@nowPlayingTranslatingLyrics": {
+    "description": "Tooltip and screen reader label of the lyrics menu button while an AI translation runs",
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "lyricsTranslateSheetTitle": "Translate Into",
+  "@lyricsTranslateSheetTitle": {
+    "description": "Title of the sheet that picks the language to translate the current lyrics into"
+  },
+  "lyricsTranslateSheetSubtitle": "The lyrics are sent to {provider}.",
+  "@lyricsTranslateSheetSubtitle": {
+    "description": "Notice under the translate sheet title naming the AI provider that receives the lyrics",
+    "placeholders": {
+      "provider": {
+        "type": "String"
+      }
+    }
+  },
+  "lyricsTranslatePartial": "{count, plural, =1{1 line} other{{count} lines}} could not be translated",
+  "@lyricsTranslatePartial": {
+    "description": "Snackbar after an AI translation that left some lines untranslated",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "lyricsTranslateAlreadyIn": "These lyrics are already in {language}",
+  "@lyricsTranslateAlreadyIn": {
+    "description": "Snackbar after an AI translation returned every line unchanged; language is the target language's own name",
+    "placeholders": {
+      "language": {
+        "type": "String"
+      }
+    }
+  },
+  "lyricsAiTranslation": "AI Translation",
+  "@lyricsAiTranslation": {
+    "description": "Lyrics settings row and page title for translating lyrics with the user's own AI provider"
+  },
+  "lyricsAiTranslationOff": "Not set up",
+  "@lyricsAiTranslationOff": {
+    "description": "Subtitle of the AI Translation settings row before a provider is configured"
+  },
+  "lyricsAiTranslationNotice": "Lyrics you translate are sent to the provider you choose, using your own API key. The provider's terms and pricing apply. Translations are saved on this device and never change your lyric files.",
+  "@lyricsAiTranslationNotice": {
+    "description": "Privacy notice at the top of the AI translation settings page"
+  },
+  "lyricsAiSectionProvider": "Provider",
+  "@lyricsAiSectionProvider": {
+    "description": "AI translation settings section for the provider, key and model"
+  },
+  "lyricsAiSectionTranslation": "Translation",
+  "@lyricsAiSectionTranslation": {
+    "description": "AI translation settings section for the target language and behavior"
+  },
+  "lyricsAiProvider": "Provider",
+  "@lyricsAiProvider": {
+    "description": "AI translation setting that picks the AI service"
+  },
+  "lyricsAiProviderCustom": "Custom Server",
+  "@lyricsAiProviderCustom": {
+    "description": "AI provider choice for a self-hosted or other OpenAI-compatible server"
+  },
+  "lyricsAiProviderCustomSubtitle": "Any OpenAI-compatible server, such as Ollama or LM Studio",
+  "@lyricsAiProviderCustomSubtitle": {
+    "description": "Subtitle of the custom AI provider choice"
+  },
+  "lyricsAiBaseUrl": "Server URL",
+  "@lyricsAiBaseUrl": {
+    "description": "AI translation setting for the address of a custom OpenAI-compatible server"
+  },
+  "lyricsAiBaseUrlInvalid": "Enter a URL that starts with http:// or https://",
+  "@lyricsAiBaseUrlInvalid": {
+    "description": "Validation error for the custom AI server URL"
+  },
+  "lyricsAiNotSet": "Not set",
+  "@lyricsAiNotSet": {
+    "description": "Subtitle of an AI translation setting that has no value yet"
+  },
+  "lyricsAiApiKey": "API Key",
+  "@lyricsAiApiKey": {
+    "description": "AI translation setting for the user's API key"
+  },
+  "lyricsAiApiKeyOptional": "Optional for local servers",
+  "@lyricsAiApiKeyOptional": {
+    "description": "Subtitle of the API key setting for a custom server without a key"
+  },
+  "lyricsAiApiKeySaved": "Saved, ends in {suffix}",
+  "@lyricsAiApiKeySaved": {
+    "description": "Subtitle of the API key setting showing only its last characters",
+    "placeholders": {
+      "suffix": {
+        "type": "String"
+      }
+    }
+  },
+  "lyricsAiApiKeyDescription": "Kept in this device's secure storage and only sent to {provider}.",
+  "@lyricsAiApiKeyDescription": {
+    "description": "Explanation in the API key sheet",
+    "placeholders": {
+      "provider": {
+        "type": "String"
+      }
+    }
+  },
+  "lyricsAiModel": "Model",
+  "@lyricsAiModel": {
+    "description": "AI translation setting for the model id"
+  },
+  "lyricsAiModelDefault": "Default ({model})",
+  "@lyricsAiModelDefault": {
+    "description": "Subtitle of the model setting when the provider's default model is used",
+    "placeholders": {
+      "model": {
+        "type": "String"
+      }
+    }
+  },
+  "lyricsAiModelHint": "Model ID",
+  "@lyricsAiModelHint": {
+    "description": "Hint of the model id text field"
+  },
+  "lyricsAiModelUseDefault": "Use Default",
+  "@lyricsAiModelUseDefault": {
+    "description": "Action in the model sheet that returns to the provider's default model"
+  },
+  "lyricsAiModelLoad": "Load Models",
+  "@lyricsAiModelLoad": {
+    "description": "Button in the model sheet that lists the models the provider offers"
+  },
+  "lyricsAiModelsEmpty": "The provider listed no models",
+  "@lyricsAiModelsEmpty": {
+    "description": "Shown in the model sheet when the provider's model list is empty"
+  },
+  "lyricsAiTestConnection": "Test Connection",
+  "@lyricsAiTestConnection": {
+    "description": "AI translation settings action that translates one line to check the key and model"
+  },
+  "lyricsAiTestConnectionSubtitle": "Translates one line to check the key and model",
+  "@lyricsAiTestConnectionSubtitle": {
+    "description": "Subtitle of the test connection action"
+  },
+  "lyricsAiTestSuccess": "The connection works",
+  "@lyricsAiTestSuccess": {
+    "description": "Snackbar after a successful AI translation connection test"
+  },
+  "lyricsAiTargetLanguage": "Translate Into",
+  "@lyricsAiTargetLanguage": {
+    "description": "AI translation setting for the target language"
+  },
+  "lyricsAiTargetLanguageApp": "App language ({language})",
+  "@lyricsAiTargetLanguageApp": {
+    "description": "Target language choice that follows the app language",
+    "placeholders": {
+      "language": {
+        "type": "String"
+      }
+    }
+  },
+  "lyricsAiInstruction": "Extra Instruction",
+  "@lyricsAiInstruction": {
+    "description": "AI translation setting for optional guidance added to the translation request"
+  },
+  "lyricsAiInstructionNone": "None",
+  "@lyricsAiInstructionNone": {
+    "description": "Subtitle of the extra instruction setting when it is empty"
+  },
+  "lyricsAiInstructionHint": "For example: keep the rhymes where you can",
+  "@lyricsAiInstructionHint": {
+    "description": "Hint of the extra instruction text field"
+  },
+  "lyricsAiAutoTranslate": "Translate Automatically",
+  "@lyricsAiAutoTranslate": {
+    "description": "AI translation switch that translates lyrics as they open"
+  },
+  "lyricsAiAutoTranslateSubtitle": "Translates synced lyrics that have no translation when you open them, using your provider's quota",
+  "@lyricsAiAutoTranslateSubtitle": {
+    "description": "Subtitle of the automatic AI translation switch"
+  },
+  "lyricsAiRomanize": "Add Romanization",
+  "@lyricsAiRomanize": {
+    "description": "AI translation switch that also asks for romanized lyrics"
+  },
+  "lyricsAiRomanizeSubtitle": "Shows how lyrics in other alphabets are sung, such as romaji for Japanese or pinyin for Chinese",
+  "@lyricsAiRomanizeSubtitle": {
+    "description": "Subtitle of the AI romanization switch"
+  },
+  "lyricsAiClearCache": "Clear Saved Translations",
+  "@lyricsAiClearCache": {
+    "description": "AI translation settings action that deletes saved translations"
+  },
+  "lyricsAiClearCacheSubtitle": "{count, plural, =0{No saved translations} =1{1 song} other{{count} songs}}",
+  "@lyricsAiClearCacheSubtitle": {
+    "description": "Subtitle of the clear saved translations action",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "lyricsAiClearCacheConfirm": "Clear saved translations?",
+  "@lyricsAiClearCacheConfirm": {
+    "description": "Title of the confirmation before deleting saved AI translations"
+  },
+  "lyricsAiClearCacheMessage": "Songs will need to be translated again, which uses your provider's quota.",
+  "@lyricsAiClearCacheMessage": {
+    "description": "Message of the confirmation before deleting saved AI translations"
+  },
+  "lyricsAiClearCacheDone": "Saved translations cleared",
+  "@lyricsAiClearCacheDone": {
+    "description": "Snackbar after deleting saved AI translations"
+  },
+  "lyricsAiErrorNotConfigured": "Set up AI translation in Lyrics settings first",
+  "@lyricsAiErrorNotConfigured": {
+    "description": "AI translation error when no provider, key or model is set"
+  },
+  "lyricsAiErrorInvalidKey": "The provider did not accept the API key",
+  "@lyricsAiErrorInvalidKey": {
+    "description": "AI translation error for a rejected API key"
+  },
+  "lyricsAiErrorRateLimited": "The provider is limiting requests. Try again in a moment",
+  "@lyricsAiErrorRateLimited": {
+    "description": "AI translation error when the provider rate limits the requests"
+  },
+  "lyricsAiErrorQuota": "Your provider account is out of credit or quota",
+  "@lyricsAiErrorQuota": {
+    "description": "AI translation error for an exhausted quota or billing problem"
+  },
+  "lyricsAiErrorNetwork": "Could not reach the provider. Check your connection",
+  "@lyricsAiErrorNetwork": {
+    "description": "AI translation error when the provider cannot be reached"
+  },
+  "lyricsAiErrorTimeout": "The provider took too long to answer",
+  "@lyricsAiErrorTimeout": {
+    "description": "AI translation error when a request times out"
+  },
+  "lyricsAiErrorModelNotFound": "The provider does not offer this model",
+  "@lyricsAiErrorModelNotFound": {
+    "description": "AI translation error for an unknown model id"
+  },
+  "lyricsAiErrorRefused": "The model declined to translate these lyrics",
+  "@lyricsAiErrorRefused": {
+    "description": "AI translation error when the model refuses the request"
+  },
+  "lyricsAiErrorTruncated": "The model's answer was cut off. Try another model",
+  "@lyricsAiErrorTruncated": {
+    "description": "AI translation error when the reply hit the output limit"
+  },
+  "lyricsAiErrorBadResponse": "The model's answer could not be read. Try another model",
+  "@lyricsAiErrorBadResponse": {
+    "description": "AI translation error when the reply is not the expected JSON"
+  },
+  "lyricsAiErrorService": "The provider had a problem. Try again later",
+  "@lyricsAiErrorService": {
+    "description": "AI translation error for other provider failures"
+  },
+  "lyricsAiErrorNoLyrics": "These lyrics have nothing to translate",
+  "@lyricsAiErrorNoLyrics": {
+    "description": "AI translation error when the lyrics have no translatable lines"
   },
   "nowPlayingLibraryEmpty": "Thư viện của bạn đang trống",
   "@nowPlayingLibraryEmpty": {
@@ -6814,6 +7397,279 @@
   "nowPlayingNoMetadata": "Không có thông tin metadata",
   "@nowPlayingNoMetadata": {
     "description": "Empty state when track metadata cannot be loaded"
+  },
+  "linkDevicesTitle": "Devices",
+  "@linkDevicesTitle": {
+    "description": "Mornye Link: title and button tooltip of the phone sheet that controls the paired desktop app"
+  },
+  "linkConnectionConnected": "Connected",
+  "@linkConnectionConnected": {
+    "description": "Mornye Link: the phone is connected to the paired desktop"
+  },
+  "linkConnectionConnecting": "Connecting",
+  "@linkConnectionConnecting": {
+    "description": "Mornye Link: the phone is connecting to the paired desktop"
+  },
+  "linkConnectionDisconnected": "Not connected",
+  "@linkConnectionDisconnected": {
+    "description": "Mornye Link: the paired desktop cannot be reached"
+  },
+  "linkThisPhone": "This phone",
+  "@linkThisPhone": {
+    "description": "Mornye Link: the phone's own row in the Devices sheet; choosing it plays music here again"
+  },
+  "linkPlayingOn": "Playing on {name}",
+  "@linkPlayingOn": {
+    "description": "Mornye Link: shown in the player while the paired desktop plays in the phone's place",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkDesktopDownloads": "Downloads on {name}",
+  "@linkDesktopDownloads": {
+    "description": "Mornye Link: heading of the paired desktop's download queue",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkHandoffStarted": "Playing on {name}",
+  "@linkHandoffStarted": {
+    "description": "Mornye Link: the paired desktop took over the phone's queue",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkHandoffSending": "Sending this song to {name}...",
+  "@linkHandoffSending": {
+    "description": "Mornye Link: the phone uploads the current song, which the paired desktop lacks, before it plays there",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkHandoffMissing": "Playing on {name}. Not found there: {titles}",
+  "@linkHandoffMissing": {
+    "description": "Mornye Link: the paired desktop took over the phone's queue but lacks some tracks, listed by title",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "titles": {
+        "type": "String"
+      }
+    }
+  },
+  "linkHandoffNotFound": "{name} has none of these tracks",
+  "@linkHandoffNotFound": {
+    "description": "Mornye Link: the paired desktop has none of the tracks in the phone's queue",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkHandoffNothingPlaying": "Nothing is playing on this phone",
+  "@linkHandoffNothingPlaying": {
+    "description": "Mornye Link: Play on desktop needs a track playing on the phone"
+  },
+  "linkContinueSkipped": "Not on this phone: {titles}",
+  "@linkContinueSkipped": {
+    "description": "Mornye Link: tracks of the desktop queue the phone could not play, listed by title",
+    "placeholders": {
+      "titles": {
+        "type": "String"
+      }
+    }
+  },
+  "linkContinueNotFound": "None of these tracks are on this phone",
+  "@linkContinueNotFound": {
+    "description": "Mornye Link: the phone has none of the tracks of the desktop queue"
+  },
+  "linkRequestFailed": "Could not reach {name}",
+  "@linkRequestFailed": {
+    "description": "Mornye Link: a request to the paired desktop failed",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkDownloadOnDesktop": "Download on {name}",
+  "@linkDownloadOnDesktop": {
+    "description": "Mornye Link: queues a track, album or link for download in the paired desktop app",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkDownloadQueuedOnDesktop": "{count, plural, =1{Queued 1 track on {name}} other{Queued {count} tracks on {name}}}",
+  "@linkDownloadQueuedOnDesktop": {
+    "description": "Mornye Link: the paired desktop queued downloads",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkOpenOnDesktop": "Open on {name}",
+  "@linkOpenOnDesktop": {
+    "description": "Mornye Link: opens a shared link in the paired desktop app",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkOpenedOnDesktop": "Opened on {name}",
+  "@linkOpenedOnDesktop": {
+    "description": "Mornye Link: the paired desktop opened the link",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkSendToDesktop": "Send to {name}",
+  "@linkSendToDesktop": {
+    "description": "Mornye Link: action on a shared link that offers to open or download it on the paired desktop",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkSaveToPhone": "Save to this phone",
+  "@linkSaveToPhone": {
+    "description": "Mornye Link: downloads songs of the paired desktop's library into the phone's download folder"
+  },
+  "linkSavingToPhone": "Saving to this phone",
+  "@linkSavingToPhone": {
+    "description": "Mornye Link: title of the progress dialog while desktop songs are saved to the phone"
+  },
+  "linkSavedToPhone": "{count, plural, =1{Saved 1 song to this phone} other{Saved {count} songs to this phone}}",
+  "@linkSavedToPhone": {
+    "description": "Mornye Link: desktop songs were saved to the phone",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "linkSaveToPhoneFailed": "{count, plural, =1{1 song could not be saved} other{{count} songs could not be saved}}",
+  "@linkSaveToPhoneFailed": {
+    "description": "Mornye Link: some desktop songs could not be saved to the phone",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "linkSaveToPhoneCancelled": "Saving stopped",
+  "@linkSaveToPhoneCancelled": {
+    "description": "Mornye Link: the listener cancelled saving desktop songs to the phone"
+  },
+  "linkTransferPhoneReceiving": "{count, plural, =1{Saving {title} from {name}} other{Saving {count} songs from {name}}}",
+  "@linkTransferPhoneReceiving": {
+    "description": "Mornye Link: snackbar and notification when the phone starts copying songs from the paired computer into its download folder; title is the song's title when there is one song",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "title": {
+        "type": "String"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkTransferPhoneOffered": "{count, plural, =1{{name} is sending {title} to this phone} other{{name} is sending {count} songs to this phone}}",
+  "@linkTransferPhoneOffered": {
+    "description": "Mornye Link: snackbar when the paired computer starts sending songs to the phone; title is the song's title when there is one song",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "title": {
+        "type": "String"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkTransferPhoneView": "View",
+  "@linkTransferPhoneView": {
+    "description": "Mornye Link: snackbar action that opens the list of song transfers"
+  },
+  "linkTransferPhoneWith": "Transfer with {name}",
+  "@linkTransferPhoneWith": {
+    "description": "Mornye Link: tooltip and sheet title of a playlist's button that sends its songs to the paired computer or saves the computer's songs to the phone",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkTransferPhoneNothing": "None of these songs are on {name}",
+  "@linkTransferPhoneNothing": {
+    "description": "Mornye Link: Save to this phone found none of the chosen songs in the paired computer's library",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkSendSending": "{count, plural, =1{Sending {title} to {name}} other{Sending {count} songs to {name}}}",
+  "@linkSendSending": {
+    "description": "Mornye Link: snackbar and notification when the phone starts copying its own songs to the paired computer; title is the song's title when there is one song",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "title": {
+        "type": "String"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkSendNothing": "None of these songs can be sent to {name}",
+  "@linkSendNothing": {
+    "description": "Mornye Link: none of the chosen songs is a file on this phone in a format the paired computer takes",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkDownloadStatusQueued": "Waiting",
+  "@linkDownloadStatusQueued": {
+    "description": "Mornye Link: a download on the paired desktop has not started"
+  },
+  "linkDownloadStatusDownloading": "Downloading",
+  "@linkDownloadStatusDownloading": {
+    "description": "Mornye Link: a download on the paired desktop is running"
+  },
+  "linkDownloadStatusDone": "Done",
+  "@linkDownloadStatusDone": {
+    "description": "Mornye Link: a download on the paired desktop finished"
+  },
+  "linkDownloadStatusFailed": "Failed",
+  "@linkDownloadStatusFailed": {
+    "description": "Mornye Link: a download on the paired desktop failed"
   },
   "announcementUnableToOpenLink": "Không thể mở liên kết. Vui lòng thử lại.",
   "@announcementUnableToOpenLink": {
@@ -6929,7 +7785,7 @@
   "@downloadAlbumArtistMetadataFull": {
     "description": "Status label when album-artist folder filtering uses full metadata"
   },
-  "trackConvertOriginal": "Nguyên bản (Original)",
+  "trackConvertOriginal": "Nguyên bản",
   "@trackConvertOriginal": {
     "description": "Label for keeping original bit depth or sample rate during conversion"
   },
@@ -7133,11 +7989,11 @@
   "@extensionVerificationHelpTitleWaiting": {
     "description": "Dialog title when verification is taking longer than expected"
   },
-  "extensionVerificationHelpMessageManual": "Mornye could not open the browser automatically. Open this link in your browser, or copy it manually.",
+  "extensionVerificationHelpMessageManual": "Mornye không thể tự động mở trình duyệt. Hãy mở liên kết này trong trình duyệt của bạn hoặc sao chép thủ công.",
   "@extensionVerificationHelpMessageManual": {
     "description": "Dialog message when automatic browser launch for verification fails"
   },
-  "extensionVerificationHelpMessageWaiting": "If the browser did not open, or verification finished but did not return to Mornye, open this link again or copy it manually.",
+  "extensionVerificationHelpMessageWaiting": "Nếu trình duyệt không mở hoặc quá trình xác minh đã xong nhưng không tự quay lại Mornye, hãy mở lại liên kết này hoặc sao chép thủ công.",
   "@extensionVerificationHelpMessageWaiting": {
     "description": "Dialog message when verification may need manual browser help"
   },
@@ -7149,7 +8005,7 @@
   "@extensionVerificationCopyLink": {
     "description": "Button to copy the extension verification URL"
   },
-  "extensionVerificationPasteCallback": "Paste callback",
+  "extensionVerificationPasteCallback": "Dán liên kết callback",
   "@extensionVerificationPasteCallback": {
     "description": "Button that completes extension verification from a callback URL in the clipboard"
   },
@@ -7252,14 +8108,42 @@
   "@mornyeFavorited": {
     "description": "Selected state of the compact favorite action"
   },
-  "autoMixDescription": "Chuyển bài mượt mà bằng cách đồng bộ nhịp (beat matching) và điều chỉnh tốc độ giữ nguyên cao độ. Tự động chuyển sang Crossfade nếu không khớp được nhịp.",
+  "autoMixDescription": "Chuyển bài mượt mà bằng cách đồng bộ nhịp và điều chỉnh tốc độ giữ nguyên cao độ. Tự động chuyển sang Crossfade nếu không khớp được nhịp.",
+  "gaplessPlayback": "Gapless playback",
+  "@gaplessPlayback": {
+    "description": "Playback settings switch that starts the next song the moment one ends"
+  },
+  "gaplessPlaybackDescription": "Start the next song the moment one ends, without silence between them. AutoMix replaces it while on.",
+  "@gaplessPlaybackDescription": {
+    "description": "Subtitle of the Gapless playback switch"
+  },
   "playerCoverStyle": "Ảnh bìa",
   "@playerCoverStyle": {
     "description": "Settings section choosing how the player shows cover art"
   },
+  "landscapeLyricsArtwork": "Album art beside lyrics",
+  "@landscapeLyricsArtwork": {
+    "description": "Switch choosing album artwork instead of track details alongside lyrics in landscape"
+  },
+  "landscapeLyricsArtworkDescription": "Show album art instead of track details in the Material landscape player",
+  "@landscapeLyricsArtworkDescription": {
+    "description": "Subtitle explaining the Material landscape lyrics layout setting"
+  },
+  "compactPlayer": "Compact player",
+  "@compactPlayer": {
+    "description": "Material player setting: idle lyrics shrink the player to a slim bar instead of hiding it"
+  },
+  "compactPlayerDescription": "When lyrics are left alone, shrink the player to a slim bar so the lyrics get more room. A tap brings the full player back",
+  "@compactPlayerDescription": {
+    "description": "Subtitle of the compact player setting"
+  },
   "playerCoverStyleDefault": "Mặc định",
   "@playerCoverStyleDefault": {
     "description": "Cover art style: artwork card above the controls"
+  },
+  "playerCoverStyleCard": "Card",
+  "@playerCoverStyleCard": {
+    "description": "Cover art style: artwork as a card above the controls (full screen is the default)"
   },
   "playerCoverStyleDefaultDescription": "Hiển thị ảnh bìa dạng thẻ nổi phía trên cụm nút điều khiển",
   "@playerCoverStyleDefaultDescription": {
@@ -7281,11 +8165,11 @@
   "@musicHapticsDescription": {
     "description": "Subtitle of the music haptics setting"
   },
-  "musicHapticsSensitivity": "Sensitivity",
+  "musicHapticsSensitivity": "Độ nhạy",
   "@musicHapticsSensitivity": {
     "description": "Slider for how many beats trigger music haptics; higher values vibrate on softer hits"
   },
-  "musicHapticsStrength": "Strength",
+  "musicHapticsStrength": "Cường độ",
   "@musicHapticsStrength": {
     "description": "Slider for how strongly the phone vibrates with music haptics"
   },
@@ -7296,11 +8180,78 @@
   "autoplayFromLibrary": "Tự động phát tiếp từ Thư viện",
   "autoplayDescription": "Tự động phát tiếp các bài hát tương tự trong Thư viện khi hết danh sách chờ.",
   "autoplayPersonalization": "Tự động phát cá nhân hóa",
-  "autoplayPersonalizationDescription": "Học hỏi từ những bài hát bạn thường nghe hoặc bỏ qua ngay trên thiết bị (hoàn toàn riêng tư). Nếu tắt, ứng dụng sẽ ngừng học thói quen và quay về chế độ tự động phát thông thường.",
+  "autoplayPersonalizationDescription": "Học từ các bài hát bạn nghe và bỏ qua, một cách riêng tư trên thiết bị này. Tắt tính năng này sẽ dừng việc học và khôi phục chế độ tự động phát thông thường.",
   "autoplayResetLearning": "Đặt lại dữ liệu học gợi ý nhạc",
   "autoplayResetLearningConfirmTitle": "Đặt lại dữ liệu học gợi ý nhạc?",
   "autoplayResetLearningConfirmMessage": "Tính năng Tự động phát sẽ xóa toàn bộ dữ liệu học được từ thói quen nghe và bỏ qua bài của bạn. Không thể hoàn tác.",
   "autoplayResetLearningConfirm": "Đặt lại",
+  "autoplayLearningProgress": "Ranking tunes to you after {minimum} Autoplay songs ({count} so far)",
+  "@autoplayLearningProgress": {
+    "description": "How many Autoplay songs the listener has kept or skipped before ranking may learn from them",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "format": "decimalPattern"
+      },
+      "minimum": {
+        "type": "int",
+        "format": "decimalPattern"
+      }
+    }
+  },
+  "autoplayLearningWaiting": "Standard ranking until you both keep and skip recent Autoplay songs",
+  "@autoplayLearningWaiting": {
+    "description": "Ranking cannot be checked yet because the latest Autoplay songs were all kept or all skipped"
+  },
+  "autoplayLearningTuned": "Tuned to you: {learned}% accurate on your latest songs (standard {starting}%)",
+  "@autoplayLearningTuned": {
+    "description": "Autoplay uses learned ranking, which orders the latest kept and skipped songs better than the standard ranking",
+    "placeholders": {
+      "learned": {
+        "type": "int"
+      },
+      "starting": {
+        "type": "int"
+      }
+    }
+  },
+  "autoplayLearningStandard": "Standard ranking: tuning was not more accurate on your latest songs ({learned}% vs {starting}%)",
+  "@autoplayLearningStandard": {
+    "description": "Autoplay keeps the standard ranking because the learned one did not order the latest songs better",
+    "placeholders": {
+      "learned": {
+        "type": "int"
+      },
+      "starting": {
+        "type": "int"
+      }
+    }
+  },
+  "songAnalysis": "Song analysis",
+  "@songAnalysis": {
+    "description": "Switch that analyzes how each Library song sounds, on the device, for Autoplay"
+  },
+  "songAnalysisDescription": "Learn how each Library song sounds, privately on this device, so Autoplay picks songs that sound like what you play and flow into each other.",
+  "songAnalysisOnlyWhileCharging": "Only while charging",
+  "songAnalysisOnlyWhileChargingDescription": "Analyze the Library only while this phone charges. The song playing is analyzed either way.",
+  "songAnalysisProgress": "{analyzed} of {total} songs analyzed",
+  "@songAnalysisProgress": {
+    "description": "How many Library songs song analysis has described so far",
+    "placeholders": {
+      "analyzed": {
+        "type": "int",
+        "format": "decimalPattern"
+      },
+      "total": {
+        "type": "int",
+        "format": "decimalPattern"
+      }
+    }
+  },
+  "songAnalysisClear": "Clear song analysis",
+  "songAnalysisClearConfirmTitle": "Clear song analysis?",
+  "songAnalysisClearConfirmMessage": "Autoplay forgets how your songs sound. While song analysis is on, your Library is analyzed again.",
+  "songAnalysisClearConfirm": "Clear",
   "profileTitle": "Hồ sơ",
   "profileSetUp": "Thiết lập hồ sơ của bạn",
   "profileEdit": "Sửa tên và ảnh đại diện",
@@ -7363,6 +8314,182 @@
   "@homeShortcuts": {
     "description": "Home section header for quick links to player tools"
   },
+  "homeMixesForYou": "Mixes for you",
+  "@homeMixesForYou": {
+    "description": "Home section header for daily mixes made from the user's own Library songs"
+  },
+  "homeMixFavoritesTitle": "Favorites Mix",
+  "@homeMixFavoritesTitle": {
+    "description": "Title of the daily mix of the user's most played songs and songs like them"
+  },
+  "homeMixGenreTitle": "{genre} Mix",
+  "@homeMixGenreTitle": {
+    "description": "Title of a daily mix of one genre from the user's Library, e.g. 'Hip-Hop Mix'",
+    "placeholders": {
+      "genre": {
+        "type": "String"
+      }
+    }
+  },
+  "homeMixArtistTitle": "{artist} Mix",
+  "@homeMixArtistTitle": {
+    "description": "Title of a daily mix built around one artist and similar songs from the user's Library",
+    "placeholders": {
+      "artist": {
+        "type": "String"
+      }
+    }
+  },
+  "homeMixDecadeTitle": "{decade}s Mix",
+  "@homeMixDecadeTitle": {
+    "description": "Title of a daily mix of songs released in one decade, e.g. '2010s Mix'; decade is the decade's first year",
+    "placeholders": {
+      "decade": {
+        "type": "String"
+      }
+    }
+  },
+  "homeMixFreshTitle": "New Additions Mix",
+  "@homeMixFreshTitle": {
+    "description": "Title of the daily mix of songs added to the user's Library in the last month"
+  },
+  "homeMixRediscoverTitle": "Rediscover Mix",
+  "@homeMixRediscoverTitle": {
+    "description": "Title of the daily mix of songs the user played often months ago but not lately"
+  },
+  "homeMixDiscoverTitle": "Discover Mix",
+  "@homeMixDiscoverTitle": {
+    "description": "Title of the daily mix of Library songs the user has never played, from their favorite genres"
+  },
+  "homeMixArtistsOne": "{first}",
+  "@homeMixArtistsOne": {
+    "description": "Subtitle of a daily mix with one main artist, naming that artist",
+    "placeholders": {
+      "first": {
+        "type": "String"
+      }
+    }
+  },
+  "homeMixArtistsTwo": "{first} and {second}",
+  "@homeMixArtistsTwo": {
+    "description": "Subtitle of a daily mix with two main artists, e.g. 'Tyler, The Creator and Frank Ocean'",
+    "placeholders": {
+      "first": {
+        "type": "String"
+      },
+      "second": {
+        "type": "String"
+      }
+    }
+  },
+  "homeMixArtistsMore": "{first}, {second} and more",
+  "@homeMixArtistsMore": {
+    "description": "Subtitle of a daily mix with three or more main artists, naming the first two, e.g. 'Tyler, The Creator, Frank Ocean and more'",
+    "placeholders": {
+      "first": {
+        "type": "String"
+      },
+      "second": {
+        "type": "String"
+      }
+    }
+  },
+  "homeMixGenreHipHop": "Hip-Hop",
+  "@homeMixGenreHipHop": {
+    "description": "Genre name used in a daily mix title such as 'Hip-Hop Mix'"
+  },
+  "homeMixGenreRnb": "R&B",
+  "@homeMixGenreRnb": {
+    "description": "Genre name used in a daily mix title such as 'R&B Mix'"
+  },
+  "homeMixGenrePop": "Pop",
+  "@homeMixGenrePop": {
+    "description": "Genre name used in a daily mix title such as 'Pop Mix'"
+  },
+  "homeMixGenreKpop": "K-Pop",
+  "@homeMixGenreKpop": {
+    "description": "Genre name (Korean pop) used in a daily mix title such as 'K-Pop Mix'"
+  },
+  "homeMixGenreJpop": "J-Pop",
+  "@homeMixGenreJpop": {
+    "description": "Genre name (Japanese pop, anime and related music) used in a daily mix title such as 'J-Pop Mix'"
+  },
+  "homeMixGenreRock": "Rock",
+  "@homeMixGenreRock": {
+    "description": "Genre name used in a daily mix title such as 'Rock Mix'"
+  },
+  "homeMixGenreMetal": "Metal",
+  "@homeMixGenreMetal": {
+    "description": "Genre name used in a daily mix title such as 'Metal Mix'"
+  },
+  "homeMixGenrePunk": "Punk",
+  "@homeMixGenrePunk": {
+    "description": "Genre name used in a daily mix title such as 'Punk Mix'"
+  },
+  "homeMixGenreIndie": "Indie & Alternative",
+  "@homeMixGenreIndie": {
+    "description": "Genre name used in a daily mix title such as 'Indie & Alternative Mix'"
+  },
+  "homeMixGenreElectronic": "Electronic",
+  "@homeMixGenreElectronic": {
+    "description": "Genre name used in a daily mix title such as 'Electronic Mix'"
+  },
+  "homeMixGenreChill": "Chill & Lo-Fi",
+  "@homeMixGenreChill": {
+    "description": "Genre name (ambient, lo-fi and relaxing music) used in a daily mix title such as 'Chill & Lo-Fi Mix'"
+  },
+  "homeMixGenreJazz": "Jazz",
+  "@homeMixGenreJazz": {
+    "description": "Genre name used in a daily mix title such as 'Jazz Mix'"
+  },
+  "homeMixGenreBlues": "Blues",
+  "@homeMixGenreBlues": {
+    "description": "Genre name used in a daily mix title such as 'Blues Mix'"
+  },
+  "homeMixGenreClassical": "Classical",
+  "@homeMixGenreClassical": {
+    "description": "Genre name used in a daily mix title such as 'Classical Mix'"
+  },
+  "homeMixGenreSoundtrack": "Soundtrack",
+  "@homeMixGenreSoundtrack": {
+    "description": "Genre name (film, game and TV music) used in a daily mix title such as 'Soundtrack Mix'"
+  },
+  "homeMixGenreCountry": "Country",
+  "@homeMixGenreCountry": {
+    "description": "Genre name used in a daily mix title such as 'Country Mix'"
+  },
+  "homeMixGenreFolk": "Folk & Acoustic",
+  "@homeMixGenreFolk": {
+    "description": "Genre name used in a daily mix title such as 'Folk & Acoustic Mix'"
+  },
+  "homeMixGenreLatin": "Latin",
+  "@homeMixGenreLatin": {
+    "description": "Genre name used in a daily mix title such as 'Latin Mix'"
+  },
+  "homeMixGenreReggae": "Reggae",
+  "@homeMixGenreReggae": {
+    "description": "Genre name used in a daily mix title such as 'Reggae Mix'"
+  },
+  "homeMixGenreAfro": "Afrobeats",
+  "@homeMixGenreAfro": {
+    "description": "Genre name used in a daily mix title such as 'Afrobeats Mix'"
+  },
+  "homeMixGenreGospel": "Gospel & Worship",
+  "@homeMixGenreGospel": {
+    "description": "Genre name (Christian music) used in a daily mix title such as 'Gospel & Worship Mix'"
+  },
+  "homeMixGenreDangdut": "Dangdut",
+  "@homeMixGenreDangdut": {
+    "description": "Genre name (Indonesian popular music) used in a daily mix title such as 'Dangdut Mix'"
+  },
+  "homeMixUpdatedDaily": "Made from your Library, updated daily",
+  "@homeMixUpdatedDaily": {
+    "description": "Note in a daily mix's header explaining where its songs come from"
+  },
+  "homeMixSaveAsPlaylist": "Save as playlist",
+  "@homeMixSaveAsPlaylist": {
+    "description": "Action that saves a daily mix's songs into one of the user's playlists"
+  },
   "artistUpcomingConcerts": "Buổi diễn sắp tới",
   "artistAllUpcomingConcerts": "Tất cả buổi diễn sắp tới",
   "artistNoUpcomingConcerts": "Chưa có buổi biểu diễn nào sắp tới.",
@@ -7409,7 +8536,7 @@
   "listeningStatsLoadError": "Không thể tải thống kê nghe nhạc",
   "listeningStatsClear": "Xóa thống kê nghe nhạc",
   "listeningStatsClearError": "Không thể xóa thống kê nghe nhạc. Vui lòng thử lại.",
-  "listeningStatsClearDescription": "Xóa toàn bộ thống kê nghe nhạc trên thiết bị này? Các tệp nhạc và playlist của bạn vẫn được giữ nguyên.",
+  "listeningStatsClearDescription": "Xóa toàn bộ thống kê nghe nhạc trên thiết bị này? Các tệp nhạc và danh sách phát của bạn vẫn được giữ nguyên.",
   "libraryArtistsEmpty": "Nghệ sĩ sẽ xuất hiện tại đây sau khi bạn tải nhạc hoặc quét thư viện trên máy.",
   "listeningRewind": "Tua lại",
   "listeningRewindDescription": "Sống lại những khoảnh khắc âm nhạc đáng nhớ trong các tuần và tháng gần đây",
@@ -7623,7 +8750,7 @@
   "weeklyReleases": "Phát hành mới",
   "weeklyReleasesDescription": "Album và đĩa đơn mới nhất từ các nghệ sĩ bạn yêu thích, được cập nhật thông qua các tiện ích metadata đã cài.",
   "weeklyReleasesEmpty": "Không tìm thấy bản phát hành nào có ngày cụ thể trong khoảng thời gian này. Hãy thêm nghệ sĩ yêu thích hoặc thử chọn khoảng thời gian dài hơn.",
-  "weeklyReleasesUnavailable": "Không thể kiểm tra một số nghệ sĩ (kết quả đã lưu trước đó vẫn được giữ lại). Một số nguồn có thể không cung cấp danh mục bài hát của nghệ sĩ hoặc ngày phát hành chính xác.",
+  "weeklyReleasesUnavailable": "Một số nghệ sĩ không thể kiểm tra được. Kết quả đã lưu của họ được giữ lại. Các nhà cung cấp có thể không cung cấp danh mục nghệ sĩ hoặc ngày phát hành chính xác.",
   "weeklyReleasesLoadError": "Không thể kiểm tra nhạc mới phát hành. Hãy kéo xuống để làm mới.",
   "motionArtworkDescription": "Phát lặp lại video ảnh bìa động do nguồn metadata cung cấp. Hãy tắt nếu muốn dùng ảnh bìa tĩnh và tiết kiệm pin hơn.",
   "libraryLoading": "Đang tải Thư viện…",
@@ -7638,15 +8765,15 @@
   "discordPresenceBuildUnavailable": "Bản dựng ứng dụng này không tích hợp sẵn Discord SDK.",
   "discordPresenceAndroidHelp": "Cài đặt ứng dụng Discord và đăng nhập trên điện thoại này. Hãy bật chia sẻ trạng thái hoạt động trong Discord. Không hỗ trợ khi dùng trình phát bên ngoài.",
   "discordPresenceIosHelp": "Hãy liên kết tài khoản của bạn thông qua Discord và cho phép chia sẻ hoạt động. Nếu quá trình cấp quyền không thành công, hãy nhấn để thực hiện liên kết lại.",
-  "discordPresenceDesktopHelp": "Keep the Discord desktop app running and signed in on this computer, and allow activity sharing in Discord.",
+  "discordPresenceDesktopHelp": "Duy trì ứng dụng Discord trên máy tính đang chạy và đã đăng nhập, đồng thời cho phép chia sẻ hoạt động trong Discord.",
   "discordPresenceDisconnect": "Ngắt kết nối và quên tài khoản",
   "autoMixSettingsTitle": "Hiệu ứng chuyển bài",
   "autoMixAutomaticDuration": "Thời lượng tự động",
   "autoMixDuration": "Thời lượng chuyển giao",
   "autoMixEffect": "Hiệu ứng chuyển bài",
   "autoMixEffectAuto": "Tự động",
-  "autoMixEffectCrossfade": "Crossfade",
-  "autoMixEffectMuffled": "Âm trầm đục",
+  "autoMixEffectCrossfade": "Chuyển tiếp mượt mà",
+  "autoMixEffectMuffled": "Làm đục âm thanh",
   "autoMixEffectEcho": "Tiếng vang",
   "autoMixEffectPitch": "Cao độ",
   "autoMixEffectCustom": "Tùy chỉnh",
@@ -7670,42 +8797,42 @@
   "appearanceCustomFontSubtitle": "Nhập tệp phông chữ TTF hoặc OTF (tối đa 10 MB) để thay thế phông chữ giao diện và hệ thống.",
   "appearanceCustomFontInvalid": "Không thể tải phông chữ này. Hãy chọn tệp TTF hoặc OTF hợp lệ có dung lượng tối đa 10 MB.",
   "appearanceCustomFontReset": "Dùng phông chữ của giao diện",
-  "equalizerTitle": "Equalizer",
-  "equalizerDescription": "EQ 5–31 dải tần, chỉnh âm sắc (Tone), Preamp và xử lý dải động (Dynamics)",
-  "equalizerEnable": "Bật Equalizer (EQ)",
-  "equalizerBands": "Dải tần (Bands)",
+  "equalizerTitle": "Bộ chỉnh âm",
+  "equalizerDescription": "Eq 5–31 dải tần, chỉnh âm sắc, tiền khuếch đại và xử lý dải động",
+  "equalizerEnable": "Bật bộ chỉnh âm",
+  "equalizerBands": "Dải tần",
   "equalizerTone": "Âm sắc & Stereo",
-  "equalizerPreamp": "Preamp",
+  "equalizerPreamp": "Tiền khuếch đại",
   "equalizerBass": "Bass",
   "equalizerTreble": "Treble",
-  "equalizerBalance": "Cân bằng kênh trái/phải (Balance)",
-  "equalizerDynamics": "Dải động (Dynamics)",
-  "equalizerHeadroom": "Headroom tự động",
-  "equalizerHeadroomDescription": "Giảm mức khuếch đại đầu vào (Input gain) để tạo khoảng trống (headroom) cho các dải tần được đẩy lên, tránh bị vỡ tiếng.",
-  "equalizerLimiter": "Bộ giới hạn đỉnh (Peak limiter)",
-  "equalizerLimiterDescription": "Giữ mức đỉnh (Peak) dưới −0.5 dBFS để hạn chế hiện tượng vỡ tiếng (clipping).",
-  "equalizerCompressor": "Compressor (Bộ nén dải động)",
+  "equalizerBalance": "Cân bằng kênh trái/phải",
+  "equalizerDynamics": "Dải động",
+  "equalizerHeadroom": "Tự động dự phòng mức tín hiệu",
+  "equalizerHeadroomDescription": "Giảm mức khuếch đại đầu vào để tạo khoảng trống cho các dải tần được đẩy lên, tránh bị vỡ tiếng.",
+  "equalizerLimiter": "Bộ giới hạn đỉnh",
+  "equalizerLimiterDescription": "Giữ mức đỉnh dưới −0.5 dBFS để hạn chế hiện tượng vỡ tiếng.",
+  "equalizerCompressor": "Bộ nén tín hiệu",
   "equalizerCompressorDescription": "Giảm sự chênh lệch âm lượng giữa những đoạn nhạc nhỏ và đoạn cao trào.",
-  "equalizerThreshold": "Threshold (Ngưỡng)",
-  "equalizerRatio": "Ratio (Tỷ lệ nén)",
-  "equalizerAttack": "Attack",
-  "equalizerRelease": "Release (Nhả nén)",
-  "equalizerPresets": "Cấu hình có sẵn (Presets)",
-  "equalizerSavePreset": "Lưu cấu hình (Preset)",
-  "equalizerPresetName": "Tên cấu hình (Preset)",
-  "equalizerImport": "Nhập cấu hình (Preset)",
-  "equalizerExport": "Chia sẻ cấu hình (Preset)",
-  "equalizerImportInvalid": "Choose a valid Mornye equalizer preset (JSON, up to 64 KB).",
-  "equalizerSaved": "Đã lưu cấu hình (Preset)",
+  "equalizerThreshold": "Ngưỡng tác động",
+  "equalizerRatio": "Tỷ lệ nén",
+  "equalizerAttack": "Thời gian kích hoạt",
+  "equalizerRelease": "Thời gian hồi phục",
+  "equalizerPresets": "Cấu hình có sẵn",
+  "equalizerSavePreset": "Lưu cấu hình",
+  "equalizerPresetName": "Tên cấu hình",
+  "equalizerImport": "Nhập cấu hình",
+  "equalizerExport": "Chia sẻ cấu hình",
+  "equalizerImportInvalid": "Chọn một tệp cấu hình bộ chỉnh âm Mornye hợp lệ (JSON, tối đa 64 KB).",
+  "equalizerSaved": "Đã lưu cấu hình",
   "equalizerResetTitle": "Đặt lại Equalizer về mặc định?",
-  "equalizerResetDescription": "Đặt lại đường cong EQ phẳng cùng cài đặt âm sắc và dải động mặc định. Các cấu hình (Preset) bạn đã lưu vẫn được giữ nguyên.",
+  "equalizerResetDescription": "Đặt lại đường cong Eq phẳng cùng cài đặt âm sắc và dải động mặc định. Các cấu hình bạn đã lưu vẫn được giữ nguyên.",
   "equalizerBypass": "Các chế độ Bit-perfect, Direct USB và Hi-Res độc quyền sẽ bỏ qua EQ. Hãy tắt Bit-perfect nếu muốn dùng EQ. Trình phát bên ngoài sẽ tự quản lý hiệu ứng riêng.",
   "equalizerCurve": "Đường cong EQ (ước tính)",
   "equalizerCurveDescription": "Đường cong biểu thị mức tăng giảm của từng dải tần; đáp tuyến thực tế phụ thuộc vào bộ xử lý đầu ra.",
   "equalizerEffectivePreamp": "Mức khuếch đại đầu vào sau Headroom",
-  "equalizerDeletePreset": "Xóa cấu hình (Preset)",
+  "equalizerDeletePreset": "Xóa cấu hình",
   "equalizerCustom": "Tùy chỉnh",
-  "equalizerManagePresets": "Quản lý cấu hình (Presets)",
+  "equalizerManagePresets": "Quản lý cấu hình",
   "lyricsShareTitle": "Chia sẻ lời bài hát",
   "@lyricsShareTitle": {
     "description": "Screen that turns selected lyric lines into an image for stories"
@@ -7738,7 +8865,7 @@
   },
   "audioInfoSource": "Tệp nguồn",
   "audioInfoSignal": "Tín hiệu",
-  "audioInfoLoudness": "Độ lớn âm lượng (Loudness)",
+  "audioInfoLoudness": "Độ lớn âm lượng",
   "audioInfoProcessing": "Đang xử lý",
   "audioInfoOutput": "Đầu ra",
   "audioInfoAnalysis": "Phân tích phổ tần số và mức tín hiệu",
@@ -7748,9 +8875,9 @@
   "audioInfoLossy": "Lossy",
   "audioInfoFormat": "Định dạng",
   "audioInfoCodec": "Codec",
-  "audioInfoSampleRate": "Tốc độ lấy mẫu",
-  "audioInfoBitDepth": "Bit depth",
-  "audioInfoChannels": "Số kênh (Channels)",
+  "audioInfoSampleRate": "Tần số lấy mẫu",
+  "audioInfoBitDepth": "Độ sâu Bit",
+  "audioInfoChannels": "Số kênh",
   "audioInfoChannelCount": "{count, plural, =1{Mono} =2{Stereo} other{{count} kênh}}",
   "@audioInfoChannelCount": {
     "placeholders": {
@@ -7759,10 +8886,10 @@
       }
     }
   },
-  "audioInfoBitrate": "Bitrate",
+  "audioInfoBitrate": "Tốc độ bit",
   "audioInfoDuration": "Thời lượng",
   "audioInfoFileSize": "Dung lượng tệp",
-  "audioInfoCompression": "Độ nén (Compression)",
+  "audioInfoCompression": "Độ nén",
   "audioInfoCompressionValue": "{percent}% so với dung lượng không nén",
   "@audioInfoCompressionValue": {
     "placeholders": {
@@ -7775,6 +8902,15 @@
   "audioInfoLocationLocal": "Bộ nhớ thiết bị",
   "audioInfoLocationShared": "Thư mục chia sẻ",
   "audioInfoLocationNetwork": "Ổ đĩa mạng (NAS)",
+  "audioInfoLocationLink": "{device} via Mornye Link",
+  "@audioInfoLocationLink": {
+    "description": "Audio info location of a song played from a paired computer or phone over Mornye Link; device is that device's name",
+    "placeholders": {
+      "device": {
+        "type": "String"
+      }
+    }
+  },
   "audioInfoPcmRate": "Tốc độ dữ liệu không nén",
   "audioInfoFrequencyRange": "Dải tần số",
   "audioInfoFrequencyRangeValue": "Tối đa {frequency} (Nyquist)",
@@ -7801,14 +8937,14 @@
   },
   "audioInfoOn": "Bật",
   "audioInfoOff": "Tắt",
-  "audioInfoBypassed": "Đã bỏ qua do dùng đầu ra trực tiếp (Direct output)",
+  "audioInfoBypassed": "Đã bị bỏ qua nhờ xuất âm thanh trực tiếp",
   "audioInfoPlayer": "Trình phát nhạc",
-  "audioInfoPlayerValue": "Mornye built-in player",
+  "audioInfoPlayerValue": "Trình phát tích hợp của Mornye",
   "audioInfoSignalPath": "Chia sẻ",
-  "audioInfoPathSystem": "Bộ trộn âm hệ thống (System mixer)",
-  "audioInfoPathDirect": "Direct USB, bỏ qua bộ trộn âm hệ thống (System mixer)",
+  "audioInfoPathSystem": "Bộ trộn âm hệ thống",
+  "audioInfoPathDirect": "Direct USB, bỏ qua bộ trộn âm hệ thống",
   "audioInfoPathExclusive": "Đầu ra độc quyền (Exclusive), bỏ qua bộ trộn âm hệ thống",
-  "audioInfoDecoder": "Bộ giải mã (Decoder)",
+  "audioInfoDecoder": "Bộ giải mã",
   "audioInfoHardware": "Phần cứng",
   "audioInfoSoftware": "Phần mềm",
   "audioInfoBands": "{count} dải tần",
@@ -7820,7 +8956,7 @@
     }
   },
   "audioInfoTempo": "Nhịp độ",
-  "audioInfoResampling": "Lấy mẫu lại (Resampling)",
+  "audioInfoResampling": "Tái lấy mẫu",
   "audioInfoResamplingNone": "Không, tần số lấy mẫu khớp nguyên bản",
   "audioInfoBitPerfect": "Bit-perfect",
   "audioInfoBitPerfectActive": "Có, mẫu âm thanh nguyên bản tuyệt đối",
@@ -7834,31 +8970,78 @@
       }
     }
   },
-  "audioInfoOutputRate": "Tần số lấy mẫu đầu ra (Output sample rate)",
+  "audioInfoOutputRate": "Tần số lấy mẫu đầu ra",
   "audioInfoOutputFormat": "Định dạng đầu ra",
+  "audioInfoBluetoothFormat": "Bluetooth codec format",
+  "@audioInfoBluetoothFormat": {
+    "description": "Negotiated Bluetooth transport format, separate from Android PCM mixer properties"
+  },
+  "audioInfoAndroidNotReported": "Not reported by Android",
+  "audioInfoSystemDefaultRate": "System default sample rate",
+  "audioInfoAndroidPcmRates": "Android PCM sample rates",
+  "audioInfoAndroidPcmFormats": "Android PCM formats",
+  "audioInfoSystemDefaultBuffer": "System default buffer",
   "audioInfoDeviceRates": "Tần số lấy mẫu thiết bị hỗ trợ",
   "audioInfoDeviceFormats": "Định dạng thiết bị hỗ trợ",
   "audioInfoAnyRate": "Bất kỳ",
-  "audioInfoBuffer": "Bộ đệm trộn âm (Mixer buffer)",
-  "audioInfoLatency": "Độ trễ đầu ra (Output latency)",
-  "audioInfoLowLatency": "Âm thanh độ trễ thấp (Low-latency)",
-  "audioInfoProAudio": "Âm thanh chuyên nghiệp (Pro audio)",
+  "audioInfoBuffer": "Bộ đệm trộn âm",
+  "audioInfoLatency": "Độ trễ đầu ra",
+  "audioInfoLowLatency": "Âm thanh độ trễ thấp",
+  "audioInfoProAudio": "Âm thanh chuyên nghiệp",
   "audioInfoSupported": "Được hỗ trợ",
   "audioInfoNotSupported": "Không hỗ trợ",
   "audioInfoSpatial": "Âm thanh không gian",
-  "audioInfoHeadTracking": "Theo dõi chuyển động đầu (Head tracking)",
+  "audioInfoHeadTracking": "Theo dõi chuyển động đầu",
   "audioInfoUnavailable": "Không khả dụng",
   "audioInfoFixedVolume": "Do thiết bị điều khiển",
   "audioInfoCopy": "Sao chép báo cáo",
   "audioInfoCopied": "Đã sao chép thông tin âm thanh",
   "lyricsTextSize": "Cỡ chữ lời bài hát",
   "lyricsTextPreview": "Theo dõi từng câu hát trong bản nhạc yêu thích của bạn",
+  "lyricsBlur": "Lyrics blur",
+  "@lyricsBlur": {
+    "description": "Mornye setting: how strongly lyric lines around the current one are blurred"
+  },
+  "lyricsBlurSubtitle": "How much the lines around the current one soften",
+  "lyricsBlurOff": "Off",
+  "@lyricsBlurOff": {
+    "description": "Value of the lyrics blur slider at zero"
+  },
+  "lyricsOffset": "Lyrics timing",
+  "@lyricsOffset": {
+    "description": "Setting: move synced lyrics earlier or later than playback"
+  },
+  "lyricsOffsetSubtitle": "Show synced lyrics later or earlier, for example when Bluetooth audio arrives late",
+  "lyricsOffsetNone": "In sync",
+  "@lyricsOffsetNone": {
+    "description": "Value of the lyrics timing slider at zero"
+  },
+  "lyricsOffsetLater": "{seconds} s later",
+  "@lyricsOffsetLater": {
+    "description": "Value of the lyrics timing slider when lyrics follow playback late",
+    "placeholders": {
+      "seconds": {
+        "type": "String",
+        "example": "0.3"
+      }
+    }
+  },
+  "lyricsOffsetEarlier": "{seconds} s earlier",
+  "@lyricsOffsetEarlier": {
+    "description": "Value of the lyrics timing slider when lyrics run ahead of playback",
+    "placeholders": {
+      "seconds": {
+        "type": "String",
+        "example": "0.3"
+      }
+    }
+  },
   "appCrashTitle": "Ứng dụng đã gặp sự cố dừng đột ngột ở lần chạy trước",
-  "appAnrTitle": "The app previously stopped responding",
+  "appAnrTitle": "Ứng dụng đã bị treo trước đó",
   "@appAnrTitle": {
     "description": "Title for an Android ANR report, distinct from a crash."
   },
-  "appAnrMessage": "A diagnostic report was saved. You can copy it and send it to the developer to help investigate.",
+  "appAnrMessage": "Báo cáo chẩn đoán đã được lưu. Bạn có thể sao chép và gửi cho nhà phát triển để hỗ trợ kiểm tra lỗi.",
   "@appAnrMessage": {
     "description": "Message shown for an Android process exit due to an ANR."
   },
@@ -7884,13 +9067,13 @@
       }
     }
   },
-  "desktopPlayerIdle": "Not playing",
+  "desktopPlayerIdle": "Không phát nhạc",
   "@desktopPlayerIdle": {
     "description": "Desktop player bar text when no track is loaded"
   },
-  "desktopVolumeUp": "Increase volume",
-  "desktopVolumeDown": "Decrease volume",
-  "desktopTableSortedAscending": "{column}, sorted ascending",
+  "desktopVolumeUp": "Tăng âm lượng",
+  "desktopVolumeDown": "Giảm âm lượng",
+  "desktopTableSortedAscending": "{column}, sắp xếp tăng dần",
   "@desktopTableSortedAscending": {
     "description": "Screen reader label of a song table column header that sorts the table A to Z",
     "placeholders": {
@@ -7899,7 +9082,7 @@
       }
     }
   },
-  "desktopTableSortedDescending": "{column}, sorted descending",
+  "desktopTableSortedDescending": "{column}, sắp xếp tăng dần",
   "@desktopTableSortedDescending": {
     "description": "Screen reader label of a song table column header that sorts the table Z to A",
     "placeholders": {
@@ -7908,19 +9091,19 @@
       }
     }
   },
-  "desktopMenuOpen": "Open",
+  "desktopMenuOpen": "Mở",
   "@desktopMenuOpen": {
     "description": "Context menu item that opens an album, artist, playlist or folder"
   },
-  "desktopMenuShowDetails": "Show details",
+  "desktopMenuShowDetails": "Xem chi tiết",
   "@desktopMenuShowDetails": {
     "description": "Context menu item that opens a track's metadata page"
   },
-  "desktopDropToImport": "Drop to add to your library",
+  "desktopDropToImport": "Thả để thêm vào thư viện",
   "@desktopDropToImport": {
     "description": "Overlay shown while music files or folders are dragged over the desktop window"
   },
-  "desktopDropImported": "Adding {count} {count, plural, =1{folder} other{folders}} to your library",
+  "desktopDropImported": "Đang thêm {count} {count, plural, =1{thư mục} other{thư mục}} vào thư viện của bạn",
   "@desktopDropImported": {
     "description": "Snackbar after dropping music onto the desktop window; the folders are scanned into the library",
     "placeholders": {
@@ -7929,38 +9112,38 @@
       }
     }
   },
-  "desktopDropNothingToImport": "Drop music files or folders to add them to your library",
+  "desktopDropNothingToImport": "Kéo thả tệp nhạc hoặc thư mục để thêm vào thư viện của bạn",
   "@desktopDropNothingToImport": {
     "description": "Snackbar when the dropped items contain no folders or audio files"
   },
-  "desktopAllPlaylists": "All Playlists",
+  "desktopAllPlaylists": "Tất cả danh sách phát",
   "@desktopAllPlaylists": {
     "description": "Desktop sidebar row that opens the list of every playlist"
   },
-  "desktopMenuSettings": "Settings…",
+  "desktopMenuSettings": "Cài đặt...",
   "@desktopMenuSettings": {
     "description": "macOS app menu item that opens Settings"
   },
-  "desktopMenuFile": "File",
-  "desktopMenuEdit": "Edit",
-  "desktopMenuView": "View",
-  "desktopWindowMode": "Window mode",
-  "desktopWindowed": "Windowed",
+  "desktopMenuFile": "Tệp",
+  "desktopMenuEdit": "Chỉnh sửa",
+  "desktopMenuView": "Xem",
+  "desktopWindowMode": "Chế độ cửa sổ",
+  "desktopWindowed": "Cửa sổ",
   "desktopWindowFullscreen": "Toàn màn hình",
-  "desktopWindowBorderless": "Borderless",
-  "desktopExitFullscreen": "Exit full screen",
-  "desktopMinimizeWindow": "Minimize window",
-  "desktopZoomWindow": "Maximize or restore window",
-  "desktopWindowModeUnavailable": "The window mode could not be changed. Try again after the current window transition finishes.",
-  "desktopMenuControls": "Controls",
-  "desktopMenuWindow": "Window",
-  "desktopMenuHelp": "Help",
-  "desktopMenuPlayPause": "Play/Pause",
-  "desktopMenuMiniPlayer": "Mini Player",
+  "desktopWindowBorderless": "Không viền",
+  "desktopExitFullscreen": "Thoát toàn màn hình",
+  "desktopMinimizeWindow": "Thu nhỏ cửa sổ",
+  "desktopZoomWindow": "Phóng to hoặc khôi phục cửa sổ",
+  "desktopWindowModeUnavailable": "Không thể thay đổi chế độ cửa sổ. Vui lòng thử lại sau khi hiệu ứng chuyển cửa sổ kết thúc.",
+  "desktopMenuControls": "Điều khiển",
+  "desktopMenuWindow": "Cửa sổ",
+  "desktopMenuHelp": "Trợ giúp",
+  "desktopMenuPlayPause": "Phát/Dừng",
+  "desktopMenuMiniPlayer": "Trình phát thu nhỏ",
   "@desktopMenuMiniPlayer": {
     "description": "Window menu item, player bar button and Keyboard Shortcuts row that shrink the window into a small player floating above other windows"
   },
-  "desktopMiniPlayerExpand": "Show Full Window",
+  "desktopMiniPlayerExpand": "Hiện thị toàn bộ cửa sổ",
   "@desktopMiniPlayerExpand": {
     "description": "Mini player button that returns the window to its full size"
   },
@@ -7968,15 +9151,15 @@
   "@desktopMenuRefresh": {
     "description": "View menu item and Keyboard Shortcuts row that reloads the page on screen (Home, Repo, statistics)"
   },
-  "desktopMenuProjectPage": "Project page",
+  "desktopMenuProjectPage": "Trang dự án",
   "@desktopMenuProjectPage": {
     "description": "Help menu item that opens the app's source repository"
   },
-  "desktopDownloadsShowAll": "Show all",
+  "desktopDownloadsShowAll": "Hiện thị tất cả",
   "@desktopDownloadsShowAll": {
     "description": "Button in the desktop downloads popover that opens the full download queue"
   },
-  "desktopDownloadsQueued": "Waiting",
+  "desktopDownloadsQueued": "Chờ",
   "@desktopDownloadsQueued": {
     "description": "Status of a download in the desktop downloads popover that has not started yet"
   },
@@ -7984,32 +9167,1126 @@
   "@desktopDownloadsCancel": {
     "description": "Tooltip of the button that cancels one download in the desktop downloads popover"
   },
-  "desktopScrollBack": "Scroll back",
+  "linkDesktopSettingsTitle": "Mornye on your phone",
+  "@linkDesktopSettingsTitle": {
+    "description": "Desktop Settings page that shares this computer's library with the Mornye phone app over the local network"
+  },
+  "linkDesktopSettingsSubtitle": "Stream your library and control playback from your phone",
+  "@linkDesktopSettingsSubtitle": {
+    "description": "Subtitle of the Mornye on your phone entry in desktop Settings"
+  },
+  "linkDesktopEnableTitle": "Share with Mornye on your phone",
+  "@linkDesktopEnableTitle": {
+    "description": "Switch that turns on the local server phones connect to"
+  },
+  "linkDesktopEnableSubtitle": "Your phone can browse, play and download through this computer on your local network",
+  "@linkDesktopEnableSubtitle": {
+    "description": "Subtitle of the switch that shares the library with phones, while it is off"
+  },
+  "linkDesktopStatusStarting": "Starting",
+  "@linkDesktopStatusStarting": {
+    "description": "Status of the phone link server while it starts"
+  },
+  "linkDesktopStatusRunning": "On, {count, plural, =0{no phone connected} =1{1 phone connected} other{{count} phones connected}}",
+  "@linkDesktopStatusRunning": {
+    "description": "Status of the phone link server while it runs, with the number of connected phones",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "linkDesktopStatusFailed": "Could not start: {error}",
+  "@linkDesktopStatusFailed": {
+    "description": "Status of the phone link server when it failed to start",
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "linkDesktopFirewallHint": "Your computer may ask whether Mornye can accept incoming network connections. Allow it so your phone can connect.",
+  "@linkDesktopFirewallHint": {
+    "description": "Hint shown while the phone link server is on, about the operating system firewall prompt"
+  },
+  "linkDesktopSectionComputer": "This computer",
+  "@linkDesktopSectionComputer": {
+    "description": "Section of the phone link settings about this computer's name and address"
+  },
+  "linkDesktopDeviceName": "Name",
+  "@linkDesktopDeviceName": {
+    "description": "Row and field label for the name phones see for this computer"
+  },
+  "linkDesktopDeviceNameHint": "Phones show this name when they find this computer",
+  "@linkDesktopDeviceNameHint": {
+    "description": "Helper text of the field that renames this computer for phones"
+  },
+  "linkDesktopAddress": "Address",
+  "@linkDesktopAddress": {
+    "description": "Row that shows the network addresses phones and Subsonic apps connect to"
+  },
+  "linkDesktopSecurityCode": "Security code",
+  "@linkDesktopSecurityCode": {
+    "description": "Row that shows the short certificate fingerprint phones compare while pairing"
+  },
+  "linkDesktopSecurityCodeHint": "Your phone shows the same code when it pairs",
+  "@linkDesktopSecurityCodeHint": {
+    "description": "Subtitle explaining the security code row"
+  },
+  "linkDesktopCatalogSongs": "{count, plural, =1{1 song shared} other{{count} songs shared}}",
+  "@linkDesktopCatalogSongs": {
+    "description": "How many Library songs phones can see",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "linkDesktopSectionPhones": "Phones",
+  "@linkDesktopSectionPhones": {
+    "description": "Section of the phone link settings that lists paired phones"
+  },
+  "linkDesktopPairPhone": "Pair a phone",
+  "@linkDesktopPairPhone": {
+    "description": "Row and dialog title that shows a code to pair a phone with this computer"
+  },
+  "linkDesktopPairPhoneSubtitle": "Show a code to enter on your phone",
+  "@linkDesktopPairPhoneSubtitle": {
+    "description": "Subtitle of the Pair a phone row"
+  },
+  "linkDesktopNoDevices": "No phones paired yet",
+  "@linkDesktopNoDevices": {
+    "description": "Shown in the paired phones list when it is empty"
+  },
+  "linkDesktopDeviceConnected": "Connected",
+  "@linkDesktopDeviceConnected": {
+    "description": "Status of a paired phone that is connected now"
+  },
+  "linkDesktopDeviceLastSeen": "Last seen {date}",
+  "@linkDesktopDeviceLastSeen": {
+    "description": "Status of a paired phone that is not connected",
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "linkDesktopDeviceNeverSeen": "Not connected yet",
+  "@linkDesktopDeviceNeverSeen": {
+    "description": "Status of a paired device that never connected"
+  },
+  "linkDesktopSubsonicApp": "Subsonic app",
+  "@linkDesktopSubsonicApp": {
+    "description": "Label of a paired device that is a third-party Subsonic app"
+  },
+  "linkDesktopRevoke": "Remove",
+  "@linkDesktopRevoke": {
+    "description": "Tooltip and confirm button that removes a paired phone or Subsonic app"
+  },
+  "linkDesktopRevokeTitle": "Remove {name}?",
+  "@linkDesktopRevokeTitle": {
+    "description": "Title of the dialog that confirms removing a paired device",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkDesktopRevokeMessage": "It has to pair again before it can connect to this computer.",
+  "@linkDesktopRevokeMessage": {
+    "description": "Message of the dialog that confirms removing a paired device"
+  },
+  "linkDesktopRevoked": "{name} removed",
+  "@linkDesktopRevoked": {
+    "description": "Snackbar after removing a paired device",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkDesktopSectionOtherApps": "Other apps",
+  "@linkDesktopSectionOtherApps": {
+    "description": "Section of the phone link settings for third-party Subsonic apps"
+  },
+  "linkDesktopAddSubsonicApp": "Add another Subsonic app",
+  "@linkDesktopAddSubsonicApp": {
+    "description": "Row and dialog title that creates a key for a third-party Subsonic app"
+  },
+  "linkDesktopAddSubsonicAppSubtitle": "Create a key for a Subsonic player on another device",
+  "@linkDesktopAddSubsonicAppSubtitle": {
+    "description": "Subtitle of the Add another Subsonic app row"
+  },
+  "linkDesktopAppName": "App name",
+  "@linkDesktopAppName": {
+    "description": "Field label for the name of a third-party Subsonic app"
+  },
+  "linkDesktopCreateKey": "Create key",
+  "@linkDesktopCreateKey": {
+    "description": "Button that creates a key for a third-party Subsonic app"
+  },
+  "linkDesktopAppKeyTitle": "Connect {name}",
+  "@linkDesktopAppKeyTitle": {
+    "description": "Title of the dialog that shows the details for a new Subsonic app key",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkDesktopAppKeyMessage": "Enter these details in the app. The key is shown only now.",
+  "@linkDesktopAppKeyMessage": {
+    "description": "Message of the dialog that shows a new Subsonic app key"
+  },
+  "linkDesktopServerAddress": "Server address",
+  "@linkDesktopServerAddress": {
+    "description": "Label of the server address a Subsonic app connects to"
+  },
+  "linkDesktopUsername": "Username",
+  "@linkDesktopUsername": {
+    "description": "Label of the username a Subsonic app uses"
+  },
+  "linkDesktopApiKey": "Password or API key",
+  "@linkDesktopApiKey": {
+    "description": "Label of the key a Subsonic app uses as its password or API key"
+  },
+  "linkDesktopCopy": "Copy {label}",
+  "@linkDesktopCopy": {
+    "description": "Tooltip of a copy button next to a value",
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "linkDesktopPairInstructions": "Open Mornye on your phone, choose this computer and enter this code.",
+  "@linkDesktopPairInstructions": {
+    "description": "Instructions in the pairing dialog above the code"
+  },
+  "linkDesktopPairCheckCode": "Check that your phone shows security code {code}.",
+  "@linkDesktopPairCheckCode": {
+    "description": "Line in the pairing dialog asking to compare the short certificate fingerprint",
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
+  "linkDesktopPairExpires": "The code expires in {time}",
+  "@linkDesktopPairExpires": {
+    "description": "Countdown in the pairing dialog, as minutes and seconds",
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "linkDesktopPaired": "Paired with {name}",
+  "@linkDesktopPaired": {
+    "description": "Snackbar after a phone paired",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkDesktopPairExpired": "The code expired. Pair again to get a new one.",
+  "@linkDesktopPairExpired": {
+    "description": "Snackbar when the pairing code expired"
+  },
+  "linkDesktopPairAttempts": "Too many wrong codes. Pair again to get a new one.",
+  "@linkDesktopPairAttempts": {
+    "description": "Snackbar when pairing ended after too many wrong codes"
+  },
+  "linkDesktopPairFailed": "Could not start pairing",
+  "@linkDesktopPairFailed": {
+    "description": "Snackbar when the pairing code could not be created"
+  },
+  "linkDesktopDevicesTitle": "Phones",
+  "@linkDesktopDevicesTitle": {
+    "description": "Tooltip of the player bar button and title of its popover that list connected phones"
+  },
+  "linkDesktopPhoneNothingPlaying": "Nothing playing",
+  "@linkDesktopPhoneNothingPlaying": {
+    "description": "Shown for a connected phone that plays nothing"
+  },
+  "linkDesktopContinueOnPhone": "Continue on phone",
+  "@linkDesktopContinueOnPhone": {
+    "description": "Button that moves the desktop queue and position to a phone and pauses the desktop"
+  },
+  "linkDesktopOpenOnPhone": "Open a link on phone",
+  "@linkDesktopOpenOnPhone": {
+    "description": "Button that sends a link to a phone to open"
+  },
+  "linkDesktopOpenLinkTitle": "Open a link on {name}",
+  "@linkDesktopOpenLinkTitle": {
+    "description": "Title of the dialog that sends a link to a phone",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkDesktopOpenLinkLabel": "Link",
+  "@linkDesktopOpenLinkLabel": {
+    "description": "Field label for the link to open on a phone"
+  },
+  "linkDesktopOpen": "Open",
+  "@linkDesktopOpen": {
+    "description": "Button that sends the link to the phone"
+  },
+  "linkDesktopSentToPhone": "Sent to {name}",
+  "@linkDesktopSentToPhone": {
+    "description": "Snackbar after something was sent to a phone",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkDesktopNotDelivered": "The phone did not receive it",
+  "@linkDesktopNotDelivered": {
+    "description": "Snackbar when a message could not reach a phone"
+  },
+  "linkDesktopNothingToContinue": "Nothing is playing on this computer",
+  "@linkDesktopNothingToContinue": {
+    "description": "Snackbar when Continue on phone is used without a current song"
+  },
+  "linkTransferDesktopSendTo": "Send to {name}",
+  "@linkTransferDesktopSendTo": {
+    "description": "Mornye Link desktop: song menu action that copies this computer's songs to the connected phone {name}",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkTransferDesktopSaveHere": "Save to this computer",
+  "@linkTransferDesktopSaveHere": {
+    "description": "Mornye Link desktop: song menu action that copies a connected phone's songs into this computer's download folder"
+  },
+  "linkTransferDesktopSendingSong": "Sending \"{title}\" to {name}",
+  "@linkTransferDesktopSendingSong": {
+    "description": "Mornye Link desktop: snackbar when one song starts copying to the phone {name}",
+    "placeholders": {
+      "title": {
+        "type": "String"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkTransferDesktopSendingSongs": "{count, plural, =1{Sending 1 song to {name}} other{Sending {count} songs to {name}}}",
+  "@linkTransferDesktopSendingSongs": {
+    "description": "Mornye Link desktop: snackbar when songs start copying to the phone {name}",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkTransferDesktopReceivingSong": "Receiving \"{title}\" from {name}",
+  "@linkTransferDesktopReceivingSong": {
+    "description": "Mornye Link desktop: snackbar when one song of the phone {name} starts copying to this computer",
+    "placeholders": {
+      "title": {
+        "type": "String"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkTransferDesktopReceivingSongs": "{count, plural, =1{Receiving 1 song from {name}} other{Receiving {count} songs from {name}}}",
+  "@linkTransferDesktopReceivingSongs": {
+    "description": "Mornye Link desktop: snackbar when songs of the phone {name} start copying to this computer",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkTransferDesktopView": "View",
+  "@linkTransferDesktopView": {
+    "description": "Mornye Link desktop: snackbar action that opens the list of song transfers"
+  },
+  "linkTransferDesktopNothingToSend": "None of these songs can be sent right now",
+  "@linkTransferDesktopNothingToSend": {
+    "description": "Mornye Link desktop: snackbar when Send to phone finds no song file on this computer to send"
+  },
+  "linkTransferDesktopNothingToSave": "None of these songs can be saved right now",
+  "@linkTransferDesktopNothingToSave": {
+    "description": "Mornye Link desktop: snackbar when Save to this computer finds no song of a connected phone"
+  },
+  "desktopScrollBack": "Cuộn trở lại",
   "@desktopScrollBack": {
     "description": "Tooltip of the desktop button that scrolls a horizontal shelf of albums or artists back"
   },
-  "desktopScrollForward": "Scroll forward",
+  "desktopScrollForward": "Cuộn lên trước",
   "@desktopScrollForward": {
     "description": "Tooltip of the desktop button that scrolls a horizontal shelf of albums or artists forward"
   },
-  "settingsKeyboardShortcuts": "Keyboard Shortcuts",
+  "settingsKeyboardShortcuts": "Phím tắt",
   "@settingsKeyboardShortcuts": {
     "description": "Desktop Settings page that lists the app's keyboard shortcuts"
   },
-  "settingsKeyboardShortcutsSubtitle": "Keys for playback, navigation and panels",
+  "settingsKeyboardShortcutsSubtitle": "Các phím dùng cho phát lại, điều hướng và bảng điều khiển",
   "@settingsKeyboardShortcutsSubtitle": {
     "description": "Subtitle of the Keyboard Shortcuts entry in desktop Settings"
   },
-  "desktopShortcutsNavigation": "Navigation",
+  "desktopShortcutsNavigation": "Điều hướng",
   "@desktopShortcutsNavigation": {
     "description": "Keyboard Shortcuts section for moving between pages"
   },
-  "desktopShortcutDismiss": "Close dialog or page",
+  "desktopShortcutDismiss": "Đóng hộp thoại hoặc trang",
   "@desktopShortcutDismiss": {
     "description": "Keyboard Shortcuts row for Escape, which leaves a text field or closes the top dialog or page"
   },
-  "desktopShortcutToggleSidebar": "Show or hide sidebar",
+  "desktopShortcutToggleSidebar": "Hiển thị hoặc ẩn thanh bên",
   "@desktopShortcutToggleSidebar": {
     "description": "Keyboard Shortcuts row for the shortcut that collapses or expands the desktop sidebar"
+  },
+  "linkSettingsTitle": "Mornye on your computer",
+  "@linkSettingsTitle": {
+    "description": "Phone Settings entry that pairs the phone with the Mornye desktop app on the local network"
+  },
+  "linkSettingsSubtitle": "Play and control your computer's library",
+  "@linkSettingsSubtitle": {
+    "description": "Subtitle of the Mornye on your computer entry in phone Settings"
+  },
+  "linkPageTitle": "Computers",
+  "@linkPageTitle": {
+    "description": "Title of the page listing computers running Mornye that the phone can pair with; kept short for the large title"
+  },
+  "linkPageDescription": "Pair with Mornye on your computer to play its library on this phone and control what it plays. Both devices need to be on the same network.",
+  "@linkPageDescription": {
+    "description": "Introduction at the top of the computers page"
+  },
+  "linkPairedSection": "Paired computers",
+  "@linkPairedSection": {
+    "description": "Section header for computers this phone is paired with"
+  },
+  "linkPhoneSection": "This phone",
+  "@linkPhoneSection": {
+    "description": "Section header for what this phone shares with and how it follows its paired computer"
+  },
+  "linkShareSongsTitle": "Show songs on the computer",
+  "@linkShareSongsTitle": {
+    "description": "Switch title: this phone's songs appear in the paired computer's Library"
+  },
+  "linkShareSongsSubtitle": "Songs on this phone appear in the computer's Library and play there while this phone is connected",
+  "@linkShareSongsSubtitle": {
+    "description": "Switch subtitle for showing this phone's songs on the computer"
+  },
+  "linkFollowDesktopTitle": "Follow the computer's playback",
+  "@linkFollowDesktopTitle": {
+    "description": "Switch title: the phone's player shows the computer when the computer starts playing"
+  },
+  "linkFollowDesktopSubtitle": "When the computer starts playing, this phone shows and controls it",
+  "@linkFollowDesktopSubtitle": {
+    "description": "Switch subtitle for following the computer's playback"
+  },
+  "linkNearbySection": "On this network",
+  "@linkNearbySection": {
+    "description": "Section header for computers running Mornye found on the local network"
+  },
+  "linkSearching": "Looking for computers...",
+  "@linkSearching": {
+    "description": "Row shown while the phone searches the local network for computers"
+  },
+  "linkNoneFoundTitle": "No computers found",
+  "@linkNoneFoundTitle": {
+    "description": "Row shown when the phone is not searching and found no computer"
+  },
+  "linkNoneFound": "Open Mornye on your computer and turn on Share with Mornye on your phone in its settings.",
+  "@linkNoneFound": {
+    "description": "Hint under the search row when no computer was found yet; Share with Mornye on your phone is the name of the desktop setting"
+  },
+  "linkAddManually": "Add by address",
+  "@linkAddManually": {
+    "description": "Button and dialog title for pairing with a computer by typing its address and port"
+  },
+  "linkManualHost": "Computer address",
+  "@linkManualHost": {
+    "description": "Field label for the computer's IP address or host name"
+  },
+  "linkManualPort": "Port",
+  "@linkManualPort": {
+    "description": "Field label for the network port of the Mornye desktop server"
+  },
+  "linkManualMessage": "Mornye on your computer shows its address and port where you turn on sharing.",
+  "@linkManualMessage": {
+    "description": "Explains where to find the address and port to type"
+  },
+  "linkContinue": "Continue",
+  "@linkContinue": {
+    "description": "Dialog action that continues to the PIN step after typing an address"
+  },
+  "linkStateConnected": "Connected",
+  "@linkStateConnected": {
+    "description": "Status of the paired computer that is connected"
+  },
+  "linkStateConnecting": "Connecting...",
+  "@linkStateConnecting": {
+    "description": "Status of the paired computer while the phone connects to it"
+  },
+  "linkStateDisconnected": "Not connected",
+  "@linkStateDisconnected": {
+    "description": "Status of the paired computer when it cannot be reached"
+  },
+  "linkStateInactive": "Tap to use this computer",
+  "@linkStateInactive": {
+    "description": "Status of a paired computer other than the one in use; tapping it makes it the one in use"
+  },
+  "linkActive": "In use",
+  "@linkActive": {
+    "description": "Label next to the paired computer the phone currently uses, shown when several are paired"
+  },
+  "linkForget": "Forget",
+  "@linkForget": {
+    "description": "Action that unpairs a computer from this phone"
+  },
+  "linkForgetTitle": "Forget {name}?",
+  "@linkForgetTitle": {
+    "description": "Title of the dialog confirming that a paired computer is forgotten",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkForgetMessage": "This phone stops connecting to it. You can pair again later.",
+  "@linkForgetMessage": {
+    "description": "Explanation in the forget computer dialog"
+  },
+  "linkForgetRemoveLibrary": "Also remove its music from Library",
+  "@linkForgetRemoveLibrary": {
+    "description": "Switch in the forget computer dialog that also removes the computer's network connection and Library source"
+  },
+  "linkPinTitle": "Pair with {name}",
+  "@linkPinTitle": {
+    "description": "Title of the dialog asking for the pairing PIN",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkPinMessage": "Enter the 6-digit PIN shown on your computer.",
+  "@linkPinMessage": {
+    "description": "Instruction in the pairing PIN dialog"
+  },
+  "linkPinField": "PIN",
+  "@linkPinField": {
+    "description": "Label of the pairing PIN field"
+  },
+  "linkPinCode": "Your computer shows the code {code} next to the PIN. Pair only if it matches.",
+  "@linkPinCode": {
+    "description": "Security check in the PIN dialog; the placeholder is 8 hexadecimal characters of the computer's certificate fingerprint, grouped as 'ab12 cd34'",
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
+  "linkPinNotOpen": "Pairing is not open yet. Start pairing in Mornye on your computer to show a PIN.",
+  "@linkPinNotOpen": {
+    "description": "Note in the PIN dialog when the computer reports that no pairing window is open"
+  },
+  "linkPair": "Pair",
+  "@linkPair": {
+    "description": "Action that sends the PIN to pair with the computer"
+  },
+  "linkPaired": "Paired with {name}. Its music is being added to Library.",
+  "@linkPaired": {
+    "description": "Message after pairing succeeded",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkPairAgain": "Pair again",
+  "@linkPairAgain": {
+    "description": "Action that repeats pairing with a computer that no longer accepts this phone"
+  },
+  "linkTransfersTitle": "Transfers",
+  "@linkTransfersTitle": {
+    "description": "Mornye Link: title of the list of songs copied between this device and a linked phone or computer, and of the rows that open it"
+  },
+  "linkTransfersInProgress": "In progress",
+  "@linkTransfersInProgress": {
+    "description": "Section of the Transfers list for transfers that are running or waiting their turn"
+  },
+  "linkTransfersFinished": "Finished",
+  "@linkTransfersFinished": {
+    "description": "Section of the Transfers list for transfers that stopped: done, stopped by someone or failed"
+  },
+  "linkTransfersClearFinished": "Clear finished",
+  "@linkTransfersClearFinished": {
+    "description": "Action that removes the finished transfers from the Transfers list; the copied songs stay"
+  },
+  "linkTransfersEmptyTitle": "No transfers yet",
+  "@linkTransfersEmptyTitle": {
+    "description": "Title of the empty Transfers list, also the status of the row that opens it while there is none"
+  },
+  "linkTransfersEmptyMessage": "Send or save songs from a song's menu, an album or a selection.",
+  "@linkTransfersEmptyMessage": {
+    "description": "Hint under the empty Transfers list naming where a transfer starts (the Send to and Save to this device actions)"
+  },
+  "linkTransfersSending": "Sending {count, plural, =1{1 song} other{{count} songs}} to {name}",
+  "@linkTransfersSending": {
+    "description": "Title of a running or waiting transfer that copies this device's songs to a linked device",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkTransfersReceiving": "Receiving {count, plural, =1{1 song} other{{count} songs}} from {name}",
+  "@linkTransfersReceiving": {
+    "description": "Title of a running or waiting transfer that copies a linked device's songs to this device",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkTransfersSendingSong": "Sending {title} to {name}",
+  "@linkTransfersSendingSong": {
+    "description": "Title of a running or waiting transfer of one song from this device; the placeholder is the song's title",
+    "placeholders": {
+      "title": {
+        "type": "String"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkTransfersReceivingSong": "Receiving {title} from {name}",
+  "@linkTransfersReceivingSong": {
+    "description": "Title of a running or waiting transfer of one song to this device; the placeholder is the song's title",
+    "placeholders": {
+      "title": {
+        "type": "String"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkTransfersSongsTo": "{count, plural, =1{1 song} other{{count} songs}} to {name}",
+  "@linkTransfersSongsTo": {
+    "description": "Title of a finished transfer from this device to a linked one; its outcome shows below",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkTransfersSongsFrom": "{count, plural, =1{1 song} other{{count} songs}} from {name}",
+  "@linkTransfersSongsFrom": {
+    "description": "Title of a finished transfer from a linked device to this one; its outcome shows below",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkTransfersSongTo": "{title} to {name}",
+  "@linkTransfersSongTo": {
+    "description": "Title of a finished transfer of one song from this device; the placeholder is the song's title",
+    "placeholders": {
+      "title": {
+        "type": "String"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkTransfersSongFrom": "{title} from {name}",
+  "@linkTransfersSongFrom": {
+    "description": "Title of a finished transfer of one song to this device; the placeholder is the song's title",
+    "placeholders": {
+      "title": {
+        "type": "String"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkTransfersPosition": "{position} of {total}",
+  "@linkTransfersPosition": {
+    "description": "Which song of a running transfer is being copied, for example '3 of 12'",
+    "placeholders": {
+      "position": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "linkTransfersPercent": "{percent}%",
+  "@linkTransfersPercent": {
+    "description": "How much of a transfer or song has been copied, as a percentage",
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "linkTransfersWaiting": "Waiting",
+  "@linkTransfersWaiting": {
+    "description": "Status of a transfer or song that waits for the ones before it"
+  },
+  "linkTransfersSavedCount": "{count, plural, other{{count} saved}}",
+  "@linkTransfersSavedCount": {
+    "description": "Outcome of a finished transfer: how many songs were copied",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "linkTransfersAlreadyThereCount": "{count, plural, other{{count} already there}}",
+  "@linkTransfersAlreadyThereCount": {
+    "description": "Outcome of a finished transfer: how many songs the receiving device already had, so they were not copied again",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "linkTransfersFailedCount": "{count, plural, other{{count} failed}}",
+  "@linkTransfersFailedCount": {
+    "description": "Outcome of a finished transfer: how many songs could not be copied",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "linkTransfersStopped": "{done, plural, =0{Stopped} other{Stopped after {done} of {total}}}",
+  "@linkTransfersStopped": {
+    "description": "Outcome of a transfer someone stopped, with how many of its songs were finished",
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "linkTransfersReasonDisconnected": "Connection lost",
+  "@linkTransfersReasonDisconnected": {
+    "description": "Why a transfer failed: the devices lost their connection"
+  },
+  "linkTransfersReasonNoFolder": "Choose a download folder first",
+  "@linkTransfersReasonNoFolder": {
+    "description": "Why a transfer to this device failed: no download folder is set"
+  },
+  "linkTransfersReasonNoFolderPeer": "{name} has no download folder",
+  "@linkTransfersReasonNoFolderPeer": {
+    "description": "Why a transfer to the linked device failed: that device has no download folder set",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkTransfersReasonBusy": "Busy, try again later",
+  "@linkTransfersReasonBusy": {
+    "description": "Why a transfer failed: the receiving device could not take it now"
+  },
+  "linkTransfersReasonError": "Something went wrong",
+  "@linkTransfersReasonError": {
+    "description": "Why a transfer failed, when there is no more specific reason"
+  },
+  "linkTransfersSongSaved": "Saved",
+  "@linkTransfersSongSaved": {
+    "description": "State of one song in a transfer: it was copied"
+  },
+  "linkTransfersSongAlreadyThere": "Already there",
+  "@linkTransfersSongAlreadyThere": {
+    "description": "State of one song in a transfer: the receiving device already had it"
+  },
+  "linkTransfersSongFailed": "Failed",
+  "@linkTransfersSongFailed": {
+    "description": "State of one song in a transfer: it could not be copied"
+  },
+  "linkTransfersSongCopying": "Copying",
+  "@linkTransfersSongCopying": {
+    "description": "State of the song a transfer copies right now"
+  },
+  "linkTransfersSongNotCopied": "Not copied",
+  "@linkTransfersSongNotCopied": {
+    "description": "State of a song a stopped or failed transfer did not reach"
+  },
+  "linkTransfersStop": "Stop transfer",
+  "@linkTransfersStop": {
+    "description": "Tooltip of the button that stops a running or waiting transfer; songs already copied stay"
+  },
+  "linkTransfersActiveCount": "{count, plural, =1{1 transfer} other{{count} transfers}}",
+  "@linkTransfersActiveCount": {
+    "description": "Status of the row that opens the Transfers list while several transfers run, followed by their progress",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "linkTransfersFinishedCount": "{count, plural, =1{1 transfer finished} other{{count} transfers finished}}",
+  "@linkTransfersFinishedCount": {
+    "description": "Status of the row that opens the Transfers list when none runs: how many finished since the app opened",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "linkErrorBadPin": "That PIN is not right. Check the PIN on your computer and try again.",
+  "@linkErrorBadPin": {
+    "description": "Pairing error when the PIN is wrong"
+  },
+  "linkErrorPairingClosed": "Pairing is not open on your computer. Start pairing there, then try again.",
+  "@linkErrorPairingClosed": {
+    "description": "Pairing error when the computer has no pairing window open"
+  },
+  "linkErrorTooManyAttempts": "Too many attempts. Wait a moment, then try again.",
+  "@linkErrorTooManyAttempts": {
+    "description": "Pairing error when the computer rate limits pairing attempts"
+  },
+  "linkErrorCertificateTitle": "Computer not verified",
+  "@linkErrorCertificateTitle": {
+    "description": "Title of the warning shown when the computer's certificate does not match what it reported"
+  },
+  "linkErrorCertificate": "The computer's security certificate does not match what it reported. Someone on this network may be intercepting the connection, so pairing stopped.",
+  "@linkErrorCertificate": {
+    "description": "Warning shown when the certificate seen during the connection differs from the computer's reported fingerprint"
+  },
+  "linkErrorIncompatible": "This computer runs a Mornye version that cannot pair with this phone. Update Mornye on both devices.",
+  "@linkErrorIncompatible": {
+    "description": "Pairing error when the computer is not a compatible Mornye desktop"
+  },
+  "linkErrorUnreachable": "The computer could not be reached. Check that Mornye is open on it and that both devices are on the same network.",
+  "@linkErrorUnreachable": {
+    "description": "Pairing error when the computer cannot be reached"
+  },
+  "linkErrorTimeout": "The computer did not answer in time. Try again.",
+  "@linkErrorTimeout": {
+    "description": "Pairing error when the computer does not answer"
+  },
+  "linkErrorInvalidAddress": "Enter a valid address and port, such as 192.168.1.20 and 47710.",
+  "@linkErrorInvalidAddress": {
+    "description": "Error for an address or port that cannot be used"
+  },
+  "linkErrorFailed": "Pairing failed. Try again.",
+  "@linkErrorFailed": {
+    "description": "Generic pairing error"
+  },
+  "linkLocalNetworkTitle": "Local network access needed",
+  "@linkLocalNetworkTitle": {
+    "description": "Title of the notice shown when the phone is not allowed to use the local network"
+  },
+  "linkLocalNetworkMessage": "Mornye needs local network access to find your computer and connect to it.",
+  "@linkLocalNetworkMessage": {
+    "description": "Explains why local network access is needed"
+  },
+  "linkLocalNetworkAllow": "Allow access",
+  "@linkLocalNetworkAllow": {
+    "description": "Button that asks for local network access again"
+  },
+  "linkWifiOffTitle": "Not on Wi-Fi",
+  "@linkWifiOffTitle": {
+    "description": "Title of the notice shown when the phone is not connected to Wi-Fi or Ethernet"
+  },
+  "linkWifiOffMessage": "Connect this phone to the same Wi-Fi network as your computer.",
+  "@linkWifiOffMessage": {
+    "description": "Explains that the phone must join the computer's Wi-Fi network"
+  },
+  "linkIssueUnauthorized": "{name} no longer accepts this phone. Pair again to reconnect.",
+  "@linkIssueUnauthorized": {
+    "description": "Notice when the paired computer refuses the phone's key",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkIssueCertificate": "{name} presented a different security certificate. Pair again only if you reinstalled or reset Mornye on that computer.",
+  "@linkIssueCertificate": {
+    "description": "Warning when a paired computer's certificate changed",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkIssueIncompatible": "Update Mornye on this phone and on {name} to connect.",
+  "@linkIssueIncompatible": {
+    "description": "Notice when the paired computer speaks another protocol version",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "playlistEditOrder": "Edit order",
+  "@playlistEditOrder": {
+    "description": "Playlist header action and page title for reordering the playlist's tracks"
+  },
+  "playlistEditOrderDescription": "Drag a track by its handle, or touch and hold it, to move it.",
+  "@playlistEditOrderDescription": {
+    "description": "Explanation at the top of the playlist reorder page"
+  },
+  "playlistEditOrderSaved": "Playlist order saved",
+  "collectionOrderSaved": "Song order saved",
+  "collectionOrderChanged": "This collection changed while editing. Please reorder it again.",
+  "collectionOrderSaveFailed": "Could not save the song order. Try again.",
+  "@playlistEditOrderSaved": {
+    "description": "Snackbar after saving a new playlist track order"
+  },
+  "playlistCreateEmpty": "Empty playlist",
+  "@playlistCreateEmpty": {
+    "description": "Create playlist option that starts with no tracks"
+  },
+  "playlistCreateEmptySubtitle": "Add tracks later from any list",
+  "@playlistCreateEmptySubtitle": {
+    "description": "Subtitle of the empty playlist option"
+  },
+  "playlistCreateFromFolder": "From a folder",
+  "@playlistCreateFromFolder": {
+    "description": "Create playlist option that uses the tracks of one Library folder"
+  },
+  "playlistCreateFromFolderSubtitle": "Every track in one folder of your Library",
+  "@playlistCreateFromFolderSubtitle": {
+    "description": "Subtitle of the create playlist from folder option"
+  },
+  "playlistImportFile": "Import playlist file",
+  "@playlistImportFile": {
+    "description": "Create playlist option that imports an M3U or CSV file"
+  },
+  "playlistImportFileSubtitle": "M3U, M3U8 or CSV, matched to files on this device",
+  "@playlistImportFileSubtitle": {
+    "description": "Subtitle of the import playlist file option"
+  },
+  "playlistFolderPickerTitle": "Choose a folder",
+  "@playlistFolderPickerTitle": {
+    "description": "Title of the sheet listing Library folders to turn into a playlist"
+  },
+  "playlistFolderPickerEmptyTitle": "No folders yet",
+  "@playlistFolderPickerEmptyTitle": {
+    "description": "Title of the empty folder picker when no Library folder has tracks"
+  },
+  "playlistFolderPickerEmpty": "No scanned tracks yet. Add a Library folder and scan it first.",
+  "@playlistFolderPickerEmpty": {
+    "description": "Shown when no Library folder has tracks to create a playlist from"
+  },
+  "playlistCreatedWithTracks": "Created {name} with {count, plural, =1{1 track} other{{count} tracks}}",
+  "@playlistCreatedWithTracks": {
+    "description": "Snackbar after creating a playlist from a folder",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "playlistImportResult": "Imported {count, plural, =1{1 track} other{{count} tracks}} into {name}, {matched} matched to files on this device",
+  "@playlistImportResult": {
+    "description": "Snackbar after importing a playlist file; matched counts tracks linked to a local file",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "name": {
+        "type": "String"
+      },
+      "matched": {
+        "type": "int"
+      }
+    }
+  },
+  "playlistImportNoTracks": "No tracks found in this file",
+  "@playlistImportNoTracks": {
+    "description": "Snackbar when an imported playlist file has no entries"
+  },
+  "playlistImportFailed": "Could not read this playlist file",
+  "@playlistImportFailed": {
+    "description": "Snackbar when reading or parsing an imported playlist file fails"
+  },
+  "recognizeTitle": "Identify Song",
+  "@recognizeTitle": {
+    "description": "Title of the screen that identifies a song playing nearby through the microphone (keep short)"
+  },
+  "recognizeSearchTooltip": "Identify a song playing nearby",
+  "@recognizeSearchTooltip": {
+    "description": "Tooltip of the microphone button in the search field that opens song identification"
+  },
+  "recognizeIdleTitle": "What's playing?",
+  "@recognizeIdleTitle": {
+    "description": "Headline of the song identification screen before listening starts"
+  },
+  "recognizeIdleMessage": "Hold your device near the music, then tap to listen.",
+  "@recognizeIdleMessage": {
+    "description": "Hint under the headline before listening starts"
+  },
+  "recognizeStartListening": "Start listening",
+  "@recognizeStartListening": {
+    "description": "Accessible name of the large microphone button that starts listening"
+  },
+  "recognizeServiceNote": "A sound fingerprint is sent to Shazam to find the song. The recording stays on your device.",
+  "@recognizeServiceNote": {
+    "description": "Privacy note on the identification screen; Shazam is the recognition service and must not be translated"
+  },
+  "recognizeListening": "Listening…",
+  "@recognizeListening": {
+    "description": "Status while the microphone listens for a song"
+  },
+  "recognizeListeningMessage": "Keep the music playing near your device.",
+  "@recognizeListeningMessage": {
+    "description": "Hint while the microphone listens"
+  },
+  "recognizeSearching": "Searching…",
+  "@recognizeSearching": {
+    "description": "Status after listening stops while the last answer is on its way"
+  },
+  "recognizeNoMatchTitle": "No match found",
+  "@recognizeNoMatchTitle": {
+    "description": "Title when the recognition service did not know the song"
+  },
+  "recognizeNoMatchMessage": "Try again closer to the music, or when it's louder.",
+  "@recognizeNoMatchMessage": {
+    "description": "Hint when no song was found"
+  },
+  "recognizeTryAgain": "Try Again",
+  "@recognizeTryAgain": {
+    "description": "Button that starts listening again after no match or an error"
+  },
+  "recognizeQuietTitle": "Couldn't hear the music",
+  "@recognizeQuietTitle": {
+    "description": "Title when the microphone captured too little or too quiet audio to identify"
+  },
+  "recognizeQuietMessage": "Move closer to the music and try again.",
+  "@recognizeQuietMessage": {
+    "description": "Hint when the captured audio was too quiet or short"
+  },
+  "recognizeNetworkTitle": "No connection",
+  "@recognizeNetworkTitle": {
+    "description": "Title when identification failed because the network is unreachable"
+  },
+  "recognizeNetworkMessage": "Check your internet connection and try again.",
+  "@recognizeNetworkMessage": {
+    "description": "Hint when identification failed because of the network"
+  },
+  "recognizeRateLimitedTitle": "Too many tries",
+  "@recognizeRateLimitedTitle": {
+    "description": "Title when the recognition service asked to slow down"
+  },
+  "recognizeRateLimitedMessage": "Wait a minute, then try again.",
+  "@recognizeRateLimitedMessage": {
+    "description": "Hint when the recognition service rate limited the app"
+  },
+  "recognizeUnavailableTitle": "Identification unavailable",
+  "@recognizeUnavailableTitle": {
+    "description": "Title when the recognition service failed or answered unexpectedly"
+  },
+  "recognizeUnavailableMessage": "The recognition service didn't answer. Try again later.",
+  "@recognizeUnavailableMessage": {
+    "description": "Hint when the recognition service failed"
+  },
+  "recognizeMicrophoneTitle": "Microphone unavailable",
+  "@recognizeMicrophoneTitle": {
+    "description": "Title when the microphone could not record"
+  },
+  "recognizeMicrophoneMessage": "No microphone is available, or another app is using it.",
+  "@recognizeMicrophoneMessage": {
+    "description": "Hint when the microphone could not record"
+  },
+  "recognizePermissionTitle": "Microphone access is off",
+  "@recognizePermissionTitle": {
+    "description": "Title when microphone permission was denied"
+  },
+  "recognizePermissionMessage": "Mornye uses the microphone only while you identify a song.",
+  "@recognizePermissionMessage": {
+    "description": "Explanation when microphone permission was denied"
+  },
+  "recognizePermissionAllow": "Allow Microphone",
+  "@recognizePermissionAllow": {
+    "description": "Button that asks for microphone permission again"
+  },
+  "recognizePlay": "Play in Mornye",
+  "@recognizePlay": {
+    "description": "Button that plays the identified song from the downloads or library"
+  },
+  "recognizeSearch": "Search in Mornye",
+  "@recognizeSearch": {
+    "description": "Button that searches for the identified song when it is not in the library"
+  },
+  "recognizeOpenInShazam": "Open in Shazam",
+  "@recognizeOpenInShazam": {
+    "description": "Button that opens the identified song on the Shazam website; Shazam must not be translated"
+  },
+  "recognizeListenAgain": "Listen Again",
+  "@recognizeListenAgain": {
+    "description": "Button that starts a new identification from a result"
+  },
+  "recognizeHistory": "Recently Identified",
+  "@recognizeHistory": {
+    "description": "Section header for the list of songs identified before"
+  },
+  "recognizeClearHistory": "Clear identified songs",
+  "@recognizeClearHistory": {
+    "description": "Tooltip of the header button that clears the identification history"
+  },
+  "recognizeClearHistoryMessage": "Remove every song from this list?",
+  "@recognizeClearHistoryMessage": {
+    "description": "Confirmation message before clearing the identification history"
+  },
+  "collectionSuggestionsTitle": "Suggested songs",
+  "@collectionSuggestionsTitle": {
+    "description": "Heading of the songs suggested below an album, single or playlist"
+  },
+  "collectionSuggestionsRelated": "Based on the songs above",
+  "@collectionSuggestionsRelated": {
+    "description": "Line under the suggestions heading when an extension suggested songs like the album's or playlist's"
+  },
+  "collectionSuggestionsByArtists": "More from these artists",
+  "@collectionSuggestionsByArtists": {
+    "description": "Line under the suggestions heading when the songs were found by searching the album's or playlist's artists"
+  },
+  "collectionSuggestionsRefresh": "Suggest other songs",
+  "@collectionSuggestionsRefresh": {
+    "description": "Tooltip of the button that loads other suggestions"
+  },
+  "collectionSuggestionsAddHere": "Add to this playlist",
+  "@collectionSuggestionsAddHere": {
+    "description": "Tooltip of the button that adds a suggested song to the user's playlist shown above"
   }
 }
