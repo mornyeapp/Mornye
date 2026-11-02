@@ -415,6 +415,17 @@ abstract final class LibrarySchema {
     }
   }
 
+  static Future<void> onOpen(Database db) async {
+    await migrateIosContainerPaths(db);
+    if (Platform.isWindows) {
+      await sqlite.repairWindowsPathKeysOnOpen(
+        db,
+        'library',
+        'library_path_keys',
+      );
+    }
+  }
+
   static Future<void> migrateIosContainerPaths(Database db) async {
     if (!Platform.isIOS) return;
     final documents = await getApplicationDocumentsDirectory();
