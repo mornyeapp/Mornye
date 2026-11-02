@@ -77,33 +77,51 @@ class PlaybackResumeStore {
   Future<void> clear() => database.delete(_table);
 
   /// Relinks active and dismissed queues atomically without changing their order
-  /// or playback position. JSON stays inside SQLite, including large queues.
+  /// or playback position. Chunked reads also cover large Android queues, without
+  /// depending on optional JSON functions in the device's SQLite build.
   Future<void> relocateSource(String previous, String replacement) async {
     await database.transaction((txn) async {
       for (final table in ['playback_session', _table]) {
-        await txn.rawUpdate(
-          '''
-          UPDATE $table SET media_json = (
-            SELECT json_group_array(json(item)) FROM (
-              SELECT CASE WHEN json_extract(value, '\$.source') = ?
-                THEN json_set(value, '\$.source', ?) ELSE value END AS item
-              FROM json_each($table.media_json) ORDER BY CAST(key AS INTEGER)
-            )
-          ) WHERE EXISTS (
-            SELECT 1 FROM json_each($table.media_json)
-            WHERE json_extract(value, '\$.source') = ?
-          )
-        ''',
-          [previous, replacement, previous],
+        final matches = await txn.query(
+          table,
+          columns: ['id'],
+          where: 'instr(media_json, ?) > 0',
+          whereArgs: [jsonEncode(previous)],
         );
+        if (matches.isEmpty) continue;
+        final stored = await readJsonTextRow(
+          txn,
+          table: table,
+          jsonColumn: 'media_json',
+          columns: const [],
+        );
+        final decoded = stored?.json();
+        if (decoded is! List<Object?>) {
+          throw const FormatException('Unreadable playback queue');
+        }
+        var changed = false;
+        final updated = decoded.map((item) {
+          if (item is Map<String, dynamic> && item['source'] == previous) {
+            changed = true;
+            return {...item, 'source': replacement};
+          }
+          return item;
+        }).toList();
+        if (changed) {
+          await txn.update(table, {
+            'media_json': jsonEncode(updated),
+          }, where: 'id = 1');
+        }
       }
-      await txn.rawUpdate(
-        '''
-        UPDATE $_table SET preview_json = json_set(preview_json, '\$.source', ?)
-        WHERE json_extract(preview_json, '\$.source') = ?
-      ''',
-        [replacement, previous],
-      );
+      final rows = await txn.query(_table, columns: ['preview_json']);
+      if (rows.isNotEmpty) {
+        final preview = jsonDecode(rows.first['preview_json'] as String);
+        if (preview is Map<String, dynamic> && preview['source'] == previous) {
+          await txn.update(_table, {
+            'preview_json': jsonEncode({...preview, 'source': replacement}),
+          }, where: 'id = 1');
+        }
+      }
     });
   }
 }
