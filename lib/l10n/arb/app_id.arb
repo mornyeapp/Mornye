@@ -1,10 +1,10 @@
 {
-  "extensionsUnsecuredStorage": "Use unsecured extension storage",
-  "extensionsUnsecuredStorageDescription": "Run extensions without a Linux keyring. The key is saved locally, so anyone with access to your app files can read extension credentials. Off uses the system keyring.",
-  "extensionsStorageKeyringRequired": "Existing extension data needs its original key. Unlock the system keyring once, then enable unsecured storage again. Your data has been preserved.",
-  "extensionsStorageKeyConflict": "The local and system keyring keys differ. Storage was not changed and both keys were preserved.",
-  "extensionsStorageKeyringUnavailable": "The system keyring is unavailable or locked. Start or unlock it before switching to secure storage. Your local key has been preserved.",
-  "linkFileActionOn": "{action} on {name}",
+  "extensionsUnsecuredStorage": "Gunakan ekstensi penyimpanan tak aman",
+  "extensionsUnsecuredStorageDescription": "Jalankan ekstensi tanpa keyring Linux. Kunci disimpan di perangkat, siapa saja yang akses aplikasi dapat baca kredensial ekstensi. Matikan untuk pakai keyring sistem.",
+  "extensionsStorageKeyringRequired": "Data ekstensi yang ada butuh kunci aslinya. Buka keyring sistem sekali saja, lalu hidupkan Gunakan ekstensi penyimpanan tak aman. Datamu tetap tersimpan.",
+  "extensionsStorageKeyConflict": "Kunci keyring lokal dan sistem berbeda. Penyimpanan tidak diubah dan kunci tetap tersimpan.",
+  "extensionsStorageKeyringUnavailable": "Keyring sistem tak tersedia atau dikunci. Mulai atau buka dulu sebelum ganti ke penyimpanan aman. Kunci lokal kamu tetap tersimpan.",
+  "linkFileActionOn": "{action} pada {name}",
   "@linkFileActionOn": {
     "description": "File operation on a named linked computer",
     "placeholders": {
@@ -16,7 +16,7 @@
       }
     }
   },
-  "linkFileActionsDescription": "Changes apply to music files on {name}. Accepted work continues if this phone disconnects.",
+  "linkFileActionsDescription": "Perubahan disimpan ke file lagu {name}.",
   "@linkFileActionsDescription": {
     "placeholders": {
       "name": {
@@ -24,7 +24,7 @@
       }
     }
   },
-  "linkFileDeleteConfirm": "Delete {count} {count, plural, =1{music file} other{music files}} from {name}? This removes the files from that computer's storage.",
+  "linkFileDeleteConfirm": "Hapus {count} {count, plural, =1{file musik} other{file musik}} dari {name}? Akan menghapus file dari penyimpanan tersebut.",
   "@linkFileDeleteConfirm": {
     "placeholders": {
       "count": {
@@ -35,11 +35,11 @@
       }
     }
   },
-  "linkFileJobs": "File changes",
+  "linkFileJobs": "Perubahan file",
   "@linkFileJobs": {
     "description": "Title of the list of edits, conversions and deletions the phone started on the linked computer's music files"
   },
-  "linkFileJobsSubtitle": "Edits, conversions and deletions on {name}",
+  "linkFileJobsSubtitle": "Edit, perubahan, dan penghapusan {name}",
   "@linkFileJobsSubtitle": {
     "placeholders": {
       "name": {
@@ -47,11 +47,11 @@
       }
     }
   },
-  "linkFileJobsEmpty": "No file changes yet",
-  "linkFileJobsEmptyMessage": "Edits, conversions and deletions you start on the computer's songs from this phone appear here.",
-  "linkDesktopFileJobsSubtitle": "Changes requested from your phones",
-  "linkDesktopFileJobsEmptyMessage": "Edits, conversions and deletions requested from your phones appear here.",
-  "linkFileJobRequestedBy": "From {name}",
+  "linkFileJobsEmpty": "Belum pernah diubah",
+  "linkFileJobsEmptyMessage": "Edit, perubahan, dan penghapusan yang kamu minta ke lagu di komputer muncul di sini.",
+  "linkDesktopFileJobsSubtitle": "Ponselmu meminta perubahan",
+  "linkDesktopFileJobsEmptyMessage": "Permintaan edit, perubahan, dan penghapusan dari ponsel muncul di sini.",
+  "linkFileJobRequestedBy": "Dari {name}",
   "@linkFileJobRequestedBy": {
     "placeholders": {
       "name": {
@@ -59,13 +59,13 @@
       }
     }
   },
-  "linkFileJobsView": "View",
+  "linkFileJobsView": "Lihat",
   "@linkFileJobsView": {
     "description": "Snackbar action that opens the file changes list to see which songs failed"
   },
-  "linkFileJobsUnsupported": "Update Mornye on your computer to manage its music files from this phone.",
-  "linkFileSelectionOneDevice": "Select songs from one linked computer at a time (up to 100 songs).",
-  "linkFileJobProgress": "{finished} of {total} {total, plural, =1{song} other{songs}}",
+  "linkFileJobsUnsupported": "Update Mornye versi PC untuk mulai mengatur file lagunya dari ponsel ini.",
+  "linkFileSelectionOneDevice": "Pilih lagu dari satu PC terhubung dalam satu waktu (hingga 100 lagu).",
+  "linkFileJobProgress": "{finished} dari {total} {total, plural, =1{lagu} other{lagu}}",
   "@linkFileJobProgress": {
     "placeholders": {
       "finished": {
@@ -76,7 +76,7 @@
       }
     }
   },
-  "linkFileJobFailedCount": "{count} failed",
+  "linkFileJobFailedCount": "{count} gagal",
   "@linkFileJobFailedCount": {
     "placeholders": {
       "count": {
@@ -84,7 +84,7 @@
       }
     }
   },
-  "linkFileJobFinished": "{action} finished on {name}",
+  "linkFileJobFinished": "{action} selesai di {name}",
   "@linkFileJobFinished": {
     "placeholders": {
       "action": {
@@ -95,15 +95,15 @@
       }
     }
   },
-  "linkFileDeleting": "Deleting...",
-  "linkFileReading": "Reading tags...",
-  "linkFileSavingCover": "Saving cover art...",
-  "linkFileCancelHint": "Stop after the current song",
-  "linkFileJobCancelled": "Stopped",
-  "linkFileJobQueued": "Queued",
-  "linkFileJobCompleted": "Finished",
-  "linkFileChanged": "The file changed since the preview. Preview it again before saving.",
-  "linkFileOperationFailed": "The operation could not be completed. Check the computer's logs for details.",
+  "linkFileDeleting": "Menghapus...",
+  "linkFileReading": "Mengakses metadata...",
+  "linkFileSavingCover": "Menyimpan foto cover...",
+  "linkFileCancelHint": "Berhenti setelah lagu sekarang",
+  "linkFileJobCancelled": "Dihentikan",
+  "linkFileJobQueued": "Diantrekan",
+  "linkFileJobCompleted": "Selesai",
+  "linkFileChanged": "File sudah pernah diubah. Buka kembali sebelum menyimpan.",
+  "linkFileOperationFailed": "Tindakan tak dapat diselesaikan. Periksa log komputer untuk detailnya.",
   "trackBpm": "BPM",
   "trackMood": "Mood",
   "subsonicAddToLibrary": "Tambahkan server ke Koleksi",
