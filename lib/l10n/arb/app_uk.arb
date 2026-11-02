@@ -1140,47 +1140,47 @@
   "@permissionNearbyDevices": {
     "description": "Nearby devices permission type label; use Android's name for this permission"
   },
-  "whatsNewLinkNearbyAllow": "Allow nearby devices",
+  "whatsNewLinkNearbyAllow": "Дозволити пристрої поблизу",
   "@whatsNewLinkNearbyAllow": {
     "description": "Main button on the Nearby devices page of the What's New tour that asks for Android's Nearby devices permission"
   },
-  "whatsNewLinkNearbyGranted": "Nearby devices allowed",
+  "whatsNewLinkNearbyGranted": "Пристрої поблизу дозволено",
   "@whatsNewLinkNearbyGranted": {
     "description": "Shown on the Nearby devices page of the What's New tour after the Nearby devices permission is granted"
   },
-  "whatsNewNearbyTitle": "Nearby devices",
+  "whatsNewNearbyTitle": "Пристрої поблизу",
   "@whatsNewNearbyTitle": {
     "description": "Title of the What's New page that asks for Android's Nearby devices permission; use Android's name for this permission"
   },
-  "whatsNewNearbyDesc": "Android now asks before an app can reach other devices on your network. Mornye needs this for:",
+  "whatsNewNearbyDesc": "Тепер Android запитує дозвіл перед тим, як додаток зможе отримати доступ до інших пристроїв у вашій мережі. Програмі Mornye це потрібно для:",
   "@whatsNewNearbyDesc": {
     "description": "Description on the Nearby devices page of the What's New tour, followed by a list of uses"
   },
-  "whatsNewNearbyLinkTitle": "Finding your computer",
+  "whatsNewNearbyLinkTitle": "Пошук вашого комп’ютера",
   "@whatsNewNearbyLinkTitle": {
     "description": "Use of the Nearby devices permission: Mornye Link finds the computer"
   },
-  "whatsNewNearbyLinkBody": "Mornye Link looks for your computer on the same Wi-Fi and stays connected to it.",
+  "whatsNewNearbyLinkBody": "Mornye Link шукає ваш комп’ютер у тій самій мережі Wi-Fi та підтримує постійний зв’язок із ним.",
   "@whatsNewNearbyLinkBody": {
     "description": "Explains how Mornye Link uses the Nearby devices permission"
   },
-  "whatsNewNearbyStorageTitle": "Network storage",
+  "whatsNewNearbyStorageTitle": "Мережеве сховище",
   "@whatsNewNearbyStorageTitle": {
     "description": "Use of the Nearby devices permission: SMB and WebDAV servers at home"
   },
-  "whatsNewNearbyStorageBody": "Play music from a NAS or a server at home over SMB or WebDAV.",
+  "whatsNewNearbyStorageBody": "Відтворюйте музику з NAS або домашнього сервера через SMB чи WebDAV.",
   "@whatsNewNearbyStorageBody": {
     "description": "Explains how network storage uses the Nearby devices permission"
   },
-  "whatsNewNearbyPrivateTitle": "Only your own devices",
+  "whatsNewNearbyPrivateTitle": "Лише власні пристрої",
   "@whatsNewNearbyPrivateTitle": {
     "description": "Reassurance on the Nearby devices page of the What's New tour"
   },
-  "whatsNewNearbyPrivateBody": "Mornye uses it only to reach devices on your network, never to find where you are.",
+  "whatsNewNearbyPrivateBody": "Mornye використовує цей дозвіл лише для зв’язку з пристроями у вашій мережі й ніколи не визначає ваше місцеположення.",
   "@whatsNewNearbyPrivateBody": {
     "description": "Explains that the Nearby devices permission is not used for location"
   },
-  "whatsNewNearbyRefused": "Not allowed. Mornye Link and network storage stay off until you allow Nearby devices for Mornye in Android settings.",
+  "whatsNewNearbyRefused": "Доступ заборонено. Mornye Link та мережеве сховище залишатимуться вимкненими, доки ви не дозволите доступ до пристроїв поблизу для Mornye в налаштуваннях Android.",
   "@whatsNewNearbyRefused": {
     "description": "Shown on the Nearby devices page of the What's New tour after the permission is refused"
   },
@@ -1649,11 +1649,11 @@
   "@searchPlaylists": {
     "description": "Search result category - playlists"
   },
-  "searchShowAll": "Show all",
+  "searchShowAll": "Показати все",
   "@searchShowAll": {
     "description": "Button of a search result section on wide screens that shows every result of that kind"
   },
-  "searchShowAllCategory": "Show all {category}",
+  "searchShowAllCategory": "Показати все: {category}",
   "@searchShowAllCategory": {
     "description": "Screen reader label of the Show all button of a search result section",
     "placeholders": {
@@ -2610,12 +2610,12 @@
   "@downloadAutoConvert": {
     "description": "Toggle for automatic post-download audio conversion"
   },
-  "downloadAutoConvertAllFormatsSubtitle": "Convert completed downloads or limit FLAC bit depth and sample rate. The original is replaced only after conversion succeeds.",
-  "downloadAutoConvertOutputSubtitle": "Choose the output format for newly completed downloads.",
-  "downloadAutoConvertFlacSubtitle": "Lossless FLAC with quality limits. Lower bit depths and sample rates are preserved.",
-  "downloadAutoConvertMaxBitDepth": "Maximum bit depth",
-  "downloadAutoConvertMaxSampleRate": "Maximum sample rate",
-  "downloadAutoConvertFlacLimitsSubtitle": "These are upper limits. For example, a 44.1 kHz source stays at 44.1 kHz when 48 kHz is selected. Lossy sources are kept in their original format.",
+  "downloadAutoConvertAllFormatsSubtitle": "Конвертуйте завершені завантаження або обмежте розрядність і частоту дискретизації для FLAC. Оригінал замінюється лише після успішного завершення конвертації.",
+  "downloadAutoConvertOutputSubtitle": "Виберіть вихідний формат для нових завершених завантажень.",
+  "downloadAutoConvertFlacSubtitle": "FLAC без втрат Lossless з обмеженням якості. Нижча розрядність та частота дискретизації зберігаються без змін.",
+  "downloadAutoConvertMaxBitDepth": "Максимальна розрядність",
+  "downloadAutoConvertMaxSampleRate": "Максимальна частота дискретизації",
+  "downloadAutoConvertFlacLimitsSubtitle": "Це верхні межі. Наприклад, джерело з частотою 44.1 кГц залишиться як 44.1 кГц, навіть якщо вибрано 48 кГц. Аудіофайли зі стисненням із втратами lossy зберігаються в оригінальному форматі.",
   "downloadAutoConvertSubtitle": "Конвертуйте завершені завантаження у компактніший формат із втратою якості. Оригінал замінюється лише після успішного завершення конвертації.",
   "@downloadAutoConvertSubtitle": {
     "description": "Explanation of safe automatic post-download conversion"
@@ -3330,19 +3330,19 @@
   "@libraryFilterAll": {
     "description": "Filter chip - show all library items"
   },
-  "libraryReEnrichAll": "Re-enrich All Tracks",
+  "libraryReEnrichAll": "Оновити метадані всіх треків",
   "@libraryReEnrichAll": {
     "description": "Library settings action - re-enrich the metadata of every track in the Library"
   },
-  "libraryReEnrichAllSubtitle": "Look up and fill in metadata for every track in your Library, then review the changes",
+  "libraryReEnrichAllSubtitle": "Знайти й заповнити метадані для кожного треку в Бібліотеці, а потім переглянути зміни",
   "@libraryReEnrichAllSubtitle": {
     "description": "Subtitle for the Re-enrich All Tracks action"
   },
-  "libraryReEnrichAllEmpty": "No tracks to re-enrich. Tracks from network connections are not included.",
+  "libraryReEnrichAllEmpty": "Немає треків для оновлення. Треки з мережевих джерел не враховуються.",
   "@libraryReEnrichAllEmpty": {
     "description": "Snackbar when the Library has no tracks Re-enrich can write to"
   },
-  "libraryReEnrichAllBusy": "Wait for the Library scan to finish, then try again.",
+  "libraryReEnrichAllBusy": "Зачекайте, поки завершиться сканування Бібліотеки, а потім спробуйте знову.",
   "@libraryReEnrichAllBusy": {
     "description": "Snackbar when Re-enrich All is started during a Library scan"
   },
@@ -3572,7 +3572,7 @@
   "@tutorialReadyMessage": {
     "description": "Tutorial completion message"
   },
-  "whatsNewIntroTitle": "Mornye {version} is here",
+  "whatsNewIntroTitle": "Mornye {version} вже тут",
   "@whatsNewIntroTitle": {
     "description": "First page of the tour shown once after updating; version is like 5.3",
     "placeholders": {
@@ -3581,29 +3581,29 @@
       }
     }
   },
-  "whatsNewIntroDesc": "Our biggest update yet. Here's a quick look at what's new.",
+  "whatsNewIntroDesc": "Наше найбільше оновлення! Ось короткий огляд того, що нового.",
   "whatsNewLinkTitle": "Mornye Link",
-  "whatsNewLinkDesc": "Pair your phone and computer on the same network. Mornye Link is in beta.",
-  "whatsNewLinkPlayTitle": "Play across devices",
-  "whatsNewLinkPlayBody": "Browse your computer's library on your phone, control what it plays, and hand playback over without losing your place.",
-  "whatsNewLinkTransferTitle": "Move songs both ways",
-  "whatsNewLinkTransferBody": "Send songs to your computer or save them to your phone, right from the song menu.",
-  "whatsNewLinkSyncTitle": "Stay in sync",
-  "whatsNewLinkSyncBody": "Collections and listening history stay the same on paired devices.",
-  "whatsNewHomeTitle": "A Home that learns",
-  "whatsNewHomeDesc": "Mixes and autoplay now follow how you actually listen.",
-  "whatsNewHomeMixesTitle": "Mixes from your Library",
-  "whatsNewHomeMixesBody": "New mixes built from your own songs, including a mix for each genre.",
-  "whatsNewHomeAutoplayTitle": "Smarter autoplay",
-  "whatsNewHomeAutoplayBody": "Autoplay follows your listening session and learns from your favorites, playlists and replays.",
-  "whatsNewHomeAnalysisTitle": "Song analysis",
-  "whatsNewHomeAnalysisBody": "Mornye can analyze how your songs sound for closer picks. It stays off until you turn it on in Settings.",
-  "whatsNewPlayerTitle": "Player and lyrics",
-  "whatsNewPlayerDesc": "Smoother playback, and lyrics in any language.",
-  "whatsNewPlayerGaplessTitle": "Gapless playback",
-  "whatsNewPlayerGaplessBody": "Albums flow from one song into the next without a pause.",
-  "whatsNewPlayerTranslateTitle": "Translate lyrics",
-  "whatsNewPlayerTranslateBody": "Translate or romanize lyrics with an AI provider you set up.",
+  "whatsNewLinkDesc": "Під'єднайте телефон і комп'ютер до однієї мережі. Mornye Link перебуває на стадії бета-тестування.",
+  "whatsNewLinkPlayTitle": "Слухайте на різних пристроях",
+  "whatsNewLinkPlayBody": "Переглядайте бібліотеку комп'ютера з телефона, керуйте відтворенням та переходьте з пристрою на пристрій без втрати поточної позиції.",
+  "whatsNewLinkTransferTitle": "Двостороннє перенесення пісень",
+  "whatsNewLinkTransferBody": "Надсилайте пісні на комп'ютер або зберігайте їх на телефон прямо з меню пісні.",
+  "whatsNewLinkSyncTitle": "Завжди в синхроні",
+  "whatsNewLinkSyncBody": "Колекції та історія прослуховування залишаються однаковими на підключених пристроях.",
+  "whatsNewHomeTitle": "Головна Сторінка, що вчиться",
+  "whatsNewHomeDesc": "Мікси та автовідтворення тепер підлаштовуються під те, як ви насправді слухаєте музику.",
+  "whatsNewHomeMixesTitle": "Мікси з вашої бібліотеки",
+  "whatsNewHomeMixesBody": "Нові мікси, створені на основі ваших власних пісень, зокрема окремий мікс для кожного жанру.",
+  "whatsNewHomeAutoplayTitle": "Розумніше автовідтворення",
+  "whatsNewHomeAutoplayBody": "Автовідтворення підлаштовується під вашу поточну сесію та вчиться на основі улюблених треків, списків відтворення і повторів.",
+  "whatsNewHomeAnalysisTitle": "Аналіз пісні",
+  "whatsNewHomeAnalysisBody": "Mornye може аналізувати звучання ваших пісень для точнішого підбору схожої музики. Функція вимкнена, поки ви не увімкнете її в Налаштуваннях.",
+  "whatsNewPlayerTitle": "Програвач і тексти пісень",
+  "whatsNewPlayerDesc": "Плавне відтворення, та тексти пісень усіма мовами.",
+  "whatsNewPlayerGaplessTitle": "Відтворення без пауз",
+  "whatsNewPlayerGaplessBody": "Пісні в альбомах відтворюються безперервно, плавно переходячи від однієї до наступної без пауз.",
+  "whatsNewPlayerTranslateTitle": "Переклад тексту пісні",
+  "whatsNewPlayerTranslateBody": "Перекладайте або романізуйте тексти пісень за допомогою налаштованого вами ШІ-провайдера.",
   "whatsNewPlayerTimingTitle": "Lyrics timing",
   "whatsNewPlayerTimingBody": "Move synced lyrics earlier or later when they drift from the song.",
   "whatsNewPlayerAutoTitle": "Android Auto",
@@ -4045,7 +4045,7 @@
       }
     }
   },
-  "trackReEnrichProgress": "Повторне збагачення метаданих...",
+  "trackReEnrichProgress": "Повторне оновлення метаданих...",
   "@trackReEnrichProgress": {
     "description": "Snackbar while re-enriching metadata"
   },
@@ -6944,7 +6944,7 @@
   "@libraryExternalPlayer": {
     "description": "Setting option to use an external music player"
   },
-  "libraryExternalPlayerSubtitle": "Recommended for listening, best quality, gapless playback, EQ, and wider format support",
+  "libraryExternalPlayerSubtitle": "Відкривайте треки в інших музичних застосунках на вашому пристрої",
   "@libraryExternalPlayerSubtitle": {
     "description": "Subtitle for external player option"
   },
