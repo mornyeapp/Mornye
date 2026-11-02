@@ -420,6 +420,10 @@ class DownloadService : Service() {
                 stopForegroundService()
             }
             ACTION_START_NATIVE_QUEUE -> {
+                // Satisfy Android's foreground deadline before file I/O,
+                // queue parsing or ReplayGain recovery can block startup.
+                // Invalid payloads must also enter foreground before stopping.
+                startForegroundService()
                 val requestsJson = readNativeQueuePayload(
                     intent,
                     EXTRA_REQUESTS_JSON,
@@ -657,13 +661,12 @@ class DownloadService : Service() {
     }
 
     private fun startForegroundService() {
-        isRunning = true
-        lastNotificationSignature = null
-
-        ensureWakeLock()
-
         val notification = buildNotification(0, 0)
         startDataSyncForeground(NOTIFICATION_ID, notification)
+
+        isRunning = true
+        lastNotificationSignature = null
+        ensureWakeLock()
         pushWidgetState(0, 0)
     }
 

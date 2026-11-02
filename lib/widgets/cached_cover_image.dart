@@ -498,12 +498,21 @@ Future<void> precacheMetadataBackdrop(
 }
 
 /// Pre-warms the cover cache at the metadata-screen display size so the hero
-/// transition doesn't pop in a low-res frame.
-void precacheCoverImage(BuildContext context, String? url) {
+/// transition doesn't pop in a low-res frame. Grid callers can supply their
+/// own decode extent to share the cell's cache entry and error handling.
+void precacheCoverImage(
+  BuildContext context,
+  String? url, {
+  int? cacheWidth,
+  int? cacheHeight,
+}) {
   if (url == null || url.isEmpty) return;
   final provider = coverImageProvider(
     url,
-    cacheWidth: coverCacheWidthForViewport(context),
+    cacheWidth:
+        cacheWidth ??
+        (cacheHeight == null ? coverCacheWidthForViewport(context) : null),
+    cacheHeight: cacheHeight,
   );
   if (provider == null) return;
   // A stale local path is common and its placeholder already covers it; only

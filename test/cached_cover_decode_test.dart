@@ -666,6 +666,66 @@ void main() {
     });
   }
 
+  testWidgets('download completion prewarm shares the grid decode safely', (
+    tester,
+  ) async {
+    final cache = PaintingBinding.instance.imageCache;
+    cache.clear();
+    cache.clearLiveImages();
+    late BuildContext context;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (value) {
+            context = value;
+            return const SizedBox();
+          },
+        ),
+      ),
+    );
+    final directory = await tester.runAsync(() async {
+      final directory = await Directory.systemTemp.createTemp('grid-prewarm-');
+      await _writeCover(directory, const Size(512, 512));
+      return directory;
+    });
+    final path = '${directory!.path}/cover.png';
+    final key = await ResizeImage(
+      FileImage(File(path)),
+      width: 200,
+      height: 200,
+    ).obtainKey(ImageConfiguration.empty);
+    final reports = <FlutterErrorDetails>[];
+    final onError = FlutterError.onError;
+    FlutterError.onError = reports.add;
+    try {
+      await tester.runAsync(() async {
+        precacheCoverImage(context, path, cacheWidth: 200, cacheHeight: 200);
+        for (var i = 0; i < 200 && !cache.statusForKey(key).keepAlive; i++) {
+          await Future<void>.delayed(const Duration(milliseconds: 5));
+        }
+        expect(cache.statusForKey(key).keepAlive, isTrue);
+        expect(cache.currentSizeBytes, 200 * 200 * 4);
+        await File(path).delete();
+        cache.clear();
+        cache.clearLiveImages();
+        // Clearing a cover cache after completion must not report an uncaught
+        // Flutter error when the grid warms the old path again.
+        precacheCoverImage(context, path, cacheWidth: 200, cacheHeight: 200);
+        final control = '${directory.path}/control.png';
+        await precacheImage(FileImage(File(control)), context);
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+      });
+      expect(reports, hasLength(1));
+      expect(reports.single.exception.toString(), contains('control.png'));
+    } finally {
+      FlutterError.onError = onError;
+      await tester.pumpWidget(const SizedBox());
+      cache.clear();
+      cache.clearLiveImages();
+      await tester.runAsync(() => directory.delete(recursive: true));
+    }
+  });
+
   testWidgets('covers in other forms show the placeholder', (tester) async {
     for (final url in ['content://media/cover', 'network://nas/cover.jpg']) {
       await tester.pumpWidget(

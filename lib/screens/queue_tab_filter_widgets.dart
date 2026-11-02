@@ -140,13 +140,11 @@ extension _QueueTabFilterWidgets on _QueueTabState {
               // full-res decode evicts the whole low-RAM image cache.
               const targetSize = 200;
               if (embeddedPath != null) {
-                precacheImage(
-                  ResizeImage(
-                    FileImage(File(embeddedPath)),
-                    width: targetSize,
-                    height: targetSize,
-                  ),
+                precacheCoverImage(
                   context,
+                  embeddedPath,
+                  cacheWidth: targetSize,
+                  cacheHeight: targetSize,
                 );
               }
               if (coverUrl != null && coverUrl.isNotEmpty) {
