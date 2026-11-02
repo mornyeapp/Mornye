@@ -22,6 +22,7 @@ void main() {
     Future<String?> Function(String)? probe,
     Future<PrimaryAudioProperties> Function(String)? properties,
     Future<void> Function(String, String)? repair,
+    Future<Map<String, dynamic>> Function(String)? documentStat,
   }) => DownloadFileFinalizer(
     decryptFile:
         decrypt ??
@@ -56,6 +57,7 @@ void main() {
     repairAc4: repair ?? (_, _) async => throw StateError('Unexpected repair'),
     warn: warnings.add,
     info: (_) {},
+    readDocumentStat: documentStat ?? (_) async => {},
   );
 
   DownloadResult encrypted({bool existing = false}) => DownloadResult.fromMap({
@@ -423,6 +425,98 @@ void main() {
       );
     },
   );
+
+  test('SAF filenames come from metadata, with a path-based fallback', () async {
+    const opaque =
+        'content://com.android.providers.downloads.documents/document/msf%3A1234';
+    expect(
+      await downloadSourceFileName(
+        opaque,
+        readDocumentStat: (_) async => {
+          'exists': true,
+          'display_name': 'Song: Live 100%.flac',
+        },
+      ),
+      'Song: Live 100%.flac',
+    );
+    expect(
+      await downloadSourceFileName(
+        'content://com.android.externalstorage.documents/tree/primary%3AMusic/document/primary%3AMusic%2FSong%3A%20Live.flac',
+        readDocumentStat: (_) async => {},
+      ),
+      'Song: Live.flac',
+    );
+    for (final invalid in [null, '../escape.flac', 'dir/song.flac']) {
+      await expectLater(
+        downloadSourceFileName(
+          opaque,
+          readDocumentStat: (_) async => {'display_name': invalid},
+        ),
+        throwsFormatException,
+      );
+    }
+    expect(await downloadSourceFileName('/music/Song.flac'), 'Song.flac');
+  });
+
+  test(
+    'SAF conversion uses the document name when history has no filename',
+    () async {
+      String? published;
+      final output = File('${directory.path}/cache.opus');
+      final stage = finalizer(
+        documentStat: (_) async => {
+          'exists': true,
+          'display_name': 'Song.flac',
+        },
+        replaceSaf:
+            ({
+              required uri,
+              required treeUri,
+              required relativeDir,
+              required op,
+              avoidOverwrite = false,
+              onPublishedFileName,
+            }) async {
+              published = (await op(
+                '${directory.path}/cache.flac',
+                (_) {},
+              ))?.$2;
+              return 'content://converted';
+            },
+        convert:
+            ({
+              required inputPath,
+              required targetFormat,
+              required bitrate,
+              required deleteOriginal,
+              required losslessQuality,
+            }) async => (await output.writeAsString('converted')).path,
+      );
+      final result = await convert(
+        stage,
+        encrypted(),
+        path: 'content://downloads/document/msf%3A1234',
+        name: null,
+        saf: true,
+      );
+      expect(result.converted, isTrue);
+      expect(published, 'Song.opus');
+    },
+  );
+
+  test('unknown SAF filename keeps the source and skips conversion', () async {
+    final result = encrypted();
+    final outcome = await convert(
+      finalizer(),
+      result,
+      path: 'content://downloads/document/msf%3A1234',
+      name: null,
+      saf: true,
+    );
+    expect(outcome.converted, isFalse);
+    expect(outcome.filePath, 'content://downloads/document/msf%3A1234');
+    expect(result['auto_conversion_warning'], isNotNull);
+  });
 
   for (final format in ['opus', 'flac']) {
     test(

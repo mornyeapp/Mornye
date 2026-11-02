@@ -261,91 +261,106 @@ class MornyePlayerLayout extends ConsumerWidget {
                   // Both layers share the header's progress, so reversing a
                   // transition reuses the live cover instead of inserting a
                   // duplicate while its previous instance is still fading.
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      for (final expanded in [true, false])
-                        if (expanded
-                            ? !fullBleed && (!compact || progress < 1)
-                            : compact || progress > 0)
-                          HeroMode(
-                            key: ValueKey(expanded),
-                            enabled: expanded ? expandedArtwork : compact,
-                            child: IgnorePointer(
-                              ignoring: expanded ? !expandedArtwork : !compact,
-                              child: FadeTransition(
-                                opacity: AlwaysStoppedAnimation(
-                                  expanded ? 1 - progress : progress,
-                                ),
-                                child: KeyedSubtree(
-                                  key: ValueKey(
-                                    expanded
-                                        ? 'full-player-artwork'
-                                        : 'compact-player-artwork',
+                  child: PlayerTrackSwipeArtwork(
+                    builder: (item) => ClipRRect(
+                      borderRadius: BorderRadius.circular(fullBleed ? 0 : 12),
+                      child: PlayerArtwork(
+                        artUri: item.artUri?.toString(),
+                        colorScheme: colorScheme,
+                        cacheWidth: PlayerArtwork.transitionCacheWidth(context),
+                      ),
+                    ),
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        for (final expanded in [true, false])
+                          if (expanded
+                              ? !fullBleed && (!compact || progress < 1)
+                              : compact || progress > 0)
+                            HeroMode(
+                              key: ValueKey(expanded),
+                              enabled: expanded ? expandedArtwork : compact,
+                              child: IgnorePointer(
+                                ignoring: expanded
+                                    ? !expandedArtwork
+                                    : !compact,
+                                child: FadeTransition(
+                                  opacity: AlwaysStoppedAnimation(
+                                    expanded ? 1 - progress : progress,
                                   ),
-                                  child: PlayerArtworkDragRegion(
-                                    child: Hero(
-                                      tag: kNowPlayingArtworkHeroTag,
-                                      child: expanded
-                                          ? DecoratedBox(
-                                              decoration: BoxDecoration(
-                                                borderRadius:
-                                                    BorderRadius.circular(12),
-                                                boxShadow: const [
-                                                  BoxShadow(
-                                                    color: Color(0x40000000),
-                                                    blurRadius: 28,
-                                                    offset: Offset(0, 16),
-                                                  ),
-                                                ],
-                                              ),
-                                              child: PlayerTransitionArtwork(
-                                                artworkKey:
-                                                    artworkKeys.expanded,
-                                                child: ClipRRect(
+                                  child: KeyedSubtree(
+                                    key: ValueKey(
+                                      expanded
+                                          ? 'full-player-artwork'
+                                          : 'compact-player-artwork',
+                                    ),
+                                    child: PlayerArtworkDragRegion(
+                                      child: Hero(
+                                        tag: kNowPlayingArtworkHeroTag,
+                                        child: expanded
+                                            ? DecoratedBox(
+                                                decoration: BoxDecoration(
                                                   borderRadius:
                                                       BorderRadius.circular(12),
-                                                  child: motionArtwork,
+                                                  boxShadow: const [
+                                                    BoxShadow(
+                                                      color: Color(0x40000000),
+                                                      blurRadius: 28,
+                                                      offset: Offset(0, 16),
+                                                    ),
+                                                  ],
                                                 ),
-                                              ),
-                                            )
-                                          : Semantics(
-                                              button: true,
-                                              label: context
-                                                  .l10n
-                                                  .nowPlayingTabPlayer,
-                                              child: GestureDetector(
-                                                behavior:
-                                                    HitTestBehavior.opaque,
-                                                onTap: () => onPageChanged(0),
                                                 child: PlayerTransitionArtwork(
                                                   artworkKey:
-                                                      artworkKeys.compact,
+                                                      artworkKeys.expanded,
                                                   child: ClipRRect(
                                                     borderRadius:
                                                         BorderRadius.circular(
                                                           12,
                                                         ),
-                                                    child: PlayerArtwork(
-                                                      artUri: mediaItem.artUri
-                                                          ?.toString(),
-                                                      colorScheme: colorScheme,
-                                                      cacheWidth:
-                                                          PlayerArtwork.transitionCacheWidth(
-                                                            context,
+                                                    child: motionArtwork,
+                                                  ),
+                                                ),
+                                              )
+                                            : Semantics(
+                                                button: true,
+                                                label: context
+                                                    .l10n
+                                                    .nowPlayingTabPlayer,
+                                                child: GestureDetector(
+                                                  behavior:
+                                                      HitTestBehavior.opaque,
+                                                  onTap: () => onPageChanged(0),
+                                                  child: PlayerTransitionArtwork(
+                                                    artworkKey:
+                                                        artworkKeys.compact,
+                                                    child: ClipRRect(
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                            12,
                                                           ),
+                                                      child: PlayerArtwork(
+                                                        artUri: mediaItem.artUri
+                                                            ?.toString(),
+                                                        colorScheme:
+                                                            colorScheme,
+                                                        cacheWidth:
+                                                            PlayerArtwork.transitionCacheWidth(
+                                                              context,
+                                                            ),
+                                                      ),
                                                     ),
                                                   ),
                                                 ),
                                               ),
-                                            ),
+                                      ),
                                     ),
                                   ),
                                 ),
                               ),
                             ),
-                          ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ],

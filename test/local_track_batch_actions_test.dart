@@ -173,6 +173,7 @@ void main() {
       final sidecars = <String>[];
       final ffmpegModes = <String>[];
       final reported = <String>[];
+      final written = <String>[];
       final runner = BatchReEnrichRunner(
         beginPhase: () async {
           phaseCount++;
@@ -225,9 +226,11 @@ void main() {
         shouldStop: running,
         onProgress: progress,
         onResult: (result) => reported.add(result['method'] as String),
+        onWritten: (item) => written.add(item.id),
       );
       expect(successes, 2);
       expect(reported, ['native', 'ffmpeg']);
+      expect(written, ['1', '2']);
       expect(phaseCount, 2);
       expect(sidecars, ['/music/1.flac']);
       expect(ffmpegModes, ['split_vorbis']);
@@ -245,6 +248,42 @@ void main() {
       );
     },
   );
+
+  test('cancelling during a write reports only the completed track', () async {
+    var cancelled = false;
+    final written = <String>[];
+    final requests = <String>[];
+    final runner = BatchReEnrichRunner(
+      beginPhase: () async => const AppSettings(),
+      reEnrich: (request) async {
+        requests.add(request['file_path'] as String);
+        cancelled = true;
+        return {'method': 'native'};
+      },
+      writeSidecar:
+          ({required audioFilePath, required reEnrichResult}) async {},
+    );
+    final previews = await runner.preview(
+      [item('1'), item('2')],
+      const ReEnrichFieldSelection(
+        mode: ReEnrichBatchMode.manualValues,
+        manualValues: {'genre': 'Jazz'},
+      ),
+      shouldStop: running,
+      onProgress: progress,
+    );
+    expect(
+      await runner.apply(
+        previews,
+        shouldStop: () => cancelled,
+        onProgress: progress,
+        onWritten: (item) => written.add(item.id),
+      ),
+      1,
+    );
+    expect(requests, ['/music/1.flac']);
+    expect(written, ['1']);
+  });
 
   test(
     'manual previews avoid lookups; cancellation before apply performs no writes or phase sync',

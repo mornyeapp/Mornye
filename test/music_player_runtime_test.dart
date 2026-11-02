@@ -1060,6 +1060,34 @@ void main() {
   );
 
   test(
+    'relocated sources update every queue occurrence without restarting',
+    () async {
+      final decks = <_Deck>[];
+      final store = _ResumeSessionStore();
+      final handler = await _runtime(
+        decks: decks,
+        sessionDatabase: store,
+      ).initialize();
+      await handler.setQueueAndPlay([_track, _track]);
+      await handler.seek(const Duration(seconds: 34));
+      final sources = List.of(decks.first.sources);
+      await handler.onSourceRelocated(_track.source, '/organized/song.flac');
+      expect(handler.queue.value.map((item) => item.extras?['source']), [
+        '/organized/song.flac',
+        '/organized/song.flac',
+      ]);
+      expect(
+        handler.mediaItem.value?.extras?['source'],
+        '/organized/song.flac',
+      );
+      expect(decks.first.sources, sources);
+      expect(decks.first.position, const Duration(seconds: 34));
+      expect(jsonEncode(store.active), contains('/organized/song.flac'));
+      expect(jsonEncode(store.active), isNot(contains(_track.source)));
+    },
+  );
+
+  test(
     'an older metadata read cannot overwrite a newer successful edit',
     () async {
       final old = Completer<Map<String, dynamic>>();

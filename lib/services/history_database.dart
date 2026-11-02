@@ -125,6 +125,15 @@ class HistoryDatabase {
           _searchFtsAvailable = await HistorySchema.create(db, version);
         },
         onUpgrade: HistorySchema.upgrade,
+        onOpen: (db) async {
+          if (Platform.isWindows) {
+            await sqlite.repairWindowsPathKeysOnOpen(
+              db,
+              'history',
+              'history_path_keys',
+            );
+          }
+        },
       );
       // onCreate normally initializes this derived index. Retry once after
       // opening an existing database in case an earlier setup was

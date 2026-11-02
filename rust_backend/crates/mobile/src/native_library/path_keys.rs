@@ -203,6 +203,33 @@ fn uri_text(uri: &Url) -> String {
     output
 }
 
+/// Dart's `withoutWindowsVerbatimPrefix`: `\\?\C:\a` → `C:\a` and
+/// `\\?\UNC\server\a` → `\\server\a`, in either separator.
+fn without_windows_verbatim_prefix(path: &str) -> Option<String> {
+    let bytes = path.as_bytes();
+    if path.chars().count() < 6 {
+        return None;
+    }
+    let separator = bytes[0];
+    if (separator != b'\\' && separator != b'/')
+        || bytes[1] != separator
+        || bytes[2] != b'?'
+        || bytes[3] != separator
+    {
+        return None;
+    }
+    let rest = &path[4..];
+    let rest_bytes = rest.as_bytes();
+    if rest.chars().count() > 4
+        && rest_bytes[..3].eq_ignore_ascii_case(b"UNC")
+        && rest_bytes[3] == separator
+    {
+        let separator = separator as char;
+        return Some(format!("{separator}{separator}{}", &rest[4..]));
+    }
+    (rest_bytes[0].is_ascii_alphabetic() && rest_bytes[1] == b':').then(|| rest.to_owned())
+}
+
 pub(crate) fn build(path: &str, android: bool) -> Result<BTreeSet<String>, String> {
     let path = dart_trim(path);
     let cleaned = path.strip_prefix("EXISTS:").map(dart_trim).unwrap_or(path);
@@ -235,6 +262,9 @@ pub(crate) fn build(path: &str, android: bool) -> Result<BTreeSet<String>, Strin
         keys.insert(dart_lower(trimmed));
         if trimmed.contains('\\') {
             pending.push_back(trimmed.replace('\\', "/"));
+        }
+        if let Some(plain) = without_windows_verbatim_prefix(trimmed) {
+            pending.push_back(plain);
         }
         if trimmed.contains('%')
             && let Some(decoded) = decode(trimmed)
@@ -346,6 +376,25 @@ mod tests {
             direct
                 .intersection(&saf)
                 .any(|key| key == "/storage/emulated/0/Music/Café.flac")
+        );
+    }
+    #[test]
+    fn windows_verbatim_paths_share_keys_with_plain_paths() {
+        let plain = build(r"C:\Music\Song.flac", false).unwrap();
+        let verbatim = build(r"\\?\C:\Music\Song.flac", false).unwrap();
+        assert!(verbatim.contains(r"C:\Music\Song.flac"));
+        assert!(verbatim.contains("c:/music/song.flac"));
+        assert!(plain.is_subset(&verbatim));
+        let unc = build(r"\\?\UNC\server\share\Song.flac", false).unwrap();
+        assert!(unc.contains(r"\\server\share\Song.flac"));
+        assert!(unc.contains("//server/share/song.flac"));
+        assert_eq!(
+            without_windows_verbatim_prefix(r"\\?\Volume{0}\Song.flac"),
+            None
+        );
+        assert_eq!(
+            without_windows_verbatim_prefix("//?/D:/Song.flac").as_deref(),
+            Some("D:/Song.flac")
         );
     }
 

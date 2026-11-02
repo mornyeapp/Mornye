@@ -54,6 +54,17 @@ void main() {
     }
   });
 
+  test('paused scan notifications retain the scanned file count', () async {
+    for (final locale in filteredSupportedLocales) {
+      final strings = await AppLocalizations.delegate.load(locale);
+      expect(
+        strings.notifLibraryScanPausedBody(37),
+        contains('37'),
+        reason: locale.toString(),
+      );
+    }
+  });
+
   for (final (locale, title) in [
     (const Locale('vi'), 'Cài đặt'),
     (const Locale('zh', 'CN'), '设置'),

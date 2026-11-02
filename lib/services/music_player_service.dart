@@ -15,6 +15,7 @@ import 'package:audio_session/audio_session.dart'
         AudioInterruptionType;
 import 'package:mornye/services/listening_statistics.dart' show ListeningTrack;
 import 'package:mornye/services/library_database.dart';
+import 'package:mornye/services/app_state_database.dart';
 import 'package:mornye/services/media_library_browser.dart';
 import 'package:mornye/services/sqlite_helpers.dart' show normalizeLookupText;
 import 'package:mornye/services/platform_bridge.dart';
@@ -86,6 +87,14 @@ class PlaybackProcessing {
 void refreshPlaybackNormalization(String source) {
   final handler = musicPlayerRuntime.handler;
   if (handler != null) unawaited(handler._refreshNormalizationSource(source));
+}
+
+Future<void> notifyPlaybackSourceRelocated(
+  String previous,
+  String replacement,
+) async {
+  await musicPlayerRuntime.handler?.onSourceRelocated(previous, replacement);
+  await AppStateDatabase.instance.relocatePlaybackSource(previous, replacement);
 }
 
 List<int> buildShuffledQueueOrder({
@@ -2402,6 +2411,16 @@ class MusicPlayerHandler extends BaseAudioHandler
     }
     _markSessionQueueChanged();
     queue.add(List<MediaItem>.unmodifiable(_queueItems));
+  }
+
+  /// Updates queued and persisted sources without restarting the decoder.
+  Future<void> onSourceRelocated(String previous, String replacement) async {
+    if (_disposed || !_media.any((item) => item.source == previous)) return;
+    _relocateQueuedSource(previous, replacement);
+    if (_index >= 0 && _index < _queueItems.length) {
+      mediaItem.add(_queueItems[_index]);
+    }
+    await _persistSession(position: playbackState.value.position);
   }
 
   /// Refreshes every occurrence without reopening the decoder or seeking.

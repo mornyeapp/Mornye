@@ -111,6 +111,12 @@ Set<String> _buildPathMatchKeys(
       }
     }
 
+    // Windows resolves paths to the verbatim form (`\\?\C:\…`,
+    // `\\?\UNC\server\…`), which the desktop scanner stores, while
+    // downloads keep the plain form. Both name the same file.
+    final plain = withoutWindowsVerbatimPrefix(trimmed);
+    if (plain != null) addNormalized(plain);
+
     if (trimmed.contains('%')) {
       try {
         final decoded = Uri.decodeFull(trimmed);
@@ -181,6 +187,30 @@ Set<String> _buildPathMatchKeys(
     _pathMatchKeyCache.remove(_pathMatchKeyCache.keys.first);
   }
   return result;
+}
+
+/// [path] without its Windows verbatim prefix, in either separator:
+/// `\\?\C:\a` → `C:\a` and `\\?\UNC\server\share\a` →
+/// `\\server\share\a`. Null when [path] has no such prefix, or names a
+/// device or volume GUID that has no plain spelling.
+String? withoutWindowsVerbatimPrefix(String path) {
+  if (path.length < 6) return null;
+  final separator = path[0];
+  if ((separator != r'\' && separator != '/') ||
+      path[1] != separator ||
+      path[2] != '?' ||
+      path[3] != separator) {
+    return null;
+  }
+  final rest = path.substring(4);
+  if (rest.length > 4 &&
+      rest.substring(0, 3).toUpperCase() == 'UNC' &&
+      rest[3] == separator) {
+    return '$separator$separator${rest.substring(4)}';
+  }
+  final drive = rest.codeUnitAt(0) | 0x20;
+  if (drive >= 0x61 && drive <= 0x7a && rest[1] == ':') return rest;
+  return null;
 }
 
 String? _androidDocumentMatchKey(Uri? uri) {

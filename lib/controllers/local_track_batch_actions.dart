@@ -197,10 +197,12 @@ Future<void> reEnrichLibraryTracks(
         if (track.spotifyId?.trim().isNotEmpty == true)
           track.id: track.spotifyId!,
     },
-    refreshLibrary: () async {
+    refreshLibrary: (written) async {
       // Downloaded tracks read history, not the local-scan index. Read back
       // saved tags so failed or unselected fields cannot change history.
+      // Only tracks the batch wrote can have changed.
       for (final track in downloads) {
+        if (!written.contains(track.id)) continue;
         try {
           await DownloadedEmbeddedCoverResolver.invalidate(track.filePath);
           final metadata = await PlatformBridge.readDisplayAudioMetadata(
@@ -237,7 +239,11 @@ Future<void> reEnrichLibraryTracks(
           debugPrint('Could not refresh re-enriched download: $error');
         }
       }
-      if (isActive() && selected.any((item) => item.localItem != null)) {
+      if (isActive() &&
+          selected.any(
+            (item) =>
+                item.localItem != null && written.contains(item.localItem!.id),
+          )) {
         await _refreshReEnrichedLocalLibrary(ref);
       }
     },
@@ -265,7 +271,10 @@ Future<void> reEnrichLocalTracks(
   required Future<void> Function() onSelectionHide,
   required VoidCallback onSelectionRestore,
   required VoidCallback onComplete,
-  Future<void> Function()? refreshLibrary,
+
+  /// Refreshes the Library after the batch, given the ids of the tracks it
+  /// wrote to. Defaults to a scan of the Library folders.
+  Future<void> Function(Set<String> written)? refreshLibrary,
   Map<String, String> sourceTrackIds = const {},
 }) async {
   if (selected.isEmpty) return;
@@ -384,9 +393,11 @@ Future<void> reEnrichLocalTracks(
   );
 
   final lyricsSummary = ReEnrichLyricsSummary();
+  final written = <String>{};
   final successCount = await runner.apply(
     previews,
     onResult: lyricsSummary.add,
+    onWritten: (item) => written.add(item.id),
     shouldStop: () => cancelled || !context.mounted || !isActive(),
     onProgress: (index, item) => BatchProgressDialog.update(
       current: index + 1,
@@ -404,7 +415,7 @@ Future<void> reEnrichLocalTracks(
   final resultClosed = showReEnrichResultDialog(context, message: summary);
 
   if (refreshLibrary != null) {
-    await refreshLibrary();
+    await refreshLibrary(written);
   } else {
     await _refreshReEnrichedLocalLibrary(ref);
   }
@@ -511,6 +522,7 @@ class BatchReEnrichRunner {
     required bool Function() shouldStop,
     required void Function(int, LocalLibraryItem) onProgress,
     void Function(Map<String, dynamic>)? onResult,
+    void Function(LocalLibraryItem)? onWritten,
   }) async {
     if (shouldStop()) return 0;
     // Settings may have changed while the review sheet was open.
@@ -537,6 +549,7 @@ class BatchReEnrichRunner {
               reEnrichResult: result,
             );
             successes++;
+            onWritten?.call(preview.item);
             await _saveMotionArtwork(preview, result);
             onResult?.call(result);
           case 'ffmpeg':
@@ -546,6 +559,7 @@ class BatchReEnrichRunner {
               artistTagMode: settings.artistTagMode,
             )) {
               successes++;
+              onWritten?.call(preview.item);
               await _saveMotionArtwork(preview, result);
               onResult?.call(result);
             } else {

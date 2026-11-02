@@ -4,6 +4,7 @@ import 'package:mornye/models/download_result.dart';
 import 'package:mornye/services/download_saf_file_replacer.dart';
 import 'package:mornye/services/ffmpeg_models.dart';
 import 'package:mornye/services/ffmpeg_probe.dart';
+import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/utils/audio_conversion_utils.dart';
 import 'package:mornye/utils/audio_format_utils.dart';
 import 'package:mornye/utils/file_access.dart';
@@ -59,6 +60,7 @@ class DownloadFileFinalizer {
     required this.replaceSafFile,
     required this.warn,
     required this.info,
+    this.readDocumentStat = PlatformBridge.safStat,
   });
 
   final DecryptDownloadFile decryptFile;
@@ -69,6 +71,7 @@ class DownloadFileFinalizer {
   final ReplaceSafDownloadFile replaceSafFile;
   final void Function(String) warn;
   final void Function(String) info;
+  final Future<Map<String, dynamic>> Function(String) readDocumentStat;
 
   Future<String> _normalizeIsoBmffPath(
     String path,
@@ -227,9 +230,21 @@ class DownloadFileFinalizer {
         )) {
       return original;
     }
-    final baseName = fileName?.trim().isNotEmpty == true
-        ? fileName!.trim()
-        : File(filePath).uri.pathSegments.last;
+    final String baseName;
+    try {
+      baseName = fileName?.trim().isNotEmpty == true
+          ? fileName!.trim()
+          : await downloadSourceFileName(
+              filePath,
+              readDocumentStat: readDocumentStat,
+            );
+    } catch (e) {
+      result['auto_conversion_warning'] = e.toString();
+      warn(
+        'Cannot determine conversion filename; keeping downloaded source: $e',
+      );
+      return original;
+    }
     final convertedName = convertedOutputFileName(
       originalFileName: baseName,
       targetFormat: targetFormat,
@@ -370,6 +385,43 @@ class DownloadFileFinalizer {
       return original;
     }
   }
+}
+
+/// Reads the document's display name instead of treating an opaque ID as a name.
+Future<String> downloadSourceFileName(
+  String filePath, {
+  Future<Map<String, dynamic>> Function(String) readDocumentStat =
+      PlatformBridge.safStat,
+}) async {
+  if (!isContentUri(filePath)) return File(filePath).uri.pathSegments.last;
+  bool usable(String? name) =>
+      name != null &&
+      name.trim().isNotEmpty &&
+      name != '.' &&
+      name != '..' &&
+      !RegExp(r'[/\\\x00]').hasMatch(name);
+  try {
+    final stat = await readDocumentStat(filePath);
+    final name = stat['display_name'] as String?;
+    if (stat['exists'] != false && usable(name)) return name!;
+  } catch (_) {
+    // Older hosts may omit display_name; only the external-storage provider
+    // defines document IDs as volume:path. Other providers use opaque IDs.
+  }
+  final uri = Uri.parse(filePath);
+  if (uri.host == 'com.android.externalstorage.documents') {
+    final parts = uri.pathSegments;
+    final document = parts.indexOf('document');
+    if (document >= 0 && document + 1 < parts.length) {
+      final id = parts[document + 1];
+      final colon = id.indexOf(':');
+      if (colon >= 0) {
+        final name = id.substring(colon + 1).split('/').last;
+        if (usable(name)) return name;
+      }
+    }
+  }
+  throw const FormatException('Document filename is unavailable');
 }
 
 bool _isMp4Container(String path) {
