@@ -71,6 +71,33 @@ void main() {
   });
 
   test(
+    'relocation updates active and archived queues plus the Home preview',
+    () async {
+      await store.relocateSource('/first.flac', '/new/first.flac');
+      final active = (await db.query('playback_session')).single;
+      expect(jsonDecode(active['media_json'] as String), [
+        {...queue.first, 'source': '/new/first.flac'},
+        queue.last,
+      ]);
+      expect(active['position_ms'], 23000);
+      await store.archive(media);
+      await store.relocateSource('/second.flac', '/new/second.flac');
+      final session = (await store.session())!;
+      expect(session['media'], [
+        {...queue.first, 'source': '/new/first.flac'},
+        {...queue.last, 'source': '/new/second.flac'},
+      ]);
+      expect(session['index'], 1);
+      expect(session['positionMs'], 23000);
+      expect((await store.preview())?['media'], {
+        ...media,
+        'source': '/new/second.flac',
+      });
+      expect(await db.query('playback_session'), isEmpty);
+    },
+  );
+
+  test(
     'Home reads only the preview, even when a queue cannot be decoded',
     () async {
       await store.archive(media);

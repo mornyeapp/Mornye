@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:mornye/services/network_download_staging.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
@@ -33,6 +34,9 @@ import 'package:mornye/services/source_deletion_events.dart';
 import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/services/download_request_payload.dart';
 import 'package:mornye/services/folder_path_template.dart';
+import 'package:mornye/services/history_database.dart';
+import 'package:mornye/services/library_reorganizer.dart';
+import 'package:mornye/services/library_database.dart';
 import 'package:mornye/services/download_motion_artwork_source.dart';
 import 'package:mornye/services/ffmpeg_conversion.dart';
 import 'package:mornye/services/ffmpeg_decryption.dart';
@@ -47,6 +51,7 @@ import 'package:mornye/utils/logger.dart';
 import 'package:mornye/utils/desktop_folders.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/utils/file_access.dart';
+import 'package:mornye/utils/saf_display_path.dart';
 import 'package:mornye/utils/string_utils.dart';
 import 'package:mornye/utils/audio_format_utils.dart';
 import 'package:mornye/utils/audio_conversion_utils.dart';
@@ -71,6 +76,11 @@ export 'package:mornye/services/download_queue_persistence.dart'
 
 export 'package:mornye/services/history_database.dart'
     show HistoryLookupRequest, HistoryBatchLookupRequest;
+export 'package:mornye/services/library_reorganizer.dart'
+    show
+        LibraryReorganizationMove,
+        LibraryReorganizationPlan,
+        LibraryReorganizationResult;
 
 part 'download_queue_provider_paths.dart';
 part 'download_queue_provider_progress.dart';
@@ -82,6 +92,7 @@ part 'download_queue_provider_replaygain.dart';
 part 'download_queue_provider_embedding.dart';
 part 'download_queue_provider_single_item.dart';
 part 'download_queue_provider_hires_check.dart';
+part 'download_queue_provider_reorganize.dart';
 
 final _log = AppLogger('DownloadQueue');
 
