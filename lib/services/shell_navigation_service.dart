@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/widgets.dart';
 
 enum ShellTab { home, library, repository, settings, search }
@@ -107,6 +109,7 @@ class ShellNavigationService {
     _tabSelectionOwner = null;
     _tabSelectionHandler = null;
     _libraryLinkHandler = null;
+    resetHistory();
   }
 
   static bool requestTab(ShellTab tab) {
@@ -135,6 +138,19 @@ class ShellNavigationService {
     _currentTabIndex = currentTabIndex;
     _showRepoTab = showRepoTab;
     _showSearchTab = showSearchTab;
+    if (_currentTab == null) {
+      if (currentTabIndex == 0) {
+        _currentTab = ShellTab.home;
+      } else if (currentTabIndex == 1) {
+        _currentTab = ShellTab.library;
+      } else if (showRepoTab && currentTabIndex == 2) {
+        _currentTab = ShellTab.repository;
+      } else if (showSearchTab && currentTabIndex == (showRepoTab ? 3 : 2)) {
+        _currentTab = ShellTab.search;
+      } else {
+        _currentTab = ShellTab.settings;
+      }
+    }
     _scheduleChromeUpdate();
   }
 
@@ -179,6 +195,105 @@ class ShellNavigationService {
     if (key != null) return key.currentState;
     return _settingsDetailNavigator?.call();
   }
+
+  static final List<ShellTab> _backHistory = <ShellTab>[];
+  static final List<ShellTab> _forwardHistory = <ShellTab>[];
+  static ShellTab? _currentTab;
+  static bool _isNavigatingHistory = false;
+
+  /// Records a tab visit into navigation history.
+  static void recordTabVisit(ShellTab tab) {
+    if (_isNavigatingHistory) return;
+    if (_currentTab == null) {
+      _currentTab = tab;
+      return;
+    }
+    if (_currentTab == tab) return;
+    _backHistory.add(_currentTab!);
+    _forwardHistory.clear();
+    _currentTab = tab;
+  }
+
+  /// Whether application-level back navigation is currently possible.
+  static bool get canNavigateBack {
+    final nav = activeBackNavigator();
+    if (nav != null && nav.canPop()) return true;
+    return _backHistory.isNotEmpty;
+  }
+
+  /// Whether application-level forward navigation is currently possible.
+  static bool get canNavigateForward => _forwardHistory.isNotEmpty;
+
+  /// Navigates back: first pops inner pages in the active tab if any,
+  /// otherwise navigates back in tab history.
+  static bool navigateBack() {
+    final nav = activeBackNavigator();
+    if (nav != null && nav.canPop()) {
+      unawaited(nav.maybePop());
+      return true;
+    }
+    if (_backHistory.isNotEmpty) {
+      final prevTab = _backHistory.removeLast();
+      if (_currentTab != null) {
+        _forwardHistory.add(_currentTab!);
+      }
+      _isNavigatingHistory = true;
+      try {
+        _currentTab = prevTab;
+        if (prevTab == ShellTab.search) {
+          requestSearch();
+        } else {
+          requestTab(prevTab);
+        }
+      } finally {
+        _isNavigatingHistory = false;
+      }
+      return true;
+    }
+    return false;
+  }
+
+  /// Navigates forward in tab history.
+  static bool navigateForward() {
+    if (_forwardHistory.isNotEmpty) {
+      final nextTab = _forwardHistory.removeLast();
+      if (_currentTab != null) {
+        _backHistory.add(_currentTab!);
+      }
+      _isNavigatingHistory = true;
+      try {
+        _currentTab = nextTab;
+        if (nextTab == ShellTab.search) {
+          requestSearch();
+        } else {
+          requestTab(nextTab);
+        }
+      } finally {
+        _isNavigatingHistory = false;
+      }
+      return true;
+    }
+    return false;
+  }
+
+  @visibleForTesting
+  static void resetHistory({ShellTab? initialTab}) {
+    _backHistory.clear();
+    _forwardHistory.clear();
+    _currentTab = initialTab;
+    _isNavigatingHistory = false;
+  }
+
+  @visibleForTesting
+  static List<ShellTab> get backHistoryForTesting =>
+      List.unmodifiable(_backHistory);
+
+  @visibleForTesting
+  static List<ShellTab> get forwardHistoryForTesting =>
+      List.unmodifiable(_forwardHistory);
+
+  @visibleForTesting
+  static ShellTab get currentTabForTesting => _currentTab ?? ShellTab.home;
 }
 
 /// Track the top page in each tab. Dialogs keep the underlying page's contrast;
