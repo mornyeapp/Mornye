@@ -26,6 +26,7 @@ import 'package:mornye/widgets/no_scrollbars.dart';
 import 'package:mornye/widgets/player_artwork.dart';
 import 'package:mornye/widgets/player_lyrics_section.dart';
 import 'package:mornye/widgets/player_metadata_title.dart';
+import 'package:mornye/widgets/playback_source_label.dart';
 import 'package:mornye/widgets/player_playback_controls.dart';
 import 'package:mornye/widgets/player_volume_control.dart';
 
@@ -458,6 +459,10 @@ class _PlayerColumn extends StatelessWidget {
                           (mornye ? textTheme.bodyMedium : textTheme.titleSmall)
                               ?.copyWith(color: colorScheme.onSurfaceVariant),
                     ),
+                  PlaybackSourceLabel(
+                    item: mediaItem,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
                 ],
               ),
             ),

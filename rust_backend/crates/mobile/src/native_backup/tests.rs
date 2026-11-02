@@ -149,11 +149,35 @@ impl Fixture {
 fn backup_replace_round_trip_preserves_flags_dates_keys_order_and_fts() {
     let fixture = Fixture::new();
     fixture.restore(&[track("old")], 1, &|| Ok(())).unwrap();
-    fixture.db.execute_batch("PRAGMA user_version=17").unwrap();
+    fixture.db.execute_batch("PRAGMA user_version=18").unwrap();
+    let mut saved = track("a");
+    saved["originFilePath"] = "network://nas/Artist/Album/a.flac".into();
     fixture
-        .restore(&[track("b"), track("a")], 2, &|| Ok(()))
+        .restore(&[track("b"), saved], 2, &|| Ok(()))
         .unwrap();
     assert_eq!(fixture.ids(), ["a", "b"]);
+    assert_eq!(
+        fixture
+            .db
+            .query_row(
+                "SELECT origin_file_path FROM history WHERE id='a'",
+                [],
+                |row| row.get::<_, String>(0)
+            )
+            .unwrap(),
+        "network://nas/Artist/Album/a.flac"
+    );
+    assert_eq!(
+        fixture
+            .db
+            .query_row(
+                "SELECT COUNT(*) FROM history_path_keys WHERE path_key LIKE 'network://%'",
+                [],
+                |row| row.get::<_, i64>(0)
+            )
+            .unwrap(),
+        0
+    );
     assert!(
         fixture
             .db

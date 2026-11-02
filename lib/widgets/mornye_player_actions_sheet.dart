@@ -8,6 +8,7 @@ import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/theme/cover_palette.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/mornye_context_menu.dart';
+import 'package:mornye/services/network_offline_saver.dart';
 
 /// Navigation for the title/artist, separate from playback and file actions.
 class MornyePlayerNavigationMenu extends StatelessWidget {
@@ -147,6 +148,16 @@ class MornyePlayerActionsSheet extends ConsumerWidget {
                 'linkSave',
                 context.l10n.linkSaveToPhone,
                 CupertinoIcons.device_phone_portrait,
+              ),
+            if (!saveToPhone &&
+                canSaveNetworkOfflineSource(
+                  mediaItem.extras?['source']?.toString() ?? '',
+                ))
+              _action(
+                context,
+                'networkOffline',
+                context.l10n.offlineSave,
+                CupertinoIcons.arrow_down_circle,
               ),
           ],
           [

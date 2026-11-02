@@ -42,6 +42,7 @@ import 'package:mornye/widgets/desktop/track_table.dart';
 import 'package:mornye/widgets/error_card.dart';
 import 'package:mornye/widgets/expressive_button.dart';
 import 'package:mornye/widgets/library_selection_playback_actions.dart';
+import 'package:mornye/widgets/network_offline_actions.dart';
 import 'package:mornye/widgets/library_track_selection_bar.dart';
 import 'package:mornye/widgets/local_library_artwork_builder.dart';
 import 'package:mornye/widgets/playlist_picker_sheet.dart';
@@ -517,6 +518,14 @@ class _LibraryDirectoryViewState extends ConsumerState<LibraryDirectoryView>
     onPlay: () => _playFolder(folder),
     onShuffle: () => _playFolder(folder, shuffle: true),
     onAddToPlaylist: () => _addFolderToPlaylist(folder),
+    onDownload: !folder.key.startsWith('network://')
+        ? null
+        : () async {
+            final items = await ref.read(libraryDirectoryItemsLoaderProvider)(
+              folder.allTracks,
+            );
+            if (mounted) await saveNetworkOffline(context, ref, items);
+          },
   );
 
   /// The album pages' desktop header: the folder's cover, name and path,

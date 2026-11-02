@@ -395,6 +395,9 @@ class LibraryQueueStore {
           h.album_artist,
           h.cover_url,
           h.file_path,
+          h.origin_file_path,
+          EXISTS(SELECT 1 FROM library origin
+            WHERE origin.file_path = h.origin_file_path) AS origin_available,
           h.storage_mode,
           h.download_tree_uri,
           h.saf_relative_dir,
@@ -472,6 +475,8 @@ class LibraryQueueStore {
           l.album_artist,
           NULL AS cover_url,
           l.file_path,
+          NULL AS origin_file_path,
+          0 AS origin_available,
           NULL AS storage_mode,
           NULL AS download_tree_uri,
           NULL AS saf_relative_dir,
@@ -536,6 +541,8 @@ class LibraryQueueStore {
           NULL AS album_artist,
           NULL AS cover_url,
           NULL AS file_path,
+          NULL AS origin_file_path,
+          0 AS origin_available,
           NULL AS storage_mode,
           NULL AS download_tree_uri,
           NULL AS saf_relative_dir,
@@ -785,6 +792,9 @@ class LibraryQueueStore {
     bool hasCompletenessJoin = false,
     bool albumCompleteness = true,
   }) {
+    if (request.source == 'on-device') {
+      where.add("h.file_path NOT LIKE 'network://%'");
+    }
     if (albumCompleteness) {
       _appendAlbumCompletenessFilter(
         where,
@@ -844,6 +854,9 @@ class LibraryQueueStore {
     bool hasCompletenessJoin = false,
     bool albumCompleteness = true,
   }) {
+    if (request.source == 'on-device') {
+      where.add("l.file_path NOT LIKE 'network://%'");
+    }
     if (albumCompleteness) {
       _appendAlbumCompletenessFilter(
         where,
@@ -1225,6 +1238,8 @@ class LibraryQueueStore {
         'fileModTime': row['file_mod_time'],
       } else ...{
         'coverUrl': row['cover_url'],
+        'originFilePath': row['origin_file_path'],
+        'originAvailable': row['origin_available'] == 1,
         'storageMode': row['storage_mode'],
         'downloadTreeUri': row['download_tree_uri'],
         'safRelativeDir': row['saf_relative_dir'],

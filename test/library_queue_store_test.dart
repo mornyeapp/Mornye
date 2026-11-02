@@ -46,6 +46,7 @@ void main() {
     String artist = 'Artist',
     String title = 'Song',
     String? path,
+    String? origin,
   }) async {
     final file = path ?? '/$id.flac';
     await db.insert('history_db.history', {
@@ -55,6 +56,7 @@ void main() {
       'album_name': album,
       'album_artist': artist,
       'file_path': file,
+      'origin_file_path': origin,
       'downloaded_at': '2026-01-01',
       'service': 'example-provider',
       'album_key': '${album.toLowerCase()}|${artist.toLowerCase()}',
@@ -146,6 +148,111 @@ void main() {
     store = LibraryQueueStore(db, historyFts: false, localFts: false);
   });
   tearDown(() => db.close());
+
+  test(
+    'offline originals stay indexed, one row plays locally, removal reveals server',
+    () async {
+      const origin = 'network://nas/Artist/Album/01.flac';
+      await addLocal('server', 1, path: origin, album: 'Offline album');
+      await addHistory(
+        'offline-copy',
+        'Offline album',
+        1,
+        path: '/phone/Artist/Album/01.flac',
+        origin: origin,
+      );
+      final before = await store.trackPage(
+        const QueueLibraryDbQuery(searchQuery: 'offline album'),
+      );
+      expect(_tracks(before), ['downloaded:offline-copy']);
+      expect((before.rows.single['item'] as Map)['originAvailable'], isTrue);
+      expect(
+        (await db.query('library', where: 'id = ?', whereArgs: ['server'])),
+        hasLength(1),
+      );
+      expect(
+        await db.rawQuery(
+          'SELECT * FROM history_db.history_path_keys WHERE path_key = ?',
+          [origin],
+        ),
+        isEmpty,
+      );
+
+      final local = await store.trackPage(
+        const QueueLibraryDbQuery(
+          source: 'on-device',
+          searchQuery: 'offline album',
+        ),
+      );
+      expect(_tracks(local), ['downloaded:offline-copy']);
+      await db.delete(
+        'history_db.history',
+        where: 'id = ?',
+        whereArgs: ['offline-copy'],
+      );
+      await db.delete(
+        'history_db.history_path_keys',
+        where: 'item_id = ?',
+        whereArgs: ['offline-copy'],
+      );
+      expect(
+        _tracks(
+          await store.trackPage(
+            const QueueLibraryDbQuery(searchQuery: 'offline album'),
+          ),
+        ),
+        ['local:server'],
+      );
+      expect(
+        (await store.trackPage(
+          const QueueLibraryDbQuery(
+            source: 'on-device',
+            searchQuery: 'offline album',
+          ),
+        )).rows,
+        isEmpty,
+      );
+    },
+  );
+
+  test(
+    'server deletion preserves phone copy, unrelated same-title file stays separate',
+    () async {
+      const origin = 'network://nas/Artist/Album/01.flac';
+      await addLocal('server', 1, path: origin, album: 'Offline album');
+      await addLocal(
+        'other-server',
+        1,
+        path: 'network://other/01.flac',
+        album: 'Offline album',
+      );
+      await addHistory(
+        'offline-copy',
+        'Offline album',
+        1,
+        path: '/phone/01.flac',
+        origin: origin,
+      );
+      expect(
+        _tracks(
+          await store.trackPage(
+            const QueueLibraryDbQuery(searchQuery: 'offline album'),
+          ),
+        ),
+        ['downloaded:offline-copy', 'local:other-server'],
+      );
+      await db.delete('library', where: 'id = ?', whereArgs: ['server']);
+      final after = await store.trackPage(
+        const QueueLibraryDbQuery(
+          source: 'on-device',
+          searchQuery: 'offline album',
+        ),
+      );
+      expect(_tracks(after), ['downloaded:offline-copy']);
+      expect((after.rows.single['item'] as Map)['originAvailable'], isFalse);
+      expect((after.rows.single['item'] as Map)['filePath'], '/phone/01.flac');
+    },
+  );
 
   test(
     'network exclusion happens before paging and keeps local URI rows',

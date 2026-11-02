@@ -1,5 +1,10 @@
 import 'package:mornye/utils/string_utils.dart';
 
+/// Another transfer published the same origin while this one was fetching.
+class OfflineCopyAlreadySaved implements Exception {
+  const OfflineCopyAlreadySaved();
+}
+
 class DownloadHistoryItem {
   final String id;
   final String trackName;
@@ -8,6 +13,12 @@ class DownloadHistoryItem {
   final String? albumArtist;
   final String? coverUrl;
   final String filePath;
+
+  /// Stable network source of an independently saved offline copy.
+  final String? originFilePath;
+
+  /// Whether the latest Library scan still contains the original file.
+  final bool originAvailable;
   final String? storageMode;
   final String? downloadTreeUri;
   final String? safRelativeDir;
@@ -41,6 +52,14 @@ class DownloadHistoryItem {
   /// [hasReplayGain] a confirmed absence.
   final int replayGainMetadataScanVersion;
 
+  /// File copies retain their scanned Library identity for playlists/likes.
+  /// The legacy spotifyId column also stores foreign ids from other sources.
+  bool get _offlineLibraryFile =>
+      originFilePath != null &&
+      const {'Network offline', 'Mornye Link'}.contains(service);
+  String get collectionTrackId => _offlineLibraryFile ? spotifyId ?? id : id;
+  String get collectionTrackSource => _offlineLibraryFile ? 'local' : service;
+
   const DownloadHistoryItem({
     required this.id,
     required this.trackName,
@@ -49,6 +68,8 @@ class DownloadHistoryItem {
     this.albumArtist,
     this.coverUrl,
     required this.filePath,
+    this.originFilePath,
+    this.originAvailable = false,
     this.storageMode,
     this.downloadTreeUri,
     this.safRelativeDir,
@@ -88,6 +109,7 @@ class DownloadHistoryItem {
     'albumArtist': albumArtist,
     'coverUrl': coverUrl,
     'filePath': filePath,
+    'originFilePath': originFilePath,
     'storageMode': storageMode,
     'downloadTreeUri': downloadTreeUri,
     'safRelativeDir': safRelativeDir,
@@ -128,6 +150,9 @@ class DownloadHistoryItem {
         albumArtist: normalizeOptionalString(json['albumArtist'] as String?),
         coverUrl: normalizeCoverReference(json['coverUrl']?.toString()),
         filePath: json['filePath'] as String,
+        originFilePath: json['originFilePath'] as String?,
+        originAvailable:
+            json['originAvailable'] == true || json['originAvailable'] == 1,
         storageMode: json['storageMode'] as String?,
         downloadTreeUri: json['downloadTreeUri'] as String?,
         safRelativeDir: json['safRelativeDir'] as String?,
@@ -169,6 +194,8 @@ class DownloadHistoryItem {
     String? albumArtist,
     String? coverUrl,
     String? filePath,
+    String? originFilePath,
+    bool? originAvailable,
     String? storageMode,
     String? downloadTreeUri,
     String? safRelativeDir,
@@ -205,6 +232,8 @@ class DownloadHistoryItem {
       albumArtist: albumArtist ?? this.albumArtist,
       coverUrl: normalizeCoverReference(coverUrl ?? this.coverUrl),
       filePath: filePath ?? this.filePath,
+      originFilePath: originFilePath ?? this.originFilePath,
+      originAvailable: originAvailable ?? this.originAvailable,
       storageMode: storageMode ?? this.storageMode,
       downloadTreeUri: downloadTreeUri ?? this.downloadTreeUri,
       safRelativeDir: safRelativeDir ?? this.safRelativeDir,

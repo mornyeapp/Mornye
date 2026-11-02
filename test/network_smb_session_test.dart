@@ -255,6 +255,33 @@ void main() {
   }
 
   test(
+    'offline copies reuse read sessions and leave playback ranges available',
+    () async {
+      setUpStorage();
+      await storage.save(_connection());
+      final directory = await Directory.systemTemp.createTemp('smb-offline-');
+      addTearDown(() => directory.delete(recursive: true));
+      final download = NetworkFileDownload(storage);
+      addTearDown(download.close);
+      for (final path in ['A/01.flac', 'A/02.flac']) {
+        final output = File('${directory.path}/${path.split('/').last}');
+        await download.download(
+          NetworkStorageService.source('nas', path),
+          output,
+          checkpoint: () {},
+          progress: (_, _) {},
+        );
+        expect(await output.readAsBytes(), _bytes(4000));
+      }
+      download.close();
+      expect(await get('B/01.flac', 'bytes=0-3'), [0, 1, 2, 3]);
+      expect(server.opened, 1);
+      expect(server.closed, 0);
+      expect(server.openHandles, 0);
+    },
+  );
+
+  test(
     'a scan, its tag reads, covers and parallel reads share one SMB logon',
     () async {
       setUpStorage();

@@ -99,7 +99,19 @@ cover caches. Playback and Lyrics share in-flight reads and cache results for
 five minutes. Large HTTP files require server byte-range support; a tag read
 failure leaves playback available with filename/folder artwork fallbacks.
 
-Remote metadata editing, separate sidecar lyric files, offline downloads,
+Library songs can be saved for offline playback from their song menu, selection
+toolbar, album, playlist or folder. This copies the original audio file into the
+device's normal download folder, preserving the relative server folder and file
+name (Subsonic uses its original path when supplied, otherwise artist/album).
+No conversion or quality selection is applied. A stable network origin links
+the independent local History file to the retained scanned server row. Library
+shows one preferred local entry and offers an On this device filter, availability
+status, and separate removal of the local and server copies. A later scan that
+finds the server file gone leaves the offline copy alone. Playback prefers an
+available local copy even for network songs already queued. This does not change
+the network destination for new provider downloads or synchronize later edits.
+
+Remote metadata editing, separate sidecar lyric files,
 AutoMix and direct USB/DAP bit-perfect output are not part of this browser.
 Normal playback uses the platform audio decoder, so codec support follows the
 device.

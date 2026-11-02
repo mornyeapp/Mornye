@@ -652,7 +652,9 @@ Future<void> deleteLibraryTracks(
   final confirmed = await showAppConfirmDialog(
     context,
     title: context.l10n.dialogDeleteSelectedTitle,
-    message: context.l10n.dialogDeleteSelectedMessage(selected.length),
+    message: selected.every((item) => item.historyItem?.originFilePath != null)
+        ? context.l10n.offlineRemoveMessage
+        : context.l10n.dialogDeleteSelectedMessage(selected.length),
     confirmLabel: context.l10n.dialogDelete,
     destructive: true,
     cancelIsDefault: true,

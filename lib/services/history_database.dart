@@ -105,7 +105,7 @@ class HistoryDatabase {
   // the existing schema migration. The background native writer shares
   // history.db and must accept the same schema contract and
   // user_version without depending on FTS5.
-  static const int schemaVersion = 17;
+  static const int schemaVersion = 18;
   static const String searchFtsTable = 'history_search_fts';
   static final HistoryDatabase instance = HistoryDatabase._init();
   static final sqlite.SingleFlightInitializer<Database> _database =
@@ -433,6 +433,11 @@ class HistoryDatabase {
 
   Future<List<String>> getPhysicalFileIds(Iterable<String> filePaths) async =>
       sqlite.findPhysicalFileRowIds(await database, 'history', filePaths);
+
+  /// Origin aliases are deliberately separate from physical path keys:
+  /// deleting a server file must never delete its independent offline copy.
+  Future<Map<String, dynamic>?> findOfflineCopy(String origin) async =>
+      _firstRow(await database, 'origin_file_path = ?', [origin]);
 
   Future<Map<String, dynamic>?> getBySpotifyId(String spotifyId) async =>
       _firstRow(await database, 'spotify_id = ?', [spotifyId]);

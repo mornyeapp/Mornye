@@ -20,6 +20,7 @@ import 'package:mornye/widgets/player_gesture_regions.dart';
 import 'package:mornye/widgets/player_lyrics.dart';
 import 'package:mornye/widgets/player_lyrics_controls.dart';
 import 'package:mornye/widgets/player_metadata_title.dart';
+import 'package:mornye/widgets/playback_source_label.dart';
 import 'package:mornye/widgets/player_playback_controls.dart';
 import 'package:mornye/widgets/player_track_swipe.dart';
 
@@ -547,6 +548,10 @@ class MornyePlayerLayout extends ConsumerWidget {
                             ),
                           ),
                         ),
+                      ),
+                      PlaybackSourceLabel(
+                        item: mediaItem,
+                        color: colorScheme.onSurface.withValues(alpha: 0.72),
                       ),
                     ],
                   ),

@@ -129,7 +129,11 @@ final linkOfflineSaverProvider = Provider<LinkOfflineSaver?>((ref) {
     serverId: client.server.serverId,
     openTransport: () => LinkSubsonicTransport(connectionId: connectionId),
     destination: LinkDownloadFolderDestination(ref.watch(settingsProvider)),
-    record: history.addToHistory,
+    record: history.saveOfflineCopy,
+    existsOrigin: (origin) async {
+      final row = await HistoryDatabase.instance.findOfflineCopy(origin);
+      return row != null && await fileExists(row['filePath'] as String);
+    },
     temporaryDirectory: getTemporaryDirectory,
     exists: linkHistoryFileExists,
   );

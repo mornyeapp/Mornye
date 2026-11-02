@@ -10269,6 +10269,33 @@
       }
     }
   },
+  "offlineSave": "Save offline",
+  "offlineOnDevice": "On this device",
+  "offlineOnIPhone": "On iPhone",
+  "offlineOnPhone": "On phone",
+  "offlineServerOnly": "Server only",
+  "offlineServerAndDevice": "Server + device",
+  "offlineDeviceOnly": "Device only",
+  "offlineRemove": "Remove offline copy",
+  "offlineRemoveMessage": "Remove the offline copy from this device? The server file will be kept.",
+  "offlineDeleteServer": "Delete server copy",
+  "offlineServerReadOnly": "This server connection does not support deleting files.",
+  "offlineDeleteServerMessage": "Delete the original file from the server? The offline copy on this device will be kept.",
+  "offlineSaving": "Saving offline",
+  "offlineResult": "Saved {saved}, already available {skipped}, failed {failed}",
+  "@offlineResult": {
+    "placeholders": {
+      "saved": {"type": "int"},
+      "skipped": {"type": "int"},
+      "failed": {"type": "int"}
+    }
+  },
+  "offlineFailed": "Couldn't save the offline copy. Check the server connection and download folder access.",
+  "offlineNoSongs": "No network Library songs in this selection.",
+  "offlineCopyUnavailable": "The offline copy is unavailable. Save it again before deleting the server copy.",
+  "offlinePlayingLocal": "Playing from this device",
+  "offlineStreaming": "Streaming from {server}",
+  "@offlineStreaming": {"placeholders": {"server": {"type": "String"}}},
   "reorganizeLibraryFailed": "Couldn't reorganize your files: {error}",
   "@reorganizeLibraryFailed": {
     "description": "Snackbar when planning or applying the reorganization fails",

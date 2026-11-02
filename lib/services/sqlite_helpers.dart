@@ -714,7 +714,10 @@ class LibraryShadowSnapshot {
                 ..execute('DROP TABLE IF EXISTS temp.library_shadowed_next')
                 ..execute(
                   'CREATE TEMP TABLE library_shadowed_next AS '
-                  '${_shadowPairsSql(fromHistory: historyRows * 2 < libraryRows)}',
+                  '${_shadowPairsSql(fromHistory: historyRows * 2 < libraryRows)} '
+                  'UNION SELECT l.id AS item_id, h.id AS history_id '
+                  'FROM history_db.history h JOIN library l '
+                  'ON l.file_path = h.origin_file_path',
                 )
                 ..execute('DROP TABLE IF EXISTS $libraryShadowTable')
                 ..execute(

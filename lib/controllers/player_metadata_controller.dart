@@ -303,7 +303,13 @@ class PlayerMetadataController extends ChangeNotifier {
   }
 
   String _metadataPath(String source, String? resolved) =>
-      !source.startsWith('network://') && resolved?.isNotEmpty == true
+      resolved?.isNotEmpty == true &&
+          (!source.startsWith('network://') ||
+              !const {
+                'http',
+                'https',
+                'network',
+              }.contains(Uri.tryParse(resolved!)?.scheme))
       ? resolved!
       : source;
 

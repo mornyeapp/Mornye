@@ -654,6 +654,7 @@ class AlbumPlayActions extends StatelessWidget {
     required this.onShuffle,
     this.isPlaying = false,
     this.onAddToPlaylist,
+    this.onDownload,
   });
 
   final String playLabel;
@@ -664,6 +665,7 @@ class AlbumPlayActions extends StatelessWidget {
 
   /// Desktop only: a round "+" after Play that adds the songs to a playlist.
   final VoidCallback? onAddToPlaylist;
+  final VoidCallback? onDownload;
 
   @override
   Widget build(BuildContext context) {
@@ -673,6 +675,14 @@ class AlbumPlayActions extends StatelessWidget {
     if (context.isMornye) {
       return Row(
         children: [
+          if (onDownload != null) ...[
+            HeaderCircleButton(
+              icon: Icons.download_for_offline_outlined,
+              tooltip: context.l10n.offlineSave,
+              onPressed: onDownload,
+            ),
+            const SizedBox(width: 12),
+          ],
           Expanded(
             child: HeaderFilledButton(
               icon: isPlaying
@@ -694,10 +704,16 @@ class AlbumPlayActions extends StatelessWidget {
       );
     }
     return ExpressiveButtonGroup(
-      flexible: const {0},
+      flexible: {onDownload == null ? 0 : 1},
       spacing: tokens.gapMd,
       slotWidth: tokens.minTouchTarget,
       children: [
+        if (onDownload != null)
+          HeaderCircleButton(
+            icon: Icons.download_for_offline_outlined,
+            tooltip: context.l10n.offlineSave,
+            onPressed: onDownload,
+          ),
         ExpressiveButton(
           onPressed: onPlay,
           icon: AppIcon(isPlaying ? Icons.pause : Icons.play_arrow, size: 20),
@@ -731,6 +747,12 @@ class AlbumPlayActions extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         spacing: 10,
         children: [
+          if (onDownload != null)
+            HeaderCircleButton(
+              icon: Icons.download_for_offline_outlined,
+              tooltip: context.l10n.offlineSave,
+              onPressed: onDownload,
+            ),
           HeaderCircleButton(
             icon: CupertinoIcons.shuffle,
             tooltip: shuffleTooltip,
@@ -758,6 +780,12 @@ class AlbumPlayActions extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       spacing: 8,
       children: [
+        if (onDownload != null)
+          HeaderCircleButton(
+            icon: Icons.download_for_offline_outlined,
+            tooltip: context.l10n.offlineSave,
+            onPressed: onDownload,
+          ),
         FilledButton.icon(
           onPressed: onPlay,
           icon: AppIcon(isPlaying ? Icons.pause : Icons.play_arrow, size: 20),

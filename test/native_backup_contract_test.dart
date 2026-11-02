@@ -91,6 +91,7 @@ void main() {
         albumName: ' Album ',
         albumArtist: ' Album Artist ',
         coverUrl: 'https://example.test/cover.jpg',
+        originFilePath: 'network://nas/Artist/Album/Track.flac',
         filePath: 'content://nas.provider/tree/root/document/Ab%252FC.flac',
         storageMode: 'saf',
         downloadTreeUri: 'content://nas.provider/tree/root',

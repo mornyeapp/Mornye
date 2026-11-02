@@ -22,6 +22,7 @@ abstract final class HistorySchema {
         album_artist TEXT,
         cover_url TEXT,
         file_path TEXT NOT NULL,
+        origin_file_path TEXT,
         storage_mode TEXT,
         download_tree_uri TEXT,
         saf_relative_dir TEXT,
@@ -71,6 +72,7 @@ abstract final class HistorySchema {
     await _createNormalizedIndexes(db);
     await _createQueueIndexes(db);
     await _createPathKeyTable(db);
+    await _createOriginIndex(db);
     final searchFtsAvailable = await createSearchFts(db);
 
     _log.i('Database schema created with indexes');
@@ -161,7 +163,15 @@ abstract final class HistorySchema {
       }
       await _createQueueIndexes(db);
     }
+    if (oldVersion < 18) {
+      await addColumn('origin_file_path', 'TEXT');
+      await _createOriginIndex(db);
+    }
   }
+
+  static Future<void> _createOriginIndex(DatabaseExecutor db) => db.execute(
+    'CREATE INDEX IF NOT EXISTS idx_history_origin ON history(origin_file_path)',
+  );
 
   /// No query seeks or orders by these. v16 and the native writer drop them.
   static const unusedIndexes = [

@@ -485,6 +485,67 @@ void main() {
     );
   }
 
+  test(
+    'offline origins are shadowed in both query paths without physical aliases',
+    () async {
+      await _seed();
+      final db = await LibraryDatabase.instance.database;
+      const origin = 'network://nas/Artist/Album/original.flac';
+      await _addScanned(
+        db,
+        _scanned('server-original', origin, album: 40, number: 1),
+      );
+      final offline = {
+        ..._download(
+          'offline-copy',
+          '/phone/original.flac',
+          album: 40,
+          number: 1,
+        ),
+        'originFilePath': origin,
+      };
+      await HistoryDatabase.instance.upsert(offline);
+      await LibraryDatabase.instance.getQueueTrackPage(
+        const QueueLibraryDbQuery(),
+      );
+      final snapshot = sqlite.LibraryShadowSnapshot();
+      expect(await snapshot.read(db, (ready) async => ready), isTrue);
+      for (final useSnapshot in [false, true]) {
+        final store = LibraryQueueStore(
+          db,
+          historyFts: false,
+          localFts: false,
+          shadowSnapshot: useSnapshot,
+        );
+        final page = await store.trackPage(
+          const QueueLibraryDbQuery(searchQuery: 'album 40'),
+        );
+        expect(page.rows, hasLength(1));
+        expect((page.rows.single['item'] as Map)['id'], 'offline-copy');
+      }
+      expect(
+        await db.rawQuery(
+          'SELECT item_id FROM library_path_keys WHERE path_key = ?',
+          [origin],
+        ),
+        isNotEmpty,
+      );
+      expect(
+        await HistoryDatabase.instance.getPhysicalFileIds([origin]),
+        isEmpty,
+      );
+      await HistoryDatabase.instance.deleteByIds(['offline-copy']);
+      await snapshot.refresh(db);
+      final after = await LibraryQueueStore(
+        db,
+        historyFts: false,
+        localFts: false,
+        shadowSnapshot: true,
+      ).trackPage(const QueueLibraryDbQuery(searchQuery: 'album 40'));
+      expect((after.rows.single['item'] as Map)['id'], 'server-original');
+    },
+  );
+
   test('every writer refreshes the snapshot before the next read', () async {
     await _seed();
     final library = LibraryDatabase.instance;
@@ -774,7 +835,9 @@ void main() {
     addTearDown(db.close);
     await db.execute('ATTACH DATABASE ? AS history_db', [':memory:']);
     // Without History tables every build fails.
-    await db.execute('CREATE TABLE library(id TEXT PRIMARY KEY)');
+    await db.execute(
+      'CREATE TABLE library(id TEXT PRIMARY KEY, file_path TEXT)',
+    );
     await db.execute(
       'CREATE TABLE library_path_keys(item_id TEXT NOT NULL, '
       'path_key TEXT NOT NULL)',
@@ -790,7 +853,9 @@ void main() {
     expect(snapshot.rebuilds, 2);
     expect(_warnings('Download shadow snapshot unavailable'), 1);
 
-    await db.execute('CREATE TABLE history_db.history(id TEXT)');
+    await db.execute(
+      'CREATE TABLE history_db.history(id TEXT, origin_file_path TEXT)',
+    );
     await db.execute(
       'CREATE TABLE history_db.history_path_keys(item_id TEXT NOT NULL, '
       'path_key TEXT NOT NULL)',

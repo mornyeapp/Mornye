@@ -651,6 +651,7 @@ MusicPlayerRuntime _runtime({
   Future<String?> Function(String)? recoverMissingFile,
   Future<String?> Function(String, String, AppSettings)? recoverMovedDownload,
   Future<String> Function(String)? resolveNetworkSource,
+  Future<String?> Function(String)? offlineCopy,
   Future<Map<String, dynamic>> Function(String)? readNetworkMetadata,
   CoverStore? coverStore,
 }) {
@@ -690,6 +691,7 @@ MusicPlayerRuntime _runtime({
       recoverMovedDownload: recoverMovedDownload ?? (_, _, _) async => null,
       resolveNetworkSource:
           resolveNetworkSource ?? NetworkStorageService.instance.resolve,
+      offlineCopy: offlineCopy ?? (_) async => null,
       readNetworkMetadata:
           readNetworkMetadata ?? NetworkMetadataService.instance.read,
       coverStore: coverStore,
@@ -1862,6 +1864,76 @@ void main() {
       expect(decks.single.state, PlaybackDeckState.playing);
       expect(handler.playbackState.value.playing, isTrue);
       expect(handler.mediaItem.value?.id, _track.id);
+    },
+  );
+
+  test(
+    'queued network song prefers its offline original and retains its origin',
+    () async {
+      final temp = await Directory.systemTemp.createTemp('player-offline-');
+      addTearDown(() => temp.delete(recursive: true));
+      final local = await File(
+        '${temp.path}/song.flac',
+      ).writeAsBytes([1, 2, 3]);
+      final decks = <_Deck>[];
+      var remoteRequests = 0;
+      final handler = await _runtime(
+        decks: decks,
+        offlineCopy: (_) async => local.path,
+        resolveNetworkSource: (_) async {
+          remoteRequests++;
+          throw const SocketException('Offline');
+        },
+      ).initialize();
+      await handler.setQueueAndPlay([
+        const PlayableMedia(
+          id: 'nas-song',
+          source: 'network://nas/a.flac',
+          title: 'NAS song',
+          artist: 'Artist',
+        ),
+      ]);
+      expect(decks.single.sources, [local.path]);
+      expect(remoteRequests, 0);
+      expect(handler.mediaItem.value!.extras!['source'], local.path);
+      expect(
+        handler.mediaItem.value!.extras!['originSource'],
+        'network://nas/a.flac',
+      );
+      await handler.onSourceDeleted('network://nas/a.flac');
+      expect(handler.queue.value, hasLength(1));
+      expect(handler.playbackState.value.playing, isTrue);
+    },
+  );
+
+  test(
+    'missing offline file falls back to its server without requiring a rescan',
+    () async {
+      final temp = await Directory.systemTemp.createTemp(
+        'player-offline-missing-',
+      );
+      addTearDown(() => temp.delete(recursive: true));
+      final decks = <_Deck>[];
+      final requests = <String>[];
+      final handler = await _runtime(
+        decks: decks,
+        resolveNetworkSource: (source) async {
+          requests.add(source);
+          return 'http://127.0.0.1:1/original';
+        },
+      ).initialize();
+      await handler.setQueueAndPlay([
+        PlayableMedia(
+          id: 'saved-song',
+          source: '${temp.path}/gone.flac',
+          originSource: 'network://nas/a.flac',
+          title: 'NAS song',
+          artist: 'Artist',
+        ),
+      ]);
+      expect(requests, ['network://nas/a.flac']);
+      expect(decks.single.sources, ['stream http://127.0.0.1:1/original']);
+      expect(handler.playbackState.value.playing, isTrue);
     },
   );
 

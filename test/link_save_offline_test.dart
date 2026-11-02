@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/models/download_history.dart';
 import 'package:mornye/models/library_database_models.dart';
+import 'package:mornye/models/settings.dart';
 import 'package:mornye/services/link/features/link_save_offline.dart';
 import 'package:mornye/services/link/features/link_track_refs.dart';
 import 'package:mornye/services/link/link_protocol.dart';
@@ -133,6 +134,41 @@ void main() {
     exists: exists,
     now: () => DateTime(2026, 10, 25),
   );
+
+  for (final conflict in [false, true]) {
+    test(
+      'failed publication cleans the saved file (concurrent copy: $conflict)',
+      () async {
+        final transport = _FakeTransport();
+        final saver = LinkOfflineSaver(
+          serverId: linkTestServer.serverId,
+          openTransport: () => transport,
+          destination: LinkDownloadFolderDestination(
+            AppSettings(downloadDirectory: root.path),
+          ),
+          record: (_) async {
+            if (conflict) throw const OfflineCopyAlreadySaved();
+            throw StateError('History write failed');
+          },
+          temporaryDirectory: () async => temp,
+        );
+        final result = await saver.save([
+          LinkOfflineSong(item: _row('1'), songId: '1'),
+        ]);
+        expect(result.saved, 0);
+        expect(result.failed, conflict ? 0 : 1);
+        expect(result.skipped, conflict ? 1 : 0);
+        expect(
+          await root
+              .list(recursive: true)
+              .where((entry) => entry is File)
+              .toList(),
+          isEmpty,
+        );
+        expect(await temp.list().toList(), isEmpty);
+      },
+    );
+  }
 
   test('only rows streamed from the paired desktop can be saved', () {
     final songs = linkOfflineSongs([

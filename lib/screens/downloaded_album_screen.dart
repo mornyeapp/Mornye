@@ -45,6 +45,7 @@ import 'package:mornye/widgets/animation_utils.dart';
 import 'package:mornye/widgets/library_track_selection_bar.dart';
 import 'package:mornye/widgets/library_selection_playback_actions.dart';
 import 'package:mornye/widgets/link/link_actions.dart';
+import 'package:mornye/widgets/network_offline_actions.dart';
 import 'package:mornye/widgets/disc_separator_chip.dart';
 import 'package:mornye/widgets/album_detail_header.dart';
 import 'package:mornye/widgets/mornye_artist_header.dart';
@@ -440,16 +441,21 @@ class _DownloadedAlbumScreenState extends ConsumerState<DownloadedAlbumScreen>
       meta: tracks.isNotEmpty
           ? _buildDownloadedHeaderMeta(context, tracks, commonQuality)
           : null,
-      appBarActions: ref.watch(linkPhoneClientProvider) == null
-          ? null
-          : [
-              LinkTransferButtons(
-                items: [
-                  for (final track in tracks)
-                    UnifiedLibraryItem.fromDownloadHistory(track),
-                ],
-              ),
+      appBarActions: [
+        NetworkOfflineButton(
+          items: [
+            for (final track in tracks)
+              UnifiedLibraryItem.fromDownloadHistory(track),
+          ],
+        ),
+        if (ref.watch(linkPhoneClientProvider) != null)
+          LinkTransferButtons(
+            items: [
+              for (final track in tracks)
+                UnifiedLibraryItem.fromDownloadHistory(track),
             ],
+          ),
+      ],
       actions: tracks.isNotEmpty
           ? AlbumPlayActions(
               playLabel: context.l10n.tooltipPlay,

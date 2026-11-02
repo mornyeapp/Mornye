@@ -73,6 +73,7 @@ abstract final class HistoryRowMapper {
       'album_artist': json['albumArtist'],
       'cover_url': json['coverUrl'],
       'file_path': json['filePath'],
+      'origin_file_path': json['originFilePath'],
       'storage_mode': json['storageMode'],
       'download_tree_uri': json['downloadTreeUri'],
       'saf_relative_dir': json['safRelativeDir'],
@@ -146,6 +147,9 @@ abstract final class HistoryRowMapper {
       'albumArtist': row['album_artist'],
       'coverUrl': row['cover_url'],
       'filePath': filePath,
+      'originFilePath': row['origin_file_path'],
+      if (row.containsKey('origin_available'))
+        'originAvailable': row['origin_available'] == 1,
       'storageMode': row['storage_mode'],
       'downloadTreeUri': row['download_tree_uri'],
       'safRelativeDir': row['saf_relative_dir'],

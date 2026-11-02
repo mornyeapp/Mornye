@@ -13,6 +13,7 @@ import 'package:mornye/utils/string_utils.dart';
 class PlayableMedia {
   final String id;
   final String source;
+  final String? originSource;
   final String title;
   final String artist;
   final String album;
@@ -31,6 +32,7 @@ class PlayableMedia {
   const PlayableMedia({
     required this.id,
     required this.source,
+    this.originSource,
     required this.title,
     required this.artist,
     this.album = '',
@@ -60,6 +62,7 @@ class PlayableMedia {
   Map<String, dynamic> toJson() => {
     'id': id,
     'source': source,
+    if (originSource != null) 'originSource': originSource,
     'title': title,
     'artist': artist,
     'album': album,
@@ -104,6 +107,7 @@ class PlayableMedia {
     return PlayableMedia(
       id: id,
       source: source,
+      originSource: json['originSource'] as String?,
       title: json['title'] as String? ?? '',
       artist: json['artist'] as String? ?? '',
       album: json['album'] as String? ?? '',
@@ -161,6 +165,7 @@ class PlayableMedia {
           : null,
       extras: {
         'source': source,
+        if (originSource != null) 'originSource': originSource,
         if (displayMetadata.isNotEmpty) 'displayMetadata': displayMetadata,
         if (resolvedSource != null && resolvedSource.isNotEmpty)
           'resolvedSource': resolvedSource,
@@ -214,6 +219,7 @@ PlayableMedia playableFromHistory(DownloadHistoryItem item) {
   return PlayableMedia(
     id: item.id,
     source: item.filePath,
+    originSource: item.originFilePath,
     title: item.trackName,
     artist: item.artistName,
     album: item.albumName,

@@ -35,6 +35,7 @@ import 'package:mornye/widgets/desktop/desktop_commands.dart'
     show DesktopCommand, desktopTooltip;
 import 'package:mornye/widgets/desktop/desktop_inspector.dart';
 import 'package:mornye/widgets/link/link_actions.dart';
+import 'package:mornye/widgets/network_offline_actions.dart';
 import 'package:mornye/widgets/link/link_devices_sheet.dart';
 import 'package:mornye/widgets/lyrics_options_button.dart';
 import 'package:mornye/widgets/lyrics_screen_awake.dart';
@@ -1171,6 +1172,13 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                       title: sheetContext.l10n.linkSaveToPhone,
                       onTap: () => Navigator.of(sheetContext).pop('linkSave'),
                     ),
+                  if (!saveToPhone && canSaveNetworkOfflineSource(source))
+                    SettingsItem(
+                      icon: Icons.download_for_offline_outlined,
+                      title: sheetContext.l10n.offlineSave,
+                      onTap: () =>
+                          Navigator.of(sheetContext).pop('networkOffline'),
+                    ),
                   SettingsItem(
                     icon: Icons.bedtime_outlined,
                     title: sheetContext.l10n.nowPlayingSleepTimer,
@@ -1244,6 +1252,9 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
         break;
       case 'linkSave':
         linkSaveSongsToPhone(context, ref, transfer.desktop);
+        break;
+      case 'networkOffline':
+        await savePlayingNetworkOffline(context, ref, mediaItem);
         break;
       case 'details':
         unawaited(

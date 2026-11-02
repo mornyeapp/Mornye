@@ -15,10 +15,16 @@ import 'package:mornye/services/link/link_client_api.dart';
 import 'package:mornye/services/link/link_protocol.dart';
 import 'package:mornye/services/network_storage_service.dart';
 import 'package:mornye/services/platform_bridge.dart';
+import 'package:mornye/utils/file_access.dart' show deleteFile;
 
-/// A Library song scanned from the paired desktop, which the phone can save.
+/// A Library original from Link or network storage, which this device can save.
 class LinkOfflineSong {
-  const LinkOfflineSong({required this.item, required this.songId});
+  const LinkOfflineSong({
+    required this.item,
+    required this.songId,
+    this.relativeDir,
+    this.fileName,
+  });
 
   /// A song the desktop offered (`transfers.offer`), named and recorded with
   /// the tags it sent.
@@ -29,19 +35,20 @@ class LinkOfflineSong {
     String? text(String? value) =>
         value == null || value.trim().isEmpty ? null : value.trim();
     final durationMs = song.durationMs;
+    final source = linkDesktopSongSource(
+      server,
+      song.songId,
+      format: song.suffix,
+    );
     return LinkOfflineSong(
       songId: song.songId,
       item: LocalLibraryItem(
-        id: 'link_offer_${song.songId}',
+        id: 'network_${sha256.convert(utf8.encode(source))}',
         trackName: song.title,
         artistName: song.artist,
         albumName: text(song.album) ?? '',
         albumArtist: text(song.albumArtist),
-        filePath: linkDesktopSongSource(
-          server,
-          song.songId,
-          format: song.suffix,
-        ),
+        filePath: source,
         scannedAt: DateTime.fromMillisecondsSinceEpoch(0),
         isrc: text(song.isrc),
         trackNumber: song.track,
@@ -62,8 +69,10 @@ class LinkOfflineSong {
 
   final LocalLibraryItem item;
 
-  /// The desktop catalog id of [item].
+  /// The desktop catalog id or stable network source of [item].
   final String songId;
+  final String? relativeDir;
+  final String? fileName;
 }
 
 /// The songs of [items] that stream from [server]'s Subsonic connection.
@@ -122,6 +131,11 @@ abstract interface class LinkOfflineDestination {
     required String fileName,
     required String mimeType,
   });
+}
+
+abstract interface class OfflineRollbackDestination
+    implements LinkOfflineDestination {
+  Future<void> discard(LinkOfflineStored stored);
 }
 
 /// The download folder is unavailable (no storage access granted), so no
@@ -203,7 +217,7 @@ class _Cancelled implements Exception {
   const _Cancelled();
 }
 
-/// Saves desktop songs to the phone as downloads: the original file goes
+/// Saves Library originals to this device as downloads: the original file goes
 /// into the download folder and a history record with the song's tags makes
 /// it a Library download straight away.
 class LinkOfflineSaver {
@@ -214,10 +228,15 @@ class LinkOfflineSaver {
     required this.record,
     required this.temporaryDirectory,
     this.exists,
+    this.idPrefix = 'link',
+    this.serviceName = service,
+    this.prepareSong,
+    this.historyIdForSong,
+    this.existsOrigin,
     DateTime Function()? now,
   }) : _now = now ?? DateTime.now;
 
-  /// The paired desktop the songs come from ([LinkServerRecord.serverId]).
+  /// The source namespace, or the paired desktop's [LinkServerRecord.serverId].
   final String serverId;
 
   /// A transport for one [save] run, closed when the run ends.
@@ -231,6 +250,11 @@ class LinkOfflineSaver {
   /// Whether the history record with this id exists and its file is still
   /// there; such songs are skipped. Without it every song is fetched.
   final Future<bool> Function(String historyId)? exists;
+  final String idPrefix;
+  final String serviceName;
+  final Future<LinkOfflineSong> Function(LinkOfflineSong song)? prepareSong;
+  final String Function(LinkOfflineSong song)? historyIdForSong;
+  final Future<bool> Function(String origin)? existsOrigin;
   final DateTime Function() _now;
 
   static const service = 'Mornye Link';
@@ -238,17 +262,24 @@ class LinkOfflineSaver {
   /// The history id of [songId] (contract section 13.2): the same song
   /// saved again replaces its record.
   String historyId(String songId) =>
-      'link_${sha256.convert(utf8.encode('$serverId/$songId'))}';
+      '${idPrefix}_${sha256.convert(utf8.encode('$serverId/$songId'))}';
 
   Future<bool> _has(LinkOfflineSong song) async {
     final exists = this.exists;
-    if (exists == null) return false;
     try {
-      return await exists(historyId(song.songId));
+      if (await existsOrigin?.call(song.item.filePath) ?? false) return true;
+    } on Object {
+      // Older records can still be found by their stable transfer id.
+    }
+    try {
+      return await exists?.call(_songHistoryId(song)) ?? false;
     } on Object {
       return false;
     }
   }
+
+  String _songHistoryId(LinkOfflineSong song) =>
+      historyIdForSong?.call(song) ?? historyId(song.songId);
 
   static String _extension(LocalLibraryItem item) {
     final format = item.format?.trim().toLowerCase() ?? '';
@@ -283,20 +314,22 @@ class LinkOfflineSaver {
     final item = song.item;
     final saf = stored.storageMode == 'saf';
     return DownloadHistoryItem(
-      id: historyId(song.songId),
+      id: _songHistoryId(song),
       trackName: item.trackName,
       artistName: item.artistName,
       albumName: item.albumName,
       albumArtist: item.albumArtist,
       coverUrl: item.coverPath,
       filePath: stored.filePath,
+      originFilePath: item.filePath,
       storageMode: stored.storageMode,
       downloadTreeUri: saf ? stored.treeUri : null,
       safRelativeDir: saf ? stored.relativeDir : null,
       safFileName: saf ? stored.fileName : null,
-      service: service,
+      service: serviceName,
       downloadedAt: _now(),
       isrc: item.isrc,
+      spotifyId: item.id,
       trackNumber: item.trackNumber,
       totalTracks: item.totalTracks,
       discNumber: item.discNumber,
@@ -362,7 +395,11 @@ class LinkOfflineSaver {
           ),
         );
         LinkOfflineOutcome outcome;
+        LinkOfflineStored? published;
+        var recorded = false;
         try {
+          final prepared = await prepareSong?.call(song) ?? song;
+          checkpoint();
           await transport.download(
             song.songId,
             file,
@@ -378,23 +415,39 @@ class LinkOfflineSaver {
             ),
           );
           checkpoint();
-          final fileName = fileNameFor(song.item);
+          final fileName = prepared.fileName ?? fileNameFor(song.item);
           final stored = await destination.store(
             file,
-            relativeDir: relativeDirFor(song.item),
+            relativeDir: prepared.relativeDir ?? relativeDirFor(song.item),
             fileName: fileName,
             mimeType: networkContentType(fileName),
           );
+          published = stored;
           await record(_history(song, stored));
+          recorded = true;
           saved++;
           outcome = LinkOfflineOutcome.saved;
         } on LinkOfflineNoFolder {
           rethrow;
+        } on OfflineCopyAlreadySaved {
+          skipped++;
+          outcome = LinkOfflineOutcome.skipped;
         } on Object {
           if (cancel?.cancelled ?? false) break;
           failed++;
           outcome = LinkOfflineOutcome.failed;
         } finally {
+          if (!recorded &&
+              published != null &&
+              destination is OfflineRollbackDestination) {
+            try {
+              await (destination as OfflineRollbackDestination).discard(
+                published,
+              );
+            } catch (_) {
+              // Cleanup must not hide the original persistence failure.
+            }
+          }
           try {
             if (await file.exists()) await file.delete();
           } on FileSystemException {
@@ -466,10 +519,25 @@ class LinkSubsonicTransport implements LinkOfflineTransport {
 /// [LinkOfflineDestination] for the download folder the settings choose:
 /// Android's storage access tree in `saf` mode, else the download directory
 /// (through its security-scoped bookmark on iOS), else `Documents/Mornye`.
-class LinkDownloadFolderDestination implements LinkOfflineDestination {
+class LinkDownloadFolderDestination implements OfflineRollbackDestination {
   const LinkDownloadFolderDestination(this.settings);
 
   final AppSettings settings;
+
+  @override
+  Future<void> discard(LinkOfflineStored stored) async {
+    IosSecurityScopedAccess? access;
+    try {
+      if (Platform.isIOS && settings.downloadDirectoryBookmark.isNotEmpty) {
+        access = await PlatformBridge.startAccessingIosBookmark(
+          settings.downloadDirectoryBookmark,
+        );
+      }
+      await deleteFile(stored.filePath);
+    } finally {
+      if (access != null) await PlatformBridge.stopAccessingIosBookmark(access);
+    }
+  }
 
   @override
   Future<LinkOfflineStored> store(

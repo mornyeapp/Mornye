@@ -670,14 +670,29 @@ extension _QueueTabItemWidgets on _QueueTabState {
 
     // Scanned SAF tracks also recover artwork after a transient provider error.
     if (isDownloaded || item.filePath.startsWith('content://')) {
-      return ValueListenableBuilder<int>(
-        valueListenable: _embeddedCoverVersion,
-        builder: (context, _, child) =>
-            _buildUnifiedCoverImageInner(item, colorScheme, isDownloaded, size),
+      return OfflineAvailabilityCover(
+        item: item,
+        child: ValueListenableBuilder<int>(
+          valueListenable: _embeddedCoverVersion,
+          builder: (context, _, child) => _buildUnifiedCoverImageInner(
+            item,
+            colorScheme,
+            isDownloaded,
+            size,
+          ),
+        ),
       );
     }
 
-    return _buildUnifiedCoverImageInner(item, colorScheme, isDownloaded, size);
+    return OfflineAvailabilityCover(
+      item: item,
+      child: _buildUnifiedCoverImageInner(
+        item,
+        colorScheme,
+        isDownloaded,
+        size,
+      ),
+    );
   }
 
   Widget _buildUnifiedCoverImageInner(
@@ -1121,6 +1136,18 @@ extension _QueueTabItemWidgets on _QueueTabState {
                     colorScheme,
                     quality,
                     listStyle: true,
+                  ),
+                ],
+                if (offlineAvailabilityLabel(context, item)
+                    case final status?) ...[
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      status,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.labelSmall,
+                    ),
                   ),
                 ],
               ],

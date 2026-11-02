@@ -45,6 +45,7 @@ import 'package:mornye/utils/playback_artwork.dart';
 import 'package:mornye/services/downloaded_embedded_cover_resolver.dart';
 import 'package:mornye/utils/logger.dart';
 import 'package:mornye/services/playable_media.dart';
+import 'package:mornye/utils/file_access.dart' show fileExists;
 
 export 'autoplay_signal.dart';
 export 'music_player_runtime.dart';
@@ -1167,10 +1168,30 @@ class MusicPlayerHandler extends BaseAudioHandler
   Future<String?> _resolveSource(PlayableMedia media) async {
     if (media.source.startsWith('network://')) {
       try {
+        final copy = await _dependencies.offlineCopy(media.source);
+        if (copy != null) {
+          final resolved = copy.startsWith('content://')
+              ? await _sourceCache.resolve(copy)
+              : copy;
+          if (resolved != null) return resolved;
+        }
+      } catch (_) {
+        // An unavailable local copy leaves the server source usable.
+      }
+      try {
         return await _dependencies.resolveNetworkSource(media.source);
       } catch (_) {
         _log.w('Network source is unavailable');
         return null;
+      }
+    }
+    if (media.originSource case final origin?) {
+      if (!await fileExists(media.source)) {
+        try {
+          return await _dependencies.resolveNetworkSource(origin);
+        } catch (_) {
+          return null;
+        }
       }
     }
     if (!media.isContentUri) {
@@ -1187,7 +1208,13 @@ class MusicPlayerHandler extends BaseAudioHandler
         return null;
       }
     }
-    return _sourceCache.resolve(media.source);
+    final resolved = await _sourceCache.resolve(media.source);
+    if (resolved == null && media.originSource != null) {
+      try {
+        return await _dependencies.resolveNetworkSource(media.originSource!);
+      } catch (_) {}
+    }
+    return resolved;
   }
 
   Future<void> _cleanupPendingResolvedPaths() => _sourceCache.releaseUnpinned();
@@ -1664,6 +1691,19 @@ class MusicPlayerHandler extends BaseAudioHandler
     bool startPaused = false,
   }) async {
     await _cast.applyOutput();
+    if (!_isCurrentPlayRequest(generation, media)) return;
+    if (media.source.startsWith('network://')) {
+      try {
+        final copy = await _dependencies.offlineCopy(media.source);
+        if (!_isCurrentPlayRequest(generation, media)) return;
+        if (copy != null) {
+          _relocateQueuedSource(media.source, copy, origin: media.source);
+          media = _media[_index];
+        }
+      } catch (_) {
+        // Keep the original source when a local lookup is unavailable.
+      }
+    }
     if (!_isCurrentPlayRequest(generation, media)) return;
     _pausedByInterruption = false;
     _interruptionActive = false;
@@ -2387,7 +2427,11 @@ class MusicPlayerHandler extends BaseAudioHandler
   Future<void> playMediaItem(MediaItem mediaItem) =>
       playFromMediaId(mediaItem.id);
 
-  void _relocateQueuedSource(String previous, String replacement) {
+  void _relocateQueuedSource(
+    String previous,
+    String replacement, {
+    String? origin,
+  }) {
     _normalizationCache.invalidate(previous);
     unawaited(_sourceCache.invalidate(previous));
     for (var i = 0; i < _media.length; i++) {
@@ -2396,10 +2440,16 @@ class MusicPlayerHandler extends BaseAudioHandler
       _media[i] = PlayableMedia.fromJson({
         ...media.toJson(),
         'source': replacement,
+        'originSource': ?origin,
       })!;
       final old = _queueItems[i];
       final next = old.copyWith(
-        extras: {...?old.extras, 'source': replacement, 'resolvedSource': null},
+        extras: {
+          ...?old.extras,
+          'source': replacement,
+          'resolvedSource': null,
+          'originSource': ?origin,
+        },
       );
       _queueItems[i] = next;
       final original = _originalQueueOrder?.indexWhere(
@@ -2516,6 +2566,11 @@ class MusicPlayerHandler extends BaseAudioHandler
   Future<void> onSourceDeleted(String source) async {
     final target = source.trim();
     if (_disposed || target.isEmpty) return;
+    if (target.startsWith('network://')) {
+      try {
+        if (await _dependencies.offlineCopy(target) != null) return;
+      } catch (_) {}
+    }
 
     final hadPendingResolution = await _sourceCache.invalidate(target);
 

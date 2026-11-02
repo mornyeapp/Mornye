@@ -17,4 +17,7 @@ String libraryNotShadowedSql(String alias, {bool snapshot = false}) => snapshot
     FROM library_path_keys lpk
     JOIN history_db.history_path_keys hpk ON hpk.path_key = lpk.path_key
     WHERE lpk.item_id = $alias.id
+    UNION ALL
+    SELECT 1 FROM history_db.history offline
+    WHERE offline.origin_file_path = $alias.file_path
   )''';

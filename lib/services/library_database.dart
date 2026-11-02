@@ -251,6 +251,30 @@ class LibraryDatabase {
     required String sourceId,
   }) => _ingestion.upsertBatchExcludingHistory(items, sourceId: sourceId);
 
+  /// Retains the original of a NAS download before History moves to its local
+  /// copy. Unlike a scan import this must keep the currently shadowed row.
+  Future<void> retainOfflineOrigin(
+    LocalLibraryItem item,
+    String sourceId,
+  ) async {
+    final db = await database;
+    await db.transaction((txn) async {
+      final batch = txn.batch();
+      batch.insert(
+        'library',
+        LibraryRowMapper.encode(item.toJson(), sourceId: sourceId),
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+      sqlite.putPathKeysInBatch(
+        batch,
+        'library_path_keys',
+        item.id,
+        item.filePath,
+      );
+      await batch.commit(noResult: true);
+    });
+  }
+
   Future<List<LocalLibrarySource>> getSources() async {
     final db = await database;
     final rows = await db.rawQuery('''

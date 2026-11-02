@@ -85,6 +85,8 @@ bool _sameHistoryItem(DownloadHistoryItem a, DownloadHistoryItem b) =>
         a.albumArtist == b.albumArtist &&
         a.coverUrl == b.coverUrl &&
         a.filePath == b.filePath &&
+        a.originFilePath == b.originFilePath &&
+        a.originAvailable == b.originAvailable &&
         a.storageMode == b.storageMode &&
         a.downloadTreeUri == b.downloadTreeUri &&
         a.safRelativeDir == b.safRelativeDir &&
@@ -396,6 +398,32 @@ class DownloadHistoryNotifier extends Notifier<DownloadHistoryState> {
       preserveTrackVariant: preserveTrackVariant,
     ),
   );
+
+  /// Serialized with Link, NAS transfers and ordinary History mutations.
+  /// A concurrent transfer must not publish a second row for one origin.
+  Future<void> saveOfflineCopy(DownloadHistoryItem item) =>
+      _enqueueHistoryWrite(() async {
+        final origin = item.originFilePath;
+        if (origin == null || !origin.startsWith('network://')) {
+          throw const FormatException('An offline copy needs a network origin');
+        }
+        final existing = await _db.findOfflineCopy(origin);
+        var incoming = item;
+        if (existing != null) {
+          final path = existing['filePath'] as String;
+          if (path != item.filePath && await fileExists(path)) {
+            throw const OfflineCopyAlreadySaved();
+          }
+          incoming = DownloadHistoryItem.fromJson(
+            item.toJson()..['id'] = existing['id'],
+          );
+        }
+        await _persistHistoryItem(
+          incoming,
+          'save offline copy',
+          preserveTrackVariant: true,
+        );
+      });
 
   Future<void> adoptNativeHistoryItem(
     DownloadHistoryItem item, {

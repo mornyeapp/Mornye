@@ -46,6 +46,7 @@ import 'package:mornye/services/source_metadata_events.dart';
 import 'package:mornye/services/system_volume_service.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/utils/logger.dart';
+import 'package:mornye/utils/file_access.dart' show fileExists;
 
 final _log = AppLogger('MusicPlayerRuntime');
 
@@ -64,6 +65,7 @@ class PlaybackDependencies {
     this.readMetadata = PlatformBridge.readFileMetadata,
     this.readNetworkMetadata = _readNetworkMetadata,
     this.resolveNetworkSource = _resolveNetworkSource,
+    this.offlineCopy = _offlineCopy,
     this.networkSourceReachable = _networkSourceReachable,
     this.recoverMissingFile = _recoverMissingFile,
     this.recoverMovedDownload = _recoverMovedDownload,
@@ -110,6 +112,7 @@ class PlaybackDependencies {
   readMetadata;
   final Future<Map<String, dynamic>> Function(String) readNetworkMetadata;
   final Future<String> Function(String) resolveNetworkSource;
+  final Future<String?> Function(String) offlineCopy;
 
   /// Whether a `network://` Library song can play now, as autoplay asks
   /// before queueing it.
@@ -202,6 +205,12 @@ class PlaybackDependencies {
       NetworkMetadataService.instance.read(source);
   static Future<String> _resolveNetworkSource(String source) =>
       NetworkStorageService.instance.resolve(source);
+  static Future<String?> _offlineCopy(String source) async {
+    final row = await HistoryDatabase.instance.findOfflineCopy(source);
+    final path = row?['filePath'] as String?;
+    return path != null && await fileExists(path) ? path : null;
+  }
+
   static Future<bool> _networkSourceReachable(String source) =>
       NetworkStorageService.instance.reachable(source);
   static Future<String?> _recoverMissingFile(String path) async {

@@ -46,6 +46,7 @@ import 'package:mornye/widgets/animation_utils.dart';
 import 'package:mornye/widgets/app_snack_bar.dart';
 import 'package:mornye/widgets/library_track_selection_bar.dart';
 import 'package:mornye/widgets/link/link_actions.dart';
+import 'package:mornye/widgets/network_offline_actions.dart';
 import 'package:mornye/widgets/library_selection_playback_actions.dart';
 import 'package:mornye/widgets/local_library_artwork_builder.dart';
 import 'package:mornye/widgets/disc_separator_chip.dart';
@@ -440,9 +441,11 @@ class _LocalAlbumScreenState extends ConsumerState<LocalAlbumScreen>
         ),
       ),
       meta: _buildLocalHeaderMeta(context, qualityLabelMode),
-      appBarActions: ref.watch(linkPhoneClientProvider) == null
-          ? null
-          : [LinkTransferButtons(items: _albumItems())],
+      appBarActions: [
+        NetworkOfflineButton(items: _albumItems()),
+        if (ref.watch(linkPhoneClientProvider) != null)
+          LinkTransferButtons(items: _albumItems()),
+      ],
       actions: Consumer(
         builder: (context, ref, _) {
           final isCurrent = ref.watch(

@@ -23,6 +23,7 @@ part 'network_storage_upload.dart';
 part 'network_storage_delete.dart';
 part 'network_storage_edit.dart';
 part 'network_storage_subsonic.dart';
+part 'network_storage_download.dart';
 
 typedef _SmbListingInput = ({
   List<({String name, bool directory, int size, int modifiedTime})> files,

@@ -15,6 +15,7 @@ import 'package:mornye/widgets/player_compact_bar.dart';
 import 'package:mornye/widgets/player_gesture_regions.dart';
 import 'package:mornye/widgets/player_lyrics_controls.dart';
 import 'package:mornye/widgets/player_metadata_title.dart';
+import 'package:mornye/widgets/playback_source_label.dart';
 import 'package:mornye/widgets/player_playback_controls.dart';
 import 'package:mornye/widgets/player_volume_control.dart';
 
@@ -371,6 +372,10 @@ class MaterialPlayerLayout extends StatelessWidget {
                           maxLines: compact ? 1 : 2,
                         ),
                         SizedBox(height: compact ? 4 : 6),
+                        PlaybackSourceLabel(
+                          item: mediaItem,
+                          color: colorScheme.onSurfaceVariant,
+                        ),
                         Consumer(
                           builder: (context, ref, _) {
                             final track = ref

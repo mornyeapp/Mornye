@@ -120,8 +120,8 @@ class UnifiedLibraryItem {
   String get collectionKey {
     if (historyItem != null) {
       return libraryTrackCollectionKey(
-        id: historyItem!.id,
-        source: historyItem!.service,
+        id: historyItem!.collectionTrackId,
+        source: historyItem!.collectionTrackSource,
         isrc: historyItem!.isrc,
       );
     }
@@ -139,7 +139,7 @@ class UnifiedLibraryItem {
     if (historyItem != null) {
       final h = historyItem!;
       return Track(
-        id: h.id,
+        id: h.collectionTrackId,
         name: h.trackName,
         artistName: h.artistName,
         albumName: h.albumName,
@@ -150,7 +150,7 @@ class UnifiedLibraryItem {
         trackNumber: h.trackNumber,
         discNumber: h.discNumber,
         releaseDate: h.releaseDate,
-        source: h.service,
+        source: h.collectionTrackSource,
       );
     }
     if (localItem != null) {

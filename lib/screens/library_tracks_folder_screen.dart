@@ -46,6 +46,7 @@ import 'package:mornye/screens/track_metadata_screen.dart';
 import 'package:mornye/widgets/selection_action_button.dart';
 import 'package:mornye/widgets/in_library_badge.dart';
 import 'package:mornye/widgets/link/link_actions.dart';
+import 'package:mornye/widgets/network_offline_actions.dart';
 import 'package:mornye/widgets/playlist_picker_sheet.dart';
 import 'package:mornye/widgets/collection_suggestions_section.dart';
 import 'package:mornye/widgets/animation_utils.dart';
@@ -914,6 +915,10 @@ class _LibraryTracksFolderScreenState
             child: Text(context.l10n.dialogSave),
           ),
         if (!_editingOrder) ...[
+          if (!isSelectionMode && entries.isNotEmpty)
+            NetworkOfflineTracksButton(
+              tracks: [for (final entry in entries) entry.track],
+            ),
           if (!isSelectionMode && entries.isNotEmpty)
             HeaderCircleButton(
               icon: Icons.ios_share,

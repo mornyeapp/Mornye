@@ -4,6 +4,8 @@ import 'dart:io';
 /// Owns SAF playback copies, including copies that finish after invalidation.
 /// Transport pins keep active and prepared decks alive until they release them.
 class ContentUriPlaybackCache {
+  bool ownsPath(String path) =>
+      _entries.values.any((entry) => entry.path == path);
   ContentUriPlaybackCache({
     required Future<String?> Function(String) copy,
     required bool Function() isDisposed,

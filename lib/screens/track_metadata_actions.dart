@@ -169,7 +169,9 @@ extension _TrackMetadataFileActions on _TrackMetadataScreenState {
     final confirmed = await showAppConfirmDialog(
       screenContext,
       title: l10n.trackDeleteConfirmTitle,
-      message: _isNetworkItem
+      message: _downloadItem?.originFilePath != null
+          ? l10n.offlineRemoveMessage
+          : _isNetworkItem
           ? l10n.trackDeleteNetworkConfirmMessage
           : l10n.trackDeleteConfirmMessage,
       confirmLabel: l10n.dialogDelete,
