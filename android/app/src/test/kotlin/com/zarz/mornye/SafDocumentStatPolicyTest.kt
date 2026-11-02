@@ -38,4 +38,10 @@ class SafDocumentStatPolicyTest {
         assertEquals(123L, result.getLong("modified"))
         assertEquals("audio/flac", result.getString("mime_type"))
     }
+
+    @Test fun displayNameIsPreservedOnlyForExistingDocuments() {
+        val name = "Song: Live 100%.flac"
+        assertEquals(name, safDocumentStatResult(true, displayName = name).getString("display_name"))
+        assertTrue(safDocumentStatResult(false, displayName = name).isNull("display_name"))
+    }
 }

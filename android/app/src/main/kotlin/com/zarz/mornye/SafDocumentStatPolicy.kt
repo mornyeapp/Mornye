@@ -10,6 +10,7 @@ internal fun safDocumentStatResult(
     size: Long? = null,
     modified: Long? = null,
     mimeType: String? = null,
+    displayName: String? = null,
 ): JSONObject {
     if (hasRow == null || loading) throw IOException("SAF document metadata is unavailable")
     return JSONObject()
@@ -17,4 +18,5 @@ internal fun safDocumentStatResult(
         .put("size", if (hasRow) size ?: JSONObject.NULL else JSONObject.NULL)
         .put("modified", if (hasRow) modified ?: JSONObject.NULL else JSONObject.NULL)
         .put("mime_type", if (hasRow) mimeType ?: JSONObject.NULL else JSONObject.NULL)
+        .put("display_name", if (hasRow) displayName ?: JSONObject.NULL else JSONObject.NULL)
 }
