@@ -389,6 +389,72 @@ Future<void> createPathKeyTable(DatabaseExecutor db, String table) async {
   );
 }
 
+/// Adds the plain-path keys that rows stored with a Windows verbatim path
+/// (`\\?\C:\…`, `\\?\UNC\server\…`) lacked before those keys existed.
+/// Without them a scanned file and the download of the same file look like
+/// two files. Rows that already have their plain key cost one indexed probe.
+/// Returns the number of rows repaired.
+Future<int> repairWindowsVerbatimPathKeys(
+  Database db,
+  String sourceTable,
+  String keyTable,
+) async {
+  const path = 's.file_path';
+  const isUnc =
+      "upper(substr($path, 5, 3)) = 'UNC' "
+      'AND substr($path, 8, 1) = substr($path, 1, 1)';
+  final rows = await db.rawQuery(
+    'SELECT s.id, s.file_path FROM $sourceTable s '
+    r"WHERE substr(s.file_path, 1, 4) IN ('\\?\', '//?/') "
+    "AND (substr($path, 6, 1) = ':' OR ($isUnc)) "
+    'AND NOT EXISTS ('
+    '  SELECT 1 FROM $keyTable k WHERE k.item_id = s.id AND k.path_key = '
+    '    CASE WHEN $isUnc '
+    '      THEN substr($path, 1, 2) || substr($path, 9) '
+    '      ELSE substr($path, 5) END'
+    ')',
+  );
+  if (rows.isEmpty) return 0;
+  const pageSize = 250;
+  await db.transaction((txn) async {
+    for (var start = 0; start < rows.length; start += pageSize) {
+      final batch = txn.batch();
+      for (final row in rows.skip(start).take(pageSize)) {
+        putPathKeysInBatch(
+          batch,
+          keyTable,
+          row['id'] as String,
+          row['file_path'] as String?,
+          replaceExisting: false,
+        );
+      }
+      await batch.commit(noResult: true);
+    }
+  });
+  return rows.length;
+}
+
+/// [repairWindowsVerbatimPathKeys] for a database being opened. A failed
+/// repair is logged and leaves the database usable.
+Future<void> repairWindowsPathKeysOnOpen(
+  Database db,
+  String sourceTable,
+  String keyTable,
+) async {
+  try {
+    final repaired = await repairWindowsVerbatimPathKeys(
+      db,
+      sourceTable,
+      keyTable,
+    );
+    if (repaired > 0) {
+      _log.i('Added plain Windows path keys to $repaired $sourceTable rows');
+    }
+  } catch (error) {
+    _log.w('Could not repair Windows path keys in $sourceTable: $error');
+  }
+}
+
 /// Finds every index entry for these physical files, including SAF aliases.
 /// Keep extensions: deleting a FLAC must not remove a surviving Opus variant.
 Future<List<String>> findPhysicalFileRowIds(

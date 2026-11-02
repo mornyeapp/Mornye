@@ -65,7 +65,7 @@ class LibraryDatabase {
           _searchFtsAvailable = await LibrarySchema.create(db, version);
         },
         onUpgrade: LibrarySchema.upgrade,
-        onOpen: LibrarySchema.migrateIosContainerPaths,
+        onOpen: LibrarySchema.onOpen,
       );
       // Library upserts use INSERT OR REPLACE. Recursive triggers ensure the
       // implicit delete also decrements materialized lookup ref-counts.
