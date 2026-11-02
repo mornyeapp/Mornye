@@ -8498,7 +8498,7 @@
       }
     }
   },
-  "listeningStatsTotals": "{plays, plural, =1{1 відтворення} other{{plays} відтворень}} · {tracks, plural, =1{1 трек} other{{tracks} треків}} · {days, plural, =1{1 активний день} other{{days} активні дні}}",
+  "listeningStatsTotals": "{plays, plural, =1{1 відтворення} other{{plays} відтворень}} · {tracks, plural, =1{1 трек} other{{tracks} треків}} · {days, plural, =1{1 активний день} other{{days} активних днів}}",
   "@listeningStatsTotals": {
     "placeholders": {
       "plays": {
