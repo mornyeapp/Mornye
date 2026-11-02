@@ -299,17 +299,17 @@
   "exclusiveOutputWindows": "Ексклюзивний режим WASAPI",
   "exclusiveOutputMacos": "Ексклюзивний доступ (режим захоплення)",
   "exclusiveOutputLinux": "Прямий вивід ALSA",
-  "exclusiveOutputDescriptionWindows": "Bypass the Windows mixer so the output follows each track's sample rate and bit depth. Other apps cannot play sound while Mornye holds the device. AutoMix and previews are off in this mode. For bit-perfect output, keep the volume at 100% with the equalizer and normalization off.",
-  "exclusiveOutputDescriptionMacos": "Hold the output device for Mornye alone and switch it to each track's sample rate and bit depth, so Core Audio does not resample. Other apps cannot play sound while Mornye holds the device. AutoMix and previews are off in this mode. For bit-perfect output, keep the volume at 100% with the equalizer and normalization off.",
-  "exclusiveOutputDescriptionLinux": "Play straight to an ALSA hardware device, bypassing PipeWire or PulseAudio, so the output follows each track's sample rate and bit depth. The device must be free: the sound server releases an idle card after a few seconds, or set its profile to Off. AutoMix and previews are off in this mode.",
-  "exclusiveOutputPending": "Takes the device when a track plays.",
-  "exclusiveOutputActive": "Playing in exclusive mode.",
-  "exclusiveOutputUnavailableWindows": "The device refused exclusive access, so this track plays through the Windows mixer. Close other apps using the device, or allow exclusive control in the device's Windows sound properties.",
-  "exclusiveOutputUnavailableMacos": "Another app holds the output device, so this track plays through the system mixer.",
-  "exclusiveOutputUnavailableLinux": "The ALSA device is busy, usually held by the sound server, so this track plays through it. Set the card's profile to Off in the sound settings, or choose another device.",
-  "exclusiveOutputDevice": "Output device",
-  "exclusiveOutputDeviceFirst": "First sound card",
-  "exclusiveOutputNoDevices": "No ALSA playback devices found",
+  "exclusiveOutputDescriptionWindows": "Обхід системного мікшера Windows для виведення звуку з оригінальною частотою дискретизації та розрядністю кожного треку. Інші додатки не зможуть відтворювати звуки, поки Mornye утримує пристрій. У цьому режимі вимкнено AutoMix та попереднє прослуховування. Для точного відтворення bit-perfect установіть гучність на 100%, а також вимкніть еквалайзер і нормалізацію.",
+  "exclusiveOutputDescriptionMacos": "Захоплює аудіопристрій лише для Mornye та перемикає його на частоту дискретизації й розрядність кожного треку без передискретизації в Core Audio. Інші програми не відтворюватимуть звук, поки Mornye займає пристрій. Функції AutoMix та перегляд вимкнені. Для виводу bit-perfect залиште гучність на 100% і вимкніть еквалайзер та нормалізацію.",
+  "exclusiveOutputDescriptionLinux": "Пряме відтворення на апаратний пристрій ALSA в обхід PipeWire або PulseAudio, завдяки чому звук виводиться з оригінальною частотою дискретизації та розрядністю кожного треку. Пристрій має бути вільним: звуковий сервер звільняє неактивну карту за кілька секунд, або ж можна перевести її профіль у стан «Вимкнено». У цьому режимі вимкнено AutoMix та попереднє прослуховування.",
+  "exclusiveOutputPending": "Займає пристрій, коли відтворюється трек.",
+  "exclusiveOutputActive": "Відтворення в ексклюзивному режимі.",
+  "exclusiveOutputUnavailableWindows": "Не вдалося отримати ексклюзивний доступ, трек грає через мікшер Windows. Закрийте програми, які займають пристрій, або дозвольте монопольне керування у властивостях звуку Windows.",
+  "exclusiveOutputUnavailableMacos": "Аудіопристрій зайнятий іншою програмою, тому цей трек грає через системний мікшер.",
+  "exclusiveOutputUnavailableLinux": "Пристрій ALSA зайнятий звуковим сервером, тому трек відтворюється через системний мікшер. Вимкніть профіль карти в налаштуваннях звуку або виберіть інший пристрій.",
+  "exclusiveOutputDevice": "Пристрій виводу",
+  "exclusiveOutputDeviceFirst": "Основна звукова карта",
+  "exclusiveOutputNoDevices": "Не знайдено пристроїв відтворення ALSA",
   "usbDirect": "Прямий драйвер USB",
   "usbDirectDescription": "Використовуйте ексклюзивно USB-аудіо для FLAC/WAV, DSF/DFF та WavPack DSD з дозволом Android USB. Для нативного DSD потрібен розпізнаний сумісний ЦАП. Інші формати PCM використовують звичайне відтворення. Застосовується з наступного треку.",
   "usbDsdOverPcm": "DSD поверх PCM (DoP)",
@@ -432,11 +432,11 @@
   "libraryNoActiveDownloads": "Немає активних завантажень",
   "librarySearchHint": "Пошук у вашій бібліотеці",
   "libraryEmptyCollection": "Ваша музика з’явиться тут",
-  "libraryFolders": "Folders",
+  "libraryFolders": "Теки",
   "@libraryFolders": {
     "description": "Library view that browses downloaded and scanned songs by the folders their files are in"
   },
-  "libraryFolderCount": "{count, plural, =1{1 folder} other{{count} folders}}",
+  "libraryFolderCount": "{count, plural, =1{1 тека} one{{count} тека} few{{count} теки} many{{count} тек} other{{count} тек}}",
   "@libraryFolderCount": {
     "description": "Number of folders inside a Library folder",
     "placeholders": {
@@ -445,19 +445,19 @@
       }
     }
   },
-  "libraryFoldersEmptyTitle": "No folders yet",
+  "libraryFoldersEmptyTitle": "Теки не додано",
   "@libraryFoldersEmptyTitle": {
     "description": "Title of the Folders view when the Library has no songs"
   },
-  "libraryFoldersEmptyMessage": "Download songs or add a music folder in Local Library settings to browse them by folder.",
+  "libraryFoldersEmptyMessage": "Завантажте пісні або додайте теку з музикою в налаштуваннях, щоб переглядати файли за теками.",
   "@libraryFoldersEmptyMessage": {
     "description": "Next step shown in the empty Folders view"
   },
-  "libraryFolderMissing": "This folder is no longer in your Library",
+  "libraryFolderMissing": "Цієї теки більше немає у вашому списку відтворення",
   "@libraryFolderMissing": {
     "description": "Shown on an open folder page after its songs were deleted or moved"
   },
-  "libraryFoldersLoadFailed": "Couldn't read your folders",
+  "libraryFoldersLoadFailed": "Не вдалося прочитати ваші теки",
   "@libraryFoldersLoadFailed": {
     "description": "Shown when the Folders view fails to load"
   },
@@ -1124,19 +1124,19 @@
   "@setupSkipForNow": {
     "description": "Skip button text"
   },
-  "setupNearbyEnable": "Allow Nearby Devices",
+  "setupNearbyEnable": "Дозволити доступ до пристроїв поблизу",
   "@setupNearbyEnable": {
     "description": "Setup step title and button for the Android Nearby devices permission; Nearby devices is the Android permission name"
   },
-  "setupNearbyDescription": "Mornye Link uses it to find your computer on the same network, and network storage needs it to reach a server at home.",
+  "setupNearbyDescription": "Mornye Link використовує це для пошуку вашого комп’ютера в тій самій мережі, а мережевому сховищу це необхідно для з’єднання з домашнім сервером.",
   "@setupNearbyDescription": {
     "description": "Setup step explaining why Android's Nearby devices permission is needed"
   },
-  "setupNearbyGranted": "Nearby Devices Allowed!",
+  "setupNearbyGranted": "Доступ до пристроїв поблизу дозволено!",
   "@setupNearbyGranted": {
     "description": "Setup message after the Nearby devices permission is granted"
   },
-  "permissionNearbyDevices": "Nearby devices",
+  "permissionNearbyDevices": "Пристрої поблизу",
   "@permissionNearbyDevices": {
     "description": "Nearby devices permission type label; use Android's name for this permission"
   },
@@ -7122,7 +7122,7 @@
       }
     }
   },
-  "lyricsTranslatePartial": "{count, plural, =1{1 line} other{{count} lines}} could not be translated",
+  "lyricsTranslatePartial": "{count, plural, =1{1 рядок не вдалося перекласти} one{{count} рядок не вдалося перекласти} few{{count} рядки не вдалося перекласти} many{{count} рядків не вдалося перекласти} other{{count} рядків не вдалося перекласти}}",
   "@lyricsTranslatePartial": {
     "description": "Snackbar after an AI translation that left some lines untranslated",
     "placeholders": {
