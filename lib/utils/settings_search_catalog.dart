@@ -227,6 +227,18 @@ class SettingsSearchCatalog {
           keywords: const ['rescan all'],
         ),
         SettingsSearchEntry(
+          icon: Icons.travel_explore,
+          title: l10n.libraryReEnrichAll,
+          subtitle: l10n.libraryReEnrichAllSubtitle,
+          keywords: const [
+            're-enrich',
+            'reenrich',
+            'metadata',
+            'tags',
+            'retag',
+          ],
+        ),
+        SettingsSearchEntry(
           icon: Icons.cleaning_services_outlined,
           title: l10n.libraryCleanupMissingFiles,
           subtitle: l10n.libraryCleanupMissingFilesSubtitle,
