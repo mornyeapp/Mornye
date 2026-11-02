@@ -100,6 +100,16 @@ void main() {
         // AutoMix needs a second deck, which the held device refuses.
         await _scrollTo(tester, find.text('AutoMix'), -300);
         expect(_switch(tester, 'AutoMix').enabled, isFalse);
+        expect(_switch(tester, 'AutoMix').value, isFalse);
+        expect(_switch(tester, 'Gapless playback').enabled, isTrue);
+        expect(_switch(tester, 'Gapless playback').value, isTrue);
+        expect(container.read(settingsProvider).autoMix, isTrue);
+        _switch(tester, 'Gapless playback').onChanged!(false);
+        await tester.pumpAndSettle();
+        expect(container.read(settingsProvider).gaplessPlayback, isFalse);
+        _switch(tester, 'Gapless playback').onChanged!(true);
+        await tester.pumpAndSettle();
+        expect(container.read(settingsProvider).gaplessPlayback, isTrue);
         expect(tester.takeException(), isNull);
       },
     );

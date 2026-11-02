@@ -46,12 +46,20 @@ abstract interface class MpvEngine {
   Future<void> dispose();
 }
 
+/// Optional native playlist support. The hook runs before decoding the next
+/// file, so its normalization does not change the previous file's queued tail.
+abstract interface class MpvPlaylistEngine implements MpvEngine {
+  Future<void> appendNext(String source, Future<void> Function() onStarting);
+  Future<void> clearNext();
+}
+
 /// One libmpv instance through media_kit.
-class MediaKitEngine implements MpvEngine {
+class MediaKitEngine implements MpvEngine, MpvPlaylistEngine {
   MediaKitEngine()
     : _player = NativePlayer(
         configuration: const PlayerConfiguration(title: 'Mornye'),
       ) {
+    _player.onLoadHooks.add(_onLoad);
     _configured = Future.wait([
       // Names the PulseAudio and PipeWire stream. The app applies ReplayGain
       // itself, so mpv's stays at its default (off).
@@ -62,8 +70,7 @@ class MediaKitEngine implements MpvEngine {
       // Mornye reads sidecar lyrics itself. A failed mpv subtitle autoload
       // must not turn an otherwise playable song into a source error.
       setProperty('sub-auto', 'no'),
-      // Each deck has one source. mpv's playlist gapless mode reports EOF
-      // before its output drains, so handing off then cuts the queued tail.
+      // Until a successor is queued, EOF must wait for the output to drain.
       setProperty('gapless-audio', 'no'),
       // Room for an equalizer preamp of +12 dB applied through the volume
       // when the libmpv build has no volume filter.
@@ -73,6 +80,61 @@ class MediaKitEngine implements MpvEngine {
 
   final NativePlayer _player;
   late final Future<void> _configured;
+  ({int index, Future<void> Function() start})? _next;
+  Future<void> _playlistWrite = Future.value();
+  int _playlistGeneration = 0;
+
+  Future<void> _writePlaylist(Future<void> Function() write) {
+    final operation = _playlistWrite.then((_) => write());
+    _playlistWrite = operation.catchError((Object _) {});
+    return operation;
+  }
+
+  Future<void> _onLoad() async {
+    final next = _next;
+    if (next == null) return;
+    final generation = _playlistGeneration;
+    final index = int.tryParse(await getProperty('playlist-pos'));
+    if (generation != _playlistGeneration ||
+        next != _next ||
+        index != next.index) {
+      return;
+    }
+    _next = null;
+    await next.start();
+  }
+
+  @override
+  Future<void> appendNext(String source, Future<void> Function() onStarting) {
+    final generation = ++_playlistGeneration;
+    return _writePlaylist(() async {
+      if (generation != _playlistGeneration) return;
+      await _removeNext();
+      // Keep only the current entry before appending, bounding the native list.
+      while ((int.tryParse(await getProperty('playlist-pos')) ?? 0) > 0) {
+        await _player.remove(0);
+      }
+      if (generation != _playlistGeneration) return;
+      _next = (index: _player.state.playlist.medias.length, start: onStarting);
+      await _player.add(Media(source));
+    });
+  }
+
+  @override
+  Future<void> clearNext() {
+    _playlistGeneration++;
+    _next = null;
+    return _writePlaylist(_removeNext);
+  }
+
+  Future<void> _removeNext() async {
+    // media_kit's playlist stream can still describe the previous file while
+    // on_load is running. Read mpv directly so cancellation keeps the new one.
+    while (_player.state.playlist.medias.length >
+        (int.tryParse(await getProperty('playlist-pos')) ?? 0) + 1) {
+      await _player.remove(_player.state.playlist.medias.length - 1);
+    }
+  }
 
   @override
   Stream<bool> get completed => _player.stream.completed;
@@ -138,7 +200,13 @@ class MediaKitEngine implements MpvEngine {
   }
 
   @override
-  Future<void> dispose() => _player.dispose();
+  Future<void> dispose() async {
+    _next = null;
+    _playlistGeneration++;
+    await _playlistWrite;
+    _player.onLoadHooks.remove(_onLoad);
+    await _player.dispose();
+  }
 }
 
 /// A source libmpv could not open.
@@ -153,11 +221,9 @@ class MediaKitSourceException implements Exception {
 /// The Windows and Linux deck: one libmpv player through media_kit, with the
 /// equalizer as an mpv audio filter chain.
 ///
-/// Gapless playback across tracks needs mpv's own playlist
-/// (`gapless-audio`), but the runtime gives each deck one source at a time
-/// and prepares the next song on a separate deck for AutoMix. Tracks are
-/// therefore joined like on the audioplayers deck.
-class MediaKitPlaybackDeck implements PlaybackDeck {
+/// Gapless uses the native playlist on this same output, including exclusive
+/// mode. AutoMix still owns separate decks while it is enabled.
+class MediaKitPlaybackDeck implements PlaybackDeck, QueuedPlaybackDeck {
   MediaKitPlaybackDeck({required this.playerId, MpvEngine? engine})
     : _engine = engine ?? debugEngineFactory?.call() ?? MediaKitEngine() {
     playbackEqualizer.addListener(_equalizerChanged);
@@ -166,7 +232,12 @@ class MediaKitPlaybackDeck implements PlaybackDeck {
     playbackExclusiveDevice.addListener(_exclusiveChanged);
     _subscriptions.addAll([
       _engine.completed.listen((done) {
-        if (!done || _disposed || _state != PlaybackDeckState.playing) return;
+        if (!done ||
+            _disposed ||
+            _state != PlaybackDeckState.playing ||
+            _nextSource != null) {
+          return;
+        }
         _setState(PlaybackDeckState.completed);
         _completions.add(null);
       }),
@@ -222,6 +293,8 @@ class MediaKitPlaybackDeck implements PlaybackDeck {
   final _durations = StreamController<Duration>.broadcast();
   final _positions = StreamController<Duration>.broadcast();
   final _completions = StreamController<void>.broadcast();
+  ({String source, double volume})? _nextSource;
+  int _nextRevision = 0;
   final _subscriptions = <StreamSubscription<dynamic>>[];
   PlaybackDeckState _state = PlaybackDeckState.stopped;
   AsyncError? _failure;
@@ -279,6 +352,59 @@ class MediaKitPlaybackDeck implements PlaybackDeck {
   Stream<Duration> get onPositionChanged => _positions.stream;
   @override
   Stream<void> get onPlayerComplete => _completions.stream;
+
+  @override
+  bool get canQueueNextSource => _engine is MpvPlaylistEngine;
+
+  @override
+  Future<bool> queueNextSource(
+    String source, {
+    required double volume,
+    required void Function() onStarted,
+  }) async {
+    final engine = _engine;
+    if (engine is! MpvPlaylistEngine || _disposed) return false;
+    final token = _token;
+    final revision = ++_nextRevision;
+    final next = (source: source, volume: volume);
+    _nextSource = next;
+    // Retain the device for matching formats. A rate or channel change may
+    // reopen it rather than resampling everything to the first track's format.
+    if (await _engine.setProperty('gapless-audio', 'weak') < 0) {
+      _nextSource = null;
+      return false;
+    }
+    if (_disposed || token != _token || revision != _nextRevision) return false;
+    try {
+      await engine.appendNext(source, () async {
+        if (_disposed || token != _token || revision != _nextRevision) return;
+        _nextSource = null;
+        _source = source;
+        _duration = null;
+        _gain = volume;
+        // The on_load hook blocks event delivery. Use the synchronous native
+        // property setter rather than media_kit's event-acknowledged volume API.
+        await _engine.setProperty('volume', _mpvVolume.toString());
+        // With no following entry, completion must wait for the audible tail.
+        await _engine.setProperty('gapless-audio', 'no');
+        if (_disposed || token != _token || revision != _nextRevision) return;
+        onStarted();
+      });
+      return !_disposed && token == _token && revision == _nextRevision;
+    } catch (_) {
+      if (revision == _nextRevision) await clearNextSource();
+      rethrow;
+    }
+  }
+
+  @override
+  Future<void> clearNextSource() async {
+    _nextRevision++;
+    _nextSource = null;
+    if (_disposed) return;
+    if (_engine case final MpvPlaylistEngine engine) await engine.clearNext();
+    if (!_disposed) await _engine.setProperty('gapless-audio', 'no');
+  }
 
   void _setState(PlaybackDeckState value) {
     _state = value;
@@ -456,6 +582,7 @@ class MediaKitPlaybackDeck implements PlaybackDeck {
     if (_disposed || token != _token || source == null) return;
     // A pending load completes when the reopened source reports its
     // duration.
+    await clearNextSource();
     await _engine.open(source);
     if (_disposed || token != _token) return;
     if (position > Duration.zero) await _engine.seek(position);
@@ -566,6 +693,7 @@ class MediaKitPlaybackDeck implements PlaybackDeck {
   @override
   Future<void> stop() async {
     _token++;
+    await clearNextSource();
     _finishLoad(null);
     await _engine.stop();
     _duration = null;

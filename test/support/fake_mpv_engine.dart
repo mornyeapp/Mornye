@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:mornye/services/media_kit_playback_deck.dart';
 
 /// An in-memory libmpv for `MediaKitPlaybackDeck` tests on any host.
-class FakeMpvEngine implements MpvEngine {
+class FakeMpvEngine implements MpvEngine, MpvPlaylistEngine {
   final calls = <List<String>>[];
   final properties = <String, String>{};
   final completedEvents = StreamController<bool>.broadcast();
@@ -24,6 +24,36 @@ class FakeMpvEngine implements MpvEngine {
   /// `audio-exclusive` is on reports its duration, then loses its audio.
   bool refuseExclusive = false;
   bool disposed = false;
+  String? queuedSource;
+  Future<void> Function()? queuedStart;
+  bool failAppend = false;
+
+  @override
+  Future<void> appendNext(
+    String source,
+    Future<void> Function() onStarting,
+  ) async {
+    calls.add(['append', source]);
+    if (failAppend) throw StateError('Playlist rejected');
+    queuedSource = source;
+    queuedStart = onStarting;
+  }
+
+  @override
+  Future<void> clearNext() async {
+    calls.add(['clearNext']);
+    queuedSource = null;
+    queuedStart = null;
+  }
+
+  Future<void> advance() async {
+    final start = queuedStart;
+    queuedStart = null;
+    queuedSource = null;
+    position = Duration.zero;
+    await start?.call();
+    durationEvents.add(openDuration!);
+  }
 
   @override
   Stream<bool> get completed => completedEvents.stream;
@@ -90,6 +120,7 @@ class FakeMpvEngine implements MpvEngine {
       if (rejectFilters && value.startsWith('@mornye_format')) return -7;
     }
     properties[name] = value;
+    if (name == 'volume') volume = double.parse(value);
     return 0;
   }
 

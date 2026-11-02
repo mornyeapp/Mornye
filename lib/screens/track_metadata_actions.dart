@@ -23,12 +23,11 @@ extension _TrackMetadataFileActions on _TrackMetadataScreenState {
       debugPrint('readFileMetadata failed, using item data: $e');
     }
 
+    if (!mounted || !context.mounted || sourcePath != cleanFilePath) return;
     final initialValues = _metadataEditorValues(fileMetadata);
 
     final initialDurationSeconds =
         readPositiveInt(fileMetadata?['duration']) ?? duration ?? 0;
-
-    if (!context.mounted || sourcePath != cleanFilePath) return;
 
     final saved = await showAppModalBottomSheet<bool>(
       context: context,
@@ -90,6 +89,7 @@ extension _TrackMetadataFileActions on _TrackMetadataScreenState {
       }
       if (!mounted || sourcePath != cleanFilePath) return;
       if (!_isNetworkItem) await _refreshEmbeddedCoverPreview(force: true);
+      if (!mounted || sourcePath != cleanFilePath) return;
       _markMetadataChanged();
       await _syncDownloadHistoryMetadata();
     }

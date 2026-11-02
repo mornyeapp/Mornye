@@ -4,7 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/services/exclusive_output_deck.dart';
 import 'package:mornye/services/playback_deck.dart';
 
-class _Deck implements PlaybackDeck {
+class _Deck implements PlaybackDeck, QueuedPlaybackDeck {
   _Deck(this.name);
 
   final String name;
@@ -18,6 +18,24 @@ class _Deck implements PlaybackDeck {
   Completer<void>? pendingSource;
   bool Function()? wanted;
   bool disposed = false;
+  void Function()? queuedStart;
+
+  @override
+  bool get canQueueNextSource => name == 'mpv';
+
+  @override
+  Future<bool> queueNextSource(
+    String source, {
+    required double volume,
+    required void Function() onStarted,
+  }) async {
+    calls.add('queue $source $volume');
+    queuedStart = onStarted;
+    return true;
+  }
+
+  @override
+  Future<void> clearNextSource() async => queuedStart = null;
 
   @override
   PlaybackDeckState state = PlaybackDeckState.stopped;
@@ -137,6 +155,42 @@ void main() {
     playbackExclusiveOutput.value = false;
     playbackExclusiveStatus.value = ExclusiveOutputStatus.pending;
   });
+
+  for (final source in ['/next.flac', 'https://example.com/next.flac']) {
+    test(
+      'a native handoff restores its current source on shared output ($source)',
+      () async {
+        playbackExclusiveOutput.value = true;
+        await deck.configureOutput();
+        await deck.setFileSource('/first.flac');
+        await deck.resume();
+        var starts = 0;
+        expect(deck.canQueueNextSource, isTrue);
+        expect(
+          await deck.queueNextSource(
+            source,
+            volume: 0.4,
+            onStarted: () => starts++,
+          ),
+          isTrue,
+        );
+        final active = exclusives.single;
+        active.queuedStart!();
+        expect(starts, 1);
+        playbackExclusiveOutput.value = false;
+        await _settle();
+        await deck.configureOutput();
+        expect(
+          shared.calls,
+          contains('${source.startsWith('https:') ? 'url' : 'file'} $source'),
+        );
+        expect(shared.calls, contains('volume 0.4'));
+        expect(deck.canQueueNextSource, isFalse);
+        active.queuedStart!();
+        expect(starts, 1);
+      },
+    );
+  }
 
   test('plays through the shared deck while exclusive output is off', () async {
     await deck.configureOutput();

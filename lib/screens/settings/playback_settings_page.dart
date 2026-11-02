@@ -148,6 +148,8 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage>
   @override
   Widget build(BuildContext context) {
     final settings = ref.watch(settingsProvider);
+    final autoMixActive =
+        settings.autoMix && !(isDesktopPlatform && settings.exclusiveOutput);
     // Linux opens a chosen ALSA device; the other desktops use the default.
     final linuxDevice =
         settings.exclusiveOutput &&
@@ -240,12 +242,11 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage>
                 icon: Icons.linear_scale,
                 title: context.l10n.gaplessPlayback,
                 subtitle: context.l10n.gaplessPlaybackDescription,
-                value: settings.gaplessPlayback && !settings.autoMix,
+                value: settings.gaplessPlayback && !autoMixActive,
                 enabled:
                     settings.playerMode == 'internal' &&
-                    !settings.autoMix &&
-                    !settings.usbBitPerfect &&
-                    !(isDesktopPlatform && settings.exclusiveOutput),
+                    !autoMixActive &&
+                    !settings.usbBitPerfect,
                 onChanged: (value) => ref
                     .read(settingsProvider.notifier)
                     .setGaplessPlayback(value),
@@ -254,7 +255,7 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage>
                 icon: Icons.compare_arrows,
                 title: 'AutoMix',
                 subtitle: context.l10n.autoMixDescription,
-                value: settings.autoMix,
+                value: autoMixActive,
                 enabled:
                     !settings.usbBitPerfect &&
                     !(isDesktopPlatform && settings.exclusiveOutput),
@@ -264,7 +265,7 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage>
               ),
             ],
           ),
-          if (settings.autoMix) ...[
+          if (autoMixActive) ...[
             SliverToBoxAdapter(
               child: SettingsSectionHeader(
                 title: context.l10n.autoMixSettingsTitle,

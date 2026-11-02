@@ -70,6 +70,102 @@ void main() {
     ]);
   });
 
+  test(
+    'native gapless keeps one exclusive output and changes gain at load',
+    () async {
+      playbackExclusiveOutput.value = true;
+      addTearDown(() => playbackExclusiveOutput.value = false);
+      await deck.configureOutput();
+      await deck.setFileSource('/first.flac');
+      await deck.setVolume(0.8);
+      await deck.resume();
+      final events = <String>[];
+      deck.onPlayerComplete.listen((_) => events.add('done'));
+      final originalVolume = engine.volume;
+      final opens = engine.calls.where((call) => call.first == 'open').length;
+      expect(
+        await deck.queueNextSource(
+          '/second.flac',
+          volume: 0.4,
+          onStarted: () => events.add('next'),
+        ),
+        isTrue,
+      );
+      expect(engine.properties['gapless-audio'], 'weak');
+      expect(engine.properties['audio-exclusive'], 'yes');
+      expect(engine.volume, originalVolume);
+      engine.completedEvents.add(true);
+      await Future<void>.delayed(Duration.zero);
+      expect(events, isEmpty);
+      await engine.advance();
+      await Future<void>.delayed(Duration.zero);
+      expect(events, ['next']);
+      expect(deck.state, PlaybackDeckState.playing);
+      expect(engine.volume, closeTo(100 * 0.7368063, 0.001));
+      expect(
+        engine.calls.where((call) => call.first == 'open'),
+        hasLength(opens),
+      );
+      expect(engine.properties['gapless-audio'], 'no');
+      engine.completedEvents.add(true);
+      await Future<void>.delayed(Duration.zero);
+      expect(events, ['next', 'done']);
+    },
+  );
+
+  test('cancelled and replaced native successors cannot start late', () async {
+    await deck.setFileSource('/first.flac');
+    await deck.resume();
+    final events = <String>[];
+    await deck.queueNextSource(
+      '/second.flac',
+      volume: 0.5,
+      onStarted: () => events.add('second'),
+    );
+    final stale = engine.queuedStart!;
+    await deck.clearNextSource();
+    await stale();
+    expect(events, isEmpty);
+    expect(engine.queuedSource, isNull);
+    await deck.queueNextSource(
+      '/third.flac',
+      volume: 1,
+      onStarted: () => events.add('third'),
+    );
+    await stale();
+    expect(engine.queuedSource, '/third.flac');
+    await engine.advance();
+    await Future<void>.delayed(Duration.zero);
+    expect(events, hasLength(1));
+    await deck.dispose();
+    final calls = engine.calls.length;
+    await deck.clearNextSource();
+    await stale();
+    expect(engine.calls, hasLength(calls));
+  });
+
+  test(
+    'a rejected native playlist leaves ordinary completion available',
+    () async {
+      await deck.setFileSource('/first.flac');
+      await deck.resume();
+      engine.failAppend = true;
+      await expectLater(
+        deck.queueNextSource(
+          '/next.flac',
+          volume: 1,
+          onStarted: () => fail('Rejected source must not start'),
+        ),
+        throwsStateError,
+      );
+      expect(engine.queuedSource, isNull);
+      expect(engine.properties['gapless-audio'], 'no');
+      engine.completedEvents.add(true);
+      await Future<void>.delayed(Duration.zero);
+      expect(deck.state, PlaybackDeckState.completed);
+    },
+  );
+
   test('positions are published on a timer while playing', () async {
     final positions = <Duration>[];
     deck.onPositionChanged.listen(positions.add);
@@ -428,6 +524,12 @@ void main() {
       await deck.configureOutput();
       await deck.setFileSource('/song.flac');
       await deck.resume();
+      await deck.queueNextSource(
+        '/next.flac',
+        volume: 1,
+        onStarted: () =>
+            fail('Output recovery must cancel the stale successor'),
+      );
       engine.calls.clear();
       engine.position = const Duration(seconds: 30);
       engine.errorEvents.add((
@@ -438,11 +540,14 @@ void main() {
       // The equalizer may also set its chain; the transport is these calls.
       expect(engine.calls.where((call) => !call.contains('af')), [
         ['set', 'audio-exclusive', 'no'],
+        ['clearNext'],
+        ['set', 'gapless-audio', 'no'],
         ['open', '/song.flac'],
         ['seek', '30000'],
         ['play'],
       ]);
       expect(deck.state, PlaybackDeckState.playing);
+      expect(engine.queuedSource, isNull);
 
       // Without exclusive mode the same line is a source failure.
       final errors = <Object>[];

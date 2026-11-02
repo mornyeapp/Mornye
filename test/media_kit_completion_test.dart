@@ -7,6 +7,7 @@ import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:mornye/services/media_kit_playback_deck.dart';
+import 'package:mornye/services/playback_deck.dart';
 
 // Runs the desktop engine on the host, using the same framework folder as
 // integration_test/media_kit_playback_deck_test.dart. A null audio output
@@ -121,6 +122,80 @@ void main() {
           : false,
     );
   }
+
+  test(
+    'native playlist joins tracks without cutting the buffered tail',
+    () async {
+      final directory = await Directory.systemTemp.createTemp('mpv-gapless-');
+      final first = File('${directory.path}/first.wav');
+      final second = File('${directory.path}/second.wav');
+      final third = File('${directory.path}/third.wav');
+      await first.writeAsBytes(_toneWav());
+      await second.writeAsBytes(_toneWav());
+      await third.writeAsBytes(_toneWav());
+      final engine = MediaKitEngine();
+      final deck = MediaKitPlaybackDeck(
+        playerId: 'gapless-test',
+        engine: engine,
+      );
+      final next = Completer<void>();
+      final last = Completer<void>();
+      final done = Completer<void>();
+      final subscriptions = [
+        deck.onPlayerComplete.listen((_) {
+          if (!done.isCompleted) done.complete();
+        }),
+      ];
+      final clock = Stopwatch();
+      try {
+        expect(await engine.setProperty('ao', 'null'), greaterThanOrEqualTo(0));
+        expect(
+          await engine.setProperty('ao-null-buffer', '0.7'),
+          greaterThanOrEqualTo(0),
+        );
+        await deck.setFileSource(first.path);
+        expect(
+          await deck.queueNextSource(
+            second.path,
+            volume: 1,
+            onStarted: () {
+              if (!next.isCompleted) next.complete();
+            },
+          ),
+          isTrue,
+        );
+        clock.start();
+        await deck.resume();
+        await next.future.timeout(const Duration(seconds: 5));
+        expect(done.isCompleted, isFalse);
+        expect(deck.state, PlaybackDeckState.playing);
+        expect(await engine.getProperty('path'), second.path);
+        expect(
+          await deck.queueNextSource(
+            third.path,
+            volume: 0.5,
+            onStarted: () {
+              if (!last.isCompleted) last.complete();
+            },
+          ),
+          isTrue,
+        );
+        await last.future.timeout(const Duration(seconds: 5));
+        expect(await engine.getProperty('path'), third.path);
+        expect(await engine.getProperty('playlist-count'), '2');
+        await done.future.timeout(const Duration(seconds: 5));
+        expect(clock.elapsedMilliseconds, greaterThanOrEqualTo(8900));
+        expect(clock.elapsedMilliseconds, lessThan(9800));
+      } finally {
+        for (final subscription in subscriptions) {
+          await subscription.cancel();
+        }
+        await deck.dispose();
+        await directory.delete(recursive: true);
+      }
+    },
+    skip: _libmpvFolder.isEmpty || !Platform.isMacOS,
+  );
 
   test(
     'unreadable LRC sidecars cannot prevent their audio from playing',

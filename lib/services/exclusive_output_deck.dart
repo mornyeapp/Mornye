@@ -11,7 +11,7 @@ final _log = AppLogger('ExclusiveOutputDeck');
 /// deck while [playbackExclusiveOutput] is on; a change mid-track reopens the
 /// source on the other deck where it was. Leaving exclusive output disposes
 /// the libmpv deck, which gives the device back.
-class ExclusiveOutputDeck implements PlaybackDeck {
+class ExclusiveOutputDeck implements PlaybackDeck, QueuedPlaybackDeck {
   ExclusiveOutputDeck({
     required PlaybackDeck shared,
     required PlaybackDeck Function() createExclusive,
@@ -34,6 +34,7 @@ class ExclusiveOutputDeck implements PlaybackDeck {
   final _durations = StreamController<Duration>.broadcast();
   final _positions = StreamController<Duration>.broadcast();
   final _completions = StreamController<void>.broadcast();
+  int _queueRevision = 0;
 
   /// Settings a deck taking over must apply as well.
   double _volume = 1, _rate = 1;
@@ -95,6 +96,7 @@ class ExclusiveOutputDeck implements PlaybackDeck {
     final exclusive = _wantsExclusive;
     final previous = _active;
     if (exclusive == !identical(previous, _shared)) return;
+    _queueRevision++;
     final PlaybackDeck target;
     if (exclusive) {
       target = _exclusive = _createExclusive();
@@ -167,6 +169,49 @@ class ExclusiveOutputDeck implements PlaybackDeck {
   Stream<void> get onPlayerComplete => _completions.stream;
 
   @override
+  bool get canQueueNextSource =>
+      _active is QueuedPlaybackDeck &&
+      (_active as QueuedPlaybackDeck).canQueueNextSource;
+
+  @override
+  Future<bool> queueNextSource(
+    String source, {
+    required double volume,
+    required void Function() onStarted,
+  }) async {
+    final active = _active;
+    if (active is! QueuedPlaybackDeck || !active.canQueueNextSource) {
+      return false;
+    }
+    final revision = ++_queueRevision;
+    return active.queueNextSource(
+      source,
+      volume: volume,
+      onStarted: () {
+        if (_disposed ||
+            revision != _queueRevision ||
+            !identical(active, _active)) {
+          return;
+        }
+        _volume = volume;
+        _source = const {'http', 'https'}.contains(Uri.tryParse(source)?.scheme)
+            ? (deck) => deck.setNetworkSource(source)
+            : (deck) => deck.setFileSource(source);
+        onStarted();
+      },
+    );
+  }
+
+  @override
+  Future<void> clearNextSource() async {
+    _queueRevision++;
+    if (_disposed) return;
+    if (_active case final QueuedPlaybackDeck deck) {
+      await deck.clearNextSource();
+    }
+  }
+
+  @override
   void startPositionUpdates(Duration interval, {bool Function()? wanted}) {
     _positionInterval = interval;
     _positionWanted = wanted;
@@ -193,6 +238,7 @@ class ExclusiveOutputDeck implements PlaybackDeck {
 
   @override
   Future<void> setNetworkSource(String url, {bool arriving = false}) {
+    _queueRevision++;
     _source = (deck) => deck.setNetworkSource(url, arriving: arriving);
     return _active.setNetworkSource(url, arriving: arriving);
   }
@@ -207,6 +253,7 @@ class ExclusiveOutputDeck implements PlaybackDeck {
     bool allowFixedVolume = false,
     bool dapExclusive = false,
   }) {
+    _queueRevision++;
     _source = (deck) => deck.setFileSource(
       path,
       preferBitPerfect: preferBitPerfect,
@@ -246,6 +293,7 @@ class ExclusiveOutputDeck implements PlaybackDeck {
   Future<void> seek(Duration position) => _active.seek(position);
   @override
   Future<void> stop() {
+    _queueRevision++;
     _transportRevision++;
     _stopRevision++;
     _requestedState = PlaybackDeckState.stopped;

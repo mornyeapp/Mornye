@@ -72,6 +72,18 @@ final playbackExclusiveStatus = ValueNotifier<ExclusiveOutputStatus>(
   ExclusiveOutputStatus.pending,
 );
 
+/// A deck that can append a source to its existing output without opening a
+/// second device. The start callback replaces the ordinary completion handoff.
+abstract interface class QueuedPlaybackDeck implements PlaybackDeck {
+  bool get canQueueNextSource;
+  Future<bool> queueNextSource(
+    String source, {
+    required double volume,
+    required void Function() onStarted,
+  });
+  Future<void> clearNextSource();
+}
+
 /// One audio player owned by the music runtime. The main player and each
 /// AutoMix deck are separate instances created through
 /// `PlaybackDependencies.createDeck`.

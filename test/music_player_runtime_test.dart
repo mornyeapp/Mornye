@@ -154,6 +154,53 @@ class _CastDeck extends _Deck {
   }
 }
 
+class _QueuedDeck extends _TickingDeck implements QueuedPlaybackDeck {
+  final completions = StreamController<void>.broadcast();
+  void Function()? onStart;
+  String? nextSource;
+  double? nextVolume;
+  bool failQueue = false;
+  int queued = 0;
+
+  @override
+  bool get canQueueNextSource => true;
+  @override
+  Stream<void> get onPlayerComplete => completions.stream;
+  @override
+  Future<bool> queueNextSource(
+    String source, {
+    required double volume,
+    required void Function() onStarted,
+  }) async {
+    queued++;
+    if (failQueue) throw StateError('Native playlist unavailable');
+    nextSource = source;
+    nextVolume = volume;
+    onStart = onStarted;
+    return true;
+  }
+
+  @override
+  Future<void> clearNextSource() async {
+    nextSource = null;
+    nextVolume = null;
+    onStart = null;
+  }
+
+  void advance() {
+    nextSource = null;
+    volumes.add(nextVolume!);
+    position = Duration.zero;
+    onStart?.call();
+  }
+
+  @override
+  Future<void> dispose() async {
+    await completions.close();
+    await super.dispose();
+  }
+}
+
 class _DelayedSeekDeck extends _Deck {
   final seekStarted = Completer<void>();
   final seekBarrier = Completer<void>();
@@ -681,6 +728,121 @@ const _track = PlayableMedia(
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  test('exclusive gapless advances metadata on one continuous deck', () async {
+    final deck = _QueuedDeck();
+    var created = 0;
+    final runtime = _runtime(
+      settings: const AppSettings(
+        pauseOnMute: false,
+        exclusiveOutput: true,
+        gaplessPlayback: true,
+        autoMix: true,
+        playbackNormalization: true,
+      ),
+      createDeck: (_) {
+        created++;
+        return deck;
+      },
+      readMetadata: (path, {displayName}) async => {
+        'replaygain_track_gain': path == '/two.flac' ? '-12 dB' : '-6 dB',
+      },
+    );
+    playbackExclusiveOutput.value = true;
+    addTearDown(() => playbackExclusiveOutput.value = false);
+    final player = await runtime.initialize();
+    await player.setQueueAndPlay([
+      _track,
+      const PlayableMedia(
+        id: 'two',
+        source: '/two.flac',
+        title: 'Two',
+        artist: 'Artist',
+        duration: Duration(seconds: 60),
+      ),
+      const PlayableMedia(
+        id: 'three',
+        source: '/three.flac',
+        title: 'Three',
+        artist: 'Artist',
+        duration: Duration(seconds: 60),
+      ),
+    ]);
+    deck.positionEvents.add(const Duration(seconds: 45));
+    for (var i = 0; i < 30 && deck.nextSource == null; i++) {
+      await _settle();
+    }
+    expect(deck.nextSource, '/two.flac');
+    deck.advance();
+    await _settle();
+    expect(player.mediaItem.value!.id, 'two');
+    expect(player.playbackState.value.queueIndex, 1);
+    expect(player.processing.normalizationGain, closeTo(0.251189, 0.000001));
+    expect(deck.sources, ['/one.flac']);
+    expect(deck.disposals, 0);
+    expect(created, 1);
+    deck.positionEvents.add(const Duration(seconds: 45));
+    for (var i = 0; i < 30 && deck.nextSource == null; i++) {
+      await _settle();
+    }
+    expect(deck.nextSource, '/three.flac');
+    await player.setRepeatMode(AudioServiceRepeatMode.one);
+    await _settle();
+    expect(deck.nextSource, isNull);
+    expect(created, 1);
+  });
+
+  for (final failure in [false, true]) {
+    test(
+      'exclusive gapless handles cancellation and queue failure ($failure)',
+      () async {
+        final deck = _QueuedDeck()..failQueue = failure;
+        final runtime = _runtime(
+          settings: const AppSettings(
+            pauseOnMute: false,
+            exclusiveOutput: true,
+          ),
+          createDeck: (_) => deck,
+        );
+        playbackExclusiveOutput.value = true;
+        addTearDown(() => playbackExclusiveOutput.value = false);
+        final player = await runtime.initialize();
+        await player.setQueueAndPlay([
+          _track,
+          const PlayableMedia(
+            id: 'two',
+            source: '/two.flac',
+            title: 'Two',
+            artist: 'Artist',
+            duration: Duration(seconds: 60),
+          ),
+        ]);
+        deck.positionEvents.add(const Duration(seconds: 45));
+        for (var i = 0; i < 30 && deck.queued == 0; i++) {
+          await _settle();
+        }
+        expect(deck.queued, 1);
+        if (failure) {
+          await _settle();
+          deck.state = PlaybackDeckState.completed;
+          deck.completions.add(null);
+          for (var i = 0; i < 30 && player.mediaItem.value!.id != 'two'; i++) {
+            await _settle();
+          }
+          expect(player.mediaItem.value!.id, 'two');
+          expect(deck.sources, ['/one.flac', '/two.flac']);
+        } else {
+          final stale = deck.onStart!;
+          await player.stop();
+          stale();
+          await _settle();
+          expect(player.mediaItem.value, isNull);
+          expect(deck.nextSource, isNull);
+          expect(deck.state, PlaybackDeckState.stopped);
+        }
+      },
+    );
+  }
 
   test(
     'Cast handoff keeps position, controls and queue, and disconnect returns paused',

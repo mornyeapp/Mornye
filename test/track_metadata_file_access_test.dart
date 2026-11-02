@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -12,8 +13,27 @@ import 'package:mornye/services/source_metadata_events.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+Future<void> _settleFileIo(WidgetTester tester) async {
+  await tester.runAsync(() async {
+    var idleFrames = 0;
+    for (var i = 0; i < 200 && idleFrames < 3; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+      await Future<void>.delayed(const Duration(milliseconds: 25));
+      idleFrames = tester.binding.hasScheduledFrame ? 0 : idleFrames + 1;
+    }
+    expect(idleFrames, 3);
+  });
+  await tester.pumpAndSettle();
+}
+
 void main() {
   const channel = MethodChannel('com.zarz.mornye/backend');
+  const paths = MethodChannel('plugins.flutter.io/path_provider');
+  late Directory cache;
+  setUpAll(() async {
+    cache = await Directory.systemTemp.createTemp('metadata-file-access-');
+  });
+  tearDownAll(() async => cache.delete(recursive: true));
 
   for (final mornye in [false, true]) {
     testWidgets(
@@ -21,10 +41,13 @@ void main() {
       (tester) async {
         SharedPreferences.setMockInitialValues({});
         final messenger = tester.binding.defaultBinaryMessenger;
+        messenger.setMockMethodCallHandler(paths, (_) async => cache.path);
+        addTearDown(() => messenger.setMockMethodCallHandler(paths, null));
         var title = 'Old title';
         messenger.setMockMethodCallHandler(channel, (call) async {
           return switch (call.method) {
             'safStat' => {'exists': true, 'size': 100},
+            'extractCoverToFile' => jsonEncode({'error': 'No cover'}),
             'readFileMetadata' || 'readAudioMetadata' => jsonEncode({
               'title': title,
               'artist': 'Artist',
@@ -58,8 +81,10 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.text(title), findsWidgets);
         title = 'Edited title';
-        await SourceMetadataEvents.instance.publish(item.filePath);
-        await tester.pumpAndSettle();
+        await tester.runAsync(
+          () => SourceMetadataEvents.instance.publish(item.filePath),
+        );
+        await _settleFileIo(tester);
         expect(find.text(title), findsWidgets);
         expect(find.text('Old title'), findsNothing);
         await SourceDeletionEvents.instance.publish(item.filePath);

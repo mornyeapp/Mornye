@@ -277,7 +277,9 @@ class _TrackMetadataScreenState extends ConsumerState<TrackMetadataScreen>
 
   /// setState is @protected, so the extension part files route rebuilds
   /// through this forwarder.
-  void _setState(VoidCallback fn) => setState(fn);
+  void _setState(VoidCallback fn) {
+    if (mounted) setState(fn);
+  }
 
   @override
   double calculateExpandedHeight(BuildContext context) {
