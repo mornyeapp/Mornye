@@ -38,10 +38,12 @@ class UsbVolumeState {
       minDb = (data['minDb'] as num?)?.toDouble() ?? -90,
       maxDb = (data['maxDb'] as num?)?.toDouble() ?? 0,
       currentDb = (data['currentDb'] as num?)?.toDouble() ?? 0,
-      token = (data['token'] as num?)?.toInt() ?? 0;
+      token = (data['token'] as num?)?.toInt() ?? 0,
+      isSoftware = data['isSoftware'] == true;
   final bool available;
   final double minDb, maxDb, currentDb;
   final int token;
+  final bool isSoftware;
   double get fraction => available && maxDb > minDb
       ? ((currentDb - minDb) / (maxDb - minDb)).clamp(0, 1)
       : 0;
@@ -362,6 +364,7 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
     bool requiresDsd = false,
     bool allowFixedVolume = false,
     bool dapExclusive = false,
+    bool forceSoftwareVolume = false,
   }) async {
     await stop();
     final source = DeviceFileSource(path);
@@ -395,6 +398,7 @@ class AudioplayersPlaybackDeck implements PlaybackDeck {
               'allowFixedVolume': allowFixedVolume,
               'dapExclusive': dapExclusive,
               'requiresDsd': requiresDsd,
+              'forceSoftwareVolume': forceSoftwareVolume,
             });
         if (_disposed || preparingToken != _token) return;
         if (response?['ready'] == true) {

@@ -292,7 +292,10 @@
   "usbVolumeUnavailable": "Bu DAC'te doğrulanmış donanım ses kontrolü olmadığı için oynatma duraklatıldı. DAC veya amplifikatör sesini düşürün, gerekirse sabit ses düzeyli çıkışı etkinleştirin ve parçayı yeniden seçin.",
   "usbFixedVolume": "Sabit ses düzeyli USB çıkışına izin ver",
   "usbFixedVolumeDescription": "Uygulamanın erişebildiği ses kontrolü olmayan DAC'ler için. Kendi ses kontrolü olmayan USB kulaklıklarda kapalı bırakın. Bir sonraki parçadan itibaren uygulanır.",
-  "usbFixedVolumeWarning": "Uygulama bu çıkışın sesini düşüremez. Ses tam düzeyde başlayabilir ve telefonun ses kaydırıcısı işe yaramaz. Yalnızca DAC veya harici amplifikatörünüzde sesi düşürdükten sonra devam edin. Kendi ses kontrolü olmayan bir kulaklık için bunu etkinleştirmeyin.",
+  
+  "usbSoftwareVolume": "Software volume (USB DAC)",
+  "usbSoftwareVolumeDescription": "PCM scaled by the app - DAC hardware level parked at 0 dB.",
+  "usbSoftwareVolumeDsdError": "Software volume cannot attenuate native DSD. Use DAC hardware volume or convert DSD to PCM.",
   "dapExclusive": "DAP hi-res (AAudio özel)",
   "dapExclusiveDescription": "FLAC/WAV PCM için parçanın orijinal hızında ve hassasiyetinde Oboe/AAudio kullanır. Android 8.1 veya üstü ve uyumlu donanım gerektirir. Özel erişim kontrol edilir; kullanılamayan formatlar normal oynatmayı kullanır. DSD, doğrudan USB sürücüsü gerektirir. Bir sonraki parçadan itibaren uygulanır.",
   "dapExclusiveUnavailable": "Bu parça ve mevcut çıkış için AAudio özel erişimi kullanılamıyor. Normal oynatma kullanılıyor. USB DAC için doğrudan USB sürücüsünü deneyin.",

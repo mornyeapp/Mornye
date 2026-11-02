@@ -183,6 +183,7 @@ class ExclusiveOutputDeck implements PlaybackDeck {
     bool requiresDsd = false,
     bool allowFixedVolume = false,
     bool dapExclusive = false,
+    bool forceSoftwareVolume = false,
   }) {
     _source = (deck) => deck.setFileSource(
       path,
@@ -192,6 +193,7 @@ class ExclusiveOutputDeck implements PlaybackDeck {
       requiresDsd: requiresDsd,
       allowFixedVolume: allowFixedVolume,
       dapExclusive: dapExclusive,
+      forceSoftwareVolume: forceSoftwareVolume,
     );
     return _source!(_active);
   }

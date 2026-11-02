@@ -727,6 +727,9 @@ class SettingsNotifier extends Notifier<AppSettings> {
   void setUsbAllowFixedVolume(bool enabled) =>
       _commit(state.copyWith(usbAllowFixedVolume: enabled));
 
+  void setUsbSoftwareVolume(bool enabled) =>
+      _commit(state.copyWith(usbSoftwareVolume: enabled));
+
   void setDapExclusive(bool enabled) => _commit(
     state.copyWith(dapExclusive: enabled, usbDirect: enabled ? false : null),
   );

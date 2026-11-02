@@ -292,7 +292,10 @@
   "usbVolumeUnavailable": "이 DAC에는 검증된 하드웨어 볼륨 조절 기능이 없기 때문에 재생이 일시 중지되었습니다. DAC 또는 앰프의 볼륨을 낮춘 다음, 필요하다면 고정 볼륨 출력을 활성화하고 트랙을 다시 선택하세요",
   "usbFixedVolume": "고정 볼륨 USB 출력 허용",
   "usbFixedVolumeDescription": "앱에서 볼륨을 조절할 수 없는 DAC용입니다. 자체 볼륨 조절 기능이 없는 USB 헤드셋에서는 켜지 않은 상태로 유지하세요. 이 설정은 다음 트랙부터 적용됩니다",
-  "usbFixedVolumeWarning": "이 출력에서는 앱이 볼륨을 낮출 수 없습니다. 오디오가 최대 음량으로 시작할 수 있으며, 휴대전화의 볼륨 슬라이더로도 조절되지 않습니다. DAC 또는 외부 앰프의 볼륨을 먼저 낮춘 후에만 계속 진행하세요. 자체 볼륨 조절 기능이 없는 헤드셋에서는 이 기능을 활성화하지 마세요",
+  
+  "usbSoftwareVolume": "Software volume (USB DAC)",
+  "usbSoftwareVolumeDescription": "PCM scaled by the app - DAC hardware level parked at 0 dB.",
+  "usbSoftwareVolumeDsdError": "Software volume cannot attenuate native DSD. Use DAC hardware volume or convert DSD to PCM.",
   "dapExclusive": "DAP hi-res (AAudio 전용)",
   "dapExclusiveDescription": "FLAC/WAV PCM 파일을 트랙의 원본 샘플레이트와 정밀도 그대로 재생하려면 Oboe/AAudio를 사용합니다. Android 8.1 이상과 호환되는 하드웨어가 필요합니다. 전용 접근 가능 여부를 확인하며, 지원되지 않는 형식은 일반 재생 방식으로 처리됩니다. DSD는 다이렉트 USB 드라이버가 필요합니다. 이 설정은 다음 트랙부터 적용됩니다",
   "dapExclusiveUnavailable": "이 트랙과 현재 출력에서는 AAudio 전용 접근을 사용할 수 없습니다. 일반 재생 방식으로 전환합니다. USB DAC을 사용하는 경우 다이렉트 USB 드라이버를 사용해 보세요",

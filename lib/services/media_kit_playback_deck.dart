@@ -503,6 +503,7 @@ class MediaKitPlaybackDeck implements PlaybackDeck {
     bool requiresDsd = false,
     bool allowFixedVolume = false,
     bool dapExclusive = false,
+    bool forceSoftwareVolume = false,
   }) => _load(path, requiresDsd: requiresDsd);
 
   Future<void> _load(String source, {bool requiresDsd = false}) async {

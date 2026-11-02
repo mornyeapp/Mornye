@@ -86,6 +86,7 @@ class AppSettings {
   final bool usbDirect;
   final bool usbDsdOverPcm;
   final bool usbAllowFixedVolume;
+  final bool usbSoftwareVolume;
   final bool dapExclusive;
 
   /// Desktop: take the output device for the music player alone, bypassing
@@ -288,6 +289,7 @@ class AppSettings {
     this.usbDirect = false,
     this.usbDsdOverPcm = false,
     this.usbAllowFixedVolume = false,
+    this.usbSoftwareVolume = false,
     this.dapExclusive = false,
     this.exclusiveOutput = false,
     this.exclusiveOutputDevice = '',
@@ -438,6 +440,7 @@ class AppSettings {
     bool? usbDirect,
     bool? usbDsdOverPcm,
     bool? usbAllowFixedVolume,
+    bool? usbSoftwareVolume,
     bool? dapExclusive,
     bool? exclusiveOutput,
     String? exclusiveOutputDevice,
@@ -574,6 +577,7 @@ class AppSettings {
       usbDirect: usbDirect ?? this.usbDirect,
       usbDsdOverPcm: usbDsdOverPcm ?? this.usbDsdOverPcm,
       usbAllowFixedVolume: usbAllowFixedVolume ?? this.usbAllowFixedVolume,
+      usbSoftwareVolume: usbSoftwareVolume ?? this.usbSoftwareVolume,
       dapExclusive: dapExclusive ?? this.dapExclusive,
       exclusiveOutput: exclusiveOutput ?? this.exclusiveOutput,
       exclusiveOutputDevice:

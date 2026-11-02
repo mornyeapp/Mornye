@@ -298,10 +298,25 @@ class _MainShellState extends ConsumerState<MainShell>
   }
 
   void _onUsbAudioStatusChanged() {
-    if (usbAudioStatus.value.reason == 'active') {
+    final statusReason = usbAudioStatus.value.reason;
+    if (statusReason == 'active') {
       _usbVolumeWarningShown = false;
     }
-    if (usbAudioStatus.value.reason != 'volume_unavailable' ||
+    if (statusReason == 'dsd_software_volume') {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || usbAudioStatus.value.reason != 'dsd_software_volume') {
+          return;
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(context.l10n.usbSoftwareVolumeDsdError),
+            duration: const Duration(seconds: 8),
+          ),
+        );
+      });
+      return;
+    }
+    if (statusReason != 'volume_unavailable' ||
         _usbVolumeWarningShown) {
       return;
     }

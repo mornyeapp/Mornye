@@ -292,7 +292,10 @@
   "usbVolumeUnavailable": "Đã tạm dừng phát vì DAC này không có bộ chỉnh âm lượng phần cứng được xác nhận. Hãy giảm âm lượng trên DAC hoặc ampli trước, sau đó bật đầu ra âm lượng cố định nếu cần rồi chọn phát lại bài hát.",
   "usbFixedVolume": "Cho phép đầu ra USB âm lượng cố định",
   "usbFixedVolumeDescription": "Dành cho các bộ giải mã DAC không cho phép ứng dụng điều chỉnh âm lượng phần cứng. Hãy tắt tùy chọn này nếu bạn dùng tai nghe USB không có nút chỉnh âm lượng riêng. Áp dụng từ bài hát tiếp theo.",
-  "usbFixedVolumeWarning": "Ứng dụng không thể giảm âm lượng trên đầu ra này. Nhạc có thể phát ở mức âm lượng tối đa (100%) và thanh trượt âm lượng của điện thoại sẽ không có tác dụng. Chỉ tiếp tục sau khi bạn đã vặn nhỏ âm lượng trên DAC hoặc ampli rời. Tuyệt đối không bật tùy chọn này cho tai nghe không có nút chỉnh âm lượng riêng.",
+  
+  "usbSoftwareVolume": "Software volume (USB DAC)",
+  "usbSoftwareVolumeDescription": "PCM scaled by the app - DAC hardware level parked at 0 dB.",
+  "usbSoftwareVolumeDsdError": "Software volume cannot attenuate native DSD. Use DAC hardware volume or convert DSD to PCM.",
   "dapExclusive": "DAP Hi-Res (AAudio độc quyền)",
   "dapExclusiveDescription": "Sử dụng Oboe/AAudio ở đúng tần số lấy mẫu và độ sâu bit gốc của bản nhạc cho tệp FLAC/WAV PCM. Yêu cầu Android 8.1 trở lên và phần cứng tương thích. Ứng dụng sẽ ưu tiên kiểm tra chế độ truy cập độc quyền (Exclusive); các định dạng không hỗ trợ sẽ phát bình thường. Nhạc DSD cần trình điều khiển Direct USB. Áp dụng từ bài hát tiếp theo.",
   "dapExclusiveUnavailable": "Chế độ AAudio độc quyền không khả dụng cho bài hát và đầu ra hiện tại. Đang phát ở chế độ thông thường. Nếu dùng USB DAC, hãy thử bật trình điều khiển Direct USB.",

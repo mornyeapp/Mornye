@@ -491,6 +491,8 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage> {
                                 ? 'DSD (DoP)'
                                 : 'DSD (Native)'} · ${(status.sampleRate! / 1000).toStringAsFixed(1)} kHz',
                           'dsd_unsupported' => context.l10n.usbDsdUnsupported,
+                          'dsd_software_volume' =>
+                            context.l10n.usbSoftwareVolumeDsdError,
                           'volume_unavailable' =>
                             context.l10n.usbVolumeUnavailable,
                           'exclusive_unavailable' =>
@@ -570,6 +572,17 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage> {
                         }
                       },
                     ),
+                    SettingsSwitchItem(
+                      icon: Icons.tune,
+                      title: context.l10n.usbSoftwareVolume,
+                      subtitle: context.l10n.usbSoftwareVolumeDescription,
+                      value: settings.usbSoftwareVolume,
+                      onChanged: (value) {
+                        ref
+                            .read(settingsProvider.notifier)
+                            .setUsbSoftwareVolume(value);
+                      },
+                    ),
                     ValueListenableBuilder<UsbVolumeState?>(
                       valueListenable: usbHardwareVolume,
                       builder: (context, volume, _) => Padding(
@@ -581,7 +594,9 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              context.l10n.usbHardwareVolume,
+                              volume?.isSoftware == true
+                                  ? context.l10n.usbSoftwareVolume
+                                  : context.l10n.usbHardwareVolume,
                               style: Theme.of(context).textTheme.titleMedium,
                             ),
                             Text(

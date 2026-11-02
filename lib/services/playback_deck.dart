@@ -126,6 +126,7 @@ abstract interface class PlaybackDeck {
     bool requiresDsd = false,
     bool allowFixedVolume = false,
     bool dapExclusive = false,
+    bool forceSoftwareVolume = false,
   });
 
   /// Abandons a source that is still preparing, if any.

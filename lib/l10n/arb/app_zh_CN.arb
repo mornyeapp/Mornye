@@ -292,7 +292,10 @@
   "usbVolumeUnavailable": "播放已暂停，因为此DAC没有经过验证的硬件音量控制。降低DAC或放大器音量，然后在需要时启用固定音量输出并重新选择曲目。",
   "usbFixedVolume": "允许固定音量USB输出",
   "usbFixedVolumeDescription": "用于应用无法访问音量控制的DAC。没有自己音量控制的USB耳机请保持关闭。从下一曲目生效。",
-  "usbFixedVolumeWarning": "应用无法降低此输出的音量。音频可能以满电平开始，手机音量滑块无效。仅在降低DAC或外部放大器音量后继续。没有自己音量控制的耳机请勿启用。",
+  
+  "usbSoftwareVolume": "Software volume (USB DAC)",
+  "usbSoftwareVolumeDescription": "PCM scaled by the app - DAC hardware level parked at 0 dB.",
+  "usbSoftwareVolumeDsdError": "Software volume cannot attenuate native DSD. Use DAC hardware volume or convert DSD to PCM.",
   "dapExclusive": "DAP高解析（AAudio独占）",
   "dapExclusiveDescription": "以曲目原始采样率和精度使用Oboe/AAudio播放FLAC/WAV PCM。需要Android 8.1及以上和兼容硬件。将检查独占访问；不可用的格式使用普通播放。DSD需要直接USB驱动。从下一曲目生效。",
   "dapExclusiveUnavailable": "此曲目和当前输出无法使用AAudio独占访问。使用普通播放。对于USB DAC，请尝试直接USB驱动。",

@@ -217,7 +217,10 @@
   "usbVolumeUnavailable": "Pemutaran dijeda karena kontrol volume pada hardware DAC tidak dapat diverifikasi. Turunkan volume DAC atau Amplifier, lalu hidupkan volume output tetap bila dibutuhkan lalu putar lagi.",
   "usbFixedVolume": "Izinkan volume tetap output USB",
   "usbFixedVolumeDescription": "Untuk DAC yang tidak dapat dikontrol volume oleh aplikasi. Matikan bila menggunakan headset USB yang tidak punya kontrol volume. Berlaku di lagu selanjutnya.",
-  "usbFixedVolumeWarning": "Aplikasi tidak dapat menurunkan volume output ini. Audio mungkin terdengar sangat kencang, dan kontrol volume perangkat tidak dapat berfungsi. Lanjutkan setelan menurunkan volume DAC/Amplifier Anda. Jangan hidupkan bila headset Anda tidak punya kontrol volume.",
+  
+  "usbSoftwareVolume": "Software volume (USB DAC)",
+  "usbSoftwareVolumeDescription": "PCM scaled by the app - DAC hardware level parked at 0 dB.",
+  "usbSoftwareVolumeDsdError": "Software volume cannot attenuate native DSD. Use DAC hardware volume or convert DSD to PCM.",
   "dapExclusive": "Hi-Res DAP (eksklusif AAudio)",
   "dapExclusiveDescription": "Gunakan Oboe/AAudio pada sample rate dan presisi asli FLAC/WAV PCM. Butuh Android 8.1+ dan hardware didukung. Akses eksklusif diperiksa; format tak didukung akan gunakan pemutaran normal. DSD butuh driver Direct USB. Berlaku di lagu selanjutnya.",
   "dapExclusiveUnavailable": "Akses eksklusif AAudio tidak tersedia di lagu dan output ini. Lagu akan diputar normal. Jika pakai DAC USB, coba pakai driver Direct USB.",

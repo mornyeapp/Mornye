@@ -292,7 +292,10 @@
   "usbVolumeUnavailable": "A reprodução está pausada porque este DAC não possui controle de volume de hardware verificado. Reduza o volume no DAC ou no amplificador, ative a saída de volume fixo, se necessário, e selecione a faixa novamente.",
   "usbFixedVolume": "Permitir saída USB de volume fixo",
   "usbFixedVolumeDescription": "Para DACs sem controle de volume acessível ao aplicativo. Mantenha desativado para headsets USB que não possuam controle de volume próprio. A alteração entra em vigor a partir da próxima faixa.",
-  "usbFixedVolumeWarning": "O aplicativo não consegue reduzir o volume nesta saída. O áudio pode começar no nível máximo, e o controle deslizante de volume do celular não terá efeito. Prossiga apenas após reduzir o volume no seu DAC ou amplificador externo. Não ative esta opção ao usar um fone de ouvido que não possua controle de volume próprio.",
+  
+  "usbSoftwareVolume": "Software volume (USB DAC)",
+  "usbSoftwareVolumeDescription": "PCM scaled by the app - DAC hardware level parked at 0 dB.",
+  "usbSoftwareVolumeDsdError": "Software volume cannot attenuate native DSD. Use DAC hardware volume or convert DSD to PCM.",
   "dapExclusive": "DAP de alta resolução (Exclusivo AAudio)",
   "dapExclusiveDescription": "Utilize o Oboe/AAudio com a taxa e a precisão originais da faixa para arquivos FLAC/WAV PCM. Requer Android 8.1 ou superior e hardware compatível. O acesso exclusivo é verificado; caso não esteja disponível, utiliza-se a reprodução normal. Para DSD, é necessário o driver USB direto. A configuração entra em vigor a partir da próxima faixa.",
   "dapExclusiveUnavailable": "O acesso exclusivo via AAudio não está disponível para esta faixa e para a saída atual. A reprodução ocorrerá de modo normal. No caso de um DAC USB, tente utilizar o driver USB direto.",

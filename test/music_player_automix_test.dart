@@ -37,17 +37,20 @@ void main() {
       expect(defaults.usbDirect, isFalse);
       expect(defaults.usbDsdOverPcm, isFalse);
       expect(defaults.usbAllowFixedVolume, isFalse);
+      expect(defaults.usbSoftwareVolume, isFalse);
       expect(defaults.dapExclusive, isFalse);
       final upgraded = AppSettings.fromJson({
         'usbBitPerfect': true,
         'usbDirect': true,
       });
       expect(upgraded.usbAllowFixedVolume, isFalse);
+      expect(upgraded.usbSoftwareVolume, isFalse);
       final selected = defaults.copyWith(
         usbBitPerfect: true,
         usbDirect: true,
         usbDsdOverPcm: true,
         usbAllowFixedVolume: true,
+        usbSoftwareVolume: true,
         autoMix: true,
         playbackNormalization: true,
       );
@@ -56,6 +59,7 @@ void main() {
       expect(restored.usbDirect, isTrue);
       expect(restored.usbDsdOverPcm, isTrue);
       expect(restored.usbAllowFixedVolume, isTrue);
+      expect(restored.usbSoftwareVolume, isTrue);
       expect(
         AppSettings.fromJson(
           defaults.copyWith(dapExclusive: true).toJson(),

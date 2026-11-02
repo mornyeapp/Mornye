@@ -292,7 +292,10 @@
   "usbVolumeUnavailable": "Afspelen is gepauzeerd omdat deze DAC geen geverifieerde hardware volumeregeling heeft. Zet het volume van de DAC of amplifier zachter en schakel daarna fixed-volume uitvoer in als dat nodig is, en selecteer het nummer daarna opnieuw.",
   "usbFixedVolume": "Sta fixed-volume USB uitvoer toe",
   "usbFixedVolumeDescription": "For DACs without a volume control accessible to the app. Keep off for USB headsets without their own volume control. Applies from the next track.",
-  "usbFixedVolumeWarning": "De app kan het volume niet verlagen op deze uitvoer. Audio kan starten op het hoogste volume en de volumeregeling van uw telefoon zal niet helpen. Ga alleen verder na het verlagen van uw volume van uw DAC of externe amplifier. Zet dit niet aan voor een headset zonder eigen volumeregelaar.",
+  
+  "usbSoftwareVolume": "Software volume (USB DAC)",
+  "usbSoftwareVolumeDescription": "PCM scaled by the app - DAC hardware level parked at 0 dB.",
+  "usbSoftwareVolumeDsdError": "Software volume cannot attenuate native DSD. Use DAC hardware volume or convert DSD to PCM.",
   "dapExclusive": "DAP hi-res (alleen voor AAudio)",
   "dapExclusiveDescription": "Use Oboe/AAudio at the track's original rate and precision for FLAC/WAV PCM. Requires Android 8.1 or later and compatible hardware. Exclusive access is checked; unavailable formats use normal playback. DSD requires the direct USB driver. Applies from the next track.",
   "dapExclusiveUnavailable": "AAudio exclusive access is unavailable for this track and current output. Using normal playback. For a USB DAC, try the direct USB driver.",
