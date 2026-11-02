@@ -100,36 +100,44 @@ class LibraryCollectionsDatabase {
     final db = await database;
     await sqlite.transactionWithBusyRetry(db, (txn) async {
       for (final table in [_tableWishlist, _tableLoved, _tablePlaylistTracks]) {
-        final rows = await txn.query(
-          table,
-          columns: ['rowid', 'track_key', 'track_json'],
-          where:
-              "CASE WHEN json_valid(track_json) THEN "
-              "json_extract(track_json, '\$.source') END = 'local' "
-              "AND CASE WHEN json_valid(track_json) THEN "
-              "json_extract(track_json, '\$.id') END = ?",
-          whereArgs: [oldId],
-        );
-        for (final row in rows) {
-          final track = _decodeTrack(row['track_json'])!;
-          final previousKey = trackCollectionKey(track);
-          final updated = track.copyWith(id: newId);
-          final nextKey = trackCollectionKey(updated);
-          final key = row['track_key'] as String;
-          final renamedKey = key == previousKey
-              ? nextKey
-              : key.startsWith('occurrence:') && key.endsWith(':$previousKey')
-              ? '${key.substring(0, key.length - previousKey.length)}$nextKey'
-              : key;
-          await txn.update(
+        var after = 0;
+        while (true) {
+          final rows = await txn.query(
             table,
-            {
-              'track_key': renamedKey,
-              'track_json': jsonEncode(updated.toJson()),
-            },
-            where: 'rowid = ?',
-            whereArgs: [row['rowid']],
+            columns: ['rowid', 'track_key', 'track_json'],
+            // Prefilter serialized values, then verify the field in Dart. This
+            // also works on system SQLite builds without JSON functions.
+            where: 'rowid > ? AND instr(track_json, ?) > 0',
+            whereArgs: [after, jsonEncode(oldId)],
+            orderBy: 'rowid',
+            limit: 200,
           );
+          if (rows.isEmpty) break;
+          after = rows.last['rowid'] as int;
+          for (final row in rows) {
+            final track = _decodeTrack(row['track_json']);
+            if (track == null || track.source != 'local' || track.id != oldId) {
+              continue;
+            }
+            final previousKey = trackCollectionKey(track);
+            final updated = track.copyWith(id: newId);
+            final nextKey = trackCollectionKey(updated);
+            final key = row['track_key'] as String;
+            final renamedKey = key == previousKey
+                ? nextKey
+                : key.startsWith('occurrence:') && key.endsWith(':$previousKey')
+                ? '${key.substring(0, key.length - previousKey.length)}$nextKey'
+                : key;
+            await txn.update(
+              table,
+              {
+                'track_key': renamedKey,
+                'track_json': jsonEncode(updated.toJson()),
+              },
+              where: 'rowid = ?',
+              whereArgs: [row['rowid']],
+            );
+          }
         }
       }
     });
