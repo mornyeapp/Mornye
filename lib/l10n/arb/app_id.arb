@@ -7232,7 +7232,7 @@
   "@regionCountryID": {
     "description": "Country name for SongLink region picker"
   },
-  "regionCountryBR": "Brazil",
+  "regionCountryBR": "Brasil",
   "@regionCountryBR": {
     "description": "Country name for SongLink region picker"
   },

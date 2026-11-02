@@ -1,4 +1,109 @@
 {
+  "extensionsUnsecuredStorage": "Use unsecured extension storage",
+  "extensionsUnsecuredStorageDescription": "Run extensions without a Linux keyring. The key is saved locally, so anyone with access to your app files can read extension credentials. Off uses the system keyring.",
+  "extensionsStorageKeyringRequired": "Existing extension data needs its original key. Unlock the system keyring once, then enable unsecured storage again. Your data has been preserved.",
+  "extensionsStorageKeyConflict": "The local and system keyring keys differ. Storage was not changed and both keys were preserved.",
+  "extensionsStorageKeyringUnavailable": "The system keyring is unavailable or locked. Start or unlock it before switching to secure storage. Your local key has been preserved.",
+  "linkFileActionOn": "{action} on {name}",
+  "@linkFileActionOn": {
+    "description": "File operation on a named linked computer",
+    "placeholders": {
+      "action": {
+        "type": "String"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkFileActionsDescription": "Changes apply to music files on {name}. Accepted work continues if this phone disconnects.",
+  "@linkFileActionsDescription": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkFileDeleteConfirm": "Delete {count} {count, plural, =1{music file} other{music files}} from {name}? This removes the files from that computer's storage.",
+  "@linkFileDeleteConfirm": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkFileJobs": "File changes",
+  "@linkFileJobs": {
+    "description": "Title of the list of edits, conversions and deletions the phone started on the linked computer's music files"
+  },
+  "linkFileJobsSubtitle": "Edits, conversions and deletions on {name}",
+  "@linkFileJobsSubtitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkFileJobsEmpty": "No file changes yet",
+  "linkFileJobsEmptyMessage": "Edits, conversions and deletions you start on the computer's songs from this phone appear here.",
+  "linkDesktopFileJobsSubtitle": "Changes requested from your phones",
+  "linkDesktopFileJobsEmptyMessage": "Edits, conversions and deletions requested from your phones appear here.",
+  "linkFileJobRequestedBy": "From {name}",
+  "@linkFileJobRequestedBy": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkFileJobsView": "View",
+  "@linkFileJobsView": {
+    "description": "Snackbar action that opens the file changes list to see which songs failed"
+  },
+  "linkFileJobsUnsupported": "Update Mornye on your computer to manage its music files from this phone.",
+  "linkFileSelectionOneDevice": "Select songs from one linked computer at a time (up to 100 songs).",
+  "linkFileJobProgress": "{finished} of {total} {total, plural, =1{song} other{songs}}",
+  "@linkFileJobProgress": {
+    "placeholders": {
+      "finished": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "linkFileJobFailedCount": "{count} failed",
+  "@linkFileJobFailedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "linkFileJobFinished": "{action} finished on {name}",
+  "@linkFileJobFinished": {
+    "placeholders": {
+      "action": {
+        "type": "String"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkFileDeleting": "Deleting...",
+  "linkFileReading": "Reading tags...",
+  "linkFileSavingCover": "Saving cover art...",
+  "linkFileCancelHint": "Stop after the current song",
+  "linkFileJobCancelled": "Stopped",
+  "linkFileJobQueued": "Queued",
+  "linkFileJobCompleted": "Finished",
+  "linkFileChanged": "The file changed since the preview. Preview it again before saving.",
+  "linkFileOperationFailed": "The operation could not be completed. Check the computer's logs for details.",
   "trackBpm": "BPM",
   "trackMood": "Mood",
   "subsonicAddToLibrary": "Add server to Library",
@@ -191,6 +296,20 @@
   "dapExclusive": "DAP hi-res (AAudio exclusive)",
   "dapExclusiveDescription": "Use Oboe/AAudio at the track's original rate and precision for FLAC/WAV PCM. Requires Android 8.1 or later and compatible hardware. Exclusive access is checked; unavailable formats use normal playback. DSD requires the direct USB driver. Applies from the next track.",
   "dapExclusiveUnavailable": "AAudio exclusive access is unavailable for this track and current output. Using normal playback. For a USB DAC, try the direct USB driver.",
+  "exclusiveOutputWindows": "WASAPI exclusive mode",
+  "exclusiveOutputMacos": "Exclusive access (hog mode)",
+  "exclusiveOutputLinux": "Direct ALSA output",
+  "exclusiveOutputDescriptionWindows": "Bypass the Windows mixer so the output follows each track's sample rate and bit depth. Other apps cannot play sound while Mornye holds the device. AutoMix and previews are off in this mode. For bit-perfect output, keep the volume at 100% with the equalizer and normalization off.",
+  "exclusiveOutputDescriptionMacos": "Hold the output device for Mornye alone and switch it to each track's sample rate and bit depth, so Core Audio does not resample. Other apps cannot play sound while Mornye holds the device. AutoMix and previews are off in this mode. For bit-perfect output, keep the volume at 100% with the equalizer and normalization off.",
+  "exclusiveOutputDescriptionLinux": "Play straight to an ALSA hardware device, bypassing PipeWire or PulseAudio, so the output follows each track's sample rate and bit depth. The device must be free: the sound server releases an idle card after a few seconds, or set its profile to Off. AutoMix and previews are off in this mode.",
+  "exclusiveOutputPending": "Takes the device when a track plays.",
+  "exclusiveOutputActive": "Playing in exclusive mode.",
+  "exclusiveOutputUnavailableWindows": "The device refused exclusive access, so this track plays through the Windows mixer. Close other apps using the device, or allow exclusive control in the device's Windows sound properties.",
+  "exclusiveOutputUnavailableMacos": "Another app holds the output device, so this track plays through the system mixer.",
+  "exclusiveOutputUnavailableLinux": "The ALSA device is busy, usually held by the sound server, so this track plays through it. Set the card's profile to Off in the sound settings, or choose another device.",
+  "exclusiveOutputDevice": "Output device",
+  "exclusiveOutputDeviceFirst": "First sound card",
+  "exclusiveOutputNoDevices": "No ALSA playback devices found",
   "usbDirect": "Direct USB driver",
   "usbDirectDescription": "Use exclusive USB audio for FLAC/WAV, DSF/DFF and WavPack DSD, with Android USB permission. Native DSD requires a recognized compatible DAC. Other PCM formats use normal playback. Applies from the next track.",
   "usbDsdOverPcm": "DSD over PCM (DoP)",
@@ -313,6 +432,35 @@
   "libraryNoActiveDownloads": "No active downloads",
   "librarySearchHint": "Search your library",
   "libraryEmptyCollection": "Your music will appear here",
+  "libraryFolders": "Folders",
+  "@libraryFolders": {
+    "description": "Library view that browses downloaded and scanned songs by the folders their files are in"
+  },
+  "libraryFolderCount": "{count, plural, =1{1 folder} other{{count} folders}}",
+  "@libraryFolderCount": {
+    "description": "Number of folders inside a Library folder",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "libraryFoldersEmptyTitle": "No folders yet",
+  "@libraryFoldersEmptyTitle": {
+    "description": "Title of the Folders view when the Library has no songs"
+  },
+  "libraryFoldersEmptyMessage": "Download songs or add a music folder in Local Library settings to browse them by folder.",
+  "@libraryFoldersEmptyMessage": {
+    "description": "Next step shown in the empty Folders view"
+  },
+  "libraryFolderMissing": "This folder is no longer in your Library",
+  "@libraryFolderMissing": {
+    "description": "Shown on an open folder page after its songs were deleted or moved"
+  },
+  "libraryFoldersLoadFailed": "Couldn't read your folders",
+  "@libraryFoldersLoadFailed": {
+    "description": "Shown when the Folders view fails to load"
+  },
   "settingsTitle": "الإعدادات",
   "@settingsTitle": {
     "description": "Settings screen title"
@@ -976,6 +1124,66 @@
   "@setupSkipForNow": {
     "description": "Skip button text"
   },
+  "setupNearbyEnable": "Allow Nearby Devices",
+  "@setupNearbyEnable": {
+    "description": "Setup step title and button for the Android Nearby devices permission; Nearby devices is the Android permission name"
+  },
+  "setupNearbyDescription": "Mornye Link uses it to find your computer on the same network, and network storage needs it to reach a server at home.",
+  "@setupNearbyDescription": {
+    "description": "Setup step explaining why Android's Nearby devices permission is needed"
+  },
+  "setupNearbyGranted": "Nearby Devices Allowed!",
+  "@setupNearbyGranted": {
+    "description": "Setup message after the Nearby devices permission is granted"
+  },
+  "permissionNearbyDevices": "Nearby devices",
+  "@permissionNearbyDevices": {
+    "description": "Nearby devices permission type label; use Android's name for this permission"
+  },
+  "whatsNewLinkNearbyAllow": "Allow nearby devices",
+  "@whatsNewLinkNearbyAllow": {
+    "description": "Main button on the Nearby devices page of the What's New tour that asks for Android's Nearby devices permission"
+  },
+  "whatsNewLinkNearbyGranted": "Nearby devices allowed",
+  "@whatsNewLinkNearbyGranted": {
+    "description": "Shown on the Nearby devices page of the What's New tour after the Nearby devices permission is granted"
+  },
+  "whatsNewNearbyTitle": "Nearby devices",
+  "@whatsNewNearbyTitle": {
+    "description": "Title of the What's New page that asks for Android's Nearby devices permission; use Android's name for this permission"
+  },
+  "whatsNewNearbyDesc": "Android now asks before an app can reach other devices on your network. Mornye needs this for:",
+  "@whatsNewNearbyDesc": {
+    "description": "Description on the Nearby devices page of the What's New tour, followed by a list of uses"
+  },
+  "whatsNewNearbyLinkTitle": "Finding your computer",
+  "@whatsNewNearbyLinkTitle": {
+    "description": "Use of the Nearby devices permission: Mornye Link finds the computer"
+  },
+  "whatsNewNearbyLinkBody": "Mornye Link looks for your computer on the same Wi-Fi and stays connected to it.",
+  "@whatsNewNearbyLinkBody": {
+    "description": "Explains how Mornye Link uses the Nearby devices permission"
+  },
+  "whatsNewNearbyStorageTitle": "Network storage",
+  "@whatsNewNearbyStorageTitle": {
+    "description": "Use of the Nearby devices permission: SMB and WebDAV servers at home"
+  },
+  "whatsNewNearbyStorageBody": "Play music from a NAS or a server at home over SMB or WebDAV.",
+  "@whatsNewNearbyStorageBody": {
+    "description": "Explains how network storage uses the Nearby devices permission"
+  },
+  "whatsNewNearbyPrivateTitle": "Only your own devices",
+  "@whatsNewNearbyPrivateTitle": {
+    "description": "Reassurance on the Nearby devices page of the What's New tour"
+  },
+  "whatsNewNearbyPrivateBody": "Mornye uses it only to reach devices on your network, never to find where you are.",
+  "@whatsNewNearbyPrivateBody": {
+    "description": "Explains that the Nearby devices permission is not used for location"
+  },
+  "whatsNewNearbyRefused": "Not allowed. Mornye Link and network storage stay off until you allow Nearby devices for Mornye in Android settings.",
+  "@whatsNewNearbyRefused": {
+    "description": "Shown on the Nearby devices page of the What's New tour after the permission is refused"
+  },
   "setupNext": "التالي",
   "@setupNext": {
     "description": "Next button text"
@@ -1440,6 +1648,20 @@
   "searchPlaylists": "قوائم التشغيل",
   "@searchPlaylists": {
     "description": "Search result category - playlists"
+  },
+  "searchShowAll": "Show all",
+  "@searchShowAll": {
+    "description": "Button of a search result section on wide screens that shows every result of that kind"
+  },
+  "searchShowAllCategory": "Show all {category}",
+  "@searchShowAllCategory": {
+    "description": "Screen reader label of the Show all button of a search result section",
+    "placeholders": {
+      "category": {
+        "type": "String",
+        "example": "Albums"
+      }
+    }
   },
   "searchSortTitle": "فرز النتائج",
   "@searchSortTitle": {
@@ -2388,6 +2610,12 @@
   "@downloadAutoConvert": {
     "description": "Toggle for automatic post-download audio conversion"
   },
+  "downloadAutoConvertAllFormatsSubtitle": "Convert completed downloads or limit FLAC bit depth and sample rate. The original is replaced only after conversion succeeds.",
+  "downloadAutoConvertOutputSubtitle": "Choose the output format for newly completed downloads.",
+  "downloadAutoConvertFlacSubtitle": "Lossless FLAC with quality limits. Lower bit depths and sample rates are preserved.",
+  "downloadAutoConvertMaxBitDepth": "Maximum bit depth",
+  "downloadAutoConvertMaxSampleRate": "Maximum sample rate",
+  "downloadAutoConvertFlacLimitsSubtitle": "These are upper limits. For example, a 44.1 kHz source stays at 44.1 kHz when 48 kHz is selected. Lossy sources are kept in their original format.",
   "downloadAutoConvertSubtitle": "تحويل التنزيلات المكتملة إلى تنسيق أقل خسارة. يتم استبدال الأصل فقط بعد نجاح التحويل.",
   "@downloadAutoConvertSubtitle": {
     "description": "Explanation of safe automatic post-download conversion"
@@ -3102,6 +3330,22 @@
   "@libraryFilterAll": {
     "description": "Filter chip - show all library items"
   },
+  "libraryReEnrichAll": "Re-enrich All Tracks",
+  "@libraryReEnrichAll": {
+    "description": "Library settings action - re-enrich the metadata of every track in the Library"
+  },
+  "libraryReEnrichAllSubtitle": "Look up and fill in metadata for every track in your Library, then review the changes",
+  "@libraryReEnrichAllSubtitle": {
+    "description": "Subtitle for the Re-enrich All Tracks action"
+  },
+  "libraryReEnrichAllEmpty": "No tracks to re-enrich. Tracks from network connections are not included.",
+  "@libraryReEnrichAllEmpty": {
+    "description": "Snackbar when the Library has no tracks Re-enrich can write to"
+  },
+  "libraryReEnrichAllBusy": "Wait for the Library scan to finish, then try again.",
+  "@libraryReEnrichAllBusy": {
+    "description": "Snackbar when Re-enrich All is started during a Library scan"
+  },
   "libraryFilterDownloaded": "تم التنزيل",
   "@libraryFilterDownloaded": {
     "description": "Filter chip - show only downloaded items"
@@ -3327,6 +3571,77 @@
   "tutorialReadyMessage": "You're ready. Select your extensions, then search or paste a supported link.",
   "@tutorialReadyMessage": {
     "description": "Tutorial completion message"
+  },
+  "whatsNewIntroTitle": "Mornye {version} is here",
+  "@whatsNewIntroTitle": {
+    "description": "First page of the tour shown once after updating; version is like 5.3",
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "whatsNewIntroDesc": "Our biggest update yet. Here's a quick look at what's new.",
+  "whatsNewLinkTitle": "Mornye Link",
+  "whatsNewLinkDesc": "Pair your phone and computer on the same network. Mornye Link is in beta.",
+  "whatsNewLinkPlayTitle": "Play across devices",
+  "whatsNewLinkPlayBody": "Browse your computer's library on your phone, control what it plays, and hand playback over without losing your place.",
+  "whatsNewLinkTransferTitle": "Move songs both ways",
+  "whatsNewLinkTransferBody": "Send songs to your computer or save them to your phone, right from the song menu.",
+  "whatsNewLinkSyncTitle": "Stay in sync",
+  "whatsNewLinkSyncBody": "Collections and listening history stay the same on paired devices.",
+  "whatsNewHomeTitle": "A Home that learns",
+  "whatsNewHomeDesc": "Mixes and autoplay now follow how you actually listen.",
+  "whatsNewHomeMixesTitle": "Mixes from your Library",
+  "whatsNewHomeMixesBody": "New mixes built from your own songs, including a mix for each genre.",
+  "whatsNewHomeAutoplayTitle": "Smarter autoplay",
+  "whatsNewHomeAutoplayBody": "Autoplay follows your listening session and learns from your favorites, playlists and replays.",
+  "whatsNewHomeAnalysisTitle": "Song analysis",
+  "whatsNewHomeAnalysisBody": "Mornye can analyze how your songs sound for closer picks. It stays off until you turn it on in Settings.",
+  "whatsNewPlayerTitle": "Player and lyrics",
+  "whatsNewPlayerDesc": "Smoother playback, and lyrics in any language.",
+  "whatsNewPlayerGaplessTitle": "Gapless playback",
+  "whatsNewPlayerGaplessBody": "Albums flow from one song into the next without a pause.",
+  "whatsNewPlayerTranslateTitle": "Translate lyrics",
+  "whatsNewPlayerTranslateBody": "Translate or romanize lyrics with an AI provider you set up.",
+  "whatsNewPlayerTimingTitle": "Lyrics timing",
+  "whatsNewPlayerTimingBody": "Move synced lyrics earlier or later when they drift from the song.",
+  "whatsNewPlayerAutoTitle": "Android Auto",
+  "whatsNewPlayerAutoBody": "Browse and play your Library from your car's screen.",
+  "whatsNewPlayerExclusiveTitle": "Exclusive output",
+  "whatsNewPlayerExclusiveBody": "Send audio straight to your output device without the system mixer.",
+  "whatsNewLibraryTitle": "Library and search",
+  "whatsNewLibraryDesc": "New ways to find and organize your music.",
+  "whatsNewLibraryFoldersTitle": "Browse by folder",
+  "whatsNewLibraryFoldersBody": "Explore your Library the way it's stored on disk.",
+  "whatsNewLibrarySuggestionsTitle": "Suggested songs",
+  "whatsNewLibrarySuggestionsBody": "Albums, singles and playlists now suggest songs that fit.",
+  "whatsNewLibraryRecognizeTitle": "Recognize music",
+  "whatsNewLibraryRecognizeBody": "Tap the microphone in Search to find out what's playing nearby.",
+  "whatsNewLibraryPlaylistsTitle": "Better playlists",
+  "whatsNewLibraryPlaylistsBody": "Reorder songs, create a playlist from a folder, or import playlist files.",
+  "whatsNewFasterTitle": "Faster everywhere",
+  "whatsNewFasterDesc": "Quicker and lighter, especially with large libraries.",
+  "whatsNewFasterLibraryTitle": "A quicker Library",
+  "whatsNewFasterLibraryBody": "Tabs and albums open faster, and scrolling stays smooth.",
+  "whatsNewFasterNetworkTitle": "Faster network music",
+  "whatsNewFasterNetworkBody": "Network shares scan many times faster, and Subsonic servers sync with far fewer requests.",
+  "whatsNewFasterQueueTitle": "Long queues that last",
+  "whatsNewFasterQueueBody": "Large queues save quickly and come back after a restart.",
+  "whatsNewFasterBackgroundTitle": "Lighter in the background",
+  "whatsNewFasterBackgroundBody": "The app starts faster and does less work while music plays.",
+  "whatsNewDone": "Start listening",
+  "@whatsNewDone": {
+    "description": "Button on the last page of the What's New tour"
+  },
+  "whatsNewAboutTitle": "What's new in {version}",
+  "@whatsNewAboutTitle": {
+    "description": "About page row that reopens the What's New tour; version is like 5.3",
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
   },
   "libraryForceFullScan": "Force Full Scan",
   "@libraryForceFullScan": {
@@ -6737,6 +7052,14 @@
   "@nowPlayingOpenInExternalPlayer": {
     "description": "Menu item to open the current track in an external player"
   },
+  "nowPlayingHideVolume": "Hide volume",
+  "@nowPlayingHideVolume": {
+    "description": "Now Playing menu item that removes the volume slider from the player"
+  },
+  "nowPlayingShowVolume": "Show volume",
+  "@nowPlayingShowVolume": {
+    "description": "Now Playing menu item that brings the volume slider back to the player"
+  },
   "nowPlayingTabPlayer": "Player",
   "@nowPlayingTabPlayer": {
     "description": "Tab label for the player view"
@@ -6768,6 +7091,279 @@
   "nowPlayingNoLyricsOnline": "No lyrics found online",
   "@nowPlayingNoLyricsOnline": {
     "description": "Empty state after an online lyrics search for the playing track found nothing"
+  },
+  "nowPlayingTranslateLyrics": "Translate Lyrics",
+  "@nowPlayingTranslateLyrics": {
+    "description": "Player lyrics menu action that translates the current lyrics with the user's AI provider"
+  },
+  "nowPlayingCancelTranslation": "Cancel Translation",
+  "@nowPlayingCancelTranslation": {
+    "description": "Player lyrics menu action that stops an AI lyrics translation in progress"
+  },
+  "nowPlayingTranslatingLyrics": "Translating lyrics, {percent}%",
+  "@nowPlayingTranslatingLyrics": {
+    "description": "Tooltip and screen reader label of the lyrics menu button while an AI translation runs",
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "lyricsTranslateSheetTitle": "Translate Into",
+  "@lyricsTranslateSheetTitle": {
+    "description": "Title of the sheet that picks the language to translate the current lyrics into"
+  },
+  "lyricsTranslateSheetSubtitle": "The lyrics are sent to {provider}.",
+  "@lyricsTranslateSheetSubtitle": {
+    "description": "Notice under the translate sheet title naming the AI provider that receives the lyrics",
+    "placeholders": {
+      "provider": {
+        "type": "String"
+      }
+    }
+  },
+  "lyricsTranslatePartial": "{count, plural, =1{1 line} other{{count} lines}} could not be translated",
+  "@lyricsTranslatePartial": {
+    "description": "Snackbar after an AI translation that left some lines untranslated",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "lyricsTranslateAlreadyIn": "These lyrics are already in {language}",
+  "@lyricsTranslateAlreadyIn": {
+    "description": "Snackbar after an AI translation returned every line unchanged; language is the target language's own name",
+    "placeholders": {
+      "language": {
+        "type": "String"
+      }
+    }
+  },
+  "lyricsAiTranslation": "AI Translation",
+  "@lyricsAiTranslation": {
+    "description": "Lyrics settings row and page title for translating lyrics with the user's own AI provider"
+  },
+  "lyricsAiTranslationOff": "Not set up",
+  "@lyricsAiTranslationOff": {
+    "description": "Subtitle of the AI Translation settings row before a provider is configured"
+  },
+  "lyricsAiTranslationNotice": "Lyrics you translate are sent to the provider you choose, using your own API key. The provider's terms and pricing apply. Translations are saved on this device and never change your lyric files.",
+  "@lyricsAiTranslationNotice": {
+    "description": "Privacy notice at the top of the AI translation settings page"
+  },
+  "lyricsAiSectionProvider": "Provider",
+  "@lyricsAiSectionProvider": {
+    "description": "AI translation settings section for the provider, key and model"
+  },
+  "lyricsAiSectionTranslation": "Translation",
+  "@lyricsAiSectionTranslation": {
+    "description": "AI translation settings section for the target language and behavior"
+  },
+  "lyricsAiProvider": "Provider",
+  "@lyricsAiProvider": {
+    "description": "AI translation setting that picks the AI service"
+  },
+  "lyricsAiProviderCustom": "Custom Server",
+  "@lyricsAiProviderCustom": {
+    "description": "AI provider choice for a self-hosted or other OpenAI-compatible server"
+  },
+  "lyricsAiProviderCustomSubtitle": "Any OpenAI-compatible server, such as Ollama or LM Studio",
+  "@lyricsAiProviderCustomSubtitle": {
+    "description": "Subtitle of the custom AI provider choice"
+  },
+  "lyricsAiBaseUrl": "Server URL",
+  "@lyricsAiBaseUrl": {
+    "description": "AI translation setting for the address of a custom OpenAI-compatible server"
+  },
+  "lyricsAiBaseUrlInvalid": "Enter a URL that starts with http:// or https://",
+  "@lyricsAiBaseUrlInvalid": {
+    "description": "Validation error for the custom AI server URL"
+  },
+  "lyricsAiNotSet": "Not set",
+  "@lyricsAiNotSet": {
+    "description": "Subtitle of an AI translation setting that has no value yet"
+  },
+  "lyricsAiApiKey": "API Key",
+  "@lyricsAiApiKey": {
+    "description": "AI translation setting for the user's API key"
+  },
+  "lyricsAiApiKeyOptional": "Optional for local servers",
+  "@lyricsAiApiKeyOptional": {
+    "description": "Subtitle of the API key setting for a custom server without a key"
+  },
+  "lyricsAiApiKeySaved": "Saved, ends in {suffix}",
+  "@lyricsAiApiKeySaved": {
+    "description": "Subtitle of the API key setting showing only its last characters",
+    "placeholders": {
+      "suffix": {
+        "type": "String"
+      }
+    }
+  },
+  "lyricsAiApiKeyDescription": "Kept in this device's secure storage and only sent to {provider}.",
+  "@lyricsAiApiKeyDescription": {
+    "description": "Explanation in the API key sheet",
+    "placeholders": {
+      "provider": {
+        "type": "String"
+      }
+    }
+  },
+  "lyricsAiModel": "Model",
+  "@lyricsAiModel": {
+    "description": "AI translation setting for the model id"
+  },
+  "lyricsAiModelDefault": "Default ({model})",
+  "@lyricsAiModelDefault": {
+    "description": "Subtitle of the model setting when the provider's default model is used",
+    "placeholders": {
+      "model": {
+        "type": "String"
+      }
+    }
+  },
+  "lyricsAiModelHint": "Model ID",
+  "@lyricsAiModelHint": {
+    "description": "Hint of the model id text field"
+  },
+  "lyricsAiModelUseDefault": "Use Default",
+  "@lyricsAiModelUseDefault": {
+    "description": "Action in the model sheet that returns to the provider's default model"
+  },
+  "lyricsAiModelLoad": "Load Models",
+  "@lyricsAiModelLoad": {
+    "description": "Button in the model sheet that lists the models the provider offers"
+  },
+  "lyricsAiModelsEmpty": "The provider listed no models",
+  "@lyricsAiModelsEmpty": {
+    "description": "Shown in the model sheet when the provider's model list is empty"
+  },
+  "lyricsAiTestConnection": "Test Connection",
+  "@lyricsAiTestConnection": {
+    "description": "AI translation settings action that translates one line to check the key and model"
+  },
+  "lyricsAiTestConnectionSubtitle": "Translates one line to check the key and model",
+  "@lyricsAiTestConnectionSubtitle": {
+    "description": "Subtitle of the test connection action"
+  },
+  "lyricsAiTestSuccess": "The connection works",
+  "@lyricsAiTestSuccess": {
+    "description": "Snackbar after a successful AI translation connection test"
+  },
+  "lyricsAiTargetLanguage": "Translate Into",
+  "@lyricsAiTargetLanguage": {
+    "description": "AI translation setting for the target language"
+  },
+  "lyricsAiTargetLanguageApp": "App language ({language})",
+  "@lyricsAiTargetLanguageApp": {
+    "description": "Target language choice that follows the app language",
+    "placeholders": {
+      "language": {
+        "type": "String"
+      }
+    }
+  },
+  "lyricsAiInstruction": "Extra Instruction",
+  "@lyricsAiInstruction": {
+    "description": "AI translation setting for optional guidance added to the translation request"
+  },
+  "lyricsAiInstructionNone": "None",
+  "@lyricsAiInstructionNone": {
+    "description": "Subtitle of the extra instruction setting when it is empty"
+  },
+  "lyricsAiInstructionHint": "For example: keep the rhymes where you can",
+  "@lyricsAiInstructionHint": {
+    "description": "Hint of the extra instruction text field"
+  },
+  "lyricsAiAutoTranslate": "Translate Automatically",
+  "@lyricsAiAutoTranslate": {
+    "description": "AI translation switch that translates lyrics as they open"
+  },
+  "lyricsAiAutoTranslateSubtitle": "Translates synced lyrics that have no translation when you open them, using your provider's quota",
+  "@lyricsAiAutoTranslateSubtitle": {
+    "description": "Subtitle of the automatic AI translation switch"
+  },
+  "lyricsAiRomanize": "Add Romanization",
+  "@lyricsAiRomanize": {
+    "description": "AI translation switch that also asks for romanized lyrics"
+  },
+  "lyricsAiRomanizeSubtitle": "Shows how lyrics in other alphabets are sung, such as romaji for Japanese or pinyin for Chinese",
+  "@lyricsAiRomanizeSubtitle": {
+    "description": "Subtitle of the AI romanization switch"
+  },
+  "lyricsAiClearCache": "Clear Saved Translations",
+  "@lyricsAiClearCache": {
+    "description": "AI translation settings action that deletes saved translations"
+  },
+  "lyricsAiClearCacheSubtitle": "{count, plural, =0{No saved translations} =1{1 song} other{{count} songs}}",
+  "@lyricsAiClearCacheSubtitle": {
+    "description": "Subtitle of the clear saved translations action",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "lyricsAiClearCacheConfirm": "Clear saved translations?",
+  "@lyricsAiClearCacheConfirm": {
+    "description": "Title of the confirmation before deleting saved AI translations"
+  },
+  "lyricsAiClearCacheMessage": "Songs will need to be translated again, which uses your provider's quota.",
+  "@lyricsAiClearCacheMessage": {
+    "description": "Message of the confirmation before deleting saved AI translations"
+  },
+  "lyricsAiClearCacheDone": "Saved translations cleared",
+  "@lyricsAiClearCacheDone": {
+    "description": "Snackbar after deleting saved AI translations"
+  },
+  "lyricsAiErrorNotConfigured": "Set up AI translation in Lyrics settings first",
+  "@lyricsAiErrorNotConfigured": {
+    "description": "AI translation error when no provider, key or model is set"
+  },
+  "lyricsAiErrorInvalidKey": "The provider did not accept the API key",
+  "@lyricsAiErrorInvalidKey": {
+    "description": "AI translation error for a rejected API key"
+  },
+  "lyricsAiErrorRateLimited": "The provider is limiting requests. Try again in a moment",
+  "@lyricsAiErrorRateLimited": {
+    "description": "AI translation error when the provider rate limits the requests"
+  },
+  "lyricsAiErrorQuota": "Your provider account is out of credit or quota",
+  "@lyricsAiErrorQuota": {
+    "description": "AI translation error for an exhausted quota or billing problem"
+  },
+  "lyricsAiErrorNetwork": "Could not reach the provider. Check your connection",
+  "@lyricsAiErrorNetwork": {
+    "description": "AI translation error when the provider cannot be reached"
+  },
+  "lyricsAiErrorTimeout": "The provider took too long to answer",
+  "@lyricsAiErrorTimeout": {
+    "description": "AI translation error when a request times out"
+  },
+  "lyricsAiErrorModelNotFound": "The provider does not offer this model",
+  "@lyricsAiErrorModelNotFound": {
+    "description": "AI translation error for an unknown model id"
+  },
+  "lyricsAiErrorRefused": "The model declined to translate these lyrics",
+  "@lyricsAiErrorRefused": {
+    "description": "AI translation error when the model refuses the request"
+  },
+  "lyricsAiErrorTruncated": "The model's answer was cut off. Try another model",
+  "@lyricsAiErrorTruncated": {
+    "description": "AI translation error when the reply hit the output limit"
+  },
+  "lyricsAiErrorBadResponse": "The model's answer could not be read. Try another model",
+  "@lyricsAiErrorBadResponse": {
+    "description": "AI translation error when the reply is not the expected JSON"
+  },
+  "lyricsAiErrorService": "The provider had a problem. Try again later",
+  "@lyricsAiErrorService": {
+    "description": "AI translation error for other provider failures"
+  },
+  "lyricsAiErrorNoLyrics": "These lyrics have nothing to translate",
+  "@lyricsAiErrorNoLyrics": {
+    "description": "AI translation error when the lyrics have no translatable lines"
   },
   "nowPlayingLibraryEmpty": "Your library is empty",
   "@nowPlayingLibraryEmpty": {
@@ -6801,6 +7397,279 @@
   "nowPlayingNoMetadata": "No metadata available",
   "@nowPlayingNoMetadata": {
     "description": "Empty state when track metadata cannot be loaded"
+  },
+  "linkDevicesTitle": "Devices",
+  "@linkDevicesTitle": {
+    "description": "Mornye Link: title and button tooltip of the phone sheet that controls the paired desktop app"
+  },
+  "linkConnectionConnected": "Connected",
+  "@linkConnectionConnected": {
+    "description": "Mornye Link: the phone is connected to the paired desktop"
+  },
+  "linkConnectionConnecting": "Connecting",
+  "@linkConnectionConnecting": {
+    "description": "Mornye Link: the phone is connecting to the paired desktop"
+  },
+  "linkConnectionDisconnected": "Not connected",
+  "@linkConnectionDisconnected": {
+    "description": "Mornye Link: the paired desktop cannot be reached"
+  },
+  "linkThisPhone": "This phone",
+  "@linkThisPhone": {
+    "description": "Mornye Link: the phone's own row in the Devices sheet; choosing it plays music here again"
+  },
+  "linkPlayingOn": "Playing on {name}",
+  "@linkPlayingOn": {
+    "description": "Mornye Link: shown in the player while the paired desktop plays in the phone's place",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkDesktopDownloads": "Downloads on {name}",
+  "@linkDesktopDownloads": {
+    "description": "Mornye Link: heading of the paired desktop's download queue",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkHandoffStarted": "Playing on {name}",
+  "@linkHandoffStarted": {
+    "description": "Mornye Link: the paired desktop took over the phone's queue",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkHandoffSending": "Sending this song to {name}...",
+  "@linkHandoffSending": {
+    "description": "Mornye Link: the phone uploads the current song, which the paired desktop lacks, before it plays there",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkHandoffMissing": "Playing on {name}. Not found there: {titles}",
+  "@linkHandoffMissing": {
+    "description": "Mornye Link: the paired desktop took over the phone's queue but lacks some tracks, listed by title",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "titles": {
+        "type": "String"
+      }
+    }
+  },
+  "linkHandoffNotFound": "{name} has none of these tracks",
+  "@linkHandoffNotFound": {
+    "description": "Mornye Link: the paired desktop has none of the tracks in the phone's queue",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkHandoffNothingPlaying": "Nothing is playing on this phone",
+  "@linkHandoffNothingPlaying": {
+    "description": "Mornye Link: Play on desktop needs a track playing on the phone"
+  },
+  "linkContinueSkipped": "Not on this phone: {titles}",
+  "@linkContinueSkipped": {
+    "description": "Mornye Link: tracks of the desktop queue the phone could not play, listed by title",
+    "placeholders": {
+      "titles": {
+        "type": "String"
+      }
+    }
+  },
+  "linkContinueNotFound": "None of these tracks are on this phone",
+  "@linkContinueNotFound": {
+    "description": "Mornye Link: the phone has none of the tracks of the desktop queue"
+  },
+  "linkRequestFailed": "Could not reach {name}",
+  "@linkRequestFailed": {
+    "description": "Mornye Link: a request to the paired desktop failed",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkDownloadOnDesktop": "Download on {name}",
+  "@linkDownloadOnDesktop": {
+    "description": "Mornye Link: queues a track, album or link for download in the paired desktop app",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkDownloadQueuedOnDesktop": "{count, plural, =1{Queued 1 track on {name}} other{Queued {count} tracks on {name}}}",
+  "@linkDownloadQueuedOnDesktop": {
+    "description": "Mornye Link: the paired desktop queued downloads",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkOpenOnDesktop": "Open on {name}",
+  "@linkOpenOnDesktop": {
+    "description": "Mornye Link: opens a shared link in the paired desktop app",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkOpenedOnDesktop": "Opened on {name}",
+  "@linkOpenedOnDesktop": {
+    "description": "Mornye Link: the paired desktop opened the link",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkSendToDesktop": "Send to {name}",
+  "@linkSendToDesktop": {
+    "description": "Mornye Link: action on a shared link that offers to open or download it on the paired desktop",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkSaveToPhone": "Save to this phone",
+  "@linkSaveToPhone": {
+    "description": "Mornye Link: downloads songs of the paired desktop's library into the phone's download folder"
+  },
+  "linkSavingToPhone": "Saving to this phone",
+  "@linkSavingToPhone": {
+    "description": "Mornye Link: title of the progress dialog while desktop songs are saved to the phone"
+  },
+  "linkSavedToPhone": "{count, plural, =1{Saved 1 song to this phone} other{Saved {count} songs to this phone}}",
+  "@linkSavedToPhone": {
+    "description": "Mornye Link: desktop songs were saved to the phone",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "linkSaveToPhoneFailed": "{count, plural, =1{1 song could not be saved} other{{count} songs could not be saved}}",
+  "@linkSaveToPhoneFailed": {
+    "description": "Mornye Link: some desktop songs could not be saved to the phone",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "linkSaveToPhoneCancelled": "Saving stopped",
+  "@linkSaveToPhoneCancelled": {
+    "description": "Mornye Link: the listener cancelled saving desktop songs to the phone"
+  },
+  "linkTransferPhoneReceiving": "{count, plural, =1{Saving {title} from {name}} other{Saving {count} songs from {name}}}",
+  "@linkTransferPhoneReceiving": {
+    "description": "Mornye Link: snackbar and notification when the phone starts copying songs from the paired computer into its download folder; title is the song's title when there is one song",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "title": {
+        "type": "String"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkTransferPhoneOffered": "{count, plural, =1{{name} is sending {title} to this phone} other{{name} is sending {count} songs to this phone}}",
+  "@linkTransferPhoneOffered": {
+    "description": "Mornye Link: snackbar when the paired computer starts sending songs to the phone; title is the song's title when there is one song",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "title": {
+        "type": "String"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkTransferPhoneView": "View",
+  "@linkTransferPhoneView": {
+    "description": "Mornye Link: snackbar action that opens the list of song transfers"
+  },
+  "linkTransferPhoneWith": "Transfer with {name}",
+  "@linkTransferPhoneWith": {
+    "description": "Mornye Link: tooltip and sheet title of a playlist's button that sends its songs to the paired computer or saves the computer's songs to the phone",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkTransferPhoneNothing": "None of these songs are on {name}",
+  "@linkTransferPhoneNothing": {
+    "description": "Mornye Link: Save to this phone found none of the chosen songs in the paired computer's library",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkSendSending": "{count, plural, =1{Sending {title} to {name}} other{Sending {count} songs to {name}}}",
+  "@linkSendSending": {
+    "description": "Mornye Link: snackbar and notification when the phone starts copying its own songs to the paired computer; title is the song's title when there is one song",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "title": {
+        "type": "String"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkSendNothing": "None of these songs can be sent to {name}",
+  "@linkSendNothing": {
+    "description": "Mornye Link: none of the chosen songs is a file on this phone in a format the paired computer takes",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkDownloadStatusQueued": "Waiting",
+  "@linkDownloadStatusQueued": {
+    "description": "Mornye Link: a download on the paired desktop has not started"
+  },
+  "linkDownloadStatusDownloading": "Downloading",
+  "@linkDownloadStatusDownloading": {
+    "description": "Mornye Link: a download on the paired desktop is running"
+  },
+  "linkDownloadStatusDone": "Done",
+  "@linkDownloadStatusDone": {
+    "description": "Mornye Link: a download on the paired desktop finished"
+  },
+  "linkDownloadStatusFailed": "Failed",
+  "@linkDownloadStatusFailed": {
+    "description": "Mornye Link: a download on the paired desktop failed"
   },
   "announcementUnableToOpenLink": "Unable to open link. Please try again.",
   "@announcementUnableToOpenLink": {
@@ -7240,13 +8109,41 @@
     "description": "Selected state of the compact favorite action"
   },
   "autoMixDescription": "Blend songs with beat matching and pitch-preserving tempo adjustment. Uses crossfade when beats cannot be matched.",
+  "gaplessPlayback": "Gapless playback",
+  "@gaplessPlayback": {
+    "description": "Playback settings switch that starts the next song the moment one ends"
+  },
+  "gaplessPlaybackDescription": "Start the next song the moment one ends, without silence between them. AutoMix replaces it while on.",
+  "@gaplessPlaybackDescription": {
+    "description": "Subtitle of the Gapless playback switch"
+  },
   "playerCoverStyle": "Cover art",
   "@playerCoverStyle": {
     "description": "Settings section choosing how the player shows cover art"
   },
+  "landscapeLyricsArtwork": "Album art beside lyrics",
+  "@landscapeLyricsArtwork": {
+    "description": "Switch choosing album artwork instead of track details alongside lyrics in landscape"
+  },
+  "landscapeLyricsArtworkDescription": "Show album art instead of track details in the Material landscape player",
+  "@landscapeLyricsArtworkDescription": {
+    "description": "Subtitle explaining the Material landscape lyrics layout setting"
+  },
+  "compactPlayer": "Compact player",
+  "@compactPlayer": {
+    "description": "Material player setting: idle lyrics shrink the player to a slim bar instead of hiding it"
+  },
+  "compactPlayerDescription": "When lyrics are left alone, shrink the player to a slim bar so the lyrics get more room. A tap brings the full player back",
+  "@compactPlayerDescription": {
+    "description": "Subtitle of the compact player setting"
+  },
   "playerCoverStyleDefault": "افتراضي",
   "@playerCoverStyleDefault": {
     "description": "Cover art style: artwork card above the controls"
+  },
+  "playerCoverStyleCard": "Card",
+  "@playerCoverStyleCard": {
+    "description": "Cover art style: artwork as a card above the controls (full screen is the default)"
   },
   "playerCoverStyleDefaultDescription": "Artwork as a card above the controls",
   "@playerCoverStyleDefaultDescription": {
@@ -7288,6 +8185,73 @@
   "autoplayResetLearningConfirmTitle": "Reset recommendation learning?",
   "autoplayResetLearningConfirmMessage": "Autoplay forgets what it learned from your listening and skips. This can't be undone.",
   "autoplayResetLearningConfirm": "إعادة الضبط",
+  "autoplayLearningProgress": "Ranking tunes to you after {minimum} Autoplay songs ({count} so far)",
+  "@autoplayLearningProgress": {
+    "description": "How many Autoplay songs the listener has kept or skipped before ranking may learn from them",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "format": "decimalPattern"
+      },
+      "minimum": {
+        "type": "int",
+        "format": "decimalPattern"
+      }
+    }
+  },
+  "autoplayLearningWaiting": "Standard ranking until you both keep and skip recent Autoplay songs",
+  "@autoplayLearningWaiting": {
+    "description": "Ranking cannot be checked yet because the latest Autoplay songs were all kept or all skipped"
+  },
+  "autoplayLearningTuned": "Tuned to you: {learned}% accurate on your latest songs (standard {starting}%)",
+  "@autoplayLearningTuned": {
+    "description": "Autoplay uses learned ranking, which orders the latest kept and skipped songs better than the standard ranking",
+    "placeholders": {
+      "learned": {
+        "type": "int"
+      },
+      "starting": {
+        "type": "int"
+      }
+    }
+  },
+  "autoplayLearningStandard": "Standard ranking: tuning was not more accurate on your latest songs ({learned}% vs {starting}%)",
+  "@autoplayLearningStandard": {
+    "description": "Autoplay keeps the standard ranking because the learned one did not order the latest songs better",
+    "placeholders": {
+      "learned": {
+        "type": "int"
+      },
+      "starting": {
+        "type": "int"
+      }
+    }
+  },
+  "songAnalysis": "Song analysis",
+  "@songAnalysis": {
+    "description": "Switch that analyzes how each Library song sounds, on the device, for Autoplay"
+  },
+  "songAnalysisDescription": "Learn how each Library song sounds, privately on this device, so Autoplay picks songs that sound like what you play and flow into each other.",
+  "songAnalysisOnlyWhileCharging": "Only while charging",
+  "songAnalysisOnlyWhileChargingDescription": "Analyze the Library only while this phone charges. The song playing is analyzed either way.",
+  "songAnalysisProgress": "{analyzed} of {total} songs analyzed",
+  "@songAnalysisProgress": {
+    "description": "How many Library songs song analysis has described so far",
+    "placeholders": {
+      "analyzed": {
+        "type": "int",
+        "format": "decimalPattern"
+      },
+      "total": {
+        "type": "int",
+        "format": "decimalPattern"
+      }
+    }
+  },
+  "songAnalysisClear": "Clear song analysis",
+  "songAnalysisClearConfirmTitle": "Clear song analysis?",
+  "songAnalysisClearConfirmMessage": "Autoplay forgets how your songs sound. While song analysis is on, your Library is analyzed again.",
+  "songAnalysisClearConfirm": "Clear",
   "profileTitle": "Profile",
   "profileSetUp": "Set up your profile",
   "profileEdit": "Edit name and photo",
@@ -7349,6 +8313,182 @@
   "homeShortcuts": "Shortcuts",
   "@homeShortcuts": {
     "description": "Home section header for quick links to player tools"
+  },
+  "homeMixesForYou": "Mixes for you",
+  "@homeMixesForYou": {
+    "description": "Home section header for daily mixes made from the user's own Library songs"
+  },
+  "homeMixFavoritesTitle": "Favorites Mix",
+  "@homeMixFavoritesTitle": {
+    "description": "Title of the daily mix of the user's most played songs and songs like them"
+  },
+  "homeMixGenreTitle": "{genre} Mix",
+  "@homeMixGenreTitle": {
+    "description": "Title of a daily mix of one genre from the user's Library, e.g. 'Hip-Hop Mix'",
+    "placeholders": {
+      "genre": {
+        "type": "String"
+      }
+    }
+  },
+  "homeMixArtistTitle": "{artist} Mix",
+  "@homeMixArtistTitle": {
+    "description": "Title of a daily mix built around one artist and similar songs from the user's Library",
+    "placeholders": {
+      "artist": {
+        "type": "String"
+      }
+    }
+  },
+  "homeMixDecadeTitle": "{decade}s Mix",
+  "@homeMixDecadeTitle": {
+    "description": "Title of a daily mix of songs released in one decade, e.g. '2010s Mix'; decade is the decade's first year",
+    "placeholders": {
+      "decade": {
+        "type": "String"
+      }
+    }
+  },
+  "homeMixFreshTitle": "New Additions Mix",
+  "@homeMixFreshTitle": {
+    "description": "Title of the daily mix of songs added to the user's Library in the last month"
+  },
+  "homeMixRediscoverTitle": "Rediscover Mix",
+  "@homeMixRediscoverTitle": {
+    "description": "Title of the daily mix of songs the user played often months ago but not lately"
+  },
+  "homeMixDiscoverTitle": "Discover Mix",
+  "@homeMixDiscoverTitle": {
+    "description": "Title of the daily mix of Library songs the user has never played, from their favorite genres"
+  },
+  "homeMixArtistsOne": "{first}",
+  "@homeMixArtistsOne": {
+    "description": "Subtitle of a daily mix with one main artist, naming that artist",
+    "placeholders": {
+      "first": {
+        "type": "String"
+      }
+    }
+  },
+  "homeMixArtistsTwo": "{first} and {second}",
+  "@homeMixArtistsTwo": {
+    "description": "Subtitle of a daily mix with two main artists, e.g. 'Tyler, The Creator and Frank Ocean'",
+    "placeholders": {
+      "first": {
+        "type": "String"
+      },
+      "second": {
+        "type": "String"
+      }
+    }
+  },
+  "homeMixArtistsMore": "{first}, {second} and more",
+  "@homeMixArtistsMore": {
+    "description": "Subtitle of a daily mix with three or more main artists, naming the first two, e.g. 'Tyler, The Creator, Frank Ocean and more'",
+    "placeholders": {
+      "first": {
+        "type": "String"
+      },
+      "second": {
+        "type": "String"
+      }
+    }
+  },
+  "homeMixGenreHipHop": "Hip-Hop",
+  "@homeMixGenreHipHop": {
+    "description": "Genre name used in a daily mix title such as 'Hip-Hop Mix'"
+  },
+  "homeMixGenreRnb": "R&B",
+  "@homeMixGenreRnb": {
+    "description": "Genre name used in a daily mix title such as 'R&B Mix'"
+  },
+  "homeMixGenrePop": "Pop",
+  "@homeMixGenrePop": {
+    "description": "Genre name used in a daily mix title such as 'Pop Mix'"
+  },
+  "homeMixGenreKpop": "K-Pop",
+  "@homeMixGenreKpop": {
+    "description": "Genre name (Korean pop) used in a daily mix title such as 'K-Pop Mix'"
+  },
+  "homeMixGenreJpop": "J-Pop",
+  "@homeMixGenreJpop": {
+    "description": "Genre name (Japanese pop, anime and related music) used in a daily mix title such as 'J-Pop Mix'"
+  },
+  "homeMixGenreRock": "Rock",
+  "@homeMixGenreRock": {
+    "description": "Genre name used in a daily mix title such as 'Rock Mix'"
+  },
+  "homeMixGenreMetal": "Metal",
+  "@homeMixGenreMetal": {
+    "description": "Genre name used in a daily mix title such as 'Metal Mix'"
+  },
+  "homeMixGenrePunk": "Punk",
+  "@homeMixGenrePunk": {
+    "description": "Genre name used in a daily mix title such as 'Punk Mix'"
+  },
+  "homeMixGenreIndie": "Indie & Alternative",
+  "@homeMixGenreIndie": {
+    "description": "Genre name used in a daily mix title such as 'Indie & Alternative Mix'"
+  },
+  "homeMixGenreElectronic": "Electronic",
+  "@homeMixGenreElectronic": {
+    "description": "Genre name used in a daily mix title such as 'Electronic Mix'"
+  },
+  "homeMixGenreChill": "Chill & Lo-Fi",
+  "@homeMixGenreChill": {
+    "description": "Genre name (ambient, lo-fi and relaxing music) used in a daily mix title such as 'Chill & Lo-Fi Mix'"
+  },
+  "homeMixGenreJazz": "Jazz",
+  "@homeMixGenreJazz": {
+    "description": "Genre name used in a daily mix title such as 'Jazz Mix'"
+  },
+  "homeMixGenreBlues": "Blues",
+  "@homeMixGenreBlues": {
+    "description": "Genre name used in a daily mix title such as 'Blues Mix'"
+  },
+  "homeMixGenreClassical": "Classical",
+  "@homeMixGenreClassical": {
+    "description": "Genre name used in a daily mix title such as 'Classical Mix'"
+  },
+  "homeMixGenreSoundtrack": "Soundtrack",
+  "@homeMixGenreSoundtrack": {
+    "description": "Genre name (film, game and TV music) used in a daily mix title such as 'Soundtrack Mix'"
+  },
+  "homeMixGenreCountry": "Country",
+  "@homeMixGenreCountry": {
+    "description": "Genre name used in a daily mix title such as 'Country Mix'"
+  },
+  "homeMixGenreFolk": "Folk & Acoustic",
+  "@homeMixGenreFolk": {
+    "description": "Genre name used in a daily mix title such as 'Folk & Acoustic Mix'"
+  },
+  "homeMixGenreLatin": "Latin",
+  "@homeMixGenreLatin": {
+    "description": "Genre name used in a daily mix title such as 'Latin Mix'"
+  },
+  "homeMixGenreReggae": "Reggae",
+  "@homeMixGenreReggae": {
+    "description": "Genre name used in a daily mix title such as 'Reggae Mix'"
+  },
+  "homeMixGenreAfro": "Afrobeats",
+  "@homeMixGenreAfro": {
+    "description": "Genre name used in a daily mix title such as 'Afrobeats Mix'"
+  },
+  "homeMixGenreGospel": "Gospel & Worship",
+  "@homeMixGenreGospel": {
+    "description": "Genre name (Christian music) used in a daily mix title such as 'Gospel & Worship Mix'"
+  },
+  "homeMixGenreDangdut": "Dangdut",
+  "@homeMixGenreDangdut": {
+    "description": "Genre name (Indonesian popular music) used in a daily mix title such as 'Dangdut Mix'"
+  },
+  "homeMixUpdatedDaily": "Made from your Library, updated daily",
+  "@homeMixUpdatedDaily": {
+    "description": "Note in a daily mix's header explaining where its songs come from"
+  },
+  "homeMixSaveAsPlaylist": "Save as playlist",
+  "@homeMixSaveAsPlaylist": {
+    "description": "Action that saves a daily mix's songs into one of the user's playlists"
   },
   "artistUpcomingConcerts": "Upcoming Concerts",
   "artistAllUpcomingConcerts": "All Upcoming Concerts",
@@ -7762,6 +8902,15 @@
   "audioInfoLocationLocal": "Device storage",
   "audioInfoLocationShared": "Shared folder",
   "audioInfoLocationNetwork": "Network storage",
+  "audioInfoLocationLink": "{device} via Mornye Link",
+  "@audioInfoLocationLink": {
+    "description": "Audio info location of a song played from a paired computer or phone over Mornye Link; device is that device's name",
+    "placeholders": {
+      "device": {
+        "type": "String"
+      }
+    }
+  },
   "audioInfoPcmRate": "Uncompressed data rate",
   "audioInfoFrequencyRange": "Frequency range",
   "audioInfoFrequencyRangeValue": "Up to {frequency} (Nyquist)",
@@ -7823,6 +8972,15 @@
   },
   "audioInfoOutputRate": "Output sample rate",
   "audioInfoOutputFormat": "تنسيق الإخراج",
+  "audioInfoBluetoothFormat": "Bluetooth codec format",
+  "@audioInfoBluetoothFormat": {
+    "description": "Negotiated Bluetooth transport format, separate from Android PCM mixer properties"
+  },
+  "audioInfoAndroidNotReported": "Not reported by Android",
+  "audioInfoSystemDefaultRate": "System default sample rate",
+  "audioInfoAndroidPcmRates": "Android PCM sample rates",
+  "audioInfoAndroidPcmFormats": "Android PCM formats",
+  "audioInfoSystemDefaultBuffer": "System default buffer",
   "audioInfoDeviceRates": "Device sample rates",
   "audioInfoDeviceFormats": "Device formats",
   "audioInfoAnyRate": "Any",
@@ -7840,6 +8998,44 @@
   "audioInfoCopied": "Audio info copied",
   "lyricsTextSize": "Lyrics text size",
   "lyricsTextPreview": "Follow every line of your favorite song",
+  "lyricsBlur": "Lyrics blur",
+  "@lyricsBlur": {
+    "description": "Mornye setting: how strongly lyric lines around the current one are blurred"
+  },
+  "lyricsBlurSubtitle": "How much the lines around the current one soften",
+  "lyricsBlurOff": "Off",
+  "@lyricsBlurOff": {
+    "description": "Value of the lyrics blur slider at zero"
+  },
+  "lyricsOffset": "Lyrics timing",
+  "@lyricsOffset": {
+    "description": "Setting: move synced lyrics earlier or later than playback"
+  },
+  "lyricsOffsetSubtitle": "Show synced lyrics later or earlier, for example when Bluetooth audio arrives late",
+  "lyricsOffsetNone": "In sync",
+  "@lyricsOffsetNone": {
+    "description": "Value of the lyrics timing slider at zero"
+  },
+  "lyricsOffsetLater": "{seconds} s later",
+  "@lyricsOffsetLater": {
+    "description": "Value of the lyrics timing slider when lyrics follow playback late",
+    "placeholders": {
+      "seconds": {
+        "type": "String",
+        "example": "0.3"
+      }
+    }
+  },
+  "lyricsOffsetEarlier": "{seconds} s earlier",
+  "@lyricsOffsetEarlier": {
+    "description": "Value of the lyrics timing slider when lyrics run ahead of playback",
+    "placeholders": {
+      "seconds": {
+        "type": "String",
+        "example": "0.3"
+      }
+    }
+  },
   "appCrashTitle": "The app previously crashed",
   "appAnrTitle": "The app previously stopped responding",
   "@appAnrTitle": {
@@ -7971,6 +9167,364 @@
   "@desktopDownloadsCancel": {
     "description": "Tooltip of the button that cancels one download in the desktop downloads popover"
   },
+  "linkDesktopSettingsTitle": "Mornye on your phone",
+  "@linkDesktopSettingsTitle": {
+    "description": "Desktop Settings page that shares this computer's library with the Mornye phone app over the local network"
+  },
+  "linkDesktopSettingsSubtitle": "Stream your library and control playback from your phone",
+  "@linkDesktopSettingsSubtitle": {
+    "description": "Subtitle of the Mornye on your phone entry in desktop Settings"
+  },
+  "linkDesktopEnableTitle": "Share with Mornye on your phone",
+  "@linkDesktopEnableTitle": {
+    "description": "Switch that turns on the local server phones connect to"
+  },
+  "linkDesktopEnableSubtitle": "Your phone can browse, play and download through this computer on your local network",
+  "@linkDesktopEnableSubtitle": {
+    "description": "Subtitle of the switch that shares the library with phones, while it is off"
+  },
+  "linkDesktopStatusStarting": "Starting",
+  "@linkDesktopStatusStarting": {
+    "description": "Status of the phone link server while it starts"
+  },
+  "linkDesktopStatusRunning": "On, {count, plural, =0{no phone connected} =1{1 phone connected} other{{count} phones connected}}",
+  "@linkDesktopStatusRunning": {
+    "description": "Status of the phone link server while it runs, with the number of connected phones",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "linkDesktopStatusFailed": "Could not start: {error}",
+  "@linkDesktopStatusFailed": {
+    "description": "Status of the phone link server when it failed to start",
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "linkDesktopFirewallHint": "Your computer may ask whether Mornye can accept incoming network connections. Allow it so your phone can connect.",
+  "@linkDesktopFirewallHint": {
+    "description": "Hint shown while the phone link server is on, about the operating system firewall prompt"
+  },
+  "linkDesktopSectionComputer": "This computer",
+  "@linkDesktopSectionComputer": {
+    "description": "Section of the phone link settings about this computer's name and address"
+  },
+  "linkDesktopDeviceName": "Name",
+  "@linkDesktopDeviceName": {
+    "description": "Row and field label for the name phones see for this computer"
+  },
+  "linkDesktopDeviceNameHint": "Phones show this name when they find this computer",
+  "@linkDesktopDeviceNameHint": {
+    "description": "Helper text of the field that renames this computer for phones"
+  },
+  "linkDesktopAddress": "Address",
+  "@linkDesktopAddress": {
+    "description": "Row that shows the network addresses phones and Subsonic apps connect to"
+  },
+  "linkDesktopSecurityCode": "Security code",
+  "@linkDesktopSecurityCode": {
+    "description": "Row that shows the short certificate fingerprint phones compare while pairing"
+  },
+  "linkDesktopSecurityCodeHint": "Your phone shows the same code when it pairs",
+  "@linkDesktopSecurityCodeHint": {
+    "description": "Subtitle explaining the security code row"
+  },
+  "linkDesktopCatalogSongs": "{count, plural, =1{1 song shared} other{{count} songs shared}}",
+  "@linkDesktopCatalogSongs": {
+    "description": "How many Library songs phones can see",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "linkDesktopSectionPhones": "Phones",
+  "@linkDesktopSectionPhones": {
+    "description": "Section of the phone link settings that lists paired phones"
+  },
+  "linkDesktopPairPhone": "Pair a phone",
+  "@linkDesktopPairPhone": {
+    "description": "Row and dialog title that shows a code to pair a phone with this computer"
+  },
+  "linkDesktopPairPhoneSubtitle": "Show a code to enter on your phone",
+  "@linkDesktopPairPhoneSubtitle": {
+    "description": "Subtitle of the Pair a phone row"
+  },
+  "linkDesktopNoDevices": "No phones paired yet",
+  "@linkDesktopNoDevices": {
+    "description": "Shown in the paired phones list when it is empty"
+  },
+  "linkDesktopDeviceConnected": "Connected",
+  "@linkDesktopDeviceConnected": {
+    "description": "Status of a paired phone that is connected now"
+  },
+  "linkDesktopDeviceLastSeen": "Last seen {date}",
+  "@linkDesktopDeviceLastSeen": {
+    "description": "Status of a paired phone that is not connected",
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "linkDesktopDeviceNeverSeen": "Not connected yet",
+  "@linkDesktopDeviceNeverSeen": {
+    "description": "Status of a paired device that never connected"
+  },
+  "linkDesktopSubsonicApp": "Subsonic app",
+  "@linkDesktopSubsonicApp": {
+    "description": "Label of a paired device that is a third-party Subsonic app"
+  },
+  "linkDesktopRevoke": "Remove",
+  "@linkDesktopRevoke": {
+    "description": "Tooltip and confirm button that removes a paired phone or Subsonic app"
+  },
+  "linkDesktopRevokeTitle": "Remove {name}?",
+  "@linkDesktopRevokeTitle": {
+    "description": "Title of the dialog that confirms removing a paired device",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkDesktopRevokeMessage": "It has to pair again before it can connect to this computer.",
+  "@linkDesktopRevokeMessage": {
+    "description": "Message of the dialog that confirms removing a paired device"
+  },
+  "linkDesktopRevoked": "{name} removed",
+  "@linkDesktopRevoked": {
+    "description": "Snackbar after removing a paired device",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkDesktopSectionOtherApps": "Other apps",
+  "@linkDesktopSectionOtherApps": {
+    "description": "Section of the phone link settings for third-party Subsonic apps"
+  },
+  "linkDesktopAddSubsonicApp": "Add another Subsonic app",
+  "@linkDesktopAddSubsonicApp": {
+    "description": "Row and dialog title that creates a key for a third-party Subsonic app"
+  },
+  "linkDesktopAddSubsonicAppSubtitle": "Create a key for a Subsonic player on another device",
+  "@linkDesktopAddSubsonicAppSubtitle": {
+    "description": "Subtitle of the Add another Subsonic app row"
+  },
+  "linkDesktopAppName": "App name",
+  "@linkDesktopAppName": {
+    "description": "Field label for the name of a third-party Subsonic app"
+  },
+  "linkDesktopCreateKey": "Create key",
+  "@linkDesktopCreateKey": {
+    "description": "Button that creates a key for a third-party Subsonic app"
+  },
+  "linkDesktopAppKeyTitle": "Connect {name}",
+  "@linkDesktopAppKeyTitle": {
+    "description": "Title of the dialog that shows the details for a new Subsonic app key",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkDesktopAppKeyMessage": "Enter these details in the app. The key is shown only now.",
+  "@linkDesktopAppKeyMessage": {
+    "description": "Message of the dialog that shows a new Subsonic app key"
+  },
+  "linkDesktopServerAddress": "Server address",
+  "@linkDesktopServerAddress": {
+    "description": "Label of the server address a Subsonic app connects to"
+  },
+  "linkDesktopUsername": "Username",
+  "@linkDesktopUsername": {
+    "description": "Label of the username a Subsonic app uses"
+  },
+  "linkDesktopApiKey": "Password or API key",
+  "@linkDesktopApiKey": {
+    "description": "Label of the key a Subsonic app uses as its password or API key"
+  },
+  "linkDesktopCopy": "Copy {label}",
+  "@linkDesktopCopy": {
+    "description": "Tooltip of a copy button next to a value",
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "linkDesktopPairInstructions": "Open Mornye on your phone, choose this computer and enter this code.",
+  "@linkDesktopPairInstructions": {
+    "description": "Instructions in the pairing dialog above the code"
+  },
+  "linkDesktopPairCheckCode": "Check that your phone shows security code {code}.",
+  "@linkDesktopPairCheckCode": {
+    "description": "Line in the pairing dialog asking to compare the short certificate fingerprint",
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
+  "linkDesktopPairExpires": "The code expires in {time}",
+  "@linkDesktopPairExpires": {
+    "description": "Countdown in the pairing dialog, as minutes and seconds",
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "linkDesktopPaired": "Paired with {name}",
+  "@linkDesktopPaired": {
+    "description": "Snackbar after a phone paired",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkDesktopPairExpired": "The code expired. Pair again to get a new one.",
+  "@linkDesktopPairExpired": {
+    "description": "Snackbar when the pairing code expired"
+  },
+  "linkDesktopPairAttempts": "Too many wrong codes. Pair again to get a new one.",
+  "@linkDesktopPairAttempts": {
+    "description": "Snackbar when pairing ended after too many wrong codes"
+  },
+  "linkDesktopPairFailed": "Could not start pairing",
+  "@linkDesktopPairFailed": {
+    "description": "Snackbar when the pairing code could not be created"
+  },
+  "linkDesktopDevicesTitle": "Phones",
+  "@linkDesktopDevicesTitle": {
+    "description": "Tooltip of the player bar button and title of its popover that list connected phones"
+  },
+  "linkDesktopPhoneNothingPlaying": "Nothing playing",
+  "@linkDesktopPhoneNothingPlaying": {
+    "description": "Shown for a connected phone that plays nothing"
+  },
+  "linkDesktopContinueOnPhone": "Continue on phone",
+  "@linkDesktopContinueOnPhone": {
+    "description": "Button that moves the desktop queue and position to a phone and pauses the desktop"
+  },
+  "linkDesktopOpenOnPhone": "Open a link on phone",
+  "@linkDesktopOpenOnPhone": {
+    "description": "Button that sends a link to a phone to open"
+  },
+  "linkDesktopOpenLinkTitle": "Open a link on {name}",
+  "@linkDesktopOpenLinkTitle": {
+    "description": "Title of the dialog that sends a link to a phone",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkDesktopOpenLinkLabel": "Link",
+  "@linkDesktopOpenLinkLabel": {
+    "description": "Field label for the link to open on a phone"
+  },
+  "linkDesktopOpen": "Open",
+  "@linkDesktopOpen": {
+    "description": "Button that sends the link to the phone"
+  },
+  "linkDesktopSentToPhone": "Sent to {name}",
+  "@linkDesktopSentToPhone": {
+    "description": "Snackbar after something was sent to a phone",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkDesktopNotDelivered": "The phone did not receive it",
+  "@linkDesktopNotDelivered": {
+    "description": "Snackbar when a message could not reach a phone"
+  },
+  "linkDesktopNothingToContinue": "Nothing is playing on this computer",
+  "@linkDesktopNothingToContinue": {
+    "description": "Snackbar when Continue on phone is used without a current song"
+  },
+  "linkTransferDesktopSendTo": "Send to {name}",
+  "@linkTransferDesktopSendTo": {
+    "description": "Mornye Link desktop: song menu action that copies this computer's songs to the connected phone {name}",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkTransferDesktopSaveHere": "Save to this computer",
+  "@linkTransferDesktopSaveHere": {
+    "description": "Mornye Link desktop: song menu action that copies a connected phone's songs into this computer's download folder"
+  },
+  "linkTransferDesktopSendingSong": "Sending \"{title}\" to {name}",
+  "@linkTransferDesktopSendingSong": {
+    "description": "Mornye Link desktop: snackbar when one song starts copying to the phone {name}",
+    "placeholders": {
+      "title": {
+        "type": "String"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkTransferDesktopSendingSongs": "{count, plural, =1{Sending 1 song to {name}} other{Sending {count} songs to {name}}}",
+  "@linkTransferDesktopSendingSongs": {
+    "description": "Mornye Link desktop: snackbar when songs start copying to the phone {name}",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkTransferDesktopReceivingSong": "Receiving \"{title}\" from {name}",
+  "@linkTransferDesktopReceivingSong": {
+    "description": "Mornye Link desktop: snackbar when one song of the phone {name} starts copying to this computer",
+    "placeholders": {
+      "title": {
+        "type": "String"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkTransferDesktopReceivingSongs": "{count, plural, =1{Receiving 1 song from {name}} other{Receiving {count} songs from {name}}}",
+  "@linkTransferDesktopReceivingSongs": {
+    "description": "Mornye Link desktop: snackbar when songs of the phone {name} start copying to this computer",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkTransferDesktopView": "View",
+  "@linkTransferDesktopView": {
+    "description": "Mornye Link desktop: snackbar action that opens the list of song transfers"
+  },
+  "linkTransferDesktopNothingToSend": "None of these songs can be sent right now",
+  "@linkTransferDesktopNothingToSend": {
+    "description": "Mornye Link desktop: snackbar when Send to phone finds no song file on this computer to send"
+  },
+  "linkTransferDesktopNothingToSave": "None of these songs can be saved right now",
+  "@linkTransferDesktopNothingToSave": {
+    "description": "Mornye Link desktop: snackbar when Save to this computer finds no song of a connected phone"
+  },
   "desktopScrollBack": "Scroll back",
   "@desktopScrollBack": {
     "description": "Tooltip of the desktop button that scrolls a horizontal shelf of albums or artists back"
@@ -7998,5 +9552,741 @@
   "desktopShortcutToggleSidebar": "Show or hide sidebar",
   "@desktopShortcutToggleSidebar": {
     "description": "Keyboard Shortcuts row for the shortcut that collapses or expands the desktop sidebar"
+  },
+  "linkSettingsTitle": "Mornye on your computer",
+  "@linkSettingsTitle": {
+    "description": "Phone Settings entry that pairs the phone with the Mornye desktop app on the local network"
+  },
+  "linkSettingsSubtitle": "Play and control your computer's library",
+  "@linkSettingsSubtitle": {
+    "description": "Subtitle of the Mornye on your computer entry in phone Settings"
+  },
+  "linkPageTitle": "Computers",
+  "@linkPageTitle": {
+    "description": "Title of the page listing computers running Mornye that the phone can pair with; kept short for the large title"
+  },
+  "linkPageDescription": "Pair with Mornye on your computer to play its library on this phone and control what it plays. Both devices need to be on the same network.",
+  "@linkPageDescription": {
+    "description": "Introduction at the top of the computers page"
+  },
+  "linkPairedSection": "Paired computers",
+  "@linkPairedSection": {
+    "description": "Section header for computers this phone is paired with"
+  },
+  "linkPhoneSection": "This phone",
+  "@linkPhoneSection": {
+    "description": "Section header for what this phone shares with and how it follows its paired computer"
+  },
+  "linkShareSongsTitle": "Show songs on the computer",
+  "@linkShareSongsTitle": {
+    "description": "Switch title: this phone's songs appear in the paired computer's Library"
+  },
+  "linkShareSongsSubtitle": "Songs on this phone appear in the computer's Library and play there while this phone is connected",
+  "@linkShareSongsSubtitle": {
+    "description": "Switch subtitle for showing this phone's songs on the computer"
+  },
+  "linkFollowDesktopTitle": "Follow the computer's playback",
+  "@linkFollowDesktopTitle": {
+    "description": "Switch title: the phone's player shows the computer when the computer starts playing"
+  },
+  "linkFollowDesktopSubtitle": "When the computer starts playing, this phone shows and controls it",
+  "@linkFollowDesktopSubtitle": {
+    "description": "Switch subtitle for following the computer's playback"
+  },
+  "linkNearbySection": "On this network",
+  "@linkNearbySection": {
+    "description": "Section header for computers running Mornye found on the local network"
+  },
+  "linkSearching": "Looking for computers...",
+  "@linkSearching": {
+    "description": "Row shown while the phone searches the local network for computers"
+  },
+  "linkNoneFoundTitle": "No computers found",
+  "@linkNoneFoundTitle": {
+    "description": "Row shown when the phone is not searching and found no computer"
+  },
+  "linkNoneFound": "Open Mornye on your computer and turn on Share with Mornye on your phone in its settings.",
+  "@linkNoneFound": {
+    "description": "Hint under the search row when no computer was found yet; Share with Mornye on your phone is the name of the desktop setting"
+  },
+  "linkAddManually": "Add by address",
+  "@linkAddManually": {
+    "description": "Button and dialog title for pairing with a computer by typing its address and port"
+  },
+  "linkManualHost": "Computer address",
+  "@linkManualHost": {
+    "description": "Field label for the computer's IP address or host name"
+  },
+  "linkManualPort": "Port",
+  "@linkManualPort": {
+    "description": "Field label for the network port of the Mornye desktop server"
+  },
+  "linkManualMessage": "Mornye on your computer shows its address and port where you turn on sharing.",
+  "@linkManualMessage": {
+    "description": "Explains where to find the address and port to type"
+  },
+  "linkContinue": "Continue",
+  "@linkContinue": {
+    "description": "Dialog action that continues to the PIN step after typing an address"
+  },
+  "linkStateConnected": "Connected",
+  "@linkStateConnected": {
+    "description": "Status of the paired computer that is connected"
+  },
+  "linkStateConnecting": "Connecting...",
+  "@linkStateConnecting": {
+    "description": "Status of the paired computer while the phone connects to it"
+  },
+  "linkStateDisconnected": "Not connected",
+  "@linkStateDisconnected": {
+    "description": "Status of the paired computer when it cannot be reached"
+  },
+  "linkStateInactive": "Tap to use this computer",
+  "@linkStateInactive": {
+    "description": "Status of a paired computer other than the one in use; tapping it makes it the one in use"
+  },
+  "linkActive": "In use",
+  "@linkActive": {
+    "description": "Label next to the paired computer the phone currently uses, shown when several are paired"
+  },
+  "linkForget": "Forget",
+  "@linkForget": {
+    "description": "Action that unpairs a computer from this phone"
+  },
+  "linkForgetTitle": "Forget {name}?",
+  "@linkForgetTitle": {
+    "description": "Title of the dialog confirming that a paired computer is forgotten",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkForgetMessage": "This phone stops connecting to it. You can pair again later.",
+  "@linkForgetMessage": {
+    "description": "Explanation in the forget computer dialog"
+  },
+  "linkForgetRemoveLibrary": "Also remove its music from Library",
+  "@linkForgetRemoveLibrary": {
+    "description": "Switch in the forget computer dialog that also removes the computer's network connection and Library source"
+  },
+  "linkPinTitle": "Pair with {name}",
+  "@linkPinTitle": {
+    "description": "Title of the dialog asking for the pairing PIN",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkPinMessage": "Enter the 6-digit PIN shown on your computer.",
+  "@linkPinMessage": {
+    "description": "Instruction in the pairing PIN dialog"
+  },
+  "linkPinField": "PIN",
+  "@linkPinField": {
+    "description": "Label of the pairing PIN field"
+  },
+  "linkPinCode": "Your computer shows the code {code} next to the PIN. Pair only if it matches.",
+  "@linkPinCode": {
+    "description": "Security check in the PIN dialog; the placeholder is 8 hexadecimal characters of the computer's certificate fingerprint, grouped as 'ab12 cd34'",
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
+  "linkPinNotOpen": "Pairing is not open yet. Start pairing in Mornye on your computer to show a PIN.",
+  "@linkPinNotOpen": {
+    "description": "Note in the PIN dialog when the computer reports that no pairing window is open"
+  },
+  "linkPair": "Pair",
+  "@linkPair": {
+    "description": "Action that sends the PIN to pair with the computer"
+  },
+  "linkPaired": "Paired with {name}. Its music is being added to Library.",
+  "@linkPaired": {
+    "description": "Message after pairing succeeded",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkPairAgain": "Pair again",
+  "@linkPairAgain": {
+    "description": "Action that repeats pairing with a computer that no longer accepts this phone"
+  },
+  "linkTransfersTitle": "Transfers",
+  "@linkTransfersTitle": {
+    "description": "Mornye Link: title of the list of songs copied between this device and a linked phone or computer, and of the rows that open it"
+  },
+  "linkTransfersInProgress": "In progress",
+  "@linkTransfersInProgress": {
+    "description": "Section of the Transfers list for transfers that are running or waiting their turn"
+  },
+  "linkTransfersFinished": "Finished",
+  "@linkTransfersFinished": {
+    "description": "Section of the Transfers list for transfers that stopped: done, stopped by someone or failed"
+  },
+  "linkTransfersClearFinished": "Clear finished",
+  "@linkTransfersClearFinished": {
+    "description": "Action that removes the finished transfers from the Transfers list; the copied songs stay"
+  },
+  "linkTransfersEmptyTitle": "No transfers yet",
+  "@linkTransfersEmptyTitle": {
+    "description": "Title of the empty Transfers list, also the status of the row that opens it while there is none"
+  },
+  "linkTransfersEmptyMessage": "Send or save songs from a song's menu, an album or a selection.",
+  "@linkTransfersEmptyMessage": {
+    "description": "Hint under the empty Transfers list naming where a transfer starts (the Send to and Save to this device actions)"
+  },
+  "linkTransfersSending": "Sending {count, plural, =1{1 song} other{{count} songs}} to {name}",
+  "@linkTransfersSending": {
+    "description": "Title of a running or waiting transfer that copies this device's songs to a linked device",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkTransfersReceiving": "Receiving {count, plural, =1{1 song} other{{count} songs}} from {name}",
+  "@linkTransfersReceiving": {
+    "description": "Title of a running or waiting transfer that copies a linked device's songs to this device",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkTransfersSendingSong": "Sending {title} to {name}",
+  "@linkTransfersSendingSong": {
+    "description": "Title of a running or waiting transfer of one song from this device; the placeholder is the song's title",
+    "placeholders": {
+      "title": {
+        "type": "String"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkTransfersReceivingSong": "Receiving {title} from {name}",
+  "@linkTransfersReceivingSong": {
+    "description": "Title of a running or waiting transfer of one song to this device; the placeholder is the song's title",
+    "placeholders": {
+      "title": {
+        "type": "String"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkTransfersSongsTo": "{count, plural, =1{1 song} other{{count} songs}} to {name}",
+  "@linkTransfersSongsTo": {
+    "description": "Title of a finished transfer from this device to a linked one; its outcome shows below",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkTransfersSongsFrom": "{count, plural, =1{1 song} other{{count} songs}} from {name}",
+  "@linkTransfersSongsFrom": {
+    "description": "Title of a finished transfer from a linked device to this one; its outcome shows below",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkTransfersSongTo": "{title} to {name}",
+  "@linkTransfersSongTo": {
+    "description": "Title of a finished transfer of one song from this device; the placeholder is the song's title",
+    "placeholders": {
+      "title": {
+        "type": "String"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkTransfersSongFrom": "{title} from {name}",
+  "@linkTransfersSongFrom": {
+    "description": "Title of a finished transfer of one song to this device; the placeholder is the song's title",
+    "placeholders": {
+      "title": {
+        "type": "String"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkTransfersPosition": "{position} of {total}",
+  "@linkTransfersPosition": {
+    "description": "Which song of a running transfer is being copied, for example '3 of 12'",
+    "placeholders": {
+      "position": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "linkTransfersPercent": "{percent}%",
+  "@linkTransfersPercent": {
+    "description": "How much of a transfer or song has been copied, as a percentage",
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "linkTransfersWaiting": "Waiting",
+  "@linkTransfersWaiting": {
+    "description": "Status of a transfer or song that waits for the ones before it"
+  },
+  "linkTransfersSavedCount": "{count, plural, other{{count} saved}}",
+  "@linkTransfersSavedCount": {
+    "description": "Outcome of a finished transfer: how many songs were copied",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "linkTransfersAlreadyThereCount": "{count, plural, other{{count} already there}}",
+  "@linkTransfersAlreadyThereCount": {
+    "description": "Outcome of a finished transfer: how many songs the receiving device already had, so they were not copied again",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "linkTransfersFailedCount": "{count, plural, other{{count} failed}}",
+  "@linkTransfersFailedCount": {
+    "description": "Outcome of a finished transfer: how many songs could not be copied",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "linkTransfersStopped": "{done, plural, =0{Stopped} other{Stopped after {done} of {total}}}",
+  "@linkTransfersStopped": {
+    "description": "Outcome of a transfer someone stopped, with how many of its songs were finished",
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "linkTransfersReasonDisconnected": "Connection lost",
+  "@linkTransfersReasonDisconnected": {
+    "description": "Why a transfer failed: the devices lost their connection"
+  },
+  "linkTransfersReasonNoFolder": "Choose a download folder first",
+  "@linkTransfersReasonNoFolder": {
+    "description": "Why a transfer to this device failed: no download folder is set"
+  },
+  "linkTransfersReasonNoFolderPeer": "{name} has no download folder",
+  "@linkTransfersReasonNoFolderPeer": {
+    "description": "Why a transfer to the linked device failed: that device has no download folder set",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkTransfersReasonBusy": "Busy, try again later",
+  "@linkTransfersReasonBusy": {
+    "description": "Why a transfer failed: the receiving device could not take it now"
+  },
+  "linkTransfersReasonError": "Something went wrong",
+  "@linkTransfersReasonError": {
+    "description": "Why a transfer failed, when there is no more specific reason"
+  },
+  "linkTransfersSongSaved": "Saved",
+  "@linkTransfersSongSaved": {
+    "description": "State of one song in a transfer: it was copied"
+  },
+  "linkTransfersSongAlreadyThere": "Already there",
+  "@linkTransfersSongAlreadyThere": {
+    "description": "State of one song in a transfer: the receiving device already had it"
+  },
+  "linkTransfersSongFailed": "Failed",
+  "@linkTransfersSongFailed": {
+    "description": "State of one song in a transfer: it could not be copied"
+  },
+  "linkTransfersSongCopying": "Copying",
+  "@linkTransfersSongCopying": {
+    "description": "State of the song a transfer copies right now"
+  },
+  "linkTransfersSongNotCopied": "Not copied",
+  "@linkTransfersSongNotCopied": {
+    "description": "State of a song a stopped or failed transfer did not reach"
+  },
+  "linkTransfersStop": "Stop transfer",
+  "@linkTransfersStop": {
+    "description": "Tooltip of the button that stops a running or waiting transfer; songs already copied stay"
+  },
+  "linkTransfersActiveCount": "{count, plural, =1{1 transfer} other{{count} transfers}}",
+  "@linkTransfersActiveCount": {
+    "description": "Status of the row that opens the Transfers list while several transfers run, followed by their progress",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "linkTransfersFinishedCount": "{count, plural, =1{1 transfer finished} other{{count} transfers finished}}",
+  "@linkTransfersFinishedCount": {
+    "description": "Status of the row that opens the Transfers list when none runs: how many finished since the app opened",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "linkErrorBadPin": "That PIN is not right. Check the PIN on your computer and try again.",
+  "@linkErrorBadPin": {
+    "description": "Pairing error when the PIN is wrong"
+  },
+  "linkErrorPairingClosed": "Pairing is not open on your computer. Start pairing there, then try again.",
+  "@linkErrorPairingClosed": {
+    "description": "Pairing error when the computer has no pairing window open"
+  },
+  "linkErrorTooManyAttempts": "Too many attempts. Wait a moment, then try again.",
+  "@linkErrorTooManyAttempts": {
+    "description": "Pairing error when the computer rate limits pairing attempts"
+  },
+  "linkErrorCertificateTitle": "Computer not verified",
+  "@linkErrorCertificateTitle": {
+    "description": "Title of the warning shown when the computer's certificate does not match what it reported"
+  },
+  "linkErrorCertificate": "The computer's security certificate does not match what it reported. Someone on this network may be intercepting the connection, so pairing stopped.",
+  "@linkErrorCertificate": {
+    "description": "Warning shown when the certificate seen during the connection differs from the computer's reported fingerprint"
+  },
+  "linkErrorIncompatible": "This computer runs a Mornye version that cannot pair with this phone. Update Mornye on both devices.",
+  "@linkErrorIncompatible": {
+    "description": "Pairing error when the computer is not a compatible Mornye desktop"
+  },
+  "linkErrorUnreachable": "The computer could not be reached. Check that Mornye is open on it and that both devices are on the same network.",
+  "@linkErrorUnreachable": {
+    "description": "Pairing error when the computer cannot be reached"
+  },
+  "linkErrorTimeout": "The computer did not answer in time. Try again.",
+  "@linkErrorTimeout": {
+    "description": "Pairing error when the computer does not answer"
+  },
+  "linkErrorInvalidAddress": "Enter a valid address and port, such as 192.168.1.20 and 47710.",
+  "@linkErrorInvalidAddress": {
+    "description": "Error for an address or port that cannot be used"
+  },
+  "linkErrorFailed": "Pairing failed. Try again.",
+  "@linkErrorFailed": {
+    "description": "Generic pairing error"
+  },
+  "linkLocalNetworkTitle": "Local network access needed",
+  "@linkLocalNetworkTitle": {
+    "description": "Title of the notice shown when the phone is not allowed to use the local network"
+  },
+  "linkLocalNetworkMessage": "Mornye needs local network access to find your computer and connect to it.",
+  "@linkLocalNetworkMessage": {
+    "description": "Explains why local network access is needed"
+  },
+  "linkLocalNetworkAllow": "Allow access",
+  "@linkLocalNetworkAllow": {
+    "description": "Button that asks for local network access again"
+  },
+  "linkWifiOffTitle": "Not on Wi-Fi",
+  "@linkWifiOffTitle": {
+    "description": "Title of the notice shown when the phone is not connected to Wi-Fi or Ethernet"
+  },
+  "linkWifiOffMessage": "Connect this phone to the same Wi-Fi network as your computer.",
+  "@linkWifiOffMessage": {
+    "description": "Explains that the phone must join the computer's Wi-Fi network"
+  },
+  "linkIssueUnauthorized": "{name} no longer accepts this phone. Pair again to reconnect.",
+  "@linkIssueUnauthorized": {
+    "description": "Notice when the paired computer refuses the phone's key",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkIssueCertificate": "{name} presented a different security certificate. Pair again only if you reinstalled or reset Mornye on that computer.",
+  "@linkIssueCertificate": {
+    "description": "Warning when a paired computer's certificate changed",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkIssueIncompatible": "Update Mornye on this phone and on {name} to connect.",
+  "@linkIssueIncompatible": {
+    "description": "Notice when the paired computer speaks another protocol version",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "playlistEditOrder": "Edit order",
+  "@playlistEditOrder": {
+    "description": "Playlist header action and page title for reordering the playlist's tracks"
+  },
+  "playlistEditOrderDescription": "Drag a track by its handle, or touch and hold it, to move it.",
+  "@playlistEditOrderDescription": {
+    "description": "Explanation at the top of the playlist reorder page"
+  },
+  "playlistEditOrderSaved": "Playlist order saved",
+  "collectionOrderSaved": "Song order saved",
+  "collectionOrderChanged": "This collection changed while editing. Please reorder it again.",
+  "collectionOrderSaveFailed": "Could not save the song order. Try again.",
+  "@playlistEditOrderSaved": {
+    "description": "Snackbar after saving a new playlist track order"
+  },
+  "playlistCreateEmpty": "Empty playlist",
+  "@playlistCreateEmpty": {
+    "description": "Create playlist option that starts with no tracks"
+  },
+  "playlistCreateEmptySubtitle": "Add tracks later from any list",
+  "@playlistCreateEmptySubtitle": {
+    "description": "Subtitle of the empty playlist option"
+  },
+  "playlistCreateFromFolder": "From a folder",
+  "@playlistCreateFromFolder": {
+    "description": "Create playlist option that uses the tracks of one Library folder"
+  },
+  "playlistCreateFromFolderSubtitle": "Every track in one folder of your Library",
+  "@playlistCreateFromFolderSubtitle": {
+    "description": "Subtitle of the create playlist from folder option"
+  },
+  "playlistImportFile": "Import playlist file",
+  "@playlistImportFile": {
+    "description": "Create playlist option that imports an M3U or CSV file"
+  },
+  "playlistImportFileSubtitle": "M3U, M3U8 or CSV, matched to files on this device",
+  "@playlistImportFileSubtitle": {
+    "description": "Subtitle of the import playlist file option"
+  },
+  "playlistFolderPickerTitle": "Choose a folder",
+  "@playlistFolderPickerTitle": {
+    "description": "Title of the sheet listing Library folders to turn into a playlist"
+  },
+  "playlistFolderPickerEmptyTitle": "No folders yet",
+  "@playlistFolderPickerEmptyTitle": {
+    "description": "Title of the empty folder picker when no Library folder has tracks"
+  },
+  "playlistFolderPickerEmpty": "No scanned tracks yet. Add a Library folder and scan it first.",
+  "@playlistFolderPickerEmpty": {
+    "description": "Shown when no Library folder has tracks to create a playlist from"
+  },
+  "playlistCreatedWithTracks": "Created {name} with {count, plural, =1{1 track} other{{count} tracks}}",
+  "@playlistCreatedWithTracks": {
+    "description": "Snackbar after creating a playlist from a folder",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "playlistImportResult": "Imported {count, plural, =1{1 track} other{{count} tracks}} into {name}, {matched} matched to files on this device",
+  "@playlistImportResult": {
+    "description": "Snackbar after importing a playlist file; matched counts tracks linked to a local file",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "name": {
+        "type": "String"
+      },
+      "matched": {
+        "type": "int"
+      }
+    }
+  },
+  "playlistImportNoTracks": "No tracks found in this file",
+  "@playlistImportNoTracks": {
+    "description": "Snackbar when an imported playlist file has no entries"
+  },
+  "playlistImportFailed": "Could not read this playlist file",
+  "@playlistImportFailed": {
+    "description": "Snackbar when reading or parsing an imported playlist file fails"
+  },
+  "recognizeTitle": "Identify Song",
+  "@recognizeTitle": {
+    "description": "Title of the screen that identifies a song playing nearby through the microphone (keep short)"
+  },
+  "recognizeSearchTooltip": "Identify a song playing nearby",
+  "@recognizeSearchTooltip": {
+    "description": "Tooltip of the microphone button in the search field that opens song identification"
+  },
+  "recognizeIdleTitle": "What's playing?",
+  "@recognizeIdleTitle": {
+    "description": "Headline of the song identification screen before listening starts"
+  },
+  "recognizeIdleMessage": "Hold your device near the music, then tap to listen.",
+  "@recognizeIdleMessage": {
+    "description": "Hint under the headline before listening starts"
+  },
+  "recognizeStartListening": "Start listening",
+  "@recognizeStartListening": {
+    "description": "Accessible name of the large microphone button that starts listening"
+  },
+  "recognizeServiceNote": "A sound fingerprint is sent to Shazam to find the song. The recording stays on your device.",
+  "@recognizeServiceNote": {
+    "description": "Privacy note on the identification screen; Shazam is the recognition service and must not be translated"
+  },
+  "recognizeListening": "Listening…",
+  "@recognizeListening": {
+    "description": "Status while the microphone listens for a song"
+  },
+  "recognizeListeningMessage": "Keep the music playing near your device.",
+  "@recognizeListeningMessage": {
+    "description": "Hint while the microphone listens"
+  },
+  "recognizeSearching": "Searching…",
+  "@recognizeSearching": {
+    "description": "Status after listening stops while the last answer is on its way"
+  },
+  "recognizeNoMatchTitle": "No match found",
+  "@recognizeNoMatchTitle": {
+    "description": "Title when the recognition service did not know the song"
+  },
+  "recognizeNoMatchMessage": "Try again closer to the music, or when it's louder.",
+  "@recognizeNoMatchMessage": {
+    "description": "Hint when no song was found"
+  },
+  "recognizeTryAgain": "Try Again",
+  "@recognizeTryAgain": {
+    "description": "Button that starts listening again after no match or an error"
+  },
+  "recognizeQuietTitle": "Couldn't hear the music",
+  "@recognizeQuietTitle": {
+    "description": "Title when the microphone captured too little or too quiet audio to identify"
+  },
+  "recognizeQuietMessage": "Move closer to the music and try again.",
+  "@recognizeQuietMessage": {
+    "description": "Hint when the captured audio was too quiet or short"
+  },
+  "recognizeNetworkTitle": "No connection",
+  "@recognizeNetworkTitle": {
+    "description": "Title when identification failed because the network is unreachable"
+  },
+  "recognizeNetworkMessage": "Check your internet connection and try again.",
+  "@recognizeNetworkMessage": {
+    "description": "Hint when identification failed because of the network"
+  },
+  "recognizeRateLimitedTitle": "Too many tries",
+  "@recognizeRateLimitedTitle": {
+    "description": "Title when the recognition service asked to slow down"
+  },
+  "recognizeRateLimitedMessage": "Wait a minute, then try again.",
+  "@recognizeRateLimitedMessage": {
+    "description": "Hint when the recognition service rate limited the app"
+  },
+  "recognizeUnavailableTitle": "Identification unavailable",
+  "@recognizeUnavailableTitle": {
+    "description": "Title when the recognition service failed or answered unexpectedly"
+  },
+  "recognizeUnavailableMessage": "The recognition service didn't answer. Try again later.",
+  "@recognizeUnavailableMessage": {
+    "description": "Hint when the recognition service failed"
+  },
+  "recognizeMicrophoneTitle": "Microphone unavailable",
+  "@recognizeMicrophoneTitle": {
+    "description": "Title when the microphone could not record"
+  },
+  "recognizeMicrophoneMessage": "No microphone is available, or another app is using it.",
+  "@recognizeMicrophoneMessage": {
+    "description": "Hint when the microphone could not record"
+  },
+  "recognizePermissionTitle": "Microphone access is off",
+  "@recognizePermissionTitle": {
+    "description": "Title when microphone permission was denied"
+  },
+  "recognizePermissionMessage": "Mornye uses the microphone only while you identify a song.",
+  "@recognizePermissionMessage": {
+    "description": "Explanation when microphone permission was denied"
+  },
+  "recognizePermissionAllow": "Allow Microphone",
+  "@recognizePermissionAllow": {
+    "description": "Button that asks for microphone permission again"
+  },
+  "recognizePlay": "Play in Mornye",
+  "@recognizePlay": {
+    "description": "Button that plays the identified song from the downloads or library"
+  },
+  "recognizeSearch": "Search in Mornye",
+  "@recognizeSearch": {
+    "description": "Button that searches for the identified song when it is not in the library"
+  },
+  "recognizeOpenInShazam": "Open in Shazam",
+  "@recognizeOpenInShazam": {
+    "description": "Button that opens the identified song on the Shazam website; Shazam must not be translated"
+  },
+  "recognizeListenAgain": "Listen Again",
+  "@recognizeListenAgain": {
+    "description": "Button that starts a new identification from a result"
+  },
+  "recognizeHistory": "Recently Identified",
+  "@recognizeHistory": {
+    "description": "Section header for the list of songs identified before"
+  },
+  "recognizeClearHistory": "Clear identified songs",
+  "@recognizeClearHistory": {
+    "description": "Tooltip of the header button that clears the identification history"
+  },
+  "recognizeClearHistoryMessage": "Remove every song from this list?",
+  "@recognizeClearHistoryMessage": {
+    "description": "Confirmation message before clearing the identification history"
+  },
+  "collectionSuggestionsTitle": "Suggested songs",
+  "@collectionSuggestionsTitle": {
+    "description": "Heading of the songs suggested below an album, single or playlist"
+  },
+  "collectionSuggestionsRelated": "Based on the songs above",
+  "@collectionSuggestionsRelated": {
+    "description": "Line under the suggestions heading when an extension suggested songs like the album's or playlist's"
+  },
+  "collectionSuggestionsByArtists": "More from these artists",
+  "@collectionSuggestionsByArtists": {
+    "description": "Line under the suggestions heading when the songs were found by searching the album's or playlist's artists"
+  },
+  "collectionSuggestionsRefresh": "Suggest other songs",
+  "@collectionSuggestionsRefresh": {
+    "description": "Tooltip of the button that loads other suggestions"
+  },
+  "collectionSuggestionsAddHere": "Add to this playlist",
+  "@collectionSuggestionsAddHere": {
+    "description": "Tooltip of the button that adds a suggested song to the user's playlist shown above"
   }
 }
