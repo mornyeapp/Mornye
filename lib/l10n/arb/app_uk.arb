@@ -3604,8 +3604,8 @@
   "whatsNewPlayerGaplessBody": "Пісні в альбомах відтворюються безперервно, плавно переходячи від однієї до наступної без пауз.",
   "whatsNewPlayerTranslateTitle": "Переклад тексту пісні",
   "whatsNewPlayerTranslateBody": "Перекладайте або романізуйте тексти пісень за допомогою налаштованого вами ШІ-провайдера.",
-  "whatsNewPlayerTimingTitle": "Lyrics timing",
-  "whatsNewPlayerTimingBody": "Move synced lyrics earlier or later when they drift from the song.",
+  "whatsNewPlayerTimingTitle": "Таймінг тексту",
+  "whatsNewPlayerTimingBody": "Зсувайте синхронізований текст вперед або назад, якщо він розбігається з піснею.",
   "whatsNewPlayerAutoTitle": "Android Auto",
   "whatsNewPlayerAutoBody": "Browse and play your Library from your car's screen.",
   "whatsNewPlayerExclusiveTitle": "Exclusive output",
@@ -7223,7 +7223,7 @@
       }
     }
   },
-  "lyricsAiModelHint": "Model ID",
+  "lyricsAiModelHint": "ID моделі",
   "@lyricsAiModelHint": {
     "description": "Hint of the model id text field"
   },
@@ -7296,7 +7296,7 @@
   "@lyricsAiClearCache": {
     "description": "AI translation settings action that deletes saved translations"
   },
-  "lyricsAiClearCacheSubtitle": "{count, plural, =0{No saved translations} =1{1 song} other{{count} songs}}",
+  "lyricsAiClearCacheSubtitle": "{count, plural, =0{Немає збережених перекладів} =1{1 пісня} other{{count} пісень}}",
   "@lyricsAiClearCacheSubtitle": {
     "description": "Subtitle of the clear saved translations action",
     "placeholders": {
