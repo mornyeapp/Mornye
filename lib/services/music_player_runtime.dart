@@ -241,9 +241,8 @@ class PlaybackDependencies {
       config: const AudioServiceConfig(
         androidNotificationChannelId: 'com.zarz.mornye.playback',
         androidNotificationChannelName: 'Playback',
-        // System UI draws only the small icon's alpha. The opaque launcher
-        // default became a blank dot in the status bar and output switcher.
-        androidNotificationIcon: 'drawable/ic_launcher_monochrome',
+        // The notification mark omits the adaptive launcher's safe-zone padding.
+        androidNotificationIcon: 'drawable/ic_notification_mornye',
         artDownscaleWidth: 512,
         artDownscaleHeight: 512,
         // Keep background resume eligible for audio focus. The Android fork

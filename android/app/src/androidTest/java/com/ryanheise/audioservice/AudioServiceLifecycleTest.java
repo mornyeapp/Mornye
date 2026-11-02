@@ -4,6 +4,11 @@ import android.app.Activity;
 import android.app.Instrumentation;
 import android.content.Context;
 import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.Rect;
+import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -78,6 +83,7 @@ public class AudioServiceLifecycleTest {
         Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
         String[] resources = {
             "mipmap/ic_launcher", "drawable/ic_launcher_monochrome",
+            "drawable/ic_notification_mornye",
             "drawable/ic_notification_airplay", "drawable/ic_notification_star",
             "drawable/ic_notification_star_filled", "drawable/ic_notification_shuffle",
             "drawable/ic_notification_shuffle_on", "drawable/ic_widget_previous",
@@ -94,6 +100,35 @@ public class AudioServiceLifecycleTest {
         }
         assertEquals(0, AudioServicePlugin.resolveResourceId(context, "drawable/missing_icon"));
         assertEquals(0, AudioServicePlugin.resolveResourceId(context, null));
+    }
+
+    @Test
+    public void notificationMarkFillsTheStatusBarGridWithoutClipping() {
+        Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
+        int id = AudioServicePlugin.resolveResourceId(context, "drawable/ic_notification_mornye");
+        for (int size : new int[] {24, 36, 48, 72, 96}) {
+            Drawable drawable = context.getDrawable(id);
+            Bitmap bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
+            drawable.setBounds(0, 0, size, size);
+            drawable.draw(new Canvas(bitmap));
+            Rect opaque = new Rect();
+            for (int y = 0; y < size; y++) {
+                for (int x = 0; x < size; x++) {
+                    if (Color.alpha(bitmap.getPixel(x, y)) > 127) {
+                        opaque.union(x, y, x + 1, y + 1);
+                    }
+                }
+            }
+            bitmap.recycle();
+            assertTrue("Visible width at " + size + "px: " + opaque, opaque.width() >= size * 0.58);
+            assertTrue("Visible height at " + size + "px: " + opaque, opaque.height() >= size * 0.78);
+            assertTrue("Left inset at " + size + "px", opaque.left >= size * 0.05);
+            assertTrue("Top inset at " + size + "px", opaque.top >= size * 0.05);
+            assertTrue("Right inset at " + size + "px", opaque.right <= size * 0.95);
+            assertTrue("Bottom inset at " + size + "px", opaque.bottom <= size * 0.95);
+            assertEquals(size / 2f, opaque.exactCenterX(), 1f);
+            assertEquals(size / 2f, opaque.exactCenterY(), 1f);
+        }
     }
 
     private static class DeepLinkActivity extends AudioServiceFragmentActivity {

@@ -73,6 +73,12 @@ void main() {
     final androidDetails =
         showArguments['platformSpecifics'] as Map<Object?, Object?>;
 
+    final initialization =
+        methodCalls.firstWhere((call) => call.method == 'initialize').arguments
+            as Map<Object?, Object?>;
+    expect(initialization['defaultIcon'], '@drawable/ic_notification_mornye');
+    expect(androidDetails['icon'], '@drawable/ic_notification_mornye');
+
     expect(
       NotificationService.verificationRequiredId,
       isNot(NotificationService.downloadProgressId),

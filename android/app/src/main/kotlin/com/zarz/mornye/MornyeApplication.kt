@@ -16,6 +16,7 @@ class MornyeApplication : Application() {
             when (resource) {
                 "mipmap/ic_launcher" -> R.mipmap.ic_launcher
                 "drawable/ic_launcher_monochrome" -> R.drawable.ic_launcher_monochrome
+                "drawable/ic_notification_mornye" -> R.drawable.ic_notification_mornye
                 "drawable/ic_notification_airplay" -> R.drawable.ic_notification_airplay
                 "drawable/ic_notification_star" -> R.drawable.ic_notification_star
                 "drawable/ic_notification_star_filled" -> R.drawable.ic_notification_star_filled

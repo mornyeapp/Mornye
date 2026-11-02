@@ -162,10 +162,9 @@ class NotificationService {
   }
 
   Future<void> _initialize() async {
-    // System UI draws only the small icon's alpha, so use the brand mark
-    // rather than the opaque launcher icon.
+    // Use the notification mark without the adaptive launcher's padding.
     const androidSettings = AndroidInitializationSettings(
-      '@drawable/ic_launcher_monochrome',
+      '@drawable/ic_notification_mornye',
     );
     const iosSettings = DarwinInitializationSettings(
       requestAlertPermission: false,
@@ -353,7 +352,7 @@ class NotificationService {
         playSound: playSound,
         enableVibration: !inProgress,
         onlyAlertOnce: inProgress,
-        icon: '@drawable/ic_launcher_monochrome',
+        icon: '@drawable/ic_notification_mornye',
       ),
       iOS: DarwinNotificationDetails(
         presentAlert: !inProgress,
