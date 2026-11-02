@@ -8606,7 +8606,7 @@
   },
   "listeningRewindArtistsTitle": "Чергування виконавців",
   "listeningRewindTopTrackTitle": "Ваш найкраща пісня",
-  "listeningRewindPlays": "{plays, plural, =1{1 відтворювався} other{{plays} відтворювались}}",
+  "listeningRewindPlays": "{plays, plural, =1{1 відтворювався} other{{plays} відтворювань}}",
   "@listeningRewindPlays": {
     "placeholders": {
       "plays": {
@@ -8638,7 +8638,7 @@
     }
   },
   "listeningRewindReplayTitle": "Не міг відірватися",
-  "listeningRewindReplayBody": "Ви відтворили це {plays} разів {date}",
+  "listeningRewindReplayBody": "Ви відтворили це {plays} раз {date}",
   "@listeningRewindReplayBody": {
     "placeholders": {
       "plays": {
