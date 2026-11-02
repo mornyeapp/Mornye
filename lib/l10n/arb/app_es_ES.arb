@@ -3330,6 +3330,22 @@
   "@libraryFilterAll": {
     "description": "Filter chip - show all library items"
   },
+  "libraryReEnrichAll": "Re-enrich All Tracks",
+  "@libraryReEnrichAll": {
+    "description": "Library settings action - re-enrich the metadata of every track in the Library"
+  },
+  "libraryReEnrichAllSubtitle": "Look up and fill in metadata for every track in your Library, then review the changes",
+  "@libraryReEnrichAllSubtitle": {
+    "description": "Subtitle for the Re-enrich All Tracks action"
+  },
+  "libraryReEnrichAllEmpty": "No tracks to re-enrich. Tracks from network connections are not included.",
+  "@libraryReEnrichAllEmpty": {
+    "description": "Snackbar when the Library has no tracks Re-enrich can write to"
+  },
+  "libraryReEnrichAllBusy": "Wait for the Library scan to finish, then try again.",
+  "@libraryReEnrichAllBusy": {
+    "description": "Snackbar when Re-enrich All is started during a Library scan"
+  },
   "libraryFilterDownloaded": "Descargado",
   "@libraryFilterDownloaded": {
     "description": "Filter chip - show only downloaded items"
