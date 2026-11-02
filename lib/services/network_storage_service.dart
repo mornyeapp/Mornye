@@ -309,7 +309,6 @@ class NetworkStorageService {
 
   /// Owners stop scans before removing the connection finishes.
   final connectionRemovals = SourceDeletionEvents();
-  static const timeout = Duration(seconds: 20);
   static const _probeTimeout = Duration(seconds: 3);
   static const _probeReuse = Duration(seconds: 10);
 
@@ -321,6 +320,26 @@ class NetworkStorageService {
 
   /// Connections known to be out of reach, with when a probe last failed.
   final _unreachable = <String, DateTime?>{};
+
+  /// Default timeout for general network operations, listings, and downloads.
+  static const timeout = Duration(seconds: 20);
+
+  /// Maximum socket backpressure wait time per chunk during file uploads.
+  /// Prevents false stall failures on slow or fluctuating mobile networks.
+  static const uploadChunkTimeout = Duration(minutes: 2);
+
+  /// Maximum wait time for the server to commit and return response headers
+  /// after all upload bytes have been flushed. Accommodates slow NAS disk I/O.
+  static const uploadResponseTimeout = Duration(minutes: 30);
+
+  @visibleForTesting
+  static Duration? debugTimeoutOverride;
+
+  @visibleForTesting
+  static Duration? debugUploadChunkTimeoutOverride;
+
+  @visibleForTesting
+  static Duration? debugUploadResponseTimeoutOverride;
   Future<List<NetworkConnection>>? _loading;
   List<NetworkConnection>? _connections;
   Future<HttpServer>? _server;
@@ -808,10 +827,17 @@ class NetworkStorageService {
       request.contentLength = await upload.length();
       var sent = 0;
       try {
+        final chunkTimeout =
+            debugUploadChunkTimeoutOverride ?? uploadChunkTimeout;
         await for (final chunk in upload.openRead()) {
           checkpoint?.call();
           request.add(chunk);
-          await request.flush().timeout(timeout);
+          await _waitForUpload(
+            request.flush(),
+            request,
+            chunkTimeout,
+            checkpoint: checkpoint,
+          );
           sent += chunk.length;
           progress?.call(sent);
         }
@@ -835,13 +861,23 @@ class NetworkStorageService {
     }
     final HttpClientResponse response;
     try {
-      response = await request.close().timeout(
-        timeout,
-        onTimeout: () {
-          request.abort();
-          throw TimeoutException('Network response timed out');
-        },
-      );
+      final effectiveTimeout = upload != null
+          ? (debugUploadResponseTimeoutOverride ?? uploadResponseTimeout)
+          : (debugTimeoutOverride ?? timeout);
+      response = upload != null
+          ? await _waitForUpload(
+              request.close(),
+              request,
+              effectiveTimeout,
+              checkpoint: checkpoint,
+            )
+          : await request.close().timeout(
+              effectiveTimeout,
+              onTimeout: () {
+                request.abort();
+                throw TimeoutException('Network response timed out');
+              },
+            );
     } on HandshakeException {
       if (rejectedCertificate != null) throw rejectedCertificate!;
       rethrow;
@@ -1362,6 +1398,58 @@ class NetworkStorageService {
       } catch (_) {}
     }
   }
+
+  /// Long upload waits still observe the caller's cancellation checkpoint.
+  Future<T> _waitForUpload<T>(
+    Future<T> operation,
+    HttpClientRequest request,
+    Duration limit, {
+    void Function()? checkpoint,
+  }) async {
+    Timer? timer;
+    var pending = operation;
+    if (checkpoint != null) {
+      final cancelled = Completer<T>();
+      pending = Future.any([operation, cancelled.future]);
+      timer = Timer.periodic(const Duration(milliseconds: 250), (_) {
+        if (cancelled.isCompleted) return;
+        try {
+          checkpoint();
+        } catch (error, stack) {
+          cancelled.completeError(error, stack);
+          request.abort();
+        }
+      });
+    }
+    try {
+      return await pending.timeout(
+        limit,
+        onTimeout: () {
+          request.abort();
+          throw TimeoutException('Network response timed out');
+        },
+      );
+    } finally {
+      timer?.cancel();
+    }
+  }
+
+  @visibleForTesting
+  Future<HttpClientResponse> debugRequest({
+    required HttpClient client,
+    required NetworkConnection connection,
+    required String method,
+    required Uri uri,
+    File? upload,
+    void Function()? checkpoint,
+  }) => _request(
+    client,
+    connection,
+    method,
+    uri,
+    upload: upload,
+    checkpoint: checkpoint,
+  );
 
   Future<void> dispose() async {
     final server = _server;
