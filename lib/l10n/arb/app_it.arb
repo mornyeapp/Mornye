@@ -1,10 +1,10 @@
 {
   "extensionsUnsecuredStorage": "Usa spazio di estensione non sicuro",
   "extensionsUnsecuredStorageDescription": "Esegui le estensioni senza un portachiavi Linux. La chiave è salvata localmente, quindi qualsiasi persona con accesso ai file della tua app può leggere le credenziali. Se questa impostazione è disattivata usa il portachiavi.",
-  "extensionsStorageKeyringRequired": "Existing extension data needs its original key. Unlock the system keyring once, then enable unsecured storage again. Your data has been preserved.",
-  "extensionsStorageKeyConflict": "The local and system keyring keys differ. Storage was not changed and both keys were preserved.",
-  "extensionsStorageKeyringUnavailable": "The system keyring is unavailable or locked. Start or unlock it before switching to secure storage. Your local key has been preserved.",
-  "linkFileActionOn": "{action} on {name}",
+  "extensionsStorageKeyringRequired": "I dati dell'estensione esistente necessitano della chiave originale. Sblocca il portachiavi di sistema una volta, quindi abilita nuovamente l'archiviazione non protetta. I tuoi dati sono stati conservati.",
+  "extensionsStorageKeyConflict": "Le chiavi del portachiavi locale e di sistema differiscono. La memoria non è stata modificata ed entrambe le chiavi sono state conservate.",
+  "extensionsStorageKeyringUnavailable": "Il portachiavi di sistema non è disponibile o è bloccato. Avvialo o sbloccalo prima di passare all'archiviazione sicura. La tua chiave locale è stata preservata.",
+  "linkFileActionOn": "{action} su {name}",
   "@linkFileActionOn": {
     "description": "File operation on a named linked computer",
     "placeholders": {
@@ -16,7 +16,7 @@
       }
     }
   },
-  "linkFileActionsDescription": "Changes apply to music files on {name}. Accepted work continues if this phone disconnects.",
+  "linkFileActionsDescription": "Le modifiche si applicano ai file musicali su {name}. Il lavoro accettato continua se questo telefono si disconnette.",
   "@linkFileActionsDescription": {
     "placeholders": {
       "name": {
@@ -24,7 +24,7 @@
       }
     }
   },
-  "linkFileDeleteConfirm": "Delete {count} {count, plural, =1{music file} other{music files}} from {name}? This removes the files from that computer's storage.",
+  "linkFileDeleteConfirm": "Elimina {count} {count, plural, one {file musicali} =1{file musicale} other{file musicali}} da {name}? Questo rimuove i file dalla memoria di quel computer.",
   "@linkFileDeleteConfirm": {
     "placeholders": {
       "count": {
@@ -35,11 +35,11 @@
       }
     }
   },
-  "linkFileJobs": "File changes",
+  "linkFileJobs": "Modifiche al file",
   "@linkFileJobs": {
     "description": "Title of the list of edits, conversions and deletions the phone started on the linked computer's music files"
   },
-  "linkFileJobsSubtitle": "Edits, conversions and deletions on {name}",
+  "linkFileJobsSubtitle": "Modifica, conversioni ed eliminazioni su {name}",
   "@linkFileJobsSubtitle": {
     "placeholders": {
       "name": {
@@ -47,11 +47,11 @@
       }
     }
   },
-  "linkFileJobsEmpty": "No file changes yet",
-  "linkFileJobsEmptyMessage": "Edits, conversions and deletions you start on the computer's songs from this phone appear here.",
-  "linkDesktopFileJobsSubtitle": "Changes requested from your phones",
-  "linkDesktopFileJobsEmptyMessage": "Edits, conversions and deletions requested from your phones appear here.",
-  "linkFileJobRequestedBy": "From {name}",
+  "linkFileJobsEmpty": "Ancora nessuna modifica",
+  "linkFileJobsEmptyMessage": "Le modifiche, le conversioni e le eliminazioni eseguite sui brani del computer da questo telefono vengono visualizzate qui.",
+  "linkDesktopFileJobsSubtitle": "Modifiche richieste dai tuoi telefoni",
+  "linkDesktopFileJobsEmptyMessage": "Modifiche, conversioni ed eliminazioni richieste dai telefoni appaiono qui.",
+  "linkFileJobRequestedBy": "Da {name}",
   "@linkFileJobRequestedBy": {
     "placeholders": {
       "name": {
@@ -59,13 +59,13 @@
       }
     }
   },
-  "linkFileJobsView": "View",
+  "linkFileJobsView": "Visualizza",
   "@linkFileJobsView": {
     "description": "Snackbar action that opens the file changes list to see which songs failed"
   },
-  "linkFileJobsUnsupported": "Update Mornye on your computer to manage its music files from this phone.",
-  "linkFileSelectionOneDevice": "Select songs from one linked computer at a time (up to 100 songs).",
-  "linkFileJobProgress": "{finished} of {total} {total, plural, =1{song} other{songs}}",
+  "linkFileJobsUnsupported": "Aggiorna Mornye sul computer per gestire i suoi file musicali da questo telefono.",
+  "linkFileSelectionOneDevice": "Seleziona brani da un computer collegato alla volta (fino a 100 canzoni).",
+  "linkFileJobProgress": "{finished} di {total} {total, plural, =1{song} other{songs}}",
   "@linkFileJobProgress": {
     "placeholders": {
       "finished": {
@@ -76,7 +76,7 @@
       }
     }
   },
-  "linkFileJobFailedCount": "{count} failed",
+  "linkFileJobFailedCount": "{count} non riuscito",
   "@linkFileJobFailedCount": {
     "placeholders": {
       "count": {
@@ -84,7 +84,7 @@
       }
     }
   },
-  "linkFileJobFinished": "{action} finished on {name}",
+  "linkFileJobFinished": "{action} terminata il {name}",
   "@linkFileJobFinished": {
     "placeholders": {
       "action": {
@@ -95,15 +95,15 @@
       }
     }
   },
-  "linkFileDeleting": "Deleting...",
-  "linkFileReading": "Reading tags...",
-  "linkFileSavingCover": "Saving cover art...",
-  "linkFileCancelHint": "Stop after the current song",
-  "linkFileJobCancelled": "Stopped",
-  "linkFileJobQueued": "Queued",
-  "linkFileJobCompleted": "Finished",
-  "linkFileChanged": "The file changed since the preview. Preview it again before saving.",
-  "linkFileOperationFailed": "The operation could not be completed. Check the computer's logs for details.",
+  "linkFileDeleting": "Cancellazione in corso...",
+  "linkFileReading": "Lettura dei tag...",
+  "linkFileSavingCover": "Salvataggio copertina...",
+  "linkFileCancelHint": "Interrompi dopo il brano corrente",
+  "linkFileJobCancelled": "Interrotto",
+  "linkFileJobQueued": "In coda",
+  "linkFileJobCompleted": "Finito",
+  "linkFileChanged": "Il file è cambiato rispetto all'anteprima. Visualizzalo di nuovo in anteprima prima di salvare.",
+  "linkFileOperationFailed": "Impossibile completare l'operazione. Controlla i registri del computer per i dettagli.",
   "trackBpm": "BPM",
   "trackMood": "Umore",
   "subsonicAddToLibrary": "Aggiungi server alla Libreria",
@@ -266,33 +266,33 @@
   "@networkRemoveConnection": {
     "description": "Connection form action that removes the saved connection and its credentials, without deleting files on the server"
   },
-  "networkNoFiles": "No supported music files or folders found.",
+  "networkNoFiles": "Nessun file musicale o cartella supportata trovata.",
   "@networkNoFiles": {
     "description": "Empty folder message when the network listing contains no directories or supported audio files"
   },
-  "networkConnectionError": "Could not access the network source. Check the server address, credentials, and connection, then retry.",
+  "networkConnectionError": "Impossibile accedere all'origine della rete. Controlla l'indirizzo del server, le credenziali e la connessione, quindi riprova.",
   "@networkConnectionError": {
     "description": "Fallback network access error when the failure has no more specific classification"
   },
-  "extensionAccountTitle": "Extension account",
-  "extensionAccountInvalidForm": "The extension returned an invalid account form.",
-  "extensionAccountRestartLogin": "Restart account login to continue.",
-  "extensionAccountRequiredValue": "Enter a value.",
-  "extensionAccountInvalidNumber": "Enter a valid number.",
-  "settingsPlaybackSubtitle": "Player, volume, AutoMix, and audio output",
-  "sectionPlayer": "Player",
-  "sectionVolumeAndTransitions": "Volume and transitions",
-  "sectionAudioOutput": "Audio output",
-  "usbBitPerfect": "Hi-res and bit-perfect audio",
-  "usbBitPerfectDescription": "Preserve source precision on compatible outputs. Choose direct USB or AAudio exclusive below; otherwise Android USB output requires Android 14 or later. Applies from the next track, without AutoMix or normalization. System volume may not control direct USB.",
-  "usbHardwareVolume": "DAC hardware volume",
-  "usbVolumeWarningTitle": "Check your listening volume",
-  "usbVolumeWarning": "Direct USB audio can be much louder than normal playback, and phone volume buttons may not control it. Lower your DAC or amplifier volume before starting. When supported, Mornye sets the DAC to at most −40 dB on connection; this does not guarantee a safe listening level on every amplifier or headphone.",
-  "usbVolumeAccept": "I understand",
-  "usbVolumeUnavailable": "Playback is paused because this DAC has no verified hardware volume control. Lower the DAC or amplifier volume, then enable fixed-volume output if needed and select the track again.",
-  "usbFixedVolume": "Allow fixed-volume USB output",
-  "usbFixedVolumeDescription": "For DACs without a volume control accessible to the app. Keep off for USB headsets without their own volume control. Applies from the next track.",
-  "usbFixedVolumeWarning": "The app cannot lower the volume on this output. Audio may start at full level, and the phone volume slider will not help. Only continue after lowering the volume on your DAC or external amplifier. Do not enable this for a headset without its own volume control.",
+  "extensionAccountTitle": "Account estensione",
+  "extensionAccountInvalidForm": "L'estensione ha restituito un modulo di account non valido.",
+  "extensionAccountRestartLogin": "Riavvia l'accesso dell'account per continuare.",
+  "extensionAccountRequiredValue": "Inserisci un valore.",
+  "extensionAccountInvalidNumber": "Inserisci un numero valido.",
+  "settingsPlaybackSubtitle": "Lettore, volume, AutoMix e uscita audio",
+  "sectionPlayer": "Lettore",
+  "sectionVolumeAndTransitions": "Volume e transizioni",
+  "sectionAudioOutput": "Uscita audio",
+  "usbBitPerfect": "Audio Hi-res e bit-perfect",
+  "usbBitPerfectDescription": "Preserva la precisione della sorgente sulle uscite compatibili. Scegli l'USB diretto o l'esclusiva AAudio di seguito; in alternativa l'uscita USB Android richiede Android 14 o versione successiva. Si applica dalla traccia successiva, senza AutoMix o normalizzazione. Il volume del sistema potrebbe non controllare direttamente l'USB.",
+  "usbHardwareVolume": "Volume hardware DAC",
+  "usbVolumeWarningTitle": "Controlla il volume di ascolto",
+  "usbVolumeWarning": "L'audio USB diretto può essere molto più forte della normale riproduzione e i pulsanti del volume del telefono potrebbero non controllarlo. Abbassa il volume del DAC o dell'amplificatore prima di iniziare. Se supportato, Mornye imposta il DAC al massimo su −40 dB durante la connessione; ciò non garantisce un livello di ascolto sicuro su ogni amplificatore o cuffia.",
+  "usbVolumeAccept": "Ho capito",
+  "usbVolumeUnavailable": "La riproduzione è in pausa perché questo DAC non dispone di un controllo del volume hardware verificato. Abbassa il volume del DAC o dell'amplificatore, quindi abilita l'uscita a volume fisso se necessario e seleziona nuovamente la traccia.",
+  "usbFixedVolume": "Consenti uscita USB a volume fisso",
+  "usbFixedVolumeDescription": "Per i DAC senza un controllo del volume accessibile all'app. Evitare le cuffie USB senza il proprio controllo del volume. Si applica dalla traccia successiva.",
+  "usbFixedVolumeWarning": "L'app non può abbassare il volume su questa uscita. L'audio potrebbe avviarsi al livello massimo e il dispositivo di scorrimento del volume del telefono non sarà di aiuto. Continua solo dopo aver abbassato il volume del DAC o dell'amplificatore esterno. Non abilitare questa opzione per cuffie senza il proprio controllo del volume.",
   "dapExclusive": "DAP hi-res (AAudio exclusive)",
   "dapExclusiveDescription": "Use Oboe/AAudio at the track's original rate and precision for FLAC/WAV PCM. Requires Android 8.1 or later and compatible hardware. Exclusive access is checked; unavailable formats use normal playback. DSD requires the direct USB driver. Applies from the next track.",
   "dapExclusiveUnavailable": "AAudio exclusive access is unavailable for this track and current output. Using normal playback. For a USB DAC, try the direct USB driver.",
