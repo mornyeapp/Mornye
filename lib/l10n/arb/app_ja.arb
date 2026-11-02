@@ -327,7 +327,7 @@
   "@nowPlayingVolume": {
     "description": "System volume control label in the Mornye player"
   },
-  "appearanceStyle": "App Style",
+  "appearanceStyle": "アプリのスタイル",
   "appearanceAccentRed": "Red (default)",
   "appearanceAccentOrange": "Orange",
   "appearanceAccentGreen": "Green",
@@ -335,10 +335,10 @@
   "appearanceAccentBlue": "Blue",
   "appearanceAccentPurple": "Purple",
   "appearanceAccentPink": "Pink",
-  "appearanceGlassClarity": "Glass clarity",
-  "appearanceGlassOutlines": "Glass outlines",
-  "appearanceGlassOutlinesSubtitle": "Show decorative edges around Mornye glass. Turning this off keeps blur and refraction.",
-  "appearanceGlassClaritySubtitle": "Adjust transparency in Mornye menus and navigation. Text contrast is preserved.",
+  "appearanceGlassClarity": "ガラスの透明度",
+  "appearanceGlassOutlines": "ガラスの輪郭",
+  "appearanceGlassOutlinesSubtitle": "Mornyeガラスの周りに装飾的な縁を表示します。オフにすると、ぼやけて屈折します。",
+  "appearanceGlassClaritySubtitle": "Mornyeメニューとナビゲーションの透明度を調整します。テキストコントラストは保持されます。",
   "appearanceGlassTinted": "Tinted",
   "appearanceGlassClear": "消去",
   "appearanceGlassClearPerformance": "Very clear glass may use more power and feel less smooth on older devices. Lower clarity if needed.",
@@ -360,8 +360,8 @@
       }
     }
   },
-  "appearanceUseSystemFont": "Use system font",
-  "appearanceUseSystemFontSubtitle": "Use your device’s default typeface for app text.",
+  "appearanceUseSystemFont": "システムフォントを使用",
+  "appearanceUseSystemFontSubtitle": "アプリのテキストにデバイスのデフォルトのフォントを使用します。",
   "@appearanceStyle": {
     "description": "Appearance section for choosing the app visual style"
   },
@@ -2700,19 +2700,19 @@
   "@appearanceAmoledDarkSubtitle": {
     "description": "Subtitle for AMOLED dark"
   },
-  "appearanceHeroAnimations": "Hero animations",
+  "appearanceHeroAnimations": "ヒーローアニメーション",
   "@appearanceHeroAnimations": {
     "description": "Toggle for shared-element (Hero) transitions"
   },
-  "appearanceHeroAnimationsSubtitle": "Fly covers between screens, e.g. when opening the player",
+  "appearanceHeroAnimationsSubtitle": "プレイヤーを開いた時など、画面間を飛ばします。",
   "@appearanceHeroAnimationsSubtitle": {
     "description": "Subtitle for the Hero animations toggle"
   },
-  "appearanceForceBlur": "Always use blur effects",
+  "appearanceForceBlur": "常にぼかし効果を使用",
   "@appearanceForceBlur": {
     "description": "Toggle that forces backdrop blur on even when the device profile disabled it"
   },
-  "appearanceForceBlurSubtitle": "Enable the navigation bar blur even on devices where it is off by default. May cost performance.",
+  "appearanceForceBlurSubtitle": "デフォルトでオフになっているデバイスでもナビゲーションバーのぼかしを有効にします。パフォーマンスが低下する可能性があります。",
   "@appearanceForceBlurSubtitle": {
     "description": "Subtitle for the force-blur toggle"
   },
@@ -8793,8 +8793,8 @@
   "playbackPauseOnMuteDescription": "Pause at zero media volume and resume when raised. Manual pauses stay paused. Standard audio output only.",
   "playbackOnHeadphonesConnected": "Play when headphones connect",
   "playbackOnHeadphonesConnectedDescription": "Resume the current song when wired or Bluetooth headphones connect. Disconnecting pauses playback. Built-in player only.",
-  "appearanceCustomFont": "Custom font",
-  "appearanceCustomFontSubtitle": "Import a TTF or OTF file (up to 10 MB). Overrides the theme and system font.",
+  "appearanceCustomFont": "カスタムフォント",
+  "appearanceCustomFontSubtitle": "TTFまたはOTFファイルをインポートします（最大 10 MB）。テーマとシステムフォントを上書きします。",
   "appearanceCustomFontInvalid": "Could not load this font. Choose a valid TTF or OTF file up to 10 MB.",
   "appearanceCustomFontReset": "Use theme font",
   "equalizerTitle": "イコライザー",
