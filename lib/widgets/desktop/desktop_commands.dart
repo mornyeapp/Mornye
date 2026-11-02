@@ -23,6 +23,7 @@ enum DesktopCommand {
   search,
   settings,
   back,
+  forward,
   lyrics,
   upNext,
   toggleSidebar,
@@ -91,6 +92,7 @@ SingleActivator? desktopCommandShortcut(
     DesktopCommand.search => _primary(LogicalKeyboardKey.keyF, target),
     DesktopCommand.settings => _primary(LogicalKeyboardKey.comma, target),
     DesktopCommand.back => _primary(LogicalKeyboardKey.bracketLeft, target),
+    DesktopCommand.forward => _primary(LogicalKeyboardKey.bracketRight, target),
     DesktopCommand.lyrics => _primary(
       LogicalKeyboardKey.keyL,
       target,
@@ -180,6 +182,10 @@ Map<ShortcutActivator, Intent> desktopShortcutBindings([
       desktopDestinationShortcut(position, target): DesktopDestinationIntent(
         position,
       ),
+    const SingleActivator(LogicalKeyboardKey.browserBack):
+        const DesktopCommandIntent(DesktopCommand.back),
+    const SingleActivator(LogicalKeyboardKey.browserForward):
+        const DesktopCommandIntent(DesktopCommand.forward),
   });
 }
 

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -101,6 +102,7 @@ class _DesktopShortcutsState extends ConsumerState<DesktopShortcuts> {
       DesktopCommand.volumeUp ||
       DesktopCommand.volumeDown => !_editingText,
       DesktopCommand.back => _canCloseTopLayer,
+      DesktopCommand.forward => ShellNavigationService.canNavigateForward,
       DesktopCommand.dismiss =>
         _editingText ||
             _canCloseTopLayer ||
@@ -133,13 +135,19 @@ class _DesktopShortcutsState extends ConsumerState<DesktopShortcuts> {
         ShellNavigationService.requestTab(ShellTab.settings);
       case DesktopCommand.back:
         _closeTopLayer();
+      case DesktopCommand.forward:
+        ShellNavigationService.navigateForward();
       case DesktopCommand.dismiss:
         if (_editingText) {
           FocusManager.instance.primaryFocus?.unfocus();
+        } else if (_rootNavigator?.canPop() == true) {
+          unawaited(_rootNavigator!.maybePop());
+        } else if (dismissDesktopPlayerLayer(_windowWidth)) {
+          return;
+        } else if (desktopWindowMode.value != DesktopWindowMode.windowed) {
+          unawaited(leaveDesktopWindowMode());
         } else if (_canCloseTopLayer) {
           _closeTopLayer();
-        } else {
-          unawaited(leaveDesktopWindowMode());
         }
       case DesktopCommand.lyrics:
         toggleDesktopInspector(DesktopInspectorPanel.lyrics);
@@ -198,11 +206,11 @@ class _DesktopShortcutsState extends ConsumerState<DesktopShortcuts> {
   bool get _canCloseTopLayer =>
       _rootNavigator?.canPop() == true ||
       canDismissDesktopPlayerLayer(_windowWidth) ||
-      ShellNavigationService.activeBackNavigator()?.canPop() == true;
+      ShellNavigationService.canNavigateBack;
 
   /// Closes what Escape or Back closes: a dialog or page over the shell
   /// first, then the floating inspector or Now Playing, then the active
-  /// destination's own pages.
+  /// destination's own pages, and finally navigating back in application tab history.
   void _closeTopLayer() {
     final root = _rootNavigator;
     if (root != null && root.canPop()) {
@@ -211,7 +219,32 @@ class _DesktopShortcutsState extends ConsumerState<DesktopShortcuts> {
     }
     if (dismissDesktopPlayerLayer(_windowWidth)) return;
     final tab = ShellNavigationService.activeBackNavigator();
-    if (tab != null && tab.canPop()) unawaited(tab.maybePop());
+    if (tab != null && tab.canPop()) {
+      unawaited(tab.maybePop());
+      return;
+    }
+    if (ShellNavigationService.canNavigateBack) {
+      ShellNavigationService.navigateBack();
+      return;
+    }
+  }
+
+  int _lastPointerButtons = 0;
+
+  void _handlePointerEvent(PointerEvent event) {
+    if (event.kind != PointerDeviceKind.mouse) return;
+    final pressed = event.buttons & ~_lastPointerButtons;
+    _lastPointerButtons = event.buttons;
+
+    if ((pressed & kBackMouseButton) != 0) {
+      if (_canCloseTopLayer) {
+        _closeTopLayer();
+      }
+    } else if ((pressed & kForwardMouseButton) != 0) {
+      if (ShellNavigationService.canNavigateForward) {
+        ShellNavigationService.navigateForward();
+      }
+    }
   }
 
   void _nudgeVolume(double delta) {
@@ -258,6 +291,14 @@ class _DesktopShortcutsState extends ConsumerState<DesktopShortcuts> {
           ),
         ),
       ),
+    );
+    child = Listener(
+      behavior: HitTestBehavior.translucent,
+      onPointerDown: _handlePointerEvent,
+      onPointerMove: _handlePointerEvent,
+      onPointerUp: _handlePointerEvent,
+      onPointerCancel: (_) => _lastPointerButtons = 0,
+      child: child,
     );
     if (defaultTargetPlatform == TargetPlatform.macOS) {
       child = ValueListenableBuilder<DesktopWindowMode>(
