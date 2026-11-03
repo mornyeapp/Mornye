@@ -1,22 +1,19 @@
 import 'dart:async';
 
 import 'package:audio_service/audio_service.dart';
-import 'package:mornye/services/cast_media_server.dart';
 import 'package:mornye/services/cast_output.dart';
 import 'package:mornye/services/playback_deck.dart';
 
+/// Plays the queue on a Cast receiver. Songs reach it through the native
+/// media server (`serve`, `register`), which exposes only the registered
+/// files and streams, on the interface that reaches the receiver.
 class CastPlaybackDeck implements PlaybackDeck {
-  CastPlaybackDeck({
-    required this.output,
-    required this.metadata,
-    CastMediaServer? server,
-  }) : _server = server ?? CastMediaServer() {
+  CastPlaybackDeck({required this.output, required this.metadata}) {
     _subscription = output.updates.listen(_receive);
   }
 
   final CastOutput output;
   final MediaItem? Function() metadata;
-  final CastMediaServer _server;
   final _states = StreamController<PlaybackDeckState>.broadcast(sync: true);
   final _positions = StreamController<Duration>.broadcast(sync: true);
   final _durations = StreamController<Duration>.broadcast(sync: true);
@@ -107,9 +104,9 @@ class CastPlaybackDeck implements PlaybackDeck {
     final mime = mimeType(
       format == null || format.isEmpty ? path.split('.').last : format,
     );
-    final serving = _serving ??= _server.start(
-      output.host ?? (throw StateError('TV has no network address')),
-    );
+    final serving = _serving ??= output.command('serve', {
+      'host': output.host ?? (throw StateError('TV has no network address')),
+    });
     try {
       await serving;
     } on Object {
@@ -117,21 +114,20 @@ class CastPlaybackDeck implements PlaybackDeck {
       rethrow;
     }
     if (token != _token || _state == PlaybackDeckState.disposed) return;
-    _server.clear();
-    final url = _server.register(source, mime);
+    await output.command('clearMedia');
+    final url = await _register(source, mime);
     String? artwork;
     final art = item?.artUri;
     if (art != null && const {'http', 'https', 'file'}.contains(art.scheme)) {
-      artwork = _server
-          .register(
-            art.scheme == 'file' ? art.toFilePath() : art.toString(),
-            'image/jpeg',
-          )
-          .toString();
+      artwork = await _register(
+        art.scheme == 'file' ? art.toFilePath() : art.toString(),
+        'image/jpeg',
+      );
     }
+    if (token != _token || _state == PlaybackDeckState.disposed) return;
     _duration = item?.duration ?? Duration.zero;
     await output.command('load', {
-      'url': url.toString(),
+      'url': url,
       'mime': mime,
       'token': token,
       'title': item?.title ?? '',
@@ -144,6 +140,16 @@ class CastPlaybackDeck implements PlaybackDeck {
     _position = Duration.zero;
     _ready = true;
     _setState(PlaybackDeckState.paused);
+  }
+
+  Future<String> _register(String source, String mime) async {
+    final reply = await output.request<Map<Object?, Object?>>('register', {
+      'source': source,
+      'mime': mime,
+    });
+    final url = reply?['url'];
+    if (url is! String) throw StateError('TV media server did not answer');
+    return url;
   }
 
   @override
@@ -212,7 +218,13 @@ class CastPlaybackDeck implements PlaybackDeck {
     _state = PlaybackDeckState.disposed;
     _token = ++_nextToken;
     await _subscription.cancel();
-    await _server.close();
+    if (_serving != null) {
+      try {
+        await output.command('closeMedia');
+      } on Object {
+        // The session or the native side may already be gone.
+      }
+    }
     unawaited(_states.close());
     unawaited(_positions.close());
     unawaited(_durations.close());

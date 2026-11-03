@@ -103,12 +103,13 @@
 	<true/>
 	
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>Connect to your music servers and network storage to browse and play your music.</string>
+	<string>Connect to your music servers, network storage and Google Cast speakers and TVs to browse and play your music.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Listen to music playing nearby to identify the song. Only a sound fingerprint leaves your device.</string>
 	<key>NSBonjourServices</key>
 	<array>
 		<string>_mornye._tcp</string>
+		<string>_googlecast._tcp</string>
 	</array>
 	<key>NSAppTransportSecurity</key>
 	<dict>

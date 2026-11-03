@@ -298,7 +298,10 @@ class MusicPlayerHandler extends BaseAudioHandler
     _player = _dependencies.createDeck('music-player');
     _cast = _MusicCast(
       this,
-      castOutput ?? (Platform.isAndroid ? CastOutput.instance : null),
+      castOutput ??
+          (Platform.isAndroid || Platform.isIOS || isDesktopPlatform
+              ? CastOutput.instance
+              : null),
     );
     _normalizationCache = PlaybackNormalizationCache(
       readMetadata: _dependencies.readMetadata,

@@ -12,6 +12,7 @@ import 'package:mornye/providers/theme_provider.dart';
 import 'package:mornye/theme/app_tokens.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/theme/player_artwork_theme.dart';
+import 'package:mornye/services/cast_output.dart';
 import 'package:mornye/utils/lyrics_parser.dart';
 import 'package:mornye/utils/lyrics_timeline.dart';
 import 'package:mornye/utils/string_utils.dart';
@@ -19,7 +20,9 @@ import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/app_icon_button.dart';
 import 'package:mornye/widgets/app_loading_indicator.dart';
 import 'package:mornye/widgets/audio_quality_badges.dart';
+import 'package:mornye/widgets/cast_device_picker.dart';
 import 'package:mornye/widgets/desktop/desktop_commands.dart';
+import 'package:mornye/widgets/desktop/desktop_cast_button.dart';
 import 'package:mornye/widgets/desktop/desktop_downloads_button.dart';
 import 'package:mornye/widgets/desktop/desktop_inspector.dart';
 import 'package:mornye/widgets/desktop/desktop_link_devices_button.dart';
@@ -719,6 +722,9 @@ class _TrailingControls extends ConsumerWidget {
   /// Narrowest room in which the Material bar keeps its volume slider.
   static const double _materialVolumeMinWidth = 140;
 
+  /// The Material bar's Cast button, a standard 48 dp icon button.
+  static const double _castWidth = 48;
+
   final bool enabled;
 
   /// The Material bar's app theme, for the downloads button and popover.
@@ -802,19 +808,35 @@ class _TrailingControls extends ConsumerWidget {
               children: [DesktopLinkDevicesButton(), DesktopDownloadsButton()],
             ),
           ),
-          // A narrow window leaves too little room for a usable slider;
-          // the volume shortcuts still work there.
+          // A narrow window leaves too little room for a usable slider, then
+          // for Cast; the volume shortcuts still work there.
           Flexible(
             child: LayoutBuilder(
-              builder: (context, constraints) =>
-                  constraints.maxWidth < _materialVolumeMinWidth
-                  ? const SizedBox.shrink()
-                  : ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 220),
-                      child: PlayerVolumeControl(
-                        foreground: colorScheme.onSurface,
+              builder: (context, constraints) {
+                final cast = constraints.maxWidth >= _castWidth;
+                final slider =
+                    constraints.maxWidth - (cast ? _castWidth : 0) >=
+                    _materialVolumeMinWidth;
+                return Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (cast)
+                      Theme(
+                        data: appTheme ?? Theme.of(context),
+                        child: const DesktopCastButton(),
                       ),
-                    ),
+                    if (slider)
+                      Flexible(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 220),
+                          child: PlayerVolumeControl(
+                            foreground: colorScheme.onSurface,
+                          ),
+                        ),
+                      ),
+                  ],
+                );
+              },
             ),
           ),
         ],
@@ -848,11 +870,29 @@ class _MornyeVolumeButton extends ConsumerStatefulWidget {
 
 class _MornyeVolumeButtonState extends ConsumerState<_MornyeVolumeButton> {
   final _menu = MenuController();
+  final _cast = CastOutput.instance;
+
+  @override
+  void initState() {
+    super.initState();
+    _cast.addListener(_castChanged);
+  }
+
+  @override
+  void dispose() {
+    _cast.removeListener(_castChanged);
+    super.dispose();
+  }
+
+  void _castChanged() {
+    if (mounted) setState(() {});
+  }
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final volume = ref.watch(systemVolumeProvider).value;
+    final cast = _cast;
     final icon = switch (volume) {
       null => CupertinoIcons.speaker_2_fill,
       <= 0 => CupertinoIcons.speaker_slash_fill,
@@ -880,13 +920,35 @@ class _MornyeVolumeButtonState extends ConsumerState<_MornyeVolumeButton> {
           height: 48,
           child: PlayerVolumeControl(foreground: colorScheme.onSurface),
         ),
+        // The capsule has no room for its own Cast button; output sits with
+        // volume, as in Music.
+        SizedBox(
+          width: 240,
+          child: MenuItemButton(
+            key: const ValueKey('desktop-player-cast'),
+            leadingIcon: AppIcon(
+              cast.connected ? Icons.cast_connected : Icons.cast,
+              size: 18,
+            ),
+            onPressed: () {
+              _menu.close();
+              showCastDevicePicker(context, output: cast);
+            },
+            child: Text(
+              cast.connected
+                  ? cast.deviceName ?? context.l10n.audioOutputCast
+                  : context.l10n.audioOutputCast,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ),
       ],
       child: DesktopVolumeScroll(
         child: AppIconButton(
           key: const ValueKey('desktop-player-volume'),
           tooltip: context.l10n.nowPlayingVolume,
-          color: colorScheme.onSurface,
-          icon: AppIcon(icon),
+          color: cast.connected ? colorScheme.primary : colorScheme.onSurface,
+          icon: AppIcon(cast.connected ? Icons.cast_connected : icon),
           onPressed: () => _menu.isOpen ? _menu.close() : _menu.open(),
         ),
       ),

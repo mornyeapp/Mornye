@@ -223,6 +223,8 @@ class PlatformBridge {
       StreamController<Map<String, dynamic>>.broadcast();
   static final StreamController<String> _linkPairingEndedEvents =
       StreamController<String>.broadcast();
+  static final StreamController<Map<Object?, Object?>> _castEvents =
+      StreamController<Map<Object?, Object?>>.broadcast();
   static bool _backendEventHandlerInstalled = false;
 
   /// The Rust backend answers on Android and iOS through the MethodChannel
@@ -335,6 +337,20 @@ class PlatformBridge {
   );
 
   static Future<void> linkStop() => _invokeVoid('linkStop');
+
+  // Desktop Google Cast (rust_backend/crates/cast): one call per service
+  // method, and the session and device list as events.
+
+  static Future<Object?> castCall(
+    String method, [
+    Map<String, Object?>? arguments,
+  ]) => _channel.invokeMethod<Object?>('castCall', {
+    'method': method,
+    'args': ?arguments,
+  });
+
+  /// Session snapshots, and `{"devices": [...]}` when the list changes.
+  static Stream<Map<Object?, Object?>> castEvents() => _events(_castEvents);
 
   /// `running`, `port`, `fingerprint`, `serverId`, `name`, `addresses` and
   /// the connected `clients`.
@@ -504,6 +520,11 @@ class PlatformBridge {
           final args = call.arguments;
           final reason = args is Map ? args['reason']?.toString() : null;
           _linkPairingEndedEvents.add(reason ?? 'cancelled');
+          return null;
+        case 'castStatus' || 'castDevices':
+          if (call.arguments case final Map<Object?, Object?> payload) {
+            _castEvents.add(payload);
+          }
           return null;
         case 'extensionVerificationNotificationTapped':
           _verificationNotificationEvents.add(null);

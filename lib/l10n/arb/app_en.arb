@@ -10128,6 +10128,23 @@
   "audioOutputCastDescription": "Google Cast devices on the same Wi-Fi network",
   "audioOutputStopCasting": "Stop casting",
   "audioOutputCastUnavailable": "Unable to open Google Cast. Check Google Play services and local network access.",
+  "audioOutputAirPlay": "AirPlay and Bluetooth",
+  "@audioOutputAirPlay": {
+    "description": "iOS Audio output sheet row that opens the system picker for AirPlay, Bluetooth and this iPhone"
+  },
+  "audioOutputCastSearching": "Looking for Google Cast devices…",
+  "@audioOutputCastSearching": {
+    "description": "Shown in the Cast device picker on iOS and desktop while no receiver has been found on the network yet"
+  },
+  "audioOutputCastConnectFailed": "Could not connect to {device}",
+  "@audioOutputCastConnectFailed": {
+    "description": "Snackbar after connecting to a Google Cast receiver failed; device is the name the owner gave it",
+    "placeholders": {
+      "device": {
+        "type": "String"
+      }
+    }
+  },
   "collectionSuggestionsAddHere": "Add to this playlist",
   "@collectionSuggestionsAddHere": {
     "description": "Tooltip of the button that adds a suggested song to the user's playlist shown above"

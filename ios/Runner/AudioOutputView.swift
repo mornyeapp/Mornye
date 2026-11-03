@@ -124,68 +124,56 @@ final class AudioRouteInfoBridge {
     }
 }
 
-final class AudioOutputViewFactory: NSObject, FlutterPlatformViewFactory {
-    private let messenger: FlutterBinaryMessenger
-
-    init(messenger: FlutterBinaryMessenger) {
-        self.messenger = messenger
-        super.init()
-    }
-
-    func createArgsCodec() -> FlutterMessageCodec & NSObjectProtocol {
-        FlutterStandardMessageCodec.sharedInstance()
-    }
-
-    func create(withFrame frame: CGRect, viewIdentifier viewId: Int64, arguments args: Any?) -> FlutterPlatformView {
-        AudioOutputView(frame: frame, id: viewId, messenger: messenger, arguments: args)
-    }
-}
-
-private final class AudioOutputView: NSObject, FlutterPlatformView, AVRoutePickerViewDelegate {
-    private let picker: AVRoutePickerView
+/// `show` opens the system route picker (AirPlay, Bluetooth, this iPhone)
+/// from the app's own Audio output sheet, the counterpart of Android's
+/// output switcher on the same channel. It answers once the picker closes,
+/// false when it could not open.
+final class AudioOutputBridge: NSObject, AVRoutePickerViewDelegate {
     private let channel: FlutterMethodChannel
+    private let window: () -> UIWindow?
+    private var picker: AVRoutePickerView?
+    private var pending: FlutterResult?
 
-    init(frame: CGRect, id: Int64, messenger: FlutterBinaryMessenger, arguments: Any?) {
-        picker = AVRoutePickerView(frame: frame)
-        channel = FlutterMethodChannel(name: "com.zarz.mornye/audio_output/\(id)", binaryMessenger: messenger)
+    init(messenger: FlutterBinaryMessenger, window: @escaping () -> UIWindow?) {
+        channel = FlutterMethodChannel(name: "com.zarz.mornye/audio_output", binaryMessenger: messenger)
+        self.window = window
         super.init()
-        picker.backgroundColor = .clear
-        picker.prioritizesVideoDevices = false
-        picker.delegate = self
-        update(arguments)
         channel.setMethodCallHandler { [weak self] call, result in
-            if call.method == "update" {
-                self?.update(call.arguments)
-                result(nil)
-            } else {
+            guard call.method == "show", let self else {
                 result(FlutterMethodNotImplemented)
+                return
             }
+            self.show(result)
         }
     }
 
-    private func update(_ arguments: Any?) {
-        guard let values = arguments as? [String: Any] else { return }
-        if let value = values["color"] as? NSNumber {
-            let argb = value.uint32Value
-            picker.tintColor = UIColor(
-                red: CGFloat((argb >> 16) & 0xff) / 255,
-                green: CGFloat((argb >> 8) & 0xff) / 255,
-                blue: CGFloat(argb & 0xff) / 255,
-                alpha: CGFloat((argb >> 24) & 0xff) / 255
-            )
-            picker.activeTintColor = picker.tintColor
+    private func show(_ result: @escaping FlutterResult) {
+        guard pending == nil, let window = window() else {
+            result(false)
+            return
         }
-        picker.accessibilityLabel = values["label"] as? String
-    }
-
-    func view() -> UIView { picker }
-
-    func routePickerViewWillBeginPresentingRoutes(_ routePickerView: AVRoutePickerView) {
-        channel.invokeMethod("pickerChanged", arguments: true)
+        // The picker has no public way to open; its button does, so it sits
+        // invisibly in the window while the system sheet is up.
+        let picker = AVRoutePickerView(frame: CGRect(x: 0, y: 0, width: 1, height: 1))
+        picker.prioritizesVideoDevices = false
+        picker.alpha = 0.01
+        picker.delegate = self
+        window.addSubview(picker)
+        guard let button = picker.subviews.compactMap({ $0 as? UIButton }).first else {
+            picker.removeFromSuperview()
+            result(false)
+            return
+        }
+        self.picker = picker
+        pending = result
+        button.sendActions(for: .touchUpInside)
     }
 
     func routePickerViewDidEndPresentingRoutes(_ routePickerView: AVRoutePickerView) {
-        channel.invokeMethod("pickerChanged", arguments: false)
+        picker?.removeFromSuperview()
+        picker = nil
+        pending?(true)
+        pending = nil
     }
 
     deinit {

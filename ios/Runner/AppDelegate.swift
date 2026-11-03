@@ -28,6 +28,8 @@ import UniformTypeIdentifiers
     private var linkNowPlaying: LinkNowPlayingBridge?
     private var audioRouteInfo: AudioRouteInfoBridge?
     private var musicHaptics: MusicHapticsBridge?
+    private var audioOutput: AudioOutputBridge?
+    private var castOutput: CastOutputPlugin?
     private let coreBackend: CoreBackend = createCoreBackend()
     private var pendingSessionGrantEvents: [[String: Any]] = []
 
@@ -173,10 +175,8 @@ import UniformTypeIdentifiers
         linkNowPlaying = LinkNowPlayingBridge(messenger: messenger)
         audioRouteInfo = AudioRouteInfoBridge(messenger: messenger)
         musicHaptics = MusicHapticsBridge(messenger: messenger)
-        registry.registrar(forPlugin: "AudioOutputView")?.register(
-            AudioOutputViewFactory(messenger: messenger),
-            withId: "com.zarz.mornye/audio_output"
-        )
+        audioOutput = AudioOutputBridge(messenger: messenger) { [weak self] in self?.activeWindow }
+        castOutput = CastOutputPlugin(messenger: messenger)
     }
 
     /// The window of the foreground scene. Under the UIScene lifecycle the

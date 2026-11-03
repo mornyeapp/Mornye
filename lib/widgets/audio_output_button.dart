@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -10,11 +8,14 @@ import 'package:mornye/services/music_player_service.dart';
 import 'package:mornye/utils/logger.dart';
 import 'package:mornye/widgets/app_bottom_sheet.dart';
 import 'package:mornye/widgets/app_icon_button.dart';
+import 'package:mornye/widgets/cast_device_picker.dart';
 import 'package:mornye/widgets/expressive_icon_button.dart';
 
 enum _OutputChoice { system, cast, disconnect }
 
-/// System routes and Google Cast have separate native device pickers.
+/// One sheet for both kinds of output: the system's routes (Android's
+/// output switcher, or AirPlay and Bluetooth on iOS) and Google Cast, which
+/// opens Google's device dialog on Android and the app's list on iOS.
 class AudioOutputButton extends StatefulWidget {
   const AudioOutputButton({
     super.key,
@@ -22,6 +23,7 @@ class AudioOutputButton extends StatefulWidget {
     this.backgroundColor,
     this.width = 48,
     this.onPickerChanged,
+    this.output,
   });
 
   final Color? color;
@@ -32,85 +34,57 @@ class AudioOutputButton extends StatefulWidget {
   final double width;
   final ValueChanged<bool>? onPickerChanged;
 
+  /// The Cast session; [CastOutput.instance] when null.
+  final CastOutput? output;
+
   @override
   State<AudioOutputButton> createState() => _AudioOutputButtonState();
 }
 
 class _AudioOutputButtonState extends State<AudioOutputButton> {
-  static const _androidChannel = MethodChannel('com.zarz.mornye/audio_output');
-  MethodChannel? _viewChannel;
+  static const _systemChannel = MethodChannel('com.zarz.mornye/audio_output');
   bool _opening = false;
 
-  Map<String, Object> get _appearance => {
-    'color': (widget.color ?? Theme.of(context).colorScheme.onSurface)
-        .toARGB32(),
-    'label': context.l10n.nowPlayingAudioOutput,
-  };
+  CastOutput get _output => widget.output ?? CastOutput.instance;
 
-  @override
-  void didUpdateWidget(AudioOutputButton oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    _updateAppearance();
-  }
+  bool get _ios => defaultTargetPlatform == TargetPlatform.iOS;
 
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _updateAppearance();
-  }
-
-  void _updateAppearance() {
-    final channel = _viewChannel;
-    if (channel != null) {
-      unawaited(channel.invokeMethod<void>('update', _appearance));
-    }
-  }
-
-  void _attachView(int id) {
-    _viewChannel?.setMethodCallHandler(null);
-    _viewChannel = MethodChannel('com.zarz.mornye/audio_output/$id')
-      ..setMethodCallHandler((call) async {
-        if (mounted && call.method == 'pickerChanged') {
-          widget.onPickerChanged?.call(call.arguments == true);
-        }
-      });
-    _updateAppearance();
-  }
-
-  Future<void> _showAndroidPicker() async {
+  Future<void> _showPicker() async {
     if (_opening) return;
     _opening = true;
     widget.onPickerChanged?.call(true);
     var opened = false;
     var casting = false;
     try {
+      final output = _output;
       final choice = await showAppBottomSheet<_OutputChoice>(
         context: context,
         title: context.l10n.nowPlayingAudioOutput,
         builder: (context) => ListenableBuilder(
-          listenable: CastOutput.instance,
+          listenable: output,
           builder: (context, _) => Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               AppSheetOption(
-                title: Text(context.l10n.audioOutputSystem),
-                leading: const Icon(Icons.speaker_group_outlined),
+                title: Text(
+                  _ios
+                      ? context.l10n.audioOutputAirPlay
+                      : context.l10n.audioOutputSystem,
+                ),
+                leading: Icon(
+                  _ios ? Icons.airplay : Icons.speaker_group_outlined,
+                ),
                 onTap: () => Navigator.pop(context, _OutputChoice.system),
               ),
               AppSheetOption(
-                title: Text(
-                  CastOutput.instance.deviceName ??
-                      context.l10n.audioOutputCast,
-                ),
+                title: Text(output.deviceName ?? context.l10n.audioOutputCast),
                 subtitle: Text(context.l10n.audioOutputCastDescription),
                 leading: Icon(
-                  CastOutput.instance.connected
-                      ? Icons.cast_connected
-                      : Icons.cast,
+                  output.connected ? Icons.cast_connected : Icons.cast,
                 ),
                 onTap: () => Navigator.pop(context, _OutputChoice.cast),
               ),
-              if (CastOutput.instance.connected)
+              if (output.connected)
                 AppSheetOption(
                   title: Text(context.l10n.audioOutputStopCasting),
                   leading: const Icon(Icons.stop_circle_outlined),
@@ -124,13 +98,16 @@ class _AudioOutputButtonState extends State<AudioOutputButton> {
       casting = choice != _OutputChoice.system;
       switch (choice) {
         case _OutputChoice.system:
-          opened = await _androidChannel.invokeMethod<bool>('show') ?? false;
-        case _OutputChoice.cast:
+          opened = await _systemChannel.invokeMethod<bool>('show') ?? false;
+        case _OutputChoice.cast when output.nativePicker:
           await LocalNetworkAccess.instance.ensureGranted();
           await initMusicPlayer();
-          opened = await CastOutput.instance.showPicker();
+          opened = await output.showPicker();
+        case _OutputChoice.cast:
+          await showCastDevicePicker(context, output: output);
+          opened = true;
         case _OutputChoice.disconnect:
-          await CastOutput.instance.command('disconnect');
+          await output.command('disconnect');
           opened = true;
       }
     } on PlatformException {
@@ -159,51 +136,22 @@ class _AudioOutputButtonState extends State<AudioOutputButton> {
   }
 
   @override
-  void dispose() {
-    _viewChannel?.setMethodCallHandler(null);
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     if (kIsWeb) return const SizedBox.shrink();
-    switch (defaultTargetPlatform) {
-      case TargetPlatform.iOS:
-        final picker = SizedBox.square(
-          dimension: 48,
-          child: UiKitView(
-            viewType: 'com.zarz.mornye/audio_output',
-            creationParams: _appearance,
-            creationParamsCodec: const StandardMessageCodec(),
-            onPlatformViewCreated: _attachView,
-          ),
-        );
-        final background = widget.backgroundColor;
-        if (background == null) return picker;
-        return DecoratedBox(
-          decoration: ShapeDecoration(
-            color: background,
-            shape: const StadiumBorder(),
-          ),
-          child: SizedBox(
-            width: widget.width,
-            height: 48,
-            child: Center(child: picker),
-          ),
-        );
-      case TargetPlatform.android:
-        return ListenableBuilder(
-          listenable: CastOutput.instance,
-          builder: (context, _) => _androidButton(context),
-        );
-      default:
-        return const SizedBox.shrink();
-    }
+    return switch (defaultTargetPlatform) {
+      TargetPlatform.android || TargetPlatform.iOS => ListenableBuilder(
+        listenable: _output,
+        builder: (context, _) => _button(context),
+      ),
+      _ => const SizedBox.shrink(),
+    };
   }
 
-  Widget _androidButton(BuildContext context) {
-    final icon = CastOutput.instance.connected
+  Widget _button(BuildContext context) {
+    final icon = _output.connected
         ? Icons.cast_connected
+        : _ios
+        ? Icons.airplay
         : Icons.speaker_group_outlined;
     if (widget.backgroundColor case final background?) {
       return ExpressiveIconButton(
@@ -212,14 +160,14 @@ class _AudioOutputButtonState extends State<AudioOutputButton> {
         foregroundColor: widget.color,
         backgroundColor: background,
         icon: Icon(icon),
-        onPressed: _showAndroidPicker,
+        onPressed: _showPicker,
       );
     }
     return AppIconButton(
       tooltip: context.l10n.nowPlayingAudioOutput,
       color: widget.color,
       icon: Icon(icon),
-      onPressed: _showAndroidPicker,
+      onPressed: _showPicker,
     );
   }
 }

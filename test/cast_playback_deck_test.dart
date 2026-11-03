@@ -1,18 +1,11 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mornye/services/cast_media_server.dart';
 import 'package:mornye/services/cast_output.dart';
 import 'package:mornye/services/cast_playback_deck.dart';
 import 'package:mornye/services/playback_deck.dart';
-
-class _Server extends CastMediaServer {
-  @override
-  Future<void> start(String receiverHost) => bind(InternetAddress.loopbackIPv4);
-}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -24,18 +17,25 @@ void main() {
   late StreamController<Object?> events;
   late List<MethodCall> calls;
   late Map<Object?, Object?> load;
+  late List<Map<Object?, Object?>> registered;
   Completer<void>? pendingLoad;
 
   setUp(() async {
     events = StreamController<Object?>.broadcast(sync: true);
     calls = [];
+    registered = [];
     pendingLoad = null;
     messenger.setMockMethodCallHandler(channel, (call) async {
       calls.add(call);
-      if (call.method == 'state') return {'connected': false};
-      if (call.method == 'load') {
-        load = call.arguments as Map<Object?, Object?>;
-        await pendingLoad?.future;
+      switch (call.method) {
+        case 'state':
+          return {'connected': false};
+        case 'register':
+          registered.add(call.arguments as Map<Object?, Object?>);
+          return {'url': 'http://192.0.2.2:4000/media/${registered.length}'};
+        case 'load':
+          load = call.arguments as Map<Object?, Object?>;
+          await pendingLoad?.future;
       }
       return null;
     });
@@ -44,13 +44,13 @@ void main() {
     events.add({'connected': true, 'deviceId': 'tv', 'host': '192.0.2.10'});
     deck = CastPlaybackDeck(
       output: output,
-      server: _Server(),
-      metadata: () => const MediaItem(
+      metadata: () => MediaItem(
         id: 'song',
         title: 'A song',
         artist: 'An artist',
-        duration: Duration(minutes: 3),
-        extras: {'format': 'flac'},
+        duration: const Duration(minutes: 3),
+        artUri: Uri.file('/private/covers/song.jpg'),
+        extras: const {'format': 'flac'},
       ),
     );
   });
@@ -69,7 +69,19 @@ void main() {
       expect(load['title'], 'A song');
       expect(load['artist'], 'An artist');
       expect(load['duration'], 180000);
-      expect(load['url'].toString(), isNot(contains('/private/')));
+      // Paths stay on the phone: the receiver gets server URLs only.
+      expect(load['url'], 'http://192.0.2.2:4000/media/1');
+      expect(load['artwork'], 'http://192.0.2.2:4000/media/2');
+      expect(registered, [
+        {'source': '/private/music/song.flac', 'mime': 'audio/flac'},
+        {'source': '/private/covers/song.jpg', 'mime': 'image/jpeg'},
+      ]);
+      final serve = calls.firstWhere((call) => call.method == 'serve');
+      expect(serve.arguments, {'host': '192.0.2.10'});
+      expect(
+        calls.map((c) => c.method),
+        containsAllInOrder(['serve', 'clearMedia', 'register', 'load']),
+      );
       await deck.seek(const Duration(seconds: 12));
       await deck.resume();
       // The handler cancels preparation before every pause, including loaded sources.
@@ -100,6 +112,32 @@ void main() {
       expect(completed, 1);
     },
   );
+
+  test('closing the deck closes the media server it started', () async {
+    await deck.setFileSource('/song.flac');
+    await deck.dispose();
+    expect(calls.last.method, 'closeMedia');
+  });
+
+  test('a TV the server cannot reach fails the load and can retry', () async {
+    var refused = true;
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      calls.add(call);
+      if (call.method == 'serve' && refused) {
+        refused = false;
+        throw PlatformException(code: 'CAST_MEDIA');
+      }
+      if (call.method == 'register') return {'url': 'http://192.0.2.2/m/1'};
+      return null;
+    });
+    await expectLater(
+      deck.setFileSource('/song.flac'),
+      throwsA(isA<PlatformException>()),
+    );
+    await deck.setFileSource('/song.flac');
+    expect(calls.where((call) => call.method == 'serve'), hasLength(2));
+    expect(calls.last.method, 'load');
+  });
 
   test('a cancelled load cannot become ready or resume', () async {
     pendingLoad = Completer<void>();

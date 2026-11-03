@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/l10n/app_localizations.dart';
+import 'package:mornye/services/cast_output.dart';
 import 'package:mornye/widgets/audio_output_button.dart';
 
 void main() {
@@ -13,7 +14,11 @@ void main() {
   final messenger =
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
 
-  Widget app({ValueChanged<bool>? onChanged, Color? background}) => MaterialApp(
+  Widget app({
+    ValueChanged<bool>? onChanged,
+    Color? background,
+    CastOutput? output,
+  }) => MaterialApp(
     localizationsDelegates: AppLocalizations.localizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
     home: Scaffold(
@@ -22,6 +27,7 @@ void main() {
           onPickerChanged: onChanged,
           backgroundColor: background,
           width: 56,
+          output: output,
         ),
       ),
     ),
@@ -33,43 +39,91 @@ void main() {
   });
 
   testWidgets(
-    'iOS embeds the native audio route control and forwards its presentation',
+    'iOS opens AirPlay from the sheet and keeps controls up until it closes',
     (tester) async {
-      int? viewId;
+      final picker = Completer<bool>();
       final visibility = <bool>[];
-      final updates = <MethodCall>[];
-      MethodChannel? viewChannel;
-      messenger.setMockMethodCallHandler(SystemChannels.platform_views, (
-        call,
-      ) async {
-        if (call.method == 'create') {
-          final args = call.arguments as Map<Object?, Object?>;
-          expect(args['viewType'], 'com.zarz.mornye/audio_output');
-          viewId = args['id'] as int;
-          viewChannel = MethodChannel('com.zarz.mornye/audio_output/$viewId');
-          messenger.setMockMethodCallHandler(
-            viewChannel!,
-            (call) async => updates.add(call),
-          );
-        }
-        return null;
+      final requests = <String>[];
+      messenger.setMockMethodCallHandler(channel, (call) {
+        requests.add(call.method);
+        return picker.future;
       });
       await tester.pumpWidget(app(onChanged: visibility.add));
+      await tester.tap(find.byTooltip('Audio Output'));
       await tester.pumpAndSettle();
-      expect(viewId, isNotNull);
-      expect(updates.last.arguments, containsPair('label', 'Audio Output'));
-      for (final open in [true, false]) {
-        await messenger.handlePlatformMessage(
-          viewChannel!.name,
-          const StandardMethodCodec().encodeMethodCall(
-            MethodCall('pickerChanged', open),
-          ),
-          (_) {},
-        );
-      }
+      expect(find.text('Cast to TV'), findsOneWidget);
+      await tester.tap(find.text('AirPlay and Bluetooth'));
+      await tester.pumpAndSettle();
+      expect(requests, ['show']);
+      expect(visibility, [true]);
+      picker.complete(true);
+      await tester.pumpAndSettle();
       expect(visibility, [true, false]);
+      expect(find.byType(SnackBar), findsNothing);
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.iOS),
+  );
+
+  testWidgets(
+    'iOS lists Cast receivers in the app and connects to the chosen one',
+    (tester) async {
+      const castChannel = MethodChannel('cast-test');
+      final events = StreamController<Object?>.broadcast(sync: true);
+      final calls = <MethodCall>[];
+      messenger.setMockMethodCallHandler(castChannel, (call) async {
+        calls.add(call);
+        if (call.method == 'connect') {
+          events.add({
+            'connected': true,
+            'deviceId': 'tv-1',
+            'deviceName': 'Living Room',
+            'host': '192.0.2.10',
+          });
+        }
+        return call.method == 'state' ? {'connected': false} : null;
+      });
+      final output = CastOutput(
+        channel: castChannel,
+        events: events.stream,
+        nativePicker: false,
+      );
+      addTearDown(() async {
+        output.dispose();
+        await events.close();
+        messenger.setMockMethodCallHandler(castChannel, null);
+      });
+      await tester.pumpWidget(app(output: output));
+      await tester.tap(find.byTooltip('Audio Output'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Cast to TV'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(find.text('Looking for Google Cast devices…'), findsOneWidget);
+      expect(calls.map((call) => call.method), contains('discover'));
+
+      events.add({
+        'devices': [
+          {'id': 'tv-1', 'name': 'Living Room', 'model': 'Chromecast'},
+          {'id': '', 'name': 'Broken entry'},
+        ],
+      });
+      await tester.pump();
+      expect(find.text('Living Room'), findsOneWidget);
+      expect(find.text('Chromecast'), findsOneWidget);
+      expect(find.text('Broken entry'), findsNothing);
+      expect(find.text('Looking for Google Cast devices…'), findsNothing);
+
+      await tester.tap(find.text('Living Room'));
+      await tester.pumpAndSettle();
+      final connect = calls.lastWhere((call) => call.method == 'connect');
+      expect(connect.arguments, {'deviceId': 'tv-1'});
+      expect(output.connected, isTrue);
+      expect(find.text('Looking for Google Cast devices…'), findsNothing);
+      // Closing the list stops looking for receivers.
+      expect(calls.last.method, 'discover');
+      expect(calls.last.arguments, {'on': false});
+      expect(find.byIcon(Icons.cast_connected), findsOneWidget);
       await tester.pumpWidget(const SizedBox());
-      messenger.setMockMethodCallHandler(viewChannel!, null);
     },
     variant: TargetPlatformVariant.only(TargetPlatform.iOS),
   );
@@ -144,13 +198,17 @@ void main() {
         tester.getSize(find.byType(AudioOutputButton)),
         const Size(56, 48),
       );
-      if (defaultTargetPlatform == TargetPlatform.android) {
-        await tester.tap(find.byTooltip('Audio Output'));
-        await tester.pumpAndSettle();
-        await tester.tap(find.text('This device and Bluetooth'));
-        await tester.pumpAndSettle();
-        expect(requests, 1);
-      }
+      await tester.tap(find.byTooltip('Audio Output'));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.text(
+          defaultTargetPlatform == TargetPlatform.iOS
+              ? 'AirPlay and Bluetooth'
+              : 'This device and Bluetooth',
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(requests, 1);
       await tester.pumpWidget(const SizedBox());
     },
     variant: TargetPlatformVariant({

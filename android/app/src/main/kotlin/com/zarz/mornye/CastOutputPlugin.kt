@@ -4,6 +4,8 @@ import android.app.Activity
 import android.content.Context
 import android.net.Uri
 import android.net.wifi.WifiManager
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import android.view.ViewGroup
 import androidx.appcompat.view.ContextThemeWrapper
@@ -21,6 +23,7 @@ import com.google.android.gms.cast.framework.CastSession
 import com.google.android.gms.cast.framework.SessionManagerListener
 import com.google.android.gms.cast.framework.media.RemoteMediaClient
 import com.google.android.gms.common.images.WebImage
+import com.mornye.backend.CastBridge
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
@@ -28,6 +31,7 @@ import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import org.json.JSONObject
+import java.util.concurrent.Executors
 
 /** Belongs to the shared engine so a detached Activity does not stop TV playback. */
 internal class CastOutputPlugin : FlutterPlugin, ActivityAware, EventChannel.StreamHandler {
@@ -41,6 +45,9 @@ internal class CastOutputPlugin : FlutterPlugin, ActivityAware, EventChannel.Str
     private var boundSession: CastSession? = null
     private var revision = 0
     private var wifiLock: WifiManager.WifiLock? = null
+    private val mainThread = Handler(Looper.getMainLooper())
+    private val mediaWorker = Executors.newSingleThreadExecutor { Thread(it, "MornyeCastMedia") }
+    private var mediaBridge: CastBridge? = null
 
     private val progress = RemoteMediaClient.ProgressListener { _, _ -> publish() }
     private val volumeListener = object : Cast.Listener() {
@@ -145,6 +152,7 @@ internal class CastOutputPlugin : FlutterPlugin, ActivityAware, EventChannel.Str
                         else result.error("CAST_TRANSPORT", "TV command failed (${reply.status.statusCode})", null)
                     }
                 }
+                "serve", "register", "clearMedia", "closeMedia" -> media(call, result)
                 "position" -> result.success(client?.approximateStreamPosition ?: 0)
                 "volume" -> {
                     val session = cast?.sessionManager?.currentCastSession
@@ -157,6 +165,24 @@ internal class CastOutputPlugin : FlutterPlugin, ActivityAware, EventChannel.Str
             }
         } catch (error: Exception) {
             result.error("CAST_UNAVAILABLE", error.message, null)
+        }
+    }
+
+    /** The TV streams from the Rust media server (`mornye-cast`), off the UI isolate. */
+    private fun media(call: MethodCall, result: MethodChannel.Result) {
+        val arguments = JSONObject((call.arguments as? Map<*, *>) ?: emptyMap<String, Any?>()).toString()
+        mediaWorker.execute {
+            val reply = runCatching {
+                val bridge = mediaBridge ?: CastBridge().also { mediaBridge = it }
+                val value = JSONObject("{\"v\":${bridge.call(call.method, arguments)}}").opt("v")
+                if (value is JSONObject) value.keys().asSequence().associateWith { value.opt(it) } else null
+            }
+            mainThread.post {
+                reply.fold(
+                    { result.success(it) },
+                    { result.error("CAST_MEDIA", it.message, null) },
+                )
+            }
         }
     }
 
@@ -239,5 +265,10 @@ internal class CastOutputPlugin : FlutterPlugin, ActivityAware, EventChannel.Str
         detach()
         sink = null
         cast = null
+        mediaWorker.execute {
+            mediaBridge?.close()
+            mediaBridge = null
+        }
+        mediaWorker.shutdown()
     }
 }
