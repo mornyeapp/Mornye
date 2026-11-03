@@ -287,6 +287,15 @@ abstract interface class NetworkLocalCopies implements NetworkVirtualSources {
   Future<String?> recover(String path);
 }
 
+/// Virtual sources that can delete a shared file on its owning device.
+abstract interface class NetworkVirtualFileDeletion
+    implements NetworkVirtualSources {
+  Future<bool> canDeleteFile(String id, String path);
+
+  /// True only after the owner confirms the file is absent.
+  Future<bool> deleteFile(String id, String path);
+}
+
 /// A server's answer that the media at a network source is missing or not
 /// what was asked for, such as a 404 or a song where a cover was asked.
 /// Asking again soon gets the same answer.

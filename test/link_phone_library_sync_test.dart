@@ -617,6 +617,111 @@ void main() {
       files: files ?? LinkPhoneFiles(),
     )..start();
 
+    test(
+      'deletion only resolves currently shared songs, never offered files',
+      () async {
+        final client = FakeLinkClient();
+        addTearDown(client.close);
+        final rows = FakeLibraryRows([linkLocalRow(song)]);
+        final library = rows.library();
+        final catalog = await library.catalog();
+        final name = nameOf(song, 64);
+        rows.rows.clear();
+        rows.bump();
+        var deletions = 0;
+        final handler = LinkPhoneFileRequests(
+          client: client,
+          library: library,
+          files: LinkPhoneFiles(),
+          offered: catalog.fileNamed,
+          deleteSharedFile: (_) async {
+            deletions++;
+            return true;
+          },
+        )..start();
+        addTearDown(handler.dispose);
+        client.push({
+          'type': LinkMessageTypes.filesDeleteRequest,
+          'requestId': 'delete-1',
+          'name': name,
+        });
+        await until(() => client.sent.isNotEmpty);
+        expect(client.sent.single['error'], 'not_found');
+        expect(deletions, 0);
+        expect(File(song).existsSync(), isTrue);
+      },
+    );
+
+    test('unsupported deletion leaves the phone file untouched', () async {
+      final client = FakeLinkClient();
+      addTearDown(client.close);
+      final handler = requests(client, FakeLibraryRows([linkLocalRow(song)]));
+      addTearDown(handler.dispose);
+      client.push({
+        'type': LinkMessageTypes.filesDeleteRequest,
+        'requestId': 'delete-1',
+        'name': nameOf(song, 64),
+      });
+      await until(() => client.sent.isNotEmpty);
+      expect(client.sent.single['error'], 'unsupported');
+      expect(File(song).existsSync(), isTrue);
+    });
+
+    test(
+      'deletion validates names and serializes phone storage operations',
+      () async {
+        final client = FakeLinkClient();
+        addTearDown(client.close);
+        final rows = _uriRows(1);
+        final name = '${linkFileIdFor(_uri(0), 0)}.flac';
+        final started = Completer<void>();
+        final release = Completer<bool>();
+        var deletions = 0;
+        final handler = LinkPhoneFileRequests(
+          client: client,
+          library: rows.library(),
+          files: LinkPhoneFiles(),
+          deleteSharedFile: (path) async {
+            expect(path, _uri(0));
+            deletions++;
+            started.complete();
+            return release.future;
+          },
+        )..start();
+        addTearDown(handler.dispose);
+        for (final invalid in [
+          song,
+          '../$name',
+          name.replaceAll('.flac', '.mp3'),
+        ]) {
+          client.push({
+            'type': LinkMessageTypes.filesDeleteRequest,
+            'requestId': 'invalid',
+            'name': invalid,
+          });
+        }
+        await until(() => client.sent.isNotEmpty);
+        expect(client.sent.single['error'], 'not_found');
+        expect(deletions, 0);
+        client.push({
+          'type': LinkMessageTypes.filesDeleteRequest,
+          'requestId': 'delete-1',
+          'name': name,
+        });
+        await started.future.timeout(const Duration(seconds: 5));
+        client.push({
+          'type': LinkMessageTypes.filesDeleteRequest,
+          'requestId': 'delete-2',
+          'name': name,
+        });
+        expect(client.sent.last['error'], 'busy');
+        release.complete(false);
+        await until(() => client.sent.length == 3);
+        expect(client.sent.last['deleted'], isFalse);
+        expect(deletions, 1);
+      },
+    );
+
     test('upload the song and say it is coming', () async {
       final client = FakeLinkClient();
       final handler = requests(client, FakeLibraryRows([linkLocalRow(song)]));

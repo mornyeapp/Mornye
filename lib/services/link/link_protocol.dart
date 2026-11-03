@@ -154,6 +154,13 @@ abstract final class LinkMessageTypes {
   /// Phone to desktop: `{"requestId","name","lyrics"}` or `{"error"}`.
   static const filesLyrics = 'files.lyrics';
 
+  /// Desktop to phone: delete a shared catalog song by {requestId, name}.
+  /// Paths supplied by the desktop are never accepted.
+  static const filesDeleteRequest = 'files.delete.request';
+
+  /// Phone to desktop: {requestId, name, deleted} or {error}.
+  static const filesDeleted = 'files.deleted';
+
   /// Phone to desktop: the requested `name` is on its way as `file`, of
   /// `size` bytes; `streamable` is false when it plays only once whole.
   static const filesSending = 'files.sending';

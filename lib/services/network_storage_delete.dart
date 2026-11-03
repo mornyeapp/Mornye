@@ -1,9 +1,7 @@
 part of 'network_storage_service.dart';
 
 extension NetworkStorageDelete on NetworkStorageService {
-  Future<({NetworkConnection connection, String path})?> _deletionLocation(
-    String source,
-  ) async {
+  ({String id, String path})? _deletionTarget(String source) {
     final uri = Uri.parse(source);
     final segments = uri.pathSegments;
     if (uri.scheme != 'network' ||
@@ -15,8 +13,16 @@ extension NetworkStorageDelete on NetworkStorageService {
         segments.any((s) => s.isEmpty || s.contains('/'))) {
       return null;
     }
-    final path = networkPath(segments.join('/'));
-    final c = await connection(uri.host);
+    return (id: uri.host, path: networkPath(segments.join('/')));
+  }
+
+  Future<({NetworkConnection connection, String path})?> _deletionLocation(
+    String source,
+  ) async {
+    final target = _deletionTarget(source);
+    if (target == null) return null;
+    final (:id, :path) = target;
+    final c = await connection(id);
     c.validate();
     if (!c.writable) return null;
     // A server-level SMB connection may list shares. Never unlink a share.
@@ -30,6 +36,13 @@ extension NetworkStorageDelete on NetworkStorageService {
   /// Protocol capability only; the server still decides write permission.
   Future<bool> canDeleteFile(String source) async {
     try {
+      final target = _deletionTarget(source);
+      if (target == null) return false;
+      final virtual = virtualSources;
+      if (virtual != null && virtual.owns(target.id)) {
+        return virtual is NetworkVirtualFileDeletion &&
+            await virtual.canDeleteFile(target.id, target.path);
+      }
       return await _deletionLocation(source) != null;
     } catch (_) {
       return false;
@@ -39,6 +52,13 @@ extension NetworkStorageDelete on NetworkStorageService {
   /// Deletes one file, never a folder. Only confirmed absence is successful.
   /// Transport/permission failures propagate so callers keep their index rows.
   Future<bool> deleteFile(String source) async {
+    final target = _deletionTarget(source);
+    if (target == null) return false;
+    final virtual = virtualSources;
+    if (virtual != null && virtual.owns(target.id)) {
+      return virtual is NetworkVirtualFileDeletion &&
+          await virtual.deleteFile(target.id, target.path);
+    }
     final location = await _deletionLocation(source);
     if (location == null) return false;
     final (:connection, :path) = location;

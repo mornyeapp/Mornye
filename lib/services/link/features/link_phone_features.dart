@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:mornye/l10n/app_localizations.dart';
 import 'package:mornye/l10n/supported_locales.dart';
+import 'package:mornye/providers/deleted_library_files.dart';
 import 'package:mornye/providers/download_history_provider.dart';
 import 'package:mornye/providers/local_library_provider.dart';
 import 'package:mornye/providers/music_player_provider.dart';
@@ -249,11 +250,20 @@ final linkPhoneLibraryProvider = Provider<LinkPhoneLibraryPublisher?>((ref) {
         : (_) async => const QueueLibraryDbPage(rows: [], nextCursor: null),
   );
   final publisher = LinkPhoneLibraryPublisher(client: client, library: library);
+  final container = ref.container;
   final requests = LinkPhoneFileRequests(
     client: client,
     library: library,
     files: ref.watch(linkPhoneFilesProvider),
     offered: ref.watch(linkPhoneSenderProvider).fileNamed,
+    deleteSharedFile: options.shareSongs
+        ? (path) async {
+            if (!await deleteFile(path)) return false;
+            await removeDeletedLibraryFileEntries(container, [path]);
+            publisher.publish();
+            return true;
+          }
+        : null,
   );
   ref.listen(linkPhoneLibraryRevisionProvider, (previous, next) {
     revision = next;

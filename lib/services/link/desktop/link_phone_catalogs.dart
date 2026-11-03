@@ -90,6 +90,7 @@ class LinkPhoneCatalogs {
   final _versions = <String, String?>{};
   final _coverBytes = <String, int>{};
   final _queues = <String, Future<void>>{};
+  final _deleted = <String, Future<Set<String>>>{};
 
   /// The last cover removal queued for each phone. `GET phone/covers` waits
   /// for it; the other readers look up covers of committed songs, which no
@@ -225,6 +226,7 @@ class LinkPhoneCatalogs {
     if (upload.next < total) return const {'ok': true};
     _uploads.remove(sourceId);
     await upload.commit(File('$folder/$_catalogName'));
+    await _pruneDeleted(sourceId);
     _versions[sourceId] = version;
     _committedCovers[sourceId] = upload.coverIds;
     _onCommit?.call(deviceId);
@@ -468,6 +470,13 @@ class LinkPhoneCatalogs {
   /// The songs of the list the phone [sourceId] committed. The file is read
   /// at once, so a commit meanwhile never waits for a slow reader.
   Stream<LinkPhoneSong> songs(String sourceId) async* {
+    final deleted = await _deletedSongs(sourceId);
+    await for (final song in _readSongs(sourceId)) {
+      if (!deleted.contains(song.fileId)) yield song;
+    }
+  }
+
+  Stream<LinkPhoneSong> _readSongs(String sourceId) async* {
     final Uint8List bytes;
     try {
       bytes = await File(
@@ -491,6 +500,7 @@ class LinkPhoneCatalogs {
   /// The committed song of the phone [sourceId] with [fileId], or null.
   Future<LinkPhoneSong?> song(String sourceId, String fileId) async {
     if (!isLinkFileId(fileId)) return null;
+    if ((await _deletedSongs(sourceId)).contains(fileId)) return null;
     final Uint8List bytes;
     try {
       bytes = await File(
@@ -518,6 +528,50 @@ class LinkPhoneCatalogs {
       start = end + 1;
     }
     return null;
+  }
+
+  Future<Set<String>> _deletedSongs(String sourceId) =>
+      _deleted.putIfAbsent(sourceId, () async {
+        final ids = <String>{};
+        final folder = Directory('${await _folder(sourceId)}/deleted');
+        if (await folder.exists()) {
+          await for (final file in folder.list(followLinks: false)) {
+            final id = p.basename(file.path);
+            if (file is File && isLinkFileId(id)) ids.add(id);
+          }
+        }
+        return ids;
+      });
+
+  /// Keep confirmed deletions out of stale or in-flight catalog snapshots,
+  /// including after a desktop restart. The phone remains the file owner.
+  Future<void> recordDeleted(String deviceId, String fileId) {
+    final sourceId = linkPhoneSourceId(deviceId);
+    return _serial(sourceId, () async {
+      if (!isLinkFileId(fileId) || await song(sourceId, fileId) == null) return;
+      final deleted = await _deletedSongs(sourceId);
+      final folder = Directory('${await _folder(sourceId)}/deleted');
+      await folder.create(recursive: true);
+      await File('${folder.path}/$fileId').writeAsString('', flush: true);
+      deleted.add(fileId);
+      _onCommit?.call(deviceId);
+    });
+  }
+
+  /// Once a full phone snapshot omits a deleted song, a later deliberate
+  /// re-import of that file can appear normally again.
+  Future<void> _pruneDeleted(String sourceId) async {
+    final deleted = await _deletedSongs(sourceId);
+    if (deleted.isEmpty) return;
+    final absent = {...deleted};
+    await for (final song in _readSongs(sourceId)) {
+      absent.remove(song.fileId);
+    }
+    final folder = '${await _folder(sourceId)}/deleted';
+    for (final fileId in absent) {
+      await File('$folder/$fileId').delete();
+      deleted.remove(fileId);
+    }
   }
 
   static LinkPhoneSong? _decode(Uint8List bytes, int start, int end) {
@@ -644,6 +698,7 @@ class LinkPhoneCatalogs {
     _versions.remove(sourceId);
     _coverBytes.remove(sourceId);
     _triedCovers.remove(sourceId);
+    _deleted.remove(sourceId);
     try {
       await Directory(await _folder(sourceId)).delete(recursive: true);
     } on FileSystemException {

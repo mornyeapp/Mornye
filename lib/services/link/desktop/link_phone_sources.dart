@@ -62,6 +62,11 @@ typedef _LyricsAnswer = ({
   String name,
   Completer<String?> answer,
 });
+typedef _DeleteAnswer = ({
+  String deviceId,
+  String name,
+  Completer<bool> answer,
+});
 
 /// A song the phone is sending: the `file` it lands as, its `size`, whether
 /// it plays before it is whole, and its arrival.
@@ -78,7 +83,8 @@ typedef _Sending = ({
 /// list without the songs the desktop has; playback uses the received
 /// file, else asks the connected phone to send it. A received file the
 /// player misses is asked of the connected phones again ([recover]).
-class LinkPhoneSources implements NetworkLocalCopies {
+class LinkPhoneSources
+    implements NetworkLocalCopies, NetworkVirtualFileDeletion {
   LinkPhoneSources({
     required LinkPhoneCatalogs catalogs,
     required DesktopLinkCatalogIndex? Function() index,
@@ -91,6 +97,7 @@ class LinkPhoneSources implements NetworkLocalCopies {
     Future<Map<String, dynamic>> Function(String path)? readTags,
     this.answerTimeout = const Duration(seconds: 15),
     this.lyricsTimeout = const Duration(seconds: 5),
+    this.deleteTimeout = const Duration(seconds: 20),
     this.progressInterval = const Duration(milliseconds: 250),
   }) : _catalogs = catalogs,
        _index = index,
@@ -106,6 +113,12 @@ class LinkPhoneSources implements NetworkLocalCopies {
 
   /// Wait for the original phone's embedded lyrics without fetching audio.
   final Duration lyricsTimeout;
+
+  /// Wait for the phone to confirm deletion, also bounds older clients
+  /// that do not understand deletion requests.
+  final Duration deleteTimeout;
+  final _deleteAnswers = <String, _DeleteAnswer>{};
+  final _deletions = <String, Future<bool>>{};
 
   /// How often [receive] reports the bytes of a song on its way.
   final Duration progressInterval;
@@ -148,6 +161,56 @@ class LinkPhoneSources implements NetworkLocalCopies {
   /// While the phone is connected; a received copy alone does not count.
   @override
   bool reachable(String id) => _connectedDevice(id) != null;
+
+  @override
+  Future<bool> canDeleteFile(String id, String path) async {
+    if (_closed || !owns(id) || !reachable(id)) return false;
+    final name = _songName(path);
+    if (name == null) return false;
+    final fileId = name.substring(0, name.indexOf('.'));
+    return (await _catalogs.song(id, fileId))?.name == name;
+  }
+
+  @override
+  Future<bool> deleteFile(String id, String path) {
+    final key = '$id/$path';
+    return _deletions[key] ??= _deleteFile(id, path).whenComplete(() {
+      _deletions.remove(key);
+    });
+  }
+
+  Future<bool> _deleteFile(String id, String path) async {
+    if (!await canDeleteFile(id, path)) return false;
+    final deviceId = _connectedDevice(id);
+    if (_closed || deviceId == null) return false;
+    final requestId = NetworkStorageService.newId();
+    final answer = Completer<bool>();
+    _deleteAnswers[requestId] = (
+      deviceId: deviceId,
+      name: path,
+      answer: answer,
+    );
+    try {
+      final delivered = await _send({
+        'type': LinkMessageTypes.filesDeleteRequest,
+        'requestId': requestId,
+        'name': path,
+      }, deviceId).timeout(deleteTimeout, onTimeout: () => 0);
+      if (delivered <= 0) return false;
+      if (!await answer.future.timeout(deleteTimeout, onTimeout: () => false)) {
+        _log.w('The phone did not confirm deletion of a shared song');
+        return false;
+      }
+      final fileId = path.substring(0, path.indexOf('.'));
+      await _catalogs.recordDeleted(deviceId, fileId);
+      return true;
+    } on Object catch (error) {
+      _log.w('Could not delete a shared phone song: $error');
+      return false;
+    } finally {
+      _deleteAnswers.remove(requestId);
+    }
+  }
 
   @override
   Stream<NetworkVirtualSong> songs(String id) async* {
@@ -362,6 +425,18 @@ class LinkPhoneSources implements NetworkLocalCopies {
   /// returns whether [message] was one of them.
   bool onMessage(String deviceId, Map<String, dynamic> message) {
     final type = message['type'];
+    if (type == LinkMessageTypes.filesDeleted) {
+      final pending = _deleteAnswers[message['requestId']];
+      if (pending != null &&
+          pending.deviceId == deviceId &&
+          pending.name == message['name'] &&
+          !pending.answer.isCompleted) {
+        pending.answer.complete(
+          message['deleted'] == true && message['error'] == null,
+        );
+      }
+      return true;
+    }
     if (type == LinkMessageTypes.filesLyrics) {
       final pending = _lyricsAnswers[message['requestId']];
       if (pending != null &&
@@ -392,6 +467,12 @@ class LinkPhoneSources implements NetworkLocalCopies {
 
   /// Fails the requests of phones that are no longer connected.
   void keepConnected(Set<String> deviceIds) {
+    for (final pending in _deleteAnswers.values.toList()) {
+      if (!deviceIds.contains(pending.deviceId) &&
+          !pending.answer.isCompleted) {
+        pending.answer.complete(false);
+      }
+    }
     for (final pending in _lyricsAnswers.values.toList()) {
       if (!deviceIds.contains(pending.deviceId) &&
           !pending.answer.isCompleted) {
@@ -495,6 +576,9 @@ class LinkPhoneSources implements NetworkLocalCopies {
   /// Fails every request under way.
   void close() {
     _closed = true;
+    for (final pending in _deleteAnswers.values.toList()) {
+      if (!pending.answer.isCompleted) pending.answer.complete(false);
+    }
     for (final pending in _lyricsAnswers.values.toList()) {
       if (!pending.answer.isCompleted) pending.answer.complete(null);
     }

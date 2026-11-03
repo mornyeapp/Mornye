@@ -14,6 +14,9 @@ import 'package:mornye/services/link/features/link_phone_files.dart';
 import 'package:mornye/controllers/player_metadata_controller.dart';
 import 'package:audio_service/audio_service.dart';
 import 'package:mornye/utils/lyrics_parser.dart';
+import 'package:mornye/services/network_storage_service.dart';
+import 'package:mornye/services/source_deletion_events.dart';
+import 'package:mornye/utils/file_access.dart';
 
 import 'support/link_desktop_fakes.dart';
 import 'support/link_fakes.dart'
@@ -77,6 +80,7 @@ void main() {
   LinkPhoneSources sources({
     Duration? answerTimeout,
     Duration lyricsTimeout = const Duration(milliseconds: 250),
+    Duration deleteTimeout = const Duration(seconds: 5),
   }) => LinkPhoneSources(
     catalogs: catalogs,
     index: () => index,
@@ -95,6 +99,7 @@ void main() {
         tags[path] ?? (throw const FileSystemException('unreadable')),
     answerTimeout: answerTimeout ?? const Duration(seconds: 15),
     lyricsTimeout: lyricsTimeout,
+    deleteTimeout: deleteTimeout,
   );
 
   Future<void> commit(List<LinkPhoneSong> songs) async {
@@ -479,6 +484,195 @@ void main() {
         throwsFormatException,
       );
     });
+  });
+
+  group('deletion', () {
+    test(
+      'Library deletion reaches the phone and waits for confirmation',
+      () async {
+        final original = File('${root.path}/phone-song.flac')
+          ..writeAsStringSync('audio');
+        final rows = FakeLibraryRows([linkLocalRow(original.path)]);
+        final library = rows.library();
+        final shared = (await library.catalog()).songs.single;
+        await commit([shared]);
+        final client = _LyricsClient();
+        addTearDown(client.close);
+        final gate = Completer<void>();
+        final started = Completer<void>();
+        final phone = LinkPhoneFileRequests(
+          client: client,
+          library: library,
+          files: LinkPhoneFiles(),
+          deleteSharedFile: (path) async {
+            expect(path, original.path);
+            started.complete();
+            await gate.future;
+            if (!await deleteFile(
+              path,
+              deletionEvents: SourceDeletionEvents(),
+            )) {
+              return false;
+            }
+            rows.rows.clear();
+            rows.bump();
+            return true;
+          },
+        )..start();
+        addTearDown(phone.dispose);
+        final desktop = sources();
+        addTearDown(desktop.close);
+        client.onReply = (message) => desktop.onMessage(_phone, message);
+        sendOverride = (message, deviceId) async {
+          expect(deviceId, _phone);
+          client.push(message);
+          return 1;
+        };
+        final storage = NetworkStorageService(
+          read: () async {
+            fail('Virtual phone songs must not use saved NAS connections');
+          },
+        )..virtualSources = desktop;
+        addTearDown(storage.dispose);
+        final source = NetworkStorageService.source(sourceId, shared.name);
+        final events = SourceDeletionEvents();
+        final removed = <String>[];
+        events.subscribe((source) async => removed.add(source));
+        expect(await storage.canDeleteFile(source), isTrue);
+        final pending = deleteFile(
+          source,
+          networkStorage: storage,
+          deletionEvents: events,
+        );
+        await started.future;
+        expect(await original.exists(), isTrue);
+        expect(removed, isEmpty);
+        expect(await desktop.songs(sourceId).toList(), hasLength(1));
+        gate.complete();
+        expect(await pending, isTrue);
+        expect(await original.exists(), isFalse);
+        expect(removed, [source]);
+        expect(await desktop.songs(sourceId).toList(), isEmpty);
+        expect((await library.catalog()).songs, isEmpty);
+        expect(client.uploads, isEmpty);
+      },
+    );
+
+    test(
+      'only the matching phone, request and song can confirm deletion',
+      () async {
+        final shared = song(1);
+        await commit([shared]);
+        final desktop = sources();
+        addTearDown(desktop.close);
+        final asked = Completer<Map<String, dynamic>>();
+        sendOverride = (message, _) async {
+          asked.complete(message);
+          return 1;
+        };
+        var completed = false;
+        final pending = desktop.deleteFile(sourceId, shared.name).then((value) {
+          completed = true;
+          return value;
+        });
+        final request = await asked.future;
+        final reply = {
+          ...request,
+          'type': LinkMessageTypes.filesDeleted,
+          'deleted': true,
+        };
+        desktop.onMessage('another-phone', reply);
+        desktop.onMessage(_phone, {...reply, 'requestId': 'another-request'});
+        desktop.onMessage(_phone, {...reply, 'name': song(2).name});
+        await Future<void>.delayed(Duration.zero);
+        expect(completed, isFalse);
+        expect(await catalogs.song(sourceId, shared.fileId), isNotNull);
+        desktop.onMessage(_phone, reply);
+        expect(await pending, isTrue);
+      },
+    );
+
+    for (final outcome in [
+      'timeout',
+      'failed',
+      'disconnect',
+      'closed',
+      'not_sent',
+    ]) {
+      test('$outcome keeps the shared song indexed', () async {
+        final shared = song(1);
+        await commit([shared]);
+        final desktop = sources(
+          deleteTimeout: const Duration(milliseconds: 20),
+        );
+        addTearDown(desktop.close);
+        sendOverride = (message, _) async {
+          switch (outcome) {
+            case 'failed':
+              desktop.onMessage(_phone, {
+                ...message,
+                'type': LinkMessageTypes.filesDeleted,
+                'deleted': false,
+                'error': 'delete_failed',
+              });
+            case 'disconnect':
+              desktop.keepConnected({});
+            case 'closed':
+              desktop.close();
+          }
+          return outcome == 'not_sent' ? 0 : 1;
+        };
+        expect(await desktop.deleteFile(sourceId, shared.name), isFalse);
+        expect(await catalogs.song(sourceId, shared.fileId), isNotNull);
+      });
+    }
+
+    test(
+      'offline phones, unknown songs and malformed paths are rejected',
+      () async {
+        final shared = song(1);
+        await commit([shared]);
+        final desktop = sources();
+        addTearDown(desktop.close);
+        final storage = NetworkStorageService()..virtualSources = desktop;
+        addTearDown(storage.dispose);
+        for (final path in [
+          'network://$sourceId/',
+          'network://$sourceId/${shared.name}?delete=true',
+          'network://$sourceId/album%2F${shared.name}',
+          'network://$sourceId/${shared.fileId}.mp3',
+          'network://$sourceId/${song(2).name}',
+        ]) {
+          expect(await storage.canDeleteFile(path), isFalse);
+          expect(await storage.deleteFile(path), isFalse);
+        }
+        connected.clear();
+        expect(await desktop.deleteFile(sourceId, shared.name), isFalse);
+        expect(sent, isEmpty);
+      },
+    );
+
+    test(
+      'stale catalogs cannot resurrect confirmed deletions after restart',
+      () async {
+        final shared = song(1);
+        await commit([shared]);
+        await catalogs.recordDeleted(_phone, shared.fileId);
+        await commit([shared, song(2)]);
+        catalogs = LinkPhoneCatalogs(
+          root: () async => root,
+          paired: (_) async => true,
+        );
+        expect((await catalogs.songs(sourceId).toList()).map((s) => s.fileId), [
+          song(2).fileId,
+        ]);
+        expect(await catalogs.song(sourceId, shared.fileId), isNull);
+        await commit([song(2)]);
+        // A deliberate later re-import can be shown once absence was synced.
+        await commit([shared, song(2)]);
+        expect(await catalogs.song(sourceId, shared.fileId), isNotNull);
+      },
+    );
   });
 
   group('metadata', () {

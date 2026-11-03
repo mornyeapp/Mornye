@@ -284,6 +284,7 @@ class LinkPhoneFileRequests {
     this.offered,
     this.maxUploads = 2,
     Future<String> Function(String path)? readLyrics,
+    this.deleteSharedFile,
   }) : _readLyrics = readLyrics ?? _embeddedLyrics;
 
   static Future<String> _embeddedLyrics(String path) async =>
@@ -300,6 +301,11 @@ class LinkPhoneFileRequests {
   final int maxUploads;
   final Future<String> Function(String path) _readLyrics;
   final _lyricsRequests = <String>{};
+
+  /// Deletes the resolved local file and reconciles the phone's indexes.
+  /// Null disables remote deletion; offered transfers never grant deletion.
+  final Future<bool> Function(String path)? deleteSharedFile;
+  bool _deleting = false;
 
   final _subscriptions = <StreamSubscription<Object?>>[];
   final _waiting = Queue<String>();
@@ -335,6 +341,10 @@ class LinkPhoneFileRequests {
   }
 
   void _onMessage(Map<String, dynamic> message) {
+    if (message['type'] == LinkMessageTypes.filesDeleteRequest) {
+      unawaited(_deleteSong(message));
+      return;
+    }
     if (message['type'] == LinkMessageTypes.filesLyricsRequest) {
       unawaited(_sendLyrics(message));
       return;
@@ -383,6 +393,55 @@ class LinkPhoneFileRequests {
       _say({...reply, 'error': 'unavailable'});
     } finally {
       _lyricsRequests.remove(requestId);
+    }
+  }
+
+  Future<void> _deleteSong(Map<String, dynamic> message) async {
+    final requestId = message['requestId'];
+    final name = message['name'];
+    if (_disposed ||
+        requestId is! String ||
+        requestId.isEmpty ||
+        requestId.length > 128 ||
+        name is! String ||
+        !RegExp(r'^[0-9a-f]{32}\.[a-z0-9]{1,10}$').hasMatch(name) ||
+        !linkUploadExtensions.contains(name.split('.').last)) {
+      return;
+    }
+    final reply = <String, dynamic>{
+      'type': LinkMessageTypes.filesDeleted,
+      'requestId': requestId,
+      'name': name,
+    };
+    final delete = deleteSharedFile;
+    if (delete == null || _deleting) {
+      _say({...reply, 'error': delete == null ? 'unsupported' : 'busy'});
+      return;
+    }
+    _deleting = true;
+    try {
+      // Rebuild after a revision change; an older shared list or an offered
+      // transfer is not authority to delete a file that is no longer shared.
+      final catalog = await library.catalog();
+      final file = catalog.fileNamed(name);
+      if (_disposed) return;
+      // Content URI uploads determine their extension from a temporary copy,
+      // so validate the shared name, not LinkPhoneFile.extension (often null).
+      if (file == null || !catalog.songs.any((song) => song.name == name)) {
+        _say({...reply, 'error': 'not_found'});
+        return;
+      }
+      final deleted = await delete(file.source);
+      _say({
+        ...reply,
+        'deleted': deleted,
+        if (!deleted) 'error': 'delete_failed',
+      });
+    } on Object catch (error) {
+      _log.w('Could not delete a shared phone song: $error');
+      _say({...reply, 'error': 'unavailable'});
+    } finally {
+      _deleting = false;
     }
   }
 
