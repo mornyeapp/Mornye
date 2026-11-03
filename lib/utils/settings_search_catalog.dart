@@ -245,6 +245,12 @@ class SettingsSearchCatalog {
           keywords: const ['remove missing'],
         ),
         SettingsSearchEntry(
+          icon: Icons.manage_search,
+          title: l10n.libraryFindMovedDownloads,
+          subtitle: l10n.libraryFindMovedDownloadsSubtitle,
+          keywords: const ['moved files', 'relink', 'resync', 'missing files'],
+        ),
+        SettingsSearchEntry(
           icon: Icons.delete_outline,
           title: l10n.libraryClear,
           subtitle: l10n.libraryClearSubtitle,

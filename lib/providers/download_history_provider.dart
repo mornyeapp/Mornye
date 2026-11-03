@@ -819,10 +819,17 @@ class DownloadHistoryNotifier extends Notifier<DownloadHistoryState> {
       Map<String, String> replacementFileNames,
       Map<String, String> replacementRelativeDirs,
       Map<String, String> pathById,
+      Set<String> recoveredIds,
     })
   >
-  _inspectOrphanedEntries(List<Map<String, dynamic>> entries) async {
+  _inspectOrphanedEntries(
+    List<Map<String, dynamic>> entries, {
+    bool recoverMovedFiles = false,
+  }) async {
     final orphanedIds = <String>[];
+    // Downloads found in the current download folder after a move; recovery
+    // has already stored their new paths.
+    final recoveredIds = <String>{};
     final replacementPaths = <String, String>{};
     final replacementFileNames = <String, String>{};
     final replacementRelativeDirs = <String, String>{};
@@ -857,12 +864,15 @@ class DownloadHistoryNotifier extends Notifier<DownloadHistoryState> {
           try {
             if (await fileExists(filePath)) return MapEntry(id, true);
 
-            final moved = Platform.isAndroid
+            final moved = Platform.isAndroid || recoverMovedFiles
                 ? await DownloadFileRecovery(
                     history: _db,
                   ).recover(filePath, historyId: id, knownMissing: true)
                 : null;
-            if (moved != null) return MapEntry(id, true);
+            if (moved != null) {
+              recoveredIds.add(id);
+              return MapEntry(id, true);
+            }
             final sibling = await _findConvertedSibling(filePath);
             if (sibling != null) {
               _historyLog.i(
@@ -929,7 +939,10 @@ class DownloadHistoryNotifier extends Notifier<DownloadHistoryState> {
                 historyId: id,
                 knownMissing: true,
               );
-              if (moved != null) continue;
+              if (moved != null) {
+                recoveredIds.add(id);
+                continue;
+              }
             } catch (error) {
               _historyLog.w(
                 'Retaining download while its new folder is unavailable: $error',
@@ -976,6 +989,7 @@ class DownloadHistoryNotifier extends Notifier<DownloadHistoryState> {
       replacementFileNames: replacementFileNames,
       replacementRelativeDirs: replacementRelativeDirs,
       pathById: pathById,
+      recoveredIds: recoveredIds,
     );
   }
 
@@ -1212,6 +1226,60 @@ class DownloadHistoryNotifier extends Notifier<DownloadHistoryState> {
       'Cleaned up ${committed.deleted} orphaned entries and repaired ${committed.repaired} paths',
     );
     return committed.deleted;
+  }
+
+  /// Relinks downloads whose files were moved: into the current download
+  /// folder with the same subfolders and name, or to a converted copy next to
+  /// the old file. Unlike [cleanupOrphanedDownloads], nothing is removed;
+  /// downloads whose files cannot be found are only counted as [missing].
+  Future<({int relinked, int missing})> findMovedDownloads() async {
+    _historyLog.i('Looking for moved downloads...');
+    final missingIds = <String>{};
+    final recoveredIds = <String>{};
+    final replacementPaths = <String, String>{};
+    final replacementFileNames = <String, String>{};
+    final replacementRelativeDirs = <String, String>{};
+    final inspectedEntries = <Map<String, dynamic>>[];
+    const pageSize = 256;
+    var offset = 0;
+
+    while (true) {
+      final entries = await _db.getEntriesWithPathsPage(
+        limit: pageSize,
+        offset: offset,
+      );
+      if (entries.isEmpty) break;
+      inspectedEntries.addAll(entries);
+      final result = await _inspectOrphanedEntries(
+        entries,
+        recoverMovedFiles: true,
+      );
+      missingIds.addAll(result.orphanedIds);
+      recoveredIds.addAll(result.recoveredIds);
+      replacementPaths.addAll(result.replacementPaths);
+      replacementFileNames.addAll(result.replacementFileNames);
+      replacementRelativeDirs.addAll(result.replacementRelativeDirs);
+      if (entries.length < pageSize) break;
+      // Recovery changes paths, not rows, so the pages stay in place.
+      offset += entries.length;
+    }
+
+    var repaired = 0;
+    if (replacementPaths.isNotEmpty) {
+      final committed = await _commitInspectedHistoryChanges(
+        entries: inspectedEntries,
+        orphanedIds: const [],
+        replacementPaths: replacementPaths,
+        replacementFileNames: replacementFileNames,
+        replacementRelativeDirs: replacementRelativeDirs,
+      );
+      repaired = committed.repaired;
+    }
+    final relinked = recoveredIds.length + repaired;
+    _historyLog.i(
+      'Relinked $relinked moved downloads; ${missingIds.length} still missing',
+    );
+    return (relinked: relinked, missing: missingIds.length);
   }
 
   Future<void> clearHistory() async {

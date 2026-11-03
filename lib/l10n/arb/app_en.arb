@@ -3184,6 +3184,26 @@
   "@libraryCleanupMissingFilesSubtitle": {
     "description": "Subtitle for cleanup button"
   },
+  "libraryFindMovedDownloads": "Find Moved Downloads",
+  "@libraryFindMovedDownloads": {
+    "description": "Library action that relinks downloads whose files were moved to the current download folder"
+  },
+  "libraryFindMovedDownloadsSubtitle": "Relink downloads you moved into the current download folder, without removing anything",
+  "@libraryFindMovedDownloadsSubtitle": {
+    "description": "Subtitle for the Find Moved Downloads action"
+  },
+  "libraryFindMovedDownloadsResult": "{relinked, plural, =0{No moved downloads found} =1{Relinked 1 download} other{Relinked {relinked} downloads}}{missing, plural, =0{} =1{ · 1 file still missing} other{ · {missing} files still missing}}",
+  "@libraryFindMovedDownloadsResult": {
+    "description": "Snackbar after Find Moved Downloads: downloads relinked, then downloads whose files are still missing",
+    "placeholders": {
+      "relinked": {
+        "type": "int"
+      },
+      "missing": {
+        "type": "int"
+      }
+    }
+  },
   "libraryClear": "Clear Library",
   "@libraryClear": {
     "description": "Button to clear all library entries"

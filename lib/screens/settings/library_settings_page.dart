@@ -42,6 +42,7 @@ class _LibrarySettingsPageState extends ConsumerState<LibrarySettingsPage> {
   int _androidSdkVersion = 0;
   bool _hasStoragePermission = false;
   bool _isCleaningMissingFiles = false;
+  bool _isFindingMovedDownloads = false;
   bool _isLoadingReEnrich = false;
 
   String _getDisplayPath(String path) {
@@ -249,7 +250,9 @@ class _LibrarySettingsPageState extends ConsumerState<LibrarySettingsPage> {
   }
 
   Future<void> _cleanupMissingFiles() async {
-    if (_isCleaningMissingFiles || ref.read(localLibraryProvider).isScanning) {
+    if (_isCleaningMissingFiles ||
+        _isFindingMovedDownloads ||
+        ref.read(localLibraryProvider).isScanning) {
       return;
     }
     final library = ref.read(localLibraryProvider.notifier);
@@ -289,6 +292,38 @@ class _LibrarySettingsPageState extends ConsumerState<LibrarySettingsPage> {
       await reEnrichWholeLibrary(context, ref, isActive: () => mounted);
     } finally {
       if (mounted) setState(() => _isLoadingReEnrich = false);
+    }
+  }
+
+  Future<void> _findMovedDownloads() async {
+    if (_isFindingMovedDownloads || _isCleaningMissingFiles) return;
+    setState(() => _isFindingMovedDownloads = true);
+    try {
+      final result = await ref
+          .read(downloadHistoryProvider.notifier)
+          .findMovedDownloads();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            context.l10n.libraryFindMovedDownloadsResult(
+              result.relinked,
+              result.missing,
+            ),
+          ),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            context.l10n.snackbarError(context.friendlyError(error)),
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isFindingMovedDownloads = false);
     }
   }
 
@@ -725,8 +760,13 @@ class _LibrarySettingsPageState extends ConsumerState<LibrarySettingsPage> {
                       (state) => state.totalCount > 0,
                     ),
                   );
+                  final canFindMoved =
+                      !_isFindingMovedDownloads &&
+                      !_isCleaningMissingFiles &&
+                      hasDownloads;
                   final canCleanup =
                       !_isCleaningMissingFiles &&
+                      !_isFindingMovedDownloads &&
                       !libraryState.isScanning &&
                       (libraryState.totalCount > 0 ||
                           hasDownloads ||
@@ -792,6 +832,24 @@ class _LibrarySettingsPageState extends ConsumerState<LibrarySettingsPage> {
                           ),
                         ),
                       ],
+                      Opacity(
+                        opacity: canFindMoved || _isFindingMovedDownloads
+                            ? 1.0
+                            : 0.5,
+                        child: SettingsItem(
+                          icon: Icons.manage_search,
+                          title: context.l10n.libraryFindMovedDownloads,
+                          subtitle:
+                              context.l10n.libraryFindMovedDownloadsSubtitle,
+                          trailing: _isFindingMovedDownloads
+                              ? const AppLoadingIndicator(
+                                  size: 20,
+                                  strokeWidth: 2,
+                                )
+                              : null,
+                          onTap: canFindMoved ? _findMovedDownloads : null,
+                        ),
+                      ),
                       Opacity(
                         opacity: canCleanup || _isCleaningMissingFiles
                             ? 1.0
