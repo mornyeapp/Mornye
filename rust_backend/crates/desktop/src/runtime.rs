@@ -3,6 +3,7 @@
 
 use crate::backend::Backend;
 use crate::call::{Args, CallError, CallResult, CallState, Reply};
+use crate::cast::Cast;
 use crate::discord::Discord;
 use crate::events::Events;
 use crate::keep_awake::KeepAwake;
@@ -71,6 +72,7 @@ pub(crate) struct Runtime {
     pub(crate) discord: Discord,
     pub(crate) watcher: LibraryWatcher,
     pub(crate) link: Link,
+    pub(crate) cast: Cast,
     pool: Pool,
     calls: Mutex<HashMap<u64, Arc<CallState>>>,
 }
@@ -98,6 +100,7 @@ pub(crate) fn init(callback: Option<MornyeCallback>, config: &[u8]) {
         discord: Discord::default(),
         watcher: LibraryWatcher::default(),
         link: Link::default(),
+        cast: Cast::default(),
         pool: Pool::default(),
         calls: Mutex::new(HashMap::new()),
     });

@@ -712,6 +712,8 @@ pub(crate) static METHODS: &[Entry] = &[
     pool("linkEmbeddedPictures", |c, a| {
         c.rt.link.embedded_pictures(a)
     }),
+    // Desktop only: Google Cast output (cast.rs).
+    pool("castCall", |c, a| c.rt.cast.call(a)),
 ];
 
 fn table() -> &'static HashMap<&'static str, &'static Entry> {

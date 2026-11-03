@@ -14,6 +14,7 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 mornye-mobile = { path = "../mobile" }
 mornye-link.workspace = true
+mornye-cast.workspace = true
 chrono.workspace = true
 getrandom.workspace = true
 notify.workspace = true

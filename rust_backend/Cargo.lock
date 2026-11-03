@@ -1659,6 +1659,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "mornye-cast"
+version = "0.1.0"
+dependencies = [
+ "bytes",
+ "futures-util",
+ "getrandom 0.4.3",
+ "http",
+ "http-body-util",
+ "hyper",
+ "hyper-rustls",
+ "hyper-util",
+ "mdns-sd",
+ "mornye-network",
+ "rcgen",
+ "rustls",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "tokio-rustls",
+ "tokio-util",
+]
+
+[[package]]
 name = "mornye-core"
 version = "0.1.0"
 dependencies = [
@@ -1685,6 +1709,7 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "getrandom 0.4.3",
+ "mornye-cast",
  "mornye-link",
  "mornye-mobile",
  "notify",
@@ -1777,6 +1802,7 @@ dependencies = [
  "chrono",
  "libc",
  "libusb1-sys",
+ "mornye-cast",
  "mornye-core",
  "mornye-extensions",
  "mornye-network",

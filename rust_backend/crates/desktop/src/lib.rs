@@ -4,12 +4,13 @@
 //! argument shapes, a worker pool per call, pushed event streams, and an
 //! FFmpeg command pump that runs the bundled `ffmpeg` executable. Desktop OS
 //! services live here too: keep-awake during downloads, Discord Rich
-//! Presence over local IPC, library folder watching, a panic log, and the
-//! Mornye Link server for the phone app.
+//! Presence over local IPC, library folder watching, a panic log, the
+//! Mornye Link server for the phone app, and Google Cast output.
 
 mod backend;
 mod call;
 mod callback_url;
+mod cast;
 mod crash_log;
 mod discord;
 mod dispatch;

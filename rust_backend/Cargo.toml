@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/core", "crates/network", "crates/providers", "crates/extensions", "crates/mobile", "crates/desktop", "crates/link", "crates/bindgen"]
+members = ["crates/core", "crates/network", "crates/providers", "crates/extensions", "crates/mobile", "crates/desktop", "crates/link", "crates/cast", "crates/bindgen"]
 exclude = ["vendor/rustix-1.1.6", "vendor/libusb1-sys-0.7.0", "vendor/cap-primitives-4.0.3"]
 resolver = "3"
 
@@ -24,6 +24,7 @@ mornye-core = { path = "crates/core" }
 mornye-extensions = { path = "crates/extensions" }
 mornye-network = { path = "crates/network" }
 mornye-providers = { path = "crates/providers" }
+mornye-cast = { path = "crates/cast" }
 # Crates enable `bindgen` per target: rquickjs-sys ships Windows bindings.
 rquickjs = "=0.14.0"
 base64 = "0.23"

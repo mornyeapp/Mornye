@@ -6,6 +6,7 @@
 //! contract.
 
 mod cancellation;
+mod cast;
 mod data_jobs;
 mod extensions;
 mod ffmpeg;
