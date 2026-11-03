@@ -32,6 +32,7 @@ import 'package:mornye/services/link/sync/link_sync_handlers.dart';
 import 'package:mornye/services/lyrics_translation_sharing.dart';
 import 'package:mornye/services/network_storage_service.dart';
 import 'package:mornye/services/playable_media.dart';
+import 'package:mornye/services/source_deletion_events.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/utils/logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -180,6 +181,7 @@ class LinkDesktopHostState {
 /// [linkHostRouterProvider] and pushes the desktop player to phones.
 class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
   static const exportDelay = Duration(seconds: 10);
+  static const deletionExportDelay = Duration(milliseconds: 300);
   static const stateDelay = Duration(milliseconds: 250);
   static const stateInterval = Duration(seconds: 15);
   static const downloadsDelay = Duration(seconds: 1);
@@ -189,6 +191,7 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
   final _backendSubscriptions = <StreamSubscription<Object?>>[];
   final _appSubscriptions = <ProviderSubscription<Object?>>[];
   StreamSubscription<void>? _playerSubscription;
+  void Function()? _unsubscribeSourceDeletion;
   LinkPlayerPort? _player;
   LinkDesktopOps? _ops;
   LinkLibraryJobsHost? _libraryJobs;
@@ -206,6 +209,7 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
   final _rescanAfterExport = <String>{};
   LinkPlayerState? _lastSentState;
   Timer? _exportTimer;
+  bool _urgentExportScheduled = false;
   Timer? _stateTimer;
   Timer? _heartbeat;
   Timer? _downloadsTimer;
@@ -665,6 +669,11 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
   }
 
   void _listenApp() {
+    _unsubscribeSourceDeletion = SourceDeletionEvents.instance.subscribe((
+      source,
+    ) async {
+      if (linkLocalFilePath(source) != null) _scheduleExport(urgent: true);
+    });
     final updates = _downloadUpdates = LinkDownloadUpdates(
       items: () => ref.read(linkDownloadItemsProvider),
       send: (message, id) => _send(message, deviceId: id),
@@ -696,6 +705,9 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
   }
 
   void _cancelApp() {
+    _unsubscribeSourceDeletion?.call();
+    _unsubscribeSourceDeletion = null;
+    _urgentExportScheduled = false;
     _downloadUpdates?.dispose();
     _downloadUpdates = null;
     _lyricsTranslations?.dispose();
@@ -995,10 +1007,18 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
     }
   }
 
-  void _scheduleExport() {
-    if (!state.running) return;
+  void _scheduleExport({bool urgent = false}) {
+    if (!ref.mounted || !state.running) return;
+    // Index updates following a confirmed file deletion must not postpone
+    // its short refresh behind the normal Library debounce.
+    if (_urgentExportScheduled && (_exportTimer?.isActive ?? false)) return;
+    _urgentExportScheduled = urgent;
     _exportTimer?.cancel();
-    _exportTimer = Timer(exportDelay, () => unawaited(exportCatalog()));
+    _exportTimer = Timer(urgent ? deletionExportDelay : exportDelay, () {
+      _exportTimer = null;
+      _urgentExportScheduled = false;
+      unawaited(exportCatalog());
+    });
   }
 
   /// Writes the catalog and hands it to the server; runs on start and after

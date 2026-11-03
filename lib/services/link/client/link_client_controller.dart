@@ -397,6 +397,7 @@ class LinkClientController extends Notifier<LinkClientState> {
 
   void _onConnection(LinkSession session) {
     if (_disposed || !identical(session, _session)) return;
+    final wasConnected = state.connection == LinkConnectionState.connected;
     state = state.copyWith(
       connection: session.connectionState,
       issue: session.issue,
@@ -409,15 +410,32 @@ class LinkClientController extends Notifier<LinkClientState> {
     unawaited(_syncBackgroundConnection());
     if (!_connected) session.pause();
     _updateDiscovery();
+    if (session.connectionState != LinkConnectionState.connected) {
+      _rescan?.cancel();
+      _rescan = null;
+    } else if (!wasConnected) {
+      // A catalog notification can be lost while the phone is offline or
+      // suspended, even when the desktop believes it was delivered.
+      _scheduleRescan(session);
+    }
   }
 
   void _onMessage(LinkSession session, Map<String, dynamic> message) {
     if (_disposed || !identical(session, _session)) return;
     if (message['type'] != LinkMessageTypes.catalogChanged) return;
+    _scheduleRescan(session);
+  }
+
+  void _scheduleRescan(LinkSession session) {
     final connectionId = session.server.connectionId;
     _rescan?.cancel();
     _rescan = Timer(rescanDelay, () {
       _rescan = null;
+      if (_disposed ||
+          !identical(session, _session) ||
+          session.connectionState != LinkConnectionState.connected) {
+        return;
+      }
       unawaited(
         _library
             .rescan(connectionId)

@@ -12,6 +12,7 @@ import 'package:mornye/services/link/link_host_router.dart';
 import 'package:mornye/services/link/link_protocol.dart';
 import 'package:mornye/services/lyrics_translation.dart';
 import 'package:mornye/services/lyrics_translation_sharing.dart';
+import 'package:mornye/services/source_deletion_events.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -564,6 +565,74 @@ void main() {
     expect(exporter.exports, hasLength(2));
     await shutdown(tester);
   });
+
+  testWidgets('confirmed desktop deletion bypasses the Library export delay', (
+    tester,
+  ) async {
+    await boot(tester);
+    container.listen(linkDesktopHostProvider, (_, _) {});
+    final revision = container.read(fakeLibraryRevisionProvider.notifier);
+    exporter.songs = [catalogSong('l:a')];
+    backend.catalogSongs = 1;
+    await SourceDeletionEvents.instance.publish('/music/b.flac');
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(exporter.exports, hasLength(1));
+    // Deletion updates both indexes and can publish more than one revision.
+    revision.bump();
+    await SourceDeletionEvents.instance.publish('/music/b.flac');
+    revision.bump();
+    await tester.pump(LinkDesktopHost.deletionExportDelay);
+    await flush(tester);
+    expect(exporter.exports, hasLength(2));
+    expect(backend.catalogs, hasLength(2));
+    expect(hostState().catalogSongs, 1);
+    await tester.pump(const Duration(seconds: 11));
+    expect(
+      exporter.exports,
+      hasLength(2),
+      reason: 'one coalesced deletion export',
+    );
+    await host().setEnabled(false);
+    await SourceDeletionEvents.instance.publish('/music/a.flac');
+    await tester.pump(const Duration(seconds: 11));
+    expect(exporter.exports, hasLength(2));
+    await shutdown(tester);
+  });
+
+  testWidgets('network file deletion does not export the desktop catalog', (
+    tester,
+  ) async {
+    await boot(tester);
+    await SourceDeletionEvents.instance.publish('network://phone/a.flac');
+    await tester.pump(LinkDesktopHost.deletionExportDelay);
+    await flush(tester);
+    expect(exporter.exports, hasLength(1));
+    await shutdown(tester);
+  });
+
+  testWidgets(
+    'deletion during an export publishes a fresh snapshot afterwards',
+    (tester) async {
+      await boot(tester);
+      backend.catalogGate = Completer<void>();
+      final pending = host().exportCatalog();
+      await flush(tester);
+      expect(exporter.exports, hasLength(2));
+      exporter.songs = [catalogSong('l:a')];
+      backend.catalogSongs = 1;
+      await SourceDeletionEvents.instance.publish('/music/b.flac');
+      await tester.pump(LinkDesktopHost.deletionExportDelay);
+      await flush(tester);
+      expect(exporter.exports, hasLength(2));
+      backend.catalogGate!.complete();
+      await pending;
+      await flush(tester);
+      expect(exporter.exports, hasLength(3));
+      expect(backend.catalogs, hasLength(3));
+      expect(hostState().catalogSongs, 1);
+      await shutdown(tester);
+    },
+  );
 
   testWidgets('an unchanged catalog is not pushed again, a changed one and '
       'a new server get it', (tester) async {

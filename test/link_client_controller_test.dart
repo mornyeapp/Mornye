@@ -472,6 +472,7 @@ void main() {
     final record = await harness.controller.pair(linkTestTarget('a'), '123456');
     await pumpEventQueue();
     final session = harness.sessions.single;
+    session.emit(LinkConnectionState.connected);
     session.push({'type': LinkMessageTypes.catalogChanged, 'version': 1});
     session.push({'type': 'player.state'});
     session.push({'type': LinkMessageTypes.catalogChanged, 'version': 2});
@@ -483,6 +484,54 @@ void main() {
     expect(harness.bridge.calls.where((c) => c.startsWith('rescan')), [
       'rescan ${record.connectionId}',
     ]);
+  });
+
+  test(
+    'connecting and reconnecting refresh missed desktop catalog changes',
+    () async {
+      final harness = await _started();
+      final record = await harness.controller.pair(
+        linkTestTarget('a'),
+        '123456',
+      );
+      await pumpEventQueue();
+      final session = harness.sessions.single;
+      session.emit(LinkConnectionState.connected);
+      await Future<void>.delayed(
+        LinkClientController.rescanDelay + const Duration(milliseconds: 200),
+      );
+      expect(harness.bridge.calls.where((c) => c.startsWith('rescan')), [
+        'rescan ${record.connectionId}',
+      ]);
+      // The server may think its push arrived before the old socket disconnected.
+      session.emit(LinkConnectionState.disconnected);
+      await pumpEventQueue();
+      session.emit(LinkConnectionState.connected);
+      await pumpEventQueue();
+      session.emit(LinkConnectionState.connected);
+      await Future<void>.delayed(
+        LinkClientController.rescanDelay + const Duration(milliseconds: 200),
+      );
+      expect(harness.bridge.calls.where((c) => c.startsWith('rescan')), [
+        'rescan ${record.connectionId}',
+        'rescan ${record.connectionId}',
+      ]);
+    },
+  );
+
+  test('a disconnect cancels a pending desktop catalog refresh', () async {
+    final harness = await _started();
+    await harness.controller.pair(linkTestTarget('a'), '123456');
+    await pumpEventQueue();
+    final session = harness.sessions.single;
+    session.emit(LinkConnectionState.connected);
+    session.push({'type': LinkMessageTypes.catalogChanged, 'version': 1});
+    await pumpEventQueue();
+    session.emit(LinkConnectionState.disconnected);
+    await Future<void>.delayed(
+      LinkClientController.rescanDelay + const Duration(milliseconds: 200),
+    );
+    expect(harness.bridge.calls.where((c) => c.startsWith('rescan')), isEmpty);
   });
 
   test('a refused permission stops discovery until asked again', () async {
