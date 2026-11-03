@@ -297,7 +297,7 @@
   "dapExclusiveDescription": "Utilize o Oboe/AAudio com a taxa e a precisão originais da faixa para arquivos FLAC/WAV PCM. Requer Android 8.1 ou superior e hardware compatível. O acesso exclusivo é verificado; caso não esteja disponível, utiliza-se a reprodução normal. Para DSD, é necessário o driver USB direto. A configuração entra em vigor a partir da próxima faixa.",
   "dapExclusiveUnavailable": "O acesso exclusivo via AAudio não está disponível para esta faixa e para a saída atual. A reprodução ocorrerá de modo normal. No caso de um DAC USB, tente utilizar o driver USB direto.",
   "exclusiveOutputWindows": "WASAPI exclusive mode",
-  "exclusiveOutputMacos": "Exclusive access (hog mode)",
+  "exclusiveOutputMacos": "",
   "exclusiveOutputLinux": "Direct ALSA output",
   "exclusiveOutputDescriptionWindows": "Bypass the Windows mixer so the output follows each track's sample rate and bit depth. Other apps cannot play sound while Mornye holds the device. AutoMix and previews are off in this mode. For bit-perfect output, keep the volume at 100% with the equalizer and normalization off.",
   "exclusiveOutputDescriptionMacos": "Hold the output device for Mornye alone and switch it to each track's sample rate and bit depth, so Core Audio does not resample. Other apps cannot play sound while Mornye holds the device. AutoMix and previews are off in this mode. For bit-perfect output, keep the volume at 100% with the equalizer and normalization off.",
