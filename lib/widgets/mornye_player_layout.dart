@@ -381,6 +381,11 @@ class MornyePlayerLayout extends ConsumerWidget {
             child: MornyeLandscapePlayer(
               page: page,
               isPlaying: ref.watch(playbackPlayingProvider),
+              autoHideLyricsControls: ref.watch(
+                settingsProvider.select(
+                  (settings) => settings.autoHideLyricsControls,
+                ),
+              ),
               controlsHeldOpen: lyricsOptionsOpen,
               onPageChanged: onPageChanged,
               artwork: stage(artworkOnly: true),

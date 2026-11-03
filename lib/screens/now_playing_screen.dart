@@ -121,6 +121,7 @@ class NowPlayingScreen extends ConsumerStatefulWidget {
 class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
   ProviderSubscription<AsyncValue<MediaItem?>>? _mediaItemSub;
   ProviderSubscription<bool>? _lyricsPlayingSub;
+  ProviderSubscription<bool>? _lyricsAutoHideSub;
   late final _trackMetadata =
       widget.metadataControllerFactory?.call() ?? PlayerMetadataController();
   late final LyricsTranslationController _lyricsTranslation;
@@ -177,6 +178,19 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
       }
       _scheduleLyricsControlsHide();
     });
+    _lyricsAutoHideSub = ref.listenManual<bool>(
+      settingsProvider.select((settings) => settings.autoHideLyricsControls),
+      (_, enabled) {
+        if (!enabled) {
+          _lyricsPointers.clear();
+          _lyricsScrollDistance = 0;
+          if (_lyricsControlsHidden) {
+            setState(() => _lyricsControlsHidden = false);
+          }
+        }
+        _scheduleLyricsControlsHide();
+      },
+    );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       unawaited(
@@ -247,6 +261,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
     _lyricsIdleTimer?.cancel();
     _mediaItemSub?.close();
     _lyricsPlayingSub?.close();
+    _lyricsAutoHideSub?.close();
     _lyricsTranslation.cancel(owner: this);
     _trackMetadata.dispose();
     _artworkForeground.dispose();
@@ -875,6 +890,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
 
   bool get _canAutoHideLyricsControls =>
       _lyricsAutoHideLayout &&
+      ref.read(settingsProvider).autoHideLyricsControls &&
       _currentPage == 1 &&
       ref.read(playbackPlayingProvider) &&
       !MediaQuery.accessibleNavigationOf(context);
@@ -915,6 +931,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
 
   bool _onLyricsScroll(ScrollUpdateNotification notification) {
     if (_currentPage != 1 ||
+        !ref.read(settingsProvider).autoHideLyricsControls ||
         _landscape ||
         notification.dragDetails == null ||
         notification.metrics.axis != Axis.vertical) {

@@ -23,6 +23,7 @@ class MornyeLandscapePlayer extends StatefulWidget {
     required this.onPageChanged,
     this.lyricsOptions,
     this.controlsHeldOpen = false,
+    this.autoHideLyricsControls = true,
   });
 
   final Widget artwork;
@@ -36,6 +37,7 @@ class MornyeLandscapePlayer extends StatefulWidget {
   final int page;
   final bool isPlaying;
   final bool controlsHeldOpen;
+  final bool autoHideLyricsControls;
   final ValueChanged<int> onPageChanged;
   final Widget? lyricsOptions;
 
@@ -51,7 +53,9 @@ class _MornyeLandscapePlayerState extends State<MornyeLandscapePlayer> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (isAndroidTv || MediaQuery.accessibleNavigationOf(context)) {
+    if (!widget.autoHideLyricsControls ||
+        isAndroidTv ||
+        MediaQuery.accessibleNavigationOf(context)) {
       _actionsVisible = true;
       _hideTimer?.cancel();
     } else {
@@ -63,7 +67,8 @@ class _MornyeLandscapePlayerState extends State<MornyeLandscapePlayer> {
   void didUpdateWidget(MornyeLandscapePlayer oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.page != widget.page ||
-        oldWidget.isPlaying != widget.isPlaying) {
+        oldWidget.isPlaying != widget.isPlaying ||
+        oldWidget.autoHideLyricsControls != widget.autoHideLyricsControls) {
       _actionsVisible = true;
       _scheduleHide();
     } else if (oldWidget.controlsHeldOpen != widget.controlsHeldOpen) {
@@ -74,6 +79,7 @@ class _MornyeLandscapePlayerState extends State<MornyeLandscapePlayer> {
   void _scheduleHide() {
     _hideTimer?.cancel();
     if (widget.page != 1 ||
+        !widget.autoHideLyricsControls ||
         isAndroidTv ||
         !widget.isPlaying ||
         widget.controlsHeldOpen ||

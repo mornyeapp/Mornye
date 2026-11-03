@@ -417,6 +417,17 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage>
                     .read(settingsProvider.notifier)
                     .setLandscapeLyricsArtwork(value),
               ),
+              if (!isDesktopPlatform)
+                SettingsSwitchItem(
+                  key: const ValueKey('auto-hide-lyrics-controls'),
+                  icon: Icons.fullscreen,
+                  title: context.l10n.autoHideLyricsControls,
+                  subtitle: context.l10n.autoHideLyricsControlsDescription,
+                  value: settings.autoHideLyricsControls,
+                  onChanged: ref
+                      .read(settingsProvider.notifier)
+                      .setAutoHideLyricsControls,
+                ),
               SettingsSwitchItem(
                 icon: Icons.short_text,
                 title: context.l10n.compactPlayer,

@@ -340,6 +340,19 @@ class SettingsSearchCatalog {
           subtitle: l10n.landscapeLyricsArtworkDescription,
           keywords: const ['landscape', 'lyrics', 'album art', 'details'],
         ),
+        if (!isDesktopPlatform)
+          SettingsSearchEntry(
+            icon: Icons.fullscreen,
+            title: l10n.autoHideLyricsControls,
+            subtitle: l10n.autoHideLyricsControlsDescription,
+            keywords: const [
+              'lyrics',
+              'fullscreen',
+              '5 seconds',
+              'controls',
+              'idle',
+            ],
+          ),
         SettingsSearchEntry(
           icon: Icons.short_text,
           title: l10n.compactPlayer,

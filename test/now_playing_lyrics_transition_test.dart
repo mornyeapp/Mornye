@@ -1655,6 +1655,61 @@ void main() {
     );
   }
 
+  for (final mornye in [false, true]) {
+    for (final landscape in [false, true]) {
+      testWidgets('automatic fullscreen lyrics follows the saved option '
+          '(Mornye: $mornye, landscape: $landscape)', (tester) async {
+        metadataOverrides['lyrics'] = List.generate(
+          20,
+          (index) => '[00:${index.toString().padLeft(2, '0')}.00]Line $index',
+        ).join('\n');
+        await pumpNowPlaying(
+          tester,
+          theme: mornye ? MornyeTheme.build(Brightness.dark) : AppTheme.light(),
+          size: landscape ? const Size(852, 393) : const Size(393, 852),
+          playback: PlaybackState(playing: true),
+        );
+        mediaItems.add(item('many'));
+        await settlePlayer(tester);
+        final settings = ProviderScope.containerOf(
+          tester.element(find.byType(NowPlayingScreen)),
+        ).read(settingsProvider.notifier);
+        settings.setAutoHideLyricsControls(false);
+        if (!mornye && landscape) settings.setLandscapeLyricsArtwork(true);
+        await settlePlayer(tester);
+        final toggle = mornye
+            ? findAppIcon(CupertinoIcons.quote_bubble)
+            : find.byKey(const ValueKey('material-lyrics-toggle'));
+        await tester.tap(toggle);
+        await settlePlayer(tester);
+        await tester.pump(const Duration(seconds: 6));
+        expect(toggle.hitTestable(), findsOneWidget);
+
+        // Manual scrolling must not hide controls when the option is off.
+        await tester.drag(find.byType(ListView), const Offset(0, -100));
+        await settlePlayer(tester);
+        expect(toggle.hitTestable(), findsOneWidget);
+
+        settings.setAutoHideLyricsControls(true);
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 4900));
+        expect(toggle.hitTestable(), findsOneWidget);
+        await tester.pump(const Duration(milliseconds: 100));
+        await settlePlayer(tester);
+        expect(toggle.hitTestable(), findsNothing);
+
+        // A live change reveals already hidden controls immediately.
+        settings.setAutoHideLyricsControls(false);
+        await settlePlayer(tester);
+        expect(toggle.hitTestable(), findsOneWidget);
+        await tester.pump(const Duration(seconds: 6));
+        expect(toggle.hitTestable(), findsOneWidget);
+        await tester.pumpWidget(const SizedBox());
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
+
   for (final landscape in [false, true]) {
     testWidgets(
       'Material lyrics fill the player while idle (landscape: $landscape)',

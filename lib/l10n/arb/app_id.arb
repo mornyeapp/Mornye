@@ -7431,6 +7431,14 @@
   "@landscapeLyricsArtworkDescription": {
     "description": "Subtitle explaining the Material landscape lyrics layout setting"
   },
+  "autoHideLyricsControls": "Lirik layar penuh otomatis",
+  "@autoHideLyricsControls": {
+    "description": "Playback switch that lets lyrics take more screen space after five idle seconds"
+  },
+  "autoHideLyricsControlsDescription": "Sembunyikan kontrol player setelah 5 detik saat lirik terbuka. Nonaktifkan untuk mempertahankan tampilan saat ini",
+  "@autoHideLyricsControlsDescription": {
+    "description": "Subtitle explaining the five-second Now Playing lyrics timeout"
+  },
   "playerCoverStyleDefault": "Default",
   "@playerCoverStyleDefault": {
     "description": "Cover art style: artwork card above the controls"

@@ -8147,6 +8147,14 @@
   "@landscapeLyricsArtworkDescription": {
     "description": "Subtitle explaining the Material landscape lyrics layout setting"
   },
+  "autoHideLyricsControls": "Automatic fullscreen lyrics",
+  "@autoHideLyricsControls": {
+    "description": "Playback switch that lets lyrics take more screen space after five idle seconds"
+  },
+  "autoHideLyricsControlsDescription": "Hide player controls after 5 seconds while lyrics are open. Turn off to keep the current view",
+  "@autoHideLyricsControlsDescription": {
+    "description": "Subtitle explaining the five-second Now Playing lyrics timeout"
+  },
   "compactPlayer": "Compact player",
   "@compactPlayer": {
     "description": "Material player setting: idle lyrics shrink the player to a slim bar instead of hiding it"

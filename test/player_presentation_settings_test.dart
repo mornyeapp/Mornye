@@ -11,6 +11,8 @@ import 'package:mornye/models/settings.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/screens/settings/playback_settings_page.dart';
 import 'package:mornye/theme/app_theme.dart';
+import 'package:mornye/theme/mornye_theme.dart';
+import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/utils/settings_search_catalog.dart';
 import 'package:mornye/widgets/material_player_backdrop.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -29,6 +31,7 @@ void main() {
     expect(full.playerCoverStyleFor(mornye: true), 'fullscreen');
     expect(restored.musicHaptics, isFalse);
     expect(restored.landscapeLyricsArtwork, isFalse);
+    expect(restored.autoHideLyricsControls, isTrue);
   });
 
   test('cover style and music haptics survive a round trip', () {
@@ -36,11 +39,17 @@ void main() {
       playerCoverStyle: 'default',
       musicHaptics: true,
       landscapeLyricsArtwork: true,
+      autoHideLyricsControls: false,
     );
     final restored = AppSettings.fromJson(settings.toJson());
     expect(restored.playerCoverStyle, 'default');
     expect(restored.musicHaptics, isTrue);
     expect(restored.landscapeLyricsArtwork, isTrue);
+    expect(restored.autoHideLyricsControls, isFalse);
+    expect(
+      restored.copyWith(autoHideLyricsControls: true).autoHideLyricsControls,
+      isTrue,
+    );
     expect(
       restored.copyWith(landscapeLyricsArtwork: false).landscapeLyricsArtwork,
       isFalse,
@@ -108,6 +117,68 @@ void main() {
     );
     expect(tester.takeException(), isNull);
   });
+
+  for (final mornye in [false, true]) {
+    testWidgets(
+      'automatic fullscreen lyrics is saved and searchable (Mornye: $mornye)',
+      (tester) async {
+        SharedPreferences.setMockInitialValues({});
+        debugDesktopPlatformOverride = false;
+        addTearDown(() => debugDesktopPlatformOverride = null);
+        tester.view.physicalSize = const Size(390, 844);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        final container = ProviderContainer(
+          overrides: [
+            initialSettingsProvider.overrideWithValue(const AppSettings()),
+          ],
+        );
+        addTearDown(container.dispose);
+        await tester.pumpWidget(
+          UncontrolledProviderScope(
+            container: container,
+            child: MaterialApp(
+              theme: mornye
+                  ? MornyeTheme.build(Brightness.dark)
+                  : AppTheme.light(),
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              home: const PlaybackSettingsPage(),
+            ),
+          ),
+        );
+        final option = find.byKey(const ValueKey('auto-hide-lyrics-controls'));
+        await tester.scrollUntilVisible(
+          option,
+          200,
+          scrollable: find.byType(Scrollable).first,
+        );
+        await tester.pumpAndSettle();
+        expect(container.read(settingsProvider).autoHideLyricsControls, isTrue);
+        await tester.tap(option);
+        await tester.pumpAndSettle();
+        expect(
+          container.read(settingsProvider).autoHideLyricsControls,
+          isFalse,
+        );
+        final prefs = await SharedPreferences.getInstance();
+        final restored = AppSettings.fromJson(
+          jsonDecode(prefs.getString('app_settings')!) as Map<String, dynamic>,
+        );
+        expect(restored.autoHideLyricsControls, isFalse);
+        final l10n = AppLocalizations.of(tester.element(option));
+        expect(
+          SettingsSearchCatalog(l10n).playback.where(
+            (entry) =>
+                entry.title == l10n.autoHideLyricsControls &&
+                entry.matches(SettingsSearchQuery('fullscreen lyrics')),
+          ),
+          hasLength(1),
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 
   testWidgets('full-screen Material cover keeps the entire app bar readable', (
     tester,

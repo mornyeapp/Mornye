@@ -711,6 +711,9 @@ class SettingsNotifier extends Notifier<AppSettings> {
   void setLandscapeLyricsArtwork(bool enabled) =>
       _commit(state.copyWith(landscapeLyricsArtwork: enabled));
 
+  void setAutoHideLyricsControls(bool enabled) =>
+      _commit(state.copyWith(autoHideLyricsControls: enabled));
+
   void setCompactPlayer(bool enabled) =>
       _commit(state.copyWith(compactPlayer: enabled));
 

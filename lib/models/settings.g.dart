@@ -85,6 +85,7 @@ AppSettings _$AppSettingsFromJson(Map<String, dynamic> json) => AppSettings(
       ? ''
       : playerCoverStyleFromJson(json['playerCoverStyle']),
   landscapeLyricsArtwork: json['landscapeLyricsArtwork'] as bool? ?? false,
+  autoHideLyricsControls: json['autoHideLyricsControls'] as bool? ?? true,
   compactPlayer: json['compactPlayer'] as bool? ?? false,
   isFirstLaunch: json['isFirstLaunch'] as bool? ?? true,
   checkForUpdates: json['checkForUpdates'] as bool? ?? true,
@@ -240,6 +241,7 @@ Map<String, dynamic> _$AppSettingsToJson(
   'musicHapticsStrength': instance.musicHapticsStrength,
   'playerCoverStyle': instance.playerCoverStyle,
   'landscapeLyricsArtwork': instance.landscapeLyricsArtwork,
+  'autoHideLyricsControls': instance.autoHideLyricsControls,
   'compactPlayer': instance.compactPlayer,
   'isFirstLaunch': instance.isFirstLaunch,
   'checkForUpdates': instance.checkForUpdates,
