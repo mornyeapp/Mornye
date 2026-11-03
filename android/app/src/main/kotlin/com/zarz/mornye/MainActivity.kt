@@ -11,6 +11,8 @@ import android.os.Build
 import android.os.Bundle
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
 import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.android.FlutterActivityLaunchConfigs.BackgroundMode
 import io.flutter.embedding.android.FlutterFragment
@@ -56,6 +58,7 @@ class MainActivity: FlutterFragmentActivity() {
     private val CHANNEL = "com.zarz.mornye/backend"
     private val LARGE_JSON_RESULT_FILE_KEY = "__json_file"
     private val LARGE_JSON_RESULT_FILE_THRESHOLD_BYTES = 256 * 1024
+    private var keyboardDismissalPending = false
     internal val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     internal var backendChannel: MethodChannel? = null
     internal var audioOutputChannel: MethodChannel? = null
@@ -386,6 +389,27 @@ class MainActivity: FlutterFragmentActivity() {
         resources.configuration.uiMode and Configuration.UI_MODE_TYPE_MASK == Configuration.UI_MODE_TYPE_TELEVISION ||
             packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK) ||
             packageManager.hasSystemFeature(PackageManager.FEATURE_TELEVISION)
+
+    override fun onStop() {
+        keyboardDismissalPending = !isTelevisionDevice()
+        super.onStop()
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) {
+            if (keyboardDismissalPending) {
+                keyboardDismissalPending = false
+                // An IME hide sent while stopped can be rejected because
+                // the window is no longer served by the input method.
+                WindowCompat.getInsetsController(window, window.decorView)
+                    .hide(WindowInsetsCompat.Type.ime())
+            }
+            // The IME can disappear while the activity is stopped. Refresh
+            // Flutter's viewport from Android's current insets on return.
+            window.decorView.requestApplyInsets()
+        }
+    }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)

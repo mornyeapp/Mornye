@@ -22,6 +22,7 @@ import 'package:mornye/l10n/supported_locales.dart';
 import 'package:mornye/utils/adaptive_layout.dart';
 import 'package:mornye/utils/android_tv.dart';
 import 'package:mornye/utils/desktop_platform.dart';
+import 'package:mornye/widgets/android_keyboard_lifecycle.dart';
 import 'package:mornye/widgets/app_snack_bar.dart';
 import 'package:mornye/widgets/desktop/desktop_shortcuts.dart';
 import 'package:mornye/widgets/desktop/library_drop_target.dart';
@@ -221,7 +222,7 @@ Widget buildAppContent(
       ),
     );
   }
-  return _AppMediaQuery(child: appContent);
+  return AndroidKeyboardLifecycle(child: _AppMediaQuery(child: appContent));
 }
 
 /// Treats the display as one continuous surface so bottom sheets and dialogs
