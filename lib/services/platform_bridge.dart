@@ -1140,6 +1140,13 @@ class PlatformBridge {
   static Future<bool> safExists(String uri) =>
       _invokeAs('safExists', {'uri': uri});
 
+  /// Lists playable documents for a temporary queue, without indexing a source.
+  static Future<List<dynamic>> listSafAudioFiles(String treeUri) async =>
+      await _channel.invokeMethod<List<dynamic>>('listSafAudioFiles', {
+        'tree_uri': treeUri,
+      }) ??
+      const [];
+
   /// Exact-path checks. Only explicit `missing` results authorize cleanup;
   /// absent responses and permission/provider failures remain unknown.
   static Future<Map<String, bool?>> safExistsBatch(List<String> uris) async {

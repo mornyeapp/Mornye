@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:ui' show ImageFilter;
+import 'package:mornye/controllers/open_audio_controller.dart';
+import 'package:mornye/services/audio_file_open_service.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:mornye/widgets/app_alert_dialog.dart';
@@ -148,6 +150,7 @@ class _MainShellState extends ConsumerState<MainShell>
   bool _safRepairDialogVisible = false;
   bool _usbVolumeWarningShown = false;
   StreamSubscription<String>? _shareSubscription;
+  StreamSubscription<List<OpenAudioFile>>? _audioOpenSubscription;
   DateTime? _lastBackPress;
   final GlobalKey<NavigatorState> _homeTabNavigatorKey =
       ShellNavigationService.homeTabNavigatorKey;
@@ -340,6 +343,11 @@ class _MainShellState extends ConsumerState<MainShell>
   }
 
   void _setupShareListener() {
+    final audio = AudioFileOpenService.instance;
+    _audioOpenSubscription = audio.requests.listen(_openAudioFiles);
+    for (final files in audio.takePending()) {
+      unawaited(_openAudioFiles(files));
+    }
     final pendingUrl = ShareIntentService().consumePendingUrl();
     if (pendingUrl != null) {
       _handleSharedUrl(pendingUrl);
@@ -354,6 +362,14 @@ class _MainShellState extends ConsumerState<MainShell>
       },
       cancelOnError: false,
     );
+  }
+
+  Future<void> _openAudioFiles(List<OpenAudioFile> files) async {
+    try {
+      await ref.read(openAudioControllerProvider.notifier).open(files);
+    } catch (error) {
+      if (mounted) showCannotOpenFileSnackBar(context, error);
+    }
   }
 
   Future<void> _handleSharedUrl(String url) async {
@@ -421,6 +437,7 @@ class _MainShellState extends ConsumerState<MainShell>
     usbAudioStatus.removeListener(_onUsbAudioStatusChanged);
     ShellNavigationService.unregisterTabSelectionHandler(this);
     _shareSubscription?.cancel();
+    _audioOpenSubscription?.cancel();
     _pageController.dispose();
     _tabJumpOpacity.dispose();
     _tabJumpTransitionController.dispose();

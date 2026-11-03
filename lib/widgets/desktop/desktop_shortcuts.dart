@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/constants/app_info.dart';
+import 'package:mornye/controllers/open_audio_controller.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
@@ -15,6 +16,7 @@ import 'package:mornye/services/music_playback_deck.dart'
 import 'package:mornye/services/shell_navigation_service.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/app_refresh_indicator.dart';
+import 'package:mornye/widgets/open_audio_button.dart';
 import 'package:mornye/widgets/desktop/desktop_commands.dart';
 import 'package:mornye/widgets/desktop/desktop_inspector.dart';
 import 'package:mornye/widgets/desktop/desktop_player_bar.dart';
@@ -94,6 +96,8 @@ class _DesktopShortcutsState extends ConsumerState<DesktopShortcuts> {
       return false;
     }
     return switch (command) {
+      DesktopCommand.openAudioFiles ||
+      DesktopCommand.openAudioFolder => !ref.read(openAudioControllerProvider),
       DesktopCommand.playPause => !_editingText && _nothingFocused,
       // Text fields use these keys for caret movement.
       DesktopCommand.next ||
@@ -113,6 +117,18 @@ class _DesktopShortcutsState extends ConsumerState<DesktopShortcuts> {
     if (_playerCommand(command) && !ref.read(playerUiEnabledProvider)) return;
     final controller = ref.read(musicPlayerControllerProvider);
     switch (command) {
+      case DesktopCommand.openAudioFiles:
+      case DesktopCommand.openAudioFolder:
+        final target = _rootNavigator?.context;
+        if (target != null) {
+          unawaited(
+            pickOpenAudio(
+              target,
+              ref,
+              folder: command == DesktopCommand.openAudioFolder,
+            ),
+          );
+        }
       case DesktopCommand.playPause:
         unawaited(
           controller.togglePlayPause(ref.read(playbackPlayingProvider)),
@@ -428,7 +444,11 @@ class _DesktopMenuBarState extends ConsumerState<_DesktopMenuBar> {
       ),
       PlatformMenu(
         label: l10n.desktopMenuFile,
-        menus: [_command(l10n.mornyeSearch, DesktopCommand.search)],
+        menus: [
+          _command(l10n.openAudioFiles, DesktopCommand.openAudioFiles),
+          _command(l10n.openAudioFolder, DesktopCommand.openAudioFolder),
+          _command(l10n.mornyeSearch, DesktopCommand.search),
+        ],
       ),
       PlatformMenu(
         label: l10n.desktopMenuEdit,

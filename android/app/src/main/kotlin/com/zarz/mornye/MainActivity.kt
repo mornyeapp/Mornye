@@ -101,6 +101,7 @@ class MainActivity: FlutterFragmentActivity() {
         "processPendingExtensionCallbacks",
         "safExists",
         "safExistsBatch",
+        "listSafAudioFiles",
         "isSafTreeAccessible",
         "probeSafTreeReadAccess",
         "safDelete",
@@ -371,6 +372,7 @@ class MainActivity: FlutterFragmentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        AudioOpenBridge.consume(this, intent)
         requestedOrientation = if (isTelevisionDevice()) {
             ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
         } else {
@@ -412,6 +414,7 @@ class MainActivity: FlutterFragmentActivity() {
     }
 
     override fun onNewIntent(intent: Intent) {
+        AudioOpenBridge.consume(this, intent)
         super.onNewIntent(intent)
         setIntent(intent)
         handleVerificationNotificationIntent(intent)
@@ -458,6 +461,7 @@ class MainActivity: FlutterFragmentActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        AudioOpenBridge.attach(flutterEngine.dartExecutor.binaryMessenger)
         // Select and initialize the runtime before Flutter can dispatch a call.
         val selectedBackend = coreBackend
         sweepStaleCacheFiles()
@@ -526,6 +530,7 @@ class MainActivity: FlutterFragmentActivity() {
                         }
                         "safExists" -> handleSafExists(call, result)
                         "safExistsBatch" -> handleSafExistsBatch(call, result)
+                        "listSafAudioFiles" -> handleListSafAudioFiles(call, result)
                         "probeSafTreeReadAccess" -> handleProbeSafTreeReadAccess(call, result)
                         "isSafTreeAccessible" -> handleIsSafTreeAccessible(call, result)
                         "safDelete" -> handleSafDelete(call, result)

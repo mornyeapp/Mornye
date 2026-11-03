@@ -45,6 +45,7 @@ class MainFlutterWindow: NSWindow {
 
     RegisterGeneratedPlugins(registry: flutterViewController)
     registerWindowChannel(flutterViewController.engine.binaryMessenger)
+    (NSApp.delegate as? AppDelegate)?.installAudioOpenChannel(flutterViewController.engine.binaryMessenger)
 
     super.awakeFromNib()
 

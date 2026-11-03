@@ -12,6 +12,35 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.File
 
+internal suspend fun Context.handleListSafAudioFiles(call: MethodCall, result: MethodChannel.Result) {
+    val tree = Uri.parse(call.argument<String>("tree_uri") ?: "")
+    val files = withContext(Dispatchers.IO) {
+        val root = DocumentFile.fromTreeUri(this@handleListSafAudioFiles, tree)
+            ?: throw IllegalArgumentException("Invalid audio folder")
+        val pending = ArrayDeque<DocumentFile>()
+        val visited = mutableSetOf<String>()
+        val found = mutableListOf<Map<String, String>>()
+        val extensions = setOf("flac", "alac", "wav", "aiff", "aif", "opus", "ogg", "mp3", "aac", "m4a")
+        pending.add(root)
+        while (pending.isNotEmpty()) {
+            val directory = pending.removeFirst()
+            if (!visited.add(directory.uri.toString())) continue
+            check(visited.size <= 10000) { "Too many folders selected" }
+            for (child in listSafChildrenOrThrow(directory, includeLastModified = false)) {
+                if (child.isDirectory) {
+                    check(pending.size + visited.size < 10000) { "Too many folders selected" }
+                    pending.add(child.doc)
+                } else if (child.isFile && child.name?.substringAfterLast('.')?.lowercase() in extensions) {
+                    check(found.size < 10000) { "Too many audio files selected" }
+                    found.add(mapOf("source" to child.doc.uri.toString(), "name" to child.name.orEmpty()))
+                }
+            }
+        }
+        found.sortedBy { it["name"]?.lowercase() }
+    }
+    result.success(files)
+}
+
 internal suspend fun Context.handleSafExists(call: MethodCall, result: MethodChannel.Result) {
     val uriStr = call.argument<String>("uri") ?: ""
     val exists = withContext(Dispatchers.IO) {

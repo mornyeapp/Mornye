@@ -35,6 +35,50 @@ import UniformTypeIdentifiers
     private var securityScopedAccesses: [String: (URL, CoreDirectoryScope)] = [:]
 
     private var pendingDirectoryPickerResult: FlutterResult?
+    private var audioOpenChannel: FlutterMethodChannel?
+    private var pendingAudio: [[String]] = []
+    private var audioOpenReady = false
+    private let audioOpenQueue = DispatchQueue(label: "com.zarz.mornye.open_audio", qos: .userInitiated)
+
+    /// Keep imported documents readable after the sender releases its grant.
+    func handleAudioOpen(url: URL) -> Bool {
+        guard url.isFileURL else { return false }
+        let allowed = ["flac", "alac", "wav", "aiff", "aif", "opus", "ogg", "mp3", "aac", "m4a"]
+        guard allowed.contains(url.pathExtension.lowercased()) else { return false }
+        audioOpenQueue.async { [weak self] in
+            let scoped = url.startAccessingSecurityScopedResource()
+            defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+            let folder = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+                .appendingPathComponent("open_audio", isDirectory: true)
+                .appendingPathComponent(UUID().uuidString, isDirectory: true)
+            let target = folder.appendingPathComponent(url.lastPathComponent)
+            do {
+                try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+                var coordinationError: NSError?
+                var copyError: Error?
+                NSFileCoordinator().coordinate(readingItemAt: url, options: [], error: &coordinationError) { readable in
+                    do { try FileManager.default.copyItem(at: readable, to: target) }
+                    catch { copyError = error }
+                }
+                if let error = coordinationError ?? copyError as NSError? { throw error }
+            } catch {
+                // Deliver the failed path as well so Flutter shows its normal
+                // cannot-open feedback instead of silently ignoring the request.
+                NSLog("Could not import audio document: %@", error.localizedDescription)
+            }
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                let files = [target.path]
+                if self.audioOpenReady {
+                    self.audioOpenChannel?.invokeMethod("open", arguments: files)
+                } else {
+                    if self.pendingAudio.count >= 32 { self.pendingAudio.removeFirst() }
+                    self.pendingAudio.append(files)
+                }
+            }
+        }
+        return true
+    }
 
     /// Whether a download queue is active; while true a background assertion
     /// is acquired before work starts and renewed on later background entries.
@@ -62,6 +106,15 @@ import UniformTypeIdentifiers
     }
 
     private func configureFlutterEngine(_ messenger: FlutterBinaryMessenger, registry: FlutterPluginRegistry) {
+        let audioChannel = FlutterMethodChannel(name: "com.zarz.mornye/open_audio", binaryMessenger: messenger)
+        audioOpenChannel = audioChannel
+        audioChannel.setMethodCallHandler { [weak self] call, result in
+            guard let self else { result(nil); return }
+            guard call.method == "takePending" else { result(FlutterMethodNotImplemented); return }
+            self.audioOpenReady = true
+            result(self.pendingAudio)
+            self.pendingAudio.removeAll()
+        }
         concertCalendar = ConcertCalendarBridge(messenger: messenger) { [weak self] in
             self?.activeWindow?.rootViewController
         }
@@ -183,7 +236,7 @@ import UniformTypeIdentifiers
         open url: URL,
         options: [UIApplication.OpenURLOptionsKey: Any] = [:]
     ) -> Bool {
-        if handleExtensionOAuthRedirect(url: url) {
+        if handleAudioOpen(url: url) || handleExtensionOAuthRedirect(url: url) {
             return true
         }
         return super.application(app, open: url, options: options)
@@ -838,13 +891,16 @@ class SceneDelegate: FlutterSceneDelegate {
         }
         super.scene(scene, willConnectTo: session, options: connectionOptions)
         for context in connectionOptions.urlContexts {
-            _ = appDelegate?.handleExtensionOAuthRedirect(url: context.url)
+            if appDelegate?.handleAudioOpen(url: context.url) != true {
+                _ = appDelegate?.handleExtensionOAuthRedirect(url: context.url)
+            }
         }
     }
 
     override func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {
         let unhandled = URLContexts.filter {
-            appDelegate?.handleExtensionOAuthRedirect(url: $0.url) != true
+            appDelegate?.handleAudioOpen(url: $0.url) != true &&
+                appDelegate?.handleExtensionOAuthRedirect(url: $0.url) != true
         }
         if !unhandled.isEmpty {
             super.scene(scene, openURLContexts: unhandled)

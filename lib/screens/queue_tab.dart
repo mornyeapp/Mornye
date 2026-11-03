@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:mornye/widgets/open_audio_button.dart';
 import 'package:flutter/foundation.dart'
     show ValueListenable, listEquals, setEquals;
 import 'package:flutter/material.dart';
@@ -888,6 +889,7 @@ class _QueueTabState extends ConsumerState<QueueTab> {
                   AppSliverHeader.tabRoot(
                     title: context.l10n.navLibrary,
                     alignToContent: true,
+                    actions: const [OpenAudioButton()],
                   )
                 else
                   AppSliverHeader.page(

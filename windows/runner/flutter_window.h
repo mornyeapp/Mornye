@@ -9,6 +9,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <vector>
 
 #include "win32_window.h"
 
@@ -18,6 +19,8 @@ class FlutterWindow : public Win32Window {
   // Creates a new FlutterWindow hosting a Flutter view running |project|.
   explicit FlutterWindow(const flutter::DartProject& project);
   virtual ~FlutterWindow();
+  static constexpr ULONG_PTR kOpenAudioMessage = 0x4D415544;
+  void OpenAudioFiles(const std::vector<std::string>& paths);
 
  protected:
   bool OnCreate() override;
@@ -54,6 +57,9 @@ class FlutterWindow : public Win32Window {
 
   std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>>
       window_channel_;
+  std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>> audio_channel_;
+  flutter::EncodableList pending_audio_;
+  bool audio_ready_ = false;
 
   // Whether the window shows the mini player, and what it restores.
   bool mini_player_ = false;

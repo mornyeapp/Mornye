@@ -24,6 +24,9 @@ struct _MyApplication {
   GtkWindow* window;
   // Answers lib/widgets/desktop/desktop_window.dart.
   FlMethodChannel* window_channel;
+  FlMethodChannel* audio_channel;
+  FlValue* pending_audio;
+  gboolean audio_ready;
   GtkWidget* header_bar;
   gboolean borderless;
 
@@ -43,6 +46,19 @@ struct _MyApplication {
 };
 
 G_DEFINE_TYPE(MyApplication, my_application, GTK_TYPE_APPLICATION)
+
+static void audio_method_call_cb(FlMethodChannel* /*channel*/,
+                                FlMethodCall* call, gpointer user_data) {
+  MyApplication* self = MY_APPLICATION(user_data);
+  if (strcmp(fl_method_call_get_name(call), "takePending") != 0) {
+    fl_method_call_respond_not_implemented(call, nullptr);
+    return;
+  }
+  self->audio_ready = TRUE;
+  fl_method_call_respond_success(call, self->pending_audio, nullptr);
+  g_clear_pointer(&self->pending_audio, fl_value_unref);
+  self->pending_audio = fl_value_new_list();
+}
 
 static const gchar* window_mode(MyApplication* self) {
   GdkWindow* window = gtk_widget_get_window(GTK_WIDGET(self->window));
@@ -422,6 +438,11 @@ static void my_application_activate(GApplication* application) {
       "com.zarz.mornye/window", FL_METHOD_CODEC(codec));
   fl_method_channel_set_method_call_handler(
       self->window_channel, window_method_call_cb, self, nullptr);
+  self->audio_channel = fl_method_channel_new(
+      fl_engine_get_binary_messenger(fl_view_get_engine(view)),
+      "com.zarz.mornye/open_audio", FL_METHOD_CODEC(codec));
+  fl_method_channel_set_method_call_handler(
+      self->audio_channel, audio_method_call_cb, self, nullptr);
 
   gtk_widget_grab_focus(GTK_WIDGET(view));
 }
@@ -456,6 +477,28 @@ static gboolean my_application_local_command_line(GApplication* application,
 static gint my_application_command_line(GApplication* application,
                                         GApplicationCommandLine* command_line) {
   g_application_activate(application);
+  MyApplication* self = MY_APPLICATION(application);
+  gint count = 0;
+  g_auto(GStrv) args =
+      g_application_command_line_get_arguments(command_line, &count);
+  g_autoptr(FlValue) files = fl_value_new_list();
+  for (gint i = 1; i < count; ++i) {
+    if (args[i][0] == '-') continue;
+    g_autofree gchar* scheme = g_uri_parse_scheme(args[i]);
+    if (scheme != nullptr && strcmp(scheme, "file") != 0) continue;
+    g_autoptr(GFile) file =
+        g_application_command_line_create_file_for_arg(command_line, args[i]);
+    g_autofree gchar* path = g_file_get_path(file);
+    if (path != nullptr) fl_value_append_take(files, fl_value_new_string(path));
+  }
+  if (fl_value_get_length(files) != 0) {
+    if (self->audio_ready) {
+      fl_method_channel_invoke_method(self->audio_channel, "open", files,
+                                      nullptr, nullptr, nullptr);
+    } else if (fl_value_get_length(self->pending_audio) < 32) {
+      fl_value_append(self->pending_audio, files);
+    }
+  }
   return 0;
 }
 
@@ -471,6 +514,8 @@ static void my_application_dispose(GObject* object) {
   MyApplication* self = MY_APPLICATION(object);
   g_clear_pointer(&self->dart_entrypoint_arguments, g_strfreev);
   g_clear_object(&self->window_channel);
+  g_clear_object(&self->audio_channel);
+  g_clear_pointer(&self->pending_audio, fl_value_unref);
   self->window = nullptr;
   G_OBJECT_CLASS(my_application_parent_class)->dispose(object);
 }
@@ -485,7 +530,9 @@ static void my_application_class_init(MyApplicationClass* klass) {
   G_OBJECT_CLASS(klass)->dispose = my_application_dispose;
 }
 
-static void my_application_init(MyApplication* self) {}
+static void my_application_init(MyApplication* self) {
+  self->pending_audio = fl_value_new_list();
+}
 
 MyApplication* my_application_new() {
   // Set the program name to the application ID, which helps various systems

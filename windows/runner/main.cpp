@@ -18,6 +18,26 @@ constexpr wchar_t kSingleInstanceMutex[] = L"Local\\com.zarz.mornye.instance";
 // taskbar groups the window with its pinned shortcut.
 constexpr wchar_t kAppUserModelId[] = L"com.zarz.mornye";
 
+void ForwardAudioToInstance() {
+  HWND window = nullptr;
+  // A second file-manager launch can arrive before the first window exists.
+  for (int attempt = 0; attempt < 50 && window == nullptr; ++attempt) {
+    window = ::FindWindowW(L"FLUTTER_RUNNER_WIN32_WINDOW", L"Mornye");
+    if (window == nullptr) ::Sleep(100);
+  }
+  if (window == nullptr) return;
+  const auto* command = ::GetCommandLineW();
+  COPYDATASTRUCT data = {};
+  data.dwData = FlutterWindow::kOpenAudioMessage;
+  data.cbData = static_cast<DWORD>((wcslen(command) + 1) * sizeof(wchar_t));
+  data.lpData = const_cast<wchar_t*>(command);
+  DWORD_PTR response = 0;
+  ::SendMessageTimeoutW(window, WM_COPYDATA, 0, reinterpret_cast<LPARAM>(&data),
+                        SMTO_ABORTIFHUNG, 5000, &response);
+  if (::IsIconic(window)) ::ShowWindow(window, SW_RESTORE);
+  ::SetForegroundWindow(window);
+}
+
 constexpr wchar_t kUrlSchemeKey[] = L"Software\\Classes\\mornye";
 constexpr wchar_t kUrlCommandKey[] =
     L"Software\\Classes\\mornye\\shell\\open\\command";
@@ -66,8 +86,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   HANDLE instance_mutex =
       ::CreateMutexW(nullptr, TRUE, kSingleInstanceMutex);
   if (instance_mutex != nullptr && ::GetLastError() == ERROR_ALREADY_EXISTS) {
-    // False while the first instance has not created its window yet; the
-    // URL is then lost, as for any launch during startup.
+    ForwardAudioToInstance();
     SendAppLinkToInstance();
     ::CloseHandle(instance_mutex);
     return EXIT_SUCCESS;
@@ -100,6 +119,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
     return EXIT_FAILURE;
   }
   window.SetQuitOnClose(true);
+  window.OpenAudioFiles(GetCommandLineArguments());
 
   ::MSG msg;
   while (::GetMessage(&msg, nullptr, 0, 0)) {

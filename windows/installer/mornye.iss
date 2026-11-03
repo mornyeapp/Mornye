@@ -60,6 +60,7 @@ PrivilegesRequired=lowest
 DefaultDirName={userpf}\{#AppName}
 DisableDirPage=yes
 DisableProgramGroupPage=yes
+ChangesAssociations=yes
 DefaultGroupName={#AppName}
 UsePreviousAppDir=yes
 ArchitecturesAllowed={#AllowedArchitectures}
@@ -95,6 +96,40 @@ Name: "{autoprograms}\{#AppName}"; Filename: "{app}\{#AppExe}"; AppUserModelID: 
 Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExe}"; AppUserModelID: "{#AppUserModelId}"; Tasks: desktopicon
 
 [Registry]
+; Register an optional player. Never change the user's default or UserChoice.
+Root: HKCU; Subkey: "Software\Classes\Mornye.Audio"; ValueType: string; ValueName: ""; ValueData: "Mornye audio"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\Mornye.Audio\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: """{app}\{#AppExe}"",0"
+Root: HKCU; Subkey: "Software\Classes\Mornye.Audio\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#AppExe}"" ""%1"""
+Root: HKCU; Subkey: "Software\Classes\Applications\{#AppExe}"; ValueType: string; ValueName: "FriendlyAppName"; ValueData: "{#AppName}"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\Applications\{#AppExe}\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#AppExe}"" ""%1"""
+Root: HKCU; Subkey: "Software\RegisteredApplications"; ValueType: string; ValueName: "Mornye"; ValueData: "Software\Mornye\Capabilities"; Flags: uninsdeletevalue
+Root: HKCU; Subkey: "Software\Mornye\Capabilities"; ValueType: string; ValueName: "ApplicationName"; ValueData: "{#AppName}"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Mornye\Capabilities"; ValueType: string; ValueName: "ApplicationDescription"; ValueData: "Play audio files with Mornye"
+#sub RegisterAudioExtension
+Root: HKCU; Subkey: "Software\Classes\.{#AudioExt}\OpenWithProgids"; ValueType: string; ValueName: "Mornye.Audio"; ValueData: ""; Flags: uninsdeletevalue
+Root: HKCU; Subkey: "Software\Classes\Applications\{#AppExe}\SupportedTypes"; ValueType: string; ValueName: ".{#AudioExt}"; ValueData: ""
+Root: HKCU; Subkey: "Software\Mornye\Capabilities\FileAssociations"; ValueType: string; ValueName: ".{#AudioExt}"; ValueData: "Mornye.Audio"
+#endsub
+#define AudioExt "mp3"
+#call RegisterAudioExtension
+#define AudioExt "flac"
+#call RegisterAudioExtension
+#define AudioExt "alac"
+#call RegisterAudioExtension
+#define AudioExt "wav"
+#call RegisterAudioExtension
+#define AudioExt "aiff"
+#call RegisterAudioExtension
+#define AudioExt "aif"
+#call RegisterAudioExtension
+#define AudioExt "opus"
+#call RegisterAudioExtension
+#define AudioExt "ogg"
+#call RegisterAudioExtension
+#define AudioExt "aac"
+#call RegisterAudioExtension
+#define AudioExt "m4a"
+#call RegisterAudioExtension
 Root: HKCU; Subkey: "Software\Classes\mornye"; ValueType: string; ValueName: ""; ValueData: "URL:{#AppName} Protocol"; Flags: uninsdeletekey
 Root: HKCU; Subkey: "Software\Classes\mornye"; ValueType: string; ValueName: "URL Protocol"; ValueData: ""
 Root: HKCU; Subkey: "Software\Classes\mornye\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: """{app}\{#AppExe}"",0"

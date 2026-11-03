@@ -17,6 +17,7 @@ import 'package:mornye/services/library_database.dart';
 import 'package:mornye/utils/adaptive_layout.dart';
 import 'package:mornye/utils/nav_bar_inset.dart';
 import 'package:mornye/widgets/app_bottom_sheet.dart';
+import 'package:mornye/widgets/open_audio_button.dart';
 import 'package:mornye/widgets/tv_navigation.dart';
 import 'package:mornye/widgets/app_refresh_indicator.dart';
 import 'package:mornye/widgets/app_search_field.dart';
@@ -323,6 +324,7 @@ class _MornyeLibraryScreenState extends ConsumerState<MornyeLibraryScreen> {
             ? context.l10n.searchArtists
             : context.l10n.searchAlbums);
     final actions = <Widget>[
+      if (_overview) const OpenAudioButton(),
       IconButton(
         tooltip: context.l10n.librarySearchHint,
         icon: const Icon(Icons.search),

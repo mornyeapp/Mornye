@@ -1,6 +1,7 @@
 #include "flutter_window.h"
 
 #include <flutter/standard_method_codec.h>
+#include <shellapi.h>
 #include <windowsx.h>
 
 #include <algorithm>
@@ -10,6 +11,7 @@
 #include <variant>
 
 #include "flutter/generated_plugin_registrant.h"
+#include "utils.h"
 
 namespace {
 
@@ -73,6 +75,20 @@ bool FlutterWindow::OnCreate() {
     return false;
   }
   RegisterPlugins(flutter_controller_->engine());
+  audio_channel_ =
+      std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
+          flutter_controller_->engine()->messenger(), "com.zarz.mornye/open_audio",
+          &flutter::StandardMethodCodec::GetInstance());
+  audio_channel_->SetMethodCallHandler(
+      [this](const auto& call, auto result) {
+        if (call.method_name() != "takePending") {
+          result->NotImplemented();
+          return;
+        }
+        audio_ready_ = true;
+        result->Success(flutter::EncodableValue(pending_audio_));
+        pending_audio_.clear();
+      });
   window_channel_ =
       std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
           flutter_controller_->engine()->messenger(), "com.zarz.mornye/window",
@@ -95,7 +111,28 @@ bool FlutterWindow::OnCreate() {
   return true;
 }
 
+void FlutterWindow::OpenAudioFiles(const std::vector<std::string>& paths) {
+  flutter::EncodableList files;
+  for (const auto& path : paths) {
+    // Keep protocol callbacks in app_links, and reject command-line flags.
+    if (path.rfind("file:", 0) == 0 || path.rfind("\\\\", 0) == 0 ||
+        (path.size() >= 3 && path[1] == ':' &&
+         (path[2] == '\\' || path[2] == '/'))) {
+      files.emplace_back(path);
+    }
+  }
+  if (files.empty()) return;
+  if (audio_ready_) {
+    audio_channel_->InvokeMethod(
+        "open", std::make_unique<flutter::EncodableValue>(files));
+  } else {
+    if (pending_audio_.size() >= 32) pending_audio_.erase(pending_audio_.begin());
+    pending_audio_.emplace_back(files);
+  }
+}
+
 void FlutterWindow::OnDestroy() {
+  audio_channel_ = nullptr;
   window_channel_ = nullptr;
   if (flutter_controller_) {
     flutter_controller_ = nullptr;
@@ -108,6 +145,26 @@ LRESULT
 FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
                               WPARAM const wparam,
                               LPARAM const lparam) noexcept {
+  if (message == WM_COPYDATA && lparam != 0) {
+    const auto* data = reinterpret_cast<const COPYDATASTRUCT*>(lparam);
+    if (data->dwData == kOpenAudioMessage) {
+      if (data->lpData == nullptr || data->cbData < sizeof(wchar_t) ||
+          data->cbData > 65536 || data->cbData % sizeof(wchar_t) != 0) {
+        return FALSE;
+      }
+      const auto* text = static_cast<const wchar_t*>(data->lpData);
+      const size_t length = data->cbData / sizeof(wchar_t);
+      if (text[length - 1] != L'\0') return FALSE;
+      int count = 0;
+      auto** args = ::CommandLineToArgvW(text, &count);
+      if (args == nullptr) return FALSE;
+      std::vector<std::string> files;
+      for (int i = 1; i < count; ++i) files.push_back(Utf8FromUtf16(args[i]));
+      ::LocalFree(args);
+      OpenAudioFiles(files);
+      return TRUE;
+    }
+  }
   // Give Flutter, including plugins, an opportunity to handle window messages.
   if (flutter_controller_) {
     std::optional<LRESULT> result =

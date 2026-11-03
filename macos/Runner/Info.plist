@@ -8,6 +8,37 @@
 	<string>Mornye</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleDocumentTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>Audio</string>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+			<key>LSHandlerRank</key>
+			<string>Alternate</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>public.audio</string>
+				<string>org.xiph.flac</string>
+				<string>org.xiph.ogg-audio</string>
+				<string>org.xiph.opus</string>
+			</array>
+			<key>CFBundleTypeExtensions</key>
+			<array>
+				<string>flac</string>
+				<string>alac</string>
+				<string>wav</string>
+				<string>aiff</string>
+				<string>aif</string>
+				<string>opus</string>
+				<string>ogg</string>
+				<string>mp3</string>
+				<string>aac</string>
+				<string>m4a</string>
+			</array>
+		</dict>
+	</array>
 	<key>CFBundleIconFile</key>
 	<string></string>
 	<key>CFBundleIdentifier</key>

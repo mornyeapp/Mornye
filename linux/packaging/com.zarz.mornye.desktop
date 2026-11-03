@@ -11,4 +11,4 @@ StartupNotify=true
 StartupWMClass=com.zarz.mornye
 Categories=AudioVideo;Audio;Player;Music;
 Keywords=music;player;audio;flac;library;
-MimeType=x-scheme-handler/mornye;
+MimeType=x-scheme-handler/mornye;audio/mpeg;audio/flac;audio/x-flac;audio/ogg;audio/opus;application/ogg;audio/x-wav;audio/wav;audio/aac;audio/mp4;audio/x-aiff;

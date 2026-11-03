@@ -10296,6 +10296,9 @@
   "offlinePlayingLocal": "Playing from this device",
   "offlineStreaming": "Streaming from {server}",
   "@offlineStreaming": {"placeholders": {"server": {"type": "String"}}},
+  "openAudio": "Open audio",
+  "openAudioFiles": "Open audio files",
+  "openAudioFolder": "Play folder",
   "reorganizeLibraryFailed": "Couldn't reorganize your files: {error}",
   "@reorganizeLibraryFailed": {
     "description": "Snackbar when planning or applying the reorganization fails",

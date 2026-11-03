@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:mornye/services/audio_file_open_service.dart';
 import 'package:crypto/crypto.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart';
@@ -803,6 +804,7 @@ class _EagerInitializationState extends ConsumerState<EagerInitialization>
       await Future.wait([
         NotificationService().initialize(),
         ShareIntentService().initialize(),
+        AudioFileOpenService.instance.initialize(),
       ]);
     } catch (e) {
       debugPrint('Failed to initialize app services: $e');

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:receive_sharing_intent/receive_sharing_intent.dart';
 import 'package:mornye/utils/logger.dart';
+import 'package:mornye/services/audio_file_open_service.dart';
 
 final _log = AppLogger('ShareIntent');
 
@@ -62,6 +63,16 @@ class ShareIntentService {
     List<SharedMediaFile> files, {
     bool isInitial = false,
   }) {
+    final audio = [
+      for (final file in files)
+        if (file.type == SharedMediaType.file &&
+            OpenAudioFile.parse(file.path)?.isAudio == true)
+          file.path,
+    ];
+    if (audio.isNotEmpty) {
+      AudioFileOpenService.instance.receive(audio);
+      return;
+    }
     for (final file in files) {
       final textsToCheck = [file.path, if (file.message != null) file.message!];
 

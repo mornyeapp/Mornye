@@ -3,6 +3,38 @@ import FlutterMacOS
 
 @main
 class AppDelegate: FlutterAppDelegate {
+  private var audioOpenChannel: FlutterMethodChannel?
+  private var pendingAudio: [[String]] = []
+  private var audioOpenReady = false
+
+  func installAudioOpenChannel(_ messenger: FlutterBinaryMessenger) {
+    let channel = FlutterMethodChannel(name: "com.zarz.mornye/open_audio", binaryMessenger: messenger)
+    audioOpenChannel = channel
+    channel.setMethodCallHandler { [weak self] call, result in
+      guard let self else { result(nil); return }
+      guard call.method == "takePending" else { result(FlutterMethodNotImplemented); return }
+      self.audioOpenReady = true
+      result(self.pendingAudio)
+      self.pendingAudio.removeAll()
+    }
+  }
+
+  override func application(_ application: NSApplication, open urls: [URL]) {
+    let files = urls.filter(\.isFileURL).map(\.path)
+    if !files.isEmpty {
+      if audioOpenReady {
+        audioOpenChannel?.invokeMethod("open", arguments: files)
+      } else {
+        if pendingAudio.count >= 32 { pendingAudio.removeFirst() }
+        pendingAudio.append(files)
+      }
+      application.activate(ignoringOtherApps: true)
+      application.windows.first?.makeKeyAndOrderFront(nil)
+    }
+    let links = urls.filter { !$0.isFileURL }
+    if !links.isEmpty { super.application(application, open: links) }
+  }
+
   override func applicationWillFinishLaunching(_ notification: Notification) {
     // macOS only keeps one instance per app copy. With a second copy (an
     // old download next to /Applications, a mounted dmg, a debug build next
