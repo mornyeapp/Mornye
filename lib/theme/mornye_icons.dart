@@ -52,7 +52,8 @@ IconData _cupertinoFor(IconData icon) {
     Icons.folder_outlined ||
     Icons.folder_open ||
     Icons.folder_special ||
-    Icons.folder_special_outlined => CupertinoIcons.folder,
+    Icons.folder_special_outlined ||
+    Icons.drive_file_move_outlined => CupertinoIcons.folder,
     Icons.create_new_folder_outlined => CupertinoIcons.folder_badge_plus,
     Icons.storage_outlined ||
     Icons.sd_storage_outlined ||

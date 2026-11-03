@@ -13,6 +13,7 @@ void main() {
       Icons.library_music: CupertinoIcons.music_note_list,
       Icons.monitor_heart_outlined: CupertinoIcons.waveform_path_ecg,
       Icons.folder_open: CupertinoIcons.folder,
+      Icons.drive_file_move_outlined: CupertinoIcons.folder,
       Icons.computer: CupertinoIcons.desktopcomputer,
       Icons.campaign_outlined: CupertinoIcons.speaker_2,
       Icons.telegram: CupertinoIcons.paperplane,

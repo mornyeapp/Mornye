@@ -35,6 +35,10 @@ void main() {
     expect(materialSymbolFor(Icons.home_outlined)?.filled, isFalse);
     expect(materialSymbolFor(Icons.album_rounded)?.filled, isTrue);
     expect(materialSymbolFor(Icons.warning_amber_rounded)?.filled, isFalse);
+    expect(materialSymbolFor(Icons.drive_file_move_outlined), (
+      icon: Symbols.drive_file_move_rounded,
+      filled: false,
+    ));
   });
 
   test('unmapped and non-Material icons have no symbol', () {

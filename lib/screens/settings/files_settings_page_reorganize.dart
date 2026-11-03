@@ -161,11 +161,7 @@ class _ReorganizeScanningDialog extends StatelessWidget {
       child: AppAlertDialog(
         content: Row(
           children: [
-            const SizedBox(
-              width: 28,
-              height: 28,
-              child: AppProgressIndicator.circular(strokeWidth: 3),
-            ),
+            const AppLoadingIndicator(size: 28),
             const SizedBox(width: 20),
             Expanded(child: Text(context.l10n.reorganizeLibraryScanning)),
           ],
@@ -191,6 +187,9 @@ class _ReorganizeConfirmDialog extends StatelessWidget {
       fontFamily: 'monospace',
       color: colorScheme.onSurfaceVariant,
     );
+    final arrowSize = MediaQuery.textScalerOf(
+      context,
+    ).scale(pathStyle?.fontSize ?? 12);
     final notes = <String>[
       if (plan.alreadyOrganized > 0)
         l10n.reorganizeLibraryAlreadyOrganized(plan.alreadyOrganized),
@@ -226,9 +225,27 @@ class _ReorganizeConfirmDialog extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(move.sourceDisplayPath, style: pathStyle),
-                    Text(
-                      '→ ${move.targetDisplayPath}',
-                      style: pathStyle?.copyWith(color: colorScheme.primary),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Mirrors in right-to-left layouts, unlike a text arrow.
+                        AppIcon(
+                          context.isMornye
+                              ? mornyeArrowForward
+                              : Icons.arrow_forward_rounded,
+                          size: arrowSize,
+                          color: colorScheme.primary,
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            move.targetDisplayPath,
+                            style: pathStyle?.copyWith(
+                              color: colorScheme.primary,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),

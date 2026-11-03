@@ -10,6 +10,7 @@ import 'package:mornye/widgets/app_switch.dart';
 import 'package:mornye/widgets/app_text_field.dart';
 import 'package:mornye/widgets/app_bottom_sheet.dart';
 import 'package:mornye/widgets/app_choice_chip.dart';
+import 'package:mornye/theme/mornye_icons.dart' show mornyeArrowForward;
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
@@ -37,7 +38,7 @@ import 'package:mornye/widgets/settings_group.dart';
 import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/expressive_button.dart';
 import 'package:mornye/widgets/app_sliver_header.dart';
-import 'package:mornye/widgets/app_progress_indicator.dart';
+import 'package:mornye/widgets/app_loading_indicator.dart';
 import 'package:mornye/widgets/batch_progress_dialog.dart';
 
 part 'files_settings_page_widgets.dart';
@@ -348,23 +349,17 @@ class _FilesSettingsPageState extends ConsumerState<FilesSettingsPage> {
               ],
             ),
 
-            SliverToBoxAdapter(
-              child: SettingsSectionHeader(
-                title: context.l10n.sectionExistingDownloads,
-              ),
-            ),
-            SliverToBoxAdapter(
-              child: SettingsGroup(
-                children: [
-                  SettingsItem(
-                    icon: Icons.drive_file_move_outlined,
-                    title: context.l10n.reorganizeLibraryTitle,
-                    subtitle: context.l10n.reorganizeLibrarySubtitle,
-                    onTap: () => _reorganizeExistingDownloads(context, ref),
-                    showDivider: false,
-                  ),
-                ],
-              ),
+            ...settingsSectionSlivers(
+              title: context.l10n.sectionExistingDownloads,
+              children: [
+                SettingsItem(
+                  icon: Icons.drive_file_move_outlined,
+                  title: context.l10n.reorganizeLibraryTitle,
+                  subtitle: context.l10n.reorganizeLibrarySubtitle,
+                  onTap: () => _reorganizeExistingDownloads(context, ref),
+                  showDivider: false,
+                ),
+              ],
             ),
 
             if (Platform.isAndroid && _androidSdkVersion >= 33) ...[

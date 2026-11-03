@@ -269,6 +269,7 @@ final Map<IconData, IconData> _outlinedSymbols = {
   Icons.download_for_offline_outlined: Symbols.download_for_offline_rounded,
   Icons.download_outlined: Symbols.download_rounded,
   Icons.downloading_outlined: Symbols.downloading_rounded,
+  Icons.drive_file_move_outlined: Symbols.drive_file_move_rounded,
   Icons.dynamic_feed_outlined: Symbols.dynamic_feed_rounded,
   Icons.edit_outlined: Symbols.edit_rounded,
   Icons.error_outline: Symbols.error_rounded,
