@@ -266,8 +266,9 @@ enum ReleaseMode: String {
           case .readyToPlay:
             self.finishPlayerItemPreparation(.success(()))
           case .failed:
-            self.finishPlayerItemPreparation(
-              .failure(AudioPlayerError.error("Failed to set playerItem")))
+            let failure = Self.sourceError(playerItem.error)
+            self.eventHandler.onLog(message: "AVPlayer preparation failed: \(failure)")
+            self.finishPlayerItemPreparation(.failure(failure))
             self.reset()
           default:
             // Do not resume continuation yet.
@@ -278,6 +279,20 @@ enum ReleaseMode: String {
       // Replacing the player item triggers continuation of the observation.
       self.player.replaceCurrentItem(with: playerItem)
     }
+  }
+
+  /// Preserve the native cause without exposing URLs, headers or credentials
+  /// from NSError.userInfo in the player error or exported logs.
+  static func sourceError(_ error: Error?) -> AudioPlayerError {
+    var causes: [String] = []
+    var current = error as NSError?
+    for _ in 0..<5 {
+      guard let cause = current else { break }
+      causes.append("\(cause.domain) (\(cause.code))")
+      current = cause.userInfo[NSUnderlyingErrorKey] as? NSError
+    }
+    let detail = causes.isEmpty ? "" : " [\(causes.joined(separator: "; "))]"
+    return .error("Failed to set playerItem\(detail)")
   }
 
   private func finishPlayerItemPreparation(_ result: Result<Void, Error>) {

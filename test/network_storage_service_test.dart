@@ -558,7 +558,18 @@ void main() {
         } else {
           final part = networkByteRange(r.headers.value('range'), 10);
           r.response.statusCode = r.headers.value('range') == null ? 200 : 206;
-          r.response.headers.set('content-type', 'audio/flac');
+          final mime = switch (r.uri.pathSegments.last.toLowerCase()) {
+            'generic.flac' || 'generic.m4a' => 'application/octet-stream',
+            'untyped.mp3' => null,
+            'transcoded.flac' => 'audio/mpeg',
+            'login.flac' => 'text/html',
+            _ => 'audio/flac',
+          };
+          if (mime == null) {
+            r.response.headers.removeAll(HttpHeaders.contentTypeHeader);
+          } else {
+            r.response.headers.set(HttpHeaders.contentTypeHeader, mime);
+          }
           r.response.headers.set('accept-ranges', 'bytes');
           r.response.headers.set(
             'content-range',
@@ -724,6 +735,7 @@ void main() {
           NetworkStorageService.source(c.id, 'A B.flac'),
         );
         expect(url, isNot(contains('secret')));
+        expect(Uri.parse(url).path, endsWith('.flac'));
         final client = HttpClient();
         addTearDown(() => client.close(force: true));
         final request = await client.getUrl(Uri.parse(url));
@@ -742,6 +754,71 @@ void main() {
         final removed = await (await client.getUrl(Uri.parse(url))).close();
         expect(removed.statusCode, 404);
         await removed.drain<void>();
+      },
+    );
+
+    test(
+      'proxy keeps private file-type hints and fills generic MIME types',
+      () async {
+        final c = connection(
+          '$origin/music/',
+          user: 'test',
+          password: 'secret',
+        );
+        await service.save(c);
+        final client = HttpClient();
+        addTearDown(() => client.close(force: true));
+        for (final (name, suffix, mime) in [
+          ('generic.FLAC', 'flac', 'audio/flac'),
+          ('untyped.mp3', 'mp3', 'audio/mpeg'),
+          ('transcoded.flac', 'flac', 'audio/mpeg'),
+          ('login.flac', 'flac', 'text/html'),
+        ]) {
+          final url = Uri.parse(
+            await service.resolve(
+              NetworkStorageService.source(c.id, '日本語 #100%/$name'),
+            ),
+          );
+          expect(url.path, endsWith('.$suffix'));
+          expect(url.path, isNot(contains(name.toLowerCase())));
+          expect(url.pathSegments, hasLength(1));
+          expect(url.userInfo, isEmpty);
+          expect(url.query, isEmpty);
+          final request = await client.getUrl(url);
+          request.headers.set(HttpHeaders.rangeHeader, 'bytes=4-7');
+          final response = await request.close();
+          expect(response.statusCode, HttpStatus.partialContent);
+          expect(response.headers.contentType?.mimeType, mime);
+          expect(
+            response.headers.value(HttpHeaders.contentRangeHeader),
+            'bytes 4-7/10',
+          );
+          expect(await response.expand((chunk) => chunk).toList(), [
+            4,
+            5,
+            6,
+            7,
+          ]);
+          final head = await (await client.headUrl(url)).close();
+          expect(head.headers.contentType?.mimeType, mime);
+          expect(head.contentLength, 10);
+          expect(await head.expand((chunk) => chunk).toList(), isEmpty);
+        }
+
+        final direct = connection(
+          '$origin/generic.m4a',
+          id: 'direct',
+          user: 'test',
+          password: 'secret',
+        );
+        await service.save(direct);
+        final url = Uri.parse(
+          await service.resolve(NetworkStorageService.source(direct.id, '')),
+        );
+        expect(url.path, endsWith('.m4a'));
+        final response = await (await client.headUrl(url)).close();
+        expect(response.headers.contentType?.mimeType, 'audio/mp4');
+        await response.drain<void>();
       },
     );
 
@@ -1082,6 +1159,7 @@ void main() {
     final url = await service.resolve(
       NetworkStorageService.source(c.id, 'A B.wav'),
     );
+    expect(Uri.parse(url).path, endsWith('.wav'));
     final client = HttpClient();
     addTearDown(() => client.close(force: true));
     final request = await client.getUrl(Uri.parse(url));

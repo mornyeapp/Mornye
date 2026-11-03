@@ -364,6 +364,7 @@ void main() {
       final restored = PlayableMedia.fromJson(saved)!;
       final url = await storage.resolve(restored.source);
       expect(Uri.parse(url).query, isEmpty);
+      expect(Uri.parse(url).path, endsWith('.${song.format}'));
       final http = HttpClient();
       addTearDown(() => http.close(force: true));
       final request = await http.getUrl(Uri.parse(url));

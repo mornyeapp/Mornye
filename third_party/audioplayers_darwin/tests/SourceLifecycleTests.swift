@@ -54,10 +54,10 @@ final class DeferredSeekItem: AVPlayerItem {
   @MainActor final class Preparation {
     var result: Result<Void, Error>?
 
-    init(_ wrapper: WrappedMediaPlayer, url: String) {
+    init(_ wrapper: WrappedMediaPlayer, url: String, isLocal: Bool = true) {
       Task { @MainActor in
         do {
-          try await wrapper.setSourceUrl(url: url, isLocal: true)
+          try await wrapper.setSourceUrl(url: url, isLocal: isLocal)
           result = .success(())
         } catch {
           result = .failure(error)
@@ -129,6 +129,45 @@ final class DeferredSeekItem: AVPlayerItem {
       native.currentItem == nil, events.preparedCount == 2
     else {
       throw Failure.message("Missing native source was not reported as a preparation failure")
+    }
+    guard case AudioPlayerError.error(let message) = error,
+      message.contains("ErrorDomain")
+    else {
+      throw Failure.message("Native preparation failure lost its NSError domain and code")
+    }
+    await wrapper.dispose()
+  }
+
+  @MainActor static func testSourceDiagnostics() throws {
+    let cause = NSError(
+      domain: NSURLErrorDomain, code: NSURLErrorCannotConnectToHost,
+      userInfo: [
+        NSURLErrorFailingURLErrorKey: URL(string: "https://user:secret@nas.test/private.flac")!
+      ])
+    let error = NSError(
+      domain: AVFoundationErrorDomain, code: -11800,
+      userInfo: [NSUnderlyingErrorKey: cause, NSLocalizedDescriptionKey: "secret URL"])
+    guard case .error(let message) = WrappedMediaPlayer.sourceError(error),
+      message.contains("\(AVFoundationErrorDomain) (-11800)"),
+      message.contains("\(NSURLErrorDomain) (\(NSURLErrorCannotConnectToHost))"),
+      !message.contains("secret"), !message.contains("nas.test")
+    else {
+      throw Failure.message("Source diagnostics lost the native cause or exposed private userInfo")
+    }
+  }
+
+  @MainActor static func testNetworkPreparation(_ url: String) async throws {
+    let native = AVPlayer()
+    let events = AudioPlayersStreamHandler()
+    let wrapper = WrappedMediaPlayer(
+      reference: AudioplayersDarwinPlugin(), eventHandler: events, player: native)
+    let preparation = Preparation(wrapper, url: url, isLocal: false)
+    try await waitFor("HTTP source preparation did not finish") { preparation.result != nil }
+    guard case .success = preparation.result, events.preparedCount == 1,
+      native.currentItem?.status == .readyToPlay
+    else {
+      throw Failure.message(
+        "HTTP source failed to prepare: \(String(describing: preparation.result))")
     }
     await wrapper.dispose()
   }
@@ -213,6 +252,8 @@ final class DeferredSeekItem: AVPlayerItem {
 
   @MainActor static func main() async {
     do {
+      try testSourceDiagnostics()
+      print("PASS: source errors retain native causes without leaking private userInfo")
       let native = DeferredPlayer()
       let events = AudioPlayersStreamHandler()
       let wrapper = WrappedMediaPlayer(
@@ -243,6 +284,10 @@ final class DeferredSeekItem: AVPlayerItem {
       print("PASS: a linked next player starts as the current one completes")
       try await testSeekCompletionBelongsToCurrentSource()
       print("PASS: replaced, disposed and cancelled seeks cannot affect the current source")
+      for url in CommandLine.arguments.dropFirst() {
+        try await testNetworkPreparation(url)
+        print("PASS: native AVPlayer prepares the HTTP proxy source")
+      }
     } catch {
       print("FAIL: \(error)")
       exit(1)

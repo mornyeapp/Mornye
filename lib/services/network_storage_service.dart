@@ -646,7 +646,7 @@ class NetworkStorageService {
     if (virtualFor(host) case final virtual?) {
       return virtual.resolve(host, path);
     }
-    await _readyConnection(host, path);
+    final c = await _readyConnection(host, path);
     _server ??= HttpServer.bind(InternetAddress.loopbackIPv4, 0).then((server) {
       server.listen((request) => unawaited(_serve(request)));
       return server;
@@ -658,7 +658,14 @@ class NetworkStorageService {
       _server = null;
       rethrow;
     }
-    final token = newId();
+    final name = _networkFileName(c, path);
+    final dot = name.lastIndexOf('.');
+    final suffix = dot < 0 ? '' : name.substring(dot + 1).toLowerCase();
+    // AVPlayer needs a file-type hint even when a NAS serves generic bytes.
+    // Keep names and credentials private behind the unguessable route.
+    final token = RegExp(r'^[a-z0-9]{1,10}$').hasMatch(suffix)
+        ? '${newId()}.$suffix'
+        : newId();
     while (_routes.length >= 256) {
       _routes.remove(_routes.keys.first);
     }
@@ -1420,8 +1427,9 @@ class NetworkStorageService {
         request.response.statusCode = HttpStatus.notFound;
         return;
       }
+      final c = await connection(route.id);
       read = await _openRead(
-        await connection(route.id),
+        c,
         route.path,
         method: request.method,
         range: request.headers.value(HttpHeaders.rangeHeader),
@@ -1430,6 +1438,21 @@ class NetworkStorageService {
           ? HttpStatus.badGateway
           : read.status;
       read.headers.forEach(request.response.headers.set);
+      final mime = read.headers[HttpHeaders.contentTypeHeader]
+          ?.split(';')
+          .first
+          .trim()
+          .toLowerCase();
+      if (read.status >= 200 &&
+          read.status < 300 &&
+          (mime == null ||
+              mime == 'application/octet-stream' ||
+              mime == 'binary/octet-stream')) {
+        request.response.headers.set(
+          HttpHeaders.contentTypeHeader,
+          networkContentType(_networkFileName(c, route.path)),
+        );
+      }
       consumed = true;
       if (request.method == 'GET') {
         await request.response.addStream(read.bytes);
@@ -1519,6 +1542,9 @@ class NetworkStorageService {
     await _smbSessions.close();
   }
 }
+
+String _networkFileName(NetworkConnection connection, String path) =>
+    networkTarget(connection, path).pathSegments.lastOrNull ?? '';
 
 String networkContentType(String name) =>
     switch (name.split('.').last.toLowerCase()) {

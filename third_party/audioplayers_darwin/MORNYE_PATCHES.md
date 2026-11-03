@@ -14,6 +14,13 @@ vendored.
 
 ## Patches
 
+### Source failure diagnostics
+
+Failed preparation preserves the native NSError domains and codes, including
+the underlying chain (five causes at most), instead of replacing every failure
+with the same message. It logs the same bounded cause chain. URLs, headers and
+other userInfo values are omitted so playback errors cannot expose NAS credentials.
+
 ### Per-player equalizer
 
 - AudioplayersDarwinPlugin.swift handles a `setEqualizer` method with a
@@ -124,6 +131,13 @@ swiftc darwin/audioplayers_darwin/Sources/audioplayers_darwin/{WrappedMediaPlaye
   tests/SourceLifecycleTests.swift -o /tmp/source_lifecycle_tests
 /tmp/source_lifecycle_tests
 ```
+
+Optional URL arguments also exercise real AVPlayer HTTP preparation. From the
+application root, set `MORNYE_DARWIN_SOURCE_TEST` to that compiled binary and run
+`flutter test test/network_storage_darwin_test.dart` to check the complete NAS
+proxy route. The fixture serves generated WAV audio as generic bytes and checks
+that the native player can prepare it through the proxy with byte-range reads.
+This host check does not replace testing on a physical iPhone.
 
 ## Changed Files
 
