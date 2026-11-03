@@ -32,8 +32,17 @@ from the server.
 Connections are stored in the platform secure store. Playback sessions contain
 opaque connection IDs and relative paths instead of server credentials. A
 random-token loopback proxy handles GET, HEAD and byte ranges. Files stream on
-demand without making a full local copy; HTTP seeking depends on the server's
-range support. Requests have a 20-second connection/read-inactivity timeout.
+demand; HTTP seeking depends on the server's range support. Requests have a
+20-second connection/read-inactivity timeout.
+
+While a network song plays, the player downloads the whole files of the next
+two songs in queue order, then the current one, one at a time into the app
+cache (at most 1 GB and 32 files, least recently played first, 256 MB per
+file). A song opens from its copy only once the copy is complete, so the next
+song starts without waiting for the server and gapless playback holds; until
+then it streams. Copies are checked against the server's size and modification
+time or entity tag, and an edit or deletion made in the app drops its copy.
+Saved offline copies take priority, and Mornye Link songs are not cached.
 
 Browsing alone does not add anything to the Library. Inside an SMB or WebDAV
 folder, choose **Add folder to Library** to index that folder and its subfolders.

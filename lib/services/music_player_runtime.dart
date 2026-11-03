@@ -32,6 +32,7 @@ import 'package:mornye/services/media_session_filter.dart';
 import 'package:mornye/services/music_playback_deck.dart';
 import 'package:mornye/services/music_player_service.dart';
 import 'package:mornye/services/network_metadata_service.dart';
+import 'package:mornye/services/network_playback_cache.dart';
 import 'package:mornye/services/network_storage_service.dart';
 import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/services/playback_deck.dart';
@@ -66,6 +67,7 @@ class PlaybackDependencies {
     this.readNetworkMetadata = _readNetworkMetadata,
     this.resolveNetworkSource = _resolveNetworkSource,
     this.offlineCopy = _offlineCopy,
+    this.networkCache = _networkCache,
     this.networkSourceReachable = _networkSourceReachable,
     this.recoverMissingFile = _recoverMissingFile,
     this.recoverMovedDownload = _recoverMovedDownload,
@@ -113,6 +115,10 @@ class PlaybackDependencies {
   final Future<Map<String, dynamic>> Function(String) readNetworkMetadata;
   final Future<String> Function(String) resolveNetworkSource;
   final Future<String?> Function(String) offlineCopy;
+
+  /// The local copies of network songs around the one playing; null plays
+  /// every network song from its server.
+  final NetworkPlaybackCache? Function() networkCache;
 
   /// Whether a `network://` Library song can play now, as autoplay asks
   /// before queueing it.
@@ -210,6 +216,8 @@ class PlaybackDependencies {
     final path = row?['filePath'] as String?;
     return path != null && await fileExists(path) ? path : null;
   }
+
+  static NetworkPlaybackCache? _networkCache() => NetworkPlaybackCache.instance;
 
   static Future<bool> _networkSourceReachable(String source) =>
       NetworkStorageService.instance.reachable(source);

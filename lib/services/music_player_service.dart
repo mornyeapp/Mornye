@@ -27,6 +27,7 @@ import 'package:mornye/services/cast_output.dart';
 import 'package:mornye/services/cover_store.dart';
 import 'package:mornye/services/music_player_runtime.dart';
 import 'package:mornye/services/music_playback_deck.dart';
+import 'package:mornye/services/network_playback_cache.dart';
 import 'package:mornye/services/network_storage_service.dart'
     show subsonicSongIdFromPath;
 import 'package:mornye/services/playback_deck.dart';
@@ -58,6 +59,7 @@ part 'music_player_autoplay.dart';
 part 'music_player_covers.dart';
 part 'music_player_cast.dart';
 part 'music_player_gapless.dart';
+part 'music_player_prefetch.dart';
 
 final _log = AppLogger('MusicPlayer');
 
@@ -135,6 +137,7 @@ class MusicPlayerHandler extends BaseAudioHandler
   late final _MusicCast _cast;
   late final _MusicAutoMix _autoMix;
   late final _MusicGapless _gapless = _MusicGapless(this);
+  late final _MusicPrefetch _prefetch = _MusicPrefetch(this);
   late final _MusicCovers _covers = _MusicCovers(this);
   late final _MusicAutoplay _autoplay;
   late final MusicHaptics _haptics;
@@ -1045,6 +1048,7 @@ class MusicPlayerHandler extends BaseAudioHandler
     _positionCheckDue = false;
     _broadcastPosition(position, readAt: readAt);
     _autoMix.onPosition(position);
+    _prefetch.onPosition(position);
     _gapless.onPosition(position);
     unawaited(_autoplay.fill());
     if (_restoringSession ||
@@ -1090,6 +1094,8 @@ class MusicPlayerHandler extends BaseAudioHandler
           'http',
           'https',
         }.contains(Uri.tryParse(path)?.scheme) ||
+        // A network song keeps its loudness whether or not it is cached.
+        _prefetch.owns(path) ||
         !_settings.playbackNormalization ||
         _settings.usbBitPerfect ||
         _player.isDirect) {
@@ -1181,6 +1187,9 @@ class MusicPlayerHandler extends BaseAudioHandler
       } catch (_) {
         // An unavailable local copy leaves the server source usable.
       }
+      // A whole prefetched copy opens as a local file on every engine; a
+      // song still downloading streams from the server instead.
+      if (await _prefetch.lookup(media) case final cached?) return cached;
       try {
         return await _dependencies.resolveNetworkSource(media.source);
       } catch (_) {
@@ -2279,6 +2288,7 @@ class MusicPlayerHandler extends BaseAudioHandler
     unawaited(_runtime.ranker.flush());
     _playbackAutomation.cancelPendingActions();
     _autoplay.reset();
+    _prefetch.stop();
     cancelSleepTimer();
     final generation = ++_playRequestGeneration;
     _switchingGeneration = 0;
@@ -2478,6 +2488,8 @@ class MusicPlayerHandler extends BaseAudioHandler
 
   /// Refreshes every occurrence without reopening the decoder or seeking.
   Future<void> onSourceMetadataChanged(String source) async {
+    // An edited network file must not play from its copy before the edit.
+    await _prefetch.invalidate(source);
     if (_disposed || !_media.any((item) => item.source == source)) return;
     final token = Object();
     _metadataChanges[source] = token;
@@ -2569,6 +2581,7 @@ class MusicPlayerHandler extends BaseAudioHandler
   Future<void> onSourceDeleted(String source) async {
     final target = source.trim();
     if (_disposed || target.isEmpty) return;
+    await _prefetch.invalidate(target);
     if (target.startsWith('network://')) {
       try {
         if (await _dependencies.offlineCopy(target) != null) return;
@@ -2643,6 +2656,7 @@ class MusicPlayerHandler extends BaseAudioHandler
 
   Future<void> _dispose() async {
     _autoplay.reset();
+    _prefetch.stop();
     _disposed = true;
     await _cast.dispose();
     _runtime.personalization.finish();

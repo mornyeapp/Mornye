@@ -36,6 +36,7 @@ import 'package:mornye/services/link/link_protocol.dart';
 import 'package:mornye/services/media_library_browser.dart';
 import 'package:mornye/services/music_player_service.dart';
 import 'package:mornye/services/network_metadata_service.dart';
+import 'package:mornye/services/network_playback_cache.dart';
 import 'package:mornye/services/network_storage_service.dart';
 import 'package:mornye/services/playback_deck.dart';
 import 'package:mornye/services/playback_notification.dart';
@@ -49,6 +50,31 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart'
 
 import 'support/link_fakes.dart';
 import 'support/virtual_time.dart';
+
+/// A NAS download of a three-byte song, held until [release] completes.
+class _NasTransfer implements NetworkPlaybackTransfer {
+  _NasTransfer(this.release);
+
+  final Future<void>? release;
+
+  @override
+  Future<String?> identity(String source) async => 'v1';
+
+  @override
+  Future<void> download(
+    String source,
+    File output, {
+    required void Function() checkpoint,
+    required void Function(int received, int? total) progress,
+  }) async {
+    await release;
+    await output.writeAsBytes([1, 2, 3]);
+    progress(3, 3);
+  }
+
+  @override
+  void close() {}
+}
 
 class _Deck implements PlaybackDeck {
   @override
@@ -652,6 +678,7 @@ MusicPlayerRuntime _runtime({
   Future<String?> Function(String, String, AppSettings)? recoverMovedDownload,
   Future<String> Function(String)? resolveNetworkSource,
   Future<String?> Function(String)? offlineCopy,
+  NetworkPlaybackCache? networkCache,
   Future<Map<String, dynamic>> Function(String)? readNetworkMetadata,
   CoverStore? coverStore,
 }) {
@@ -692,6 +719,7 @@ MusicPlayerRuntime _runtime({
       resolveNetworkSource:
           resolveNetworkSource ?? NetworkStorageService.instance.resolve,
       offlineCopy: offlineCopy ?? (_) async => null,
+      networkCache: () => networkCache,
       readNetworkMetadata:
           readNetworkMetadata ?? NetworkMetadataService.instance.read,
       coverStore: coverStore,
@@ -1936,6 +1964,112 @@ void main() {
       expect(handler.playbackState.value.playing, isTrue);
     },
   );
+
+  group('prefetched network copies', () {
+    const source = 'network://nas/Album/song.flac';
+    const song = PlayableMedia(
+      id: 'nas-song',
+      source: source,
+      title: 'NAS song',
+      artist: 'Artist',
+    );
+
+    Future<NetworkPlaybackCache> networkCache({Future<void>? release}) async {
+      final root = await Directory.systemTemp.createTemp('player-prefetch-');
+      addTearDown(() async {
+        // Let a background index write finish first.
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+        try {
+          await root.delete(recursive: true);
+        } on FileSystemException {
+          // Removed with the system temporary folder later.
+        }
+      });
+      return NetworkPlaybackCache(
+        directory: () async => root,
+        transfer: () => _NasTransfer(release),
+        connectionRemovals: SourceDeletionEvents(),
+      );
+    }
+
+    test('a whole copy plays as a local file', () async {
+      final cache = await networkCache();
+      cache.want([source]);
+      expect(await cache.ready(source, const Duration(seconds: 5)), isTrue);
+      final decks = <_Deck>[];
+      var remoteRequests = 0;
+      final handler = await _runtime(
+        decks: decks,
+        networkCache: cache,
+        resolveNetworkSource: (_) async {
+          remoteRequests++;
+          return 'http://127.0.0.1:1/song.flac';
+        },
+      ).initialize();
+
+      await handler.setQueueAndPlay([song]);
+
+      final path = decks.single.sources.single;
+      expect(cache.owns(path), isTrue);
+      expect(await File(path).readAsBytes(), [1, 2, 3]);
+      expect(remoteRequests, 0);
+      // The queue keeps the server song; only this playback opens the copy.
+      expect(handler.mediaItem.value!.extras!['source'], source);
+    });
+
+    test('a song still downloading streams from its server', () async {
+      final cache = await networkCache(release: Completer<void>().future);
+      cache.want([source]);
+      final decks = <_Deck>[];
+      final handler = await _runtime(
+        decks: decks,
+        networkCache: cache,
+        resolveNetworkSource: (_) async => 'http://127.0.0.1:1/song.flac',
+      ).initialize();
+
+      await handler.setQueueAndPlay([song]);
+
+      expect(decks.single.sources, ['stream http://127.0.0.1:1/song.flac']);
+      cache.want([]);
+    });
+
+    test('a saved offline copy plays before a prefetched one', () async {
+      final cache = await networkCache();
+      cache.want([source]);
+      expect(await cache.ready(source, const Duration(seconds: 5)), isTrue);
+      final temp = await Directory.systemTemp.createTemp('player-offline-');
+      addTearDown(() => temp.delete(recursive: true));
+      final local = await File('${temp.path}/song.flac').writeAsBytes([4]);
+      final decks = <_Deck>[];
+      final handler = await _runtime(
+        decks: decks,
+        networkCache: cache,
+        offlineCopy: (_) async => local.path,
+      ).initialize();
+
+      await handler.setQueueAndPlay([song]);
+
+      expect(decks.single.sources, [local.path]);
+    });
+
+    test('an edited song no longer plays from its old copy', () async {
+      final cache = await networkCache();
+      cache.want([source]);
+      expect(await cache.ready(source, const Duration(seconds: 5)), isTrue);
+      cache.want([]);
+      final events = SourceMetadataEvents();
+      final handler = await _runtime(
+        networkCache: cache,
+        sourceMetadataEvents: events,
+        readNetworkMetadata: (_) async => {'error': 'unavailable'},
+      ).initialize();
+      await handler.setQueueAndPlay([song]);
+
+      await events.publish(source);
+
+      expect(await cache.lookup(source), isNull);
+    });
+  });
 
   for (final resolved in [
     '/received/Phone song.flac',
