@@ -42,6 +42,20 @@ Dart caller is `lib/services/music_playback_deck.dart` in the app.
   relying on `setPlaybackParams` (or, before API 23, `setRate(1.0)`) to start
   output.
 
+### Mixed output
+
+On Android 9 (API 28) and later, `MediaPlayerWrapper` enables a
+`DynamicsProcessing` effect with no stage in use on the player's own session
+(player/MixedOutput.kt) before each `start()`, and disables it on `pause()`,
+`stop()` and `reset()`; `release()` frees it. Without it, MediaPlayer may
+send long local tracks to a compressed offload output, where the audio DSP
+decodes them outside the platform mixer. Features that read the mixed output
+then get silence, for example the music-synced lights on Nothing phones
+(Mornye issue 802). An enabled effect without offload support makes the
+platform choose PCM through the mixer, which ExoPlayer-based players use by
+default. The effect leaves the sound unchanged. If the device refuses it,
+playback continues and the plugin logs the reason.
+
 ### Next player
 
 A `setNextPlayer` method with an optional `nextPlayerId` links two players
@@ -81,6 +95,7 @@ Compared against the pub.dev 5.3.0 package in the local pub cache:
 - `android/build.gradle`
 - `android/src/main/kotlin/xyz/luan/audioplayers/AudioplayersPlugin.kt`
 - `android/src/main/kotlin/xyz/luan/audioplayers/player/MediaPlayerWrapper.kt`
+- `android/src/main/kotlin/xyz/luan/audioplayers/player/MixedOutput.kt` (new)
 - `android/src/main/kotlin/xyz/luan/audioplayers/player/PlaybackEqualizer.kt` (new)
 - `android/src/main/kotlin/xyz/luan/audioplayers/player/WrappedPlayer.kt`
 - `android/src/main/kotlin/xyz/luan/audioplayers/source/UrlSource.kt`

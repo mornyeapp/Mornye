@@ -12,6 +12,7 @@ class MediaPlayerWrapper(
 ) : PlayerWrapper {
     private var released = false
     private var equalizer: PlaybackEqualizer? = null
+    private val mixedOutput = MixedOutput(wrappedPlayer, mediaPlayer.audioSessionId)
     private var playbackParamsApplied = false
 
     init {
@@ -93,6 +94,7 @@ class MediaPlayerWrapper(
     }
 
     override fun start() {
+        mixedOutput.hold(true)
         setRate(wrappedPlayer.rate)
         // Do not depend on setPlaybackParams implicitly starting the output.
         mediaPlayer.start()
@@ -100,10 +102,12 @@ class MediaPlayerWrapper(
 
     override fun pause() {
         mediaPlayer.pause()
+        mixedOutput.hold(false)
     }
 
     override fun stop() {
         mediaPlayer.stop()
+        mixedOutput.hold(false)
     }
 
     override fun release() {
@@ -112,6 +116,7 @@ class MediaPlayerWrapper(
         released = true
         if (Build.VERSION.SDK_INT >= 28) equalizer?.close()
         equalizer = null
+        mixedOutput.close()
         mediaPlayer.reset()
         mediaPlayer.release()
     }
@@ -134,6 +139,7 @@ class MediaPlayerWrapper(
     override fun reset() {
         if (Build.VERSION.SDK_INT >= 28) equalizer?.close()
         equalizer = null
+        mixedOutput.hold(false)
         mediaPlayer.reset()
     }
 

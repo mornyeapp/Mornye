@@ -31,6 +31,11 @@ API reference: https://developer.android.com/reference/android/media/audiofx/Dyn
 A `setNextPlayer` method links a prepared player to start the moment another
 completes, through `MediaPlayer.setNextMediaPlayer`, for gapless playback.
 
+While a player plays on Android 9+, an effect with no processing in use stays
+enabled on its session, so the platform mixes its audio instead of sending it
+to a compressed offload output. System features that read the mixed output,
+such as music-synced phone lights, then receive the music.
+
 ## Usage
 
 This package is [endorsed](https://flutter.dev/docs/development/packages-and-plugins/developing-packages#endorsed-federated-plugin),
