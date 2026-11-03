@@ -3,8 +3,8 @@
   "extensionsUnsecuredStorageDescription": "Запускайте розширення без зв'язки ключів Linux. Ключ зберігається локально, тому будь-хто з доступом до файлів додатка зможе прочитати облікові дані розширень. Якщо опцію вимкнено, використовується системна зв'язка ключів.",
   "extensionsStorageKeyringRequired": "Для наявних даних розширень потрібен оригінальний ключ. Розблокуйте системну зв'язку ключів один раз, а потім знову увімкніть незахищене сховище. Ваші дані збережено.",
   "extensionsStorageKeyConflict": "Локальний ключ і ключ системної зв'язки ключів не збігаються. Налаштування сховища не змінилися, обидва ключі збережено.",
-  "extensionsStorageKeyringUnavailable": "The system keyring is unavailable or locked. Start or unlock it before switching to secure storage. Your local key has been preserved.",
-  "linkFileActionOn": "{action} on {name}",
+  "extensionsStorageKeyringUnavailable": "Системна в’язка ключів недоступна або заблокована. Запустіть або розблокуйте її перед переходом на захищене сховище. Ваш локальний ключ збережено.",
+  "linkFileActionOn": "{action} На {name}",
   "@linkFileActionOn": {
     "description": "File operation on a named linked computer",
     "placeholders": {
@@ -16,7 +16,7 @@
       }
     }
   },
-  "linkFileActionsDescription": "Changes apply to music files on {name}. Accepted work continues if this phone disconnects.",
+  "linkFileActionsDescription": "Зміни застосовуються до музичних файлів на {name}. Розпочата робота продовжиться, навіть якщо цей телефон від’єднається.",
   "@linkFileActionsDescription": {
     "placeholders": {
       "name": {
@@ -24,7 +24,7 @@
       }
     }
   },
-  "linkFileDeleteConfirm": "Delete {count} {count, plural, =1{music file} other{music files}} from {name}? This removes the files from that computer's storage.",
+  "linkFileDeleteConfirm": "Видалити {count} {count, plural, =1{музичний файл} one{музичний файл} few{музичні файли} many{музичних файлів} other{музичних файлів}} з пристрою {name}? Це вилучить файли з пам’яті того комп’ютера.",
   "@linkFileDeleteConfirm": {
     "placeholders": {
       "count": {
@@ -35,11 +35,11 @@
       }
     }
   },
-  "linkFileJobs": "File changes",
+  "linkFileJobs": "Зміни у файлах",
   "@linkFileJobs": {
     "description": "Title of the list of edits, conversions and deletions the phone started on the linked computer's music files"
   },
-  "linkFileJobsSubtitle": "Edits, conversions and deletions on {name}",
+  "linkFileJobsSubtitle": "Редагування, конвертація та видалення на {name}",
   "@linkFileJobsSubtitle": {
     "placeholders": {
       "name": {
@@ -47,11 +47,11 @@
       }
     }
   },
-  "linkFileJobsEmpty": "No file changes yet",
-  "linkFileJobsEmptyMessage": "Edits, conversions and deletions you start on the computer's songs from this phone appear here.",
-  "linkDesktopFileJobsSubtitle": "Changes requested from your phones",
-  "linkDesktopFileJobsEmptyMessage": "Edits, conversions and deletions requested from your phones appear here.",
-  "linkFileJobRequestedBy": "From {name}",
+  "linkFileJobsEmpty": "Поки що немає змін у файлах",
+  "linkFileJobsEmptyMessage": "Тут з’являтимуться зміни, конвертація та видалення пісень комп’ютера, які ви запускаєте з цього телефона.",
+  "linkDesktopFileJobsSubtitle": "Зміни, надіслані з ваших телефонів",
+  "linkDesktopFileJobsEmptyMessage": "Тут з’являтимуться зміни, конвертація та видалення, надіслані з ваших телефонів.",
+  "linkFileJobRequestedBy": "З пристрою {name}",
   "@linkFileJobRequestedBy": {
     "placeholders": {
       "name": {
@@ -59,13 +59,13 @@
       }
     }
   },
-  "linkFileJobsView": "View",
+  "linkFileJobsView": "Перегляд",
   "@linkFileJobsView": {
     "description": "Snackbar action that opens the file changes list to see which songs failed"
   },
-  "linkFileJobsUnsupported": "Update Mornye on your computer to manage its music files from this phone.",
-  "linkFileSelectionOneDevice": "Select songs from one linked computer at a time (up to 100 songs).",
-  "linkFileJobProgress": "{finished} of {total} {total, plural, =1{song} other{songs}}",
+  "linkFileJobsUnsupported": "Оновіть Mornye на комп’ютері, щоб керувати його музичними файлами з цього телефона.",
+  "linkFileSelectionOneDevice": "Вибирайте пісні лише з одного підключеного комп’ютера за раз (до 100 пісень).",
+  "linkFileJobProgress": "{finished} з {total} {total, plural, =1{пісні} one{пісні} few{пісень} many{пісень} other{пісень}}",
   "@linkFileJobProgress": {
     "placeholders": {
       "finished": {
@@ -76,7 +76,7 @@
       }
     }
   },
-  "linkFileJobFailedCount": "{count} failed",
+  "linkFileJobFailedCount": "{count} Не вдалося",
   "@linkFileJobFailedCount": {
     "placeholders": {
       "count": {
@@ -84,7 +84,7 @@
       }
     }
   },
-  "linkFileJobFinished": "{action} finished on {name}",
+  "linkFileJobFinished": "Процес «{action}» завершено на {name}",
   "@linkFileJobFinished": {
     "placeholders": {
       "action": {
@@ -95,15 +95,15 @@
       }
     }
   },
-  "linkFileDeleting": "Deleting...",
-  "linkFileReading": "Reading tags...",
-  "linkFileSavingCover": "Saving cover art...",
-  "linkFileCancelHint": "Stop after the current song",
-  "linkFileJobCancelled": "Stopped",
-  "linkFileJobQueued": "Queued",
-  "linkFileJobCompleted": "Finished",
-  "linkFileChanged": "The file changed since the preview. Preview it again before saving.",
-  "linkFileOperationFailed": "The operation could not be completed. Check the computer's logs for details.",
+  "linkFileDeleting": "Видалення...",
+  "linkFileReading": "Зчитування тегів...",
+  "linkFileSavingCover": "Збереження обкладинки...",
+  "linkFileCancelHint": "Зупинити після цієї пісні",
+  "linkFileJobCancelled": "Зупинено",
+  "linkFileJobQueued": "У черзі",
+  "linkFileJobCompleted": "Завершено",
+  "linkFileChanged": "Файл змінився після попереднього перегляду. Перегляньте його знову перед збереженням.",
+  "linkFileOperationFailed": "Не вдалося завершити операцію. Перевірте журнал комп’ютера, щоб дізнатися деталі.",
   "trackBpm": "BPM",
   "trackMood": "За настроєм",
   "subsonicAddToLibrary": "Додати сервер до бібліотеки",
@@ -296,20 +296,20 @@
   "dapExclusive": "DAP hi-res (ексклюзивно для AAudio)",
   "dapExclusiveDescription": "Використовуйте Oboe/AAudio з оригінальною частотою та точністю треку для FLAC/WAV PCM. Потрібен Android 8.1 або пізнішої версії та сумісне обладнання. Ексклюзивний доступ позначено; недоступні формати використовують звичайне відтворення. DSD вимагає драйвера Direct USB. Застосовується з наступного треку.",
   "dapExclusiveUnavailable": "Ексклюзивний доступ AAudio недоступний для цього треку та поточного виходу. Використовується звичайне відтворення. Для USB ЦАП є прямий драйвер USB.",
-  "exclusiveOutputWindows": "WASAPI exclusive mode",
-  "exclusiveOutputMacos": "Exclusive access (hog mode)",
-  "exclusiveOutputLinux": "Direct ALSA output",
-  "exclusiveOutputDescriptionWindows": "Bypass the Windows mixer so the output follows each track's sample rate and bit depth. Other apps cannot play sound while Mornye holds the device. AutoMix and previews are off in this mode. For bit-perfect output, keep the volume at 100% with the equalizer and normalization off.",
-  "exclusiveOutputDescriptionMacos": "Hold the output device for Mornye alone and switch it to each track's sample rate and bit depth, so Core Audio does not resample. Other apps cannot play sound while Mornye holds the device. AutoMix and previews are off in this mode. For bit-perfect output, keep the volume at 100% with the equalizer and normalization off.",
-  "exclusiveOutputDescriptionLinux": "Play straight to an ALSA hardware device, bypassing PipeWire or PulseAudio, so the output follows each track's sample rate and bit depth. The device must be free: the sound server releases an idle card after a few seconds, or set its profile to Off. AutoMix and previews are off in this mode.",
-  "exclusiveOutputPending": "Takes the device when a track plays.",
-  "exclusiveOutputActive": "Playing in exclusive mode.",
-  "exclusiveOutputUnavailableWindows": "The device refused exclusive access, so this track plays through the Windows mixer. Close other apps using the device, or allow exclusive control in the device's Windows sound properties.",
-  "exclusiveOutputUnavailableMacos": "Another app holds the output device, so this track plays through the system mixer.",
-  "exclusiveOutputUnavailableLinux": "The ALSA device is busy, usually held by the sound server, so this track plays through it. Set the card's profile to Off in the sound settings, or choose another device.",
-  "exclusiveOutputDevice": "Output device",
-  "exclusiveOutputDeviceFirst": "First sound card",
-  "exclusiveOutputNoDevices": "No ALSA playback devices found",
+  "exclusiveOutputWindows": "Ексклюзивний режим WASAPI",
+  "exclusiveOutputMacos": "Ексклюзивний доступ (режим захоплення)",
+  "exclusiveOutputLinux": "Прямий вивід ALSA",
+  "exclusiveOutputDescriptionWindows": "Обхід системного мікшера Windows для виведення звуку з оригінальною частотою дискретизації та розрядністю кожного треку. Інші додатки не зможуть відтворювати звуки, поки Mornye утримує пристрій. У цьому режимі вимкнено AutoMix та попереднє прослуховування. Для точного відтворення bit-perfect установіть гучність на 100%, а також вимкніть еквалайзер і нормалізацію.",
+  "exclusiveOutputDescriptionMacos": "Захоплює аудіопристрій лише для Mornye та перемикає його на частоту дискретизації й розрядність кожного треку без передискретизації в Core Audio. Інші програми не відтворюватимуть звук, поки Mornye займає пристрій. Функції AutoMix та перегляд вимкнені. Для виводу bit-perfect залиште гучність на 100% і вимкніть еквалайзер та нормалізацію.",
+  "exclusiveOutputDescriptionLinux": "Пряме відтворення на апаратний пристрій ALSA в обхід PipeWire або PulseAudio, завдяки чому звук виводиться з оригінальною частотою дискретизації та розрядністю кожного треку. Пристрій має бути вільним: звуковий сервер звільняє неактивну карту за кілька секунд, або ж можна перевести її профіль у стан «Вимкнено». У цьому режимі вимкнено AutoMix та попереднє прослуховування.",
+  "exclusiveOutputPending": "Займає пристрій, коли відтворюється трек.",
+  "exclusiveOutputActive": "Відтворення в ексклюзивному режимі.",
+  "exclusiveOutputUnavailableWindows": "Не вдалося отримати ексклюзивний доступ, трек грає через мікшер Windows. Закрийте програми, які займають пристрій, або дозвольте монопольне керування у властивостях звуку Windows.",
+  "exclusiveOutputUnavailableMacos": "Аудіопристрій зайнятий іншою програмою, тому цей трек грає через системний мікшер.",
+  "exclusiveOutputUnavailableLinux": "Пристрій ALSA зайнятий звуковим сервером, тому трек відтворюється через системний мікшер. Вимкніть профіль карти в налаштуваннях звуку або виберіть інший пристрій.",
+  "exclusiveOutputDevice": "Пристрій виводу",
+  "exclusiveOutputDeviceFirst": "Основна звукова карта",
+  "exclusiveOutputNoDevices": "Не знайдено пристроїв відтворення ALSA",
   "usbDirect": "Прямий драйвер USB",
   "usbDirectDescription": "Використовуйте ексклюзивно USB-аудіо для FLAC/WAV, DSF/DFF та WavPack DSD з дозволом Android USB. Для нативного DSD потрібен розпізнаний сумісний ЦАП. Інші формати PCM використовують звичайне відтворення. Застосовується з наступного треку.",
   "usbDsdOverPcm": "DSD поверх PCM (DoP)",
@@ -432,11 +432,11 @@
   "libraryNoActiveDownloads": "Немає активних завантажень",
   "librarySearchHint": "Пошук у вашій бібліотеці",
   "libraryEmptyCollection": "Ваша музика з’явиться тут",
-  "libraryFolders": "Folders",
+  "libraryFolders": "Теки",
   "@libraryFolders": {
     "description": "Library view that browses downloaded and scanned songs by the folders their files are in"
   },
-  "libraryFolderCount": "{count, plural, =1{1 folder} other{{count} folders}}",
+  "libraryFolderCount": "{count, plural, =1{1 тека} one{{count} тека} few{{count} теки} many{{count} тек} other{{count} тек}}",
   "@libraryFolderCount": {
     "description": "Number of folders inside a Library folder",
     "placeholders": {
@@ -445,19 +445,19 @@
       }
     }
   },
-  "libraryFoldersEmptyTitle": "No folders yet",
+  "libraryFoldersEmptyTitle": "Теки не додано",
   "@libraryFoldersEmptyTitle": {
     "description": "Title of the Folders view when the Library has no songs"
   },
-  "libraryFoldersEmptyMessage": "Download songs or add a music folder in Local Library settings to browse them by folder.",
+  "libraryFoldersEmptyMessage": "Завантажте пісні або додайте теку з музикою в налаштуваннях, щоб переглядати файли за теками.",
   "@libraryFoldersEmptyMessage": {
     "description": "Next step shown in the empty Folders view"
   },
-  "libraryFolderMissing": "This folder is no longer in your Library",
+  "libraryFolderMissing": "Цієї теки більше немає у вашому списку відтворення",
   "@libraryFolderMissing": {
     "description": "Shown on an open folder page after its songs were deleted or moved"
   },
-  "libraryFoldersLoadFailed": "Couldn't read your folders",
+  "libraryFoldersLoadFailed": "Не вдалося прочитати ваші теки",
   "@libraryFoldersLoadFailed": {
     "description": "Shown when the Folders view fails to load"
   },
@@ -606,7 +606,7 @@
   "@optionsEmbedLyricsSubtitle": {
     "description": "Subtitle for embed lyrics"
   },
-  "optionsReplayGain": "Нормалізація звуку",
+  "optionsReplayGain": "ReplayGain",
   "@optionsReplayGain": {
     "description": "Title for ReplayGain setting toggle"
   },
@@ -1124,63 +1124,63 @@
   "@setupSkipForNow": {
     "description": "Skip button text"
   },
-  "setupNearbyEnable": "Allow Nearby Devices",
+  "setupNearbyEnable": "Дозволити доступ до пристроїв поблизу",
   "@setupNearbyEnable": {
     "description": "Setup step title and button for the Android Nearby devices permission; Nearby devices is the Android permission name"
   },
-  "setupNearbyDescription": "Mornye Link uses it to find your computer on the same network, and network storage needs it to reach a server at home.",
+  "setupNearbyDescription": "Mornye Link використовує це для пошуку вашого комп’ютера в тій самій мережі, а мережевому сховищу це необхідно для з’єднання з домашнім сервером.",
   "@setupNearbyDescription": {
     "description": "Setup step explaining why Android's Nearby devices permission is needed"
   },
-  "setupNearbyGranted": "Nearby Devices Allowed!",
+  "setupNearbyGranted": "Доступ до пристроїв поблизу дозволено!",
   "@setupNearbyGranted": {
     "description": "Setup message after the Nearby devices permission is granted"
   },
-  "permissionNearbyDevices": "Nearby devices",
+  "permissionNearbyDevices": "Пристрої поблизу",
   "@permissionNearbyDevices": {
     "description": "Nearby devices permission type label; use Android's name for this permission"
   },
-  "whatsNewLinkNearbyAllow": "Allow nearby devices",
+  "whatsNewLinkNearbyAllow": "Дозволити пристрої поблизу",
   "@whatsNewLinkNearbyAllow": {
     "description": "Main button on the Nearby devices page of the What's New tour that asks for Android's Nearby devices permission"
   },
-  "whatsNewLinkNearbyGranted": "Nearby devices allowed",
+  "whatsNewLinkNearbyGranted": "Пристрої поблизу дозволено",
   "@whatsNewLinkNearbyGranted": {
     "description": "Shown on the Nearby devices page of the What's New tour after the Nearby devices permission is granted"
   },
-  "whatsNewNearbyTitle": "Nearby devices",
+  "whatsNewNearbyTitle": "Пристрої поблизу",
   "@whatsNewNearbyTitle": {
     "description": "Title of the What's New page that asks for Android's Nearby devices permission; use Android's name for this permission"
   },
-  "whatsNewNearbyDesc": "Android now asks before an app can reach other devices on your network. Mornye needs this for:",
+  "whatsNewNearbyDesc": "Тепер Android запитує дозвіл перед тим, як додаток зможе отримати доступ до інших пристроїв у вашій мережі. Програмі Mornye це потрібно для:",
   "@whatsNewNearbyDesc": {
     "description": "Description on the Nearby devices page of the What's New tour, followed by a list of uses"
   },
-  "whatsNewNearbyLinkTitle": "Finding your computer",
+  "whatsNewNearbyLinkTitle": "Пошук вашого комп’ютера",
   "@whatsNewNearbyLinkTitle": {
     "description": "Use of the Nearby devices permission: Mornye Link finds the computer"
   },
-  "whatsNewNearbyLinkBody": "Mornye Link looks for your computer on the same Wi-Fi and stays connected to it.",
+  "whatsNewNearbyLinkBody": "Mornye Link шукає ваш комп’ютер у тій самій мережі Wi-Fi та підтримує постійний зв’язок із ним.",
   "@whatsNewNearbyLinkBody": {
     "description": "Explains how Mornye Link uses the Nearby devices permission"
   },
-  "whatsNewNearbyStorageTitle": "Network storage",
+  "whatsNewNearbyStorageTitle": "Мережеве сховище",
   "@whatsNewNearbyStorageTitle": {
     "description": "Use of the Nearby devices permission: SMB and WebDAV servers at home"
   },
-  "whatsNewNearbyStorageBody": "Play music from a NAS or a server at home over SMB or WebDAV.",
+  "whatsNewNearbyStorageBody": "Відтворюйте музику з NAS або домашнього сервера через SMB чи WebDAV.",
   "@whatsNewNearbyStorageBody": {
     "description": "Explains how network storage uses the Nearby devices permission"
   },
-  "whatsNewNearbyPrivateTitle": "Only your own devices",
+  "whatsNewNearbyPrivateTitle": "Лише власні пристрої",
   "@whatsNewNearbyPrivateTitle": {
     "description": "Reassurance on the Nearby devices page of the What's New tour"
   },
-  "whatsNewNearbyPrivateBody": "Mornye uses it only to reach devices on your network, never to find where you are.",
+  "whatsNewNearbyPrivateBody": "Mornye використовує цей дозвіл лише для зв’язку з пристроями у вашій мережі й ніколи не визначає ваше місцеположення.",
   "@whatsNewNearbyPrivateBody": {
     "description": "Explains that the Nearby devices permission is not used for location"
   },
-  "whatsNewNearbyRefused": "Not allowed. Mornye Link and network storage stay off until you allow Nearby devices for Mornye in Android settings.",
+  "whatsNewNearbyRefused": "Доступ заборонено. Mornye Link та мережеве сховище залишатимуться вимкненими, доки ви не дозволите доступ до пристроїв поблизу для Mornye в налаштуваннях Android.",
   "@whatsNewNearbyRefused": {
     "description": "Shown on the Nearby devices page of the What's New tour after the permission is refused"
   },
@@ -1649,11 +1649,11 @@
   "@searchPlaylists": {
     "description": "Search result category - playlists"
   },
-  "searchShowAll": "Show all",
+  "searchShowAll": "Показати все",
   "@searchShowAll": {
     "description": "Button of a search result section on wide screens that shows every result of that kind"
   },
-  "searchShowAllCategory": "Show all {category}",
+  "searchShowAllCategory": "Показати все: {category}",
   "@searchShowAllCategory": {
     "description": "Screen reader label of the Show all button of a search result section",
     "placeholders": {
@@ -2578,7 +2578,7 @@
   "@extensionsErrorLoading": {
     "description": "Error message when extension fails to load"
   },
-  "qualityFlacLossless": "FLAC без втрат",
+  "qualityFlacLossless": "FLAC Lossless",
   "@qualityFlacLossless": {
     "description": "Quality option - CD quality FLAC"
   },
@@ -2610,12 +2610,12 @@
   "@downloadAutoConvert": {
     "description": "Toggle for automatic post-download audio conversion"
   },
-  "downloadAutoConvertAllFormatsSubtitle": "Convert completed downloads or limit FLAC bit depth and sample rate. The original is replaced only after conversion succeeds.",
-  "downloadAutoConvertOutputSubtitle": "Choose the output format for newly completed downloads.",
-  "downloadAutoConvertFlacSubtitle": "Lossless FLAC with quality limits. Lower bit depths and sample rates are preserved.",
-  "downloadAutoConvertMaxBitDepth": "Maximum bit depth",
-  "downloadAutoConvertMaxSampleRate": "Maximum sample rate",
-  "downloadAutoConvertFlacLimitsSubtitle": "These are upper limits. For example, a 44.1 kHz source stays at 44.1 kHz when 48 kHz is selected. Lossy sources are kept in their original format.",
+  "downloadAutoConvertAllFormatsSubtitle": "Конвертуйте завершені завантаження або обмежте розрядність і частоту дискретизації для FLAC. Оригінал замінюється лише після успішного завершення конвертації.",
+  "downloadAutoConvertOutputSubtitle": "Виберіть вихідний формат для нових завершених завантажень.",
+  "downloadAutoConvertFlacSubtitle": "FLAC без втрат Lossless з обмеженням якості. Нижча розрядність та частота дискретизації зберігаються без змін.",
+  "downloadAutoConvertMaxBitDepth": "Максимальна розрядність",
+  "downloadAutoConvertMaxSampleRate": "Максимальна частота дискретизації",
+  "downloadAutoConvertFlacLimitsSubtitle": "Це верхні межі. Наприклад, джерело з частотою 44.1 кГц залишиться як 44.1 кГц, навіть якщо вибрано 48 кГц. Аудіофайли зі стисненням із втратами lossy зберігаються в оригінальному форматі.",
   "downloadAutoConvertSubtitle": "Конвертуйте завершені завантаження у компактніший формат із втратою якості. Оригінал замінюється лише після успішного завершення конвертації.",
   "@downloadAutoConvertSubtitle": {
     "description": "Explanation of safe automatic post-download conversion"
@@ -3330,19 +3330,19 @@
   "@libraryFilterAll": {
     "description": "Filter chip - show all library items"
   },
-  "libraryReEnrichAll": "Re-enrich All Tracks",
+  "libraryReEnrichAll": "Оновити метадані всіх треків",
   "@libraryReEnrichAll": {
     "description": "Library settings action - re-enrich the metadata of every track in the Library"
   },
-  "libraryReEnrichAllSubtitle": "Look up and fill in metadata for every track in your Library, then review the changes",
+  "libraryReEnrichAllSubtitle": "Знайти й заповнити метадані для кожного треку в Бібліотеці, а потім переглянути зміни",
   "@libraryReEnrichAllSubtitle": {
     "description": "Subtitle for the Re-enrich All Tracks action"
   },
-  "libraryReEnrichAllEmpty": "No tracks to re-enrich. Tracks from network connections are not included.",
+  "libraryReEnrichAllEmpty": "Немає треків для оновлення. Треки з мережевих джерел не враховуються.",
   "@libraryReEnrichAllEmpty": {
     "description": "Snackbar when the Library has no tracks Re-enrich can write to"
   },
-  "libraryReEnrichAllBusy": "Wait for the Library scan to finish, then try again.",
+  "libraryReEnrichAllBusy": "Зачекайте, поки завершиться сканування Бібліотеки, а потім спробуйте знову.",
   "@libraryReEnrichAllBusy": {
     "description": "Snackbar when Re-enrich All is started during a Library scan"
   },
@@ -3374,15 +3374,15 @@
   "@libraryFilterQuality": {
     "description": "Filter section - audio quality"
   },
-  "libraryFilterQualityHiRes": "Висока роздільна здатність (24 біти)",
+  "libraryFilterQualityHiRes": "Hi-Res (24bit)",
   "@libraryFilterQualityHiRes": {
     "description": "Filter option - high resolution audio"
   },
-  "libraryFilterQualityCD": "CD (16-бітний)",
+  "libraryFilterQualityCD": "CD (16bit)",
   "@libraryFilterQualityCD": {
     "description": "Filter option - CD quality audio"
   },
-  "libraryFilterQualityLossy": "Із втратами (lossy)",
+  "libraryFilterQualityLossy": "Lossy",
   "@libraryFilterQualityLossy": {
     "description": "Filter option - lossy compressed audio"
   },
@@ -3572,7 +3572,7 @@
   "@tutorialReadyMessage": {
     "description": "Tutorial completion message"
   },
-  "whatsNewIntroTitle": "Mornye {version} is here",
+  "whatsNewIntroTitle": "Mornye {version} вже тут",
   "@whatsNewIntroTitle": {
     "description": "First page of the tour shown once after updating; version is like 5.3",
     "placeholders": {
@@ -3581,31 +3581,31 @@
       }
     }
   },
-  "whatsNewIntroDesc": "Our biggest update yet. Here's a quick look at what's new.",
+  "whatsNewIntroDesc": "Наше найбільше оновлення! Ось короткий огляд того, що нового.",
   "whatsNewLinkTitle": "Mornye Link",
-  "whatsNewLinkDesc": "Pair your phone and computer on the same network. Mornye Link is in beta.",
-  "whatsNewLinkPlayTitle": "Play across devices",
-  "whatsNewLinkPlayBody": "Browse your computer's library on your phone, control what it plays, and hand playback over without losing your place.",
-  "whatsNewLinkTransferTitle": "Move songs both ways",
-  "whatsNewLinkTransferBody": "Send songs to your computer or save them to your phone, right from the song menu.",
-  "whatsNewLinkSyncTitle": "Stay in sync",
-  "whatsNewLinkSyncBody": "Collections and listening history stay the same on paired devices.",
-  "whatsNewHomeTitle": "A Home that learns",
-  "whatsNewHomeDesc": "Mixes and autoplay now follow how you actually listen.",
-  "whatsNewHomeMixesTitle": "Mixes from your Library",
-  "whatsNewHomeMixesBody": "New mixes built from your own songs, including a mix for each genre.",
-  "whatsNewHomeAutoplayTitle": "Smarter autoplay",
-  "whatsNewHomeAutoplayBody": "Autoplay follows your listening session and learns from your favorites, playlists and replays.",
-  "whatsNewHomeAnalysisTitle": "Song analysis",
-  "whatsNewHomeAnalysisBody": "Mornye can analyze how your songs sound for closer picks. It stays off until you turn it on in Settings.",
-  "whatsNewPlayerTitle": "Player and lyrics",
-  "whatsNewPlayerDesc": "Smoother playback, and lyrics in any language.",
-  "whatsNewPlayerGaplessTitle": "Gapless playback",
-  "whatsNewPlayerGaplessBody": "Albums flow from one song into the next without a pause.",
-  "whatsNewPlayerTranslateTitle": "Translate lyrics",
-  "whatsNewPlayerTranslateBody": "Translate or romanize lyrics with an AI provider you set up.",
-  "whatsNewPlayerTimingTitle": "Lyrics timing",
-  "whatsNewPlayerTimingBody": "Move synced lyrics earlier or later when they drift from the song.",
+  "whatsNewLinkDesc": "Під'єднайте телефон і комп'ютер до однієї мережі. Mornye Link перебуває на стадії бета-тестування.",
+  "whatsNewLinkPlayTitle": "Слухайте на різних пристроях",
+  "whatsNewLinkPlayBody": "Переглядайте бібліотеку комп'ютера з телефона, керуйте відтворенням та переходьте з пристрою на пристрій без втрати поточної позиції.",
+  "whatsNewLinkTransferTitle": "Двостороннє перенесення пісень",
+  "whatsNewLinkTransferBody": "Надсилайте пісні на комп'ютер або зберігайте їх на телефон прямо з меню пісні.",
+  "whatsNewLinkSyncTitle": "Завжди в синхроні",
+  "whatsNewLinkSyncBody": "Колекції та історія прослуховування залишаються однаковими на підключених пристроях.",
+  "whatsNewHomeTitle": "Головна Сторінка, що вчиться",
+  "whatsNewHomeDesc": "Мікси та автовідтворення тепер підлаштовуються під те, як ви насправді слухаєте музику.",
+  "whatsNewHomeMixesTitle": "Мікси з вашої бібліотеки",
+  "whatsNewHomeMixesBody": "Нові мікси, створені на основі ваших власних пісень, зокрема окремий мікс для кожного жанру.",
+  "whatsNewHomeAutoplayTitle": "Розумніше автовідтворення",
+  "whatsNewHomeAutoplayBody": "Автовідтворення підлаштовується під вашу поточну сесію та вчиться на основі улюблених треків, списків відтворення і повторів.",
+  "whatsNewHomeAnalysisTitle": "Аналіз пісні",
+  "whatsNewHomeAnalysisBody": "Mornye може аналізувати звучання ваших пісень для точнішого підбору схожої музики. Функція вимкнена, поки ви не увімкнете її в Налаштуваннях.",
+  "whatsNewPlayerTitle": "Програвач і тексти пісень",
+  "whatsNewPlayerDesc": "Плавне відтворення, та тексти пісень усіма мовами.",
+  "whatsNewPlayerGaplessTitle": "Відтворення без пауз",
+  "whatsNewPlayerGaplessBody": "Пісні в альбомах відтворюються безперервно, плавно переходячи від однієї до наступної без пауз.",
+  "whatsNewPlayerTranslateTitle": "Переклад тексту пісні",
+  "whatsNewPlayerTranslateBody": "Перекладайте або романізуйте тексти пісень за допомогою налаштованого вами ШІ-провайдера.",
+  "whatsNewPlayerTimingTitle": "Таймінг тексту",
+  "whatsNewPlayerTimingBody": "Зсувайте синхронізований текст вперед або назад, якщо він розбігається з піснею.",
   "whatsNewPlayerAutoTitle": "Android Auto",
   "whatsNewPlayerAutoBody": "Browse and play your Library from your car's screen.",
   "whatsNewPlayerExclusiveTitle": "Exclusive output",
@@ -4045,7 +4045,7 @@
       }
     }
   },
-  "trackReEnrichProgress": "Повторне збагачення метаданих...",
+  "trackReEnrichProgress": "Повторне оновлення метаданих...",
   "@trackReEnrichProgress": {
     "description": "Snackbar while re-enriching metadata"
   },
@@ -6944,7 +6944,7 @@
   "@libraryExternalPlayer": {
     "description": "Setting option to use an external music player"
   },
-  "libraryExternalPlayerSubtitle": "Recommended for listening, best quality, gapless playback, EQ, and wider format support",
+  "libraryExternalPlayerSubtitle": "Відкривайте треки в інших музичних застосунках на вашому пристрої",
   "@libraryExternalPlayerSubtitle": {
     "description": "Subtitle for external player option"
   },
@@ -7122,7 +7122,7 @@
       }
     }
   },
-  "lyricsTranslatePartial": "{count, plural, =1{1 line} other{{count} lines}} could not be translated",
+  "lyricsTranslatePartial": "{count, plural, =1{1 рядок не вдалося перекласти} one{{count} рядок не вдалося перекласти} few{{count} рядки не вдалося перекласти} many{{count} рядків не вдалося перекласти} other{{count} рядків не вдалося перекласти}}",
   "@lyricsTranslatePartial": {
     "description": "Snackbar after an AI translation that left some lines untranslated",
     "placeholders": {
@@ -7223,7 +7223,7 @@
       }
     }
   },
-  "lyricsAiModelHint": "Model ID",
+  "lyricsAiModelHint": "ID моделі",
   "@lyricsAiModelHint": {
     "description": "Hint of the model id text field"
   },
@@ -7296,7 +7296,7 @@
   "@lyricsAiClearCache": {
     "description": "AI translation settings action that deletes saved translations"
   },
-  "lyricsAiClearCacheSubtitle": "{count, plural, =0{No saved translations} =1{1 song} other{{count} songs}}",
+  "lyricsAiClearCacheSubtitle": "{count, plural, =0{Немає збережених перекладів} =1{1 пісня} other{{count} пісень}}",
   "@lyricsAiClearCacheSubtitle": {
     "description": "Subtitle of the clear saved translations action",
     "placeholders": {
@@ -10288,5 +10288,160 @@
   "collectionSuggestionsAddHere": "Add to this playlist",
   "@collectionSuggestionsAddHere": {
     "description": "Tooltip of the button that adds a suggested song to the user's playlist shown above"
+  },
+  "sectionExistingDownloads": "Existing Files",
+  "@sectionExistingDownloads": {
+    "description": "Files settings section header for actions on already-downloaded files"
+  },
+  "reorganizeLibraryTitle": "Apply Rules to Existing Files",
+  "@reorganizeLibraryTitle": {
+    "description": "Files settings action that moves and renames already-downloaded tracks to match the current folder and filename rules"
+  },
+  "reorganizeLibrarySubtitle": "Move and rename downloads and Local Library files in your download folder so they follow the folder and filename rules above",
+  "@reorganizeLibrarySubtitle": {
+    "description": "Subtitle of the apply-rules-to-existing-files action"
+  },
+  "reorganizeLibraryScanning": "Checking your files…",
+  "@reorganizeLibraryScanning": {
+    "description": "Shown while Mornye works out which downloaded files need to move"
+  },
+  "reorganizeLibraryBusy": "Wait for active downloads to finish before reorganizing files",
+  "@reorganizeLibraryBusy": {
+    "description": "Snackbar when the user tries to reorganize files while downloads are running"
+  },
+  "reorganizeLibraryNothingTitle": "Already Organized",
+  "@reorganizeLibraryNothingTitle": {
+    "description": "Dialog title when every downloaded file already follows the rules"
+  },
+  "reorganizeLibraryNothingMessage": "{count, plural, =0{There are no tracks in your download folder to reorganize. Files Mornye did not download are included once the folder is added and scanned in Local Library.} =1{The track in your download folder already follows the current rules.} other{All {count} tracks in your download folder already follow the current rules.}}",
+  "@reorganizeLibraryNothingMessage": {
+    "description": "Dialog message when there is nothing to move",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "reorganizeLibraryConfirmTitle": "Reorganize {count} {count, plural, =1{file} other{files}}?",
+  "@reorganizeLibraryConfirmTitle": {
+    "description": "Confirmation dialog title before moving files",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "reorganizeLibraryConfirmMessage": "These tracks will be moved or renamed to match your current Files settings, using their tags. Lyrics (.lrc) files next to them move too, and folders left empty are removed.",
+  "@reorganizeLibraryConfirmMessage": {
+    "description": "Confirmation dialog body before moving files"
+  },
+  "reorganizeLibraryExamples": "For example:",
+  "@reorganizeLibraryExamples": {
+    "description": "Label above a few sample moves in the reorganize confirmation dialog"
+  },
+  "reorganizeLibraryMoreChanges": "…and {count} more",
+  "@reorganizeLibraryMoreChanges": {
+    "description": "Shown under the sample moves when more files will be moved",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "reorganizeLibraryAlreadyOrganized": "{count} {count, plural, =1{track already matches} other{tracks already match}} and will stay where {count, plural, =1{it is} other{they are}}.",
+  "@reorganizeLibraryAlreadyOrganized": {
+    "description": "Note in the reorganize confirmation dialog",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "reorganizeLibraryOutsideFolder": "{count} {count, plural, =1{track is} other{tracks are}} stored outside the current download folder and will be left alone.",
+  "@reorganizeLibraryOutsideFolder": {
+    "description": "Note in the reorganize confirmation dialog",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "reorganizeLibraryMissing": "{count} {count, plural, =1{file} other{files}} could not be found and will be skipped.",
+  "@reorganizeLibraryMissing": {
+    "description": "Note in the reorganize confirmation dialog",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "reorganizeLibraryUntagged": "{count} {count, plural, =1{file has} other{files have}} no artist tag and will be left alone.",
+  "@reorganizeLibraryUntagged": {
+    "description": "Note in the reorganize confirmation dialog about scanned files without tags",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "reorganizeLibraryScanHint": "Files Mornye did not download are only included after their folder is added and scanned in Local Library.",
+  "@reorganizeLibraryScanHint": {
+    "description": "Hint in the reorganize confirmation dialog about which files are covered"
+  },
+  "reorganizeLibraryKeepsPlaylistFolders": "Your folder rule uses the playlist name, which Mornye doesn't keep for past downloads, so files stay in their current folder and are only renamed.",
+  "@reorganizeLibraryKeepsPlaylistFolders": {
+    "description": "Warning in the reorganize confirmation dialog when the folder rule depends on the playlist"
+  },
+  "reorganizeLibraryDropsPlaylistFolders": "Mornye doesn't keep which playlist a past download came from, so tracks inside playlist folders will be moved out of them.",
+  "@reorganizeLibraryDropsPlaylistFolders": {
+    "description": "Warning in the reorganize confirmation dialog when playlist folders are enabled"
+  },
+  "reorganizeLibrarySafNote": "Your download folder was picked through Android's folder picker, so each file is copied to its new place and then removed. This can take a while for a large library.",
+  "@reorganizeLibrarySafNote": {
+    "description": "Note in the reorganize confirmation dialog in Android SAF storage mode"
+  },
+  "reorganizeLibraryConfirmAction": "Move Files",
+  "@reorganizeLibraryConfirmAction": {
+    "description": "Confirm button of the reorganize dialog"
+  },
+  "reorganizeLibraryMoving": "Moving files",
+  "@reorganizeLibraryMoving": {
+    "description": "Title of the progress dialog while files are moved"
+  },
+  "reorganizeLibraryDone": "Moved {moved} of {total} {total, plural, =1{file} other{files}}",
+  "@reorganizeLibraryDone": {
+    "description": "Snackbar after reorganizing files",
+    "placeholders": {
+      "moved": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "reorganizeLibraryDoneWithFailures": "Moved {moved} of {total} {total, plural, =1{file} other{files}} · {failed} failed",
+  "@reorganizeLibraryDoneWithFailures": {
+    "description": "Snackbar after reorganizing files when some moves failed",
+    "placeholders": {
+      "moved": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      },
+      "failed": {
+        "type": "int"
+      }
+    }
+  },
+  "reorganizeLibraryFailed": "Couldn't reorganize your files: {error}",
+  "@reorganizeLibraryFailed": {
+    "description": "Snackbar when planning or applying the reorganization fails",
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
   }
 }
