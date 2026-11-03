@@ -44,8 +44,9 @@ void main() {
       if (call.method == 'getWindowMode') return nativeMode.name;
       if (call.method == 'setWindowMode') {
         final name = (call.arguments as Map)['mode'] as String;
-        final target =
-            DesktopWindowMode.values.firstWhere((m) => m.name == name);
+        final target = DesktopWindowMode.values.firstWhere(
+          (m) => m.name == name,
+        );
         await emitMode(target);
         return true;
       }
@@ -73,10 +74,8 @@ void main() {
         navigatorKey: navigatorKey,
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
-        builder: (context, widgetChild) => DesktopShortcuts(
-          navigatorKey: navigatorKey,
-          child: widgetChild!,
-        ),
+        builder: (context, widgetChild) =>
+            DesktopShortcuts(navigatorKey: navigatorKey, child: widgetChild!),
         home: Scaffold(body: child),
       ),
     );
@@ -138,6 +137,57 @@ void main() {
       expect(ShellNavigationService.forwardHistoryForTesting, isEmpty);
     });
 
+    test('Destination changes reported by the shell enter the history', () {
+      addTearDown(() {
+        ShellNavigationService.syncState(
+          currentTabIndex: 0,
+          showRepoTab: false,
+        );
+        ShellNavigationService.resetHistory();
+      });
+      final requested = <ShellTab>[];
+      ShellNavigationService.registerTabSelectionHandler(
+        owner: 'test-sync',
+        handler: requested.add,
+      );
+      addTearDown(
+        () => ShellNavigationService.unregisterTabSelectionHandler('test-sync'),
+      );
+      ShellNavigationService.syncState(currentTabIndex: 0, showRepoTab: true);
+      ShellNavigationService.resetHistory();
+
+      // Mornye with the Store: Home, Library, Store, Search, Settings.
+      for (final index in [1, 2, 3]) {
+        ShellNavigationService.syncState(
+          currentTabIndex: index,
+          showRepoTab: true,
+          showSearchTab: true,
+        );
+      }
+      expect(ShellNavigationService.currentTabForTesting, ShellTab.search);
+      expect(ShellNavigationService.backHistoryForTesting, [
+        ShellTab.home,
+        ShellTab.library,
+        ShellTab.repository,
+      ]);
+
+      // Hiding the Store moves Search to index 2; it is the same destination.
+      ShellNavigationService.syncState(
+        currentTabIndex: 2,
+        showRepoTab: false,
+        showSearchTab: true,
+      );
+      expect(ShellNavigationService.backHistoryForTesting, hasLength(3));
+
+      // Back skips the Store, which is no longer shown.
+      expect(ShellNavigationService.navigateBack(), isTrue);
+      expect(requested, [ShellTab.library]);
+      expect(ShellNavigationService.currentTabForTesting, ShellTab.library);
+      expect(ShellNavigationService.forwardHistoryForTesting, [
+        ShellTab.search,
+      ]);
+    });
+
     test('Boundary conditions for empty history', () {
       ShellNavigationService.resetHistory(initialTab: ShellTab.home);
       expect(ShellNavigationService.navigateBack(), isFalse);
@@ -157,7 +207,9 @@ void main() {
         // Navigating elsewhere pushes the actual initial tab
         ShellNavigationService.recordTabVisit(ShellTab.settings);
         expect(ShellNavigationService.canNavigateBack, isTrue);
-        expect(ShellNavigationService.backHistoryForTesting, [ShellTab.library]);
+        expect(ShellNavigationService.backHistoryForTesting, [
+          ShellTab.library,
+        ]);
         expect(ShellNavigationService.currentTabForTesting, ShellTab.settings);
 
         // Back returns to the actual initial tab
@@ -257,9 +309,8 @@ void main() {
                 onPressed: () {
                   showDialog<void>(
                     context: context,
-                    builder: (_) => const AlertDialog(
-                      title: Text('Test Dialog'),
-                    ),
+                    builder: (_) =>
+                        const AlertDialog(title: Text('Test Dialog')),
                   );
                 },
                 child: const Text('Open Dialog'),
@@ -348,9 +399,7 @@ void main() {
                 onPressed: () {
                   Navigator.of(context).push(
                     MaterialPageRoute<void>(
-                      builder: (_) => const Scaffold(
-                        body: Text('Detail Page'),
-                      ),
+                      builder: (_) => const Scaffold(body: Text('Detail Page')),
                     ),
                   );
                 },
@@ -374,8 +423,14 @@ void main() {
         expect(find.text('Go to Detail'), findsOneWidget);
         expect(currentActiveTab, ShellTab.library);
 
-        // Subsequent Escape navigates tab back from library to home
+        // Escape never switches destinations; Back returns to Home.
         await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+        await tester.pumpAndSettle();
+        expect(currentActiveTab, ShellTab.library);
+
+        await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+        await tester.sendKeyEvent(LogicalKeyboardKey.bracketLeft);
+        await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
         await tester.pumpAndSettle();
 
         expect(currentActiveTab, ShellTab.home);
@@ -383,59 +438,97 @@ void main() {
     );
 
     testWidgets(
-      'Priority 5: Escape navigates to previous tab in history when no higher targets',
+      'Escape in full screen closes a page before leaving full screen',
       (tester) async {
         final navKey = GlobalKey<NavigatorState>();
-        ShellTab? currentActiveTab = ShellTab.home;
-
-        ShellNavigationService.registerTabSelectionHandler(
-          owner: 'test-owner-escape',
-          handler: (tab) => currentActiveTab = tab,
-        );
-        addTearDown(
-          () => ShellNavigationService.unregisterTabSelectionHandler(
-            'test-owner-escape',
-          ),
-        );
-
-        ShellNavigationService.recordTabVisit(ShellTab.library);
-        currentActiveTab = ShellTab.library;
-        ShellNavigationService.recordTabVisit(ShellTab.settings);
-        currentActiveTab = ShellTab.settings;
+        await emitMode(DesktopWindowMode.fullscreen);
 
         await tester.pumpWidget(
           buildTestApp(
             navigatorKey: navKey,
-            child: const Text('Tab Shell'),
+            child: Builder(
+              builder: (context) => ElevatedButton(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const Scaffold(body: Text('Detail Page')),
+                  ),
+                ),
+                child: const Text('Go to Detail'),
+              ),
+            ),
           ),
         );
         await tester.pumpAndSettle();
+        await tester.tap(find.text('Go to Detail'));
+        await tester.pumpAndSettle();
 
-        expect(ShellNavigationService.canNavigateBack, isTrue);
-
-        // Escape navigates back from settings to library
         await tester.sendKeyEvent(LogicalKeyboardKey.escape);
         await tester.pumpAndSettle();
 
-        expect(currentActiveTab, ShellTab.library);
+        expect(find.text('Detail Page'), findsNothing);
+        expect(desktopWindowMode.value, DesktopWindowMode.fullscreen);
 
-        // Escape navigates back from library to home
         await tester.sendKeyEvent(LogicalKeyboardKey.escape);
         await tester.pumpAndSettle();
 
-        expect(currentActiveTab, ShellTab.home);
-        expect(ShellNavigationService.canNavigateBack, isFalse);
-
-        // Further Escape does not crash or navigate away from root
-        await tester.sendKeyEvent(LogicalKeyboardKey.escape);
-        await tester.pumpAndSettle();
-
-        expect(currentActiveTab, ShellTab.home);
+        expect(desktopWindowMode.value, DesktopWindowMode.windowed);
       },
     );
 
+    testWidgets('Escape keeps the destination; Back walks the history', (
+      tester,
+    ) async {
+      final navKey = GlobalKey<NavigatorState>();
+      ShellTab? currentActiveTab = ShellTab.home;
+
+      ShellNavigationService.registerTabSelectionHandler(
+        owner: 'test-owner-escape',
+        handler: (tab) => currentActiveTab = tab,
+      );
+      addTearDown(
+        () => ShellNavigationService.unregisterTabSelectionHandler(
+          'test-owner-escape',
+        ),
+      );
+
+      ShellNavigationService.recordTabVisit(ShellTab.library);
+      currentActiveTab = ShellTab.library;
+      ShellNavigationService.recordTabVisit(ShellTab.settings);
+      currentActiveTab = ShellTab.settings;
+
+      await tester.pumpWidget(
+        buildTestApp(navigatorKey: navKey, child: const Text('Tab Shell')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(ShellNavigationService.canNavigateBack, isTrue);
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+
+      expect(currentActiveTab, ShellTab.settings);
+
+      Future<void> back() async {
+        await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+        await tester.sendKeyEvent(LogicalKeyboardKey.bracketLeft);
+        await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+        await tester.pumpAndSettle();
+      }
+
+      await back();
+      expect(currentActiveTab, ShellTab.library);
+
+      await back();
+      expect(currentActiveTab, ShellTab.home);
+      expect(ShellNavigationService.canNavigateBack, isFalse);
+
+      // Further Back does not crash or navigate away from root
+      await back();
+      expect(currentActiveTab, ShellTab.home);
+    });
+
     testWidgets(
-      'Starting on a non-Home tab, navigating elsewhere, and returning with Escape',
+      'Starting on a non-Home tab, navigating elsewhere, and returning with Back',
       (tester) async {
         final navKey = GlobalKey<NavigatorState>();
         ShellTab? currentActiveTab;
@@ -471,18 +564,21 @@ void main() {
 
         expect(ShellNavigationService.canNavigateBack, isTrue);
 
-        // Escape returns to Library
-        await tester.sendKeyEvent(LogicalKeyboardKey.escape);
-        await tester.pumpAndSettle();
+        Future<void> back() async {
+          await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+          await tester.sendKeyEvent(LogicalKeyboardKey.bracketLeft);
+          await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+          await tester.pumpAndSettle();
+        }
 
+        // Back returns to Library
+        await back();
         expect(currentActiveTab, ShellTab.library);
         // Back history is now exhausted: cannot go back to a non-existent Home
         expect(ShellNavigationService.canNavigateBack, isFalse);
 
-        // Next Escape does not change tab
-        await tester.sendKeyEvent(LogicalKeyboardKey.escape);
-        await tester.pumpAndSettle();
-
+        // Next Back does not change tab
+        await back();
         expect(currentActiveTab, ShellTab.library);
       },
     );
@@ -547,112 +643,104 @@ void main() {
       },
     );
 
-    testWidgets(
-      'Holding mouse button does not repeatedly trigger navigation',
-      (tester) async {
-        final navKey = GlobalKey<NavigatorState>();
-        ShellTab? currentActiveTab = ShellTab.home;
+    testWidgets('Holding mouse button does not repeatedly trigger navigation', (
+      tester,
+    ) async {
+      final navKey = GlobalKey<NavigatorState>();
+      ShellTab? currentActiveTab = ShellTab.home;
 
-        ShellNavigationService.registerTabSelectionHandler(
-          owner: 'test-owner-mouse-hold',
-          handler: (tab) => currentActiveTab = tab,
-        );
-        addTearDown(
-          () => ShellNavigationService.unregisterTabSelectionHandler(
-            'test-owner-mouse-hold',
-          ),
-        );
+      ShellNavigationService.registerTabSelectionHandler(
+        owner: 'test-owner-mouse-hold',
+        handler: (tab) => currentActiveTab = tab,
+      );
+      addTearDown(
+        () => ShellNavigationService.unregisterTabSelectionHandler(
+          'test-owner-mouse-hold',
+        ),
+      );
 
-        ShellNavigationService.recordTabVisit(ShellTab.library);
-        currentActiveTab = ShellTab.library;
-        ShellNavigationService.recordTabVisit(ShellTab.settings);
-        currentActiveTab = ShellTab.settings;
+      ShellNavigationService.recordTabVisit(ShellTab.library);
+      currentActiveTab = ShellTab.library;
+      ShellNavigationService.recordTabVisit(ShellTab.settings);
+      currentActiveTab = ShellTab.settings;
 
-        await tester.pumpWidget(
-          buildTestApp(
-            navigatorKey: navKey,
-            child: const Center(child: Text('Mouse Hold Page')),
-          ),
-        );
-        await tester.pumpAndSettle();
+      await tester.pumpWidget(
+        buildTestApp(
+          navigatorKey: navKey,
+          child: const Center(child: Text('Mouse Hold Page')),
+        ),
+      );
+      await tester.pumpAndSettle();
 
-        final center = tester.getCenter(find.text('Mouse Hold Page'));
-        final pointer = TestPointer(2, PointerDeviceKind.mouse);
+      final center = tester.getCenter(find.text('Mouse Hold Page'));
+      final pointer = TestPointer(2, PointerDeviceKind.mouse);
 
-        // Down with Mouse Button 4
-        await tester.sendEventToBinding(
-          pointer.down(center, buttons: kBackMouseButton),
-        );
-        await tester.pumpAndSettle();
+      // Down with Mouse Button 4
+      await tester.sendEventToBinding(
+        pointer.down(center, buttons: kBackMouseButton),
+      );
+      await tester.pumpAndSettle();
 
-        expect(currentActiveTab, ShellTab.library);
+      expect(currentActiveTab, ShellTab.library);
 
-        // Move while held: should NOT trigger another back navigation!
-        await tester.sendEventToBinding(
-          pointer.move(
-            center + const Offset(10, 10),
-            buttons: kBackMouseButton,
-          ),
-        );
-        await tester.pumpAndSettle();
+      // Move while held: should NOT trigger another back navigation!
+      await tester.sendEventToBinding(
+        pointer.move(center + const Offset(10, 10), buttons: kBackMouseButton),
+      );
+      await tester.pumpAndSettle();
 
-        expect(currentActiveTab, ShellTab.library);
+      expect(currentActiveTab, ShellTab.library);
 
-        await tester.sendEventToBinding(
-          pointer.move(
-            center + const Offset(20, 20),
-            buttons: kBackMouseButton,
-          ),
-        );
-        await tester.pumpAndSettle();
+      await tester.sendEventToBinding(
+        pointer.move(center + const Offset(20, 20), buttons: kBackMouseButton),
+      );
+      await tester.pumpAndSettle();
 
-        expect(currentActiveTab, ShellTab.library);
+      expect(currentActiveTab, ShellTab.library);
 
-        // Release
-        await tester.sendEventToBinding(pointer.up());
-        await tester.pumpAndSettle();
+      // Release
+      await tester.sendEventToBinding(pointer.up());
+      await tester.pumpAndSettle();
 
-        expect(currentActiveTab, ShellTab.library);
-      },
-    );
+      expect(currentActiveTab, ShellTab.library);
+    });
 
-    testWidgets(
-      'No interference with sliders or normal pointer controls',
-      (tester) async {
-        final navKey = GlobalKey<NavigatorState>();
-        double sliderVal = 0.5;
+    testWidgets('No interference with sliders or normal pointer controls', (
+      tester,
+    ) async {
+      final navKey = GlobalKey<NavigatorState>();
+      double sliderVal = 0.5;
 
-        await tester.pumpWidget(
-          buildTestApp(
-            navigatorKey: navKey,
-            child: StatefulBuilder(
-              builder: (context, setState) => Slider(
-                value: sliderVal,
-                onChanged: (val) => setState(() => sliderVal = val),
-              ),
+      await tester.pumpWidget(
+        buildTestApp(
+          navigatorKey: navKey,
+          child: StatefulBuilder(
+            builder: (context, setState) => Slider(
+              value: sliderVal,
+              onChanged: (val) => setState(() => sliderVal = val),
             ),
           ),
-        );
-        await tester.pumpAndSettle();
+        ),
+      );
+      await tester.pumpAndSettle();
 
-        final sliderFinder = find.byType(Slider);
-        expect(sliderFinder, findsOneWidget);
+      final sliderFinder = find.byType(Slider);
+      expect(sliderFinder, findsOneWidget);
 
-        // Tap slider with primary mouse button
-        final topLeft = tester.getTopLeft(sliderFinder);
-        final bottomRight = tester.getBottomRight(sliderFinder);
-        final target = Offset(
-          bottomRight.dx - 20,
-          (topLeft.dy + bottomRight.dy) / 2,
-        );
+      // Tap slider with primary mouse button
+      final topLeft = tester.getTopLeft(sliderFinder);
+      final bottomRight = tester.getBottomRight(sliderFinder);
+      final target = Offset(
+        bottomRight.dx - 20,
+        (topLeft.dy + bottomRight.dy) / 2,
+      );
 
-        await tester.tapAt(target);
-        await tester.pumpAndSettle();
+      await tester.tapAt(target);
+      await tester.pumpAndSettle();
 
-        // Value updated properly via primary button click
-        expect(sliderVal, greaterThan(0.7));
-      },
-    );
+      // Value updated properly via primary button click
+      expect(sliderVal, greaterThan(0.7));
+    });
   });
 
   group('Keyboard Shortcuts and Hardware Browser Keys', () {
@@ -726,7 +814,9 @@ void main() {
       expect(currentActiveTab, ShellTab.library);
     });
 
-    testWidgets('Browser Back and Forward keys trigger navigation', (tester) async {
+    testWidgets('Browser Back and Forward keys trigger navigation', (
+      tester,
+    ) async {
       final navKey = GlobalKey<NavigatorState>();
       ShellTab? currentActiveTab = ShellTab.home;
 
@@ -773,40 +863,51 @@ void main() {
       expect(currentActiveTab, ShellTab.library);
     });
 
-    test('Track skip shortcuts remain preserved and bound to Ctrl/Cmd + Left/Right', () {
-      final bindings = desktopShortcutBindings(TargetPlatform.windows);
-      final prevShortcut = desktopCommandShortcut(
-        DesktopCommand.previous,
-        TargetPlatform.windows,
-      );
-      final nextShortcut = desktopCommandShortcut(
-        DesktopCommand.next,
-        TargetPlatform.windows,
-      );
+    test(
+      'Track skip shortcuts remain preserved and bound to Ctrl/Cmd + Left/Right',
+      () {
+        final bindings = desktopShortcutBindings(TargetPlatform.windows);
+        final prevShortcut = desktopCommandShortcut(
+          DesktopCommand.previous,
+          TargetPlatform.windows,
+        );
+        final nextShortcut = desktopCommandShortcut(
+          DesktopCommand.next,
+          TargetPlatform.windows,
+        );
 
-      expect(prevShortcut, isNotNull);
-      expect(prevShortcut!.trigger, LogicalKeyboardKey.arrowLeft);
-      expect(prevShortcut.control, isTrue);
+        expect(prevShortcut, isNotNull);
+        expect(prevShortcut!.trigger, LogicalKeyboardKey.arrowLeft);
+        expect(prevShortcut.control, isTrue);
 
-      expect(nextShortcut, isNotNull);
-      expect(nextShortcut!.trigger, LogicalKeyboardKey.arrowRight);
-      expect(nextShortcut.control, isTrue);
+        expect(nextShortcut, isNotNull);
+        expect(nextShortcut!.trigger, LogicalKeyboardKey.arrowRight);
+        expect(nextShortcut.control, isTrue);
 
-      final prevMatching = bindings.entries.where(
-        (e) =>
-            e.key is SingleActivator &&
-            (e.key as SingleActivator).trigger == LogicalKeyboardKey.arrowLeft,
-      );
-      expect(prevMatching, isNotEmpty);
-      expect((prevMatching.first.value as DesktopCommandIntent).command, DesktopCommand.previous);
+        final prevMatching = bindings.entries.where(
+          (e) =>
+              e.key is SingleActivator &&
+              (e.key as SingleActivator).trigger ==
+                  LogicalKeyboardKey.arrowLeft,
+        );
+        expect(prevMatching, isNotEmpty);
+        expect(
+          (prevMatching.first.value as DesktopCommandIntent).command,
+          DesktopCommand.previous,
+        );
 
-      final nextMatching = bindings.entries.where(
-        (e) =>
-            e.key is SingleActivator &&
-            (e.key as SingleActivator).trigger == LogicalKeyboardKey.arrowRight,
-      );
-      expect(nextMatching, isNotEmpty);
-      expect((nextMatching.first.value as DesktopCommandIntent).command, DesktopCommand.next);
-    });
+        final nextMatching = bindings.entries.where(
+          (e) =>
+              e.key is SingleActivator &&
+              (e.key as SingleActivator).trigger ==
+                  LogicalKeyboardKey.arrowRight,
+        );
+        expect(nextMatching, isNotEmpty);
+        expect(
+          (nextMatching.first.value as DesktopCommandIntent).command,
+          DesktopCommand.next,
+        );
+      },
+    );
   });
 }

@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/widgets.dart';
 
 enum ShellTab { home, library, repository, settings, search }
@@ -135,22 +133,13 @@ class ShellNavigationService {
         _showSearchTab == showSearchTab) {
       return;
     }
+    _currentTab ??= _tabAtCurrentIndex();
     _currentTabIndex = currentTabIndex;
     _showRepoTab = showRepoTab;
     _showSearchTab = showSearchTab;
-    if (_currentTab == null) {
-      if (currentTabIndex == 0) {
-        _currentTab = ShellTab.home;
-      } else if (currentTabIndex == 1) {
-        _currentTab = ShellTab.library;
-      } else if (showRepoTab && currentTabIndex == 2) {
-        _currentTab = ShellTab.repository;
-      } else if (showSearchTab && currentTabIndex == (showRepoTab ? 3 : 2)) {
-        _currentTab = ShellTab.search;
-      } else {
-        _currentTab = ShellTab.settings;
-      }
-    }
+    // Every destination change reaches the shell here, whether it came from
+    // the sidebar, a shortcut or a link, so history records it here too.
+    recordTabVisit(_tabAtCurrentIndex());
     _scheduleChromeUpdate();
   }
 
@@ -201,7 +190,17 @@ class ShellNavigationService {
   static ShellTab? _currentTab;
   static bool _isNavigatingHistory = false;
 
-  /// Records a tab visit into navigation history.
+  static ShellTab _tabAtCurrentIndex() {
+    if (_currentTabIndex == 0) return ShellTab.home;
+    if (_currentTabIndex == 1) return ShellTab.library;
+    if (_showRepoTab && _currentTabIndex == 2) return ShellTab.repository;
+    if (_showSearchTab && _currentTabIndex == (_showRepoTab ? 3 : 2)) {
+      return ShellTab.search;
+    }
+    return ShellTab.settings;
+  }
+
+  /// Records a destination visit into navigation history.
   static void recordTabVisit(ShellTab tab) {
     if (_isNavigatingHistory) return;
     if (_currentTab == null) {
@@ -214,66 +213,42 @@ class ShellNavigationService {
     _currentTab = tab;
   }
 
-  /// Whether application-level back navigation is currently possible.
-  static bool get canNavigateBack {
-    final nav = activeBackNavigator();
-    if (nav != null && nav.canPop()) return true;
-    return _backHistory.isNotEmpty;
-  }
+  /// Whether destination history has an earlier destination. Pages inside
+  /// the active destination are closed by the caller before this applies.
+  static bool get canNavigateBack => _backHistory.any(_canRevisit);
 
-  /// Whether application-level forward navigation is currently possible.
-  static bool get canNavigateForward => _forwardHistory.isNotEmpty;
+  /// Whether destination history has a later destination.
+  static bool get canNavigateForward => _forwardHistory.any(_canRevisit);
 
-  /// Navigates back: first pops inner pages in the active tab if any,
-  /// otherwise navigates back in tab history.
-  static bool navigateBack() {
-    final nav = activeBackNavigator();
-    if (nav != null && nav.canPop()) {
-      unawaited(nav.maybePop());
-      return true;
-    }
-    if (_backHistory.isNotEmpty) {
-      final prevTab = _backHistory.removeLast();
-      if (_currentTab != null) {
-        _forwardHistory.add(_currentTab!);
-      }
-      _isNavigatingHistory = true;
-      try {
-        _currentTab = prevTab;
-        if (prevTab == ShellTab.search) {
-          requestSearch();
-        } else {
-          requestTab(prevTab);
-        }
-      } finally {
-        _isNavigatingHistory = false;
-      }
-      return true;
-    }
-    return false;
-  }
+  /// Returns to the previously visited destination.
+  static bool navigateBack() => _travel(_backHistory, _forwardHistory);
 
-  /// Navigates forward in tab history.
-  static bool navigateForward() {
-    if (_forwardHistory.isNotEmpty) {
-      final nextTab = _forwardHistory.removeLast();
-      if (_currentTab != null) {
-        _backHistory.add(_currentTab!);
-      }
-      _isNavigatingHistory = true;
-      try {
-        _currentTab = nextTab;
-        if (nextTab == ShellTab.search) {
-          requestSearch();
-        } else {
-          requestTab(nextTab);
-        }
-      } finally {
-        _isNavigatingHistory = false;
-      }
-      return true;
+  /// Returns to the destination left by [navigateBack].
+  static bool navigateForward() => _travel(_forwardHistory, _backHistory);
+
+  /// A destination can disappear after a visit (the Store hidden), and
+  /// history must not step onto the destination already shown.
+  static bool _canRevisit(ShellTab tab) =>
+      tab != _currentTab && (tab != ShellTab.repository || _showRepoTab);
+
+  static bool _travel(List<ShellTab> from, List<ShellTab> to) {
+    while (from.isNotEmpty && !_canRevisit(from.last)) {
+      from.removeLast();
     }
-    return false;
+    if (from.isEmpty) return false;
+    final target = from.removeLast();
+    final current = _currentTab;
+    if (current != null) to.add(current);
+    _isNavigatingHistory = true;
+    try {
+      _currentTab = target;
+      // Switch destinations as they were left; requestSearch would also
+      // reset Search to its field.
+      requestTab(target);
+    } finally {
+      _isNavigatingHistory = false;
+    }
+    return true;
   }
 
   @visibleForTesting

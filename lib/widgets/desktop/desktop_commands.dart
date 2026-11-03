@@ -164,6 +164,12 @@ List<SingleActivator> desktopCommandShortcuts(
     ?desktopCommandShortcut(command, target),
     if (command == DesktopCommand.fullScreen && _usesCommandKey(target))
       const SingleActivator(LogicalKeyboardKey.f11),
+    // The Back and Forward keys of Windows and Linux keyboards. Mouse side
+    // buttons arrive as pointer buttons instead (DesktopShortcuts).
+    if (command == DesktopCommand.back && !_usesCommandKey(target))
+      const SingleActivator(LogicalKeyboardKey.browserBack),
+    if (command == DesktopCommand.forward && !_usesCommandKey(target))
+      const SingleActivator(LogicalKeyboardKey.browserForward),
   ];
 }
 
@@ -190,10 +196,6 @@ Map<ShortcutActivator, Intent> desktopShortcutBindings([
       desktopDestinationShortcut(position, target): DesktopDestinationIntent(
         position,
       ),
-    const SingleActivator(LogicalKeyboardKey.browserBack):
-        const DesktopCommandIntent(DesktopCommand.back),
-    const SingleActivator(LogicalKeyboardKey.browserForward):
-        const DesktopCommandIntent(DesktopCommand.forward),
   });
 }
 

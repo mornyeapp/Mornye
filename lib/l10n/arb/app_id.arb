@@ -8213,6 +8213,10 @@
   "@desktopShortcutDismiss": {
     "description": "Keyboard Shortcuts row for Escape, which leaves a text field or closes the top dialog or page"
   },
+  "desktopShortcutForward": "Maju",
+  "@desktopShortcutForward": {
+    "description": "Keyboard Shortcuts row and View menu item that returns to the destination left with Back"
+  },
   "desktopShortcutToggleSidebar": "Tampilkan atau sembunyikan sidebar",
   "@desktopShortcutToggleSidebar": {
     "description": "Keyboard Shortcuts row for the shortcut that collapses or expands the desktop sidebar"
