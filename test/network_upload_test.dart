@@ -293,6 +293,34 @@ void main() {
     },
   );
 
+  test(
+    'a Library upload creates its folders and skips a name already there',
+    () async {
+      final target = await storage.prepareNewUpload(
+        folder,
+        'Artist/Album',
+        'Song #1.flac',
+      );
+      expect(target, 'network://nas/Artist/Album/Song%20%231.flac');
+      expect(
+        dav.folders,
+        containsAll(['/music/Artist/', '/music/Artist/Album/']),
+      );
+      dav.files['/music/Artist/Album/song #1.FLAC'] = [9];
+      expect(
+        await storage.prepareNewUpload(folder, 'Artist/Album', 'Song #1.flac'),
+        isNull,
+      );
+      expect(dav.files['/music/Artist/Album/song #1.FLAC'], [9]);
+      // Only the audio name counts: a lone lyrics file does not block it.
+      dav.files['/music/Artist/Album/Other.lrc'] = [1];
+      expect(
+        await storage.prepareNewUpload(folder, 'Artist/Album', 'Other.flac'),
+        isNotNull,
+      );
+    },
+  );
+
   test('an existing lyrics sidecar also reserves its audio name', () async {
     dav.files['/music/Song #1.lrc'] = utf8.encode('Older lyrics');
     await prepare(dir: '', lyrics: true);

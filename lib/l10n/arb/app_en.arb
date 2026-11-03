@@ -125,6 +125,47 @@
   "@networkUploading": {
     "description": "Download queue status during upload of prepared audio to the network destination; a progress percentage may follow"
   },
+  "networkUpload": "Upload to network storage",
+  "@networkUpload": {
+    "description": "Library song action that copies songs stored on this device to a NAS or WebDAV folder; also the title of the folder choice sheet"
+  },
+  "networkUploadChooseFolder": "Choose a folder",
+  "@networkUploadChooseFolder": {
+    "description": "Subtitle of a network connection in the upload sheet; opens its folders to pick the upload destination"
+  },
+  "networkUploadHere": "Upload to this folder",
+  "@networkUploadHere": {
+    "description": "Action in the network folder browser that picks the current folder as the upload destination"
+  },
+  "networkUploadDescription": "Songs go into Artist/Album folders here. Files already on the server are never replaced.",
+  "@networkUploadDescription": {
+    "description": "Help below the upload destination action describing the folder layout and that existing server files are kept"
+  },
+  "networkUploadResult": "Uploaded {saved}, already there {skipped}, failed {failed}",
+  "@networkUploadResult": {
+    "description": "Snackbar after uploading Library songs to network storage",
+    "placeholders": {
+      "saved": {"type": "int"},
+      "skipped": {"type": "int"},
+      "failed": {"type": "int"}
+    }
+  },
+  "networkUploadCancelled": "Upload stopped",
+  "@networkUploadCancelled": {
+    "description": "Snackbar when the listener cancels uploading Library songs to network storage"
+  },
+  "networkUploadFailed": "Couldn't upload the songs. Check the server connection and that this account can write to the folder.",
+  "@networkUploadFailed": {
+    "description": "Snackbar when uploading Library songs to network storage fails as a whole"
+  },
+  "networkUploadReadOnly": "This connection doesn't accept uploads. Choose an SMB or WebDAV folder.",
+  "@networkUploadReadOnly": {
+    "description": "Snackbar when the chosen upload destination is a read-only connection or no longer exists"
+  },
+  "networkUploadNoSongs": "No songs stored on this device in this selection.",
+  "@networkUploadNoSongs": {
+    "description": "Snackbar when the upload action is used on songs that already stream from a server"
+  },
   "networkDownloadDescription": "Prepare songs on this device, then upload them to your NAS. Keep the app open until the upload finishes. Retry reuses prepared audio. Existing files are kept; new downloads with the same name get a numbered suffix.",
   "@networkDownloadDescription": {
     "description": "Help below the network download destination action explaining local preparation, upload, retry behavior, and preservation of existing files; NAS means network-attached storage"

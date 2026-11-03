@@ -8,6 +8,8 @@ import 'package:mornye/widgets/desktop/desktop_link_transfer_actions.dart';
 import 'package:mornye/widgets/playlist_picker_sheet.dart';
 import 'package:mornye/services/network_offline_saver.dart';
 import 'package:mornye/widgets/network_offline_actions.dart';
+import 'package:mornye/providers/network_upload_provider.dart';
+import 'package:mornye/widgets/network_upload_actions.dart';
 
 /// Context menu groups for library files (downloaded or scanned), acting on
 /// [items]: the selection the menu was opened on.
@@ -86,6 +88,18 @@ List<List<ContextMenuAction>> libraryTrackMenuGroups(
           onSelected: () {
             onDone?.call();
             saveNetworkOffline(root, ref, items);
+          },
+        ),
+      if (networkUploadOffered(
+        ref.read(networkUploadConnectionsProvider).value,
+        items,
+      ))
+        ContextMenuAction(
+          icon: Icons.cloud_upload_outlined,
+          label: l10n.networkUpload,
+          onSelected: () {
+            onDone?.call();
+            uploadToNetworkStorage(root, ref, items);
           },
         ),
     ],

@@ -14,6 +14,7 @@ import 'package:mornye/services/saf_migration_prompt_store.dart';
 import 'package:mornye/providers/download_queue_provider.dart';
 import 'package:mornye/providers/extension_provider.dart';
 import 'package:mornye/providers/music_player_provider.dart';
+import 'package:mornye/providers/network_upload_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/providers/playback_notification_provider.dart';
 import 'package:mornye/providers/repo_provider.dart';
@@ -283,6 +284,9 @@ class _MainShellState extends ConsumerState<MainShell>
       _initialSafRepairComplete = true;
       if (!mounted) return;
       unawaited(_restorePlayback());
+      // Library menus are built synchronously and offer an upload only once
+      // the writable connections are known.
+      ref.read(networkUploadConnectionsProvider);
       _setupShareListener();
       await _checkSafMigration();
       if (!mounted) return;

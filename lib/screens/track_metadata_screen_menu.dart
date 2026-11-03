@@ -45,6 +45,13 @@ extension _TrackMetadataMenu on _TrackMetadataScreenState {
             else if (downloadItem != null)
               UnifiedLibraryItem.fromDownloadHistory(downloadItem),
           ]);
+    final uploadItems = [
+      if (_fileExists && !_isNetworkItem)
+        if (localItem != null)
+          UnifiedLibraryItem.fromLocalLibrary(localItem)
+        else if (downloadItem != null)
+          UnifiedLibraryItem.fromDownloadHistory(downloadItem),
+    ];
     return <_MetadataOption>[
       if (canSaveNetworkOfflineSource(cleanFilePath) && desktopSongs.isEmpty)
         _MetadataOption(
@@ -80,6 +87,15 @@ extension _TrackMetadataMenu on _TrackMetadataScreenState {
           icon: Icons.computer,
           label: l10n.linkSendToDesktop(linkDesktopName(linkClient)),
           onTap: () => linkSendSongsToDesktop(screenContext, ref, phoneSongs),
+        ),
+      if (networkUploadOffered(
+        ref.read(networkUploadConnectionsProvider).value,
+        uploadItems,
+      ))
+        _MetadataOption(
+          icon: Icons.cloud_upload_outlined,
+          label: l10n.networkUpload,
+          onTap: () => uploadToNetworkStorage(screenContext, ref, uploadItems),
         ),
       if (albumName.trim().isNotEmpty)
         _MetadataOption(

@@ -11,6 +11,8 @@ import 'package:mornye/widgets/playlist_picker_sheet.dart';
 import 'package:mornye/widgets/selection_action_button.dart';
 import 'package:mornye/services/network_offline_saver.dart';
 import 'package:mornye/widgets/network_offline_actions.dart';
+import 'package:mornye/providers/network_upload_provider.dart';
+import 'package:mornye/widgets/network_upload_actions.dart';
 
 /// Collection actions stay separate from actions that modify audio files.
 class LibrarySelectionPlaybackActions extends ConsumerWidget {
@@ -36,6 +38,20 @@ class LibrarySelectionPlaybackActions extends ConsumerWidget {
           onPressed: () {
             final root = Navigator.of(context, rootNavigator: true).context;
             unawaited(saveNetworkOffline(root, ref, items));
+            onClose();
+          },
+        ),
+      if (networkUploadOffered(
+        ref.watch(networkUploadConnectionsProvider).value,
+        items,
+      ))
+        SelectionActionButton(
+          icon: Icons.cloud_upload_outlined,
+          label: context.l10n.networkUpload,
+          colorScheme: colors,
+          onPressed: () {
+            final root = Navigator.of(context, rootNavigator: true).context;
+            unawaited(uploadToNetworkStorage(root, ref, items));
             onClose();
           },
         ),

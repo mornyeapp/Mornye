@@ -139,6 +139,7 @@ IconData _cupertinoFor(IconData icon) {
     Icons.wifi => CupertinoIcons.wifi,
     Icons.signal_cellular_alt => CupertinoIcons.antenna_radiowaves_left_right,
     Icons.cloud || Icons.cloud_outlined => CupertinoIcons.cloud,
+    Icons.cloud_upload_outlined => CupertinoIcons.cloud_upload,
     Icons.high_quality => CupertinoIcons.hifispeaker,
     Icons.four_k => CupertinoIcons.waveform,
     Icons.dynamic_feed_outlined ||

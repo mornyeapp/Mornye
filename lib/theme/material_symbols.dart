@@ -258,6 +258,7 @@ final Map<IconData, IconData> _outlinedSymbols = {
   Icons.cleaning_services_outlined: Symbols.cleaning_services_rounded,
   Icons.cloud_download_outlined: Symbols.cloud_download_rounded,
   Icons.cloud_outlined: Symbols.cloud_rounded,
+  Icons.cloud_upload_outlined: Symbols.cloud_upload_rounded,
   Icons.color_lens_outlined: Symbols.color_lens_rounded,
   Icons.compress_outlined: Symbols.compress_rounded,
   Icons.content_copy_outlined: Symbols.content_copy_rounded,
