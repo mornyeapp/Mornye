@@ -14,6 +14,7 @@ import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/app_icon_button.dart';
 import 'package:mornye/widgets/app_progress_indicator.dart';
 import 'package:mornye/widgets/app_snack_bar.dart';
+import 'package:mornye/widgets/lyrics_editor_sheet.dart';
 import 'package:mornye/widgets/mornye_context_menu.dart';
 
 /// The localized message for a translation failure. Raw errors never reach
@@ -123,7 +124,9 @@ class _LyricsOptionsButtonState extends ConsumerState<LyricsOptionsButton> {
     bool ready,
   ) {
     final metadata = widget.metadata;
-    if (metadata.loading || !metadata.lyrics.synced) return null;
+    if (metadata.loading || metadata.lyrics.isEmpty) return null;
+    final canEdit = canEditPlayerLyrics(metadata);
+    if (!metadata.lyrics.synced) return canEdit ? _editButton(context) : null;
     final original = metadata.lyrics;
     final lyrics = ref
         .read(lyricsTranslationProvider.notifier)
@@ -136,7 +139,7 @@ class _LyricsOptionsButtonState extends ConsumerState<LyricsOptionsButton> {
     final translating = job != null && job.sourceHash == source.hash;
     final canTranslate = ready && !source.isEmpty && job == null;
     if (!pronunciation && !translation && !canTranslate && !translating) {
-      return null;
+      return canEdit ? _editButton(context) : null;
     }
     final colorScheme = widget.colorScheme;
     final foreground = _open ? colorScheme.surface : colorScheme.onSurface;
@@ -172,9 +175,37 @@ class _LyricsOptionsButtonState extends ConsumerState<LyricsOptionsButton> {
           translation: translation,
           canTranslate: canTranslate,
           translating: translating,
+          canEdit: canEdit,
         ),
       ),
     );
+  }
+
+  /// The button alone when editing is the only option, as for plain lyrics.
+  Widget _editButton(BuildContext context) {
+    final colorScheme = widget.colorScheme;
+    final foreground = _open ? colorScheme.surface : colorScheme.onSurface;
+    return AppIconButton.filledTonal(
+      key: const ValueKey('lyrics-edit'),
+      tooltip: context.l10n.lyricsEditTitle,
+      icon: const AppIcon.adaptive(Icons.edit_note),
+      style: IconButton.styleFrom(
+        foregroundColor: foreground,
+        backgroundColor: colorScheme.onSurface.withValues(
+          alpha: _open ? 0.85 : 0.16,
+        ),
+      ),
+      onPressed: _edit,
+    );
+  }
+
+  Future<void> _edit() async {
+    _setOpen(true);
+    try {
+      await openLyricsEditor(context, widget.metadata);
+    } finally {
+      _setOpen(false);
+    }
   }
 
   void _setOpen(bool open) {
@@ -190,6 +221,7 @@ class _LyricsOptionsButtonState extends ConsumerState<LyricsOptionsButton> {
     required bool translation,
     required bool canTranslate,
     required bool translating,
+    required bool canEdit,
   }) async {
     final settings = ref.read(settingsProvider);
     final l10n = context.l10n;
@@ -233,6 +265,7 @@ class _LyricsOptionsButtonState extends ConsumerState<LyricsOptionsButton> {
           Icons.language_rounded,
         ),
       ],
+      if (canEdit) ('edit', l10n.lyricsEditTitle, Icons.edit_note),
     ];
     _setOpen(true);
     String? action;
@@ -306,8 +339,16 @@ class _LyricsOptionsButtonState extends ConsumerState<LyricsOptionsButton> {
           ref.read(lyricsTranslationProvider.notifier).cancel();
       }
     } finally {
-      // The language sheet keeps controls visible until it closes.
-      if (action != 'translateInto') _setOpen(false);
+      // The language sheet and the editor keep controls visible until they
+      // close.
+      if (action != 'translateInto' && action != 'edit') _setOpen(false);
+    }
+    if (action == 'edit') {
+      try {
+        if (mounted) await openLyricsEditor(context, widget.metadata);
+      } finally {
+        _setOpen(false);
+      }
     }
     if (action == 'translate' || action == 'translateInto') {
       try {

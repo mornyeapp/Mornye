@@ -10316,5 +10316,32 @@
         "type": "String"
       }
     }
-  }
+  },
+  "lyricsEditTitle": "Edit lyrics",
+  "@lyricsEditTitle": {"description": "Lyrics menu action and title of the lyrics editor, which edits lines and their times"},
+  "lyricsEditWrite": "Write lyrics",
+  "@lyricsEditWrite": {"description": "Button under 'No lyrics' in the player that opens the lyrics editor with an empty line"},
+  "lyricsEditSetTime": "Set time",
+  "@lyricsEditSetTime": {"description": "Lyrics editor button that gives the selected line the current playback position, then selects the next line"},
+  "lyricsEditSetTimeTooltip": "Give the selected line the current position",
+  "lyricsEditEarlier": "−0.1",
+  "@lyricsEditEarlier": {"description": "Short label of the button that moves the selected line's time 0.1 seconds earlier"},
+  "lyricsEditLater": "+0.1",
+  "@lyricsEditLater": {"description": "Short label of the button that moves the selected line's time 0.1 seconds later"},
+  "lyricsEditEarlierTooltip": "Move 0.1 s earlier",
+  "lyricsEditLaterTooltip": "Move 0.1 s later",
+  "lyricsEditNoTime": "No time",
+  "@lyricsEditNoTime": {"description": "Shown for a lyric line that has no time yet"},
+  "lyricsEditPlayFrom": "Play from {time}",
+  "@lyricsEditPlayFrom": {"placeholders": {"time": {"type": "String"}}},
+  "lyricsEditOutOfOrder": "Earlier than the line before it",
+  "lyricsEditLineHint": "Lyric line",
+  "lyricsEditAddLine": "Add line",
+  "lyricsEditInsertBelow": "Insert line below",
+  "lyricsEditRemoveTime": "Remove time",
+  "lyricsEditDeleteLine": "Delete line",
+  "lyricsEditLineActions": "Line actions",
+  "lyricsEditSaved": "Lyrics saved",
+  "lyricsEditSaveFailed": "Couldn't save the lyrics to this file",
+  "lyricsEditReadOnly": "Lyrics can't be saved to this song's file"
 }

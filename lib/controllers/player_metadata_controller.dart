@@ -74,6 +74,13 @@ class PlayerMetadataController extends ChangeNotifier {
 
   String? get source => _requestKey?.$2;
 
+  /// The queue item whose file this controller reads, or null for an item
+  /// without one.
+  MediaItem? get item => _item;
+
+  /// The lyrics as stored: LRC, TTML or plain text, empty when none.
+  String get rawLyrics => _lyricsRaw;
+
   /// The path the current metadata was probed from: the resolved copy of a
   /// document, or the source itself.
   String? get filePath => _loadedPath;
@@ -145,6 +152,35 @@ class PlayerMetadataController extends ChangeNotifier {
       _savingLyricsSources.remove(source);
     }
     if (!_disposed && generation == _generation) notifyListeners();
+  }
+
+  /// Embeds [raw] in the original audio file and shows it. Throws when the
+  /// file can't be written, leaving the current lyrics in place.
+  Future<void> saveEditedLyrics(String raw) async {
+    final source = this.source;
+    if (_disposed || _item == null || source == null) {
+      throw StateError('No editable track is loaded');
+    }
+    final generation = _generation;
+    final parsed = raw.trim().isEmpty
+        ? ParsedLyrics.empty
+        : await _parseLyrics(raw);
+    // A document plays from a copy, so reloading after the save would read
+    // the old lyrics back; show what was written instead.
+    _savingLyricsSources.add(source);
+    try {
+      await _saveOnline(source, raw);
+      await _metadataEvents.publish(source);
+    } finally {
+      _savingLyricsSources.remove(source);
+    }
+    if (_disposed || generation != _generation) return;
+    _metadata = Map.unmodifiable({...?_metadata, 'lyrics': raw});
+    _lyrics = parsed;
+    _lyricsRaw = raw;
+    _onlineSearchMissed = false;
+    _onlineLyricsSaveFailed = false;
+    notifyListeners();
   }
 
   /// Reads deferred file tags when opening technical details. Already loaded

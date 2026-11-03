@@ -12,6 +12,7 @@ import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/app_loading_indicator.dart';
 import 'package:mornye/widgets/app_snack_bar.dart';
 import 'package:mornye/widgets/expressive_button.dart';
+import 'package:mornye/widgets/lyrics_editor_sheet.dart';
 import 'package:mornye/widgets/player_lyrics.dart';
 import 'package:mornye/widgets/lyrics_text_scale.dart';
 
@@ -149,6 +150,16 @@ class PlayerLyricsSection extends ConsumerWidget {
             child: Text(context.l10n.nowPlayingSearchLyricsOnline),
           ),
         ],
+        if (canEditPlayerLyrics(metadata)) ...[
+          const SizedBox(height: 8),
+          ExpressiveButton(
+            key: const ValueKey('lyrics-write'),
+            text: true,
+            onPressed: () => openLyricsEditor(context, metadata),
+            icon: const Icon(Icons.edit_note),
+            child: Text(context.l10n.lyricsEditWrite),
+          ),
+        ],
       ],
     ),
   );
@@ -182,8 +193,9 @@ class PlayerLyricsSection extends ConsumerWidget {
         ],
       );
     }
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+    final plain = SingleChildScrollView(
+      // Leaves room for the options button over the end of the text.
+      padding: EdgeInsets.fromLTRB(24, 16, 24, options == null ? 32 : 80),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -208,6 +220,18 @@ class PlayerLyricsSection extends ConsumerWidget {
           ?_lyricsCredits(),
         ],
       ),
+    );
+    if (options == null) return plain;
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        plain,
+        PositionedDirectional(
+          start: context.isMornye ? mornyeLyricsContentInset : 24,
+          bottom: 8,
+          child: options!,
+        ),
+      ],
     );
   }
 
