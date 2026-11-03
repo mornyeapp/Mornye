@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/services/ffmpeg_desktop.dart';
 import 'package:mornye/services/ffmpeg_probe.dart';
@@ -122,6 +123,8 @@ Future<void> _writeWav(File file) async {
 }
 
 void main() {
+  final binding = TestWidgetsFlutterBinding.ensureInitialized();
+
   group('DesktopFFmpegTools', () {
     test('searches the override, the bundle, then PATH', () {
       expect(
@@ -312,8 +315,17 @@ void main() {
 
   group('FFmpegExecution on desktop', () {
     late _Starts starts;
+    final nativeCalls = <String>[];
+    const nativeChannel = MethodChannel('flutter.arthenica.com/ffmpeg_kit');
 
     setUp(() {
+      nativeCalls.clear();
+      binding.defaultBinaryMessenger.setMockMethodCallHandler(nativeChannel, (
+        call,
+      ) async {
+        nativeCalls.add(call.method);
+        throw MissingPluginException('No FFmpegKit native plugin on Windows');
+      });
       debugDesktopPlatformOverride = true;
       starts = _Starts()..next = () => _FakeProcess()..finish(0);
       DesktopFFmpegRunner.debugShared = DesktopFFmpegRunner(
@@ -325,6 +337,11 @@ void main() {
     tearDown(() {
       debugDesktopPlatformOverride = null;
       DesktopFFmpegRunner.debugShared = null;
+      binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        nativeChannel,
+        null,
+      );
+      expect(nativeCalls, isEmpty);
     });
 
     test('splits command strings with FFmpegKit quoting', () async {
@@ -351,6 +368,26 @@ void main() {
       expect((await session.completed).success, isFalse);
       expect(starts.processes.single.kills, isNotEmpty);
     });
+
+    test(
+      'routes argument execution and metadata to standalone tools',
+      () async {
+        final result = await FFmpegExecution.arguments([
+          '-i',
+          'input.wav',
+          '-c:a',
+          'flac',
+          'output.flac',
+        ]);
+        expect(result.success, isTrue);
+        expect(starts.calls.single.$1, _tools.ffmpegPath);
+
+        starts.next = () => _FakeProcess(stdoutText: _probeJson)..finish(0);
+        final info = await FFmpegExecution.mediaInformation('output.flac');
+        expect(info?.getFormat(), 'flac');
+        expect(starts.calls.last.$1, _tools.ffprobePath);
+      },
+    );
   });
 
   final hostTools = DesktopFFmpegTools.locate(
