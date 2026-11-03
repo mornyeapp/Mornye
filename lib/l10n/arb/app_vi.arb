@@ -1124,63 +1124,63 @@
   "@setupSkipForNow": {
     "description": "Skip button text"
   },
-  "setupNearbyEnable": "Allow Nearby Devices",
+  "setupNearbyEnable": "Cho phép thiết bị lân cận",
   "@setupNearbyEnable": {
     "description": "Setup step title and button for the Android Nearby devices permission; Nearby devices is the Android permission name"
   },
-  "setupNearbyDescription": "Mornye Link uses it to find your computer on the same network, and network storage needs it to reach a server at home.",
+  "setupNearbyDescription": "Mornye Link dùng tính năng này để tìm máy tính của bạn trên cùng mạng, và lưu trữ mạng cần nó để kết nối tới máy chủ tại nhà.",
   "@setupNearbyDescription": {
     "description": "Setup step explaining why Android's Nearby devices permission is needed"
   },
-  "setupNearbyGranted": "Nearby Devices Allowed!",
+  "setupNearbyGranted": "Đã cho phép thiết bị lân cận!",
   "@setupNearbyGranted": {
     "description": "Setup message after the Nearby devices permission is granted"
   },
-  "permissionNearbyDevices": "Nearby devices",
+  "permissionNearbyDevices": "Các thiết bị lân cận",
   "@permissionNearbyDevices": {
     "description": "Nearby devices permission type label; use Android's name for this permission"
   },
-  "whatsNewLinkNearbyAllow": "Allow nearby devices",
+  "whatsNewLinkNearbyAllow": "Cho phép thiết bị lân cận",
   "@whatsNewLinkNearbyAllow": {
     "description": "Main button on the Nearby devices page of the What's New tour that asks for Android's Nearby devices permission"
   },
-  "whatsNewLinkNearbyGranted": "Nearby devices allowed",
+  "whatsNewLinkNearbyGranted": "Cho phép các thiết bị lân cận",
   "@whatsNewLinkNearbyGranted": {
     "description": "Shown on the Nearby devices page of the What's New tour after the Nearby devices permission is granted"
   },
-  "whatsNewNearbyTitle": "Nearby devices",
+  "whatsNewNearbyTitle": "Các thiết bị lân cận",
   "@whatsNewNearbyTitle": {
     "description": "Title of the What's New page that asks for Android's Nearby devices permission; use Android's name for this permission"
   },
-  "whatsNewNearbyDesc": "Android now asks before an app can reach other devices on your network. Mornye needs this for:",
+  "whatsNewNearbyDesc": "Android sẽ hỏi trước khi cho phép một ứng dụng truy cập các thiết bị khác trong mạng của bạn. Mornye cần quyền này để:",
   "@whatsNewNearbyDesc": {
     "description": "Description on the Nearby devices page of the What's New tour, followed by a list of uses"
   },
-  "whatsNewNearbyLinkTitle": "Finding your computer",
+  "whatsNewNearbyLinkTitle": "Tìm máy tính của bạn",
   "@whatsNewNearbyLinkTitle": {
     "description": "Use of the Nearby devices permission: Mornye Link finds the computer"
   },
-  "whatsNewNearbyLinkBody": "Mornye Link looks for your computer on the same Wi-Fi and stays connected to it.",
+  "whatsNewNearbyLinkBody": "Mornye Link tìm kiếm máy tính của bạn trên cùng mạng Wi-Fi và duy trì kết nối với máy tính đó.",
   "@whatsNewNearbyLinkBody": {
     "description": "Explains how Mornye Link uses the Nearby devices permission"
   },
-  "whatsNewNearbyStorageTitle": "Network storage",
+  "whatsNewNearbyStorageTitle": "Lưu trữ mạng",
   "@whatsNewNearbyStorageTitle": {
     "description": "Use of the Nearby devices permission: SMB and WebDAV servers at home"
   },
-  "whatsNewNearbyStorageBody": "Play music from a NAS or a server at home over SMB or WebDAV.",
+  "whatsNewNearbyStorageBody": "Phát nhạc từ NAS hoặc máy chủ tại nhà qua SMB hoặc WebDAV.",
   "@whatsNewNearbyStorageBody": {
     "description": "Explains how network storage uses the Nearby devices permission"
   },
-  "whatsNewNearbyPrivateTitle": "Only your own devices",
+  "whatsNewNearbyPrivateTitle": "Chỉ các thiết bị của riêng bạn",
   "@whatsNewNearbyPrivateTitle": {
     "description": "Reassurance on the Nearby devices page of the What's New tour"
   },
-  "whatsNewNearbyPrivateBody": "Mornye uses it only to reach devices on your network, never to find where you are.",
+  "whatsNewNearbyPrivateBody": "Mornye chỉ dùng tính năng này để kết nối với các thiết bị trên mạng của bạn, chứ không bao giờ để tìm vị trí của bạn.",
   "@whatsNewNearbyPrivateBody": {
     "description": "Explains that the Nearby devices permission is not used for location"
   },
-  "whatsNewNearbyRefused": "Not allowed. Mornye Link and network storage stay off until you allow Nearby devices for Mornye in Android settings.",
+  "whatsNewNearbyRefused": "Không được phép. Mornye Link và tính năng lưu trữ mạng vẫn tắt cho đến khi bạn cho phép thiết bị lân cận cho Mornye trong cài đặt Android.",
   "@whatsNewNearbyRefused": {
     "description": "Shown on the Nearby devices page of the What's New tour after the permission is refused"
   },
@@ -1649,11 +1649,11 @@
   "@searchPlaylists": {
     "description": "Search result category - playlists"
   },
-  "searchShowAll": "Show all",
+  "searchShowAll": "Hiển thị tất cả",
   "@searchShowAll": {
     "description": "Button of a search result section on wide screens that shows every result of that kind"
   },
-  "searchShowAllCategory": "Show all {category}",
+  "searchShowAllCategory": "Hiển thị tất cả {category}",
   "@searchShowAllCategory": {
     "description": "Screen reader label of the Show all button of a search result section",
     "placeholders": {
@@ -2610,12 +2610,12 @@
   "@downloadAutoConvert": {
     "description": "Toggle for automatic post-download audio conversion"
   },
-  "downloadAutoConvertAllFormatsSubtitle": "Convert completed downloads or limit FLAC bit depth and sample rate. The original is replaced only after conversion succeeds.",
-  "downloadAutoConvertOutputSubtitle": "Choose the output format for newly completed downloads.",
-  "downloadAutoConvertFlacSubtitle": "Lossless FLAC with quality limits. Lower bit depths and sample rates are preserved.",
-  "downloadAutoConvertMaxBitDepth": "Maximum bit depth",
-  "downloadAutoConvertMaxSampleRate": "Maximum sample rate",
-  "downloadAutoConvertFlacLimitsSubtitle": "These are upper limits. For example, a 44.1 kHz source stays at 44.1 kHz when 48 kHz is selected. Lossy sources are kept in their original format.",
+  "downloadAutoConvertAllFormatsSubtitle": "Chuyển đổi các tệp tải xuống hoàn tất hoặc giới hạn độ sâu bit và tần số mẫu FLAC. Bản gốc chỉ được thay thế sau khi chuyển đổi thành công.",
+  "downloadAutoConvertOutputSubtitle": "Chọn định dạng đầu ra cho các tệp tải xuống mới hoàn tất.",
+  "downloadAutoConvertFlacSubtitle": "FLAC không mất dữ liệu với giới hạn chất lượng. Độ sâu bit và tần số mẫu thấp hơn được giữ nguyên.",
+  "downloadAutoConvertMaxBitDepth": "Độ sâu bit tối đa",
+  "downloadAutoConvertMaxSampleRate": "Tần số mẫu tối đa",
+  "downloadAutoConvertFlacLimitsSubtitle": "Đây là các giới hạn trên. Ví dụ, một nguồn 44,1 kHz vẫn giữ nguyên ở 44,1 kHz khi chọn 48 kHz. Các nguồn có tổn hao (lossy) được giữ nguyên định dạng ban đầu.",
   "downloadAutoConvertSubtitle": "Tự động chuyển các bài vừa tải xong sang định dạng nén gọn nhẹ hơn. Tệp gốc chỉ bị thay thế sau khi chuyển đổi thành công.",
   "@downloadAutoConvertSubtitle": {
     "description": "Explanation of safe automatic post-download conversion"
@@ -3330,19 +3330,19 @@
   "@libraryFilterAll": {
     "description": "Filter chip - show all library items"
   },
-  "libraryReEnrichAll": "Re-enrich All Tracks",
+  "libraryReEnrichAll": "Cập nhật lại toàn bộ thông tin bài hát",
   "@libraryReEnrichAll": {
     "description": "Library settings action - re-enrich the metadata of every track in the Library"
   },
-  "libraryReEnrichAllSubtitle": "Look up and fill in metadata for every track in your Library, then review the changes",
+  "libraryReEnrichAllSubtitle": "Tìm kiếm và điền thông tin chi tiết (metadata) cho mọi bài hát trong Thư viện của bạn, sau đó xem lại các thay đổi",
   "@libraryReEnrichAllSubtitle": {
     "description": "Subtitle for the Re-enrich All Tracks action"
   },
-  "libraryReEnrichAllEmpty": "No tracks to re-enrich. Tracks from network connections are not included.",
+  "libraryReEnrichAllEmpty": "Không có bài hát nào để cập nhật lại. Các bài hát từ kết nối mạng không được bao gồm.",
   "@libraryReEnrichAllEmpty": {
     "description": "Snackbar when the Library has no tracks Re-enrich can write to"
   },
-  "libraryReEnrichAllBusy": "Wait for the Library scan to finish, then try again.",
+  "libraryReEnrichAllBusy": "Vui lòng chờ quá trình quét Thư viện hoàn tất, sau đó thử lại.",
   "@libraryReEnrichAllBusy": {
     "description": "Snackbar when Re-enrich All is started during a Library scan"
   },
@@ -3572,7 +3572,7 @@
   "@tutorialReadyMessage": {
     "description": "Tutorial completion message"
   },
-  "whatsNewIntroTitle": "Mornye {version} is here",
+  "whatsNewIntroTitle": "Mornye phiên bản {version} đã có",
   "@whatsNewIntroTitle": {
     "description": "First page of the tour shown once after updating; version is like 5.3",
     "placeholders": {
@@ -3581,28 +3581,28 @@
       }
     }
   },
-  "whatsNewIntroDesc": "Our biggest update yet. Here's a quick look at what's new.",
+  "whatsNewIntroDesc": "Bản cập nhật lớn nhất từ trước đến nay của chúng tôi. Dưới đây là cái nhìn nhanh về những điểm mới.",
   "whatsNewLinkTitle": "Mornye Link",
-  "whatsNewLinkDesc": "Pair your phone and computer on the same network. Mornye Link is in beta.",
-  "whatsNewLinkPlayTitle": "Play across devices",
-  "whatsNewLinkPlayBody": "Browse your computer's library on your phone, control what it plays, and hand playback over without losing your place.",
-  "whatsNewLinkTransferTitle": "Move songs both ways",
-  "whatsNewLinkTransferBody": "Send songs to your computer or save them to your phone, right from the song menu.",
-  "whatsNewLinkSyncTitle": "Stay in sync",
-  "whatsNewLinkSyncBody": "Collections and listening history stay the same on paired devices.",
-  "whatsNewHomeTitle": "A Home that learns",
-  "whatsNewHomeDesc": "Mixes and autoplay now follow how you actually listen.",
-  "whatsNewHomeMixesTitle": "Mixes from your Library",
-  "whatsNewHomeMixesBody": "New mixes built from your own songs, including a mix for each genre.",
-  "whatsNewHomeAutoplayTitle": "Smarter autoplay",
-  "whatsNewHomeAutoplayBody": "Autoplay follows your listening session and learns from your favorites, playlists and replays.",
-  "whatsNewHomeAnalysisTitle": "Song analysis",
-  "whatsNewHomeAnalysisBody": "Mornye can analyze how your songs sound for closer picks. It stays off until you turn it on in Settings.",
-  "whatsNewPlayerTitle": "Player and lyrics",
-  "whatsNewPlayerDesc": "Smoother playback, and lyrics in any language.",
-  "whatsNewPlayerGaplessTitle": "Gapless playback",
-  "whatsNewPlayerGaplessBody": "Albums flow from one song into the next without a pause.",
-  "whatsNewPlayerTranslateTitle": "Translate lyrics",
+  "whatsNewLinkDesc": "Ghép đôi điện thoại và máy tính của bạn trên cùng một mạng. Mornye Link đang trong giai đoạn thử nghiệm.",
+  "whatsNewLinkPlayTitle": "Phát nhạc trên các thiết bị",
+  "whatsNewLinkPlayBody": "Duyệt qua thư viện của máy tính trên điện thoại, điều khiển nội dung đang phát và chuyển đổi quá trình phát mà không bị mất vị trí.",
+  "whatsNewLinkTransferTitle": "Chuyển bài hát theo cả hai hướng",
+  "whatsNewLinkTransferBody": "Gửi bài hát đến máy tính của bạn hoặc lưu về điện thoại, ngay từ menu bài hát.",
+  "whatsNewLinkSyncTitle": "Đồng bộ liên tục",
+  "whatsNewLinkSyncBody": "Bộ sưu tập và lịch sử nghe nhạc luôn đồng bộ trên các thiết bị đã ghép đôi.",
+  "whatsNewHomeTitle": "Trang chủ tự học hỏi theo thói quen",
+  "whatsNewHomeDesc": "Các bản hòa âm và tính năng tự động phát giờ đây sẽ tuân theo cách bạn thực sự nghe nhạc.",
+  "whatsNewHomeMixesTitle": "Bản hòa âm từ Thư viện của bạn",
+  "whatsNewHomeMixesBody": "Các bản hòa âm mới được tạo từ chính các bài hát của bạn, bao gồm một bản hòa âm cho từng thể loại.",
+  "whatsNewHomeAutoplayTitle": "Tự động phát thông minh hơn",
+  "whatsNewHomeAutoplayBody": "Tính năng tự động phát bám sát phiên nghe nhạc của bạn và học hỏi từ các bài hát yêu thích, danh sách phát cũng như các lượt phát lại.",
+  "whatsNewHomeAnalysisTitle": "Phân tích bài hát",
+  "whatsNewHomeAnalysisBody": "Mornye có thể phân tích âm thanh của các bài hát để đưa ra lựa chọn phù hợp hơn. Tính năng này sẽ tắt cho đến khi bạn bật nó trong phần Cài đặt.",
+  "whatsNewPlayerTitle": "Trình phát và lời bài hát",
+  "whatsNewPlayerDesc": "Phát nhạc mượt mà hơn và hiển thị lời bài hát bằng bất kỳ ngôn ngữ nào.",
+  "whatsNewPlayerGaplessTitle": "Phát liền mạch",
+  "whatsNewPlayerGaplessBody": "Các album phát liền mạch từ bài hát này sang bài hát tiếp theo mà không có khoảng dừng.",
+  "whatsNewPlayerTranslateTitle": "Dịch lời bài hát",
   "whatsNewPlayerTranslateBody": "Translate or romanize lyrics with an AI provider you set up.",
   "whatsNewPlayerTimingTitle": "Lyrics timing",
   "whatsNewPlayerTimingBody": "Move synced lyrics earlier or later when they drift from the song.",
