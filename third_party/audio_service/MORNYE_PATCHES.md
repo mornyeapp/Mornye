@@ -57,6 +57,18 @@ from the upstream package are not vendored.
   service is no longer attached" when the service changed or the interface
   was destroyed; `destroy()` also clears the method handler and shuts the
   executor down.
+- Android: queue positions read a published, immutable queue snapshot without
+  taking the service monitor. Artwork decoding and queue publication can hold
+  that monitor on the media worker; an Android Auto insertion callback on the
+  main thread must not wait for them. Clearing the service replaces the queue
+  snapshot instead of mutating one a callback might still be reading.
+- Android: reuse native notification actions and PlaybackState custom actions
+  while the controls are equal. Position-only updates previously rebuilt all
+  actions and PendingIntents on the main thread twice per second. A changed
+  control or service configuration rebuilds them; compact layout changes keep
+  the existing actions. The app's instrumented
+  `AudioServiceResponsivenessTest` covers slow artwork, queue snapshots,
+  action reuse, changed controls and configuration invalidation.
 - Android: close the `ParcelFileDescriptor` used for content artwork after
   decoding, including failure paths. The service listener stays attached while
   an Activity retains its Flutter engine across service recreation; engine

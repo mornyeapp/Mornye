@@ -42,6 +42,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -104,7 +105,7 @@ public class AudioService extends MediaBrowserServiceCompat {
     private volatile boolean destroyed;
     private static PendingIntent contentIntent;
     private static ServiceListener listener;
-    private static List<MediaSessionCompat.QueueItem> queue = new ArrayList<>();
+    private static volatile List<MediaSessionCompat.QueueItem> queue = Collections.emptyList();
     private static final PinnedMetadataCache<MediaMetadataCompat> mediaMetadataCache = new PinnedMetadataCache<>(256);
 
     public static void init(ServiceListener listener) {
@@ -292,6 +293,7 @@ public class AudioService extends MediaBrowserServiceCompat {
     private List<MediaControl> controls = new ArrayList<>();
     private List<NotificationCompat.Action> nativeActions = new ArrayList<>();
     private List<PlaybackStateCompat.CustomAction> customActions = new ArrayList<>();
+    private boolean controlsConfigured;
     private int[] compactActionIndices;
     private MediaMetadataCompat mediaMetadata;
     private Bitmap artBitmap;
@@ -388,7 +390,7 @@ public class AudioService extends MediaBrowserServiceCompat {
         }
         mediaMetadata = null;
         artBitmap = null;
-        queue.clear();
+        queue = Collections.emptyList();
         controls.clear();
         artBitmapCache.evictAll();
         compactActionIndices = null;
@@ -411,6 +413,7 @@ public class AudioService extends MediaBrowserServiceCompat {
 
     public void configure(AudioServiceConfig config) {
         this.config = config;
+        controlsConfigured = false;
         notificationChannelId = (config.androidNotificationChannelId != null)
             ? config.androidNotificationChannelId
             : getApplication().getPackageName() + ".channel";
@@ -548,33 +551,35 @@ public class AudioService extends MediaBrowserServiceCompat {
     }
 
     void setState(List<MediaControl> controls, long actionBits, int[] compactActionIndices, AudioProcessingState processingState, boolean playing, long position, long bufferedPosition, float speed, long updateTime, Integer errorCode, String errorMessage, int repeatMode, int shuffleMode, boolean captioningEnabled, Long queueIndex) {
-        boolean notificationChanged = false;
-        if (!Arrays.equals(compactActionIndices, this.compactActionIndices)) {
-            notificationChanged = true;
-        }
-        if (!controls.equals(this.controls)) {
-            notificationChanged = true;
-        }
-        this.controls = controls;
-        this.nativeActions.clear();
-        this.customActions.clear();
-        for (MediaControl control : controls) {
-            final PlaybackStateCompat.CustomAction customAction = createCustomAction(control);
-            if (customAction != null) {
-                // SystemUI sends PlaybackState custom actions through a binder
-                // callback, which cannot launch an activity from the background.
-                // Android 13+ supplies its own output switcher. Activity actions
-                // remain direct PendingIntents in legacy MediaStyle notifications.
-                if (control.customAction == null || customActionActivity(control) == null) {
-                    customActions.add(customAction);
+        boolean controlsChanged = !controlsConfigured || !controls.equals(this.controls);
+        boolean notificationChanged = controlsChanged
+                || !Arrays.equals(compactActionIndices, this.compactActionIndices);
+        if (controlsChanged) {
+            // Position ticks reuse their actions instead of issuing fresh
+            // PendingIntent Binder calls on the main thread every time.
+            controlsConfigured = false;
+            this.nativeActions.clear();
+            this.customActions.clear();
+            for (MediaControl control : controls) {
+                final PlaybackStateCompat.CustomAction customAction = createCustomAction(control);
+                if (customAction != null) {
+                    // SystemUI sends PlaybackState custom actions through a binder
+                    // callback, which cannot launch an activity from the background.
+                    // Android 13+ supplies its own output switcher. Activity actions
+                    // remain direct PendingIntents in legacy MediaStyle notifications.
+                    if (control.customAction == null || customActionActivity(control) == null) {
+                        customActions.add(customAction);
+                    }
+                    if (control.customAction != null) {
+                        nativeActions.add(new NotificationCompat.Action(
+                            getResourceId(control.icon), control.label, customActionIntent(control)));
+                    }
+                } else {
+                    nativeActions.add(createAction(control.icon, control.label, control.actionCode));
                 }
-                if (control.customAction != null) {
-                    nativeActions.add(new NotificationCompat.Action(
-                        getResourceId(control.icon), control.label, customActionIntent(control)));
-                }
-            } else {
-                nativeActions.add(createAction(control.icon, control.label, control.actionCode));
             }
+            this.controls = new ArrayList<>(controls);
+            controlsConfigured = true;
         }
         this.compactActionIndices = compactActionIndices;
         boolean wasPlaying = this.playing;
@@ -818,17 +823,22 @@ public class AudioService extends MediaBrowserServiceCompat {
      * Gets called from background thread.
      */
     synchronized void setQueue(List<MediaSessionCompat.QueueItem> queue, Map<String, MediaMetadataCompat> metadata) {
+        final List<MediaSessionCompat.QueueItem> publishedQueue =
+                Collections.unmodifiableList(new ArrayList<>(queue));
         synchronized (mediaMetadataCache) {
             if (destroyed) throw new IllegalStateException("Audio service is no longer attached");
             mediaMetadataCache.setQueue(metadata);
         }
-        AudioService.queue = queue;
-        mediaSession.setQueue(queue);
+        AudioService.queue = publishedQueue;
+        mediaSession.setQueue(publishedQueue);
     }
 
-    synchronized int queueIndexForPosition(int index) {
-        return queue.isEmpty() ? index
-                : QueueItemIndex.fromPosition(queue.get(0).getQueueId(), queue.size(), index);
+    int queueIndexForPosition(int index) {
+        // The media worker holds the service monitor while reading artwork.
+        // Main-thread browser callbacks only need the published queue snapshot.
+        final List<MediaSessionCompat.QueueItem> publishedQueue = queue;
+        return publishedQueue.isEmpty() ? index
+                : QueueItemIndex.fromPosition(publishedQueue.get(0).getQueueId(), publishedQueue.size(), index);
     }
 
     void playMediaItem(MediaDescriptionCompat description) {
