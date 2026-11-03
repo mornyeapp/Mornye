@@ -1,10 +1,10 @@
 {
-  "extensionsUnsecuredStorage": "Use unsecured extension storage",
-  "extensionsUnsecuredStorageDescription": "Run extensions without a Linux keyring. The key is saved locally, so anyone with access to your app files can read extension credentials. Off uses the system keyring.",
-  "extensionsStorageKeyringRequired": "Existing extension data needs its original key. Unlock the system keyring once, then enable unsecured storage again. Your data has been preserved.",
-  "extensionsStorageKeyConflict": "The local and system keyring keys differ. Storage was not changed and both keys were preserved.",
-  "extensionsStorageKeyringUnavailable": "The system keyring is unavailable or locked. Start or unlock it before switching to secure storage. Your local key has been preserved.",
-  "linkFileActionOn": "{action} on {name}",
+  "extensionsUnsecuredStorage": "Sử dụng bộ lưu trữ tiện ích mở rộng không bảo mật",
+  "extensionsUnsecuredStorageDescription": "Chạy tiện ích mở rộng không cần chuỗi khóa Linux. Khóa được lưu cục bộ, nghĩa là bất kỳ ai có quyền truy cập vào file ứng dụng đều có thể đọc thông tin đăng nhập của tiện ích. Tắt nghĩa là sử dụng chuỗi khóa hệ thống.",
+  "extensionsStorageKeyringRequired": "Dữ liệu tiện ích mở rộng hiện có cần khóa gốc của nó. Hãy mở khóa chuỗi khóa hệ thống một lần, sau đó bật lại bộ lưu trữ không bảo mật. Dữ liệu của bạn đã được giữ nguyên.",
+  "extensionsStorageKeyConflict": "Khóa cục bộ và khóa chuỗi khóa hệ thống khác nhau. Bộ lưu trữ chưa bị thay đổi và cả hai khóa đã được giữ nguyên.",
+  "extensionsStorageKeyringUnavailable": "Chuỗi khóa hệ thống không khả dụng hoặc đang bị khóa. Hãy khởi động hoặc mở khóa nó trước khi chuyển sang bộ lưu trữ bảo mật. Khóa cục bộ của bạn đã được giữ nguyên.",
+  "linkFileActionOn": "{action} trên {name}",
   "@linkFileActionOn": {
     "description": "File operation on a named linked computer",
     "placeholders": {
@@ -16,7 +16,7 @@
       }
     }
   },
-  "linkFileActionsDescription": "Changes apply to music files on {name}. Accepted work continues if this phone disconnects.",
+  "linkFileActionsDescription": "Các thay đổi sẽ áp dụng cho tệp nhạc trên {name}. Công việc đã chấp nhận vẫn tiếp tục nếu điện thoại này mất kết nối.",
   "@linkFileActionsDescription": {
     "placeholders": {
       "name": {
@@ -24,7 +24,7 @@
       }
     }
   },
-  "linkFileDeleteConfirm": "Delete {count} {count, plural, =1{music file} other{music files}} from {name}? This removes the files from that computer's storage.",
+  "linkFileDeleteConfirm": "Xóa {count} {count, plural, =1{tệp nhạc} other{tệp nhạc}} khỏi {name}? Hành động này sẽ xóa các tệp khỏi bộ lưu trữ của máy tính đó.",
   "@linkFileDeleteConfirm": {
     "placeholders": {
       "count": {
@@ -35,11 +35,11 @@
       }
     }
   },
-  "linkFileJobs": "File changes",
+  "linkFileJobs": "Thay đổi tệp",
   "@linkFileJobs": {
     "description": "Title of the list of edits, conversions and deletions the phone started on the linked computer's music files"
   },
-  "linkFileJobsSubtitle": "Edits, conversions and deletions on {name}",
+  "linkFileJobsSubtitle": "Chỉnh sửa, chuyển đổi và xóa trên {name}",
   "@linkFileJobsSubtitle": {
     "placeholders": {
       "name": {
@@ -47,11 +47,11 @@
       }
     }
   },
-  "linkFileJobsEmpty": "No file changes yet",
-  "linkFileJobsEmptyMessage": "Edits, conversions and deletions you start on the computer's songs from this phone appear here.",
-  "linkDesktopFileJobsSubtitle": "Changes requested from your phones",
-  "linkDesktopFileJobsEmptyMessage": "Edits, conversions and deletions requested from your phones appear here.",
-  "linkFileJobRequestedBy": "From {name}",
+  "linkFileJobsEmpty": "Chưa có thay đổi tệp nào",
+  "linkFileJobsEmptyMessage": "Các chỉnh sửa, chuyển đổi và thao tác xóa mà bạn thực hiện trên tệp nhạc của máy tính từ điện thoại này sẽ xuất hiện ở đây.",
+  "linkDesktopFileJobsSubtitle": "Yêu cầu thay đổi từ điện thoại của bạn",
+  "linkDesktopFileJobsEmptyMessage": "Các yêu cầu chỉnh sửa, chuyển đổi và xóa được gửi từ điện thoại của bạn sẽ xuất hiện ở đây.",
+  "linkFileJobRequestedBy": "Từ {name}",
   "@linkFileJobRequestedBy": {
     "placeholders": {
       "name": {
@@ -59,13 +59,13 @@
       }
     }
   },
-  "linkFileJobsView": "View",
+  "linkFileJobsView": "Xem",
   "@linkFileJobsView": {
     "description": "Snackbar action that opens the file changes list to see which songs failed"
   },
-  "linkFileJobsUnsupported": "Update Mornye on your computer to manage its music files from this phone.",
-  "linkFileSelectionOneDevice": "Select songs from one linked computer at a time (up to 100 songs).",
-  "linkFileJobProgress": "{finished} of {total} {total, plural, =1{song} other{songs}}",
+  "linkFileJobsUnsupported": "Cập nhật Mornye trên máy tính của bạn để quản lý các tệp nhạc từ điện thoại này.",
+  "linkFileSelectionOneDevice": "Chọn bài hát từ một máy tính được liên kết tại một thời điểm (tối đa 100 bài hát).",
+  "linkFileJobProgress": "Đã xong {finished}/{total} {total, plural, =1{bài hát} other{bài hát}}\n",
   "@linkFileJobProgress": {
     "placeholders": {
       "finished": {
@@ -76,7 +76,7 @@
       }
     }
   },
-  "linkFileJobFailedCount": "{count} failed",
+  "linkFileJobFailedCount": "{count} thất bại",
   "@linkFileJobFailedCount": {
     "placeholders": {
       "count": {
@@ -84,7 +84,7 @@
       }
     }
   },
-  "linkFileJobFinished": "{action} finished on {name}",
+  "linkFileJobFinished": "{action} đã hoàn tất trên {name}",
   "@linkFileJobFinished": {
     "placeholders": {
       "action": {
@@ -95,29 +95,29 @@
       }
     }
   },
-  "linkFileDeleting": "Deleting...",
-  "linkFileReading": "Reading tags...",
-  "linkFileSavingCover": "Saving cover art...",
-  "linkFileCancelHint": "Stop after the current song",
-  "linkFileJobCancelled": "Stopped",
-  "linkFileJobQueued": "Queued",
-  "linkFileJobCompleted": "Finished",
-  "linkFileChanged": "The file changed since the preview. Preview it again before saving.",
-  "linkFileOperationFailed": "The operation could not be completed. Check the computer's logs for details.",
+  "linkFileDeleting": "Đang xoá",
+  "linkFileReading": "Đang đọc thẻ...",
+  "linkFileSavingCover": "Đang lưu ảnh bìa...",
+  "linkFileCancelHint": "Dừng sau bài hát hiện tại",
+  "linkFileJobCancelled": "Đã dừng",
+  "linkFileJobQueued": "Đang xếp hàng",
+  "linkFileJobCompleted": "Đã hoàn thành",
+  "linkFileChanged": "Tệp đã thay đổi kể từ bản xem trước. Hãy xem lại trước khi lưu.",
+  "linkFileOperationFailed": "Không thể hoàn tất thao tác. Hãy kiểm tra nhật ký của máy tính để biết chi tiết.",
   "trackBpm": "BPM",
   "trackMood": "Tâm trạng",
   "subsonicAddToLibrary": "Thêm máy chủ vào Thư viện",
-  "subsonicLibraryAdded": "Đã thêm máy chủ vào Thư viện",
-  "subsonicLibraryDescription": "Đồng bộ danh mục và ảnh bìa từ máy chủ vào Thư viện. Nhạc vẫn được lưu trên máy chủ của bạn. Quét lại trong cài đặt Thư viện cục bộ để cập nhật danh mục.",
+  "subsonicLibraryAdded": "Máy chủ đã được thêm vào Thư viện ",
+  "subsonicLibraryDescription": "Đồng bộ danh mục và ảnh bìa máy chủ vào Thư viện. Nhạc vẫn nằm trên máy chủ của bạn. Quét lại trong cài đặt Thư viện cục bộ để cập nhật danh mục.",
   "subsonicAuthentication": "Xác thực",
-  "subsonicToken": "Token có salt",
+  "subsonicToken": "Salted token",
   "subsonicPasswordAuth": "Mật khẩu",
-  "subsonicApiKey": "Khóa API",
+  "subsonicApiKey": "Khoá API",
   "subsonicUsername": "Tên người dùng",
   "subsonicPassword": "Mật khẩu",
   "subsonicSearch": "Tìm kiếm nhạc trên máy chủ...",
-  "subsonicMoreAlbums": "Xem thêm album",
-  "subsonicErrorApi": "Máy chủ không hỗ trợ phiên bản API hoặc phương thức xác thực này. Hãy kiểm tra lại cài đặt máy chủ và phương thức đăng nhập đã chọn.",
+  "subsonicMoreAlbums": "Thêm album",
+  "subsonicErrorApi": "Máy chủ không hỗ trợ phiên bản API hoặc phương thức xác thực này. Kiểm tra cài đặt máy chủ và phương thức đăng nhập đã chọn.",
   "networkDownloadDestination": "Điểm đến tải xuống từ mạng",
   "@networkDownloadDestination": {
     "description": "Files settings item that opens network storage to choose a folder for downloaded music"
@@ -138,7 +138,7 @@
   "@networkDownloadAccessFailed": {
     "description": "Snackbar prefix when the write-access check fails while selecting a network download folder; followed by a specific network error message"
   },
-  "networkUploading": "Đang tải lên ổ đĩa mạng (Nas)",
+  "networkUploading": "Đang tải lên ổ đĩa mạng",
   "@networkUploading": {
     "description": "Download queue status during upload of prepared audio to the network destination; a progress percentage may follow"
   },
@@ -154,23 +154,23 @@
   "@networkLibraryAdded": {
     "description": "Status label replacing the add-to-Library action after the network folder has been added as a source; does not mean scanning has finished"
   },
-  "networkLibraryDescription": "Quét thư mục này cùng các thư mục con. Tệp nhạc vẫn nằm trên máy chủ của bạn; chỉ metadata và ảnh bìa được lưu trên thiết bị này. Bạn có thể quản lý hoặc quét lại trong cài đặt Thư viện trên máy.",
+  "networkLibraryDescription": "Quét thư mục này cùng các thư mục con. Tệp nhạc vẫn nằm trên máy chủ của bạn; chỉ Metadata và ảnh bìa được lưu trên thiết bị này. Bạn có thể quản lý hoặc quét lại trong cài đặt Thư viện trên máy.",
   "@networkLibraryDescription": {
     "description": "Help below the add-to-Library action explaining recursive scanning, local metadata and artwork storage, and management in Local Library settings"
   },
-  "networkStorage": "Ổ đĩa mạng (Nas)",
+  "networkStorage": "Ổ đĩa mạng",
   "@networkStorage": {
     "description": "Title and navigation label for the screen used to manage network connections and browse remote music folders"
   },
-  "networkErrorUnreachable": "Không thể kết nối tới máy chủ. Hãy kiểm tra xem điện thoại đã vào đúng mạng chưa và dịch vụ chia sẻ tệp đã bật chưa. Với giao thức SMB, cổng 445 phải mở.",
+  "networkErrorUnreachable": "Không thể kết nối tới máy chủ. Hãy kiểm tra xem điện thoại đã vào đúng mạng và  dịch vụ chia sẻ tệp đã bật chưa. Với giao thức SMB, cổng 445 phải mở.",
   "@networkErrorUnreachable": {
     "description": "Network access error for an unreachable server, with connection troubleshooting and the SMB port requirement"
   },
-  "networkErrorTimeout": "Máy chủ không phản hồi kịp thời. Hãy kiểm tra lại kết nối mạng và thử lại.",
+  "networkErrorTimeout": "Máy chủ không phản hồi. Hãy kiểm tra lại kết nối mạng và thử lại.",
   "@networkErrorTimeout": {
     "description": "Network access error when a server operation exceeds its time limit"
   },
-  "networkErrorAuthentication": "Máy chủ từ chối đăng nhập. Hãy kiểm tra lại tên đăng nhập, mật khẩu và tên miền. Hãy để trống ô Domain trừ khi máy chủ của bạn bắt buộc.",
+  "networkErrorAuthentication": "Máy chủ từ chối đăng nhập. Hãy kiểm tra lại tên đăng nhập, mật khẩu và tên miền. Để trống ô Domain trừ khi máy chủ của bạn bắt buộc.",
   "@networkErrorAuthentication": {
     "description": "Network access error when the server rejects credentials; domain refers to the optional SMB authentication domain"
   },
@@ -178,7 +178,7 @@
   "@networkErrorPermission": {
     "description": "Network access error when the server denies account permissions for a shared folder; distinct from the device's local network permission"
   },
-  "networkErrorLocalPermission": "Không được phép truy cập mạng cục bộ. Vui lòng cấp quyền \"Thiết bị ở gần\" cho Mornye trong cài đặt ứng dụng Android, sau đó thử lại.",
+  "networkErrorLocalPermission": "Không cho phép truy cập mạng cục bộ. Hãy bật thiết bị lân cận cho Mornye trong phần cài đặt ứng dụng Android, sau đó thử lại.",
   "@networkErrorLocalPermission": {
     "description": "Network access error when Android denies local network permission; Nearby devices is the Android app permission setting"
   },
@@ -186,7 +186,7 @@
   "@networkErrorShare": {
     "description": "Network access error for a missing share or folder; share means an SMB shared folder and the example illustrates its URL path"
   },
-  "networkErrorProtocol": "Máy chủ và trình kết nối SMB không thống nhất được giao thức hỗ trợ. Vui lòng bật SMB2 hoặc SMB3 trên máy chủ (không hỗ trợ SMB1).",
+  "networkErrorProtocol": "Máy chủ và trình kết nối SMB không thống nhất được giao thức hỗ trợ. Vui lòng bật SMB2 hoặc SMB3 trên máy chủ. SMB1 không được hỗ trợ.",
   "@networkErrorProtocol": {
     "description": "Network access error for incompatible SMB protocol versions; preserve the version names SMB1, SMB2, and SMB3"
   },
@@ -242,11 +242,11 @@
   "@networkPassword": {
     "description": "Optional connection form field for the server account password, with input characters hidden"
   },
-  "networkDomain": "Tên miền / Domain (không bắt buộc)",
+  "networkDomain": "Tên miền/Domain (không bắt buộc)",
   "@networkDomain": {
     "description": "Optional connection form field shown only for SMB; refers to the authentication domain, not the server's internet domain name"
   },
-  "networkConnectSave": "Kết nối và lưu",
+  "networkConnectSave": "Kết nối & lưu",
   "@networkConnectSave": {
     "description": "Connection form action that checks access to the network source before saving the connection"
   },
@@ -296,20 +296,20 @@
   "dapExclusive": "DAP Hi-Res (AAudio độc quyền)",
   "dapExclusiveDescription": "Sử dụng Oboe/AAudio ở đúng tần số lấy mẫu và độ sâu bit gốc của bản nhạc cho tệp FLAC/WAV PCM. Yêu cầu Android 8.1 trở lên và phần cứng tương thích. Ứng dụng sẽ ưu tiên kiểm tra chế độ truy cập độc quyền (Exclusive); các định dạng không hỗ trợ sẽ phát bình thường. Nhạc DSD cần trình điều khiển Direct USB. Áp dụng từ bài hát tiếp theo.",
   "dapExclusiveUnavailable": "Chế độ AAudio độc quyền không khả dụng cho bài hát và đầu ra hiện tại. Đang phát ở chế độ thông thường. Nếu dùng USB DAC, hãy thử bật trình điều khiển Direct USB.",
-  "exclusiveOutputWindows": "WASAPI exclusive mode",
-  "exclusiveOutputMacos": "Exclusive access (hog mode)",
-  "exclusiveOutputLinux": "Direct ALSA output",
-  "exclusiveOutputDescriptionWindows": "Bypass the Windows mixer so the output follows each track's sample rate and bit depth. Other apps cannot play sound while Mornye holds the device. AutoMix and previews are off in this mode. For bit-perfect output, keep the volume at 100% with the equalizer and normalization off.",
-  "exclusiveOutputDescriptionMacos": "Hold the output device for Mornye alone and switch it to each track's sample rate and bit depth, so Core Audio does not resample. Other apps cannot play sound while Mornye holds the device. AutoMix and previews are off in this mode. For bit-perfect output, keep the volume at 100% with the equalizer and normalization off.",
-  "exclusiveOutputDescriptionLinux": "Play straight to an ALSA hardware device, bypassing PipeWire or PulseAudio, so the output follows each track's sample rate and bit depth. The device must be free: the sound server releases an idle card after a few seconds, or set its profile to Off. AutoMix and previews are off in this mode.",
-  "exclusiveOutputPending": "Takes the device when a track plays.",
-  "exclusiveOutputActive": "Playing in exclusive mode.",
-  "exclusiveOutputUnavailableWindows": "The device refused exclusive access, so this track plays through the Windows mixer. Close other apps using the device, or allow exclusive control in the device's Windows sound properties.",
-  "exclusiveOutputUnavailableMacos": "Another app holds the output device, so this track plays through the system mixer.",
-  "exclusiveOutputUnavailableLinux": "The ALSA device is busy, usually held by the sound server, so this track plays through it. Set the card's profile to Off in the sound settings, or choose another device.",
-  "exclusiveOutputDevice": "Output device",
-  "exclusiveOutputDeviceFirst": "First sound card",
-  "exclusiveOutputNoDevices": "No ALSA playback devices found",
+  "exclusiveOutputWindows": "Chế độ độc quyền WASAPI",
+  "exclusiveOutputMacos": "Truy cập độc quyền (chế độ chiếm quyền độc quyền)",
+  "exclusiveOutputLinux": "Đầu ra ALSA trực tiếp",
+  "exclusiveOutputDescriptionWindows": "Bỏ qua bộ trộn Windows để đầu ra khớp với tần số lấy mẫu và độ sâu bit của từng bài hát. Các ứng dụng khác không thể phát âm thanh khi Mornye đang giữ thiết bị. Tự động trộn và bản xem trước sẽ tắt ở chế độ này. Để có đầu ra chuẩn bit (bit-perfect), hãy giữ âm lượng ở mức 100% với bộ cân chỉnh âm thanh (equalizer) và tính năng chuẩn hóa (normalization) tắt.",
+  "exclusiveOutputDescriptionMacos": "Giữ thiết bị đầu ra chỉ dành riêng cho Mornye và chuyển đổi theo tần số lấy mẫu và độ sâu bit của từng bài hát, để Core Audio không thực hiện việc lấy mẫu lại. Các ứng dụng khác không thể phát âm thanh khi Mornye đang giữ thiết bị. Tự động trộn (AutoMix) và các bản xem trước sẽ tắt ở chế độ này. Để có đầu ra chuẩn bit (bit-perfect), hãy giữ âm lượng ở mức 100% với bộ cân chỉnh âm thanh (equalizer) và tính năng chuẩn hóa (normalization) tắt.\n",
+  "exclusiveOutputDescriptionLinux": "Phát trực tiếp tới thiết bị phần cứng ALSA, bỏ qua PipeWire hoặc PulseAudio, để đầu ra khớp với tần số lấy mẫu và độ sâu bit của từng bài hát. Thiết bị phải ở trạng thái rảnh: máy chủ âm thanh sẽ giải phóng card đang nhàn rỗi sau vài giây, hoặc đặt cấu hình của card thành Tắt. Tự động trộn (AutoMix) và các bản xem trước sẽ tắt ở chế độ này.",
+  "exclusiveOutputPending": "Chiếm thiết bị khi phát",
+  "exclusiveOutputActive": "Đang phát ở chế độ độc quyền",
+  "exclusiveOutputUnavailableWindows": "Thiết bị từ chối quyền truy cập độc quyền, vì vậy bài hát này được phát qua bộ trộn Windows. Hãy đóng các ứng dụng khác đang sử dụng thiết bị, hoặc cho phép điều khiển độc quyền trong thuộc tính âm thanh Windows của thiết bị.",
+  "exclusiveOutputUnavailableMacos": "Ứng dụng khác đang giữ thiết bị đầu ra, vì vậy bài hát này được phát qua bộ trộn hệ thống.",
+  "exclusiveOutputUnavailableLinux": "Thiết bị ALSA đang bận, thường do máy chủ âm thanh chiếm giữ, vì vậy bài hát này được phát qua đó. Hãy đặt cấu hình của card thành Tắt trong cài đặt âm thanh, hoặc chọn thiết bị khác.",
+  "exclusiveOutputDevice": "Thiết bị đầu ra",
+  "exclusiveOutputDeviceFirst": "Card âm thanh đầu tiên",
+  "exclusiveOutputNoDevices": "Không tìm thấy thiết bị phát ALSA nào",
   "usbDirect": "Trình điều khiển Direct USB",
   "usbDirectDescription": "Sử dụng chế độ âm thanh USB độc quyền cho FLAC/WAV, DSF/DFF và WavPack DSD thông qua quyền USB của Android. Phát Native DSD yêu cầu DAC tương thích được nhận diện. Các định dạng PCM khác sẽ phát ở chế độ thông thường. Áp dụng từ bài hát tiếp theo.",
   "usbDsdOverPcm": "DSD over PCM (DoP)",
@@ -407,11 +407,11 @@
   "@searchRecentlySearched": {
     "description": "Section header for recent searches on the desktop Search page"
   },
-  "searchLibraryPrompt": "Tìm trong Thư viện của bạn",
+  "searchLibraryPrompt": "Tìm kiếm trong Thư viện của bạn",
   "@searchLibraryPrompt": {
     "description": "Shown on the desktop Search page when the Library scope has no search words yet"
   },
-  "searchBrowse": "Browse",
+  "searchBrowse": "Duyệt",
   "@searchBrowse": {
     "description": "Section header for home feed tiles on the desktop Search page"
   },
@@ -432,11 +432,11 @@
   "libraryNoActiveDownloads": "Không có lượt tải nào đang chạy",
   "librarySearchHint": "Tìm trong thư viện của bạn",
   "libraryEmptyCollection": "Nhạc của bạn sẽ xuất hiện tại đây",
-  "libraryFolders": "Folders",
+  "libraryFolders": "Thư mục",
   "@libraryFolders": {
     "description": "Library view that browses downloaded and scanned songs by the folders their files are in"
   },
-  "libraryFolderCount": "{count, plural, =1{1 folder} other{{count} folders}}",
+  "libraryFolderCount": "{count, plural, =1{1 thư mục} other{{count} thư mục}}",
   "@libraryFolderCount": {
     "description": "Number of folders inside a Library folder",
     "placeholders": {
@@ -445,19 +445,19 @@
       }
     }
   },
-  "libraryFoldersEmptyTitle": "No folders yet",
+  "libraryFoldersEmptyTitle": "Chưa có thư mục nào",
   "@libraryFoldersEmptyTitle": {
     "description": "Title of the Folders view when the Library has no songs"
   },
-  "libraryFoldersEmptyMessage": "Download songs or add a music folder in Local Library settings to browse them by folder.",
+  "libraryFoldersEmptyMessage": "Tải nhạc hoặc thêm thư mục nhạc trong cài đặt Thư viện cục bộ để duyệt theo thư mục.",
   "@libraryFoldersEmptyMessage": {
     "description": "Next step shown in the empty Folders view"
   },
-  "libraryFolderMissing": "This folder is no longer in your Library",
+  "libraryFolderMissing": "Thư mục này không còn trong Thư viện của bạn",
   "@libraryFolderMissing": {
     "description": "Shown on an open folder page after its songs were deleted or moved"
   },
-  "libraryFoldersLoadFailed": "Couldn't read your folders",
+  "libraryFoldersLoadFailed": "Không thể đọc các thư mục của bạn",
   "@libraryFoldersLoadFailed": {
     "description": "Shown when the Folders view fails to load"
   },
@@ -517,7 +517,7 @@
   "@folderOrganizationCustom": {
     "description": "Folder organization mode using a user-defined template"
   },
-  "folderTemplateInvalid": "Nhập đường dẫn thư mục tương đối kèm theo các thẻ được hỗ trợ. Không được phép sử dụng các thư mục trống, ký hiệu . hoặc .",
+  "folderTemplateInvalid": "Nhập đường dẫn thư mục tương đối cùng với các thẻ được hỗ trợ. Thư mục trống, . và .. không được phép.",
   "@folderTemplateInvalid": {
     "description": "Validation error for an invalid folder template"
   },
