@@ -270,103 +270,115 @@ void main() {
       await tester.pumpWidget(const SizedBox.shrink());
     });
 
-    testWidgets('the lyrics menu translates into a chosen language ($mornye)', (
-      tester,
-    ) async {
-      tester.view.physicalSize = const Size(420, 900);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.reset);
-      final playback = StreamController<PlaybackState>.broadcast();
-      addTearDown(playback.close);
-      final metadata = _Lyrics(_lyrics);
-      final preview = PlaybackSeekPreview();
-      addTearDown(metadata.dispose);
-      addTearDown(preview.dispose);
-      final requests = <http.Request>[];
-      await tester.pumpWidget(
-        _app(
-          mornye: mornye,
-          overrides: [
-            initialSettingsProvider.overrideWithValue(
-              const AppSettings(
-                lyricsAiModel: 'gpt-4.1-mini',
-                lyricsTranslationLanguage: 'en',
+    for (final pick in [false, true]) {
+      testWidgets('the lyrics menu translates into '
+          '${pick ? 'a picked' : 'the settings'} language ($mornye)', (
+        tester,
+      ) async {
+        tester.view.physicalSize = const Size(420, 900);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        final playback = StreamController<PlaybackState>.broadcast();
+        addTearDown(playback.close);
+        final metadata = _Lyrics(_lyrics);
+        final preview = PlaybackSeekPreview();
+        addTearDown(metadata.dispose);
+        addTearDown(preview.dispose);
+        final requests = <http.Request>[];
+        await tester.pumpWidget(
+          _app(
+            mornye: mornye,
+            overrides: [
+              initialSettingsProvider.overrideWithValue(
+                AppSettings(
+                  lyricsAiModel: 'gpt-4.1-mini',
+                  lyricsTranslationLanguage: pick ? 'en' : 'de',
+                ),
               ),
-            ),
-            playbackStateProvider.overrideWith((ref) => playback.stream),
-            musicPlayerControllerProvider.overrideWith(
-              (ref) => throw StateError('Unexpected audio access'),
-            ),
-            currentMediaItemProvider.overrideWith(_MediaItems.new),
-            lyricsAiKeyStoreProvider.overrideWithValue(
-              MemoryLyricsAiKeyStore({'openai': 'sk-test-1234'}),
-            ),
-            lyricsTranslationCacheProvider.overrideWithValue(_MemoryCache()),
-            lyricsAiHttpClientProvider.overrideWithValue(
-              () => MockClient((request) async {
-                requests.add(request);
-                return _translated(request, 'de:');
-              }),
-            ),
-          ],
-          home: Scaffold(
-            body: PlayerLyricsSection(
-              metadata: metadata,
-              seekPreview: preview,
-              colorScheme: const ColorScheme.dark(),
-              isActive: true,
-              options: LyricsOptionsButton(
+              playbackStateProvider.overrideWith((ref) => playback.stream),
+              musicPlayerControllerProvider.overrideWith(
+                (ref) => throw StateError('Unexpected audio access'),
+              ),
+              currentMediaItemProvider.overrideWith(_MediaItems.new),
+              lyricsAiKeyStoreProvider.overrideWithValue(
+                MemoryLyricsAiKeyStore({'openai': 'sk-test-1234'}),
+              ),
+              lyricsTranslationCacheProvider.overrideWithValue(_MemoryCache()),
+              lyricsAiHttpClientProvider.overrideWithValue(
+                () => MockClient((request) async {
+                  requests.add(request);
+                  return _translated(request, 'de:');
+                }),
+              ),
+            ],
+            home: Scaffold(
+              body: PlayerLyricsSection(
                 metadata: metadata,
+                seekPreview: preview,
                 colorScheme: const ColorScheme.dark(),
+                isActive: true,
+                options: LyricsOptionsButton(
+                  metadata: metadata,
+                  colorScheme: const ColorScheme.dark(),
+                ),
               ),
             ),
           ),
-        ),
-      );
-      await tester.pumpAndSettle();
+        );
+        await tester.pumpAndSettle();
 
-      final options = find.byKey(const ValueKey('lyrics-language-options'));
-      expect(options, findsOneWidget);
-      await tester.tap(options);
-      await tester.pumpAndSettle();
-      // Nothing to show or hide yet, only the translation itself.
-      expect(find.text('Show Translation'), findsNothing);
-      expect(find.text('Hide Translation'), findsNothing);
-      await tester.tap(find.text('Translate Lyrics'));
-      await tester.pumpAndSettle();
+        final options = find.byKey(const ValueKey('lyrics-language-options'));
+        expect(options, findsOneWidget);
+        await tester.tap(options);
+        await tester.pumpAndSettle();
+        // Nothing to show or hide yet, only the translation itself.
+        expect(find.text('Show Translation'), findsNothing);
+        expect(find.text('Hide Translation'), findsNothing);
+        expect(find.text('Other Language…'), findsOneWidget);
+        if (pick) {
+          await tester.tap(find.text('Other Language…'));
+          await tester.pumpAndSettle();
+          expect(find.text('Translate Into'), findsOneWidget);
+          expect(find.text('The lyrics are sent to OpenAI.'), findsOneWidget);
+          final german = find.byKey(const ValueKey('lyrics-language-de'));
+          await tester.scrollUntilVisible(
+            german,
+            200,
+            scrollable: find.byType(Scrollable).last,
+          );
+          await tester.tap(german);
+        } else {
+          // The language from settings needs no sheet.
+          await tester.tap(find.text('Translate to Deutsch'));
+        }
+        await tester.pumpAndSettle();
+        expect(find.text('Translate Into'), findsNothing);
 
-      expect(find.text('Translate Into'), findsOneWidget);
-      expect(find.text('The lyrics are sent to OpenAI.'), findsOneWidget);
-      final german = find.byKey(const ValueKey('lyrics-language-de'));
-      await tester.scrollUntilVisible(
-        german,
-        200,
-        scrollable: find.byType(Scrollable).last,
-      );
-      await tester.tap(german);
-      await tester.pumpAndSettle();
+        expect(requests, hasLength(1));
+        expect(parsedReplies, 1);
+        expect(
+          find.textContaining('de:Hello there', findRichText: true),
+          findsWidgets,
+        );
+        final container = ProviderScope.containerOf(
+          tester.element(find.byType(PlayerLyricsSection)),
+        );
+        expect(
+          container.read(settingsProvider).lyricsTranslationLanguage,
+          'de',
+        );
 
-      expect(requests, hasLength(1));
-      expect(parsedReplies, 1);
-      expect(
-        find.textContaining('de:Hello there', findRichText: true),
-        findsWidgets,
-      );
-      final container = ProviderScope.containerOf(
-        tester.element(find.byType(PlayerLyricsSection)),
-      );
-      expect(container.read(settingsProvider).lyricsTranslationLanguage, 'de');
-
-      // The existing toggle now offers the original lyrics only.
-      await tester.tap(options);
-      await tester.pumpAndSettle();
-      expect(find.text('Hide Translation'), findsOneWidget);
-      await tester.tap(find.text('Hide Translation'));
-      await tester.pumpAndSettle();
-      expect(container.read(settingsProvider).playerShowTranslation, isFalse);
-      expect(tester.takeException(), isNull);
-      await tester.pumpWidget(const SizedBox.shrink());
-    });
+        // The existing toggle now offers the original lyrics only.
+        await tester.tap(options);
+        await tester.pumpAndSettle();
+        expect(find.text('Hide Translation'), findsOneWidget);
+        await tester.tap(find.text('Hide Translation'));
+        await tester.pumpAndSettle();
+        expect(container.read(settingsProvider).playerShowTranslation, isFalse);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      });
+    }
   }
 
   testWidgets('the menu stays hidden until a provider is set up', (

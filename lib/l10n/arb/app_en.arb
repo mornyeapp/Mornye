@@ -7052,9 +7052,18 @@
   "@nowPlayingNoLyricsOnline": {
     "description": "Empty state after an online lyrics search for the playing track found nothing"
   },
-  "nowPlayingTranslateLyrics": "Translate Lyrics",
-  "@nowPlayingTranslateLyrics": {
-    "description": "Player lyrics menu action that translates the current lyrics with the user's AI provider"
+  "nowPlayingTranslateLyricsTo": "Translate to {language}",
+  "@nowPlayingTranslateLyricsTo": {
+    "description": "Player lyrics menu action that translates the current lyrics with the user's AI provider into the language chosen in settings; language is that language's own name",
+    "placeholders": {
+      "language": {
+        "type": "String"
+      }
+    }
+  },
+  "nowPlayingTranslateOtherLanguage": "Other Language…",
+  "@nowPlayingTranslateOtherLanguage": {
+    "description": "Player lyrics menu action that opens a sheet to translate the current lyrics into a language other than the one in settings"
   },
   "nowPlayingCancelTranslation": "Cancel Translation",
   "@nowPlayingCancelTranslation": {

@@ -193,6 +193,7 @@ class _LyricsOptionsButtonState extends ConsumerState<LyricsOptionsButton> {
   }) async {
     final settings = ref.read(settingsProvider);
     final l10n = context.l10n;
+    final target = lyricsTranslationTargetFor(settings);
     final actions = <(String, String, IconData)>[
       if (pronunciation)
         (
@@ -218,12 +219,20 @@ class _LyricsOptionsButtonState extends ConsumerState<LyricsOptionsButton> {
           l10n.nowPlayingCancelTranslation,
           Icons.close_rounded,
         )
-      else if (canTranslate)
+      else if (canTranslate) ...[
+        // The language from settings applies at once; the picker is only
+        // for another language.
         (
           'translate',
-          l10n.nowPlayingTranslateLyrics,
+          l10n.nowPlayingTranslateLyricsTo(target.nativeName),
           Icons.auto_awesome_outlined,
         ),
+        (
+          'translateInto',
+          l10n.nowPlayingTranslateOtherLanguage,
+          Icons.language_rounded,
+        ),
+      ],
     ];
     _setOpen(true);
     String? action;
@@ -298,32 +307,41 @@ class _LyricsOptionsButtonState extends ConsumerState<LyricsOptionsButton> {
       }
     } finally {
       // The language sheet keeps controls visible until it closes.
-      if (action != 'translate') _setOpen(false);
+      if (action != 'translateInto') _setOpen(false);
     }
-    if (action == 'translate') {
+    if (action == 'translate' || action == 'translateInto') {
       try {
-        await _translate(original);
+        await _translate(original, choose: action == 'translateInto');
       } finally {
         _setOpen(false);
       }
     }
   }
 
-  Future<void> _translate(ParsedLyrics lyrics) async {
+  /// Translates into the language from settings, or into one picked now
+  /// when [choose] is set. A picked language becomes the new setting.
+  Future<void> _translate(ParsedLyrics lyrics, {required bool choose}) async {
     final l10n = context.l10n;
     final settings = ref.read(settingsProvider);
-    final provider = LyricsAiProvider.fromId(settings.lyricsAiProvider);
-    final code = await showLyricsLanguagePicker(
-      context,
-      title: l10n.lyricsTranslateSheetTitle,
-      subtitle: l10n.lyricsTranslateSheetSubtitle(
-        lyricsAiProviderName(l10n, provider),
-      ),
-      selected: lyricsTranslationTargetFor(settings).code,
-    );
-    if (code == null || code.isEmpty || !mounted) return;
-    final settingsNotifier = ref.read(settingsProvider.notifier)
-      ..setLyricsTranslationLanguage(code);
+    final target = lyricsTranslationTargetFor(settings).code;
+    final settingsNotifier = ref.read(settingsProvider.notifier);
+    final String code;
+    if (choose) {
+      final provider = LyricsAiProvider.fromId(settings.lyricsAiProvider);
+      final picked = await showLyricsLanguagePicker(
+        context,
+        title: l10n.lyricsTranslateSheetTitle,
+        subtitle: l10n.lyricsTranslateSheetSubtitle(
+          lyricsAiProviderName(l10n, provider),
+        ),
+        selected: target,
+      );
+      if (picked == null || picked.isEmpty || !mounted) return;
+      code = picked;
+      settingsNotifier.setLyricsTranslationLanguage(code);
+    } else {
+      code = target;
+    }
     if (!ref.read(settingsProvider).playerShowTranslation) {
       settingsNotifier.setPlayerShowTranslation(true);
     }
