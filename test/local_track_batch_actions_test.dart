@@ -41,7 +41,10 @@ class _BatchLibrary extends LocalLibraryNotifier {
   @override
   LocalLibraryState build() => LocalLibraryState();
   @override
-  Future<void> scanAllSources({bool forceFullScan = false}) {
+  Future<void> scanAllSources({
+    bool forceFullScan = false,
+    bool notify = true,
+  }) {
     _refreshStarted = true;
     return refreshed.future;
   }

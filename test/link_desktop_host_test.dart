@@ -856,7 +856,7 @@ void main() {
     });
 
     player.current = snapshot(positionMs: 30000, playing: false);
-    expect(host().hasCurrentTrack, isTrue);
+    expect(host().hasCurrentTrack(), isTrue);
     expect(await host().continueOnPhone('p1'), isTrue);
     final handoff = backend.sent.last;
     expect(handoff.deviceId, 'p1');
@@ -1003,7 +1003,7 @@ void main() {
   ) async {
     await boot(tester);
     final events = <LinkPairingEvent>[];
-    final subscription = host().pairingEvents.listen(events.add);
+    final subscription = host().pairingEvents().listen(events.add);
     backend.deviceList = [
       const LinkPairedDevice(deviceId: 'p9', name: 'New', platform: 'ios'),
     ];

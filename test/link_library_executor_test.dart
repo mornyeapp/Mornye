@@ -25,7 +25,7 @@ class _Settings extends SettingsNotifier {
 
 class _History extends DownloadHistoryNotifier {
   final removed = <String>[];
-  String? savedTitle;
+  String? _savedTitle;
   @override
   DownloadHistoryState build() => DownloadHistoryState();
   @override
@@ -50,7 +50,7 @@ class _History extends DownloadHistoryNotifier {
     bool? hasLyrics,
     int? lyricsMetadataScanVersion,
   }) async {
-    savedTitle = trackName;
+    _savedTitle = trackName;
   }
 
   @override
@@ -229,7 +229,7 @@ void main() {
       addTearDown(
         SourceMetadataEvents.instance.subscribe((source) async {
           expect(source, audio.path);
-          published.add(history.savedTitle);
+          published.add(history._savedTitle);
         }),
       );
       var fail = false;
@@ -289,7 +289,7 @@ void main() {
         {'error': 'metadata_failed'},
       );
       expect(published, ['Edited title']);
-      expect(history.savedTitle, 'Edited title');
+      expect(history._savedTitle, 'Edited title');
     },
   );
 

@@ -309,6 +309,6 @@ class LinkClientHarness {
   /// load.
   Future<void> start() async {
     container.listen(linkClientControllerProvider, (_, _) {});
-    await controller.ready;
+    await controller.ensureLoaded();
   }
 }

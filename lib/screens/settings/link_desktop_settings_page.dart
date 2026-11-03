@@ -227,7 +227,7 @@ class LinkDesktopSettingsPage extends ConsumerWidget {
       barrierDismissible: false,
       builder: (context) => LinkDesktopPairingDialog(
         window: window,
-        events: notifier.pairingEvents,
+        events: notifier.pairingEvents(),
       ),
     );
     if (outcome == null) {

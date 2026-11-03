@@ -105,7 +105,7 @@ class DesktopLinkDevicesSheet extends ConsumerWidget {
                       ? null
                       : () => choose(() async {
                           if (state.followedPhone == null &&
-                              host.hasCurrentTrack) {
+                              host.hasCurrentTrack()) {
                             return host.continueOnPhone(client.deviceId);
                           }
                           return host.followPhone(client.deviceId);

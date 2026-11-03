@@ -261,11 +261,8 @@ class LinkClientController extends Notifier<LinkClientState> {
   LinkClientStore get _store => ref.read(linkClientStoreProvider);
   LinkLibraryBridge get _library => ref.read(linkLibraryBridgeProvider);
 
-  /// The active session, as [linkActiveClientProvider] publishes it.
-  LinkSession? get session => _session;
-
   /// Completes once paired desktops are loaded and the session started.
-  Future<void> get ready => _loading ?? Future.value();
+  Future<void> ensureLoaded() => _loading ?? Future.value();
 
   @override
   LinkClientState build() {

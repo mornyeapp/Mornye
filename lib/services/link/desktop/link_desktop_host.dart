@@ -327,7 +327,7 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
   );
 
   /// `linkPaired` and `linkPairingEnded`, for the pairing dialog.
-  Stream<LinkPairingEvent> get pairingEvents => _pairingEvents.stream;
+  Stream<LinkPairingEvent> pairingEvents() => _pairingEvents.stream;
 
   Future<void> _restore() async {
     String? name;
@@ -1159,10 +1159,7 @@ class LinkDesktopHost extends Notifier<LinkDesktopHostState> {
       0;
 
   /// Whether the desktop has a current song to continue on a phone.
-  bool get hasCurrentTrack => _player?.snapshot().current != null;
-
-  /// Whether the desktop's own player is playing.
-  bool get isPlaying => _player?.snapshot().playing ?? false;
+  bool hasCurrentTrack() => _player?.snapshot().current != null;
 
   /// Selects an already playing or paused phone without restarting it.
   bool followPhone(String deviceId) {

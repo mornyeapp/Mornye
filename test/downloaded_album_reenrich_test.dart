@@ -60,7 +60,10 @@ class _Library extends LocalLibraryNotifier {
   LocalLibraryState build() => LocalLibraryState();
 
   @override
-  Future<void> scanAllSources({bool forceFullScan = false}) async {
+  Future<void> scanAllSources({
+    bool forceFullScan = false,
+    bool notify = true,
+  }) async {
     _refreshes++;
   }
 }

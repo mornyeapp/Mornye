@@ -93,9 +93,10 @@ class LinkTransfer {
 /// cancel handler and report status; the UI lists them and cancels or
 /// clears them. Nothing is kept across launches.
 class LinkTransfers extends Notifier<List<LinkTransfer>> {
-  final _cancels = <String, void Function()>{};
+  LinkTransfers({DateTime Function()? now}) : _now = now ?? DateTime.now;
 
-  DateTime Function() now = DateTime.now;
+  final _cancels = <String, void Function()>{};
+  final DateTime Function() _now;
 
   @override
   List<LinkTransfer> build() => const [];
@@ -126,7 +127,7 @@ class LinkTransfers extends Notifier<List<LinkTransfer>> {
         if (transfer.id == status.transferId)
           () {
             found = true;
-            return transfer.withStatus(status, now());
+            return transfer.withStatus(status, _now());
           }()
         else
           transfer,
