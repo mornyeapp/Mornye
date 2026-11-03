@@ -3,6 +3,23 @@ part of 'home_tab.dart';
 const _homeShelfLimit = 10;
 const _homeShelfCoverSize = 120.0;
 const _homeMixCoverSize = 152.0;
+const _homeDesktopShelfCoverSize = 168.0;
+const _homeDesktopMixCoverSize = 192.0;
+
+/// The pane width from which the Material desktop Home sets Continue
+/// listening and Shortcuts side by side.
+const _homeDesktopColumnsMinWidth = 720.0;
+
+/// Whether Home lays out for a pointer and a wide pane rather than a phone:
+/// the Material desktop app. The Mornye style keeps its own Home.
+bool _homeDesktop(BuildContext context) =>
+    isDesktopPlatform && !context.isMornye;
+
+double _homeShelfCoverSizeOf(BuildContext context) =>
+    _homeDesktop(context) ? _homeDesktopShelfCoverSize : _homeShelfCoverSize;
+
+double _homeMixCoverSizeOf(BuildContext context) =>
+    _homeDesktop(context) ? _homeDesktopMixCoverSize : _homeMixCoverSize;
 
 typedef HomeRecentlyAdded = ({List<UnifiedLibraryItem> items, int trackCount});
 
@@ -317,18 +334,24 @@ class _HomeSections extends ConsumerWidget {
     final mixes =
         ref.watch(libraryMixesProvider.select((s) => s.value)) ?? const [];
 
+    final showContinue = hasMediaItem || hasResume;
+
     final sections = <Widget>[
-      if (hasMediaItem || hasResume)
+      if (_homeDesktop(context))
+        _HomeDesktopTop(inset: inset, showContinue: showContinue)
+      else ...[
+        if (showContinue)
+          _HomeSection(
+            title: l10n.homeContinueListening,
+            inset: inset,
+            child: const _HomeContinueListeningCard(),
+          ),
         _HomeSection(
-          title: l10n.homeContinueListening,
+          title: l10n.homeShortcuts,
           inset: inset,
-          child: const _HomeContinueListeningCard(),
+          child: const _HomeShortcuts(),
         ),
-      _HomeSection(
-        title: l10n.homeShortcuts,
-        inset: inset,
-        child: const _HomeShortcuts(),
-      ),
+      ],
       // Built after startup settles when nothing is cached: the sections'
       // size animation opens its space rather than letting it jump in.
       if (mixes.isNotEmpty)
@@ -369,6 +392,86 @@ class _HomeSections extends ConsumerWidget {
           ],
         ],
       ),
+    );
+  }
+}
+
+/// Continue listening and Shortcuts on the Material desktop Home: side by
+/// side at one height once the pane is wide enough, the shortcuts as a list
+/// beside the player and as one row without it.
+class _HomeDesktopTop extends StatelessWidget {
+  const _HomeDesktopTop({required this.inset, required this.showContinue});
+
+  final double inset;
+  final bool showContinue;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    if (!showContinue) {
+      return _HomeSection(
+        title: l10n.homeShortcuts,
+        inset: inset,
+        child: const _HomeShortcuts(layout: _HomeShortcutsLayout.row),
+      );
+    }
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth - 2 * inset < _homeDesktopColumnsMinWidth) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _HomeSection(
+                title: l10n.homeContinueListening,
+                inset: inset,
+                child: const _HomeContinueListeningCard(),
+              ),
+              const SizedBox(height: 28),
+              _HomeSection(
+                title: l10n.homeShortcuts,
+                inset: inset,
+                child: const _HomeShortcuts(layout: _HomeShortcutsLayout.row),
+              ),
+            ],
+          );
+        }
+        // Four shortcut rows of at least 56dp each set the shared height.
+        final textScale = MediaQuery.textScalerOf(context).scale(1);
+        final height = math.max(240.0, 4 * 56 * textScale + 3 * 4);
+        return Padding(
+          padding: EdgeInsets.symmetric(horizontal: inset),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                flex: 3,
+                child: _HomeSection(
+                  title: l10n.homeContinueListening,
+                  inset: 0,
+                  child: SizedBox(
+                    height: height,
+                    child: const _HomeContinueListeningCard(hero: true),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 24),
+              Expanded(
+                flex: 2,
+                child: _HomeSection(
+                  title: l10n.homeShortcuts,
+                  inset: 0,
+                  child: SizedBox(
+                    height: height,
+                    child: const _HomeShortcuts(
+                      layout: _HomeShortcutsLayout.list,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
@@ -421,7 +524,12 @@ class _HomeSection extends StatelessWidget {
 
 /// The active track or the last dismissed session, with its saved progress.
 class _HomeContinueListeningCard extends ConsumerStatefulWidget {
-  const _HomeContinueListeningCard();
+  const _HomeContinueListeningCard({this.hero = false});
+
+  /// The desktop card beside Shortcuts: the cover fills its height, the
+  /// title sits above, and the progress and play button run along the
+  /// bottom.
+  final bool hero;
 
   @override
   ConsumerState<_HomeContinueListeningCard> createState() =>
@@ -473,6 +581,162 @@ class _HomeContinueListeningCardState
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final artist = mediaItem.artist ?? '';
+    final album = mediaItem.album ?? '';
+    final hero = widget.hero;
+    final devicePixelRatio = MediaQuery.devicePixelRatioOf(context);
+    final dimmed = colorScheme.onPrimaryContainer.withValues(alpha: 0.8);
+
+    Widget artwork(double extent) => PlayerArtwork(
+      // A network cover not stored yet shows once fetched.
+      artUri:
+          mediaItem.artUri?.toString() ??
+          mediaItem.extras?['artworkRef']?.toString(),
+      colorScheme: colorScheme,
+      cacheWidth: (extent * devicePixelRatio).round(),
+      iconSize: 32,
+    );
+
+    final title = Text(
+      mediaItem.title,
+      maxLines: hero ? 2 : 1,
+      overflow: TextOverflow.ellipsis,
+      style: (hero ? textTheme.headlineSmall : textTheme.titleLarge)?.copyWith(
+        color: colorScheme.onPrimaryContainer,
+      ),
+    );
+    final artistLine = Text(
+      artist,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: (hero ? textTheme.titleMedium : textTheme.bodyMedium)?.copyWith(
+        color: dimmed,
+      ),
+    );
+    final progress = _HomeContinueListeningProgress(
+      duration: mediaItem.duration ?? Duration.zero,
+      savedPosition: current == null ? resume?.position : null,
+    );
+    final playButton = Tooltip(
+      message: isPlaying ? context.l10n.actionPause : context.l10n.tooltipPlay,
+      child: Semantics(
+        button: true,
+        child: Material(
+          type: MaterialType.transparency,
+          child: InkWell(
+            customBorder: const CircleBorder(),
+            onTap: isLoading
+                ? null
+                : current == null
+                ? _resume
+                : () => controller.togglePlayPause(isPlaying),
+            // Round like the mini player's play button, so the same action
+            // keeps the same shape across screens.
+            child: Ink(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                color: colorScheme.primary,
+                shape: BoxShape.circle,
+              ),
+              child: Center(
+                child: isLoading
+                    ? AppLoadingIndicator(
+                        size: 24,
+                        color: colorScheme.onPrimary,
+                      )
+                    : Icon(
+                        isPlaying ? Icons.pause : Icons.play_arrow,
+                        size: 28,
+                        color: colorScheme.onPrimary,
+                      ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final Widget content;
+    if (hero) {
+      content = Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            AspectRatio(
+              aspectRatio: 1,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: LayoutBuilder(
+                  builder: (context, constraints) =>
+                      artwork(constraints.maxHeight),
+                ),
+              ),
+            ),
+            const SizedBox(width: 24),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsetsDirectional.fromSTEB(0, 8, 4, 0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    title,
+                    if (artist.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      artistLine,
+                    ],
+                    if (album.isNotEmpty && album != mediaItem.title)
+                      Text(
+                        album,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: textTheme.bodyMedium?.copyWith(color: dimmed),
+                      ),
+                    const Spacer(),
+                    Row(
+                      children: [
+                        Expanded(child: progress),
+                        const SizedBox(width: 16),
+                        playButton,
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    } else {
+      content = Padding(
+        padding: const EdgeInsetsDirectional.fromSTEB(12, 12, 16, 12),
+        child: Row(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: SizedBox.square(
+                dimension: _coverSize,
+                child: artwork(_coverSize),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  title,
+                  if (artist.isNotEmpty) artistLine,
+                  const SizedBox(height: 12),
+                  progress,
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            playButton,
+          ],
+        ),
+      );
+    }
 
     return Material(
       color: colorScheme.primaryContainer,
@@ -484,104 +748,7 @@ class _HomeContinueListeningCardState
             : current == null
             ? () => _resume(openPlayer: true)
             : _openPlayer,
-        child: Padding(
-          padding: const EdgeInsetsDirectional.fromSTEB(12, 12, 16, 12),
-          child: Row(
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(20),
-                child: SizedBox.square(
-                  dimension: _coverSize,
-                  child: PlayerArtwork(
-                    // A network cover not stored yet shows once fetched.
-                    artUri:
-                        mediaItem.artUri?.toString() ??
-                        mediaItem.extras?['artworkRef']?.toString(),
-                    colorScheme: colorScheme,
-                    cacheWidth:
-                        (_coverSize * MediaQuery.devicePixelRatioOf(context))
-                            .round(),
-                    iconSize: 32,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      mediaItem.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: textTheme.titleLarge?.copyWith(
-                        color: colorScheme.onPrimaryContainer,
-                      ),
-                    ),
-                    if (artist.isNotEmpty)
-                      Text(
-                        artist,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: textTheme.bodyMedium?.copyWith(
-                          color: colorScheme.onPrimaryContainer.withValues(
-                            alpha: 0.8,
-                          ),
-                        ),
-                      ),
-                    const SizedBox(height: 12),
-                    _HomeContinueListeningProgress(
-                      duration: mediaItem.duration ?? Duration.zero,
-                      savedPosition: current == null ? resume?.position : null,
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 12),
-              Tooltip(
-                message: isPlaying
-                    ? context.l10n.actionPause
-                    : context.l10n.tooltipPlay,
-                child: Semantics(
-                  button: true,
-                  child: Material(
-                    type: MaterialType.transparency,
-                    child: InkWell(
-                      customBorder: const CircleBorder(),
-                      onTap: isLoading
-                          ? null
-                          : current == null
-                          ? _resume
-                          : () => controller.togglePlayPause(isPlaying),
-                      // Round like the mini player's play button, so the
-                      // same action keeps the same shape across screens.
-                      child: Ink(
-                        width: 56,
-                        height: 56,
-                        decoration: BoxDecoration(
-                          color: colorScheme.primary,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Center(
-                          child: isLoading
-                              ? AppLoadingIndicator(
-                                  size: 24,
-                                  color: colorScheme.onPrimary,
-                                )
-                              : Icon(
-                                  isPlaying ? Icons.pause : Icons.play_arrow,
-                                  size: 28,
-                                  color: colorScheme.onPrimary,
-                                ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
+        child: content,
       ),
     );
   }
@@ -631,17 +798,20 @@ class _HomeShelf extends StatelessWidget {
     required this.inset,
     required this.itemCount,
     required this.itemBuilder,
-    this.coverSize = _homeShelfCoverSize,
+    this.coverSize,
   });
 
   final double inset;
   final int itemCount;
   final IndexedWidgetBuilder itemBuilder;
-  final double coverSize;
+
+  /// Null for the platform's shelf cover size.
+  final double? coverSize;
 
   @override
   Widget build(BuildContext context) {
     final textScale = MediaQuery.textScalerOf(context).scale(1);
+    final coverSize = this.coverSize ?? _homeShelfCoverSizeOf(context);
     return SizedBox(
       height: coverSize + 52 * textScale,
       child: DesktopScrollArrows(
@@ -665,7 +835,7 @@ class _HomeShelfTile extends StatelessWidget {
     required this.subtitle,
     required this.semanticLabel,
     required this.onTap,
-    this.size = _homeShelfCoverSize,
+    this.size,
   });
 
   final Widget cover;
@@ -673,12 +843,15 @@ class _HomeShelfTile extends StatelessWidget {
   final String subtitle;
   final String semanticLabel;
   final VoidCallback onTap;
-  final double size;
+
+  /// Null for the platform's shelf cover size.
+  final double? size;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+    final size = this.size ?? _homeShelfCoverSizeOf(context);
     return Semantics(
       button: true,
       label: semanticLabel,
@@ -734,8 +907,9 @@ class _HomeRecentlyAddedShelf extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final colorScheme = Theme.of(context).colorScheme;
-    final cacheWidth =
-        (_homeShelfCoverSize * MediaQuery.devicePixelRatioOf(context)).round();
+    final coverSize = _homeShelfCoverSizeOf(context);
+    final cacheWidth = (coverSize * MediaQuery.devicePixelRatioOf(context))
+        .round();
     return _HomeShelf(
       inset: inset,
       itemCount: items.length + 1,
@@ -751,7 +925,7 @@ class _HomeRecentlyAddedShelf extends ConsumerWidget {
             item.trackName,
             item.artistName,
           ),
-          cover: _homeLibraryCover(item, colorScheme, cacheWidth),
+          cover: _homeLibraryCover(item, colorScheme, coverSize, cacheWidth),
           onTap: () => _play(ref, index),
         );
       },
@@ -779,6 +953,7 @@ class _HomeRecentlyAddedShelf extends ConsumerWidget {
 Widget _homeLibraryCover(
   UnifiedLibraryItem item,
   ColorScheme colorScheme,
+  double size,
   int cacheWidth,
 ) {
   final history = item.historyItem;
@@ -786,8 +961,8 @@ Widget _homeLibraryCover(
     return _DownloadedOrRemoteCover(
       downloadedFilePath: history.filePath,
       imageUrl: history.coverUrl,
-      width: _homeShelfCoverSize,
-      height: _homeShelfCoverSize,
+      width: size,
+      height: size,
       borderRadius: BorderRadius.zero,
       fallbackIcon: Icons.music_note,
       fallbackIconSize: 32,
@@ -824,7 +999,7 @@ class _HomeLibraryTile extends StatelessWidget {
     return Align(
       alignment: Alignment.topCenter,
       child: SizedBox.square(
-        dimension: _homeShelfCoverSize,
+        dimension: _homeShelfCoverSizeOf(context),
         child: Material(
           color: colorScheme.surfaceContainerHigh,
           shape: RoundedRectangleBorder(
@@ -884,8 +1059,9 @@ class _HomeOnRepeatShelf extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final colorScheme = Theme.of(context).colorScheme;
-    final cacheWidth =
-        (_homeShelfCoverSize * MediaQuery.devicePixelRatioOf(context)).round();
+    final coverSize = _homeShelfCoverSizeOf(context);
+    final cacheWidth = (coverSize * MediaQuery.devicePixelRatioOf(context))
+        .round();
     return _HomeShelf(
       inset: inset,
       itemCount: tracks.length,
@@ -899,7 +1075,7 @@ class _HomeOnRepeatShelf extends ConsumerWidget {
             track.artist,
           ),
           cover: item != null
-              ? _homeLibraryCover(item, colorScheme, cacheWidth)
+              ? _homeLibraryCover(item, colorScheme, coverSize, cacheWidth)
               : PlayerArtwork(
                   artUri: track.artwork,
                   colorScheme: colorScheme,
@@ -934,20 +1110,21 @@ class _HomeMixesShelf extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final coverSize = _homeMixCoverSizeOf(context);
     return _HomeShelf(
       inset: inset,
-      coverSize: _homeMixCoverSize,
+      coverSize: coverSize,
       itemCount: mixes.length,
       itemBuilder: (context, index) {
         final view = mixes[index];
         final title = libraryMixTitle(context.l10n, view.mix);
         final subtitle = libraryMixSubtitle(context.l10n, view.mix);
         return _HomeShelfTile(
-          size: _homeMixCoverSize,
+          size: coverSize,
           title: title,
           subtitle: subtitle,
           semanticLabel: subtitle.isEmpty ? title : '$title, $subtitle',
-          cover: LibraryMixCover(items: view.items, size: _homeMixCoverSize),
+          cover: LibraryMixCover(items: view.items, size: coverSize),
           onTap: () =>
               pushPage<void>(context, (_) => LibraryMixScreen(view: view)),
         );
@@ -956,9 +1133,23 @@ class _HomeMixesShelf extends StatelessWidget {
   }
 }
 
+enum _HomeShortcutsLayout {
+  /// Two columns of tall tiles, on phones and tablets.
+  grid,
+
+  /// One connected list that fills the height it is given, beside the
+  /// desktop Continue listening card.
+  list,
+
+  /// One row of short tiles across the desktop pane.
+  row,
+}
+
 /// Quick ways into player tools that otherwise sit a few screens deep.
 class _HomeShortcuts extends ConsumerWidget {
-  const _HomeShortcuts();
+  const _HomeShortcuts({this.layout = _HomeShortcutsLayout.grid});
+
+  final _HomeShortcutsLayout layout;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -968,44 +1159,78 @@ class _HomeShortcuts extends ConsumerWidget {
 
     // Shuffle is the one emphasized action; the other tools share a neutral
     // tile so color marks importance rather than varying per tile.
-    final tiles = [
-      _HomeShortcutTile(
+    final shortcuts = <({String label, IconData icon, VoidCallback onTap})>[
+      (
         label: l10n.nowPlayingShuffleLibrary,
         icon: Icons.shuffle,
-        container: colorScheme.primaryContainer,
-        onContainer: colorScheme.onPrimaryContainer,
-        badge: colorScheme.primary,
-        onBadge: colorScheme.onPrimary,
         onTap: () => _shuffle(context, ref),
       ),
-      _HomeShortcutTile(
+      (
         label: l10n.equalizerTitle,
         icon: Icons.graphic_eq,
-        container: colorScheme.surfaceContainerHigh,
-        onContainer: colorScheme.onSurface,
-        badge: colorScheme.secondaryContainer,
-        onBadge: colorScheme.onSecondaryContainer,
         onTap: () => open(const EqualizerScreen()),
       ),
-      _HomeShortcutTile(
+      (
         label: l10n.listeningStats,
         icon: Icons.insights,
-        container: colorScheme.surfaceContainerHigh,
-        onContainer: colorScheme.onSurface,
-        badge: colorScheme.secondaryContainer,
-        onBadge: colorScheme.onSecondaryContainer,
         onTap: () => open(const ListeningStatisticsScreen()),
       ),
-      _HomeShortcutTile(
+      (
         label: l10n.networkStorage,
         icon: Icons.lan_outlined,
-        container: colorScheme.surfaceContainerHigh,
-        onContainer: colorScheme.onSurface,
-        badge: colorScheme.secondaryContainer,
-        onBadge: colorScheme.onSecondaryContainer,
         onTap: () => open(const NetworkStorageScreen()),
       ),
     ];
+    final tiles = [
+      for (final (index, shortcut) in shortcuts.indexed)
+        _HomeShortcutTile(
+          label: shortcut.label,
+          icon: shortcut.icon,
+          container: index == 0
+              ? colorScheme.primaryContainer
+              : colorScheme.surfaceContainerHigh,
+          onContainer: index == 0
+              ? colorScheme.onPrimaryContainer
+              : colorScheme.onSurface,
+          badge: index == 0
+              ? colorScheme.primary
+              : colorScheme.secondaryContainer,
+          onBadge: index == 0
+              ? colorScheme.onPrimary
+              : colorScheme.onSecondaryContainer,
+          onTap: shortcut.onTap,
+          layout: layout,
+          position: (index: index, count: shortcuts.length),
+        ),
+    ];
+
+    switch (layout) {
+      case _HomeShortcutsLayout.list:
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (final (index, tile) in tiles.indexed) ...[
+              if (index > 0) const SizedBox(height: 4),
+              Expanded(child: tile),
+            ],
+          ],
+        );
+      case _HomeShortcutsLayout.row:
+        // A label that wraps keeps its neighbors the same height.
+        return IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (final (index, tile) in tiles.indexed) ...[
+                if (index > 0) const SizedBox(width: 8),
+                Expanded(child: tile),
+              ],
+            ],
+          ),
+        );
+      case _HomeShortcutsLayout.grid:
+        break;
+    }
 
     return Column(
       children: [
@@ -1047,6 +1272,8 @@ class _HomeShortcutTile extends StatelessWidget {
     required this.badge,
     required this.onBadge,
     required this.onTap,
+    required this.layout,
+    required this.position,
   });
 
   final String label;
@@ -1056,34 +1283,82 @@ class _HomeShortcutTile extends StatelessWidget {
   final Color badge;
   final Color onBadge;
   final VoidCallback onTap;
+  final _HomeShortcutsLayout layout;
+
+  /// Where the tile sits among the shortcuts, for the list's corners.
+  final ({int index, int count}) position;
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: container,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
+    final badgeWidget = _HomeIconBadge(
+      icon: icon,
+      color: badge,
+      onColor: onBadge,
+    );
+    final text = Text(
+      label,
+      maxLines: 2,
+      overflow: TextOverflow.ellipsis,
+      style: Theme.of(
+        context,
+      ).textTheme.titleSmall?.copyWith(color: onContainer),
+    );
+    final BorderRadius radius;
+    final Widget content;
+    switch (layout) {
+      case _HomeShortcutsLayout.grid:
+        radius = BorderRadius.circular(24);
+        content = Padding(
           padding: const EdgeInsets.fromLTRB(14, 14, 14, 16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+            children: [badgeWidget, const SizedBox(height: 16), text],
+          ),
+        );
+      case _HomeShortcutsLayout.list:
+        // One connected group: large outer corners, small inner ones.
+        const outer = Radius.circular(24);
+        const inner = Radius.circular(6);
+        final first = position.index == 0;
+        final last = position.index == position.count - 1;
+        radius = BorderRadius.vertical(
+          top: first ? outer : inner,
+          bottom: last ? outer : inner,
+        );
+        content = Padding(
+          padding: const EdgeInsetsDirectional.fromSTEB(12, 8, 16, 8),
+          child: Row(
             children: [
-              _HomeIconBadge(icon: icon, color: badge, onColor: onBadge),
-              const SizedBox(height: 16),
-              Text(
-                label,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(
-                  context,
-                ).textTheme.titleSmall?.copyWith(color: onContainer),
+              badgeWidget,
+              const SizedBox(width: 16),
+              Expanded(child: text),
+              const SizedBox(width: 8),
+              AppIcon.adaptive(
+                Icons.chevron_right,
+                size: 20,
+                color: onContainer.withValues(alpha: 0.7),
               ),
             ],
           ),
-        ),
-      ),
+        );
+      case _HomeShortcutsLayout.row:
+        radius = BorderRadius.circular(24);
+        content = Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            children: [
+              badgeWidget,
+              const SizedBox(width: 12),
+              Expanded(child: text),
+            ],
+          ),
+        );
+    }
+    return Material(
+      color: container,
+      shape: RoundedRectangleBorder(borderRadius: radius),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(onTap: onTap, child: content),
     );
   }
 }
