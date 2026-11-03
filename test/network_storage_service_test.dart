@@ -555,6 +555,26 @@ void main() {
           );
         } else if (r.uri.path.endsWith('/')) {
           r.response.write('<a href="A%20B.flac">Audio</a>');
+        } else if (r.uri.pathSegments.last == 'whole.flac') {
+          // A server without byte ranges sends the whole file in pieces.
+          r.response.headers.contentType = ContentType('audio', 'flac');
+          r.response.contentLength = 10;
+          try {
+            if (r.method != 'HEAD') {
+              for (final piece in [
+                [0, 1, 2],
+                [3, 4, 5, 6],
+                [7, 8, 9],
+              ]) {
+                r.response.add(piece);
+                await r.response.flush();
+              }
+            }
+            await r.response.close();
+          } on IOException {
+            // The proxy stops reading once it has the requested range.
+          }
+          return;
         } else {
           final part = networkByteRange(r.headers.value('range'), 10);
           r.response.statusCode = r.headers.value('range') == null ? 200 : 206;
@@ -821,6 +841,43 @@ void main() {
         await response.drain<void>();
       },
     );
+
+    test('proxy serves byte ranges a server without them ignores', () async {
+      final c = connection('$origin/music/', user: 'test', password: 'secret');
+      await service.save(c);
+      final url = Uri.parse(
+        await service.resolve(NetworkStorageService.source(c.id, 'whole.flac')),
+      );
+      final client = HttpClient();
+      addTearDown(() => client.close(force: true));
+      for (final (range, status, contentRange, body) in [
+        ('bytes=0-1', 206, 'bytes 0-1/10', [0, 1]),
+        ('bytes=2-7', 206, 'bytes 2-7/10', [2, 3, 4, 5, 6, 7]),
+        ('bytes=8-', 206, 'bytes 8-9/10', [8, 9]),
+        ('bytes=-3', 206, 'bytes 7-9/10', [7, 8, 9]),
+        ('bytes=10-', 416, 'bytes */10', <int>[]),
+        (null, 200, null, List.generate(10, (i) => i)),
+      ]) {
+        final request = await client.getUrl(url);
+        if (range != null) request.headers.set(HttpHeaders.rangeHeader, range);
+        final response = await request.close();
+        expect(response.statusCode, status, reason: range);
+        expect(
+          response.headers.value(HttpHeaders.contentRangeHeader),
+          contentRange,
+          reason: range,
+        );
+        expect(response.headers.value(HttpHeaders.acceptRangesHeader), 'bytes');
+        expect(response.contentLength, body.length, reason: range);
+        expect(await response.expand((chunk) => chunk).toList(), body);
+      }
+      final head = await client.headUrl(url);
+      head.headers.set(HttpHeaders.rangeHeader, 'bytes=0-1');
+      final response = await head.close();
+      expect(response.statusCode, HttpStatus.partialContent);
+      expect(response.contentLength, 2);
+      await response.drain<void>();
+    });
 
     test('WebDAV and direct HTTP file validation use real requests', () async {
       final dav = connection(

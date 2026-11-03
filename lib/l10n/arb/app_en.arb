@@ -8655,6 +8655,20 @@
   "@snackbarPlaybackMuted": {
     "description": "Shown after mute automation pauses playback; another explicit play request can override the pause."
   },
+  "snackbarPlaybackFormatUnsupported": "This format can't be played on this device: {format}",
+  "@snackbarPlaybackFormatUnsupported": {
+    "description": "Shown when the player cannot decode a song and stops on it. format is a file format name such as APE or WavPack.",
+    "placeholders": {
+      "format": {"type": "String"}
+    }
+  },
+  "snackbarPlaybackFormatUnsupportedSkipped": "This format can't be played on this device: {format}. Playing the next song.",
+  "@snackbarPlaybackFormatUnsupportedSkipped": {
+    "description": "Shown when the player cannot decode a song and continues with the next one in the queue. format is a file format name such as APE or WavPack.",
+    "placeholders": {
+      "format": {"type": "String"}
+    }
+  },
   "playbackPauseOnMuteDescription": "Pause at zero media volume and resume when raised. Manual pauses stay paused. Standard audio output only.",
   "playbackOnHeadphonesConnected": "Play when headphones connect",
   "playbackOnHeadphonesConnectedDescription": "Resume the current song when wired or Bluetooth headphones connect. Disconnecting pauses playback. Built-in player only.",

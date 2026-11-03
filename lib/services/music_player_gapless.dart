@@ -127,11 +127,12 @@ class _MusicGapless {
         }
         if (!_current(generation)) return;
       }
-      final path = lease?.path ?? await handler._resolveSource(next);
+      final path = lease?.path ?? await handler._formats.resolve(next);
       if (path == null || !_current(generation)) return;
       final isCopy =
           (next.isContentUri && lease == null) ||
-          handler._sourceCache.ownsPath(path);
+          handler._sourceCache.ownsPath(path) ||
+          handler._formats.owns(path);
       if (isCopy) _pins.add(path);
       final volume = await handler._normalizationVolumeFor(
         path,

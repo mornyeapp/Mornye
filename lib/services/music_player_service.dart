@@ -23,6 +23,7 @@ import 'package:mornye/services/playback_normalization.dart';
 import 'package:mornye/services/playback_automation.dart';
 import 'package:mornye/services/playback_session_writer.dart';
 import 'package:mornye/services/content_uri_playback_cache.dart';
+import 'package:mornye/services/avplayer_formats.dart';
 import 'package:mornye/services/cast_output.dart';
 import 'package:mornye/services/cover_store.dart';
 import 'package:mornye/services/music_player_runtime.dart';
@@ -58,6 +59,7 @@ part 'music_player_automix.dart';
 part 'music_player_autoplay.dart';
 part 'music_player_covers.dart';
 part 'music_player_cast.dart';
+part 'music_player_formats.dart';
 part 'music_player_gapless.dart';
 part 'music_player_prefetch.dart';
 
@@ -138,6 +140,7 @@ class MusicPlayerHandler extends BaseAudioHandler
   late final _MusicAutoMix _autoMix;
   late final _MusicGapless _gapless = _MusicGapless(this);
   late final _MusicPrefetch _prefetch = _MusicPrefetch(this);
+  late final _MusicFormats _formats = _MusicFormats(this);
   late final _MusicCovers _covers = _MusicCovers(this);
   late final _MusicAutoplay _autoplay;
   late final MusicHaptics _haptics;
@@ -1076,6 +1079,8 @@ class MusicPlayerHandler extends BaseAudioHandler
     _normalizationGeneration++;
     _normalizationCache.invalidate(source);
     await _sourceCache.invalidate(source, waitForPending: true);
+    // A FLAC copy carries the tags it was made with.
+    await _formats.invalidate(source);
     if (_disposed) return;
     if (_index >= 0 &&
         _index < _media.length &&
@@ -1658,7 +1663,9 @@ class MusicPlayerHandler extends BaseAudioHandler
       media.source.toLowerCase().endsWith('.dsf') ||
       media.source.toLowerCase().endsWith('.dff');
 
-  Future<void> _startResolvedSource(
+  /// Starts [path] and returns what plays: [path], or a FLAC copy when
+  /// AVPlayer cannot open it.
+  Future<String> _startResolvedSource(
     String path,
     int generation,
     PlayableMedia media,
@@ -1670,29 +1677,43 @@ class MusicPlayerHandler extends BaseAudioHandler
     // source. Serialize preparation and recheck before making it audible.
     // Link may resolve a network song to its completed local copy.
     // A file still arriving resolves to its HTTP stream instead.
-    if (const {'http', 'https'}.contains(Uri.tryParse(path)?.scheme)) {
-      await _player.setNetworkSource(
-        path,
-        arriving: _runtime.streamsArrivingFile(path),
-      );
-    } else {
-      await _player.setFileSource(
-        path,
-        preferBitPerfect: _settings.usbBitPerfect,
-        directUsb: _settings.usbDirect,
-        allowFixedVolume: _settings.usbAllowFixedVolume,
-        dapExclusive: _settings.dapExclusive,
-        allowDop: _settings.usbDsdOverPcm,
-        requiresDsd: _requiresDsd(media),
+    try {
+      if (const {'http', 'https'}.contains(Uri.tryParse(path)?.scheme)) {
+        await _player.setNetworkSource(
+          path,
+          arriving: _runtime.streamsArrivingFile(path),
+        );
+      } else {
+        await _player.setFileSource(
+          path,
+          preferBitPerfect: _settings.usbBitPerfect,
+          directUsb: _settings.usbDirect,
+          allowFixedVolume: _settings.usbAllowFixedVolume,
+          dapExclusive: _settings.dapExclusive,
+          allowDop: _settings.usbDsdOverPcm,
+          requiresDsd: _requiresDsd(media),
+        );
+      }
+    } catch (_) {
+      if (!_isCurrentPlayRequest(generation, media)) rethrow;
+      final copy = await _formats.afterFailure(media, path);
+      if (copy == null || !_isCurrentPlayRequest(generation, media)) rethrow;
+      return _startResolvedSource(
+        copy,
+        generation,
+        media,
+        position,
+        startPaused: startPaused,
       );
     }
-    if (!_isCurrentPlayRequest(generation, media)) return;
+    if (!_isCurrentPlayRequest(generation, media)) return path;
     if (position != null) {
       await _player.seek(position);
-      if (!_isCurrentPlayRequest(generation, media)) return;
+      if (!_isCurrentPlayRequest(generation, media)) return path;
     }
     if (!startPaused) await _player.resume();
     if (!_isCurrentPlayRequest(generation, media)) await _player.pause();
+    return path;
   }
 
   Future<void> _loadIndex(
@@ -1782,7 +1803,7 @@ class MusicPlayerHandler extends BaseAudioHandler
         _log.w('Failed to open direct SAF playback lease: $e');
       }
     }
-    var resolved = playbackLease?.path ?? await _resolveSource(media);
+    var resolved = playbackLease?.path ?? await _formats.resolve(media);
     var usingLocalSafCopy = media.isContentUri && playbackLease == null;
     if (!_isCurrentPlayRequest(generation, media)) {
       if (playbackLease != null) {
@@ -1844,7 +1865,7 @@ class MusicPlayerHandler extends BaseAudioHandler
           ? effectiveStartPosition
           : null;
       try {
-        await _startResolvedSource(
+        resolved = await _startResolvedSource(
           resolved,
           generation,
           media,
@@ -1891,7 +1912,10 @@ class MusicPlayerHandler extends BaseAudioHandler
         unawaited(_loadNetworkMetadata(media, generation));
       }
       _pendingRestorePosition = null;
-      _activeResolvedPath = usingLocalSafCopy ? resolved : null;
+      _activeResolvedPath = usingLocalSafCopy || _formats.owns(resolved)
+          ? resolved
+          : null;
+      _formats.started();
       await _cleanupPendingResolvedPaths();
       if (!_isCurrentPlayRequest(generation, media)) return;
       // Plain file paths were already published before loading. Re-publishing
@@ -1909,6 +1933,15 @@ class MusicPlayerHandler extends BaseAudioHandler
       // poll the engine for the real duration as a fallback.
       unawaited(_ensureDurationKnown(media, generation));
     } catch (e, stackTrace) {
+      if (!_isCurrentPlayRequest(generation, media)) return;
+      if (await _formats.skipUnplayable(
+        media,
+        resolved,
+        generation,
+        startPaused: startPaused,
+      )) {
+        return;
+      }
       if (!_isCurrentPlayRequest(generation, media)) return;
       _reportPlaybackError(_player, e, stackTrace);
     } finally {
@@ -2691,6 +2724,7 @@ class MusicPlayerHandler extends BaseAudioHandler
     }
     _activeResolvedPath = null;
     await _sourceCache.dispose();
+    await _formats.dispose();
   }
 }
 

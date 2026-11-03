@@ -10,6 +10,7 @@ import 'package:mornye/models/settings.dart';
 import 'package:mornye/services/alsa_output_devices.dart';
 import 'package:mornye/services/app_state_database.dart';
 import 'package:mornye/services/exclusive_output_deck.dart';
+import 'package:mornye/services/ffmpeg_support.dart' show FFmpegExecution;
 import 'package:mornye/services/autoplay_personalization.dart';
 import 'package:mornye/services/autoplay_ranker.dart';
 import 'package:mornye/services/autoplay_taste.dart';
@@ -55,6 +56,10 @@ final _log = AppLogger('MusicPlayerRuntime');
 /// unless a remote device plays in its place.
 ({SwitchAudioHandler session, MusicPlayerHandler local})? _systemSession;
 
+/// A song the player could not play because of its [format]; [skipped]
+/// when the next song plays in its place.
+typedef UnplayableSong = ({String format, bool skipped});
+
 /// The process services used by a player. Tests can replace effects without
 /// changing the queue, transport, interruption or automation algorithms.
 class PlaybackDependencies {
@@ -77,6 +82,8 @@ class PlaybackDependencies {
     this.createTaste = AutoplayTaste.new,
     this.createRanker = AutoplayRanker.new,
     this.createSongAnalysis = _createSongAnalysis,
+    this.convertAudio = _convertAudio,
+    this.playbackCopies,
     AppStateDatabase? sessionDatabase,
     LibraryDatabase? libraryDatabase,
     HistoryDatabase? historyDatabase,
@@ -88,6 +95,7 @@ class PlaybackDependencies {
     Stream<double>? volumeChanges,
     bool? isIOS,
     bool? isAndroid,
+    bool? isMacOS,
     this.notificationChannel = const MethodChannel(
       'com.zarz.mornye/playback_notification',
     ),
@@ -101,7 +109,8 @@ class PlaybackDependencies {
        _sourceMetadataEvents = sourceMetadataEvents,
        _volumeChanges = volumeChanges,
        _isIOS = isIOS,
-       _isAndroid = isAndroid;
+       _isAndroid = isAndroid,
+       _isMacOS = isMacOS;
 
   final PlaybackDeck Function(String playerId) createDeck;
   final PlaybackDeck Function(CastOutput output, MediaItem? Function() metadata)
@@ -145,6 +154,14 @@ class PlaybackDependencies {
 
   /// Analysis of how the Library's songs sound, reading songs from it.
   final SongAnalysis Function(LibraryDatabase library) createSongAnalysis;
+
+  /// Runs FFmpeg with these arguments; true when it succeeded. Makes the
+  /// FLAC copies AVPlayer plays in place of formats it cannot open.
+  final Future<bool> Function(List<String> arguments) convertAudio;
+
+  /// Where those copies go, emptied before the first; a folder in the
+  /// system temporary directory when null.
+  final Directory? playbackCopies;
   final AppStateDatabase? _sessionDatabase;
   final LibraryDatabase? _libraryDatabase;
   final HistoryDatabase? _historyDatabase;
@@ -154,7 +171,7 @@ class PlaybackDependencies {
   final SourceDeletionEvents? _sourceDeletionEvents;
   final SourceMetadataEvents? _sourceMetadataEvents;
   final Stream<double>? _volumeChanges;
-  final bool? _isIOS, _isAndroid;
+  final bool? _isIOS, _isAndroid, _isMacOS;
 
   AppStateDatabase get sessionDatabase =>
       _sessionDatabase ?? AppStateDatabase.instance;
@@ -174,6 +191,9 @@ class PlaybackDependencies {
       _volumeChanges ?? SystemVolumeService.instance.changes;
   bool get isIOS => _isIOS ?? Platform.isIOS;
   bool get isAndroid => _isAndroid ?? Platform.isAndroid;
+
+  /// The macOS app, which plays through AVPlayer like iOS.
+  bool get isMacOS => _isMacOS ?? (isDesktopPlatform && Platform.isMacOS);
 
   // Windows and Linux play through libmpv. Without the library they fall
   // back to audioplayers, which has no equalizer there. macOS plays through
@@ -205,6 +225,8 @@ class PlaybackDependencies {
       ? _createDeck(playerId)
       : AudioplayersPlaybackDeck(playerId: playerId, equalizerAvailable: false);
   static Future<AudioSession> _getAudioSession() => AudioSession.instance;
+  static Future<bool> _convertAudio(List<String> arguments) async =>
+      (await FFmpegExecution.arguments(arguments)).success;
   static SongAnalysis _createSongAnalysis(LibraryDatabase library) =>
       SongAnalysis(library: library);
   static Future<Map<String, dynamic>> _readNetworkMetadata(String source) =>
@@ -310,6 +332,7 @@ class MusicPlayerRuntime {
   Future<void>? _restoreFuture;
   final _handlers = StreamController<MusicPlayerHandler?>.broadcast(sync: true);
   final _mutedPlaybackEvents = StreamController<void>.broadcast();
+  final _unplayableSongs = StreamController<UnplayableSong>.broadcast();
   bool _initializing = false;
   bool _disposed = false;
   Future<void>? _disposeFuture;
@@ -345,6 +368,13 @@ class MusicPlayerRuntime {
 
   void notifyMutedPlayback() {
     if (!_disposed) _mutedPlaybackEvents.add(null);
+  }
+
+  /// Songs whose format this device cannot play, as they fail.
+  Stream<UnplayableSong> get unplayableSongs => _unplayableSongs.stream;
+
+  void notifyUnplayableSong(String format, {required bool skipped}) {
+    if (!_disposed) _unplayableSongs.add((format: format, skipped: skipped));
   }
 
   /// Feeds the exclusive output setting to the decks.
@@ -676,6 +706,7 @@ class MusicPlayerRuntime {
     await _songAnalysis?.dispose();
     await _handlers.close();
     await _mutedPlaybackEvents.close();
+    await _unplayableSongs.close();
   }
 
   Stream<T> _events<T>(

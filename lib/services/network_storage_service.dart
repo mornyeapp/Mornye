@@ -241,6 +241,25 @@ Uri networkTarget(NetworkConnection connection, String path) {
   return (start: start, end: end);
 }
 
+/// Bytes [start] to [end] (inclusive) of a whole representation's [bytes].
+/// Stops reading [bytes] after [end].
+Stream<List<int>> networkByteWindow(
+  Stream<List<int>> bytes,
+  int start,
+  int end,
+) async* {
+  var offset = 0;
+  await for (final chunk in bytes) {
+    final from = max(0, start - offset);
+    final to = min(chunk.length, end + 1 - offset);
+    if (from < to) {
+      yield from == 0 && to == chunk.length ? chunk : chunk.sublist(from, to);
+    }
+    offset += chunk.length;
+    if (offset > end) break;
+  }
+}
+
 /// One song of a [NetworkVirtualSources] host for a Library scan: its
 /// `path` under the host, its `tags` (the keys
 /// [NetworkVirtualSources.metadata] answers), its local cover file and file
@@ -1428,11 +1447,12 @@ class NetworkStorageService {
         return;
       }
       final c = await connection(route.id);
+      final range = request.headers.value(HttpHeaders.rangeHeader);
       read = await _openRead(
         c,
         route.path,
         method: request.method,
-        range: request.headers.value(HttpHeaders.rangeHeader),
+        range: range,
       );
       request.response.statusCode = read.status >= 300 && read.status < 400
           ? HttpStatus.badGateway
@@ -1453,9 +1473,41 @@ class NetworkStorageService {
           networkContentType(_networkFileName(c, route.path)),
         );
       }
+      var bytes = read.bytes;
+      final length = int.tryParse(
+        read.headers[HttpHeaders.contentLengthHeader] ?? '',
+      );
+      if (read.status == HttpStatus.ok && length != null) {
+        // AVPlayer refuses every song but MP3 from a server that answers a
+        // range request with the whole file, so the proxy cuts the range.
+        request.response.headers.set(HttpHeaders.acceptRangesHeader, 'bytes');
+        if (range != null) {
+          final ({int start, int end}) part;
+          try {
+            part = networkByteRange(range, length);
+          } on FormatException {
+            request.response
+              ..statusCode = HttpStatus.requestedRangeNotSatisfiable
+              ..headers.set(HttpHeaders.contentRangeHeader, 'bytes */$length')
+              ..headers.set(HttpHeaders.contentLengthHeader, '0');
+            return;
+          }
+          request.response
+            ..statusCode = HttpStatus.partialContent
+            ..headers.set(
+              HttpHeaders.contentRangeHeader,
+              'bytes ${part.start}-${part.end}/$length',
+            )
+            ..headers.set(
+              HttpHeaders.contentLengthHeader,
+              '${part.end - part.start + 1}',
+            );
+          bytes = networkByteWindow(bytes, part.start, part.end);
+        }
+      }
       consumed = true;
       if (request.method == 'GET') {
-        await request.response.addStream(read.bytes);
+        await request.response.addStream(bytes);
       } else {
         await read.discard();
       }
