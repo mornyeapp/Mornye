@@ -28,6 +28,7 @@ import 'package:mornye/services/download_metadata_resolver.dart';
 import 'package:mornye/services/download_metadata_embedding.dart';
 import 'package:mornye/services/download_saf_file_replacer.dart';
 import 'package:mornye/services/download_connectivity_policy.dart';
+import 'package:mornye/services/connectivity_monitor.dart';
 import 'package:mornye/services/download_keep_awake.dart';
 import 'package:mornye/services/download_scheduler.dart';
 import 'package:mornye/services/download_retry_backoff.dart';

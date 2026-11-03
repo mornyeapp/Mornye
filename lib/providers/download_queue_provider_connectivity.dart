@@ -4,7 +4,7 @@ part of 'download_queue_provider.dart';
 extension _DownloadQueueConnectivity on DownloadQueueNotifier {
   void _startConnectivityMonitoring() {
     _connectivitySub?.cancel();
-    _connectivitySub = Connectivity().onConnectivityChanged.listen(
+    _connectivitySub = ConnectivityMonitor.instance.changes.listen(
       _handleConnectivityResults,
       onError: (Object error, StackTrace stackTrace) {
         _log.w('Connectivity monitoring failed: $error');

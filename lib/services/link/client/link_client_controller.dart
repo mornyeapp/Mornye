@@ -6,6 +6,7 @@ import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/constants/app_info.dart';
+import 'package:mornye/services/connectivity_monitor.dart';
 import 'package:mornye/services/link/client/link_client_bonsoir.dart';
 import 'package:mornye/services/link/client/link_client_discovery.dart';
 import 'package:mornye/services/link/client/link_client_http.dart';
@@ -78,7 +79,7 @@ class LinkClientEnvironment {
         LinkClientSession(server: server, apiKey: apiKey, device: device),
     ensureLocalNetwork: LocalNetworkAccess.instance.ensureGranted,
     onLocalNetwork: _onLocalNetwork,
-    networkChanges: Connectivity().onConnectivityChanged.map((_) {}),
+    networkChanges: ConnectivityMonitor.instance.changes.map((_) {}),
     updateBackgroundConnection: _updateBackgroundConnection,
   );
 
