@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:crypto/crypto.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -312,11 +313,14 @@ void main() {
     final payload = utf8.encode('verified package bytes');
     final payloadSha = sha256.convert(payload).toString();
     const assetName = 'Mornye-$_version-linux-x86_64.AppImage';
+    const channel = MethodChannel('com.zarz.mornye/backend');
 
     setUp(() async {
       temp = await Directory.systemTemp.createTemp('mornye-updater-test');
     });
     tearDown(() async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, null);
       if (await temp.exists()) await temp.delete(recursive: true);
     });
 
@@ -350,6 +354,36 @@ void main() {
       expect(await file.readAsBytes(), payload);
       expect(File('${file.path}.part').existsSync(), isFalse);
     });
+
+    test(
+      'uses the native digest and rejects its mismatch before publishing',
+      () async {
+        var hashes = 0;
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, (call) async {
+              expect(call.method, 'runNativeDataJob');
+              final arguments = call.arguments as Map;
+              final request =
+                  jsonDecode(arguments['request_json'] as String) as Map;
+              expect(request['operation'], 'hash_file');
+              final file = File(request['path'] as String);
+              expect(file.path, endsWith('.part'));
+              expect(await file.readAsBytes(), payload);
+              hashes++;
+              return {'sha256': '0' * 64};
+            });
+        final updater = DesktopUpdater(
+          client: client('$payloadSha  $assetName\n'),
+          downloadDirectory: temp,
+        );
+        await expectLater(
+          updater.download(info()),
+          throwsA(isA<DesktopUpdateException>()),
+        );
+        expect(hashes, 1);
+        expect(temp.listSync(), isEmpty);
+      },
+    );
 
     test('rejects a package whose digest does not match', () async {
       final updater = DesktopUpdater(

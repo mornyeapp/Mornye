@@ -2,10 +2,10 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
-import 'dart:typed_data';
 
 import 'package:audio_service/audio_service.dart' show MediaItem;
 import 'package:crypto/crypto.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/services/cover_store.dart';
 import 'package:mornye/services/network_storage_service.dart';
@@ -34,10 +34,13 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   HttpOverrides.global = null;
   late Directory directory;
+  const channel = MethodChannel('com.zarz.mornye/backend');
   setUp(() async {
     directory = await Directory.systemTemp.createTemp('cover-store-test-');
   });
   tearDown(() async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, null);
     await directory.delete(recursive: true);
   });
 
@@ -71,6 +74,35 @@ void main() {
       await Future<void>.delayed(const Duration(milliseconds: 5));
     }
   }
+
+  test(
+    'native cover digest preserves the content-addressed filename',
+    () async {
+      final bytes = _jpeg(2);
+      final digest = sha256.convert(bytes).toString();
+      var hashes = 0;
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+            expect(call.method, 'runNativeDataJob');
+            final request =
+                jsonDecode((call.arguments as Map)['request_json'] as String)
+                    as Map;
+            expect(request['operation'], 'hash_file');
+            expect(await File(request['path'] as String).readAsBytes(), bytes);
+            hashes++;
+            return {'sha256': digest};
+          });
+      final covers = store(
+        fetch: (_, output) async {
+          await output.writeAsBytes(bytes);
+        },
+      );
+      final path = await covers.file('network://library/cover.image');
+      expect(path, endsWith('_${digest.substring(0, 16)}.image'));
+      expect(hashes, 1);
+      expect(await File(path!).readAsBytes(), bytes);
+    },
+  );
 
   test(
     'a network cover keeps one path while resolve answers a new URL',

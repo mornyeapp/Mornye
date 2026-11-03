@@ -3,10 +3,10 @@ import 'dart:collection';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import 'package:mornye/services/native_file_hash.dart';
 import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/utils/file_access.dart';
 
@@ -788,8 +788,7 @@ class DownloadedEmbeddedCoverResolver {
   }
 
   static Future<String> _contentHash(String path) async {
-    final digest = await sha256.bind(File(path).openRead()).first;
-    return digest.toString().substring(0, 16);
+    return (await hashFileSha256(path)).substring(0, 16);
   }
 
   /// Two independently mixed 63-bit FNV-1a lanes keep filenames compact.

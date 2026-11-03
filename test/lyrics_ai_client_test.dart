@@ -30,6 +30,8 @@ String _openAiReply(String content, {String finish = 'stop'}) => jsonEncode({
 });
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   group('request building', () {
     test(
       'all providers keep song context separate from requested line ids',

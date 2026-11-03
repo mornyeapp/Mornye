@@ -75,6 +75,8 @@ LyricsAiClient _client(
 }
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   group('source', () {
     test('strips timing tags and skips instrumental lines', () {
       expect(

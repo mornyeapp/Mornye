@@ -7,6 +7,7 @@ import 'dart:isolate';
 import 'package:crypto/crypto.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import 'package:mornye/services/native_file_hash.dart';
 import 'package:mornye/services/network_storage_service.dart';
 import 'package:mornye/utils/cover_art_utils.dart';
 import 'package:mornye/utils/file_access.dart';
@@ -417,8 +418,7 @@ class CoverStore {
     }
     final head = await file.openRead(0, 12).expand((chunk) => chunk).toList();
     if (!_isImage(head)) throw const FormatException('Not a cover image');
-    final digest = await sha256.bind(file.openRead()).single;
-    return digest.toString().substring(0, 16);
+    return (await hashFileSha256(file.path)).substring(0, 16);
   }
 
   /// Whether [head], the first 12 bytes of a file, starts a JPEG, PNG, GIF,

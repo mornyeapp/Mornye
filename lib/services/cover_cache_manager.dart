@@ -7,6 +7,7 @@ import 'package:flutter_cache_manager/file.dart' as cache_file;
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
+import 'package:mornye/services/cache_maintenance_service.dart';
 import 'package:mornye/services/cover_cache_info_repository.dart';
 import 'package:mornye/utils/cache_byte_budget.dart';
 import 'package:mornye/utils/periodic_async_task.dart';
@@ -199,27 +200,14 @@ class CoverCacheManager {
       return const CacheStats(fileCount: 0, totalSizeBytes: 0);
     }
 
-    final cacheDir = Directory(cachePath);
-
-    if (!await cacheDir.exists()) {
-      return const CacheStats(fileCount: 0, totalSizeBytes: 0);
-    }
-
-    int fileCount = 0;
-    int totalSize = 0;
-
-    try {
-      await for (final entity in cacheDir.list(recursive: true)) {
-        if (entity is File) {
-          fileCount++;
-          totalSize += await entity.length();
-        }
-      }
-    } catch (e) {
-      debugPrint('CoverCacheManager: Error getting stats: $e');
-    }
-
-    return CacheStats(fileCount: fileCount, totalSizeBytes: totalSize);
+    final stats = await CacheMaintenanceService.scanDirectory(
+      Directory(cachePath),
+      followLinks: true,
+    );
+    return CacheStats(
+      fileCount: stats.fileCount,
+      totalSizeBytes: stats.totalSizeBytes,
+    );
   }
 
   static CacheManager _createManager() {

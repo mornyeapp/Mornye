@@ -60,6 +60,8 @@ fn execute(
     let operation = string(request, "operation")?;
     match operation {
         "hash_file" => Ok(json!({"sha256": hash_file(string(request, "path")?, check)?})),
+        "directory_stats" => crate::native_directory_stats::execute(request, check),
+        "train_autoplay_taste" => crate::native_autoplay_taste::execute(request, check),
         "matches_network_upload" => crate::network_tags::matches_upload(request, check),
         "network_metadata" => {
             let metadata = crate::network_tags::read_to_cache(
@@ -87,6 +89,9 @@ fn execute(
             crate::native_id3::execute(request, Some(bytes), check)
         }
         "parse_lyrics" => crate::native_lyrics::execute(request, Some(bytes), check),
+        "parse_lyrics_translation_reply" => {
+            crate::native_lyrics_translation::execute(request, Some(bytes), check)
+        }
         "palette" => {
             let colors = mornye_core::native_palette::quantize_rgba(bytes, check)?;
             Ok(json!({"colors": colors}))

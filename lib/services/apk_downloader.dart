@@ -1,21 +1,15 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:crypto/crypto.dart';
-import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:mornye/services/platform_bridge.dart';
+import 'package:mornye/services/native_file_hash.dart';
 import 'package:mornye/utils/logger.dart';
 
 final _log = AppLogger('ApkDownloader');
 
 typedef ProgressCallback = void Function(int received, int total);
-
-Future<String> _hashApkInBackground(String path) async =>
-    (await sha256.bind(File(path).openRead()).first).toString();
 
 class ApkDownloader {
   static const _streamIdleTimeout = Duration(seconds: 60);
@@ -171,21 +165,7 @@ class ApkDownloader {
     }
   }
 
-  static Future<String> _hashApk(File file) async {
-    try {
-      final result = await PlatformBridge.runNativeDataJob({
-        'operation': 'hash_file',
-        'path': file.path,
-      });
-      final digest = result['sha256'];
-      if (digest is! String || !RegExp(r'^[a-f0-9]{64}$').hasMatch(digest)) {
-        throw const FormatException('Invalid native APK digest');
-      }
-      return digest;
-    } on MissingPluginException {
-      return compute(_hashApkInBackground, file.path);
-    }
-  }
+  static Future<String> _hashApk(File file) => hashFileSha256(file.path);
 
   static Future<Map<String, dynamic>?> _readResumeMetadata(File file) async {
     try {

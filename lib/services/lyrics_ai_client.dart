@@ -2,8 +2,11 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:mornye/services/lyrics_translation_alignment.dart';
+import 'package:mornye/services/platform_bridge.dart';
 
 /// The services AI lyrics translation can call with the user's own key.
 enum LyricsAiProvider {
@@ -504,6 +507,78 @@ String extractLyricsAiText(LyricsAiProvider provider, Map<String, Object?> j) {
 
 final _fence = RegExp(r'^```[a-zA-Z0-9_-]*\s*\n?([\s\S]*?)\n?```\s*$');
 
+Map<int, LyricsAiLine> _parseLyricsTranslationReplyOnWorker(
+  ({String reply, Set<int> ids}) input,
+) => parseLyricsTranslationReply(input.reply, input.ids);
+
+/// Parses model output on the native worker. Hosts without a native plugin keep
+/// the compatibility parser in an isolate rather than the Flutter frame.
+Future<Map<int, LyricsAiLine>> parseLyricsTranslationReplyInBackground(
+  String reply,
+  Set<int> ids,
+) async {
+  final Map<String, dynamic> result;
+  try {
+    result = await PlatformBridge.runNativeDataJob({
+      'operation': 'parse_lyrics_translation_reply',
+      'ids': ids.toList(growable: false),
+    }, bytes: utf8.encode(reply));
+  } on MissingPluginException {
+    return compute(_parseLyricsTranslationReplyOnWorker, (
+      reply: reply,
+      ids: ids,
+    ));
+  }
+  if (result['error'] == 'badResponse') {
+    throw const LyricsAiException(
+      LyricsAiErrorKind.badResponse,
+      detail: 'reply is not a JSON list',
+    );
+  }
+  final lines = result['lines'];
+  if (lines is! List) {
+    throw const LyricsAiException(LyricsAiErrorKind.badResponse);
+  }
+  final parsed = <int, LyricsAiLine>{};
+  for (final value in lines) {
+    if (value is! Map ||
+        value['id'] is! int ||
+        value['text'] is! String ||
+        (value['romanization'] != null && value['romanization'] is! String)) {
+      throw const LyricsAiException(LyricsAiErrorKind.badResponse);
+    }
+    final id = value['id'] as int;
+    if (!ids.contains(id) || parsed.containsKey(id)) {
+      throw const LyricsAiException(LyricsAiErrorKind.badResponse);
+    }
+    parsed[id] = (
+      text: value['text'] as String,
+      romanization: value['romanization'] as String?,
+      alignment: _lyricsTranslationChunksFromNative(value['alignment']),
+      romanizationAlignment: _lyricsTranslationChunksFromNative(
+        value['romanizationAlignment'],
+      ),
+    );
+  }
+  return parsed;
+}
+
+List<LyricsTranslationChunk> _lyricsTranslationChunksFromNative(Object? value) {
+  if (value is! List) {
+    throw const LyricsAiException(LyricsAiErrorKind.badResponse);
+  }
+  final chunks = <LyricsTranslationChunk>[];
+  for (final chunk in value) {
+    if (chunk is! Map || chunk['text'] is! String || chunk['source'] is! int) {
+      throw const LyricsAiException(LyricsAiErrorKind.badResponse);
+    }
+    chunks.add(
+      LyricsTranslationChunk(chunk['text'] as String, chunk['source'] as int),
+    );
+  }
+  return List.unmodifiable(chunks);
+}
+
 /// Reads `{id: line}` from a model reply. Accepts the requested
 /// `{"lines": [...]}` object, a bare array, code fences and leading prose.
 /// Unknown ids, duplicates and blank texts are dropped; a reply that is
@@ -687,7 +762,7 @@ class LyricsAiClient {
     if (text.trim().isEmpty) {
       throw const LyricsAiException(LyricsAiErrorKind.badResponse);
     }
-    return parseLyricsTranslationReply(text, ids);
+    return parseLyricsTranslationReplyInBackground(text, ids);
   }
 
   Future<String> _sendTranslation(

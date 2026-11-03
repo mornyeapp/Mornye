@@ -3,9 +3,11 @@ import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart' show compute, visibleForTesting;
+import 'package:flutter/services.dart' show MissingPluginException;
 import 'package:mornye/services/autoplay_personalization.dart';
 import 'package:mornye/services/autoplay_signal.dart';
 import 'package:mornye/services/playable_media.dart';
+import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/services/sqlite_helpers.dart' as sqlite;
 import 'package:mornye/utils/logger.dart';
 import 'package:sqflite/sqflite.dart';
@@ -221,6 +223,67 @@ _PackedTaste _packTaste(AutoplayTasteModel model) {
 
 _PackedTaste _trainPackedTaste(List<AutoplayTastePlay> plays) =>
     _packTaste(trainAutoplayTaste(plays));
+
+Map<String, dynamic> _tasteTrainingRequest(List<AutoplayTastePlay> plays) => {
+  'operation': 'train_autoplay_taste',
+  'plays': [
+    for (final play in plays)
+      {
+        'id': play.id,
+        'song': play.song,
+        'artist': play.artist,
+        'atMicros': play.at.microsecondsSinceEpoch,
+        'kind': play.kind.name,
+        'reward': play.reward,
+      },
+  ],
+};
+
+_PackedTaste _hydrateNativeTaste(Map<String, dynamic> result) {
+  final tokens = (result['tokens'] as List).cast<String>();
+  final values = (result['vectors'] as List).cast<num>();
+  if (tokens.length > _vocabulary ||
+      values.length != tokens.length * AutoplayTasteModel.dimensions ||
+      values.any((value) => !value.isFinite || value.abs() > 1.001)) {
+    throw const FormatException('Invalid native autoplay taste model');
+  }
+  return _packTaste(
+    AutoplayTasteModel(
+      tokens: tokens,
+      vectors: Float32List.fromList([
+        for (final value in values) value.toDouble(),
+      ]),
+      positives: result['positives'] as int,
+      through: result['through'] as int,
+    ),
+  );
+}
+
+Future<_PackedTaste> _trainNativePackedTaste(
+  List<AutoplayTastePlay> plays,
+) async {
+  try {
+    final request = await compute(_tasteTrainingRequest, plays);
+    final result = await PlatformBridge.runNativeDataJob(request);
+    return await compute(_hydrateNativeTaste, result);
+  } on MissingPluginException {
+    return compute(_trainPackedTaste, plays, debugLabel: 'autoplay-taste');
+  }
+}
+
+/// Trains one snapshot on the native worker; persistence stays with Dart.
+Future<AutoplayTasteModel> trainAutoplayTasteInBackground(
+  List<AutoplayTastePlay> plays,
+) async => (await _trainNativePackedTaste(plays)).model;
+
+@visibleForTesting
+Future<AutoplayTasteModel> trainAutoplayTasteDartInBackground(
+  List<AutoplayTastePlay> plays,
+) async => (await compute(
+  _trainPackedTaste,
+  plays,
+  debugLabel: 'autoplay-taste',
+)).model;
 
 class _Position {
   _Position(this.song, this.artist, this.weight);
@@ -619,7 +682,7 @@ class AutoplayTaste {
   );
 
   static Future<_PackedTaste> _trainOnWorker(List<AutoplayTastePlay> plays) =>
-      compute(_trainPackedTaste, plays, debugLabel: 'autoplay-taste');
+      _trainNativePackedTaste(plays);
 
   /// The model autoplay uses now, if any.
   @visibleForTesting

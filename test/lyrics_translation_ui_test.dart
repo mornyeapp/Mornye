@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
@@ -16,6 +17,7 @@ import 'package:mornye/providers/lyrics_translation_provider.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/screens/settings/lyrics_ai_translation_page.dart';
+import 'package:mornye/services/lyrics_ai_client.dart';
 import 'package:mornye/services/lyrics_translation.dart';
 import 'package:mornye/services/lyrics_translation_sharing.dart';
 import 'package:mornye/theme/app_theme.dart';
@@ -124,7 +126,45 @@ Widget _app({
 );
 
 void main() {
-  setUp(() => SharedPreferences.setMockInitialValues({}));
+  TestWidgetsFlutterBinding.ensureInitialized();
+  const channel = MethodChannel('com.zarz.mornye/backend');
+  final messenger =
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+  var parsedReplies = 0;
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+    parsedReplies = 0;
+    // Widget tests fake the worker boundary. Real native parser parity is
+    // covered separately, without spawning an isolate under the fake clock.
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      if (call.method != 'runNativeDataJob') throw MissingPluginException();
+      final arguments = call.arguments as Map;
+      final request = jsonDecode(arguments['request_json'] as String) as Map;
+      expect(request['operation'], 'parse_lyrics_translation_reply');
+      final reply = utf8.decode(arguments['bytes'] as Uint8List);
+      final ids = (request['ids'] as List).cast<int>().toSet();
+      final parsed = parseLyricsTranslationReply(reply, ids);
+      parsedReplies++;
+      return jsonEncode({
+        'lines': [
+          for (final entry in parsed.entries)
+            {
+              'id': entry.key,
+              'text': entry.value.text,
+              'romanization': entry.value.romanization,
+              'alignment': [
+                for (final chunk in entry.value.alignment) chunk.toJson(),
+              ],
+              'romanizationAlignment': [
+                for (final chunk in entry.value.romanizationAlignment)
+                  chunk.toJson(),
+              ],
+            },
+        ],
+      });
+    });
+  });
+  tearDown(() => messenger.setMockMethodCallHandler(channel, null));
 
   for (final desktop in [false, true]) {
     for (final mornye in [false, true]) {
@@ -307,6 +347,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(requests, hasLength(1));
+      expect(parsedReplies, 1);
       expect(
         find.textContaining('de:Hello there', findRichText: true),
         findsWidgets,
@@ -419,6 +460,7 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('lyrics-ai-test')));
       await tester.pumpAndSettle();
       expect(find.text('The connection works'), findsOneWidget);
+      expect(parsedReplies, 1);
 
       await tester.pump(const Duration(seconds: 5));
       await tester.pumpAndSettle();

@@ -87,6 +87,8 @@ const _chunks = [
 ];
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   test(
     'AI pronunciation uses original timing and preserves provider readings',
     () {

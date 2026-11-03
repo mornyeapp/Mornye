@@ -1,11 +1,10 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:isolate';
 
-import 'package:crypto/crypto.dart';
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import 'package:mornye/services/native_file_hash.dart';
 import 'package:mornye/services/update_checker.dart';
 import 'package:mornye/utils/logger.dart';
 
@@ -18,9 +17,6 @@ class DesktopUpdateException implements Exception {
   @override
   String toString() => 'DesktopUpdateException: $message';
 }
-
-Future<String> _hashFile(String path) async =>
-    (await sha256.bind(File(path).openRead()).first).toString();
 
 /// Downloads a desktop release package, checks it against the release's
 /// SHA256SUMS.txt (and GitHub's digest when present), and applies it the way
@@ -138,8 +134,7 @@ class DesktopUpdater {
         throw DesktopUpdateException('Incomplete download: $received/$total');
       }
 
-      final partPath = partFile.path;
-      final actual = await Isolate.run(() => _hashFile(partPath));
+      final actual = await hashFileSha256(partFile.path);
       if (actual != expected) {
         throw const DesktopUpdateException('SHA-256 verification failed');
       }

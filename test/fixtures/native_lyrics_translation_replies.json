@@ -1,0 +1,53 @@
+[
+  {
+    "name": "fences thoughts filtering and compact alignment",
+    "request": {
+      "ids": [7, 9],
+      "reply": "<think>notes</think>\n```json\n{\"lines\":[{\"id\":\"7\",\"text\":\" Hello world \",\"romanization\":\" hi \",\"alignment\":[[0,\"Hello \"],[1,\"world\"]],\"romanizationAlignment\":[[0,\"hi\"]]},{\"id\":7,\"text\":\"duplicate\"},{\"id\":9,\"text\":\" \"},{\"id\":99,\"text\":\"unknown\"}]}\n```"
+    },
+    "expected": {
+      "lines": [
+        {"id": 7, "text": "Hello world", "romanization": "hi", "alignment": [{"text": "Hello ", "source": 0}, {"text": "world", "source": 1}], "romanizationAlignment": [{"text": "hi", "source": 0}]}
+      ]
+    }
+  },
+  {
+    "name": "first array uses original object order",
+    "request": {
+      "ids": [2],
+      "reply": "Here is the result: {\"z\":[{\"id\":2,\"translation\":\"first\"}],\"a\":[{\"id\":2,\"text\":\"second\"}]} End."
+    },
+    "expected": {"lines": [{"id": 2, "text": "first", "romanization": null, "alignment": [], "romanizationAlignment": []}]}
+  },
+  {
+    "name": "numeric ids and invalid alignment preserve translations",
+    "request": {
+      "ids": [-1, 2, 16],
+      "reply": "[{\"id\":2,\"text\":\" \"},{\"id\":-1.9,\"text\":\"negative\",\"alignment\":[[-1,\"negative\"]]},{\"id\":2.9,\"text\":\"fraction\",\"alignment\":[[0,\"different\"]]},{\"id\":\"0x10\",\"translation\":\"hex\",\"romanization\":false},{\"id\":2,\"text\":\"duplicate\"}]"
+    },
+    "expected": {"lines": [{"id": -1, "text": "negative", "romanization": null, "alignment": [], "romanizationAlignment": []}, {"id": 2, "text": "fraction", "romanization": null, "alignment": [], "romanizationAlignment": []}, {"id": 16, "text": "hex", "romanization": null, "alignment": [], "romanizationAlignment": []}]}
+  },
+  {
+    "name": "legacy chunks and unicode text",
+    "request": {
+      "ids": [1],
+      "reply": "{\"translations\":[{\"id\":1,\"text\":\"🌙 malam\",\"alignment\":[{\"text\":\"🌙 \",\"source\":0},{\"text\":\"malam\",\"source\":1}]}]}"
+    },
+    "expected": {"lines": [{"id": 1, "text": "🌙 malam", "romanization": null, "alignment": [{"text": "🌙 ", "source": 0}, {"text": "malam", "source": 1}], "romanizationAlignment": []}]}
+  },
+  {
+    "name": "an empty list is a usable partial reply",
+    "request": {"ids": [1], "reply": "[]"},
+    "expected": {"lines": []}
+  },
+  {
+    "name": "preferred invalid lines is not replaced by another array",
+    "request": {"ids": [1], "reply": "{\"lines\":false,\"translations\":[{\"id\":1,\"text\":\"ignored\"}]}"},
+    "expected": {"error": "badResponse", "detail": "reply is not a JSON list"}
+  },
+  {
+    "name": "malformed reply has a typed error",
+    "request": {"ids": [1], "reply": "not JSON"},
+    "expected": {"error": "badResponse", "detail": "reply is not a JSON list"}
+  }
+]

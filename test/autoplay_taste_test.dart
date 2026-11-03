@@ -127,6 +127,7 @@ R _captureTraining<R>(List<_TrainingTimer> timers, R Function() action) =>
     );
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   test(
     'a feedback burst schedules one training outside the track change',
     () async {

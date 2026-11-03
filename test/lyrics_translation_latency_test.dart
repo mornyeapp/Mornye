@@ -48,6 +48,8 @@ Future<void> _until(bool Function() done) async {
 }
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   test('compact alignment preserves timing and rejects invalid pairs', () {
     final compact = readLyricsTranslationChunks(
       [
@@ -399,7 +401,14 @@ void main() {
             .whenComplete(() => finished = true);
         var completed = 0, rounds = 0;
         while (!finished) {
-          await _until(() => finished || completed < gates.length);
+          // Native parsing may finish each response on a different worker.
+          // Fill each simulated network wave before releasing its responses.
+          await _until(
+            () =>
+                finished ||
+                gates.length - completed == workers ||
+                (gates.length == 4 && completed < gates.length),
+          );
           if (finished) break;
           rounds++;
           final wave = gates.sublist(completed);
