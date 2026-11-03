@@ -51,8 +51,9 @@ Stream<double> playbackOutputVolumeChanges() =>
 /// device.
 final playbackExclusiveOutput = ValueNotifier<bool>(false);
 
-/// Linux: the ALSA device [playbackExclusiveOutput] opens, as an mpv device
-/// name. Empty until one is known; the output stays shared meanwhile.
+/// Linux (ALSA device) or Windows (WASAPI endpoint identifier) device
+/// [playbackExclusiveOutput] opens. Empty until one is known; the output stays
+/// default / shared meanwhile.
 final playbackExclusiveDevice = ValueNotifier<String>('');
 
 /// Whether [playbackExclusiveOutput] took the device for the current track.

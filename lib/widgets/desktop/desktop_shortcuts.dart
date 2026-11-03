@@ -20,6 +20,7 @@ import 'package:mornye/widgets/desktop/desktop_inspector.dart';
 import 'package:mornye/widgets/desktop/desktop_player_bar.dart';
 import 'package:mornye/widgets/desktop/desktop_window.dart';
 import 'package:mornye/widgets/desktop/desktop_window_controls.dart';
+import 'package:mornye/widgets/desktop/windows_audio_quick_settings.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 /// Keyboard shortcuts for desktop builds, plus the macOS menu bar that
@@ -197,16 +198,21 @@ class _DesktopShortcutsState extends ConsumerState<DesktopShortcuts> {
 
   bool get _canCloseTopLayer =>
       _rootNavigator?.canPop() == true ||
+      DesktopAudioControlCenterController.instance.isOpen ||
       canDismissDesktopPlayerLayer(_windowWidth) ||
       ShellNavigationService.activeBackNavigator()?.canPop() == true;
 
   /// Closes what Escape or Back closes: a dialog or page over the shell
-  /// first, then the floating inspector or Now Playing, then the active
-  /// destination's own pages.
+  /// first, then Audio Control Center, then the floating inspector or Now Playing,
+  /// then the active destination's own pages.
   void _closeTopLayer() {
     final root = _rootNavigator;
     if (root != null && root.canPop()) {
       unawaited(root.maybePop());
+      return;
+    }
+    if (DesktopAudioControlCenterController.instance.isOpen) {
+      DesktopAudioControlCenterController.instance.close();
       return;
     }
     if (dismissDesktopPlayerLayer(_windowWidth)) return;

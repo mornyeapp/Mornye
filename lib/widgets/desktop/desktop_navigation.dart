@@ -1,6 +1,8 @@
 import 'dart:ui' show lerpDouble;
 
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
+import 'package:flutter/foundation.dart'
+    show defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/l10n/l10n.dart';
@@ -12,6 +14,7 @@ import 'package:mornye/services/user_profile_store.dart';
 import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/material_expressive.dart';
 import 'package:mornye/theme/mornye_theme.dart';
+import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/app_icon_button.dart';
 import 'package:mornye/widgets/desktop/desktop_commands.dart';
@@ -19,6 +22,7 @@ import 'package:mornye/widgets/desktop/desktop_inspector.dart';
 import 'package:mornye/widgets/desktop/desktop_now_playing.dart';
 import 'package:mornye/widgets/desktop/desktop_player_bar.dart';
 import 'package:mornye/widgets/desktop/desktop_window.dart';
+import 'package:mornye/widgets/desktop/windows_audio_quick_settings.dart';
 import 'package:mornye/widgets/profile_avatar.dart';
 import 'package:mornye/widgets/no_scrollbars.dart';
 
@@ -250,6 +254,10 @@ class DesktopShellLayout extends ConsumerWidget {
                   key: const ValueKey('desktop-now-playing'),
                   child: nowPlaying,
                 ),
+              if (isDesktopPlatform &&
+                  defaultTargetPlatform == TargetPlatform.windows &&
+                  !nowPlayingOpen)
+                const DesktopAudioControlCenterOverlay(),
             ],
           );
         },

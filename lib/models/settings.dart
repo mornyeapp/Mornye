@@ -97,6 +97,26 @@ class AppSettings {
   /// Linux: the ALSA device [exclusiveOutput] opens, as an mpv device name
   /// (`alsa/hw:CARD=…,DEV=…`). Empty picks the first card.
   final String exclusiveOutputDevice;
+
+  /// Windows: output mode discriminator ('shared', 'exclusive_event', 'exclusive_push').
+  /// Both 'exclusive_event' and 'exclusive_push' set [exclusiveOutput] to true.
+  final String windowsOutputMode;
+
+  /// Windows: selected Core Audio render endpoint identifier or mpv device ID.
+  /// Empty selects the system default endpoint.
+  final String windowsOutputDevice;
+
+  /// Windows: whether to automatically fall back to shared mode if exclusive mode fails.
+  final bool windowsExclusiveFallback;
+
+  /// Windows: requested target sample rate (0 = automatic / match source).
+  final int windowsOutputSampleRate;
+
+  /// Windows: requested sample format ('auto', 's16', 's24', 's32', 'float').
+  final String windowsOutputSampleFormat;
+
+  /// Windows: requested channel configuration ('auto', 'stereo').
+  final String windowsOutputChannels;
   final bool autoplay;
   final bool autoplayPersonalization;
 
@@ -291,6 +311,12 @@ class AppSettings {
     this.dapExclusive = false,
     this.exclusiveOutput = false,
     this.exclusiveOutputDevice = '',
+    this.windowsOutputMode = 'exclusive_event',
+    this.windowsOutputDevice = '',
+    this.windowsExclusiveFallback = true,
+    this.windowsOutputSampleRate = 0,
+    this.windowsOutputSampleFormat = 'auto',
+    this.windowsOutputChannels = 'auto',
     this.autoplay = false,
     this.autoplayPersonalization = true,
     this.songAnalysis = false,
@@ -441,6 +467,12 @@ class AppSettings {
     bool? dapExclusive,
     bool? exclusiveOutput,
     String? exclusiveOutputDevice,
+    String? windowsOutputMode,
+    String? windowsOutputDevice,
+    bool? windowsExclusiveFallback,
+    int? windowsOutputSampleRate,
+    String? windowsOutputSampleFormat,
+    String? windowsOutputChannels,
     bool? autoplay,
     bool? autoplayPersonalization,
     bool? songAnalysis,
@@ -578,6 +610,16 @@ class AppSettings {
       exclusiveOutput: exclusiveOutput ?? this.exclusiveOutput,
       exclusiveOutputDevice:
           exclusiveOutputDevice ?? this.exclusiveOutputDevice,
+      windowsOutputMode: windowsOutputMode ?? this.windowsOutputMode,
+      windowsOutputDevice: windowsOutputDevice ?? this.windowsOutputDevice,
+      windowsExclusiveFallback:
+          windowsExclusiveFallback ?? this.windowsExclusiveFallback,
+      windowsOutputSampleRate:
+          windowsOutputSampleRate ?? this.windowsOutputSampleRate,
+      windowsOutputSampleFormat:
+          windowsOutputSampleFormat ?? this.windowsOutputSampleFormat,
+      windowsOutputChannels:
+          windowsOutputChannels ?? this.windowsOutputChannels,
       autoplay: autoplay ?? this.autoplay,
       autoplayPersonalization:
           autoplayPersonalization ?? this.autoplayPersonalization,

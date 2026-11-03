@@ -3,6 +3,8 @@ import 'dart:math' as math;
 
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
+import 'package:flutter/foundation.dart'
+    show defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/controllers/player_metadata_controller.dart';
@@ -25,6 +27,7 @@ import 'package:mornye/widgets/desktop/desktop_inspector.dart';
 import 'package:mornye/widgets/desktop/desktop_link_devices_button.dart';
 import 'package:mornye/widgets/desktop/desktop_window.dart';
 import 'package:mornye/widgets/desktop/desktop_volume_scroll.dart';
+import 'package:mornye/widgets/desktop/windows_audio_quick_settings.dart';
 import 'package:mornye/widgets/link/link_devices_sheet.dart';
 import 'package:mornye/widgets/mornye_chrome.dart';
 import 'package:mornye/widgets/mornye_playback_button.dart';
@@ -768,9 +771,17 @@ class _TrailingControls extends StatelessWidget {
             ),
             onPressed: toggleDesktopMiniPlayer,
           ),
-        if (mornye)
-          const _MornyeVolumeButton()
-        else ...[
+        if (mornye) ...[
+          if (defaultTargetPlatform == TargetPlatform.windows)
+            AppIconButton(
+              key: const ValueKey('desktop-player-acc-mornye'),
+              tooltip: 'Audio Control Center',
+              color: colorScheme.onSurface,
+              icon: const AppIcon(CupertinoIcons.slider_horizontal_3),
+              onPressed: toggleDesktopAudioQuickSettings,
+            ),
+          const _MornyeVolumeButton(),
+        ] else ...[
           Theme(
             data: appTheme ?? Theme.of(context),
             child: const Row(
@@ -778,6 +789,14 @@ class _TrailingControls extends StatelessWidget {
               children: [DesktopLinkDevicesButton(), DesktopDownloadsButton()],
             ),
           ),
+          if (defaultTargetPlatform == TargetPlatform.windows)
+            AppIconButton(
+              key: const ValueKey('desktop-player-acc-material'),
+              tooltip: 'Audio Control Center',
+              color: colorScheme.onSurface,
+              icon: const AppIcon(Icons.tune),
+              onPressed: toggleDesktopAudioQuickSettings,
+            ),
           // A narrow window leaves too little room for a usable slider;
           // the volume shortcuts still work there.
           Flexible(

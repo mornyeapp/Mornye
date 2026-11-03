@@ -10,6 +10,7 @@ import 'package:mornye/services/music_playback_deck.dart'
     show UsbDsdUnavailable;
 import 'package:mornye/services/playback_deck.dart';
 import 'package:mornye/services/playback_equalizer.dart';
+import 'package:mornye/services/windows_audio_device_service.dart';
 import 'package:mornye/utils/logger.dart';
 
 final _log = AppLogger('MediaKitDeck');
@@ -175,6 +176,9 @@ class MediaKitPlaybackDeck implements PlaybackDeck {
         _duration = value;
         _durations.add(value);
         _finishLoad(null);
+        if (defaultTargetPlatform == TargetPlatform.windows) {
+          unawaited(_updateAudioStatus());
+        }
       }),
       _engine.sampleRate.listen((rate) {
         if (_disposed || rate == _sampleRate) return;
@@ -424,6 +428,130 @@ class MediaKitPlaybackDeck implements PlaybackDeck {
     return (name: 'audio-exclusive', value: exclusive ? 'yes' : 'no');
   }
 
+  bool _isFallbackDevice = false;
+
+  int? _parseBitDepth(String? format) {
+    if (format == null || format.isEmpty) return null;
+    final f = format.toLowerCase();
+    if (f.contains('16')) return 16;
+    if (f.contains('24')) return 24;
+    if (f.contains('32') || f.contains('float')) return 32;
+    if (f.contains('64') || f.contains('double')) return 64;
+    return null;
+  }
+
+  Future<void> _updateAudioStatus() async {
+    if (_disposed || defaultTargetPlatform != TargetPlatform.windows) return;
+    try {
+      final srcSampleRateStr = await _engine.getProperty('audio-params/samplerate');
+      final srcFormatStr = await _engine.getProperty('audio-params/format');
+      final srcChannelsStr = await _engine.getProperty('audio-params/channels');
+      final srcSampleRate = int.tryParse(srcSampleRateStr);
+      final srcBitDepth = _parseBitDepth(srcFormatStr);
+
+      String outSampleRateStr = await _engine.getProperty('audio-out-params/samplerate');
+      String outFormatStr = await _engine.getProperty('audio-out-params/format');
+      String outChannelsStr = await _engine.getProperty('audio-out-params/channels');
+      String outChannelCountStr = await _engine.getProperty('audio-out-params/channel-count');
+
+      if (outSampleRateStr.isEmpty) outSampleRateStr = srcSampleRateStr;
+      if (outFormatStr.isEmpty) outFormatStr = srcFormatStr;
+      if (outChannelsStr.isEmpty) outChannelsStr = srcChannelsStr;
+
+      final outSampleRate = int.tryParse(outSampleRateStr);
+      final outBitDepth = _parseBitDepth(outFormatStr);
+      final outChannelCount = int.tryParse(outChannelCountStr);
+
+      String actualMode = 'shared';
+      String reason = _isFallbackDevice ? 'fallback' : 'active';
+      if (playbackExclusiveOutput.value) {
+        try {
+          final exclusiveStatus = await _engine.getProperty('audio-exclusive');
+          if (exclusiveStatus == 'yes') {
+            actualMode = 'exclusive_event';
+            reason = _isFallbackDevice ? 'fallback' : 'active';
+          } else {
+            actualMode = 'shared';
+            reason = 'fallback';
+          }
+        } catch (_) {
+          actualMode = 'shared';
+          reason = 'fallback';
+        }
+      } else {
+        actualMode = 'shared';
+      }
+
+      final isVolume100 = playbackOutputVolume.value >= 0.999;
+      final isNormBypassed = _gain >= 0.999;
+      final isEqDisabled = !playbackEqualizer.value.enabled;
+      final isRateMatching = srcSampleRate != null &&
+          outSampleRate != null &&
+          srcSampleRate == outSampleRate;
+      final isExclusive = actualMode.startsWith('exclusive');
+
+      final isBitPerfect = isExclusive &&
+          isVolume100 &&
+          isNormBypassed &&
+          isEqDisabled &&
+          isRateMatching;
+
+      String bitPerfectReason;
+      if (isBitPerfect) {
+        bitPerfectReason =
+            'Bit-perfect direct output: WASAPI Exclusive active, unattenuated 100% volume, DSP/EQ bypassed, source rate matched ($srcSampleRate Hz).';
+      } else {
+        final degradations = <String>[];
+        if (!isExclusive) {
+          degradations.add('WASAPI Shared mixer active (system audio engine may resample or limit bit depth)');
+        }
+        if (!isRateMatching && srcSampleRate != null && outSampleRate != null) {
+          degradations.add('Sample rate conversion: ${srcSampleRate}Hz -> ${outSampleRate}Hz');
+        }
+        if (!isVolume100) {
+          degradations.add('Digital volume attenuation: ${(playbackOutputVolume.value * 100).round()}%');
+        }
+        if (!isNormBypassed) {
+          degradations.add('Gain normalization active');
+        }
+        if (!isEqDisabled) {
+          degradations.add('Equalizer DSP processing active');
+        }
+        bitPerfectReason = degradations.isEmpty
+            ? 'Not verified'
+            : degradations.join(' • ');
+      }
+
+      final selectedSetting = playbackExclusiveDevice.value;
+      final selectedEp = WindowsAudioDeviceService.instance.findEndpoint(selectedSetting);
+      final selectedName = selectedEp?.name ?? (selectedSetting.isNotEmpty ? selectedSetting : 'System Default');
+
+      final activeName = _isFallbackDevice
+          ? 'System Default (Fallback)'
+          : selectedName;
+
+      windowsAudioStatus.value = WindowsAudioStatus(
+        reason: reason,
+        mode: actualMode,
+        selectedDevice: selectedName,
+        activeDevice: activeName,
+        device: activeName,
+        sampleRate: outSampleRate,
+        bitDepth: outBitDepth,
+        format: outFormatStr,
+        channels: outChannelsStr,
+        channelCount: outChannelCount,
+        sourceSampleRate: srcSampleRate,
+        sourceBitDepth: srcBitDepth,
+        sourceFormat: srcFormatStr,
+        isBitPerfect: isBitPerfect,
+        bitPerfectReason: bitPerfectReason,
+      );
+    } catch (e) {
+      _log.w('Failed to query audio parameters: $e');
+    }
+  }
+
   /// Sets the output for [playbackExclusiveOutput]. A change while a source
   /// is open reopens the output, so it applies at once.
   Future<void> _applyExclusive({bool reload = false}) async {
@@ -432,11 +560,35 @@ class MediaKitPlaybackDeck implements PlaybackDeck {
     _output = target;
     _exclusive = target != _outputFor(exclusive: false);
     playbackExclusiveStatus.value = ExclusiveOutputStatus.pending;
+
+    if (defaultTargetPlatform == TargetPlatform.windows) {
+      final deviceSetting = playbackExclusiveDevice.value;
+      String mpvDevice = 'auto';
+      if (deviceSetting.isNotEmpty && deviceSetting != 'auto') {
+        if (deviceSetting.startsWith('wasapi/')) {
+          mpvDevice = deviceSetting;
+        } else {
+          final ep = WindowsAudioDeviceService.instance.findEndpoint(deviceSetting);
+          mpvDevice = ep?.mpvDeviceId ?? (deviceSetting.startsWith('{') ? 'wasapi/$deviceSetting' : 'auto');
+        }
+      }
+      await _engine.setProperty('audio-device', mpvDevice);
+      _isFallbackDevice = false;
+    }
+
     await _engine.setProperty(target.name, target.value);
-    if (!reload || _disposed || _state == PlaybackDeckState.stopped) return;
+    if (!reload || _disposed || _state == PlaybackDeckState.stopped) {
+      if (defaultTargetPlatform == TargetPlatform.windows) {
+        unawaited(_updateAudioStatus());
+      }
+      return;
+    }
     await _engine.command(const ['ao-reload']);
     if (_exclusive && _output == target) {
       playbackExclusiveStatus.value = ExclusiveOutputStatus.active;
+    }
+    if (defaultTargetPlatform == TargetPlatform.windows) {
+      unawaited(_updateAudioStatus());
     }
   }
 
@@ -448,11 +600,18 @@ class MediaKitPlaybackDeck implements PlaybackDeck {
     _output = shared;
     _exclusive = false;
     playbackExclusiveStatus.value = ExclusiveOutputStatus.unavailable;
+    if (defaultTargetPlatform == TargetPlatform.windows) {
+      _isFallbackDevice = true;
+      await _engine.setProperty('audio-device', 'auto');
+    }
     final source = _source;
     final token = _token;
     final playing = _state == PlaybackDeckState.playing;
     final position = _engine.position;
     await _engine.setProperty(shared.name, shared.value);
+    if (defaultTargetPlatform == TargetPlatform.windows) {
+      unawaited(_updateAudioStatus());
+    }
     if (_disposed || token != _token || source == null) return;
     // A pending load completes when the reopened source reports its
     // duration.
@@ -485,6 +644,9 @@ class MediaKitPlaybackDeck implements PlaybackDeck {
           .setVolume(_mpvVolume)
           .catchError((Object error) => _log.w('Output volume: $error')),
     );
+    if (defaultTargetPlatform == TargetPlatform.windows) {
+      unawaited(_updateAudioStatus());
+    }
   }
 
   @override
@@ -662,6 +824,9 @@ class MediaKitPlaybackDeck implements PlaybackDeck {
       }
       await _applyChainGain(chain);
       reportEqualizerError(playerId, _missingFeatures(settings));
+      if (defaultTargetPlatform == TargetPlatform.windows) {
+        unawaited(_updateAudioStatus());
+      }
     } catch (error) {
       _appliedSpec = null;
       if (!_disposed && settings.enabled) {

@@ -731,11 +731,42 @@ class SettingsNotifier extends Notifier<AppSettings> {
     state.copyWith(dapExclusive: enabled, usbDirect: enabled ? false : null),
   );
 
-  void setExclusiveOutput(bool enabled) =>
-      _commit(state.copyWith(exclusiveOutput: enabled));
+  void setExclusiveOutput(bool enabled) => _commit(
+    state.copyWith(
+      exclusiveOutput: enabled,
+      windowsOutputMode: enabled
+          ? (state.windowsOutputMode == 'shared'
+              ? 'exclusive_event'
+              : state.windowsOutputMode)
+          : 'shared',
+    ),
+  );
 
   void setExclusiveOutputDevice(String device) =>
       _commit(state.copyWith(exclusiveOutputDevice: device));
+
+  void setWindowsOutputMode(String mode) {
+    final exclusive = mode.startsWith('exclusive');
+    _commit(state.copyWith(
+      windowsOutputMode: mode,
+      exclusiveOutput: exclusive,
+    ));
+  }
+
+  void setWindowsOutputDevice(String device) =>
+      _commit(state.copyWith(windowsOutputDevice: device));
+
+  void setWindowsExclusiveFallback(bool fallback) =>
+      _commit(state.copyWith(windowsExclusiveFallback: fallback));
+
+  void setWindowsOutputSampleRate(int rate) =>
+      _commit(state.copyWith(windowsOutputSampleRate: rate));
+
+  void setWindowsOutputSampleFormat(String format) =>
+      _commit(state.copyWith(windowsOutputSampleFormat: format));
+
+  void setWindowsOutputChannels(String channels) =>
+      _commit(state.copyWith(windowsOutputChannels: channels));
 
   void setEmbedMetadata(bool enabled) =>
       _commit(state.copyWith(embedMetadata: enabled));

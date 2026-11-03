@@ -327,7 +327,9 @@ class MusicPlayerRuntime {
       // Stop a playing preview before its deck would reopen the output too.
       unawaited(exclusiveAudioHook?.call());
     }
-    if (exclusive && defaultTargetPlatform == TargetPlatform.linux) {
+    if (defaultTargetPlatform == TargetPlatform.windows) {
+      playbackExclusiveDevice.value = settings.windowsOutputDevice;
+    } else if (exclusive && defaultTargetPlatform == TargetPlatform.linux) {
       final device = settings.exclusiveOutputDevice;
       if (device.isNotEmpty) {
         playbackExclusiveDevice.value = device;
