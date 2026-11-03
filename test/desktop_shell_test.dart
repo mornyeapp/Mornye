@@ -15,6 +15,7 @@ import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/providers/system_volume_provider.dart';
 import 'package:mornye/services/playback_deck.dart';
+import 'package:mornye/services/link/desktop/link_desktop_host.dart';
 import 'package:mornye/services/remote_playback.dart';
 import 'package:mornye/services/shell_navigation_service.dart';
 import 'package:mornye/services/user_profile_store.dart';
@@ -143,6 +144,7 @@ void main() {
     Stream<MediaItem?>? mediaItems,
     bool playing = false,
     bool loading = false,
+    bool linkAvailable = false,
     RemotePlayback? remote,
     String playerMode = 'internal',
     UserProfile profile = const UserProfile(name: 'Ada Lovelace'),
@@ -164,6 +166,7 @@ void main() {
       ),
     ),
     activeRemotePlaybackProvider.overrideWithValue(remote),
+    linkDevicesAvailableProvider.overrideWithValue(linkAvailable),
     musicPlayerControllerProvider.overrideWithValue(controller),
     systemVolumeProvider.overrideWith((ref) => Stream.value(0.5)),
     systemVolumeWriterProvider.overrideWithValue((value) async {
@@ -182,6 +185,7 @@ void main() {
     Stream<MediaItem?>? mediaItems,
     bool playing = false,
     bool loading = false,
+    bool linkAvailable = false,
     RemotePlayback? remote,
     String playerMode = 'internal',
     List<DesktopSidebarLink> libraryLinks = const [],
@@ -200,6 +204,7 @@ void main() {
           mediaItems: mediaItems,
           playing: playing,
           loading: loading,
+          linkAvailable: linkAvailable,
           remote: remote,
           profile: profile,
           playerMode: playerMode,
@@ -332,6 +337,52 @@ void main() {
   }
 
   group('Material shell', () {
+    for (final width in [800.0, 900.0]) {
+      for (final playing in [false, true]) {
+        for (final link in [false, true]) {
+          testWidgets(
+            'player controls fit at $width (playing: $playing, Link: $link)',
+            (tester) async {
+              await pumpShell(
+                tester,
+                mornye: false,
+                width: width,
+                playing: playing,
+                linkAvailable: link,
+              );
+              expect(tester.takeException(), isNull);
+              final bar = tester.getRect(find.byType(DesktopPlayerBar));
+              for (final key in [
+                'desktop-player-lyrics',
+                'desktop-player-up-next',
+                'desktop-player-mini',
+                if (link) 'desktop-link-devices-button',
+                'desktop-downloads-button',
+                if (!playing) 'desktop-player-dismiss',
+              ]) {
+                final button = find.byKey(ValueKey(key));
+                expect(button, findsOneWidget);
+                final rect = tester.getRect(button);
+                expect(rect.left, greaterThanOrEqualTo(bar.left));
+                expect(rect.right, lessThanOrEqualTo(bar.right));
+                expect(rect.top, greaterThanOrEqualTo(bar.top));
+                expect(rect.bottom, lessThanOrEqualTo(bar.bottom));
+              }
+              await tester.tap(find.byTooltip('Next track (Ctrl+Right)'));
+              expect(controller.calls, ['next']);
+              if (!playing) {
+                await tester.tap(
+                  find.byKey(const ValueKey('desktop-player-dismiss')),
+                );
+                expect(controller.calls, ['next', 'dismiss']);
+              }
+              expect(tester.takeException(), isNull);
+            },
+          );
+        }
+      }
+    }
+
     testWidgets('collapses the rail at 900 and shows the player bar', (
       tester,
     ) async {

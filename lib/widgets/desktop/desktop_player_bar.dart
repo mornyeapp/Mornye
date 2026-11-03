@@ -101,6 +101,10 @@ void _toggleNowPlaying() =>
 class _MaterialPlayerBar extends StatelessWidget {
   const _MaterialPlayerBar({required this.mediaItem, required this.appTheme});
 
+  // Lyrics, queue, mini player, Link, downloads and dismiss each keep their
+  // 48dp target. Reserve both sides equally so transport stays centered.
+  static const double _sideControlsMinWidth = 6 * 48;
+
   final MediaItem? mediaItem;
 
   /// The theme outside the bar's artwork scope.
@@ -118,35 +122,45 @@ class _MaterialPlayerBar extends StatelessWidget {
           height: DesktopPlayerBar.materialHeight,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Row(
-              children: [
-                Expanded(
-                  flex: 3,
-                  child: Align(
-                    alignment: AlignmentDirectional.centerStart,
-                    child: _TrackSummary(mediaItem: mediaItem),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  flex: 4,
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      _Transport(enabled: loaded),
-                      SizedBox(
-                        height: 24,
-                        child: _SeekRow(mediaItem: mediaItem),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final sideWidth = math.max(
+                  _sideControlsMinWidth,
+                  (constraints.maxWidth - 32) * 0.3,
+                );
+                return Row(
+                  children: [
+                    SizedBox(
+                      width: sideWidth,
+                      child: Align(
+                        alignment: AlignmentDirectional.centerStart,
+                        child: _TrackSummary(mediaItem: mediaItem),
                       ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  flex: 3,
-                  child: _TrailingControls(enabled: loaded, appTheme: appTheme),
-                ),
-              ],
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          _Transport(enabled: loaded),
+                          SizedBox(
+                            height: 24,
+                            child: _SeekRow(mediaItem: mediaItem),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    SizedBox(
+                      width: sideWidth,
+                      child: _TrailingControls(
+                        enabled: loaded,
+                        appTheme: appTheme,
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
           ),
         ),
