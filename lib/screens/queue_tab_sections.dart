@@ -40,31 +40,15 @@ const _artistSorts = {'artist-asc', 'artist-desc'};
 const _albumSorts = {'album-asc', 'album-desc'};
 const _dateSorts = {'latest', 'oldest'};
 
-/// Sort choices offered by the Library sort sheet, in display order.
-const _librarySortModes = [
-  'latest',
-  'oldest',
-  'size-desc',
-  'size-asc',
-  'a-z',
-  'z-a',
-  'artist-asc',
-  'artist-desc',
-  'album-asc',
-  'album-desc',
-  'release-newest',
-  'release-oldest',
-  'genre-asc',
-  'genre-desc',
-];
-
 extension _QueueTabSections on _QueueTabState {
   Iterable<String> get _availableLibrarySortModes {
     final mode =
         widget.librarySection ?? ref.read(settingsProvider).historyFilterMode;
     return mode == 'playlists'
-        ? _librarySortModes.where((sort) => !sort.startsWith('size-'))
-        : _librarySortModes;
+        ? AppSettings.librarySortModes.where(
+            (sort) => !sort.startsWith('size-'),
+          )
+        : AppSettings.librarySortModes;
   }
 
   String _sortLabel(BuildContext context, String mode) {
@@ -206,6 +190,7 @@ extension _QueueTabSections on _QueueTabState {
       _sortMode = mode;
       _resetLibraryPaging();
     });
+    _rememberSortMode(mode);
   }
 
   /// The sort modes as a checked menu below the sort button, on desktop.

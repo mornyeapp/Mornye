@@ -242,6 +242,7 @@ extension _QueueTabFilterSheet on _QueueTabState {
                           _sortMode = tempSortMode;
                           _resetLibraryPaging();
                         });
+                        _rememberSortMode(tempSortMode);
                         Navigator.pop(context);
                         if (widget.librarySection == null &&
                             isAlbumCompletenessFilter(tempMetadata)) {

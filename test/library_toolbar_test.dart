@@ -26,13 +26,18 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 
 class _Settings extends SettingsNotifier {
+  _Settings([this.sortMode = 'latest']);
+
+  final String sortMode;
+
   // The Rewind banner animates for as long as it is shown; keep it off so
   // the page settles.
   @override
-  AppSettings build() => const AppSettings(
+  AppSettings build() => AppSettings(
     defaultLibraryView: 'all',
     historyViewMode: 'list',
     listeningStatisticsEnabled: false,
+    librarySortMode: sortMode,
   );
 }
 
@@ -136,6 +141,8 @@ void main() {
     List<DateTime>? dates,
     List<UserPlaylistCollection> playlists = const [],
     bool withQueueItem = true,
+    String sortMode = 'latest',
+    String? section,
   }) async {
     debugDesktopPlatformOverride = desktop;
     tester.view.physicalSize = const Size(1280, 900);
@@ -160,7 +167,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          settingsProvider.overrideWith(_Settings.new),
+          settingsProvider.overrideWith(() => _Settings(sortMode)),
           downloadHistoryProvider.overrideWith(
             () => _History(dates ?? [DateTime(2026, 1, 10)]),
           ),
@@ -184,7 +191,9 @@ void main() {
             child: child!,
           ),
           // Mornye opens Songs as a section page from its Library root.
-          home: Scaffold(body: QueueTab(librarySection: mornye ? 'all' : null)),
+          home: Scaffold(
+            body: QueueTab(librarySection: section ?? (mornye ? 'all' : null)),
+          ),
         ),
       ),
     );
@@ -197,6 +206,16 @@ void main() {
 
   AppLocalizations l10nOf(WidgetTester tester) =>
       AppLocalizations.of(tester.element(find.byType(QueueTab)));
+
+  String savedSortOf(WidgetTester tester) => ProviderScope.containerOf(
+    tester.element(find.byType(QueueTab)),
+  ).read(settingsProvider).librarySortMode;
+
+  Future<void> settle(WidgetTester tester, [int frames = 10]) async {
+    for (var i = 0; i < frames; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+  }
 
   Finder toolButton(String? tooltip, {String? label}) => find
       .byWidgetPredicate(
@@ -379,10 +398,86 @@ void main() {
         }
         expect(queries.any((sql) => sql.contains('sort_size DESC')), isTrue);
         expect(find.text(l10n.libraryFilterSortSizeSmallest), findsNothing);
+        // Kept for the next launch (#776).
+        expect(savedSortOf(tester), 'size-desc');
+        expect(tester.takeException(), isNull);
+      });
+
+      testWidgets('the Library opens with the saved sort '
+          '(desktop: $desktop, Mornye: $mornye)', (tester) async {
+        await pumpLibrary(
+          tester,
+          desktop: desktop,
+          mornye: mornye,
+          sortMode: 'size-desc',
+        );
+        expect(queries.any((sql) => sql.contains('sort_size DESC')), isTrue);
+        if (!mornye) {
+          final l10n = l10nOf(tester);
+          expect(
+            find.text(l10n.libraryFilterSortSizeLargest).hitTestable(),
+            findsOneWidget,
+          );
+          expect(find.text(l10n.libraryFilterSortLatest), findsNothing);
+        }
+        expect(savedSortOf(tester), 'size-desc');
         expect(tester.takeException(), isNull);
       });
     }
   }
+
+  testWidgets('Playlists show Latest without replacing a saved size sort', (
+    tester,
+  ) async {
+    await pumpLibrary(tester, sortMode: 'size-desc');
+    final l10n = l10nOf(tester);
+    final sizeQueries = queries
+        .where((sql) => sql.contains('sort_size DESC'))
+        .length;
+    expect(sizeQueries, greaterThan(0));
+
+    Finder tab(String label) =>
+        find.descendant(of: find.byType(TabBar), matching: find.text(label));
+    await tester.tap(tab(l10n.searchPlaylists));
+    await settle(tester, 40);
+    expect(savedSortOf(tester), 'size-desc');
+
+    queries.clear();
+    await tester.tap(tab(l10n.searchSongs));
+    await settle(tester, 40);
+    // Back on Songs, the saved size sort applies again.
+    expect(queries.any((sql) => sql.contains('sort_size DESC')), isTrue);
+    expect(savedSortOf(tester), 'size-desc');
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Reset in the filter sheet saves Latest again', (tester) async {
+    await pumpLibrary(tester, mornye: true, sortMode: 'a-z');
+    final l10n = l10nOf(tester);
+    expect(savedSortOf(tester), 'a-z');
+    await tester.tap(find.text(l10n.libraryFilterTitle).hitTestable());
+    await settle(tester);
+    await tester.tap(find.text(l10n.libraryFilterReset));
+    await settle(tester, 2);
+    await tester.ensureVisible(find.text(l10n.libraryFilterApply));
+    await tester.tap(find.text(l10n.libraryFilterApply));
+    await settle(tester);
+    expect(savedSortOf(tester), 'latest');
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a Playlists page opened with a saved size sort keeps it saved', (
+    tester,
+  ) async {
+    await pumpLibrary(
+      tester,
+      mornye: true,
+      section: 'playlists',
+      sortMode: 'size-desc',
+    );
+    expect(savedSortOf(tester), 'size-desc');
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('the view tool switches the Library to the grid', (tester) async {
     await pumpLibrary(tester);

@@ -970,6 +970,7 @@ extension _QueueTabItemWidgets on _QueueTabState {
                 _sortMode = mode;
                 _resetLibraryPaging();
               });
+              _rememberSortMode(mode);
             },
           ),
         ),

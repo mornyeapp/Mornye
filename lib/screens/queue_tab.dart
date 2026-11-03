@@ -300,6 +300,7 @@ class _QueueTabState extends ConsumerState<QueueTab> {
     ).clamp(0, _filterModes.length - 1);
     _albumsShowSingles = initialFilter == 'singles';
     final initialMode = _modeForPage(initialPage);
+    _sortMode = _sortModeFor(widget.librarySection ?? initialMode);
     if (widget.librarySection == null &&
         settings.historyFilterMode != initialMode) {
       Future.microtask(() {
@@ -418,8 +419,9 @@ class _QueueTabState extends ConsumerState<QueueTab> {
 
   void _onFilterPageChanged(int index) {
     if (widget.librarySection != null) return;
-    if (_modeForPage(index) == 'playlists' && _sortMode.startsWith('size-')) {
-      setState(() => _sortMode = 'latest');
+    final sortMode = _sortModeFor(_modeForPage(index));
+    if (sortMode != _sortMode) {
+      setState(() => _sortMode = sortMode);
     }
     HapticFeedback.selectionClick();
     ref
@@ -512,7 +514,21 @@ class _QueueTabState extends ConsumerState<QueueTab> {
       _sortMode = 'latest';
       _resetLibraryPaging();
     });
+    _rememberSortMode('latest');
   }
+
+  /// The saved Library sort for the [filterMode] page. Playlists have no
+  /// size sort, so they show Latest instead without changing the saved sort.
+  String _sortModeFor(String filterMode) {
+    final saved = ref.read(settingsProvider).librarySortMode;
+    return filterMode == 'playlists' && saved.startsWith('size-')
+        ? 'latest'
+        : saved;
+  }
+
+  /// Saves [mode] as the Library sort, so it is kept after a restart.
+  void _rememberSortMode(String mode) =>
+      ref.read(settingsProvider.notifier).setLibrarySortMode(mode);
 
   @override
   Widget build(BuildContext context) {

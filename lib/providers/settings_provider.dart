@@ -207,6 +207,7 @@ class SettingsNotifier extends Notifier<AppSettings> {
           defaultLibraryView: _normalizeDefaultLibraryView(
             loaded.defaultLibraryView,
           ),
+          librarySortMode: _normalizeLibrarySortMode(loaded.librarySortMode),
           libraryQualityLabelMode: normalizeLibraryQualityLabelMode(
             loaded.libraryQualityLabelMode,
           ),
@@ -496,6 +497,13 @@ class SettingsNotifier extends Notifier<AppSettings> {
     final normalized = value.trim().toLowerCase();
     if (_libraryViewValues.contains(normalized)) return normalized;
     return 'last';
+  }
+
+  String _normalizeLibrarySortMode(String value) {
+    final normalized = value.trim().toLowerCase();
+    return AppSettings.librarySortModes.contains(normalized)
+        ? normalized
+        : 'latest';
   }
 
   String _normalizeExtensionVerificationBrowserMode(String value) {
@@ -916,6 +924,12 @@ class SettingsNotifier extends Notifier<AppSettings> {
 
   void setHistoryFilterMode(String mode) =>
       _commit(state.copyWith(historyFilterMode: mode));
+
+  void setLibrarySortMode(String mode) {
+    final normalized = _normalizeLibrarySortMode(mode);
+    if (normalized == state.librarySortMode) return;
+    _commit(state.copyWith(librarySortMode: normalized));
+  }
 
   void setAskQualityBeforeDownload(bool enabled) =>
       _commit(state.copyWith(askQualityBeforeDownload: enabled));
