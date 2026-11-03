@@ -509,6 +509,140 @@ void main() {
 
       expect(engine.properties['audio-exclusive'], 'no');
     });
+
+    test('switching endpoint while staying in Shared mode applies audio-device and reloads output', () async {
+      playbackExclusiveOutput.value = false;
+      playbackExclusiveDevice.value = 'wasapi/{11111111-1111-1111-1111-111111111111}';
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+
+      expect(engine.properties['audio-device'], 'wasapi/{11111111-1111-1111-1111-111111111111}');
+      expect(engine.properties['audio-exclusive'], 'no');
+
+      // Change device while keeping Shared mode unchanged (target == _output for exclusive property)
+      playbackExclusiveDevice.value = 'wasapi/{22222222-2222-2222-2222-222222222222}';
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+
+      expect(engine.properties['audio-device'], 'wasapi/{22222222-2222-2222-2222-222222222222}');
+      expect(engine.properties['audio-exclusive'], 'no');
+      expect(deck.debugAppliedAudioDevice, 'wasapi/{22222222-2222-2222-2222-222222222222}');
+    });
+
+    test('switching endpoint while staying in Exclusive mode applies audio-device and reloads output', () async {
+      playbackExclusiveOutput.value = true;
+      playbackExclusiveDevice.value = 'wasapi/{11111111-1111-1111-1111-111111111111}';
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+
+      expect(engine.properties['audio-device'], 'wasapi/{11111111-1111-1111-1111-111111111111}');
+      expect(engine.properties['audio-exclusive'], 'yes');
+
+      // Change device while keeping Exclusive mode unchanged
+      playbackExclusiveDevice.value = 'wasapi/{22222222-2222-2222-2222-222222222222}';
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+
+      expect(engine.properties['audio-device'], 'wasapi/{22222222-2222-2222-2222-222222222222}');
+      expect(engine.properties['audio-exclusive'], 'yes');
+      expect(deck.debugAppliedAudioDevice, 'wasapi/{22222222-2222-2222-2222-222222222222}');
+    });
+
+    test('reloading audio output during playback preserves playing state and position', () async {
+      playbackExclusiveDevice.value = 'wasapi/{11111111-1111-1111-1111-111111111111}';
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+
+      await deck.setFileSource('test_song.flac');
+      await deck.resume();
+      await deck.seek(const Duration(seconds: 42));
+
+      expect(deck.state, PlaybackDeckState.playing);
+      expect(engine.position, const Duration(seconds: 42));
+
+      engine.calls.clear();
+      // Switch output device while playing
+      playbackExclusiveDevice.value = 'wasapi/{22222222-2222-2222-2222-222222222222}';
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+
+      // ao-reload executed and playback resumed
+      expect(engine.calls.any((c) => c.length >= 2 && c[0] == 'command' && c[1] == 'ao-reload'), isTrue);
+      expect(engine.calls.any((c) => c.isNotEmpty && c[0] == 'play'), isTrue);
+      expect(deck.state, PlaybackDeckState.playing);
+      expect(engine.position, const Duration(seconds: 42));
+    });
+
+    test('reloading audio output while paused preserves paused state', () async {
+      playbackExclusiveDevice.value = 'wasapi/{11111111-1111-1111-1111-111111111111}';
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+
+      await deck.setFileSource('test_song.flac');
+      await deck.resume();
+      await deck.pause();
+
+      expect(deck.state, PlaybackDeckState.paused);
+
+      engine.calls.clear();
+      // Switch output device while paused
+      playbackExclusiveDevice.value = 'wasapi/{22222222-2222-2222-2222-222222222222}';
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+
+      expect(engine.calls.any((c) => c.length >= 2 && c[0] == 'command' && c[1] == 'ao-reload'), isTrue);
+      expect(deck.state, PlaybackDeckState.paused);
+      expect(engine.calls.any((c) => c.isNotEmpty && c[0] == 'play'), isFalse);
+    });
+
+    test('selected device and actual output device are distinct and not falsely reported as identical', () async {
+      const defaultEp = WindowsAudioEndpoint(
+        endpointId: '{0.0.0.00000000}.{default-guid}',
+        mpvDeviceId: 'wasapi/{default-guid}',
+        guid: '{default-guid}',
+        name: 'Speakers (Realtek High Definition Audio)',
+        isDefault: true,
+        state: 1,
+      );
+      const usbEp = WindowsAudioEndpoint(
+        endpointId: '{0.0.0.00000000}.{usb-guid}',
+        mpvDeviceId: 'wasapi/{usb-guid}',
+        guid: '{usb-guid}',
+        name: 'Headphones (USB Audio DAC)',
+        isDefault: false,
+        state: 1,
+      );
+      WindowsAudioDeviceService.instance.debugSetEndpoints([defaultEp, usbEp]);
+
+      try {
+        // Case A: When user selects "System Default", selectedDevice reports 'System Default'
+        // while activeDevice accurately reports the physical default endpoint name.
+        playbackExclusiveDevice.value = '';
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+
+        var status = windowsAudioStatus.value;
+        expect(status.selectedDevice, 'System Default');
+        expect(status.activeDevice, 'Speakers (Realtek High Definition Audio)');
+        expect(status.selectedDevice, isNot(equals(status.activeDevice)));
+
+        // Case B: When user selects Headphones, both report the endpoint name once applied.
+        playbackExclusiveDevice.value = usbEp.mpvDeviceId;
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+
+        status = windowsAudioStatus.value;
+        expect(status.selectedDevice, 'Headphones (USB Audio DAC)');
+        expect(status.activeDevice, 'Headphones (USB Audio DAC)');
+        expect(status.selectedDevice, equals(status.activeDevice));
+
+        // Case C: When output fails exclusive access and falls back to shared,
+        // activeDevice accurately indicates the default fallback endpoint rather than falsely matching.
+        playbackExclusiveOutput.value = true;
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+
+        engine.openError = (prefix: 'ao', text: 'WASAPI exclusive failed');
+        engine.errorEvents.add((prefix: 'cplayer', text: 'Could not open/initialize audio device -> no sound.'));
+        await Future<void>.delayed(const Duration(milliseconds: 150));
+
+        status = windowsAudioStatus.value;
+        expect(status.selectedDevice, 'Headphones (USB Audio DAC)');
+        expect(status.activeDevice, 'Speakers (Realtek High Definition Audio) (Fallback)');
+        expect(status.selectedDevice, isNot(equals(status.activeDevice)));
+      } finally {
+        WindowsAudioDeviceService.instance.debugSetEndpoints(const []);
+      }
+    });
   });
 
   group('Capability Cache Invalidation', () {

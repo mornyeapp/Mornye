@@ -244,6 +244,13 @@ class MediaKitPlaybackDeck implements PlaybackDeck {
   /// The output property as last set; null before the first set.
   ({String name, String value})? _output;
 
+  /// The audio-device property last applied to the engine on Windows; null before the first set.
+  String? _appliedAudioDevice;
+
+  /// The audio-device property last applied, for tests.
+  @visibleForTesting
+  String? get debugAppliedAudioDevice => _appliedAudioDevice;
+
   /// Whether [_output] is the exclusive one.
   bool _exclusive = false;
   int? _sampleRate;
@@ -524,11 +531,25 @@ class MediaKitPlaybackDeck implements PlaybackDeck {
 
       final selectedSetting = playbackExclusiveDevice.value;
       final selectedEp = WindowsAudioDeviceService.instance.findEndpoint(selectedSetting);
-      final selectedName = selectedEp?.name ?? (selectedSetting.isNotEmpty ? selectedSetting : 'System Default');
+      final selectedName = selectedSetting.isEmpty || selectedSetting == 'auto'
+          ? 'System Default'
+          : (selectedEp?.name ?? selectedSetting);
 
-      final activeName = _isFallbackDevice
-          ? 'System Default (Fallback)'
-          : selectedName;
+      String activeName;
+      if (_isFallbackDevice) {
+        final defaultEp = WindowsAudioDeviceService.instance.activeDefaultEndpoint;
+        final baseName = defaultEp?.name ?? 'System Default';
+        activeName = '$baseName (Fallback)';
+      } else {
+        final currentMpvDevice = await _engine.getProperty('audio-device');
+        if (currentMpvDevice.isEmpty || currentMpvDevice == 'auto') {
+          final defaultEp = WindowsAudioDeviceService.instance.activeDefaultEndpoint;
+          activeName = defaultEp?.name ?? 'System Default';
+        } else {
+          final activeEp = WindowsAudioDeviceService.instance.findEndpoint(currentMpvDevice);
+          activeName = activeEp?.name ?? currentMpvDevice;
+        }
+      }
 
       windowsAudioStatus.value = WindowsAudioStatus(
         reason: reason,
@@ -552,27 +573,42 @@ class MediaKitPlaybackDeck implements PlaybackDeck {
     }
   }
 
-  /// Sets the output for [playbackExclusiveOutput]. A change while a source
-  /// is open reopens the output, so it applies at once.
+  String _targetAudioDevice() {
+    if (defaultTargetPlatform == TargetPlatform.windows) {
+      final deviceSetting = playbackExclusiveDevice.value;
+      if (deviceSetting.isEmpty || deviceSetting == 'auto') {
+        return 'auto';
+      }
+      if (deviceSetting.startsWith('wasapi/')) {
+        return deviceSetting;
+      }
+      final ep = WindowsAudioDeviceService.instance.findEndpoint(deviceSetting);
+      return ep?.mpvDeviceId ??
+          (deviceSetting.startsWith('{') ? 'wasapi/$deviceSetting' : 'auto');
+    }
+    return 'auto';
+  }
+
+  /// Sets the output for [playbackExclusiveOutput] and [playbackExclusiveDevice].
+  /// A change while a source is open reloads the output, so it applies at once.
   Future<void> _applyExclusive({bool reload = false}) async {
     final target = _outputFor(exclusive: playbackExclusiveOutput.value);
-    if (_disposed || target == _output) return;
+    final targetDevice = defaultTargetPlatform == TargetPlatform.windows
+        ? _targetAudioDevice()
+        : null;
+
+    final modeChanged = _output == null || target != _output;
+    final deviceChanged = defaultTargetPlatform == TargetPlatform.windows &&
+        (_appliedAudioDevice == null || targetDevice != _appliedAudioDevice);
+
+    if (_disposed || (!modeChanged && !deviceChanged)) return;
     _output = target;
+    _appliedAudioDevice = targetDevice;
     _exclusive = target != _outputFor(exclusive: false);
     playbackExclusiveStatus.value = ExclusiveOutputStatus.pending;
 
-    if (defaultTargetPlatform == TargetPlatform.windows) {
-      final deviceSetting = playbackExclusiveDevice.value;
-      String mpvDevice = 'auto';
-      if (deviceSetting.isNotEmpty && deviceSetting != 'auto') {
-        if (deviceSetting.startsWith('wasapi/')) {
-          mpvDevice = deviceSetting;
-        } else {
-          final ep = WindowsAudioDeviceService.instance.findEndpoint(deviceSetting);
-          mpvDevice = ep?.mpvDeviceId ?? (deviceSetting.startsWith('{') ? 'wasapi/$deviceSetting' : 'auto');
-        }
-      }
-      await _engine.setProperty('audio-device', mpvDevice);
+    if (defaultTargetPlatform == TargetPlatform.windows && targetDevice != null) {
+      await _engine.setProperty('audio-device', targetDevice);
       _isFallbackDevice = false;
     }
 
@@ -583,7 +619,28 @@ class MediaKitPlaybackDeck implements PlaybackDeck {
       }
       return;
     }
-    await _engine.command(const ['ao-reload']);
+
+    final wasPlaying = _state == PlaybackDeckState.playing;
+    final wasPaused = _state == PlaybackDeckState.paused;
+    final currentPos = await getCurrentPosition() ?? _engine.position;
+
+    try {
+      await _engine.command(const ['ao-reload']);
+      if (wasPlaying && _state == PlaybackDeckState.playing) {
+        await _engine.play();
+      } else if (wasPaused && _state == PlaybackDeckState.paused) {
+        await _engine.pause();
+      }
+      if (currentPos > Duration.zero) {
+        final posAfter = await getCurrentPosition() ?? _engine.position;
+        if (posAfter == Duration.zero && currentPos > const Duration(seconds: 1)) {
+          await _engine.seek(currentPos);
+        }
+      }
+    } catch (e) {
+      _log.w('ao-reload failed: $e');
+    }
+
     if (_exclusive && _output == target) {
       playbackExclusiveStatus.value = ExclusiveOutputStatus.active;
     }
@@ -602,6 +659,7 @@ class MediaKitPlaybackDeck implements PlaybackDeck {
     playbackExclusiveStatus.value = ExclusiveOutputStatus.unavailable;
     if (defaultTargetPlatform == TargetPlatform.windows) {
       _isFallbackDevice = true;
+      _appliedAudioDevice = 'auto';
       await _engine.setProperty('audio-device', 'auto');
     }
     final source = _source;

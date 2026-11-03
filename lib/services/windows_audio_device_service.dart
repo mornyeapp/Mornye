@@ -329,6 +329,13 @@ class WindowsAudioDeviceService extends ChangeNotifier {
   List<WindowsAudioEndpoint> get endpoints => _endpoints;
   bool get isLoading => _isLoading;
 
+  /// Sets mock endpoints in unit tests.
+  @visibleForTesting
+  void debugSetEndpoints(List<WindowsAudioEndpoint> endpoints) {
+    _endpoints = List.unmodifiable(endpoints);
+    notifyListeners();
+  }
+
   /// Current default render endpoint.
   WindowsAudioEndpoint? get activeDefaultEndpoint {
     for (final ep in _endpoints) {
