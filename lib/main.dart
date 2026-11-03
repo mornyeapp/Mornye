@@ -373,9 +373,10 @@ Future<void> _startBackgroundPlayback() async {
 /// calls.
 Future<void> _initializeOrientation() async {
   await initializeAndroidTv();
-  // MainActivity.onCreate already asks phones for portrait, the request
-  // below, and the router observer repeats it on the first page. TV gets
-  // fixed landscape there and the user landscape here.
+  // MainActivity.onCreate already asks phones for portrait and lets tablets
+  // follow the device, as the request below would, and the router observer
+  // repeats it on the first page. TV gets fixed landscape there and the user
+  // landscape here.
   if (Platform.isAndroid && !isAndroidTv) return;
   await setAppOrientation();
 }
