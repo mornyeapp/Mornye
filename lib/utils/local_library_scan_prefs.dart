@@ -7,6 +7,7 @@ const localLibraryLastScannedAtKey = 'local_library_last_scanned_at';
 const localLibraryActiveScanSourceKey = 'local_library_active_scan_source';
 const localLibraryActiveScanStartedAtKey =
     'local_library_active_scan_started_at';
+const localLibraryActiveScanNotifyKey = 'local_library_active_scan_notify';
 const localLibraryRecoveredScanKey = 'local_library_recovered_scan';
 const localLibraryScanFailuresKey = 'local_library_scan_failures';
 

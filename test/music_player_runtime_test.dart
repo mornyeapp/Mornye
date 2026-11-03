@@ -3474,6 +3474,53 @@ void main() {
     );
 
     test(
+      'scanned Library covers survive shuffled skips and restored order',
+      () async {
+        final songs = [
+          for (var i = 0; i < 4; i++)
+            playableFromLocal(
+              LocalLibraryItem(
+                id: 'scanned-$i',
+                trackName: 'Song $i',
+                artistName: 'Artist',
+                albumName: 'Album',
+                filePath: 'network://nas/Album/$i.flac',
+                coverPath: 'network://nas/Album/$i.jpg',
+                scannedAt: DateTime(2026),
+              ),
+            ),
+        ];
+        for (final media in songs) {
+          await covers.file(media.coverReference!);
+        }
+        final handler = await _runtime(
+          coverStore: covers,
+          resolveNetworkSource: resolve,
+          readNetworkMetadata: (_) async => {},
+        ).initialize();
+        await handler.setQueueAndPlay(songs, shuffle: true);
+        for (var i = 0; i < songs.length; i++) {
+          await handler.skipToQueueItem(i);
+          final item = handler.mediaItem.value!;
+          final reference = item.extras!['artworkRef'] as String;
+          expect(item.artUri!.toFilePath(), covers.indexedFile(reference));
+          expect(handler.queue.value[i].artUri, item.artUri);
+        }
+        await handler.setShuffleMode(AudioServiceShuffleMode.none);
+        expect(
+          handler.queue.value.map((item) => item.id),
+          songs.map((s) => s.id),
+        );
+        for (final item in handler.queue.value) {
+          expect(
+            item.artUri!.toFilePath(),
+            covers.indexedFile(item.extras!['artworkRef'] as String),
+          );
+        }
+      },
+    );
+
+    test(
       'a cover not stored yet shows once fetched, with the next three ahead',
       () async {
         final songs = [

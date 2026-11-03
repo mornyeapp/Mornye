@@ -703,8 +703,9 @@ class _EagerInitializationState extends ConsumerState<EagerInitialization>
     }
     if (_desktopLibraryWatcher != null) return;
     final watcher = _desktopLibraryWatcher = DesktopLibraryWatcher(
-      scanSource: (sourceId) =>
-          ref.read(localLibraryProvider.notifier).startSourceScan(sourceId),
+      scanSource: (sourceId) => ref
+          .read(localLibraryProvider.notifier)
+          .startSourceScan(sourceId, notify: false, waitForCurrentScan: true),
       isScanning: () => ref.read(localLibraryProvider).isScanning,
     );
     _desktopLibrarySourcesSub = ref.listenManual<List<LocalLibrarySource>>(
@@ -766,7 +767,10 @@ class _EagerInitializationState extends ConsumerState<EagerInitialization>
     if (pendingSourceId != null && pendingSourceId.trim().isNotEmpty) {
       await ref
           .read(localLibraryProvider.notifier)
-          .startSourceScan(pendingSourceId.trim());
+          .startSourceScan(
+            pendingSourceId.trim(),
+            notify: prefs.getBool(localLibraryActiveScanNotifyKey) ?? true,
+          );
       return;
     }
     final lastScanned = readLocalLibraryLastScannedAt(prefs);
@@ -789,7 +793,7 @@ class _EagerInitializationState extends ConsumerState<EagerInitialization>
       }
     }
 
-    await ref.read(localLibraryProvider.notifier).scanAllSources();
+    await ref.read(localLibraryProvider.notifier).scanAllSources(notify: false);
   }
 
   Future<void> _initializeAppServices() async {

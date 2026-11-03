@@ -38,10 +38,15 @@ extension _LocalLibrarySources on LocalLibraryNotifier {
   Future<void> _scanSourcesSequentially(
     Iterable<String> sourceIds, {
     bool forceFullScan = false,
+    bool notify = true,
   }) async {
     for (final sourceId in sourceIds) {
       if (!ref.mounted) break;
-      await startSourceScan(sourceId, forceFullScan: forceFullScan);
+      await startSourceScan(
+        sourceId,
+        forceFullScan: forceFullScan,
+        notify: notify,
+      );
       if (_scanCancelRequested) break;
     }
   }
@@ -73,7 +78,7 @@ extension _LocalLibrarySources on LocalLibraryNotifier {
         if (active != null) await active;
         if (!ref.mounted || _pendingReconnectScans.isEmpty) break;
         final sourceId = _pendingReconnectScans.first;
-        await startSourceScan(sourceId);
+        await startSourceScan(sourceId, notify: false);
         _pendingReconnectScans.remove(sourceId);
       }
     } catch (error, stack) {

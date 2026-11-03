@@ -187,6 +187,7 @@ String? normalizeArtUri(String cover) {
   final value = cover.trim();
   if (value.isEmpty) return null;
   if (value.startsWith('http') ||
+      CoverStore.fetches(value) ||
       isContentUri(value) ||
       value.startsWith('file://')) {
     return value;
@@ -239,20 +240,13 @@ PlayableMedia playableFromHistory(DownloadHistoryItem item) {
 }
 
 PlayableMedia playableFromLocal(LocalLibraryItem item) {
-  String? art;
-  final cover = item.coverPath;
-  if (cover != null && cover.trim().isNotEmpty) {
-    art = cover.startsWith('http') || isContentUri(cover)
-        ? cover
-        : Uri.file(cover).toString();
-  }
   return PlayableMedia(
     id: item.id,
     source: item.filePath,
     title: item.trackName,
     artist: item.artistName,
     album: item.albumName,
-    artUri: art,
+    artUri: normalizeArtUri(item.coverPath ?? ''),
     duration: (item.duration != null && item.duration! > 0)
         ? Duration(seconds: item.duration!)
         : null,

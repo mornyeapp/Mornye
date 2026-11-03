@@ -188,6 +188,7 @@ class LocalLibraryNotifier extends Notifier<LocalLibraryState> {
   bool _scanCancelRequested = false;
   bool _scanPauseRequested = false;
   bool _scanInProgress = false;
+  bool _scanNotificationsEnabled = true;
   Future<void>? _scanCompletion;
   NetworkLibraryScanner? _networkScanner;
   String? _activeScanPath;
@@ -486,18 +487,29 @@ class LocalLibraryNotifier extends Notifier<LocalLibraryState> {
         });
   }
 
-  Future<void> scanAllSources({bool forceFullScan = false}) async {
+  Future<void> scanAllSources({
+    bool forceFullScan = false,
+    bool notify = true,
+  }) async {
     await _ensureLoadedFromDatabase();
     final sourceIds = state.sources
         .where((source) => source.enabled && source.available)
         .map((source) => source.id)
         .toList(growable: false);
-    await _scanSourcesSequentially(sourceIds, forceFullScan: forceFullScan);
+    await _scanSourcesSequentially(
+      sourceIds,
+      forceFullScan: forceFullScan,
+      notify: notify,
+    );
   }
 
+  /// Automatic callers can suppress result notices and wait for the current
+  /// scan's cleanup, which can outlive the visible scanning state.
   Future<void> startSourceScan(
     String sourceId, {
     bool forceFullScan = false,
+    bool notify = true,
+    bool waitForCurrentScan = false,
   }) async {
     final reconnect = _pendingReconnectScans.contains(sourceId);
     while (ref.mounted) {
@@ -507,7 +519,7 @@ class LocalLibraryNotifier extends Notifier<LocalLibraryState> {
         return;
       }
       if (_scanInProgress) {
-        if (!reconnect) return;
+        if (!reconnect && !waitForCurrentScan) return;
         final active = _scanCompletion;
         if (active != null) await active;
         continue;
@@ -517,6 +529,8 @@ class LocalLibraryNotifier extends Notifier<LocalLibraryState> {
         forceFullScan: forceFullScan,
         iosBookmark: source.bookmark,
         sourceId: source.id,
+        notify: notify,
+        waitForCurrentScan: reconnect || waitForCurrentScan,
       );
       return;
     }
@@ -527,18 +541,27 @@ class LocalLibraryNotifier extends Notifier<LocalLibraryState> {
     bool forceFullScan = false,
     String? iosBookmark,
     String? sourceId,
+    bool notify = true,
+    bool waitForCurrentScan = false,
   }) async {
     if (!ref.mounted) return;
     await _recoverInterruptedScan();
     if (!ref.mounted) return;
-    if (_scanInProgress || state.isScanning) {
-      _log.w('Scan already in progress');
-      return;
+    while (_scanInProgress || state.isScanning) {
+      if (!waitForCurrentScan) {
+        _log.w('Scan already in progress');
+        return;
+      }
+      final active = _scanCompletion;
+      if (active == null) return;
+      await active;
+      if (!ref.mounted) return;
     }
 
     final completion = Completer<void>();
     _scanCompletion = completion.future;
     _scanInProgress = true;
+    _scanNotificationsEnabled = notify;
     _activeScanPath = folderPath;
     _activeScanSourceId = sourceId;
     if (sourceId != null) _pendingReconnectScans.remove(sourceId);
@@ -564,6 +587,7 @@ class LocalLibraryNotifier extends Notifier<LocalLibraryState> {
         );
       }
       _scanInProgress = false;
+      _scanNotificationsEnabled = true;
       _activeScanPath = null;
       _activeScanSourceId = null;
       _scanCompletion = null;

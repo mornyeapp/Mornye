@@ -41,7 +41,12 @@ class LinkNetworkLibraryBridge implements LinkLibraryBridge {
     NetworkStorageService? storage,
     LibraryDatabase? database,
   }) : _storage = storage ?? NetworkStorageService.instance,
-       _database = database ?? LibraryDatabase.instance;
+       _database = database ?? LibraryDatabase.instance {
+    _ref.onDispose(() {
+      _scanWatch?.close();
+      _pendingScans.clear();
+    });
+  }
 
   final Ref _ref;
   final NetworkStorageService _storage;
@@ -97,6 +102,7 @@ class LinkNetworkLibraryBridge implements LinkLibraryBridge {
           path: _rootSource(connection.id),
           displayName: connection.name,
         );
+    if (!_ref.mounted) return;
     _ref.read(settingsProvider.notifier).setLocalLibraryEnabled(true);
     _scan(source.id);
   }
@@ -104,11 +110,12 @@ class LinkNetworkLibraryBridge implements LinkLibraryBridge {
   @override
   Future<void> rescan(String connectionId) async {
     final source = await _database.getSourceByPath(_rootSource(connectionId));
-    if (source == null || !source.enabled) return;
+    if (!_ref.mounted || source == null || !source.enabled) return;
     _scan(source.id);
   }
 
   void _scan(String sourceId) {
+    if (!_ref.mounted) return;
     if (_ref.read(localLibraryProvider).isScanning) {
       // A request during another scan would be dropped; run it afterwards.
       _pendingScans.add(sourceId);
@@ -123,7 +130,7 @@ class LinkNetworkLibraryBridge implements LinkLibraryBridge {
     unawaited(
       _ref
           .read(localLibraryProvider.notifier)
-          .startSourceScan(sourceId)
+          .startSourceScan(sourceId, notify: false, waitForCurrentScan: true)
           .catchError((Object error) => _log.w('Library scan failed: $error')),
     );
   }
@@ -134,10 +141,16 @@ class LinkNetworkLibraryBridge implements LinkLibraryBridge {
     final pending = _pendingScans.toList();
     _pendingScans.clear();
     unawaited(() async {
+      if (!_ref.mounted) return;
       final library = _ref.read(localLibraryProvider.notifier);
       for (final sourceId in pending) {
         try {
-          await library.startSourceScan(sourceId);
+          if (!_ref.mounted) return;
+          await library.startSourceScan(
+            sourceId,
+            notify: false,
+            waitForCurrentScan: true,
+          );
         } catch (error) {
           _log.w('Library scan failed: $error');
         }
