@@ -123,7 +123,13 @@ the network destination for new provider downloads or synchronize later edits.
 Remote metadata editing, separate sidecar lyric files,
 AutoMix and direct USB/DAP bit-perfect output are not part of this browser.
 Normal playback uses the platform audio decoder, so codec support follows the
-device.
+device. On iOS and macOS, formats AVPlayer cannot open (APE, WavPack, DSD and
+others) are converted with FFmpeg to a temporary lossless copy first; a song
+that still cannot play is named in a notice and skipped.
+
+Songs already in the local Library can be uploaded to a writable SMB or WebDAV
+connection from the track menu, the Library selection and album headers. Files
+land in `<folder>/<Album Artist>/<Album>/` and never replace a remote file.
 
 ## Validation
 

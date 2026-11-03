@@ -381,7 +381,8 @@ void main() {
             expect(uri.scheme, 'http');
             expect(uri.host, '127.0.0.1');
             expect(uri.hasPort, true);
-            expect(uri.path, matches(r'^/[a-f0-9]{48}$'));
+            // The route keeps the file type for AVPlayer, never the name.
+            expect(uri.path, matches(r'^/[a-f0-9]{48}(\.[a-z0-9]{1,10})?$'));
             expect(jsonEncode(request), isNot(contains('secret')));
             expect(request['length'], await file.length());
             expect(
