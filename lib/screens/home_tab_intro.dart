@@ -382,6 +382,13 @@ class _HomeSections extends ConsumerWidget {
         ? ref.watch(homeRecentlyPlayedProvider.select((s) => s.value)) ??
               const <HomeRepeatTrack>[]
         : const <HomeRepeatTrack>[];
+    // The card only stands in once nothing was played: while the shelf
+    // loads, it would show and then give way to Recently Played.
+    final recentlyPlayedLoading =
+        mornye &&
+        ref.watch(
+          homeRecentlyPlayedProvider.select((s) => !s.hasValue && !s.hasError),
+        );
     final hasTopPicks = mornye && _HomeTopPicksSection.hasPicks(ref);
     final sections = <Widget>[
       if (hasTopPicks) _HomeTopPicksSection(inset: inset),
@@ -402,7 +409,7 @@ class _HomeSections extends ConsumerWidget {
               inset: inset + 8,
             ),
           )
-        else if (showContinue)
+        else if (showContinue && !recentlyPlayedLoading)
           _HomeSection(
             title: l10n.homeContinueListening,
             inset: inset,

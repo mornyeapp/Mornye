@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -60,6 +62,7 @@ void main() {
             position: Duration(seconds: 23),
           ),
           controller: controller,
+          recentlyPlayed: Future.value(const <HomeRepeatTrack>[]),
         );
         await tester.pumpAndSettle();
         expect(find.text('Continue listening'), findsOneWidget);
@@ -81,6 +84,48 @@ void main() {
         await tester.pumpAndSettle();
       });
     }
+  }
+
+  for (final result in ['nothing played', 'load error']) {
+    testWidgets('Mornye Home holds the card until Recently Played settles '
+        '($result)', (tester) async {
+      tester.view.physicalSize = const Size(430, 932);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final recentlyPlayed = Completer<List<HomeRepeatTrack>>();
+      await _pumpStartupHome(
+        tester,
+        _StartupExtensions(),
+        _StartupExplore(),
+        feedDisabled: true,
+        resume: const (
+          media: PlayableMedia(
+            id: 'saved-song',
+            source: '/saved.flac',
+            title: 'Last session',
+            artist: 'Saved artist',
+            duration: Duration(minutes: 3),
+          ),
+          position: Duration(seconds: 23),
+        ),
+        recentlyPlayed: recentlyPlayed.future,
+      );
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pump(const Duration(seconds: 1));
+      expect(find.text('Continue listening'), findsNothing);
+
+      if (result == 'load error') {
+        recentlyPlayed.completeError(StateError('Unavailable'));
+      } else {
+        recentlyPlayed.complete(const <HomeRepeatTrack>[]);
+      }
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pump(const Duration(seconds: 1));
+      expect(find.text('Continue listening'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump(const Duration(seconds: 1));
+    });
   }
 
   testWidgets('Home sections stay in place while Continue listening leaves', (
@@ -1022,10 +1067,13 @@ Future<void> _pumpStartupHome(
   PlaybackResumePreview? resume,
   MusicPlayerController? controller,
   ValueNotifier<bool>? showPlayer,
+  Future<List<HomeRepeatTrack>>? recentlyPlayed,
 }) => tester.pumpWidget(
   ProviderScope(
     overrides: [
       settingsProvider.overrideWith(() => _StartupSettings(feedDisabled)),
+      if (recentlyPlayed != null)
+        homeRecentlyPlayedProvider.overrideWith((ref) => recentlyPlayed),
       extensionProvider.overrideWith(() => extensions),
       exploreProvider.overrideWith(() => explore),
       downloadHistoryProvider.overrideWith(_History.new),
