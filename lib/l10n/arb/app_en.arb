@@ -8922,6 +8922,8 @@
   "audioInfoBitPerfect": "Bit-perfect",
   "audioInfoBitPerfectActive": "Yes, unaltered samples",
   "audioInfoBitPerfectNo": "No, mixed by the system",
+  "audioInfoBitPerfectUnverified": "Not verified",
+  "audioInfoBitPerfectProcessed": "No, audio processing is active",
   "audioInfoDevice": "Device",
   "audioInfoDeviceType": "{type, select, speaker{Phone speaker} earpiece{Earpiece} wired_headphones{Wired headphones} wired_headset{Wired headset} line{Line out} bluetooth{Bluetooth} bluetooth_le{Bluetooth LE Audio} usb{USB audio} usb_headset{USB headset} hdmi{HDMI} dock{Dock} cast{Cast} hearing_aid{Hearing aid} airplay{AirPlay} car{Car audio} other{Other}}",
   "@audioInfoDeviceType": {

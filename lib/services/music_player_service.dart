@@ -83,7 +83,8 @@ class PlaybackProcessing {
   /// Linear volume from ReplayGain normalization; 1 when none applies.
   final double normalizationGain;
 
-  /// A direct USB or exclusive path that bypasses the system mixer and DSP.
+  /// A verified native direct path that bypasses the system mixer and DSP.
+  /// Desktop exclusive output may still apply software processing.
   final bool direct;
 
   /// AutoMix tempo matching; 1 outside a transition.

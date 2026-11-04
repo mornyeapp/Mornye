@@ -72,6 +72,7 @@ class _AudioInfoSheetState extends State<_AudioInfoSheet>
   int _loadGeneration = 0;
   bool _loading = false;
   Timer? _statusTimer;
+  (bool?, double?, double?) _processingSnapshot = (null, null, null);
 
   @override
   void initState() {
@@ -79,6 +80,7 @@ class _AudioInfoSheetState extends State<_AudioInfoSheet>
     WidgetsBinding.instance.addObserver(this);
     widget.metadata.addListener(_load);
     usbAudioStatus.addListener(_usbChanged);
+    playbackExclusiveStatus.addListener(_usbChanged);
     _refreshStatus();
     _scheduleStatusRefresh();
     _load();
@@ -89,6 +91,7 @@ class _AudioInfoSheetState extends State<_AudioInfoSheet>
     WidgetsBinding.instance.removeObserver(this);
     widget.metadata.removeListener(_load);
     usbAudioStatus.removeListener(_usbChanged);
+    playbackExclusiveStatus.removeListener(_usbChanged);
     _statusTimer?.cancel();
     super.dispose();
   }
@@ -103,7 +106,17 @@ class _AudioInfoSheetState extends State<_AudioInfoSheet>
   }
 
   void _refreshStatus() {
-    unawaited(musicPlayerRuntime.handler?.refreshOutputStatus());
+    final handler = musicPlayerRuntime.handler;
+    unawaited(handler?.refreshOutputStatus());
+    final processing = handler?.processing;
+    final snapshot = (
+      processing?.direct,
+      processing?.normalizationGain,
+      processing?.autoMixRate,
+    );
+    if (snapshot != _processingSnapshot) {
+      setState(() => _processingSnapshot = snapshot);
+    }
   }
 
   void _scheduleStatusRefresh() {
@@ -158,6 +171,9 @@ class _AudioInfoSheetState extends State<_AudioInfoSheet>
       widget.metadata,
       usbAudioStatus,
       playbackEqualizer,
+      playbackExclusiveStatus,
+      playbackExclusiveOutput,
+      playbackOutputVolume,
     ]),
     builder: (context, _) {
       final facts = _AudioFacts(
@@ -171,6 +187,8 @@ class _AudioInfoSheetState extends State<_AudioInfoSheet>
         equalizer: playbackEqualizer.value,
         processing: musicPlayerRuntime.handler?.processing,
         settings: musicPlayerRuntime.settings,
+        exclusiveStatus: playbackExclusiveStatus.value,
+        softwareVolume: playbackOutputVolume.value,
         linkDevice: linkSourceName(
           widget.linkSources,
           widget.metadata.filePath,
@@ -392,6 +410,8 @@ class _AudioFacts {
     required this.equalizer,
     required this.processing,
     required this.settings,
+    required this.exclusiveStatus,
+    required this.softwareVolume,
     this.linkDevice,
   });
 
@@ -405,6 +425,8 @@ class _AudioFacts {
   final EqualizerSettings equalizer;
   final PlaybackProcessing? processing;
   final AppSettings settings;
+  final ExclusiveOutputStatus exclusiveStatus;
+  final double softwareVolume;
 
   /// The paired computer or phone the network song plays from.
   final String? linkDevice;
@@ -428,6 +450,7 @@ class _AudioFacts {
       _losslessFormats.contains(codec.toLowerCase());
   late final bool direct =
       (processing?.direct ?? false) && usb.reason == 'active';
+  late final bool exclusive = exclusiveStatus == ExclusiveOutputStatus.active;
 
   List<_Section> sections() => [
     _Section(l10n.audioInfoSource, _source()),
@@ -555,8 +578,7 @@ class _AudioFacts {
     final String signalPath;
     if (direct && usb.driver == 'usb_direct') {
       signalPath = l10n.audioInfoPathDirect;
-    } else if ((direct && usb.driver == 'aaudio_exclusive') ||
-        playbackExclusiveStatus.value == ExclusiveOutputStatus.active) {
+    } else if ((direct && usb.driver == 'aaudio_exclusive') || exclusive) {
       signalPath = l10n.audioInfoPathExclusive;
     } else {
       signalPath = l10n.audioInfoPathSystem;
@@ -600,18 +622,23 @@ class _AudioFacts {
       if ((rate - 1).abs() > 0.001)
         _Fact(l10n.audioInfoTempo, '${rate.toStringAsFixed(3)}×'),
       if (_resampling case final value?) _Fact(l10n.audioInfoResampling, value),
-      _Fact(
-        l10n.audioInfoBitPerfect,
-        _bitPerfect
-            ? l10n.audioInfoBitPerfectActive
-            : l10n.audioInfoBitPerfectNo,
-        emphasis: _bitPerfect,
-      ),
+      _Fact(l10n.audioInfoBitPerfect, switch (_bitPerfect) {
+        AudioBitPerfectStatus.verified => l10n.audioInfoBitPerfectActive,
+        AudioBitPerfectStatus.systemMixed => l10n.audioInfoBitPerfectNo,
+        AudioBitPerfectStatus.processed => l10n.audioInfoBitPerfectProcessed,
+        AudioBitPerfectStatus.unverified => l10n.audioInfoBitPerfectUnverified,
+      }, emphasis: _bitPerfect == AudioBitPerfectStatus.verified),
     ];
   }
 
-  // A preferred mixer format is configuration, not proof of active playback.
-  bool get _bitPerfect => direct;
+  // EQ settings alone do not confirm which filters the engine applied.
+  AudioBitPerfectStatus get _bitPerfect => audioBitPerfectStatus(
+    directActive: direct,
+    exclusiveActive: exclusive,
+    normalizationGain: processing?.normalizationGain ?? 1,
+    tempo: processing?.autoMixRate ?? 1,
+    softwareVolume: softwareVolume,
+  );
 
   bool get _bluetoothFormatUnreported =>
       !direct && route?.bluetoothFormatUnreported == true;
@@ -620,7 +647,8 @@ class _AudioFacts {
 
   int? get _outputRate {
     if (direct) return usb.sampleRate;
-    if (_androidOutputUnreported) return null;
+    // Shared mixer properties cannot describe an exclusive engine's output.
+    if (exclusive || _androidOutputUnreported) return null;
     return route?.device?.mixerSampleRate ?? route?.mixerSampleRate;
   }
 
@@ -628,7 +656,9 @@ class _AudioFacts {
     if (_androidOutputUnreported) return l10n.audioInfoAndroidNotReported;
     final source = sampleRate, output = _outputRate;
     if (source == null || output == null) return null;
-    if (_bitPerfect || source == output) return l10n.audioInfoResamplingNone;
+    if (_bitPerfect == AudioBitPerfectStatus.verified || source == output) {
+      return l10n.audioInfoResamplingNone;
+    }
     return '${_khz(source)} → ${_khz(output)}';
   }
 
@@ -669,7 +699,7 @@ class _AudioFacts {
           ].join(' · '),
         )
       else if (device?.mixerBitDepth case final bits?
-          when !_androidOutputUnreported)
+          when !exclusive && !_androidOutputUnreported)
         _Fact(l10n.audioInfoOutputFormat, '$bits-bit'),
       if (device != null && route?.platform == 'android')
         _Fact(
