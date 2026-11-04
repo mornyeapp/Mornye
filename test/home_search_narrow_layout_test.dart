@@ -58,13 +58,13 @@ String _paintFingerprint(WidgetTester tester) {
 /// the phone rows records new values; the failure prints the fingerprint.
 const _baseFingerprints = {
   'phone Material': 'c975d61edc1fef90079a8ac06bf1a8c5307ac43b',
-  'phone Mornye': 'b6eb17a3cc554345f3650308f908aeff80858f07',
+  'phone Mornye': 'd72fe45a3f9638e3ebe47b549dee17232cd13e4f',
   'landscape phone Material': '88fd46463538cd4b3d728743a1174612da7a9731',
-  'landscape phone Mornye': 'a52f2e86d51d48d56386bae6aed54e9964adb7f7',
+  'landscape phone Mornye': 'ad2081a7237deca37d087111c28546cdec9f1781',
   'portrait tablet Material': '94d41e2ff5146d50d53d7b50f33ec371b88fc11f',
-  'portrait tablet Mornye': '4ed79340ac67aefb625dcb4418686de5458b0b79',
+  'portrait tablet Mornye': 'c4d77afbdcda7e4fbd3b90b586068aa134b1b30b',
   'narrow desktop window Material': '74198bcea5c9b07d7e5a90075abcb974b99f876e',
-  'narrow desktop window Mornye': 'b0e19d226ab2aa594ba4d4e1f41407841790dd4a',
+  'narrow desktop window Mornye': '481b5d5c69fc3a5b171e0124a6244c306b9489c0',
 };
 
 void main() {

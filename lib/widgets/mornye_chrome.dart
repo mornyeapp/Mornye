@@ -19,6 +19,7 @@ class MornyeSegmentedControl extends ConsumerWidget {
     required this.selectedIndex,
     required this.onChanged,
     this.samplesBackdrop = true,
+    this.compact = false,
   });
 
   final List<String> labels;
@@ -28,19 +29,22 @@ class MornyeSegmentedControl extends ConsumerWidget {
   /// See [MornyeGlass.samplesBackdrop].
   final bool samplesBackdrop;
 
+  /// A pointer-sized control for a desktop toolbar, 36 tall as in Music.
+  final bool compact;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final scaler = MediaQuery.textScalerOf(context);
     // At least 56 so each segment keeps a 48 dp target inside the pill inset.
-    final height = (MediaQuery.textScalerOf(context).scale(15) + 36).clamp(
-      56.0,
-      double.infinity,
-    );
+    final height = compact
+        ? scaler.scale(36)
+        : (scaler.scale(15) + 36).clamp(56.0, double.infinity);
     final contrastBlocked = ref.watch(
       mornyeGlassContrastBlockedProvider(MediaQuery.highContrastOf(context)),
     );
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: EdgeInsets.symmetric(vertical: compact ? 0 : 8),
       child: SizedBox(
         height: height,
         child: MornyeGlassPress(
@@ -61,6 +65,7 @@ class MornyeSegmentedControl extends ConsumerWidget {
               labels: labels,
               selectedIndex: selectedIndex,
               onChanged: onChanged,
+              padding: EdgeInsets.all(compact ? 3 : 4),
               itemBuilder: (context, index, selected) => Center(
                 child: Text(
                   labels[index],

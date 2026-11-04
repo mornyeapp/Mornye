@@ -1179,7 +1179,10 @@ class HomeSearchSkeleton extends StatelessWidget {
         ],
         HomeSearchSkeletonLayout.overview => [
           _headerSkeleton(context, 60),
-          const _CoverShelfSkeleton(round: false),
+          if (context.isMornye)
+            const _TopResultsSkeleton()
+          else
+            const _CoverShelfSkeleton(round: false),
           _headerSkeleton(context, 70),
           const _CoverShelfSkeleton(round: true),
           _headerSkeleton(context, 65),
@@ -1412,26 +1415,92 @@ class _CoverShelfSkeleton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final edge = searchCoverEdge(context);
-    return SizedBox(
-      height: searchCoverShelfExtent + searchCoverTextHeight(context) + 8,
-      child: ExcludeSemantics(
-        child: ShimmerLoading(
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            physics: const NeverScrollableScrollPhysics(),
-            padding: EdgeInsets.symmetric(horizontal: edge),
-            itemCount: 8,
-            separatorBuilder: (_, _) => const SizedBox(width: searchCoverGap),
-            itemBuilder: (_, index) => SizedBox(
-              width: searchCoverShelfExtent,
-              child: _CoverCellSkeleton(
-                extent: searchCoverShelfExtent,
-                round: round,
-                index: index,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final extent = searchShelfExtentFor(
+          context,
+          constraints.maxWidth,
+          round: round,
+        );
+        return SizedBox(
+          height: extent + searchCoverTextHeight(context) + 8,
+          child: ExcludeSemantics(
+            child: ShimmerLoading(
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                physics: const NeverScrollableScrollPhysics(),
+                padding: EdgeInsets.symmetric(horizontal: edge),
+                itemCount: 8,
+                separatorBuilder: (_, _) =>
+                    const SizedBox(width: searchCoverGap),
+                itemBuilder: (_, index) => SizedBox(
+                  width: extent,
+                  child: _CoverCellSkeleton(
+                    extent: extent,
+                    round: round,
+                    index: index,
+                  ),
+                ),
               ),
             ),
           ),
-        ),
+        );
+      },
+    );
+  }
+}
+
+/// Mornye's Top Results cards while the search loads.
+class _TopResultsSkeleton extends StatelessWidget {
+  const _TopResultsSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    final edge = searchCoverEdge(context);
+    final fill = Theme.of(
+      context,
+    ).colorScheme.onSurface.withValues(alpha: 0.08);
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: edge),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final columns = searchTopResultColumns(constraints.maxWidth);
+          final height = MediaQuery.textScalerOf(
+            context,
+          ).scale(searchTopResultHeight);
+          return ExcludeSemantics(
+            child: Column(
+              spacing: searchCoverGap,
+              children: [
+                for (var row = 0; row < 2; row++)
+                  Row(
+                    spacing: searchCoverGap,
+                    children: [
+                      for (var column = 0; column < columns; column++)
+                        Expanded(
+                          child: Container(
+                            height: height,
+                            padding: const EdgeInsets.symmetric(horizontal: 14),
+                            decoration: BoxDecoration(
+                              color: fill,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            alignment: AlignmentDirectional.centerStart,
+                            child: const ShimmerLoading(
+                              child: SkeletonBox(
+                                width: 42,
+                                height: 42,
+                                borderRadius: 5,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }

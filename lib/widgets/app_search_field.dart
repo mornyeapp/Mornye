@@ -26,7 +26,11 @@ class AppSearchField extends StatelessWidget {
     this.focusNode,
     this.autofocus = false,
     this.samplesBackdrop = true,
+    this.compact = false,
   });
+
+  /// The height of a [compact] Mornye field, as Music's desktop toolbar.
+  static const compactHeight = 36.0;
 
   final TextEditingController controller;
   final String hintText;
@@ -43,12 +47,17 @@ class AppSearchField extends StatelessWidget {
   /// the plain page background.
   final bool samplesBackdrop;
 
+  /// A pointer-sized field for a desktop toolbar.
+  final bool compact;
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final mornye = context.isMornye;
+    final height = MediaQuery.textScalerOf(context).scale(compactHeight);
+    final glassRadius = compact ? height / 2 : 28.0;
     final radius = BorderRadius.circular(
-      mornye ? 28 : context.tokens.radiusSheet,
+      mornye ? glassRadius : context.tokens.radiusSheet,
     );
 
     final field = ValueListenableBuilder<TextEditingValue>(
@@ -58,8 +67,24 @@ class AppSearchField extends StatelessWidget {
         focusNode: focusNode,
         autofocus: autofocus,
         textInputAction: TextInputAction.search,
+        style: compact
+            ? Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 14)
+            : null,
         decoration: InputDecoration(
           hintText: hintText,
+          hintStyle: compact
+              ? Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  fontSize: 14,
+                  color: colorScheme.onSurfaceVariant,
+                )
+              : null,
+          isDense: compact,
+          prefixIconConstraints: compact
+              ? BoxConstraints.tightFor(height: height)
+              : null,
+          suffixIconConstraints: compact
+              ? BoxConstraints.tightFor(height: height)
+              : null,
           prefixIcon:
               prefixIcon ??
               AppIcon(mornye ? CupertinoIcons.search : Icons.search),
@@ -99,10 +124,9 @@ class AppSearchField extends StatelessWidget {
           fillColor: mornye
               ? Colors.transparent
               : colorScheme.surfaceContainerHigh,
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 20,
-            vertical: 16,
-          ),
+          contentPadding: compact
+              ? const EdgeInsets.symmetric(horizontal: 8, vertical: 8)
+              : const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         ),
         onChanged: onChanged,
         onSubmitted: onSubmitted,
@@ -112,12 +136,12 @@ class AppSearchField extends StatelessWidget {
     if (!mornye) return field;
     return Consumer(
       builder: (context, ref, child) => MornyeGlass.navigation(
-        radius: 28,
+        radius: glassRadius,
         blurEnabled: ref.watch(mornyeBlurEnabledProvider),
         samplesBackdrop: samplesBackdrop,
         child: child!,
       ),
-      child: field,
+      child: compact ? SizedBox(height: height, child: field) : field,
     );
   }
 }

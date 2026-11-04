@@ -69,6 +69,38 @@ Future<void> _dismissSnackBars(WidgetTester tester) async {
 }
 
 void main() {
+  testWidgets('Mornye All view opens with Top Results cards', (tester) async {
+    await pumpSearchFixture(
+      tester,
+      size: const Size(1000, 1800),
+      mornye: true,
+      desktop: true,
+      settings: _grid,
+      results: SearchFixtureResults(count: 3, songCount: 8),
+      filters: searchFixtureAllFilters,
+    );
+    // A song first, then the album, more songs and the playlist.
+    Finder card(String key) => find.byKey(ValueKey(key));
+    expect(card('top-album-album-0'), findsOneWidget);
+    expect(card('top-playlist-playlist-0'), findsOneWidget);
+    final album = tester.getRect(card('top-album-album-0'));
+    final playlist = tester.getRect(card('top-playlist-playlist-0'));
+    expect(album.height, searchTopResultHeight);
+    expect(album.top, lessThan(playlist.top));
+    expect(playlist.left, greaterThan(album.left));
+    final segments = find.textContaining(' · ');
+    expect(segments.evaluate().length, 6);
+    // Artists go by name alone, bigger than a phone's list row.
+    final artist = tester.getSize(
+      find.byKey(const ValueKey('artist-artist-0')),
+    );
+    final albumCell = tester.getSize(
+      find.byKey(const ValueKey('album-album-0')),
+    );
+    expect(artist.width, lessThan(albumCell.width));
+    expect(tester.takeException(), isNull);
+  });
+
   for (final mornye in [false, true]) {
     final style = mornye ? 'Mornye' : 'Material';
 
@@ -229,9 +261,23 @@ void main() {
       );
       expect(results.requestedFilters, [null]);
 
-      // Songs come first, as covers like every other kind.
+      // Material opens with songs, as covers like every other kind. Mornye
+      // opens with Top Results, and songs follow the albums.
       final headers = [
-        for (final title in ['Songs', 'Artists', 'Albums', 'Playlists'])
+        for (final title in [
+          if (mornye) ...[
+            'Top Results',
+            'Artists',
+            'Albums',
+            'Songs',
+            'Playlists',
+          ] else ...[
+            'Songs',
+            'Artists',
+            'Albums',
+            'Playlists',
+          ],
+        ])
           tester.getTopLeft(find.text(title)).dy,
       ];
       expect(headers, orderedEquals([...headers]..sort()));
@@ -266,7 +312,8 @@ void main() {
         );
       }
       expect(find.byType(DesktopScrollArrows), findsNWidgets(4));
-      expect(find.byType(SliverGrid), findsNothing);
+      // Only Mornye's Top Results cards form a grid.
+      expect(find.byType(SliverGrid), mornye ? findsOneWidget : findsNothing);
 
       // Show all switches to that kind's filter.
       await tester.tap(find.bySemanticsLabel('Show all Albums'));
@@ -428,7 +475,21 @@ void main() {
         results: SearchFixtureResults(holdLoading: true),
       );
       expect(find.byType(TrackListSkeleton), findsNothing);
-      expect(largestBox(), searchCoverShelfExtent);
+      final shelfCover = largestBox();
+      if (!mornye) expect(shelfCover, searchCoverShelfExtent);
+      await pumpSearchFixture(
+        tester,
+        size: _desktop,
+        mornye: mornye,
+        desktop: true,
+        settings: _grid,
+        filters: searchFixtureAllFilters,
+        results: SearchFixtureResults(count: 3, songCount: 8),
+      );
+      expect(
+        tester.getSize(find.byKey(const ValueKey('album-album-0'))).width,
+        shelfCover,
+      );
       expect(tester.takeException(), isNull);
     });
 

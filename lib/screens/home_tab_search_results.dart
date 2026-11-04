@@ -608,6 +608,58 @@ extension _HomeTabSearchResultsUI on _HomeTabState {
     VoidCallback? onShowAll,
   }) {
     final mornye = context.isMornye;
+    // Music's wide headers: the title itself leads on, with a chevron.
+    if (mornye && onShowAll != null) {
+      return SliverToBoxAdapter(
+        child: Padding(
+          padding: const EdgeInsetsDirectional.fromSTEB(
+            20,
+            22,
+            12,
+            12,
+          ).add(EdgeInsets.symmetric(horizontal: homeContentInset(context))),
+          child: Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: Semantics(
+              button: true,
+              label: context.l10n.searchShowAllCategory(title),
+              onTap: onShowAll,
+              excludeSemantics: true,
+              child: MouseRegion(
+                cursor: SystemMouseCursors.click,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: onShowAll,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    spacing: 6,
+                    children: [
+                      Flexible(
+                        child: Text(
+                          title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(
+                                fontWeight: FontWeight.w700,
+                                color: colorScheme.onSurface,
+                              ),
+                        ),
+                      ),
+                      Icon(
+                        CupertinoIcons.chevron_forward,
+                        size: 14,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
     return SliverToBoxAdapter(
       child: Padding(
         // Aligned with the clamped result list below on wide screens.
@@ -900,8 +952,10 @@ extension _HomeTabSearchResultsUI on _HomeTabState {
         _searchFocusNode.hasFocus;
 
     final searchingLibrary = _searchingLibrary;
+    final compact = _compactSearchField;
     return AppSearchField(
       controller: _urlController,
+      compact: compact,
       samplesBackdrop: false,
       focusNode: _searchFocusNode,
       hintText: searchingLibrary
@@ -929,11 +983,23 @@ extension _HomeTabSearchResultsUI on _HomeTabState {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (hasText)
-            AppIconButton(
-              icon: const Icon(Icons.clear),
-              onPressed: _clearAndRefresh,
-              tooltip: context.l10n.dialogClear,
-            )
+            compact
+                ? IconButton(
+                    icon: const Icon(CupertinoIcons.clear_circled_solid),
+                    iconSize: 17,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints.tightFor(
+                      width: 30,
+                      height: 30,
+                    ),
+                    onPressed: _clearAndRefresh,
+                    tooltip: context.l10n.dialogClear,
+                  )
+                : AppIconButton(
+                    icon: const Icon(Icons.clear),
+                    onPressed: _clearAndRefresh,
+                    tooltip: context.l10n.dialogClear,
+                  )
           else if (showInputActions && !searchingLibrary) ...[
             AppIconButton(
               icon: const Icon(Icons.file_upload_outlined),

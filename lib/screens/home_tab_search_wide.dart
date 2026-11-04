@@ -79,6 +79,9 @@ extension _HomeTabSearchWideUI on _HomeTabState {
       showEmptyResult: showEmptySearchResult && !hasActualData,
       colorScheme: colorScheme,
     );
+    // Mornye opens the All view as Music does: the best matches as cards,
+    // with the shelves below them.
+    final topResults = overview && context.isMornye;
 
     // Songs are covers too, as the other kinds are.
     void addSongs() {
@@ -117,7 +120,65 @@ extension _HomeTabSearchWideUI on _HomeTabState {
         );
     }
 
-    if (overview && songs.isNotEmpty) addSongs();
+    if (topResults) {
+      final albums = _sortCollectionResults(buckets.albumItems);
+      final playlists = _sortCollectionResults(buckets.playlistItems);
+      final isInHistory = _watchSearchHistory(resultsRef, songs);
+      final songFilter = filterFor('track');
+      final picks = [
+        for (final (kind, index) in _topResultPicks(
+          songs: songs.length,
+          albums: albums.length,
+          playlists: playlists.length,
+        ))
+          switch (kind) {
+            'track' => _SearchTopSongCard(
+              key: ValueKey('top-track-${songs[index].id}'),
+              track: songs[index],
+              isInHistory: isInHistory(index),
+              showLocalLibraryIndicator: showLocalLibraryIndicator,
+              onDownload: ({bool forceQualityPicker = false}) => _downloadTrack(
+                songIndexes[index],
+                forceQualityPicker: forceQualityPicker,
+              ),
+            ),
+            'album' => _SearchTopCollectionCard(
+              key: ValueKey('top-album-${albums[index].id}'),
+              item: albums[index],
+              kindLabel: context.l10n.recentTypeAlbum,
+              onTap: () => _navigateToExtensionAlbum(albums[index]),
+              onSaveCover: () => _saveSearchResultCover(albums[index]),
+            ),
+            _ => _SearchTopCollectionCard(
+              key: ValueKey('top-playlist-${playlists[index].id}'),
+              item: playlists[index],
+              kindLabel: context.l10n.recentTypePlaylist,
+              onTap: () => _navigateToExtensionPlaylist(playlists[index]),
+              onSaveCover: () => _saveSearchResultCover(playlists[index]),
+            ),
+          },
+      ];
+      if (picks.isNotEmpty) {
+        slivers
+          ..add(
+            _buildResultSectionHeader(
+              title: context.l10n.searchTopResults,
+              colorScheme: colorScheme,
+              showSortButton: false,
+              onShowAll: songFilter == null
+                  ? null
+                  : () => _selectSearchFilter(songFilter),
+            ),
+          )
+          ..add(_buildSearchTopResults(picks));
+      }
+    }
+
+    var songsAdded = false;
+    if (overview && !topResults && songs.isNotEmpty) {
+      addSongs();
+      songsAdded = true;
+    }
 
     for (final (items, kind, title, open) in [
       (
@@ -139,6 +200,11 @@ extension _HomeTabSearchWideUI on _HomeTabState {
         _navigateToExtensionPlaylist,
       ),
     ]) {
+      // Songs follow the albums under Top Results.
+      if (topResults && kind == 'playlist' && songs.isNotEmpty) {
+        addSongs();
+        songsAdded = true;
+      }
       if (items.isEmpty) continue;
       final sorted = _sortCollectionResults(items);
       final filter = overview ? filterFor(kind) : null;
@@ -168,10 +234,61 @@ extension _HomeTabSearchWideUI on _HomeTabState {
         );
     }
 
-    if (!overview && songs.isNotEmpty) addSongs();
+    if (!songsAdded && songs.isNotEmpty) addSongs();
 
     slivers.add(const SliverToBoxAdapter(child: SizedBox(height: 16)));
     return slivers;
+  }
+
+  /// Which results fill the Top Results cards: a song first, then the first
+  /// album, more songs and the first playlist. A kind that runs out gives its
+  /// place to the next one that has results left.
+  List<(String, int)> _topResultPicks({
+    required int songs,
+    required int albums,
+    required int playlists,
+  }) {
+    final counts = {'track': songs, 'album': albums, 'playlist': playlists};
+    final used = {'track': 0, 'album': 0, 'playlist': 0};
+    bool left(String kind) => used[kind]! < counts[kind]!;
+    final picks = <(String, int)>[];
+    for (final slot in const [
+      'track',
+      'album',
+      'track',
+      'track',
+      'track',
+      'playlist',
+    ]) {
+      final kind = left(slot) ? slot : counts.keys.where(left).firstOrNull;
+      if (kind == null) break;
+      picks.add((kind, used[kind]!));
+      used[kind] = used[kind]! + 1;
+    }
+    return picks;
+  }
+
+  Widget _buildSearchTopResults(List<Widget> cards) {
+    final edge = searchCoverEdge(context);
+    final height = MediaQuery.textScalerOf(
+      context,
+    ).scale(searchTopResultHeight);
+    return SliverPadding(
+      padding: EdgeInsetsDirectional.fromSTEB(edge, 0, edge, 8),
+      sliver: SliverLayoutInfoBuilder<double>(
+        select: (constraints) => constraints.crossAxisExtent,
+        builder: (context, width) => SliverGrid.builder(
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: searchTopResultColumns(width),
+            mainAxisSpacing: searchCoverGap,
+            crossAxisSpacing: searchCoverGap,
+            mainAxisExtent: height,
+          ),
+          itemCount: cards.length,
+          itemBuilder: (context, index) => cards[index],
+        ),
+      ),
+    );
   }
 
   /// [items] in the chosen sort. Collections have no duration, so the
@@ -231,21 +348,270 @@ extension _HomeTabSearchWideUI on _HomeTabState {
   ) {
     final edge = searchCoverEdge(context);
     return SliverToBoxAdapter(
-      child: SizedBox(
-        height: searchCoverShelfExtent + searchCoverTextHeight(context) + 8,
-        child: DesktopScrollArrows(
-          key: ValueKey('search-shelf-$kind'),
-          builder: (context, controller) => ListView.separated(
-            controller: controller,
-            scrollDirection: Axis.horizontal,
-            padding: EdgeInsets.symmetric(horizontal: edge),
-            itemCount: count,
-            separatorBuilder: (_, _) => const SizedBox(width: searchCoverGap),
-            itemBuilder: (context, index) => SizedBox(
-              width: searchCoverShelfExtent,
-              child: cell(context, index, searchCoverShelfExtent),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final extent = searchShelfExtentFor(
+            context,
+            constraints.maxWidth,
+            round: kind == 'artist',
+          );
+          return SizedBox(
+            height: extent + searchCoverTextHeight(context) + 8,
+            child: DesktopScrollArrows(
+              key: ValueKey('search-shelf-$kind'),
+              builder: (context, controller) => ListView.separated(
+                controller: controller,
+                scrollDirection: Axis.horizontal,
+                padding: EdgeInsets.symmetric(horizontal: edge),
+                itemCount: count,
+                separatorBuilder: (_, _) =>
+                    const SizedBox(width: searchCoverGap),
+                itemBuilder: (context, index) => SizedBox(
+                  width: extent,
+                  child: cell(context, index, extent),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// One Top Results card: small artwork, title and "Kind · name", with
+/// [trailing] at the end, on a tonal rounded rectangle.
+class _SearchTopResultCard extends StatelessWidget {
+  const _SearchTopResultCard({
+    required this.coverUrl,
+    required this.placeholderIcon,
+    required this.title,
+    required this.kindLabel,
+    required this.artistName,
+    required this.explicit,
+    required this.trailing,
+    required this.onTap,
+    this.onLongPress,
+    required this.onContextMenu,
+  });
+
+  static const _artwork = 42.0;
+
+  final String? coverUrl;
+  final IconData placeholderIcon;
+  final String title;
+  final String kindLabel;
+  final String artistName;
+  final bool explicit;
+  final Widget trailing;
+  final VoidCallback onTap;
+  final VoidCallback? onLongPress;
+  final ValueChanged<Offset> onContextMenu;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final radius = BorderRadius.circular(10);
+    final placeholder = Container(
+      width: _artwork,
+      height: _artwork,
+      color: colorScheme.surfaceContainerHighest,
+      child: Icon(
+        placeholderIcon,
+        size: 20,
+        color: colorScheme.onSurfaceVariant,
+      ),
+    );
+    final subtitle = artistName.isEmpty
+        ? kindLabel
+        : '$kindLabel · $artistName';
+    return DesktopContextMenuRegion(
+      onContextMenu: onContextMenu,
+      child: Material(
+        color: colorScheme.onSurface.withValues(alpha: 0.08),
+        borderRadius: radius,
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          onLongPress: onLongPress,
+          hoverColor: colorScheme.onSurface.withValues(alpha: 0.05),
+          child: Padding(
+            padding: const EdgeInsetsDirectional.only(start: 14, end: 4),
+            child: Row(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(5),
+                  child: coverUrl?.isNotEmpty == true
+                      ? CachedCoverImage(
+                          imageUrl: coverUrl!,
+                          width: _artwork,
+                          height: _artwork,
+                          fit: BoxFit.cover,
+                          errorWidget: (_, _, _) => placeholder,
+                        )
+                      : placeholder,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      ExplicitTrackTitle(
+                        title: title,
+                        explicit: explicit,
+                        maxLines: 1,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontSize: 15,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          fontSize: 13,
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                trailing,
+              ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A song among the Top Results. A click does what the cover shelf's does;
+/// the dots open the song's options.
+class _SearchTopSongCard extends ConsumerWidget {
+  const _SearchTopSongCard({
+    super.key,
+    required this.track,
+    required this.isInHistory,
+    required this.showLocalLibraryIndicator,
+    required this.onDownload,
+  });
+
+  final Track track;
+  final bool isInHistory;
+  final bool showLocalLibraryIndicator;
+  final void Function({bool forceQualityPicker}) onDownload;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = context.l10n;
+    final isQueued = ref.watch(
+      downloadQueueLookupProvider.select(
+        (lookup) => lookup.byTrackId.containsKey(track.id),
+      ),
+    );
+    final isInLocalLibrary =
+        showLocalLibraryIndicator &&
+        ref.watch(
+          localLibraryProvider.select(
+            (state) => state.existsInLibrary(
+              isrc: track.isrc,
+              trackName: track.name,
+              artistName: track.artistName,
+            ),
+          ),
+        );
+    void showOptions({Offset? position}) =>
+        TrackCollectionQuickActions.showTrackOptionsSheet(
+          context,
+          ref,
+          track,
+          position: position,
+          hasLocalPlaybackCandidate: isInHistory || isInLocalLibrary,
+        );
+    return _SearchTopResultCard(
+      coverUrl: track.coverUrl,
+      placeholderIcon: Icons.music_note,
+      title: track.name,
+      kindLabel: l10n.recentTypeSong,
+      artistName: track.artistName,
+      explicit: track.explicit == true,
+      onTap: () => _TrackItemWithStatus.activate(
+        context,
+        ref,
+        track,
+        isQueued: isQueued,
+        isInHistory: isInHistory,
+        isInLocalLibrary: isInLocalLibrary,
+        onDownload: onDownload,
+      ),
+      onLongPress: showOptions,
+      onContextMenu: (position) => showOptions(position: position),
+      trailing: IconButton(
+        tooltip: MaterialLocalizations.of(context).moreButtonTooltip,
+        iconSize: 18,
+        icon: const Icon(CupertinoIcons.ellipsis),
+        onPressed: showOptions,
+      ),
+    );
+  }
+}
+
+/// An album or playlist among the Top Results: a click opens it.
+class _SearchTopCollectionCard extends StatelessWidget {
+  const _SearchTopCollectionCard({
+    super.key,
+    required this.item,
+    required this.kindLabel,
+    required this.onTap,
+    required this.onSaveCover,
+  });
+
+  final Track item;
+  final String kindLabel;
+  final VoidCallback onTap;
+  final VoidCallback onSaveCover;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final hasCover = item.coverUrl?.isNotEmpty == true;
+    return _SearchTopResultCard(
+      coverUrl: item.coverUrl,
+      placeholderIcon: item.isPlaylistItem ? Icons.playlist_play : Icons.album,
+      title: item.name,
+      kindLabel: kindLabel,
+      artistName: item.artistName,
+      explicit: item.explicit == true,
+      onTap: onTap,
+      onContextMenu: (position) => showContextMenu(
+        context,
+        position: position,
+        groups: [
+          [
+            ContextMenuAction(
+              icon: Icons.open_in_new,
+              label: l10n.desktopMenuOpen,
+              onSelected: onTap,
+            ),
+            if (hasCover)
+              ContextMenuAction(
+                icon: Icons.image_outlined,
+                label: l10n.trackSaveCoverArt,
+                onSelected: onSaveCover,
+              ),
+          ],
+        ],
+      ),
+      trailing: Padding(
+        padding: const EdgeInsetsDirectional.only(end: 12),
+        child: Icon(
+          CupertinoIcons.chevron_forward,
+          size: 14,
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
         ),
       ),
     );
@@ -547,16 +913,19 @@ class _SearchCoverCell extends StatelessWidget {
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              const SizedBox(height: 2),
-              Text(
-                _CollectionItemWidget.subtitleOf(context, item),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: textAlign,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
+              // Music names an artist and leaves it there.
+              if (!(mornye && isArtist)) ...[
+                const SizedBox(height: 2),
+                Text(
+                  _CollectionItemWidget.subtitleOf(context, item),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: textAlign,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
                 ),
-              ),
+              ],
             ],
           ),
         ),

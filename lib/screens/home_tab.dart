@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:mornye/widgets/app_snack_bar.dart';
@@ -153,6 +154,9 @@ class _HomeTabState extends ConsumerState<HomeTab>
   String _libraryQuery = '';
   Timer? _libraryQueryDebounce;
   bool get _searchingLibrary => _searchesLibrary && _offersLibraryScope;
+
+  /// Mornye's desktop field is pointer-sized, as Music's toolbar field is.
+  bool get _compactSearchField => context.isMornye && isDesktopPlatform;
 
   bool _embeddedCoverRefreshScheduled = false;
   List<Extension>? _thumbnailSizesExtensionsCache;
@@ -1057,12 +1061,36 @@ class _HomeTabState extends ConsumerState<HomeTab>
             .firstOrNull
             ?.displayName ??
         context.l10n.librarySourceOnline;
-    const scopeWidth = 260.0;
+    // Equal segments, each hugging the longer label.
+    final labelStyle = Theme.of(
+      context,
+    ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600);
+    double labelWidth(String label) {
+      final painter = TextPainter(
+        text: TextSpan(text: label, style: labelStyle),
+        textDirection: Directionality.of(context),
+        textScaler: MediaQuery.textScalerOf(context),
+      )..layout();
+      final width = painter.width;
+      painter.dispose();
+      return width;
+    }
+
+    final scopeWidth =
+        (2 *
+                    (math.max(
+                          labelWidth(online),
+                          labelWidth(context.l10n.navLibrary),
+                        ) +
+                        24) +
+                6)
+            .clamp(150.0, 260.0);
     const gap = 16.0;
     final scope = SizedBox(
       width: scopeWidth,
       child: MornyeSegmentedControl(
         key: const ValueKey('search-scope'),
+        compact: true,
         labels: [online, context.l10n.navLibrary],
         selectedIndex: _searchesLibrary ? 1 : 0,
         onChanged: (index) => _setSearchScope(library: index == 1),
@@ -1071,7 +1099,7 @@ class _HomeTabState extends ConsumerState<HomeTab>
     return SliverAppBar(
       pinned: true,
       automaticallyImplyLeading: false,
-      toolbarHeight: 88,
+      toolbarHeight: 60,
       backgroundColor: Theme.of(context).colorScheme.surface,
       surfaceTintColor: Colors.transparent,
       titleSpacing: 0,

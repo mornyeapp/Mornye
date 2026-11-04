@@ -8389,6 +8389,10 @@
   "@homeShortcuts": {
     "description": "Home section header for quick links to player tools"
   },
+  "searchTopResults": "Top Results",
+  "@searchTopResults": {
+    "description": "Mornye search on wide screens: heading of the best matches"
+  },
   "homeTopPicks": "Top Picks for You",
   "@homeTopPicks": {
     "description": "Mornye Home: heading of the first shelf, the day's mixes shown as banners"
