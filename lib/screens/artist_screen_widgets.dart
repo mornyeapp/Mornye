@@ -96,19 +96,46 @@ extension _ArtistScreenSections on _ArtistScreenState {
         artwork: hasMotionBanner
             ? MotionHeaderBanner(videoUrl: headerVideoUrl, fallback: artwork)
             : artwork,
-        actions: isSelectionMode
+        toolbarActions: isSelectionMode
             ? const []
             : [
                 HeaderCircleButton(
                   icon: CupertinoIcons.square_arrow_up,
-                  buttonSize: 50,
-                  iconSize: 24,
-                  iconColor: colorScheme.primary,
-                  glassTintColor: Colors.white,
-                  glassTintOpacity: 0.10,
                   tooltip: context.l10n.openInOtherServices,
                   onPressed: () => _showShareSheet(context),
                 ),
+                HeaderMoreButton(
+                  groups: () => [
+                    [
+                      ContextMenuAction(
+                        icon: isFavoriteArtist
+                            ? CupertinoIcons.star_fill
+                            : CupertinoIcons.star,
+                        label: isFavoriteArtist
+                            ? context.l10n.artistOptionRemoveFromFavorites
+                            : context.l10n.artistOptionAddToFavorites,
+                        onSelected: () => _toggleFavoriteArtist(context),
+                      ),
+                      if (hasDiscography)
+                        ContextMenuAction(
+                          icon: CupertinoIcons.arrow_down,
+                          label: context.l10n.discographyDownload,
+                          onSelected: () => _showDiscographyOptions(
+                            context,
+                            colorScheme,
+                            albums,
+                          ),
+                        ),
+                    ],
+                  ],
+                ),
+              ],
+        actions: isSelectionMode
+            ? const []
+            : [
+                // Keeps the larger button on the page's center line.
+                if (_isLoadingDiscography || hasDiscography)
+                  const SizedBox.square(dimension: 50),
                 if (_isLoadingDiscography)
                   const ShimmerLoading(
                     child: SkeletonBox(width: 74, height: 74, borderRadius: 37),

@@ -6,12 +6,26 @@ class ShellNavigationService {
   static final searchRequests = ValueNotifier<int>(0);
   static final chromeBrightness = ValueNotifier<Brightness?>(null);
   static final chromeSurface = ValueNotifier<Color?>(null);
+
+  /// The artwork of the visible page's hero, which the desktop sidebar shows
+  /// blurred under its tint.
+  static final chromeBackdrop = ValueNotifier<String?>(null);
+
+  /// How far the visible page has scrolled its hero.
+  static final chromeBackdropOffset = ValueNotifier<double>(0);
   static final _visiblePages = <GlobalKey<NavigatorState>, Route<dynamic>?>{};
   static final _chromeScopes =
       <
         Object,
-        ({ModalRoute<dynamic> route, Brightness brightness, Color? surface})
+        ({
+          ModalRoute<dynamic> route,
+          Brightness brightness,
+          Color? surface,
+          String? backdrop,
+        })
       >{};
+  static final _backdropOffsets = <Object, double>{};
+  static Object? _chromeOwner;
   static bool _chromeUpdateScheduled = false;
   static int _searchGeneration = 0;
 
@@ -20,8 +34,14 @@ class ShellNavigationService {
     required ModalRoute<dynamic> route,
     required Brightness brightness,
     Color? surface,
+    String? backdrop,
   }) {
-    final scope = (route: route, brightness: brightness, surface: surface);
+    final scope = (
+      route: route,
+      brightness: brightness,
+      surface: surface,
+      backdrop: backdrop,
+    );
     if (_chromeScopes[owner] == scope) return;
     _chromeScopes[owner] = scope;
     _scheduleChromeUpdate();
@@ -29,7 +49,15 @@ class ShellNavigationService {
 
   static void clearChromeBrightness(Object owner) {
     _chromeScopes.remove(owner);
+    _backdropOffsets.remove(owner);
     _scheduleChromeUpdate();
+  }
+
+  /// Records a page's scroll, kept per page so returning to a scrolled page
+  /// puts the sidebar's artwork back where the hero is.
+  static void setChromeBackdropOffset(Object owner, double offset) {
+    _backdropOffsets[owner] = offset;
+    if (identical(owner, _chromeOwner)) chromeBackdropOffset.value = offset;
   }
 
   static void _scheduleChromeUpdate() {
@@ -40,14 +68,22 @@ class ShellNavigationService {
       final activePage = _visiblePages[_activeTabNavigatorKey()];
       Brightness? brightness;
       Color? surface;
-      for (final scope in _chromeScopes.values) {
+      String? backdrop;
+      Object? owner;
+      for (final MapEntry(key: scopeOwner, value: scope)
+          in _chromeScopes.entries) {
         if (identical(scope.route, activePage)) {
           brightness = scope.brightness;
           surface = scope.surface;
+          backdrop = scope.backdrop;
+          owner = scopeOwner;
         }
       }
+      _chromeOwner = owner;
       chromeBrightness.value = brightness;
       chromeSurface.value = surface;
+      chromeBackdrop.value = backdrop;
+      chromeBackdropOffset.value = _backdropOffsets[owner] ?? 0;
     });
     WidgetsBinding.instance.ensureVisualUpdate();
   }

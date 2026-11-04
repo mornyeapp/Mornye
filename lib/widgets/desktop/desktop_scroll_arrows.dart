@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/desktop_platform.dart';
+import 'package:mornye/widgets/mornye_chrome.dart';
+import 'package:mornye/widgets/mornye_glass_press.dart';
 
 /// Builds a horizontal list that scrolls with [controller].
 typedef DesktopScrollArrowsBuilder =
@@ -67,31 +69,32 @@ class _DesktopScrollArrowsState extends State<DesktopScrollArrows> {
           // A zero-size child paints and hits nothing, as no child did.
           ValueListenableBuilder<bool>(
             valueListenable: _hovered,
-            builder: (context, hovered, _) => !hovered
-                ? const SizedBox.shrink()
-                : ListenableBuilder(
-                    listenable: _controller,
-                    builder: (context, _) {
-                      final position = _controller.hasClients
-                          ? _controller.position
-                          : null;
-                      final ready =
-                          position != null && position.hasContentDimensions;
-                      return Stack(
-                        children: [
-                          if (ready && position.extentBefore > 0)
-                            _arrow(context, forward: false),
-                          if (ready && position.extentAfter > 0)
-                            _arrow(context, forward: true),
-                        ],
-                      );
-                    },
-                  ),
+            builder: (context, hovered, _) {
+              if (context.isMornye) {
+                return _ArrowsFade(hovered: hovered, child: _arrows(context));
+              }
+              return hovered ? _arrows(context) : const SizedBox.shrink();
+            },
           ),
         ],
       ),
     );
   }
+
+  Widget _arrows(BuildContext context) => ListenableBuilder(
+    listenable: _controller,
+    builder: (context, _) {
+      final position = _controller.hasClients ? _controller.position : null;
+      final ready = position != null && position.hasContentDimensions;
+      return Stack(
+        children: [
+          if (ready && position.extentBefore > 0)
+            _arrow(context, forward: false),
+          if (ready && position.extentAfter > 0) _arrow(context, forward: true),
+        ],
+      );
+    },
+  );
 
   Widget _arrow(BuildContext context, {required bool forward}) {
     final l10n = context.l10n;
@@ -100,6 +103,50 @@ class _DesktopScrollArrowsState extends State<DesktopScrollArrows> {
     final icon = forward
         ? (mornye ? CupertinoIcons.forward : Icons.chevron_right)
         : (mornye ? CupertinoIcons.back : Icons.chevron_left);
+    if (mornye) {
+      // Music's tall glass paddle, close to the edge of the shelf.
+      return PositionedDirectional(
+        start: forward ? null : 6,
+        end: forward ? 6 : null,
+        top: 0,
+        bottom: 0,
+        child: Center(
+          child: Tooltip(
+            message: forward
+                ? l10n.desktopScrollForward
+                : l10n.desktopScrollBack,
+            child: SizedBox(
+              width: 28,
+              height: 52,
+              child: MornyeGlassPress(
+                radius: 14,
+                child: MornyeGlassPanel(
+                  radius: 14,
+                  child: Material(
+                    type: MaterialType.transparency,
+                    child: InkWell(
+                      onTap: () => _page(forward ? 1 : -1),
+                      splashFactory: NoSplash.splashFactory,
+                      hoverColor: colorScheme.onSurface.withValues(alpha: 0.06),
+                      highlightColor: colorScheme.onSurface.withValues(
+                        alpha: 0.12,
+                      ),
+                      child: Center(
+                        child: Icon(
+                          icon,
+                          size: 16,
+                          color: colorScheme.onSurface,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
     return PositionedDirectional(
       start: forward ? null : 8,
       end: forward ? 8 : null,
@@ -109,9 +156,7 @@ class _DesktopScrollArrowsState extends State<DesktopScrollArrows> {
         child: Tooltip(
           message: forward ? l10n.desktopScrollForward : l10n.desktopScrollBack,
           child: Material(
-            color: mornye
-                ? colorScheme.surface.withValues(alpha: 0.86)
-                : colorScheme.secondaryContainer,
+            color: colorScheme.secondaryContainer,
             shape: const CircleBorder(),
             elevation: 2,
             shadowColor: Colors.black38,
@@ -122,15 +167,55 @@ class _DesktopScrollArrowsState extends State<DesktopScrollArrows> {
                 dimension: 40,
                 child: Icon(
                   icon,
-                  size: mornye ? 20 : 24,
-                  color: mornye
-                      ? colorScheme.onSurface
-                      : colorScheme.onSecondaryContainer,
+                  size: 24,
+                  color: colorScheme.onSecondaryContainer,
                 ),
               ),
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Fades Mornye's arrows in and out with the pointer, building them only
+/// while they show so a shelf at rest stays free of scroll listeners.
+class _ArrowsFade extends StatefulWidget {
+  const _ArrowsFade({required this.hovered, required this.child});
+
+  final bool hovered;
+  final Widget child;
+
+  @override
+  State<_ArrowsFade> createState() => _ArrowsFadeState();
+}
+
+class _ArrowsFadeState extends State<_ArrowsFade> {
+  late bool _shown = widget.hovered;
+
+  @override
+  void didUpdateWidget(_ArrowsFade oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.hovered) _shown = true;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_shown) return const SizedBox.shrink();
+    return IgnorePointer(
+      ignoring: !widget.hovered,
+      child: TweenAnimationBuilder<double>(
+        tween: Tween(begin: 0, end: widget.hovered ? 1 : 0),
+        duration: MediaQuery.disableAnimationsOf(context)
+            ? Duration.zero
+            : const Duration(milliseconds: 250),
+        onEnd: () {
+          if (!widget.hovered) setState(() => _shown = false);
+        },
+        builder: (context, opacity, child) =>
+            Opacity(opacity: opacity, child: child),
+        child: widget.child,
       ),
     );
   }

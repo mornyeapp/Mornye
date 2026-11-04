@@ -34,6 +34,7 @@ import 'package:mornye/widgets/link/link_devices_sheet.dart';
 import 'package:mornye/widgets/mornye_chrome.dart';
 import 'package:mornye/widgets/mornye_playback_button.dart';
 import 'package:mornye/widgets/mornye_player_background.dart';
+import 'package:mornye/widgets/overflow_marquee.dart';
 import 'package:mornye/widgets/player_artwork.dart';
 import 'package:mornye/widgets/player_lyrics.dart';
 import 'package:mornye/widgets/player_volume_control.dart';
@@ -63,7 +64,7 @@ class DesktopPlayerBar extends ConsumerWidget {
   static const double materialHeight = 80;
 
   /// Height of the Mornye capsule.
-  static const double mornyeHeight = 48;
+  static const double mornyeHeight = 56;
 
   /// Space between the Mornye capsule and the bottom of the window.
   static const double floatingMargin = 10;
@@ -453,6 +454,7 @@ class _Transport extends ConsumerWidget {
             color: colorScheme.onSurface,
             iconSize: 18,
             padding: const EdgeInsets.all(7),
+            pointerPress: true,
             onPressed: enabled ? controller.previous : null,
           ),
           MornyePlaybackButton(
@@ -464,6 +466,7 @@ class _Transport extends ConsumerWidget {
             iconSize: 22,
             padding: const EdgeInsets.all(5),
             loading: isLoading,
+            pointerPress: true,
             onPressed: onPlayPause,
           ),
           MornyePlaybackButton(
@@ -472,6 +475,7 @@ class _Transport extends ConsumerWidget {
             color: colorScheme.onSurface,
             iconSize: 18,
             padding: const EdgeInsets.all(7),
+            pointerPress: true,
             onPressed: enabled ? controller.next : null,
           ),
         ],
@@ -610,7 +614,7 @@ class _SeekRow extends ConsumerWidget {
 class _MornyeLcd extends StatelessWidget {
   const _MornyeLcd({required this.mediaItem});
 
-  static const double _artworkSize = 32;
+  static const double _artworkSize = 34;
 
   final MediaItem? mediaItem;
 
@@ -643,10 +647,12 @@ class _MornyeLcd extends StatelessWidget {
               onTap: _toggleNowPlaying,
               child: Row(
                 children: [
-                  _Artwork(
-                    mediaItem: item,
-                    size: _artworkSize,
-                    radius: context.tokens.radiusThumb - 4,
+                  _MornyeLcdArtwork(
+                    child: _Artwork(
+                      mediaItem: item,
+                      size: _artworkSize,
+                      radius: context.tokens.radiusThumb - 4,
+                    ),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
@@ -680,7 +686,67 @@ class _MornyeLcd extends StatelessWidget {
   }
 }
 
+/// The LCD's artwork, which grows by a tenth under the pointer and shows
+/// that a click opens Now Playing.
+class _MornyeLcdArtwork extends StatefulWidget {
+  const _MornyeLcdArtwork({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_MornyeLcdArtwork> createState() => _MornyeLcdArtworkState();
+}
+
+class _MornyeLcdArtworkState extends State<_MornyeLcdArtwork> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
+    final motion = reduceMotion
+        ? Duration.zero
+        : const Duration(milliseconds: 150);
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: AnimatedScale(
+        scale: _hovered && !reduceMotion ? 1.1 : 1,
+        duration: motion,
+        curve: Curves.easeOut,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            widget.child,
+            Positioned.fill(
+              child: AnimatedOpacity(
+                key: const ValueKey('desktop-player-artwork-overlay'),
+                opacity: _hovered ? 1 : 0,
+                duration: motion,
+                curve: Curves.easeOut,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.45),
+                    borderRadius: BorderRadius.circular(
+                      context.tokens.radiusThumb - 4,
+                    ),
+                  ),
+                  child: const Icon(
+                    CupertinoIcons.arrow_up_left_arrow_down_right,
+                    size: 14,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 /// The LCD's title and "artist · album" line, left-aligned like Music's.
+/// A line too long for the capsule scrolls twice, then rests at its start.
 class _MornyeLcdLines extends ConsumerWidget {
   const _MornyeLcdLines({required this.mediaItem});
 
@@ -699,12 +765,16 @@ class _MornyeLcdLines extends ConsumerWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        ExplicitTrackTitle(
-          title: mediaItem.title,
-          explicit: parseExplicitFlag(mediaItem.extras?['explicit']) == true,
-          style: style?.copyWith(fontWeight: FontWeight.w600),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
+        OverflowMarquee(
+          resetKey: (mediaItem.id, mediaItem.title),
+          maxCycles: 2,
+          child: ExplicitTrackTitle(
+            title: mediaItem.title,
+            explicit: parseExplicitFlag(mediaItem.extras?['explicit']) == true,
+            style: style?.copyWith(fontWeight: FontWeight.w600),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
         ),
         // The capsule has two lines: while the desktop follows a phone,
         // the second names it instead.
@@ -717,11 +787,15 @@ class _MornyeLcdLines extends ConsumerWidget {
             glyphSize: 12,
           )
         else if (subtitle.isNotEmpty)
-          Text(
-            subtitle,
-            style: style?.copyWith(color: colorScheme.onSurfaceVariant),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+          OverflowMarquee(
+            resetKey: (mediaItem.id, subtitle),
+            maxCycles: 2,
+            child: Text(
+              subtitle,
+              style: style?.copyWith(color: colorScheme.onSurfaceVariant),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
       ],
     );
@@ -923,41 +997,50 @@ class _MornyeVolumeButtonState extends ConsumerState<_MornyeVolumeButton> {
       controller: _menu,
       consumeOutsideTap: true,
       alignmentOffset: const Offset(-96, 8),
-      style: MenuStyle(
-        padding: const WidgetStatePropertyAll(EdgeInsets.zero),
-        backgroundColor: WidgetStatePropertyAll(
-          colorScheme.surfaceContainerHigh,
-        ),
-        shape: WidgetStatePropertyAll(
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        ),
+      style: const MenuStyle(
+        padding: WidgetStatePropertyAll(EdgeInsets.zero),
+        // The glass panel below is the popover's surface, so it can fade in.
+        backgroundColor: WidgetStatePropertyAll(Colors.transparent),
+        surfaceTintColor: WidgetStatePropertyAll(Colors.transparent),
+        shadowColor: WidgetStatePropertyAll(Colors.transparent),
+        elevation: WidgetStatePropertyAll(0),
       ),
       menuChildren: [
-        SizedBox(
-          key: const ValueKey('desktop-player-volume-popover'),
-          width: 240,
-          height: 48,
-          child: PlayerVolumeControl(foreground: colorScheme.onSurface),
-        ),
-        // The capsule has no room for its own Cast button; output sits with
-        // volume, as in Music.
-        SizedBox(
-          width: 240,
-          child: MenuItemButton(
-            key: const ValueKey('desktop-player-cast'),
-            leadingIcon: AppIcon(
-              cast.connected ? Icons.cast_connected : Icons.cast,
-              size: 18,
-            ),
-            onPressed: () {
-              _menu.close();
-              showCastDevicePicker(context, output: cast);
-            },
-            child: Text(
-              cast.connected
-                  ? cast.deviceName ?? context.l10n.audioOutputCast
-                  : context.l10n.audioOutputCast,
-              overflow: TextOverflow.ellipsis,
+        _MornyePopoverEntrance(
+          child: MornyeGlassPanel.overlay(
+            radius: 14,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  key: const ValueKey('desktop-player-volume-popover'),
+                  width: 240,
+                  height: 48,
+                  child: PlayerVolumeControl(foreground: colorScheme.onSurface),
+                ),
+                // The capsule has no room for its own Cast button; output
+                // sits with volume, as in Music.
+                SizedBox(
+                  width: 240,
+                  child: MenuItemButton(
+                    key: const ValueKey('desktop-player-cast'),
+                    leadingIcon: AppIcon(
+                      cast.connected ? Icons.cast_connected : Icons.cast,
+                      size: 18,
+                    ),
+                    onPressed: () {
+                      _menu.close();
+                      showCastDevicePicker(context, output: cast);
+                    },
+                    child: Text(
+                      cast.connected
+                          ? cast.deviceName ?? context.l10n.audioOutputCast
+                          : context.l10n.audioOutputCast,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ),
@@ -971,6 +1054,33 @@ class _MornyeVolumeButtonState extends ConsumerState<_MornyeVolumeButton> {
           onPressed: () => _menu.isOpen ? _menu.close() : _menu.open(),
         ),
       ),
+    );
+  }
+}
+
+/// Music's popover entrance: 250ms of fade with a short rise.
+class _MornyePopoverEntrance extends StatelessWidget {
+  const _MornyePopoverEntrance({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: 1),
+      duration: reduceMotion
+          ? Duration.zero
+          : const Duration(milliseconds: 250),
+      curve: Curves.easeOut,
+      builder: (context, progress, child) => Opacity(
+        opacity: progress,
+        child: Transform.translate(
+          offset: Offset(0, 6 * (1 - progress)),
+          child: child,
+        ),
+      ),
+      child: child,
     );
   }
 }

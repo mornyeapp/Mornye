@@ -14,6 +14,7 @@ import 'package:mornye/theme/material_expressive.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/app_icon_button.dart';
+import 'package:mornye/widgets/cached_cover_image.dart';
 import 'package:mornye/widgets/desktop/desktop_commands.dart';
 import 'package:mornye/widgets/desktop/desktop_inspector.dart';
 import 'package:mornye/widgets/desktop/desktop_now_playing.dart';
@@ -268,8 +269,7 @@ class DesktopShellLayout extends ConsumerWidget {
   Widget _shell(BuildContext context, bool showPlayer) {
     final width = MediaQuery.sizeOf(context).width;
     if (context.isMornye) {
-      // The sidebar always shows; the page background shows around the
-      // inset panel.
+      // The sidebar always shows, full height against the window's edges.
       return ColoredBox(
         color: Theme.of(context).colorScheme.surface,
         child: Row(
@@ -1017,16 +1017,7 @@ class DesktopSidebar extends ConsumerWidget {
   });
 
   /// Width of the panel.
-  static const double width = 210;
-
-  /// Space between the panel and the window edges and content pane.
-  static const double margin = 8;
-
-  /// Width the sidebar takes from the window.
-  static const double footprint = width + 2 * margin;
-
-  /// Corner radius of the panel.
-  static const double radius = 12;
+  static const double width = 226;
 
   final List<DesktopDestination> destinations;
   final ShellTab? selected;
@@ -1116,7 +1107,7 @@ class DesktopSidebar extends ConsumerWidget {
         // A source list scrolls without a bar, as in Music's sidebar.
         return NoScrollbars(
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(6, 0, 6, 8),
+            padding: const EdgeInsets.fromLTRB(10, 0, 10, 8),
             children: [
               for (final destination in topLevel) destinationRow(destination),
               if (links.isNotEmpty) ...[
@@ -1159,55 +1150,162 @@ class DesktopSidebar extends ConsumerWidget {
     final panel = ValueListenableBuilder<Color?>(
       valueListenable: ShellNavigationService.chromeSurface,
       builder: (context, tint, child) => DecoratedBox(
+        // One piece with the window, as in Music: only a hairline parts it
+        // from the content, and the window's own corners are its corners.
         decoration: BoxDecoration(
           color: panelColor(context, tint),
-          borderRadius: BorderRadius.circular(radius),
-          border: Border.all(
-            color: Theme.of(
-              context,
-            ).colorScheme.onSurface.withValues(alpha: 0.08),
-            width: 0.5,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.10),
-              blurRadius: 12,
-              offset: const Offset(0, 2),
+          border: BorderDirectional(
+            end: BorderSide(
+              color: Theme.of(
+                context,
+              ).colorScheme.onSurface.withValues(alpha: 0.1),
+              width: 0.5,
             ),
-          ],
+          ),
         ),
         child: child,
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(radius),
-        child: Material(
-          type: MaterialType.transparency,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const _SidebarHeader(),
-              Expanded(child: list),
-              if (settings != null)
-                _SidebarAccountRow(
-                  settings: settings,
-                  settingsSelected: selected == ShellTab.settings,
-                  settingsTooltip: desktopDestinationTooltip(
-                    context,
-                    settings.label,
-                    _positionOf(destinations, ShellTab.settings),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          const _SidebarBackdrop(),
+          Material(
+            type: MaterialType.transparency,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const _SidebarHeader(),
+                Expanded(child: list),
+                if (settings != null)
+                  _SidebarAccountRow(
+                    settings: settings,
+                    settingsSelected: selected == ShellTab.settings,
+                    settingsTooltip: desktopDestinationTooltip(
+                      context,
+                      settings.label,
+                      _positionOf(destinations, ShellTab.settings),
+                    ),
+                    onOpenSettings: () => onSelected(ShellTab.settings),
+                    onOpenProfile:
+                        onOpenProfile ?? () => onSelected(ShellTab.settings),
                   ),
-                  onOpenSettings: () => onSelected(ShellTab.settings),
-                  onOpenProfile:
-                      onOpenProfile ?? () => onSelected(ShellTab.settings),
-                ),
-            ],
+              ],
+            ),
           ),
-        ),
+        ],
       ),
     );
-    return SizedBox(
-      width: footprint,
-      child: Padding(padding: const EdgeInsets.all(margin), child: panel),
+    return SizedBox(width: width, child: panel);
+  }
+}
+
+/// The page's hero running on under the sidebar, as in Music, where the
+/// artwork fills the window and the sidebar blurs it.
+///
+/// The sidebar and the page are separate panes, so this paints the artwork
+/// again rather than sampling the page: a tiny decode, enlarged and mirrored
+/// at the seam. The enlargement is the blur, with no filter to rerun on each
+/// scroll frame, and the mirror meets the hero's edge with the same colors.
+class _SidebarBackdrop extends StatelessWidget {
+  const _SidebarBackdrop();
+
+  /// Decoded width; the fewer pixels, the softer the enlarged image.
+  static const int _decodeWidth = 48;
+
+  @override
+  Widget build(BuildContext context) => ValueListenableBuilder<String?>(
+    valueListenable: ShellNavigationService.chromeBackdrop,
+    builder: (context, source, _) {
+      final image = source == null
+          ? null
+          : coverImageProvider(source, cacheWidth: _decodeWidth);
+      return AnimatedSwitcher(
+        duration: MediaQuery.disableAnimationsOf(context)
+            ? Duration.zero
+            : const Duration(milliseconds: 300),
+        layoutBuilder: (current, previous) =>
+            Stack(fit: StackFit.expand, children: [...previous, ?current]),
+        child: image == null
+            ? const SizedBox.expand()
+            : ClipRect(
+                key: ValueKey(source),
+                child: _SidebarArtwork(image: image),
+              ),
+      );
+    },
+  );
+}
+
+class _SidebarArtwork extends StatelessWidget {
+  const _SidebarArtwork({required this.image});
+
+  final ImageProvider image;
+
+  @override
+  Widget build(BuildContext context) {
+    final window = MediaQuery.sizeOf(context);
+    final hero = Size(
+      window.width - DesktopSidebar.width,
+      // MornyeArtistHeader's hero height on the desktop.
+      (window.height * 0.82).clamp(420.0, 820.0),
+    );
+    return ValueListenableBuilder<Color?>(
+      valueListenable: ShellNavigationService.chromeSurface,
+      builder: (context, tint, _) {
+        final fill = DesktopSidebar.panelColor(context, tint);
+        return AnimatedBuilder(
+          animation: ShellNavigationService.chromeBackdropOffset,
+          builder: (context, child) => Transform.translate(
+            offset: Offset(
+              0,
+              -ShellNavigationService.chromeBackdropOffset.value,
+            ),
+            child: child,
+          ),
+          child: RepaintBoundary(
+            child: OverflowBox(
+              alignment: AlignmentDirectional.topEnd,
+              minWidth: hero.width,
+              maxWidth: hero.width,
+              minHeight: hero.height,
+              maxHeight: hero.height,
+              child: Stack(
+                key: const ValueKey('desktop-sidebar-backdrop'),
+                fit: StackFit.expand,
+                children: [
+                  Transform.flip(
+                    flipX: true,
+                    child: Image(
+                      image: image,
+                      fit: BoxFit.cover,
+                      alignment: Alignment.topCenter,
+                      filterQuality: FilterQuality.high,
+                      gaplessPlayback: true,
+                      excludeFromSemantics: true,
+                      errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                    ),
+                  ),
+                  // Music's sidebar glass, fading out where the hero ends.
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        stops: const [0, 0.6, 1],
+                        colors: [
+                          fill.withValues(alpha: 0.42),
+                          fill.withValues(alpha: 0.62),
+                          fill,
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -1249,7 +1347,7 @@ class _SidebarAccountRow extends ConsumerWidget {
         ),
       ),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(6, 6, 6, 6),
+        padding: const EdgeInsets.fromLTRB(10, 6, 10, 8),
         child: Row(
           children: [
             Expanded(
@@ -1333,9 +1431,8 @@ class _SidebarHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => SizedBox(
-    // The panel starts [DesktopSidebar.margin] below the window top.
     height: desktopTitleBarInContentFor(context)
-        ? desktopTitleBarHeight - DesktopSidebar.margin
+        ? desktopTitleBarHeight
         : height,
     child: const DesktopWindowDragArea(
       zoomOnDoubleClick: true,

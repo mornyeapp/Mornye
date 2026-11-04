@@ -39,6 +39,54 @@ void main() {
     return (feedback.decoration as BoxDecoration).color!.a;
   }
 
+  testWidgets('the capsule press shrinks the glyph over a growing disc', (
+    tester,
+  ) async {
+    final style = IconButton.styleFrom(
+      minimumSize: const Size.square(32),
+      fixedSize: const Size.square(32),
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Center(
+            child: IconButtonTheme(
+              data: IconButtonThemeData(style: style),
+              child: MornyePlaybackButton(
+                icon: CupertinoIcons.play_fill,
+                tooltip: 'Playback action',
+                color: Colors.white,
+                iconSize: 22,
+                padding: const EdgeInsets.all(5),
+                pointerPress: true,
+                onPressed: () {},
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    final button = find.byType(IconButton);
+    final icon = find.byIcon(CupertinoIcons.play_fill);
+    final disc = find.byKey(const ValueKey('mornye-playback-press-disc'));
+    final bounds = tester.getRect(button);
+    final iconWidth = tester.getRect(icon).width;
+    expect(tester.getSize(disc).width, 32);
+
+    final press = await tester.startGesture(bounds.center);
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(tester.getRect(icon).width, closeTo(iconWidth * 0.9, 0.01));
+    expect(tester.getRect(button), bounds);
+    final grown = tester.widget<Transform>(disc).transform.getMaxScaleOnAxis();
+    expect(grown * 32, closeTo(38, 0.01));
+
+    await press.up();
+    await tester.pumpAndSettle();
+    expect(tester.getRect(icon).width, iconWidth);
+  });
+
   testWidgets('press feedback keeps the tap target fixed and cancels safely', (
     tester,
   ) async {

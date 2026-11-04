@@ -25,7 +25,14 @@ class DesktopHoverPlayButton extends StatefulWidget {
 
   /// Visible circle; the pointer target is [_target].
   static const double _diameter = 36;
+  static const double _mornyeDiameter = 30;
   static const double _target = 40;
+
+  /// Dims the artwork behind the Mornye button, as in Music.
+  static const Color _mornyeScrim = Color(0x4D333333);
+
+  /// Corner radius of the Mornye tiles this button sits on.
+  static const double _mornyeRadius = 8;
 
   @override
   State<DesktopHoverPlayButton> createState() => _DesktopHoverPlayButtonState();
@@ -49,63 +56,92 @@ class _DesktopHoverPlayButtonState extends State<DesktopHoverPlayButton> {
         ? Colors.white.withValues(alpha: 0.92)
         : colorScheme.primaryContainer;
     final foreground = mornye ? Colors.black : colorScheme.onPrimaryContainer;
-    return Positioned.fill(
-      child: MouseRegion(
-        opaque: false,
-        hitTestBehavior: HitTestBehavior.translucent,
-        onEnter: (_) => setState(() => _hovered = true),
-        onExit: (_) => setState(() => _hovered = false),
-        child: Align(
-          alignment: AlignmentDirectional.bottomStart,
-          child: Padding(
-            padding: const EdgeInsets.all(6),
-            child: AnimatedOpacity(
-              opacity: visible ? 1 : 0,
-              duration: const Duration(milliseconds: 120),
-              child: IgnorePointer(
-                ignoring: !visible,
-                child: Focus(
-                  canRequestFocus: false,
-                  onFocusChange: (focused) =>
-                      setState(() => _focused = focused),
-                  child: IconButton(
-                    tooltip: widget.tooltip,
-                    onPressed: widget.onPlay,
-                    padding: EdgeInsets.zero,
-                    style: IconButton.styleFrom(
-                      fixedSize: const Size.square(
-                        DesktopHoverPlayButton._target,
-                      ),
-                      minimumSize: const Size.square(
-                        DesktopHoverPlayButton._target,
-                      ),
-                      shape: const CircleBorder(),
-                      backgroundColor: Colors.transparent,
-                    ),
-                    icon: Container(
-                      width: DesktopHoverPlayButton._diameter,
-                      height: DesktopHoverPlayButton._diameter,
-                      decoration: BoxDecoration(
-                        color: background,
-                        shape: BoxShape.circle,
-                        boxShadow: const [
-                          BoxShadow(blurRadius: 6, color: Color(0x33000000)),
-                        ],
-                      ),
-                      child: Icon(
-                        mornye
-                            ? mornyeIconFor(Icons.play_arrow)
-                            : Icons.play_arrow_rounded,
-                        size: 22,
-                        color: foreground,
-                      ),
-                    ),
+    final diameter = mornye
+        ? DesktopHoverPlayButton._mornyeDiameter
+        : DesktopHoverPlayButton._diameter;
+    final fade = Duration(milliseconds: mornye ? 100 : 120);
+    final fadeCurve = mornye ? Curves.easeIn : Curves.linear;
+    final button = Align(
+      alignment: AlignmentDirectional.bottomStart,
+      child: Padding(
+        // The visible circle sits 10 from the Mornye artwork's corner; the
+        // target around it is larger.
+        padding: EdgeInsets.all(mornye ? 5 : 6),
+        child: AnimatedOpacity(
+          opacity: visible ? 1 : 0,
+          duration: fade,
+          curve: fadeCurve,
+          child: IgnorePointer(
+            ignoring: !visible,
+            child: Focus(
+              canRequestFocus: false,
+              onFocusChange: (focused) => setState(() => _focused = focused),
+              child: IconButton(
+                tooltip: widget.tooltip,
+                onPressed: widget.onPlay,
+                padding: EdgeInsets.zero,
+                style: IconButton.styleFrom(
+                  fixedSize: const Size.square(DesktopHoverPlayButton._target),
+                  minimumSize: const Size.square(
+                    DesktopHoverPlayButton._target,
+                  ),
+                  shape: const CircleBorder(),
+                  backgroundColor: Colors.transparent,
+                ),
+                icon: Container(
+                  width: diameter,
+                  height: diameter,
+                  decoration: BoxDecoration(
+                    color: background,
+                    shape: BoxShape.circle,
+                    boxShadow: const [
+                      BoxShadow(blurRadius: 6, color: Color(0x33000000)),
+                    ],
+                  ),
+                  child: Icon(
+                    mornye
+                        ? mornyeIconFor(Icons.play_arrow)
+                        : Icons.play_arrow_rounded,
+                    size: mornye ? 16 : 22,
+                    color: foreground,
                   ),
                 ),
               ),
             ),
           ),
         ),
+      ),
+    );
+    return Positioned.fill(
+      child: MouseRegion(
+        opaque: false,
+        hitTestBehavior: HitTestBehavior.translucent,
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() => _hovered = false),
+        child: !mornye
+            ? button
+            : Stack(
+                fit: StackFit.expand,
+                children: [
+                  IgnorePointer(
+                    child: AnimatedOpacity(
+                      key: const ValueKey('desktop-hover-scrim'),
+                      opacity: visible ? 1 : 0,
+                      duration: fade,
+                      curve: fadeCurve,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: DesktopHoverPlayButton._mornyeScrim,
+                          borderRadius: BorderRadius.circular(
+                            DesktopHoverPlayButton._mornyeRadius,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  button,
+                ],
+              ),
       ),
     );
   }

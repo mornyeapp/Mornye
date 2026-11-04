@@ -1,6 +1,9 @@
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 
+/// How far the pointer press disc grows: from 32 to 38 on the capsule.
+const _pressDiscGrowth = 6 / 32;
+
 /// The press response and advancing skip glyphs used by Mornye's transport.
 class MornyePlaybackButton extends StatefulWidget {
   const MornyePlaybackButton({
@@ -12,6 +15,7 @@ class MornyePlaybackButton extends StatefulWidget {
     this.iconSize = 40,
     this.padding = const EdgeInsets.all(8),
     this.loading = false,
+    this.pointerPress = false,
   });
 
   final IconData icon;
@@ -22,6 +26,10 @@ class MornyePlaybackButton extends StatefulWidget {
   final EdgeInsetsGeometry padding;
   final bool loading;
 
+  /// The desktop capsule's press, as in Music: the glyph shrinks to 90% over
+  /// a disc that grows past the button, both 200ms easing out.
+  final bool pointerPress;
+
   @override
   State<MornyePlaybackButton> createState() => _MornyePlaybackButtonState();
 }
@@ -31,8 +39,8 @@ class _MornyePlaybackButtonState extends State<MornyePlaybackButton>
   final _states = WidgetStatesController();
   late final _press = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 100),
-    reverseDuration: const Duration(milliseconds: 320),
+    duration: Duration(milliseconds: widget.pointerPress ? 200 : 100),
+    reverseDuration: Duration(milliseconds: widget.pointerPress ? 200 : 320),
   );
   late final _skip = AnimationController(
     vsync: this,
@@ -109,7 +117,14 @@ class _MornyePlaybackButtonState extends State<MornyePlaybackButton>
   @override
   Widget build(BuildContext context) {
     final reduceMotion = MediaQuery.disableAnimationsOf(context);
-    final motion = Duration(milliseconds: reduceMotion ? 120 : 180);
+    final pointerPress = widget.pointerPress;
+    final motion = Duration(
+      milliseconds: reduceMotion
+          ? 120
+          : pointerPress
+          ? 200
+          : 180,
+    );
     final enabled = widget.onPressed != null && !widget.loading;
     final button = IconButton(
       statesController: _states,
@@ -139,11 +154,15 @@ class _MornyePlaybackButtonState extends State<MornyePlaybackButton>
         builder: (context, states, _) {
           final pressed = states.contains(WidgetState.pressed);
           return AnimatedScale(
-            scale: pressed && !reduceMotion ? 0.95 : 1,
+            scale: !pressed || reduceMotion
+                ? 1
+                : pointerPress
+                ? 0.9
+                : 0.95,
             duration: motion,
-            curve: Curves.easeOutCubic,
+            curve: pointerPress ? Curves.easeOut : Curves.easeOutCubic,
             child: AnimatedOpacity(
-              opacity: pressed ? 0.72 : 1,
+              opacity: pressed && !pointerPress ? 0.72 : 1,
               duration: motion,
               child: SizedBox.square(
                 dimension: widget.iconSize,
@@ -172,15 +191,38 @@ class _MornyePlaybackButtonState extends State<MornyePlaybackButton>
     return AnimatedBuilder(
       animation: _press,
       child: button,
-      builder: (context, child) => DecoratedBox(
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: widget.color.withValues(
-            alpha: 0.14 * Curves.easeOutCubic.transform(_press.value),
-          ),
-        ),
-        child: child,
-      ),
+      builder: (context, child) {
+        if (!pointerPress) {
+          return DecoratedBox(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: widget.color.withValues(
+                alpha: 0.14 * Curves.easeOutCubic.transform(_press.value),
+              ),
+            ),
+            child: child,
+          );
+        }
+        final progress = Curves.easeOut.transform(_press.value);
+        return Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Positioned.fill(
+              child: Transform.scale(
+                key: const ValueKey('mornye-playback-press-disc'),
+                scale: reduceMotion ? 1 : 1 + _pressDiscGrowth * progress,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: widget.color.withValues(alpha: 0.2 * progress),
+                  ),
+                ),
+              ),
+            ),
+            child!,
+          ],
+        );
+      },
     );
   }
 }

@@ -35,6 +35,7 @@ import 'package:mornye/widgets/overflow_marquee.dart';
 import 'package:mornye/widgets/player_artwork.dart';
 import 'package:mornye/widgets/settings_group.dart';
 import 'package:mornye/widgets/mornye_chrome.dart';
+import 'package:mornye/widgets/mornye_glass_press.dart';
 
 class MiniPlayer extends ConsumerStatefulWidget {
   const MiniPlayer({super.key, this.compact = false, this.bottomPadding = 8});
@@ -450,11 +451,14 @@ class _MiniPlayerBodyState extends ConsumerState<_MiniPlayerBody> {
     return mornye
         ? Padding(
             padding: EdgeInsets.only(bottom: widget.bottomPadding),
-            child: MornyeGlass.navigation(
-              strongTint: true,
-              tintOpacity: MornyeTheme.chromeOpacity(context),
-              blurEnabled: ref.watch(mornyeBlurEnabledProvider),
-              child: swipeable,
+            child: MornyeGlassPress(
+              radius: 32,
+              child: MornyeGlass.navigation(
+                strongTint: true,
+                tintOpacity: MornyeTheme.chromeOpacity(context),
+                blurEnabled: ref.watch(mornyeBlurEnabledProvider),
+                child: swipeable,
+              ),
             ),
           )
         : swipeable;

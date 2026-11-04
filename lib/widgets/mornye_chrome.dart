@@ -6,6 +6,7 @@ import 'package:liquid_glass_easy/liquid_glass_easy.dart';
 import 'package:mornye/providers/runtime_profile_provider.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/desktop_platform.dart';
+import 'package:mornye/widgets/mornye_glass_press.dart';
 import 'package:mornye/widgets/mornye_selection_pill.dart';
 import 'package:mornye/widgets/mornye_liquid_backdrop.dart';
 import 'package:mornye/widgets/mornye_squircle_border.dart';
@@ -42,30 +43,33 @@ class MornyeSegmentedControl extends ConsumerWidget {
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: SizedBox(
         height: height,
-        child: MornyeGlass.navigation(
-          blurEnabled: ref.watch(mornyeBlurEnabledProvider),
+        child: MornyeGlassPress(
           radius: height / 2,
-          samplesBackdrop: samplesBackdrop,
-          child: MornyeSelectionPill(
-            contrastBlocked: contrastBlocked,
-            // The held lens follows a finger. A click never holds it, and over
-            // an opaque toolbar it only refracts a flat fill, so desktop skips
-            // it.
-            liquidInteraction:
-                !isDesktopPlatform &&
-                ref.watch(mornyeLiquidGlassProvider) &&
-                MornyeTheme.glassClarityOf(context) > 0.2,
-            labels: labels,
-            selectedIndex: selectedIndex,
-            onChanged: onChanged,
-            itemBuilder: (context, index, selected) => Center(
-              child: Text(
-                labels[index],
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurface,
-                  fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+          child: MornyeGlass.navigation(
+            blurEnabled: ref.watch(mornyeBlurEnabledProvider),
+            radius: height / 2,
+            samplesBackdrop: samplesBackdrop,
+            child: MornyeSelectionPill(
+              contrastBlocked: contrastBlocked,
+              // The held lens follows a finger. A click never holds it, and
+              // over an opaque toolbar it only refracts a flat fill, so desktop
+              // skips it.
+              liquidInteraction:
+                  !isDesktopPlatform &&
+                  ref.watch(mornyeLiquidGlassProvider) &&
+                  MornyeTheme.glassClarityOf(context) > 0.2,
+              labels: labels,
+              selectedIndex: selectedIndex,
+              onChanged: onChanged,
+              itemBuilder: (context, index, selected) => Center(
+                child: Text(
+                  labels[index],
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurface,
+                    fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                  ),
                 ),
               ),
             ),
@@ -534,7 +538,11 @@ class MornyeFilterChip extends StatelessWidget {
         ),
       ),
     );
-    return ClipRRect(borderRadius: BorderRadius.circular(24), child: content);
+    return MornyeGlassPress(
+      radius: 24,
+      enabled: onTap != null,
+      child: ClipRRect(borderRadius: BorderRadius.circular(24), child: content),
+    );
   }
 }
 

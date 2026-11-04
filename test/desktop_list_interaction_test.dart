@@ -426,6 +426,47 @@ void main() {
       ),
     );
 
+    testWidgets('Mornye dims the artwork under a small corner button', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _app(
+          Center(
+            child: SizedBox.square(
+              dimension: 160,
+              child: Stack(
+                children: [
+                  const Positioned.fill(child: ColoredBox(color: Colors.grey)),
+                  DesktopHoverPlayButton(tooltip: 'Play', onPlay: () {}),
+                ],
+              ),
+            ),
+          ),
+          mornye: true,
+        ),
+      );
+      final scrim = find.byKey(const ValueKey('desktop-hover-scrim'));
+      expect(tester.widget<AnimatedOpacity>(scrim).opacity, 0);
+
+      final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      final tile = tester.getRect(find.byType(ColoredBox).last);
+      await mouse.addPointer(location: tile.center);
+      await tester.pumpAndSettle();
+      expect(tester.widget<AnimatedOpacity>(scrim).opacity, 1);
+      expect(tester.getSize(scrim), tile.size);
+
+      final disc = tester.getRect(
+        find.descendant(
+          of: find.byType(IconButton),
+          matching: find.byType(Container),
+        ),
+      );
+      expect(disc.size, const Size.square(30));
+      expect(disc.left - tile.left, 10);
+      expect(tile.bottom - disc.bottom, 10);
+      await mouse.removePointer();
+    }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
+
     testWidgets('appears while the pointer is on the artwork', (tester) async {
       var played = 0;
       await tester.pumpWidget(tile(() => played++));

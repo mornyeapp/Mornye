@@ -8,7 +8,8 @@ import 'package:mornye/widgets/decorative_phase.dart';
 ///
 /// The bars move while [playing] and freeze where they are once playback
 /// pauses. Reduced motion keeps them still, and the motion stops while a
-/// disabled [TickerMode] hides the glyph, such as on a covered route.
+/// disabled [TickerMode] hides the glyph, such as on a covered route, or
+/// while the app's window is not active.
 ///
 /// The glyph is decorative: the row it sits in carries the label, so it
 /// adds nothing to the semantics tree.
@@ -34,9 +35,26 @@ class NowPlayingIndicator extends StatefulWidget {
   State<NowPlayingIndicator> createState() => _NowPlayingIndicatorState();
 }
 
-class _NowPlayingIndicatorState extends State<NowPlayingIndicator> {
+class _NowPlayingIndicatorState extends State<NowPlayingIndicator>
+    with WidgetsBindingObserver {
   final _phase = DecorativePhase(const Duration(milliseconds: 2400));
   bool _motionEnabled = false;
+  bool _appActive = true;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    final lifecycle = WidgetsBinding.instance.lifecycleState;
+    _appActive = lifecycle == null || lifecycle == AppLifecycleState.resumed;
+  }
+
+  // A window in the background keeps the glyph but not its animation.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _appActive = state == AppLifecycleState.resumed;
+    _syncAnimation();
+  }
 
   @override
   void didChangeDependencies() {
@@ -54,7 +72,7 @@ class _NowPlayingIndicatorState extends State<NowPlayingIndicator> {
   }
 
   void _syncAnimation() {
-    if (_motionEnabled && widget.playing) {
+    if (_motionEnabled && _appActive && widget.playing) {
       _phase.start();
     } else {
       _phase.stop();
@@ -63,6 +81,7 @@ class _NowPlayingIndicatorState extends State<NowPlayingIndicator> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _phase.dispose();
     super.dispose();
   }

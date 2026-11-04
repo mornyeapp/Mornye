@@ -14,6 +14,7 @@ import 'package:mornye/theme/material_expressive.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/theme/mornye_icons.dart';
 import 'package:mornye/widgets/mornye_chrome.dart';
+import 'package:mornye/widgets/mornye_glass_press.dart';
 import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/app_icon_button.dart';
 import 'package:mornye/widgets/expressive_button.dart';
@@ -556,7 +557,7 @@ class AlbumDetailHeader extends StatelessWidget {
   }
 }
 
-/// Marks header buttons grouped in one desktop capsule, where they drop their
+/// Marks header buttons grouped in one glass capsule, where they drop their
 /// own glass circle.
 class HeaderActionGroup extends InheritedWidget {
   const HeaderActionGroup({super.key, required super.child});
@@ -566,6 +567,39 @@ class HeaderActionGroup extends InheritedWidget {
 
   @override
   bool updateShouldNotify(HeaderActionGroup oldWidget) => false;
+}
+
+/// Mornye page actions grouped in one glass capsule, as beside Music's page
+/// title on the Mac and on iPhone.
+class MornyeActionCapsule extends ConsumerWidget {
+  const MornyeActionCapsule({super.key, required this.children});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    // Level with the round back button beside it.
+    final radius = isDesktopPlatform ? 18.0 : 22.0;
+    return Center(
+      widthFactor: 1,
+      child: MornyeGlassPress(
+        radius: radius,
+        child: MornyeGlass.navigation(
+          radius: radius,
+          tintColor: dark ? Colors.black : Colors.white,
+          tintOpacity: dark ? 0.45 : 0.55,
+          blurEnabled: ref.watch(mornyeBlurEnabledProvider),
+          child: HeaderActionGroup(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 2),
+              child: Row(mainAxisSize: MainAxisSize.min, children: children),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _AlbumStretchArtwork extends StatelessWidget {
@@ -899,7 +933,7 @@ class HeaderCircleButton extends ConsumerWidget {
         tooltip: tooltip,
         icon: AppIcon(mornyeIconFor(icon), size: iconSize),
         style: IconButton.styleFrom(
-          minimumSize: Size.square(buttonSize ?? 36),
+          minimumSize: Size.square(buttonSize ?? 44),
           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
           foregroundColor: iconColor ?? scheme.onSurface,
         ),
@@ -911,20 +945,24 @@ class HeaderCircleButton extends ConsumerWidget {
           message: tooltip,
           child: SizedBox.square(
             dimension: buttonSize ?? 44,
-            child: CupertinoButton(
-              padding: EdgeInsets.zero,
-              minimumSize: Size.square(buttonSize ?? 44),
-              borderRadius: BorderRadius.circular((buttonSize ?? 48) / 2),
-              color: scheme.onSurface.withValues(
-                alpha: scheme.brightness == Brightness.dark ? 0.10 : 0.06,
-              ),
-              onPressed: onPressed,
-              child: AppIcon(
-                mornyeIconFor(icon),
-                size: iconSize,
-                color: onPressed == null
-                    ? scheme.onSurfaceVariant
-                    : iconColor ?? scheme.primary,
+            child: MornyeGlassPress(
+              radius: (buttonSize ?? 44) / 2,
+              enabled: onPressed != null,
+              child: CupertinoButton(
+                padding: EdgeInsets.zero,
+                minimumSize: Size.square(buttonSize ?? 44),
+                borderRadius: BorderRadius.circular((buttonSize ?? 48) / 2),
+                color: scheme.onSurface.withValues(
+                  alpha: scheme.brightness == Brightness.dark ? 0.10 : 0.06,
+                ),
+                onPressed: onPressed,
+                child: AppIcon(
+                  mornyeIconFor(icon),
+                  size: iconSize,
+                  color: onPressed == null
+                      ? scheme.onSurfaceVariant
+                      : iconColor ?? scheme.primary,
+                ),
               ),
             ),
           ),
@@ -944,18 +982,22 @@ class HeaderCircleButton extends ConsumerWidget {
       );
       return Center(
         widthFactor: 1,
-        child: MornyeGlass.navigation(
+        child: MornyeGlassPress(
           radius: (buttonSize ?? 48) / 2,
-          tintColor:
-              glassTintColor ??
-              (scheme.brightness == Brightness.dark
-                  ? Colors.black
-                  : Colors.white),
-          tintOpacity:
-              glassTintOpacity ??
-              (scheme.brightness == Brightness.dark ? 0.45 : 0.55),
-          blurEnabled: blurEnabled,
-          child: button,
+          enabled: onPressed != null,
+          child: MornyeGlass.navigation(
+            radius: (buttonSize ?? 48) / 2,
+            tintColor:
+                glassTintColor ??
+                (scheme.brightness == Brightness.dark
+                    ? Colors.black
+                    : Colors.white),
+            tintOpacity:
+                glassTintOpacity ??
+                (scheme.brightness == Brightness.dark ? 0.45 : 0.55),
+            blurEnabled: blurEnabled,
+            child: button,
+          ),
         ),
       );
     }
@@ -968,6 +1010,27 @@ class HeaderCircleButton extends ConsumerWidget {
       foregroundColor: iconColor ?? scheme.onSurfaceVariant,
     );
   }
+}
+
+/// The page's More button, opening [groups] below itself.
+class HeaderMoreButton extends StatelessWidget {
+  const HeaderMoreButton({super.key, required this.groups});
+
+  final List<List<ContextMenuAction>> Function() groups;
+
+  @override
+  Widget build(BuildContext context) => HeaderCircleButton(
+    icon: context.isMornye ? CupertinoIcons.ellipsis : Icons.more_horiz,
+    tooltip: MaterialLocalizations.of(context).showMenuTooltip,
+    onPressed: () => showContextMenu(
+      context,
+      position:
+          contextMenuPositionBelow(context) ??
+          contextMenuOriginOf(context) ??
+          Offset.zero,
+      groups: groups(),
+    ),
+  );
 }
 
 class _MornyeHeaderButton extends StatelessWidget {
@@ -998,37 +1061,41 @@ class _MornyeHeaderButton extends StatelessWidget {
       constraints: desktop
           ? const BoxConstraints(minHeight: 36, maxHeight: 36, minWidth: 130)
           : const BoxConstraints(minHeight: 50),
-      child: CupertinoButton(
-        padding: desktop
-            ? const EdgeInsets.symmetric(horizontal: 18)
-            : const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        minimumSize: desktop ? const Size(130, 36) : null,
-        borderRadius: BorderRadius.circular(desktop ? 18 : 28),
-        color: filled
-            ? scheme.primary
-            : scheme.onSurface.withValues(
-                alpha: scheme.brightness == Brightness.dark ? 0.10 : 0.06,
-              ),
-        onPressed: onPressed,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            AppIcon(icon, size: desktop ? 16 : 20, color: foreground),
-            SizedBox(width: desktop ? 6 : 8),
-            Flexible(
-              child: Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: desktop ? 15 : 17,
-                  fontWeight: FontWeight.w600,
-                  color: foreground,
+      child: MornyeGlassPress(
+        radius: desktop ? 18 : 28,
+        enabled: onPressed != null,
+        child: CupertinoButton(
+          padding: desktop
+              ? const EdgeInsets.symmetric(horizontal: 18)
+              : const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          minimumSize: desktop ? const Size(130, 36) : null,
+          borderRadius: BorderRadius.circular(desktop ? 18 : 28),
+          color: filled
+              ? scheme.primary
+              : scheme.onSurface.withValues(
+                  alpha: scheme.brightness == Brightness.dark ? 0.10 : 0.06,
+                ),
+          onPressed: onPressed,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AppIcon(icon, size: desktop ? 16 : 20, color: foreground),
+              SizedBox(width: desktop ? 6 : 8),
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: desktop ? 15 : 17,
+                    fontWeight: FontWeight.w600,
+                    color: foreground,
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

@@ -50,6 +50,18 @@ class _MornyeArtistSurfaceState extends State<MornyeArtistSurface> {
     super.dispose();
   }
 
+  /// The sidebar's artwork scrolls with the hero it continues.
+  bool _onPageScroll(ScrollNotification notification) {
+    final metrics = notification.metrics;
+    if (notification.depth == 0 && metrics.axis == Axis.vertical) {
+      ShellNavigationService.setChromeBackdropOffset(
+        this,
+        math.max(metrics.pixels, 0),
+      );
+    }
+    return false;
+  }
+
   @override
   Widget build(BuildContext context) {
     // Desktop album and playlist pages keep the plain pane background and
@@ -111,6 +123,9 @@ class _MornyeArtistSurfaceState extends State<MornyeArtistSurface> {
               route: route,
               brightness: Brightness.dark,
               surface: surface,
+              backdrop: isDesktopPlatform && !widget.neutralActions
+                  ? source
+                  : null,
             );
           }
           return CoverPaletteBuilder(
@@ -169,12 +184,18 @@ class _MornyeArtistSurfaceState extends State<MornyeArtistSurface> {
                   ),
                 );
               }
+              final page = HeaderPalette(
+                scheme: _innerTheme.colorScheme,
+                child: widget.child,
+              );
               return Theme(
                 data: _innerTheme,
-                child: HeaderPalette(
-                  scheme: _innerTheme.colorScheme,
-                  child: widget.child,
-                ),
+                child: isDesktopPlatform && !widget.neutralActions
+                    ? NotificationListener<ScrollNotification>(
+                        onNotification: _onPageScroll,
+                        child: page,
+                      )
+                    : page,
               );
             },
           );
@@ -193,6 +214,7 @@ class MornyeArtistHeader extends StatelessWidget {
     required this.artwork,
     required this.actions,
     required this.showTitle,
+    this.toolbarActions = const [],
     this.showTitleListenable,
     this.listeners,
     this.logoUrl,
@@ -202,6 +224,9 @@ class MornyeArtistHeader extends StatelessWidget {
   final String name;
   final Widget artwork;
   final List<Widget> actions;
+
+  /// Grouped in the glass capsule at the toolbar's trailing end, as in Music.
+  final List<Widget> toolbarActions;
   final bool showTitle;
 
   /// Replaces [showTitle] when set; see [headerToolbarTitle].
@@ -289,6 +314,12 @@ class MornyeArtistHeader extends StatelessWidget {
             surfaceTintColor: Colors.transparent,
             leadingWidth: 64,
             leading: back,
+            actions: toolbarActions.isEmpty
+                ? null
+                : [MornyeActionCapsule(children: toolbarActions)],
+            actionsPadding: EdgeInsetsDirectional.only(
+              end: isDesktopPlatform ? 16 : 12,
+            ),
             title: headerToolbarTitle(
               showTitleListenable,
               showTitle,

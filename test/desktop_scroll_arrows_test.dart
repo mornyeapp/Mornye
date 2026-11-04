@@ -1,9 +1,12 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/l10n/l10n.dart';
+import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/widgets/desktop/desktop_scroll_arrows.dart';
+import 'package:mornye/widgets/mornye_chrome.dart';
 
 void main() {
   late ScrollController controller;
@@ -44,6 +47,65 @@ void main() {
   }
 
   tearDown(() => debugDesktopPlatformOverride = null);
+
+  testWidgets('Mornye fades a tall glass paddle with the pointer', (
+    tester,
+  ) async {
+    debugDesktopPlatformOverride = true;
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          theme: MornyeTheme.build(Brightness.dark),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Center(
+            child: SizedBox(
+              width: 300,
+              height: 100,
+              child: DesktopScrollArrows(
+                builder: (context, scrollController) => ListView.builder(
+                  controller: scrollController,
+                  scrollDirection: Axis.horizontal,
+                  itemCount: 20,
+                  itemBuilder: (_, index) =>
+                      SizedBox(width: 100, child: Text('Item $index')),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    addTearDown(mouse.removePointer);
+    await mouse.addPointer(location: Offset.zero);
+    await mouse.moveTo(tester.getCenter(find.byType(ListView)));
+    await tester.pump();
+
+    final arrow = find.byTooltip('Scroll forward');
+    final fade = find.ancestor(of: arrow, matching: find.byType(Opacity));
+    await tester.pump(const Duration(milliseconds: 125));
+    expect(
+      tester.widget<Opacity>(fade).opacity,
+      closeTo(0.5, 0.01),
+      reason: 'a linear 250ms fade is halfway',
+    );
+    await tester.pump(const Duration(milliseconds: 125));
+    expect(tester.widget<Opacity>(fade).opacity, 1);
+    expect(
+      tester.getSize(
+        find.descendant(of: arrow, matching: find.byType(MornyeGlassPanel)),
+      ),
+      const Size(28, 52),
+    );
+
+    await mouse.moveTo(const Offset(1, 1));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 125));
+    expect(arrow, findsOneWidget);
+    await tester.pumpAndSettle();
+    expect(arrow, findsNothing);
+  });
 
   testWidgets('desktop shows arrows on hover in the open directions', (
     tester,

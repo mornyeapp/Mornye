@@ -158,9 +158,8 @@ class DesktopInspector extends ConsumerWidget {
                 header: true,
                 child: Text(
                   title,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: Theme.of(context).textTheme.titleMedium
+                      ?.copyWith(fontWeight: FontWeight.w600),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -184,9 +183,8 @@ class DesktopInspector extends ConsumerWidget {
             child: Text(
               l10n.nowPlayingNothingPlaying,
               textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              ),
+              style: Theme.of(context).textTheme.bodyMedium
+                  ?.copyWith(color: colorScheme.onSurfaceVariant),
             ),
           ),
         );
@@ -279,7 +277,7 @@ class DesktopInspector extends ConsumerWidget {
 /// iOS-like ease for Mornye.
 AppMotionSpec desktopInspectorMotion(BuildContext context) => AppMotion.spatial(
   context,
-  const AppMotionSpec(Duration(milliseconds: 380), Curves.easeOutCubic),
+  const AppMotionSpec(Duration(milliseconds: 300), Curves.easeOutCubic),
 );
 
 /// Opens and closes [panel] with motion, keeping the last panel on screen

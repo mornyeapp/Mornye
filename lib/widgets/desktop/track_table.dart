@@ -377,6 +377,9 @@ class _QualityKey implements Comparable<_QualityKey> {
   }
 }
 
+/// How fast a Mornye row's hover actions appear, as in Music.
+const _mornyeRowFade = Duration(milliseconds: 100);
+
 String _formatDuration(Duration duration) {
   final hours = duration.inHours;
   final minutes = duration.inMinutes.remainder(60);
@@ -652,7 +655,8 @@ class _TrackTableRowViewState extends State<_TrackTableRowView> {
                 opacity: hovered || selected || current || _trailingFocused
                     ? 1
                     : 0,
-                duration: tokens.motionFast,
+                duration: material ? tokens.motionFast : _mornyeRowFade,
+                curve: material ? Curves.linear : Curves.easeIn,
                 child: child,
               ),
               child: row.trailing,
@@ -889,7 +893,8 @@ class _AlbumRowViewState extends State<_AlbumRowView> {
             onFocusChange: (focused) => setState(() => _focused = focused),
             child: AnimatedOpacity(
               opacity: active ? 1 : 0,
-              duration: tokens.motionFast,
+              duration: context.isMornye ? _mornyeRowFade : tokens.motionFast,
+              curve: context.isMornye ? Curves.easeIn : Curves.linear,
               child: Builder(
                 builder: (buttonContext) => IconButton(
                   tooltip: l10n.showMenuTooltip,

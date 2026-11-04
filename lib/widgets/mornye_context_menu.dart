@@ -50,6 +50,19 @@ Future<T?> showMornyeContextMenu<T>({
                 0.62,
                 curve: Curves.easeOutCubic,
               ).transform(animation.value);
+              // Liquid glass runs slightly past its size and settles back.
+              final overshoot =
+                  animation.status == AnimationStatus.reverse ||
+                      MediaQuery.disableAnimationsOf(context)
+                  ? 0.0
+                  : 0.015 *
+                        math.sin(
+                          math.pi *
+                              const Interval(
+                                0.4,
+                                0.9,
+                              ).transform(animation.value),
+                        );
               return CustomSingleChildLayout(
                 delegate: _MenuLayout(
                   anchor: target,
@@ -64,7 +77,7 @@ Future<T?> showMornyeContextMenu<T>({
                   progress: motion,
                 ),
                 child: Transform.scale(
-                  scale: 0.16 + 0.84 * motion,
+                  scale: (0.16 + 0.84 * motion) * (1 + overshoot),
                   child: IgnorePointer(
                     ignoring:
                         motion < 1 ||

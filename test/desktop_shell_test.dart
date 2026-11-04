@@ -282,7 +282,7 @@ void main() {
       items.add(_track.copyWith(id: 'next', title: 'Another song'));
       await tester.pumpAndSettle();
       expect(find.byType(DesktopPlayerBar), findsOneWidget);
-      expect(find.text('Another song'), findsOneWidget);
+      expect(find.text('Another song'), findsWidgets);
       expect(tester.takeException(), isNull);
     });
 
@@ -666,14 +666,15 @@ void main() {
         expect(find.byType(DesktopSidebar), findsOneWidget);
         expect(
           tester.getSize(find.byType(DesktopSidebar)).width,
-          DesktopSidebar.footprint,
+          DesktopSidebar.width,
         );
         // The Material rail must not appear in the Mornye style.
         expect(find.byType(DesktopNavigationRail), findsNothing);
         expect(find.byType(NavigationRail), findsNothing);
         expectNoTouchNavigation();
         expect(find.byType(DesktopPlayerBar), findsOneWidget);
-        expect(find.text('A song'), findsOneWidget);
+        // A title too long for the capsule also shows its marquee copy.
+        expect(find.text('A song'), findsWidgets);
         expect(find.byKey(const ValueKey('desktop-sidebar-search')), findsOne);
       });
     }
@@ -701,6 +702,33 @@ void main() {
       expect(DesktopPlayerBar.floatingWidth(500), 476);
       expect(DesktopPlayerBar.floatingWidth(2000), 900);
     });
+
+    testWidgets(
+      'capsule artwork grows and offers Now Playing under the mouse',
+      (tester) async {
+        await pumpShell(tester, mornye: true, width: 1400);
+
+        final overlay = find.byKey(
+          const ValueKey('desktop-player-artwork-overlay'),
+        );
+        expect(tester.widget<AnimatedOpacity>(overlay).opacity, 0);
+        final scale = find.ancestor(
+          of: overlay,
+          matching: find.byType(AnimatedScale),
+        );
+        expect(tester.widget<AnimatedScale>(scale).scale, 1);
+
+        final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+        addTearDown(mouse.removePointer);
+        await mouse.addPointer(location: Offset.zero);
+        await mouse.moveTo(tester.getCenter(overlay));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 200));
+
+        expect(tester.widget<AnimatedOpacity>(overlay).opacity, 1);
+        expect(tester.widget<AnimatedScale>(scale).scale, 1.1);
+      },
+    );
 
     testWidgets('player capsule keeps volume in a popover', (tester) async {
       await pumpShell(tester, mornye: true, width: 1400);
@@ -757,8 +785,61 @@ void main() {
         find.ancestor(of: find.text('home'), matching: find.byType(InkWell)),
       );
       expect(home.height, 32);
-      // Music's measurements: rows inset 6pt in a panel inset 8pt.
-      expect(home.left, DesktopSidebar.margin + 6);
+      // The sidebar runs to the window's edge, so its rows bring the inset.
+      expect(home.left, 10);
+    });
+
+    testWidgets('the sidebar is one piece with the window', (tester) async {
+      await pumpShell(tester, mornye: true, width: 1400);
+
+      final window = tester.getRect(find.byType(MaterialApp));
+      final sidebar = tester.getRect(find.byType(DesktopSidebar));
+      expect(sidebar.left, window.left);
+      expect(sidebar.top, window.top);
+      expect(sidebar.bottom, window.bottom);
+      expect(
+        tester.getRect(find.byKey(const ValueKey('desktop-content'))).left,
+        sidebar.right,
+      );
+      expect(
+        find.descendant(
+          of: find.byType(DesktopSidebar),
+          matching: find.byWidgetPredicate(
+            (widget) =>
+                widget is DecoratedBox &&
+                switch (widget.decoration) {
+                  BoxDecoration(:final borderRadius, :final boxShadow) =>
+                    borderRadius != null || boxShadow != null,
+                  _ => false,
+                },
+          ),
+        ),
+        findsNothing,
+        reason: 'the panel has no corners or shadow of its own',
+      );
+    });
+
+    testWidgets('the sidebar shows the page hero under its tint', (
+      tester,
+    ) async {
+      addTearDown(() => ShellNavigationService.chromeBackdrop.value = null);
+      await pumpShell(tester, mornye: true, width: 1400);
+      const backdrop = ValueKey('desktop-sidebar-backdrop');
+      expect(find.byKey(backdrop), findsNothing);
+
+      ShellNavigationService.chromeBackdrop.value = '/tmp/artist.jpg';
+      await tester.pumpAndSettle();
+      final top = tester.getRect(find.byKey(backdrop)).top;
+      expect(top, 0);
+
+      ShellNavigationService.chromeBackdropOffset.value = 120;
+      await tester.pump();
+      expect(tester.getRect(find.byKey(backdrop)).top, top - 120);
+      ShellNavigationService.chromeBackdropOffset.value = 0;
+
+      ShellNavigationService.chromeBackdrop.value = null;
+      await tester.pumpAndSettle();
+      expect(find.byKey(backdrop), findsNothing);
     });
 
     testWidgets('sidebar lists Library pages and playlists', (tester) async {
@@ -838,11 +919,11 @@ void main() {
       );
       expect(
         tester.getSize(find.byType(DesktopSidebar)).width,
-        DesktopSidebar.footprint,
+        DesktopSidebar.width,
       );
       expect(
         tester.getRect(find.byKey(const ValueKey('desktop-content'))).left,
-        DesktopSidebar.footprint,
+        DesktopSidebar.width,
       );
     });
   });
