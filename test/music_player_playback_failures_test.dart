@@ -74,7 +74,9 @@ void main() {
       expect(native.resumedSources, contains('/two.flac'));
     });
 
-    test('a missing track later in the queue is skipped to the next song', () async {
+    test(
+      'a missing track later in the queue is skipped to the next song',
+      () async {
       final directory = await Directory.systemTemp.createTemp(
         'missing-queued-track-',
       );
@@ -87,7 +89,11 @@ void main() {
       );
       await handler.setQueueAndPlay([_tracks[0], missing, _tracks[2]]);
       await native.complete('music-player');
-      await _until(() => handler.mediaItem.value?.id == 'missing');
+      await _until(
+        () =>
+            handler.mediaItem.value?.id == 'missing' &&
+            handler.playbackState.value.playing,
+      );
 
       await native.error(
         'music-player',
