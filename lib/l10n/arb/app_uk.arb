@@ -106,9 +106,9 @@
   "linkFileOperationFailed": "Не вдалося завершити операцію. Перевірте журнал комп’ютера, щоб дізнатися деталі.",
   "trackBpm": "BPM",
   "trackMood": "За настроєм",
-  "subsonicAddToLibrary": "Додати сервер до бібліотеки",
-  "subsonicLibraryAdded": "Сервер додано до бібліотеки",
-  "subsonicLibraryDescription": "Синхронізуйте каталог сервера та обкладинки з бібліотекою. Музика залишається на вашому сервері. Для оновлення каталогу виконайте повторне сканування в налаштуваннях локальної бібліотеки.",
+  "subsonicAddToLibrary": "Додати сервер до Бібліотеки",
+  "subsonicLibraryAdded": "Сервер додано до Бібліотеки",
+  "subsonicLibraryDescription": "Синхронізуйте каталог сервера та обкладинки зі списком відтворення. Музика залишається на вашому сервері. Для оновлення каталогу виконайте повторне сканування в налаштуваннях локального списку відтворення.",
   "subsonicAuthentication": "Автентифікація",
   "subsonicToken": "Хешований токен",
   "subsonicPasswordAuth": "Пароль",
@@ -146,15 +146,15 @@
   "@networkDownloadDescription": {
     "description": "Help below the network download destination action explaining local preparation, upload, retry behavior, and preservation of existing files; NAS means network-attached storage"
   },
-  "networkAddToLibrary": "Додати теку до бібліотеки",
+  "networkAddToLibrary": "Додати теку до Бібліотеки",
   "@networkAddToLibrary": {
     "description": "Action that adds the current network folder as a Library source and starts scanning it"
   },
-  "networkLibraryAdded": "Теку додано до бібліотеки",
+  "networkLibraryAdded": "Теку додано до Бібліотеки",
   "@networkLibraryAdded": {
     "description": "Status label replacing the add-to-Library action after the network folder has been added as a source; does not mean scanning has finished"
   },
-  "networkLibraryDescription": "Скануйте цю теку та її підтеки. Музика залишається на вашому сервері, а метадані та обкладинки зберігаються на цьому пристрої. Керуйте бібліотекою або повторно скануйте її в налаштуваннях.",
+  "networkLibraryDescription": "Сканування цієї теки та її підтек. Музика залишається на вашому сервері; метадані та обкладинки зберігаються на цьому пристрої. Керуйте цим або повторіть сканування в налаштуваннях «Локальної бібліотеки».",
   "@networkLibraryDescription": {
     "description": "Help below the add-to-Library action explaining recursive scanning, local metadata and artwork storage, and management in Local Library settings"
   },
@@ -407,7 +407,7 @@
   "@searchRecentlySearched": {
     "description": "Section header for recent searches on the desktop Search page"
   },
-  "searchLibraryPrompt": "Пошук у вашій бібліотеці",
+  "searchLibraryPrompt": "Пошук у Бібліотеці",
   "@searchLibraryPrompt": {
     "description": "Shown on the desktop Search page when the Library scope has no search words yet"
   },
@@ -449,11 +449,11 @@
   "@libraryFoldersEmptyTitle": {
     "description": "Title of the Folders view when the Library has no songs"
   },
-  "libraryFoldersEmptyMessage": "Завантажте пісні або додайте теку з музикою в налаштуваннях, щоб переглядати файли за теками.",
+  "libraryFoldersEmptyMessage": "Завантажте пісні або додайте музичну теку в налаштуваннях «Локальної бібліотеки», щоб переглядати їх за теками.",
   "@libraryFoldersEmptyMessage": {
     "description": "Next step shown in the empty Folders view"
   },
-  "libraryFolderMissing": "Цієї теки більше немає у вашому списку відтворення",
+  "libraryFolderMissing": "Цієї теки більше немає у вашій Бібліотеці",
   "@libraryFolderMissing": {
     "description": "Shown on an open folder page after its songs were deleted or moved"
   },
@@ -943,7 +943,7 @@
   "@aboutSquiglyDesc": {
     "description": "Credit for the Squigly resolver"
   },
-  "aboutAppDescription": "Шукайте музичні метадані, керуйте розширеннями та впорядковуйте свою бібліотеку.",
+  "aboutAppDescription": "Пошук метаданих музики, керування розширеннями та впорядкування бібліотеки.",
   "@aboutAppDescription": {
     "description": "App description in header card"
   },
@@ -1240,7 +1240,7 @@
   "@dialogDownload": {
     "description": "Confirm button in Download All dialog"
   },
-  "previewPlay": "Відтворити попередній",
+  "previewPlay": "Попереднє відтворення",
   "@previewPlay": {
     "description": "Tooltip for the button that plays a short track preview snippet"
   },
@@ -3041,7 +3041,7 @@
   "@allFilesAccessDisabledMessage": {
     "description": "Snackbar message when user disables all files access"
   },
-  "settingsLocalLibrary": "Локальна бібліотека",
+  "settingsLocalLibrary": "Локальна Бібліотека",
   "@settingsLocalLibrary": {
     "description": "Settings menu item - local library"
   },
@@ -3057,7 +3057,7 @@
   "@settingsCacheSubtitle": {
     "description": "Subtitle for cache management menu"
   },
-  "libraryTitle": "Локальна бібліотека",
+  "libraryTitle": "Локальна Бібліотека",
   "@libraryTitle": {
     "description": "Library settings page title"
   },
@@ -3065,7 +3065,7 @@
   "@libraryScanSettings": {
     "description": "Section header for scan settings"
   },
-  "libraryEnableLocalLibrary": "Увімкнути локальну бібліотеку",
+  "libraryEnableLocalLibrary": "Увімкнути локальну Бібліотеку",
   "@libraryEnableLocalLibrary": {
     "description": "Toggle to enable library scanning"
   },
@@ -3073,7 +3073,7 @@
   "@libraryEnableLocalLibrarySubtitle": {
     "description": "Subtitle for enable toggle"
   },
-  "libraryFolder": "Тека бібліотеки",
+  "libraryFolder": "Тека Бібліотеки",
   "@libraryFolder": {
     "description": "Folder selection setting"
   },
@@ -3141,7 +3141,7 @@
   "@libraryUnreadableFilesTitle": {
     "description": "Title of the list of files a library scan could not read, and the action that opens it"
   },
-  "libraryUnreadableFilesSubtitle": "Ці файли не додано до бібліотеки. Вони можуть бути пошкоджені, недозавантажені або заблоковані сховищем.",
+  "libraryUnreadableFilesSubtitle": "Ці файли не були додані до вашої бібліотеки. Вони можуть бути пошкоджені, ще завантажуватися або бути заблокованими додатком сховища.",
   "@libraryUnreadableFilesSubtitle": {
     "description": "Explanation above the list of files a library scan could not read"
   },
@@ -3194,7 +3194,7 @@
   "@libraryActions": {
     "description": "Section header for library actions"
   },
-  "libraryScan": "Сканувати бібліотеку",
+  "libraryScan": "Сканувати Бібліотеку",
   "@libraryScan": {
     "description": "Button to start library scan"
   },
@@ -3214,7 +3214,7 @@
   "@libraryCleanupMissingFilesSubtitle": {
     "description": "Subtitle for cleanup button"
   },
-  "libraryClear": "Очистити бібліотеку",
+  "libraryClear": "Очистити Бібліотеку",
   "@libraryClear": {
     "description": "Button to clear all library entries"
   },
@@ -3222,7 +3222,7 @@
   "@libraryClearSubtitle": {
     "description": "Subtitle for clear button"
   },
-  "libraryClearConfirmTitle": "Очистити бібліотеку",
+  "libraryClearConfirmTitle": "Очистити Бібліотеку",
   "@libraryClearConfirmTitle": {
     "description": "Dialog title for clear confirmation"
   },
@@ -3293,7 +3293,7 @@
       }
     }
   },
-  "libraryInLibrary": "У бібліотеці",
+  "libraryInLibrary": "У Бібліотеці",
   "@libraryInLibrary": {
     "description": "Badge shown on tracks that exist in local library"
   },
@@ -3512,11 +3512,11 @@
   "@tutorialLibraryTitle": {
     "description": "Tutorial library page title"
   },
-  "tutorialLibraryDesc": "Завантажену та локально заскановану музику впорядковано у вашій бібліотеці.",
+  "tutorialLibraryDesc": "Завантажену та локально заскановану музику впорядковано у вашій Бібліотеці.",
   "@tutorialLibraryDesc": {
     "description": "Tutorial library page description"
   },
-  "tutorialLibraryTip1": "Керуйте активними, очікуваними та завершеними завантаженнями в черзі бібліотеки",
+  "tutorialLibraryTip1": "Керуйте активними, очікуваними та завершеними завантаженнями в черзі Бібліотеки",
   "@tutorialLibraryTip1": {
     "description": "Tutorial library tip 1"
   },
@@ -3552,7 +3552,7 @@
   "@tutorialSettingsTitle": {
     "description": "Tutorial settings page title"
   },
-  "tutorialSettingsDesc": "Налаштуйте параметри завантаження, відтворення, роботи з бібліотекою, зовнішнього вигляду та зберігання.",
+  "tutorialSettingsDesc": "Налаштуйте параметри завантаження, відтворення, роботи з Бібліотекою, зовнішнього вигляду та зберігання.",
   "@tutorialSettingsDesc": {
     "description": "Tutorial settings page description"
   },
@@ -3592,7 +3592,7 @@
   "whatsNewLinkSyncBody": "Колекції та історія прослуховування залишаються однаковими на підключених пристроях.",
   "whatsNewHomeTitle": "Головна Сторінка, що вчиться",
   "whatsNewHomeDesc": "Мікси та автовідтворення тепер підлаштовуються під те, як ви насправді слухаєте музику.",
-  "whatsNewHomeMixesTitle": "Мікси з вашої бібліотеки",
+  "whatsNewHomeMixesTitle": "Мікси з вашої Бібліотеки",
   "whatsNewHomeMixesBody": "Нові мікси, створені на основі ваших власних пісень, зокрема окремий мікс для кожного жанру.",
   "whatsNewHomeAutoplayTitle": "Розумніше автовідтворення",
   "whatsNewHomeAutoplayBody": "Автовідтворення підлаштовується під вашу поточну сесію та вчиться на основі улюблених треків, списків відтворення і повторів.",
@@ -3607,34 +3607,34 @@
   "whatsNewPlayerTimingTitle": "Таймінг тексту",
   "whatsNewPlayerTimingBody": "Зсувайте синхронізований текст вперед або назад, якщо він розбігається з піснею.",
   "whatsNewPlayerAutoTitle": "Android Auto",
-  "whatsNewPlayerAutoBody": "Переглядайте свій список відтворення та вмикайте музику прямо на екрані вашого авто.",
+  "whatsNewPlayerAutoBody": "Переглядайте та відтворюйте вміст Бібліотеки на екрані вашого авто.",
   "whatsNewPlayerExclusiveTitle": "Ексклюзивний вивід",
-  "whatsNewPlayerExclusiveBody": "Send audio straight to your output device without the system mixer.",
-  "whatsNewLibraryTitle": "Library and search",
-  "whatsNewLibraryDesc": "New ways to find and organize your music.",
-  "whatsNewLibraryFoldersTitle": "Browse by folder",
-  "whatsNewLibraryFoldersBody": "Explore your Library the way it's stored on disk.",
-  "whatsNewLibrarySuggestionsTitle": "Suggested songs",
-  "whatsNewLibrarySuggestionsBody": "Albums, singles and playlists now suggest songs that fit.",
-  "whatsNewLibraryRecognizeTitle": "Recognize music",
-  "whatsNewLibraryRecognizeBody": "Tap the microphone in Search to find out what's playing nearby.",
-  "whatsNewLibraryPlaylistsTitle": "Better playlists",
-  "whatsNewLibraryPlaylistsBody": "Reorder songs, create a playlist from a folder, or import playlist files.",
-  "whatsNewFasterTitle": "Faster everywhere",
-  "whatsNewFasterDesc": "Quicker and lighter, especially with large libraries.",
-  "whatsNewFasterLibraryTitle": "A quicker Library",
-  "whatsNewFasterLibraryBody": "Tabs and albums open faster, and scrolling stays smooth.",
-  "whatsNewFasterNetworkTitle": "Faster network music",
-  "whatsNewFasterNetworkBody": "Network shares scan many times faster, and Subsonic servers sync with far fewer requests.",
-  "whatsNewFasterQueueTitle": "Long queues that last",
-  "whatsNewFasterQueueBody": "Large queues save quickly and come back after a restart.",
-  "whatsNewFasterBackgroundTitle": "Lighter in the background",
-  "whatsNewFasterBackgroundBody": "The app starts faster and does less work while music plays.",
-  "whatsNewDone": "Start listening",
+  "whatsNewPlayerExclusiveBody": "Надсилайте аудіо безпосередньо на пристрій виводу в обхід системного мікшера.",
+  "whatsNewLibraryTitle": "Бібліотека та пошук",
+  "whatsNewLibraryDesc": "Нові способи пошуку та впорядкування вашої музики.",
+  "whatsNewLibraryFoldersTitle": "Перегляд за теками",
+  "whatsNewLibraryFoldersBody": "Досліджуйте свою Бібліотеку в тому вигляді, як вона збережена на диску.",
+  "whatsNewLibrarySuggestionsTitle": "Рекомендовані пісні",
+  "whatsNewLibrarySuggestionsBody": "В альбомах, синглах та списках відтворення тепер пропонуються пісні, які пасують за стилем.",
+  "whatsNewLibraryRecognizeTitle": "Розпізнавання музики",
+  "whatsNewLibraryRecognizeBody": "Торкніться мікрофона в «Пошуку», щоб дізнатися, що грає поруч.",
+  "whatsNewLibraryPlaylistsTitle": "Кращі списки відтворення",
+  "whatsNewLibraryPlaylistsBody": "Змінюйте порядок пісень, створюйте списки відтворення з тек або імпортуйте файли списків відтворення.",
+  "whatsNewFasterTitle": "Швидше в усьому",
+  "whatsNewFasterDesc": "Швидше та легше, особливо з великими бібліотеками.",
+  "whatsNewFasterLibraryTitle": "Швидша бібліотека",
+  "whatsNewFasterLibraryBody": "Вкладки та альбоми відкриваються швидше, а гортання залишається плавним.",
+  "whatsNewFasterNetworkTitle": "Прискорення мережевої музики",
+  "whatsNewFasterNetworkBody": "Спільні мережеві ресурси скануються в рази швидше, а сервери Subsonic синхронізуються з набагато меншою кількістю запитів.",
+  "whatsNewFasterQueueTitle": "Черги, які не зникають",
+  "whatsNewFasterQueueBody": "Великі черги зберігаються швидко й відновлюються після перезапуску.",
+  "whatsNewFasterBackgroundTitle": "Легший у фоновому режимі",
+  "whatsNewFasterBackgroundBody": "Додаток запускається швидше й виконує менше фонових процесів під час відтворення музики.",
+  "whatsNewDone": "Почати слухати",
   "@whatsNewDone": {
     "description": "Button on the last page of the What's New tour"
   },
-  "whatsNewAboutTitle": "What's new in {version}",
+  "whatsNewAboutTitle": "Що нового у версії {version}",
   "@whatsNewAboutTitle": {
     "description": "About page row that reopens the What's New tour; version is like 5.3",
     "placeholders": {
@@ -4691,7 +4691,7 @@
   "@settingsBackup": {
     "description": "Settings menu item - backup and restore page"
   },
-  "settingsBackupSubtitle": "Перемістити вашу бібліотеку, історію та налаштування на новий пристрій",
+  "settingsBackupSubtitle": "Перенесіть свою бібліотеку, історію та налаштування на новий пристрій",
   "@settingsBackupSubtitle": {
     "description": "Subtitle for backup and restore settings item"
   },
@@ -5768,7 +5768,7 @@
   "@notifEmbeddingMetadata": {
     "description": "Notification body while embedding metadata into a downloaded track"
   },
-  "notifAlreadyInLibraryCount": "Вже в бібліотеці ({completed}/{total})",
+  "notifAlreadyInLibraryCount": "Вже в Бібліотеці ({completed}/{total})",
   "@notifAlreadyInLibraryCount": {
     "description": "Notification title when track is already in library, with count",
     "placeholders": {
@@ -5780,7 +5780,7 @@
       }
     }
   },
-  "notifAlreadyInLibrary": "Вже в бібліотеці",
+  "notifAlreadyInLibrary": "Вже в Бібліотеці",
   "@notifAlreadyInLibrary": {
     "description": "Notification title when track is already in library"
   },
@@ -5937,7 +5937,7 @@
   "@notifLibraryScanPaused": {
     "description": "Notification title when the user pauses a library scan"
   },
-  "notifLibraryScanPausedBody": "{count} Файли проскановано. Відновіть роботу в налаштуваннях локальної бібліотеки, щоб продовжити з цього місця.",
+  "notifLibraryScanPausedBody": "Проскановано файлів: {count}. Відновіть процес у налаштуваннях «Локальної бібліотеки», щоб продовжити з цього місця.",
   "@notifLibraryScanPausedBody": {
     "description": "Notification body for a paused library scan - files scanned so far",
     "placeholders": {
@@ -6623,7 +6623,7 @@
   "@a11yDeselectTrack": {
     "description": "Accessibility label for deselecting a track"
   },
-  "a11yPlayTrackByArtist": "Відтворити {trackName} від {artistName}",
+  "a11yPlayTrackByArtist": "Відтворити {trackName} — {artistName}",
   "@a11yPlayTrackByArtist": {
     "description": "Accessibility label for playing a local library track",
     "placeholders": {
@@ -6683,7 +6683,7 @@
   "@libraryScanCancelledSubtitle": {
     "description": "Library scan status subtitle after cancellation"
   },
-  "libraryDownloadsHistoryExcluded": "{count} З історії завантажень (виключено зі списку)",
+  "libraryDownloadsHistoryExcluded": "{count} З історії завантажень (вилучено зі списку)",
   "@libraryDownloadsHistoryExcluded": {
     "description": "Library count note for downloaded history items excluded from the local list",
     "placeholders": {
@@ -7052,11 +7052,11 @@
   "@nowPlayingOpenInExternalPlayer": {
     "description": "Menu item to open the current track in an external player"
   },
-  "nowPlayingHideVolume": "Hide volume",
+  "nowPlayingHideVolume": "Сховати гучність",
   "@nowPlayingHideVolume": {
     "description": "Now Playing menu item that removes the volume slider from the player"
   },
-  "nowPlayingShowVolume": "Show volume",
+  "nowPlayingShowVolume": "Показати гучність",
   "@nowPlayingShowVolume": {
     "description": "Now Playing menu item that brings the volume slider back to the player"
   },
@@ -7092,15 +7092,15 @@
   "@nowPlayingNoLyricsOnline": {
     "description": "Empty state after an online lyrics search for the playing track found nothing"
   },
-  "nowPlayingTranslateLyrics": "Translate Lyrics",
+  "nowPlayingTranslateLyrics": "Перекласти текст пісні",
   "@nowPlayingTranslateLyrics": {
     "description": "Player lyrics menu action that translates the current lyrics with the user's AI provider"
   },
-  "nowPlayingCancelTranslation": "Cancel Translation",
+  "nowPlayingCancelTranslation": "Скасувати переклад",
   "@nowPlayingCancelTranslation": {
     "description": "Player lyrics menu action that stops an AI lyrics translation in progress"
   },
-  "nowPlayingTranslatingLyrics": "Translating lyrics, {percent}%",
+  "nowPlayingTranslatingLyrics": "Переклад тексту пісні, {percent}%",
   "@nowPlayingTranslatingLyrics": {
     "description": "Tooltip and screen reader label of the lyrics menu button while an AI translation runs",
     "placeholders": {
@@ -7109,11 +7109,11 @@
       }
     }
   },
-  "lyricsTranslateSheetTitle": "Translate Into",
+  "lyricsTranslateSheetTitle": "Перекласти на",
   "@lyricsTranslateSheetTitle": {
     "description": "Title of the sheet that picks the language to translate the current lyrics into"
   },
-  "lyricsTranslateSheetSubtitle": "The lyrics are sent to {provider}.",
+  "lyricsTranslateSheetSubtitle": "Текст пісні надіслано до {provider}.",
   "@lyricsTranslateSheetSubtitle": {
     "description": "Notice under the translate sheet title naming the AI provider that receives the lyrics",
     "placeholders": {
@@ -7131,7 +7131,7 @@
       }
     }
   },
-  "lyricsTranslateAlreadyIn": "These lyrics are already in {language}",
+  "lyricsTranslateAlreadyIn": "Цей текст пісні вже є такою мовою: {language}",
   "@lyricsTranslateAlreadyIn": {
     "description": "Snackbar after an AI translation returned every line unchanged; language is the target language's own name",
     "placeholders": {
@@ -8177,8 +8177,8 @@
   "autoMixOff": "Автомікс вимкнено",
   "autoplayOn": "Автовідтворення увімкнено",
   "autoplayOff": "Автовідтворення вимкнено",
-  "autoplayFromLibrary": "Автовідтворення з вашої бібліотеки",
-  "autoplayDescription": "Продовжувати відтворення схожих пісень із вашої бібліотеки, коли черга закінчиться.",
+  "autoplayFromLibrary": "Автовідтворення з вашої Бібліотеки",
+  "autoplayDescription": "Продовжувати відтворення схожих пісень із вашої Бібліотеки, коли черга закінчиться.",
   "autoplayPersonalization": "Персоналізований автозапуск",
   "autoplayPersonalizationDescription": "Навчайтеся на основі пісень, які ви слухаєте та пропускаєте, приватно на цьому пристрої. Вимкнення цієї функції зупинить навчання та відновить звичайне автовідтворення.",
   "autoplayResetLearning": "Скинути налаштування рекомендацій",
@@ -8753,7 +8753,7 @@
   "weeklyReleasesUnavailable": "Не вдалося перевірити деяких виконавців, тому їхні збережені результати залишено. Провайдери можуть не надавати каталоги виконавців або точні дати релізів.",
   "weeklyReleasesLoadError": "Не вдалося перевірити нові релізи. Потягніть, щоб оновити.",
   "motionArtworkDescription": "Анімовані обкладинки надаються провайдерами метаданих. Вимкніть, щоб використовувати статичні зображення та економити заряд батареї.",
-  "libraryLoading": "Завантаження бібліотеки…",
+  "libraryLoading": "Завантаження Бібліотеки…",
   "libraryLoadFailed": "Не вдалося завантажити бібліотеку. Спробуйте знову завантажити збережені теки та індекс треків.",
   "discordPresenceDescription": "Показуйте назву, виконавця, альбом і прогрес відтворення музики, яка грає у вбудованому програвачі у вашому профілі Discord. Локальні аудіофайли та обкладинки ніколи не завантажуються [в мережу]. Очищається, коли відтворення призупиняється або зупиняється.",
   "discordPresenceDisabled": "Вимкнено",
@@ -10241,7 +10241,7 @@
   "@recognizePermissionAllow": {
     "description": "Button that asks for microphone permission again"
   },
-  "recognizePlay": "Play in Mornye",
+  "recognizePlay": "Відтворити в Mornye",
   "@recognizePlay": {
     "description": "Button that plays the identified song from the downloads or library"
   },
