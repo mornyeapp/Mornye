@@ -2574,7 +2574,7 @@ class MusicPlayerHandler extends BaseAudioHandler
   }
 
   /// Reopens a source if storage rejected its deletion. A user action that
-  /// changed the queue or playback generation takes precedence over restoration.
+  /// changed the queue or playback generation takes precedence over resuming.
   Future<void> onSourceDeletionCancelled(String source) async {
     final target = source.trim();
     if (_disposed || target.isEmpty) return;
