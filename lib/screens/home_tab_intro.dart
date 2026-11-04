@@ -930,8 +930,8 @@ class _HomeShelf extends StatelessWidget {
   }
 }
 
-/// Hands [builder] the cover size of a shelf in this pane: Mornye's are large,
-/// about four to a wide pane, as in Music.
+/// Hands [builder] the cover size of a shelf in this pane: Mornye's follow
+/// Music, about six to a desktop pane.
 class _HomeShelfSize extends StatelessWidget {
   const _HomeShelfSize({required this.inset, required this.builder});
 
@@ -947,10 +947,10 @@ class _HomeShelfSize extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final content = constraints.maxWidth - 2 * inset;
-        final perPane = (content + _homeMornyeShelfGap) / 4.17;
+        final perPane = (content + _homeMornyeShelfGap) / 6.1;
         return builder(
           context,
-          (perPane - _homeMornyeShelfGap).clamp(160.0, 280.0),
+          (perPane - _homeMornyeShelfGap).clamp(130.0, 280.0),
         );
       },
     );
@@ -1398,7 +1398,7 @@ class _HomeTopPicksShelf extends StatelessWidget {
       builder: (context, constraints) {
         final content = constraints.maxWidth - 2 * inset;
         final width = isDesktopPlatform
-            ? ((content - 3 * _gap) / 3.3).clamp(220.0, 320.0)
+            ? ((content + _gap) / 4.6 - _gap).clamp(180.0, 320.0)
             : math.min(content - 44, 280.0);
         return SizedBox(
           height: width / MornyeMixBanner.aspectRatio,
