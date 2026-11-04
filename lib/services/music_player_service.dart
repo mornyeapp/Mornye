@@ -153,6 +153,7 @@ class MusicPlayerHandler extends BaseAudioHandler
   final _metadataChanges = <String, Object>{};
   final _sourceDeletionSnapshots =
       <String, ({int generation, int index, Duration position, bool wasPlaying})>{};
+  final _sourcesBeingDeleted = <String>{};
   String? _activeResolvedPath;
   bool _disposed = false;
   Future<void>? _disposeFuture;
@@ -1530,7 +1531,7 @@ class MusicPlayerHandler extends BaseAudioHandler
     Duration startPosition = Duration.zero,
   }) async {
     if (_disposed || index < 0 || index >= _media.length) return;
-    if (_sourceDeletionSnapshots.containsKey(_media[index].source)) return;
+    if (_sourcesBeingDeleted.contains(_media[index].source)) return;
     if (_reloadingAfterServerDied) {
       _reloadingAfterServerDied = false;
     } else {
@@ -2471,62 +2472,62 @@ class MusicPlayerHandler extends BaseAudioHandler
   /// storage operation to restore playback at the saved position.
   Future<void> onSourceDeleting(String source) async {
     final target = source.trim();
-    if (_disposed ||
-        target.isEmpty ||
-        _sourceDeletionSnapshots.containsKey(target)) {
-      return;
-    }
+    if (_disposed || target.isEmpty) return;
 
     final index = _index;
     if (index < 0 || index >= _media.length || _media[index].source != target) {
       return;
     }
+    // Block a concurrent Play/Repeat action from reopening the source while
+    // storage deletion is in flight. Skipping to a different track is allowed.
+    if (!_sourcesBeingDeleted.add(target)) return;
 
-    final wasPlaying =
-        _player.state == PlaybackDeckState.playing ||
-        playbackState.value.playing;
-    final generation = ++_playRequestGeneration;
-    _switchingGeneration = generation;
+    var snapshotCreated = false;
     try {
       await _player.cancelPreparation();
       await _cancelTransitions();
       await _serializeSourceChange(() async {
-        if (_disposed ||
-            generation != _playRequestGeneration ||
-            _index != index ||
-            _media[index].source != target) {
+        if (_disposed || _index != index || _media[index].source != target) {
           return;
         }
 
         final position = await _currentPositionForPersist();
-        if (_disposed ||
-            generation != _playRequestGeneration ||
-            _index != index ||
-            _media[index].source != target) {
+        if (_disposed || _index != index || _media[index].source != target) {
           return;
         }
+        final wasPlaying =
+            _player.state == PlaybackDeckState.playing ||
+            playbackState.value.playing;
+        final generation = ++_playRequestGeneration;
+        _switchingGeneration = generation;
+        try {
+          // A desktop decoder can still hold the file open. Stop it before the
+          // filesystem operation rather than reacting after the file is gone.
+          await _player.stop();
+          if (_disposed || _index != index || _media[index].source != target) {
+            return;
+          }
 
-        // A desktop decoder can still hold the file open. Stop it before the
-        // filesystem operation rather than reacting after the file is gone.
-        await _player.stop();
-        if (_disposed || generation != _playRequestGeneration) return;
-
-        _sourceReady = false;
-        _activeResolvedPath = null;
-        _pendingRestorePosition = position;
-        _userPaused = true;
-        _sourceDeletionSnapshots[target] = (
-          generation: generation,
-          index: index,
-          position: position,
-          wasPlaying: wasPlaying,
-        );
-        _broadcastPosition(position, force: true);
-        _broadcastState(playerState: PlaybackDeckState.paused);
-        await _persistSession(position: position);
+          _sourceReady = false;
+          _activeResolvedPath = null;
+          _pendingRestorePosition = position;
+          _userPaused = true;
+          _sourceDeletionSnapshots[target] = (
+            generation: generation,
+            index: index,
+            position: position,
+            wasPlaying: wasPlaying,
+          );
+          snapshotCreated = true;
+          _broadcastPosition(position, force: true);
+          _broadcastState(playerState: PlaybackDeckState.paused);
+          await _persistSession(position: position);
+        } finally {
+          if (_switchingGeneration == generation) _switchingGeneration = 0;
+        }
       });
     } finally {
-      if (_switchingGeneration == generation) _switchingGeneration = 0;
+      if (!snapshotCreated) _sourcesBeingDeleted.remove(target);
     }
   }
 
@@ -2535,6 +2536,7 @@ class MusicPlayerHandler extends BaseAudioHandler
   Future<void> onSourceDeletionCancelled(String source) async {
     final target = source.trim();
     if (_disposed || target.isEmpty) return;
+    _sourcesBeingDeleted.remove(target);
     final snapshot = _sourceDeletionSnapshots.remove(target);
     if (snapshot == null ||
         snapshot.generation != _playRequestGeneration ||
@@ -2568,6 +2570,7 @@ class MusicPlayerHandler extends BaseAudioHandler
   Future<void> onSourceDeleted(String source) async {
     final target = source.trim();
     if (_disposed || target.isEmpty) return;
+    _sourcesBeingDeleted.remove(target);
     _sourceDeletionSnapshots.remove(target);
 
     final hadPendingResolution = await _sourceCache.invalidate(target);
