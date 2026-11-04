@@ -2398,11 +2398,23 @@ void main() {
       await handler.setQueueAndPlay([removed, _track]);
       decks.single.position = const Duration(seconds: 17);
       expect(decks.single.state, PlaybackDeckState.playing);
+      final deletionPrepared = Completer<void>();
+      final continueDeletion = Completer<void>();
+      events.subscribeBeforeDeletion((_) async {
+        deletionPrepared.complete();
+        await continueDeletion.future;
+      });
 
-      expect(
-        await deleteFile(undeletable.path, deletionEvents: events),
-        isFalse,
-      );
+      final deleting = deleteFile(undeletable.path, deletionEvents: events);
+      await deletionPrepared.future;
+      try {
+        // Seeking while storage is deciding must update the rollback snapshot,
+        // not call the stopped native player.
+        await handler.seek(const Duration(seconds: 23));
+      } finally {
+        continueDeletion.complete();
+      }
+      expect(await deleting, isFalse);
 
       expect(await undeletable.exists(), isTrue);
       expect(handler.queue.value.map((item) => item.id), [
@@ -2410,7 +2422,8 @@ void main() {
         'one',
       ]);
       expect(handler.mediaItem.value?.id, 'undeletable');
-      expect(handler.playbackState.value.position, const Duration(seconds: 17));
+      expect(handler.playbackState.value.position, const Duration(seconds: 23));
+      expect(decks.single.position, const Duration(seconds: 23));
       expect(decks.single.sources, [undeletable.path, undeletable.path]);
       expect(decks.single.state, PlaybackDeckState.playing);
     },
