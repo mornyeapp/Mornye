@@ -4,18 +4,17 @@ option(MEDIA_KIT_LIBS_AVAILABLE "package:media_kit libraries are available." ON)
 set(PROJECT_NAME "media_kit_libs_windows_audio")
 project(${PROJECT_NAME} LANGUAGES CXX)
 
+set(LIBMPV_RELEASE "2026-10-22-488fec0789")
 if(FLUTTER_TARGET_PLATFORM STREQUAL "windows-arm64" OR
    CMAKE_GENERATOR_PLATFORM MATCHES "^(ARM64|arm64)$" OR
    CMAKE_SYSTEM_PROCESSOR MATCHES "^(ARM64|arm64|aarch64)$")
-  set(LIBMPV_RELEASE "2026-10-22-488fec0789")
   set(LIBMPV "mpv-dev-lgpl-aarch64-20261022-git-488fec0789.7z")
-  set(LIBMPV_URL "https://github.com/zhongfly/mpv-winbuild/releases/download/${LIBMPV_RELEASE}/${LIBMPV}")
   set(LIBMPV_HASH "SHA256=dba2715a2e7e344a1c6325c129332a955ca274665068e72dda7cac9b67a0509f")
 else()
-  set(LIBMPV "mpv-dev-x86_64-20230924-git-652a1dd.7z")
-  set(LIBMPV_URL "https://github.com/media-kit/libmpv-win32-audio-build/releases/download/2023-09-24/${LIBMPV}")
-  set(LIBMPV_HASH "MD5=cd738e16e2a19626d7cfa48801524f8c")
+  set(LIBMPV "mpv-dev-lgpl-x86_64-20261022-git-488fec0789.7z")
+  set(LIBMPV_HASH "SHA256=133f9ed88ba9db933bc0a0d0a6e3316cec4f9fc2c459a03d420a7fa2448d6a6a")
 endif()
+set(LIBMPV_URL "https://github.com/zhongfly/mpv-winbuild/releases/download/${LIBMPV_RELEASE}/${LIBMPV}")
 
 set(LIBMPV_ARCHIVE "${CMAKE_CURRENT_BINARY_DIR}/${LIBMPV}")
 set(LIBMPV_SRC "${CMAKE_CURRENT_BINARY_DIR}/${LIBMPV}-extracted")
