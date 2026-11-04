@@ -182,9 +182,18 @@ extension _ArtistScreenSections on _ArtistScreenState {
         actions: isSelectionMode
             ? const []
             : [
-                // Keeps the larger button on the page's center line.
+                // Balances the star, keeping the larger button centered.
                 if (_isLoadingDiscography || hasDiscography)
-                  const SizedBox.square(dimension: 50),
+                  HeaderCircleButton(
+                    icon: CupertinoIcons.shuffle,
+                    buttonSize: 50,
+                    iconSize: 24,
+                    iconColor: colorScheme.primary,
+                    glassTintColor: Colors.white,
+                    glassTintOpacity: 0.10,
+                    tooltip: context.l10n.actionShuffle,
+                    onPressed: () => _shuffleArtist(context),
+                  ),
                 if (_isLoadingDiscography)
                   const ShimmerLoading(
                     child: SkeletonBox(width: 74, height: 74, borderRadius: 37),
@@ -650,6 +659,16 @@ extension _ArtistScreenSections on _ArtistScreenState {
         ),
       ],
     );
+  }
+
+  Future<void> _shuffleArtist(BuildContext context) async {
+    final shuffled = await ref
+        .read(musicPlayerControllerProvider)
+        .shuffleLibrary(artist: widget.artistName);
+    if (shuffled || !context.mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(context.l10n.artistShuffleEmpty)));
   }
 
   void _showShareSheet(BuildContext context) {

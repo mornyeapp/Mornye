@@ -7824,6 +7824,10 @@
   "@actionShuffle": {
     "description": "Tooltip for shuffle playback action"
   },
+  "artistShuffleEmpty": "No songs by this artist in your Library yet",
+  "@artistShuffleEmpty": {
+    "description": "Snackbar when shuffling an artist with no songs in the Library"
+  },
   "downloadPrimaryArtistOnlyOn": "Primary only: On",
   "@downloadPrimaryArtistOnlyOn": {
     "description": "Status label when primary-artist-only folder naming is enabled"

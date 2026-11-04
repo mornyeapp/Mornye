@@ -3240,6 +3240,42 @@ void main() {
     },
   );
 
+  test('shuffling an artist plays only the songs that credit them', () async {
+    final added = DateTime(2026).toIso8601String();
+    Map<String, Object?> row(String id, String artist) => {
+      'source': 'downloaded',
+      'item': {
+        'id': id,
+        'trackName': id,
+        'artistName': artist,
+        'albumName': 'Album',
+        'filePath': '/$id.flac',
+        'service': 'extension',
+        'downloadedAt': added,
+      },
+    };
+    final runtime = _runtime(
+      settings: const AppSettings(pauseOnMute: false),
+      libraryDatabase: _QueueLibrary([
+        row('solo', 'First Artist'),
+        row('duet', 'Second Artist, first artist'),
+        row('other', 'Second Artist'),
+      ]),
+    );
+    final container = ProviderContainer(
+      overrides: [musicPlayerRuntimeProvider.overrideWithValue(runtime)],
+    );
+    addTearDown(container.dispose);
+    final controller = container.read(musicPlayerControllerProvider);
+
+    expect(await controller.shuffleLibrary(artist: 'Missing Artist'), isFalse);
+    expect(await controller.shuffleLibrary(artist: 'First Artist'), isTrue);
+    expect(runtime.handler!.queue.value.map((item) => item.id).toSet(), {
+      'solo',
+      'duet',
+    });
+  });
+
   test('a media browser plays the album a song was chosen from', () async {
     final runtime = _runtime(
       libraryDatabase: _BrowsedLibrary(),

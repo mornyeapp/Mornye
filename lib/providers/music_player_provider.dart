@@ -14,6 +14,7 @@ import 'package:mornye/services/library_database.dart';
 import 'package:mornye/services/library_media_identity.dart';
 import 'package:mornye/services/music_player_service.dart';
 import 'package:mornye/services/remote_playback.dart';
+import 'package:mornye/utils/artist_utils.dart';
 
 export 'package:mornye/services/playable_media.dart'
     show playableFromHistory, playableFromLocal;
@@ -436,9 +437,21 @@ class MusicPlayerController {
 
   /// Plays every Library song, downloads and enabled scanned sources alike,
   /// from a random one with shuffle on. The queue keeps the Library order
-  /// underneath, so turning shuffle off returns to that order.
-  Future<bool> shuffleLibrary() async {
-    final media = await _runtime.browser.librarySongs();
+  /// underneath, so turning shuffle off returns to that order. With [artist],
+  /// plays only the songs that credit that artist. Returns false when there
+  /// is nothing to play.
+  Future<bool> shuffleLibrary({String? artist}) async {
+    var media = await _runtime.browser.librarySongs();
+    if (artist != null) {
+      final name = artist.trim().toLowerCase();
+      media = [
+        for (final song in media)
+          if (splitArtistNames(
+            song.artist,
+          ).any((credited) => credited.toLowerCase() == name))
+            song,
+      ];
+    }
     if (media.isEmpty) return false;
     if (remote case final remote?) {
       await remote.setShuffle(true);
