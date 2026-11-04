@@ -79,12 +79,8 @@ void main() {
           expect(find.text('Made for You'), findsOneWidget);
           expect(find.byType(MornyeMixBanner), findsOneWidget);
           expect(find.text('Mixes for you'), findsNothing);
-          // The shelf comes first: above Home's other sections.
-          final shortcuts = find.text('Shortcuts', skipOffstage: false);
-          expect(
-            tester.getTopLeft(find.text('Top Picks for You')).dy,
-            lessThan(tester.getTopLeft(shortcuts).dy),
-          );
+          // Music's Home has no tools.
+          expect(find.text('Shortcuts', skipOffstage: false), findsNothing);
         } else {
           expect(find.text('Mixes for you'), findsOneWidget);
           expect(find.byType(LibraryMixCover), findsOneWidget);

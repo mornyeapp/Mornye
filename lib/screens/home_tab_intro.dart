@@ -5,6 +5,7 @@ const _homeShelfCoverSize = 120.0;
 const _homeMixCoverSize = 152.0;
 const _homeDesktopShelfCoverSize = 168.0;
 const _homeDesktopMixCoverSize = 192.0;
+const _homeMornyeShelfGap = 16.0;
 
 /// The pane width from which the Material desktop Home sets Continue
 /// listening and Shortcuts side by side.
@@ -20,6 +21,8 @@ double _homeShelfCoverSizeOf(BuildContext context) =>
 
 double _homeMixCoverSizeOf(BuildContext context) =>
     _homeDesktop(context) ? _homeDesktopMixCoverSize : _homeMixCoverSize;
+
+double _homeShelfRadiusOf(BuildContext context) => context.isMornye ? 10 : 20;
 
 typedef HomeRecentlyAdded = ({List<UnifiedLibraryItem> items, int trackCount});
 
@@ -401,11 +404,14 @@ class _HomeSections extends ConsumerWidget {
             inset: inset,
             child: const _HomeContinueListeningCard(),
           ),
-        _HomeSection(
-          title: l10n.homeShortcuts,
-          inset: inset,
-          child: const _HomeShortcuts(),
-        ),
+        // Music's Home has no tools: Mornye keeps them in the player and
+        // Settings.
+        if (!mornye)
+          _HomeSection(
+            title: l10n.homeShortcuts,
+            inset: inset,
+            child: const _HomeShortcuts(),
+          ),
       ],
       // Built after startup settles when nothing is cached: the sections'
       // size animation opens its space rather than letting it jump in.
@@ -424,7 +430,7 @@ class _HomeSections extends ConsumerWidget {
           child: _HomeRecentlyAddedShelf(
             items: recentlyAdded.items,
             trackCount: recentlyAdded.trackCount,
-            inset: inset,
+            inset: mornye ? inset + 8 : inset,
           ),
         ),
       if (onRepeat.isNotEmpty)
@@ -432,7 +438,10 @@ class _HomeSections extends ConsumerWidget {
           title: l10n.homeOnRepeat,
           inset: inset,
           shelf: true,
-          child: _HomeOnRepeatShelf(tracks: onRepeat, inset: inset),
+          child: _HomeOnRepeatShelf(
+            tracks: onRepeat,
+            inset: mornye ? inset + 8 : inset,
+          ),
         ),
     ];
 
@@ -891,7 +900,6 @@ class _HomeShelf extends StatelessWidget {
     required this.itemCount,
     required this.itemBuilder,
     this.coverSize,
-    this.gap = 12,
   });
 
   final double inset;
@@ -900,7 +908,6 @@ class _HomeShelf extends StatelessWidget {
 
   /// Null for the platform's shelf cover size.
   final double? coverSize;
-  final double gap;
 
   @override
   Widget build(BuildContext context) {
@@ -914,10 +921,38 @@ class _HomeShelf extends StatelessWidget {
           scrollDirection: Axis.horizontal,
           padding: EdgeInsets.symmetric(horizontal: inset),
           itemCount: itemCount,
-          separatorBuilder: (_, _) => SizedBox(width: gap),
+          separatorBuilder: (_, _) =>
+              SizedBox(width: context.isMornye ? _homeMornyeShelfGap : 12),
           itemBuilder: itemBuilder,
         ),
       ),
+    );
+  }
+}
+
+/// Hands [builder] the cover size of a shelf in this pane: Mornye's are large,
+/// about four to a wide pane, as in Music.
+class _HomeShelfSize extends StatelessWidget {
+  const _HomeShelfSize({required this.inset, required this.builder});
+
+  final double inset;
+  final Widget Function(BuildContext context, double coverSize) builder;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!context.isMornye) {
+      return builder(context, _homeShelfCoverSizeOf(context));
+    }
+    if (!isDesktopPlatform) return builder(context, 160);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final content = constraints.maxWidth - 2 * inset;
+        final perPane = (content + _homeMornyeShelfGap) / 4.17;
+        return builder(
+          context,
+          (perPane - _homeMornyeShelfGap).clamp(160.0, 280.0),
+        );
+      },
     );
   }
 }
@@ -930,7 +965,6 @@ class _HomeShelfTile extends StatelessWidget {
     required this.semanticLabel,
     required this.onTap,
     this.size,
-    this.radius = 20,
   });
 
   final Widget cover;
@@ -941,13 +975,13 @@ class _HomeShelfTile extends StatelessWidget {
 
   /// Null for the platform's shelf cover size.
   final double? size;
-  final double radius;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final size = this.size ?? _homeShelfCoverSizeOf(context);
+    final radius = _homeShelfRadiusOf(context);
     return Semantics(
       button: true,
       label: semanticLabel,
@@ -1003,26 +1037,37 @@ class _HomeRecentlyAddedShelf extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final colorScheme = Theme.of(context).colorScheme;
-    final coverSize = _homeShelfCoverSizeOf(context);
-    final cacheWidth = (coverSize * MediaQuery.devicePixelRatioOf(context))
-        .round();
-    return _HomeShelf(
+    return _HomeShelfSize(
       inset: inset,
-      itemCount: items.length + 1,
-      itemBuilder: (context, index) {
-        if (index == items.length) {
-          return _HomeLibraryTile(trackCount: trackCount);
-        }
-        final item = items[index];
-        return _HomeShelfTile(
-          title: item.trackName,
-          subtitle: item.artistName,
-          semanticLabel: context.l10n.a11yOpenTrackByArtist(
-            item.trackName,
-            item.artistName,
-          ),
-          cover: _homeLibraryCover(item, colorScheme, coverSize, cacheWidth),
-          onTap: () => _play(ref, index),
+      builder: (context, coverSize) {
+        final cacheWidth = (coverSize * MediaQuery.devicePixelRatioOf(context))
+            .round();
+        return _HomeShelf(
+          inset: inset,
+          coverSize: coverSize,
+          itemCount: items.length + 1,
+          itemBuilder: (context, index) {
+            if (index == items.length) {
+              return _HomeLibraryTile(trackCount: trackCount, size: coverSize);
+            }
+            final item = items[index];
+            return _HomeShelfTile(
+              size: coverSize,
+              title: item.trackName,
+              subtitle: item.artistName,
+              semanticLabel: context.l10n.a11yOpenTrackByArtist(
+                item.trackName,
+                item.artistName,
+              ),
+              cover: _homeLibraryCover(
+                item,
+                colorScheme,
+                coverSize,
+                cacheWidth,
+              ),
+              onTap: () => _play(ref, index),
+            );
+          },
         );
       },
     );
@@ -1084,9 +1129,10 @@ PlayableMedia? _homePlayableFromLibrary(UnifiedLibraryItem item) =>
 
 /// Ends the Recently added shelf with a way into the whole Library.
 class _HomeLibraryTile extends StatelessWidget {
-  const _HomeLibraryTile({required this.trackCount});
+  const _HomeLibraryTile({required this.trackCount, required this.size});
 
   final int trackCount;
+  final double size;
 
   @override
   Widget build(BuildContext context) {
@@ -1095,11 +1141,11 @@ class _HomeLibraryTile extends StatelessWidget {
     return Align(
       alignment: Alignment.topCenter,
       child: SizedBox.square(
-        dimension: _homeShelfCoverSizeOf(context),
+        dimension: size,
         child: Material(
           color: colorScheme.surfaceContainerHigh,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(_homeShelfRadiusOf(context)),
           ),
           clipBehavior: Clip.antiAlias,
           child: InkWell(
@@ -1155,30 +1201,36 @@ class _HomeOnRepeatShelf extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final colorScheme = Theme.of(context).colorScheme;
-    final coverSize = _homeShelfCoverSizeOf(context);
-    final cacheWidth = (coverSize * MediaQuery.devicePixelRatioOf(context))
-        .round();
-    return _HomeShelf(
+    return _HomeShelfSize(
       inset: inset,
-      itemCount: tracks.length,
-      itemBuilder: (context, index) {
-        final (:track, :item) = tracks[index];
-        return _HomeShelfTile(
-          title: track.title,
-          subtitle: track.artist,
-          semanticLabel: context.l10n.a11yOpenTrackByArtist(
-            track.title,
-            track.artist,
-          ),
-          cover: item != null
-              ? _homeLibraryCover(item, colorScheme, coverSize, cacheWidth)
-              : PlayerArtwork(
-                  artUri: track.artwork,
-                  colorScheme: colorScheme,
-                  cacheWidth: cacheWidth,
-                  iconSize: 32,
-                ),
-          onTap: () => _homePlayRepeatTracks(ref, tracks, index),
+      builder: (context, coverSize) {
+        final cacheWidth = (coverSize * MediaQuery.devicePixelRatioOf(context))
+            .round();
+        return _HomeShelf(
+          inset: inset,
+          coverSize: coverSize,
+          itemCount: tracks.length,
+          itemBuilder: (context, index) {
+            final (:track, :item) = tracks[index];
+            return _HomeShelfTile(
+              size: coverSize,
+              title: track.title,
+              subtitle: track.artist,
+              semanticLabel: context.l10n.a11yOpenTrackByArtist(
+                track.title,
+                track.artist,
+              ),
+              cover: item != null
+                  ? _homeLibraryCover(item, colorScheme, coverSize, cacheWidth)
+                  : PlayerArtwork(
+                      artUri: track.artwork,
+                      colorScheme: colorScheme,
+                      cacheWidth: cacheWidth,
+                      iconSize: 32,
+                    ),
+              onTap: () => _homePlayRepeatTracks(ref, tracks, index),
+            );
+          },
         );
       },
     );
@@ -1190,33 +1242,26 @@ class _HomeOnRepeatShelf extends ConsumerWidget {
 class _HomeRecentlyPlayedShelf extends ConsumerWidget {
   const _HomeRecentlyPlayedShelf({required this.tracks, required this.inset});
 
-  static const _gap = 16.0;
-
   final List<HomeRepeatTrack> tracks;
   final double inset;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final colorScheme = Theme.of(context).colorScheme;
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final content = constraints.maxWidth - 2 * inset;
-        final coverSize = isDesktopPlatform
-            ? ((content + _gap) / 4.17 - _gap).clamp(160.0, 280.0)
-            : 160.0;
+    return _HomeShelfSize(
+      inset: inset,
+      builder: (context, coverSize) {
         final cacheWidth = (coverSize * MediaQuery.devicePixelRatioOf(context))
             .round();
         return _HomeShelf(
           inset: inset,
           coverSize: coverSize,
-          gap: _gap,
           itemCount: tracks.length,
           itemBuilder: (context, index) {
             final (:track, :item) = tracks[index];
             final title = track.album.isEmpty ? track.title : track.album;
             return _HomeShelfTile(
               size: coverSize,
-              radius: 10,
               title: title,
               subtitle: track.artist,
               semanticLabel: context.l10n.a11yOpenTrackByArtist(
@@ -1305,51 +1350,35 @@ class _HomeTopPicksShelf extends StatelessWidget {
   final List<ExploreItem> playlists;
   final double inset;
 
-  Widget _playlist(
-    BuildContext context,
-    ExploreItem item,
-    int seed,
-    double width,
-  ) {
-    final subtitle = item.artists.isNotEmpty
-        ? item.artists
-        : item.description ?? '';
-    final coverUrl = item.coverUrl ?? '';
-    final pixelRatio = MediaQuery.devicePixelRatioOf(context);
+  /// One card: mixes and playlists share the banner, so the whole shelf reads
+  /// as Mornye's own whichever service a playlist came from.
+  Widget _card({
+    required int seed,
+    required String title,
+    required String eyebrow,
+    required String subtitle,
+    required double width,
+    required VoidCallback onTap,
+  }) {
     return Semantics(
       button: true,
-      label: subtitle.isEmpty ? item.name : '${item.name}, $subtitle',
+      label: subtitle.isEmpty ? title : '$title, $subtitle',
       excludeSemantics: true,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(12),
         child: Stack(
           children: [
-            MornyePlaylistBanner(
+            MornyeMixBanner(
               seed: seed,
-              title: item.name,
+              title: title,
+              eyebrow: eyebrow,
               subtitle: subtitle,
-              coverUrl: coverUrl,
               width: width,
-              cover: CachedCoverImage(
-                imageUrl: coverUrl,
-                fit: BoxFit.cover,
-                memCacheWidth: (width * pixelRatio).round(),
-              ),
             ),
             Positioned.fill(
               child: Material(
                 color: Colors.transparent,
-                child: InkWell(
-                  onTap: () => pushPage<void>(
-                    context,
-                    (_) => ExtensionPlaylistScreen(
-                      extensionId: item.providerId ?? '',
-                      playlistId: item.id,
-                      playlistName: item.name,
-                      coverUrl: item.coverUrl,
-                    ),
-                  ),
-                ),
+                child: InkWell(onTap: onTap),
               ),
             ),
           ],
@@ -1382,44 +1411,36 @@ class _HomeTopPicksShelf extends StatelessWidget {
               separatorBuilder: (_, _) => const SizedBox(width: _gap),
               itemBuilder: (context, index) {
                 if (index >= mixes.length) {
-                  return _playlist(
-                    context,
-                    playlists[index - mixes.length],
-                    seeds[index],
-                    width,
+                  final item = playlists[index - mixes.length];
+                  return _card(
+                    seed: seeds[index],
+                    title: item.name,
+                    eyebrow: l10n.collectionPlaylist,
+                    subtitle: item.artists.isNotEmpty
+                        ? item.artists
+                        : item.description ?? '',
+                    width: width,
+                    onTap: () => pushPage<void>(
+                      context,
+                      (_) => ExtensionPlaylistScreen(
+                        extensionId: item.providerId ?? '',
+                        playlistId: item.id,
+                        playlistName: item.name,
+                        coverUrl: item.coverUrl,
+                      ),
+                    ),
                   );
                 }
                 final view = mixes[index];
-                final title = libraryMixTitle(l10n, view.mix);
-                final subtitle = libraryMixSubtitle(l10n, view.mix);
-                return Semantics(
-                  button: true,
-                  label: subtitle.isEmpty ? title : '$title, $subtitle',
-                  excludeSemantics: true,
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Stack(
-                      children: [
-                        MornyeMixBanner(
-                          seed: seeds[index],
-                          title: title,
-                          eyebrow: l10n.homeMadeForYou,
-                          subtitle: subtitle,
-                          width: width,
-                        ),
-                        Positioned.fill(
-                          child: Material(
-                            color: Colors.transparent,
-                            child: InkWell(
-                              onTap: () => pushPage<void>(
-                                context,
-                                (_) => LibraryMixScreen(view: view),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+                return _card(
+                  seed: seeds[index],
+                  title: libraryMixTitle(l10n, view.mix),
+                  eyebrow: l10n.homeMadeForYou,
+                  subtitle: libraryMixSubtitle(l10n, view.mix),
+                  width: width,
+                  onTap: () => pushPage<void>(
+                    context,
+                    (_) => LibraryMixScreen(view: view),
                   ),
                 );
               },

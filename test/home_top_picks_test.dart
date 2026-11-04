@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mornye/models/settings.dart';
 import 'package:mornye/providers/explore_provider.dart';
 import 'package:mornye/providers/home_top_picks_provider.dart';
 
@@ -41,5 +42,34 @@ void main() {
     expect(ids('2026-11-04'), hasLength(5));
     expect(ids('2026-11-04'), ids('2026-11-04'));
     expect(ids('2026-11-05'), isNot(ids('2026-11-04')));
+  });
+
+  test('leaves charts out, by their name or their section', () {
+    final picks = pickTopPickPlaylists([
+      ExploreSection(
+        uri: 'a',
+        title: 'Updated Playlists',
+        items: [_item('Top 100: Global'), _item('Rock Hits')],
+      ),
+      ExploreSection(uri: 'b', title: 'City Charts', items: [_item('Paris')]),
+    ], '2026-11-04');
+    expect(picks.map((item) => item.id), ['Rock Hits']);
+  });
+
+  group('source extension', () {
+    const off = AppSettings.homeFeedProviderOff;
+    const preferred = homeTopPicksDefaultExtension;
+
+    test('with no feed chosen the default wins, then the first', () {
+      expect(pickTopPicksExtension(['a', preferred], off), preferred);
+      expect(pickTopPicksExtension(['a', preferred], null), preferred);
+      expect(pickTopPicksExtension(['a', 'b'], off), 'a');
+      expect(pickTopPicksExtension(const [], off), isNull);
+    });
+
+    test('a chosen feed is kept, even over the default', () {
+      expect(pickTopPicksExtension(['a', preferred], 'a'), 'a');
+      expect(pickTopPicksExtension(['b', preferred], 'a'), isNull);
+    });
   });
 }

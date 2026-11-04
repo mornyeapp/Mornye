@@ -13,13 +13,17 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 final _log = AppLogger('HomeTopPicks');
 
-const _cacheKey = 'home_top_picks_v1';
+const _cacheKey = 'home_top_picks_v2';
 
 /// The most extension playlists Top Picks show after the mixes.
 const homeTopPickPlaylists = 9;
 
+/// Feeds carry a chart for every country and city, which read as noise among
+/// picks made for one listener.
+final _chartName = RegExp(r'\b(top \d+|charts?)\b', caseSensitive: false);
+
 /// Up to [count] playlists of [sections] with a cover, each once, in an order
-/// that holds for the [day] and changes with the next.
+/// that holds for the [day] and changes with the next. Charts are left out.
 @visibleForTesting
 List<ExploreItem> pickTopPickPlaylists(
   List<ExploreSection> sections,
@@ -28,8 +32,10 @@ List<ExploreItem> pickTopPickPlaylists(
 }) {
   final playlists = <String, ExploreItem>{};
   for (final section in sections) {
+    if (_chartName.hasMatch(section.title)) continue;
     for (final item in section.items) {
       if (item.type != 'playlist' || item.id.isEmpty) continue;
+      if (_chartName.hasMatch(item.name)) continue;
       if (item.coverUrl?.trim().isNotEmpty != true) continue;
       playlists.putIfAbsent(item.id, () => item);
     }
@@ -40,21 +46,34 @@ List<ExploreItem> pickTopPickPlaylists(
   return ordered.take(count).toList(growable: false);
 }
 
-/// The extension Top Picks read: the one the Home feed uses, or with the feed
-/// switched off the first that offers a feed.
+/// The extension Top Picks read when the Home feed names none: the Mornye
+/// style follows Music, so its picks do too.
+const homeTopPicksDefaultExtension = 'apple-music';
+
+/// Which of the [available] extensions Top Picks read: the one the Home feed
+/// uses, or with no feed chosen [homeTopPicksDefaultExtension], then the first.
+@visibleForTesting
+String? pickTopPicksExtension(List<String> available, String? homeFeed) {
+  if (homeFeed != null &&
+      homeFeed.isNotEmpty &&
+      homeFeed != AppSettings.homeFeedProviderOff) {
+    return available.contains(homeFeed) ? homeFeed : null;
+  }
+  return available.contains(homeTopPicksDefaultExtension)
+      ? homeTopPicksDefaultExtension
+      : available.firstOrNull;
+}
+
 final homeTopPicksExtensionProvider = Provider<String?>((ref) {
-  final preferred = ref.watch(
+  final homeFeed = ref.watch(
     settingsProvider.select((settings) => settings.homeFeedProvider),
   );
   final available = ref
       .watch(extensionProvider.select((state) => state.extensions))
       .where((extension) => extension.enabled && extension.hasHomeFeed);
-  if (preferred != null &&
-      preferred.isNotEmpty &&
-      preferred != AppSettings.homeFeedProviderOff) {
-    return available.where((e) => e.id == preferred).firstOrNull?.id;
-  }
-  return available.firstOrNull?.id;
+  return pickTopPicksExtension([
+    for (final extension in available) extension.id,
+  ], homeFeed);
 });
 
 /// A day's random extension playlists, kept for that day. A failed read falls
@@ -67,23 +86,28 @@ final homeTopPicksProvider = FutureProvider<List<ExploreItem>>((ref) async {
   final cached = _decode(prefs.getString(_cacheKey));
   final usable = cached?.extensionId == extensionId ? cached : null;
   if (usable != null && usable.day == day) return usable.items;
+  List<ExploreSection>? sections;
   try {
-    final sections = await readExtensionHomeFeed(extensionId);
-    if (sections == null) return usable?.items ?? const [];
-    final items = pickTopPickPlaylists(sections, day);
-    await prefs.setString(
-      _cacheKey,
-      jsonEncode({
-        'day': day,
-        'extensionId': extensionId,
-        'items': [for (final item in items) item.toJson()],
-      }),
-    );
-    return items;
+    sections = await readExtensionHomeFeed(extensionId);
   } on Object catch (error, stack) {
     _log.w('Could not read Top Picks playlists: $error\n$stack');
-    return usable?.items ?? const [];
   }
+  if (sections == null) {
+    if (usable != null) return usable.items;
+    // Startup clears the bridge's caches and cancels reads under way: failing
+    // with an Exception, not an Error, has Riverpod try again in a moment.
+    throw Exception('Top Picks have no playlists yet');
+  }
+  final items = pickTopPickPlaylists(sections, day);
+  await prefs.setString(
+    _cacheKey,
+    jsonEncode({
+      'day': day,
+      'extensionId': extensionId,
+      'items': [for (final item in items) item.toJson()],
+    }),
+  );
+  return items;
 });
 
 ({String day, String extensionId, List<ExploreItem> items})? _decode(
