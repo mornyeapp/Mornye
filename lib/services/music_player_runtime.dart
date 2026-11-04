@@ -276,6 +276,8 @@ class MusicPlayerRuntime {
   AppSettings _settings;
   MusicPlayerHandler? _handler;
   void Function()? _unsubscribeSourceDeletion;
+  void Function()? _unsubscribeSourceDeletionPreparation;
+  void Function()? _unsubscribeSourceDeletionCancellation;
   void Function()? _unsubscribeSourceMetadata;
   Future<MusicPlayerHandler>? _initFuture;
   Future<void>? _restoreFuture;
@@ -478,6 +480,10 @@ class MusicPlayerRuntime {
     }
     _handler = handler;
     if (!identical(existing, handler)) {
+      _unsubscribeSourceDeletionPreparation = dependencies.sourceDeletionEvents
+          .subscribeBeforeDeletion(handler.onSourceDeleting);
+      _unsubscribeSourceDeletionCancellation = dependencies.sourceDeletionEvents
+          .subscribeDeletionCancelled(handler.onSourceDeletionCancelled);
       _unsubscribeSourceDeletion = dependencies.sourceDeletionEvents.subscribe(
         handler.onSourceDeleted,
       );
@@ -490,6 +496,10 @@ class MusicPlayerRuntime {
 
   void detach(MusicPlayerHandler handler) {
     if (!identical(_handler, handler)) return;
+    _unsubscribeSourceDeletionPreparation?.call();
+    _unsubscribeSourceDeletionPreparation = null;
+    _unsubscribeSourceDeletionCancellation?.call();
+    _unsubscribeSourceDeletionCancellation = null;
     _unsubscribeSourceDeletion?.call();
     _unsubscribeSourceDeletion = null;
     _unsubscribeSourceMetadata?.call();
