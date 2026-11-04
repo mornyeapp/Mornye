@@ -42,6 +42,7 @@ import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/utils/int_utils.dart';
 import 'package:mornye/utils/playback_artwork.dart';
 import 'package:mornye/services/downloaded_embedded_cover_resolver.dart';
+import 'package:mornye/services/file_access_check.dart';
 import 'package:mornye/utils/logger.dart';
 import 'package:mornye/services/playable_media.dart';
 
@@ -157,6 +158,7 @@ class MusicPlayerHandler extends BaseAudioHandler
   bool _initialized = false;
   bool _sourceReady = false;
   Object? _playbackError;
+  int? _checkingPlaybackErrorGeneration;
 
   /// Reloads of the current song after Android's media server died, and
   /// whether the next [_playIndex] is one of them.
@@ -558,6 +560,48 @@ class MusicPlayerHandler extends BaseAudioHandler
     ];
   }
 
+  /// A decoder's unavailable-file error is ambiguous: it can also mean a
+  /// provider refused access. Only skip after the source itself is confirmed
+  /// missing by the filesystem or storage provider.
+  bool _mayBeMissingSourceError(Object error) {
+    final message = error.toString().toLowerCase();
+    if (message.contains('audio file is unavailable') ||
+        message.contains('cannot open file') ||
+        message.contains('no such file or directory') ||
+        message.contains('file does not exist') ||
+        message.contains('file not found') ||
+        message.contains('path not found')) {
+      return true;
+    }
+    if (error is FileSystemException) {
+      final code = error.osError?.errorCode;
+      return code == 2 || code == (Platform.isWindows ? 3 : 20);
+    }
+    return false;
+  }
+
+  Future<bool> _skipConfirmedMissingSource(
+    PlayableMedia media,
+    int generation,
+    Object error,
+  ) async {
+    if (!_isCurrentPlayRequest(generation, media)) return true;
+    if (media.isNetwork ||
+        media.source.startsWith('network://') ||
+        _runtime.arrivingFile(media.source) != null ||
+        !_mayBeMissingSourceError(error)) {
+      return false;
+    }
+
+    final result = await checkFileAccess(media.source);
+    if (!_isCurrentPlayRequest(generation, media)) return true;
+    if (result is! FileAccessMissing) return false;
+
+    _log.w('Skipping missing track: ' + media.title);
+    await onSourceDeleted(media.source);
+    return true;
+  }
+
   void _reportPlaybackError(
     PlaybackDeck player,
     Object error,
@@ -567,24 +611,53 @@ class MusicPlayerHandler extends BaseAudioHandler
       return;
     }
     if (_reloadAfterServerDied(error)) return;
-    _sourceReady = false;
-    _playbackError = error;
-    _userPaused = true;
-    _pausedByInterruption = false;
-    _playbackAutomation.cancelPendingActions();
-    _log.e('Playback failed for ${mediaItem.value?.title}', error, stackTrace);
-    _broadcastState(playerState: PlaybackDeckState.stopped);
     final generation = _playRequestGeneration;
+    if (_checkingPlaybackErrorGeneration == generation) return;
+    _checkingPlaybackErrorGeneration = generation;
+    final media = _index >= 0 && _index < _media.length ? _media[_index] : null;
     unawaited(
-      _serializeSourceChange(() async {
+      _handlePlaybackError(player, media, generation, error, stackTrace),
+    );
+  }
+
+  Future<void> _handlePlaybackError(
+    PlaybackDeck player,
+    PlayableMedia? media,
+    int generation,
+    Object error,
+    StackTrace stackTrace,
+  ) async {
+    try {
+      if (media != null &&
+          await _skipConfirmedMissingSource(media, generation, error)) {
+        return;
+      }
+      if (_disposed ||
+          !identical(player, _player) ||
+          generation != _playRequestGeneration ||
+          _playbackError != null) {
+        return;
+      }
+      _sourceReady = false;
+      _playbackError = error;
+      _userPaused = true;
+      _pausedByInterruption = false;
+      _playbackAutomation.cancelPendingActions();
+      _log.e('Playback failed: ' + (mediaItem.value?.title ?? 'unknown'), error, stackTrace);
+      _broadcastState(playerState: PlaybackDeckState.stopped);
+      await _serializeSourceChange(() async {
         if (_disposed || generation != _playRequestGeneration) return;
         await _cancelTransitions();
         if (_disposed || generation != _playRequestGeneration) return;
         await player.stop();
-      }).catchError((Object error) {
-        _log.w('Could not stop failed playback: $error');
-      }),
-    );
+      });
+    } catch (failure) {
+      _log.w('Could not handle playback failure: $failure');
+    } finally {
+      if (_checkingPlaybackErrorGeneration == generation) {
+        _checkingPlaybackErrorGeneration = null;
+      }
+    }
   }
 
   static const _serverDiedReloadLimit = 2;
