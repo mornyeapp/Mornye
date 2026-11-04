@@ -365,6 +365,7 @@ void main() {
         kThemeModeKey: mode.name,
         kSeedColorKey: 0xff123456,
         kMornyeAccentKey: 'red',
+        kMornyeAccentMovedToBlueKey: true,
       });
       final prefs = await SharedPreferences.getInstance();
       await openSettings(tester, prefs);

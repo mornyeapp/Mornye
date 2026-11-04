@@ -10,6 +10,25 @@ import 'package:mornye/providers/theme_provider.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  test('a stored red moves to blue once, and red picked later stays', () async {
+    SharedPreferences.setMockInitialValues({kMornyeAccentKey: 'red'});
+    final prefs = await SharedPreferences.getInstance();
+    expect(loadBootstrapThemeSettings(prefs).mornyeAccent, MornyeAccent.blue);
+    expect(prefs.getString(kMornyeAccentKey), 'blue');
+
+    await prefs.setString(kMornyeAccentKey, 'red');
+    expect(loadBootstrapThemeSettings(prefs).mornyeAccent, MornyeAccent.red);
+    expect(prefs.getString(kMornyeAccentKey), 'red');
+  });
+
+  test('the move leaves any other accent alone', () async {
+    SharedPreferences.setMockInitialValues({kMornyeAccentKey: 'pink'});
+    final prefs = await SharedPreferences.getInstance();
+    expect(loadBootstrapThemeSettings(prefs).mornyeAccent, MornyeAccent.pink);
+    expect(prefs.getString(kMornyeAccentKey), 'pink');
+    expect(prefs.getBool(kMornyeAccentMovedToBlueKey), isTrue);
+  });
+
   test(
     'early theme edits preserve untouched saved settings and await saving',
     () async {

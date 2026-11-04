@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -75,6 +77,22 @@ class DynamicColors {
   }
 }
 
+/// The accent to load, moving an install off the old default once. Every
+/// theme save wrote the accent, so a stored red usually only means red was
+/// the default. Red picked after this stays.
+MornyeAccent _loadMornyeAccent(SharedPreferences prefs) {
+  final stored = prefs.getString(kMornyeAccentKey);
+  if (prefs.getBool(kMornyeAccentMovedToBlueKey) ?? false) {
+    return mornyeAccentFromString(stored);
+  }
+  unawaited(prefs.setBool(kMornyeAccentMovedToBlueKey, true));
+  if (stored == MornyeAccent.red.name) {
+    unawaited(prefs.setString(kMornyeAccentKey, MornyeAccent.blue.name));
+    return MornyeAccent.blue;
+  }
+  return mornyeAccentFromString(stored);
+}
+
 ThemeSettings loadBootstrapThemeSettings(SharedPreferences prefs) {
   return ThemeSettings(
     themeMode: themeModeFromString(prefs.getString(kThemeModeKey)),
@@ -82,7 +100,7 @@ ThemeSettings loadBootstrapThemeSettings(SharedPreferences prefs) {
     seedColorValue: prefs.getInt(kSeedColorKey) ?? kDefaultSeedColor,
     useAmoled: prefs.getBool(kUseAmoledKey) ?? false,
     style: themeStyleFromString(prefs.getString(kThemeStyleKey)),
-    mornyeAccent: mornyeAccentFromString(prefs.getString(kMornyeAccentKey)),
+    mornyeAccent: _loadMornyeAccent(prefs),
     useSystemFont: prefs.getBool(kUseSystemFontKey) ?? false,
     customFontId: prefs.getString(kCustomFontIdKey) ?? '',
     customFontName: prefs.getString(kCustomFontNameKey) ?? '',

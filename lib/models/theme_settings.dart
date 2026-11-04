@@ -8,6 +8,7 @@ const String kSeedColorKey = 'seed_color';
 const String kUseAmoledKey = 'use_amoled';
 const String kThemeStyleKey = 'theme_style';
 const String kMornyeAccentKey = 'mornye_accent';
+const String kMornyeAccentMovedToBlueKey = 'mornye_accent_moved_to_blue';
 const String kUseSystemFontKey = 'use_system_font';
 const String kCustomFontIdKey = 'custom_font_id';
 const String kCustomFontNameKey = 'custom_font_name';
