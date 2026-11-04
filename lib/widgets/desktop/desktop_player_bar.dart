@@ -10,6 +10,7 @@ import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/theme_provider.dart';
 import 'package:mornye/theme/app_tokens.dart';
+import 'package:mornye/theme/material_expressive.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/theme/player_artwork_theme.dart';
 import 'package:mornye/services/cast_output.dart';
@@ -28,6 +29,7 @@ import 'package:mornye/widgets/desktop/desktop_inspector.dart';
 import 'package:mornye/widgets/desktop/desktop_link_devices_button.dart';
 import 'package:mornye/widgets/desktop/desktop_window.dart';
 import 'package:mornye/widgets/desktop/desktop_volume_scroll.dart';
+import 'package:mornye/widgets/expressive_playback_transport.dart';
 import 'package:mornye/widgets/link/link_devices_sheet.dart';
 import 'package:mornye/widgets/mornye_chrome.dart';
 import 'package:mornye/widgets/mornye_playback_button.dart';
@@ -473,6 +475,23 @@ class _Transport extends ConsumerWidget {
             onPressed: enabled ? controller.next : null,
           ),
         ],
+      );
+    }
+    if (materialExpressiveEnabled(context)) {
+      return SizedBox(
+        width: 192,
+        child: ExpressivePlaybackTransport(
+          colorScheme: colorScheme,
+          playing: isPlaying,
+          loading: isLoading,
+          dense: true,
+          playTooltip: playTooltip,
+          previousTooltip: previousTooltip,
+          nextTooltip: nextTooltip,
+          onPlayPause: onPlayPause,
+          onPrevious: enabled ? controller.previous : null,
+          onNext: enabled ? controller.next : null,
+        ),
       );
     }
     return Row(

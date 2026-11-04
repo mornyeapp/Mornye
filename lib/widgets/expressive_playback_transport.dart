@@ -28,6 +28,7 @@ class ExpressivePlaybackTransport extends StatefulWidget {
     this.leading,
     this.trailing,
     this.compact = false,
+    this.dense = false,
     this.fill = false,
   });
 
@@ -37,14 +38,20 @@ class ExpressivePlaybackTransport extends StatefulWidget {
   final String playTooltip;
   final String previousTooltip;
   final String nextTooltip;
-  final VoidCallback onPlayPause;
-  final VoidCallback onPrevious;
-  final VoidCallback onNext;
+
+  /// A null callback disables its button, as before a song is loaded.
+  final VoidCallback? onPlayPause;
+  final VoidCallback? onPrevious;
+  final VoidCallback? onNext;
 
   /// 48dp actions beside the group, such as shuffle and repeat.
   final Widget? leading;
   final Widget? trailing;
   final bool compact;
+
+  /// The 40dp desktop size for a bar that also holds the seek row, sized for
+  /// a pointer rather than a thumb.
+  final bool dense;
 
   /// Stretches the group, in its resting proportions, so the row spans the
   /// full width and [leading] and [trailing] line up with its ends.
@@ -65,8 +72,12 @@ class _ExpressivePlaybackTransportState
   @override
   Widget build(BuildContext context) {
     final compact = widget.compact;
-    final height = compact ? 56.0 : 72.0;
-    final restingWidths = compact ? [56.0, 80.0, 56.0] : [68.0, 104.0, 68.0];
+    final dense = widget.dense;
+    final height = dense ? 40.0 : (compact ? 56.0 : 72.0);
+    final restingWidths = dense
+        ? [48.0, 64.0, 48.0]
+        : (compact ? [56.0, 80.0, 56.0] : [68.0, 104.0, 68.0]);
+    final sideIconSize = dense ? 20.0 : (compact ? 28.0 : 32.0);
     return LayoutBuilder(
       builder: (context, constraints) {
         final sideActions =
@@ -106,13 +117,16 @@ class _ExpressivePlaybackTransportState
         }
         final scheme = widget.colorScheme;
         final playIcon = widget.loading
-            ? AppLoadingIndicator(color: scheme.onSurfaceVariant)
+            ? AppLoadingIndicator(
+                size: dense ? 20 : 32,
+                color: scheme.onSurfaceVariant,
+              )
             : null;
         final buttons = [
           _button(
             tooltip: widget.previousTooltip,
             icon: const AppIcon(Icons.skip_previous),
-            iconSize: compact ? 28 : 32,
+            iconSize: sideIconSize,
             round: false,
             background: scheme.secondaryContainer,
             foreground: scheme.onSecondaryContainer,
@@ -123,7 +137,7 @@ class _ExpressivePlaybackTransportState
             icon: playIcon ?? const AppIcon(Icons.play_arrow),
             selectedIcon: playIcon ?? const AppIcon(Icons.pause),
             selected: widget.playing,
-            iconSize: compact ? 32 : 40,
+            iconSize: dense ? 24 : (compact ? 32 : 40),
             round: true,
             background: scheme.primary,
             foreground: scheme.onPrimary,
@@ -132,7 +146,7 @@ class _ExpressivePlaybackTransportState
           _button(
             tooltip: widget.nextTooltip,
             icon: const AppIcon(Icons.skip_next),
-            iconSize: compact ? 28 : 32,
+            iconSize: sideIconSize,
             round: false,
             background: scheme.secondaryContainer,
             foreground: scheme.onSecondaryContainer,
@@ -215,7 +229,11 @@ class _ExpressivePlaybackTransportState
             isSelected: selected,
             semanticLabel: tooltip,
             onPressed: onPressed,
-            size: widget.compact ? M3EIconButtonSize.md : M3EIconButtonSize.lg,
+            size: widget.dense
+                ? M3EIconButtonSize.sm
+                : (widget.compact
+                      ? M3EIconButtonSize.md
+                      : M3EIconButtonSize.lg),
             shape: round
                 ? M3EIconButtonShapeVariant.round
                 : M3EIconButtonShapeVariant.square,

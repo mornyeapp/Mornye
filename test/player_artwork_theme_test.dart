@@ -16,10 +16,10 @@ import 'package:mornye/screens/now_playing_screen.dart';
 import 'package:mornye/theme/app_theme.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/theme/player_artwork_theme.dart';
-import 'package:mornye/widgets/app_icon_button.dart';
 import 'package:mornye/widgets/cached_cover_image.dart';
 import 'package:mornye/widgets/desktop/desktop_downloads_button.dart';
 import 'package:mornye/widgets/desktop/desktop_player_bar.dart';
+import 'package:mornye/widgets/expressive_playback_transport.dart';
 import 'package:mornye/widgets/mini_player.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -265,13 +265,14 @@ void main() {
       );
       expect(surface.color, cover.surfaceContainer);
       expect(Theme.of(tester.element(find.text('Song'))).colorScheme, cover);
-      final play = tester
-          .widgetList<AppIconButton>(
-            find.descendant(of: bar, matching: find.byType(AppIconButton)),
-          )
-          .singleWhere((button) => button.style?.backgroundColor != null);
-      expect(play.style!.backgroundColor!.resolve({}), cover.primary);
-      expect(play.style!.foregroundColor!.resolve({}), cover.onPrimary);
+      final transport = tester.widget<ExpressivePlaybackTransport>(
+        find.descendant(
+          of: bar,
+          matching: find.byType(ExpressivePlaybackTransport),
+        ),
+      );
+      expect(transport.colorScheme, cover);
+      expect(transport.dense, isTrue);
       // Downloads are app chrome hosted in the bar.
       expect(
         Theme.of(

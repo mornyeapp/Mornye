@@ -136,4 +136,42 @@ void main() {
     expect(leading.left, greaterThan(0));
     expect(800 - trailing.right, moreOrLessEquals(leading.left));
   });
+
+  testWidgets('the dense size fits a desktop bar and disables without songs', (
+    tester,
+  ) async {
+    final scheme = ColorScheme.fromSeed(seedColor: Colors.teal);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: ThemeData(colorScheme: scheme),
+        home: Scaffold(
+          body: Center(
+            child: SizedBox(
+              width: 192,
+              child: ExpressivePlaybackTransport(
+                colorScheme: scheme,
+                playing: false,
+                loading: false,
+                dense: true,
+                playTooltip: 'Play',
+                previousTooltip: 'Previous',
+                nextTooltip: 'Next',
+                onPlayPause: null,
+                onPrevious: null,
+                onNext: null,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final previous = tester.getRect(find.byTooltip('Previous'));
+    final play = tester.getRect(find.byTooltip('Play'));
+    expect(previous.height, moreOrLessEquals(40));
+    expect(previous.width, moreOrLessEquals(48));
+    expect(play.width, moreOrLessEquals(64));
+    await tester.tap(find.byTooltip('Play'), warnIfMissed: false);
+    expect(tester.takeException(), isNull);
+  });
 }
