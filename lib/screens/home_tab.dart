@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
-import 'package:flutter/cupertino.dart' show CupertinoIcons;
+import 'package:flutter/cupertino.dart' show CupertinoButton, CupertinoIcons;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:mornye/widgets/app_snack_bar.dart';
@@ -1276,30 +1276,41 @@ class _HomeTabState extends ConsumerState<HomeTab>
             currentSearchProvider,
             extensions,
           );
-          if (searchFilters.isEmpty && !showTools) {
+          final displayFilter = HomeSearchProviderPolicy.displayFilterSelection(
+            selectedSearchFilter,
+            defaultSearchTab,
+            currentSearchProvider,
+            extensions,
+          );
+          // Wide Mornye results move between kinds by their section headers.
+          final noChips = wide && isDesktopPlatform && context.isMornye;
+          final showBack = noChips && displayFilter != 'all';
+          if (!showTools && !showBack && (noChips || searchFilters.isEmpty)) {
             return const SliverToBoxAdapter(child: SizedBox.shrink());
           }
+          final tools = showTools
+              ? Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: _buildSearchResultTools(
+                    colorScheme,
+                    showSortButton: true,
+                    viewToggle: _buildSearchViewToggle(grid: grid),
+                  ),
+                )
+              : null;
           return SliverToBoxAdapter(
-            child: _buildSearchFilterBar(
-              searchFilters,
-              HomeSearchProviderPolicy.displayFilterSelection(
-                selectedSearchFilter,
-                defaultSearchTab,
-                currentSearchProvider,
-                extensions,
-              ),
-              colorScheme,
-              tools: showTools
-                  ? Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: _buildSearchResultTools(
-                        colorScheme,
-                        showSortButton: true,
-                        viewToggle: _buildSearchViewToggle(grid: grid),
-                      ),
-                    )
-                  : null,
-            ),
+            child: noChips
+                ? _buildSearchBackBar(
+                    colorScheme,
+                    showBack: showBack,
+                    tools: tools,
+                  )
+                : _buildSearchFilterBar(
+                    searchFilters,
+                    displayFilter,
+                    colorScheme,
+                    tools: tools,
+                  ),
           );
         },
       ),

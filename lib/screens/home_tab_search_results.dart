@@ -906,6 +906,48 @@ extension _HomeTabSearchResultsUI on _HomeTabState {
     );
   }
 
+  /// Music on the Mac has no filter chips: a section's chevron opens that
+  /// section, and with [showBack] this row leads back to every kind. [tools]
+  /// sit at its end.
+  Widget _buildSearchBackBar(
+    ColorScheme colorScheme, {
+    required bool showBack,
+    Widget? tools,
+  }) {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 20 + homeContentInset(context)),
+      child: Row(
+        children: [
+          if (showBack)
+            CupertinoButton(
+              padding: EdgeInsets.zero,
+              minimumSize: const Size(0, 36),
+              onPressed: () => _selectSearchFilter('all'),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                spacing: 4,
+                children: [
+                  Icon(
+                    CupertinoIcons.chevron_back,
+                    size: 14,
+                    color: colorScheme.primary,
+                  ),
+                  Text(
+                    context.l10n.historyFilterAll,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: colorScheme.primary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          const Spacer(),
+          ?tools,
+        ],
+      ),
+    );
+  }
+
   IconData _getFilterIcon(String iconName) {
     switch (iconName.toLowerCase()) {
       case 'music':

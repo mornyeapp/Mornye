@@ -69,6 +69,33 @@ Future<void> _dismissSnackBars(WidgetTester tester) async {
 }
 
 void main() {
+  testWidgets('Mornye desktop results move between kinds without chips', (
+    tester,
+  ) async {
+    final results = SearchFixtureResults(count: 3, songCount: 8);
+    await pumpSearchFixture(
+      tester,
+      size: _desktop,
+      mornye: true,
+      desktop: true,
+      settings: _grid,
+      results: results,
+      filters: searchFixtureAllFilters,
+    );
+    expect(find.text('Albums filter'), findsNothing);
+    expect(find.text('All'), findsNothing);
+
+    await tester.tap(find.text('Albums'));
+    await tester.pumpAndSettle();
+    expect(results.requestedFilters.last, 'album');
+
+    await tester.tap(find.text('All'));
+    await tester.pumpAndSettle();
+    expect(find.text('All'), findsNothing);
+    expect(find.byKey(const ValueKey('top-album-album-0')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('Mornye All view opens with Top Results cards', (tester) async {
     await pumpSearchFixture(
       tester,
@@ -152,7 +179,9 @@ void main() {
           results: results,
           filters: searchFixtureAllFilters,
         );
-        await tester.tap(find.text('Albums filter'));
+        await tester.tap(
+          find.text(mornye && desktop ? 'Albums' : 'Albums filter'),
+        );
         await tester.pumpAndSettle();
         expect(results.requestedFilters.last, 'album');
 
@@ -227,7 +256,7 @@ void main() {
         results: SearchFixtureResults(count: 4),
         filters: searchFixtureAllFilters,
       );
-      await tester.tap(find.text('Artists filter'));
+      await tester.tap(find.text(mornye ? 'Artists' : 'Artists filter'));
       await tester.pumpAndSettle();
       final cell = find.byKey(const ValueKey('artist-artist-0'));
       expect(cell, findsOneWidget);
@@ -284,10 +313,12 @@ void main() {
       // Sort ends the filter row, so each Show all ends its own header.
       final sortTop = tester.getCenter(find.text('Sort').hitTestable()).dy;
       expect(sortTop, lessThan(headers.first));
-      expect(
-        tester.getCenter(find.text('All')).dy,
-        moreOrLessEquals(sortTop, epsilon: 12),
-      );
+      if (!mornye) {
+        expect(
+          tester.getCenter(find.text('All')).dy,
+          moreOrLessEquals(sortTop, epsilon: 12),
+        );
+      }
       final songShelf = find.byKey(const ValueKey('search-shelf-track'));
       expect(songShelf, findsOneWidget);
       expect(
@@ -386,7 +417,7 @@ void main() {
         settings: settings,
         filters: searchFixtureAllFilters,
       );
-      await tester.tap(find.text('Songs filter'));
+      await tester.tap(find.text(mornye ? 'Songs' : 'Songs filter'));
       await tester.pumpAndSettle();
       expect(find.byType(SliverGrid), findsOneWidget);
       expect(_songCell(0), findsOneWidget);
@@ -507,7 +538,7 @@ void main() {
         filters: searchFixtureAllFilters,
         results: SearchFixtureResults(count: 3),
       );
-      await tester.tap(find.text('Albums filter'));
+      await tester.tap(find.text(mornye ? 'Albums' : 'Albums filter'));
       await tester.pumpAndSettle();
       expect(
         tester.getCenter(find.byKey(const ValueKey('album-album-0'))).dx,
