@@ -4229,6 +4229,15 @@
   "@collectionRemoveFromPlaylist": {
     "description": "Tooltip for removing track from playlist"
   },
+  "collectionDeleteFilesMessage": "Hapus permanen {count} file audio dari penyimpanan? Ini memengaruhi semua playlist yang menggunakan file tersebut.",
+  "@collectionDeleteFilesMessage": {
+    "description": "Konfirmasi penghapusan file fisik dari seleksi koleksi, berbeda dari menghapus entri playlist",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "collectionRemoveFromFolder": "Hapus dari folder",
   "@collectionRemoveFromFolder": {
     "description": "Tooltip for removing track from wishlist/loved folder"

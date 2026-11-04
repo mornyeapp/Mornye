@@ -562,6 +562,14 @@ class MusicPlayerController {
         else if (item.historyItem != null)
           playableFromHistory(item.historyItem!),
     ];
+    await enqueueMedia(media, playNext: playNext);
+  }
+
+  Future<void> enqueueMedia(
+    List<PlayableMedia> media, {
+    bool playNext = false,
+  }) async {
+    if (media.isEmpty) return;
     if (remote case final remote?) {
       return remote.enqueue(media, playNext: playNext);
     }

@@ -25,11 +25,12 @@ Future<int?> confirmAndDeleteTracks({
   required Future<bool> Function(String id) deleteItem,
   Future<void> Function(List<String> ids)? persistDeletedItems,
   required VoidCallback onExitSelectionMode,
+  String? message,
 }) async {
   final confirmed = await showAppConfirmDialog(
     context,
     title: context.l10n.downloadedAlbumDeleteSelected,
-    message: context.l10n.downloadedAlbumDeleteMessage(ids.length),
+    message: message ?? context.l10n.downloadedAlbumDeleteMessage(ids.length),
     confirmLabel: context.l10n.dialogDelete,
     destructive: true,
     cancelIsDefault: true,

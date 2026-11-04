@@ -1,3 +1,7 @@
+import 'dart:async';
+import 'dart:io';
+
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -19,6 +23,10 @@ import 'package:mornye/theme/app_theme.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/album_detail_header.dart';
 import 'package:mornye/widgets/track_card.dart';
+import 'package:mornye/widgets/selection_action_button.dart';
+import 'package:mornye/widgets/destructive_selection_button.dart';
+import 'package:mornye/widgets/selection_bottom_bar.dart';
+import 'package:mornye/utils/desktop_platform.dart';
 
 import 'support/app_icon_finder.dart';
 
@@ -47,6 +55,16 @@ class _Player extends MusicPlayerController {
   List<PlayableMedia> queue = [];
   int? index;
   bool? shuffle;
+  bool? insertedNext;
+
+  @override
+  Future<void> enqueueMedia(
+    List<PlayableMedia> media, {
+    bool playNext = false,
+  }) async {
+    queue = media;
+    insertedNext = playNext;
+  }
 
   @override
   Future<MusicPlayerHandler?> ensureInitialized() async => _Handler();
@@ -179,13 +197,81 @@ class _RemovalCollections extends _Collections {
 }
 
 class _Library extends LocalLibraryNotifier {
+  final removedFiles = <String>[];
+
   @override
   LocalLibraryState build() => LocalLibraryState();
+
+  @override
+  Future<void> removePhysicalFiles(Iterable<String> paths) async {
+    removedFiles.addAll(paths);
+  }
 }
 
 class _History extends DownloadHistoryNotifier {
+  final removedFiles = <String>[];
+  final deletionCompleted = Completer<void>();
+
   @override
   DownloadHistoryState build() => DownloadHistoryState();
+
+  @override
+  Future<void> removePhysicalFiles(Iterable<String> paths) async {
+    removedFiles.addAll(paths);
+    deletionCompleted.complete();
+  }
+}
+
+Widget _selectionApp({
+  required bool mornye,
+  required _Player player,
+  required _Playback playback,
+  _Library? library,
+  _History? history,
+  bool internalPlayer = true,
+}) => ProviderScope(
+  overrides: [
+    settingsProvider.overrideWith(_Settings.new),
+    playerUiEnabledProvider.overrideWithValue(internalPlayer),
+    musicPlayerControllerProvider.overrideWithValue(player),
+    playbackProvider.overrideWith(() => playback),
+    libraryCollectionsProvider.overrideWith(_Collections.new),
+    localLibraryProvider.overrideWith(() => library ?? _Library()),
+    downloadHistoryProvider.overrideWith(() => history ?? _History()),
+    downloadHistoryVisibleBatchExistsProvider.overrideWith(
+      (ref, request) => const {},
+    ),
+    localLibraryCoverProvider.overrideWith((ref, request) async => null),
+    localLibraryFirstCoverProvider.overrideWith((ref, request) async => null),
+  ],
+  child: MaterialApp(
+    theme: mornye ? MornyeTheme.build(Brightness.dark) : AppTheme.light(),
+    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    supportedLocales: AppLocalizations.supportedLocales,
+    home: const SelectionOverlayHost(
+      child: LibraryTracksFolderScreen(
+        mode: LibraryTracksFolderMode.playlist,
+        playlistId: 'playlist',
+      ),
+    ),
+  ),
+);
+
+Future<void> _selectAllTracks(WidgetTester tester) async {
+  await tester.pumpAndSettle();
+  await tester.ensureVisible(find.text('First'));
+  if (isDesktopPlatform) {
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.tap(find.text('First'));
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+  } else {
+    await tester.longPress(find.text('First'));
+  }
+  await tester.pumpAndSettle();
+  tester
+      .widget<SelectionBottomBar>(find.byType(SelectionBottomBar))
+      .onToggleSelectAll();
+  await tester.pumpAndSettle();
 }
 
 class _DownloadSelection extends DownloadQueueNotifier {
@@ -221,6 +307,209 @@ class _DownloadExtensions extends ExtensionNotifier {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   setUp(() => SharedPreferences.setMockInitialValues({}));
+
+  for (final mornye in [false, true]) {
+    for (final desktop in [false, true]) {
+      for (final next in <bool?>[null, true, false]) {
+        testWidgets(
+          'playlist selection plays or enqueues in order ($mornye, $desktop, $next)',
+          (tester) async {
+            debugDesktopPlatformOverride = desktop;
+            addTearDown(() => debugDesktopPlatformOverride = null);
+            tester.view.physicalSize = desktop
+                ? const Size(1000, 900)
+                : const Size(360, 780);
+            tester.view.devicePixelRatio = 1;
+            addTearDown(tester.view.reset);
+            final player = _Player();
+            final playback = _Playback();
+            await tester.pumpWidget(
+              _selectionApp(mornye: mornye, player: player, playback: playback),
+            );
+            await _selectAllTracks(tester);
+            final action = find.widgetWithText(
+              SelectionActionButton,
+              next == null
+                  ? 'Play'
+                  : next
+                  ? 'Play next'
+                  : 'Add to queue',
+            );
+            await tester.ensureVisible(action);
+            await tester.tap(action);
+            await tester.pumpAndSettle();
+
+            expect(player.queue.map((item) => item.title), [
+              'First',
+              'Selected',
+              'Last',
+            ]);
+            expect(player.insertedNext, next);
+            if (next == null) expect(player.index, 0);
+            expect(find.byType(SelectionBottomBar), findsNothing);
+            expect(tester.takeException(), isNull);
+          },
+        );
+      }
+    }
+
+    testWidgets('playlist desktop menu acts on its clicked track ($mornye)', (
+      tester,
+    ) async {
+      debugDesktopPlatformOverride = true;
+      addTearDown(() => debugDesktopPlatformOverride = null);
+      tester.view.physicalSize = const Size(1000, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final player = _Player();
+      await tester.pumpWidget(
+        _selectionApp(mornye: mornye, player: player, playback: _Playback()),
+      );
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('First'));
+      final gesture = await tester.startGesture(
+        tester.getCenter(find.text('First')),
+        kind: PointerDeviceKind.mouse,
+        buttons: kSecondaryButton,
+      );
+      await gesture.up();
+      await tester.pumpAndSettle();
+      expect(find.text('Add to queue'), findsOneWidget);
+      expect(find.text('Delete 1 track'), findsOneWidget);
+      expect(find.text('Remove from playlist (1)'), findsOneWidget);
+      await tester.tap(find.text('Play next'));
+      await tester.pumpAndSettle();
+      expect(player.queue.map((item) => item.title), ['First']);
+      expect(player.insertedNext, isTrue);
+      expect(find.byType(SelectionBottomBar), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets(
+      'playlist file deletion confirms and cleans both indexes ($mornye)',
+      (tester) async {
+        tester.view.physicalSize = const Size(390, 844);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        final folder = Directory.systemTemp.createTempSync('playlist-delete-');
+        addTearDown(() => folder.delete(recursive: true));
+        final files = [
+          File('${folder.path}/first.flac'),
+          File('${folder.path}/selected.flac'),
+        ];
+        for (final file in files) {
+          file.writeAsBytesSync([1]);
+        }
+        final playback = _Playback()
+          ..paths.addAll({
+            'First': files.first.path,
+            'Selected': files.last.path,
+            'Last': 'network://example/song.flac',
+          });
+        final library = _Library();
+        final history = _History();
+        await tester.pumpWidget(
+          _selectionApp(
+            mornye: mornye,
+            player: _Player(),
+            playback: playback,
+            library: library,
+            history: history,
+          ),
+        );
+        await _selectAllTracks(tester);
+        // Phones end the selection bar with the full-width delete button.
+        final delete = find.widgetWithText(
+          DestructiveSelectionButton,
+          'Delete 2 tracks',
+        );
+        await tester.ensureVisible(delete);
+        await tester.tap(delete);
+        await tester.pumpAndSettle();
+        expect(find.text('Delete'), findsOneWidget);
+        expect(
+          find.textContaining('Permanently delete 2 audio files'),
+          findsOneWidget,
+        );
+        expect(files.every((file) => file.existsSync()), isTrue);
+        await tester.tap(find.text('Cancel'));
+        await tester.pumpAndSettle();
+        expect(library.removedFiles, isEmpty);
+        expect(history.removedFiles, isEmpty);
+
+        await tester.tap(delete);
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Delete'));
+        await tester.pumpAndSettle();
+        for (
+          var attempt = 0;
+          attempt < 100 && !history.deletionCompleted.isCompleted;
+          attempt++
+        ) {
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 10)),
+          );
+          await tester.pump(const Duration(milliseconds: 16));
+        }
+        await tester.pumpAndSettle();
+        expect(history.deletionCompleted.isCompleted, isTrue);
+        expect(files.any((file) => file.existsSync()), isFalse);
+        expect(library.removedFiles, files.map((file) => file.path));
+        expect(history.removedFiles, files.map((file) => file.path));
+        expect(find.byType(SelectionBottomBar), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'playlist leaves unavailable and CUE files out of actions ($mornye)',
+      (tester) async {
+        tester.view.physicalSize = const Size(390, 844);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        final playback = _Playback()..paths.clear();
+        playback.paths['First'] = '/album.cue#track01';
+        await tester.pumpWidget(
+          _selectionApp(mornye: mornye, player: _Player(), playback: playback),
+        );
+        await _selectAllTracks(tester);
+        expect(
+          find.widgetWithText(
+            SelectionActionButton,
+            'Remove from playlist (4)',
+          ),
+          findsOneWidget,
+        );
+        expect(find.textContaining('Delete '), findsNothing);
+        final next = tester.widget<SelectionActionButton>(
+          find.widgetWithText(SelectionActionButton, 'Play next'),
+        );
+        expect(next.onPressed, isNull);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets('external player hides collection queue controls ($mornye)', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        _selectionApp(
+          mornye: mornye,
+          player: _Player(),
+          playback: _Playback(),
+          internalPlayer: false,
+        ),
+      );
+      await _selectAllTracks(tester);
+      expect(find.text('Play next'), findsNothing);
+      expect(find.text('Add to queue'), findsNothing);
+      expect(find.textContaining('Add to playlist'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   for (final mornye in [false, true]) {
     testWidgets('large local playlist renders and scrolls ($mornye)', (
@@ -345,6 +634,9 @@ void main() {
       testWidgets(
         'selection dispatches one ${mode.name} removal (Mornye: $mornye)',
         (tester) async {
+          tester.view.physicalSize = const Size(400, 850);
+          tester.view.devicePixelRatio = 1;
+          addTearDown(tester.view.reset);
           final calls = <(String, List<String>)>[];
           await tester.pumpWidget(
             ProviderScope(
@@ -388,7 +680,11 @@ void main() {
           await tester.ensureVisible(find.text('First'));
           await tester.longPress(find.text('First'));
           await tester.pumpAndSettle();
-          await tester.ensureVisible(find.text('Unavailable'));
+          await Scrollable.ensureVisible(
+            tester.element(find.text('Unavailable')),
+            alignment: 0.15,
+          );
+          await tester.pumpAndSettle();
           await tester.tap(find.text('Unavailable'));
           await tester.pumpAndSettle();
           await tester.tap(findAppIcon(Icons.remove_circle_outline));

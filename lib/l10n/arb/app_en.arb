@@ -4436,6 +4436,15 @@
   "@collectionRemoveFromPlaylist": {
     "description": "Tooltip for removing track from playlist"
   },
+  "collectionDeleteFilesMessage": "Permanently delete {count} {count, plural, =1{audio file} other{audio files}} from storage? This affects every playlist that uses {count, plural, =1{this file} other{these files}}.",
+  "@collectionDeleteFilesMessage": {
+    "description": "Confirmation for physical file deletion from a collection selection, distinct from removing playlist entries",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "collectionRemoveFromFolder": "Remove from folder",
   "@collectionRemoveFromFolder": {
     "description": "Tooltip for removing track from wishlist/loved folder"
