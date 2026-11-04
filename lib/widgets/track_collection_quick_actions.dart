@@ -13,6 +13,7 @@ import 'package:mornye/services/cover_cache_manager.dart';
 import 'package:mornye/controllers/clickable_metadata.dart';
 import 'package:mornye/controllers/local_playback.dart';
 import 'package:mornye/utils/desktop_platform.dart';
+import 'package:mornye/utils/service_track_link.dart';
 import 'package:mornye/widgets/desktop/context_menu.dart';
 import 'package:mornye/widgets/link/link_actions.dart';
 import 'package:mornye/widgets/playlist_picker_sheet.dart';
@@ -133,6 +134,7 @@ List<List<ContextMenuAction>> trackOptionMenuGroups(
     allowQualityVariants: ref.read(settingsProvider).allowQualityVariants,
     hasLocalPlaybackCandidate: hasLocalPlaybackCandidate,
   );
+  final link = serviceTrackLinkFor(track);
 
   void notify(String message) {
     if (!root.mounted) return;
@@ -235,6 +237,17 @@ List<List<ContextMenuAction>> trackOptionMenuGroups(
         label: l10n.trackOptionCopyTrackAndArtist,
         onSelected: () => copy('${track.name} - ${track.artistName}'),
       ),
+      if (link != null)
+        ContextMenuAction(
+          icon: Icons.link,
+          label: l10n.trackOptionCopyLink(link.serviceName),
+          onSelected: () {
+            Clipboard.setData(ClipboardData(text: link.webUrl));
+            if (root.mounted) {
+              notify(root.l10n.snackbarUrlCopied(link.serviceName));
+            }
+          },
+        ),
     ],
   ];
 }
@@ -251,6 +264,7 @@ class _TrackOptionsSheet extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final colorScheme = Theme.of(context).colorScheme;
+    final link = serviceTrackLinkFor(track);
 
     final isLoved = ref.watch(
       libraryCollectionsProvider.select((state) => state.isLoved(track)),
@@ -300,7 +314,10 @@ class _TrackOptionsSheet extends ConsumerWidget {
               Navigator.pop(context);
               SharePlus.instance.share(
                 ShareParams(
-                  text: '${track.name} — ${track.artistName}',
+                  text: [
+                    '${track.name} - ${track.artistName}',
+                    ?link?.webUrl,
+                  ].join('\n'),
                   sharePositionOrigin: origin,
                 ),
               );
@@ -371,6 +388,12 @@ class _TrackOptionsSheet extends ConsumerWidget {
               onPressed: () =>
                   _copyText(context, '${track.name} - ${track.artistName}'),
             ),
+            if (link != null)
+              MornyeMenuAction(
+                icon: CupertinoIcons.link,
+                label: l10n.trackOptionCopyLink(link.serviceName),
+                onPressed: () => _copyLink(context, link),
+              ),
           ],
         ],
       );
@@ -502,6 +525,12 @@ class _TrackOptionsSheet extends ConsumerWidget {
                 onTap: () =>
                     _copyText(context, '${track.name} - ${track.artistName}'),
               ),
+              if (link != null)
+                _OptionTile(
+                  icon: Icons.link,
+                  title: context.l10n.trackOptionCopyLink(link.serviceName),
+                  onTap: () => _copyLink(context, link),
+                ),
 
               _OptionTile(
                 icon: Icons.album_outlined,
@@ -623,6 +652,17 @@ class _TrackOptionsSheet extends ConsumerWidget {
     Clipboard.setData(ClipboardData(text: text));
     ScaffoldMessenger.of(rootContext).showSnackBar(
       SnackBar(content: Text(rootContext.l10n.trackCopiedToClipboard)),
+    );
+  }
+
+  void _copyLink(BuildContext context, ServiceTrackLink link) {
+    final rootContext = Navigator.of(context, rootNavigator: true).context;
+    Navigator.pop(context);
+    Clipboard.setData(ClipboardData(text: link.webUrl));
+    ScaffoldMessenger.of(rootContext).showSnackBar(
+      SnackBar(
+        content: Text(rootContext.l10n.snackbarUrlCopied(link.serviceName)),
+      ),
     );
   }
 

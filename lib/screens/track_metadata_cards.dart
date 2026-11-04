@@ -449,33 +449,14 @@ extension _TrackMetadataCards on _TrackMetadataScreenState {
       _spotifyId!,
       fallbackService: _service.toLowerCase(),
     );
-    final rawId = _displayServiceTrackId(_spotifyId!);
-
-    String webUrl;
-    Uri? appUri;
-    String serviceName;
-
-    if (openService == MusicServices.deezer) {
-      webUrl = 'https://www.deezer.com/track/$rawId';
-      appUri = Uri.parse('deezer://www.deezer.com/track/$rawId');
-      serviceName = 'Deezer';
-    } else if (openService == MusicServices.amazon) {
-      webUrl = 'https://music.amazon.com/search/$rawId';
-      appUri = Uri.parse('amznm://search/$rawId');
-      serviceName = 'Amazon Music';
-    } else if (openService == MusicServices.tidal) {
-      webUrl = 'https://listen.tidal.com/track/$rawId';
-      appUri = Uri.parse('tidal://track/$rawId');
-      serviceName = 'Tidal';
-    } else if (openService == MusicServices.qobuz) {
-      webUrl = 'https://play.qobuz.com/track/$rawId';
-      appUri = Uri.parse('qobuz://track/$rawId');
-      serviceName = 'Qobuz';
-    } else {
-      webUrl = 'https://open.spotify.com/track/$rawId';
-      appUri = Uri.parse('spotify:track:$rawId');
-      serviceName = 'Spotify';
-    }
+    // Unknown services open as Spotify, as this button always has.
+    final link = ServiceTrackLink(
+      openService,
+      _displayServiceTrackId(_spotifyId!),
+    );
+    final webUrl = link.webUrl;
+    final appUri = link.appUri;
+    final serviceName = link.serviceName;
 
     try {
       final launched = await launchUrl(

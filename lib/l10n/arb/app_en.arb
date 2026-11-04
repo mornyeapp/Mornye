@@ -8124,6 +8124,16 @@
   "@trackOptionCopyTrackAndArtist": {
     "description": "Track menu action that copies the track title and artist"
   },
+  "trackOptionCopyLink": "Copy {service} link",
+  "@trackOptionCopyLink": {
+    "description": "Track menu action that copies the track's web link on its streaming service",
+    "placeholders": {
+      "service": {
+        "type": "String",
+        "description": "Streaming service name, such as Spotify"
+      }
+    }
+  },
   "metadataCopyValue": "Copy value",
   "@metadataCopyValue": {
     "description": "Metadata menu action that copies only the selected value"

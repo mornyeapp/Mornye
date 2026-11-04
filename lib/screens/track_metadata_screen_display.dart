@@ -1,8 +1,6 @@
 // ignore_for_file: invalid_use_of_protected_member, invalid_use_of_visible_for_testing_member
 part of 'track_metadata_screen.dart';
 
-final _spotifyTrackIdPattern = RegExp(r'^[A-Za-z0-9]{22}$');
-
 extension _TrackMetadataDisplay on _TrackMetadataScreenState {
   bool _isBitrateFormatValue(String? value) {
     return const {
@@ -58,58 +56,10 @@ extension _TrackMetadataDisplay on _TrackMetadataScreenState {
     );
   }
 
-  String _displayServiceTrackId(String value) {
-    final raw = value.trim();
-    if (raw.isEmpty) return raw;
-    final spotifyTrackIdPattern = _spotifyTrackIdPattern;
+  String _displayServiceTrackId(String value) => displayServiceTrackId(value);
 
-    if (raw.startsWith('deezer:')) return raw.substring('deezer:'.length);
-    if (raw.startsWith('tidal:')) return raw.substring('tidal:'.length);
-    if (raw.startsWith('qobuz:')) return raw.substring('qobuz:'.length);
-    if (spotifyTrackIdPattern.hasMatch(raw)) return raw;
-
-    if (raw.startsWith('spotify:')) {
-      final last = raw.split(':').last.trim();
-      if (spotifyTrackIdPattern.hasMatch(last)) return last;
-      return raw;
-    }
-
-    final uri = Uri.tryParse(raw);
-    if (uri != null &&
-        uri.host.contains('spotify.com') &&
-        uri.pathSegments.length >= 2 &&
-        uri.pathSegments.first == 'track') {
-      final candidate = uri.pathSegments[1].trim();
-      if (spotifyTrackIdPattern.hasMatch(candidate)) {
-        return candidate;
-      }
-    }
-
-    return raw;
-  }
-
-  String _serviceForTrackId(String value, {required String fallbackService}) {
-    final raw = value.trim();
-    if (raw.isEmpty) return fallbackService;
-    final spotifyTrackIdPattern = _spotifyTrackIdPattern;
-
-    if (raw.startsWith('deezer:')) return MusicServices.deezer;
-    if (raw.startsWith('tidal:')) return MusicServices.tidal;
-    if (raw.startsWith('qobuz:')) return MusicServices.qobuz;
-    if (raw.startsWith('spotify:')) return MusicServices.spotify;
-    if (spotifyTrackIdPattern.hasMatch(raw)) return MusicServices.spotify;
-
-    final uri = Uri.tryParse(raw);
-    if (uri != null) {
-      final host = uri.host.toLowerCase();
-      if (host.contains('spotify.com')) return MusicServices.spotify;
-      if (host.contains('deezer.com')) return MusicServices.deezer;
-      if (host.contains('tidal.com')) return MusicServices.tidal;
-      if (host.contains('qobuz.com')) return MusicServices.qobuz;
-    }
-
-    return fallbackService;
-  }
+  String _serviceForTrackId(String value, {required String fallbackService}) =>
+      serviceForTrackId(value, fallbackService: fallbackService);
 
   String? get _displayAudioQuality {
     final fileName = _extractFileNameFromPathOrUri(cleanFilePath);

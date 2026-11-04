@@ -129,6 +129,101 @@ void main() {
         .load();
   });
 
+  for (final mornye in [true, false]) {
+    testWidgets('track menu copies the service link (Mornye: $mornye)', (
+      tester,
+    ) async {
+      String? copied;
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (call) async {
+          if (call.method == 'Clipboard.setData') {
+            copied = (call.arguments as Map)['text'] as String?;
+          }
+          return null;
+        },
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform,
+          null,
+        ),
+      );
+      const linked = Track(
+        id: 'example-track',
+        name: 'Example track',
+        artistName: 'Example artist',
+        albumName: 'Example album',
+        duration: 180,
+        deezerId: '42',
+      );
+      await tester.pumpWidget(
+        _app(
+          const TrackCollectionQuickActions(track: linked),
+          _Collections(),
+          brightness: Brightness.light,
+          mornye: mornye,
+        ),
+      );
+      await tester.tap(find.byType(TrackCollectionQuickActions));
+      await tester.pumpAndSettle();
+      final action = find.text('Copy Deezer link');
+      await tester.ensureVisible(action);
+      await tester.tap(action);
+      await tester.pumpAndSettle();
+      expect(copied, 'https://www.deezer.com/track/42');
+      expect(find.text('Deezer URL copied to clipboard'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('desktop track menu offers the link only when known', (
+    tester,
+  ) async {
+    final labels = <String, List<String>>{};
+    const linked = Track(
+      id: 'deezer:42',
+      name: 'Example track',
+      artistName: 'Example artist',
+      albumName: 'Example album',
+      duration: 180,
+    );
+    await tester.pumpWidget(
+      _app(
+        Consumer(
+          builder: (context, ref, _) {
+            for (final track in [_track, linked]) {
+              labels[track.id] = [
+                for (final group in trackOptionMenuGroups(context, ref, track))
+                  for (final action in group) action.label,
+              ];
+            }
+            return const SizedBox();
+          },
+        ),
+        _Collections(),
+        brightness: Brightness.light,
+      ),
+    );
+    expect(labels['deezer:42'], contains('Copy Deezer link'));
+    expect(labels['example-track']!.where((l) => l.contains('link')), isEmpty);
+  });
+
+  testWidgets('track menu hides the link for an unknown service', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _app(
+        const TrackCollectionQuickActions(track: _track),
+        _Collections(),
+        brightness: Brightness.light,
+      ),
+    );
+    await tester.tap(find.byIcon(CupertinoIcons.ellipsis));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('link'), findsNothing);
+  });
+
   for (final brightness in Brightness.values) {
     testWidgets('track menu reaches playlist creation in $brightness', (
       tester,
