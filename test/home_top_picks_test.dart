@@ -58,18 +58,16 @@ void main() {
 
   group('source extension', () {
     const off = AppSettings.homeFeedProviderOff;
-    const preferred = homeTopPicksDefaultExtension;
 
-    test('with no feed chosen the default wins, then the first', () {
-      expect(pickTopPicksExtension(['a', preferred], off), preferred);
-      expect(pickTopPicksExtension(['a', preferred], null), preferred);
+    test('with no feed chosen any extension serves', () {
       expect(pickTopPicksExtension(['a', 'b'], off), 'a');
+      expect(pickTopPicksExtension(['a', 'b'], null), 'a');
       expect(pickTopPicksExtension(const [], off), isNull);
     });
 
-    test('a chosen feed is kept, even over the default', () {
-      expect(pickTopPicksExtension(['a', preferred], 'a'), 'a');
-      expect(pickTopPicksExtension(['b', preferred], 'a'), isNull);
+    test('a chosen feed is kept while its extension is there', () {
+      expect(pickTopPicksExtension(['a', 'b'], 'b'), 'b');
+      expect(pickTopPicksExtension(['b', 'c'], 'a'), 'b');
     });
   });
 }

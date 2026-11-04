@@ -3,7 +3,6 @@ import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:mornye/models/settings.dart';
 import 'package:mornye/providers/explore_provider.dart';
 import 'package:mornye/providers/extension_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
@@ -46,23 +45,11 @@ List<ExploreItem> pickTopPickPlaylists(
   return ordered.take(count).toList(growable: false);
 }
 
-/// The extension Top Picks read when the Home feed names none: the Mornye
-/// style follows Music, so its picks do too.
-const homeTopPicksDefaultExtension = 'apple-music';
-
 /// Which of the [available] extensions Top Picks read: the one the Home feed
-/// uses, or with no feed chosen [homeTopPicksDefaultExtension], then the first.
+/// uses, or the first when the feed is off or its extension is gone.
 @visibleForTesting
-String? pickTopPicksExtension(List<String> available, String? homeFeed) {
-  if (homeFeed != null &&
-      homeFeed.isNotEmpty &&
-      homeFeed != AppSettings.homeFeedProviderOff) {
-    return available.contains(homeFeed) ? homeFeed : null;
-  }
-  return available.contains(homeTopPicksDefaultExtension)
-      ? homeTopPicksDefaultExtension
-      : available.firstOrNull;
-}
+String? pickTopPicksExtension(List<String> available, String? homeFeed) =>
+    available.contains(homeFeed) ? homeFeed : available.firstOrNull;
 
 final homeTopPicksExtensionProvider = Provider<String?>((ref) {
   final homeFeed = ref.watch(
