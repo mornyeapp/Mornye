@@ -105,16 +105,22 @@ class _MornyeArtistSurfaceState extends State<MornyeArtistSurface> {
           final useAccent =
               !widget.neutralActions && dominant.saturation >= 0.08;
           final accent = HSLColor.fromColor(palette.primary);
+          // Music's artist pages fall away to near black, the artwork's color
+          // only a trace in it; albums keep their lighter neutral surface.
           final surface = useAccent
               ? accent
-                    .withSaturation((accent.saturation * 0.9).clamp(0.0, 0.88))
-                    .withLightness(0.14 + dominant.lightness * 0.05)
+                    .withSaturation((accent.saturation * 0.6).clamp(0.0, 0.6))
+                    .withLightness(0.08 + dominant.lightness * 0.03)
                     .toColor()
               : dominant
                     .withSaturation(
                       (dominant.saturation * 0.45).clamp(0.0, 0.22),
                     )
-                    .withLightness(0.24 + dominant.lightness * 0.20)
+                    .withLightness(
+                      widget.neutralActions
+                          ? 0.24 + dominant.lightness * 0.20
+                          : 0.05,
+                    )
                     .toColor();
           final route = ModalRoute.of(context);
           if (route != null) {
