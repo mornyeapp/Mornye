@@ -865,6 +865,72 @@ void main() {
     },
   );
 
+  for (final ratio in [0.75, 16 / 9]) {
+    testWidgets('landscape motion cover stays square across tabs and rotation '
+        '(video ratio: $ratio)', (tester) async {
+      final queue = [item('first'), item('second')];
+      final controller = _QueueController(
+        (index) => mediaItems.add(queue[index]),
+      );
+      await pumpNowPlaying(
+        tester,
+        theme: MornyeTheme.build(Brightness.dark),
+        size: const Size(852, 393),
+        motionArtwork: MotionArtwork('file:///cover.mp4', aspectRatio: ratio),
+        queue: queue,
+        controller: controller,
+        playback: PlaybackState(queueIndex: 0),
+      );
+      mediaItems.add(queue.first);
+      await settlePlayer(tester);
+
+      final artwork = find.byKey(const ValueKey('full-player-artwork'));
+      void expectSquareCover() {
+        final size = tester.getSize(artwork);
+        expect(size.width, greaterThan(140));
+        expect(size.width, closeTo(size.height, 0.1));
+        final clip = find.descendant(
+          of: artwork,
+          matching: find.byType(ClipRRect),
+        );
+        expect(clip, findsOneWidget);
+        expect(tester.getSize(clip), size);
+      }
+
+      expectSquareCover();
+      await tester.tap(findAppIcon(CupertinoIcons.quote_bubble));
+      await settlePlayer(tester);
+      expectSquareCover();
+      await tester.tap(artwork);
+      await settlePlayer(tester);
+      final toggle = findAppIcon(CupertinoIcons.quote_bubble);
+      expect(toggle.hitTestable(), findsNothing);
+      await tester.tap(artwork);
+      await settlePlayer(tester);
+      expect(toggle.hitTestable(), findsOneWidget);
+
+      await tester.drag(artwork, const Offset(-110, 0));
+      await settlePlayer(tester);
+      expect(controller.selected, [1]);
+      expect(find.text('Second').hitTestable(), findsOneWidget);
+      expect(toggle.hitTestable(), findsOneWidget);
+      expectSquareCover();
+      await tester.drag(artwork, const Offset(110, 0));
+      await settlePlayer(tester);
+      expect(controller.selected, [1, 0]);
+
+      await tester.tap(findAppIcon(CupertinoIcons.list_bullet));
+      await settlePlayer(tester);
+      expectSquareCover();
+      tester.view.physicalSize = const Size(393, 852);
+      await settlePlayer(tester);
+      tester.view.physicalSize = const Size(852, 393);
+      await settlePlayer(tester);
+      expectSquareCover();
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets('custom glass keeps live lyrics under the finger on reversal', (
     tester,
   ) async {

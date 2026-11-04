@@ -141,7 +141,7 @@ class MornyePlayerLayout extends ConsumerWidget {
               0.0,
               (stage.maxHeight - (artworkOnly ? 24 : 8)).clamp(0.0, 360.0),
             );
-            final ratio = artworkAspectRatio ?? 1.0;
+            final ratio = artworkOnly ? 1.0 : artworkAspectRatio ?? 1.0;
             final artWidth = ratio < 1 ? artSize * ratio : artSize;
             final artHeight = ratio > 1 ? artSize / ratio : artSize;
             final fullBleed = !insetArtwork && !artworkOnly;

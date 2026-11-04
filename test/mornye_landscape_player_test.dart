@@ -15,6 +15,10 @@ void main() {
     WidgetTester tester, {
     GlobalKey? capture,
     bool blur = true,
+    bool playing = true,
+    TextDirection direction = TextDirection.ltr,
+    double? playerWidth,
+    bool accessibleNavigation = false,
   }) async {
     tester.view.physicalSize = const Size(852, 393);
     tester.view.devicePixelRatio = 1;
@@ -28,24 +32,38 @@ void main() {
           backdropBlurEnabledProvider.overrideWithValue(blur),
         ],
         child: MaterialApp(
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(
+              context,
+            ).copyWith(accessibleNavigation: accessibleNavigation),
+            child: Directionality(textDirection: direction, child: child!),
+          ),
           theme: MornyeTheme.build(Brightness.dark),
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: Scaffold(
             backgroundColor: const Color(0xFF303030),
-            body: RepaintBoundary(
-              key: capture,
-              child: StatefulBuilder(
-                builder: (context, setState) => MornyeLandscapePlayer(
-                  page: page,
-                  isPlaying: true,
-                  onPageChanged: (value) => setState(() => page = value),
-                  artwork: const SizedBox.expand(),
-                  header: const SizedBox(height: 48),
-                  lyrics: const CustomPaint(painter: _Stripes()),
-                  queue: const SizedBox.expand(),
-                  controls: const SizedBox(height: 68),
-                  volume: const SizedBox(height: 48),
+            body: SizedBox(
+              width: playerWidth,
+              child: RepaintBoundary(
+                key: capture,
+                child: StatefulBuilder(
+                  builder: (context, setState) => MornyeLandscapePlayer(
+                    page: page,
+                    isPlaying: playing,
+                    onPageChanged: (value) => setState(() => page = value),
+                    artwork: const SizedBox.expand(
+                      child: ColoredBox(
+                        key: ValueKey('artwork'),
+                        color: Colors.transparent,
+                      ),
+                    ),
+                    header: const SizedBox(height: 48),
+                    lyrics: const CustomPaint(painter: _Stripes()),
+                    queue: const SizedBox.expand(),
+                    controls: const SizedBox(height: 68),
+                    volume: const SizedBox(height: 48),
+                  ),
                 ),
               ),
             ),
@@ -55,6 +73,52 @@ void main() {
     );
     await tester.pumpAndSettle();
   }
+
+  for (final direction in TextDirection.values) {
+    for (final playing in [false, true]) {
+      testWidgets('artwork toggles actions in a constrained $direction player '
+          '(playing: $playing)', (tester) async {
+        await pumpPlayer(
+          tester,
+          playing: playing,
+          direction: direction,
+          playerWidth: 600,
+        );
+        final toggle = find.byIcon(CupertinoIcons.quote_bubble);
+        final artwork = find.byKey(const ValueKey('artwork'));
+        expect(toggle.hitTestable(), findsOneWidget);
+        await tester.tap(artwork);
+        await tester.pumpAndSettle();
+        expect(toggle.hitTestable(), findsNothing);
+        await tester.tap(artwork);
+        await tester.pumpAndSettle();
+        expect(toggle.hitTestable(), findsOneWidget);
+
+        await tester.tap(artwork);
+        await tester.pumpAndSettle();
+        expect(toggle.hitTestable(), findsNothing);
+        await tester.tap(
+          find.byKey(const ValueKey('landscape-lyrics-viewport')),
+        );
+        await tester.pumpAndSettle();
+        expect(toggle.hitTestable(), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
+
+  testWidgets('accessible navigation keeps actions visible on artwork taps', (
+    tester,
+  ) async {
+    await pumpPlayer(tester, accessibleNavigation: true);
+    await tester.tap(find.byKey(const ValueKey('artwork')));
+    await tester.pump(const Duration(seconds: 6));
+    expect(
+      find.byIcon(CupertinoIcons.quote_bubble).hitTestable(),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('landscape selected tabs use the neutral portrait colors', (
     tester,
