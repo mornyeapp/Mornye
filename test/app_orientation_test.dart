@@ -19,6 +19,12 @@ class _PlayerRoute extends NowPlayingRoute {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   const portrait = ['DeviceOrientation.portraitUp'];
+  const tablet = [
+    'DeviceOrientation.portraitUp',
+    'DeviceOrientation.portraitDown',
+    'DeviceOrientation.landscapeLeft',
+    'DeviceOrientation.landscapeRight',
+  ];
   const player = [
     'DeviceOrientation.portraitUp',
     'DeviceOrientation.landscapeLeft',
@@ -29,6 +35,8 @@ void main() {
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
 
   setUp(() {
+    // The default test view is 800x600, which would count as a tablet.
+    debugTabletOverride = false;
     requests.clear();
     messenger.setMockMethodCallHandler(SystemChannels.platform, (call) async {
       if (call.method == 'SystemChrome.setPreferredOrientations') {
@@ -37,9 +45,10 @@ void main() {
       return null;
     });
   });
-  tearDown(
-    () => messenger.setMockMethodCallHandler(SystemChannels.platform, null),
-  );
+  tearDown(() {
+    debugTabletOverride = null;
+    messenger.setMockMethodCallHandler(SystemChannels.platform, null);
+  });
 
   Future<NavigatorState> pumpApp(WidgetTester tester) async {
     final key = GlobalKey<NavigatorState>();
@@ -58,6 +67,63 @@ void main() {
   test('startup requests portrait before the first route is built', () async {
     await setAppOrientation();
     expect(requests, [portrait]);
+  });
+
+  test('tablets rotate on every page and in the full player', () async {
+    debugTabletOverride = true;
+    await setAppOrientation();
+    await setAppOrientation(playerVisible: true);
+    expect(requests, List.filled(2, tablet));
+  });
+
+  testWidgets('tablets keep rotating after leaving the full player', (
+    tester,
+  ) async {
+    debugTabletOverride = true;
+    final key = GlobalKey<NavigatorState>();
+    await tester.pumpWidget(
+      MaterialApp(
+        navigatorKey: key,
+        navigatorObservers: [AppOrientationObserver()],
+        home: const Scaffold(body: Text('Library')),
+      ),
+    );
+    await tester.pumpAndSettle();
+    key.currentState!.push(_PlayerRoute());
+    await tester.pumpAndSettle();
+    key.currentState!.pop();
+    await tester.pumpAndSettle();
+    expect(requests, isNotEmpty);
+    expect(requests, everyElement(tablet));
+    expect(tester.takeException(), isNull);
+  });
+
+  test('a TV is never treated as a tablet', () async {
+    debugAndroidTvOverride = true;
+    debugTabletOverride = true;
+    addTearDown(() => debugAndroidTvOverride = null);
+    await setAppOrientation();
+    expect(requests, [
+      ['DeviceOrientation.landscapeLeft', 'DeviceOrientation.landscapeRight'],
+    ]);
+  });
+
+  test('a display at least 600 wide on its shorter side is a tablet', () {
+    final view =
+        TestWidgetsFlutterBinding.instance.platformDispatcher.views.first;
+    addTearDown(view.display.reset);
+    debugTabletOverride = null;
+    for (final (size, dpr, tablet) in const [
+      (Size(1080, 2400), 2.75, false), // phone, about 393 x 873
+      (Size(2400, 1080), 2.75, false), // the same phone in landscape
+      (Size(1800, 2880), 2.0, true), // 11" tablet, 900 x 1440
+      (Size(1920, 1200), 2.0, true), // 10" tablet in landscape, 960 x 600
+    ]) {
+      view.display
+        ..size = size
+        ..devicePixelRatio = dpr;
+      expect(isTabletDevice, tablet, reason: '$size at $dpr');
+    }
   });
 
   test('TV stays landscape in setup, library and full player', () async {

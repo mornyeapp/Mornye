@@ -373,10 +373,13 @@ class MainActivity: FlutterFragmentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         AudioOpenBridge.consume(this, intent)
-        requestedOrientation = if (isTelevisionDevice()) {
-            ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
-        } else {
-            ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        // Phones start in portrait and tablets follow the device until
+        // setAppOrientation in app_orientation.dart applies its own rule.
+        requestedOrientation = when {
+            isTelevisionDevice() -> ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+            resources.configuration.smallestScreenWidthDp >= 600 ->
+                ActivityInfo.SCREEN_ORIENTATION_FULL_USER
+            else -> ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
         }
         // Ensure the shared audio_service engine exists before the activity
         // delegate looks it up by cached id (see getCachedEngineId above).
