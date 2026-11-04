@@ -2471,7 +2471,9 @@ void main() {
     },
   );
 
-  test('a player that cannot release its source prevents file deletion', () async {
+  test(
+    'a player that cannot release its source prevents file deletion',
+    () async {
     final directory = await Directory.systemTemp.createTemp('failed-reaction-');
     addTearDown(() => directory.delete(recursive: true));
     final file = await File(
@@ -2493,7 +2495,8 @@ void main() {
     expect(await deleteFile(file.path, deletionEvents: events), isFalse);
     expect(await file.exists(), isTrue);
     expect(handler.queue.value.map((item) => item.id), ['removed']);
-  });
+    },
+  );
 
   test(
     'deletion retires a pending SAF copy without blocking a later copy',
