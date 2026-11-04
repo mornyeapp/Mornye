@@ -731,7 +731,7 @@ class _ArtistScreenState extends ConsumerState<ArtistScreen>
                                 child: ArtistFeaturedAlbumCard(
                                   album: albums.first,
                                   onTap: () => _navigateToAlbum(albums.first),
-                                  onAdd: () =>
+                                  onDownload: () =>
                                       _downloadAlbums(context, [albums.first]),
                                   loadMetadata: _albumMetadataLoader(
                                     albums.first,

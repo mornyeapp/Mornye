@@ -6,23 +6,22 @@ import 'package:mornye/utils/editorial_notes.dart';
 import 'package:mornye/widgets/album_detail_header.dart';
 import 'package:mornye/widgets/cached_cover_image.dart';
 
-/// The artist's newest album on Mornye's phone page, as in Music: its cover,
-/// name and a short note, with a button that adds it to the Library.
+/// The artist's newest album, with a short note and a download action.
 ///
 /// The note is the provider's editorial text. Most providers have none, and
-/// those albums describe themselves by their type, year and length.
+/// those albums describe themselves by their type, year and track count.
 class ArtistFeaturedAlbumCard extends StatefulWidget {
   const ArtistFeaturedAlbumCard({
     super.key,
     required this.album,
     required this.onTap,
-    required this.onAdd,
+    required this.onDownload,
     this.loadMetadata,
   });
 
   final ArtistAlbum album;
   final VoidCallback onTap;
-  final VoidCallback onAdd;
+  final VoidCallback onDownload;
 
   /// Reads the album's metadata for its editorial note; null when no provider
   /// can be asked.
@@ -35,6 +34,7 @@ class ArtistFeaturedAlbumCard extends StatefulWidget {
 
 class _ArtistFeaturedAlbumCardState extends State<ArtistFeaturedAlbumCard> {
   String? _note;
+  int _noteGeneration = 0;
 
   @override
   void initState() {
@@ -45,15 +45,18 @@ class _ArtistFeaturedAlbumCardState extends State<ArtistFeaturedAlbumCard> {
   @override
   void didUpdateWidget(ArtistFeaturedAlbumCard oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.album.id == widget.album.id) return;
+    if (oldWidget.album.id == widget.album.id &&
+        oldWidget.album.providerId == widget.album.providerId) {
+      return;
+    }
     _note = null;
     _loadNote();
   }
 
   Future<void> _loadNote() async {
+    final generation = ++_noteGeneration;
     final load = widget.loadMetadata;
     if (load == null) return;
-    final albumId = widget.album.id;
     final String? note;
     try {
       final metadata = await load();
@@ -66,7 +69,7 @@ class _ArtistFeaturedAlbumCardState extends State<ArtistFeaturedAlbumCard> {
       // The card already reads well without its note.
       return;
     }
-    if (!mounted || albumId != widget.album.id || note == null) return;
+    if (!mounted || generation != _noteGeneration || note == null) return;
     setState(() => _note = note);
   }
 
@@ -140,12 +143,12 @@ class _ArtistFeaturedAlbumCardState extends State<ArtistFeaturedAlbumCard> {
                 ),
                 const SizedBox(width: 12),
                 HeaderCircleButton(
-                  icon: CupertinoIcons.add,
+                  icon: CupertinoIcons.arrow_down,
                   buttonSize: 32,
                   iconSize: 16,
                   tonal: true,
-                  tooltip: l10n.artistAddToLibrary,
-                  onPressed: widget.onAdd,
+                  tooltip: l10n.dialogDownload,
+                  onPressed: widget.onDownload,
                 ),
               ],
             ),

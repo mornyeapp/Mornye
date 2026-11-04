@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -16,8 +18,9 @@ const _album = ArtistAlbum(
 
 Future<void> _pump(
   WidgetTester tester, {
+  ArtistAlbum album = _album,
   VoidCallback? onTap,
-  VoidCallback? onAdd,
+  VoidCallback? onDownload,
   Future<Map<String, dynamic>> Function()? loadMetadata,
 }) async {
   await tester.pumpWidget(
@@ -27,9 +30,9 @@ Future<void> _pump(
         supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(
           body: ArtistFeaturedAlbumCard(
-            album: _album,
+            album: album,
             onTap: onTap ?? () {},
-            onAdd: onAdd ?? () {},
+            onDownload: onDownload ?? () {},
             loadMetadata: loadMetadata,
           ),
         ),
@@ -40,6 +43,20 @@ Future<void> _pump(
 }
 
 void main() {
+  ArtistAlbum albumFrom(String provider) => ArtistAlbum(
+    id: '123',
+    providerId: provider,
+    name: 'Example album',
+    releaseDate: '2026-02-03',
+    totalTracks: 12,
+    albumType: 'album',
+    artists: 'Example artist',
+  );
+
+  Map<String, dynamic> metadataNote(String note) => {
+    'editorial_notes': {'standard': note},
+  };
+
   testWidgets('a provider without a note gets the album summary', (
     tester,
   ) async {
@@ -75,17 +92,74 @@ void main() {
     expect(find.textContaining('2026'), findsNothing);
   });
 
-  testWidgets('the plus adds the album and the card opens it', (tester) async {
-    var added = 0;
-    var opened = 0;
-    await _pump(tester, onAdd: () => added++, onTap: () => opened++);
+  testWidgets('switching providers clears a note for the same album ID', (
+    tester,
+  ) async {
+    await _pump(
+      tester,
+      album: albumFrom('catalog-one'),
+      loadMetadata: () async => metadataNote('First catalog note'),
+    );
+    expect(find.text('First catalog note'), findsOneWidget);
 
-    await tester.tap(find.byTooltip('Add to Library'));
+    final next = Completer<Map<String, dynamic>>();
+    await _pump(
+      tester,
+      album: albumFrom('catalog-two'),
+      loadMetadata: () => next.future,
+    );
+    expect(find.text('First catalog note'), findsNothing);
+    expect(find.textContaining('2026'), findsOneWidget);
+
+    next.complete(metadataNote('Second catalog note'));
     await tester.pumpAndSettle();
-    expect((added, opened), (1, 0));
+    expect(find.text('Second catalog note'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('returning to a provider ignores older pending notes', (
+    tester,
+  ) async {
+    final first = Completer<Map<String, dynamic>>();
+    final second = Completer<Map<String, dynamic>>();
+    final current = Completer<Map<String, dynamic>>();
+    for (final (provider, request) in [
+      ('catalog-one', first),
+      ('catalog-two', second),
+      ('catalog-one', current),
+    ]) {
+      await _pump(
+        tester,
+        album: albumFrom(provider),
+        loadMetadata: () => request.future,
+      );
+    }
+
+    first.complete(metadataNote('Stale first note'));
+    second.complete(metadataNote('Stale second note'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Stale'), findsNothing);
+    expect(find.textContaining('2026'), findsOneWidget);
+
+    current.complete(metadataNote('Current catalog note'));
+    await tester.pumpAndSettle();
+    expect(find.text('Current catalog note'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('the download action and card navigation stay separate', (
+    tester,
+  ) async {
+    var downloaded = 0;
+    var opened = 0;
+    await _pump(tester, onDownload: () => downloaded++, onTap: () => opened++);
+
+    await tester.tap(find.byTooltip('Download'));
+    await tester.pumpAndSettle();
+    expect((downloaded, opened), (1, 0));
 
     await tester.tap(find.text('Example album'));
     await tester.pumpAndSettle();
-    expect((added, opened), (1, 1));
+    expect((downloaded, opened), (1, 1));
   });
 }

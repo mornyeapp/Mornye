@@ -7824,10 +7824,6 @@
   "@actionShuffle": {
     "description": "Tooltip for shuffle playback action"
   },
-  "artistAddToLibrary": "Add to Library",
-  "@artistAddToLibrary": {
-    "description": "Tooltip for the button that adds an artist's featured album to the Library"
-  },
   "artistShuffleEmpty": "No songs by this artist in your Library yet",
   "@artistShuffleEmpty": {
     "description": "Snackbar when shuffling an artist with no songs in the Library"

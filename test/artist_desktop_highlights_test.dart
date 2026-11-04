@@ -8,6 +8,7 @@ import 'package:mornye/providers/track_provider.dart';
 import 'package:mornye/screens/artist_screen.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/desktop_platform.dart';
+import 'package:mornye/widgets/artist_featured_album_card.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -16,7 +17,7 @@ void main() {
   Future<void> pumpArtist(WidgetTester tester, {required bool desktop}) async {
     debugDesktopPlatformOverride = desktop;
     SharedPreferences.setMockInitialValues({});
-    await tester.binding.setSurfaceSize(const Size(1000, 1200));
+    await tester.binding.setSurfaceSize(Size(desktop ? 1000 : 430, 1200));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     const channel = MethodChannel('com.zarz.mornye/backend');
     final messenger =
@@ -121,8 +122,26 @@ void main() {
 
   testWidgets('phones keep the stacked Mornye artist layout', (tester) async {
     await pumpArtist(tester, desktop: false);
-    expect(find.text('Latest Release'), findsNothing);
+    final featured = find.byType(ArtistFeaturedAlbumCard);
+    expect(featured, findsOneWidget);
+    expect(find.text('Latest Release'), findsOneWidget);
+    expect(find.text('Top Songs'), findsNothing);
     expect(find.byKey(const ValueKey('artist-highlights')), findsNothing);
+    expect(
+      find.descendant(of: featured, matching: find.text('Album 5')),
+      findsOneWidget,
+    );
+
+    // The newest album precedes Popular vertically, and songs remain a list.
+    final card = tester.getRect(featured);
+    final popular = tester.getRect(find.text('Popular'));
+    final firstSong = tester.getRect(find.text('Song 0'));
+    final secondSong = tester.getRect(find.text('Song 1'));
+    expect(popular.top, greaterThanOrEqualTo(card.bottom));
+    expect(firstSong.top, greaterThan(popular.bottom));
+    expect(secondSong.top, greaterThan(firstSong.bottom));
+    expect(secondSong.left, closeTo(firstSong.left, 0.01));
+    expect(tester.takeException(), isNull);
     await dispose(tester);
   });
 }
