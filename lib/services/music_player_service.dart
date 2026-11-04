@@ -598,8 +598,13 @@ class MusicPlayerHandler extends BaseAudioHandler
     if (result is! FileAccessMissing) return false;
 
     _log.w('Skipping missing track: ' + media.title);
-    await onSourceDeleted(media.source);
-    return true;
+    try {
+      await onSourceDeleted(media.source);
+      return true;
+    } catch (failure) {
+      _log.w('Could not advance past missing track: $failure');
+      return false;
+    }
   }
 
   void _reportPlaybackError(
