@@ -152,7 +152,8 @@ class MusicPlayerHandler extends BaseAudioHandler
   int _playRequestGeneration = 0;
   final _metadataChanges = <String, Object>{};
   final _sourceDeletionSnapshots =
-      <String, ({int generation, int index, Duration position, bool wasPlaying})>{};
+      <String,
+          ({int generation, int index, Duration position, bool wasPlaying})>{};
   final _sourcesBeingDeleted = <String>{};
   String? _activeResolvedPath;
   bool _disposed = false;
@@ -2277,7 +2278,11 @@ class MusicPlayerHandler extends BaseAudioHandler
       if (_shuffle) {
         if (_playHistory.length >= 2) {
           _playHistory.removeLast();
-          await _playIndex(_playHistory.last, recordHistory: false, userSkip: true);
+          await _playIndex(
+            _playHistory.last,
+            recordHistory: false,
+            userSkip: true,
+          );
         }
       } else if (_index > 0) {
         await _playIndex(_index - 1, userSkip: true);
