@@ -108,7 +108,10 @@ void main() {
         expect(handler.queue.value.map((item) => item.id), ['one', 'three']);
         expect(handler.playbackState.value.queueIndex, 1);
         expect(handler.playbackState.value.errorMessage, isNull);
- () async {
+      },
+    );
+
+    test('a missing only track stops and clears the player cleanly', () async {
       final directory = await Directory.systemTemp.createTemp(
         'missing-only-track-',
       );
