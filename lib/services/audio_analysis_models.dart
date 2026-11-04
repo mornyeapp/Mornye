@@ -1,7 +1,37 @@
 // Analysis result models. `AudioAnalysisData` is the persisted cache JSON.
 
+class AudioAnalysisBitrate {
+  const AudioAnalysisBitrate(this.bitsPerSecond, {this.fileAverage = false});
+
+  factory AudioAnalysisBitrate.fromProbe({
+    int? streamBitrate,
+    int? containerBitrate,
+    required int fileSize,
+    required double duration,
+  }) {
+    if (streamBitrate != null && streamBitrate > 0) {
+      return AudioAnalysisBitrate(streamBitrate);
+    }
+    if (containerBitrate != null && containerBitrate > 0) {
+      return AudioAnalysisBitrate(containerBitrate, fileAverage: true);
+    }
+    if (fileSize > 0 && duration.isFinite && duration > 0) {
+      return AudioAnalysisBitrate(
+        (fileSize * 8 / duration).round(),
+        fileAverage: true,
+      );
+    }
+    return const AudioAnalysisBitrate(0);
+  }
+
+  final int bitsPerSecond;
+
+  /// Includes container overhead and tags, not just the encoded audio stream.
+  final bool fileAverage;
+}
+
 class AudioAnalysisData {
-  static const cacheVersion = 13;
+  static const cacheVersion = 14;
 
   final String filePath;
   final int fileSize;
@@ -14,6 +44,7 @@ class AudioAnalysisData {
   final int bitsPerSample;
   final double duration;
   final int bitrate;
+  final bool bitrateIsFileAverage;
   final String bitDepth;
   final double dynamicRange;
   final double peakAmplitude;
@@ -37,6 +68,7 @@ class AudioAnalysisData {
     required this.bitsPerSample,
     required this.duration,
     required this.bitrate,
+    this.bitrateIsFileAverage = false,
     required this.bitDepth,
     required this.dynamicRange,
     required this.peakAmplitude,
@@ -62,6 +94,7 @@ class AudioAnalysisData {
     'bitsPerSample': bitsPerSample,
     'duration': duration,
     'bitrate': bitrate,
+    'bitrateIsFileAverage': bitrateIsFileAverage,
     'bitDepth': bitDepth,
     'dynamicRange': dynamicRange,
     'peakAmplitude': peakAmplitude,
@@ -87,6 +120,7 @@ class AudioAnalysisData {
       bitsPerSample: json['bitsPerSample'] as int,
       duration: (json['duration'] as num).toDouble(),
       bitrate: json['bitrate'] as int,
+      bitrateIsFileAverage: json['bitrateIsFileAverage'] == true,
       bitDepth: json['bitDepth'] as String,
       dynamicRange: (json['dynamicRange'] as num).toDouble(),
       peakAmplitude: (json['peakAmplitude'] as num).toDouble(),

@@ -23,8 +23,8 @@ void main() {
   });
 
   group('audio analysis cache', () {
-    test('invalidates results from the previous cutoff estimator', () {
-      expect(AudioAnalysisData.cacheVersion, 13);
+    test('invalidates results without bitrate source information', () {
+      expect(AudioAnalysisData.cacheVersion, greaterThan(13));
     });
   });
 

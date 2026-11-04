@@ -91,8 +91,10 @@ class _AudioInfoCard extends StatelessWidget {
                 if (data.bitrate > 0)
                   _MetricChip(
                     icon: Icons.speed,
-                    label: context.l10n.trackConvertBitrate,
-                    value: _formatBitrate(data.bitrate),
+                    label: data.bitrateIsFileAverage
+                        ? context.l10n.audioAnalysisFileBitrate
+                        : context.l10n.trackConvertBitrate,
+                    value: formatAudioAnalysisBitrate(data.bitrate),
                     cs: cs,
                   ),
                 _MetricChip(
@@ -122,6 +124,13 @@ class _AudioInfoCard extends StatelessWidget {
                   ),
               ],
             ),
+            if (data.bitrate > 0 && data.bitrateIsFileAverage) ...[
+              const SizedBox(height: 8),
+              Text(
+                context.l10n.audioAnalysisFileBitrateHint,
+                style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
+              ),
+            ],
             const SizedBox(height: 8),
             Divider(color: cs.outlineVariant),
             const SizedBox(height: 8),
@@ -227,13 +236,6 @@ class _AudioInfoCard extends StatelessWidget {
     return data.channels > 0 ? '${data.channels}' : 'N/A';
   }
 
-  String _formatBitrate(int bitsPerSecond) {
-    if (bitsPerSecond >= 1000000) {
-      return '${(bitsPerSecond / 1000000).toStringAsFixed(2)} Mbps';
-    }
-    return '${(bitsPerSecond / 1000).round()} kbps';
-  }
-
   String _formatClipping(BuildContext context, int samples) {
     if (samples <= 0) return context.l10n.audioAnalysisNoClipping;
     return _formatNumber(samples);
@@ -261,6 +263,14 @@ class _AudioInfoCard extends StatelessWidget {
     if (n >= 1000) return '${(n / 1000).toStringAsFixed(1)}K';
     return n.toString();
   }
+}
+
+/// Match file metadata's whole-kbps precision without rounding it up by 1 kbps.
+String formatAudioAnalysisBitrate(int bitsPerSecond) {
+  if (bitsPerSecond >= 1000000) {
+    return '${(bitsPerSecond / 1000000).toStringAsFixed(2)} Mbps';
+  }
+  return '${bitsPerSecond ~/ 1000} kbps';
 }
 
 class _MetricChip extends StatelessWidget {

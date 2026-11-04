@@ -37,14 +37,24 @@ Future<void> showAudioInfoSheet(
   Map<String, String> linkSources = const {},
 }) {
   unawaited(metadata.ensureFileMetadata());
-  return showAppScrollableBottomSheet<void>(
+  return showAppModalBottomSheet<void>(
     context: context,
-    title: context.l10n.audioInfoTitle,
-    subtitle: metadata.qualityLabel,
-    builder: (context, controller) => _AudioInfoSheet(
-      metadata: metadata,
-      controller: controller,
-      linkSources: linkSources,
+    useRootNavigator: true,
+    isScrollControlled: true,
+    builder: (context) => AppScrollableSheet(
+      builder: (context, controller) => ListenableBuilder(
+        listenable: metadata,
+        builder: (context, child) => AppBottomSheet(
+          title: context.l10n.audioInfoTitle,
+          subtitle: metadata.qualityLabel,
+          child: child!,
+        ),
+        child: _AudioInfoSheet(
+          metadata: metadata,
+          controller: controller,
+          linkSources: linkSources,
+        ),
+      ),
     ),
   );
 }
@@ -277,6 +287,7 @@ class _AudioInfoSheetState extends State<_AudioInfoSheet>
         ..writeln(section.title);
       for (final fact in section.facts) {
         report.writeln('${fact.label}: ${fact.value}');
+        if (fact.detail case final detail?) report.writeln(detail);
       }
     }
     await Clipboard.setData(ClipboardData(text: report.toString().trim()));
@@ -340,27 +351,39 @@ class _FactRow extends StatelessWidget {
                 horizontal: inset,
                 vertical: tokens.rowPaddingVCompact,
               ),
-              child: LayoutBuilder(
-                // The value keeps its natural width up to just over half the
-                // row, so short values never squeeze long labels onto two lines.
-                builder: (context, constraints) => Row(
-                  children: [
-                    Expanded(
-                      child: Text(fact.label, style: theme.textTheme.bodyLarge),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  LayoutBuilder(
+                    // The value keeps its natural width up to just over half the
+                    // row, so short values never squeeze long labels onto two lines.
+                    builder: (context, constraints) => Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            fact.label,
+                            style: theme.textTheme.bodyLarge,
+                          ),
+                        ),
+                        SizedBox(width: tokens.gapMd),
+                        ConstrainedBox(
+                          constraints: BoxConstraints(
+                            maxWidth: constraints.maxWidth * 0.55,
+                          ),
+                          child: Text(
+                            fact.value,
+                            textAlign: TextAlign.end,
+                            style: valueStyle,
+                          ),
+                        ),
+                      ],
                     ),
-                    SizedBox(width: tokens.gapMd),
-                    ConstrainedBox(
-                      constraints: BoxConstraints(
-                        maxWidth: constraints.maxWidth * 0.55,
-                      ),
-                      child: Text(
-                        fact.value,
-                        textAlign: TextAlign.end,
-                        style: valueStyle,
-                      ),
-                    ),
+                  ),
+                  if (fact.detail case final detail?) ...[
+                    SizedBox(height: tokens.gapSm),
+                    Text(detail, style: theme.textTheme.bodySmall),
                   ],
-                ),
+                ],
               ),
             ),
           ),
@@ -387,11 +410,12 @@ class _Section {
 }
 
 class _Fact {
-  const _Fact(this.label, this.value, {this.emphasis = false});
+  const _Fact(this.label, this.value, {this.emphasis = false, this.detail});
 
   final String label;
   final String value;
   final bool emphasis;
+  final String? detail;
 }
 
 const _losslessFormats = {'flac', 'alac', 'wav', 'aiff', 'ape', 'wv', 'pcm'};
@@ -442,7 +466,7 @@ class _AudioFacts {
   late final int? bitrateKbps =
       readPositiveInt(metadata['bitrate']) ??
       ((route?.stream?.bitrate ?? 0) > 0
-          ? (route!.stream!.bitrate! / 1000).round()
+          ? route!.stream!.bitrate! ~/ 1000
           : null);
   late final int? durationSeconds = readPositiveInt(metadata['duration']);
   late final bool lossless =
@@ -682,7 +706,11 @@ class _AudioFacts {
       if (_outputRate case final rate?)
         _Fact(l10n.audioInfoOutputRate, _khz(rate)),
       if (_bluetoothFormatUnreported) ...[
-        _Fact(l10n.audioInfoBluetoothFormat, l10n.audioInfoAndroidNotReported),
+        _Fact(
+          l10n.audioInfoBluetoothFormat,
+          l10n.audioInfoBluetoothUnavailable,
+          detail: l10n.audioInfoBluetoothUnavailableHint,
+        ),
       ],
       if (_androidOutputUnreported) ...[
         if (!_bluetoothFormatUnreported)

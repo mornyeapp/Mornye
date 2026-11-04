@@ -8936,6 +8936,10 @@
     "description": "Negotiated Bluetooth transport format, separate from Android PCM mixer properties"
   },
   "audioInfoAndroidNotReported": "Not reported by Android",
+  "audioInfoBluetoothUnavailable": "Unavailable to this app",
+  "audioInfoBluetoothUnavailableHint": "Android may show the active codec in Bluetooth settings without making it available to Mornye. This is separate from the song's file format.",
+  "audioAnalysisFileBitrate": "Average file bitrate",
+  "audioAnalysisFileBitrateHint": "Includes tags and container overhead. It can differ from the audio stream bitrate and is not the Bluetooth bitrate.",
   "audioInfoSystemDefaultRate": "System default sample rate",
   "audioInfoAndroidPcmRates": "Android PCM sample rates",
   "audioInfoAndroidPcmFormats": "Android PCM formats",

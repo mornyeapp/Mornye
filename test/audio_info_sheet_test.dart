@@ -276,7 +276,12 @@ void main() {
           find.text('Bluetooth codec format'),
           200,
         );
-        expect(find.text('Not reported by Android'), findsNWidgets(2));
+        expect(find.text('Not reported by Android'), findsOneWidget);
+        expect(find.text('Unavailable to this app'), findsOneWidget);
+        expect(
+          find.textContaining('Android may show the active codec'),
+          findsOneWidget,
+        );
         expect(find.text('44.1 kHz → 48 kHz'), findsNothing);
         expect(find.text('44.1 kHz → 96 kHz'), findsNothing);
         expect(find.text('Output sample rate'), findsNothing);
@@ -555,10 +560,12 @@ void main() {
         expect(reads, 1);
         expect(find.text('Reading tags...'), findsOneWidget);
         expect(find.text('No ReplayGain tags'), findsNothing);
+        final initialQuality = metadata.qualityLabel!;
+        expect(find.text(initialQuality), findsOneWidget);
 
         tags.complete({
           'format': 'opus',
-          'bitrate': 380,
+          'bitrate': 238,
           'replaygain_track_gain': '5.00 dB',
           'replaygain_track_peak': '0.326353',
           'replaygain_album_gain': '5.00 dB',
@@ -567,6 +574,9 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.text('No ReplayGain tags'), findsNothing);
         expect(find.text('Reading tags...'), findsNothing);
+        expect(find.text(initialQuality), findsNothing);
+        expect(find.text(metadata.qualityLabel!), findsOneWidget);
+        expect(find.text('238 kbps'), findsOneWidget);
         expect(find.text('+5.00 dB'), findsNWidgets(2));
         expect(find.textContaining('0.326353'), findsNWidgets(2));
 
