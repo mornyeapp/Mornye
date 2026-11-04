@@ -777,5 +777,9 @@ void main() {
       expect(stale(count: 440), isTrue);
       expect(stale(count: 501, cachedEmpty: true), isTrue);
     });
+
+    test('are built again when none came out, even at the same total', () {
+      expect(stale(cachedEmpty: true), isTrue);
+    });
   });
 }

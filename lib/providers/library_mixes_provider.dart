@@ -70,8 +70,9 @@ class LibraryMixView {
 
 /// Whether the cached mixes give way to new ones: on a new day, when Local
 /// Library is switched, or when the Library grew or shrank by a tenth (at
-/// least ten songs). A Library too small for mixes is checked again as soon
-/// as it changes.
+/// least ten songs). A Library that made no mixes is checked again as soon as
+/// it changes, even when its total holds: songs copied from a paired phone
+/// swap a network row for a file.
 @visibleForTesting
 bool libraryMixesStale({
   required String cachedDay,
@@ -83,7 +84,7 @@ bool libraryMixesStale({
   required int count,
 }) {
   if (cachedDay != day || cachedIncludeLocal != includeLocal) return true;
-  if (cachedEmpty && count != cachedCount) return true;
+  if (cachedEmpty) return true;
   final change = (count - cachedCount).abs();
   return change >= 10 && change * 10 >= cachedCount;
 }
