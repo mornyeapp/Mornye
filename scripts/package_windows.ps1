@@ -9,8 +9,8 @@
 #   Mornye-<version>-windows-<arch>-setup.exe
 #   Mornye-<version>-windows-<arch>-portable.zip
 #
-# Inno Setup 6 is used from PATH, its default install folder, or installed
-# with Chocolatey when neither has it.
+# Inno Setup 6 is used from PATH or standard installation folders
+# (Local AppData or Program Files).
 
 [CmdletBinding()]
 param(
@@ -62,12 +62,20 @@ if ($Only -in 'all', 'installer') {
     if ($isccCommand) {
         $iscc = $isccCommand.Source
     } else {
-        $default = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
-        if (-not (Test-Path $default)) {
-            choco install innosetup --no-progress -y
-            if ($LASTEXITCODE -ne 0) { throw 'Could not install Inno Setup' }
+        $candidates = @(
+            (Join-Path $env:LOCALAPPDATA 'Programs\Inno Setup 6\ISCC.exe'),
+            (Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'),
+            (Join-Path $env:ProgramFiles 'Inno Setup 6\ISCC.exe')
+        )
+        foreach ($candidate in $candidates) {
+            if (Test-Path $candidate) {
+                $iscc = $candidate
+                break
+            }
         }
-        $iscc = $default
+        if (-not $iscc) {
+            throw 'Could not locate Inno Setup 6 compiler (ISCC.exe). Please install Inno Setup 6 manually (e.g. "winget install JRSoftware.InnoSetup" or "choco install innosetup"), or add ISCC.exe to your PATH.'
+        }
     }
 
     $script = Join-Path $projectDir 'windows\installer\mornye.iss'

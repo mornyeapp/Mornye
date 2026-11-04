@@ -57,6 +57,21 @@ if(TARGET permission_handler_windows_plugin)
     "_SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS")
 endif()
 
+# Two plugins use only CW2A and CA2W from ATL, an optional Visual Studio
+# component. Build Tools installs without it get a minimal stand-in; the
+# real ATL is used whenever it is installed.
+include(CheckIncludeFileCXX)
+check_include_file_cxx(atlbase.h MORNYE_HAS_ATL)
+if(NOT MORNYE_HAS_ATL)
+  foreach(atl_target flutter_local_notifications_windows
+          flutter_secure_storage_windows_plugin)
+    if(TARGET ${atl_target})
+      target_include_directories(${atl_target} PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/atl_shim")
+    endif()
+  endforeach()
+endif()
+
 
 # === Installation ===
 # Support files are copied into place next to the executable, so that it can
