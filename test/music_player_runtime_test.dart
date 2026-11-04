@@ -85,6 +85,7 @@ class _Deck implements PlaybackDeck {
   Duration position = Duration.zero;
   int disposals = 0;
   bool failStop = false;
+  Future<void> Function()? beforeDispose;
 
   @override
   bool get isDirect => false;
@@ -123,7 +124,11 @@ class _Deck implements PlaybackDeck {
   @override
   Future<Duration?> getCurrentPosition() async => position;
   @override
-  Future<void> dispose() async => disposals++;
+  Future<void> dispose() async {
+    await beforeDispose?.call();
+    disposals++;
+  }
+
   @override
   Future<void> setFileSource(
     String path, {
@@ -2849,6 +2854,156 @@ void main() {
         expect(runtime.handler!.mediaItem.value?.id, 'one');
         expect(runtime.handler!.playbackState.value.queueIndex, 0);
       }
+    },
+  );
+
+  for (final hasSuccessor in [false, true]) {
+    test('local deletion releases the decoder first ($hasSuccessor)', () async {
+      final directory = await Directory.systemTemp.createTemp('open-deletion-');
+      addTearDown(() => directory.delete(recursive: true));
+      final file = await File(
+        '${directory.path}/song.flac',
+      ).writeAsString('audio');
+      final events = SourceDeletionEvents();
+      final decks = <_Deck>[];
+      final handler = await _runtime(
+        decks: decks,
+        sourceDeletionEvents: events,
+      ).initialize();
+      await handler.setQueueAndPlay([
+        PlayableMedia(
+          id: 'removed',
+          source: file.path,
+          title: 'Removed',
+          artist: '',
+        ),
+        if (hasSuccessor) _track,
+      ]);
+      final playing = decks.single;
+      var releasedBeforeDelete = false;
+      playing.beforeDispose = () async {
+        releasedBeforeDelete = await file.exists();
+      };
+
+      expect(await deleteFile(file.path, deletionEvents: events), isTrue);
+      expect(releasedBeforeDelete, isTrue);
+      expect(playing.disposals, 1);
+      expect(handler.mediaItem.value?.id, hasSuccessor ? 'one' : null);
+      expect(
+        handler.queue.value.map((item) => item.id),
+        hasSuccessor ? ['one'] : isEmpty,
+      );
+    });
+  }
+
+  test('failed decoder release keeps the current song resumable', () async {
+    final directory = await Directory.systemTemp.createTemp('held-deletion-');
+    addTearDown(() => directory.delete(recursive: true));
+    final file = await File(
+      '${directory.path}/song.flac',
+    ).writeAsString('audio');
+    final events = SourceDeletionEvents();
+    final decks = <_Deck>[];
+    final handler = await _runtime(
+      decks: decks,
+      sourceDeletionEvents: events,
+    ).initialize();
+    await handler.setQueueAndPlay([
+      PlayableMedia(id: 'held', source: file.path, title: 'Held', artist: ''),
+    ]);
+    decks.single.beforeDispose = () async => throw StateError('Release failed');
+    expect(await deleteFile(file.path, deletionEvents: events), isFalse);
+    expect(await file.exists(), isTrue);
+    expect(handler.queue.value.single.id, 'held');
+    expect(handler.mediaItem.value?.id, 'held');
+    expect(handler.playbackState.value.playing, isFalse);
+    await handler.play();
+    expect(decks.last.sources, [file.path]);
+    expect(handler.playbackState.value.playing, isTrue);
+  });
+
+  test(
+    'a rejected storage deletion retains the queue and resume position',
+    () async {
+      final events = SourceDeletionEvents();
+      final handler = await _runtime(sourceDeletionEvents: events).initialize();
+      await handler.setQueueAndPlay([_track]);
+      await handler.seek(const Duration(seconds: 12));
+      expect(await events.delete(_track.source, () async => false), isFalse);
+      expect(handler.queue.value.single.id, 'one');
+      expect(handler.playbackState.value.playing, isFalse);
+      await handler.play();
+      expect(handler.playbackState.value.playing, isTrue);
+      expect(handler.playbackState.value.position.inSeconds, 12);
+    },
+  );
+
+  test(
+    'Play cannot reopen the current file while deletion releases it',
+    () async {
+      final directory = await Directory.systemTemp.createTemp(
+        'pending-release-',
+      );
+      addTearDown(() => directory.delete(recursive: true));
+      final file = await File(
+        '${directory.path}/song.flac',
+      ).writeAsString('audio');
+      final events = SourceDeletionEvents();
+      final decks = <_Deck>[];
+      final handler = await _runtime(
+        decks: decks,
+        sourceDeletionEvents: events,
+      ).initialize();
+      await handler.setQueueAndPlay([
+        PlayableMedia(id: 'held', source: file.path, title: 'Held', artist: ''),
+      ]);
+      final entered = Completer<void>();
+      final release = Completer<void>();
+      decks.single.beforeDispose = () async {
+        entered.complete();
+        await release.future;
+      };
+      final deletion = deleteFile(file.path, deletionEvents: events);
+      await entered.future;
+      try {
+        await handler.play();
+        expect(await file.exists(), isTrue);
+        expect(decks.single.sources, [file.path]);
+      } finally {
+        release.complete();
+      }
+      expect(await deletion, isTrue);
+      expect(handler.mediaItem.value, isNull);
+      expect(decks.last.sources, isEmpty);
+    },
+  );
+
+  test(
+    'deleting a duplicate current source selects its immediate successor',
+    () async {
+      final events = SourceDeletionEvents();
+      final handler = await _runtime(sourceDeletionEvents: events).initialize();
+      const next = PlayableMedia(
+        id: 'next',
+        source: '/next.flac',
+        title: 'Next',
+        artist: '',
+      );
+      const last = PlayableMedia(
+        id: 'last',
+        source: '/last.flac',
+        title: 'Last',
+        artist: '',
+      );
+      await handler.setQueueAndPlay([
+        _track,
+        _track,
+        next,
+        last,
+      ], initialIndex: 1);
+      await events.publish(_track.source);
+      expect(handler.mediaItem.value?.id, 'next');
+      expect(handler.playbackState.value.queueIndex, 0);
     },
   );
 

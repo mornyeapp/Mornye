@@ -10,6 +10,64 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test(
+    'local deletion waits for file release and coalesces requests',
+    () async {
+      final directory = await Directory.systemTemp.createTemp(
+        'release-deletion-',
+      );
+      addTearDown(() => directory.delete(recursive: true));
+      final file = await File(
+        '${directory.path}/song.flac',
+      ).writeAsString('audio');
+      final events = SourceDeletionEvents();
+      final entered = Completer<void>();
+      final released = Completer<void>();
+      var preparations = 0;
+      var publications = 0;
+      events.subscribe(
+        (_) async => publications++,
+        beforeDelete: (source) async {
+          preparations++;
+          expect(events.isDeleting(source), isTrue);
+          expect(await file.exists(), isTrue);
+          entered.complete();
+          await released.future;
+        },
+      );
+      final first = deleteFile(file.path, deletionEvents: events);
+      await entered.future;
+      final second = deleteFile(file.path, deletionEvents: events);
+      expect(await file.exists(), isTrue);
+      released.complete();
+      expect(await Future.wait([first, second]), [true, true]);
+      expect(preparations, 1);
+      expect(publications, 1);
+      expect(events.isDeleting(file.path), isFalse);
+    },
+  );
+
+  test('failed release keeps the file and does not publish deletion', () async {
+    final directory = await Directory.systemTemp.createTemp('failed-release-');
+    addTearDown(() => directory.delete(recursive: true));
+    final file = await File(
+      '${directory.path}/song.flac',
+    ).writeAsString('audio');
+    final events = SourceDeletionEvents();
+    final deleted = <String>[];
+    final unsubscribe = events.subscribe(
+      (source) async => deleted.add(source),
+      beforeDelete: (_) async =>
+          throw StateError('Decoder still owns the file'),
+    );
+    expect(await deleteFile(file.path, deletionEvents: events), isFalse);
+    expect(await file.readAsString(), 'audio');
+    expect(deleted, isEmpty);
+    expect(events.isDeleting(file.path), isFalse);
+    unsubscribe();
+    expect(await deleteFile(file.path, deletionEvents: events), isTrue);
+  });
+
+  test(
     'successful deletion waits for cleanup and survives reaction failure',
     () async {
       final directory = await Directory.systemTemp.createTemp(

@@ -1180,6 +1180,9 @@ class MusicPlayerHandler extends BaseAudioHandler
   }
 
   Future<String?> _resolveSource(PlayableMedia media) async {
+    if (_dependencies.sourceDeletionEvents.isDeleting(media.source)) {
+      return null;
+    }
     if (media.source.startsWith('network://')) {
       try {
         final copy = await _dependencies.offlineCopy(media.source);
@@ -1454,6 +1457,7 @@ class MusicPlayerHandler extends BaseAudioHandler
 
   bool _isCurrentPlayRequest(int generation, PlayableMedia media) {
     return !_disposed &&
+        !_dependencies.sourceDeletionEvents.isDeleting(media.source) &&
         generation == _playRequestGeneration &&
         _index >= 0 &&
         _index < _media.length &&
@@ -1603,6 +1607,9 @@ class MusicPlayerHandler extends BaseAudioHandler
     Duration startPosition = Duration.zero,
   }) async {
     if (_disposed || index < 0 || index >= _media.length) return;
+    if (_dependencies.sourceDeletionEvents.isDeleting(_media[index].source)) {
+      return;
+    }
     if (_reloadingAfterServerDied) {
       _reloadingAfterServerDied = false;
     } else {
@@ -2608,6 +2615,49 @@ class MusicPlayerHandler extends BaseAudioHandler
     }
   }
 
+  /// Release native file handles before unlinking a local song. Stop alone can
+  /// retain the source in AVPlayer/MediaPlayer, so retire the owning deck.
+  /// Keep the queue until deletion succeeds; a failed delete remains resumable.
+  Future<void> prepareSourceDeletion(String source) async {
+    if (_disposed ||
+        _cast.active ||
+        !_media.any((item) => item.source == source)) {
+      return;
+    }
+    final isCurrent =
+        _index >= 0 &&
+        _index < _media.length &&
+        _media[_index].source == source;
+    final generation = isCurrent
+        ? ++_playRequestGeneration
+        : _playRequestGeneration;
+    if (isCurrent) {
+      _sourceReady = false;
+      _userPaused = true;
+      _pendingRestorePosition = playbackState.value.position;
+      _playbackAutomation.cancelPendingActions();
+      await _player.cancelPreparation();
+    }
+    await _serializeSourceChange(() async {
+      if (_disposed || generation != _playRequestGeneration) return;
+      await _cancelTransitions();
+      if (!isCurrent || _disposed || generation != _playRequestGeneration) {
+        return;
+      }
+      try {
+        await _disposeDeck(_player);
+      } finally {
+        if (!_disposed) {
+          _player = _dependencies.createDeck('music-player-delete-$generation');
+          _listenToPlayer(_player);
+          _activeResolvedPath = null;
+          _broadcastState(playerState: PlaybackDeckState.paused);
+        }
+      }
+      await _cleanupPendingResolvedPaths();
+    });
+  }
+
   /// Called when a file is deleted from disk. Removes it from the queue and, if
   /// it is the track currently playing, stops or advances so a deleted song can
   /// no longer be played.
@@ -2658,7 +2708,10 @@ class MusicPlayerHandler extends BaseAudioHandler
     if (_media.isEmpty) {
       reaction = stop();
     } else if (wasCurrent) {
-      final nextIndex = _index.clamp(0, _media.length - 1);
+      final nextIndex = (_index - removedBeforeCurrent).clamp(
+        0,
+        _media.length - 1,
+      );
       reaction = _playIndex(nextIndex);
     } else {
       _index = (_index - removedBeforeCurrent).clamp(0, _media.length - 1);

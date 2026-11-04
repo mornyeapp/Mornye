@@ -539,6 +539,7 @@ class MusicPlayerRuntime {
     if (!identical(existing, handler)) {
       _unsubscribeSourceDeletion = dependencies.sourceDeletionEvents.subscribe(
         handler.onSourceDeleted,
+        beforeDelete: handler.prepareSourceDeletion,
       );
       _unsubscribeSourceMetadata = dependencies.sourceMetadataEvents.subscribe(
         handler.onSourceMetadataChanged,

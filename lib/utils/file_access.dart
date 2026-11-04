@@ -387,11 +387,15 @@ Future<bool> deleteFile(
       final deleted = await PlatformBridge.safDelete(path);
       confirmedAbsent = deleted || !await PlatformBridge.safExists(path);
     } else {
-      final file = File(path);
-      if (await file.exists()) {
-        await file.delete();
-      }
-      confirmedAbsent = !await file.exists();
+      final source = path;
+      return await (deletionEvents ?? SourceDeletionEvents.instance).delete(
+        source,
+        () async {
+          final file = File(source);
+          if (await file.exists()) await file.delete();
+          return !await file.exists();
+        },
+      );
     }
   } catch (_) {
     return false;
