@@ -580,7 +580,7 @@ class MornyeActionCapsule extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final dark = Theme.of(context).brightness == Brightness.dark;
     // Level with the round back button beside it.
-    final radius = isDesktopPlatform ? 18.0 : 22.0;
+    final radius = isDesktopPlatform ? 19.0 : 22.0;
     return Center(
       widthFactor: 1,
       child: MornyeGlassPress(
@@ -925,15 +925,21 @@ class HeaderCircleButton extends ConsumerWidget {
     // Desktop headers use pointer-sized controls.
     final desktop = isDesktopPlatform;
     final buttonSize =
-        this.buttonSize ?? (desktop ? (context.isMornye ? 36.0 : 40.0) : null);
-    final iconSize = desktop && this.iconSize == 22 ? 18.0 : this.iconSize;
+        this.buttonSize ?? (desktop ? (context.isMornye ? 38.0 : 40.0) : null);
+    final iconSize = desktop && this.iconSize == 22
+        ? (context.isMornye ? 20.0 : 18.0)
+        : this.iconSize;
     if (context.isMornye && HeaderActionGroup.of(context)) {
       return IconButton(
         onPressed: onPressed,
         tooltip: tooltip,
         icon: AppIcon(mornyeIconFor(icon), size: iconSize),
         style: IconButton.styleFrom(
-          minimumSize: Size.square(buttonSize ?? 44),
+          // Music sets the capsule's buttons closer together than its height.
+          minimumSize: desktop
+              ? Size(35, buttonSize ?? 44)
+              : Size.square(buttonSize ?? 44),
+          padding: desktop ? EdgeInsets.zero : null,
           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
           foregroundColor: iconColor ?? scheme.onSurface,
         ),

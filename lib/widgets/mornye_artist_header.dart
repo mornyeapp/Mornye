@@ -243,7 +243,7 @@ class MornyeArtistHeader extends StatelessWidget {
   List<Widget> buildSlivers(BuildContext context) {
     final surface = Theme.of(context).colorScheme.surface;
     final back = Padding(
-      padding: EdgeInsetsDirectional.only(start: isDesktopPlatform ? 16 : 12),
+      padding: EdgeInsetsDirectional.only(start: isDesktopPlatform ? 8 : 12),
       child: Align(
         alignment: AlignmentDirectional.centerStart,
         widthFactor: 1,
@@ -318,25 +318,28 @@ class MornyeArtistHeader extends StatelessWidget {
                 ? null
                 : [MornyeActionCapsule(children: toolbarActions)],
             actionsPadding: EdgeInsetsDirectional.only(
-              end: isDesktopPlatform ? 16 : 12,
+              end: isDesktopPlatform ? 8 : 12,
             ),
-            title: headerToolbarTitle(
-              showTitleListenable,
-              showTitle,
-              (showTitle) => AnimatedOpacity(
-                opacity: showTitle ? 1 : 0,
-                duration: const Duration(milliseconds: 180),
-                child: Text(
-                  name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w600,
+            // Music on the Mac leaves the toolbar untitled over the artist.
+            title: isDesktopPlatform
+                ? null
+                : headerToolbarTitle(
+                    showTitleListenable,
+                    showTitle,
+                    (showTitle) => AnimatedOpacity(
+                      opacity: showTitle ? 1 : 0,
+                      duration: const Duration(milliseconds: 180),
+                      child: Text(
+                        name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
                   ),
-                ),
-              ),
-            ),
             flexibleSpace: FlexibleSpaceBar(
               collapseMode: CollapseMode.pin,
               stretchModes: const [StretchMode.zoomBackground],

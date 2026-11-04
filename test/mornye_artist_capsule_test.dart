@@ -17,6 +17,7 @@ void main() {
     WidgetTester tester, {
     required List<String> log,
     required bool desktop,
+    bool showTitle = false,
   }) async {
     debugDesktopPlatformOverride = desktop;
     await tester.binding.setSurfaceSize(const Size(900, 800));
@@ -32,7 +33,7 @@ void main() {
               slivers: [
                 MornyeArtistHeader(
                   name: 'Artist',
-                  showTitle: false,
+                  showTitle: showTitle,
                   artwork: const ColoredBox(color: Colors.grey),
                   actions: const [],
                   toolbarActions: [
@@ -65,6 +66,12 @@ void main() {
   for (final desktop in [true, false]) {
     final platform = desktop ? 'desktop' : 'mobile';
 
+    testWidgets('$platform toolbar title follows the platform', (tester) async {
+      await pumpHeader(tester, log: [], desktop: desktop, showTitle: true);
+      // The hero always names the artist; only the phone repeats it above.
+      expect(find.text('Artist'), findsNWidgets(desktop ? 1 : 2));
+    });
+
     testWidgets('$platform groups Share and More at the trailing edge', (
       tester,
     ) async {
@@ -75,11 +82,12 @@ void main() {
       final bounds = tester.getRect(
         find.descendant(of: capsule, matching: find.byType(MornyeGlass)),
       );
-      expect(bounds.right, 900 - (desktop ? 16 : 12));
+      expect(bounds.right, 900 - (desktop ? 8 : 12));
       // Level with the round back button.
       final back = tester.getRect(find.byTooltip('Back'));
       expect(bounds.center.dy, back.center.dy);
-      expect(bounds.height, desktop ? 36 : 44);
+      expect(bounds.height, desktop ? 38 : 44);
+      if (desktop) expect(back.left, 8);
       final share = tester.getRect(find.byTooltip('Share'));
       final more = tester.getRect(
         find.byTooltip(

@@ -793,6 +793,9 @@ extension _ArtistScreenSections on _ArtistScreenState {
                     colorScheme,
                     existingHistoryKeys.contains(historyKeys[index]),
                     compact: true,
+                    separated:
+                        index <
+                        math.min(start + rowsPerColumn, tracks.length) - 1,
                   ),
                 ),
             ],
@@ -990,6 +993,7 @@ extension _ArtistScreenSections on _ArtistScreenState {
     ColorScheme colorScheme,
     bool isInHistory, {
     bool compact = false,
+    bool separated = true,
   }) {
     return Consumer(
       builder: (context, ref, child) {
@@ -1169,7 +1173,7 @@ extension _ArtistScreenSections on _ArtistScreenState {
             ),
           ),
         );
-        if (!context.isMornye) return row;
+        if (!context.isMornye || !separated) return row;
         return Stack(
           children: [
             row,
