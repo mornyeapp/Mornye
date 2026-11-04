@@ -2495,7 +2495,11 @@ void main() {
       expect(await deleteFile(file.path, deletionEvents: events), isFalse);
       expect(await file.exists(), isTrue);
       expect(handler.queue.value.map((item) => item.id), ['removed']);
+    },
+  );
 
+  test(
+    'deletion retires a pending SAF copy without blocking a later copy',
     () async {
       final directory = await Directory.systemTemp.createTemp(
         'pending-deletion-',
