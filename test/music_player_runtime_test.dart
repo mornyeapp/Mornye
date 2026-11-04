@@ -392,7 +392,17 @@ class _ResumeSessionStore extends _SessionStore {
 class _DeletionHandler extends MusicPlayerHandler {
   _DeletionHandler(MusicPlayerRuntime runtime) : super(runtime: runtime);
 
+  final preparingSources = <String>[];
+  final cancelledSources = <String>[];
   final deletedSources = <String>[];
+
+  @override
+  Future<void> onSourceDeleting(String source) async =>
+      preparingSources.add(source);
+
+  @override
+  Future<void> onSourceDeletionCancelled(String source) async =>
+      cancelledSources.add(source);
 
   @override
   Future<void> onSourceDeleted(String source) async =>
@@ -2280,18 +2290,31 @@ void main() {
       final secondHandler = await second.initialize() as _DeletionHandler;
       final isolatedHandler = await isolated.initialize() as _DeletionHandler;
       first.attach(firstHandler); // Reattaching must not subscribe twice.
+      await events.prepareDeletion('/one.flac');
+      await events.cancelDeletion('/one.flac');
       await events.publish('/one.flac');
+      expect(firstHandler.preparingSources, ['/one.flac']);
+      expect(secondHandler.preparingSources, ['/one.flac']);
+      expect(isolatedHandler.preparingSources, isEmpty);
+      expect(firstHandler.cancelledSources, ['/one.flac']);
+      expect(secondHandler.cancelledSources, ['/one.flac']);
       expect(firstHandler.deletedSources, ['/one.flac']);
       expect(secondHandler.deletedSources, ['/one.flac']);
       expect(isolatedHandler.deletedSources, isEmpty);
       await firstHandler.dispose();
       final replacement = await first.initialize() as _DeletionHandler;
+      await events.prepareDeletion('/two.flac');
+      await events.cancelDeletion('/two.flac');
       await events.publish('/two.flac');
       expect(firstHandler.deletedSources, ['/one.flac']);
+      expect(replacement.preparingSources, ['/two.flac']);
+      expect(replacement.cancelledSources, ['/two.flac']);
       expect(replacement.deletedSources, ['/two.flac']);
       expect(secondHandler.deletedSources, ['/one.flac', '/two.flac']);
       await first.dispose();
       await second.dispose();
+      await events.prepareDeletion('/three.flac');
+      await events.cancelDeletion('/three.flac');
       await events.publish('/three.flac');
       expect(replacement.deletedSources, ['/two.flac']);
       expect(secondHandler.deletedSources, ['/one.flac', '/two.flac']);
@@ -2309,9 +2332,10 @@ void main() {
         '${directory.path}/one.flac',
       ).writeAsString('audio');
       final events = SourceDeletionEvents();
+      final deckGroups = [<_Deck>[], <_Deck>[]];
       final runtimes = [
-        _runtime(sourceDeletionEvents: events),
-        _runtime(sourceDeletionEvents: events),
+        _runtime(decks: deckGroups[0], sourceDeletionEvents: events),
+        _runtime(decks: deckGroups[1], sourceDeletionEvents: events),
       ];
       final removed = PlayableMedia(
         id: 'removed',
@@ -2326,12 +2350,69 @@ void main() {
           _track,
         ]);
       }
+      expect(deckGroups.map((decks) => decks.single.state), [
+        PlaybackDeckState.playing,
+        PlaybackDeckState.playing,
+      ]);
+      final prepared = <String>[];
+      events.subscribeBeforeDeletion((source) async {
+        prepared.add(source);
+        expect(await file.exists(), isTrue);
+        expect(deckGroups.map((decks) => decks.single.state), [
+          PlaybackDeckState.stopped,
+          PlaybackDeckState.stopped,
+        ]);
+      });
       expect(await deleteFile(file.path, deletionEvents: events), isTrue);
+      expect(prepared, [file.path]);
       for (final runtime in runtimes) {
         expect(runtime.handler!.queue.value.map((item) => item.id), ['one']);
         expect(runtime.handler!.mediaItem.value?.id, 'one');
         expect(runtime.handler!.playbackState.value.queueIndex, 0);
       }
+    },
+  );
+
+  test(
+    'failed storage deletion restores the active track and playback position',
+    () async {
+      final directory = await Directory.systemTemp.createTemp(
+        'cancelled-queued-deletion-',
+      );
+      addTearDown(() => directory.delete(recursive: true));
+      // File.delete rejects a directory path. It exercises a real storage
+      // failure after playback has released the active source.
+      final undeletable = await Directory(
+        '${directory.path}/still-here.flac',
+      ).create();
+      final events = SourceDeletionEvents();
+      final decks = <_Deck>[];
+      final runtime = _runtime(decks: decks, sourceDeletionEvents: events);
+      final handler = await runtime.initialize();
+      final removed = PlayableMedia(
+        id: 'undeletable',
+        source: undeletable.path,
+        title: 'Undeletable',
+        artist: 'Artist',
+      );
+      await handler.setQueueAndPlay([removed, _track]);
+      decks.single.position = const Duration(seconds: 17);
+      expect(decks.single.state, PlaybackDeckState.playing);
+
+      expect(
+        await deleteFile(undeletable.path, deletionEvents: events),
+        isFalse,
+      );
+
+      expect(await undeletable.exists(), isTrue);
+      expect(handler.queue.value.map((item) => item.id), [
+        'undeletable',
+        'one',
+      ]);
+      expect(handler.mediaItem.value?.id, 'undeletable');
+      expect(handler.playbackState.value.position, const Duration(seconds: 17));
+      expect(decks.single.sources, [undeletable.path, undeletable.path]);
+      expect(decks.single.state, PlaybackDeckState.playing);
     },
   );
 
@@ -2377,7 +2458,7 @@ void main() {
     },
   );
 
-  test('failed player stop cannot undo a confirmed storage deletion', () async {
+  test('a player that cannot release its source prevents file deletion', () async {
     final directory = await Directory.systemTemp.createTemp('failed-reaction-');
     addTearDown(() => directory.delete(recursive: true));
     final file = await File(
@@ -2396,9 +2477,9 @@ void main() {
       ),
     ]);
     decks.single.failStop = true;
-    expect(await deleteFile(file.path, deletionEvents: events), isTrue);
-    expect(await file.exists(), isFalse);
-    expect(handler.queue.value, isEmpty);
+    expect(await deleteFile(file.path, deletionEvents: events), isFalse);
+    expect(await file.exists(), isTrue);
+    expect(handler.queue.value.map((item) => item.id), ['removed']);
   });
 
   test(
