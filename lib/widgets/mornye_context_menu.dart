@@ -1,7 +1,9 @@
 import 'dart:math' as math;
+import 'dart:ui' show lerpDouble;
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/mornye_chrome.dart';
 
@@ -24,12 +26,15 @@ Future<T?> showMornyeContextMenu<T>({
   final themes = InheritedTheme.capture(from: context, to: navigator.context);
   final target = anchor ?? mornyeMenuAnchor(context);
   return navigator.push<T>(
-    RawDialogRoute<T>(
+    _MenuRoute<T>(
       barrierColor: Colors.black.withValues(alpha: 0.12),
       barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
       transitionDuration: MediaQuery.disableAnimationsOf(context)
           ? Duration.zero
-          : const Duration(milliseconds: 320),
+          : _openDuration,
+      closeDuration: MediaQuery.disableAnimationsOf(context)
+          ? Duration.zero
+          : const Duration(milliseconds: 240),
       // Opacity layers isolate a BackdropFilter from the underlying artwork.
       transitionBuilder: (_, _, _, child) => child,
       pageBuilder: (context, animation, _) {
@@ -39,59 +44,414 @@ Future<T?> showMornyeContextMenu<T>({
           namesRoute: true,
           label: MaterialLocalizations.of(context).popupMenuLabel,
           explicitChildNodes: true,
-          child: AnimatedBuilder(
-            animation: animation,
-            child: themes.wrap(Builder(builder: builder)),
-            builder: (context, child) {
-              // Keep the same glass surface throughout the flight, so its
-              // material is already visible as the menu grows from its control.
-              final motion = const Interval(
-                0,
-                0.62,
-                curve: Curves.easeOutCubic,
-              ).transform(animation.value);
-              // Liquid glass runs slightly past its size and settles back.
-              final overshoot =
-                  animation.status == AnimationStatus.reverse ||
-                      MediaQuery.disableAnimationsOf(context)
-                  ? 0.0
-                  : 0.015 *
-                        math.sin(
-                          math.pi *
-                              const Interval(
-                                0.4,
-                                0.9,
-                              ).transform(animation.value),
-                        );
-              return CustomSingleChildLayout(
-                delegate: _MenuLayout(
-                  anchor: target,
-                  preferAbove: preferAbove,
-                  maxWidth: maxWidth,
-                  padding: media.padding.copyWith(
-                    bottom: math.max(
-                      media.padding.bottom,
-                      media.viewInsets.bottom,
-                    ),
-                  ),
-                  progress: motion,
-                ),
-                child: Transform.scale(
-                  scale: (0.16 + 0.84 * motion) * (1 + overshoot),
-                  child: IgnorePointer(
-                    ignoring:
-                        motion < 1 ||
-                        animation.status == AnimationStatus.reverse,
-                    child: child!,
-                  ),
-                ),
-              );
-            },
+          child: CustomSingleChildLayout(
+            delegate: _MenuLayout(
+              anchor: target,
+              preferAbove: preferAbove,
+              maxWidth: maxWidth,
+              padding: media.padding.copyWith(
+                bottom: math.max(media.padding.bottom, media.viewInsets.bottom),
+              ),
+            ),
+            child: _MenuFlight(
+              animation: animation,
+              anchor: target?.center,
+              child: themes.wrap(Builder(builder: builder)),
+            ),
           ),
         );
       },
     ),
   );
+}
+
+/// Long enough for the spring in [_MenuFlight] to settle.
+const _openDuration = Duration(milliseconds: 640);
+
+/// A dialog route that closes faster than it opens.
+class _MenuRoute<T> extends RawDialogRoute<T> {
+  _MenuRoute({
+    required super.pageBuilder,
+    required super.barrierColor,
+    required super.barrierLabel,
+    required super.transitionBuilder,
+    required super.transitionDuration,
+    required Duration closeDuration,
+  }) : _closeDuration = closeDuration;
+
+  final Duration _closeDuration;
+
+  @override
+  Duration get reverseTransitionDuration => _closeDuration;
+}
+
+/// How far along the opening rows start taking presses.
+const double _pressableFrom = 0.38;
+
+/// The route's progress, which the menu's glass follows.
+class _MenuFlight extends InheritedWidget {
+  const _MenuFlight({
+    required this.animation,
+    required this.anchor,
+    required super.child,
+  });
+
+  final Animation<double> animation;
+
+  /// Center of the control the menu pours out of, in global coordinates.
+  final Offset? anchor;
+
+  static _MenuFlight? maybeOf(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<_MenuFlight>();
+
+  @override
+  bool updateShouldNotify(_MenuFlight oldWidget) =>
+      animation != oldWidget.animation || anchor != oldWidget.anchor;
+}
+
+/// One axis of the opening: an underdamped spring, [delay] seconds late.
+double _pour(double seconds, double delay) {
+  const damping = 0.62;
+  const frequency = 15.0;
+  final damped = frequency * math.sqrt(1 - damping * damping);
+  double position(double time) {
+    final decay = math.exp(-damping * frequency * time);
+    return 1 -
+        decay *
+            (math.cos(damped * time) +
+                damping * frequency / damped * math.sin(damped * time));
+  }
+
+  final time = math.max(seconds - delay, 0.0);
+  final length = _openDuration.inMicroseconds / 1e6 - delay;
+  // The spring is still a pixel or two short when the route ends: spread that
+  // remainder over the flight so the menu lands on its exact size.
+  final spring = position(time) + (1 - position(length)) * (time / length);
+  // The size runs just past its target, not by the spring's whole overshoot.
+  return spring <= 1 ? spring : 1 + (spring - 1) * 0.35;
+}
+
+/// Sizes shared by the two render objects of a morphing menu.
+class _MenuGeometry {
+  /// What the menu's content asks for, and so the glass at rest.
+  BoxConstraints constraints = const BoxConstraints();
+  Size resting = Size.zero;
+
+  /// Top left of the glass inside the resting box, changing with the morph.
+  Offset position = Offset.zero;
+}
+
+/// Pours the glass out of its control like water: a drop at the control runs
+/// down into a tall oval, then spreads to the menu's width and settles with a
+/// small wobble. The panel really changes size, so its lens, rim and corners
+/// stay true on every frame, while the rows wait in place and fade up inside.
+class _LiquidMenuGlass extends StatefulWidget {
+  const _LiquidMenuGlass({
+    required this.flight,
+    required this.glass,
+    required this.child,
+  });
+
+  final _MenuFlight flight;
+  final Widget Function(double radius, Widget child) glass;
+  final Widget child;
+
+  @override
+  State<_LiquidMenuGlass> createState() => _LiquidMenuGlassState();
+}
+
+class _LiquidMenuGlassState extends State<_LiquidMenuGlass> {
+  static const double _dropSize = 44;
+  static const double _restingRadius = 28;
+
+  final _geometry = _MenuGeometry();
+  double? _closingFrom;
+  double _closingWidth = 1;
+  double _closingHeight = 1;
+
+  double get _seconds =>
+      widget.flight.animation.value * _openDuration.inMilliseconds / 1000;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.flight.animation.addStatusListener(_onStatus);
+  }
+
+  @override
+  void didUpdateWidget(_LiquidMenuGlass oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final animation = widget.flight.animation;
+    if (animation == oldWidget.flight.animation) return;
+    oldWidget.flight.animation.removeStatusListener(_onStatus);
+    animation.addStatusListener(_onStatus);
+  }
+
+  @override
+  void dispose() {
+    widget.flight.animation.removeStatusListener(_onStatus);
+    super.dispose();
+  }
+
+  void _onStatus(AnimationStatus status) {
+    if (status != AnimationStatus.reverse) return;
+    // Closes from wherever the opening had reached.
+    _closingFrom = widget.flight.animation.value;
+    _closingHeight = _pour(_seconds, 0);
+    _closingWidth = _pour(_seconds, 0.05);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final animation = widget.flight.animation;
+    return AnimatedBuilder(
+      animation: animation,
+      child: widget.child,
+      builder: (context, content) {
+        final from = _closingFrom;
+        final double width;
+        final double height;
+        final double fade;
+        if (from != null && from > 0) {
+          final closing = 1 - (animation.value / from).clamp(0.0, 1.0);
+          // Drawn back into the control, width first.
+          width =
+              _closingWidth *
+              (1 -
+                  Curves.easeInCubic.transform(
+                    (closing * 1.2).clamp(0.0, 1.0),
+                  ));
+          height = _closingHeight * (1 - Curves.easeInCubic.transform(closing));
+          fade = 1 - const Interval(0, 0.45).transform(closing);
+        } else {
+          width = _pour(_seconds, 0.05);
+          height = _pour(_seconds, 0);
+          fade = const Interval(
+            0.14,
+            0.46,
+            curve: Curves.easeOut,
+          ).transform(animation.value);
+        }
+        final resting = _geometry.resting;
+        final shortest = math.min(
+          lerpDouble(_dropSize, resting.width, width)!,
+          lerpDouble(_dropSize, resting.height, height)!,
+        );
+        // A drop is round; the corners tighten as it spreads.
+        final radius = math.min(
+          shortest / 2,
+          lerpDouble(
+            shortest / 2,
+            _restingRadius,
+            Curves.easeInCubic.transform(width.clamp(0.0, 1.0)),
+          )!,
+        );
+        return IgnorePointer(
+          ignoring:
+              animation.value < _pressableFrom ||
+              animation.status == AnimationStatus.reverse,
+          child: _MenuFrame(
+            geometry: _geometry,
+            anchor: widget.flight.anchor,
+            width: width,
+            height: height,
+            dropSize: _dropSize,
+            child: widget.glass(
+              radius,
+              _MenuContent(
+                geometry: _geometry,
+                width: width,
+                height: height,
+                dropSize: _dropSize,
+                child: Opacity(opacity: fade, child: content),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// Takes the menu's resting space and places the glass inside it.
+class _MenuFrame extends SingleChildRenderObjectWidget {
+  const _MenuFrame({
+    required this.geometry,
+    required this.anchor,
+    required this.width,
+    required this.height,
+    required this.dropSize,
+    required super.child,
+  });
+
+  final _MenuGeometry geometry;
+  final Offset? anchor;
+  final double width;
+  final double height;
+  final double dropSize;
+
+  @override
+  RenderObject createRenderObject(BuildContext context) => _RenderMenuFrame(
+    geometry,
+    anchor: anchor,
+    widthProgress: width,
+    heightProgress: height,
+    dropSize: dropSize,
+  );
+
+  @override
+  void updateRenderObject(BuildContext context, _RenderMenuFrame renderObject) {
+    renderObject
+      ..anchor = anchor
+      ..widthProgress = width
+      ..heightProgress = height
+      ..dropSize = dropSize
+      ..markNeedsPaint();
+  }
+}
+
+class _RenderMenuFrame extends RenderProxyBox {
+  _RenderMenuFrame(
+    this.geometry, {
+    required this.anchor,
+    required this.widthProgress,
+    required this.heightProgress,
+    required this.dropSize,
+  });
+
+  final _MenuGeometry geometry;
+  Offset? anchor;
+  double widthProgress;
+  double heightProgress;
+  double dropSize;
+
+  @override
+  void performLayout() {
+    geometry.constraints = constraints;
+    final content = child!;
+    // Unbounded: the glass takes its size from [_RenderMenuContent].
+    content.layout(const BoxConstraints(), parentUsesSize: true);
+    size = constraints.constrain(Size.copy(geometry.resting));
+  }
+
+  @override
+  void paint(PaintingContext context, Offset offset) {
+    final origin = anchor == null
+        ? size.center(Offset.zero)
+        : globalToLocal(anchor!);
+    final drop = origin - Offset(dropSize, dropSize) / 2;
+    geometry.position = Offset(
+      drop.dx * (1 - widthProgress),
+      drop.dy * (1 - heightProgress),
+    );
+    context.paintChild(child!, offset + geometry.position);
+  }
+
+  @override
+  void applyPaintTransform(RenderBox child, Matrix4 transform) {
+    transform.translateByDouble(
+      geometry.position.dx,
+      geometry.position.dy,
+      0,
+      1,
+    );
+  }
+
+  @override
+  bool hitTestChildren(BoxHitTestResult result, {required Offset position}) =>
+      result.addWithPaintOffset(
+        offset: geometry.position,
+        position: position,
+        hitTest: (result, transformed) =>
+            child!.hitTest(result, position: transformed),
+      );
+}
+
+/// Lays the rows out at their resting size inside the morphing glass, and
+/// holds them still on screen as the glass moves around them.
+class _MenuContent extends SingleChildRenderObjectWidget {
+  const _MenuContent({
+    required this.geometry,
+    required this.width,
+    required this.height,
+    required this.dropSize,
+    required super.child,
+  });
+
+  final _MenuGeometry geometry;
+  final double width;
+  final double height;
+  final double dropSize;
+
+  @override
+  RenderObject createRenderObject(BuildContext context) => _RenderMenuContent(
+    geometry,
+    widthProgress: width,
+    heightProgress: height,
+    dropSize: dropSize,
+  );
+
+  @override
+  void updateRenderObject(
+    BuildContext context,
+    _RenderMenuContent renderObject,
+  ) {
+    renderObject
+      ..widthProgress = width
+      ..heightProgress = height
+      ..dropSize = dropSize
+      ..markNeedsLayout();
+  }
+}
+
+class _RenderMenuContent extends RenderProxyBox {
+  _RenderMenuContent(
+    this.geometry, {
+    required this.widthProgress,
+    required this.heightProgress,
+    required this.dropSize,
+  });
+
+  final _MenuGeometry geometry;
+  double widthProgress;
+  double heightProgress;
+  double dropSize;
+
+  @override
+  void performLayout() {
+    final content = child!;
+    content.layout(geometry.constraints, parentUsesSize: true);
+    final resting = content.size;
+    geometry.resting = resting;
+    size = Size(
+      math.max(lerpDouble(dropSize, resting.width, widthProgress)!, 0),
+      math.max(lerpDouble(dropSize, resting.height, heightProgress)!, 0),
+    );
+  }
+
+  @override
+  void paint(PaintingContext context, Offset offset) {
+    context.paintChild(child!, offset - geometry.position);
+  }
+
+  @override
+  void applyPaintTransform(RenderBox child, Matrix4 transform) {
+    transform.translateByDouble(
+      -geometry.position.dx,
+      -geometry.position.dy,
+      0,
+      1,
+    );
+  }
+
+  @override
+  bool hitTestChildren(BoxHitTestResult result, {required Offset position}) =>
+      result.addWithPaintOffset(
+        offset: -geometry.position,
+        position: position,
+        hitTest: (result, transformed) =>
+            child!.hitTest(result, position: transformed),
+      );
 }
 
 class _MenuLayout extends SingleChildLayoutDelegate {
@@ -100,14 +460,12 @@ class _MenuLayout extends SingleChildLayoutDelegate {
     required this.padding,
     required this.preferAbove,
     required this.maxWidth,
-    required this.progress,
   });
 
   final Rect? anchor;
   final EdgeInsets padding;
   final bool preferAbove;
   final double maxWidth;
-  final double progress;
   static const double _margin = 16;
 
   @override
@@ -158,15 +516,7 @@ class _MenuLayout extends SingleChildLayoutDelegate {
             : bottom;
       }
     }
-    final resting = Offset(x.clamp(left, right), y.clamp(top, bottom));
-    final origin = anchor?.center;
-    return origin == null
-        ? resting
-        : Offset.lerp(
-            origin - childSize.center(Offset.zero),
-            resting,
-            progress,
-          )!;
+    return Offset(x.clamp(left, right), y.clamp(top, bottom));
   }
 
   @override
@@ -174,7 +524,6 @@ class _MenuLayout extends SingleChildLayoutDelegate {
       anchor != oldDelegate.anchor ||
       padding != oldDelegate.padding ||
       maxWidth != oldDelegate.maxWidth ||
-      progress != oldDelegate.progress ||
       preferAbove != oldDelegate.preferAbove;
 }
 
@@ -188,8 +537,8 @@ class _MenuSurface extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final dark = theme.brightness == Brightness.dark;
-    return MornyeGlassPanel.overlay(
-      radius: 28,
+    Widget glass(double radius, Widget child) => MornyeGlassPanel.overlay(
+      radius: radius,
       smoothCorners: true,
       highlightBorder: true,
       highlightIntensity: 0.4,
@@ -203,6 +552,10 @@ class _MenuSurface extends StatelessWidget {
           : 0.80,
       child: child,
     );
+    final flight = _MenuFlight.maybeOf(context);
+    return flight == null
+        ? glass(28, child)
+        : _LiquidMenuGlass(flight: flight, glass: glass, child: child);
   }
 }
 

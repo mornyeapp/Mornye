@@ -990,6 +990,14 @@
   "@artistPopular": {
     "description": "Section header for popular/top tracks"
   },
+  "artistLatestRelease": "Latest Release",
+  "@artistLatestRelease": {
+    "description": "Artist page on desktop: heading above the newest album"
+  },
+  "artistTopSongs": "Top Songs",
+  "@artistTopSongs": {
+    "description": "Artist page on desktop: heading above the artist's best known songs"
+  },
   "artistMonthlyListeners": "{count} monthly listeners",
   "@artistMonthlyListeners": {
     "description": "Monthly listener count display",
@@ -8242,6 +8250,8 @@
   "autoMixOff": "AutoMix off",
   "autoplayOn": "Autoplay on",
   "autoplayOff": "Autoplay off",
+  "queueAutoplay": "Autoplay",
+  "queueAutoMix": "AutoMix",
   "autoplayFromLibrary": "Autoplay from your Library",
   "autoplayDescription": "Continue with related songs from your Library when the queue ends.",
   "autoplayPersonalization": "Personalized autoplay",

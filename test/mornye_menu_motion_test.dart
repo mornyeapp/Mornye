@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -84,7 +85,7 @@ void main() {
   }
 
   Rect visibleBounds(WidgetTester tester) {
-    final box = tester.renderObject<RenderBox>(find.byType(MornyeContextMenu));
+    final box = tester.renderObject<RenderBox>(find.byType(MornyeGlassPanel));
     return Rect.fromPoints(
       box.localToGlobal(Offset.zero),
       box.localToGlobal(box.size.bottomRight(Offset.zero)),
@@ -94,13 +95,17 @@ void main() {
   MornyeGlassPanel panel(WidgetTester tester) =>
       tester.widget<MornyeGlassPanel>(find.byType(MornyeGlassPanel));
 
+  /// The box the menu keeps throughout its flight.
+  Size resting(WidgetTester tester) =>
+      tester.renderObject<RenderBox>(find.byType(MornyeContextMenu)).size;
+
   Future<Color> surfaceColor(WidgetTester tester, GlobalKey capture) async =>
       (await tester.runAsync(() async {
         final boundary = tester.renderObject<RenderRepaintBoundary>(
           find.byKey(capture),
         );
         final menu = tester.renderObject<RenderBox>(
-          find.byType(MornyeContextMenu),
+          find.byType(MornyeGlassPanel),
         );
         final point = boundary.globalToLocal(
           menu.localToGlobal(Offset(12, menu.size.height / 2)),
@@ -131,26 +136,40 @@ void main() {
     ) async {
       final capture = GlobalKey();
       await open(tester, anchor, capture: capture);
+      // The second frame has measured the menu and placed the drop.
+      await tester.pump();
       final first = visibleBounds(tester);
       expect(first.center.dx, closeTo(anchor.center.dx, 0.01));
       expect(first.center.dy, closeTo(anchor.center.dy, 0.01));
-      expect(first.width, closeTo(320 * 0.16, 0.01));
+      expect(first.size, const Size.square(44));
+      expect(panel(tester).radius, 22, reason: 'a round drop at the control');
       expect(find.byType(BackdropFilter), findsOneWidget);
       final backdrop = tester.element(find.byType(BackdropFilter));
       await tester.pump(const Duration(milliseconds: 100));
       final flying = visibleBounds(tester);
       expect(flying.width, greaterThan(first.width));
       expect(flying.width, lessThan(320));
+      expect(
+        flying.height / resting(tester).height,
+        greaterThan(flying.width / 320),
+        reason: 'the height runs ahead of the width',
+      );
       expect(panel(tester).glassProgress, 1);
       expect(tester.element(find.byType(BackdropFilter)), same(backdrop));
       final openingColor = await surfaceColor(tester, capture);
       await tester.pump(const Duration(milliseconds: 140));
-      final resting = visibleBounds(tester);
-      expect(resting.width, closeTo(320, 0.01));
+      var widest = 0.0;
+      for (var frame = 0; frame < 24; frame++) {
+        await tester.pump(const Duration(milliseconds: 16));
+        widest = math.max(widest, visibleBounds(tester).width);
+      }
+      expect(widest, greaterThan(320), reason: 'the glass runs past its size');
+      expect(widest, lessThan(320 * 1.04));
       expect(panel(tester).glassProgress, 1);
       expect(tester.element(find.byType(BackdropFilter)), same(backdrop));
       await tester.pumpAndSettle();
-      expect(visibleBounds(tester), resting);
+      final resting_ = visibleBounds(tester);
+      expect(resting_.width, closeTo(320, 0.01));
       expect(panel(tester).glassProgress, 1);
       final settledColor = await surfaceColor(tester, capture);
       // The material keeps its tint while it grows. Only the modal barrier
@@ -158,10 +177,10 @@ void main() {
       expect(openingColor.r, closeTo(settledColor.r, 0.02));
       expect(openingColor.g, closeTo(settledColor.g, 0.02));
       expect(openingColor.b, closeTo(settledColor.b, 0.02));
-      expect(resting.left, greaterThanOrEqualTo(16));
-      expect(resting.right, lessThanOrEqualTo(374));
-      expect(resting.top, greaterThanOrEqualTo(40));
-      expect(resting.bottom, lessThanOrEqualTo(804));
+      expect(resting_.left, greaterThanOrEqualTo(16));
+      expect(resting_.right, lessThanOrEqualTo(374));
+      expect(resting_.top, greaterThanOrEqualTo(40));
+      expect(resting_.bottom, lessThanOrEqualTo(804));
       expect(panel(tester).smoothCorners, isTrue);
       expect(panel(tester).radius, 28);
       // The outside clip follows the same squircle as the lens and rim.

@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/l10n/app_localizations.dart';
+import 'package:mornye/models/theme_settings.dart';
 import 'package:mornye/theme/app_theme.dart';
 import 'package:mornye/theme/app_tokens.dart';
 import 'package:mornye/theme/mornye_theme.dart';
@@ -92,7 +93,7 @@ void main() {
       );
       expect(
         MornyeTheme.build(Brightness.dark).colorScheme.primary,
-        MornyeTheme.darkAccent,
+        MornyeTheme.accentColor(MornyeAccent.blue, Brightness.dark),
       );
     });
 

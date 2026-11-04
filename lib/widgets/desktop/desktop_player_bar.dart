@@ -198,7 +198,7 @@ class _MornyePlayerBar extends StatelessWidget {
               minimumSize: const Size.square(32),
               fixedSize: const Size.square(32),
               padding: EdgeInsets.zero,
-              iconSize: 17,
+              iconSize: 19,
               visualDensity: VisualDensity.compact,
             ),
           ),
@@ -570,10 +570,10 @@ class _SeekRow extends ConsumerWidget {
       data: SliderTheme.of(context).copyWith(
         trackHeight: dense ? 3 : 4,
         activeTrackColor: mornye
-            ? colorScheme.onSurface.withValues(alpha: 0.6)
+            ? colorScheme.onSurface.withValues(alpha: 0.85)
             : colorScheme.primary,
         inactiveTrackColor: mornye
-            ? colorScheme.onSurface.withValues(alpha: 0.12)
+            ? colorScheme.onSurface.withValues(alpha: 0.16)
             : colorScheme.secondaryContainer,
         thumbColor: dense ? colorScheme.onSurface : colorScheme.primary,
         thumbShape: RoundSliderThumbShape(enabledThumbRadius: dense ? 4 : 6),
@@ -651,7 +651,7 @@ class _MornyeLcd extends StatelessWidget {
                     child: _Artwork(
                       mediaItem: item,
                       size: _artworkSize,
-                      radius: context.tokens.radiusThumb - 4,
+                      radius: 5,
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -771,7 +771,10 @@ class _MornyeLcdLines extends ConsumerWidget {
           child: ExplicitTrackTitle(
             title: mediaItem.title,
             explicit: parseExplicitFlag(mediaItem.extras?['explicit']) == true,
-            style: style?.copyWith(fontWeight: FontWeight.w600),
+            style: style?.copyWith(
+              color: colorScheme.onSurface,
+              fontWeight: FontWeight.w600,
+            ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
@@ -792,7 +795,10 @@ class _MornyeLcdLines extends ConsumerWidget {
             maxCycles: 2,
             child: Text(
               subtitle,
-              style: style?.copyWith(color: colorScheme.onSurfaceVariant),
+              // Music's second line stays bright over the capsule's glass.
+              style: style?.copyWith(
+                color: colorScheme.onSurface.withValues(alpha: 0.78),
+              ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),

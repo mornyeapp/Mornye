@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/physics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:liquid_glass_easy/liquid_glass_easy.dart';
 import 'package:mornye/l10n/l10n.dart';
@@ -60,6 +61,15 @@ class MornyeChromeController extends ValueNotifier<bool> {
   }
 }
 
+/// The tabs' foreground leaves early, before the glass under it narrows past
+/// the outer tabs, and stays bounded while the spring overshoots.
+class _TabOpacity extends Animatable<double> {
+  const _TabOpacity();
+
+  @override
+  double transform(double t) => (1 - t / 0.45).clamp(0.0, 1.0);
+}
+
 /// A single mini-player survives the transition, preserving its artwork Hero,
 /// playback controls and track swipe gestures as the tabs fold away.
 class MornyeBottomBar extends ConsumerStatefulWidget {
@@ -88,16 +98,21 @@ class MornyeBottomBar extends ConsumerStatefulWidget {
 
 class _MornyeBottomBarState extends ConsumerState<MornyeBottomBar>
     with SingleTickerProviderStateMixin {
-  late final _controller = AnimationController(
+  // A spring keeps its velocity when a scroll reverses the fold mid-flight, and
+  // being slightly underdamped lets the glass run past its size and settle.
+  static const _foldSpring = SpringDescription(
+    mass: 1,
+    stiffness: 170,
+    damping: 20,
+  );
+
+  /// Runs past 0 and 1 by the spring's overshoot.
+  late final _controller = AnimationController.unbounded(
     vsync: this,
-    duration: const Duration(milliseconds: 380),
     value: widget.collapsed ? 1 : 0,
   );
-  late final _collapse = CurvedAnimation(
-    parent: _controller,
-    curve: Curves.easeInOutCubic,
-  );
-  late final _tabOpacity = ReverseAnimation(_collapse);
+  late double _target = widget.collapsed ? 1 : 0;
+  late final _tabOpacity = _controller.drive(const _TabOpacity());
   // Side capsules move between backdrop batches; keep their lenses mounted.
   final _leadingSurfaceKey = GlobalKey();
   final _searchSurfaceKey = GlobalKey();
@@ -105,10 +120,21 @@ class _MornyeBottomBarState extends ConsumerState<MornyeBottomBar>
   void _updateCollapse() {
     final target = widget.collapsed ? 1.0 : 0.0;
     if (MediaQuery.disableAnimationsOf(context)) {
+      _target = target;
       _controller.value = target;
-    } else {
-      _controller.animateTo(target);
+      return;
     }
+    if (target == _target) return;
+    _target = target;
+    _controller.animateWith(
+      SpringSimulation(
+        _foldSpring,
+        _controller.value,
+        target,
+        _controller.velocity,
+        snapToEnd: true,
+      ),
+    );
   }
 
   @override
@@ -125,7 +151,6 @@ class _MornyeBottomBarState extends ConsumerState<MornyeBottomBar>
 
   @override
   void dispose() {
-    _collapse.dispose();
     _controller.dispose();
     super.dispose();
   }
@@ -158,17 +183,14 @@ class _MornyeBottomBarState extends ConsumerState<MornyeBottomBar>
     // These contents do not depend on animation progress. Retain their widget
     // instances so folding only updates geometry and foreground opacity. A
     // backdrop inside a fading layer loses access to the page behind the bar.
-    Widget sideSurface(Key key) => ScaleTransition(
+    Widget sideSurface(Key key) => RepaintBoundary(
       key: key,
-      scale: _collapse,
-      child: RepaintBoundary(
-        child: MornyeGlass.navigation(
-          blurEnabled: blurEnabled,
-          strongTint: true,
-          tintOpacity: MornyeTheme.navigationOpacity(context),
-          radius: 26,
-          child: const SizedBox.expand(),
-        ),
+      child: MornyeGlass.navigation(
+        blurEnabled: blurEnabled,
+        strongTint: true,
+        tintOpacity: MornyeTheme.navigationOpacity(context),
+        radius: 26,
+        child: const SizedBox.expand(),
       ),
     );
     final leadingSurface = sideSurface(_leadingSurfaceKey);
@@ -189,6 +211,7 @@ class _MornyeBottomBarState extends ConsumerState<MornyeBottomBar>
           blurEnabled: blurEnabled,
           liquidGlass: liquidGlass,
           contentOpacity: _tabOpacity,
+          fold: _controller,
           hiddenIconIndices: hideMovingIcons
               ? {leadingIndex, destinations.length - 1}
               : const {},
@@ -226,9 +249,30 @@ class _MornyeBottomBarState extends ConsumerState<MornyeBottomBar>
                 destinations.length *
                 (index + 0.5);
         return AnimatedBuilder(
-          animation: _collapse,
+          animation: _controller,
           builder: (context, _) {
-            final amount = _collapse.value;
+            final fold = _controller.value;
+            // Layout stops at the ends; only the capsules take the overshoot.
+            // The snap keeps the wobble around 1 from reopening the tab bar.
+            final clamped = fold.clamp(0.0, 1.0);
+            final amount = clamped > 0.995
+                ? 1.0
+                : clamped < 0.005
+                ? 0.0
+                : clamped;
+            // A capsule grows quickly out of the bar, and stretches along its
+            // path with its speed, as a drop of glass does.
+            final grown =
+                math.pow(clamped, 0.6) * (1 + (fold - clamped).abs() * 2);
+            final stretch = (_controller.velocity.abs() * 0.045).clamp(
+              0.0,
+              0.28,
+            );
+            final drop = Matrix4.diagonal3Values(
+              grown * (1 + stretch),
+              grown * (1 - stretch * 0.6),
+              1,
+            );
             Widget movingIcon({
               required bool leading,
               required Widget surface,
@@ -254,12 +298,19 @@ class _MornyeBottomBarState extends ConsumerState<MornyeBottomBar>
                       children: [
                         Positioned.fill(
                           child: Offstage(
-                            offstage: amount == 0,
-                            // While folding, a capsule crosses the tab bar
-                            // and needs a backdrop sample of its own.
-                            child: amount == 1
-                                ? surface
-                                : LiquidGlassBatch(child: surface),
+                            // The tab bar's own glass becomes the leading
+                            // circle and hands over only once it is one.
+                            offstage: leading ? amount < 1 : amount == 0,
+                            child: Transform(
+                              alignment: Alignment.center,
+                              transform: drop,
+                              transformHitTests: false,
+                              // While folding, a capsule crosses the tab bar
+                              // and needs a backdrop sample of its own.
+                              child: amount == 1
+                                  ? surface
+                                  : LiquidGlassBatch(child: surface),
+                            ),
                           ),
                         ),
                         Material(
@@ -309,7 +360,28 @@ class _MornyeBottomBarState extends ConsumerState<MornyeBottomBar>
                   BackdropGroup(
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
+                      // Laid out top to bottom, but painted bottom first: the
+                      // player settles in front of the shrinking tab bar.
+                      verticalDirection: VerticalDirection.up,
                       children: [
+                        Offstage(
+                          // Retain tab state, but drop its backdrop layers only
+                          // after the last visible frame of the fold.
+                          offstage: amount == 1,
+                          // Unclipped: the bar's glass narrows and shortens
+                          // into the leading circle as one shape.
+                          child: Align(
+                            alignment: Alignment.bottomCenter,
+                            heightFactor: 1 - amount,
+                            child: IgnorePointer(
+                              ignoring: amount > 0.5,
+                              child: ExcludeSemantics(
+                                excluding: amount > 0.5,
+                                child: amount == 0 ? fullTabs : foldingTabs,
+                              ),
+                            ),
+                          ),
+                        ),
                         if (hasPlayer || amount > 0)
                           Align(
                             alignment: Alignment.bottomCenter,
@@ -337,27 +409,6 @@ class _MornyeBottomBarState extends ConsumerState<MornyeBottomBar>
                               ),
                             ),
                           ),
-                        Offstage(
-                          // Retain tab state, but drop its backdrop layers only
-                          // after the last visible frame of the fold.
-                          offstage: amount == 1,
-                          child: ClipRect(
-                            clipBehavior: amount == 0
-                                ? Clip.none
-                                : Clip.hardEdge,
-                            child: Align(
-                              alignment: Alignment.bottomCenter,
-                              heightFactor: 1 - amount,
-                              child: IgnorePointer(
-                                ignoring: amount > 0.5,
-                                child: ExcludeSemantics(
-                                  excluding: amount > 0.5,
-                                  child: amount == 0 ? fullTabs : foldingTabs,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
                       ],
                     ),
                   ),

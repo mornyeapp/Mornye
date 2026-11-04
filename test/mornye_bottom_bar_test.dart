@@ -143,7 +143,8 @@ void main() {
     (tester) async {
       await pumpShell(tester, blur: true, liquidGlass: false);
       void expectSharedBackdrop({
-        int movingSurfaces = 2,
+        // The search capsule crosses the bar; the leading circle is the bar.
+        int movingSurfaces = 1,
         int sharedSurfaces = 2,
       }) {
         final filters = find.descendant(
@@ -177,7 +178,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 190));
       expectSharedBackdrop();
       await tester.pumpAndSettle();
-      expectSharedBackdrop(sharedSurfaces: 1);
+      expectSharedBackdrop(movingSurfaces: 2, sharedSurfaces: 1);
       expect(tester.takeException(), isNull);
     },
   );
@@ -211,26 +212,26 @@ void main() {
         await tester.pump(const Duration(milliseconds: 190));
         final folding = lenses();
         final foldingKeys = keys(folding);
-        expect(foldingKeys, hasLength(withPlayer ? 4 : 3));
-        // The capsules cross the tabs, so each samples on its own.
-        expect(foldingKeys.toSet(), hasLength(3));
+        expect(foldingKeys, hasLength(withPlayer ? 3 : 2));
+        // The search capsule crosses the tabs, so it samples on its own.
+        expect(foldingKeys.toSet(), hasLength(2));
         expect(
           foldingKeys.where(expanded.contains),
-          hasLength(folding.length - 2),
+          hasLength(folding.length - 1),
         );
 
         await tester.pumpAndSettle();
         final resting = lenses();
         expect(resting, hasLength(withPlayer ? 3 : 2));
         expect(keys(resting).toSet(), expanded.toSet());
-        // Switching batches reparents the capsule lenses instead of
-        // rebuilding them.
-        expect(resting.every(folding.contains), isTrue);
+        // Switching batches reparents the search capsule's lens instead of
+        // rebuilding it. The leading circle takes over from the bar only here.
+        expect(resting.where(folding.contains), hasLength(withPlayer ? 2 : 1));
 
         chrome.expand();
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 190));
-        expect(keys(lenses()).toSet(), hasLength(3));
+        expect(keys(lenses()).toSet(), hasLength(2));
         await tester.pumpAndSettle();
         expect(keys(lenses()), expanded);
         expect(tester.takeException(), isNull);
@@ -291,9 +292,13 @@ void main() {
           await tester.pump();
           if (collapsed) {
             await tester.pump(const Duration(milliseconds: 190));
+            // The bar has narrowed past the middle by now.
             await expectBlur(
-              capsuleSample,
-              'Capsule halfway to collapsed=$collapsed',
+              tester.getCenter(
+                    find.byKey(const ValueKey('mornye-compact-leading')),
+                  ) +
+                  const Offset(0, 18),
+              'Bar halfway to collapsed=$collapsed',
             );
           }
           // Sample below the icons once the growing circles are large enough to
@@ -304,8 +309,9 @@ void main() {
             'mornye-compact-search',
           ]) {
             final center = tester.getCenter(find.byKey(ValueKey(key)));
+            // Just under the icon: a fast circle is squashed along its travel.
             await expectBlur(
-              center + const Offset(0, 18),
+              center + const Offset(0, 14),
               '$key moving to collapsed=$collapsed',
             );
           }

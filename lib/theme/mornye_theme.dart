@@ -11,7 +11,7 @@ import 'package:mornye/theme/app_tokens.dart';
 class MornyeTheme extends ThemeExtension<MornyeTheme> {
   const MornyeTheme({
     this.chromeSurface,
-    this.accent = MornyeAccent.red,
+    this.accent = MornyeAccent.blue,
     this.useSystemFont = false,
     this.fontFamily,
     this.glassClarity = kDefaultMornyeGlassClarity,
@@ -85,6 +85,8 @@ class MornyeTheme extends ThemeExtension<MornyeTheme> {
     };
     // Accents also label links and small controls on white surfaces.
     if (!dark && accent == MornyeAccent.green) return const Color(0xff24863d);
+    // The system high contrast blue reads navy; this one still clears 4.5:1.
+    if (!dark && accent == MornyeAccent.blue) return const Color(0xff0071e3);
     return dark ? color.darkColor : color.highContrastColor;
   }
 
@@ -130,7 +132,7 @@ class MornyeTheme extends ThemeExtension<MornyeTheme> {
   static ThemeData build(
     Brightness brightness, {
     Color? chromeSurface,
-    MornyeAccent accent = MornyeAccent.red,
+    MornyeAccent accent = MornyeAccent.blue,
     bool useSystemFont = false,
     String? fontFamily,
     double glassClarity = kDefaultMornyeGlassClarity,
@@ -229,7 +231,7 @@ class MornyeTheme extends ThemeExtension<MornyeTheme> {
     return build(
       brightness ?? theme.brightness,
       chromeSurface: chromeSurface,
-      accent: preferences?.accent ?? MornyeAccent.red,
+      accent: preferences?.accent ?? MornyeAccent.blue,
       useSystemFont: preferences?.useSystemFont ?? false,
       fontFamily: preferences?.fontFamily,
       glassClarity: preferences?.glassClarity ?? kDefaultMornyeGlassClarity,

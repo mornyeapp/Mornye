@@ -1,4 +1,4 @@
-import 'dart:ui' show ImageFilter;
+import 'dart:ui' show ImageFilter, lerpDouble;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -577,7 +577,11 @@ class MornyeTabBar extends ConsumerWidget {
     this.liquidGlass = true,
     this.hiddenIconIndices = const {},
     this.contentOpacity = const AlwaysStoppedAnimation(1),
+    this.fold = const AlwaysStoppedAnimation(0),
   });
+
+  /// Side of the circle the glass folds into.
+  static const double foldedSize = 52;
 
   final List<NavigationDestination> destinations;
   final int selectedIndex;
@@ -588,6 +592,10 @@ class MornyeTabBar extends ConsumerWidget {
 
   /// Fade only the foreground so the backdrop can keep sampling the page.
   final Animation<double> contentOpacity;
+
+  /// From 0, the full bar, to 1, the glass narrowed into a leading circle of
+  /// [foldedSize]. It may overshoot, which makes the shape wobble as it lands.
+  final Animation<double> fold;
 
   /// The floating layout also supplies the coordinates for collapsing icons.
   static bool usesLiquidGlass(
@@ -638,12 +646,36 @@ class MornyeTabBar extends ConsumerWidget {
               child: Transform.scale(
                 scaleX: 1 + 0.025 * progress,
                 scaleY: 1 + 0.06 * progress,
-                child: MornyeGlass.navigation(
-                  blurEnabled: blurEnabled,
-                  strongTint: true,
-                  tintOpacity: MornyeTheme.navigationOpacity(context),
-                  refractionDepth: 0.45 + 0.15 * progress,
-                  child: const SizedBox.expand(),
+                child: LayoutBuilder(
+                  builder: (context, constraints) => AnimatedBuilder(
+                    animation: fold,
+                    builder: (context, _) {
+                      final amount = fold.value;
+                      return Align(
+                        alignment: AlignmentDirectional.bottomStart,
+                        child: SizedBox(
+                          width: lerpDouble(
+                            constraints.maxWidth,
+                            foldedSize,
+                            amount,
+                          ),
+                          height: lerpDouble(
+                            constraints.maxHeight,
+                            foldedSize,
+                            amount,
+                          ),
+                          child: MornyeGlass.navigation(
+                            blurEnabled: blurEnabled,
+                            strongTint: true,
+                            tintOpacity: MornyeTheme.navigationOpacity(context),
+                            refractionDepth: 0.45 + 0.15 * progress,
+                            radius: lerpDouble(32, foldedSize / 2, amount)!,
+                            child: const SizedBox.expand(),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
                 ),
               ),
             ),

@@ -201,7 +201,8 @@ void main() {
           ),
       ];
       await _pumpArtist(tester, mornye: mornye, albums: albums);
-      final shelf = find.byType(DesktopScrollArrows);
+      // Mornye's highlights row scrolls too; the albums are the last shelf.
+      final shelf = find.byType(DesktopScrollArrows).last;
       final list = find.descendant(of: shelf, matching: find.byType(ListView));
       final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
       addTearDown(mouse.removePointer);

@@ -231,10 +231,15 @@ void main() {
       expect(decoded.useSystemFont, isTrue);
       expect(copied.useSystemFont, isTrue);
       expect(ThemeSettings.fromJson({}).useSystemFont, isFalse);
-      expect(ThemeSettings.fromJson({}).mornyeAccent, MornyeAccent.red);
+      expect(ThemeSettings.fromJson({}).mornyeAccent, MornyeAccent.blue);
       expect(
         ThemeSettings.fromJson({kMornyeAccentKey: 'unknown'}).mornyeAccent,
+        MornyeAccent.blue,
+      );
+      expect(
+        ThemeSettings.fromJson({kMornyeAccentKey: 'red'}).mornyeAccent,
         MornyeAccent.red,
+        reason: 'a saved choice stays',
       );
       expect(
         ThemeSettings.fromJson({'theme_mode': 'invalid'}).themeMode,

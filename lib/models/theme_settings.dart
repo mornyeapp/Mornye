@@ -46,7 +46,7 @@ enum MornyeAccent { red, orange, green, teal, blue, purple, pink }
 MornyeAccent mornyeAccentFromString(String? value) =>
     MornyeAccent.values.firstWhere(
       (accent) => accent.name == value,
-      orElse: () => MornyeAccent.red,
+      orElse: () => MornyeAccent.blue,
     );
 
 /// Style used until the person picks one: Mornye on macOS, Material on
@@ -84,7 +84,7 @@ class ThemeSettings {
     this.seedColorValue = kDefaultSeedColor,
     this.useAmoled = false,
     this.style = AppThemeStyle.material,
-    this.mornyeAccent = MornyeAccent.red,
+    this.mornyeAccent = MornyeAccent.blue,
     this.useSystemFont = false,
     this.customFontId = '',
     this.customFontName = '',

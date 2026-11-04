@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
+import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/widgets/player_queue_artwork.dart';
 import 'package:mornye/widgets/player_queue_dismissible.dart';
 
@@ -64,6 +65,38 @@ class MornyePlayerQueue extends ConsumerWidget {
       ),
     );
 
+    // Music on the Mac: shuffle and repeat live in the player capsule, so the
+    // panel keeps only the two wide, labelled queue modes.
+    Widget desktopModeButton({
+      required IconData icon,
+      required String label,
+      required String stateLabel,
+      required bool selected,
+      required VoidCallback onPressed,
+    }) => Expanded(
+      child: Semantics(
+        selected: selected,
+        label: stateLabel,
+        excludeSemantics: true,
+        button: true,
+        child: FilledButton.icon(
+          style: FilledButton.styleFrom(
+            backgroundColor: Colors.white.withValues(
+              alpha: selected ? 0.82 : 0.12,
+            ),
+            foregroundColor: selected ? Colors.black : Colors.white,
+            minimumSize: const Size(0, 36),
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            shape: const StadiumBorder(),
+            textStyle: Theme.of(context).textTheme.bodyMedium,
+          ),
+          onPressed: onPressed,
+          icon: Icon(icon, size: 20),
+          label: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
+        ),
+      ),
+    );
+
     return CustomScrollView(
       key: const PageStorageKey('mornye-player-queue'),
       slivers: [
@@ -73,56 +106,87 @@ class MornyePlayerQueue extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    modeButton(
-                      icon: CupertinoIcons.arrow_merge,
-                      label: autoMix
-                          ? context.l10n.autoMixOn
-                          : context.l10n.autoMixOff,
-                      selected: autoMix,
-                      onPressed: () => ref
-                          .read(settingsProvider.notifier)
-                          .setAutoMix(!autoMix),
-                    ),
-                    const SizedBox(width: 12),
-                    modeButton(
-                      icon: CupertinoIcons.shuffle,
-                      label: playback.shuffle
-                          ? context.l10n.nowPlayingShuffleOn
-                          : context.l10n.nowPlayingPlayInOrder,
-                      selected: playback.shuffle,
-                      onPressed: () => controller.setShuffle(!playback.shuffle),
-                    ),
-                    const SizedBox(width: 12),
-                    modeButton(
-                      icon: playback.repeat == AudioServiceRepeatMode.one
-                          ? CupertinoIcons.repeat_1
-                          : CupertinoIcons.repeat,
-                      label: repeatLabel,
-                      selected: playback.repeat != AudioServiceRepeatMode.none,
-                      onPressed: () =>
-                          controller.setRepeatMode(switch (playback.repeat) {
-                            AudioServiceRepeatMode.none =>
-                              AudioServiceRepeatMode.all,
-                            AudioServiceRepeatMode.all =>
-                              AudioServiceRepeatMode.one,
-                            _ => AudioServiceRepeatMode.none,
-                          }),
-                    ),
-                    const SizedBox(width: 12),
-                    modeButton(
-                      icon: CupertinoIcons.infinite,
-                      label: autoplay
-                          ? context.l10n.autoplayOn
-                          : context.l10n.autoplayOff,
-                      selected: autoplay,
-                      onPressed: () => ref
-                          .read(settingsProvider.notifier)
-                          .setAutoplay(!autoplay),
-                    ),
-                  ],
-                ),
+                if (isDesktopPlatform)
+                  Row(
+                    children: [
+                      desktopModeButton(
+                        icon: CupertinoIcons.infinite,
+                        label: context.l10n.queueAutoplay,
+                        stateLabel: autoplay
+                            ? context.l10n.autoplayOn
+                            : context.l10n.autoplayOff,
+                        selected: autoplay,
+                        onPressed: () => ref
+                            .read(settingsProvider.notifier)
+                            .setAutoplay(!autoplay),
+                      ),
+                      const SizedBox(width: 12),
+                      desktopModeButton(
+                        icon: CupertinoIcons.arrow_merge,
+                        label: context.l10n.queueAutoMix,
+                        stateLabel: autoMix
+                            ? context.l10n.autoMixOn
+                            : context.l10n.autoMixOff,
+                        selected: autoMix,
+                        onPressed: () => ref
+                            .read(settingsProvider.notifier)
+                            .setAutoMix(!autoMix),
+                      ),
+                    ],
+                  )
+                else
+                  Row(
+                    children: [
+                      modeButton(
+                        icon: CupertinoIcons.arrow_merge,
+                        label: autoMix
+                            ? context.l10n.autoMixOn
+                            : context.l10n.autoMixOff,
+                        selected: autoMix,
+                        onPressed: () => ref
+                            .read(settingsProvider.notifier)
+                            .setAutoMix(!autoMix),
+                      ),
+                      const SizedBox(width: 12),
+                      modeButton(
+                        icon: CupertinoIcons.shuffle,
+                        label: playback.shuffle
+                            ? context.l10n.nowPlayingShuffleOn
+                            : context.l10n.nowPlayingPlayInOrder,
+                        selected: playback.shuffle,
+                        onPressed: () =>
+                            controller.setShuffle(!playback.shuffle),
+                      ),
+                      const SizedBox(width: 12),
+                      modeButton(
+                        icon: playback.repeat == AudioServiceRepeatMode.one
+                            ? CupertinoIcons.repeat_1
+                            : CupertinoIcons.repeat,
+                        label: repeatLabel,
+                        selected:
+                            playback.repeat != AudioServiceRepeatMode.none,
+                        onPressed: () =>
+                            controller.setRepeatMode(switch (playback.repeat) {
+                              AudioServiceRepeatMode.none =>
+                                AudioServiceRepeatMode.all,
+                              AudioServiceRepeatMode.all =>
+                                AudioServiceRepeatMode.one,
+                              _ => AudioServiceRepeatMode.none,
+                            }),
+                      ),
+                      const SizedBox(width: 12),
+                      modeButton(
+                        icon: CupertinoIcons.infinite,
+                        label: autoplay
+                            ? context.l10n.autoplayOn
+                            : context.l10n.autoplayOff,
+                        selected: autoplay,
+                        onPressed: () => ref
+                            .read(settingsProvider.notifier)
+                            .setAutoplay(!autoplay),
+                      ),
+                    ],
+                  ),
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   child: Column(

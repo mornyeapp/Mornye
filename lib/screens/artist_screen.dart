@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
@@ -708,19 +709,36 @@ class _ArtistScreenState extends ConsumerState<ArtistScreen>
                             ),
                           ),
                         if (!_isLoadingDiscography && _error == null) ...[
-                          if (context.isMornye &&
-                              albums.isNotEmpty &&
-                              !isSelectionMode)
-                            SliverToBoxAdapter(
-                              child: _buildMornyeFeaturedAlbum(
-                                context,
-                                albums.first,
+                          if (isDesktopPlatform && context.isMornye)
+                            if (albums.isNotEmpty ||
+                                (_topTracks?.isNotEmpty ?? false))
+                              SliverToBoxAdapter(
+                                child: _buildMornyeDesktopHighlights(
+                                  context,
+                                  colorScheme,
+                                  isSelectionMode ? null : albums.firstOrNull,
+                                ),
+                              )
+                            else
+                              const SliverToBoxAdapter()
+                          else ...[
+                            if (context.isMornye &&
+                                albums.isNotEmpty &&
+                                !isSelectionMode)
+                              SliverToBoxAdapter(
+                                child: _buildMornyeFeaturedAlbum(
+                                  context,
+                                  albums.first,
+                                ),
                               ),
-                            ),
-                          if (_topTracks != null && _topTracks!.isNotEmpty)
-                            SliverToBoxAdapter(
-                              child: _buildPopularSection(context, colorScheme),
-                            ),
+                            if (_topTracks != null && _topTracks!.isNotEmpty)
+                              SliverToBoxAdapter(
+                                child: _buildPopularSection(
+                                  context,
+                                  colorScheme,
+                                ),
+                              ),
+                          ],
                           if (releases.isNotEmpty)
                             SliverToBoxAdapter(
                               key: const ValueKey('artist-releases'),
