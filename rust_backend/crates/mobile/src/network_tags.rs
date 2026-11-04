@@ -24,13 +24,26 @@ const DEADLINE: Duration = Duration::from_secs(20);
 
 fn proxy_session(url: &str, timeout: Duration) -> Result<NetworkSession, String> {
     let parsed = UrlParts::parse(url).ok_or("invalid network proxy URL")?;
-    let token = parsed.path.strip_prefix(b"/").unwrap_or_default();
+    // Playback routes carry an optional file-type hint for native players.
+    let mut route = parsed
+        .path
+        .strip_prefix(b"/")
+        .unwrap_or_default()
+        .splitn(2, |byte| *byte == b'.');
+    let token = route.next().unwrap_or_default();
+    let valid_suffix = route.next().is_none_or(|suffix| {
+        (1..=10).contains(&suffix.len())
+            && suffix
+                .iter()
+                .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit())
+    });
     if parsed.scheme != "http"
         || parsed.hostname != "127.0.0.1"
         || parsed.port.is_none()
         || parsed.has_credentials
         || !parsed.raw_query.is_empty()
         || !parsed.fragment.is_empty()
+        || !valid_suffix
         || token.len() != 48
         || !token.iter().all(u8::is_ascii_hexdigit)
     {
@@ -616,6 +629,39 @@ mod tests {
         .concat()
     }
     #[test]
+    fn accepts_proxy_routes_with_or_without_file_type_hints() {
+        for suffix in ["", ".flac", ".mp3", ".m4a", ".opus", ".a123456789"] {
+            let url = format!("http://127.0.0.1:12345/{}{suffix}", "a".repeat(48));
+            assert!(proxy_session(&url, DEADLINE).is_ok(), "rejected {suffix:?}");
+        }
+    }
+
+    #[test]
+    fn file_type_hints_preserve_proxy_url_restrictions() {
+        let token = "a".repeat(48);
+        for url in [
+            format!("http://127.0.0.1:80/{}g.flac", "a".repeat(47)),
+            format!("http://127.0.0.1:80/{}.flac", "a".repeat(47)),
+            format!("http://127.0.0.1:80/{}.flac", "a".repeat(49)),
+            format!("http://127.0.0.1:80/{token}."),
+            format!("http://127.0.0.1:80/{token}.abcdefghijk"),
+            format!("http://127.0.0.1:80/{token}.flac.extra"),
+            format!("http://127.0.0.1:80/{token}.flac/extra"),
+            format!("http://127.0.0.1:80/{token}.fl-ac"),
+            format!("http://127.0.0.1:80/{token}.FLAC"),
+            format!("http://127.0.0.1:80/{token}.flac?query=value"),
+            format!("http://127.0.0.1:80/{token}.flac#fragment"),
+            format!("http://user:password@127.0.0.1:80/{token}.flac"),
+            format!("http://127.0.0.1/{token}.flac"),
+            format!("https://127.0.0.1:80/{token}.flac"),
+            format!("http://192.168.1.1:80/{token}.flac"),
+            format!("http://example.test:80/{token}.flac"),
+        ] {
+            assert!(proxy_session(&url, DEADLINE).is_err(), "accepted {url}");
+        }
+    }
+
+    #[test]
     fn fixture_does_not_respond_to_abandoned_connections() {
         let fixture = Fixture::new(b"abc".to_vec(), false);
         let address = fixture
@@ -752,15 +798,40 @@ mod tests {
         .unwrap();
         data.resize(32 * 1024 * 1024, 0);
         let fixture = Fixture::new(data, true);
-        let tags = read(&fixture.url, "song.flac", &|| Ok(())).unwrap();
-        assert_eq!(tags["title"], "Title");
-        assert_eq!(tags["artist"], "Artist");
-        assert_eq!(tags["lyrics"], fields["lyrics"]);
-        assert_eq!(
-            tags["cover_base64"],
-            base64::engine::general_purpose::STANDARD.encode(cover.data)
-        );
-        assert!(fixture.bytes.load(Ordering::Relaxed) < 1024 * 1024);
+        for suffix in ["", ".flac"] {
+            let before = fixture.bytes.load(Ordering::Relaxed);
+            let url = format!("{}{suffix}", fixture.url);
+            let tags = read(&url, "song.flac", &|| Ok(())).unwrap();
+            assert_eq!(tags["title"], "Title");
+            assert_eq!(tags["artist"], "Artist");
+            assert_eq!(tags["lyrics"], fields["lyrics"]);
+            assert_eq!(
+                tags["cover_base64"],
+                base64::engine::general_purpose::STANDARD.encode(&cover.data)
+            );
+            let cache = tempfile::tempdir().unwrap();
+            let response = crate::data_jobs::run_native_data_job(
+                json!({
+                    "operation": "network_metadata", "url": url,
+                    "display_name": "song.flac", "cache_directory": cache.path()
+                })
+                .to_string(),
+                vec![],
+                None,
+            )
+            .unwrap();
+            let response: Value = serde_json::from_str(&response).unwrap();
+            assert_eq!(response["cacheable"], true);
+            let cached = &response["metadata"];
+            assert_eq!(cached["title"], "Title");
+            assert_eq!(cached["lyrics"], fields["lyrics"]);
+            assert!(cached.get("cover_base64").is_none());
+            assert_eq!(
+                fs::read(cached["cover_path"].as_str().unwrap()).unwrap(),
+                cover.data
+            );
+            assert!(fixture.bytes.load(Ordering::Relaxed) - before < 1024 * 1024);
+        }
     }
     #[test]
     fn seeks_past_audio_to_mp4_tail_tags() {

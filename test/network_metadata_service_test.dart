@@ -75,7 +75,10 @@ void main() {
               final args = call.arguments as Map;
               final request = jsonDecode(args['request_json'] as String) as Map;
               expect(request['operation'], 'network_metadata');
-              expect(request['url'], startsWith('http://127.0.0.1:'));
+              expect(
+                request['url'],
+                matches(r'^http://127\.0\.0\.1:\d+/[a-f0-9]{48}\.flac$'),
+              );
               expect(
                 request['cache_directory'],
                 '${directory.path}/network_metadata',
