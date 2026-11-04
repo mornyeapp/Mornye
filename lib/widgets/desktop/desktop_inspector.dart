@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
@@ -9,6 +10,7 @@ import 'package:mornye/controllers/player_metadata_controller.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/lyrics_translation_provider.dart';
 import 'package:mornye/providers/music_player_provider.dart';
+import 'package:mornye/providers/runtime_profile_provider.dart';
 import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/playback_seek_preview.dart';
@@ -28,6 +30,9 @@ enum DesktopInspectorPanel { lyrics, upNext }
 
 /// Width of the trailing inspector.
 const double desktopInspectorWidth = 340;
+
+/// Width of Mornye's floating glass inspector, as slim as Music's.
+const double mornyeGlassInspectorWidth = 260;
 
 /// Window width from which the inspector sits beside the content pane.
 /// Narrower windows show it as a panel over the content.
@@ -82,27 +87,29 @@ void closeDesktopNowPlaying() {
 }
 
 /// Whether the inspector floats over the content in a window [windowWidth]
-/// wide.
-bool desktopInspectorOverlays(double windowWidth) =>
-    windowWidth < desktopInspectorBesideBreakpoint;
+/// wide. Mornye's floats at any width, as Music's glass panel does, until the
+/// window goes full screen.
+bool desktopInspectorOverlays(double windowWidth, {required bool mornye}) =>
+    windowWidth < desktopInspectorBesideBreakpoint ||
+    (mornye && !desktopWindowFullScreen.value);
 
 /// Whether Escape or Back has a player layer to close in a window
 /// [windowWidth] wide.
-bool canDismissDesktopPlayerLayer(double windowWidth) =>
+bool canDismissDesktopPlayerLayer(double windowWidth, {required bool mornye}) =>
     desktopNowPlayingOpen.value ||
     (desktopInspectorPanel.value != null &&
-        desktopInspectorOverlays(windowWidth));
+        desktopInspectorOverlays(windowWidth, mornye: mornye));
 
 /// Closes the top player layer: Now Playing, which covers the window, then
 /// the inspector while it floats over the content. Returns whether a layer
 /// closed.
-bool dismissDesktopPlayerLayer(double windowWidth) {
+bool dismissDesktopPlayerLayer(double windowWidth, {required bool mornye}) {
   if (desktopNowPlayingOpen.value) {
     closeDesktopNowPlaying();
     return true;
   }
   if (desktopInspectorPanel.value != null &&
-      desktopInspectorOverlays(windowWidth)) {
+      desktopInspectorOverlays(windowWidth, mornye: mornye)) {
     desktopInspectorPanel.value = null;
     return true;
   }
@@ -140,6 +147,7 @@ class DesktopInspector extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final mornye = context.isMornye;
+    final glass = mornye && overlay;
     final l10n = context.l10n;
     final mediaItem = ref.watch(currentMediaItemProvider).value;
     final title = switch (panel) {
@@ -158,8 +166,9 @@ class DesktopInspector extends ConsumerWidget {
                 header: true,
                 child: Text(
                   title,
-                  style: Theme.of(context).textTheme.titleMedium
-                      ?.copyWith(fontWeight: FontWeight.w600),
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -183,8 +192,9 @@ class DesktopInspector extends ConsumerWidget {
             child: Text(
               l10n.nowPlayingNothingPlaying,
               textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium
-                  ?.copyWith(color: colorScheme.onSurfaceVariant),
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
             ),
           ),
         );
@@ -198,6 +208,10 @@ class DesktopInspector extends ConsumerWidget {
                 ? MornyePlayerQueue(colorScheme: colorScheme)
                 : DesktopMaterialQueue(colorScheme: colorScheme),
         };
+      }
+      // Music's glass panel has no title bar: the capsule's toggles close it.
+      if (glass) {
+        return Padding(padding: const EdgeInsets.only(top: 12), child: body);
       }
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -216,12 +230,27 @@ class DesktopInspector extends ConsumerWidget {
         context,
         brightness: Brightness.dark,
       );
+      final blur = ref.watch(mornyeBlurEnabledProvider);
       panelSurface = Theme(
         data: theme,
         child: Stack(
           fit: StackFit.expand,
           children: [
-            MornyePlayerBackground(artUri: mediaItem?.artUri),
+            // Floating over the content it is Music's glass, which shows
+            // what passes beneath it; full screen keeps the artwork.
+            if (overlay) ...[
+              if (blur)
+                BackdropFilter(
+                  filter: ui.ImageFilter.blur(sigmaX: 60, sigmaY: 60),
+                  child: const SizedBox.expand(),
+                ),
+              ColoredBox(
+                color: const Color(
+                  0xff363636,
+                ).withValues(alpha: blur ? 0.74 : 0.97),
+              ),
+            ] else
+              MornyePlayerBackground(artUri: mediaItem?.artUri),
             Material(
               type: MaterialType.transparency,
               child: Builder(builder: content),
@@ -248,10 +277,16 @@ class DesktopInspector extends ConsumerWidget {
       label: title,
       child: Container(
         key: ValueKey('desktop-inspector-${panel.name}'),
-        width: desktopInspectorWidth,
+        width: glass ? mornyeGlassInspectorWidth : desktopInspectorWidth,
         clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
-          border: overlay ? null : BorderDirectional(start: divider),
+          border: overlay && !mornye
+              ? null
+              : BorderDirectional(
+                  start: overlay
+                      ? BorderSide(color: Colors.white.withValues(alpha: 0.1))
+                      : divider,
+                ),
           // The shadow falls toward the content the pane floats over.
           boxShadow: overlay
               ? [
@@ -380,9 +415,13 @@ class _DesktopInspectorTransitionState extends State<DesktopInspectorTransition>
         // width, but never below nothing.
         final value = math.max(0.0, _curve.transform(_controller.value));
         if (widget.overlay) {
+          final translation = Offset((1 - value) * (rtl ? -1 : 1), 0);
+          // An opacity layer would hide the backdrop from Mornye's glass.
           return FractionalTranslation(
-            translation: Offset((1 - value) * (rtl ? -1 : 1), 0),
-            child: Opacity(opacity: value.clamp(0.0, 1.0), child: child),
+            translation: translation,
+            child: context.isMornye
+                ? child
+                : Opacity(opacity: value.clamp(0.0, 1.0), child: child),
           );
         }
         return ClipRect(

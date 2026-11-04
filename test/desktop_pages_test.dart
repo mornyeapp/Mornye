@@ -280,7 +280,9 @@ void main() {
         await tester.pumpAndSettle();
       }
 
-      testWidgets('sits beside the content at 1400', (tester) async {
+      testWidgets('sits beside the content at 1400, or floats in Mornye', (
+        tester,
+      ) async {
         await pumpShell(tester, 1400);
         final lyrics = find.byKey(const ValueKey('desktop-inspector-lyrics'));
         expect(lyrics, findsNothing);
@@ -288,29 +290,58 @@ void main() {
         await tester.tap(find.byKey(const ValueKey('desktop-player-lyrics')));
         await tester.pumpAndSettle();
         expect(lyrics, findsOneWidget);
-        expect(tester.getSize(lyrics).width, desktopInspectorWidth);
-        final content = tester.getRect(find.text('content'));
-        expect(content.right, lessThan(tester.getRect(lyrics).left));
+        expect(
+          tester.getSize(lyrics).width,
+          mornye ? mornyeGlassInspectorWidth : desktopInspectorWidth,
+        );
+        final content = tester.getRect(
+          find.ancestor(
+            of: find.text('content'),
+            matching: find.byType(Center),
+          ),
+        );
+        if (mornye) {
+          // The glass runs the window's height over a pane that stays put.
+          expect(content.right, 1400);
+          expect(tester.getRect(lyrics).height, 800);
+        } else {
+          expect(content.right, tester.getRect(lyrics).left);
+        }
 
         await pressShortcut(tester, LogicalKeyboardKey.keyU);
         expect(lyrics, findsNothing);
-        expect(
-          find.byKey(const ValueKey('desktop-inspector-upNext')),
-          findsOneWidget,
-        );
-        // Escape leaves an inspector that sits beside the content open.
+        final upNext = find.byKey(const ValueKey('desktop-inspector-upNext'));
+        expect(upNext, findsOneWidget);
+        // Escape closes a floating inspector and leaves one beside the
+        // content open.
         await tester.sendKeyEvent(LogicalKeyboardKey.escape);
         await tester.pumpAndSettle();
-        expect(
-          find.byKey(const ValueKey('desktop-inspector-upNext')),
-          findsOneWidget,
-        );
+        expect(upNext, mornye ? findsNothing : findsOneWidget);
 
-        await tester.tap(find.byKey(const ValueKey('desktop-player-up-next')));
-        await tester.pumpAndSettle();
+        if (!mornye) {
+          await tester.tap(
+            find.byKey(const ValueKey('desktop-player-up-next')),
+          );
+          await tester.pumpAndSettle();
+        }
         expect(desktopInspectorPanel.value, isNull);
         expect(tester.takeException(), isNull);
       });
+
+      if (mornye) {
+        testWidgets('a full screen window puts the panel beside the content', (
+          tester,
+        ) async {
+          desktopWindowFullScreen.value = true;
+          addTearDown(() => desktopWindowFullScreen.value = false);
+          await pumpShell(tester, 1400);
+          await pressShortcut(tester, LogicalKeyboardKey.keyU);
+          final upNext = find.byKey(const ValueKey('desktop-inspector-upNext'));
+          expect(tester.getSize(upNext).width, desktopInspectorWidth);
+          expect(tester.getRect(upNext).height, 800);
+          expect(tester.takeException(), isNull);
+        });
+      }
 
       testWidgets('floats over the content at 1000', (tester) async {
         await pumpShell(tester, 1000);

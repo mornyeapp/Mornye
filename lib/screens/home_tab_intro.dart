@@ -24,6 +24,10 @@ double _homeMixCoverSizeOf(BuildContext context) =>
 
 double _homeShelfRadiusOf(BuildContext context) => context.isMornye ? 10 : 20;
 
+/// Whether Home sets its text at Music's smaller Mac sizes.
+bool _homeMusicText(BuildContext context) =>
+    context.isMornye && isDesktopPlatform;
+
 typedef HomeRecentlyAdded = ({List<UnifiedLibraryItem> items, int trackCount});
 
 /// The newest downloaded and scanned tracks, with the Library's track count
@@ -566,6 +570,7 @@ class _HomeSection extends StatelessWidget {
       title,
       style: Theme.of(context).textTheme.titleMedium?.copyWith(
         color: colorScheme.onSurface,
+        fontSize: _homeMusicText(context) ? 15 : null,
         fontWeight: FontWeight.w600,
       ),
     );
@@ -982,6 +987,7 @@ class _HomeShelfTile extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     final size = this.size ?? _homeShelfCoverSizeOf(context);
     final radius = _homeShelfRadiusOf(context);
+    final musicText = _homeMusicText(context);
     return Semantics(
       button: true,
       label: semanticLabel,
@@ -1005,6 +1011,8 @@ class _HomeShelfTile extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: textTheme.labelLarge?.copyWith(
                   color: colorScheme.onSurface,
+                  fontSize: musicText ? 13 : null,
+                  fontWeight: musicText ? FontWeight.w400 : null,
                 ),
               ),
               Text(
@@ -1013,6 +1021,7 @@ class _HomeShelfTile extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: textTheme.bodySmall?.copyWith(
                   color: colorScheme.onSurfaceVariant,
+                  fontSize: musicText ? 13 : null,
                 ),
               ),
             ],

@@ -219,7 +219,7 @@ class _DesktopShortcutsState extends ConsumerState<DesktopShortcuts> {
 
   bool get _canCloseTopLayer =>
       _rootNavigator?.canPop() == true ||
-      canDismissDesktopPlayerLayer(_windowWidth) ||
+      canDismissDesktopPlayerLayer(_windowWidth, mornye: context.isMornye) ||
       ShellNavigationService.activeBackNavigator()?.canPop() == true;
 
   /// Closes what Escape closes: a dialog or page over the shell first, then
@@ -231,7 +231,9 @@ class _DesktopShortcutsState extends ConsumerState<DesktopShortcuts> {
       unawaited(root.maybePop());
       return;
     }
-    if (dismissDesktopPlayerLayer(_windowWidth)) return;
+    if (dismissDesktopPlayerLayer(_windowWidth, mornye: context.isMornye)) {
+      return;
+    }
     final tab = ShellNavigationService.activeBackNavigator();
     if (tab != null && tab.canPop()) unawaited(tab.maybePop());
   }

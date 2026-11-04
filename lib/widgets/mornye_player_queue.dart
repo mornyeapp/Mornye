@@ -66,7 +66,7 @@ class MornyePlayerQueue extends ConsumerWidget {
     );
 
     // Music on the Mac: shuffle and repeat live in the player capsule, so the
-    // panel keeps only the two wide, labelled queue modes.
+    // panel keeps only the two wide queue modes, drawn as their icons.
     Widget desktopModeButton({
       required IconData icon,
       required String label,
@@ -79,7 +79,7 @@ class MornyePlayerQueue extends ConsumerWidget {
         label: stateLabel,
         excludeSemantics: true,
         button: true,
-        child: FilledButton.icon(
+        child: FilledButton(
           style: FilledButton.styleFrom(
             backgroundColor: Colors.white.withValues(
               alpha: selected ? 0.82 : 0.12,
@@ -91,8 +91,7 @@ class MornyePlayerQueue extends ConsumerWidget {
             textStyle: Theme.of(context).textTheme.bodyMedium,
           ),
           onPressed: onPressed,
-          icon: Icon(icon, size: 20),
-          label: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
+          child: Icon(icon, semanticLabel: label, size: 20),
         ),
       ),
     );
@@ -101,7 +100,9 @@ class MornyePlayerQueue extends ConsumerWidget {
       key: const PageStorageKey('mornye-player-queue'),
       slivers: [
         SliverPadding(
-          padding: const EdgeInsets.symmetric(horizontal: 28),
+          padding: EdgeInsets.symmetric(
+            horizontal: isDesktopPlatform ? 16 : 28,
+          ),
           sliver: SliverToBoxAdapter(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,

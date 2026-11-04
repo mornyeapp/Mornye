@@ -6,10 +6,14 @@ import 'package:audio_service/audio_service.dart';
 import 'package:flutter/cupertino.dart' show CupertinoButton, CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mornye/controllers/clickable_metadata.dart' show pushPage;
 import 'package:mornye/controllers/player_metadata_controller.dart';
+import 'package:mornye/controllers/player_track_navigation.dart';
 import 'package:mornye/l10n/l10n.dart';
+import 'package:mornye/providers/library_collections_provider.dart';
 import 'package:mornye/providers/lyrics_translation_provider.dart';
 import 'package:mornye/providers/music_player_provider.dart';
+import 'package:mornye/screens/equalizer_screen.dart';
 import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/theme/player_artwork_theme.dart';
@@ -19,16 +23,21 @@ import 'package:mornye/widgets/desktop/desktop_inspector.dart';
 import 'package:mornye/widgets/desktop/desktop_window.dart';
 import 'package:mornye/widgets/lyrics_options_button.dart';
 import 'package:mornye/widgets/material_player_backdrop.dart';
+import 'package:mornye/widgets/mornye_context_menu.dart';
+import 'package:mornye/widgets/mornye_playback_button.dart';
 import 'package:mornye/widgets/mornye_player_background.dart';
 import 'package:mornye/widgets/mornye_player_favorite_button.dart';
 import 'package:mornye/widgets/mornye_player_queue.dart';
 import 'package:mornye/widgets/no_scrollbars.dart';
 import 'package:mornye/widgets/player_artwork.dart';
+import 'package:mornye/widgets/player_details_sheet.dart';
 import 'package:mornye/widgets/player_lyrics_section.dart';
 import 'package:mornye/widgets/player_metadata_title.dart';
 import 'package:mornye/widgets/playback_source_label.dart';
 import 'package:mornye/widgets/player_playback_controls.dart';
 import 'package:mornye/widgets/player_volume_control.dart';
+import 'package:mornye/widgets/playlist_picker_sheet.dart';
+import 'package:share_plus/share_plus.dart';
 
 /// Now Playing on the desktop, covering the whole window as Music's player
 /// does: the cover, title and transport on the leading side, lyrics or Up
@@ -466,12 +475,25 @@ class _PlayerColumn extends StatelessWidget {
                 ],
               ),
             ),
-            if (mornye)
-              MornyePlayerFavoriteButton(
-                mediaItem: mediaItem,
-                color: colorScheme.onSurface,
-                iconSize: 20,
+            if (mornye) ...[
+              const SizedBox(width: 8),
+              _ActionDisc(
+                child: MornyePlayerFavoriteButton(
+                  mediaItem: mediaItem,
+                  color: colorScheme.onSurface,
+                  iconSize: _actionIconSize,
+                  padding: _actionPadding,
+                ),
               ),
+              const SizedBox(width: 8),
+              _ActionDisc(
+                child: _PlayerMoreButton(
+                  mediaItem: mediaItem,
+                  metadata: metadata,
+                  colorScheme: colorScheme,
+                ),
+              ),
+            ],
           ],
         ),
         PlayerPlaybackControls(
@@ -487,6 +509,181 @@ class _PlayerColumn extends StatelessWidget {
       ],
     );
   }
+}
+
+const _actionIconSize = 16.0;
+const _actionPadding = EdgeInsets.all(8);
+
+/// The translucent disc behind the Favorite and More buttons, as in Music.
+class _ActionDisc extends StatelessWidget {
+  const _ActionDisc({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => SizedBox.square(
+    dimension: 32,
+    child: ClipOval(
+      child: ColoredBox(
+        color: Colors.white.withValues(alpha: 0.14),
+        child: child,
+      ),
+    ),
+  );
+}
+
+/// More for the playing song: Music's menu, with the Equalizer added as
+/// Mornye's desktop player has no other way to it.
+class _PlayerMoreButton extends ConsumerWidget {
+  const _PlayerMoreButton({
+    required this.mediaItem,
+    required this.metadata,
+    required this.colorScheme,
+  });
+
+  final MediaItem mediaItem;
+  final PlayerMetadataController metadata;
+  final ColorScheme colorScheme;
+
+  Future<void> _open(BuildContext context, WidgetRef ref) async {
+    final l10n = context.l10n;
+    final track = ref.read(playerCollectionTrackProvider(mediaItem)).value;
+    final loved =
+        track != null && ref.read(libraryCollectionsProvider).isLoved(track);
+    MornyeMenuAction row(
+      BuildContext menuContext,
+      String value,
+      String label, {
+      IconData? icon,
+      bool disclosure = false,
+      bool selected = false,
+    }) => MornyeMenuAction(
+      icon: icon,
+      label: label,
+      disclosure: disclosure,
+      selected: selected,
+      onPressed: () => Navigator.of(menuContext).pop(value),
+    );
+    final anchor = mornyeMenuAnchor(context);
+    final action = await showMornyeContextMenu<String>(
+      context: context,
+      anchor: anchor,
+      preferAbove: true,
+      maxWidth: 240,
+      builder: (menuContext) => MornyeContextMenu(
+        dense: true,
+        groups: [
+          [
+            row(
+              menuContext,
+              'playlist',
+              l10n.collectionAddToPlaylist,
+              disclosure: true,
+            ),
+          ],
+          [
+            row(menuContext, 'details', l10n.mornyeGetInfo),
+            row(
+              menuContext,
+              'favorite',
+              loved ? l10n.mornyeFavorited : l10n.mornyeFavorite,
+              selected: loved,
+            ),
+            row(menuContext, 'equalizer', l10n.equalizerTitle),
+          ],
+          [
+            if ((mediaItem.album ?? '').trim().isNotEmpty)
+              row(menuContext, 'album', l10n.homeGoToAlbum),
+            if ((mediaItem.artist ?? '').trim().isNotEmpty)
+              row(menuContext, 'artist', l10n.mornyeGoToArtist),
+          ],
+          [
+            row(
+              menuContext,
+              'share',
+              l10n.trackMetadataShare,
+              icon: CupertinoIcons.share,
+              disclosure: true,
+            ),
+          ],
+        ],
+      ),
+    );
+    if (action == null || !context.mounted) return;
+    switch (action) {
+      case 'playlist' || 'favorite':
+        await _updateCollection(context, ref, favorite: action == 'favorite');
+      case 'details':
+        unawaited(
+          showPlayerDetailsSheet(
+            context,
+            colorScheme,
+            metadata: metadata,
+            mediaItem: mediaItem,
+          ),
+        );
+      case 'equalizer':
+        await pushPage<void>(context, (_) => const EqualizerScreen());
+      case 'album':
+        await openPlayingAlbum(
+          context,
+          ref,
+          mediaItem: mediaItem,
+          source: mediaItem.extras?['source']?.toString() ?? '',
+        );
+      case 'artist':
+        await openPlayingArtist(context, ref, mediaItem);
+      case 'share':
+        final artist = mediaItem.artist ?? '';
+        await SharePlus.instance.share(
+          ShareParams(
+            text: artist.isEmpty
+                ? mediaItem.title
+                : '${mediaItem.title}, $artist',
+            sharePositionOrigin: anchor,
+          ),
+        );
+    }
+  }
+
+  Future<void> _updateCollection(
+    BuildContext context,
+    WidgetRef ref, {
+    required bool favorite,
+  }) async {
+    try {
+      final provider = playerCollectionTrackProvider(mediaItem);
+      if (ref.read(provider).hasError) ref.invalidate(provider);
+      final track = await ref.read(provider.future);
+      if (!context.mounted) return;
+      if (favorite) {
+        await ref.read(libraryCollectionsProvider.notifier).toggleLoved(track);
+      } else {
+        await showAddTrackToPlaylistSheet(context, ref, track);
+      }
+    } catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            context.l10n.snackbarError(context.friendlyError(error)),
+          ),
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) => Builder(
+    builder: (buttonContext) => MornyePlaybackButton(
+      icon: CupertinoIcons.ellipsis,
+      tooltip: MaterialLocalizations.of(context).moreButtonTooltip,
+      color: colorScheme.onSurface,
+      iconSize: _actionIconSize,
+      padding: _actionPadding,
+      onPressed: () => _open(buttonContext, ref),
+    ),
+  );
 }
 
 class _Capsule extends StatelessWidget {

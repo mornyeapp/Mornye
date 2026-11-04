@@ -286,7 +286,7 @@ class DesktopShellLayout extends ConsumerWidget {
             Expanded(
               key: const ValueKey('desktop-content'),
               child: _DesktopContentArea(
-                overlayInspector: desktopInspectorOverlays(width),
+                windowWidth: width,
                 body: body,
                 floatingPlayer: showPlayer ? playerBar : null,
                 showPlayer: showPlayer,
@@ -342,7 +342,7 @@ class DesktopShellLayout extends ConsumerWidget {
               ),
               Expanded(
                 child: _DesktopContentArea(
-                  overlayInspector: desktopInspectorOverlays(width),
+                  windowWidth: width,
                   body: body,
                   showPlayer: showPlayer,
                   titleBarDrag: true,
@@ -385,19 +385,22 @@ class _PaneMediaQuery extends StatelessWidget {
   );
 }
 
+/// The narrowest pane that fits the Mornye capsule beside the glass inspector.
+const double _capsuleBesideInspectorWidth = mornyeGlassInspectorWidth + 520;
+
 /// The content pane, the trailing inspector and, in Mornye, the floating
 /// player. Pages bring their own search fields (Home, Library), so there is
 /// no shell search bar above them.
 class _DesktopContentArea extends StatelessWidget {
   const _DesktopContentArea({
-    required this.overlayInspector,
+    required this.windowWidth,
     required this.body,
     this.floatingPlayer,
     this.showPlayer = true,
     this.titleBarDrag = false,
   });
 
-  final bool overlayInspector;
+  final double windowWidth;
   final Widget body;
 
   /// The Mornye player capsule, floating over the bottom of the pane.
@@ -412,61 +415,93 @@ class _DesktopContentArea extends StatelessWidget {
   Widget build(BuildContext context) {
     final player = floatingPlayer;
     final playerInset = player == null ? 0.0 : DesktopPlayerBar.floatingInset;
-    return ValueListenableBuilder<DesktopInspectorPanel?>(
-      valueListenable: desktopInspectorPanel,
-      builder: (context, panel, _) {
-        if (!showPlayer) panel = null;
-        final content = Stack(
-          fit: StackFit.expand,
-          children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+    final mornye = context.isMornye;
+    return ListenableBuilder(
+      listenable: Listenable.merge([
+        desktopInspectorPanel,
+        desktopWindowFullScreen,
+      ]),
+      builder: (context, _) {
+        final panel = showPlayer ? desktopInspectorPanel.value : null;
+        final overlayInspector = desktopInspectorOverlays(
+          windowWidth,
+          mornye: mornye,
+        );
+        final content = LayoutBuilder(
+          builder: (context, pane) {
+            // Mornye's glass runs the window's height and the capsule moves
+            // beside it, while the pane has room for the two.
+            final beside =
+                mornye &&
+                overlayInspector &&
+                pane.maxWidth >= _capsuleBesideInspectorWidth;
+            final motion = desktopInspectorMotion(context);
+            return Stack(
+              fit: StackFit.expand,
               children: [
-                // A semantics container keeps the tab navigators'
-                // modal barriers from hiding the sidebar.
-                Expanded(
-                  key: const ValueKey('desktop-pages'),
-                  child: Semantics(
-                    container: true,
-                    child: _PaneMediaQuery(
-                      bottomInset: playerInset,
-                      child: body,
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // A semantics container keeps the tab navigators'
+                    // modal barriers from hiding the sidebar.
+                    Expanded(
+                      key: const ValueKey('desktop-pages'),
+                      child: Semantics(
+                        container: true,
+                        child: _PaneMediaQuery(
+                          bottomInset: playerInset,
+                          child: body,
+                        ),
+                      ),
                     ),
+                  ],
+                ),
+                if (player != null)
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: DesktopPlayerBar.floatingMargin,
+                    child: AnimatedPadding(
+                      duration: MediaQuery.disableAnimationsOf(context)
+                          ? Duration.zero
+                          : motion.duration,
+                      curve: motion.curve,
+                      padding: EdgeInsetsDirectional.only(
+                        end: beside && panel != null
+                            ? mornyeGlassInspectorWidth
+                            : 0,
+                      ),
+                      child: LayoutBuilder(
+                        builder: (context, constraints) => Center(
+                          child: SizedBox(
+                            width: DesktopPlayerBar.floatingWidth(
+                              constraints.maxWidth,
+                            ),
+                            child: player,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                // A narrow window's inspector floats above the player.
+                PositionedDirectional(
+                  top: 0,
+                  bottom: beside ? 0 : playerInset,
+                  end: 0,
+                  width: mornye
+                      ? mornyeGlassInspectorWidth
+                      : desktopInspectorWidth,
+                  child: DesktopInspectorTransition(
+                    key: const ValueKey('desktop-inspector-overlay'),
+                    panel: overlayInspector ? panel : null,
+                    overlay: true,
+                    builder: (context, panel) =>
+                        DesktopInspector(panel: panel, overlay: true),
                   ),
                 ),
               ],
-            ),
-            if (player != null)
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: DesktopPlayerBar.floatingMargin,
-                child: LayoutBuilder(
-                  builder: (context, constraints) => Center(
-                    child: SizedBox(
-                      width: DesktopPlayerBar.floatingWidth(
-                        constraints.maxWidth,
-                      ),
-                      child: player,
-                    ),
-                  ),
-                ),
-              ),
-            // A narrow window's inspector floats above the player.
-            PositionedDirectional(
-              top: 0,
-              bottom: playerInset,
-              end: 0,
-              width: desktopInspectorWidth,
-              child: DesktopInspectorTransition(
-                key: const ValueKey('desktop-inspector-overlay'),
-                panel: overlayInspector ? panel : null,
-                overlay: true,
-                builder: (context, panel) =>
-                    DesktopInspector(panel: panel, overlay: true),
-              ),
-            ),
-          ],
+            );
+          },
         );
         // One structure for every state, so opening the inspector never
         // remounts the destinations.

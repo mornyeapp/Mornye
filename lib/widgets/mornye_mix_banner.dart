@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:mornye/utils/desktop_platform.dart';
 
 const mornyeLockupAsset =
     'assets/brand/logo/png/mornye-lockup-horizontal-white@1x.png';
@@ -94,7 +95,7 @@ double mornyeBannerTitleSize(String title, double width) {
       .fold<int>(1, (length, word) => math.max(length, word.length));
   final line = (width - 40) / 0.58;
   return [
-    width * 0.2,
+    width * 0.17,
     line / longest,
     line * 2.4 / title.length,
   ].reduce(math.min);
@@ -126,6 +127,8 @@ class MornyeMixBanner extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     final pixelRatio = MediaQuery.devicePixelRatioOf(context);
     final logoWidth = width * 0.3;
+    // Music's cards keep a small caption on the Mac.
+    final captionSize = isDesktopPlatform ? 12.0 : null;
     return MediaQuery.withClampedTextScaling(
       maxScaleFactor: 1.2,
       child: SizedBox(
@@ -181,6 +184,7 @@ class MornyeMixBanner extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: textTheme.bodySmall?.copyWith(
                         color: Colors.white.withValues(alpha: 0.82),
+                        fontSize: captionSize,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -191,6 +195,7 @@ class MornyeMixBanner extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: textTheme.bodyMedium?.copyWith(
                           color: Colors.white,
+                          fontSize: captionSize,
                           fontWeight: FontWeight.w500,
                         ),
                       ),

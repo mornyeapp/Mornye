@@ -15,6 +15,7 @@ import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/playback_seek_preview.dart';
 import 'package:mornye/utils/string_utils.dart';
 import 'package:mornye/widgets/app_icon.dart';
+import 'package:mornye/widgets/app_icon_button.dart';
 import 'package:mornye/widgets/app_loading_indicator.dart';
 import 'package:mornye/widgets/audio_info_sheet.dart';
 import 'package:mornye/widgets/automix_status_badge.dart';
@@ -66,7 +67,14 @@ class PlayerPlaybackControls extends ConsumerWidget {
     final mornye = context.isMornye;
     final isPlaying = ref.watch(playbackPlayingProvider);
     final isLoading = ref.watch(playbackLoadingProvider);
-    final playPauseSize = compact
+    // Mornye's desktop player keeps Music's lighter transport, with shuffle
+    // and repeat at the timeline's ends; its phone player has them in the queue.
+    final desktopMornye = mornye && edgeAligned;
+    final showModes = showPlaybackModes && (!mornye || edgeAligned);
+    final skipSize = desktopMornye ? 30.0 : 40.0;
+    final playPauseSize = desktopMornye
+        ? (isPlaying ? 34.0 : 32.0)
+        : compact
         ? (isPlaying ? 44.0 : 40.0)
         : (isPlaying ? 60.0 : 54.0);
     final timeStyle = Theme.of(
@@ -237,11 +245,11 @@ class PlayerPlaybackControls extends ConsumerWidget {
               child: Row(
                 // Edge to edge, the shuffle and repeat buttons line up with
                 // the timeline's ends.
-                mainAxisAlignment: edgeAligned && !mornye
+                mainAxisAlignment: edgeAligned
                     ? MainAxisAlignment.spaceBetween
                     : MainAxisAlignment.spaceEvenly,
                 children: [
-                  if (!mornye && showPlaybackModes)
+                  if (showModes)
                     PlayerPlaybackModeButton(
                       mode: PlayerPlaybackMode.shuffle,
                       colorScheme: colorScheme,
@@ -250,6 +258,7 @@ class PlayerPlaybackControls extends ConsumerWidget {
                     MornyePlaybackButton(
                       icon: CupertinoIcons.backward_fill,
                       color: colorScheme.onSurface,
+                      iconSize: skipSize,
                       tooltip: context.l10n.nowPlayingPreviousTrack,
                       onPressed: controller.previous,
                     )
@@ -300,6 +309,7 @@ class PlayerPlaybackControls extends ConsumerWidget {
                     MornyePlaybackButton(
                       icon: CupertinoIcons.forward_fill,
                       color: colorScheme.onSurface,
+                      iconSize: skipSize,
                       tooltip: context.l10n.nowPlayingNextTrack,
                       onPressed: controller.next,
                     )
@@ -311,7 +321,7 @@ class PlayerPlaybackControls extends ConsumerWidget {
                       icon: const Icon(Icons.skip_next),
                       onPressed: controller.next,
                     ),
-                  if (!mornye && showPlaybackModes)
+                  if (showModes)
                     PlayerPlaybackModeButton(
                       mode: PlayerPlaybackMode.repeat,
                       colorScheme: colorScheme,
@@ -408,6 +418,28 @@ class PlayerPlaybackModeButton extends ConsumerWidget {
       ref,
       mode,
     );
+    if (context.isMornye) {
+      // Plain over the player's backdrop; a fill marks the active mode, as
+      // on the capsule.
+      return Semantics(
+        toggled: selected,
+        child: AppIconButton(
+          tooltip: tooltip,
+          iconSize: 20,
+          isSelected: selected,
+          color: colorScheme.onSurface,
+          style: selected
+              ? IconButton.styleFrom(
+                  backgroundColor: colorScheme.onSurface.withValues(
+                    alpha: 0.18,
+                  ),
+                )
+              : null,
+          icon: AppIcon(icon),
+          onPressed: onPressed,
+        ),
+      );
+    }
     return ExpressiveIconButton(
       iconSize: 24,
       selected: selected,

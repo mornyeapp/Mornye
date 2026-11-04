@@ -8169,6 +8169,7 @@
   "@mornyeFavorite": {
     "description": "Compact context menu action that adds a track to Loved"
   },
+  "mornyeGetInfo": "Get Info",
   "mornyeFavorited": "Favorited",
   "@mornyeFavorited": {
     "description": "Selected state of the compact favorite action"

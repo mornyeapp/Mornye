@@ -567,14 +567,19 @@ class MornyeMenuAction {
     this.subtitle,
     this.selected = false,
     this.destructive = false,
+    this.disclosure = false,
   });
 
-  final IconData icon;
+  /// Null for a text row, as most of Music's are.
+  final IconData? icon;
   final String label;
   final String? subtitle;
   final VoidCallback? onPressed;
   final bool selected;
   final bool destructive;
+
+  /// Marks a row that leads to more choices with a trailing chevron.
+  final bool disclosure;
 }
 
 /// One frosted popover, with compact shortcuts and separated action groups.
@@ -680,7 +685,9 @@ class MornyeContextMenu extends StatelessWidget {
         : action.destructive || action.selected
         ? theme.colorScheme.primary
         : theme.colorScheme.onSurface;
-    final icon = Icon(action.icon, size: compact ? 24 : 22, color: color);
+    final icon = action.icon == null
+        ? null
+        : Icon(action.icon, size: compact ? 24 : 22, color: color);
     final label = Text(
       action.label,
       textAlign: compact ? TextAlign.center : TextAlign.start,
@@ -706,15 +713,14 @@ class MornyeContextMenu extends StatelessWidget {
             ? Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  icon,
+                  ?icon,
                   SizedBox(height: dense ? 4 : 7),
                   label,
                 ],
               )
             : Row(
                 children: [
-                  icon,
-                  SizedBox(width: dense ? 12 : 16),
+                  if (icon != null) ...[icon, SizedBox(width: dense ? 12 : 16)],
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -735,6 +741,12 @@ class MornyeContextMenu extends StatelessWidget {
                       ],
                     ),
                   ),
+                  if (action.disclosure)
+                    Icon(
+                      CupertinoIcons.chevron_forward,
+                      size: 15,
+                      color: color,
+                    ),
                 ],
               ),
       ),
