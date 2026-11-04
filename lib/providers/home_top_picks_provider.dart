@@ -3,6 +3,7 @@ import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mornye/models/settings.dart';
 import 'package:mornye/providers/explore_provider.dart';
 import 'package:mornye/providers/extension_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
@@ -17,8 +18,7 @@ const _cacheKey = 'home_top_picks_v2';
 /// The most extension playlists Top Picks show after the mixes.
 const homeTopPickPlaylists = 9;
 
-/// Feeds carry a chart for every country and city, which read as noise among
-/// picks made for one listener.
+/// Exclude chart playlists and sections from the daily selection.
 final _chartName = RegExp(r'\b(top \d+|charts?)\b', caseSensitive: false);
 
 /// Up to [count] playlists of [sections] with a cover, each once, in an order
@@ -29,27 +29,35 @@ List<ExploreItem> pickTopPickPlaylists(
   String day, {
   int count = homeTopPickPlaylists,
 }) {
-  final playlists = <String, ExploreItem>{};
+  final playlists = <(String?, String), ExploreItem>{};
   for (final section in sections) {
     if (_chartName.hasMatch(section.title)) continue;
     for (final item in section.items) {
       if (item.type != 'playlist' || item.id.isEmpty) continue;
       if (_chartName.hasMatch(item.name)) continue;
       if (item.coverUrl?.trim().isNotEmpty != true) continue;
-      playlists.putIfAbsent(item.id, () => item);
+      playlists.putIfAbsent((item.providerId, item.id), () => item);
     }
   }
   final ordered = playlists.values.toList()
-    ..sort((a, b) => a.id.compareTo(b.id))
+    ..sort((a, b) {
+      final provider = (a.providerId ?? '').compareTo(b.providerId ?? '');
+      return provider != 0 ? provider : a.id.compareTo(b.id);
+    })
     ..shuffle(Random(int.tryParse(day.replaceAll('-', '')) ?? 0));
   return ordered.take(count).toList(growable: false);
 }
 
-/// Which of the [available] extensions Top Picks read: the one the Home feed
-/// uses, or the first when the feed is off or its extension is gone.
+/// Respect the Home feed selection. Auto uses the first available extension;
+/// Off or an unavailable selection does not query another extension.
 @visibleForTesting
-String? pickTopPicksExtension(List<String> available, String? homeFeed) =>
-    available.contains(homeFeed) ? homeFeed : available.firstOrNull;
+String? pickTopPicksExtension(List<String> available, String? homeFeed) {
+  if (homeFeed == AppSettings.homeFeedProviderOff) return null;
+  if (homeFeed != null && homeFeed.isNotEmpty) {
+    return available.contains(homeFeed) ? homeFeed : null;
+  }
+  return available.firstOrNull;
+}
 
 final homeTopPicksExtensionProvider = Provider<String?>((ref) {
   final homeFeed = ref.watch(

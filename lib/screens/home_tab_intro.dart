@@ -1408,7 +1408,7 @@ class _HomeTopPicksShelf extends StatelessWidget {
     final l10n = context.l10n;
     final seeds = mornyeBannerSeeds([
       for (final view in mixes) '${view.mix.kind.name}/${view.mix.key}',
-      for (final item in playlists) 'playlist/${item.id}',
+      for (final item in playlists) 'playlist/${item.providerId}/${item.id}',
     ]);
     return LayoutBuilder(
       builder: (context, constraints) {

@@ -58,8 +58,8 @@ extension _HomeTabExploreUI on _HomeTabState {
     }
     final sectionHeight = _exploreSectionHeight(context);
     final isTablet = MediaQuery.sizeOf(context).shortestSide >= 600;
-    if (section.isYTMusicQuickPicks) {
-      return _buildYTMusicQuickPicksSection(section, colorScheme);
+    if (section.isQuickPicks) {
+      return _buildQuickPicksSection(section, colorScheme);
     }
 
     // Titles and the first card line up with the centered column on tablets;
@@ -166,7 +166,7 @@ extension _HomeTabExploreUI on _HomeTabState {
     );
   }
 
-  Widget _buildYTMusicQuickPicksSection(
+  Widget _buildQuickPicksSection(
     ExploreSection section,
     ColorScheme colorScheme,
   ) {

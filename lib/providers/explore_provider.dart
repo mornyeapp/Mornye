@@ -105,14 +105,14 @@ class ExploreSection {
   final String uri;
   final String title;
   final List<ExploreItem> items;
-  final bool isYTMusicQuickPicks;
+  final bool isQuickPicks;
   final bool isFeatured;
 
   const ExploreSection({
     required this.uri,
     required this.title,
     required this.items,
-    this.isYTMusicQuickPicks = false,
+    this.isQuickPicks = false,
     this.isFeatured = false,
   });
 
@@ -121,20 +121,30 @@ class ExploreSection {
     final items = itemsList
         .map((item) => ExploreItem.fromJson(item as Map<String, dynamic>))
         .toList();
-    final isQuickPicks = _isYTMusicQuickPicksItems(items);
+    final layout = json['layout'];
+    // Older feeds omit layout. Infer a compact track list from its content.
+    // Compact rows expose track actions, so other item types use cards even
+    // when a feed requests quick-picks.
+    final isQuickPicks =
+        (layout == null || layout == 'quick-picks') &&
+        _isQuickPicksItems(items);
     return ExploreSection(
       uri: json['uri'] as String? ?? '',
       title: json['title'] as String? ?? '',
       items: items,
-      isYTMusicQuickPicks: isQuickPicks,
-      isFeatured: json['layout'] == 'featured',
+      isQuickPicks: isQuickPicks,
+      isFeatured: layout == 'featured',
     );
   }
 
   Map<String, dynamic> toJson() => {
     'uri': uri,
     'title': title,
-    'layout': isFeatured ? 'featured' : 'shelf',
+    'layout': isFeatured
+        ? 'featured'
+        : isQuickPicks
+        ? 'quick-picks'
+        : 'shelf',
     'items': items.map((i) => i.toJson()).toList(),
   };
 }
@@ -191,9 +201,8 @@ String _getLocalGreeting() {
   }
 }
 
-bool _isYTMusicQuickPicksItems(List<ExploreItem> items) {
+bool _isQuickPicksItems(List<ExploreItem> items) {
   if (items.isEmpty) return false;
-  if (items.first.providerId != 'ytmusic-spotiflac') return false;
   for (final item in items) {
     if (item.type != 'track') {
       return false;
@@ -221,7 +230,7 @@ List<Map<String, Object?>> _normalizeExploreSectionsPayload(
     sections.add({
       'uri': section['uri']?.toString() ?? '',
       'title': section['title']?.toString() ?? '',
-      'layout': section['layout']?.toString() ?? 'shelf',
+      if (section['layout'] != null) 'layout': section['layout'].toString(),
       'items': items,
     });
   }
@@ -570,8 +579,8 @@ class ExploreNotifier extends Notifier<ExploreState> {
   void clear() {
     _homeFeedRequestId++;
     _cacheRestoreGeneration++;
-    // Top Picks read the same bridge while the feed is off: only a fetch of
-    // this notifier's own is cancelled.
+    // Top Picks share the bridge. Only request cancellation when this
+    // notifier has an active fetch.
     if (_activeHomeFeedRequestId != null) {
       PlatformBridge.cancelExtensionHomeFeedRequests();
     }
@@ -582,8 +591,8 @@ class ExploreNotifier extends Notifier<ExploreState> {
   Future<void> refresh() => fetchHomeFeed(forceRefresh: true);
 }
 
-/// One read of [extensionId]'s home feed, null when it fails. Top Picks use it
-/// apart from [exploreProvider], so the feed being off leaves them working.
+/// Read [extensionId]'s home feed with the same item normalization as Explore.
+/// Return null on failure so callers can retain their cached content.
 Future<List<ExploreSection>?> readExtensionHomeFeed(String extensionId) async {
   final result = await PlatformBridge.getExtensionHomeFeed(extensionId);
   if (result == null || result['success'] != true) return null;

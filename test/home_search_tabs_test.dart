@@ -242,16 +242,22 @@ void main() {
     }
   }
 
-  for (final result in [
-    'no extensions',
-    'initialization error',
-    'feed error',
-    'empty feed',
+  for (final (mornye, result) in [
+    for (final mornye in [false, true])
+      for (final result in [
+        'no extensions',
+        'initialization error',
+        'feed error',
+        'empty feed',
+      ])
+        (mornye, result),
   ]) {
-    testWidgets('Home leaves startup loading after $result', (tester) async {
+    testWidgets('Home leaves startup loading after $result (Mornye=$mornye)', (
+      tester,
+    ) async {
       final extensions = _StartupExtensions();
       final explore = _StartupExplore();
-      await _pumpStartupHome(tester, extensions, explore);
+      await _pumpStartupHome(tester, extensions, explore, mornye: mornye);
       expect(find.byType(ShimmerLoading), findsOneWidget);
       extensions.update(
         ExtensionState(
@@ -273,24 +279,38 @@ void main() {
       await tester.pump();
       await tester.pumpAndSettle();
       expect(find.byType(ShimmerLoading), findsNothing);
-      expect(find.text('Shortcuts'), findsOneWidget);
+      final showsSetupPrompt =
+          !mornye &&
+          (result == 'no extensions' || result == 'initialization error');
+      expect(
+        find.text('No search providers yet'),
+        showsSetupPrompt ? findsOneWidget : findsNothing,
+      );
+      expect(
+        find.text('Shortcuts'),
+        !mornye && !showsSetupPrompt ? findsOneWidget : findsNothing,
+      );
       expect(tester.takeException(), isNull);
     });
   }
 
-  testWidgets('Home with its feed disabled shows local sections immediately', (
-    tester,
-  ) async {
-    await _pumpStartupHome(
-      tester,
-      _StartupExtensions(),
-      _StartupExplore(),
-      feedDisabled: true,
+  for (final mornye in [false, true]) {
+    testWidgets(
+      'Home with its feed disabled skips startup loading (Mornye=$mornye)',
+      (tester) async {
+        await _pumpStartupHome(
+          tester,
+          _StartupExtensions(),
+          _StartupExplore(),
+          mornye: mornye,
+          feedDisabled: true,
+        );
+        expect(find.text('Shortcuts'), mornye ? findsNothing : findsOneWidget);
+        expect(find.byType(ShimmerLoading), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
     );
-    expect(find.text('Shortcuts'), findsOneWidget);
-    expect(find.byType(ShimmerLoading), findsNothing);
-    expect(tester.takeException(), isNull);
-  });
+  }
 
   testWidgets('Home can show restored feed content before extensions finish', (
     tester,
@@ -398,7 +418,7 @@ void main() {
                       uri: 'example:section:$index',
                       title: 'Section $index',
                       isFeatured: layout == 'featured',
-                      isYTMusicQuickPicks: layout.startsWith('quick-pick'),
+                      isQuickPicks: layout.startsWith('quick-pick'),
                       items: [
                         ExploreItem(
                           id: 'track-$index',
@@ -962,7 +982,7 @@ void main() {
   });
 
   for (final withSearchExtension in [false, true]) {
-    testWidgets('Mornye Home without a feed shows its sections '
+    testWidgets('Mornye Home without a feed still shows local playback '
         '(search extension: $withSearchExtension)', (tester) async {
       tester.view.physicalSize = const Size(430, 932);
       tester.view.devicePixelRatio = 1;
@@ -978,6 +998,21 @@ void main() {
             downloadHistoryProvider.overrideWith(_History.new),
             recentAccessProvider.overrideWith(_Recent.new),
             trackProvider.overrideWith(_Search.new),
+            homeRecentlyPlayedProvider.overrideWith((ref) async => const []),
+            currentMediaItemProvider.overrideWithBuild(
+              (ref, notifier) => Stream.value(null),
+            ),
+            playbackResumeProvider.overrideWith(
+              (ref) async => const (
+                media: PlayableMedia(
+                  id: 'local-song',
+                  source: '/local.flac',
+                  title: 'Local song',
+                  artist: 'Local artist',
+                ),
+                position: Duration(seconds: 10),
+              ),
+            ),
           ],
           child: MaterialApp(
             theme: MornyeTheme.build(Brightness.dark),
@@ -987,9 +1022,11 @@ void main() {
           ),
         ),
       );
-      await tester.pump();
+      await tester.pumpAndSettle();
 
-      expect(find.text('Shortcuts'), findsOneWidget);
+      expect(find.text('Continue listening'), findsOneWidget);
+      expect(find.text('Local song'), findsOneWidget);
+      expect(find.text('Shortcuts'), findsNothing);
       expect(find.text('No search providers yet'), findsNothing);
       expect(tester.takeException(), isNull);
     });
