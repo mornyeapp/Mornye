@@ -1450,7 +1450,7 @@ class _CoverShelfSkeleton extends StatelessWidget {
   }
 }
 
-/// Mornye's Top Results cards while the search loads.
+/// Mornye's mixed result preview cards while the search loads.
 class _TopResultsSkeleton extends StatelessWidget {
   const _TopResultsSkeleton();
 

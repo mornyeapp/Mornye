@@ -906,12 +906,13 @@ extension _HomeTabSearchResultsUI on _HomeTabState {
     );
   }
 
-  /// Music on the Mac has no filter chips: a section's chevron opens that
-  /// section, and with [showBack] this row leads back to every kind. [tools]
-  /// sit at its end.
+  /// Compact desktop navigation with a back action and the provider's full
+  /// filter list. Section headings alone cannot expose filters with no results.
   Widget _buildSearchBackBar(
     ColorScheme colorScheme, {
     required bool showBack,
+    required List<SearchFilter> filters,
+    required String? selectedFilter,
     Widget? tools,
   }) {
     return Padding(
@@ -928,7 +929,7 @@ extension _HomeTabSearchResultsUI on _HomeTabState {
                 spacing: 4,
                 children: [
                   Icon(
-                    CupertinoIcons.chevron_back,
+                    CupertinoIcons.back,
                     size: 14,
                     color: colorScheme.primary,
                   ),
@@ -942,6 +943,48 @@ extension _HomeTabSearchResultsUI on _HomeTabState {
               ),
             ),
           const Spacer(),
+          if (filters.isNotEmpty)
+            Builder(
+              builder: (buttonContext) => AppIconButton(
+                tooltip: context.l10n.libraryFilterTitle,
+                icon: const Icon(CupertinoIcons.line_horizontal_3_decrease),
+                onPressed: () async {
+                  final selected = await showMornyeContextMenu<String>(
+                    context: buttonContext,
+                    builder: (menuContext) => MornyeContextMenu(
+                      dense: true,
+                      groups: [
+                        [
+                          MornyeMenuAction(
+                            icon: null,
+                            label: context.l10n.historyFilterAll,
+                            selected: selectedFilter == 'all',
+                            onPressed: () => Navigator.pop(menuContext, 'all'),
+                          ),
+                          for (final filter in filters.where(
+                            (filter) =>
+                                canonicalExtensionSearchFilterId(filter.id) !=
+                                'all',
+                          ))
+                            MornyeMenuAction(
+                              icon: filter.icon == null
+                                  ? null
+                                  : mornyeIconFor(_getFilterIcon(filter.icon!)),
+                              label: filter.label ?? filter.id,
+                              selected: selectedFilter == filter.id,
+                              onPressed: () =>
+                                  Navigator.pop(menuContext, filter.id),
+                            ),
+                        ],
+                      ],
+                    ),
+                  );
+                  if (selected != null && mounted) {
+                    _selectSearchFilter(selected);
+                  }
+                },
+              ),
+            ),
           ?tools,
         ],
       ),

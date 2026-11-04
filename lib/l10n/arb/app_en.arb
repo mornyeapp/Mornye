@@ -8402,9 +8402,9 @@
   "@homeShortcuts": {
     "description": "Home section header for quick links to player tools"
   },
-  "searchTopResults": "Top Results",
-  "@searchTopResults": {
-    "description": "Mornye search on wide screens: heading of the best matches"
+  "searchResults": "Search Results",
+  "@searchResults": {
+    "description": "Heading of a mixed preview of search result types, without implying a relevance ranking"
   },
   "homeTopPicks": "Top Picks for You",
   "@homeTopPicks": {

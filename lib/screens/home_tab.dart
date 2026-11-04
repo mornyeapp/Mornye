@@ -988,7 +988,6 @@ class _HomeTabState extends ConsumerState<HomeTab>
                 ),
               if (hasActiveSearchSurface &&
                   !showRecentAccess &&
-                  !showEmptySearchResult &&
                   !showLibraryResults)
                 _buildSearchFilterSliver(
                   colorScheme: colorScheme,
@@ -1282,10 +1281,11 @@ class _HomeTabState extends ConsumerState<HomeTab>
             currentSearchProvider,
             extensions,
           );
-          // Wide Mornye results move between kinds by their section headers.
+          // Section headers are shortcuts; the compact filter menu keeps
+          // every extension-declared filter reachable, even without results.
           final noChips = wide && isDesktopPlatform && context.isMornye;
           final showBack = noChips && displayFilter != 'all';
-          if (!showTools && !showBack && (noChips || searchFilters.isEmpty)) {
+          if (!showTools && !showBack && searchFilters.isEmpty) {
             return const SliverToBoxAdapter(child: SizedBox.shrink());
           }
           final tools = showTools
@@ -1303,6 +1303,8 @@ class _HomeTabState extends ConsumerState<HomeTab>
                 ? _buildSearchBackBar(
                     colorScheme,
                     showBack: showBack,
+                    filters: searchFilters,
+                    selectedFilter: displayFilter,
                     tools: tools,
                   )
                 : _buildSearchFilterBar(

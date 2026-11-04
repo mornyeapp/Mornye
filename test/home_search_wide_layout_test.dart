@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:material_3_expressive/material_3_expressive.dart'
     show M3EButton;
 import 'package:mornye/models/settings.dart';
+import 'package:mornye/providers/extension_provider.dart';
 import 'package:mornye/utils/adaptive_layout.dart';
 import 'package:mornye/widgets/animation_utils.dart';
 import 'package:mornye/widgets/desktop/desktop_scroll_arrows.dart';
@@ -96,7 +97,46 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('Mornye All view opens with Top Results cards', (tester) async {
+  for (final view in ['list', 'grid']) {
+    testWidgets('Mornye $view keeps custom and empty filters reachable', (
+      tester,
+    ) async {
+      final results = SearchFixtureResults(count: 0, songCount: 2);
+      await pumpSearchFixture(
+        tester,
+        size: _desktop,
+        mornye: true,
+        desktop: true,
+        settings: _grid.copyWith(searchViewMode: view),
+        results: results,
+        filters: const [
+          SearchFilter(id: 'all', label: 'All entries'),
+          ...searchFixtureAllFilters,
+          SearchFilter(id: 'spoken', label: 'Spoken audio'),
+        ],
+      );
+      expect(find.text('Albums'), findsNothing);
+      await tester.tap(find.byTooltip('Filters'));
+      await tester.pumpAndSettle();
+      expect(find.text('All'), findsOneWidget);
+      expect(find.text('All entries'), findsNothing);
+      await tester.tap(find.text('Albums filter'));
+      await tester.pumpAndSettle();
+      expect(results.requestedFilters.last, 'album');
+
+      // The previous search has no results, but other filters remain usable.
+      await tester.tap(find.byTooltip('Filters'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Spoken audio'));
+      await tester.pumpAndSettle();
+      expect(results.requestedFilters.last, 'spoken');
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('Mornye All view opens with Search Results cards', (
+    tester,
+  ) async {
     await pumpSearchFixture(
       tester,
       size: const Size(1000, 1800),
@@ -291,11 +331,11 @@ void main() {
       expect(results.requestedFilters, [null]);
 
       // Material opens with songs, as covers like every other kind. Mornye
-      // opens with Top Results, and songs follow the albums.
+      // opens with a mixed preview, and songs follow the albums.
       final headers = [
         for (final title in [
           if (mornye) ...[
-            'Top Results',
+            'Search Results',
             'Artists',
             'Albums',
             'Songs',
@@ -343,7 +383,7 @@ void main() {
         );
       }
       expect(find.byType(DesktopScrollArrows), findsNWidgets(4));
-      // Only Mornye's Top Results cards form a grid.
+      // Only Mornye's mixed preview cards form a grid.
       expect(find.byType(SliverGrid), mornye ? findsOneWidget : findsNothing);
 
       // Show all switches to that kind's filter.

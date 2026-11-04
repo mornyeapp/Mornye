@@ -79,8 +79,8 @@ extension _HomeTabSearchWideUI on _HomeTabState {
       showEmptyResult: showEmptySearchResult && !hasActualData,
       colorScheme: colorScheme,
     );
-    // Mornye opens the All view as Music does: the best matches as cards,
-    // with the shelves below them.
+    // A compact preview of result types precedes the full shelves. The
+    // provider does not supply a relevance ranking across different types.
     final topResults = overview && context.isMornye;
 
     // Songs are covers too, as the other kinds are.
@@ -124,7 +124,6 @@ extension _HomeTabSearchWideUI on _HomeTabState {
       final albums = _sortCollectionResults(buckets.albumItems);
       final playlists = _sortCollectionResults(buckets.playlistItems);
       final isInHistory = _watchSearchHistory(resultsRef, songs);
-      final songFilter = filterFor('track');
       final picks = [
         for (final (kind, index) in _topResultPicks(
           songs: songs.length,
@@ -162,12 +161,9 @@ extension _HomeTabSearchWideUI on _HomeTabState {
         slivers
           ..add(
             _buildResultSectionHeader(
-              title: context.l10n.searchTopResults,
+              title: context.l10n.searchResults,
               colorScheme: colorScheme,
               showSortButton: false,
-              onShowAll: songFilter == null
-                  ? null
-                  : () => _selectSearchFilter(songFilter),
             ),
           )
           ..add(_buildSearchTopResults(picks));
@@ -200,7 +196,7 @@ extension _HomeTabSearchWideUI on _HomeTabState {
         _navigateToExtensionPlaylist,
       ),
     ]) {
-      // Songs follow the albums under Top Results.
+      // Songs follow the albums under the mixed preview.
       if (topResults && kind == 'playlist' && songs.isNotEmpty) {
         addSongs();
         songsAdded = true;
@@ -240,7 +236,7 @@ extension _HomeTabSearchWideUI on _HomeTabState {
     return slivers;
   }
 
-  /// Which results fill the Top Results cards: a song first, then the first
+  /// Which results fill the preview cards: a song first, then the first
   /// album, more songs and the first playlist. A kind that runs out gives its
   /// place to the next one that has results left.
   List<(String, int)> _topResultPicks({
@@ -379,7 +375,7 @@ extension _HomeTabSearchWideUI on _HomeTabState {
   }
 }
 
-/// One Top Results card: small artwork, title and "Kind · name", with
+/// One result preview card: small artwork, title and "Kind · name", with
 /// [trailing] at the end, on a tonal rounded rectangle.
 class _SearchTopResultCard extends StatelessWidget {
   const _SearchTopResultCard({
@@ -913,7 +909,7 @@ class _SearchCoverCell extends StatelessWidget {
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              // Music names an artist and leaves it there.
+              // Artist cards need no repeated artist-name subtitle.
               if (!(mornye && isArtist)) ...[
                 const SizedBox(height: 2),
                 Text(
