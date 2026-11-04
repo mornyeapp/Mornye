@@ -77,40 +77,38 @@ void main() {
     test(
       'a missing track later in the queue is skipped to the next song',
       () async {
-      final directory = await Directory.systemTemp.createTemp(
-        'missing-queued-track-',
-      );
-      addTearDown(() => directory.delete(recursive: true));
-      final missing = PlayableMedia(
-        id: 'missing',
-        source: '${directory.path}/removed.flac',
-        title: 'Missing',
-        artist: 'Artist',
-      );
-      await handler.setQueueAndPlay([_tracks[0], missing, _tracks[2]]);
-      await native.complete('music-player');
-      await _until(
-        () =>
-            handler.mediaItem.value?.id == 'missing' &&
-            handler.playbackState.value.playing,
-      );
+        final directory = await Directory.systemTemp.createTemp(
+          'missing-queued-track-',
+        );
+        addTearDown(() => directory.delete(recursive: true));
+        final missing = PlayableMedia(
+          id: 'missing',
+          source: '${directory.path}/removed.flac',
+          title: 'Missing',
+          artist: 'Artist',
+        );
+        await handler.setQueueAndPlay([_tracks[0], missing, _tracks[2]]);
+        await native.complete('music-player');
+        await _until(
+          () =>
+              handler.mediaItem.value?.id == 'missing' &&
+              handler.playbackState.value.playing,
+        );
 
-      await native.error(
-        'music-player',
-        message: 'Cannot open file: Audio file is unavailable',
-      );
-      await _until(
-        () =>
-            handler.mediaItem.value?.id == 'three' &&
-            handler.playbackState.value.playing,
-      );
+        await native.error(
+          'music-player',
+          message: 'Cannot open file: Audio file is unavailable',
+        );
+        await _until(
+          () =>
+              handler.mediaItem.value?.id == 'three' &&
+              handler.playbackState.value.playing,
+        );
 
-      expect(handler.queue.value.map((item) => item.id), ['one', 'three']);
-      expect(handler.playbackState.value.queueIndex, 1);
-      expect(handler.playbackState.value.errorMessage, isNull);
-    });
-
-    test('a missing only track stops and clears the player cleanly', () async {
+        expect(handler.queue.value.map((item) => item.id), ['one', 'three']);
+        expect(handler.playbackState.value.queueIndex, 1);
+        expect(handler.playbackState.value.errorMessage, isNull);
+ () async {
       final directory = await Directory.systemTemp.createTemp(
         'missing-only-track-',
       );
