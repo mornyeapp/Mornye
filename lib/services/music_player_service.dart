@@ -2016,6 +2016,11 @@ class MusicPlayerHandler extends BaseAudioHandler
   }
 
   Future<void> _playInternal() async {
+    if (_index >= 0 &&
+        _index < _media.length &&
+        _sourcesBeingDeleted.contains(_media[_index].source)) {
+      return;
+    }
     _pausedByInterruption = false;
     _interruptionActive = false;
     _userPaused = false;
