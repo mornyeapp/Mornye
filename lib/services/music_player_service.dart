@@ -572,7 +572,7 @@ class MusicPlayerHandler extends BaseAudioHandler
           // Preparation errors are handled by _loadIndex, including the SAF
           // fallback. Runtime failures must not look like successful completion.
           if (_sourceReady || _switchingGeneration == 0) {
-            _reportPlaybackError(player, error, stackTrace);
+            unawaited(_failures.onRuntimeError(player, error, stackTrace));
           }
         },
       ),
@@ -800,6 +800,7 @@ class MusicPlayerHandler extends BaseAudioHandler
 
   bool get _shouldIgnoreComplete =>
       _switchingGeneration != 0 ||
+      _failures.checking ||
       _interruptionActive ||
       _userPaused ||
       _playbackError != null;
@@ -1607,6 +1608,7 @@ class MusicPlayerHandler extends BaseAudioHandler
     int index, {
     bool recordHistory = true,
     bool userSkip = false,
+    bool startPaused = false,
     Duration startPosition = Duration.zero,
   }) async {
     if (_disposed || index < 0 || index >= _media.length) return;
@@ -1652,6 +1654,7 @@ class MusicPlayerHandler extends BaseAudioHandler
           generation,
           media,
           recordHistory: recordHistory,
+          startPaused: startPaused,
           startPosition: startPosition,
         );
       } finally {
@@ -1934,7 +1937,7 @@ class MusicPlayerHandler extends BaseAudioHandler
       _activeResolvedPath = usingLocalSafCopy || _formats.owns(resolved)
           ? resolved
           : null;
-      _failures.started();
+      _failures.started(media, resolved);
       await _cleanupPendingResolvedPaths();
       if (!_isCurrentPlayRequest(generation, media)) return;
       // Plain file paths were already published before loading. Re-publishing
@@ -2694,48 +2697,16 @@ class MusicPlayerHandler extends BaseAudioHandler
 
     final hadPendingResolution = await _sourceCache.invalidate(target);
 
-    final wasCurrent =
-        _index >= 0 &&
-        _index < _media.length &&
-        _media[_index].source == target;
-
-    var removedBeforeCurrent = 0;
-    final kept = <PlayableMedia>[];
-    final keptQueue = <MediaItem>[];
-    for (var i = 0; i < _media.length; i++) {
-      if (_media[i].source == target) {
-        if (i < _index) removedBeforeCurrent++;
-        continue;
-      }
-      kept.add(_media[i]);
-      keptQueue.add(_queueItems[i]);
-    }
-
-    if (kept.length == _media.length) return;
-
-    _media
-      ..clear()
-      ..addAll(kept);
-    _queueItems
-      ..clear()
-      ..addAll(keptQueue);
-    final keptSet = Set<MediaItem>.identity()..addAll(keptQueue);
-    _originalQueueOrder?.removeWhere((item) => !keptSet.contains(item));
-    _markSessionQueueChanged();
-    _playHistory.clear();
-    queue.add(List<MediaItem>.unmodifiable(_queueItems));
+    final removed = _pruneQueuedSource(target);
+    if (removed == null) return;
 
     Future<void>? reaction;
     if (_media.isEmpty) {
       reaction = stop();
-    } else if (wasCurrent) {
-      final nextIndex = (_index - removedBeforeCurrent).clamp(
-        0,
-        _media.length - 1,
-      );
-      reaction = _playIndex(nextIndex);
+    } else if (removed.wasCurrent) {
+      reaction = _playIndex(removed.nextIndex.clamp(0, _media.length - 1));
     } else {
-      _index = (_index - removedBeforeCurrent).clamp(0, _media.length - 1);
+      _index = removed.nextIndex.clamp(0, _media.length - 1);
       _broadcastState();
       unawaited(_persistSession(position: playbackState.value.position));
     }
@@ -2749,6 +2720,46 @@ class MusicPlayerHandler extends BaseAudioHandler
         }),
       );
     }
+  }
+
+  ({bool wasCurrent, int nextIndex})? _pruneQueuedSource(String target) {
+    final wasCurrent =
+        _index >= 0 &&
+        _index < _media.length &&
+        _media[_index].source == target;
+
+    var removedBeforeCurrent = 0;
+    final kept = <PlayableMedia>[];
+    final keptQueue = <MediaItem>[];
+    final newIndices = <int, int>{};
+    for (var i = 0; i < _media.length; i++) {
+      if (_media[i].source == target) {
+        if (i < _index) removedBeforeCurrent++;
+        continue;
+      }
+      newIndices[i] = kept.length;
+      kept.add(_media[i]);
+      keptQueue.add(_queueItems[i]);
+    }
+
+    if (kept.length == _media.length) return null;
+
+    _media
+      ..clear()
+      ..addAll(kept);
+    _queueItems
+      ..clear()
+      ..addAll(keptQueue);
+    final keptSet = Set<MediaItem>.identity()..addAll(keptQueue);
+    _originalQueueOrder?.removeWhere((item) => !keptSet.contains(item));
+    _markSessionQueueChanged();
+    final keptHistory = [for (final index in _playHistory) ?newIndices[index]];
+    _playHistory
+      ..clear()
+      ..addAll(keptHistory);
+    queue.add(List<MediaItem>.unmodifiable(_queueItems));
+
+    return (wasCurrent: wasCurrent, nextIndex: _index - removedBeforeCurrent);
   }
 
   Future<void> dispose() => _disposeFuture ??= _dispose();

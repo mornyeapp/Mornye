@@ -423,6 +423,7 @@ class _MusicAutoMix {
           ? _nextPath
           : null;
       handler._pendingRestorePosition = null;
+      handler._failures.started(next, _nextPath);
       rate = plan.rate;
       handler._runtime.personalization.begin(_learningTrack(next));
       handler._playbackInstance++;

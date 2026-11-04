@@ -10,6 +10,7 @@ import 'package:mornye/models/settings.dart';
 import 'package:mornye/services/alsa_output_devices.dart';
 import 'package:mornye/services/app_state_database.dart';
 import 'package:mornye/services/exclusive_output_deck.dart';
+import 'package:mornye/services/file_access_check.dart';
 import 'package:mornye/services/ffmpeg_support.dart' show FFmpegExecution;
 import 'package:mornye/services/autoplay_personalization.dart';
 import 'package:mornye/services/autoplay_ranker.dart';
@@ -75,6 +76,7 @@ class PlaybackDependencies {
     this.networkCache = _networkCache,
     this.networkSourceReachable = _networkSourceReachable,
     this.recoverMissingFile = _recoverMissingFile,
+    this.fileAccess = checkFileAccess,
     this.recoverMovedDownload = _recoverMovedDownload,
     this.initializeHandler = _initializeAudioHandler,
     this.synchronizePlaybackState = _synchronizePlaybackState,
@@ -138,6 +140,7 @@ class PlaybackDependencies {
   /// folder pruned: a path, or a URL streaming it as it arrives. Null for
   /// any other path; throws when it cannot be fetched.
   final Future<String?> Function(String) recoverMissingFile;
+  final Future<FileAccessCheck> Function(String) fileAccess;
   final Future<String?> Function(
     String source,
     String historyId,
