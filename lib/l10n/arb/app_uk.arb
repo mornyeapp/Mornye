@@ -10245,15 +10245,15 @@
   "@recognizePlay": {
     "description": "Button that plays the identified song from the downloads or library"
   },
-  "recognizeSearch": "Search in Mornye",
+  "recognizeSearch": "Пошук у Mornye",
   "@recognizeSearch": {
     "description": "Button that searches for the identified song when it is not in the library"
   },
-  "recognizeOpenInShazam": "Open in Shazam",
+  "recognizeOpenInShazam": "Відкрити в Shazam",
   "@recognizeOpenInShazam": {
     "description": "Button that opens the identified song on the Shazam website; Shazam must not be translated"
   },
-  "recognizeListenAgain": "Listen Again",
+  "recognizeListenAgain": "Слухати знову",
   "@recognizeListenAgain": {
     "description": "Button that starts a new identification from a result"
   },
