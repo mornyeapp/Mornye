@@ -215,8 +215,8 @@ class LinkPlayingOnLabel extends ConsumerWidget {
   /// The label's color; Material defaults to `primary`.
   final Color? color;
 
-  /// Material's tap height where a row reserves less than a touch target;
-  /// the touch target by default.
+  /// The tap height where a row reserves less than a touch target; the touch
+  /// target by default.
   final double? height;
 
   @override
@@ -240,7 +240,7 @@ class LinkPlayingOnLabel extends ConsumerWidget {
       return CupertinoButton(
         key: const ValueKey('link-playing-on'),
         padding: const EdgeInsets.symmetric(horizontal: 12),
-        minimumSize: Size.square(context.tokens.minTouchTarget),
+        minimumSize: Size.square(height ?? context.tokens.minTouchTarget),
         onPressed: () => showLinkDevicesSheet(context),
         child: label,
       );

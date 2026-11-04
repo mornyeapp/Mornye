@@ -62,8 +62,16 @@ export 'package:mornye/routes/now_playing_route.dart';
 
 final _log = AppLogger('NowPlaying');
 
-/// Material portrait's "Playing on" row, kept while empty.
+/// Portrait's "Playing on" row, kept while empty.
 const _playingOnRowHeight = 36.0;
+
+/// Screens shorter than this keep Mornye's volume row clear by leaving the
+/// empty row out; its cover and controls need the height.
+const _mornyePlayingOnMinScreenHeight = 720.0;
+
+/// What Mornye holds back above its volume row, so the toolbar reaches
+/// Material's height while the track header stays level with Material's.
+const _mornyeControlsHeadroom = 20.0;
 
 /// How much of an iPhone's home indicator inset stays under that row. The
 /// indicator sits in the screen's bottom 13pt, and the label's text ends 8pt
@@ -372,14 +380,13 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
         materialBackdrop &&
         MediaQuery.orientationOf(context) == Orientation.portrait;
     final overCover = materialFullScreen && _currentPage != 1;
-    // Material's portrait keeps the "Playing on" row while empty, so the
-    // controls stay put when a computer takes over playback. On an iPhone
-    // the row reaches into the home indicator's inset rather than stacking
-    // a second empty band on top of it.
+    // Portrait keeps the "Playing on" row while empty, so the controls stay
+    // put when a computer takes over playback. On an iPhone the row reaches
+    // into the home indicator's inset rather than stacking a second empty
+    // band on top of it.
     final reservesPlayingOnRow =
-        !mornye &&
         MediaQuery.orientationOf(context) == Orientation.portrait &&
-        screen.height >= 640;
+        screen.height >= (mornye ? _mornyePlayingOnMinScreenHeight : 640);
     final bottomInset = MediaQuery.paddingOf(context).bottom;
     final homeIndicatorBelowRow =
         reservesPlayingOnRow && Theme.of(context).platform == TargetPlatform.iOS
@@ -575,6 +582,9 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                           page: _currentPage,
                           motionArtwork: artwork(),
                           artworkAspectRatio: artworkRatio,
+                          controlsHeadroom: reservesPlayingOnRow
+                              ? _mornyeControlsHeadroom
+                              : 0,
                           insetArtwork: !fullBleed,
                           artworkTopInset:
                               MediaQuery.paddingOf(context).top +
@@ -725,9 +735,8 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                           ),
                         ),
                       // Landscape has no row to spare; the toolbar's devices
-                      // button shows the device there. Mornye's larger cover
-                      // and short phones' lyrics keep the room an empty row
-                      // would take.
+                      // button shows the device there. Short phones' lyrics
+                      // keep the room an empty row would take.
                       if (MediaQuery.orientationOf(context) ==
                           Orientation.portrait) ...[
                         if (!reservesPlayingOnRow) ...[
@@ -736,11 +745,12 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                           ),
                           const SizedBox(height: 8),
                         ] else
-                          const SizedBox(
-                            key: ValueKey('link-playing-on-row'),
+                          SizedBox(
+                            key: const ValueKey('link-playing-on-row'),
                             height: _playingOnRowHeight,
                             child: Center(
                               child: LinkPlayingOnLabel(
+                                color: mornye ? Colors.white : null,
                                 height: _playingOnRowHeight,
                               ),
                             ),

@@ -27,12 +27,14 @@ import 'package:mornye/providers/player_artwork_video_provider.dart';
 import 'package:mornye/services/motion_artwork_store.dart';
 import 'package:mornye/services/network_metadata_service.dart';
 import 'package:mornye/services/network_storage_service.dart';
+import 'package:mornye/services/remote_playback.dart';
 import 'package:video_player/video_player.dart';
 import 'package:mornye/screens/now_playing_screen.dart';
 import 'package:mornye/screens/lyrics_share_screen.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/theme/app_theme.dart';
 import 'package:mornye/utils/lyrics_parser.dart';
+import 'package:mornye/widgets/audio_output_button.dart';
 import 'package:mornye/widgets/expressive_icon_button.dart';
 import 'package:mornye/widgets/expressive_playback_transport.dart';
 import 'package:mornye/widgets/expressive_seek_track.dart';
@@ -176,6 +178,7 @@ void main() {
     MotionArtwork? motionArtwork,
     MusicPlayerController? controller,
     List<MediaItem> queue = const [],
+    RemotePlayback? remote,
   }) async {
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
@@ -187,6 +190,8 @@ void main() {
         overrides: [
           if (controller != null)
             musicPlayerControllerProvider.overrideWithValue(controller),
+          if (remote != null)
+            activeRemotePlaybackProvider.overrideWithValue(remote),
           currentMediaItemProvider.overrideWithBuild(
             (ref, notifier) => mediaItems.stream,
           ),
@@ -511,6 +516,66 @@ void main() {
       } else {
         expect(row, findsNothing);
       }
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  for (final (size, kept) in [
+    (const Size(430, 932), true),
+    (const Size(360, 700), false),
+  ]) {
+    testWidgets('Mornye portrait keeps an empty Playing on row ($size)', (
+      tester,
+    ) async {
+      await pumpNowPlaying(
+        tester,
+        theme: MornyeTheme.build(Brightness.dark),
+        size: size,
+      );
+      mediaItems.add(item('first'));
+      await settlePlayer(tester);
+      final row = find.byKey(const ValueKey('link-playing-on-row'));
+      if (kept) {
+        expect(tester.getSize(row).height, 36);
+      } else {
+        expect(row, findsNothing);
+      }
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  for (final mornye in [true, false]) {
+    testWidgets('portrait stays put while a computer takes over '
+        '(${mornye ? 'Mornye' : 'Material'})', (tester) async {
+      Future<({Rect title, Rect toolbar})> measure(
+        RemotePlayback? remote,
+      ) async {
+        await pumpNowPlaying(
+          tester,
+          theme: mornye ? MornyeTheme.build(Brightness.dark) : AppTheme.light(),
+          size: const Size(412, 915),
+          remote: remote,
+        );
+        mediaItems.add(item('first'));
+        await settlePlayer(tester);
+        return (
+          title: tester.getRect(find.byType(PlayerMetadataTitle).first),
+          toolbar: tester.getRect(find.byType(AudioOutputButton)),
+        );
+      }
+
+      final idle = await measure(null);
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump(const Duration(seconds: 1));
+      final playing = await measure(_TestRemote());
+
+      expect(find.text('Playing on Studio PC'), findsOneWidget);
+      expect(playing.title, idle.title);
+      expect(playing.toolbar, idle.toolbar);
+      // The toolbar sits on the row in both styles, and the header stays
+      // level with Material's rather than dropping with the shorter row.
+      expect(915 - idle.toolbar.bottom, 36);
+      expect(idle.title.top, closeTo(mornye ? 510 : 509, 0.5));
       expect(tester.takeException(), isNull);
     });
   }
@@ -910,7 +975,8 @@ void main() {
         final title = tester.getRect(titleFinder);
         final volume = tester.getRect(find.byType(PlayerVolumeControl));
         expect(playingCover.width, playingCover.height);
-        expect(playingCover.width, greaterThanOrEqualTo(393 * 0.84));
+        // Room for the Playing on row comes out of the cover on this phone.
+        expect(playingCover.width, greaterThanOrEqualTo(393 * 0.81));
         expect(playingCover.left, greaterThan(0));
         expect(playingCover.bottom, lessThan(title.top));
         expect(
@@ -945,6 +1011,7 @@ void main() {
         expect(tester.takeException(), isNull);
         await tester.pumpWidget(const SizedBox());
       },
+      variant: TargetPlatformVariant.only(TargetPlatform.iOS),
     );
   }
 
@@ -5163,6 +5230,22 @@ class _SeekController extends MusicPlayerController {
     completions.add(completion);
     return completion.future;
   }
+}
+
+/// A computer playing in the phone's place; the player reads only its name
+/// and the song on its way there.
+class _TestRemote implements RemotePlayback {
+  @override
+  String get name => 'Studio PC';
+
+  @override
+  Stream<RemoteTransfer?> get transfers => Stream.value(null);
+
+  @override
+  Stream<double> get volumes => const Stream.empty();
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 class _TestCollections extends LibraryCollectionsNotifier {
