@@ -2131,6 +2131,24 @@ class MusicPlayerHandler extends BaseAudioHandler
 
   @override
   Future<void> seek(Duration position) async {
+    if (_index >= 0 &&
+        _index < _media.length &&
+        _sourcesBeingDeleted.contains(_media[_index].source)) {
+      final source = _media[_index].source;
+      _pendingRestorePosition = position;
+      final snapshot = _sourceDeletionSnapshots[source];
+      if (snapshot != null) {
+        _sourceDeletionSnapshots[source] = (
+          generation: snapshot.generation,
+          index: snapshot.index,
+          position: position,
+          wasPlaying: snapshot.wasPlaying,
+        );
+      }
+      _broadcastPosition(position, force: true);
+      await _persistSession(position: position);
+      return;
+    }
     final generation = _playRequestGeneration;
     await _autoMix.cancel();
     await _serializeSourceChange(() async {
@@ -2253,6 +2271,19 @@ class MusicPlayerHandler extends BaseAudioHandler
 
   @override
   Future<void> skipToPrevious() async {
+    if (_index >= 0 &&
+        _index < _media.length &&
+        _sourcesBeingDeleted.contains(_media[_index].source)) {
+      if (_shuffle) {
+        if (_playHistory.length >= 2) {
+          _playHistory.removeLast();
+          await _playIndex(_playHistory.last, recordHistory: false, userSkip: true);
+        }
+      } else if (_index > 0) {
+        await _playIndex(_index - 1, userSkip: true);
+      }
+      return;
+    }
     await _cancelTransitions();
     if (playbackState.value.position > const Duration(seconds: 3)) {
       await _player.seek(Duration.zero);
@@ -2496,7 +2527,8 @@ class MusicPlayerHandler extends BaseAudioHandler
           return;
         }
 
-        final position = await _currentPositionForPersist();
+        final position =
+            _pendingRestorePosition ?? await _currentPositionForPersist();
         if (_disposed || _index != index || _media[index].source != target) {
           return;
         }
