@@ -336,7 +336,15 @@ class _HomeSections extends ConsumerWidget {
 
     final showContinue = hasMediaItem || hasResume;
 
+    final topPicks = context.isMornye;
     final sections = <Widget>[
+      if (topPicks && mixes.isNotEmpty)
+        _HomeSection(
+          title: l10n.homeTopPicks,
+          inset: inset,
+          shelf: true,
+          child: _HomeTopPicksShelf(mixes: mixes, inset: inset + 8),
+        ),
       if (_homeDesktop(context))
         _HomeDesktopTop(inset: inset, showContinue: showContinue)
       else ...[
@@ -354,7 +362,7 @@ class _HomeSections extends ConsumerWidget {
       ],
       // Built after startup settles when nothing is cached: the sections'
       // size animation opens its space rather than letting it jump in.
-      if (mixes.isNotEmpty)
+      if (!topPicks && mixes.isNotEmpty)
         _HomeSection(
           title: l10n.homeMixesForYou,
           inset: inset,
@@ -1127,6 +1135,80 @@ class _HomeMixesShelf extends StatelessWidget {
           cover: LibraryMixCover(items: view.items, size: coverSize),
           onTap: () =>
               pushPage<void>(context, (_) => LibraryMixScreen(view: view)),
+        );
+      },
+    );
+  }
+}
+
+/// Mornye's first shelf: the day's mixes as tall banners, a little over three
+/// to the pane on desktop and one with its neighbor peeking on phones.
+class _HomeTopPicksShelf extends StatelessWidget {
+  const _HomeTopPicksShelf({required this.mixes, required this.inset});
+
+  static const _gap = 16.0;
+
+  final List<LibraryMixView> mixes;
+  final double inset;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final seeds = mornyeBannerSeeds(
+      mixes.map((view) => '${view.mix.kind.name}/${view.mix.key}'),
+    );
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final content = constraints.maxWidth - 2 * inset;
+        final width = isDesktopPlatform
+            ? ((content - 3 * _gap) / 3.3).clamp(220.0, 320.0)
+            : math.min(content - 44, 280.0);
+        return SizedBox(
+          height: width / MornyeMixBanner.aspectRatio,
+          child: DesktopScrollArrows(
+            builder: (context, controller) => ListView.separated(
+              controller: controller,
+              scrollDirection: Axis.horizontal,
+              padding: EdgeInsets.symmetric(horizontal: inset),
+              itemCount: mixes.length,
+              separatorBuilder: (_, _) => const SizedBox(width: _gap),
+              itemBuilder: (context, index) {
+                final view = mixes[index];
+                final title = libraryMixTitle(l10n, view.mix);
+                final subtitle = libraryMixSubtitle(l10n, view.mix);
+                return Semantics(
+                  button: true,
+                  label: subtitle.isEmpty ? title : '$title, $subtitle',
+                  excludeSemantics: true,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Stack(
+                      children: [
+                        MornyeMixBanner(
+                          seed: seeds[index],
+                          title: title,
+                          eyebrow: l10n.homeMadeForYou,
+                          subtitle: subtitle,
+                          width: width,
+                        ),
+                        Positioned.fill(
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              onTap: () => pushPage<void>(
+                                context,
+                                (_) => LibraryMixScreen(view: view),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
         );
       },
     );

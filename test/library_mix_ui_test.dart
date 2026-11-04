@@ -20,6 +20,7 @@ import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/widgets/desktop/track_table.dart';
 import 'package:mornye/widgets/library_mix_cover.dart';
 import 'package:mornye/widgets/library_track_selection_bar.dart';
+import 'package:mornye/widgets/mornye_mix_banner.dart';
 import 'package:mornye/widgets/track_card.dart';
 
 import 'support/fixed_settings.dart';
@@ -72,9 +73,23 @@ void main() {
         );
         // Rows take taps again once the scroll comes to rest.
         await tester.pump(const Duration(seconds: 1));
-        expect(find.text('Mixes for you'), findsOneWidget);
         expect(find.text('Tyler, The Creator and Frank Ocean'), findsOneWidget);
-        expect(find.byType(LibraryMixCover), findsOneWidget);
+        if (mornye) {
+          expect(find.text('Top Picks for You'), findsOneWidget);
+          expect(find.text('Made for You'), findsOneWidget);
+          expect(find.byType(MornyeMixBanner), findsOneWidget);
+          expect(find.text('Mixes for you'), findsNothing);
+          // The shelf comes first: above Home's other sections.
+          final shortcuts = find.text('Shortcuts', skipOffstage: false);
+          expect(
+            tester.getTopLeft(find.text('Top Picks for You')).dy,
+            lessThan(tester.getTopLeft(shortcuts).dy),
+          );
+        } else {
+          expect(find.text('Mixes for you'), findsOneWidget);
+          expect(find.byType(LibraryMixCover), findsOneWidget);
+          expect(find.byType(MornyeMixBanner), findsNothing);
+        }
 
         await tester.tap(title);
         await tester.pump();

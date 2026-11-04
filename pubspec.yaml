@@ -199,6 +199,7 @@ flutter:
     - COPYING
     - NOTICE
     - assets/images/
+    - assets/brand/logo/png/mornye-lockup-horizontal-white@1x.png
     - assets/fonts/Inter-LICENSE.txt
     - assets/fonts/GoogleSansFlex-LICENSE.txt
     - assets/licenses/usb.txt

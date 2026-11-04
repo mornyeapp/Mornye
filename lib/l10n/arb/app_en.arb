@@ -8389,6 +8389,14 @@
   "@homeShortcuts": {
     "description": "Home section header for quick links to player tools"
   },
+  "homeTopPicks": "Top Picks for You",
+  "@homeTopPicks": {
+    "description": "Mornye Home: heading of the first shelf, the day's mixes shown as banners"
+  },
+  "homeMadeForYou": "Made for You",
+  "@homeMadeForYou": {
+    "description": "Mornye Home: small label on a mix banner"
+  },
   "homeMixesForYou": "Mixes for you",
   "@homeMixesForYou": {
     "description": "Home section header for daily mixes made from the user's own Library songs"
