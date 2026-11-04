@@ -22,6 +22,7 @@ import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/models/track.dart';
 import 'package:mornye/models/artist_concert.dart';
 import 'package:mornye/widgets/artist_concerts_button.dart';
+import 'package:mornye/widgets/artist_featured_album_card.dart';
 import 'package:mornye/providers/extension_provider.dart';
 import 'package:mornye/providers/track_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
@@ -727,9 +728,14 @@ class _ArtistScreenState extends ConsumerState<ArtistScreen>
                                 albums.isNotEmpty &&
                                 !isSelectionMode)
                               SliverToBoxAdapter(
-                                child: _buildMornyeFeaturedAlbum(
-                                  context,
-                                  albums.first,
+                                child: ArtistFeaturedAlbumCard(
+                                  album: albums.first,
+                                  onTap: () => _navigateToAlbum(albums.first),
+                                  onAdd: () =>
+                                      _downloadAlbums(context, [albums.first]),
+                                  loadMetadata: _albumMetadataLoader(
+                                    albums.first,
+                                  ),
                                 ),
                               ),
                             if (_topTracks != null && _topTracks!.isNotEmpty)

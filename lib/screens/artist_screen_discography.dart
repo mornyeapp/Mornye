@@ -312,6 +312,19 @@ extension _ArtistScreenDiscography on _ArtistScreenState {
     }
   }
 
+  /// Reads [album]'s metadata from the provider it names, if any.
+  Future<Map<String, dynamic>> Function()? _albumMetadataLoader(
+    ArtistAlbum album,
+  ) {
+    final providerId = album.providerId;
+    if (providerId == null || providerId.isEmpty) return null;
+    return () => PlatformBridge.getProviderMetadata(
+      providerId,
+      'album',
+      stripPrefixedResourceId(album.id),
+    );
+  }
+
   Future<List<Track>> _fetchAlbumTracks(ArtistAlbum album) async {
     final providerId = album.providerId;
     if (providerId != null && providerId.isNotEmpty) {
