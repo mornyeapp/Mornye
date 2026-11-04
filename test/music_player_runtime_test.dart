@@ -2430,6 +2430,54 @@ void main() {
   );
 
   test(
+    'deleting a queued track does not interrupt current playback',
+    () async {
+      final directory = await Directory.systemTemp.createTemp(
+        'noncurrent-queued-deletion-',
+      );
+      addTearDown(() => directory.delete(recursive: true));
+      final currentFile = await File(
+        '${directory.path}/current.flac',
+      ).writeAsString('current');
+      final queuedFile = await File(
+        '${directory.path}/queued.flac',
+      ).writeAsString('queued');
+      final events = SourceDeletionEvents();
+      final decks = <_Deck>[];
+      final runtime = _runtime(decks: decks, sourceDeletionEvents: events);
+      final handler = await runtime.initialize();
+      await handler.setQueueAndPlay([
+        PlayableMedia(
+          id: 'current',
+          source: currentFile.path,
+          title: 'Current',
+          artist: 'Artist',
+        ),
+        PlayableMedia(
+          id: 'queued',
+          source: queuedFile.path,
+          title: 'Queued',
+          artist: 'Artist',
+        ),
+      ]);
+      final prepared = <String>[];
+      events.subscribeBeforeDeletion((source) async {
+        prepared.add(source);
+        expect(decks.single.state, PlaybackDeckState.playing);
+        expect(handler.mediaItem.value?.id, 'current');
+      });
+
+      expect(await deleteFile(queuedFile.path, deletionEvents: events), isTrue);
+
+      expect(prepared, [queuedFile.path]);
+      expect(handler.queue.value.map((item) => item.id), ['current']);
+      expect(handler.mediaItem.value?.id, 'current');
+      expect(decks.single.state, PlaybackDeckState.playing);
+      expect(decks.single.sources, [currentFile.path]);
+    },
+  );
+
+  test(
     'SAF deletion releases cached playback copies before returning',
     () async {
       final directory = await Directory.systemTemp.createTemp(
@@ -2474,7 +2522,9 @@ void main() {
   test(
     'a player that cannot release its source prevents file deletion',
     () async {
-      final directory = await Directory.systemTemp.createTemp('failed-reaction-');
+      final directory = await Directory.systemTemp.createTemp(
+        'failed-reaction-',
+      );
       addTearDown(() => directory.delete(recursive: true));
       final file = await File(
         '${directory.path}/song.flac',
