@@ -15,9 +15,8 @@ internal fun MainActivity.handleVerificationNotificationIntent(intent: Intent?) 
 }
 
 /**
- * Deliver Spotify (or other) OAuth authorization code to the extension runtime
- * and run its token exchange (e.g. completeSpotifyLogin). State is a one-time
- * host nonce resolved to the owning extension by the backend.
+ * Queues an extension OAuth callback for completion after Dart initializes.
+ * The backend resolves the one-time state nonce to the owning extension.
  */
 internal fun MainActivity.handleExtensionOAuthIntent(intent: Intent?) {
     val uri = intent?.data ?: return

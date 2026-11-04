@@ -50,7 +50,7 @@ class LibrarySearchResults extends ConsumerStatefulWidget {
   final String query;
   final ValueChanged<String> onOpenArtist;
 
-  /// Groups the overview as Music on the Mac does: artists, albums and
+  /// Groups the overview into artists, albums and
   /// playlists in rows of artwork that scroll sideways, songs as rows, and
   /// no filter chips until a section header opens one kind.
   final bool shelves;

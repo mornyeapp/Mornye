@@ -28,7 +28,7 @@ class DesktopHoverPlayButton extends StatefulWidget {
   static const double _mornyeDiameter = 30;
   static const double _target = 40;
 
-  /// Dims the artwork behind the Mornye button, as in Music.
+  /// Dims the artwork behind the Mornye button.
   static const Color _mornyeScrim = Color(0x4D333333);
 
   /// Corner radius of the Mornye tiles this button sits on.
@@ -50,8 +50,7 @@ class _DesktopHoverPlayButtonState extends State<DesktopHoverPlayButton> {
     final colorScheme = Theme.of(context).colorScheme;
     final mornye = context.isMornye;
     final visible = _hovered || _focused;
-    // Mornye follows Apple Music's light disc; Material uses its primary FAB
-    // colors.
+    // Mornye uses a light disc; Material uses its primary FAB colors.
     final background = mornye
         ? Colors.white.withValues(alpha: 0.92)
         : colorScheme.primaryContainer;

@@ -127,7 +127,7 @@ class MornyeMixBanner extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     final pixelRatio = MediaQuery.devicePixelRatioOf(context);
     final logoWidth = width * 0.3;
-    // Music's cards keep a small caption on the Mac.
+    // Pointer layouts use a compact caption.
     final captionSize = isDesktopPlatform ? 12.0 : null;
     return MediaQuery.withClampedTextScaling(
       maxScaleFactor: 1.2,

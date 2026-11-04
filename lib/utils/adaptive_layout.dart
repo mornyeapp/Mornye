@@ -114,7 +114,7 @@ double wideInsetForWidth(
 
 /// Horizontal inset that centers full-width list content on tablets/landscape;
 /// zero on phones, so rows stop stretching across the whole screen. Mornye
-/// desktop pages run across the whole content pane, as Music's do, and center
+/// desktop pages run across the whole content pane and center
 /// only past [desktopContentMaxWidth]. Material desktop pages center past
 /// [desktopMaterialContentMaxWidth], so long lists keep a reading width
 /// instead of stretching across a wide window.
@@ -176,7 +176,7 @@ const double searchTopResultHeight = 80;
 int searchTopResultColumns(double width) => width >= 840 ? 3 : 2;
 
 /// The cover side of a search shelf in a pane [paneWidth] wide. Mornye sizes
-/// covers to the pane with the next one peeking, as in Music: a little over
+/// covers to the pane with the next one peeking: a little over
 /// four albums or five artists.
 double searchShelfExtentFor(
   BuildContext context,

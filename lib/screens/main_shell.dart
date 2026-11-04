@@ -754,8 +754,8 @@ class _MainShellState extends ConsumerState<MainShell>
     ];
   }
 
-  /// The Library pages under the Mornye desktop sidebar's Library heading,
-  /// as in Music. Recently Added is the Library root.
+  /// The pages under the Mornye desktop sidebar's Library heading.
+  /// Recently Added is the Library root.
   List<DesktopSidebarLink> _desktopLibraryLinks({required int queueCount}) {
     final l10n = context.l10n;
     return [

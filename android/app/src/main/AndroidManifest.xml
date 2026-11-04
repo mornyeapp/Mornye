@@ -96,7 +96,7 @@
                 <data android:mimeType="application/x-flac" />
             </intent-filter>
 
-            <!-- Handle music URL sharing (Spotify, Deezer, Tidal, YT Music) -->
+            <!-- Accept shared text for app-level URL handling. -->
             <intent-filter>
                 <action android:name="android.intent.action.SEND" />
                 <category android:name="android.intent.category.DEFAULT" />

@@ -122,8 +122,7 @@ extension _TrackMetadataMornye on _TrackMetadataScreenState {
                           ),
                         ),
                         const SizedBox(height: 16),
-                        // Music sizes its header buttons to the title column
-                        // rather than the window.
+                        // Keep header buttons within the title column.
                         Center(
                           child: ConstrainedBox(
                             constraints: const BoxConstraints(maxWidth: 400),

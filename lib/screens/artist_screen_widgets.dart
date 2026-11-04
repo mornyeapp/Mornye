@@ -106,7 +106,7 @@ extension _ArtistScreenSections on _ArtistScreenState {
       ),
     );
 
-    // Mornye keeps its Apple Music hero on desktop, filling the pane.
+    // Mornye keeps the full-pane hero on desktop.
     if (isDesktopPlatform && !context.isMornye) {
       return _buildDesktopHeader(
         context,
@@ -681,7 +681,7 @@ extension _ArtistScreenSections on _ArtistScreenState {
     );
   }
 
-  /// Music on the Mac: Latest Release and Top Songs share one row of equal
+  /// Latest Release and Top Songs share one row of equal
   /// columns that scroll sideways together, each snapping to the left edge.
   Widget _buildMornyeDesktopHighlights(
     BuildContext context,
@@ -1205,7 +1205,7 @@ extension _ArtistScreenSections on _ArtistScreenState {
   }) {
     if (isDesktopPlatform && context.isMornye) {
       // Four covers to the pane's width: two line up under each highlight
-      // column above, as in Music.
+      // column above.
       return LayoutBuilder(
         builder: (context, constraints) {
           final column = _mornyeHighlightColumn(constraints.maxWidth);

@@ -60,7 +60,7 @@ AppThemeStyle defaultAppThemeStyle() =>
 AppThemeStyle themeStyleFromString(String? value) => AppThemeStyle.values
     .firstWhere((style) => style.name == value, orElse: defaultAppThemeStyle);
 
-/// Default Spotify green color for fallback
+/// Fallback seed when dynamic color and a custom seed are unavailable.
 const int kDefaultSeedColor = 0xFF1DB954;
 
 class ThemeSettings {

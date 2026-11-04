@@ -55,9 +55,9 @@ final desktopPlayerDismissed = ValueNotifier<bool>(false);
 /// Material docks an 80dp bar along the bottom of the window, on the
 /// `surfaceContainer` fill of the current artwork's scheme
 /// ([PlayerArtworkTheme]). Mornye draws a glass capsule that the shell
-/// floats over the bottom of the content pane, laid out like the Music
-/// player: shuffle and the transport, a center "LCD" with the track and its
-/// progress, then lyrics, Up Next, downloads and volume.
+/// floats over the bottom of the content pane: shuffle and transport, a
+/// center display with the track and its progress, then lyrics, Up Next,
+/// downloads and volume.
 class DesktopPlayerBar extends ConsumerWidget {
   const DesktopPlayerBar({super.key});
 
@@ -74,7 +74,7 @@ class DesktopPlayerBar extends ConsumerWidget {
   static const double floatingInset = mornyeHeight + floatingMargin + 12;
 
   /// Width of the Mornye capsule in a content pane [paneWidth] wide: about
-  /// 70% of it, as in Music, from 520 to 900 and never closer than 12 to
+  /// 70% of it, from 520 to 900 and never closer than 12 to
   /// the pane's sides.
   static double floatingWidth(double paneWidth) => math.min(
     (paneWidth * 0.7).clamp(520.0, 900.0),
@@ -175,9 +175,9 @@ class _MaterialPlayerBar extends StatelessWidget {
   }
 }
 
-/// The Mornye capsule, laid out like the Music player: shuffle, the
-/// transport and repeat, the LCD, then downloads, lyrics, Up Next and a
-/// volume button whose slider opens in a popover. Its buttons take macOS
+/// The Mornye capsule: shuffle, transport and repeat, the center display,
+/// then downloads, lyrics, Up Next and a volume button whose slider opens in
+/// a popover. Its buttons take macOS
 /// toolbar sizes rather than touch sizes.
 class _MornyePlayerBar extends StatelessWidget {
   const _MornyePlayerBar({required this.mediaItem});
@@ -225,7 +225,7 @@ class _MornyePlayerBar extends StatelessWidget {
 enum _MornyeMode { shuffle, repeat }
 
 /// Shuffle or repeat in the capsule: small secondary glyphs, accent while
-/// on, as in Music, and dimmed while nothing is loaded.
+/// on, and dimmed while nothing is loaded.
 class _MornyeModeButton extends ConsumerWidget {
   const _MornyeModeButton({required this.mode, required this.enabled});
 
@@ -607,10 +607,9 @@ class _SeekRow extends ConsumerWidget {
   }
 }
 
-/// The Mornye center display: artwork, then the title and artist centered
+/// The Mornye center display: artwork, then the title and artist aligned
 /// over a thin progress bar. Clicking the artwork or text opens Now
-/// Playing. With nothing loaded it shows a music glyph, like Music's idle
-/// display.
+/// Playing. With nothing loaded it shows a music glyph.
 class _MornyeLcd extends StatelessWidget {
   const _MornyeLcd({required this.mediaItem});
 
@@ -635,7 +634,7 @@ class _MornyeLcd extends StatelessWidget {
         ),
       );
     }
-    // As in Music: artwork and left-aligned lines, with a hairline progress
+    // Artwork and left-aligned lines, with a hairline progress
     // track along the bottom from the artwork's edge.
     return Column(
       children: [
@@ -745,7 +744,7 @@ class _MornyeLcdArtworkState extends State<_MornyeLcdArtwork> {
   }
 }
 
-/// The LCD's title and "artist · album" line, left-aligned like Music's.
+/// The display's title and "artist · album" line, both left-aligned.
 /// A line too long for the capsule scrolls twice, then rests at its start.
 class _MornyeLcdLines extends ConsumerWidget {
   const _MornyeLcdLines({required this.mediaItem});
@@ -795,7 +794,7 @@ class _MornyeLcdLines extends ConsumerWidget {
             maxCycles: 2,
             child: Text(
               subtitle,
-              // Music's second line stays bright over the capsule's glass.
+              // Keep the subtitle legible over the capsule's glass.
               style: style?.copyWith(
                 color: colorScheme.onSurface.withValues(alpha: 0.78),
               ),
@@ -812,7 +811,7 @@ class _MornyeLcdLines extends ConsumerWidget {
 /// volume. Material fills its third of the bar, with phones and downloads
 /// after Up Next and then the volume slider. The Mornye capsule leads with
 /// phones and downloads and ends with a volume button whose slider opens in
-/// a popover, as Music does. The phones button shows only while a phone is
+/// a popover. The phones button shows only while a phone is
 /// connected over Mornye Link. Paused local playback adds a dismiss button
 /// at the end in both styles.
 class _TrailingControls extends ConsumerWidget {
@@ -1025,7 +1024,7 @@ class _MornyeVolumeButtonState extends ConsumerState<_MornyeVolumeButton> {
                   child: PlayerVolumeControl(foreground: colorScheme.onSurface),
                 ),
                 // The capsule has no room for its own Cast button; output
-                // sits with volume, as in Music.
+                // sits with volume.
                 SizedBox(
                   width: 240,
                   child: MenuItemButton(
@@ -1064,7 +1063,7 @@ class _MornyeVolumeButtonState extends ConsumerState<_MornyeVolumeButton> {
   }
 }
 
-/// Music's popover entrance: 250ms of fade with a short rise.
+/// The popover entrance: 250ms of fade with a short rise.
 class _MornyePopoverEntrance extends StatelessWidget {
   const _MornyePopoverEntrance({required this.child});
 

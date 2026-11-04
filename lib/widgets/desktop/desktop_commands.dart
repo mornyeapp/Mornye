@@ -121,7 +121,7 @@ SingleActivator? desktopCommandShortcut(
             )
           : null,
     DesktopCommand.refresh => _primary(LogicalKeyboardKey.keyR, target),
-    // Music's "Switch to MiniPlayer" on macOS. Ctrl+Alt elsewhere is AltGr
+    // Use Cmd+Option+M on macOS. Ctrl+Alt elsewhere is AltGr
     // on many keyboard layouts, so Windows and Linux add Shift instead.
     DesktopCommand.miniPlayer => _primary(
       LogicalKeyboardKey.keyM,

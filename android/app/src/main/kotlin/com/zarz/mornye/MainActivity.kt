@@ -344,9 +344,8 @@ class MainActivity: FlutterFragmentActivity() {
         }
     }
 
-    // Disable Flutter's built-in deep linking so that incoming ACTION_VIEW URLs
-    // (Spotify, Deezer, Tidal, YouTube Music) are NOT forwarded to GoRouter.
-    // We handle these URLs ourselves via receive_sharing_intent + ShareIntentService.
+    // Keep incoming ACTION_VIEW URLs out of GoRouter. The sharing-intent
+    // handler and ShareIntentService resolve them before navigation.
     override fun shouldHandleDeeplinking(): Boolean = false
 
     // Bridge spill files and SAF temp copies are deleted after use on the

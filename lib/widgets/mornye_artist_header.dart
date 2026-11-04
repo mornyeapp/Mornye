@@ -65,7 +65,7 @@ class _MornyeArtistSurfaceState extends State<MornyeArtistSurface> {
   @override
   Widget build(BuildContext context) {
     // Desktop album and playlist pages keep the plain pane background and
-    // app accent; artist pages keep their artwork tint, as in Apple Music.
+    // app accent; artist pages keep their artwork tint.
     if (isDesktopPlatform && widget.neutralActions) return widget.child;
     final baseTheme = Theme.of(context);
     if (!identical(baseTheme, _baseTheme) ||
@@ -105,8 +105,8 @@ class _MornyeArtistSurfaceState extends State<MornyeArtistSurface> {
           final useAccent =
               !widget.neutralActions && dominant.saturation >= 0.08;
           final accent = HSLColor.fromColor(palette.primary);
-          // Music's artist pages fall away to near black, the artwork's color
-          // only a trace in it; albums keep their lighter neutral surface.
+          // Keep a faint artwork tint on artist pages; album pages use the
+          // lighter neutral surface.
           final surface = useAccent
               ? accent
                     .withSaturation((accent.saturation * 0.6).clamp(0.0, 0.6))
@@ -231,7 +231,7 @@ class MornyeArtistHeader extends StatelessWidget {
   final Widget artwork;
   final List<Widget> actions;
 
-  /// Grouped in the glass capsule at the toolbar's trailing end, as in Music.
+  /// Grouped in the glass capsule at the toolbar's trailing end.
   final List<Widget> toolbarActions;
   final bool showTitle;
 
@@ -304,8 +304,7 @@ class MornyeArtistHeader extends StatelessWidget {
               listenersHeight +
               (actions.isEmpty ? 0 : 94) +
               32;
-          // Desktop: the portrait fills most of the pane, as in Apple Music
-          // on the Mac.
+          // The desktop portrait fills most of the content pane.
           final expandedHeight = isDesktopPlatform
               ? math.max(
                   contentHeight + 160,
@@ -326,7 +325,7 @@ class MornyeArtistHeader extends StatelessWidget {
             actionsPadding: EdgeInsetsDirectional.only(
               end: isDesktopPlatform ? 8 : 12,
             ),
-            // Music on the Mac leaves the toolbar untitled over the artist.
+            // The desktop hero already displays the artist's name.
             title: isDesktopPlatform
                 ? null
                 : headerToolbarTitle(

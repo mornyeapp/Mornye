@@ -29,7 +29,7 @@ class AppSearchField extends StatelessWidget {
     this.compact = false,
   });
 
-  /// The height of a [compact] Mornye field, as Music's desktop toolbar.
+  /// The height of a [compact] Mornye desktop toolbar field.
   static const compactHeight = 36.0;
 
   final TextEditingController controller;

@@ -1,8 +1,7 @@
 part of 'home_tab.dart';
 
 extension _HomeTabRecentUI on _HomeTabState {
-  /// The Mornye desktop Search page lays recents out as Music does: one row
-  /// of cards that scrolls sideways.
+  /// The Mornye desktop Search page lays recents out as a horizontal card shelf.
   bool get _recentAccessAsCards =>
       context.isMornye &&
       isDesktopPlatform &&

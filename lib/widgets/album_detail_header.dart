@@ -569,8 +569,7 @@ class HeaderActionGroup extends InheritedWidget {
   bool updateShouldNotify(HeaderActionGroup oldWidget) => false;
 }
 
-/// Mornye page actions grouped in one glass capsule, as beside Music's page
-/// title on the Mac and on iPhone.
+/// Mornye page actions grouped in one glass capsule.
 class MornyeActionCapsule extends ConsumerWidget {
   const MornyeActionCapsule({super.key, required this.children});
 
@@ -924,8 +923,7 @@ class HeaderCircleButton extends ConsumerWidget {
     final scheme = HeaderPalette.of(context);
     // Desktop headers use pointer-sized controls.
     final desktop = isDesktopPlatform;
-    // Mornye's toolbar glass matches Music's; the tonal circles stay level
-    // with the action pills beside them.
+    // Tonal circles stay level with the action pills beside them.
     final toolbarGlass = context.isMornye && !tonal;
     final buttonSize =
         this.buttonSize ??
@@ -939,7 +937,7 @@ class HeaderCircleButton extends ConsumerWidget {
         tooltip: tooltip,
         icon: AppIcon(mornyeIconFor(icon), size: iconSize),
         style: IconButton.styleFrom(
-          // Music sets the capsule's buttons closer together than its height.
+          // Pointer controls use a compact width within the shared capsule.
           minimumSize: desktop
               ? Size(42, buttonSize ?? 44)
               : Size.square(buttonSize ?? 44),
@@ -1059,7 +1057,7 @@ class _MornyeHeaderButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = HeaderPalette.of(context);
-    // Desktop pills are the compact gray capsules of Apple Music.
+    // Desktop action pills use a compact, neutral fill.
     final desktop = isDesktopPlatform;
     final filled = prominent && !desktop;
     final foreground = onPressed == null

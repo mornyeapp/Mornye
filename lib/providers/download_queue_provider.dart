@@ -1786,7 +1786,6 @@ class DownloadQueueNotifier extends Notifier<DownloadQueueState> {
       }
     }
 
-    // iOS: request a background execution window (no foreground service).
     if (Platform.isIOS && _totalQueuedAtStart > 0) {
       await PlatformBridge.beginBackgroundDownloadTask();
     }

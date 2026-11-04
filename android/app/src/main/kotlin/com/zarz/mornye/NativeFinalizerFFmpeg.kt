@@ -222,9 +222,8 @@ internal fun NativeDownloadFinalizer.probePrimaryAudioCodec(path: String, should
 /**
  * Returns true when the file on [path] starts with the native FLAC magic
  * bytes (`fLaC`). A file may contain a FLAC audio stream yet live inside
- * an MP4/fMP4 container (e.g. some Amazon Music downloads); native FLAC
- * tag writers require the raw fLaC header, so we must detect that mismatch
- * before skipping the container conversion step.
+ * an MP4/fMP4 container; native FLAC tag writers require the raw fLaC
+ * header, so detect that mismatch before skipping container conversion.
  */
 internal fun NativeDownloadFinalizer.isNativeFlacFile(path: String): Boolean {
     return try {

@@ -72,8 +72,8 @@ class DownloadQueuePersistence {
       _saved = decoded.saved;
       return decoded.items;
     });
-    // A restore is ordered with durable writes now that decoding can yield to
-    // a worker. Its error still reaches the caller without poisoning retries.
+    // Serialize restore with durable writes because decoding can yield to a
+    // worker. Its error reaches the caller without preventing later retries.
     _write = restored.then<void>((_) {}, onError: (Object _, StackTrace _) {});
     return restored;
   }

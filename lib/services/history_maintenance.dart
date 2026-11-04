@@ -6,7 +6,8 @@ import 'package:mornye/utils/ios_container_paths.dart';
 
 /// Restored history can contain an older container even after this install's
 /// startup migration ran. Update stored paths and their match keys together.
-/// The version marker also repairs restores performed before this fix.
+/// The version marker reruns the repair for installations without that marker,
+/// even if their recorded container path already matches.
 Future<int?> migrateIosHistoryPaths(
   Database db,
   SharedPreferences prefs, {

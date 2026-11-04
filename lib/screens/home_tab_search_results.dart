@@ -608,7 +608,7 @@ extension _HomeTabSearchResultsUI on _HomeTabState {
     VoidCallback? onShowAll,
   }) {
     final mornye = context.isMornye;
-    // Music's wide headers: the title itself leads on, with a chevron.
+    // The title and chevron both open the section's complete results.
     if (mornye && onShowAll != null) {
       return SliverToBoxAdapter(
         child: Padding(

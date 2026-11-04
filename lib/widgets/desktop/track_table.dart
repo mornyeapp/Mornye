@@ -91,7 +91,7 @@ class SliverTrackTable extends StatefulWidget {
     this.uniformRowHeight = false,
   });
 
-  /// The album page layout of Apple Music: no column headers, the number,
+  /// The compact album layout: no column headers, the number,
   /// title and duration with a "More" button, the artist under the title only
   /// when it differs from [albumArtist], separators from the title column,
   /// and a play glyph in place of the number under the pointer. [columns],
@@ -377,7 +377,7 @@ class _QualityKey implements Comparable<_QualityKey> {
   }
 }
 
-/// How fast a Mornye row's hover actions appear, as in Music.
+/// How fast a Mornye row's hover actions appear.
 const _mornyeRowFade = Duration(milliseconds: 100);
 
 String _formatDuration(Duration duration) {
@@ -402,7 +402,7 @@ class TrackTableLayout {
   static const double albumNumber = 32;
   static const double albumTitleGap = 14;
 
-  // Pointer rows: Music's 40pt, and the M3 compact list density for Material
+  // Pointer rows: 40pt for Mornye, and the M3 compact list density for Material
   // instead of the 48dp touch row.
   static double rowMinHeightFor(BuildContext context) =>
       context.isMornye ? 40 : 44;
@@ -978,7 +978,7 @@ class _AlbumRowViewState extends State<_AlbumRowView> {
                   children: [
                     number,
                     const SizedBox(width: TrackTableLayout.albumTitleGap),
-                    // The separator starts at the title, as in Apple Music.
+                    // Align the separator with the title column.
                     Expanded(
                       child: DecoratedBox(
                         decoration: BoxDecoration(

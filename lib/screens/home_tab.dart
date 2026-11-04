@@ -145,8 +145,8 @@ class _HomeTabState extends ConsumerState<HomeTab>
   static const int _minLiveSearchChars = 3;
   static const Duration _liveSearchDelay = Duration(milliseconds: 800);
 
-  /// The Mornye desktop Search page can search the library instead of the
-  /// online provider, as the scope control in Music does.
+  /// The Mornye desktop Search page can switch between the library and the
+  /// selected online provider.
   bool get _offersLibraryScope =>
       widget.mode == HomeTabMode.search &&
       context.isMornye &&
@@ -156,7 +156,7 @@ class _HomeTabState extends ConsumerState<HomeTab>
   Timer? _libraryQueryDebounce;
   bool get _searchingLibrary => _searchesLibrary && _offersLibraryScope;
 
-  /// Mornye's desktop field is pointer-sized, as Music's toolbar field is.
+  /// Mornye's desktop field uses the compact toolbar size.
   bool get _compactSearchField => context.isMornye && isDesktopPlatform;
 
   bool _embeddedCoverRefreshScheduled = false;
@@ -896,8 +896,7 @@ class _HomeTabState extends ConsumerState<HomeTab>
         !hasResults;
     final searchToolbar = _offersLibraryScope;
     final showLibraryResults = _searchingLibrary && hasSearchInput;
-    // As in Music, the library scope waits for words without recents or
-    // Browse.
+    // The library scope waits for input before showing local matches.
     final showLibraryPrompt = _searchingLibrary && !hasSearchInput;
     final sectionMotion = AppMotion.spatial(
       context,
@@ -1047,8 +1046,7 @@ class _HomeTabState extends ConsumerState<HomeTab>
     }
   }
 
-  /// Music on the Mac keeps its search field centered in the toolbar, with
-  /// the scope control at the trailing edge.
+  /// Centers the search field with the scope control at the trailing edge.
   Widget _buildDesktopSearchToolbarSliver() {
     final extensions = ref.watch(extensionProvider.select((s) => s.extensions));
     final providerId = HomeSearchProviderPolicy.resolveProvider(

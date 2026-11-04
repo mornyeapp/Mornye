@@ -1,5 +1,5 @@
-//! The OpenSubsonic surface (contract section 4). Owned by unit L1b. The
-//! server core authenticates first, then calls [`handle`]; it answers
+//! The OpenSubsonic surface (contract section 4). The server core
+//! authenticates first, then calls [`handle`]; it answers
 //! authentication failures with [`error_response`].
 //!
 //! Responses are built as JSON values, then rendered as OpenSubsonic JSON

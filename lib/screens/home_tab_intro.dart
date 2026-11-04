@@ -24,8 +24,8 @@ double _homeMixCoverSizeOf(BuildContext context) =>
 
 double _homeShelfRadiusOf(BuildContext context) => context.isMornye ? 10 : 20;
 
-/// Whether Home sets its text at Music's smaller Mac sizes.
-bool _homeMusicText(BuildContext context) =>
+/// Whether Home uses compact Mornye desktop typography.
+bool _homeCompactText(BuildContext context) =>
     context.isMornye && isDesktopPlatform;
 
 typedef HomeRecentlyAdded = ({List<UnifiedLibraryItem> items, int trackCount});
@@ -116,8 +116,7 @@ final homeOnRepeatProvider = FutureProvider.autoDispose<List<HomeRepeatTrack>>((
   return memo.onRepeat = tracks;
 });
 
-/// Mornye's Recently Played: one song of each album played lately, latest
-/// day first, as Music lists what was played by its album.
+/// One song per recently played album, ordered by the latest listening day.
 final homeRecentlyPlayedProvider =
     FutureProvider.autoDispose<List<HomeRepeatTrack>>((ref) async {
       final memo = ref.read(_homeShelfMemoProvider);
@@ -415,8 +414,7 @@ class _HomeSections extends ConsumerWidget {
             inset: inset,
             child: const _HomeContinueListeningCard(),
           ),
-        // Music's Home has no tools: Mornye keeps them in the player and
-        // Settings.
+        // Mornye exposes these tools in the player and Settings.
         if (!mornye)
           _HomeSection(
             title: l10n.homeShortcuts,
@@ -567,7 +565,7 @@ class _HomeSection extends StatelessWidget {
   /// Shelves scroll edge to edge and pad their own items.
   final bool shelf;
 
-  /// Makes the title a link, marked with a chevron, as in Music.
+  /// Makes the title a navigation action, marked with a chevron.
   final VoidCallback? onShowAll;
 
   @override
@@ -577,7 +575,7 @@ class _HomeSection extends StatelessWidget {
       title,
       style: Theme.of(context).textTheme.titleMedium?.copyWith(
         color: colorScheme.onSurface,
-        fontSize: _homeMusicText(context) ? 15 : null,
+        fontSize: _homeCompactText(context) ? 15 : null,
         fontWeight: FontWeight.w600,
       ),
     );
@@ -688,7 +686,7 @@ class _HomeContinueListeningCardState
     final album = mediaItem.album ?? '';
     final hero = widget.hero;
     final devicePixelRatio = MediaQuery.devicePixelRatioOf(context);
-    // Music keeps Home neutral: the accent is not spent on this card.
+    // Mornye uses a neutral surface for the resume card.
     final neutral = context.isMornye;
     final onContainer = neutral
         ? colorScheme.onSurface
@@ -942,8 +940,8 @@ class _HomeShelf extends StatelessWidget {
   }
 }
 
-/// Hands [builder] the cover size of a shelf in this pane: Mornye's follow
-/// Music, about six to a desktop pane.
+/// Hands [builder] the shelf cover size, fitting about six covers across a
+/// Mornye desktop pane.
 class _HomeShelfSize extends StatelessWidget {
   const _HomeShelfSize({required this.inset, required this.builder});
 
@@ -994,7 +992,7 @@ class _HomeShelfTile extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     final size = this.size ?? _homeShelfCoverSizeOf(context);
     final radius = _homeShelfRadiusOf(context);
-    final musicText = _homeMusicText(context);
+    final compactText = _homeCompactText(context);
     return Semantics(
       button: true,
       label: semanticLabel,
@@ -1018,8 +1016,8 @@ class _HomeShelfTile extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: textTheme.labelLarge?.copyWith(
                   color: colorScheme.onSurface,
-                  fontSize: musicText ? 13 : null,
-                  fontWeight: musicText ? FontWeight.w400 : null,
+                  fontSize: compactText ? 13 : null,
+                  fontWeight: compactText ? FontWeight.w400 : null,
                 ),
               ),
               Text(
@@ -1028,7 +1026,7 @@ class _HomeShelfTile extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: textTheme.bodySmall?.copyWith(
                   color: colorScheme.onSurfaceVariant,
-                  fontSize: musicText ? 13 : null,
+                  fontSize: compactText ? 13 : null,
                 ),
               ),
             ],
@@ -1253,7 +1251,7 @@ class _HomeOnRepeatShelf extends ConsumerWidget {
   }
 }
 
-/// What was played lately, as Music shows it: large covers named by album.
+/// Recently played tracks displayed as large covers named by album.
 /// Choosing one plays from that song.
 class _HomeRecentlyPlayedShelf extends ConsumerWidget {
   const _HomeRecentlyPlayedShelf({required this.tracks, required this.inset});
@@ -1522,7 +1520,7 @@ class _HomeShortcuts extends ConsumerWidget {
 
     // Shuffle is the one emphasized action; the other tools share a neutral
     // tile so color marks importance rather than varying per tile. Mornye
-    // follows Music and leaves every tile neutral.
+    // keeps all shortcut tiles neutral.
     final emphasized = context.isMornye ? -1 : 0;
     final shortcuts = <({String label, IconData icon, VoidCallback onTap})>[
       (

@@ -1,6 +1,6 @@
 import 'package:mornye/utils/cover_art_utils.dart';
 
-/// Mornye Link collections and history sync (unit L4). Both directions use
+/// Mornye Link collections and history sync. Both directions use
 /// the same JSON, so the desktop (server) and the phone (client) share one
 /// store implementation per database.
 ///

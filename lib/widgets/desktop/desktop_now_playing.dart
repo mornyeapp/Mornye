@@ -39,10 +39,10 @@ import 'package:mornye/widgets/player_volume_control.dart';
 import 'package:mornye/widgets/playlist_picker_sheet.dart';
 import 'package:share_plus/share_plus.dart';
 
-/// Now Playing on the desktop, covering the whole window as Music's player
-/// does: the cover, title and transport on the leading side, lyrics or Up
-/// Next ([desktopInspectorPanel]) on the trailing side, the volume at the
-/// top and the panel toggles at the bottom. With no panel the cover column
+/// Now Playing covers the desktop window: cover, title and transport on the
+/// leading side, lyrics or Up Next ([desktopInspectorPanel]) on the trailing
+/// side, the volume at the top and the panel toggles at the bottom. With no
+/// panel the cover column
 /// stands alone in the middle. Close or Escape return to the shell
 /// ([desktopNowPlayingOpen]).
 class DesktopNowPlaying extends ConsumerStatefulWidget {
@@ -514,7 +514,7 @@ class _PlayerColumn extends StatelessWidget {
 const _actionIconSize = 16.0;
 const _actionPadding = EdgeInsets.all(8);
 
-/// The translucent disc behind the Favorite and More buttons, as in Music.
+/// The translucent disc behind the Favorite and More buttons.
 class _ActionDisc extends StatelessWidget {
   const _ActionDisc({required this.child});
 
@@ -532,8 +532,7 @@ class _ActionDisc extends StatelessWidget {
   );
 }
 
-/// More for the playing song: Music's menu, with the Equalizer added as
-/// Mornye's desktop player has no other way to it.
+/// Actions for the playing song, including the desktop Equalizer entry.
 class _PlayerMoreButton extends ConsumerWidget {
   const _PlayerMoreButton({
     required this.mediaItem,

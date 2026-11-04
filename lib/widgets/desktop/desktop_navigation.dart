@@ -97,9 +97,10 @@ class DesktopDestination {
 /// The desktop shell: navigation on the leading edge, the content pane and
 /// the trailing inspector.
 ///
-/// Material uses [DesktopNavigationRail] and the player bar docked across the bottom. Mornye follows Music: the
-/// [DesktopSidebar] runs the full window height, and the player floats as a
-/// glass capsule at the bottom of the content pane, which pads its pages so
+/// Material uses [DesktopNavigationRail] and the player bar docked across
+/// the bottom. With Mornye, [DesktopSidebar] runs the full window height, and
+/// the player floats as a glass capsule at the bottom of the content pane,
+/// which pads its pages so
 /// their last rows scroll clear of it.
 ///
 /// On macOS the window content reaches under a transparent title bar
@@ -239,9 +240,8 @@ class DesktopShellLayout extends ConsumerWidget {
   /// The window's size before the mini player shrank it.
   static Size? _fullWindowSize;
 
-  /// Now Playing covers the whole window, as Music's player does. The
-  /// destinations keep their state underneath, but stop painting and
-  /// ticking.
+  /// Now Playing covers the whole window. The destinations keep their state
+  /// underneath, but stop painting and ticking.
   Widget _nowPlayingOrShell(BuildContext context, bool showPlayer) =>
       ValueListenableBuilder<bool>(
         valueListenable: desktopNowPlayingOpen,
@@ -1030,7 +1030,7 @@ class _RailDestination extends StatelessWidget {
   }
 }
 
-/// The Mornye source-list sidebar, laid out like Music's: a rounded panel
+/// The Mornye source-list sidebar: a rounded panel
 /// inset from the window edges, with the window controls and the sidebar
 /// button on top, then Search and the top-level destinations, the Library
 /// pages and the user's playlists under section headings, and the account
@@ -1111,7 +1111,7 @@ class DesktopSidebar extends ConsumerWidget {
       );
     }
 
-    // Search leads the list, as in Music.
+    // Search leads the list.
     final topLevel = [
       for (final tab in [ShellTab.search, ShellTab.home, ShellTab.repository])
         ...destinations.where((destination) => destination.tab == tab),
@@ -1139,7 +1139,7 @@ class DesktopSidebar extends ConsumerWidget {
               tooltip: tooltip ?? link.label,
               onTap: () => openLink!(link.id),
             );
-        // A source list scrolls without a bar, as in Music's sidebar.
+        // The source list scrolls without a scrollbar.
         return NoScrollbars(
           child: ListView(
             padding: const EdgeInsets.fromLTRB(10, 0, 10, 8),
@@ -1185,7 +1185,7 @@ class DesktopSidebar extends ConsumerWidget {
     final panel = ValueListenableBuilder<Color?>(
       valueListenable: ShellNavigationService.chromeSurface,
       builder: (context, tint, child) => DecoratedBox(
-        // One piece with the window, as in Music: only a hairline parts it
+        // One piece with the window: only a hairline parts it
         // from the content, and the window's own corners are its corners.
         decoration: BoxDecoration(
           color: panelColor(context, tint),
@@ -1234,8 +1234,7 @@ class DesktopSidebar extends ConsumerWidget {
   }
 }
 
-/// The page's hero running on under the sidebar, as in Music, where the
-/// artwork fills the window and the sidebar blurs it.
+/// Extends the page's hero beneath the sidebar's backdrop blur.
 ///
 /// The sidebar and the page are separate panes, so this paints the artwork
 /// again rather than sampling the page: a tiny decode, enlarged and mirrored
@@ -1320,7 +1319,7 @@ class _SidebarArtwork extends StatelessWidget {
                       errorBuilder: (_, _, _) => const SizedBox.shrink(),
                     ),
                   ),
-                  // Music's sidebar glass, fading out where the hero ends.
+                  // The sidebar glass fades out where the hero ends.
                   DecoratedBox(
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
@@ -1345,7 +1344,7 @@ class _SidebarArtwork extends StatelessWidget {
   }
 }
 
-/// The account row pinned under the sidebar's list, as in Music: the
+/// The account row pinned under the sidebar's list: the
 /// profile picture and name, which open the profile, then Settings.
 class _SidebarAccountRow extends ConsumerWidget {
   const _SidebarAccountRow({
@@ -1500,7 +1499,7 @@ class _SidebarSectionHeader extends StatelessWidget {
   );
 }
 
-/// One source-list row, measured from Music: a 32pt row inset 6pt from the
+/// One source-list row: a 32pt row inset 6pt from the
 /// panel, an 18pt accent icon and a 13pt label, and an optional count. The
 /// selected row gets a rounded translucent fill and a semibold label.
 class _SidebarRow extends StatelessWidget {

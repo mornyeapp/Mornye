@@ -65,7 +65,7 @@ class MornyePlayerQueue extends ConsumerWidget {
       ),
     );
 
-    // Music on the Mac: shuffle and repeat live in the player capsule, so the
+    // Desktop shuffle and repeat live in the player capsule, so the
     // panel keeps only the two wide queue modes, drawn as their icons.
     Widget desktopModeButton({
       required IconData icon,

@@ -36,9 +36,8 @@ class MainFlutterWindow: NSWindow {
     self.contentMinSize = NSSize(width: 800, height: 600)
     self.center()
 
-    // Like Music, the content reaches the top of the window: the sidebar
-    // runs under the traffic lights and the content pane's controls share
-    // their row. Flutter draws drag areas there (DesktopWindowDragArea).
+    // Extend the sidebar under the traffic lights and align content controls
+    // with their row. Flutter supplies drag areas (DesktopWindowDragArea).
     self.styleMask.insert(.fullSizeContentView)
     self.titlebarAppearsTransparent = true
     self.titleVisibility = .hidden

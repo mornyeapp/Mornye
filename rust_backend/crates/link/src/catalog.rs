@@ -1,5 +1,5 @@
 //! The song catalog the desktop app exports (contract section 5), indexed
-//! into artists, albums and search. Owned by unit L1b.
+//! into artists, albums and search.
 //!
 //! Ids follow contract section 4: songs keep the exported `id`, albums are
 //! `al-` + 16 hex of SHA-256(albumKey) and artists `ar-` + 16 hex of

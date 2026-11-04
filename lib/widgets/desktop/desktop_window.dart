@@ -10,7 +10,7 @@ import 'package:mornye/utils/desktop_platform.dart';
 bool? debugDesktopTitleBarInContentOverride;
 
 /// Whether the window content reaches under a transparent title bar, with
-/// the window controls over the top of the sidebar, as in Music. The macOS
+/// the window controls over the top of the sidebar. The macOS
 /// window does this (`macos/Runner/MainFlutterWindow.swift`); Windows and
 /// Linux keep their native frame.
 bool get desktopTitleBarInContent =>

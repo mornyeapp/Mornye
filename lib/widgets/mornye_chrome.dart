@@ -29,7 +29,7 @@ class MornyeSegmentedControl extends ConsumerWidget {
   /// See [MornyeGlass.samplesBackdrop].
   final bool samplesBackdrop;
 
-  /// A pointer-sized control for a desktop toolbar, 36 tall as in Music.
+  /// A pointer-sized control for a desktop toolbar, 36 tall.
   final bool compact;
 
   @override

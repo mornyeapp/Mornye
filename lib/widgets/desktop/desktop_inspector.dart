@@ -31,7 +31,7 @@ enum DesktopInspectorPanel { lyrics, upNext }
 /// Width of the trailing inspector.
 const double desktopInspectorWidth = 340;
 
-/// Width of Mornye's floating glass inspector, as slim as Music's.
+/// Width of Mornye's floating glass inspector.
 const double mornyeGlassInspectorWidth = 260;
 
 /// Window width from which the inspector sits beside the content pane.
@@ -57,8 +57,7 @@ DesktopInspectorPanel? _lastPanel;
 bool _fullScreenLyricsBound = false;
 
 /// Opens Now Playing when lyrics open in a full screen window, or when the
-/// window enters full screen with lyrics open, as Music shows lyrics in its
-/// player there rather than in a panel. Call once at startup.
+/// window enters full screen with lyrics open. Call once at startup.
 void bindDesktopFullScreenLyrics() {
   if (_fullScreenLyricsBound) return;
   _fullScreenLyricsBound = true;
@@ -87,8 +86,7 @@ void closeDesktopNowPlaying() {
 }
 
 /// Whether the inspector floats over the content in a window [windowWidth]
-/// wide. Mornye's floats at any width, as Music's glass panel does, until the
-/// window goes full screen.
+/// wide. Mornye's floats at any width until the window goes full screen.
 bool desktopInspectorOverlays(double windowWidth, {required bool mornye}) =>
     windowWidth < desktopInspectorBesideBreakpoint ||
     (mornye && !desktopWindowFullScreen.value);
@@ -209,7 +207,7 @@ class DesktopInspector extends ConsumerWidget {
                 : DesktopMaterialQueue(colorScheme: colorScheme),
         };
       }
-      // Music's glass panel has no title bar: the capsule's toggles close it.
+      // The player capsule's toggles close the glass panel.
       if (glass) {
         return Padding(padding: const EdgeInsets.only(top: 12), child: body);
       }
@@ -236,8 +234,8 @@ class DesktopInspector extends ConsumerWidget {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            // Floating over the content it is Music's glass, which shows
-            // what passes beneath it; full screen keeps the artwork.
+            // The floating panel samples the content beneath it; the full
+            // screen panel keeps the artwork backdrop.
             if (overlay) ...[
               if (blur)
                 BackdropFilter(

@@ -119,7 +119,7 @@ class _DesktopScrollArrowsState extends State<DesktopScrollArrows> {
         ? (mornye ? CupertinoIcons.forward : Icons.chevron_right)
         : (mornye ? CupertinoIcons.back : Icons.chevron_left);
     if (mornye) {
-      // Music's tall glass paddle, close to the edge of the shelf.
+      // A tall glass paddle stays close to the edge of the shelf.
       return PositionedDirectional(
         start: forward ? null : 6,
         end: forward ? 6 + _glassCover(context) : null,

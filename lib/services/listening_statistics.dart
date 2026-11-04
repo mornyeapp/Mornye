@@ -417,9 +417,9 @@ Future<void> writeListeningDeltas(
   });
 }
 
-/// One row per song of the window, most listened first. A song shows its
-/// latest day's details, and the latest cover recorded in the window when
-/// that day has none.
+/// Builds one row per song in the date range, ordered by listening time unless
+/// [order] overrides it. Uses the latest day's details and falls back to the
+/// latest cover in the range when that day has none.
 String _listeningTracksSql({
   String where = '',
   String having = '',
@@ -490,11 +490,12 @@ Future<ListeningSummary> readListeningSummary(
   );
 }
 
-/// The tracks of [readListeningSummary] in its order, [limit] from
-/// [offset], that can be played again from their key: played at least once
-/// and not recorded under a stream URL. Equal listening times keep the
-/// summary's order, by key. With [latestFirst] the songs of the latest day
-/// lead: days are as fine as the statistics record.
+/// Returns [limit] tracks from [offset] with at least one recorded play,
+/// excluding keys beginning with `http://` or `https://`.
+///
+/// Orders by listening time, or last played day then listening time when
+/// [latestFirst] is true. Track keys break ties for stable pagination.
+/// Statistics record days, so playback order within a day is unavailable.
 Future<List<ListeningTotal>> readReplayableListeningTracks(
   DatabaseExecutor db,
   DateTime start,

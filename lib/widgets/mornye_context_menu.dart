@@ -570,7 +570,7 @@ class MornyeMenuAction {
     this.disclosure = false,
   });
 
-  /// Null for a text row, as most of Music's are.
+  /// Null for a text-only row.
   final IconData? icon;
   final String label;
   final String? subtitle;

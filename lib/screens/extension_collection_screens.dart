@@ -232,7 +232,7 @@ class _ArtistLoadingScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Mornye keeps the Apple Music hero on desktop too.
+    // Mornye keeps its full-pane hero on desktop too.
     if (isDesktopPlatform && !context.isMornye) {
       final url = coverUrl;
       return Scaffold(

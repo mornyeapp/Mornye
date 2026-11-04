@@ -22,8 +22,7 @@ const double _toolbarHeight = 52;
 double desktopDetailArtworkSize(double contentWidth) =>
     (contentWidth * 0.32).clamp(200.0, 300.0);
 
-/// The artist line under a desktop detail title: large and in the accent
-/// color, like the album pages of Apple Music.
+/// The artist line under a desktop detail title, large and in the accent color.
 ///
 /// Pass a [context] inside the header (a `Builder` around the subtitle), so
 /// a Material header takes the accent of its artwork scheme.
@@ -84,7 +83,7 @@ List<Widget> desktopDetailHeaderSlivers(
       double.infinity,
     );
     final radius = circularArtwork ? side / 2 : (mornye ? 12.0 : 20.0);
-    // Mornye draws Apple's continuous corner, as Music does on its covers.
+    // Mornye uses continuous corners on rectangular covers.
     final continuous = mornye && !circularArtwork;
     final corners = BorderRadius.circular(radius);
     final shadows = [
@@ -202,7 +201,7 @@ List<Widget> desktopDetailHeaderSlivers(
           pinned: true,
           automaticallyImplyLeading: false,
           toolbarHeight: _toolbarHeight,
-          // Mornye controls float over the pane, as in Apple Music.
+          // Mornye controls float over the pane.
           backgroundColor: mornye
               ? Colors.transparent
               : backgroundColor ?? theme.colorScheme.surface,
