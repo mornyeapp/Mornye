@@ -22,10 +22,6 @@ class _MusicFormats {
   final MusicPlayerHandler handler;
   final AvPlayerCopies _copies;
 
-  /// Songs that failed in a row, each one skipped to by the one before.
-  int _failures = 0;
-  int _skipGeneration = -1;
-
   bool owns(String? path) => path != null && _copies.ownsPath(path);
 
   /// AVPlayer plays the main and prepared decks: not a cast device, nor
@@ -87,9 +83,6 @@ class _MusicFormats {
 
   Future<void> invalidate(String source) => _copies.invalidate(source);
 
-  /// A song began to play.
-  void started() => _failures = 0;
-
   /// Reports that AVPlayer could not play the current [media], resolved to
   /// [path], by its format, and plays the next song in its place unless it
   /// is the last, repeats alone, starts paused or ends a run of failures.
@@ -112,32 +105,15 @@ class _MusicFormats {
         format?.label ??
         (codec.isNotEmpty ? codec : (extension.isNotEmpty ? extension : null));
     if (label == null) return false;
-    if (generation != _skipGeneration) _failures = 0;
-    _failures++;
-    final count = handler._media.length;
-    final repeatAll = handler._repeatMode == AudioServiceRepeatMode.all;
-    final skip =
-        !startPaused &&
-        handler._repeatMode != AudioServiceRepeatMode.one &&
-        (handler._index + 1 < count || (repeatAll && count > 1)) &&
-        _failures < min(count, _skipLimit);
+    final skip = handler._failures.canSkip(
+      generation,
+      startPaused: startPaused,
+      limit: _skipLimit,
+    );
     handler._runtime.notifyUnplayableSong(label, skipped: skip);
     _log.w('AVPlayer cannot play ${media.title} ($label)');
-    if (!skip) {
-      _failures = 0;
-      return false;
-    }
-    final next = handler._index + 1 < count
-        ? handler._index + 1
-        : handler._beginRepeatPass(handler._repeatPassStart());
-    // The current source change ends first; the next one queues after it.
-    final playing = handler._playIndex(next);
-    _skipGeneration = handler._playRequestGeneration;
-    unawaited(
-      playing.catchError((Object error) {
-        _log.w('Could not play the next song: $error');
-      }),
-    );
+    if (!skip) return false;
+    handler._failures.playNext();
     return true;
   }
 

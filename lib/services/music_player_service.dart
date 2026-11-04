@@ -23,6 +23,7 @@ import 'package:mornye/services/playback_normalization.dart';
 import 'package:mornye/services/playback_automation.dart';
 import 'package:mornye/services/playback_session_writer.dart';
 import 'package:mornye/services/content_uri_playback_cache.dart';
+import 'package:mornye/services/file_access_check.dart';
 import 'package:mornye/services/avplayer_formats.dart';
 import 'package:mornye/services/cast_output.dart';
 import 'package:mornye/services/cover_store.dart';
@@ -60,6 +61,7 @@ part 'music_player_autoplay.dart';
 part 'music_player_covers.dart';
 part 'music_player_cast.dart';
 part 'music_player_formats.dart';
+part 'music_player_failures.dart';
 part 'music_player_gapless.dart';
 part 'music_player_prefetch.dart';
 
@@ -141,6 +143,7 @@ class MusicPlayerHandler extends BaseAudioHandler
   late final _MusicGapless _gapless = _MusicGapless(this);
   late final _MusicPrefetch _prefetch = _MusicPrefetch(this);
   late final _MusicFormats _formats = _MusicFormats(this);
+  late final _MusicFailures _failures = _MusicFailures(this);
   late final _MusicCovers _covers = _MusicCovers(this);
   late final _MusicAutoplay _autoplay;
   late final MusicHaptics _haptics;
@@ -1819,6 +1822,15 @@ class MusicPlayerHandler extends BaseAudioHandler
       return;
     }
     if (resolved == null) {
+      if (await _failures.skipMissing(
+        media,
+        resolved,
+        generation,
+        startPaused: startPaused,
+      )) {
+        return;
+      }
+      if (!_isCurrentPlayRequest(generation, media)) return;
       _reportPlaybackError(
         _player,
         StateError('Audio file is unavailable'),
@@ -1922,7 +1934,7 @@ class MusicPlayerHandler extends BaseAudioHandler
       _activeResolvedPath = usingLocalSafCopy || _formats.owns(resolved)
           ? resolved
           : null;
-      _formats.started();
+      _failures.started();
       await _cleanupPendingResolvedPaths();
       if (!_isCurrentPlayRequest(generation, media)) return;
       // Plain file paths were already published before loading. Re-publishing
@@ -1940,6 +1952,15 @@ class MusicPlayerHandler extends BaseAudioHandler
       // poll the engine for the real duration as a fallback.
       unawaited(_ensureDurationKnown(media, generation));
     } catch (e, stackTrace) {
+      if (!_isCurrentPlayRequest(generation, media)) return;
+      if (await _failures.skipMissing(
+        media,
+        resolved,
+        generation,
+        startPaused: startPaused,
+      )) {
+        return;
+      }
       if (!_isCurrentPlayRequest(generation, media)) return;
       if (await _formats.skipUnplayable(
         media,
