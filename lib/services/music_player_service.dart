@@ -151,6 +151,8 @@ class MusicPlayerHandler extends BaseAudioHandler
   int _index = -1;
   int _playRequestGeneration = 0;
   final _metadataChanges = <String, Object>{};
+  final _sourceDeletionSnapshots =
+      <String, ({int generation, int index, Duration position, bool wasPlaying})>{};
   String? _activeResolvedPath;
   bool _disposed = false;
   Future<void>? _disposeFuture;
@@ -1528,6 +1530,7 @@ class MusicPlayerHandler extends BaseAudioHandler
     Duration startPosition = Duration.zero,
   }) async {
     if (_disposed || index < 0 || index >= _media.length) return;
+    if (_sourceDeletionSnapshots.containsKey(_media[index].source)) return;
     if (_reloadingAfterServerDied) {
       _reloadingAfterServerDied = false;
     } else {
@@ -2462,12 +2465,110 @@ class MusicPlayerHandler extends BaseAudioHandler
     }
   }
 
-  /// Called when a file is deleted from disk. Removes it from the queue and, if
-  /// it is the track currently playing, stops or advances so a deleted song can
-  /// no longer be played.
+  /// Releases the currently playing source before storage removes its file.
+  ///
+  /// The queue item stays in place until deletion succeeds, allowing a failed
+  /// storage operation to restore playback at the saved position.
+  Future<void> onSourceDeleting(String source) async {
+    final target = source.trim();
+    if (_disposed ||
+        target.isEmpty ||
+        _sourceDeletionSnapshots.containsKey(target)) {
+      return;
+    }
+
+    final index = _index;
+    if (index < 0 || index >= _media.length || _media[index].source != target) {
+      return;
+    }
+
+    final wasPlaying =
+        _player.state == PlaybackDeckState.playing ||
+        playbackState.value.playing;
+    final generation = ++_playRequestGeneration;
+    _switchingGeneration = generation;
+    try {
+      await _player.cancelPreparation();
+      await _cancelTransitions();
+      await _serializeSourceChange(() async {
+        if (_disposed ||
+            generation != _playRequestGeneration ||
+            _index != index ||
+            _media[index].source != target) {
+          return;
+        }
+
+        final position = await _currentPositionForPersist();
+        if (_disposed ||
+            generation != _playRequestGeneration ||
+            _index != index ||
+            _media[index].source != target) {
+          return;
+        }
+
+        // A desktop decoder can still hold the file open. Stop it before the
+        // filesystem operation rather than reacting after the file is gone.
+        await _player.stop();
+        if (_disposed || generation != _playRequestGeneration) return;
+
+        _sourceReady = false;
+        _activeResolvedPath = null;
+        _pendingRestorePosition = position;
+        _userPaused = true;
+        _sourceDeletionSnapshots[target] = (
+          generation: generation,
+          index: index,
+          position: position,
+          wasPlaying: wasPlaying,
+        );
+        _broadcastPosition(position, force: true);
+        _broadcastState(playerState: PlaybackDeckState.paused);
+        await _persistSession(position: position);
+      });
+    } finally {
+      if (_switchingGeneration == generation) _switchingGeneration = 0;
+    }
+  }
+
+  /// Reopens a source if storage rejected its deletion. A user action that
+  /// changed the queue or playback generation takes precedence over restoration.
+  Future<void> onSourceDeletionCancelled(String source) async {
+    final target = source.trim();
+    if (_disposed || target.isEmpty) return;
+    final snapshot = _sourceDeletionSnapshots.remove(target);
+    if (snapshot == null ||
+        snapshot.generation != _playRequestGeneration ||
+        snapshot.index != _index ||
+        _index < 0 ||
+        _index >= _media.length ||
+        _media[_index].source != target) {
+      return;
+    }
+
+    _sourceReady = false;
+    _activeResolvedPath = null;
+    _playbackError = null;
+    _pendingRestorePosition = snapshot.position;
+    _broadcastPosition(snapshot.position, force: true);
+    if (snapshot.wasPlaying) {
+      await _playIndex(
+        snapshot.index,
+        recordHistory: false,
+        startPosition: snapshot.position,
+      );
+    } else {
+      _userPaused = true;
+      _broadcastState(playerState: PlaybackDeckState.paused);
+      await _persistSession(position: snapshot.position);
+    }
+  }
+
+  /// Called after a file has been removed from disk. Removes it from the queue
+  /// and, if it was playing, stops or advances to another available source.
   Future<void> onSourceDeleted(String source) async {
     final target = source.trim();
     if (_disposed || target.isEmpty) return;
+    _sourceDeletionSnapshots.remove(target);
 
     final hadPendingResolution = await _sourceCache.invalidate(target);
 
