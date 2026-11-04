@@ -619,7 +619,9 @@ class MusicPlayerHandler extends BaseAudioHandler
     final generation = _playRequestGeneration;
     if (_checkingPlaybackErrorGeneration == generation) return;
     _checkingPlaybackErrorGeneration = generation;
-    final media = _index >= 0 && _index < _media.length ? _media[_index] : null;
+    final media = _index >= 0 && _index < _media.length
+        ? _media[_index]
+        : null;
     unawaited(
       _handlePlaybackError(player, media, generation, error, stackTrace),
     );
@@ -648,7 +650,11 @@ class MusicPlayerHandler extends BaseAudioHandler
       _userPaused = true;
       _pausedByInterruption = false;
       _playbackAutomation.cancelPendingActions();
-      _log.e('Playback failed: ' + (mediaItem.value?.title ?? 'unknown'), error, stackTrace);
+      _log.e(
+        'Playback failed: ' + (mediaItem.value?.title ?? 'unknown'),
+        error,
+        stackTrace,
+      );
       _broadcastState(playerState: PlaybackDeckState.stopped);
       await _serializeSourceChange(() async {
         if (_disposed || generation != _playRequestGeneration) return;
