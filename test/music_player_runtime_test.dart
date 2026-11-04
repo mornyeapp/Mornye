@@ -2474,32 +2474,28 @@ void main() {
   test(
     'a player that cannot release its source prevents file deletion',
     () async {
-    final directory = await Directory.systemTemp.createTemp('failed-reaction-');
-    addTearDown(() => directory.delete(recursive: true));
-    final file = await File(
-      '${directory.path}/song.flac',
-    ).writeAsString('audio');
-    final events = SourceDeletionEvents();
-    final decks = <_Deck>[];
-    final runtime = _runtime(decks: decks, sourceDeletionEvents: events);
-    final handler = await runtime.initialize();
-    await handler.setQueueAndPlay([
-      PlayableMedia(
-        id: 'removed',
-        source: file.path,
-        title: 'Removed',
-        artist: '',
-      ),
-    ]);
-    decks.single.failStop = true;
-    expect(await deleteFile(file.path, deletionEvents: events), isFalse);
-    expect(await file.exists(), isTrue);
-    expect(handler.queue.value.map((item) => item.id), ['removed']);
-    },
-  );
+      final directory = await Directory.systemTemp.createTemp('failed-reaction-');
+      addTearDown(() => directory.delete(recursive: true));
+      final file = await File(
+        '${directory.path}/song.flac',
+      ).writeAsString('audio');
+      final events = SourceDeletionEvents();
+      final decks = <_Deck>[];
+      final runtime = _runtime(decks: decks, sourceDeletionEvents: events);
+      final handler = await runtime.initialize();
+      await handler.setQueueAndPlay([
+        PlayableMedia(
+          id: 'removed',
+          source: file.path,
+          title: 'Removed',
+          artist: '',
+        ),
+      ]);
+      decks.single.failStop = true;
+      expect(await deleteFile(file.path, deletionEvents: events), isFalse);
+      expect(await file.exists(), isTrue);
+      expect(handler.queue.value.map((item) => item.id), ['removed']);
 
-  test(
-    'deletion retires a pending SAF copy without blocking a later copy',
     () async {
       final directory = await Directory.systemTemp.createTemp(
         'pending-deletion-',
