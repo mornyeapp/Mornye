@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:typed_data';
 
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/services/backend/native_backend_transport.dart';
 import 'package:mornye/services/backend/rust_ffi_backend.dart';
@@ -11,8 +11,10 @@ import 'package:mornye/utils/desktop_platform.dart';
 
 class _FakeTransport implements NativeBackendTransport {
   final methods = <String>[];
+  final calls = <(String, Map<String, dynamic>)>[];
   final subscriptions = <int>[];
   final results = <String, Object?>{};
+  String? failingMethod;
   late NativeMessageListener listener;
 
   @override
@@ -22,11 +24,24 @@ class _FakeTransport implements NativeBackendTransport {
   @override
   void call(int id, String method, Uint8List argsJson, Uint8List? bytes) {
     methods.add(method);
+    final arguments =
+        jsonDecode(utf8.decode(argsJson)) as Map<String, dynamic>? ?? {};
+    calls.add((method, arguments));
     scheduleMicrotask(
       () => listener(
         id,
-        NativeMessageKind.result,
-        utf8.encode(jsonEncode(results[method])),
+        method == failingMethod
+            ? NativeMessageKind.error
+            : NativeMessageKind.result,
+        utf8.encode(
+          jsonEncode(
+            method == failingMethod
+                ? {'code': 'ERROR', 'message': 'Metadata write failed'}
+                : method == 'acquireDownloadDirectory'
+                ? 'grant:${arguments['path']}'
+                : results[method],
+          ),
+        ),
       ),
     );
   }
@@ -113,4 +128,114 @@ void main() {
     expect(grants.single.extensionId, 'example');
     expect(grants.single.success, isFalse);
   });
+
+  for (final (file, directory) in [
+    (
+      r'C:\Users\Example User\Temp\metadata_cover_1\cover.jpg',
+      r'C:\Users\Example User\Temp\metadata_cover_1',
+    ),
+    ('D:/Music/春の歌/cover.jpg', 'D:/Music/春の歌'),
+    (r'\\server\share\Music\cover.jpg', r'\\server\share\Music'),
+    (r'\\?\C:\Music\cover.jpg', r'\\?\C:\Music'),
+    (r'\\?\UNC\server\share\Music\cover.jpg', r'\\?\UNC\server\share\Music'),
+    ('/tmp/metadata_cover_1/cover.jpg', '/tmp/metadata_cover_1'),
+  ]) {
+    test('cover download holds a directory grant for $file', () async {
+      transport.calls.clear();
+      transport.results['downloadCoverToFile'] = {'success': true};
+
+      final result = await PlatformBridge.downloadCoverToFile(
+        'https://example.invalid/cover.jpg',
+        file,
+      );
+
+      expect(result['success'], isTrue);
+      expect(transport.calls.map((call) => [call.$1, call.$2]), [
+        [
+          'acquireDownloadDirectory',
+          {'path': directory},
+        ],
+        [
+          'downloadCoverToFile',
+          {
+            'cover_url': 'https://example.invalid/cover.jpg',
+            'output_path': file,
+            'max_dimension': 0,
+          },
+        ],
+        [
+          'releaseDownloadDirectory',
+          {'token': 'grant:$directory'},
+        ],
+      ]);
+    });
+  }
+
+  test(
+    'cover extraction shares one grant for audio and artwork siblings',
+    () async {
+      transport.calls.clear();
+      transport.results['extractCoverToFile'] = {'success': true};
+
+      await PlatformBridge.extractCoverToFile(
+        r'C:\Music\song.flac',
+        r'C:\Music\cover.jpg',
+      );
+
+      expect(transport.calls.map((call) => call.$1), [
+        'acquireDownloadDirectory',
+        'extractCoverToFile',
+        'releaseDownloadDirectory',
+      ]);
+      expect(transport.calls.first.$2, {'path': r'C:\Music'});
+    },
+  );
+
+  test('failed metadata writes release audio and artwork grants', () async {
+    transport.calls.clear();
+    transport.failingMethod = 'editFileMetadata';
+    addTearDown(() => transport.failingMethod = null);
+
+    await expectLater(
+      PlatformBridge.editFileMetadata(r'C:\Music\song.flac', {
+        'cover_path': r'C:\Temp\metadata_cover_1\cover.jpg',
+        'title': 'Song',
+      }),
+      throwsA(isA<PlatformException>()),
+    );
+
+    expect(transport.calls.map((call) => call.$1), [
+      'acquireDownloadDirectory',
+      'acquireDownloadDirectory',
+      'editFileMetadata',
+      'releaseDownloadDirectory',
+      'releaseDownloadDirectory',
+    ]);
+    expect(transport.calls[0].$2, {'path': r'C:\Music'});
+    expect(transport.calls[1].$2, {'path': r'C:\Temp\metadata_cover_1'});
+    expect(transport.calls[3].$2, {'token': r'grant:C:\Temp\metadata_cover_1'});
+    expect(transport.calls[4].$2, {'token': r'grant:C:\Music'});
+  });
+
+  test(
+    'URI, relative and backend-owned outputs do not acquire folder grants',
+    () async {
+      for (final path in [
+        '',
+        'cover.jpg',
+        r'C:cover.jpg',
+        r'\Temp\cover.jpg',
+        'content://example/document/cover',
+        'network://example/cover.jpg',
+        'https://example.invalid/cover.jpg',
+      ]) {
+        transport.calls.clear();
+        await PlatformBridge.downloadCoverToFile(
+          'https://example.invalid/cover.jpg',
+          path,
+        );
+        expect(transport.calls.map((call) => call.$1), ['downloadCoverToFile']);
+      }
+    },
+  );
 }
