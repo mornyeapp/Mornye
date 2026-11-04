@@ -1,34 +1,109 @@
 {
-  "extensionsUnsecuredStorage": "Gunakan penyimpanan extension tanpa keyring",
-  "extensionsUnsecuredStorageDescription": "Jalankan extension tanpa keyring Linux. Kunci disimpan secara lokal, sehingga siapa pun yang dapat mengakses file aplikasi bisa membaca kredensial extension. Nonaktifkan untuk memakai keyring sistem.",
-  "extensionsStorageKeyringRequired": "Data extension yang ada memerlukan kunci aslinya. Buka keyring sistem sekali, lalu aktifkan lagi penyimpanan tanpa keyring. Data kamu tetap tersimpan.",
-  "extensionsStorageKeyConflict": "Kunci lokal dan keyring sistem berbeda. Penyimpanan tidak diubah dan kedua kunci tetap tersimpan.",
-  "extensionsStorageKeyringUnavailable": "Keyring sistem tidak tersedia atau terkunci. Jalankan atau buka keyring sebelum beralih ke penyimpanan aman. Kunci lokal kamu tetap tersimpan.",
-  "linkFileActionOn": "{action} di {name}",
-  "linkFileActionsDescription": "Perubahan diterapkan pada file musik di {name}. Pekerjaan yang diterima tetap berjalan jika HP ini terputus.",
-  "linkFileDeleteConfirm": "Hapus {count} file musik dari {name}? File akan dihapus dari penyimpanan komputer tersebut.",
+  "extensionsUnsecuredStorage": "Gunakan ekstensi penyimpanan tak aman",
+  "extensionsUnsecuredStorageDescription": "Jalankan ekstensi tanpa keyring Linux. Kunci disimpan di perangkat, siapa saja yang akses aplikasi dapat baca kredensial ekstensi. Matikan untuk pakai keyring sistem.",
+  "extensionsStorageKeyringRequired": "Data ekstensi yang ada butuh kunci aslinya. Buka keyring sistem sekali saja, lalu hidupkan Gunakan ekstensi penyimpanan tak aman. Datamu tetap tersimpan.",
+  "extensionsStorageKeyConflict": "Kunci keyring lokal dan sistem berbeda. Penyimpanan tidak diubah dan kunci tetap tersimpan.",
+  "extensionsStorageKeyringUnavailable": "Keyring sistem tak tersedia atau dikunci. Mulai atau buka dulu sebelum ganti ke penyimpanan aman. Kunci lokal kamu tetap tersimpan.",
+  "linkFileActionOn": "{action} pada {name}",
+  "@linkFileActionOn": {
+    "description": "File operation on a named linked computer",
+    "placeholders": {
+      "action": {
+        "type": "String"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkFileActionsDescription": "Perubahan disimpan ke file lagu {name}.",
+  "@linkFileActionsDescription": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkFileDeleteConfirm": "Hapus {count} {count, plural, =1{file musik} other{file musik}} dari {name}? Akan menghapus file dari penyimpanan tersebut.",
+  "@linkFileDeleteConfirm": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "linkFileJobs": "Perubahan file",
-  "linkFileJobsSubtitle": "Edit, konversi, dan penghapusan di {name}",
-  "linkFileJobsEmpty": "Belum ada perubahan file",
-  "linkFileJobsEmptyMessage": "Edit, konversi, dan penghapusan lagu di komputer yang kamu mulai dari HP ini akan muncul di sini.",
-  "linkDesktopFileJobsSubtitle": "Perubahan yang diminta dari HP kamu",
-  "linkDesktopFileJobsEmptyMessage": "Edit, konversi, dan penghapusan yang diminta dari HP kamu akan muncul di sini.",
+  "@linkFileJobs": {
+    "description": "Title of the list of edits, conversions and deletions the phone started on the linked computer's music files"
+  },
+  "linkFileJobsSubtitle": "Edit, perubahan, dan penghapusan {name}",
+  "@linkFileJobsSubtitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkFileJobsEmpty": "Belum pernah diubah",
+  "linkFileJobsEmptyMessage": "Edit, perubahan, dan penghapusan yang kamu minta ke lagu di komputer muncul di sini.",
+  "linkDesktopFileJobsSubtitle": "Ponselmu meminta perubahan",
+  "linkDesktopFileJobsEmptyMessage": "Permintaan edit, perubahan, dan penghapusan dari ponsel muncul di sini.",
   "linkFileJobRequestedBy": "Dari {name}",
+  "@linkFileJobRequestedBy": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "linkFileJobsView": "Lihat",
-  "linkFileJobProgress": "{finished} dari {total} lagu",
+  "@linkFileJobsView": {
+    "description": "Snackbar action that opens the file changes list to see which songs failed"
+  },
+  "linkFileJobsUnsupported": "Update Mornye versi PC untuk mulai mengatur file lagunya dari ponsel ini.",
+  "linkFileSelectionOneDevice": "Pilih lagu dari satu PC terhubung dalam satu waktu (hingga 100 lagu).",
+  "linkFileJobProgress": "{finished} dari {total} {total, plural, =1{lagu} other{lagu}}",
+  "@linkFileJobProgress": {
+    "placeholders": {
+      "finished": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
   "linkFileJobFailedCount": "{count} gagal",
+  "@linkFileJobFailedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "linkFileJobFinished": "{action} selesai di {name}",
+  "@linkFileJobFinished": {
+    "placeholders": {
+      "action": {
+        "type": "String"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "linkFileDeleting": "Menghapus...",
-  "linkFileReading": "Membaca tag...",
-  "linkFileSavingCover": "Menyimpan cover art...",
-  "linkFileJobsUnsupported": "Perbarui Mornye di komputer agar file musiknya bisa dikelola dari HP ini.",
-  "linkFileSelectionOneDevice": "Pilih lagu dari satu komputer yang terhubung (maksimal 100 lagu).",
-  "linkFileCancelHint": "Hentikan setelah lagu yang sedang diproses",
+  "linkFileReading": "Mengakses metadata...",
+  "linkFileSavingCover": "Menyimpan foto cover...",
+  "linkFileCancelHint": "Berhenti setelah lagu sekarang",
   "linkFileJobCancelled": "Dihentikan",
-  "linkFileJobQueued": "Dalam antrean",
+  "linkFileJobQueued": "Diantrekan",
   "linkFileJobCompleted": "Selesai",
-  "linkFileChanged": "File berubah sejak pratinjau dibuat. Buat pratinjau lagi sebelum menyimpan.",
-  "linkFileOperationFailed": "Operasi tidak berhasil diselesaikan. Periksa log di komputer untuk detailnya.",
+  "linkFileChanged": "File sudah pernah diubah. Buka kembali sebelum menyimpan.",
+  "linkFileOperationFailed": "Tindakan tak dapat diselesaikan. Periksa log komputer untuk detailnya.",
   "trackBpm": "BPM",
   "trackMood": "Mood",
   "subsonicAddToLibrary": "Tambahkan server ke Koleksi",
@@ -221,20 +296,20 @@
   "dapExclusive": "Hi-Res DAP (eksklusif AAudio)",
   "dapExclusiveDescription": "Gunakan Oboe/AAudio pada sample rate dan presisi asli FLAC/WAV PCM. Butuh Android 8.1+ dan hardware didukung. Akses eksklusif diperiksa; format tak didukung akan gunakan pemutaran normal. DSD butuh driver Direct USB. Berlaku di lagu selanjutnya.",
   "dapExclusiveUnavailable": "Akses eksklusif AAudio tidak tersedia di lagu dan output ini. Lagu akan diputar normal. Jika pakai DAC USB, coba pakai driver Direct USB.",
-  "exclusiveOutputWindows": "Mode eksklusif WASAPI",
-  "exclusiveOutputMacos": "Akses eksklusif (hog mode)",
-  "exclusiveOutputLinux": "Output ALSA langsung",
-  "exclusiveOutputDescriptionWindows": "Lewati mixer Windows agar output mengikuti sample rate dan bit depth tiap lagu. Aplikasi lain tidak bisa memutar suara selama Mornye memegang perangkat. AutoMix dan preview mati di mode ini. Untuk output bit-perfect, biarkan volume di 100% dengan equalizer dan normalisasi mati.",
-  "exclusiveOutputDescriptionMacos": "Pegang perangkat output khusus untuk Mornye dan ubah ke sample rate dan bit depth tiap lagu, agar Core Audio tidak melakukan resampling. Aplikasi lain tidak bisa memutar suara selama Mornye memegang perangkat. AutoMix dan preview mati di mode ini. Untuk output bit-perfect, biarkan volume di 100% dengan equalizer dan normalisasi mati.",
-  "exclusiveOutputDescriptionLinux": "Putar langsung ke perangkat hardware ALSA, melewati PipeWire atau PulseAudio, agar output mengikuti sample rate dan bit depth tiap lagu. Perangkat harus bebas: sound server melepas kartu yang menganggur setelah beberapa detik, atau ubah profilnya ke Off. AutoMix dan preview mati di mode ini.",
-  "exclusiveOutputPending": "Perangkat diambil saat lagu diputar.",
-  "exclusiveOutputActive": "Diputar dalam mode eksklusif.",
-  "exclusiveOutputUnavailableWindows": "Perangkat menolak akses eksklusif, jadi lagu ini diputar lewat mixer Windows. Tutup aplikasi lain yang memakai perangkat, atau izinkan kontrol eksklusif di properti suara perangkat di Windows.",
-  "exclusiveOutputUnavailableMacos": "Aplikasi lain sedang memegang perangkat output, jadi lagu ini diputar lewat mixer sistem.",
-  "exclusiveOutputUnavailableLinux": "Perangkat ALSA sedang dipakai, biasanya oleh sound server, jadi lagu ini diputar lewat sound server. Ubah profil kartu ke Off di pengaturan suara, atau pilih perangkat lain.",
-  "exclusiveOutputDevice": "Perangkat output",
-  "exclusiveOutputDeviceFirst": "Kartu suara pertama",
-  "exclusiveOutputNoDevices": "Tidak ada perangkat playback ALSA",
+  "exclusiveOutputWindows": "WASAPI exclusive mode",
+  "exclusiveOutputMacos": "Exclusive access (hog mode)",
+  "exclusiveOutputLinux": "Direct ALSA output",
+  "exclusiveOutputDescriptionWindows": "Bypass the Windows mixer so the output follows each track's sample rate and bit depth. Other apps cannot play sound while Mornye holds the device. AutoMix and previews are off in this mode. For bit-perfect output, keep the volume at 100% with the equalizer and normalization off.",
+  "exclusiveOutputDescriptionMacos": "Hold the output device for Mornye alone and switch it to each track's sample rate and bit depth, so Core Audio does not resample. Other apps cannot play sound while Mornye holds the device. AutoMix and previews are off in this mode. For bit-perfect output, keep the volume at 100% with the equalizer and normalization off.",
+  "exclusiveOutputDescriptionLinux": "Play straight to an ALSA hardware device, bypassing PipeWire or PulseAudio, so the output follows each track's sample rate and bit depth. The device must be free: the sound server releases an idle card after a few seconds, or set its profile to Off. AutoMix and previews are off in this mode.",
+  "exclusiveOutputPending": "Takes the device when a track plays.",
+  "exclusiveOutputActive": "Playing in exclusive mode.",
+  "exclusiveOutputUnavailableWindows": "The device refused exclusive access, so this track plays through the Windows mixer. Close other apps using the device, or allow exclusive control in the device's Windows sound properties.",
+  "exclusiveOutputUnavailableMacos": "Another app holds the output device, so this track plays through the system mixer.",
+  "exclusiveOutputUnavailableLinux": "The ALSA device is busy, usually held by the sound server, so this track plays through it. Set the card's profile to Off in the sound settings, or choose another device.",
+  "exclusiveOutputDevice": "Output device",
+  "exclusiveOutputDeviceFirst": "First sound card",
+  "exclusiveOutputNoDevices": "No ALSA playback devices found",
   "usbDirect": "Driver Direct USB",
   "usbDirectDescription": "Gunakan audio USB eksklusif pada FLAC/WAV, DSF/DFF, dan WavPack DSD dengan izin USB Android. DSD Native butuh DAC yang didukung dan dikenali. Format PCM lain akan diputar normal. Berlaku di lagu selanjutnya.",
   "usbDsdOverPcm": "DSD melalui PCM (DoP)",
@@ -357,6 +432,35 @@
   "libraryNoActiveDownloads": "Tidak sedang download",
   "librarySearchHint": "Telusuri koleksimu",
   "libraryEmptyCollection": "Musik kamu akan muncul di sini",
+  "libraryFolders": "Folders",
+  "@libraryFolders": {
+    "description": "Library view that browses downloaded and scanned songs by the folders their files are in"
+  },
+  "libraryFolderCount": "{count, plural, =1{1 folder} other{{count} folders}}",
+  "@libraryFolderCount": {
+    "description": "Number of folders inside a Library folder",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "libraryFoldersEmptyTitle": "No folders yet",
+  "@libraryFoldersEmptyTitle": {
+    "description": "Title of the Folders view when the Library has no songs"
+  },
+  "libraryFoldersEmptyMessage": "Download songs or add a music folder in Local Library settings to browse them by folder.",
+  "@libraryFoldersEmptyMessage": {
+    "description": "Next step shown in the empty Folders view"
+  },
+  "libraryFolderMissing": "This folder is no longer in your Library",
+  "@libraryFolderMissing": {
+    "description": "Shown on an open folder page after its songs were deleted or moved"
+  },
+  "libraryFoldersLoadFailed": "Couldn't read your folders",
+  "@libraryFoldersLoadFailed": {
+    "description": "Shown when the Folders view fails to load"
+  },
   "settingsTitle": "Setelan",
   "@settingsTitle": {
     "description": "Settings screen title"
@@ -1020,21 +1124,66 @@
   "@setupSkipForNow": {
     "description": "Skip button text"
   },
-  "setupNearbyEnable": "Izinkan Perangkat di Sekitar",
-  "setupNearbyDescription": "Mornye Link memakainya untuk menemukan komputermu di jaringan yang sama, dan penyimpanan jaringan memerlukannya untuk menjangkau server di rumah.",
-  "setupNearbyGranted": "Perangkat di Sekitar Diizinkan!",
-  "permissionNearbyDevices": "Perangkat di sekitar",
-  "whatsNewLinkNearbyAllow": "Izinkan perangkat di sekitar",
-  "whatsNewLinkNearbyGranted": "Perangkat di sekitar diizinkan",
-  "whatsNewNearbyTitle": "Perangkat di sekitar",
-  "whatsNewNearbyDesc": "Android kini meminta izin sebelum aplikasi bisa menjangkau perangkat lain di jaringanmu. Mornye memerlukannya untuk:",
-  "whatsNewNearbyLinkTitle": "Menemukan komputermu",
-  "whatsNewNearbyLinkBody": "Mornye Link mencari komputermu di Wi-Fi yang sama dan tetap terhubung dengannya.",
-  "whatsNewNearbyStorageTitle": "Penyimpanan jaringan",
-  "whatsNewNearbyStorageBody": "Putar musik dari NAS atau server di rumah lewat SMB atau WebDAV.",
-  "whatsNewNearbyPrivateTitle": "Hanya perangkatmu sendiri",
-  "whatsNewNearbyPrivateBody": "Mornye memakainya hanya untuk menjangkau perangkat di jaringanmu, tidak pernah untuk mengetahui lokasimu.",
-  "whatsNewNearbyRefused": "Tidak diizinkan. Mornye Link dan penyimpanan jaringan tidak aktif sampai kamu mengizinkan Perangkat di sekitar untuk Mornye di pengaturan Android.",
+  "setupNearbyEnable": "Allow Nearby Devices",
+  "@setupNearbyEnable": {
+    "description": "Setup step title and button for the Android Nearby devices permission; Nearby devices is the Android permission name"
+  },
+  "setupNearbyDescription": "Mornye Link uses it to find your computer on the same network, and network storage needs it to reach a server at home.",
+  "@setupNearbyDescription": {
+    "description": "Setup step explaining why Android's Nearby devices permission is needed"
+  },
+  "setupNearbyGranted": "Nearby Devices Allowed!",
+  "@setupNearbyGranted": {
+    "description": "Setup message after the Nearby devices permission is granted"
+  },
+  "permissionNearbyDevices": "Nearby devices",
+  "@permissionNearbyDevices": {
+    "description": "Nearby devices permission type label; use Android's name for this permission"
+  },
+  "whatsNewLinkNearbyAllow": "Allow nearby devices",
+  "@whatsNewLinkNearbyAllow": {
+    "description": "Main button on the Nearby devices page of the What's New tour that asks for Android's Nearby devices permission"
+  },
+  "whatsNewLinkNearbyGranted": "Nearby devices allowed",
+  "@whatsNewLinkNearbyGranted": {
+    "description": "Shown on the Nearby devices page of the What's New tour after the Nearby devices permission is granted"
+  },
+  "whatsNewNearbyTitle": "Nearby devices",
+  "@whatsNewNearbyTitle": {
+    "description": "Title of the What's New page that asks for Android's Nearby devices permission; use Android's name for this permission"
+  },
+  "whatsNewNearbyDesc": "Android now asks before an app can reach other devices on your network. Mornye needs this for:",
+  "@whatsNewNearbyDesc": {
+    "description": "Description on the Nearby devices page of the What's New tour, followed by a list of uses"
+  },
+  "whatsNewNearbyLinkTitle": "Finding your computer",
+  "@whatsNewNearbyLinkTitle": {
+    "description": "Use of the Nearby devices permission: Mornye Link finds the computer"
+  },
+  "whatsNewNearbyLinkBody": "Mornye Link looks for your computer on the same Wi-Fi and stays connected to it.",
+  "@whatsNewNearbyLinkBody": {
+    "description": "Explains how Mornye Link uses the Nearby devices permission"
+  },
+  "whatsNewNearbyStorageTitle": "Network storage",
+  "@whatsNewNearbyStorageTitle": {
+    "description": "Use of the Nearby devices permission: SMB and WebDAV servers at home"
+  },
+  "whatsNewNearbyStorageBody": "Play music from a NAS or a server at home over SMB or WebDAV.",
+  "@whatsNewNearbyStorageBody": {
+    "description": "Explains how network storage uses the Nearby devices permission"
+  },
+  "whatsNewNearbyPrivateTitle": "Only your own devices",
+  "@whatsNewNearbyPrivateTitle": {
+    "description": "Reassurance on the Nearby devices page of the What's New tour"
+  },
+  "whatsNewNearbyPrivateBody": "Mornye uses it only to reach devices on your network, never to find where you are.",
+  "@whatsNewNearbyPrivateBody": {
+    "description": "Explains that the Nearby devices permission is not used for location"
+  },
+  "whatsNewNearbyRefused": "Not allowed. Mornye Link and network storage stay off until you allow Nearby devices for Mornye in Android settings.",
+  "@whatsNewNearbyRefused": {
+    "description": "Shown on the Nearby devices page of the What's New tour after the permission is refused"
+  },
   "setupNext": "Lanjut",
   "@setupNext": {
     "description": "Next button text"
@@ -1500,11 +1649,11 @@
   "@searchPlaylists": {
     "description": "Search result category - playlists"
   },
-  "searchShowAll": "Tampilkan semua",
+  "searchShowAll": "Show all",
   "@searchShowAll": {
     "description": "Button of a search result section on wide screens that shows every result of that kind"
   },
-  "searchShowAllCategory": "Tampilkan semua {category}",
+  "searchShowAllCategory": "Show all {category}",
   "@searchShowAllCategory": {
     "description": "Screen reader label of the Show all button of a search result section",
     "placeholders": {
@@ -1805,7 +1954,7 @@
   "@channelStable": {
     "description": "Update channel - stable releases"
   },
-  "channelPreview": "Pratinjau",
+  "channelPreview": "Preview",
   "@channelPreview": {
     "description": "Update channel - beta/preview releases"
   },
@@ -2166,7 +2315,7 @@
   "@storeFilterMetadata": {
     "description": "Repo filter - metadata providers"
   },
-  "storeFilterDownload": "Unduhan",
+  "storeFilterDownload": "Download",
   "@storeFilterDownload": {
     "description": "Repo filter - download providers"
   },
@@ -2238,7 +2387,7 @@
   "@extensionId": {
     "description": "Extension detail - unique ID"
   },
-  "extensionError": "Eror",
+  "extensionError": "Error",
   "@extensionError": {
     "description": "Extension detail - error message"
   },
@@ -2461,12 +2610,12 @@
   "@downloadAutoConvert": {
     "description": "Toggle for automatic post-download audio conversion"
   },
-  "downloadAutoConvertAllFormatsSubtitle": "Ubah format hasil download atau batasi bit depth dan sample rate FLAC. File asli diganti hanya setelah konversi berhasil.",
-  "downloadAutoConvertOutputSubtitle": "Pilih format output untuk download yang baru selesai.",
-  "downloadAutoConvertFlacSubtitle": "FLAC lossless dengan batas kualitas. Bit depth dan sample rate yang lebih rendah tetap dipertahankan.",
-  "downloadAutoConvertMaxBitDepth": "Bit depth maksimal",
-  "downloadAutoConvertMaxSampleRate": "Sample rate maksimal",
-  "downloadAutoConvertFlacLimitsSubtitle": "Ini adalah batas maksimal. Misalnya, sumber 44,1 kHz tetap 44,1 kHz saat 48 kHz dipilih. Sumber lossy tetap dalam format aslinya.",
+  "downloadAutoConvertAllFormatsSubtitle": "Convert completed downloads or limit FLAC bit depth and sample rate. The original is replaced only after conversion succeeds.",
+  "downloadAutoConvertOutputSubtitle": "Choose the output format for newly completed downloads.",
+  "downloadAutoConvertFlacSubtitle": "Lossless FLAC with quality limits. Lower bit depths and sample rates are preserved.",
+  "downloadAutoConvertMaxBitDepth": "Maximum bit depth",
+  "downloadAutoConvertMaxSampleRate": "Maximum sample rate",
+  "downloadAutoConvertFlacLimitsSubtitle": "These are upper limits. For example, a 44.1 kHz source stays at 44.1 kHz when 48 kHz is selected. Lossy sources are kept in their original format.",
   "downloadAutoConvertSubtitle": "Mengubah format ke lossy akan mengecilkan ukuran file. File asli akan dihapus setelah perubahan format selesai.",
   "@downloadAutoConvertSubtitle": {
     "description": "Explanation of safe automatic post-download conversion"
@@ -3181,6 +3330,22 @@
   "@libraryFilterAll": {
     "description": "Filter chip - show all library items"
   },
+  "libraryReEnrichAll": "Re-enrich All Tracks",
+  "@libraryReEnrichAll": {
+    "description": "Library settings action - re-enrich the metadata of every track in the Library"
+  },
+  "libraryReEnrichAllSubtitle": "Look up and fill in metadata for every track in your Library, then review the changes",
+  "@libraryReEnrichAllSubtitle": {
+    "description": "Subtitle for the Re-enrich All Tracks action"
+  },
+  "libraryReEnrichAllEmpty": "No tracks to re-enrich. Tracks from network connections are not included.",
+  "@libraryReEnrichAllEmpty": {
+    "description": "Snackbar when the Library has no tracks Re-enrich can write to"
+  },
+  "libraryReEnrichAllBusy": "Wait for the Library scan to finish, then try again.",
+  "@libraryReEnrichAllBusy": {
+    "description": "Snackbar when Re-enrich All is started during a Library scan"
+  },
   "libraryFilterDownloaded": "Didownload",
   "@libraryFilterDownloaded": {
     "description": "Filter chip - show only downloaded items"
@@ -3407,58 +3572,77 @@
   "@tutorialReadyMessage": {
     "description": "Tutorial completion message"
   },
-  "whatsNewIntroTitle": "Mornye {version} sudah hadir",
-  "whatsNewIntroDesc": "Pembaruan terbesar kami sejauh ini. Ini sekilas yang baru.",
+  "whatsNewIntroTitle": "Mornye {version} is here",
+  "@whatsNewIntroTitle": {
+    "description": "First page of the tour shown once after updating; version is like 5.3",
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "whatsNewIntroDesc": "Our biggest update yet. Here's a quick look at what's new.",
   "whatsNewLinkTitle": "Mornye Link",
-  "whatsNewLinkDesc": "Hubungkan HP dan komputer di jaringan yang sama. Mornye Link masih beta.",
-  "whatsNewLinkPlayTitle": "Putar di semua perangkat",
-  "whatsNewLinkPlayBody": "Jelajahi koleksi komputer dari HP, kendalikan yang diputarnya, dan pindahkan pemutaran tanpa kehilangan posisi.",
-  "whatsNewLinkTransferTitle": "Pindahkan lagu dua arah",
-  "whatsNewLinkTransferBody": "Kirim lagu ke komputer atau simpan ke HP, langsung dari menu lagu.",
-  "whatsNewLinkSyncTitle": "Tetap sinkron",
-  "whatsNewLinkSyncBody": "Koleksi dan riwayat dengar tetap sama di perangkat yang terhubung.",
-  "whatsNewHomeTitle": "Beranda yang belajar",
-  "whatsNewHomeDesc": "Mix dan autoplay kini mengikuti caramu mendengarkan.",
-  "whatsNewHomeMixesTitle": "Mix dari Koleksi",
-  "whatsNewHomeMixesBody": "Mix baru dari lagu milikmu sendiri, termasuk mix untuk tiap genre.",
-  "whatsNewHomeAutoplayTitle": "Autoplay lebih pintar",
-  "whatsNewHomeAutoplayBody": "Autoplay mengikuti sesi mendengarmu dan belajar dari favorit, playlist, dan lagu yang kamu ulang.",
-  "whatsNewHomeAnalysisTitle": "Analisis lagu",
-  "whatsNewHomeAnalysisBody": "Mornye bisa menganalisis karakter suara lagumu untuk pilihan yang lebih pas. Fitur ini mati sampai kamu menyalakannya di Setelan.",
-  "whatsNewPlayerTitle": "Pemutar dan lirik",
-  "whatsNewPlayerDesc": "Pemutaran lebih mulus, dan lirik dalam bahasa apa pun.",
-  "whatsNewPlayerGaplessTitle": "Pemutaran tanpa jeda",
-  "whatsNewPlayerGaplessBody": "Album mengalir dari satu lagu ke lagu berikutnya tanpa jeda.",
-  "whatsNewPlayerTranslateTitle": "Terjemahkan lirik",
-  "whatsNewPlayerTranslateBody": "Terjemahkan atau romanisasi lirik dengan penyedia AI yang kamu atur.",
-  "whatsNewPlayerTimingTitle": "Waktu lirik",
-  "whatsNewPlayerTimingBody": "Majukan atau mundurkan lirik sinkron saat tidak pas dengan lagu.",
+  "whatsNewLinkDesc": "Pair your phone and computer on the same network. Mornye Link is in beta.",
+  "whatsNewLinkPlayTitle": "Play across devices",
+  "whatsNewLinkPlayBody": "Browse your computer's library on your phone, control what it plays, and hand playback over without losing your place.",
+  "whatsNewLinkTransferTitle": "Move songs both ways",
+  "whatsNewLinkTransferBody": "Send songs to your computer or save them to your phone, right from the song menu.",
+  "whatsNewLinkSyncTitle": "Stay in sync",
+  "whatsNewLinkSyncBody": "Collections and listening history stay the same on paired devices.",
+  "whatsNewHomeTitle": "A Home that learns",
+  "whatsNewHomeDesc": "Mixes and autoplay now follow how you actually listen.",
+  "whatsNewHomeMixesTitle": "Mixes from your Library",
+  "whatsNewHomeMixesBody": "New mixes built from your own songs, including a mix for each genre.",
+  "whatsNewHomeAutoplayTitle": "Smarter autoplay",
+  "whatsNewHomeAutoplayBody": "Autoplay follows your listening session and learns from your favorites, playlists and replays.",
+  "whatsNewHomeAnalysisTitle": "Song analysis",
+  "whatsNewHomeAnalysisBody": "Mornye can analyze how your songs sound for closer picks. It stays off until you turn it on in Settings.",
+  "whatsNewPlayerTitle": "Player and lyrics",
+  "whatsNewPlayerDesc": "Smoother playback, and lyrics in any language.",
+  "whatsNewPlayerGaplessTitle": "Gapless playback",
+  "whatsNewPlayerGaplessBody": "Albums flow from one song into the next without a pause.",
+  "whatsNewPlayerTranslateTitle": "Translate lyrics",
+  "whatsNewPlayerTranslateBody": "Translate or romanize lyrics with an AI provider you set up.",
+  "whatsNewPlayerTimingTitle": "Lyrics timing",
+  "whatsNewPlayerTimingBody": "Move synced lyrics earlier or later when they drift from the song.",
   "whatsNewPlayerAutoTitle": "Android Auto",
-  "whatsNewPlayerAutoBody": "Jelajahi dan putar Koleksi dari layar mobil.",
-  "whatsNewPlayerExclusiveTitle": "Output eksklusif",
-  "whatsNewPlayerExclusiveBody": "Kirim audio langsung ke perangkat output tanpa mixer sistem.",
-  "whatsNewLibraryTitle": "Koleksi dan pencarian",
-  "whatsNewLibraryDesc": "Cara baru untuk menemukan dan mengatur musikmu.",
-  "whatsNewLibraryFoldersTitle": "Jelajahi per folder",
-  "whatsNewLibraryFoldersBody": "Lihat Koleksi sesuai susunan foldernya di penyimpanan.",
-  "whatsNewLibrarySuggestionsTitle": "Saran lagu",
-  "whatsNewLibrarySuggestionsBody": "Album, single, dan playlist kini menyarankan lagu yang cocok.",
-  "whatsNewLibraryRecognizeTitle": "Kenali musik",
-  "whatsNewLibraryRecognizeBody": "Ketuk mikrofon di kolom pencarian untuk tahu lagu yang sedang diputar di sekitarmu.",
-  "whatsNewLibraryPlaylistsTitle": "Playlist lebih baik",
-  "whatsNewLibraryPlaylistsBody": "Urutkan ulang lagu, buat playlist dari folder, atau impor file playlist.",
-  "whatsNewFasterTitle": "Lebih cepat di mana-mana",
-  "whatsNewFasterDesc": "Lebih cepat dan ringan, terutama untuk koleksi besar.",
-  "whatsNewFasterLibraryTitle": "Koleksi lebih cepat",
-  "whatsNewFasterLibraryBody": "Tab dan album terbuka lebih cepat, dan scroll tetap mulus.",
-  "whatsNewFasterNetworkTitle": "Musik jaringan lebih cepat",
-  "whatsNewFasterNetworkBody": "Folder jaringan dipindai jauh lebih cepat, dan server Subsonic tersinkron dengan permintaan yang jauh lebih sedikit.",
-  "whatsNewFasterQueueTitle": "Antrean panjang tetap aman",
-  "whatsNewFasterQueueBody": "Antrean besar tersimpan cepat dan kembali setelah aplikasi dibuka ulang.",
-  "whatsNewFasterBackgroundTitle": "Lebih ringan di latar belakang",
-  "whatsNewFasterBackgroundBody": "Aplikasi terbuka lebih cepat dan bekerja lebih sedikit saat musik diputar.",
-  "whatsNewDone": "Mulai mendengarkan",
-  "whatsNewAboutTitle": "Yang baru di {version}",
+  "whatsNewPlayerAutoBody": "Browse and play your Library from your car's screen.",
+  "whatsNewPlayerExclusiveTitle": "Exclusive output",
+  "whatsNewPlayerExclusiveBody": "Send audio straight to your output device without the system mixer.",
+  "whatsNewLibraryTitle": "Library and search",
+  "whatsNewLibraryDesc": "New ways to find and organize your music.",
+  "whatsNewLibraryFoldersTitle": "Browse by folder",
+  "whatsNewLibraryFoldersBody": "Explore your Library the way it's stored on disk.",
+  "whatsNewLibrarySuggestionsTitle": "Suggested songs",
+  "whatsNewLibrarySuggestionsBody": "Albums, singles and playlists now suggest songs that fit.",
+  "whatsNewLibraryRecognizeTitle": "Recognize music",
+  "whatsNewLibraryRecognizeBody": "Tap the microphone in Search to find out what's playing nearby.",
+  "whatsNewLibraryPlaylistsTitle": "Better playlists",
+  "whatsNewLibraryPlaylistsBody": "Reorder songs, create a playlist from a folder, or import playlist files.",
+  "whatsNewFasterTitle": "Faster everywhere",
+  "whatsNewFasterDesc": "Quicker and lighter, especially with large libraries.",
+  "whatsNewFasterLibraryTitle": "A quicker Library",
+  "whatsNewFasterLibraryBody": "Tabs and albums open faster, and scrolling stays smooth.",
+  "whatsNewFasterNetworkTitle": "Faster network music",
+  "whatsNewFasterNetworkBody": "Network shares scan many times faster, and Subsonic servers sync with far fewer requests.",
+  "whatsNewFasterQueueTitle": "Long queues that last",
+  "whatsNewFasterQueueBody": "Large queues save quickly and come back after a restart.",
+  "whatsNewFasterBackgroundTitle": "Lighter in the background",
+  "whatsNewFasterBackgroundBody": "The app starts faster and does less work while music plays.",
+  "whatsNewDone": "Start listening",
+  "@whatsNewDone": {
+    "description": "Button on the last page of the What's New tour"
+  },
+  "whatsNewAboutTitle": "What's new in {version}",
+  "@whatsNewAboutTitle": {
+    "description": "About page row that reopens the What's New tour; version is like 5.3",
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
   "libraryForceFullScan": "Paksa Pindai Ulang",
   "@libraryForceFullScan": {
     "description": "Button to force a complete rescan of library"
@@ -3839,7 +4023,7 @@
   "@trackEditMetadata": {
     "description": "Menu action - edit embedded metadata"
   },
-  "trackCoverSaved": "Cover art disimpan ke {fileName}",
+  "trackCoverSaved": "Foto cover disimpan ke {fileName}",
   "@trackCoverSaved": {
     "description": "Snackbar after cover art saved",
     "placeholders": {
@@ -3848,7 +4032,7 @@
       }
     }
   },
-  "trackCoverNoSource": "Tidak ada sumber cover art",
+  "trackCoverNoSource": "Tidak ada sumber foto cover",
   "@trackCoverNoSource": {
     "description": "Snackbar when no cover art URL or embedded cover"
   },
@@ -4095,7 +4279,7 @@
   "@actionCreate": {
     "description": "Generic action button - create"
   },
-  "collectionFoldersTitle": "Folder saya",
+  "collectionFoldersTitle": "Folderku",
   "@collectionFoldersTitle": {
     "description": "Library section title for custom folders"
   },
@@ -4187,7 +4371,7 @@
   "@collectionWishlistEmptyTitle": {
     "description": "Wishlist empty state title"
   },
-  "collectionWishlistEmptySubtitle": "Ketuk + di lagu untuk menyimpan lagu yang ingin Anda download nanti",
+  "collectionWishlistEmptySubtitle": "Ketuk + di lagu untuk menyimpan lagu yang ingin didownload nanti",
   "@collectionWishlistEmptySubtitle": {
     "description": "Wishlist empty state subtitle"
   },
@@ -4195,7 +4379,7 @@
   "@collectionLovedEmptyTitle": {
     "description": "Loved empty state title"
   },
-  "collectionLovedEmptySubtitle": "Ketuk hati di lagu untuk menyimpan lagu favorit Anda",
+  "collectionLovedEmptySubtitle": "Ketuk hati untuk memfavoritkan lagu",
   "@collectionLovedEmptySubtitle": {
     "description": "Loved empty state subtitle"
   },
@@ -4203,7 +4387,7 @@
   "@collectionFavoriteArtistsEmptyTitle": {
     "description": "Favorite artists empty state title"
   },
-  "collectionFavoriteArtistsEmptySubtitle": "Ketuk hati di halaman artist untuk menyimpannya di sini",
+  "collectionFavoriteArtistsEmptySubtitle": "Ketuk hati di halaman artis untuk memfavoritkannya",
   "@collectionFavoriteArtistsEmptySubtitle": {
     "description": "Favorite artists empty state subtitle"
   },
@@ -4211,7 +4395,7 @@
   "@collectionPlaylistEmptyTitle": {
     "description": "Playlist empty state title"
   },
-  "collectionPlaylistEmptySubtitle": "Tekan lama + untuk menambahkan lagu ke sini",
+  "collectionPlaylistEmptySubtitle": "Tekan lama lagu untuk ditambah ke playlist",
   "@collectionPlaylistEmptySubtitle": {
     "description": "Playlist empty state subtitle"
   },
@@ -4483,11 +4667,11 @@
   "@safMigrationTitle": {
     "description": "Title of SAF migration dialog"
   },
-  "safMigrationMessage1": "Mornye kini menggunakan Android Storage Access (SAF) untuk mendownload. Ini memperbaiki eror \"izin ditolak\" di Android 10+.",
+  "safMigrationMessage1": "Mornye kini menggunakan Android Storage Access (SAF) untuk mendownload. Ini memperbaiki error \"izin ditolak\" di Android 10+.",
   "@safMigrationMessage1": {
     "description": "First paragraph of SAF migration dialog"
   },
-  "safMigrationMessage2": "Harap pilih folder download Anda lagi untuk pindah ke sistem penyimpanan baru.",
+  "safMigrationMessage2": "Harap pilih folder download lagi untuk pindah ke sistem penyimpanan baru.",
   "@safMigrationMessage2": {
     "description": "Second paragraph of SAF migration dialog"
   },
@@ -4507,7 +4691,7 @@
   "@settingsBackup": {
     "description": "Settings menu item - backup and restore page"
   },
-  "settingsBackupSubtitle": "Pindahkan koleksi, histori, dan setelan Anda ke perangkat baru",
+  "settingsBackupSubtitle": "Pindahkan koleksi, histori, dan setelan ke perangkat baru",
   "@settingsBackupSubtitle": {
     "description": "Subtitle for backup and restore settings item"
   },
@@ -4531,7 +4715,7 @@
   "@backupImportSectionTitle": {
     "description": "Section title for the import/restore card"
   },
-  "backupImportSectionDescription": "Pilih file cadangan untuk memulihkan data Anda. Ini akan mengubah setelan sekarang, histori, dan koleksi di perangkat ini.",
+  "backupImportSectionDescription": "Pilih file cadangan untuk dipulihkan. Ini akan mengubah setelan sekarang, histori, dan koleksi di perangkat ini.",
   "@backupImportSectionDescription": {
     "description": "Description for the restore action"
   },
@@ -4577,7 +4761,7 @@
   },
   "backupSettingsOnly": "Setelan saja",
   "backupSelectHistory": "Histori download",
-  "backupSelectCollections": "Koleksi saya",
+  "backupSelectCollections": "Seluruh koleksi",
   "backupSelectCollectionsDescription": "Lagu, wishlist, artis favorit, playlist, dan cover playlist yang disukai.",
   "backupSelectExtensions": "Ekstensi dan setelannya",
   "backupSelectedExportDescription": "Buat file cadangan dari kategori terpilih. Tidak termasuk file audio.",
@@ -4645,7 +4829,7 @@
   "@backupIncludeSecrets": {
     "description": "Toggle to include secret extension settings (tokens, API keys) in the backup"
   },
-  "backupIncludeSecretsDescription": "Token dan kunci API dari ekstensi disimpan ke dalam file cadangan. Jangan bagikan file ini. Jika dimatikan, Anda harus memasukkannya setelah memulihkan.",
+  "backupIncludeSecretsDescription": "Token dan kunci API ekstensi akan ikut dicadangkan. Jangan bagikan file ini. Jika tak dicadangkan, kamu harus memasukkannya setelah pemulihan.",
   "@backupIncludeSecretsDescription": {
     "description": "Explanation for the include-credentials toggle"
   },
@@ -4725,7 +4909,7 @@
   "@snackbarFailedToWriteStorage": {
     "description": "Snackbar when writing metadata back to file fails"
   },
-  "snackbarError": "Eror: {error}",
+  "snackbarError": "Error: {error}",
   "@snackbarError": {
     "description": "Generic error snackbar with error detail",
     "placeholders": {
@@ -4754,7 +4938,7 @@
   "@downloadFolderAccessLostTitle": {
     "description": "Title of the warning banner shown in Files settings when the saved SAF folder grant is no longer valid"
   },
-  "downloadFolderAccessLostSubtitle": "Download akan gagal hingga Anda memilih folder baru",
+  "downloadFolderAccessLostSubtitle": "Download akan gagal jika kamu belum pilih folder baru",
   "@downloadFolderAccessLostSubtitle": {
     "description": "Subtitle of the warning banner shown when the saved SAF folder grant is no longer valid"
   },
@@ -4938,7 +5122,7 @@
   "@downloadNetworkWifiOnlySubtitle": {
     "description": "Subtitle for WiFi-only option in picker"
   },
-  "downloadSongLinkRegionDesc": "Wilayah digunakan untuk resolve link lagu lewat SongLink. Pilih wilayah layanan streaming yang sama dengan wilayah Anda.",
+  "downloadSongLinkRegionDesc": "Wilayah digunakan untuk resolve link lagu lewat SongLink. Pilih wilayah layanan streaming yang sama dengan wilayah kamu.",
   "@downloadSongLinkRegionDesc": {
     "description": "Description in SongLink region picker"
   },
@@ -4946,7 +5130,7 @@
   "@snackbarUnsupportedAudioFormat": {
     "description": "Snackbar when the audio format is not supported for the requested operation"
   },
-  "cacheRefresh": "Muat Ulang",
+  "cacheRefresh": "Refresh",
   "@cacheRefresh": {
     "description": "Tooltip for refresh button on cache management page"
   },
@@ -5017,7 +5201,7 @@
       }
     }
   },
-  "editMetadataAutoFillCoverAvailable": "Cover artwork tersedia",
+  "editMetadataAutoFillCoverAvailable": "Foto cover tersedia",
   "@editMetadataAutoFillCoverAvailable": {
     "description": "Preview value when the selected metadata source provides cover artwork"
   },
@@ -5206,7 +5390,7 @@
       }
     }
   },
-  "queueEmptyPlaylistsSubtitle": "Buat playlist untuk menata lagu Anda",
+  "queueEmptyPlaylistsSubtitle": "Buat playlist untuk menata lagu kesukaanmu",
   "@queueEmptyPlaylistsSubtitle": {
     "description": "Empty state subtitle for the playlists library view"
   },
@@ -5479,7 +5663,7 @@
   "@extensionsHomeFeedProvider": {
     "description": "Extensions page - label for home feed provider selector"
   },
-  "extensionsHomeFeedCountry": "Negara beranda",
+  "extensionsHomeFeedCountry": "Wilayah feed beranda",
   "@extensionsHomeFeedCountry": {
     "description": "Country picker for the active Home feed extension"
   },
@@ -5533,7 +5717,7 @@
       }
     }
   },
-  "cancelDownloadKeep": "Urung",
+  "cancelDownloadKeep": "Tak jadi",
   "@cancelDownloadKeep": {
     "description": "Dialog button - keep the active download (do not cancel)"
   },
@@ -5693,7 +5877,7 @@
       }
     }
   },
-  "notifLibraryScanProgressNoTotal": "{scanned} file terpindai",
+  "notifLibraryScanProgressNoTotal": "{scanned} file dipindai",
   "@notifLibraryScanProgressNoTotal": {
     "description": "Notification body for library scan progress when total is unknown",
     "placeholders": {
@@ -5706,7 +5890,7 @@
   "@notifLibraryScanComplete": {
     "description": "Notification title when library scan finishes"
   },
-  "notifLibraryScanCompleteBody": "{count} lagu terpindai",
+  "notifLibraryScanCompleteBody": "{count} lagu dipindai",
   "@notifLibraryScanCompleteBody": {
     "description": "Notification body for library scan complete - number of indexed tracks",
     "placeholders": {
@@ -5724,7 +5908,7 @@
       }
     }
   },
-  "notifLibraryScanErrors": "{count} eror",
+  "notifLibraryScanErrors": "{count} error",
   "@notifLibraryScanErrors": {
     "description": "Library scan complete suffix - error count",
     "placeholders": {
@@ -5737,7 +5921,7 @@
   "@notifLibraryScanFailed": {
     "description": "Notification title when library scan fails"
   },
-  "notifLibraryScanInterruptedBody": "Pemindaian koleksi sebelumnya terputus. Pindai ulang folder untuk melanjutkan. Lagu yang sudah terindeks tetap tersedia.",
+  "notifLibraryScanInterruptedBody": "Pemindaian koleksi sebelumnya terganggu. Pindai folder lagi untuk lanjut. Lagu terpindai akan tetap ada.",
   "@notifLibraryScanInterruptedBody": {
     "description": "Recovery notice after the app stops during a library scan"
   },
@@ -5856,7 +6040,7 @@
   "@optionsEmbedMetadata": {
     "description": "Settings toggle title for writing metadata into downloaded files"
   },
-  "optionsEmbedMetadataSubtitleOn": "Edit metadata, foto cover, dan lirik tersemat ke file",
+  "optionsEmbedMetadataSubtitleOn": "Edit metadata, foto cover, dan sematkan lirik ke file",
   "@optionsEmbedMetadataSubtitleOn": {
     "description": "Subtitle when metadata embedding is enabled"
   },
@@ -6038,7 +6222,7 @@
   "@logIssueNetworkErrorDescription": {
     "description": "Diagnostic badge description for generic network errors"
   },
-  "logIssueNetworkErrorSuggestion": "Periksa koneksi internet Anda",
+  "logIssueNetworkErrorSuggestion": "Periksa koneksi internetmu",
   "@logIssueNetworkErrorSuggestion": {
     "description": "Diagnostic badge suggestion for generic network errors"
   },
@@ -6188,7 +6372,7 @@
   "@settingsLyrics": {
     "description": "Settings menu item - lyrics settings"
   },
-  "settingsLyricsSubtitle": "Tersemat, mode, provider, opsi bahasa",
+  "settingsLyricsSubtitle": "Penyematan, mode, provider, opsi bahasa",
   "@settingsLyricsSubtitle": {
     "description": "Subtitle for lyrics settings"
   },
@@ -6341,7 +6525,7 @@
       }
     }
   },
-  "collectionPlaylistsDeleted": "{count} {count, plural, =1{playlist} other{playlist}} terhapus",
+  "collectionPlaylistsDeleted": "{count} {count, plural, =1{playlist} other{playlist}} dihapus",
   "@collectionPlaylistsDeleted": {
     "description": "Snackbar after deleting selected playlists",
     "placeholders": {
@@ -6386,7 +6570,7 @@
       }
     }
   },
-  "trackReEnrichSuccessWithFailures": "Metadata berhasil diupdate ulang ({successCount}/{total}) - Gagal: {failedCount}",
+  "trackReEnrichSuccessWithFailures": "Metadata berhasil diupdate ({successCount}/{total}) - Gagal: {failedCount}",
   "@trackReEnrichSuccessWithFailures": {
     "description": "Snackbar summary after batch metadata re-enrichment finishes with failures",
     "placeholders": {
@@ -6473,7 +6657,7 @@
   "@logIssueSummary": {
     "description": "Header for log issue analysis summary"
   },
-  "logTotalErrors": "Total eror: {count}",
+  "logTotalErrors": "Total error: {count}",
   "@logTotalErrors": {
     "description": "Total error count in log issue analysis",
     "placeholders": {
@@ -6495,7 +6679,7 @@
   "@libraryScanCancelled": {
     "description": "Library scan status when a scan was cancelled"
   },
-  "libraryScanCancelledSubtitle": "Anda dapat mencoba lagi saat siap.",
+  "libraryScanCancelledSubtitle": "Cobalah scan lagi bila sudah siap.",
   "@libraryScanCancelledSubtitle": {
     "description": "Library scan status subtitle after cancellation"
   },
@@ -6579,7 +6763,7 @@
   "@extensionHealthDegraded": {
     "description": "Extension service health status - degraded"
   },
-  "extensionHealthOffline": "Ofline",
+  "extensionHealthOffline": "Offline",
   "@extensionHealthOffline": {
     "description": "Extension service health status - offline"
   },
@@ -6603,7 +6787,7 @@
   "@extensionActionFailed": {
     "description": "Fallback error when an extension action fails without details"
   },
-  "extensionEnterValue": "Masukkan isi",
+  "extensionEnterValue": "Harap diisi",
   "@extensionEnterValue": {
     "description": "Hint for editing an extension setting value"
   },
@@ -6745,7 +6929,7 @@
   "@shareSheetCopyLink": {
     "description": "Tooltip for copying a cross-service link"
   },
-  "shareSheetLinkCopied": "{service} link tersalin",
+  "shareSheetLinkCopied": "{service} link disalin",
   "@shareSheetLinkCopied": {
     "description": "Snackbar after copying a cross-service link",
     "placeholders": {
@@ -6760,7 +6944,7 @@
   "@libraryExternalPlayer": {
     "description": "Setting option to use an external music player"
   },
-  "libraryExternalPlayerSubtitle": "Buka lagu di aplikasi musik lain di perangkatmu",
+  "libraryExternalPlayerSubtitle": "Buka lagu dengan aplikasi pemutar lain",
   "@libraryExternalPlayerSubtitle": {
     "description": "Subtitle for external player option"
   },
@@ -6804,7 +6988,7 @@
   },
   "concertGetTickets": "Dapatkan Tiket",
   "concertSetList": "Daftar Set Konser",
-  "concertSetListButton": "Atur Daftar",
+  "concertSetListButton": "Daftar Set",
   "concertAddToCalendar": "Tambah ke Kalender",
   "concertOpenMaps": "Buka Maps",
   "concertDetailsUnavailable": "Detail konser sekarang belum tersedia.",
@@ -6865,10 +7049,16 @@
     "description": "Confirmation after cancelling the playback sleep timer"
   },
   "nowPlayingOpenInExternalPlayer": "Buka di pemutar eksternal",
-  "nowPlayingHideVolume": "Sembunyikan volume",
-  "nowPlayingShowVolume": "Tampilkan volume",
   "@nowPlayingOpenInExternalPlayer": {
     "description": "Menu item to open the current track in an external player"
+  },
+  "nowPlayingHideVolume": "Hide volume",
+  "@nowPlayingHideVolume": {
+    "description": "Now Playing menu item that removes the volume slider from the player"
+  },
+  "nowPlayingShowVolume": "Show volume",
+  "@nowPlayingShowVolume": {
+    "description": "Now Playing menu item that brings the volume slider back to the player"
   },
   "nowPlayingTabPlayer": "Pemutar",
   "@nowPlayingTabPlayer": {
@@ -6902,7 +7092,280 @@
   "@nowPlayingNoLyricsOnline": {
     "description": "Empty state after an online lyrics search for the playing track found nothing"
   },
-  "nowPlayingLibraryEmpty": "Koleksi Anda kosong",
+  "nowPlayingTranslateLyrics": "Translate Lyrics",
+  "@nowPlayingTranslateLyrics": {
+    "description": "Player lyrics menu action that translates the current lyrics with the user's AI provider"
+  },
+  "nowPlayingCancelTranslation": "Cancel Translation",
+  "@nowPlayingCancelTranslation": {
+    "description": "Player lyrics menu action that stops an AI lyrics translation in progress"
+  },
+  "nowPlayingTranslatingLyrics": "Translating lyrics, {percent}%",
+  "@nowPlayingTranslatingLyrics": {
+    "description": "Tooltip and screen reader label of the lyrics menu button while an AI translation runs",
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "lyricsTranslateSheetTitle": "Translate Into",
+  "@lyricsTranslateSheetTitle": {
+    "description": "Title of the sheet that picks the language to translate the current lyrics into"
+  },
+  "lyricsTranslateSheetSubtitle": "The lyrics are sent to {provider}.",
+  "@lyricsTranslateSheetSubtitle": {
+    "description": "Notice under the translate sheet title naming the AI provider that receives the lyrics",
+    "placeholders": {
+      "provider": {
+        "type": "String"
+      }
+    }
+  },
+  "lyricsTranslatePartial": "{count, plural, =1{1 line} other{{count} lines}} could not be translated",
+  "@lyricsTranslatePartial": {
+    "description": "Snackbar after an AI translation that left some lines untranslated",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "lyricsTranslateAlreadyIn": "These lyrics are already in {language}",
+  "@lyricsTranslateAlreadyIn": {
+    "description": "Snackbar after an AI translation returned every line unchanged; language is the target language's own name",
+    "placeholders": {
+      "language": {
+        "type": "String"
+      }
+    }
+  },
+  "lyricsAiTranslation": "AI Translation",
+  "@lyricsAiTranslation": {
+    "description": "Lyrics settings row and page title for translating lyrics with the user's own AI provider"
+  },
+  "lyricsAiTranslationOff": "Not set up",
+  "@lyricsAiTranslationOff": {
+    "description": "Subtitle of the AI Translation settings row before a provider is configured"
+  },
+  "lyricsAiTranslationNotice": "Lyrics you translate are sent to the provider you choose, using your own API key. The provider's terms and pricing apply. Translations are saved on this device and never change your lyric files.",
+  "@lyricsAiTranslationNotice": {
+    "description": "Privacy notice at the top of the AI translation settings page"
+  },
+  "lyricsAiSectionProvider": "Provider",
+  "@lyricsAiSectionProvider": {
+    "description": "AI translation settings section for the provider, key and model"
+  },
+  "lyricsAiSectionTranslation": "Translation",
+  "@lyricsAiSectionTranslation": {
+    "description": "AI translation settings section for the target language and behavior"
+  },
+  "lyricsAiProvider": "Provider",
+  "@lyricsAiProvider": {
+    "description": "AI translation setting that picks the AI service"
+  },
+  "lyricsAiProviderCustom": "Custom Server",
+  "@lyricsAiProviderCustom": {
+    "description": "AI provider choice for a self-hosted or other OpenAI-compatible server"
+  },
+  "lyricsAiProviderCustomSubtitle": "Any OpenAI-compatible server, such as Ollama or LM Studio",
+  "@lyricsAiProviderCustomSubtitle": {
+    "description": "Subtitle of the custom AI provider choice"
+  },
+  "lyricsAiBaseUrl": "Server URL",
+  "@lyricsAiBaseUrl": {
+    "description": "AI translation setting for the address of a custom OpenAI-compatible server"
+  },
+  "lyricsAiBaseUrlInvalid": "Enter a URL that starts with http:// or https://",
+  "@lyricsAiBaseUrlInvalid": {
+    "description": "Validation error for the custom AI server URL"
+  },
+  "lyricsAiNotSet": "Not set",
+  "@lyricsAiNotSet": {
+    "description": "Subtitle of an AI translation setting that has no value yet"
+  },
+  "lyricsAiApiKey": "API Key",
+  "@lyricsAiApiKey": {
+    "description": "AI translation setting for the user's API key"
+  },
+  "lyricsAiApiKeyOptional": "Optional for local servers",
+  "@lyricsAiApiKeyOptional": {
+    "description": "Subtitle of the API key setting for a custom server without a key"
+  },
+  "lyricsAiApiKeySaved": "Saved, ends in {suffix}",
+  "@lyricsAiApiKeySaved": {
+    "description": "Subtitle of the API key setting showing only its last characters",
+    "placeholders": {
+      "suffix": {
+        "type": "String"
+      }
+    }
+  },
+  "lyricsAiApiKeyDescription": "Kept in this device's secure storage and only sent to {provider}.",
+  "@lyricsAiApiKeyDescription": {
+    "description": "Explanation in the API key sheet",
+    "placeholders": {
+      "provider": {
+        "type": "String"
+      }
+    }
+  },
+  "lyricsAiModel": "Model",
+  "@lyricsAiModel": {
+    "description": "AI translation setting for the model id"
+  },
+  "lyricsAiModelDefault": "Default ({model})",
+  "@lyricsAiModelDefault": {
+    "description": "Subtitle of the model setting when the provider's default model is used",
+    "placeholders": {
+      "model": {
+        "type": "String"
+      }
+    }
+  },
+  "lyricsAiModelHint": "Model ID",
+  "@lyricsAiModelHint": {
+    "description": "Hint of the model id text field"
+  },
+  "lyricsAiModelUseDefault": "Use Default",
+  "@lyricsAiModelUseDefault": {
+    "description": "Action in the model sheet that returns to the provider's default model"
+  },
+  "lyricsAiModelLoad": "Load Models",
+  "@lyricsAiModelLoad": {
+    "description": "Button in the model sheet that lists the models the provider offers"
+  },
+  "lyricsAiModelsEmpty": "The provider listed no models",
+  "@lyricsAiModelsEmpty": {
+    "description": "Shown in the model sheet when the provider's model list is empty"
+  },
+  "lyricsAiTestConnection": "Test Connection",
+  "@lyricsAiTestConnection": {
+    "description": "AI translation settings action that translates one line to check the key and model"
+  },
+  "lyricsAiTestConnectionSubtitle": "Translates one line to check the key and model",
+  "@lyricsAiTestConnectionSubtitle": {
+    "description": "Subtitle of the test connection action"
+  },
+  "lyricsAiTestSuccess": "The connection works",
+  "@lyricsAiTestSuccess": {
+    "description": "Snackbar after a successful AI translation connection test"
+  },
+  "lyricsAiTargetLanguage": "Translate Into",
+  "@lyricsAiTargetLanguage": {
+    "description": "AI translation setting for the target language"
+  },
+  "lyricsAiTargetLanguageApp": "App language ({language})",
+  "@lyricsAiTargetLanguageApp": {
+    "description": "Target language choice that follows the app language",
+    "placeholders": {
+      "language": {
+        "type": "String"
+      }
+    }
+  },
+  "lyricsAiInstruction": "Extra Instruction",
+  "@lyricsAiInstruction": {
+    "description": "AI translation setting for optional guidance added to the translation request"
+  },
+  "lyricsAiInstructionNone": "None",
+  "@lyricsAiInstructionNone": {
+    "description": "Subtitle of the extra instruction setting when it is empty"
+  },
+  "lyricsAiInstructionHint": "For example: keep the rhymes where you can",
+  "@lyricsAiInstructionHint": {
+    "description": "Hint of the extra instruction text field"
+  },
+  "lyricsAiAutoTranslate": "Translate Automatically",
+  "@lyricsAiAutoTranslate": {
+    "description": "AI translation switch that translates lyrics as they open"
+  },
+  "lyricsAiAutoTranslateSubtitle": "Translates synced lyrics that have no translation when you open them, using your provider's quota",
+  "@lyricsAiAutoTranslateSubtitle": {
+    "description": "Subtitle of the automatic AI translation switch"
+  },
+  "lyricsAiRomanize": "Add Romanization",
+  "@lyricsAiRomanize": {
+    "description": "AI translation switch that also asks for romanized lyrics"
+  },
+  "lyricsAiRomanizeSubtitle": "Shows how lyrics in other alphabets are sung, such as romaji for Japanese or pinyin for Chinese",
+  "@lyricsAiRomanizeSubtitle": {
+    "description": "Subtitle of the AI romanization switch"
+  },
+  "lyricsAiClearCache": "Clear Saved Translations",
+  "@lyricsAiClearCache": {
+    "description": "AI translation settings action that deletes saved translations"
+  },
+  "lyricsAiClearCacheSubtitle": "{count, plural, =0{No saved translations} =1{1 song} other{{count} songs}}",
+  "@lyricsAiClearCacheSubtitle": {
+    "description": "Subtitle of the clear saved translations action",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "lyricsAiClearCacheConfirm": "Clear saved translations?",
+  "@lyricsAiClearCacheConfirm": {
+    "description": "Title of the confirmation before deleting saved AI translations"
+  },
+  "lyricsAiClearCacheMessage": "Songs will need to be translated again, which uses your provider's quota.",
+  "@lyricsAiClearCacheMessage": {
+    "description": "Message of the confirmation before deleting saved AI translations"
+  },
+  "lyricsAiClearCacheDone": "Saved translations cleared",
+  "@lyricsAiClearCacheDone": {
+    "description": "Snackbar after deleting saved AI translations"
+  },
+  "lyricsAiErrorNotConfigured": "Set up AI translation in Lyrics settings first",
+  "@lyricsAiErrorNotConfigured": {
+    "description": "AI translation error when no provider, key or model is set"
+  },
+  "lyricsAiErrorInvalidKey": "The provider did not accept the API key",
+  "@lyricsAiErrorInvalidKey": {
+    "description": "AI translation error for a rejected API key"
+  },
+  "lyricsAiErrorRateLimited": "The provider is limiting requests. Try again in a moment",
+  "@lyricsAiErrorRateLimited": {
+    "description": "AI translation error when the provider rate limits the requests"
+  },
+  "lyricsAiErrorQuota": "Your provider account is out of credit or quota",
+  "@lyricsAiErrorQuota": {
+    "description": "AI translation error for an exhausted quota or billing problem"
+  },
+  "lyricsAiErrorNetwork": "Could not reach the provider. Check your connection",
+  "@lyricsAiErrorNetwork": {
+    "description": "AI translation error when the provider cannot be reached"
+  },
+  "lyricsAiErrorTimeout": "The provider took too long to answer",
+  "@lyricsAiErrorTimeout": {
+    "description": "AI translation error when a request times out"
+  },
+  "lyricsAiErrorModelNotFound": "The provider does not offer this model",
+  "@lyricsAiErrorModelNotFound": {
+    "description": "AI translation error for an unknown model id"
+  },
+  "lyricsAiErrorRefused": "The model declined to translate these lyrics",
+  "@lyricsAiErrorRefused": {
+    "description": "AI translation error when the model refuses the request"
+  },
+  "lyricsAiErrorTruncated": "The model's answer was cut off. Try another model",
+  "@lyricsAiErrorTruncated": {
+    "description": "AI translation error when the reply hit the output limit"
+  },
+  "lyricsAiErrorBadResponse": "The model's answer could not be read. Try another model",
+  "@lyricsAiErrorBadResponse": {
+    "description": "AI translation error when the reply is not the expected JSON"
+  },
+  "lyricsAiErrorService": "The provider had a problem. Try again later",
+  "@lyricsAiErrorService": {
+    "description": "AI translation error for other provider failures"
+  },
+  "lyricsAiErrorNoLyrics": "These lyrics have nothing to translate",
+  "@lyricsAiErrorNoLyrics": {
+    "description": "AI translation error when the lyrics have no translatable lines"
+  },
+  "nowPlayingLibraryEmpty": "Koleksi kamu kosong",
   "@nowPlayingLibraryEmpty": {
     "description": "Snackbar when shuffle library is requested but library has no tracks"
   },
@@ -6935,42 +7398,279 @@
   "@nowPlayingNoMetadata": {
     "description": "Empty state when track metadata cannot be loaded"
   },
-  "linkDevicesTitle": "Perangkat",
-  "linkConnectionConnected": "Terhubung",
-  "linkConnectionConnecting": "Menghubungkan",
-  "linkConnectionDisconnected": "Tidak terhubung",
-  "linkThisPhone": "Ponsel ini",
-  "linkPlayingOn": "Diputar di {name}",
-  "linkDesktopDownloads": "Download di {name}",
-  "linkHandoffStarted": "Diputar di {name}",
-  "linkHandoffSending": "Mengirim lagu ini ke {name}...",
-  "linkHandoffMissing": "Diputar di {name}. Tidak ditemukan di sana: {titles}",
-  "linkHandoffNotFound": "{name} tidak punya satu pun lagu ini",
-  "linkHandoffNothingPlaying": "Tidak ada yang diputar di ponsel ini",
-  "linkContinueSkipped": "Tidak ada di ponsel ini: {titles}",
-  "linkContinueNotFound": "Tidak ada satu pun lagu ini di ponsel ini",
-  "linkRequestFailed": "Tidak dapat menghubungi {name}",
-  "linkDownloadOnDesktop": "Download di {name}",
-  "linkDownloadQueuedOnDesktop": "{count, plural, other{{count} lagu masuk antrean di {name}}}",
-  "linkOpenOnDesktop": "Buka di {name}",
-  "linkOpenedOnDesktop": "Dibuka di {name}",
-  "linkSendToDesktop": "Kirim ke {name}",
-  "linkSaveToPhone": "Simpan ke ponsel ini",
-  "linkSavingToPhone": "Menyimpan ke ponsel ini",
-  "linkSavedToPhone": "{count, plural, other{{count} lagu disimpan ke ponsel ini}}",
-  "linkSaveToPhoneFailed": "{count, plural, other{{count} lagu tidak dapat disimpan}}",
-  "linkSaveToPhoneCancelled": "Penyimpanan dihentikan",
-  "linkTransferPhoneReceiving": "{count, plural, =1{Menyimpan {title} dari {name}} other{Menyimpan {count} lagu dari {name}}}",
-  "linkTransferPhoneOffered": "{count, plural, =1{{name} mengirim {title} ke ponsel ini} other{{name} mengirim {count} lagu ke ponsel ini}}",
-  "linkTransferPhoneView": "Lihat",
-  "linkTransferPhoneWith": "Transfer dengan {name}",
-  "linkTransferPhoneNothing": "Tidak ada lagu ini di {name}",
-  "linkSendSending": "{count, plural, =1{Mengirim {title} ke {name}} other{Mengirim {count} lagu ke {name}}}",
-  "linkSendNothing": "Tidak ada lagu yang bisa dikirim ke {name}",
-  "linkDownloadStatusQueued": "Menunggu",
-  "linkDownloadStatusDownloading": "Mendownload",
-  "linkDownloadStatusDone": "Selesai",
-  "linkDownloadStatusFailed": "Gagal",
+  "linkDevicesTitle": "Devices",
+  "@linkDevicesTitle": {
+    "description": "Mornye Link: title and button tooltip of the phone sheet that controls the paired desktop app"
+  },
+  "linkConnectionConnected": "Connected",
+  "@linkConnectionConnected": {
+    "description": "Mornye Link: the phone is connected to the paired desktop"
+  },
+  "linkConnectionConnecting": "Connecting",
+  "@linkConnectionConnecting": {
+    "description": "Mornye Link: the phone is connecting to the paired desktop"
+  },
+  "linkConnectionDisconnected": "Not connected",
+  "@linkConnectionDisconnected": {
+    "description": "Mornye Link: the paired desktop cannot be reached"
+  },
+  "linkThisPhone": "This phone",
+  "@linkThisPhone": {
+    "description": "Mornye Link: the phone's own row in the Devices sheet; choosing it plays music here again"
+  },
+  "linkPlayingOn": "Playing on {name}",
+  "@linkPlayingOn": {
+    "description": "Mornye Link: shown in the player while the paired desktop plays in the phone's place",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkDesktopDownloads": "Downloads on {name}",
+  "@linkDesktopDownloads": {
+    "description": "Mornye Link: heading of the paired desktop's download queue",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkHandoffStarted": "Playing on {name}",
+  "@linkHandoffStarted": {
+    "description": "Mornye Link: the paired desktop took over the phone's queue",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkHandoffSending": "Sending this song to {name}...",
+  "@linkHandoffSending": {
+    "description": "Mornye Link: the phone uploads the current song, which the paired desktop lacks, before it plays there",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkHandoffMissing": "Playing on {name}. Not found there: {titles}",
+  "@linkHandoffMissing": {
+    "description": "Mornye Link: the paired desktop took over the phone's queue but lacks some tracks, listed by title",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "titles": {
+        "type": "String"
+      }
+    }
+  },
+  "linkHandoffNotFound": "{name} has none of these tracks",
+  "@linkHandoffNotFound": {
+    "description": "Mornye Link: the paired desktop has none of the tracks in the phone's queue",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkHandoffNothingPlaying": "Nothing is playing on this phone",
+  "@linkHandoffNothingPlaying": {
+    "description": "Mornye Link: Play on desktop needs a track playing on the phone"
+  },
+  "linkContinueSkipped": "Not on this phone: {titles}",
+  "@linkContinueSkipped": {
+    "description": "Mornye Link: tracks of the desktop queue the phone could not play, listed by title",
+    "placeholders": {
+      "titles": {
+        "type": "String"
+      }
+    }
+  },
+  "linkContinueNotFound": "None of these tracks are on this phone",
+  "@linkContinueNotFound": {
+    "description": "Mornye Link: the phone has none of the tracks of the desktop queue"
+  },
+  "linkRequestFailed": "Could not reach {name}",
+  "@linkRequestFailed": {
+    "description": "Mornye Link: a request to the paired desktop failed",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkDownloadOnDesktop": "Download on {name}",
+  "@linkDownloadOnDesktop": {
+    "description": "Mornye Link: queues a track, album or link for download in the paired desktop app",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkDownloadQueuedOnDesktop": "{count, plural, =1{Queued 1 track on {name}} other{Queued {count} tracks on {name}}}",
+  "@linkDownloadQueuedOnDesktop": {
+    "description": "Mornye Link: the paired desktop queued downloads",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkOpenOnDesktop": "Open on {name}",
+  "@linkOpenOnDesktop": {
+    "description": "Mornye Link: opens a shared link in the paired desktop app",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkOpenedOnDesktop": "Opened on {name}",
+  "@linkOpenedOnDesktop": {
+    "description": "Mornye Link: the paired desktop opened the link",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkSendToDesktop": "Send to {name}",
+  "@linkSendToDesktop": {
+    "description": "Mornye Link: action on a shared link that offers to open or download it on the paired desktop",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkSaveToPhone": "Save to this phone",
+  "@linkSaveToPhone": {
+    "description": "Mornye Link: downloads songs of the paired desktop's library into the phone's download folder"
+  },
+  "linkSavingToPhone": "Saving to this phone",
+  "@linkSavingToPhone": {
+    "description": "Mornye Link: title of the progress dialog while desktop songs are saved to the phone"
+  },
+  "linkSavedToPhone": "{count, plural, =1{Saved 1 song to this phone} other{Saved {count} songs to this phone}}",
+  "@linkSavedToPhone": {
+    "description": "Mornye Link: desktop songs were saved to the phone",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "linkSaveToPhoneFailed": "{count, plural, =1{1 song could not be saved} other{{count} songs could not be saved}}",
+  "@linkSaveToPhoneFailed": {
+    "description": "Mornye Link: some desktop songs could not be saved to the phone",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "linkSaveToPhoneCancelled": "Saving stopped",
+  "@linkSaveToPhoneCancelled": {
+    "description": "Mornye Link: the listener cancelled saving desktop songs to the phone"
+  },
+  "linkTransferPhoneReceiving": "{count, plural, =1{Saving {title} from {name}} other{Saving {count} songs from {name}}}",
+  "@linkTransferPhoneReceiving": {
+    "description": "Mornye Link: snackbar and notification when the phone starts copying songs from the paired computer into its download folder; title is the song's title when there is one song",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "title": {
+        "type": "String"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkTransferPhoneOffered": "{count, plural, =1{{name} is sending {title} to this phone} other{{name} is sending {count} songs to this phone}}",
+  "@linkTransferPhoneOffered": {
+    "description": "Mornye Link: snackbar when the paired computer starts sending songs to the phone; title is the song's title when there is one song",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "title": {
+        "type": "String"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkTransferPhoneView": "View",
+  "@linkTransferPhoneView": {
+    "description": "Mornye Link: snackbar action that opens the list of song transfers"
+  },
+  "linkTransferPhoneWith": "Transfer with {name}",
+  "@linkTransferPhoneWith": {
+    "description": "Mornye Link: tooltip and sheet title of a playlist's button that sends its songs to the paired computer or saves the computer's songs to the phone",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkTransferPhoneNothing": "None of these songs are on {name}",
+  "@linkTransferPhoneNothing": {
+    "description": "Mornye Link: Save to this phone found none of the chosen songs in the paired computer's library",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkSendSending": "{count, plural, =1{Sending {title} to {name}} other{Sending {count} songs to {name}}}",
+  "@linkSendSending": {
+    "description": "Mornye Link: snackbar and notification when the phone starts copying its own songs to the paired computer; title is the song's title when there is one song",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "title": {
+        "type": "String"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkSendNothing": "None of these songs can be sent to {name}",
+  "@linkSendNothing": {
+    "description": "Mornye Link: none of the chosen songs is a file on this phone in a format the paired computer takes",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkDownloadStatusQueued": "Waiting",
+  "@linkDownloadStatusQueued": {
+    "description": "Mornye Link: a download on the paired desktop has not started"
+  },
+  "linkDownloadStatusDownloading": "Downloading",
+  "@linkDownloadStatusDownloading": {
+    "description": "Mornye Link: a download on the paired desktop is running"
+  },
+  "linkDownloadStatusDone": "Done",
+  "@linkDownloadStatusDone": {
+    "description": "Mornye Link: a download on the paired desktop finished"
+  },
+  "linkDownloadStatusFailed": "Failed",
+  "@linkDownloadStatusFailed": {
+    "description": "Mornye Link: a download on the paired desktop failed"
+  },
   "announcementUnableToOpenLink": "Tidak dapat membuka link. Coba lagi.",
   "@announcementUnableToOpenLink": {
     "description": "Snackbar shown when an announcement CTA link cannot be opened"
@@ -6984,7 +7684,7 @@
       }
     }
   },
-  "trackConvertConfirmMessageLosslessCapped": "Ubah format {sourceFormat} ke {targetFormat} ({quality})?\n\nOutput tetap menggunakan codec loseless, tapi bit depth/laju sampel akan dibatasi. File asli akan dihapus setelah diubah.",
+  "trackConvertConfirmMessageLosslessCapped": "Ubah format {sourceFormat} ke {targetFormat} ({quality})?\n\nOutput tetap menggunakan codec loseless, tapi bit depth/sample rate akan dibatasi. File asli akan dihapus setelah diubah.",
   "@trackConvertConfirmMessageLosslessCapped": {
     "description": "Confirmation dialog message for capped lossless conversion of a single file",
     "placeholders": {
@@ -6999,7 +7699,7 @@
       }
     }
   },
-  "selectionBatchConvertConfirmMessageLosslessCapped": "Ubah format {count} {count, plural, =1{lagu} other{lagu}} ke {format} ({quality})?\n\nOutput tetap menggunakan codec loseless, tapi bit depth/laju sampel akan dibatasi. File asli akan dihapus setelah diubah.",
+  "selectionBatchConvertConfirmMessageLosslessCapped": "Ubah format {count} {count, plural, =1{lagu} other{lagu}} ke {format} ({quality})?\n\nOutput tetap menggunakan codec loseless, tapi bit depth/sample rate akan dibatasi. File asli akan dihapus setelah diubah.",
   "@selectionBatchConvertConfirmMessageLosslessCapped": {
     "description": "Confirmation dialog message for capped lossless batch conversion",
     "placeholders": {
@@ -7141,7 +7841,7 @@
   "@trackAddToQueue": {
     "description": "Menu action to add a track to the playback queue"
   },
-  "snackbarExtensionInstalledEnable": "{extensionName} terinstal. Hidupkan di Setelan > Ekstensi",
+  "snackbarExtensionInstalledEnable": "{extensionName} diinstal. Hidupkan di Setelan > Ekstensi",
   "@snackbarExtensionInstalledEnable": {
     "description": "Snackbar after installing an extension from the repo tab",
     "placeholders": {
@@ -7184,7 +7884,7 @@
   "@releaseTypeEp": {
     "description": "Badge label for EP releases"
   },
-  "releaseTypeSingle": "SIngle",
+  "releaseTypeSingle": "Single",
   "@releaseTypeSingle": {
     "description": "Badge label for single releases"
   },
@@ -7289,7 +7989,7 @@
   "@extensionVerificationHelpTitleWaiting": {
     "description": "Dialog title when verification is taking longer than expected"
   },
-  "extensionVerificationHelpMessageManual": "Mornye tidak dapat membuka browser secara otomatis. Buka link ini di browser Anda, atau salin manual.",
+  "extensionVerificationHelpMessageManual": "Mornye tidak dapat membuka browser secara otomatis. Buka link ini di browser kamu, atau salin manual.",
   "@extensionVerificationHelpMessageManual": {
     "description": "Dialog message when automatic browser launch for verification fails"
   },
@@ -7404,28 +8104,44 @@
   "@mornyeFavorite": {
     "description": "Compact context menu action that adds a track to Loved"
   },
-  "mornyeFavorited": "Terfavorit",
+  "mornyeFavorited": "Difavoritkan",
   "@mornyeFavorited": {
     "description": "Selected state of the compact favorite action"
   },
   "autoMixDescription": "Padukan musik dengan pencocokan bit dan penyesuaian tempo. Menggunakan crossfade bila beat tidak dapat dicocokkan.",
+  "gaplessPlayback": "Gapless playback",
+  "@gaplessPlayback": {
+    "description": "Playback settings switch that starts the next song the moment one ends"
+  },
+  "gaplessPlaybackDescription": "Start the next song the moment one ends, without silence between them. AutoMix replaces it while on.",
+  "@gaplessPlaybackDescription": {
+    "description": "Subtitle of the Gapless playback switch"
+  },
   "playerCoverStyle": "Foto cover",
   "@playerCoverStyle": {
     "description": "Settings section choosing how the player shows cover art"
   },
-  "landscapeLyricsArtwork": "Cover album di samping lirik",
+  "landscapeLyricsArtwork": "Album art beside lyrics",
   "@landscapeLyricsArtwork": {
     "description": "Switch choosing album artwork instead of track details alongside lyrics in landscape"
   },
-  "landscapeLyricsArtworkDescription": "Tampilkan cover album menggantikan detail lagu pada player Material dalam posisi landscape",
+  "landscapeLyricsArtworkDescription": "Show album art instead of track details in the Material landscape player",
   "@landscapeLyricsArtworkDescription": {
     "description": "Subtitle explaining the Material landscape lyrics layout setting"
+  },
+  "compactPlayer": "Compact player",
+  "@compactPlayer": {
+    "description": "Material player setting: idle lyrics shrink the player to a slim bar instead of hiding it"
+  },
+  "compactPlayerDescription": "When lyrics are left alone, shrink the player to a slim bar so the lyrics get more room. A tap brings the full player back",
+  "@compactPlayerDescription": {
+    "description": "Subtitle of the compact player setting"
   },
   "playerCoverStyleDefault": "Default",
   "@playerCoverStyleDefault": {
     "description": "Cover art style: artwork card above the controls"
   },
-  "playerCoverStyleCard": "Kartu",
+  "playerCoverStyleCard": "Card",
   "@playerCoverStyleCard": {
     "description": "Cover art style: artwork as a card above the controls (full screen is the default)"
   },
@@ -7437,7 +8153,7 @@
   "@playerCoverStyleFullScreen": {
     "description": "Cover art style: artwork fills the top of the player"
   },
-  "playerCoverStyleFullScreenDescription": "Artwork memenuhi bagian atas player lalu memudar menjadi blur. Artwork bergerak di Mornye selalu layar penuh",
+  "playerCoverStyleFullScreenDescription": "Cover mengisi bagian atas pemutar dan memudar. Di Mornye, cover bergerak selalu muncul dalam layar penuh",
   "@playerCoverStyleFullScreenDescription": {
     "description": "Subtitle of the full screen cover art style"
   },
@@ -7445,7 +8161,7 @@
   "@musicHaptics": {
     "description": "Setting that vibrates the phone along with the music"
   },
-  "musicHapticsDescription": "Getar mengikuti ketukan lagu unduhan dan lokal",
+  "musicHapticsDescription": "Getarkan irama lagu hasil download dan lokal",
   "@musicHapticsDescription": {
     "description": "Subtitle of the music haptics setting"
   },
@@ -7461,48 +8177,102 @@
   "autoMixOff": "AutoMix mati",
   "autoplayOn": "Autoplay hidup",
   "autoplayOff": "Autoplay mati",
-  "autoplayFromLibrary": "Autoplay dari Koleksi Anda",
-  "autoplayDescription": "Lanjutkan dengan lagu terkait dari Koleksi saat antrean berakhir.",
-  "autoplayPersonalization": "Autoplay personal",
-  "autoplayPersonalizationDescription": "Pelajari lagu yang kamu dengarkan dan lewati secara privat di perangkat ini. Mematikannya menghentikan pembelajaran dan mengembalikan autoplay biasa.",
-  "autoplayResetLearning": "Reset pembelajaran rekomendasi",
-  "autoplayResetLearningConfirmTitle": "Reset pembelajaran rekomendasi?",
-  "autoplayResetLearningConfirmMessage": "Autoplay akan melupakan apa yang dipelajari dari lagu yang kamu dengar dan lewati. Tindakan ini tidak bisa dibatalkan.",
+  "autoplayFromLibrary": "Autoplay dari Koleksi kamu",
+  "autoplayDescription": "Lanjut dengar lagu serupa dari Koleksi kamu begitu antrean berakhir.",
+  "autoplayPersonalization": "Autoplay cerdas",
+  "autoplayPersonalizationDescription": "Pelajari lagu kesukaanmu melalui pemrosesan kecerdasan lokal. Matikan untuk berhenti pelajari dan menggunakan autoplay biasa.",
+  "autoplayResetLearning": "Reset pemahaman lagu kesukaan",
+  "autoplayResetLearningConfirmTitle": "Reset pemahaman lagu kesukaan?",
+  "autoplayResetLearningConfirmMessage": "Autoplay akan melupakan pemahaman lagu yang kamu sukai. Ini tidak dapat dibatalkan.",
   "autoplayResetLearningConfirm": "Reset",
-  "autoplayLearningProgress": "Peringkat menyesuaikan denganmu setelah {minimum} lagu Autoplay ({count} sejauh ini)",
-  "autoplayLearningWaiting": "Peringkat standar sampai ada lagu Autoplay terbaru yang kamu dengarkan dan yang kamu lewati",
-  "autoplayLearningTuned": "Disesuaikan untukmu: akurasi {learned}% pada lagu terbarumu (standar {starting}%)",
-  "autoplayLearningStandard": "Peringkat standar: penyesuaian tidak lebih akurat pada lagu terbarumu ({learned}% vs {starting}%)",
-  "songAnalysis": "Analisis lagu",
-  "songAnalysisDescription": "Pelajari bunyi setiap lagu di Koleksi secara privat di perangkat ini, agar Autoplay memilih lagu yang terdengar seperti yang kamu putar dan menyambung dengan mulus.",
-  "songAnalysisOnlyWhileCharging": "Hanya saat mengisi daya",
-  "songAnalysisOnlyWhileChargingDescription": "Analisis Koleksi hanya saat ponsel ini mengisi daya. Lagu yang sedang diputar tetap dianalisis.",
-  "songAnalysisProgress": "{analyzed} dari {total} lagu telah dianalisis",
-  "songAnalysisClear": "Hapus analisis lagu",
-  "songAnalysisClearConfirmTitle": "Hapus analisis lagu?",
-  "songAnalysisClearConfirmMessage": "Autoplay akan melupakan bunyi lagu-lagumu. Selama analisis lagu aktif, Koleksi akan dianalisis ulang.",
-  "songAnalysisClearConfirm": "Hapus",
+  "autoplayLearningProgress": "Ranking tunes to you after {minimum} Autoplay songs ({count} so far)",
+  "@autoplayLearningProgress": {
+    "description": "How many Autoplay songs the listener has kept or skipped before ranking may learn from them",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "format": "decimalPattern"
+      },
+      "minimum": {
+        "type": "int",
+        "format": "decimalPattern"
+      }
+    }
+  },
+  "autoplayLearningWaiting": "Standard ranking until you both keep and skip recent Autoplay songs",
+  "@autoplayLearningWaiting": {
+    "description": "Ranking cannot be checked yet because the latest Autoplay songs were all kept or all skipped"
+  },
+  "autoplayLearningTuned": "Tuned to you: {learned}% accurate on your latest songs (standard {starting}%)",
+  "@autoplayLearningTuned": {
+    "description": "Autoplay uses learned ranking, which orders the latest kept and skipped songs better than the standard ranking",
+    "placeholders": {
+      "learned": {
+        "type": "int"
+      },
+      "starting": {
+        "type": "int"
+      }
+    }
+  },
+  "autoplayLearningStandard": "Standard ranking: tuning was not more accurate on your latest songs ({learned}% vs {starting}%)",
+  "@autoplayLearningStandard": {
+    "description": "Autoplay keeps the standard ranking because the learned one did not order the latest songs better",
+    "placeholders": {
+      "learned": {
+        "type": "int"
+      },
+      "starting": {
+        "type": "int"
+      }
+    }
+  },
+  "songAnalysis": "Song analysis",
+  "@songAnalysis": {
+    "description": "Switch that analyzes how each Library song sounds, on the device, for Autoplay"
+  },
+  "songAnalysisDescription": "Learn how each Library song sounds, privately on this device, so Autoplay picks songs that sound like what you play and flow into each other.",
+  "songAnalysisOnlyWhileCharging": "Only while charging",
+  "songAnalysisOnlyWhileChargingDescription": "Analyze the Library only while this phone charges. The song playing is analyzed either way.",
+  "songAnalysisProgress": "{analyzed} of {total} songs analyzed",
+  "@songAnalysisProgress": {
+    "description": "How many Library songs song analysis has described so far",
+    "placeholders": {
+      "analyzed": {
+        "type": "int",
+        "format": "decimalPattern"
+      },
+      "total": {
+        "type": "int",
+        "format": "decimalPattern"
+      }
+    }
+  },
+  "songAnalysisClear": "Clear song analysis",
+  "songAnalysisClearConfirmTitle": "Clear song analysis?",
+  "songAnalysisClearConfirmMessage": "Autoplay forgets how your songs sound. While song analysis is on, your Library is analyzed again.",
+  "songAnalysisClearConfirm": "Clear",
   "profileTitle": "Profil",
-  "profileSetUp": "Atur profil Anda",
+  "profileSetUp": "Atur profil kamu",
   "profileEdit": "Edit nama dan foto",
   "backupIncludesProfile": "Termasuk nama dan foto profil",
   "profileName": "Nama",
-  "profileNameHint": "Nama Anda",
+  "profileNameHint": "Nama kamu",
   "profileChangePhoto": "Pilih foto",
   "profileRemovePhoto": "Hapus foto",
   "profilePhotoError": "Pilih foto yang di bawah 20MB.",
   "profileSaveError": "Tidak dapat menyimpan profil Anda. Coba lagi.",
   "homeGreetingMorning1": "Selamat pagi",
-  "homeGreetingMorning2": "Pagi yang cerah",
-  "homeGreetingMorning3": "Awali harimu",
+  "homeGreetingMorning2": "Bangun yuk kebo",
+  "homeGreetingMorning3": "Segarkan harimu",
   "homeGreetingAfternoon1": "Selamat siang",
-  "homeGreetingAfternoon2": "Siang yang santai",
-  "homeGreetingAfternoon3": "Tetap semangat",
+  "homeGreetingAfternoon2": "Santai saja dulu",
+  "homeGreetingAfternoon3": "Jaga suasana hatimu",
   "homeGreetingEvening1": "Selamat malam",
-  "homeGreetingEvening2": "Waktunya rileks",
-  "homeGreetingEvening3": "Senja yang syahdu",
+  "homeGreetingEvening2": "Waktunya santuy",
+  "homeGreetingEvening3": "Anak senja juga",
   "homeGreetingNight1": "Selamat malam",
-  "homeGreetingNight2": "Teman begadang",
+  "homeGreetingNight2": "Sudah larut nih",
   "homeGreetingNight3": "Malam yang tenang",
   "homeGreetingNamed": "{greeting}, {name}",
   "@homeGreetingNamed": {
@@ -7520,15 +8290,15 @@
   "@homeTaglineListening": {
     "description": "Rotating Home prompt under the greeting"
   },
-  "homeTaglineLink": "Punya link? Tempel saja di pencarian",
+  "homeTaglineLink": "Punya link? Tempel saja ke penelusuran",
   "@homeTaglineLink": {
     "description": "Rotating Home prompt explaining that links can be pasted into search"
   },
-  "homeTaglineDiscover": "Temukan album favoritmu berikutnya",
+  "homeTaglineDiscover": "Temukan album favoritmu",
   "@homeTaglineDiscover": {
     "description": "Rotating Home prompt under the greeting"
   },
-  "homeContinueListening": "Lanjutkan mendengarkan",
+  "homeContinueListening": "Lanjut mendengarkan",
   "@homeContinueListening": {
     "description": "Home section header for the track currently loaded in the player"
   },
@@ -7544,14 +8314,190 @@
   "@homeShortcuts": {
     "description": "Home section header for quick links to player tools"
   },
+  "homeMixesForYou": "Mixes for you",
+  "@homeMixesForYou": {
+    "description": "Home section header for daily mixes made from the user's own Library songs"
+  },
+  "homeMixFavoritesTitle": "Favorites Mix",
+  "@homeMixFavoritesTitle": {
+    "description": "Title of the daily mix of the user's most played songs and songs like them"
+  },
+  "homeMixGenreTitle": "{genre} Mix",
+  "@homeMixGenreTitle": {
+    "description": "Title of a daily mix of one genre from the user's Library, e.g. 'Hip-Hop Mix'",
+    "placeholders": {
+      "genre": {
+        "type": "String"
+      }
+    }
+  },
+  "homeMixArtistTitle": "{artist} Mix",
+  "@homeMixArtistTitle": {
+    "description": "Title of a daily mix built around one artist and similar songs from the user's Library",
+    "placeholders": {
+      "artist": {
+        "type": "String"
+      }
+    }
+  },
+  "homeMixDecadeTitle": "{decade}s Mix",
+  "@homeMixDecadeTitle": {
+    "description": "Title of a daily mix of songs released in one decade, e.g. '2010s Mix'; decade is the decade's first year",
+    "placeholders": {
+      "decade": {
+        "type": "String"
+      }
+    }
+  },
+  "homeMixFreshTitle": "New Additions Mix",
+  "@homeMixFreshTitle": {
+    "description": "Title of the daily mix of songs added to the user's Library in the last month"
+  },
+  "homeMixRediscoverTitle": "Rediscover Mix",
+  "@homeMixRediscoverTitle": {
+    "description": "Title of the daily mix of songs the user played often months ago but not lately"
+  },
+  "homeMixDiscoverTitle": "Discover Mix",
+  "@homeMixDiscoverTitle": {
+    "description": "Title of the daily mix of Library songs the user has never played, from their favorite genres"
+  },
+  "homeMixArtistsOne": "{first}",
+  "@homeMixArtistsOne": {
+    "description": "Subtitle of a daily mix with one main artist, naming that artist",
+    "placeholders": {
+      "first": {
+        "type": "String"
+      }
+    }
+  },
+  "homeMixArtistsTwo": "{first} and {second}",
+  "@homeMixArtistsTwo": {
+    "description": "Subtitle of a daily mix with two main artists, e.g. 'Tyler, The Creator and Frank Ocean'",
+    "placeholders": {
+      "first": {
+        "type": "String"
+      },
+      "second": {
+        "type": "String"
+      }
+    }
+  },
+  "homeMixArtistsMore": "{first}, {second} and more",
+  "@homeMixArtistsMore": {
+    "description": "Subtitle of a daily mix with three or more main artists, naming the first two, e.g. 'Tyler, The Creator, Frank Ocean and more'",
+    "placeholders": {
+      "first": {
+        "type": "String"
+      },
+      "second": {
+        "type": "String"
+      }
+    }
+  },
+  "homeMixGenreHipHop": "Hip-Hop",
+  "@homeMixGenreHipHop": {
+    "description": "Genre name used in a daily mix title such as 'Hip-Hop Mix'"
+  },
+  "homeMixGenreRnb": "R&B",
+  "@homeMixGenreRnb": {
+    "description": "Genre name used in a daily mix title such as 'R&B Mix'"
+  },
+  "homeMixGenrePop": "Pop",
+  "@homeMixGenrePop": {
+    "description": "Genre name used in a daily mix title such as 'Pop Mix'"
+  },
+  "homeMixGenreKpop": "K-Pop",
+  "@homeMixGenreKpop": {
+    "description": "Genre name (Korean pop) used in a daily mix title such as 'K-Pop Mix'"
+  },
+  "homeMixGenreJpop": "J-Pop",
+  "@homeMixGenreJpop": {
+    "description": "Genre name (Japanese pop, anime and related music) used in a daily mix title such as 'J-Pop Mix'"
+  },
+  "homeMixGenreRock": "Rock",
+  "@homeMixGenreRock": {
+    "description": "Genre name used in a daily mix title such as 'Rock Mix'"
+  },
+  "homeMixGenreMetal": "Metal",
+  "@homeMixGenreMetal": {
+    "description": "Genre name used in a daily mix title such as 'Metal Mix'"
+  },
+  "homeMixGenrePunk": "Punk",
+  "@homeMixGenrePunk": {
+    "description": "Genre name used in a daily mix title such as 'Punk Mix'"
+  },
+  "homeMixGenreIndie": "Indie & Alternative",
+  "@homeMixGenreIndie": {
+    "description": "Genre name used in a daily mix title such as 'Indie & Alternative Mix'"
+  },
+  "homeMixGenreElectronic": "Electronic",
+  "@homeMixGenreElectronic": {
+    "description": "Genre name used in a daily mix title such as 'Electronic Mix'"
+  },
+  "homeMixGenreChill": "Chill & Lo-Fi",
+  "@homeMixGenreChill": {
+    "description": "Genre name (ambient, lo-fi and relaxing music) used in a daily mix title such as 'Chill & Lo-Fi Mix'"
+  },
+  "homeMixGenreJazz": "Jazz",
+  "@homeMixGenreJazz": {
+    "description": "Genre name used in a daily mix title such as 'Jazz Mix'"
+  },
+  "homeMixGenreBlues": "Blues",
+  "@homeMixGenreBlues": {
+    "description": "Genre name used in a daily mix title such as 'Blues Mix'"
+  },
+  "homeMixGenreClassical": "Classical",
+  "@homeMixGenreClassical": {
+    "description": "Genre name used in a daily mix title such as 'Classical Mix'"
+  },
+  "homeMixGenreSoundtrack": "Soundtrack",
+  "@homeMixGenreSoundtrack": {
+    "description": "Genre name (film, game and TV music) used in a daily mix title such as 'Soundtrack Mix'"
+  },
+  "homeMixGenreCountry": "Country",
+  "@homeMixGenreCountry": {
+    "description": "Genre name used in a daily mix title such as 'Country Mix'"
+  },
+  "homeMixGenreFolk": "Folk & Acoustic",
+  "@homeMixGenreFolk": {
+    "description": "Genre name used in a daily mix title such as 'Folk & Acoustic Mix'"
+  },
+  "homeMixGenreLatin": "Latin",
+  "@homeMixGenreLatin": {
+    "description": "Genre name used in a daily mix title such as 'Latin Mix'"
+  },
+  "homeMixGenreReggae": "Reggae",
+  "@homeMixGenreReggae": {
+    "description": "Genre name used in a daily mix title such as 'Reggae Mix'"
+  },
+  "homeMixGenreAfro": "Afrobeats",
+  "@homeMixGenreAfro": {
+    "description": "Genre name used in a daily mix title such as 'Afrobeats Mix'"
+  },
+  "homeMixGenreGospel": "Gospel & Worship",
+  "@homeMixGenreGospel": {
+    "description": "Genre name (Christian music) used in a daily mix title such as 'Gospel & Worship Mix'"
+  },
+  "homeMixGenreDangdut": "Dangdut",
+  "@homeMixGenreDangdut": {
+    "description": "Genre name (Indonesian popular music) used in a daily mix title such as 'Dangdut Mix'"
+  },
+  "homeMixUpdatedDaily": "Made from your Library, updated daily",
+  "@homeMixUpdatedDaily": {
+    "description": "Note in a daily mix's header explaining where its songs come from"
+  },
+  "homeMixSaveAsPlaylist": "Save as playlist",
+  "@homeMixSaveAsPlaylist": {
+    "description": "Action that saves a daily mix's songs into one of the user's playlists"
+  },
   "artistUpcomingConcerts": "Konser Mendatang",
   "artistAllUpcomingConcerts": "Semua Konser Mendatang",
   "artistNoUpcomingConcerts": "Tiada konser mendatang.",
-  "motionArtwork": "Artwork bergerak",
-  "listeningStats": "Statistik mendengarkan",
-  "listeningStatsRecord": "Catat waktu mendengarkan",
-  "listeningStatsDescription": "Disimpan hanya di perangkat ini, mulai sekarang. Hanya mencatat player bawaan; pause, buffering, dan seek tidak menambah waktu dengar. Pemutaran dihitung setelah 30 detik.",
-  "listeningStatsEmpty": "Putar musik dengan player bawaan untuk memulai ringkasan mendengarkan. Riwayat sebelumnya tidak dapat dipulihkan.",
+  "motionArtwork": "Cover bergerak",
+  "listeningStats": "Statistik mendengar",
+  "listeningStatsRecord": "Catat mendengar",
+  "listeningStatsDescription": "Hanya disimpan di perangkat dan mencatat pemutar bawaan; jeda, buffer, dan melewati tidak akan menambah waktu mendengar. Pemutaran dihitung setelah 30 detik.",
+  "listeningStatsEmpty": "Putar musik dengan player bawaan untuk memulai ringkasan mendengar. Mendengar sebelumnya tidak tercatat.",
   "listeningStatsDays": "{days} hari",
   "@listeningStatsDays": {
     "placeholders": {
@@ -7587,14 +8533,14 @@
   "listeningStatsActivity": "Hari mendengarkan terbaru · menit",
   "listeningStatsTopArtists": "Artis teratas",
   "listeningStatsTopTracks": "Lagu teratas",
-  "listeningStatsLoadError": "Statistik mendengarkan tidak dapat dimuat",
-  "listeningStatsClear": "Hapus statistik mendengarkan",
-  "listeningStatsClearError": "Statistik mendengarkan tidak dapat dihapus. Silakan coba lagi.",
-  "listeningStatsClearDescription": "Hapus semua statistik mendengarkan di perangkat ini? Musik dan playlist tetap tersimpan.",
+  "listeningStatsLoadError": "Tak dapat memuat statistik mendengar",
+  "listeningStatsClear": "Hapus statistik mendengar",
+  "listeningStatsClearError": "Tak dapat menghapus statistik mendengar. Coba lagi.",
+  "listeningStatsClearDescription": "Hapus semua statistik mendengar perangkat ini? Musik dan playlist akan tetap ada.",
   "libraryArtistsEmpty": "Artis muncul di sini setelah kamu mengunduh musik atau memindai library lokal.",
   "listeningRewind": "Rewind",
   "listeningRewindDescription": "Lihat lagi momen menarik dari minggu dan bulan terakhir",
-  "listeningRewindChoosePeriod": "Pilih periode",
+  "listeningRewindChoosePeriod": "Pilih waktu",
   "listeningRewindLastWeeks": "{weeks} minggu terakhir",
   "@listeningRewindLastWeeks": {
     "placeholders": {
@@ -7619,7 +8565,7 @@
       }
     }
   },
-  "listeningRewindIntroTitle": "Rewind kamu",
+  "listeningRewindIntroTitle": "Rewind Kamu",
   "listeningRewindIntroBody": "Kilas balik musik yang kamu putar dari {start} sampai {end}.",
   "@listeningRewindIntroBody": {
     "placeholders": {
@@ -7707,7 +8653,7 @@
       }
     }
   },
-  "listeningRewindReplayTitle": "Tak bisa berhenti memutar",
+  "listeningRewindReplayTitle": "Kamu kecanduan banget",
   "listeningRewindReplayBody": "Kamu memutarnya {plays} kali pada {date}",
   "@listeningRewindReplayBody": {
     "placeholders": {
@@ -7720,8 +8666,8 @@
     }
   },
   "listeningRewindOutroTitle": "Itulah Rewind kamu",
-  "listeningRewindOutroBody": "Terus dengarkan. Rewind berikutnya sudah mulai terbentuk.",
-  "listeningRewindEmpty": "Belum cukup aktivitas mendengarkan di periode ini. Putar musik lewat pemutar bawaan, lalu kembali lagi nanti.",
+  "listeningRewindOutroBody": "Terus mendengar, ya. Rewind selanjutnya sedang dibuat.",
+  "listeningRewindEmpty": "Tak cukup mendengar di waktu ini. Putar lagu lewat pemutar bawaan dan kembali lagi nanti.",
   "listeningRewindLoadError": "Gagal memuat Rewind",
   "listeningRewindSlide": "Slide {index} dari {count}",
   "@listeningRewindSlide": {
@@ -7735,10 +8681,10 @@
     }
   },
   "listeningRewindShare": "Bagikan",
-  "listeningRewindShareError": "Gagal membagikan Rewind",
+  "listeningRewindShareError": "Tak dapat membagi Rewind kamu",
   "listeningRewindNext": "Berikutnya",
   "listeningRewindPrevious": "Sebelumnya",
-  "listeningRewindMonthlyReady": "4 minggu terakhirmu siap diputar ulang",
+  "listeningRewindMonthlyReady": "Rewind 4 minggu terakhir kamu sudah siap",
   "listeningRewindYearTitle": "Musikmu di {year}",
   "@listeningRewindYearTitle": {
     "placeholders": {
@@ -7754,7 +8700,7 @@
   "listeningRewindSongsLabel": "Lagu",
   "listeningRewindArtistsLabel": "Artis",
   "listeningRewindAlbumsLabel": "Album",
-  "listeningRewindDaysLabel": "Hari bermusik",
+  "listeningRewindDaysLabel": "Terlalu sibuk mendengar",
   "listeningRewindDaysShare": "Ada musik di {percent}% harimu",
   "@listeningRewindDaysShare": {
     "placeholders": {
@@ -7775,7 +8721,7 @@
   },
   "listeningRewindMonthlyArtistsTitle": "Artis tiap bulan",
   "listeningRewindLoyalTitle": "Selalu menemanimu",
-  "listeningRewindLoyalBody": "{days, plural, =1{Menemanimu di 1 hari} other{Menemanimu di {days} hari berbeda}}",
+  "listeningRewindLoyalBody": "{days, plural, =1{Bersamamu selama 1 hari} other{Bersamamu selama {days} hari}}",
   "@listeningRewindLoyalBody": {
     "placeholders": {
       "days": {
@@ -7783,7 +8729,7 @@
       }
     }
   },
-  "listeningRewindFirstSongTitle": "Awal tahunmu",
+  "listeningRewindFirstSongTitle": "Di sinilah tahunmu dimulai",
   "listeningRewindFirstSongBody": "Lagu yang paling sering diputar pada hari pertama kamu mendengarkan, {date}",
   "@listeningRewindFirstSongBody": {
     "placeholders": {
@@ -7802,28 +8748,28 @@
   },
   "listeningRewindYearOutroBody": "Sampai jumpa di tahun penuh musik berikutnya.",
   "weeklyReleases": "Rilis baru",
-  "weeklyReleasesDescription": "Album dan single terbaru dari artis favorit, melalui extension metadata yang terpasang.",
-  "weeklyReleasesEmpty": "Tidak ditemukan rilis dengan tanggal dalam periode ini. Tambahkan artis favorit atau coba periode lebih panjang.",
-  "weeklyReleasesUnavailable": "Beberapa artis tidak dapat diperiksa. Hasil tersimpan tetap dipertahankan. Penyedia mungkin tidak memberikan katalog artis atau tanggal rilis lengkap.",
-  "weeklyReleasesLoadError": "Rilis baru tidak dapat diperiksa. Tarik untuk memuat ulang.",
-  "motionArtworkDescription": "Putar berulang cover video dari penyedia metadata. Matikan untuk memakai cover diam dan menghemat baterai.",
-  "libraryLoading": "Memuat Library…",
-  "libraryLoadFailed": "Library tidak dapat dimuat. Coba lagi untuk memuat folder tersimpan dan indeks lagu.",
-  "discordPresenceDescription": "Tampilkan judul, artis, album, dan progres musik dari pemutar bawaan di profil Discord Anda. File audio dan cover lokal tidak diunggah. Status dihapus saat musik dijeda atau dihentikan.",
+  "weeklyReleasesDescription": "Album dan single terbaru dari artis favoritmu, info disediakan oleh ekstensi metadata terinstal.",
+  "weeklyReleasesEmpty": "Tak ada rilisan terjadwal di waktu ini. Tambah artis favorit atau periksa waktu lain.",
+  "weeklyReleasesUnavailable": "Beberapa artis tak dapat diperiksa. Hasil tersimpan tak dihapus. Mungkin provider tak sediakan info artismu atau tanggal rilis tepatnya.",
+  "weeklyReleasesLoadError": "Tak dapat periksa rilisan baru. Tarik untuk merefresh.",
+  "motionArtworkDescription": "Cover bergerak disediakan oleh provider metadata. Matikan untuk menggunakan foto cover dan menghemat baterai.",
+  "libraryLoading": "Memuat Koleksi…",
+  "libraryLoadFailed": "Koleksi tak dapat dimuat. Coba lagi untuk memuat folder tersimpan dan lagu terpindai",
+  "discordPresenceDescription": "Beri tahu apa yang sedang kamu dengarkan kepada teman-teman Discord kamu. Lagu lokal dan file cover tidak akan pernah diupload. Ini akan hilang saat kamu berhenti memutar atau menjedanya.",
   "discordPresenceDisabled": "Nonaktif",
-  "discordPresenceLink": "Hubungkan akun Discord",
+  "discordPresenceLink": "Tautkan akun Discord",
   "discordPresenceConnecting": "Menghubungkan ke Discord…",
   "discordPresenceReady": "Siap saat musik diputar",
-  "discordPresenceActive": "Menampilkan lagu saat ini",
-  "discordPresenceUnavailable": "Discord tidak tersedia. Mencoba lagi saat musik diputar.",
-  "discordPresenceBuildUnavailable": "SDK Discord tidak tersedia di build ini.",
-  "discordPresenceAndroidHelp": "Pasang Discord dan masuk di ponsel ini. Izinkan berbagi aktivitas di Discord. Pemutar eksternal tidak didukung.",
-  "discordPresenceIosHelp": "Hubungkan akun melalui Discord dan izinkan berbagi aktivitas. Ketuk untuk menghubungkan ulang jika otorisasi gagal.",
-  "discordPresenceDesktopHelp": "Biarkan aplikasi desktop Discord berjalan dan masuk di komputer ini, lalu izinkan berbagi aktivitas di Discord.",
+  "discordPresenceActive": "Membagi info pemutaran",
+  "discordPresenceUnavailable": "Discord tak tersedia. Mencoba lagi saat memutar.",
+  "discordPresenceBuildUnavailable": "Discord SDK tak tersedia di build ini.",
+  "discordPresenceAndroidHelp": "Instal & login Discord di perangkat. Hidupkan Share my activity di Settings > Content & Social. Pemutar eksternal tak didukung.",
+  "discordPresenceIosHelp": "Tautkan akun Anda ke Discord dan hidupkan Share my activity. Ketuk untuk tautkan lagi jika otorisasi gagal.",
+  "discordPresenceDesktopHelp": "Pastikan Discord desktop sudah jalan dan login di komputermu, lalu hidupkan Share my activity di Settings-nya.",
   "discordPresenceDisconnect": "Putuskan dan lupakan akun",
-  "autoMixSettingsTitle": "Transisi mix",
+  "autoMixSettingsTitle": "Transisi AutoMix",
   "autoMixAutomaticDuration": "Durasi otomatis",
-  "autoMixDuration": "Durasi mix",
+  "autoMixDuration": "Durasi AutoMix",
   "autoMixEffect": "Efek transisi",
   "autoMixEffectAuto": "Otomatis",
   "autoMixEffectCrossfade": "Crassfade",
@@ -7831,25 +8777,25 @@
   "autoMixEffectEcho": "Gema",
   "autoMixEffectPitch": "Nada",
   "autoMixEffectCustom": "Kustom",
-  "autoMixEffectsHelp": "Efek diterapkan pada akhir lagu yang keluar selama mix. Lagu pendek memakai overlap yang lebih singkat.",
+  "autoMixEffectsHelp": "Efek diterapkan di akhir lagu saat AutoMix hidup. Lagu singkat akan transisi lebih singkat.",
   "autoMixSpeed": "Kecepatan",
-  "autoMixPitch": "Nada (semitone)",
+  "autoMixPitch": "Pitch (semitone)",
   "autoMixEcho": "Gema",
   "autoMixLowPass": "Filter redam",
   "autoMixMixing": "Mixing",
   "autoMixCrossfading": "Crossfade",
   "playbackAutomation": "Pemutaran otomatis",
-  "playbackPauseOnMute": "Jeda saat volume nol",
-  "snackbarPlaybackMuted": "Volume media nol. Lagu dijeda. Tekan play lagi untuk tetap memutar.",
+  "playbackPauseOnMute": "Jeda saat dibisukan",
+  "snackbarPlaybackMuted": "Volume kamu dibisukan. Pemutaran dijeda. Ketuk putar untuk lanjut.",
   "@snackbarPlaybackMuted": {
     "description": "Shown after mute automation pauses playback; another explicit play request can override the pause."
   },
-  "playbackPauseOnMuteDescription": "Jeda saat volume media nol dan lanjutkan saat dinaikkan. Jeda manual tetap dihormati. Hanya untuk keluaran audio standar.",
-  "playbackOnHeadphonesConnected": "Putar saat earphone terhubung",
-  "playbackOnHeadphonesConnectedDescription": "Lanjutkan lagu saat earphone kabel atau Bluetooth terhubung. Pemutaran dijeda saat dilepas. Hanya untuk pemutar bawaan.",
+  "playbackPauseOnMuteDescription": "Menjeda musik jika volume media dibisukan dan lanjut saat dinaikkan. Jeda manual akan tetap terjeda. Hanya untuk output standar.",
+  "playbackOnHeadphonesConnected": "Putar saat headphone terhubung",
+  "playbackOnHeadphonesConnectedDescription": "Lanjut putar lagi saat headphone kabel/bluetooth terhubung. Pemutaran dijeda saat terputus. Hanya untuk pemutar bawaan.",
   "appearanceCustomFont": "Font kustom",
-  "appearanceCustomFontSubtitle": "Impor file TTF atau OTF (maksimal 10 MB). Menggantikan font tema dan sistem.",
-  "appearanceCustomFontInvalid": "Font tidak dapat dimuat. Pilih file TTF atau OTF yang valid, maksimal 10 MB.",
+  "appearanceCustomFontSubtitle": "Impor file TTP atau OTF (hingga 10MB). Mengganti font tema dan sistem",
+  "appearanceCustomFontInvalid": "Tak dapat memuat font. Pilih file TTF atau OTF hingga 10MB yang valid.",
   "appearanceCustomFontReset": "Gunakan font tema",
   "equalizerTitle": "Equalizer",
   "equalizerDescription": "5–31 band, kontrol nada, preamp, dan dinamika",
@@ -7862,9 +8808,9 @@
   "equalizerBalance": "Keseimbangan",
   "equalizerDynamics": "Dinamika",
   "equalizerHeadroom": "Headroom otomatis",
-  "equalizerHeadroomDescription": "Kurangi penguatan input untuk memberi ruang pada frekuensi yang dinaikkan.",
-  "equalizerLimiter": "Limiter puncak",
-  "equalizerLimiterDescription": "Jaga puncak di bawah −0,5 dBFS untuk mengurangi clipping.",
+  "equalizerHeadroomDescription": "Kurangi gain input untuk buat ruang untuk boost frekuensi.",
+  "equalizerLimiter": "Limiter peak",
+  "equalizerLimiterDescription": "Jaga peak dibawah –0.5dBFS untuk kurangi clipping",
   "equalizerCompressor": "Compressor",
   "equalizerCompressorDescription": "Kurangi selisih antara bagian yang pelan dan keras.",
   "equalizerThreshold": "Threshold",
@@ -7879,10 +8825,10 @@
   "equalizerImportInvalid": "Pilih preset equalizer Mornye yang valid (JSON, maksimal 64 KB).",
   "equalizerSaved": "Preset disimpan",
   "equalizerResetTitle": "Reset equalizer?",
-  "equalizerResetDescription": "Kembalikan kurva datar serta pengaturan nada dan dinamika bawaan. Preset tersimpan tetap disimpan.",
-  "equalizerBypass": "Output bit-perfect, Direct USB, dan Hi-Res eksklusif melewati EQ. Nonaktifkan output bit-perfect untuk memakai EQ. Player eksternal mengatur efeknya sendiri.",
+  "equalizerResetDescription": "Kembalikan kurva rata, nada, dan setelan dinamika default. Preset tersimpan tetap ada.",
+  "equalizerBypass": "Bit-perfect, USB Direct, dan Output Hi-Res eksklusif untuk bypass EQ. Matikan output bit-perfect untuk pakai EQ. Pemutar eksternal mengatur efeknya sendiri.",
   "equalizerCurve": "Kurva EQ (perkiraan)",
-  "equalizerCurveDescription": "Kurva menunjukkan gain tiap band; respons pastinya bergantung pada mesin output.",
+  "equalizerCurveDescription": "Kurva menunjukkan gain band; respons pasti tergantung engine output.",
   "equalizerEffectivePreamp": "Gain input setelah headroom",
   "equalizerDeletePreset": "Hapus preset",
   "equalizerCustom": "Kustom",
@@ -7891,7 +8837,7 @@
   "@lyricsShareTitle": {
     "description": "Screen that turns selected lyric lines into an image for stories"
   },
-  "lyricsShareSelectHint": "Pilih hingga {count} baris",
+  "lyricsShareSelectHint": "Pilih hingga {count} bait",
   "@lyricsShareSelectHint": {
     "placeholders": {
       "count": {
@@ -7899,7 +8845,7 @@
       }
     }
   },
-  "lyricsShareLimit": "Kamu bisa membagikan hingga {count} baris",
+  "lyricsShareLimit": "Kamu dapat bagikan hingga {count} bait",
   "@lyricsShareLimit": {
     "placeholders": {
       "count": {
@@ -7908,7 +8854,7 @@
     }
   },
   "lyricsShareAction": "Bagikan",
-  "lyricsShareError": "Gagal membuat gambar lirik",
+  "lyricsShareError": "Tak dapat buat gambar lirik",
   "lyricsShareBackgroundArtwork": "Foto cover",
   "lyricsShareBackgroundColor": "Warna cover",
   "lyricsShareBackgroundDark": "Gelap",
@@ -7931,8 +8877,8 @@
   "audioInfoCodec": "Codec",
   "audioInfoSampleRate": "Sample rate",
   "audioInfoBitDepth": "Bit depth",
-  "audioInfoChannels": "Kanal",
-  "audioInfoChannelCount": "{count, plural, =1{Mono} =2{Stereo} other{{count} kanal}}",
+  "audioInfoChannels": "Channel",
+  "audioInfoChannelCount": "{count, plural, =1{Mono} =2{Stereo} other{{count} channel}}",
   "@audioInfoChannelCount": {
     "placeholders": {
       "count": {
@@ -7944,7 +8890,7 @@
   "audioInfoDuration": "Durasi",
   "audioInfoFileSize": "Ukuran file",
   "audioInfoCompression": "Kompresi",
-  "audioInfoCompressionValue": "{percent}% dari ukuran tanpa kompresi",
+  "audioInfoCompressionValue": "{percent}% dari ukuran awal",
   "@audioInfoCompressionValue": {
     "placeholders": {
       "percent": {
@@ -7954,9 +8900,18 @@
   },
   "audioInfoLocation": "Lokasi",
   "audioInfoLocationLocal": "Penyimpanan perangkat",
-  "audioInfoLocationShared": "Folder bersama",
+  "audioInfoLocationShared": "Berbagi folder",
   "audioInfoLocationNetwork": "Penyimpanan jaringan",
-  "audioInfoPcmRate": "Data rate tanpa kompresi",
+  "audioInfoLocationLink": "{device} via Mornye Link",
+  "@audioInfoLocationLink": {
+    "description": "Audio info location of a song played from a paired computer or phone over Mornye Link; device is that device's name",
+    "placeholders": {
+      "device": {
+        "type": "String"
+      }
+    }
+  },
+  "audioInfoPcmRate": "Rate data asli",
   "audioInfoFrequencyRange": "Rentang frekuensi",
   "audioInfoFrequencyRangeValue": "Hingga {frequency} (Nyquist)",
   "@audioInfoFrequencyRangeValue": {
@@ -7968,11 +8923,11 @@
   },
   "audioInfoDynamicRange": "Rentang dinamis teoretis",
   "audioInfoTrackGain": "Gain lagu",
-  "audioInfoTrackPeak": "Puncak lagu",
+  "audioInfoTrackPeak": "Peak lagu",
   "audioInfoAlbumGain": "Gain album",
-  "audioInfoAlbumPeak": "Puncak album",
+  "audioInfoAlbumPeak": "Peak album",
   "audioInfoNoGainTags": "Tidak ada tag ReplayGain",
-  "audioInfoApplied": "Diterapkan {gain}",
+  "audioInfoApplied": "{gain} diterapkan",
   "@audioInfoApplied": {
     "placeholders": {
       "gain": {
@@ -7982,16 +8937,16 @@
   },
   "audioInfoOn": "Aktif",
   "audioInfoOff": "Nonaktif",
-  "audioInfoBypassed": "Dilewati oleh output langsung",
+  "audioInfoBypassed": "Dibypass output direct",
   "audioInfoPlayer": "Pemutar",
   "audioInfoPlayerValue": "Pemutar bawaan Mornye",
-  "audioInfoSignalPath": "Jalur sinyal",
+  "audioInfoSignalPath": "Path sinyal",
   "audioInfoPathSystem": "Mixer sistem",
   "audioInfoPathDirect": "USB langsung, melewati mixer sistem",
-  "audioInfoPathExclusive": "Output eksklusif, melewati mixer sistem",
+  "audioInfoPathExclusive": "Output eksklusif, membypass mixer sistem",
   "audioInfoDecoder": "Decoder",
-  "audioInfoHardware": "Perangkat keras",
-  "audioInfoSoftware": "Perangkat lunak",
+  "audioInfoHardware": "Hardware",
+  "audioInfoSoftware": "Software",
   "audioInfoBands": "{count} band",
   "@audioInfoBands": {
     "placeholders": {
@@ -8002,10 +8957,10 @@
   },
   "audioInfoTempo": "Tempo",
   "audioInfoResampling": "Resampling",
-  "audioInfoResamplingNone": "Tidak ada, rate sama",
+  "audioInfoResamplingNone": "Aman, sample rate sama",
   "audioInfoBitPerfect": "Bit-perfect",
-  "audioInfoBitPerfectActive": "Ya, sampel tidak diubah",
-  "audioInfoBitPerfectNo": "Tidak, dicampur oleh sistem",
+  "audioInfoBitPerfectActive": "Ya, samplenya asli",
+  "audioInfoBitPerfectNo": "Tidak, dimix oleh sistem",
   "audioInfoDevice": "Perangkat",
   "audioInfoDeviceType": "{type, select, speaker{Speaker ponsel} earpiece{Speaker telepon} wired_headphones{Headphone kabel} wired_headset{Headset kabel} line{Line out} bluetooth{Bluetooth} bluetooth_le{Bluetooth LE Audio} usb{Audio USB} usb_headset{Headset USB} hdmi{HDMI} dock{Dock} cast{Cast} hearing_aid{Alat bantu dengar} airplay{AirPlay} car{Audio mobil} other{Lainnya}}",
   "@audioInfoDeviceType": {
@@ -8017,15 +8972,18 @@
   },
   "audioInfoOutputRate": "Sample rate output",
   "audioInfoOutputFormat": "Format output",
-  "audioInfoBluetoothFormat": "Format codec Bluetooth",
-  "audioInfoAndroidNotReported": "Tidak dilaporkan oleh Android",
-  "audioInfoSystemDefaultRate": "Sample rate default sistem",
-  "audioInfoAndroidPcmRates": "Sample rate PCM Android",
-  "audioInfoAndroidPcmFormats": "Format PCM Android",
-  "audioInfoSystemDefaultBuffer": "Buffer default sistem",
+  "audioInfoBluetoothFormat": "Bluetooth codec format",
+  "@audioInfoBluetoothFormat": {
+    "description": "Negotiated Bluetooth transport format, separate from Android PCM mixer properties"
+  },
+  "audioInfoAndroidNotReported": "Not reported by Android",
+  "audioInfoSystemDefaultRate": "System default sample rate",
+  "audioInfoAndroidPcmRates": "Android PCM sample rates",
+  "audioInfoAndroidPcmFormats": "Android PCM formats",
+  "audioInfoSystemDefaultBuffer": "System default buffer",
   "audioInfoDeviceRates": "Sample rate perangkat",
   "audioInfoDeviceFormats": "Format perangkat",
-  "audioInfoAnyRate": "Apa saja",
+  "audioInfoAnyRate": "Mana saja",
   "audioInfoBuffer": "Buffer mixer",
   "audioInfoLatency": "Latensi output",
   "audioInfoLowLatency": "Audio latensi rendah",
@@ -8035,34 +8993,64 @@
   "audioInfoSpatial": "Audio spasial",
   "audioInfoHeadTracking": "Pelacakan kepala",
   "audioInfoUnavailable": "Tidak tersedia",
-  "audioInfoFixedVolume": "Diatur oleh perangkat",
+  "audioInfoFixedVolume": "Dikontrol perangkat",
   "audioInfoCopy": "Salin laporan",
   "audioInfoCopied": "Info audio disalin",
   "lyricsTextSize": "Ukuran teks lirik",
-  "lyricsTextPreview": "Ikuti setiap baris lagu favoritmu",
-  "lyricsBlur": "Blur lirik",
-  "lyricsBlurSubtitle": "Seberapa samar baris di sekitar baris yang sedang diputar",
-  "lyricsBlurOff": "Mati",
-  "lyricsOffset": "Waktu lirik",
-  "lyricsOffsetSubtitle": "Tampilkan lirik tersinkron lebih lambat atau lebih cepat, misalnya saat audio Bluetooth tertunda",
-  "lyricsOffsetNone": "Sinkron",
-  "lyricsOffsetLater": "{seconds} dtk lebih lambat",
-  "lyricsOffsetEarlier": "{seconds} dtk lebih cepat",
-  "appCrashTitle": "Aplikasi sebelumnya mengalami crash",
-  "appAnrTitle": "Aplikasi sebelumnya berhenti merespons",
+  "lyricsTextPreview": "Ikuti irama lagu favoritmu~",
+  "lyricsBlur": "Lyrics blur",
+  "@lyricsBlur": {
+    "description": "Mornye setting: how strongly lyric lines around the current one are blurred"
+  },
+  "lyricsBlurSubtitle": "How much the lines around the current one soften",
+  "lyricsBlurOff": "Off",
+  "@lyricsBlurOff": {
+    "description": "Value of the lyrics blur slider at zero"
+  },
+  "lyricsOffset": "Lyrics timing",
+  "@lyricsOffset": {
+    "description": "Setting: move synced lyrics earlier or later than playback"
+  },
+  "lyricsOffsetSubtitle": "Show synced lyrics later or earlier, for example when Bluetooth audio arrives late",
+  "lyricsOffsetNone": "In sync",
+  "@lyricsOffsetNone": {
+    "description": "Value of the lyrics timing slider at zero"
+  },
+  "lyricsOffsetLater": "{seconds} s later",
+  "@lyricsOffsetLater": {
+    "description": "Value of the lyrics timing slider when lyrics follow playback late",
+    "placeholders": {
+      "seconds": {
+        "type": "String",
+        "example": "0.3"
+      }
+    }
+  },
+  "lyricsOffsetEarlier": "{seconds} s earlier",
+  "@lyricsOffsetEarlier": {
+    "description": "Value of the lyrics timing slider when lyrics run ahead of playback",
+    "placeholders": {
+      "seconds": {
+        "type": "String",
+        "example": "0.3"
+      }
+    }
+  },
+  "appCrashTitle": "Aplikasi pernah mengalami crash",
+  "appAnrTitle": "Aplikasi pernah berhenti merespons",
   "@appAnrTitle": {
     "description": "Title for an Android ANR report, distinct from a crash."
   },
-  "appAnrMessage": "Laporan diagnostik telah disimpan. Anda dapat menyalin dan mengirimkannya ke developer untuk membantu pemeriksaan.",
+  "appAnrMessage": "Laporan crash telah disimpan. Salin dan kirimkan ke developer untuk membantu pemeriksaan.",
   "@appAnrMessage": {
     "description": "Message shown for an Android process exit due to an ANR."
   },
-  "appCrashMessage": "Laporan crash telah disimpan. Salin dan kirimkan ke developer untuk membantu pemeriksaan.",
+  "appCrashMessage": "Laporan crash disimpan. Salin dan kirim ke developer untuk ditindaklanjuti.",
   "appCrashDetails": "Lihat error dan log",
   "appCrashCopy": "Salin laporan untuk developer",
-  "appCrashDismiss": "Tutup",
-  "appCrashCopyFailed": "Laporan crash belum bisa disalin. Silakan coba lagi.",
-  "appCrashDismissFailed": "Laporan crash belum bisa ditutup. Silakan coba lagi.",
+  "appCrashDismiss": "Abaikan",
+  "appCrashCopyFailed": "Tak dapat menyalin laporan crash. Coba lagi.",
+  "appCrashDismissFailed": "Tak dapat mengabaikan laporan crash. Coba lagi.",
   "optionsEmbeddedCoverSizeOriginal": "Resolusi asli",
   "@optionsEmbeddedCoverSizeOriginal": {
     "description": "Option that preserves the provider artwork at its original resolution"
@@ -8079,7 +9067,7 @@
       }
     }
   },
-  "desktopPlayerIdle": "Tidak ada yang diputar",
+  "desktopPlayerIdle": "Tidak memutar",
   "@desktopPlayerIdle": {
     "description": "Desktop player bar text when no track is loaded"
   },
@@ -8111,11 +9099,11 @@
   "@desktopMenuShowDetails": {
     "description": "Context menu item that opens a track's metadata page"
   },
-  "desktopDropToImport": "Lepaskan untuk menambahkan ke perpustakaan",
+  "desktopDropToImport": "Lepas untuk tambah ke Koleksi",
   "@desktopDropToImport": {
     "description": "Overlay shown while music files or folders are dragged over the desktop window"
   },
-  "desktopDropImported": "Menambahkan {count} {count, plural, =1{folder} other{folder}} ke koleksi Anda",
+  "desktopDropImported": "Menambahkan {count} {count, plural, =1{folder} other{folder}} ke Koleksi kamu",
   "@desktopDropImported": {
     "description": "Snackbar after dropping music onto the desktop window; the folders are scanned into the library",
     "placeholders": {
@@ -8124,7 +9112,7 @@
       }
     }
   },
-  "desktopDropNothingToImport": "Lepaskan berkas atau folder musik untuk menambahkannya ke perpustakaan",
+  "desktopDropNothingToImport": "Lepas file musik atau folder untuk tambah ke Koleksi",
   "@desktopDropNothingToImport": {
     "description": "Snackbar when the dropped items contain no folders or audio files"
   },
@@ -8132,30 +9120,30 @@
   "@desktopAllPlaylists": {
     "description": "Desktop sidebar row that opens the list of every playlist"
   },
-  "desktopMenuSettings": "Pengaturan…",
+  "desktopMenuSettings": "Setelan…",
   "@desktopMenuSettings": {
     "description": "macOS app menu item that opens Settings"
   },
-  "desktopMenuFile": "Berkas",
+  "desktopMenuFile": "File",
   "desktopMenuEdit": "Edit",
   "desktopMenuView": "Tampilan",
-  "desktopWindowMode": "Mode jendela",
-  "desktopWindowed": "Berjendela",
+  "desktopWindowMode": "Mode window",
+  "desktopWindowed": "Windowed",
   "desktopWindowFullscreen": "Layar penuh",
-  "desktopWindowBorderless": "Tanpa bingkai",
+  "desktopWindowBorderless": "Borderless",
   "desktopExitFullscreen": "Keluar layar penuh",
-  "desktopMinimizeWindow": "Minimalkan jendela",
-  "desktopZoomWindow": "Maksimalkan atau pulihkan jendela",
-  "desktopWindowModeUnavailable": "Mode jendela tidak dapat diubah. Coba lagi setelah perpindahan jendela selesai.",
+  "desktopMinimizeWindow": "Minimalkan window",
+  "desktopZoomWindow": "Perbesar atau pulihkan window",
+  "desktopWindowModeUnavailable": "Mode window tidak dapat diubah. Coba lagi setelah transisi antarwindow selesai.",
   "desktopMenuControls": "Kontrol",
-  "desktopMenuWindow": "Jendela",
+  "desktopMenuWindow": "Window",
   "desktopMenuHelp": "Bantuan",
   "desktopMenuPlayPause": "Putar/Jeda",
   "desktopMenuMiniPlayer": "Mini Player",
   "@desktopMenuMiniPlayer": {
     "description": "Window menu item, player bar button and Keyboard Shortcuts row that shrink the window into a small player floating above other windows"
   },
-  "desktopMiniPlayerExpand": "Tampilan Jendela Penuh",
+  "desktopMiniPlayerExpand": "Tampilan Full Window",
   "@desktopMiniPlayerExpand": {
     "description": "Mini player button that returns the window to its full size"
   },
@@ -8163,7 +9151,7 @@
   "@desktopMenuRefresh": {
     "description": "View menu item and Keyboard Shortcuts row that reloads the page on screen (Home, Repo, statistics)"
   },
-  "desktopMenuProjectPage": "Halaman proyek",
+  "desktopMenuProjectPage": "Halaman project",
   "@desktopMenuProjectPage": {
     "description": "Help menu item that opens the app's source repository"
   },
@@ -8175,9 +9163,367 @@
   "@desktopDownloadsQueued": {
     "description": "Status of a download in the desktop downloads popover that has not started yet"
   },
-  "desktopDownloadsCancel": "Batalkan download",
+  "desktopDownloadsCancel": "Batal download",
   "@desktopDownloadsCancel": {
     "description": "Tooltip of the button that cancels one download in the desktop downloads popover"
+  },
+  "linkDesktopSettingsTitle": "Mornye on your phone",
+  "@linkDesktopSettingsTitle": {
+    "description": "Desktop Settings page that shares this computer's library with the Mornye phone app over the local network"
+  },
+  "linkDesktopSettingsSubtitle": "Stream your library and control playback from your phone",
+  "@linkDesktopSettingsSubtitle": {
+    "description": "Subtitle of the Mornye on your phone entry in desktop Settings"
+  },
+  "linkDesktopEnableTitle": "Share with Mornye on your phone",
+  "@linkDesktopEnableTitle": {
+    "description": "Switch that turns on the local server phones connect to"
+  },
+  "linkDesktopEnableSubtitle": "Your phone can browse, play and download through this computer on your local network",
+  "@linkDesktopEnableSubtitle": {
+    "description": "Subtitle of the switch that shares the library with phones, while it is off"
+  },
+  "linkDesktopStatusStarting": "Starting",
+  "@linkDesktopStatusStarting": {
+    "description": "Status of the phone link server while it starts"
+  },
+  "linkDesktopStatusRunning": "On, {count, plural, =0{no phone connected} =1{1 phone connected} other{{count} phones connected}}",
+  "@linkDesktopStatusRunning": {
+    "description": "Status of the phone link server while it runs, with the number of connected phones",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "linkDesktopStatusFailed": "Could not start: {error}",
+  "@linkDesktopStatusFailed": {
+    "description": "Status of the phone link server when it failed to start",
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "linkDesktopFirewallHint": "Your computer may ask whether Mornye can accept incoming network connections. Allow it so your phone can connect.",
+  "@linkDesktopFirewallHint": {
+    "description": "Hint shown while the phone link server is on, about the operating system firewall prompt"
+  },
+  "linkDesktopSectionComputer": "This computer",
+  "@linkDesktopSectionComputer": {
+    "description": "Section of the phone link settings about this computer's name and address"
+  },
+  "linkDesktopDeviceName": "Name",
+  "@linkDesktopDeviceName": {
+    "description": "Row and field label for the name phones see for this computer"
+  },
+  "linkDesktopDeviceNameHint": "Phones show this name when they find this computer",
+  "@linkDesktopDeviceNameHint": {
+    "description": "Helper text of the field that renames this computer for phones"
+  },
+  "linkDesktopAddress": "Address",
+  "@linkDesktopAddress": {
+    "description": "Row that shows the network addresses phones and Subsonic apps connect to"
+  },
+  "linkDesktopSecurityCode": "Security code",
+  "@linkDesktopSecurityCode": {
+    "description": "Row that shows the short certificate fingerprint phones compare while pairing"
+  },
+  "linkDesktopSecurityCodeHint": "Your phone shows the same code when it pairs",
+  "@linkDesktopSecurityCodeHint": {
+    "description": "Subtitle explaining the security code row"
+  },
+  "linkDesktopCatalogSongs": "{count, plural, =1{1 song shared} other{{count} songs shared}}",
+  "@linkDesktopCatalogSongs": {
+    "description": "How many Library songs phones can see",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "linkDesktopSectionPhones": "Phones",
+  "@linkDesktopSectionPhones": {
+    "description": "Section of the phone link settings that lists paired phones"
+  },
+  "linkDesktopPairPhone": "Pair a phone",
+  "@linkDesktopPairPhone": {
+    "description": "Row and dialog title that shows a code to pair a phone with this computer"
+  },
+  "linkDesktopPairPhoneSubtitle": "Show a code to enter on your phone",
+  "@linkDesktopPairPhoneSubtitle": {
+    "description": "Subtitle of the Pair a phone row"
+  },
+  "linkDesktopNoDevices": "No phones paired yet",
+  "@linkDesktopNoDevices": {
+    "description": "Shown in the paired phones list when it is empty"
+  },
+  "linkDesktopDeviceConnected": "Connected",
+  "@linkDesktopDeviceConnected": {
+    "description": "Status of a paired phone that is connected now"
+  },
+  "linkDesktopDeviceLastSeen": "Last seen {date}",
+  "@linkDesktopDeviceLastSeen": {
+    "description": "Status of a paired phone that is not connected",
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "linkDesktopDeviceNeverSeen": "Not connected yet",
+  "@linkDesktopDeviceNeverSeen": {
+    "description": "Status of a paired device that never connected"
+  },
+  "linkDesktopSubsonicApp": "Subsonic app",
+  "@linkDesktopSubsonicApp": {
+    "description": "Label of a paired device that is a third-party Subsonic app"
+  },
+  "linkDesktopRevoke": "Remove",
+  "@linkDesktopRevoke": {
+    "description": "Tooltip and confirm button that removes a paired phone or Subsonic app"
+  },
+  "linkDesktopRevokeTitle": "Remove {name}?",
+  "@linkDesktopRevokeTitle": {
+    "description": "Title of the dialog that confirms removing a paired device",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkDesktopRevokeMessage": "It has to pair again before it can connect to this computer.",
+  "@linkDesktopRevokeMessage": {
+    "description": "Message of the dialog that confirms removing a paired device"
+  },
+  "linkDesktopRevoked": "{name} removed",
+  "@linkDesktopRevoked": {
+    "description": "Snackbar after removing a paired device",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkDesktopSectionOtherApps": "Other apps",
+  "@linkDesktopSectionOtherApps": {
+    "description": "Section of the phone link settings for third-party Subsonic apps"
+  },
+  "linkDesktopAddSubsonicApp": "Add another Subsonic app",
+  "@linkDesktopAddSubsonicApp": {
+    "description": "Row and dialog title that creates a key for a third-party Subsonic app"
+  },
+  "linkDesktopAddSubsonicAppSubtitle": "Create a key for a Subsonic player on another device",
+  "@linkDesktopAddSubsonicAppSubtitle": {
+    "description": "Subtitle of the Add another Subsonic app row"
+  },
+  "linkDesktopAppName": "App name",
+  "@linkDesktopAppName": {
+    "description": "Field label for the name of a third-party Subsonic app"
+  },
+  "linkDesktopCreateKey": "Create key",
+  "@linkDesktopCreateKey": {
+    "description": "Button that creates a key for a third-party Subsonic app"
+  },
+  "linkDesktopAppKeyTitle": "Connect {name}",
+  "@linkDesktopAppKeyTitle": {
+    "description": "Title of the dialog that shows the details for a new Subsonic app key",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkDesktopAppKeyMessage": "Enter these details in the app. The key is shown only now.",
+  "@linkDesktopAppKeyMessage": {
+    "description": "Message of the dialog that shows a new Subsonic app key"
+  },
+  "linkDesktopServerAddress": "Server address",
+  "@linkDesktopServerAddress": {
+    "description": "Label of the server address a Subsonic app connects to"
+  },
+  "linkDesktopUsername": "Username",
+  "@linkDesktopUsername": {
+    "description": "Label of the username a Subsonic app uses"
+  },
+  "linkDesktopApiKey": "Password or API key",
+  "@linkDesktopApiKey": {
+    "description": "Label of the key a Subsonic app uses as its password or API key"
+  },
+  "linkDesktopCopy": "Copy {label}",
+  "@linkDesktopCopy": {
+    "description": "Tooltip of a copy button next to a value",
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "linkDesktopPairInstructions": "Open Mornye on your phone, choose this computer and enter this code.",
+  "@linkDesktopPairInstructions": {
+    "description": "Instructions in the pairing dialog above the code"
+  },
+  "linkDesktopPairCheckCode": "Check that your phone shows security code {code}.",
+  "@linkDesktopPairCheckCode": {
+    "description": "Line in the pairing dialog asking to compare the short certificate fingerprint",
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
+  "linkDesktopPairExpires": "The code expires in {time}",
+  "@linkDesktopPairExpires": {
+    "description": "Countdown in the pairing dialog, as minutes and seconds",
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "linkDesktopPaired": "Paired with {name}",
+  "@linkDesktopPaired": {
+    "description": "Snackbar after a phone paired",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkDesktopPairExpired": "The code expired. Pair again to get a new one.",
+  "@linkDesktopPairExpired": {
+    "description": "Snackbar when the pairing code expired"
+  },
+  "linkDesktopPairAttempts": "Too many wrong codes. Pair again to get a new one.",
+  "@linkDesktopPairAttempts": {
+    "description": "Snackbar when pairing ended after too many wrong codes"
+  },
+  "linkDesktopPairFailed": "Could not start pairing",
+  "@linkDesktopPairFailed": {
+    "description": "Snackbar when the pairing code could not be created"
+  },
+  "linkDesktopDevicesTitle": "Phones",
+  "@linkDesktopDevicesTitle": {
+    "description": "Tooltip of the player bar button and title of its popover that list connected phones"
+  },
+  "linkDesktopPhoneNothingPlaying": "Nothing playing",
+  "@linkDesktopPhoneNothingPlaying": {
+    "description": "Shown for a connected phone that plays nothing"
+  },
+  "linkDesktopContinueOnPhone": "Continue on phone",
+  "@linkDesktopContinueOnPhone": {
+    "description": "Button that moves the desktop queue and position to a phone and pauses the desktop"
+  },
+  "linkDesktopOpenOnPhone": "Open a link on phone",
+  "@linkDesktopOpenOnPhone": {
+    "description": "Button that sends a link to a phone to open"
+  },
+  "linkDesktopOpenLinkTitle": "Open a link on {name}",
+  "@linkDesktopOpenLinkTitle": {
+    "description": "Title of the dialog that sends a link to a phone",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkDesktopOpenLinkLabel": "Link",
+  "@linkDesktopOpenLinkLabel": {
+    "description": "Field label for the link to open on a phone"
+  },
+  "linkDesktopOpen": "Open",
+  "@linkDesktopOpen": {
+    "description": "Button that sends the link to the phone"
+  },
+  "linkDesktopSentToPhone": "Sent to {name}",
+  "@linkDesktopSentToPhone": {
+    "description": "Snackbar after something was sent to a phone",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkDesktopNotDelivered": "The phone did not receive it",
+  "@linkDesktopNotDelivered": {
+    "description": "Snackbar when a message could not reach a phone"
+  },
+  "linkDesktopNothingToContinue": "Nothing is playing on this computer",
+  "@linkDesktopNothingToContinue": {
+    "description": "Snackbar when Continue on phone is used without a current song"
+  },
+  "linkTransferDesktopSendTo": "Send to {name}",
+  "@linkTransferDesktopSendTo": {
+    "description": "Mornye Link desktop: song menu action that copies this computer's songs to the connected phone {name}",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkTransferDesktopSaveHere": "Save to this computer",
+  "@linkTransferDesktopSaveHere": {
+    "description": "Mornye Link desktop: song menu action that copies a connected phone's songs into this computer's download folder"
+  },
+  "linkTransferDesktopSendingSong": "Sending \"{title}\" to {name}",
+  "@linkTransferDesktopSendingSong": {
+    "description": "Mornye Link desktop: snackbar when one song starts copying to the phone {name}",
+    "placeholders": {
+      "title": {
+        "type": "String"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkTransferDesktopSendingSongs": "{count, plural, =1{Sending 1 song to {name}} other{Sending {count} songs to {name}}}",
+  "@linkTransferDesktopSendingSongs": {
+    "description": "Mornye Link desktop: snackbar when songs start copying to the phone {name}",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkTransferDesktopReceivingSong": "Receiving \"{title}\" from {name}",
+  "@linkTransferDesktopReceivingSong": {
+    "description": "Mornye Link desktop: snackbar when one song of the phone {name} starts copying to this computer",
+    "placeholders": {
+      "title": {
+        "type": "String"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkTransferDesktopReceivingSongs": "{count, plural, =1{Receiving 1 song from {name}} other{Receiving {count} songs from {name}}}",
+  "@linkTransferDesktopReceivingSongs": {
+    "description": "Mornye Link desktop: snackbar when songs of the phone {name} start copying to this computer",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkTransferDesktopView": "View",
+  "@linkTransferDesktopView": {
+    "description": "Mornye Link desktop: snackbar action that opens the list of song transfers"
+  },
+  "linkTransferDesktopNothingToSend": "None of these songs can be sent right now",
+  "@linkTransferDesktopNothingToSend": {
+    "description": "Mornye Link desktop: snackbar when Send to phone finds no song file on this computer to send"
+  },
+  "linkTransferDesktopNothingToSave": "None of these songs can be saved right now",
+  "@linkTransferDesktopNothingToSave": {
+    "description": "Mornye Link desktop: snackbar when Save to this computer finds no song of a connected phone"
   },
   "desktopScrollBack": "Gulir ke belakang",
   "@desktopScrollBack": {
@@ -8191,7 +9537,7 @@
   "@settingsKeyboardShortcuts": {
     "description": "Desktop Settings page that lists the app's keyboard shortcuts"
   },
-  "settingsKeyboardShortcutsSubtitle": "Tombol untuk pemutaran, navigasi dan panel",
+  "settingsKeyboardShortcutsSubtitle": "Tombol untuk pemutaran, navigasi, dan panel",
   "@settingsKeyboardShortcutsSubtitle": {
     "description": "Subtitle of the Keyboard Shortcuts entry in desktop Settings"
   },
@@ -8203,185 +9549,899 @@
   "@desktopShortcutDismiss": {
     "description": "Keyboard Shortcuts row for Escape, which leaves a text field or closes the top dialog or page"
   },
-  "desktopShortcutToggleSidebar": "Tampilkan atau sembunyikan sidebar",
+  "desktopShortcutToggleSidebar": "Tampil atau sembunyikan sidebar",
   "@desktopShortcutToggleSidebar": {
     "description": "Keyboard Shortcuts row for the shortcut that collapses or expands the desktop sidebar"
   },
-  "libraryFolders": "Folder",
-  "libraryFolderCount": "{count, plural, =1{1 folder} other{{count} folder}}",
-  "libraryFoldersEmptyTitle": "Belum ada folder",
-  "libraryFoldersEmptyMessage": "Unduh lagu atau tambahkan folder musik di setelan Koleksi Lokal untuk menjelajahinya per folder.",
-  "libraryFolderMissing": "Folder ini tidak ada lagi di Koleksi",
-  "libraryFoldersLoadFailed": "Tidak dapat membaca folder",
-  "linkDesktopSettingsTitle": "Mornye di ponsel",
-  "linkDesktopSettingsSubtitle": "Putar Library dan kendalikan pemutaran dari ponsel",
-  "linkDesktopEnableTitle": "Bagikan ke Mornye di ponsel",
-  "linkDesktopEnableSubtitle": "Ponsel dapat menjelajah, memutar, dan download melalui komputer ini di jaringan lokal",
-  "linkDesktopStatusStarting": "Memulai",
-  "linkDesktopStatusRunning": "Aktif, {count, plural, =0{tidak ada ponsel terhubung} other{{count} ponsel terhubung}}",
-  "linkDesktopStatusFailed": "Tidak dapat dimulai: {error}",
-  "linkDesktopFirewallHint": "Komputer mungkin bertanya apakah Mornye boleh menerima koneksi jaringan masuk. Izinkan agar ponsel dapat terhubung.",
-  "linkDesktopSectionComputer": "Komputer ini",
-  "linkDesktopDeviceName": "Nama",
-  "linkDesktopDeviceNameHint": "Ponsel menampilkan nama ini saat menemukan komputer ini",
-  "linkDesktopAddress": "Alamat",
-  "linkDesktopSecurityCode": "Kode keamanan",
-  "linkDesktopSecurityCodeHint": "Ponsel menampilkan kode yang sama saat dipasangkan",
-  "linkDesktopCatalogSongs": "{count} lagu dibagikan",
-  "linkDesktopSectionPhones": "Ponsel",
-  "linkDesktopPairPhone": "Pasangkan ponsel",
-  "linkDesktopPairPhoneSubtitle": "Tampilkan kode untuk dimasukkan di ponsel",
-  "linkDesktopNoDevices": "Belum ada ponsel yang dipasangkan",
-  "linkDesktopDeviceConnected": "Terhubung",
-  "linkDesktopDeviceLastSeen": "Terakhir terlihat {date}",
-  "linkDesktopDeviceNeverSeen": "Belum pernah terhubung",
-  "linkDesktopSubsonicApp": "Aplikasi Subsonic",
-  "linkDesktopRevoke": "Hapus",
-  "linkDesktopRevokeTitle": "Hapus {name}?",
-  "linkDesktopRevokeMessage": "Perangkat ini harus dipasangkan lagi sebelum dapat terhubung ke komputer ini.",
-  "linkDesktopRevoked": "{name} dihapus",
-  "linkDesktopSectionOtherApps": "Aplikasi lain",
-  "linkDesktopAddSubsonicApp": "Tambah aplikasi Subsonic lain",
-  "linkDesktopAddSubsonicAppSubtitle": "Buat kunci untuk pemutar Subsonic di perangkat lain",
-  "linkDesktopAppName": "Nama aplikasi",
-  "linkDesktopCreateKey": "Buat kunci",
-  "linkDesktopAppKeyTitle": "Hubungkan {name}",
-  "linkDesktopAppKeyMessage": "Masukkan detail ini di aplikasi. Kunci hanya ditampilkan sekarang.",
-  "linkDesktopServerAddress": "Alamat server",
-  "linkDesktopUsername": "Nama pengguna",
-  "linkDesktopApiKey": "Kata sandi atau kunci API",
-  "linkDesktopCopy": "Salin {label}",
-  "linkDesktopPairInstructions": "Buka Mornye di ponsel, pilih komputer ini, lalu masukkan kode ini.",
-  "linkDesktopPairCheckCode": "Pastikan ponsel menampilkan kode keamanan {code}.",
-  "linkDesktopPairExpires": "Kode berakhir dalam {time}",
-  "linkDesktopPaired": "Terpasang dengan {name}",
-  "linkDesktopPairExpired": "Kode sudah berakhir. Pasangkan lagi untuk mendapatkan kode baru.",
-  "linkDesktopPairAttempts": "Terlalu banyak kode salah. Pasangkan lagi untuk mendapatkan kode baru.",
-  "linkDesktopPairFailed": "Tidak dapat memulai pemasangan",
-  "linkDesktopDevicesTitle": "Ponsel",
-  "linkDesktopPhoneNothingPlaying": "Tidak ada yang diputar",
-  "linkDesktopContinueOnPhone": "Lanjutkan di ponsel",
-  "linkDesktopOpenOnPhone": "Buka link di ponsel",
-  "linkDesktopOpenLinkTitle": "Buka link di {name}",
-  "linkDesktopOpenLinkLabel": "Link",
-  "linkDesktopOpen": "Buka",
-  "linkDesktopSentToPhone": "Terkirim ke {name}",
-  "linkDesktopNotDelivered": "Ponsel tidak menerimanya",
-  "linkDesktopNothingToContinue": "Tidak ada yang diputar di komputer ini",
-  "linkTransferDesktopSendTo": "Kirim ke {name}",
-  "linkTransferDesktopSaveHere": "Simpan ke komputer ini",
-  "linkTransferDesktopSendingSong": "Mengirim \"{title}\" ke {name}",
-  "linkTransferDesktopSendingSongs": "{count, plural, other{Mengirim {count} lagu ke {name}}}",
-  "linkTransferDesktopReceivingSong": "Menerima \"{title}\" dari {name}",
-  "linkTransferDesktopReceivingSongs": "{count, plural, other{Menerima {count} lagu dari {name}}}",
-  "linkTransferDesktopView": "Lihat",
-  "linkTransferDesktopNothingToSend": "Lagu-lagu ini tidak bisa dikirim sekarang",
-  "linkTransferDesktopNothingToSave": "Lagu-lagu ini tidak bisa disimpan sekarang",
-  "linkSettingsTitle": "Mornye di komputer Anda",
-  "linkSettingsSubtitle": "Putar dan kendalikan pustaka komputer Anda",
-  "linkPageTitle": "Komputer",
-  "linkPageDescription": "Pasangkan dengan Mornye di komputer Anda untuk memutar pustakanya di ponsel ini dan mengendalikan yang diputarnya. Kedua perangkat harus berada di jaringan yang sama.",
-  "linkPairedSection": "Komputer terpasang",
-  "linkPhoneSection": "Ponsel ini",
-  "linkShareSongsTitle": "Tampilkan lagu di komputer",
-  "linkShareSongsSubtitle": "Lagu di ponsel ini muncul di Library komputer dan bisa diputar di sana selama ponsel ini terhubung",
-  "linkFollowDesktopTitle": "Ikuti pemutaran komputer",
-  "linkFollowDesktopSubtitle": "Saat komputer mulai memutar, ponsel ini menampilkan dan mengendalikannya",
-  "linkNearbySection": "Di jaringan ini",
-  "linkSearching": "Mencari komputer...",
-  "linkNoneFoundTitle": "Tidak ada komputer ditemukan",
-  "linkNoneFound": "Buka Mornye di komputer Anda dan aktifkan Bagikan dengan Mornye di ponsel Anda di pengaturannya.",
-  "linkAddManually": "Tambah lewat alamat",
-  "linkManualHost": "Alamat komputer",
+  "linkSettingsTitle": "Mornye on your computer",
+  "@linkSettingsTitle": {
+    "description": "Phone Settings entry that pairs the phone with the Mornye desktop app on the local network"
+  },
+  "linkSettingsSubtitle": "Play and control your computer's library",
+  "@linkSettingsSubtitle": {
+    "description": "Subtitle of the Mornye on your computer entry in phone Settings"
+  },
+  "linkPageTitle": "Computers",
+  "@linkPageTitle": {
+    "description": "Title of the page listing computers running Mornye that the phone can pair with; kept short for the large title"
+  },
+  "linkPageDescription": "Pair with Mornye on your computer to play its library on this phone and control what it plays. Both devices need to be on the same network.",
+  "@linkPageDescription": {
+    "description": "Introduction at the top of the computers page"
+  },
+  "linkPairedSection": "Paired computers",
+  "@linkPairedSection": {
+    "description": "Section header for computers this phone is paired with"
+  },
+  "linkPhoneSection": "This phone",
+  "@linkPhoneSection": {
+    "description": "Section header for what this phone shares with and how it follows its paired computer"
+  },
+  "linkShareSongsTitle": "Show songs on the computer",
+  "@linkShareSongsTitle": {
+    "description": "Switch title: this phone's songs appear in the paired computer's Library"
+  },
+  "linkShareSongsSubtitle": "Songs on this phone appear in the computer's Library and play there while this phone is connected",
+  "@linkShareSongsSubtitle": {
+    "description": "Switch subtitle for showing this phone's songs on the computer"
+  },
+  "linkFollowDesktopTitle": "Follow the computer's playback",
+  "@linkFollowDesktopTitle": {
+    "description": "Switch title: the phone's player shows the computer when the computer starts playing"
+  },
+  "linkFollowDesktopSubtitle": "When the computer starts playing, this phone shows and controls it",
+  "@linkFollowDesktopSubtitle": {
+    "description": "Switch subtitle for following the computer's playback"
+  },
+  "linkNearbySection": "On this network",
+  "@linkNearbySection": {
+    "description": "Section header for computers running Mornye found on the local network"
+  },
+  "linkSearching": "Looking for computers...",
+  "@linkSearching": {
+    "description": "Row shown while the phone searches the local network for computers"
+  },
+  "linkNoneFoundTitle": "No computers found",
+  "@linkNoneFoundTitle": {
+    "description": "Row shown when the phone is not searching and found no computer"
+  },
+  "linkNoneFound": "Open Mornye on your computer and turn on Share with Mornye on your phone in its settings.",
+  "@linkNoneFound": {
+    "description": "Hint under the search row when no computer was found yet; Share with Mornye on your phone is the name of the desktop setting"
+  },
+  "linkAddManually": "Add by address",
+  "@linkAddManually": {
+    "description": "Button and dialog title for pairing with a computer by typing its address and port"
+  },
+  "linkManualHost": "Computer address",
+  "@linkManualHost": {
+    "description": "Field label for the computer's IP address or host name"
+  },
   "linkManualPort": "Port",
-  "linkManualMessage": "Mornye di komputer Anda menampilkan alamat dan port di tempat Anda mengaktifkan berbagi.",
-  "linkContinue": "Lanjutkan",
-  "linkStateConnected": "Terhubung",
-  "linkStateConnecting": "Menghubungkan...",
-  "linkStateDisconnected": "Tidak terhubung",
-  "linkStateInactive": "Ketuk untuk memakai komputer ini",
-  "linkActive": "Dipakai",
-  "linkForget": "Lupakan",
-  "linkForgetTitle": "Lupakan {name}?",
-  "linkForgetMessage": "Ponsel ini berhenti terhubung ke komputer tersebut. Anda dapat memasangkannya lagi nanti.",
-  "linkForgetRemoveLibrary": "Hapus juga musiknya dari Pustaka",
-  "linkPinTitle": "Pasangkan dengan {name}",
-  "linkPinMessage": "Masukkan PIN 6 digit yang tampil di komputer Anda.",
+  "@linkManualPort": {
+    "description": "Field label for the network port of the Mornye desktop server"
+  },
+  "linkManualMessage": "Mornye on your computer shows its address and port where you turn on sharing.",
+  "@linkManualMessage": {
+    "description": "Explains where to find the address and port to type"
+  },
+  "linkContinue": "Continue",
+  "@linkContinue": {
+    "description": "Dialog action that continues to the PIN step after typing an address"
+  },
+  "linkStateConnected": "Connected",
+  "@linkStateConnected": {
+    "description": "Status of the paired computer that is connected"
+  },
+  "linkStateConnecting": "Connecting...",
+  "@linkStateConnecting": {
+    "description": "Status of the paired computer while the phone connects to it"
+  },
+  "linkStateDisconnected": "Not connected",
+  "@linkStateDisconnected": {
+    "description": "Status of the paired computer when it cannot be reached"
+  },
+  "linkStateInactive": "Tap to use this computer",
+  "@linkStateInactive": {
+    "description": "Status of a paired computer other than the one in use; tapping it makes it the one in use"
+  },
+  "linkActive": "In use",
+  "@linkActive": {
+    "description": "Label next to the paired computer the phone currently uses, shown when several are paired"
+  },
+  "linkForget": "Forget",
+  "@linkForget": {
+    "description": "Action that unpairs a computer from this phone"
+  },
+  "linkForgetTitle": "Forget {name}?",
+  "@linkForgetTitle": {
+    "description": "Title of the dialog confirming that a paired computer is forgotten",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkForgetMessage": "This phone stops connecting to it. You can pair again later.",
+  "@linkForgetMessage": {
+    "description": "Explanation in the forget computer dialog"
+  },
+  "linkForgetRemoveLibrary": "Also remove its music from Library",
+  "@linkForgetRemoveLibrary": {
+    "description": "Switch in the forget computer dialog that also removes the computer's network connection and Library source"
+  },
+  "linkPinTitle": "Pair with {name}",
+  "@linkPinTitle": {
+    "description": "Title of the dialog asking for the pairing PIN",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkPinMessage": "Enter the 6-digit PIN shown on your computer.",
+  "@linkPinMessage": {
+    "description": "Instruction in the pairing PIN dialog"
+  },
   "linkPinField": "PIN",
-  "linkPinCode": "Komputer Anda menampilkan kode {code} di samping PIN. Pasangkan hanya jika kodenya sama.",
-  "linkPinNotOpen": "Pemasangan belum dibuka. Mulai pemasangan di Mornye pada komputer Anda untuk menampilkan PIN.",
-  "linkPair": "Pasangkan",
-  "linkPaired": "Terpasang dengan {name}. Musiknya sedang ditambahkan ke Pustaka.",
-  "linkPairAgain": "Pasangkan lagi",
-  "linkTransfersTitle": "Transfer",
-  "linkTransfersInProgress": "Sedang berjalan",
-  "linkTransfersFinished": "Selesai",
-  "linkTransfersClearFinished": "Hapus yang selesai",
-  "linkTransfersEmptyTitle": "Belum ada transfer",
-  "linkTransfersEmptyMessage": "Kirim atau simpan lagu dari menu lagu, album, atau pilihan.",
-  "linkTransfersSending": "Mengirim {count, plural, other{{count} lagu}} ke {name}",
-  "linkTransfersReceiving": "Menerima {count, plural, other{{count} lagu}} dari {name}",
-  "linkTransfersSendingSong": "Mengirim {title} ke {name}",
-  "linkTransfersReceivingSong": "Menerima {title} dari {name}",
-  "linkTransfersSongsTo": "{count, plural, other{{count} lagu}} ke {name}",
-  "linkTransfersSongsFrom": "{count, plural, other{{count} lagu}} dari {name}",
-  "linkTransfersSongTo": "{title} ke {name}",
-  "linkTransfersSongFrom": "{title} dari {name}",
-  "linkTransfersPosition": "{position} dari {total}",
+  "@linkPinField": {
+    "description": "Label of the pairing PIN field"
+  },
+  "linkPinCode": "Your computer shows the code {code} next to the PIN. Pair only if it matches.",
+  "@linkPinCode": {
+    "description": "Security check in the PIN dialog; the placeholder is 8 hexadecimal characters of the computer's certificate fingerprint, grouped as 'ab12 cd34'",
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
+  "linkPinNotOpen": "Pairing is not open yet. Start pairing in Mornye on your computer to show a PIN.",
+  "@linkPinNotOpen": {
+    "description": "Note in the PIN dialog when the computer reports that no pairing window is open"
+  },
+  "linkPair": "Pair",
+  "@linkPair": {
+    "description": "Action that sends the PIN to pair with the computer"
+  },
+  "linkPaired": "Paired with {name}. Its music is being added to Library.",
+  "@linkPaired": {
+    "description": "Message after pairing succeeded",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkPairAgain": "Pair again",
+  "@linkPairAgain": {
+    "description": "Action that repeats pairing with a computer that no longer accepts this phone"
+  },
+  "linkTransfersTitle": "Transfers",
+  "@linkTransfersTitle": {
+    "description": "Mornye Link: title of the list of songs copied between this device and a linked phone or computer, and of the rows that open it"
+  },
+  "linkTransfersInProgress": "In progress",
+  "@linkTransfersInProgress": {
+    "description": "Section of the Transfers list for transfers that are running or waiting their turn"
+  },
+  "linkTransfersFinished": "Finished",
+  "@linkTransfersFinished": {
+    "description": "Section of the Transfers list for transfers that stopped: done, stopped by someone or failed"
+  },
+  "linkTransfersClearFinished": "Clear finished",
+  "@linkTransfersClearFinished": {
+    "description": "Action that removes the finished transfers from the Transfers list; the copied songs stay"
+  },
+  "linkTransfersEmptyTitle": "No transfers yet",
+  "@linkTransfersEmptyTitle": {
+    "description": "Title of the empty Transfers list, also the status of the row that opens it while there is none"
+  },
+  "linkTransfersEmptyMessage": "Send or save songs from a song's menu, an album or a selection.",
+  "@linkTransfersEmptyMessage": {
+    "description": "Hint under the empty Transfers list naming where a transfer starts (the Send to and Save to this device actions)"
+  },
+  "linkTransfersSending": "Sending {count, plural, =1{1 song} other{{count} songs}} to {name}",
+  "@linkTransfersSending": {
+    "description": "Title of a running or waiting transfer that copies this device's songs to a linked device",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkTransfersReceiving": "Receiving {count, plural, =1{1 song} other{{count} songs}} from {name}",
+  "@linkTransfersReceiving": {
+    "description": "Title of a running or waiting transfer that copies a linked device's songs to this device",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkTransfersSendingSong": "Sending {title} to {name}",
+  "@linkTransfersSendingSong": {
+    "description": "Title of a running or waiting transfer of one song from this device; the placeholder is the song's title",
+    "placeholders": {
+      "title": {
+        "type": "String"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkTransfersReceivingSong": "Receiving {title} from {name}",
+  "@linkTransfersReceivingSong": {
+    "description": "Title of a running or waiting transfer of one song to this device; the placeholder is the song's title",
+    "placeholders": {
+      "title": {
+        "type": "String"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkTransfersSongsTo": "{count, plural, =1{1 song} other{{count} songs}} to {name}",
+  "@linkTransfersSongsTo": {
+    "description": "Title of a finished transfer from this device to a linked one; its outcome shows below",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkTransfersSongsFrom": "{count, plural, =1{1 song} other{{count} songs}} from {name}",
+  "@linkTransfersSongsFrom": {
+    "description": "Title of a finished transfer from a linked device to this one; its outcome shows below",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkTransfersSongTo": "{title} to {name}",
+  "@linkTransfersSongTo": {
+    "description": "Title of a finished transfer of one song from this device; the placeholder is the song's title",
+    "placeholders": {
+      "title": {
+        "type": "String"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkTransfersSongFrom": "{title} from {name}",
+  "@linkTransfersSongFrom": {
+    "description": "Title of a finished transfer of one song to this device; the placeholder is the song's title",
+    "placeholders": {
+      "title": {
+        "type": "String"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkTransfersPosition": "{position} of {total}",
+  "@linkTransfersPosition": {
+    "description": "Which song of a running transfer is being copied, for example '3 of 12'",
+    "placeholders": {
+      "position": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
   "linkTransfersPercent": "{percent}%",
-  "linkTransfersWaiting": "Menunggu",
-  "linkTransfersSavedCount": "{count, plural, other{{count} tersimpan}}",
-  "linkTransfersAlreadyThereCount": "{count, plural, other{{count} sudah ada}}",
-  "linkTransfersFailedCount": "{count, plural, other{{count} gagal}}",
-  "linkTransfersStopped": "{done, plural, =0{Dihentikan} other{Dihentikan setelah {done} dari {total}}}",
-  "linkTransfersReasonDisconnected": "Koneksi terputus",
-  "linkTransfersReasonNoFolder": "Pilih folder download dulu",
-  "linkTransfersReasonNoFolderPeer": "{name} belum punya folder download",
-  "linkTransfersReasonBusy": "Sedang sibuk, coba lagi nanti",
-  "linkTransfersReasonError": "Terjadi kesalahan",
-  "linkTransfersSongSaved": "Tersimpan",
-  "linkTransfersSongAlreadyThere": "Sudah ada",
-  "linkTransfersSongFailed": "Gagal",
-  "linkTransfersSongCopying": "Menyalin",
-  "linkTransfersSongNotCopied": "Tidak disalin",
-  "linkTransfersStop": "Hentikan transfer",
-  "linkTransfersActiveCount": "{count, plural, other{{count} transfer}}",
-  "linkTransfersFinishedCount": "{count, plural, other{{count} transfer selesai}}",
-  "linkErrorBadPin": "PIN tersebut salah. Periksa PIN di komputer Anda dan coba lagi.",
-  "linkErrorPairingClosed": "Pemasangan tidak dibuka di komputer Anda. Mulai pemasangan di sana, lalu coba lagi.",
-  "linkErrorTooManyAttempts": "Terlalu banyak percobaan. Tunggu sebentar, lalu coba lagi.",
-  "linkErrorCertificateTitle": "Komputer tidak terverifikasi",
-  "linkErrorCertificate": "Sertifikat keamanan komputer tidak cocok dengan yang dilaporkannya. Seseorang di jaringan ini mungkin menyadap koneksi, jadi pemasangan dihentikan.",
-  "linkErrorIncompatible": "Komputer ini menjalankan versi Mornye yang tidak dapat dipasangkan dengan ponsel ini. Perbarui Mornye di kedua perangkat.",
-  "linkErrorUnreachable": "Komputer tidak dapat dijangkau. Pastikan Mornye terbuka di komputer dan kedua perangkat berada di jaringan yang sama.",
-  "linkErrorTimeout": "Komputer tidak menjawab tepat waktu. Coba lagi.",
-  "linkErrorInvalidAddress": "Masukkan alamat dan port yang valid, misalnya 192.168.1.20 dan 47710.",
-  "linkErrorFailed": "Pemasangan gagal. Coba lagi.",
-  "linkLocalNetworkTitle": "Perlu akses jaringan lokal",
-  "linkLocalNetworkMessage": "Mornye memerlukan akses jaringan lokal untuk menemukan komputer Anda dan terhubung ke sana.",
-  "linkLocalNetworkAllow": "Izinkan akses",
-  "linkWifiOffTitle": "Tidak terhubung ke Wi-Fi",
-  "linkWifiOffMessage": "Hubungkan ponsel ini ke jaringan Wi-Fi yang sama dengan komputer Anda.",
-  "linkIssueUnauthorized": "{name} tidak lagi menerima ponsel ini. Pasangkan lagi untuk terhubung kembali.",
-  "linkIssueCertificate": "{name} menampilkan sertifikat keamanan yang berbeda. Pasangkan lagi hanya jika Anda memasang ulang atau mengatur ulang Mornye di komputer tersebut.",
-  "linkIssueIncompatible": "Perbarui Mornye di ponsel ini dan di {name} untuk terhubung.",
-  "playlistEditOrder": "Ubah urutan",
-  "playlistEditOrderDescription": "Seret lagu lewat pegangannya, atau sentuh lama, untuk memindahkannya.",
-  "playlistEditOrderSaved": "Urutan playlist disimpan",
-  "collectionOrderSaved": "Urutan lagu disimpan",
-  "collectionOrderChanged": "Koleksi ini berubah saat diedit. Silakan atur ulang urutannya.",
-  "collectionOrderSaveFailed": "Urutan lagu tidak dapat disimpan. Coba lagi.",
-  "playlistCreateEmpty": "Playlist kosong",
-  "playlistCreateEmptySubtitle": "Tambahkan lagu nanti dari daftar mana pun",
-  "playlistCreateFromFolder": "Dari folder",
-  "playlistCreateFromFolderSubtitle": "Semua lagu di satu folder Koleksi Anda",
-  "playlistImportFile": "Impor file playlist",
-  "playlistImportFileSubtitle": "M3U, M3U8, atau CSV, dicocokkan dengan file di perangkat ini",
-  "playlistFolderPickerTitle": "Pilih folder",
-  "playlistFolderPickerEmptyTitle": "Belum ada folder",
-  "playlistFolderPickerEmpty": "Belum ada lagu yang dipindai. Tambahkan folder Koleksi lalu pindai terlebih dahulu.",
-  "playlistCreatedWithTracks": "{name} dibuat dengan {count, plural, =1{1 lagu} other{{count} lagu}}",
-  "playlistImportResult": "{count, plural, =1{1 lagu} other{{count} lagu}} diimpor ke {name}, {matched} cocok dengan file di perangkat ini",
-  "playlistImportNoTracks": "Tidak ada lagu di file ini",
-  "playlistImportFailed": "File playlist ini tidak dapat dibaca"
+  "@linkTransfersPercent": {
+    "description": "How much of a transfer or song has been copied, as a percentage",
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "linkTransfersWaiting": "Waiting",
+  "@linkTransfersWaiting": {
+    "description": "Status of a transfer or song that waits for the ones before it"
+  },
+  "linkTransfersSavedCount": "{count, plural, other{{count} saved}}",
+  "@linkTransfersSavedCount": {
+    "description": "Outcome of a finished transfer: how many songs were copied",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "linkTransfersAlreadyThereCount": "{count, plural, other{{count} already there}}",
+  "@linkTransfersAlreadyThereCount": {
+    "description": "Outcome of a finished transfer: how many songs the receiving device already had, so they were not copied again",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "linkTransfersFailedCount": "{count, plural, other{{count} failed}}",
+  "@linkTransfersFailedCount": {
+    "description": "Outcome of a finished transfer: how many songs could not be copied",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "linkTransfersStopped": "{done, plural, =0{Stopped} other{Stopped after {done} of {total}}}",
+  "@linkTransfersStopped": {
+    "description": "Outcome of a transfer someone stopped, with how many of its songs were finished",
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "linkTransfersReasonDisconnected": "Connection lost",
+  "@linkTransfersReasonDisconnected": {
+    "description": "Why a transfer failed: the devices lost their connection"
+  },
+  "linkTransfersReasonNoFolder": "Choose a download folder first",
+  "@linkTransfersReasonNoFolder": {
+    "description": "Why a transfer to this device failed: no download folder is set"
+  },
+  "linkTransfersReasonNoFolderPeer": "{name} has no download folder",
+  "@linkTransfersReasonNoFolderPeer": {
+    "description": "Why a transfer to the linked device failed: that device has no download folder set",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkTransfersReasonBusy": "Busy, try again later",
+  "@linkTransfersReasonBusy": {
+    "description": "Why a transfer failed: the receiving device could not take it now"
+  },
+  "linkTransfersReasonError": "Something went wrong",
+  "@linkTransfersReasonError": {
+    "description": "Why a transfer failed, when there is no more specific reason"
+  },
+  "linkTransfersSongSaved": "Saved",
+  "@linkTransfersSongSaved": {
+    "description": "State of one song in a transfer: it was copied"
+  },
+  "linkTransfersSongAlreadyThere": "Already there",
+  "@linkTransfersSongAlreadyThere": {
+    "description": "State of one song in a transfer: the receiving device already had it"
+  },
+  "linkTransfersSongFailed": "Failed",
+  "@linkTransfersSongFailed": {
+    "description": "State of one song in a transfer: it could not be copied"
+  },
+  "linkTransfersSongCopying": "Copying",
+  "@linkTransfersSongCopying": {
+    "description": "State of the song a transfer copies right now"
+  },
+  "linkTransfersSongNotCopied": "Not copied",
+  "@linkTransfersSongNotCopied": {
+    "description": "State of a song a stopped or failed transfer did not reach"
+  },
+  "linkTransfersStop": "Stop transfer",
+  "@linkTransfersStop": {
+    "description": "Tooltip of the button that stops a running or waiting transfer; songs already copied stay"
+  },
+  "linkTransfersActiveCount": "{count, plural, =1{1 transfer} other{{count} transfers}}",
+  "@linkTransfersActiveCount": {
+    "description": "Status of the row that opens the Transfers list while several transfers run, followed by their progress",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "linkTransfersFinishedCount": "{count, plural, =1{1 transfer finished} other{{count} transfers finished}}",
+  "@linkTransfersFinishedCount": {
+    "description": "Status of the row that opens the Transfers list when none runs: how many finished since the app opened",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "linkErrorBadPin": "That PIN is not right. Check the PIN on your computer and try again.",
+  "@linkErrorBadPin": {
+    "description": "Pairing error when the PIN is wrong"
+  },
+  "linkErrorPairingClosed": "Pairing is not open on your computer. Start pairing there, then try again.",
+  "@linkErrorPairingClosed": {
+    "description": "Pairing error when the computer has no pairing window open"
+  },
+  "linkErrorTooManyAttempts": "Too many attempts. Wait a moment, then try again.",
+  "@linkErrorTooManyAttempts": {
+    "description": "Pairing error when the computer rate limits pairing attempts"
+  },
+  "linkErrorCertificateTitle": "Computer not verified",
+  "@linkErrorCertificateTitle": {
+    "description": "Title of the warning shown when the computer's certificate does not match what it reported"
+  },
+  "linkErrorCertificate": "The computer's security certificate does not match what it reported. Someone on this network may be intercepting the connection, so pairing stopped.",
+  "@linkErrorCertificate": {
+    "description": "Warning shown when the certificate seen during the connection differs from the computer's reported fingerprint"
+  },
+  "linkErrorIncompatible": "This computer runs a Mornye version that cannot pair with this phone. Update Mornye on both devices.",
+  "@linkErrorIncompatible": {
+    "description": "Pairing error when the computer is not a compatible Mornye desktop"
+  },
+  "linkErrorUnreachable": "The computer could not be reached. Check that Mornye is open on it and that both devices are on the same network.",
+  "@linkErrorUnreachable": {
+    "description": "Pairing error when the computer cannot be reached"
+  },
+  "linkErrorTimeout": "The computer did not answer in time. Try again.",
+  "@linkErrorTimeout": {
+    "description": "Pairing error when the computer does not answer"
+  },
+  "linkErrorInvalidAddress": "Enter a valid address and port, such as 192.168.1.20 and 47710.",
+  "@linkErrorInvalidAddress": {
+    "description": "Error for an address or port that cannot be used"
+  },
+  "linkErrorFailed": "Pairing failed. Try again.",
+  "@linkErrorFailed": {
+    "description": "Generic pairing error"
+  },
+  "linkLocalNetworkTitle": "Local network access needed",
+  "@linkLocalNetworkTitle": {
+    "description": "Title of the notice shown when the phone is not allowed to use the local network"
+  },
+  "linkLocalNetworkMessage": "Mornye needs local network access to find your computer and connect to it.",
+  "@linkLocalNetworkMessage": {
+    "description": "Explains why local network access is needed"
+  },
+  "linkLocalNetworkAllow": "Allow access",
+  "@linkLocalNetworkAllow": {
+    "description": "Button that asks for local network access again"
+  },
+  "linkWifiOffTitle": "Not on Wi-Fi",
+  "@linkWifiOffTitle": {
+    "description": "Title of the notice shown when the phone is not connected to Wi-Fi or Ethernet"
+  },
+  "linkWifiOffMessage": "Connect this phone to the same Wi-Fi network as your computer.",
+  "@linkWifiOffMessage": {
+    "description": "Explains that the phone must join the computer's Wi-Fi network"
+  },
+  "linkIssueUnauthorized": "{name} no longer accepts this phone. Pair again to reconnect.",
+  "@linkIssueUnauthorized": {
+    "description": "Notice when the paired computer refuses the phone's key",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkIssueCertificate": "{name} presented a different security certificate. Pair again only if you reinstalled or reset Mornye on that computer.",
+  "@linkIssueCertificate": {
+    "description": "Warning when a paired computer's certificate changed",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkIssueIncompatible": "Update Mornye on this phone and on {name} to connect.",
+  "@linkIssueIncompatible": {
+    "description": "Notice when the paired computer speaks another protocol version",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "playlistEditOrder": "Edit order",
+  "@playlistEditOrder": {
+    "description": "Playlist header action and page title for reordering the playlist's tracks"
+  },
+  "playlistEditOrderDescription": "Drag a track by its handle, or touch and hold it, to move it.",
+  "@playlistEditOrderDescription": {
+    "description": "Explanation at the top of the playlist reorder page"
+  },
+  "playlistEditOrderSaved": "Playlist order saved",
+  "collectionOrderSaved": "Song order saved",
+  "collectionOrderChanged": "This collection changed while editing. Please reorder it again.",
+  "collectionOrderSaveFailed": "Could not save the song order. Try again.",
+  "@playlistEditOrderSaved": {
+    "description": "Snackbar after saving a new playlist track order"
+  },
+  "playlistCreateEmpty": "Empty playlist",
+  "@playlistCreateEmpty": {
+    "description": "Create playlist option that starts with no tracks"
+  },
+  "playlistCreateEmptySubtitle": "Add tracks later from any list",
+  "@playlistCreateEmptySubtitle": {
+    "description": "Subtitle of the empty playlist option"
+  },
+  "playlistCreateFromFolder": "From a folder",
+  "@playlistCreateFromFolder": {
+    "description": "Create playlist option that uses the tracks of one Library folder"
+  },
+  "playlistCreateFromFolderSubtitle": "Every track in one folder of your Library",
+  "@playlistCreateFromFolderSubtitle": {
+    "description": "Subtitle of the create playlist from folder option"
+  },
+  "playlistImportFile": "Import playlist file",
+  "@playlistImportFile": {
+    "description": "Create playlist option that imports an M3U or CSV file"
+  },
+  "playlistImportFileSubtitle": "M3U, M3U8 or CSV, matched to files on this device",
+  "@playlistImportFileSubtitle": {
+    "description": "Subtitle of the import playlist file option"
+  },
+  "playlistFolderPickerTitle": "Choose a folder",
+  "@playlistFolderPickerTitle": {
+    "description": "Title of the sheet listing Library folders to turn into a playlist"
+  },
+  "playlistFolderPickerEmptyTitle": "No folders yet",
+  "@playlistFolderPickerEmptyTitle": {
+    "description": "Title of the empty folder picker when no Library folder has tracks"
+  },
+  "playlistFolderPickerEmpty": "No scanned tracks yet. Add a Library folder and scan it first.",
+  "@playlistFolderPickerEmpty": {
+    "description": "Shown when no Library folder has tracks to create a playlist from"
+  },
+  "playlistCreatedWithTracks": "Created {name} with {count, plural, =1{1 track} other{{count} tracks}}",
+  "@playlistCreatedWithTracks": {
+    "description": "Snackbar after creating a playlist from a folder",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "playlistImportResult": "Imported {count, plural, =1{1 track} other{{count} tracks}} into {name}, {matched} matched to files on this device",
+  "@playlistImportResult": {
+    "description": "Snackbar after importing a playlist file; matched counts tracks linked to a local file",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "name": {
+        "type": "String"
+      },
+      "matched": {
+        "type": "int"
+      }
+    }
+  },
+  "playlistImportNoTracks": "No tracks found in this file",
+  "@playlistImportNoTracks": {
+    "description": "Snackbar when an imported playlist file has no entries"
+  },
+  "playlistImportFailed": "Could not read this playlist file",
+  "@playlistImportFailed": {
+    "description": "Snackbar when reading or parsing an imported playlist file fails"
+  },
+  "recognizeTitle": "Identify Song",
+  "@recognizeTitle": {
+    "description": "Title of the screen that identifies a song playing nearby through the microphone (keep short)"
+  },
+  "recognizeSearchTooltip": "Identify a song playing nearby",
+  "@recognizeSearchTooltip": {
+    "description": "Tooltip of the microphone button in the search field that opens song identification"
+  },
+  "recognizeIdleTitle": "What's playing?",
+  "@recognizeIdleTitle": {
+    "description": "Headline of the song identification screen before listening starts"
+  },
+  "recognizeIdleMessage": "Hold your device near the music, then tap to listen.",
+  "@recognizeIdleMessage": {
+    "description": "Hint under the headline before listening starts"
+  },
+  "recognizeStartListening": "Start listening",
+  "@recognizeStartListening": {
+    "description": "Accessible name of the large microphone button that starts listening"
+  },
+  "recognizeServiceNote": "A sound fingerprint is sent to Shazam to find the song. The recording stays on your device.",
+  "@recognizeServiceNote": {
+    "description": "Privacy note on the identification screen; Shazam is the recognition service and must not be translated"
+  },
+  "recognizeListening": "Listening…",
+  "@recognizeListening": {
+    "description": "Status while the microphone listens for a song"
+  },
+  "recognizeListeningMessage": "Keep the music playing near your device.",
+  "@recognizeListeningMessage": {
+    "description": "Hint while the microphone listens"
+  },
+  "recognizeSearching": "Searching…",
+  "@recognizeSearching": {
+    "description": "Status after listening stops while the last answer is on its way"
+  },
+  "recognizeNoMatchTitle": "No match found",
+  "@recognizeNoMatchTitle": {
+    "description": "Title when the recognition service did not know the song"
+  },
+  "recognizeNoMatchMessage": "Try again closer to the music, or when it's louder.",
+  "@recognizeNoMatchMessage": {
+    "description": "Hint when no song was found"
+  },
+  "recognizeTryAgain": "Try Again",
+  "@recognizeTryAgain": {
+    "description": "Button that starts listening again after no match or an error"
+  },
+  "recognizeQuietTitle": "Couldn't hear the music",
+  "@recognizeQuietTitle": {
+    "description": "Title when the microphone captured too little or too quiet audio to identify"
+  },
+  "recognizeQuietMessage": "Move closer to the music and try again.",
+  "@recognizeQuietMessage": {
+    "description": "Hint when the captured audio was too quiet or short"
+  },
+  "recognizeNetworkTitle": "No connection",
+  "@recognizeNetworkTitle": {
+    "description": "Title when identification failed because the network is unreachable"
+  },
+  "recognizeNetworkMessage": "Check your internet connection and try again.",
+  "@recognizeNetworkMessage": {
+    "description": "Hint when identification failed because of the network"
+  },
+  "recognizeRateLimitedTitle": "Too many tries",
+  "@recognizeRateLimitedTitle": {
+    "description": "Title when the recognition service asked to slow down"
+  },
+  "recognizeRateLimitedMessage": "Wait a minute, then try again.",
+  "@recognizeRateLimitedMessage": {
+    "description": "Hint when the recognition service rate limited the app"
+  },
+  "recognizeUnavailableTitle": "Identification unavailable",
+  "@recognizeUnavailableTitle": {
+    "description": "Title when the recognition service failed or answered unexpectedly"
+  },
+  "recognizeUnavailableMessage": "The recognition service didn't answer. Try again later.",
+  "@recognizeUnavailableMessage": {
+    "description": "Hint when the recognition service failed"
+  },
+  "recognizeMicrophoneTitle": "Microphone unavailable",
+  "@recognizeMicrophoneTitle": {
+    "description": "Title when the microphone could not record"
+  },
+  "recognizeMicrophoneMessage": "No microphone is available, or another app is using it.",
+  "@recognizeMicrophoneMessage": {
+    "description": "Hint when the microphone could not record"
+  },
+  "recognizePermissionTitle": "Microphone access is off",
+  "@recognizePermissionTitle": {
+    "description": "Title when microphone permission was denied"
+  },
+  "recognizePermissionMessage": "Mornye uses the microphone only while you identify a song.",
+  "@recognizePermissionMessage": {
+    "description": "Explanation when microphone permission was denied"
+  },
+  "recognizePermissionAllow": "Allow Microphone",
+  "@recognizePermissionAllow": {
+    "description": "Button that asks for microphone permission again"
+  },
+  "recognizePlay": "Play in Mornye",
+  "@recognizePlay": {
+    "description": "Button that plays the identified song from the downloads or library"
+  },
+  "recognizeSearch": "Search in Mornye",
+  "@recognizeSearch": {
+    "description": "Button that searches for the identified song when it is not in the library"
+  },
+  "recognizeOpenInShazam": "Open in Shazam",
+  "@recognizeOpenInShazam": {
+    "description": "Button that opens the identified song on the Shazam website; Shazam must not be translated"
+  },
+  "recognizeListenAgain": "Listen Again",
+  "@recognizeListenAgain": {
+    "description": "Button that starts a new identification from a result"
+  },
+  "recognizeHistory": "Recently Identified",
+  "@recognizeHistory": {
+    "description": "Section header for the list of songs identified before"
+  },
+  "recognizeClearHistory": "Clear identified songs",
+  "@recognizeClearHistory": {
+    "description": "Tooltip of the header button that clears the identification history"
+  },
+  "recognizeClearHistoryMessage": "Remove every song from this list?",
+  "@recognizeClearHistoryMessage": {
+    "description": "Confirmation message before clearing the identification history"
+  },
+  "collectionSuggestionsTitle": "Suggested songs",
+  "@collectionSuggestionsTitle": {
+    "description": "Heading of the songs suggested below an album, single or playlist"
+  },
+  "collectionSuggestionsRelated": "Based on the songs above",
+  "@collectionSuggestionsRelated": {
+    "description": "Line under the suggestions heading when an extension suggested songs like the album's or playlist's"
+  },
+  "collectionSuggestionsByArtists": "More from these artists",
+  "@collectionSuggestionsByArtists": {
+    "description": "Line under the suggestions heading when the songs were found by searching the album's or playlist's artists"
+  },
+  "collectionSuggestionsRefresh": "Suggest other songs",
+  "@collectionSuggestionsRefresh": {
+    "description": "Tooltip of the button that loads other suggestions"
+  },
+  "collectionSuggestionsAddHere": "Add to this playlist",
+  "@collectionSuggestionsAddHere": {
+    "description": "Tooltip of the button that adds a suggested song to the user's playlist shown above"
+  },
+  "sectionExistingDownloads": "Existing Files",
+  "@sectionExistingDownloads": {
+    "description": "Files settings section header for actions on already-downloaded files"
+  },
+  "reorganizeLibraryTitle": "Apply Rules to Existing Files",
+  "@reorganizeLibraryTitle": {
+    "description": "Files settings action that moves and renames already-downloaded tracks to match the current folder and filename rules"
+  },
+  "reorganizeLibrarySubtitle": "Move and rename downloads and Local Library files in your download folder so they follow the folder and filename rules above",
+  "@reorganizeLibrarySubtitle": {
+    "description": "Subtitle of the apply-rules-to-existing-files action"
+  },
+  "reorganizeLibraryScanning": "Checking your files…",
+  "@reorganizeLibraryScanning": {
+    "description": "Shown while Mornye works out which downloaded files need to move"
+  },
+  "reorganizeLibraryBusy": "Wait for active downloads to finish before reorganizing files",
+  "@reorganizeLibraryBusy": {
+    "description": "Snackbar when the user tries to reorganize files while downloads are running"
+  },
+  "reorganizeLibraryNothingTitle": "Already Organized",
+  "@reorganizeLibraryNothingTitle": {
+    "description": "Dialog title when every downloaded file already follows the rules"
+  },
+  "reorganizeLibraryNothingMessage": "{count, plural, =0{There are no tracks in your download folder to reorganize. Files Mornye did not download are included once the folder is added and scanned in Local Library.} =1{The track in your download folder already follows the current rules.} other{All {count} tracks in your download folder already follow the current rules.}}",
+  "@reorganizeLibraryNothingMessage": {
+    "description": "Dialog message when there is nothing to move",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "reorganizeLibraryConfirmTitle": "Reorganize {count} {count, plural, =1{file} other{files}}?",
+  "@reorganizeLibraryConfirmTitle": {
+    "description": "Confirmation dialog title before moving files",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "reorganizeLibraryConfirmMessage": "These tracks will be moved or renamed to match your current Files settings, using their tags. Lyrics (.lrc) files next to them move too, and folders left empty are removed.",
+  "@reorganizeLibraryConfirmMessage": {
+    "description": "Confirmation dialog body before moving files"
+  },
+  "reorganizeLibraryExamples": "For example:",
+  "@reorganizeLibraryExamples": {
+    "description": "Label above a few sample moves in the reorganize confirmation dialog"
+  },
+  "reorganizeLibraryMoreChanges": "…and {count} more",
+  "@reorganizeLibraryMoreChanges": {
+    "description": "Shown under the sample moves when more files will be moved",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "reorganizeLibraryAlreadyOrganized": "{count} {count, plural, =1{track already matches} other{tracks already match}} and will stay where {count, plural, =1{it is} other{they are}}.",
+  "@reorganizeLibraryAlreadyOrganized": {
+    "description": "Note in the reorganize confirmation dialog",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "reorganizeLibraryOutsideFolder": "{count} {count, plural, =1{track is} other{tracks are}} stored outside the current download folder and will be left alone.",
+  "@reorganizeLibraryOutsideFolder": {
+    "description": "Note in the reorganize confirmation dialog",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "reorganizeLibraryMissing": "{count} {count, plural, =1{file} other{files}} could not be found and will be skipped.",
+  "@reorganizeLibraryMissing": {
+    "description": "Note in the reorganize confirmation dialog",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "reorganizeLibraryUntagged": "{count} {count, plural, =1{file has} other{files have}} no artist tag and will be left alone.",
+  "@reorganizeLibraryUntagged": {
+    "description": "Note in the reorganize confirmation dialog about scanned files without tags",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "reorganizeLibraryScanHint": "Files Mornye did not download are only included after their folder is added and scanned in Local Library.",
+  "@reorganizeLibraryScanHint": {
+    "description": "Hint in the reorganize confirmation dialog about which files are covered"
+  },
+  "reorganizeLibraryKeepsPlaylistFolders": "Your folder rule uses the playlist name, which Mornye doesn't keep for past downloads, so files stay in their current folder and are only renamed.",
+  "@reorganizeLibraryKeepsPlaylistFolders": {
+    "description": "Warning in the reorganize confirmation dialog when the folder rule depends on the playlist"
+  },
+  "reorganizeLibraryDropsPlaylistFolders": "Mornye doesn't keep which playlist a past download came from, so tracks inside playlist folders will be moved out of them.",
+  "@reorganizeLibraryDropsPlaylistFolders": {
+    "description": "Warning in the reorganize confirmation dialog when playlist folders are enabled"
+  },
+  "reorganizeLibrarySafNote": "Your download folder was picked through Android's folder picker, so each file is copied to its new place and then removed. This can take a while for a large library.",
+  "@reorganizeLibrarySafNote": {
+    "description": "Note in the reorganize confirmation dialog in Android SAF storage mode"
+  },
+  "reorganizeLibraryConfirmAction": "Move Files",
+  "@reorganizeLibraryConfirmAction": {
+    "description": "Confirm button of the reorganize dialog"
+  },
+  "reorganizeLibraryMoving": "Moving files",
+  "@reorganizeLibraryMoving": {
+    "description": "Title of the progress dialog while files are moved"
+  },
+  "reorganizeLibraryDone": "Moved {moved} of {total} {total, plural, =1{file} other{files}}",
+  "@reorganizeLibraryDone": {
+    "description": "Snackbar after reorganizing files",
+    "placeholders": {
+      "moved": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "reorganizeLibraryDoneWithFailures": "Moved {moved} of {total} {total, plural, =1{file} other{files}} · {failed} failed",
+  "@reorganizeLibraryDoneWithFailures": {
+    "description": "Snackbar after reorganizing files when some moves failed",
+    "placeholders": {
+      "moved": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      },
+      "failed": {
+        "type": "int"
+      }
+    }
+  },
+  "reorganizeLibraryFailed": "Couldn't reorganize your files: {error}",
+  "@reorganizeLibraryFailed": {
+    "description": "Snackbar when planning or applying the reorganization fails",
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  }
 }
