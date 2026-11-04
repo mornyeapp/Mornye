@@ -316,6 +316,17 @@ void main() {
       if (page.length < 7) break;
     }
     expect(describe(pages), expected);
+
+    final latest = await readReplayableListeningTracks(
+      db,
+      start,
+      end,
+      limit: 1000,
+      latestFirst: true,
+    );
+    expect(latest.map((total) => total.track.key).toSet(), {
+      for (final total in pages) total.track.key,
+    });
   });
 
   test(

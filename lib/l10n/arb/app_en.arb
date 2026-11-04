@@ -8377,6 +8377,10 @@
   "@homeContinueListening": {
     "description": "Home section header for the track currently loaded in the player"
   },
+  "homeRecentlyPlayed": "Recently Played",
+  "@homeRecentlyPlayed": {
+    "description": "Mornye Home: heading of the shelf of what was played lately"
+  },
   "homeRecentlyAdded": "Recently added",
   "@homeRecentlyAdded": {
     "description": "Home section header for the newest downloaded and scanned tracks"

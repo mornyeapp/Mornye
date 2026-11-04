@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:mornye/theme/cover_palette.dart';
 
 const mornyeLockupAsset =
     'assets/brand/logo/png/mornye-lockup-horizontal-white@1x.png';
@@ -193,6 +194,110 @@ class MornyeMixBanner extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A Top Pick from outside the Library: the playlist's own cover over a strip
+/// tinted from it, as Music's editorial cards are. The cover carries its own
+/// mark, so no lockup is set over it.
+class MornyePlaylistBanner extends StatefulWidget {
+  const MornyePlaylistBanner({
+    super.key,
+    required this.seed,
+    required this.title,
+    required this.subtitle,
+    required this.coverUrl,
+    required this.cover,
+    required this.width,
+  });
+
+  /// The strip's color until the cover's own is known.
+  final int seed;
+  final String title;
+  final String subtitle;
+  final String coverUrl;
+  final Widget cover;
+  final double width;
+
+  @override
+  State<MornyePlaylistBanner> createState() => _MornyePlaylistBannerState();
+}
+
+class _MornyePlaylistBannerState extends State<MornyePlaylistBanner> {
+  Color? _tint;
+
+  @override
+  void initState() {
+    super.initState();
+    _readTint();
+  }
+
+  @override
+  void didUpdateWidget(MornyePlaylistBanner oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.coverUrl != widget.coverUrl) _readTint();
+  }
+
+  Future<void> _readTint() async {
+    final url = widget.coverUrl;
+    final color = await CoverPalette.resolveSourceColor(url);
+    if (!mounted || url != widget.coverUrl || color == null) return;
+    // Dark enough for the white text, however light the cover.
+    final hsl = HSLColor.fromColor(color);
+    setState(() {
+      _tint = hsl.withLightness(hsl.lightness.clamp(0.16, 0.32)).toColor();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final width = widget.width;
+    return MediaQuery.withClampedTextScaling(
+      maxScaleFactor: 1.2,
+      child: SizedBox(
+        width: width,
+        height: width / MornyeMixBanner.aspectRatio,
+        child: Column(
+          children: [
+            SizedBox.square(dimension: width, child: widget.cover),
+            Expanded(
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 240),
+                width: width,
+                color: _tint ?? _palettes[widget.seed % _palettes.length].depth,
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                alignment: AlignmentDirectional.centerStart,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      widget.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: textTheme.titleSmall?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    if (widget.subtitle.isNotEmpty)
+                      Text(
+                        widget.subtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: textTheme.bodySmall?.copyWith(
+                          color: Colors.white.withValues(alpha: 0.78),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

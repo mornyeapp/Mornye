@@ -301,6 +301,9 @@ Future<bool> fileExists(String? path) async {
   if (path.startsWith('network://')) return true;
   final realPath = isCueVirtualPath(path) ? stripCueTrackSuffix(path) : path;
   if (isContentUri(realPath)) {
+    // A phone's content URI can arrive with synced statistics; a computer has
+    // no way to open one.
+    if (isDesktopPlatform) return false;
     return PlatformBridge.safExists(realPath);
   }
   return File(realPath).exists();

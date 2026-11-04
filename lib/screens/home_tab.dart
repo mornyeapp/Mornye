@@ -45,6 +45,7 @@ import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/providers/extension_provider.dart';
 import 'package:mornye/providers/recent_access_provider.dart';
 import 'package:mornye/providers/explore_provider.dart';
+import 'package:mornye/providers/home_top_picks_provider.dart';
 import 'package:mornye/providers/user_profile_provider.dart';
 import 'package:mornye/widgets/desktop/desktop_scroll_arrows.dart';
 import 'package:mornye/widgets/explore_featured_section.dart';
@@ -1355,11 +1356,25 @@ class _HomeTabState extends ConsumerState<HomeTab>
           userProfileProvider.select((p) => p.value?.name ?? ''),
         );
         return SliverMainAxisGroup(
-          slivers: _buildExploreSections(
-            exploreSections,
-            showGreeting ? homeGreeting(context.l10n, name: profileName) : null,
-            colorScheme,
-          ),
+          slivers: [
+            // Mornye opens with Top Picks whether or not the feed follows.
+            if (context.isMornye && _HomeTopPicksSection.hasPicks(ref))
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 8, bottom: 12),
+                  child: _HomeTopPicksSection(
+                    inset: 16 + homeContentInset(context),
+                  ),
+                ),
+              ),
+            ..._buildExploreSections(
+              exploreSections,
+              showGreeting
+                  ? homeGreeting(context.l10n, name: profileName)
+                  : null,
+              colorScheme,
+            ),
+          ],
         );
       },
     );

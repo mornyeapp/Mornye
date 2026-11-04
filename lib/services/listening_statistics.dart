@@ -351,12 +351,14 @@ class ListeningStatisticsStore {
     DateTime end, {
     required int limit,
     int offset = 0,
+    bool latestFirst = false,
   }) async => readReplayableListeningTracks(
     await _open(),
     start,
     end,
     limit: limit,
     offset: offset,
+    latestFirst: latestFirst,
   );
 
   /// Runs a read-only aggregate against the statistics database.
@@ -421,6 +423,7 @@ Future<void> writeListeningDeltas(
 String _listeningTracksSql({
   String where = '',
   String having = '',
+  String order = 'totals.milliseconds DESC',
   String tail = '',
 }) =>
     '''
@@ -437,7 +440,7 @@ String _listeningTracksSql({
       AND details.day = totals.last_day
     LEFT JOIN listening AS covered ON covered.track_key = totals.track_key
       AND covered.day = totals.cover_day
-    ORDER BY totals.milliseconds DESC$tail
+    ORDER BY $order$tail
   ''';
 
 /// Aggregate in SQLite so an annual recap transfers one row per song, artist
@@ -490,13 +493,15 @@ Future<ListeningSummary> readListeningSummary(
 /// The tracks of [readListeningSummary] in its order, [limit] from
 /// [offset], that can be played again from their key: played at least once
 /// and not recorded under a stream URL. Equal listening times keep the
-/// summary's order, by key.
+/// summary's order, by key. With [latestFirst] the songs of the latest day
+/// lead: days are as fine as the statistics record.
 Future<List<ListeningTotal>> readReplayableListeningTracks(
   DatabaseExecutor db,
   DateTime start,
   DateTime end, {
   required int limit,
   int offset = 0,
+  bool latestFirst = false,
 }) async {
   final rows = await db.rawQuery(
     _listeningTracksSql(
@@ -504,6 +509,9 @@ Future<List<ListeningTotal>> readReplayableListeningTracks(
           " AND track_key NOT GLOB 'http://*'"
           " AND track_key NOT GLOB 'https://*'",
       having: ' HAVING SUM(plays) > 0',
+      order: latestFirst
+          ? 'totals.last_day DESC, totals.milliseconds DESC'
+          : 'totals.milliseconds DESC',
       tail: ', totals.track_key LIMIT ? OFFSET ?',
     ),
     [listeningDay(start), listeningDay(end), limit, offset],

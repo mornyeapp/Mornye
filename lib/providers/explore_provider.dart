@@ -570,12 +570,30 @@ class ExploreNotifier extends Notifier<ExploreState> {
   void clear() {
     _homeFeedRequestId++;
     _cacheRestoreGeneration++;
+    // Top Picks read the same bridge while the feed is off: only a fetch of
+    // this notifier's own is cancelled.
+    if (_activeHomeFeedRequestId != null) {
+      PlatformBridge.cancelExtensionHomeFeedRequests();
+    }
     _activeHomeFeedRequestId = null;
-    PlatformBridge.cancelExtensionHomeFeedRequests();
     state = const ExploreState();
   }
 
   Future<void> refresh() => fetchHomeFeed(forceRefresh: true);
+}
+
+/// One read of [extensionId]'s home feed, null when it fails. Top Picks use it
+/// apart from [exploreProvider], so the feed being off leaves them working.
+Future<List<ExploreSection>?> readExtensionHomeFeed(String extensionId) async {
+  final result = await PlatformBridge.getExtensionHomeFeed(extensionId);
+  if (result == null || result['success'] != true) return null;
+  final normalized = await compute(
+    _normalizeExploreSectionsPayload,
+    result['sections'],
+  );
+  return _buildExploreSectionsFromNormalizedPayload(
+    _withDefaultExploreProviderId(normalized, extensionId),
+  );
 }
 
 final exploreProvider = NotifierProvider<ExploreNotifier, ExploreState>(() {
