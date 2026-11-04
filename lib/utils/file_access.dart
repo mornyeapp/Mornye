@@ -378,8 +378,12 @@ Future<bool> deleteFile(
   // deleting album.cue would remove ALL tracks. Callers should handle
   // CUE deletion specially (e.g. only delete when all tracks are removed).
   if (isCueVirtualPath(path)) return false;
+  final events = deletionEvents ?? SourceDeletionEvents.instance;
+  var preparationStarted = false;
   bool confirmedAbsent;
   try {
+    preparationStarted = true;
+    await events.prepareDeletion(path);
     if (path.startsWith('network://')) {
       confirmedAbsent = await (networkStorage ?? NetworkStorageService.instance)
           .deleteFile(path);
@@ -394,12 +398,15 @@ Future<bool> deleteFile(
       confirmedAbsent = !await file.exists();
     }
   } catch (_) {
+    if (preparationStarted) await events.cancelDeletion(path);
     return false;
   }
-  if (confirmedAbsent) {
-    await (deletionEvents ?? SourceDeletionEvents.instance).publish(path);
+  if (!confirmedAbsent) {
+    await events.cancelDeletion(path);
+    return false;
   }
-  return confirmedAbsent;
+  await events.publish(path);
+  return true;
 }
 
 Future<FileAccessStat?> fileStat(String? path) async {
