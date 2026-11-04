@@ -592,7 +592,16 @@ class _HomeContinueListeningCardState
     final album = mediaItem.album ?? '';
     final hero = widget.hero;
     final devicePixelRatio = MediaQuery.devicePixelRatioOf(context);
-    final dimmed = colorScheme.onPrimaryContainer.withValues(alpha: 0.8);
+    // Music keeps Home neutral: the accent is not spent on this card.
+    final neutral = context.isMornye;
+    final onContainer = neutral
+        ? colorScheme.onSurface
+        : colorScheme.onPrimaryContainer;
+    final dimmed = neutral
+        ? colorScheme.onSurfaceVariant
+        : colorScheme.onPrimaryContainer.withValues(alpha: 0.8);
+    final playColor = neutral ? colorScheme.onSurface : colorScheme.primary;
+    final onPlayColor = neutral ? colorScheme.surface : colorScheme.onPrimary;
 
     Widget artwork(double extent) => PlayerArtwork(
       // A network cover not stored yet shows once fetched.
@@ -609,7 +618,7 @@ class _HomeContinueListeningCardState
       maxLines: hero ? 2 : 1,
       overflow: TextOverflow.ellipsis,
       style: (hero ? textTheme.headlineSmall : textTheme.titleLarge)?.copyWith(
-        color: colorScheme.onPrimaryContainer,
+        color: onContainer,
       ),
     );
     final artistLine = Text(
@@ -643,19 +652,16 @@ class _HomeContinueListeningCardState
               width: 56,
               height: 56,
               decoration: BoxDecoration(
-                color: colorScheme.primary,
+                color: playColor,
                 shape: BoxShape.circle,
               ),
               child: Center(
                 child: isLoading
-                    ? AppLoadingIndicator(
-                        size: 24,
-                        color: colorScheme.onPrimary,
-                      )
+                    ? AppLoadingIndicator(size: 24, color: onPlayColor)
                     : Icon(
                         isPlaying ? Icons.pause : Icons.play_arrow,
                         size: 28,
-                        color: colorScheme.onPrimary,
+                        color: onPlayColor,
                       ),
               ),
             ),
@@ -747,7 +753,9 @@ class _HomeContinueListeningCardState
     }
 
     return Material(
-      color: colorScheme.primaryContainer,
+      color: neutral
+          ? colorScheme.surfaceContainerHigh
+          : colorScheme.primaryContainer,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -776,6 +784,7 @@ class _HomeContinueListeningProgress extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final colorScheme = Theme.of(context).colorScheme;
+    final neutral = context.isMornye;
     final durationMs = duration.inMilliseconds;
     final Duration position =
         savedPosition ?? ref.watch(playbackPositionProvider);
@@ -790,10 +799,10 @@ class _HomeContinueListeningProgress extends ConsumerWidget {
         child: LinearProgressIndicator(
           value: progress,
           minHeight: 4,
-          color: colorScheme.primary,
-          backgroundColor: colorScheme.onPrimaryContainer.withValues(
-            alpha: 0.16,
-          ),
+          color: neutral ? colorScheme.onSurface : colorScheme.primary,
+          backgroundColor:
+              (neutral ? colorScheme.onSurface : colorScheme.onPrimaryContainer)
+                  .withValues(alpha: 0.16),
         ),
       ),
     );
@@ -1240,7 +1249,9 @@ class _HomeShortcuts extends ConsumerWidget {
     void open(Widget screen) => pushPage<void>(context, (_) => screen);
 
     // Shuffle is the one emphasized action; the other tools share a neutral
-    // tile so color marks importance rather than varying per tile.
+    // tile so color marks importance rather than varying per tile. Mornye
+    // follows Music and leaves every tile neutral.
+    final emphasized = context.isMornye ? -1 : 0;
     final shortcuts = <({String label, IconData icon, VoidCallback onTap})>[
       (
         label: l10n.nowPlayingShuffleLibrary,
@@ -1268,16 +1279,16 @@ class _HomeShortcuts extends ConsumerWidget {
         _HomeShortcutTile(
           label: shortcut.label,
           icon: shortcut.icon,
-          container: index == 0
+          container: index == emphasized
               ? colorScheme.primaryContainer
               : colorScheme.surfaceContainerHigh,
-          onContainer: index == 0
+          onContainer: index == emphasized
               ? colorScheme.onPrimaryContainer
               : colorScheme.onSurface,
-          badge: index == 0
+          badge: index == emphasized
               ? colorScheme.primary
               : colorScheme.secondaryContainer,
-          onBadge: index == 0
+          onBadge: index == emphasized
               ? colorScheme.onPrimary
               : colorScheme.onSecondaryContainer,
           onTap: shortcut.onTap,

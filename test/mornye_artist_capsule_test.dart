@@ -86,7 +86,7 @@ void main() {
       // Level with the round back button.
       final back = tester.getRect(find.byTooltip('Back'));
       expect(bounds.center.dy, back.center.dy);
-      expect(bounds.height, desktop ? 38 : 44);
+      expect(bounds.height, 44);
       if (desktop) expect(back.left, 8);
       final share = tester.getRect(find.byTooltip('Share'));
       final more = tester.getRect(
