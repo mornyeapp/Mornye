@@ -43,6 +43,7 @@ class OpenAudioButton extends ConsumerWidget {
                 showContextMenu(
                   context,
                   position: box.localToGlobal(Offset(0, box.size.height)),
+                  origin: contextMenuOriginOf(context),
                   groups: [
                     [
                       ContextMenuAction(

@@ -46,10 +46,14 @@ const double _mornyeMenuWidth = 280;
 /// the remaining ones are separated by dividers. The chosen action runs after
 /// the menu closes, so it can open its own dialog or sheet. The future
 /// completes after that action has started, with whether a row was chosen.
+///
+/// The Mornye menu opens out of [origin], the control that asked for it,
+/// or else out of [position].
 Future<bool> showContextMenu(
   BuildContext context, {
   required Offset position,
   required List<List<ContextMenuAction>> groups,
+  Offset? origin,
 }) async {
   final visible = [
     for (final group in groups)
@@ -64,6 +68,8 @@ Future<bool> showContextMenu(
       // The layout aligns the menu's trailing edge with the anchor's, so a
       // menu-wide anchor puts its leading edge at the pointer.
       anchor: Rect.fromLTWH(position.dx, position.dy - 8, _mornyeMenuWidth, 0),
+      // That anchor is as wide as the menu, so its center is not the control.
+      origin: origin ?? position,
       maxWidth: _mornyeMenuWidth,
       builder: (menuContext) => MornyeContextMenu(
         dense: true,

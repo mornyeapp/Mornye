@@ -19,6 +19,7 @@ Future<T?> showMornyeContextMenu<T>({
   required BuildContext context,
   required WidgetBuilder builder,
   Rect? anchor,
+  Offset? origin,
   bool preferAbove = false,
   double maxWidth = 320,
 }) {
@@ -55,7 +56,7 @@ Future<T?> showMornyeContextMenu<T>({
             ),
             child: _MenuFlight(
               animation: animation,
-              anchor: target?.center,
+              anchor: origin ?? target?.center,
               child: themes.wrap(Builder(builder: builder)),
             ),
           ),

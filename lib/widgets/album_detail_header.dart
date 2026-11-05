@@ -1036,6 +1036,7 @@ class HeaderMoreButton extends StatelessWidget {
           contextMenuPositionBelow(context) ??
           contextMenuOriginOf(context) ??
           Offset.zero,
+      origin: contextMenuOriginOf(context),
       groups: groups(),
     ),
   );
