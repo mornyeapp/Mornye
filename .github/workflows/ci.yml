@@ -385,3 +385,11 @@ jobs:
           path: |
             build/symbols/android/
             build/app/outputs/mapping/release/mapping.txt
+
+      - name: Retain Android APKs
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: mornye-apks
+          if-no-files-found: error
+          retention-days: 14
+          path: build/app/outputs/flutter-apk/*.apk
