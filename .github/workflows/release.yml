@@ -10,6 +10,10 @@ on:
         description: "Version tag (e.g., v1.0.0)"
         required: true
         default: "v1.0.0"
+      desktop:
+        description: "Build and release desktop packages too"
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -400,6 +404,7 @@ jobs:
     name: Build macOS (universal)
     runs-on: macos-15
     needs: get-version
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.desktop }}
 
     steps:
       - name: Checkout repository
@@ -502,6 +507,7 @@ jobs:
     name: Build Linux (${{ matrix.arch }})
     runs-on: ${{ matrix.runner }}
     needs: get-version
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.desktop }}
     strategy:
       fail-fast: false
       matrix:
@@ -649,6 +655,7 @@ jobs:
             runner: windows-11-arm
             rust_target: aarch64-pc-windows-msvc
     needs: get-version
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.desktop }}
     # The release goes out without Windows assets if this job fails. Remove
     # once a release run of this job is green.
     continue-on-error: true
