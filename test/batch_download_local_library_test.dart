@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/l10n/l10n.dart';
+import 'package:mornye/models/download_item.dart';
 import 'package:mornye/models/settings.dart';
 import 'package:mornye/models/track.dart';
 import 'package:mornye/providers/download_queue_provider.dart';
@@ -72,11 +73,14 @@ class _Library extends LocalLibraryNotifier {
 }
 
 class _Queue extends DownloadQueueNotifier {
+  _Queue([this.items = const []]);
+
+  final List<DownloadItem> items;
   final added = <Track>[];
   String? playlist;
 
   @override
-  DownloadQueueState build() => const DownloadQueueState();
+  DownloadQueueState build() => DownloadQueueState(items: items);
 
   @override
   void addMultipleToQueue(
@@ -139,7 +143,10 @@ void main() {
     await tester.tap(find.text('Download All'));
     await tester.pumpAndSettle();
     expect(queue.added, isEmpty);
-    expect(find.text('0 added, 2 already downloaded'), findsOneWidget);
+    expect(
+      find.text('0 added, 2 already downloaded or queued'),
+      findsOneWidget,
+    );
     expect(tester.takeException(), isNull);
   });
 
@@ -156,9 +163,90 @@ void main() {
       await tester.tap(find.text('Download All'));
       await tester.pumpAndSettle();
       expect(queue.added, isEmpty);
-      expect(find.text('0 added, 3 already downloaded'), findsOneWidget);
+      expect(
+        find.text('0 added, 3 already downloaded or queued'),
+        findsOneWidget,
+      );
     },
   );
+
+  group('songs in the download queue', () {
+    DownloadItem entry(Track track, DownloadStatus status) => DownloadItem(
+      id: '${track.id}-entry',
+      track: track,
+      service: 'example-provider',
+      status: status,
+      createdAt: DateTime(2026, 11, 5),
+    );
+    const settings = AppSettings(
+      defaultService: 'example-provider',
+      askQualityBeforeDownload: false,
+    );
+
+    for (final status in [
+      DownloadStatus.queued,
+      DownloadStatus.downloading,
+      DownloadStatus.finalizing,
+    ]) {
+      testWidgets('are not added twice while ${status.name}', (tester) async {
+        final queue = _Queue([entry(_missingTrack, status)]);
+        await _pump(
+          tester,
+          database: _Database(),
+          queue: queue,
+          settings: settings,
+          tracks: const [_missingTrack],
+        );
+        await tester.tap(find.text('Download All'));
+        await tester.pumpAndSettle();
+        expect(queue.added, isEmpty);
+        expect(
+          find.text('0 added, 1 already downloaded or queued'),
+          findsOneWidget,
+        );
+      });
+    }
+
+    testWidgets('match by ISRC across catalogs', (tester) async {
+      final queue = _Queue([
+        entry(
+          const Track(
+            id: 'other-catalog',
+            name: 'Catalog title',
+            artistName: 'Artist',
+            albumName: 'Album',
+            duration: 180,
+            isrc: 'usexa2600001',
+          ),
+          DownloadStatus.queued,
+        ),
+      ]);
+      await _pump(
+        tester,
+        database: _Database(),
+        queue: queue,
+        settings: settings,
+        tracks: const [_isrcTrack, _missingTrack],
+      );
+      await tester.tap(find.text('Download All'));
+      await tester.pumpAndSettle();
+      expect(queue.added, [_missingTrack]);
+    });
+
+    testWidgets('can be added again once they failed', (tester) async {
+      final queue = _Queue([entry(_missingTrack, DownloadStatus.failed)]);
+      await _pump(
+        tester,
+        database: _Database(),
+        queue: queue,
+        settings: settings,
+        tracks: const [_missingTrack],
+      );
+      await tester.tap(find.text('Download All'));
+      await tester.pumpAndSettle();
+      expect(queue.added, [_missingTrack]);
+    });
+  });
 
   testWidgets('local exclusion still works if the history lookup fails', (
     tester,

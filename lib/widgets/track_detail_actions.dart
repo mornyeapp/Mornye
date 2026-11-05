@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/models/library_database_models.dart';
 import 'package:mornye/models/track.dart';
+import 'package:mornye/models/download_item.dart';
 import 'package:mornye/providers/download_queue_provider.dart';
 import 'package:mornye/providers/extension_provider.dart';
 import 'package:mornye/providers/library_collections_provider.dart';
@@ -131,8 +132,17 @@ bool shouldShowBatchDownloadPicker({
   required bool allowQualityVariants,
 }) => forceQualityPicker || askQualityBeforeDownload || allowQualityVariants;
 
+/// What makes two download queue entries the same song.
+Iterable<String> _queueKeys(Track track) sync* {
+  final id = track.id.trim();
+  if (id.isNotEmpty) yield 'id:$id';
+  final isrc = track.isrc?.trim().toUpperCase();
+  if (isrc != null && isrc.isNotEmpty) yield 'isrc:$isrc';
+}
+
 /// Shared batch "add to queue" flow for detail screens: skips tracks already
-/// present in download history or the local library, then either shows the
+/// present in download history, the local library or the download queue,
+/// then either shows the
 /// quality/service picker or resolves a default service, before enqueueing
 /// the rest.
 ///
@@ -199,6 +209,16 @@ Future<void> queueTracksSkippingDownloaded(
     }
   }
   if (!context.mounted) return;
+  // Quality variants ask for a second copy of a song on purpose.
+  final waiting = settings.allowQualityVariants
+      ? const <String>{}
+      : {
+          for (final item in ref.read(downloadQueueProvider).items)
+            if (item.status == DownloadStatus.queued ||
+                item.status == DownloadStatus.downloading ||
+                item.status == DownloadStatus.finalizing)
+              ..._queueKeys(item.track),
+        };
   final tracksToQueue = <Track>[];
   var skippedCount = 0;
 
@@ -208,8 +228,9 @@ Future<void> queueTracksSkippingDownloaded(
         skipExisting &&
         existingHistoryKeys.contains(historyLookups[i].lookupKey);
     final isInLocal = existingLocalIndices.contains(i);
+    final isWaiting = _queueKeys(track).any(waiting.contains);
 
-    if (isInHistory || isInLocal) {
+    if (isInHistory || isInLocal || isWaiting) {
       skippedCount++;
     } else {
       tracksToQueue.add(track);
