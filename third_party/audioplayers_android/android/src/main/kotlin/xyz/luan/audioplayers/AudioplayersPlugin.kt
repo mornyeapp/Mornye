@@ -3,6 +3,10 @@ package xyz.luan.audioplayers
 import android.content.Context
 import android.media.AudioManager
 import android.os.Build
+import android.os.Handler
+import android.os.HandlerThread
+import android.os.Looper
+import android.util.Log
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.FlutterPlugin.FlutterPluginBinding
 import io.flutter.plugin.common.BinaryMessenger
@@ -26,25 +30,73 @@ class AudioplayersPlugin : FlutterPlugin {
     private lateinit var binaryMessenger: BinaryMessenger
     private lateinit var soundPoolManager: SoundPoolManager
 
-    private val players = ConcurrentHashMap<String, WrappedPlayer>()
+    private var players = ConcurrentHashMap<String, WrappedPlayer>()
     private var defaultAudioContext = AudioContextAndroid()
+    private var playbackThread: HandlerThread? = null
+    private var playbackHandler: Handler? = null
+    @Volatile private var generation = 0
 
     override fun onAttachedToEngine(binding: FlutterPluginBinding) {
         context = binding.applicationContext
         binaryMessenger = binding.binaryMessenger
+        generation++
+        players = ConcurrentHashMap()
+        playbackThread = HandlerThread("mornye-audioplayers").apply { start() }
+        playbackHandler = Handler(requireNotNull(playbackThread).looper)
         soundPoolManager = SoundPoolManager(this)
         methods = MethodChannel(binding.binaryMessenger, "xyz.luan/audioplayers")
-        methods.setMethodCallHandler { call, response -> safeCall(call, response, ::methodHandler) }
+        methods.setMethodCallHandler { call, response -> enqueue(call, response, ::methodHandler) }
         globalMethods = MethodChannel(binding.binaryMessenger, "xyz.luan/audioplayers.global")
-        globalMethods.setMethodCallHandler { call, response -> safeCall(call, response, ::globalMethodHandler) }
+        globalMethods.setMethodCallHandler { call, response -> enqueue(call, response, ::globalMethodHandler) }
         globalEvents = EventHandler(EventChannel(binding.binaryMessenger, "xyz.luan/audioplayers.global/events"))
     }
 
     override fun onDetachedFromEngine(binding: FlutterPluginBinding) {
-        players.values.forEach { it.dispose() }
-        players.clear()
-        soundPoolManager.dispose()
+        generation++
+        methods.setMethodCallHandler(null)
+        globalMethods.setMethodCallHandler(null)
+        val retiringPlayers = players
+        val retiringPool = soundPoolManager
+        val thread = playbackThread
+        playbackHandler?.post {
+            try {
+                retiringPlayers.values.forEach { player ->
+                    runCatching { player.dispose() }.onFailure {
+                        Log.w("Audioplayers", "Could not release a retired player", it)
+                    }
+                }
+                retiringPlayers.clear()
+                runCatching { retiringPool.dispose() }.onFailure {
+                    Log.w("Audioplayers", "Could not release a retired sound pool", it)
+                }
+            } finally {
+                thread?.quitSafely()
+            }
+        }
+        playbackHandler = null
+        playbackThread = null
         globalEvents.dispose()
+    }
+
+    private fun enqueue(call: MethodCall, response: MethodChannel.Result, handler: FlutterHandler) {
+        val epoch = generation
+        val accepted = playbackHandler?.post {
+            if (epoch == generation) safeCall(call, response, handler)
+            else response.error("AndroidAudioError", "Audio engine was detached", null)
+        } == true
+        if (!accepted) response.error("AndroidAudioError", "Audio engine is not attached", null)
+    }
+
+    /** Capture the owner so late focus/load callbacks cannot enter a new engine. */
+    fun playbackDispatcher(): (() -> Unit) -> Unit {
+        val handler = playbackHandler ?: return { action -> action() }
+        val epoch = generation
+        return { action ->
+            if (epoch == generation) {
+                if (Looper.myLooper() == handler.looper) action()
+                else handler.post { if (epoch == generation) action() }
+            }
+        }
     }
 
     private fun safeCall(
@@ -55,15 +107,16 @@ class AudioplayersPlugin : FlutterPlugin {
         try {
             handler(call, response)
         } catch (e: Throwable) {
-            response.error("Unexpected AndroidAudioError", e.message, e)
+            response.error("Unexpected AndroidAudioError", e.message, e.toString())
         }
     }
 
     private fun globalMethodHandler(call: MethodCall, response: MethodChannel.Result) {
+        val currentPlayers = players
         when (call.method) {
             "init" -> {
-                players.values.forEach { it.dispose() }
-                players.clear()
+                currentPlayers.values.forEach { it.dispose() }
+                currentPlayers.clear()
             }
 
             "setAudioContext" -> {
@@ -100,14 +153,15 @@ class AudioplayersPlugin : FlutterPlugin {
     }
 
     private fun methodHandler(call: MethodCall, response: MethodChannel.Result) {
+        val currentPlayers = players
         val playerId = call.argument<String>("playerId") ?: return
         if (call.method == "create") {
             val eventHandler = EventHandler(EventChannel(binaryMessenger, "xyz.luan/audioplayers/events/$playerId"))
-            players[playerId] = WrappedPlayer(this, eventHandler, defaultAudioContext.copy(), soundPoolManager)
+            currentPlayers[playerId] = WrappedPlayer(this, eventHandler, defaultAudioContext.copy(), soundPoolManager)
             response.success(1)
             return
         }
-        val player = getPlayer(playerId)
+        val player = getPlayer(playerId, currentPlayers)
         try {
             when (call.method) {
                 "setEqualizer" -> {
@@ -125,7 +179,7 @@ class AudioplayersPlugin : FlutterPlugin {
                             "AndroidAudioError",
                             "Failed to set source. For troubleshooting, see: " +
                                 "https://github.com/bluefireteam/audioplayers/blob/main/troubleshooting.md",
-                            e,
+                            e.toString(),
                         )
                         return
                     }
@@ -141,7 +195,7 @@ class AudioplayersPlugin : FlutterPlugin {
 
                 "setNextPlayer" -> {
                     val nextId = call.argument<String>("nextPlayerId")
-                    player.setNext(nextId?.let { getPlayer(it) })
+                    player.setNext(nextId?.let { getPlayer(it, currentPlayers) })
                 }
 
                 "resume" -> player.play()
@@ -206,7 +260,7 @@ class AudioplayersPlugin : FlutterPlugin {
 
                 "dispose" -> {
                     player.dispose()
-                    players.remove(playerId)
+                    currentPlayers.remove(playerId)
                 }
 
                 else -> {
@@ -216,12 +270,12 @@ class AudioplayersPlugin : FlutterPlugin {
             }
             response.success(1)
         } catch (e: Exception) {
-            response.error("AndroidAudioError", e.message, e)
+            response.error("AndroidAudioError", e.message, e.toString())
         }
     }
 
-    private fun getPlayer(playerId: String): WrappedPlayer {
-        return players[playerId] ?: error("Player has not yet been created or has already been disposed.")
+    private fun getPlayer(playerId: String, currentPlayers: Map<String, WrappedPlayer>): WrappedPlayer {
+        return currentPlayers[playerId] ?: error("Player has not yet been created or has already been disposed.")
     }
 
     fun getApplicationContext(): Context {
@@ -290,9 +344,14 @@ private fun MethodCall.audioContext(): AudioContextAndroid {
 
 class EventHandler(private val eventChannel: EventChannel) : EventChannel.StreamHandler {
     private var eventSink: EventChannel.EventSink? = null
+    private val main = Handler(Looper.getMainLooper())
+
+    private fun onMain(action: () -> Unit) {
+        if (Looper.myLooper() == main.looper) action() else main.post { action() }
+    }
 
     init {
-        eventChannel.setStreamHandler(this)
+        onMain { eventChannel.setStreamHandler(this) }
     }
 
     override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
@@ -304,18 +363,20 @@ class EventHandler(private val eventChannel: EventChannel) : EventChannel.Stream
     }
 
     fun success(method: String, arguments: Map<String, Any> = HashMap()) {
-        eventSink?.success(arguments + Pair("event", method))
+        onMain { eventSink?.success(arguments + Pair("event", method)) }
     }
 
     fun error(errorCode: String?, errorMessage: String?, errorDetails: Any?) {
-        eventSink?.error(errorCode, errorMessage, errorDetails)
+        onMain { eventSink?.error(errorCode, errorMessage, errorDetails) }
     }
 
     fun dispose() {
-        eventSink?.let {
-            it.endOfStream()
-            onCancel(null)
+        onMain {
+            eventSink?.let {
+                it.endOfStream()
+                onCancel(null)
+            }
+            eventChannel.setStreamHandler(null)
         }
-        eventChannel.setStreamHandler(null)
     }
 }

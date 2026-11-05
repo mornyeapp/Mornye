@@ -118,8 +118,8 @@ class SoundPoolPlayer(
                         // Need to load sound on another thread than main to avoid `NetworkOnMainThreadException`
                         mainScope.launch(Dispatchers.IO) {
                             val actualUrl = value.getAudioPathForSoundPool()
-                            // Run on main thread again
-                            mainScope.launch(Dispatchers.Main) {
+                            wrappedPlayer.onPlaybackThread {
+                                if (urlSource != value) return@onPlaybackThread
                                 wrappedPlayer.handleLog("Now loading $actualUrl")
                                 val intSoundId = soundPool.load(actualUrl, 1)
                                 soundPoolWrapper.soundIdToPlayer[intSoundId] = soundPoolPlayer
@@ -208,6 +208,7 @@ class SoundPoolPlayer(
 class SoundPoolManager(
     private val ref: AudioplayersPlugin,
 ) {
+    private val dispatch = ref.playbackDispatcher()
 
     // Only needed for legacy apps with SDK < 21
     private var legacySoundPoolWrapper: SoundPoolWrapper? = null
@@ -236,20 +237,22 @@ class SoundPoolManager(
                 ref.handleGlobalLog("Create SoundPool with $attrs")
                 val soundPoolWrapper = SoundPoolWrapper(soundPool)
                 soundPoolWrapper.soundPool.setOnLoadCompleteListener { _, sampleId, _ ->
-                    ref.handleGlobalLog("Loaded $sampleId")
-                    val loadingPlayer = soundPoolWrapper.soundIdToPlayer[sampleId]
-                    val urlSource = loadingPlayer?.urlSource
-                    if (urlSource != null) {
-                        soundPoolWrapper.soundIdToPlayer.remove(loadingPlayer.soundId)
-                        // Now mark all players using this sound as not loading and start them if necessary
-                        synchronized(soundPoolWrapper.urlToPlayers) {
-                            val urlPlayers = soundPoolWrapper.urlToPlayers[urlSource] ?: listOf()
-                            for (player in urlPlayers) {
-                                player.wrappedPlayer.handleLog("Marking $player as loaded")
-                                player.wrappedPlayer.prepared = true
-                                if (player.wrappedPlayer.playing) {
-                                    player.wrappedPlayer.handleLog("Delayed start of $player")
-                                    player.start()
+                    dispatch {
+                        ref.handleGlobalLog("Loaded $sampleId")
+                        val loadingPlayer = soundPoolWrapper.soundIdToPlayer[sampleId]
+                        val urlSource = loadingPlayer?.urlSource
+                        if (urlSource != null) {
+                            soundPoolWrapper.soundIdToPlayer.remove(loadingPlayer.soundId)
+                            // Mark all owners loaded on their playback thread.
+                            synchronized(soundPoolWrapper.urlToPlayers) {
+                                val urlPlayers = soundPoolWrapper.urlToPlayers[urlSource] ?: listOf()
+                                for (player in urlPlayers) {
+                                    player.wrappedPlayer.handleLog("Marking $player as loaded")
+                                    player.wrappedPlayer.prepared = true
+                                    if (player.wrappedPlayer.playing) {
+                                        player.wrappedPlayer.handleLog("Delayed start of $player")
+                                        player.start()
+                                    }
                                 }
                             }
                         }

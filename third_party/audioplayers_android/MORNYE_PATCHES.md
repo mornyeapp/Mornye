@@ -9,6 +9,21 @@ version is the one in this folder's `pubspec.yaml` (5.3.0, unchanged).
 
 ## Patches
 
+### Playback thread
+
+`AudioplayersPlugin` serializes method calls on an owned `HandlerThread` with a
+Looper. MediaPlayer construction, source changes, reset, release and transport
+commands stay on that thread. A slow media-service reset therefore does not
+hold Android's input/UI thread. Audio focus and SoundPool load callbacks return
+to the same owner; Flutter event-channel registration and delivery stay on the
+main thread. Method errors carry serializable details.
+
+Detaching removes channel handlers immediately and queues cleanup without
+waiting on the UI thread. The retired worker exits after cleanup, and its
+captured callbacks cannot enter a replacement engine. Instrumentation tests
+hold a real wrapper's reset, verify the main Looper still runs and later player
+commands wait, and exercise native prepare, seek and transport callbacks.
+
 ### Proc descriptor sources
 
 `UrlSource` duplicates app-owned `/proc/self/fd/<fd>` sources and passes the

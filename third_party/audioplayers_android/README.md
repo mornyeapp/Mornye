@@ -18,6 +18,11 @@ The Android implementation of [`audioplayers`](https://pub.dev/packages/audiopla
 
 ## Mornye local changes
 
+Player commands and native callbacks run on one owned playback Looper, so a slow
+MediaPlayer reset/release cannot hold Android's input thread. Flutter channel
+registration and events still run on the main thread. Engine detach queues
+cleanup without waiting for the media service.
+
 In addition to preserving granted proxy file descriptors, this fork exposes a
 player-specific `setEqualizer` method. On Android 9+, `DynamicsProcessing` attaches
 to that player's nonzero audio session and provides graphic EQ, preamp, balance,

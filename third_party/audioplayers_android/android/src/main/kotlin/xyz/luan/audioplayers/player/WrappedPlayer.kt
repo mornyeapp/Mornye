@@ -23,6 +23,9 @@ class WrappedPlayer internal constructor(
     private val soundPoolManager: SoundPoolManager,
 ) {
     private var player: PlayerWrapper? = null
+    private val dispatch = ref.playbackDispatcher()
+
+    fun onPlaybackThread(action: () -> Unit) = dispatch(action)
 
     /** The player MediaPlayer starts the moment this one completes. */
     private var next: WrappedPlayer? = null

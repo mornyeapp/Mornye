@@ -2,6 +2,7 @@ package xyz.luan.audioplayers.player
 
 import android.media.audiofx.DynamicsProcessing
 import android.os.Build
+import androidx.annotation.RequiresApi
 
 /**
  * Keeps a MediaPlayer's audio in the platform mixer while it plays.
@@ -34,6 +35,7 @@ internal class MixedOutput(private val wrappedPlayer: WrappedPlayer, private val
         effect = null
     }
 
+    @RequiresApi(28)
     private fun create(): DynamicsProcessing {
         val config = DynamicsProcessing.Config.Builder(
             DynamicsProcessing.VARIANT_FAVOR_FREQUENCY_RESOLUTION, 2,
