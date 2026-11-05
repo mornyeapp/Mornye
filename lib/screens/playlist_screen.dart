@@ -6,7 +6,9 @@ import 'package:mornye/controllers/selection_mode_mixin.dart';
 import 'package:mornye/widgets/collection_scaffold.dart';
 import 'package:mornye/widgets/selection_action_button.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mornye/models/playlist_sort.dart';
 import 'package:mornye/services/platform_bridge.dart';
+import 'package:mornye/widgets/playlist_sort_sheet.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/models/track.dart';
 import 'package:mornye/providers/download_queue_provider.dart';
@@ -70,8 +72,10 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen>
   String? _resolvedPlaylistName;
   String? _resolvedCoverUrl;
   String? _resolvedHeaderVideoUrl;
+  PlaylistSortMode _sortMode = PlaylistSortMode.custom;
 
   List<Track> get _tracks => _fetchedTracks ?? widget.tracks;
+  List<Track> get _effectiveTracks => sortTracksByMode(_tracks, _sortMode);
   String get _playlistName => _resolvedPlaylistName ?? widget.playlistName;
   String? get _coverUrl => _resolvedCoverUrl ?? widget.coverUrl;
   String? get _headerVideoUrl =>
@@ -82,9 +86,9 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen>
   String _trackSelectionId(Track track, int index) => '${track.id}#$index';
 
   List<Track> get _selectedTracks => [
-    for (var index = 0; index < _tracks.length; index++)
-      if (selectedIds.contains(_trackSelectionId(_tracks[index], index)))
-        _tracks[index],
+    for (var index = 0; index < _effectiveTracks.length; index++)
+      if (selectedIds.contains(_trackSelectionId(_effectiveTracks[index], index)))
+        _effectiveTracks[index],
   ];
 
   Widget _buildSelectionBottomBar(
@@ -264,9 +268,10 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen>
         ? MediaQuery.paddingOf(context).bottom
         : 0.0;
 
+    final tracks = _effectiveTracks;
     final ids = [
-      for (var index = 0; index < _tracks.length; index++)
-        _trackSelectionId(_tracks[index], index),
+      for (var index = 0; index < tracks.length; index++)
+        _trackSelectionId(tracks[index], index),
     ];
     pruneSelection(ids.toSet());
 
@@ -288,12 +293,12 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen>
         slivers: [
           _buildTrackList(context, colorScheme),
           _buildPlaylistFooter(context, colorScheme),
-          if (!_isLoading && _tracks.isNotEmpty && !isSelectionMode)
+          if (!_isLoading && tracks.isNotEmpty && !isSelectionMode)
             CollectionSuggestionsSliver(
               collectionKey:
                   'playlist:${widget.metadataProviderId}:'
                   '${widget.playlistId ?? widget.playlistName}',
-              tracks: _tracks,
+              tracks: tracks,
             ),
         ],
       ),
@@ -359,35 +364,43 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen>
       meta: HeaderMetaRow(
         items: [
           HeaderMetaItem(
-            context.l10n.tracksCount(_tracks.length),
+            context.l10n.tracksCount(_effectiveTracks.length),
             icon: Icons.playlist_play,
           ),
         ],
       ),
-      appBarActions: ref.watch(linkPhoneClientProvider) == null
-          ? null
-          : [
-              LinkDownloadOnDesktopButton(
-                tracks: _tracks,
-                service: _recommendedDownloadService(),
-                playlistName: _playlistName,
-              ),
-            ],
+      appBarActions: [
+        if (_effectiveTracks.length > 1)
+          buildPlaylistSortButton(
+            context: context,
+            currentSort: _sortMode,
+            hasDateAdded: false,
+            onSortChanged: (newSort) => setState(() => _sortMode = newSort),
+          ),
+        if (ref.watch(linkPhoneClientProvider) != null) ...[
+          const SizedBox(width: 8),
+          LinkDownloadOnDesktopButton(
+            tracks: _effectiveTracks,
+            service: _recommendedDownloadService(),
+            playlistName: _playlistName,
+          ),
+        ],
+      ],
       actions: CollectionHeaderActions(
-        tracks: _tracks,
-        onLoveAll: () => loveAllTracks(this.context, ref, _tracks),
+        tracks: _effectiveTracks,
+        onLoveAll: () => loveAllTracks(this.context, ref, _effectiveTracks),
         downloadIcon: Icons.download_rounded,
         tonalDownload: true,
         onDownloadAll: () => confirmDownloadAllDialog(
           context,
-          _tracks.length,
+          _effectiveTracks.length,
           () => _downloadAll(context),
         ),
         addToPlaylistIcon: Icons.playlist_add,
         onAddToPlaylist: () => showAddTracksToPlaylistSheet(
           context,
           ref,
-          _tracks,
+          _effectiveTracks,
           playlistNamePrefill: widget.playlistName,
           preserveOccurrences: true,
         ),
@@ -399,7 +412,7 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen>
       buildTrackListFooter(
         context,
         colorScheme,
-        _tracks,
+        _effectiveTracks,
         excludeEpochReleaseDate: true,
       );
 
@@ -436,20 +449,20 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen>
       );
     }
 
-    _historySnapshot.update(_tracks);
+    final tracks = _effectiveTracks;
+    _historySnapshot.update(tracks);
     final historyKeys = _historySnapshot.lookupKeys;
     final existingHistoryKeys = ref.watch(
       downloadHistoryVisibleBatchExistsProvider(_historySnapshot.request),
     );
     if (isDesktopPlatform) {
       final ids = [
-        for (var i = 0; i < _tracks.length; i++)
-          _trackSelectionId(_tracks[i], i),
+        for (var i = 0; i < tracks.length; i++)
+          _trackSelectionId(tracks[i], i),
       ];
       final inHistory = [
         for (final key in historyKeys) existingHistoryKeys.contains(key),
       ];
-      final tracks = _tracks;
       void activate(int index) => TrackListTile.activate(
         context,
         ref,
@@ -472,6 +485,8 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen>
         ids: ids,
         isInHistory: inHistory,
         selectedIds: selectedIds,
+        sort: tableSortFromPlaylistSort(_sortMode),
+        onSort: (nextSort) => setState(() => _sortMode = playlistSortFromTableSort(nextSort)),
         onSelect: applyDesktopClick,
         onActivate: activate,
         showArtwork: true,
@@ -482,7 +497,7 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen>
       padding: EdgeInsets.symmetric(horizontal: wideListInset(context)),
       sliver: SliverList(
         delegate: SliverChildBuilderDelegate((context, index) {
-          final track = _tracks[index];
+          final track = tracks[index];
           final selectionId = _trackSelectionId(track, index);
           final isInHistory = existingHistoryKeys.contains(historyKeys[index]);
           return KeyedSubtree(
@@ -533,7 +548,7 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen>
               ),
             ),
           );
-        }, childCount: _tracks.length),
+        }, childCount: tracks.length),
       ),
     );
   }
