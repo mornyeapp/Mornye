@@ -20,6 +20,7 @@ import 'package:mornye/services/link/features/link_save_offline.dart';
 import 'package:mornye/services/link/link_client_api.dart';
 import 'package:mornye/utils/logger.dart';
 import 'package:mornye/widgets/album_detail_header.dart';
+import 'package:mornye/widgets/desktop/context_menu.dart';
 import 'package:mornye/widgets/app_bottom_sheet.dart';
 import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/app_snack_bar.dart';
@@ -392,78 +393,76 @@ class LinkTransferButtons extends ConsumerWidget {
   }
 }
 
-/// The app bar action of a Library playlist: a sheet that sends this
+/// The More menu action of a Library playlist: a sheet that sends this
 /// phone's own songs among [tracks] to the paired desktop or saves the
 /// desktop's to this phone, while that desktop is connected. The songs are
-/// looked up when one is chosen. Empty otherwise.
-class LinkTrackTransferButton extends ConsumerWidget {
-  const LinkTrackTransferButton({super.key, required this.tracks});
-
-  final List<Track> tracks;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final client = ref.watch(linkPhoneClientProvider);
-    if (client == null || tracks.isEmpty || !_watchConnected(ref)) {
-      return const SizedBox.shrink();
-    }
-    return HeaderCircleButton(
-      icon: Icons.devices,
-      iconSize: 20,
-      tooltip: context.l10n.linkTransferPhoneWith(linkDesktopName(client)),
-      onPressed: () => _showSheet(context, ref, client),
-    );
+/// looked up when one is chosen. Null otherwise.
+ContextMenuAction? linkTrackTransferAction(
+  BuildContext context,
+  WidgetRef ref,
+  List<Track> tracks,
+) {
+  final client = ref.read(linkPhoneClientProvider);
+  if (client == null || tracks.isEmpty || !linkTransfersAvailable(ref)) {
+    return null;
   }
+  return ContextMenuAction(
+    icon: Icons.devices,
+    label: context.l10n.linkTransferPhoneWith(linkDesktopName(client)),
+    onSelected: () =>
+        unawaited(_showTrackTransferSheet(context, ref, client, tracks)),
+  );
+}
 
-  Future<void> _showSheet(
-    BuildContext context,
-    WidgetRef ref,
-    LinkClientApi client,
-  ) async {
-    final name = linkDesktopName(client);
-    final root = Navigator.of(context, rootNavigator: true).context;
-    Future<List<UnifiedLibraryItem>> items() => linkLibraryItemsFor(
-      tracks,
-      includeLocal: ref.read(settingsProvider).localLibraryEnabled,
-    );
-    await showAppBottomSheet<void>(
-      context: context,
-      useRootNavigator: true,
-      title: context.l10n.linkTransferPhoneWith(name),
-      builder: (sheetContext) => Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          AppSheetOption(
-            leading: const AppIcon.adaptive(Icons.computer),
-            title: Text(sheetContext.l10n.linkSendToDesktop(name)),
-            onTap: () async {
-              Navigator.pop(sheetContext);
-              final found = await items();
-              if (root.mounted) await linkSendSongsToDesktop(root, ref, found);
-            },
-          ),
-          AppSheetOption(
-            leading: const AppIcon.adaptive(Icons.phone_android),
-            title: Text(sheetContext.l10n.linkSaveToPhone),
-            onTap: () async {
-              Navigator.pop(sheetContext);
-              final found = await items();
-              if (!root.mounted) return;
-              final songs = linkOfflineSongs([
-                for (final item in found) ?item.localItem,
-              ], client.server);
-              if (songs.isEmpty) {
-                _notify(root, root.l10n.linkTransferPhoneNothing(name));
-              } else {
-                linkSaveSongsToPhone(root, ref, songs);
-              }
-            },
-          ),
-          const SizedBox(height: 8),
-        ],
-      ),
-    );
-  }
+Future<void> _showTrackTransferSheet(
+  BuildContext context,
+  WidgetRef ref,
+  LinkClientApi client,
+  List<Track> tracks,
+) async {
+  final name = linkDesktopName(client);
+  final root = Navigator.of(context, rootNavigator: true).context;
+  Future<List<UnifiedLibraryItem>> items() => linkLibraryItemsFor(
+    tracks,
+    includeLocal: ref.read(settingsProvider).localLibraryEnabled,
+  );
+  await showAppBottomSheet<void>(
+    context: context,
+    useRootNavigator: true,
+    title: context.l10n.linkTransferPhoneWith(name),
+    builder: (sheetContext) => Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        AppSheetOption(
+          leading: const AppIcon.adaptive(Icons.computer),
+          title: Text(sheetContext.l10n.linkSendToDesktop(name)),
+          onTap: () async {
+            Navigator.pop(sheetContext);
+            final found = await items();
+            if (root.mounted) await linkSendSongsToDesktop(root, ref, found);
+          },
+        ),
+        AppSheetOption(
+          leading: const AppIcon.adaptive(Icons.phone_android),
+          title: Text(sheetContext.l10n.linkSaveToPhone),
+          onTap: () async {
+            Navigator.pop(sheetContext);
+            final found = await items();
+            if (!root.mounted) return;
+            final songs = linkOfflineSongs([
+              for (final item in found) ?item.localItem,
+            ], client.server);
+            if (songs.isEmpty) {
+              _notify(root, root.l10n.linkTransferPhoneNothing(name));
+            } else {
+              linkSaveSongsToPhone(root, ref, songs);
+            }
+          },
+        ),
+        const SizedBox(height: 8),
+      ],
+    ),
+  );
 }
 
 /// The Library selection toolbar's Mornye Link actions for the selected

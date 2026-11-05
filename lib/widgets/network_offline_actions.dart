@@ -19,6 +19,7 @@ import 'package:mornye/widgets/app_alert_dialog.dart';
 import 'package:mornye/providers/network_offline_provider.dart';
 import 'package:mornye/services/network_offline_saver.dart';
 import 'package:mornye/widgets/album_detail_header.dart';
+import 'package:mornye/widgets/desktop/context_menu.dart';
 import 'package:mornye/widgets/app_bottom_sheet.dart';
 import 'package:mornye/widgets/app_progress_indicator.dart';
 import 'package:mornye/widgets/app_icon.dart';
@@ -291,25 +292,23 @@ class NetworkOfflineButton extends ConsumerWidget {
   }
 }
 
-class NetworkOfflineTracksButton extends ConsumerWidget {
-  const NetworkOfflineTracksButton({super.key, required this.tracks});
-  final List<Track> tracks;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) => HeaderCircleButton(
-    icon: Icons.download_for_offline_outlined,
-    tooltip: context.l10n.offlineSave,
-    onPressed: () async {
-      final items = await linkLibraryItemsFor(
-        tracks,
-        includeLocal: ref.read(settingsProvider).localLibraryEnabled,
-      );
-      if (context.mounted) {
-        await saveNetworkOffline(context, ref, items);
-      }
-    },
-  );
-}
+ContextMenuAction networkOfflineTracksAction(
+  BuildContext context,
+  WidgetRef ref,
+  List<Track> tracks,
+) => ContextMenuAction(
+  icon: Icons.download_for_offline_outlined,
+  label: context.l10n.offlineSave,
+  onSelected: () async {
+    final items = await linkLibraryItemsFor(
+      tracks,
+      includeLocal: ref.read(settingsProvider).localLibraryEnabled,
+    );
+    if (context.mounted) {
+      await saveNetworkOffline(context, ref, items);
+    }
+  },
+);
 
 class OfflineAvailabilityCover extends StatelessWidget {
   const OfflineAvailabilityCover({

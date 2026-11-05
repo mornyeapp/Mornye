@@ -14,6 +14,7 @@ import 'package:mornye/services/link/desktop/link_desktop_host.dart';
 import 'package:mornye/theme/app_theme.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/desktop_platform.dart';
+import 'package:mornye/widgets/album_detail_header.dart';
 import 'package:mornye/widgets/collection_reorder_sliver.dart';
 import 'package:mornye/widgets/expressive_button.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -112,6 +113,7 @@ void main() {
     bool desktop = false,
     bool mornye = false,
     LibraryTracksFolderMode mode = LibraryTracksFolderMode.loved,
+    bool editOrder = true,
   }) async {
     debugDesktopPlatformOverride = desktop;
     tester.view.physicalSize = desktop
@@ -148,7 +150,10 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('collection-edit-order')));
+    if (!editOrder) return collections;
+    await tester.tap(find.byType(HeaderMoreButton));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Edit order'));
     await tester.pumpAndSettle();
     expect(find.byType(LibraryTracksFolderScreen), findsOneWidget);
     expect(find.byType(CollectionReorderSliver), findsOneWidget);
@@ -227,6 +232,48 @@ void main() {
         );
       }
     }
+  }
+
+  for (final (desktop, mornye) in [
+    (false, false),
+    (false, true),
+    (true, false),
+    (true, true),
+  ]) {
+    testWidgets('playlist actions open from one More button '
+        '(desktop: $desktop, Mornye: $mornye)', (tester) async {
+      await open(
+        tester,
+        desktop: desktop,
+        mornye: mornye,
+        mode: LibraryTracksFolderMode.playlist,
+        editOrder: false,
+      );
+      expect(find.byType(HeaderMoreButton), findsOneWidget);
+      expect(find.byIcon(Icons.ios_share), findsNothing);
+      expect(find.byIcon(Icons.camera_alt_outlined), findsNothing);
+
+      await tester.tap(find.byType(HeaderMoreButton));
+      await tester.pumpAndSettle();
+      for (final label in [
+        'Export as M3U8',
+        'Edit order',
+        'Rename playlist',
+        'Change cover image',
+      ]) {
+        final row = find.text(label).hitTestable();
+        expect(row, findsOneWidget, reason: label);
+        final rect = tester.getRect(row);
+        expect(rect.left, greaterThanOrEqualTo(0), reason: label);
+        expect(
+          rect.right,
+          lessThanOrEqualTo(tester.view.physicalSize.width),
+          reason: label,
+        );
+      }
+      // Nothing to remove without a cover of the listener's own.
+      expect(find.text('Remove cover image'), findsNothing);
+    });
   }
 
   testWidgets('discard keeps the original order', (tester) async {

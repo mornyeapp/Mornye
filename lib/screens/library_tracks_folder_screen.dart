@@ -15,10 +15,8 @@ import 'package:mornye/widgets/expressive_button.dart';
 import 'package:mornye/widgets/expressive_button_group.dart';
 import 'package:mornye/theme/app_tokens.dart';
 import 'package:mornye/widgets/track_card.dart';
-import 'package:mornye/widgets/app_bottom_sheet.dart';
 import 'package:mornye/widgets/app_snack_bar.dart';
 import 'package:mornye/theme/mornye_theme.dart';
-import 'package:mornye/theme/mornye_icons.dart';
 import 'package:share_plus/share_plus.dart' show ShareParams, SharePlus, XFile;
 import 'package:mornye/widgets/album_detail_header.dart';
 import 'package:mornye/widgets/cached_cover_image.dart';
@@ -929,6 +927,17 @@ class _LibraryTracksFolderScreenState
         widget.mode != LibraryTracksFolderMode.wishlist &&
         entries.isNotEmpty &&
         watchDesktopLinkPhones(ref);
+    final moreMenu =
+        !isSelectionMode &&
+            !_editingOrder &&
+            (entries.isNotEmpty || isPlaylistMode)
+        ? () => _moreMenuGroups(
+            title,
+            entries,
+            playlist,
+            linkTransfers: linkTransfers,
+          )
+        : null;
 
     final dpr = MediaQuery.devicePixelRatioOf(context);
     final cacheWidth = (MediaQuery.sizeOf(context).width * dpr).round().clamp(
@@ -1042,69 +1051,11 @@ class _LibraryTracksFolderScreenState
                 : _saveOrder,
             child: Text(context.l10n.dialogSave),
           ),
-        if (!_editingOrder) ...[
-          if (!isSelectionMode && entries.isNotEmpty)
-            NetworkOfflineTracksButton(
-              tracks: [for (final entry in entries) entry.track],
-            ),
-          if (!isSelectionMode && entries.isNotEmpty)
-            HeaderCircleButton(
-              icon: Icons.ios_share,
-              iconSize: 20,
-              tooltip: context.l10n.collectionExportM3u,
-              onPressed: () => _exportAsM3u8(context, title, entries),
-            ),
-          if (isPlaylistMode &&
-              !isSelectionMode &&
-              entries.isNotEmpty &&
-              ref.watch(linkPhoneClientProvider) != null) ...[
-            const SizedBox(width: 8),
-            LinkTrackTransferButton(
-              tracks: entries.map((e) => e.track).toList(growable: false),
-            ),
-          ],
-          if (!isSelectionMode && entries.length > 1) ...[
-            const SizedBox(width: 8),
-            HeaderCircleButton(
-              key: const ValueKey('collection-edit-order'),
-              icon: Icons.swap_vert,
-              iconSize: 20,
-              tooltip: context.l10n.playlistEditOrder,
-              onPressed: () => _editOrder(entries),
-            ),
-          ],
-          if (isPlaylistMode && !isSelectionMode) ...[
-            const SizedBox(width: 8),
-            HeaderCircleButton(
-              icon: Icons.edit_outlined,
-              iconSize: 20,
-              tooltip: context.l10n.collectionRenamePlaylist,
-              onPressed: () {
-                final id = widget.playlistId ?? playlist?.id;
-                if (id == null || id.isEmpty) return;
-                _showRenamePlaylistDialog(context, id, playlist?.name ?? title);
-              },
-            ),
-            const SizedBox(width: 8),
-            Builder(
-              builder: (buttonContext) => HeaderCircleButton(
-                icon: Icons.camera_alt_outlined,
-                iconSize: 20,
-                tooltip: context.l10n.collectionPlaylistChangeCover,
-                onPressed: () =>
-                    _showCoverOptionsSheet(buttonContext, hasCustomCover),
-              ),
-            ),
-          ],
-        ],
+        // The desktop header adds its own from [moreMenu].
+        if (moreMenu != null && !isDesktopPlatform)
+          HeaderMoreButton(groups: moreMenu),
       ],
-      moreMenu: linkTransfers && !isSelectionMode && !_editingOrder
-          ? () => [
-              desktopLinkTransferTrackActions(context, ref, [
-                for (final entry in entries) entry.track,
-              ]),
-            ]
-          : null,
+      moreMenu: moreMenu,
       // Centered so the tight leading slot cannot stretch it.
       leading: Center(
         child: HeaderCircleButton(
@@ -1201,108 +1152,63 @@ class _LibraryTracksFolderScreenState
     );
   }
 
-  void _showCoverOptionsSheet(BuildContext context, bool hasCustomCover) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final menuPosition = isDesktopPlatform
-        ? contextMenuPositionBelow(context)
-        : null;
-    if (menuPosition != null) {
-      showContextMenu(
-        context,
-        position: menuPosition,
-        groups: [
-          [
-            ContextMenuAction(
-              icon: Icons.image_outlined,
-              label: context.l10n.collectionPlaylistChangeCover,
-              onSelected: _pickCoverImage,
-            ),
-          ],
-          if (hasCustomCover)
-            [
-              ContextMenuAction(
-                icon: Icons.delete_outline,
-                label: context.l10n.collectionPlaylistRemoveCover,
-                destructive: true,
-                onSelected: _removeCoverImage,
-              ),
-            ],
+  /// The actions behind the header's More button, built when it opens.
+  List<List<ContextMenuAction>> _moreMenuGroups(
+    String title,
+    List<CollectionTrackEntry> entries,
+    UserPlaylistCollection? playlist, {
+    required bool linkTransfers,
+  }) {
+    final isPlaylistMode = widget.mode == LibraryTracksFolderMode.playlist;
+    final hasCustomCover = playlist?.coverImagePath?.isNotEmpty ?? false;
+    final tracks = [for (final entry in entries) entry.track];
+    return [
+      [
+        if (entries.isNotEmpty) ...[
+          networkOfflineTracksAction(context, ref, tracks),
+          ContextMenuAction(
+            icon: Icons.ios_share,
+            label: context.l10n.collectionExportM3u,
+            onSelected: () => _exportAsM3u8(context, title, entries),
+          ),
         ],
-      );
-      return;
-    }
-
-    showAppModalBottomSheet<void>(
-      context: context,
-      useRootNavigator: true,
-      builder: (sheetContext) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const AppSheetHandle(),
-            const SizedBox(height: 16),
-            AppSheetOption(
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 24,
-                vertical: 4,
-              ),
-              leading: context.isMornye
-                  ? Icon(
-                      mornyeIconFor(Icons.image_outlined),
-                      color: colorScheme.primary,
-                    )
-                  : Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: colorScheme.secondaryContainer,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(
-                        Icons.image_outlined,
-                        color: colorScheme.onSecondaryContainer,
-                      ),
-                    ),
-              title: Text(context.l10n.collectionPlaylistChangeCover),
-              onTap: () {
-                Navigator.pop(sheetContext);
-                _pickCoverImage();
-              },
-            ),
-            if (hasCustomCover)
-              AppSheetOption(
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 4,
-                ),
-                leading: context.isMornye
-                    ? Icon(
-                        mornyeIconFor(Icons.delete_outline),
-                        color: colorScheme.primary,
-                      )
-                    : Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: colorScheme.errorContainer,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Icon(
-                          Icons.delete_outline,
-                          color: colorScheme.onErrorContainer,
-                        ),
-                      ),
-                title: Text(context.l10n.collectionPlaylistRemoveCover),
-                onTap: () {
-                  Navigator.pop(sheetContext);
-                  _removeCoverImage();
-                },
-              ),
-            const SizedBox(height: 16),
-          ],
-        ),
-      ),
-    );
+        if (isPlaylistMode) ?linkTrackTransferAction(context, ref, tracks),
+      ],
+      if (linkTransfers) desktopLinkTransferTrackActions(context, ref, tracks),
+      [
+        if (entries.length > 1)
+          ContextMenuAction(
+            icon: Icons.swap_vert,
+            label: context.l10n.playlistEditOrder,
+            onSelected: () => _editOrder(entries),
+          ),
+        if (isPlaylistMode) ...[
+          ContextMenuAction(
+            icon: Icons.edit_outlined,
+            label: context.l10n.collectionRenamePlaylist,
+            onSelected: () {
+              final id = widget.playlistId ?? playlist?.id;
+              if (id == null || id.isEmpty) return;
+              _showRenamePlaylistDialog(context, id, playlist?.name ?? title);
+            },
+          ),
+          ContextMenuAction(
+            icon: Icons.image_outlined,
+            label: context.l10n.collectionPlaylistChangeCover,
+            onSelected: _pickCoverImage,
+          ),
+        ],
+      ],
+      if (isPlaylistMode && hasCustomCover)
+        [
+          ContextMenuAction(
+            icon: Icons.delete_outline,
+            label: context.l10n.collectionPlaylistRemoveCover,
+            destructive: true,
+            onSelected: _removeCoverImage,
+          ),
+        ],
+    ];
   }
 
   Future<void> _showRenamePlaylistDialog(
