@@ -4,7 +4,6 @@ import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/widgets/album_detail_header.dart';
 import 'package:mornye/widgets/app_bottom_sheet.dart';
 import 'package:mornye/widgets/desktop/context_menu.dart';
-import 'package:mornye/widgets/desktop/desktop_selection.dart';
 import 'package:mornye/widgets/desktop/track_table.dart';
 
 PlaylistSortMode playlistSortFromTableSort(TrackTableSort? sort) {
