@@ -1,4 +1,17 @@
 {
+  "libraryLyricsSearchDescription": "Search lyrics saved in your songs. The first search may take a while; you can switch filters to stop it.",
+  "libraryLyricsIndexing": "Preparing lyrics search: {count} songs checked",
+  "@libraryLyricsIndexing": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "libraryLyricsSearchIncomplete": "Some songs could not be read. Results may be incomplete.",
+  "libraryLyricsRefresh": "Refresh lyrics search",
+  "networkErrorListing": "The server responded, but its folder listing could not be read. For WebDAV, use the WebDAV endpoint. For HTTP, use a directory listing or direct audio URL.",
+  "networkErrorStorage": "The server was reached, but this device could not save the connection. Check the app log and retry.",
   "extensionsUnsecuredStorage": "Use unsecured extension storage",
   "extensionsUnsecuredStorageDescription": "Run extensions without a Linux keyring. The key is saved locally, so anyone with access to your app files can read extension credentials. Off uses the system keyring.",
   "extensionsStorageKeyringRequired": "Existing extension data needs its original key. Unlock the system keyring once, then enable unsecured storage again. Your data has been preserved.",
@@ -141,6 +154,53 @@
   "networkUploading": "Uploading to network storage",
   "@networkUploading": {
     "description": "Download queue status during upload of prepared audio to the network destination; a progress percentage may follow"
+  },
+  "networkUpload": "Upload to network storage",
+  "@networkUpload": {
+    "description": "Library song action that copies songs stored on this device to a NAS or WebDAV folder; also the title of the folder choice sheet"
+  },
+  "networkUploadChooseFolder": "Choose a folder",
+  "@networkUploadChooseFolder": {
+    "description": "Subtitle of a network connection in the upload sheet; opens its folders to pick the upload destination"
+  },
+  "networkUploadHere": "Upload to this folder",
+  "@networkUploadHere": {
+    "description": "Action in the network folder browser that picks the current folder as the upload destination"
+  },
+  "networkUploadDescription": "Songs go into Artist/Album folders here. Files already on the server are never replaced.",
+  "@networkUploadDescription": {
+    "description": "Help below the upload destination action describing the folder layout and that existing server files are kept"
+  },
+  "networkUploadResult": "Uploaded {saved}, already there {skipped}, failed {failed}",
+  "@networkUploadResult": {
+    "description": "Snackbar after uploading Library songs to network storage",
+    "placeholders": {
+      "saved": {
+        "type": "int"
+      },
+      "skipped": {
+        "type": "int"
+      },
+      "failed": {
+        "type": "int"
+      }
+    }
+  },
+  "networkUploadCancelled": "Upload stopped",
+  "@networkUploadCancelled": {
+    "description": "Snackbar when the listener cancels uploading Library songs to network storage"
+  },
+  "networkUploadFailed": "Couldn't upload the songs. Check the server connection and that this account can write to the folder.",
+  "@networkUploadFailed": {
+    "description": "Snackbar when uploading Library songs to network storage fails as a whole"
+  },
+  "networkUploadReadOnly": "This connection doesn't accept uploads. Choose an SMB or WebDAV folder.",
+  "@networkUploadReadOnly": {
+    "description": "Snackbar when the chosen upload destination is a read-only connection or no longer exists"
+  },
+  "networkUploadNoSongs": "No songs stored on this device in this selection.",
+  "@networkUploadNoSongs": {
+    "description": "Snackbar when the upload action is used on songs that already stream from a server"
   },
   "networkDownloadDescription": "Prepare songs on this device, then upload them to your NAS. Keep the app open until the upload finishes. Retry reuses prepared audio. Existing files are kept; new downloads with the same name get a numbered suffix.",
   "@networkDownloadDescription": {
@@ -317,6 +377,9 @@
   "usbDsdUnsupported": "This DSD format or connected DAC is not supported. Playback stopped.",
   "usbPermissionDenied": "USB permission was not granted. Using normal playback.",
   "usbBitPerfectPending": "Waiting for the next track and a compatible USB output.",
+  "usbOutputReady": "USB output is ready. Start playback to activate it.",
+  "usbOutputPreparing": "Preparing USB audio output...",
+  "usbOutputCancelled": "USB preparation was cancelled. Select a track to try again.",
   "usbBitPerfectNoDevice": "No USB DAC connected. Using normal audio output.",
   "usbBitPerfectFallback": "This device or audio format does not support bit-perfect output. Using normal playback.",
   "usbBitPerfectRouteChanged": "The USB audio route changed. Playback paused; select a track to reconnect.",
@@ -962,6 +1025,14 @@
   "artistPopular": "人気",
   "@artistPopular": {
     "description": "Section header for popular/top tracks"
+  },
+  "artistLatestRelease": "Latest Release",
+  "@artistLatestRelease": {
+    "description": "Artist page on desktop: heading above the newest album"
+  },
+  "artistTopSongs": "Top Songs",
+  "@artistTopSongs": {
+    "description": "Artist page on desktop: heading above the artist's best known songs"
   },
   "artistMonthlyListeners": "{count} 人の月間リスナー",
   "@artistMonthlyListeners": {
@@ -3214,6 +3285,26 @@
   "@libraryCleanupMissingFilesSubtitle": {
     "description": "Subtitle for cleanup button"
   },
+  "libraryFindMovedDownloads": "Find Moved Downloads",
+  "@libraryFindMovedDownloads": {
+    "description": "Library action that relinks downloads whose files were moved to the current download folder"
+  },
+  "libraryFindMovedDownloadsSubtitle": "Relink downloads you moved into the current download folder, without removing anything",
+  "@libraryFindMovedDownloadsSubtitle": {
+    "description": "Subtitle for the Find Moved Downloads action"
+  },
+  "libraryFindMovedDownloadsResult": "{relinked, plural, =0{No moved downloads found} =1{Relinked 1 download} other{Relinked {relinked} downloads}}{missing, plural, =0{} =1{ · 1 file still missing} other{ · {missing} files still missing}}",
+  "@libraryFindMovedDownloadsResult": {
+    "description": "Snackbar after Find Moved Downloads: downloads relinked, then downloads whose files are still missing",
+    "placeholders": {
+      "relinked": {
+        "type": "int"
+      },
+      "missing": {
+        "type": "int"
+      }
+    }
+  },
   "libraryClear": "ライブラリを消去",
   "@libraryClear": {
     "description": "Button to clear all library entries"
@@ -4402,6 +4493,15 @@
   "collectionRemoveFromPlaylist": "Remove from playlist",
   "@collectionRemoveFromPlaylist": {
     "description": "Tooltip for removing track from playlist"
+  },
+  "collectionDeleteFilesMessage": "Permanently delete {count} {count, plural, =1{audio file} other{audio files}} from storage? This affects every playlist that uses {count, plural, =1{this file} other{these files}}.",
+  "@collectionDeleteFilesMessage": {
+    "description": "Confirmation for physical file deletion from a collection selection, distinct from removing playlist entries",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
   },
   "collectionRemoveFromFolder": "フォルダから削除",
   "@collectionRemoveFromFolder": {
@@ -7092,9 +7192,18 @@
   "@nowPlayingNoLyricsOnline": {
     "description": "Empty state after an online lyrics search for the playing track found nothing"
   },
-  "nowPlayingTranslateLyrics": "Translate Lyrics",
-  "@nowPlayingTranslateLyrics": {
-    "description": "Player lyrics menu action that translates the current lyrics with the user's AI provider"
+  "nowPlayingTranslateLyricsTo": "Translate to {language}",
+  "@nowPlayingTranslateLyricsTo": {
+    "description": "Player lyrics menu action that translates the current lyrics with the user's AI provider into the language chosen in settings; language is that language's own name",
+    "placeholders": {
+      "language": {
+        "type": "String"
+      }
+    }
+  },
+  "nowPlayingTranslateOtherLanguage": "Other Language…",
+  "@nowPlayingTranslateOtherLanguage": {
+    "description": "Player lyrics menu action that opens a sheet to translate the current lyrics into a language other than the one in settings"
   },
   "nowPlayingCancelTranslation": "Cancel Translation",
   "@nowPlayingCancelTranslation": {
@@ -7284,6 +7393,14 @@
   "@lyricsAiAutoTranslateSubtitle": {
     "description": "Subtitle of the automatic AI translation switch"
   },
+  "lyricsAiMode": "Translation Mode",
+  "@lyricsAiMode": {
+    "description": "Select fast line translation or slower word-synced translation"
+  },
+  "lyricsAiModeFast": "Fast",
+  "lyricsAiModeFastDescription": "Translates per line without word timing. Uses less time and output.",
+  "lyricsAiModeSynced": "Synced",
+  "lyricsAiModeSyncedDescription": "Aligns translations and romanization to sung words and phrases. Takes longer and needs word-timed lyrics.",
   "lyricsAiRomanize": "Add Romanization",
   "@lyricsAiRomanize": {
     "description": "AI translation switch that also asks for romanized lyrics"
@@ -7769,6 +7886,10 @@
   "@actionShuffle": {
     "description": "Tooltip for shuffle playback action"
   },
+  "artistShuffleEmpty": "No songs by this artist in your Library yet",
+  "@artistShuffleEmpty": {
+    "description": "Snackbar when shuffling an artist with no songs in the Library"
+  },
   "downloadPrimaryArtistOnlyOn": "Primary only: On",
   "@downloadPrimaryArtistOnlyOn": {
     "description": "Status label when primary-artist-only folder naming is enabled"
@@ -8077,6 +8198,16 @@
   "@trackOptionCopyTrackAndArtist": {
     "description": "Track menu action that copies the track title and artist"
   },
+  "trackOptionCopyLink": "Copy {service} link",
+  "@trackOptionCopyLink": {
+    "description": "Track menu action that copies the track's web link on its streaming service",
+    "placeholders": {
+      "service": {
+        "type": "String",
+        "description": "Streaming service name, such as Spotify"
+      }
+    }
+  },
   "metadataCopyValue": "Copy value",
   "@metadataCopyValue": {
     "description": "Metadata menu action that copies only the selected value"
@@ -8104,6 +8235,7 @@
   "@mornyeFavorite": {
     "description": "Compact context menu action that adds a track to Loved"
   },
+  "mornyeGetInfo": "Get Info",
   "mornyeFavorited": "お気に入り済み",
   "@mornyeFavorited": {
     "description": "Selected state of the compact favorite action"
@@ -8128,6 +8260,14 @@
   "landscapeLyricsArtworkDescription": "Show album art instead of track details in the Material landscape player",
   "@landscapeLyricsArtworkDescription": {
     "description": "Subtitle explaining the Material landscape lyrics layout setting"
+  },
+  "autoHideLyricsControls": "Automatic fullscreen lyrics",
+  "@autoHideLyricsControls": {
+    "description": "Playback switch that lets lyrics take more screen space after five idle seconds"
+  },
+  "autoHideLyricsControlsDescription": "Hide player controls after 5 seconds while lyrics are open. Turn off to keep the current view",
+  "@autoHideLyricsControlsDescription": {
+    "description": "Subtitle explaining the five-second Now Playing lyrics timeout"
   },
   "compactPlayer": "Compact player",
   "@compactPlayer": {
@@ -8177,6 +8317,8 @@
   "autoMixOff": "AutoMix off",
   "autoplayOn": "Autoplay on",
   "autoplayOff": "Autoplay off",
+  "queueAutoplay": "Autoplay",
+  "queueAutoMix": "AutoMix",
   "autoplayFromLibrary": "Autoplay from your Library",
   "autoplayDescription": "Continue with related songs from your Library when the queue ends.",
   "autoplayPersonalization": "Personalized autoplay",
@@ -8302,6 +8444,10 @@
   "@homeContinueListening": {
     "description": "Home section header for the track currently loaded in the player"
   },
+  "homeRecentlyPlayed": "Recently Played",
+  "@homeRecentlyPlayed": {
+    "description": "Mornye Home: heading of the shelf of what was played lately"
+  },
   "homeRecentlyAdded": "Recently added",
   "@homeRecentlyAdded": {
     "description": "Home section header for the newest downloaded and scanned tracks"
@@ -8313,6 +8459,18 @@
   "homeShortcuts": "Shortcuts",
   "@homeShortcuts": {
     "description": "Home section header for quick links to player tools"
+  },
+  "searchResults": "Search Results",
+  "@searchResults": {
+    "description": "Heading of a mixed preview of search result types, without implying a relevance ranking"
+  },
+  "homeTopPicks": "Top Picks for You",
+  "@homeTopPicks": {
+    "description": "Mornye Home: heading of the first shelf, the day's mixes shown as banners"
+  },
+  "homeMadeForYou": "Made for You",
+  "@homeMadeForYou": {
+    "description": "Mornye Home: small label on a mix banner"
   },
   "homeMixesForYou": "Mixes for you",
   "@homeMixesForYou": {
@@ -8790,6 +8948,24 @@
   "@snackbarPlaybackMuted": {
     "description": "Shown after mute automation pauses playback; another explicit play request can override the pause."
   },
+  "snackbarPlaybackFormatUnsupported": "This format can't be played on this device: {format}",
+  "@snackbarPlaybackFormatUnsupported": {
+    "description": "Shown when the player cannot decode a song and stops on it. format is a file format name such as APE or WavPack.",
+    "placeholders": {
+      "format": {
+        "type": "String"
+      }
+    }
+  },
+  "snackbarPlaybackFormatUnsupportedSkipped": "This format can't be played on this device: {format}. Playing the next song.",
+  "@snackbarPlaybackFormatUnsupportedSkipped": {
+    "description": "Shown when the player cannot decode a song and continues with the next one in the queue. format is a file format name such as APE or WavPack.",
+    "placeholders": {
+      "format": {
+        "type": "String"
+      }
+    }
+  },
   "playbackPauseOnMuteDescription": "Pause at zero media volume and resume when raised. Manual pauses stay paused. Standard audio output only.",
   "playbackOnHeadphonesConnected": "Play when headphones connect",
   "playbackOnHeadphonesConnectedDescription": "Resume the current song when wired or Bluetooth headphones connect. Disconnecting pauses playback. Built-in player only.",
@@ -8961,6 +9137,8 @@
   "audioInfoBitPerfect": "Bit-perfect",
   "audioInfoBitPerfectActive": "Yes, unaltered samples",
   "audioInfoBitPerfectNo": "No, mixed by the system",
+  "audioInfoBitPerfectUnverified": "Not verified",
+  "audioInfoBitPerfectProcessed": "No, audio processing is active",
   "audioInfoDevice": "Device",
   "audioInfoDeviceType": "{type, select, speaker{Phone speaker} earpiece{Earpiece} wired_headphones{Wired headphones} wired_headset{Wired headset} line{Line out} bluetooth{Bluetooth} bluetooth_le{Bluetooth LE Audio} usb{USB audio} usb_headset{USB headset} hdmi{HDMI} dock{Dock} cast{Cast} hearing_aid{Hearing aid} airplay{AirPlay} car{Car audio} other{Other}}",
   "@audioInfoDeviceType": {
@@ -8977,6 +9155,10 @@
     "description": "Negotiated Bluetooth transport format, separate from Android PCM mixer properties"
   },
   "audioInfoAndroidNotReported": "Not reported by Android",
+  "audioInfoBluetoothUnavailable": "Unavailable to this app",
+  "audioInfoBluetoothUnavailableHint": "Android may show the active codec in Bluetooth settings without making it available to Mornye. This is separate from the song's file format.",
+  "audioAnalysisFileBitrate": "Average file bitrate",
+  "audioAnalysisFileBitrateHint": "Includes tags and container overhead. It can differ from the audio stream bitrate and is not the Bluetooth bitrate.",
   "audioInfoSystemDefaultRate": "System default sample rate",
   "audioInfoAndroidPcmRates": "Android PCM sample rates",
   "audioInfoAndroidPcmFormats": "Android PCM formats",
@@ -9548,6 +9730,10 @@
   "desktopShortcutDismiss": "Close dialog or page",
   "@desktopShortcutDismiss": {
     "description": "Keyboard Shortcuts row for Escape, which leaves a text field or closes the top dialog or page"
+  },
+  "desktopShortcutForward": "Forward",
+  "@desktopShortcutForward": {
+    "description": "Keyboard Shortcuts row and View menu item that returns to the destination left with Back"
   },
   "desktopShortcutToggleSidebar": "Show or hide sidebar",
   "@desktopShortcutToggleSidebar": {
@@ -10285,6 +10471,54 @@
   "@collectionSuggestionsRefresh": {
     "description": "Tooltip of the button that loads other suggestions"
   },
+  "lastfmDescription": "Track your listening and show what is playing on Last.fm.",
+  "lastfmConnect": "Connect Last.fm",
+  "lastfmConnecting": "Connecting to Last.fm...",
+  "lastfmFinishConnection": "Finish connecting",
+  "lastfmAuthorizeHelp": "Approve access in your browser, then return here and choose Finish connecting.",
+  "lastfmScrobbling": "Scrobbling",
+  "lastfmScrobblingDescription": "Send songs you listen to in the built-in player to Last.fm.",
+  "lastfmNowPlaying": "Show Now Playing",
+  "lastfmNowPlayingDescription": "Show the current song on your Last.fm profile.",
+  "lastfmDisconnect": "Disconnect Last.fm",
+  "lastfmConnectionError": "Last.fm could not be reached. Saved scrobbles will be retried automatically.",
+  "lastfmStorageError": "Last.fm settings could not be saved. Check access to this device's secure storage and try again.",
+  "lastfmAuthorizationPending": "Access has not been approved yet. Finish authorizing Mornye in your browser.",
+  "lastfmAuthorizationExpired": "This connection request expired. Connect again to continue.",
+  "lastfmReauthenticate": "Your Last.fm connection expired. Connect again to resume scrobbling.",
+  "lastfmUnavailable": "Last.fm is unavailable in this build.",
+  "lastfmRejected": "Last.fm rejected a scrobble. Check the song's title and artist tags.",
+  "lastfmPending": "{count, plural, =1{1 scrobble waiting to sync} other{{count} scrobbles waiting to sync}}",
+  "@lastfmPending": {
+    "description": "Number of saved Last.fm scrobbles awaiting submission",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "audioOutputSystem": "This device and Bluetooth",
+  "audioOutputCast": "Cast to TV",
+  "audioOutputCastDescription": "Google Cast devices on the same Wi-Fi network",
+  "audioOutputStopCasting": "Stop casting",
+  "audioOutputCastUnavailable": "Unable to open Google Cast. Check Google Play services and local network access.",
+  "audioOutputAirPlay": "AirPlay and Bluetooth",
+  "@audioOutputAirPlay": {
+    "description": "iOS Audio output sheet row that opens the system picker for AirPlay, Bluetooth and this iPhone"
+  },
+  "audioOutputCastSearching": "Looking for Google Cast devices…",
+  "@audioOutputCastSearching": {
+    "description": "Shown in the Cast device picker on iOS and desktop while no receiver has been found on the network yet"
+  },
+  "audioOutputCastConnectFailed": "Could not connect to {device}",
+  "@audioOutputCastConnectFailed": {
+    "description": "Snackbar after connecting to a Google Cast receiver failed; device is the name the owner gave it",
+    "placeholders": {
+      "device": {
+        "type": "String"
+      }
+    }
+  },
   "collectionSuggestionsAddHere": "Add to this playlist",
   "@collectionSuggestionsAddHere": {
     "description": "Tooltip of the button that adds a suggested song to the user's playlist shown above"
@@ -10435,6 +10669,48 @@
       }
     }
   },
+  "offlineSave": "Save offline",
+  "offlineOnDevice": "On this device",
+  "offlineOnIPhone": "On iPhone",
+  "offlineOnPhone": "On phone",
+  "offlineServerOnly": "Server only",
+  "offlineServerAndDevice": "Server + device",
+  "offlineDeviceOnly": "Device only",
+  "offlineRemove": "Remove offline copy",
+  "offlineRemoveMessage": "Remove the offline copy from this device? The server file will be kept.",
+  "offlineDeleteServer": "Delete server copy",
+  "offlineServerReadOnly": "This server connection does not support deleting files.",
+  "offlineDeleteServerMessage": "Delete the original file from the server? The offline copy on this device will be kept.",
+  "offlineSaving": "Saving offline",
+  "offlineResult": "Saved {saved}, already available {skipped}, failed {failed}",
+  "@offlineResult": {
+    "placeholders": {
+      "saved": {
+        "type": "int"
+      },
+      "skipped": {
+        "type": "int"
+      },
+      "failed": {
+        "type": "int"
+      }
+    }
+  },
+  "offlineFailed": "Couldn't save the offline copy. Check the server connection and download folder access.",
+  "offlineNoSongs": "No network Library songs in this selection.",
+  "offlineCopyUnavailable": "The offline copy is unavailable. Save it again before deleting the server copy.",
+  "offlinePlayingLocal": "Playing from this device",
+  "offlineStreaming": "Streaming from {server}",
+  "@offlineStreaming": {
+    "placeholders": {
+      "server": {
+        "type": "String"
+      }
+    }
+  },
+  "openAudio": "Open audio",
+  "openAudioFiles": "Open audio files",
+  "openAudioFolder": "Play folder",
   "reorganizeLibraryFailed": "Couldn't reorganize your files: {error}",
   "@reorganizeLibraryFailed": {
     "description": "Snackbar when planning or applying the reorganization fails",
@@ -10443,5 +10719,50 @@
         "type": "String"
       }
     }
-  }
+  },
+  "lyricsEditTitle": "Edit lyrics",
+  "@lyricsEditTitle": {
+    "description": "Lyrics menu action and title of the lyrics editor, which edits lines and their times"
+  },
+  "lyricsEditWrite": "Write lyrics",
+  "@lyricsEditWrite": {
+    "description": "Button under 'No lyrics' in the player that opens the lyrics editor with an empty line"
+  },
+  "lyricsEditSetTime": "Set time",
+  "@lyricsEditSetTime": {
+    "description": "Lyrics editor button that gives the selected line the current playback position, then selects the next line"
+  },
+  "lyricsEditSetTimeTooltip": "Give the selected line the current position",
+  "lyricsEditEarlier": "−0.1",
+  "@lyricsEditEarlier": {
+    "description": "Short label of the button that moves the selected line's time 0.1 seconds earlier"
+  },
+  "lyricsEditLater": "+0.1",
+  "@lyricsEditLater": {
+    "description": "Short label of the button that moves the selected line's time 0.1 seconds later"
+  },
+  "lyricsEditEarlierTooltip": "Move 0.1 s earlier",
+  "lyricsEditLaterTooltip": "Move 0.1 s later",
+  "lyricsEditNoTime": "No time",
+  "@lyricsEditNoTime": {
+    "description": "Shown for a lyric line that has no time yet"
+  },
+  "lyricsEditPlayFrom": "Play from {time}",
+  "@lyricsEditPlayFrom": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "lyricsEditOutOfOrder": "Earlier than the line before it",
+  "lyricsEditLineHint": "Lyric line",
+  "lyricsEditAddLine": "Add line",
+  "lyricsEditInsertBelow": "Insert line below",
+  "lyricsEditRemoveTime": "Remove time",
+  "lyricsEditDeleteLine": "Delete line",
+  "lyricsEditLineActions": "Line actions",
+  "lyricsEditSaved": "Lyrics saved",
+  "lyricsEditSaveFailed": "Couldn't save the lyrics to this file",
+  "lyricsEditReadOnly": "Lyrics can't be saved to this song's file"
 }
