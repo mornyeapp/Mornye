@@ -11,6 +11,7 @@
 #include <string>
 #include <vector>
 
+#include "taskbar_controls.h"
 #include "win32_window.h"
 
 // A window that does nothing but host a Flutter view.
@@ -58,6 +59,8 @@ class FlutterWindow : public Win32Window {
   std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>>
       window_channel_;
   std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>> audio_channel_;
+  std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>> taskbar_channel_;
+  std::unique_ptr<TaskbarControls> taskbar_controls_;
   flutter::EncodableList pending_audio_;
   bool audio_ready_ = false;
 

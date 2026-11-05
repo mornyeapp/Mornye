@@ -53,6 +53,29 @@ std::string StringArgument(const flutter::EncodableValue* arguments,
   return value == nullptr ? std::string() : *value;
 }
 
+bool BoolArgument(const flutter::EncodableValue* arguments, const char* key) {
+  if (arguments == nullptr) return false;
+  const auto* map = std::get_if<flutter::EncodableMap>(arguments);
+  if (map == nullptr) return false;
+  const auto entry = map->find(flutter::EncodableValue(key));
+  if (entry == map->end()) return false;
+  const auto* value = std::get_if<bool>(&entry->second);
+  return value != nullptr && *value;
+}
+
+std::wstring TaskbarLabel(const flutter::EncodableValue* arguments,
+                         const char* key) {
+  const auto text = StringArgument(arguments, key);
+  const int length = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
+                                       text.c_str(), -1, nullptr, 0);
+  if (length <= 1) return {};
+  std::wstring result(length, L'\0');
+  MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, text.c_str(), -1,
+                     result.data(), length);
+  result.pop_back();
+  return result;
+}
+
 }  // namespace
 
 FlutterWindow::FlutterWindow(const flutter::DartProject& project)
@@ -97,6 +120,35 @@ bool FlutterWindow::OnCreate() {
       [this](const flutter::MethodCall<flutter::EncodableValue>& call,
              std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>>
                  result) { HandleWindowCall(call, std::move(result)); });
+  taskbar_channel_ =
+      std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
+          flutter_controller_->engine()->messenger(), "com.zarz.mornye/taskbar",
+          &flutter::StandardMethodCodec::GetInstance());
+  taskbar_controls_ = std::make_unique<TaskbarControls>(
+      GetHandle(), [this](const char* action) {
+        taskbar_channel_->InvokeMethod(
+            "button",
+            std::make_unique<flutter::EncodableValue>(std::string(action)));
+      });
+  taskbar_channel_->SetMethodCallHandler(
+      [this](const auto& call, auto result) {
+        if (call.method_name() != "update") {
+          result->NotImplemented();
+          return;
+        }
+        const auto* args = call.arguments();
+        TaskbarPlaybackState state;
+        state.visible = BoolArgument(args, "visible");
+        state.playing = BoolArgument(args, "playing");
+        state.toggle = BoolArgument(args, "toggle");
+        state.previous = BoolArgument(args, "previous");
+        state.next = BoolArgument(args, "next");
+        state.toggle_label = TaskbarLabel(args, "toggleLabel");
+        state.previous_label = TaskbarLabel(args, "previousLabel");
+        state.next_label = TaskbarLabel(args, "nextLabel");
+        taskbar_controls_->Update(std::move(state));
+        result->Success();
+      });
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
   flutter_controller_->engine()->SetNextFrameCallback([&]() {
@@ -132,6 +184,8 @@ void FlutterWindow::OpenAudioFiles(const std::vector<std::string>& paths) {
 }
 
 void FlutterWindow::OnDestroy() {
+  taskbar_controls_ = nullptr;
+  taskbar_channel_ = nullptr;
   audio_channel_ = nullptr;
   window_channel_ = nullptr;
   if (flutter_controller_) {
@@ -145,6 +199,9 @@ LRESULT
 FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
                               WPARAM const wparam,
                               LPARAM const lparam) noexcept {
+  if (taskbar_controls_ && taskbar_controls_->HandleMessage(message, wparam)) {
+    return 0;
+  }
   if (message == WM_COPYDATA && lparam != 0) {
     const auto* data = reinterpret_cast<const COPYDATASTRUCT*>(lparam);
     if (data->dwData == kOpenAudioMessage) {
