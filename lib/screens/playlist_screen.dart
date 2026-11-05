@@ -474,8 +474,7 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen>
     );
     if (isDesktopPlatform) {
       final ids = [
-        for (var i = 0; i < tracks.length; i++)
-          _trackSelectionId(tracks[i], i),
+        for (var i = 0; i < tracks.length; i++) _trackSelectionId(tracks[i], i),
       ];
       final inHistory = [
         for (final key in historyKeys) existingHistoryKeys.contains(key),

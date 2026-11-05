@@ -12,7 +12,15 @@ import 'package:mornye/widgets/desktop/desktop_selection.dart';
 import 'package:mornye/widgets/now_playing_indicator.dart';
 
 /// A column of a [SliverTrackTable], in display order.
-enum TrackTableColumn { number, title, artist, album, dateAdded, quality, duration }
+enum TrackTableColumn {
+  number,
+  title,
+  artist,
+  album,
+  dateAdded,
+  quality,
+  duration,
+}
 
 /// The column a [SliverTrackTable] is sorted by, and its direction.
 typedef TrackTableSort = ({TrackTableColumn column, bool ascending});

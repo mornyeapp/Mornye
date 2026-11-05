@@ -487,8 +487,12 @@ class _LibraryTracksFolderScreenState
               });
             },
             onSelect: applyDesktopClick,
-            onActivate: (index) =>
-                _activateEntry(effectiveEntries, folderTracks, inHistory, index),
+            onActivate: (index) => _activateEntry(
+              effectiveEntries,
+              folderTracks,
+              inHistory,
+              index,
+            ),
             onContextMenu: (index, position) => showSelectionMenu(
               effectiveEntries[index].key,
               () => _showEntryMenu(

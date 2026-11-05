@@ -57,21 +57,30 @@ void main() {
 
     test('sorts by dateAddedDesc (newest first)', () {
       final entries = [entry1, entry2, entry3];
-      final sorted = sortCollectionTrackEntries(entries, PlaylistSortMode.dateAddedDesc);
+      final sorted = sortCollectionTrackEntries(
+        entries,
+        PlaylistSortMode.dateAddedDesc,
+      );
 
       expect(sorted.map((e) => e.key).toList(), ['3', '2', '1']);
     });
 
     test('sorts by dateAddedAsc (oldest first)', () {
       final entries = [entry3, entry2, entry1];
-      final sorted = sortCollectionTrackEntries(entries, PlaylistSortMode.dateAddedAsc);
+      final sorted = sortCollectionTrackEntries(
+        entries,
+        PlaylistSortMode.dateAddedAsc,
+      );
 
       expect(sorted.map((e) => e.key).toList(), ['1', '2', '3']);
     });
 
     test('stable sort for identical dates', () {
       final entries = [entry2, entrySameDate];
-      final sorted = sortCollectionTrackEntries(entries, PlaylistSortMode.dateAddedDesc);
+      final sorted = sortCollectionTrackEntries(
+        entries,
+        PlaylistSortMode.dateAddedDesc,
+      );
 
       expect(sorted.map((e) => e.key).toList(), ['2', '4']);
     });
@@ -108,7 +117,10 @@ void main() {
 
     test('restores custom (original) order', () {
       final entries = [entry3, entry1, entry2];
-      final sorted = sortCollectionTrackEntries(entries, PlaylistSortMode.custom);
+      final sorted = sortCollectionTrackEntries(
+        entries,
+        PlaylistSortMode.custom,
+      );
 
       expect(sorted.map((e) => e.key).toList(), ['3', '1', '2']);
     });
@@ -143,11 +155,21 @@ void main() {
         duration: 100,
       );
 
-      final byTitle = sortTracksByMode([track4, track3, track2, track1], PlaylistSortMode.titleAsc);
+      final byTitle = sortTracksByMode([
+        track4,
+        track3,
+        track2,
+        track1,
+      ], PlaylistSortMode.titleAsc);
       // 'Álbum' (album) < 'Amour' (amour) < 'éclair' (eclair) < 'Zoo' (zoo)
       expect(byTitle.map((t) => t.id).toList(), ['d1', 'd2', 'd3', 'd4']);
 
-      final byArtist = sortTracksByMode([track3, track2, track1, track4], PlaylistSortMode.artistAsc);
+      final byArtist = sortTracksByMode([
+        track3,
+        track2,
+        track1,
+        track4,
+      ], PlaylistSortMode.artistAsc);
       // 'ABBA' (abba) < 'Édith Piaf' (edith piaf) < 'Elton John' (elton john) < 'Zebra' (zebra)
       expect(byArtist.map((t) => t.id).toList(), ['d4', 'd1', 'd2', 'd3']);
     });

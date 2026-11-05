@@ -25,7 +25,9 @@ void main() {
     duration: 180,
   );
 
-  testWidgets('PlaylistScreen displays sort button and sorts tracks', (tester) async {
+  testWidgets('PlaylistScreen displays sort button and sorts tracks', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       ProviderScope(
         child: MaterialApp(
@@ -65,7 +67,9 @@ void main() {
     expect(find.byKey(const ValueKey('playlist-sort-button')), findsOneWidget);
   });
 
-  testWidgets('sort button is hidden during selection mode in PlaylistScreen', (tester) async {
+  testWidgets('sort button is hidden during selection mode in PlaylistScreen', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       ProviderScope(
         child: MaterialApp(

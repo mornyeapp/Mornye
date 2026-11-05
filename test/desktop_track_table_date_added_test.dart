@@ -15,10 +15,7 @@ void main() {
       title: 'Second Song',
       dateAdded: DateTime.utc(2026, 3, 15),
     );
-    final rowNoDate = TrackTableRow(
-      id: '3',
-      title: 'No Date Song',
-    );
+    final rowNoDate = TrackTableRow(id: '3', title: 'No Date Song');
 
     test('compareTrackTableRows sorts by dateAdded correctly', () {
       // Ascending: earlier dates first

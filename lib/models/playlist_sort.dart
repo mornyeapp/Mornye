@@ -18,22 +18,69 @@ enum PlaylistSortMode {
 
 /// Map of common accented/diacritic characters to their base equivalents.
 const _diacritics = <String, String>{
-  'à': 'a', 'á': 'a', 'â': 'a', 'ã': 'a', 'ä': 'a', 'å': 'a', 'ā': 'a', 'ă': 'a', 'ą': 'a',
-  'ç': 'c', 'ć': 'c', 'č': 'c',
-  'ď': 'd', 'đ': 'd',
-  'è': 'e', 'é': 'e', 'ê': 'e', 'ë': 'e', 'ē': 'e', 'ė': 'e', 'ę': 'e', 'ě': 'e',
+  'à': 'a',
+  'á': 'a',
+  'â': 'a',
+  'ã': 'a',
+  'ä': 'a',
+  'å': 'a',
+  'ā': 'a',
+  'ă': 'a',
+  'ą': 'a',
+  'ç': 'c',
+  'ć': 'c',
+  'č': 'c',
+  'ď': 'd',
+  'đ': 'd',
+  'è': 'e',
+  'é': 'e',
+  'ê': 'e',
+  'ë': 'e',
+  'ē': 'e',
+  'ė': 'e',
+  'ę': 'e',
+  'ě': 'e',
   'ğ': 'g',
-  'ì': 'i', 'í': 'i', 'î': 'i', 'ï': 'i', 'ī': 'i', 'į': 'i',
+  'ì': 'i',
+  'í': 'i',
+  'î': 'i',
+  'ï': 'i',
+  'ī': 'i',
+  'į': 'i',
   'ł': 'l',
-  'ñ': 'n', 'ń': 'n', 'ň': 'n',
-  'ò': 'o', 'ó': 'o', 'ô': 'o', 'õ': 'o', 'ö': 'o', 'ø': 'o', 'ō': 'o', 'ő': 'o',
+  'ñ': 'n',
+  'ń': 'n',
+  'ň': 'n',
+  'ò': 'o',
+  'ó': 'o',
+  'ô': 'o',
+  'õ': 'o',
+  'ö': 'o',
+  'ø': 'o',
+  'ō': 'o',
+  'ő': 'o',
   'ř': 'r',
-  'ś': 's', 'š': 's', 'ş': 's', 'ș': 's',
-  'ť': 't', 'ț': 't',
-  'ù': 'u', 'ú': 'u', 'û': 'u', 'ü': 'u', 'ū': 'u', 'ů': 'u', 'ű': 'u',
-  'ý': 'y', 'ÿ': 'y',
-  'ź': 'z', 'ż': 'z', 'ž': 'z',
-  'æ': 'ae', 'œ': 'oe', 'ß': 'ss',
+  'ś': 's',
+  'š': 's',
+  'ş': 's',
+  'ș': 's',
+  'ť': 't',
+  'ț': 't',
+  'ù': 'u',
+  'ú': 'u',
+  'û': 'u',
+  'ü': 'u',
+  'ū': 'u',
+  'ů': 'u',
+  'ű': 'u',
+  'ý': 'y',
+  'ÿ': 'y',
+  'ź': 'z',
+  'ż': 'z',
+  'ž': 'z',
+  'æ': 'ae',
+  'œ': 'oe',
+  'ß': 'ss',
 };
 
 final _combiningMarksRegex = RegExp(r'[\u0300-\u036f]');
@@ -94,17 +141,41 @@ List<CollectionTrackEntry> sortCollectionTrackEntries(
       case PlaylistSortMode.dateAddedAsc:
         cmp = entryA.addedAt.compareTo(entryB.addedAt);
       case PlaylistSortMode.titleAsc:
-        cmp = _compareStrings(entryA.track.name, entryB.track.name, ascending: true);
+        cmp = _compareStrings(
+          entryA.track.name,
+          entryB.track.name,
+          ascending: true,
+        );
       case PlaylistSortMode.titleDesc:
-        cmp = _compareStrings(entryA.track.name, entryB.track.name, ascending: false);
+        cmp = _compareStrings(
+          entryA.track.name,
+          entryB.track.name,
+          ascending: false,
+        );
       case PlaylistSortMode.artistAsc:
-        cmp = _compareStrings(entryA.track.artistName, entryB.track.artistName, ascending: true);
+        cmp = _compareStrings(
+          entryA.track.artistName,
+          entryB.track.artistName,
+          ascending: true,
+        );
       case PlaylistSortMode.artistDesc:
-        cmp = _compareStrings(entryA.track.artistName, entryB.track.artistName, ascending: false);
+        cmp = _compareStrings(
+          entryA.track.artistName,
+          entryB.track.artistName,
+          ascending: false,
+        );
       case PlaylistSortMode.albumAsc:
-        cmp = _compareStrings(entryA.track.albumName, entryB.track.albumName, ascending: true);
+        cmp = _compareStrings(
+          entryA.track.albumName,
+          entryB.track.albumName,
+          ascending: true,
+        );
       case PlaylistSortMode.albumDesc:
-        cmp = _compareStrings(entryA.track.albumName, entryB.track.albumName, ascending: false);
+        cmp = _compareStrings(
+          entryA.track.albumName,
+          entryB.track.albumName,
+          ascending: false,
+        );
       case PlaylistSortMode.durationAsc:
         cmp = entryA.track.duration.compareTo(entryB.track.duration);
       case PlaylistSortMode.durationDesc:
@@ -119,10 +190,7 @@ List<CollectionTrackEntry> sortCollectionTrackEntries(
 }
 
 /// Returns a new list of [Track] sorted according to [mode].
-List<Track> sortTracksByMode(
-  List<Track> tracks,
-  PlaylistSortMode mode,
-) {
+List<Track> sortTracksByMode(List<Track> tracks, PlaylistSortMode mode) {
   if (mode == PlaylistSortMode.custom || tracks.length <= 1) {
     return List.of(tracks);
   }
@@ -140,21 +208,45 @@ List<Track> sortTracksByMode(
       case PlaylistSortMode.custom:
         cmp = 0;
       case PlaylistSortMode.dateAddedDesc:
-        cmp = _compareStrings(trackB.releaseDate, trackA.releaseDate, ascending: true);
+        cmp = _compareStrings(
+          trackB.releaseDate,
+          trackA.releaseDate,
+          ascending: true,
+        );
       case PlaylistSortMode.dateAddedAsc:
-        cmp = _compareStrings(trackA.releaseDate, trackB.releaseDate, ascending: true);
+        cmp = _compareStrings(
+          trackA.releaseDate,
+          trackB.releaseDate,
+          ascending: true,
+        );
       case PlaylistSortMode.titleAsc:
         cmp = _compareStrings(trackA.name, trackB.name, ascending: true);
       case PlaylistSortMode.titleDesc:
         cmp = _compareStrings(trackA.name, trackB.name, ascending: false);
       case PlaylistSortMode.artistAsc:
-        cmp = _compareStrings(trackA.artistName, trackB.artistName, ascending: true);
+        cmp = _compareStrings(
+          trackA.artistName,
+          trackB.artistName,
+          ascending: true,
+        );
       case PlaylistSortMode.artistDesc:
-        cmp = _compareStrings(trackA.artistName, trackB.artistName, ascending: false);
+        cmp = _compareStrings(
+          trackA.artistName,
+          trackB.artistName,
+          ascending: false,
+        );
       case PlaylistSortMode.albumAsc:
-        cmp = _compareStrings(trackA.albumName, trackB.albumName, ascending: true);
+        cmp = _compareStrings(
+          trackA.albumName,
+          trackB.albumName,
+          ascending: true,
+        );
       case PlaylistSortMode.albumDesc:
-        cmp = _compareStrings(trackA.albumName, trackB.albumName, ascending: false);
+        cmp = _compareStrings(
+          trackA.albumName,
+          trackB.albumName,
+          ascending: false,
+        );
       case PlaylistSortMode.durationAsc:
         cmp = trackA.duration.compareTo(trackB.duration);
       case PlaylistSortMode.durationDesc:

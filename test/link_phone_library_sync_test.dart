@@ -846,72 +846,79 @@ void main() {
       handler.dispose();
     });
 
-    test('re-requesting an actively uploading file repeats filesSending immediately', () async {
-      final path = '${dir.path}/active.flac';
-      File(path).writeAsBytesSync(List.filled(16, 1));
-      final name = nameOf(path, 16);
-      final release = Completer<void>();
-      final client = FakeLinkClient()
-        ..whileUploading = (n, s, sent) => release.future;
-      final handler = requests(
-        client,
-        FakeLibraryRows([linkLocalRow(path)]),
-      );
-
-      client.push({'type': LinkMessageTypes.filesRequest, 'name': name});
-      await until(() => said(client, LinkMessageTypes.filesSending).length == 1);
-
-      // Computer asks again for the same song while it is still uploading:
-      client.push({'type': LinkMessageTypes.filesRequest, 'name': name});
-      await until(() => said(client, LinkMessageTypes.filesSending).length == 2);
-      expect(said(client, LinkMessageTypes.filesSending)[1]['name'], name);
-
-      release.complete();
-      await until(() => client.uploads.length == 1);
-      handler.dispose();
-    });
-
-    test('re-requesting a waiting file promotes it to the front of the queue', () async {
-      final paths = [for (var i = 0; i < 4; i++) '${dir.path}/queued$i.flac'];
-      for (final path in paths) {
+    test(
+      're-requesting an actively uploading file repeats filesSending immediately',
+      () async {
+        final path = '${dir.path}/active.flac';
         File(path).writeAsBytesSync(List.filled(16, 1));
-      }
-      final names = [for (final path in paths) nameOf(path, 16)];
-      final releases = <String, Completer<void>>{};
-      final started = <String>[];
-      final client = FakeLinkClient()
-        ..whileUploading = (name, size, sent) {
-          started.add(name);
-          return (releases[name] = Completer<void>()).future;
-        };
-      final handler = requests(
-        client,
-        FakeLibraryRows([for (final path in paths) linkLocalRow(path)]),
-      );
+        final name = nameOf(path, 16);
+        final release = Completer<void>();
+        final client = FakeLinkClient()
+          ..whileUploading = (n, s, sent) => release.future;
+        final handler = requests(client, FakeLibraryRows([linkLocalRow(path)]));
 
-      client.push({'type': LinkMessageTypes.filesRequest, 'name': names[0]});
-      client.push({'type': LinkMessageTypes.filesRequest, 'name': names[1]});
-      client.push({'type': LinkMessageTypes.filesRequest, 'name': names[2]});
-      client.push({'type': LinkMessageTypes.filesRequest, 'name': names[3]});
-      await until(() => started.length == 2);
-      expect(started, [names[0], names[1]]);
+        client.push({'type': LinkMessageTypes.filesRequest, 'name': name});
+        await until(
+          () => said(client, LinkMessageTypes.filesSending).length == 1,
+        );
 
-      client.push({'type': LinkMessageTypes.filesRequest, 'name': names[3]});
-      await Future<void>.delayed(const Duration(milliseconds: 20));
+        // Computer asks again for the same song while it is still uploading:
+        client.push({'type': LinkMessageTypes.filesRequest, 'name': name});
+        await until(
+          () => said(client, LinkMessageTypes.filesSending).length == 2,
+        );
+        expect(said(client, LinkMessageTypes.filesSending)[1]['name'], name);
 
-      releases[names[0]]!.complete();
-      await until(() => started.length == 3);
-      expect(started, [names[0], names[1], names[3]]);
+        release.complete();
+        await until(() => client.uploads.length == 1);
+        handler.dispose();
+      },
+    );
 
-      releases[names[1]]!.complete();
-      releases[names[3]]!.complete();
-      await until(() => started.length == 4);
-      expect(started, [names[0], names[1], names[3], names[2]]);
+    test(
+      're-requesting a waiting file promotes it to the front of the queue',
+      () async {
+        final paths = [for (var i = 0; i < 4; i++) '${dir.path}/queued$i.flac'];
+        for (final path in paths) {
+          File(path).writeAsBytesSync(List.filled(16, 1));
+        }
+        final names = [for (final path in paths) nameOf(path, 16)];
+        final releases = <String, Completer<void>>{};
+        final started = <String>[];
+        final client = FakeLinkClient()
+          ..whileUploading = (name, size, sent) {
+            started.add(name);
+            return (releases[name] = Completer<void>()).future;
+          };
+        final handler = requests(
+          client,
+          FakeLibraryRows([for (final path in paths) linkLocalRow(path)]),
+        );
 
-      releases[names[2]]!.complete();
-      await until(() => client.uploads.length == 4);
-      handler.dispose();
-    });
+        client.push({'type': LinkMessageTypes.filesRequest, 'name': names[0]});
+        client.push({'type': LinkMessageTypes.filesRequest, 'name': names[1]});
+        client.push({'type': LinkMessageTypes.filesRequest, 'name': names[2]});
+        client.push({'type': LinkMessageTypes.filesRequest, 'name': names[3]});
+        await until(() => started.length == 2);
+        expect(started, [names[0], names[1]]);
+
+        client.push({'type': LinkMessageTypes.filesRequest, 'name': names[3]});
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+
+        releases[names[0]]!.complete();
+        await until(() => started.length == 3);
+        expect(started, [names[0], names[1], names[3]]);
+
+        releases[names[1]]!.complete();
+        releases[names[3]]!.complete();
+        await until(() => started.length == 4);
+        expect(started, [names[0], names[1], names[3], names[2]]);
+
+        releases[names[2]]!.complete();
+        await until(() => client.uploads.length == 4);
+        handler.dispose();
+      },
+    );
 
     test('drop waiting requests when the connection drops', () async {
       final paths = [for (var i = 0; i < 3; i++) '${dir.path}/song$i.flac'];

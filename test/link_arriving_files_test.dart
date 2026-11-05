@@ -110,30 +110,33 @@ void main() {
     await response.drain<void>();
   });
 
-  test('does not advertise Accept-Ranges before whole and rejects ranges beyond written', () async {
-    final bytes = List<int>.generate(1000, (i) => i % 251);
-    await part().writeAsBytes(bytes.sublist(0, 100));
-    final arrival = (await arriving.expect(dir.path, _name, bytes.length))!;
+  test(
+    'does not advertise Accept-Ranges before whole and rejects ranges beyond written',
+    () async {
+      final bytes = List<int>.generate(1000, (i) => i % 251);
+      await part().writeAsBytes(bytes.sublist(0, 100));
+      final arrival = (await arriving.expect(dir.path, _name, bytes.length))!;
 
-    final headReq = await http.headUrl(Uri.parse(arrival.url));
-    final headRes = await headReq.close();
-    expect(headRes.statusCode, HttpStatus.ok);
-    expect(headRes.headers.value(HttpHeaders.acceptRangesHeader), isNull);
-    await headRes.drain<void>();
+      final headReq = await http.headUrl(Uri.parse(arrival.url));
+      final headRes = await headReq.close();
+      expect(headRes.statusCode, HttpStatus.ok);
+      expect(headRes.headers.value(HttpHeaders.acceptRangesHeader), isNull);
+      await headRes.drain<void>();
 
-    final farRange = await get(arrival.url, range: 'bytes=900-');
-    expect(farRange.statusCode, HttpStatus.requestedRangeNotSatisfiable);
-    await farRange.drain<void>();
+      final farRange = await get(arrival.url, range: 'bytes=900-');
+      expect(farRange.statusCode, HttpStatus.requestedRangeNotSatisfiable);
+      await farRange.drain<void>();
 
-    // Once whole, Accept-Ranges: bytes is advertised:
-    await part().writeAsBytes(bytes.sublist(100), mode: FileMode.append);
-    await part().rename(arrival.path);
-    await arrival.done;
+      // Once whole, Accept-Ranges: bytes is advertised:
+      await part().writeAsBytes(bytes.sublist(100), mode: FileMode.append);
+      await part().rename(arrival.path);
+      await arrival.done;
 
-    final wholeReq = await http.headUrl(Uri.parse(arrival.url));
-    final wholeRes = await wholeReq.close();
-    expect(wholeRes.statusCode, HttpStatus.ok);
-    expect(wholeRes.headers.value(HttpHeaders.acceptRangesHeader), 'bytes');
-    await wholeRes.drain<void>();
-  });
+      final wholeReq = await http.headUrl(Uri.parse(arrival.url));
+      final wholeRes = await wholeReq.close();
+      expect(wholeRes.statusCode, HttpStatus.ok);
+      expect(wholeRes.headers.value(HttpHeaders.acceptRangesHeader), 'bytes');
+      await wholeRes.drain<void>();
+    },
+  );
 }

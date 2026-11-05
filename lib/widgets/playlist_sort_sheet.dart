@@ -9,21 +9,20 @@ import 'package:mornye/widgets/desktop/track_table.dart';
 PlaylistSortMode playlistSortFromTableSort(TrackTableSort? sort) {
   if (sort == null) return PlaylistSortMode.custom;
   return switch (sort.column) {
-    TrackTableColumn.dateAdded => sort.ascending
-        ? PlaylistSortMode.dateAddedAsc
-        : PlaylistSortMode.dateAddedDesc,
-    TrackTableColumn.title => sort.ascending
-        ? PlaylistSortMode.titleAsc
-        : PlaylistSortMode.titleDesc,
-    TrackTableColumn.artist => sort.ascending
-        ? PlaylistSortMode.artistAsc
-        : PlaylistSortMode.artistDesc,
-    TrackTableColumn.album => sort.ascending
-        ? PlaylistSortMode.albumAsc
-        : PlaylistSortMode.albumDesc,
-    TrackTableColumn.duration => sort.ascending
-        ? PlaylistSortMode.durationAsc
-        : PlaylistSortMode.durationDesc,
+    TrackTableColumn.dateAdded =>
+      sort.ascending
+          ? PlaylistSortMode.dateAddedAsc
+          : PlaylistSortMode.dateAddedDesc,
+    TrackTableColumn.title =>
+      sort.ascending ? PlaylistSortMode.titleAsc : PlaylistSortMode.titleDesc,
+    TrackTableColumn.artist =>
+      sort.ascending ? PlaylistSortMode.artistAsc : PlaylistSortMode.artistDesc,
+    TrackTableColumn.album =>
+      sort.ascending ? PlaylistSortMode.albumAsc : PlaylistSortMode.albumDesc,
+    TrackTableColumn.duration =>
+      sort.ascending
+          ? PlaylistSortMode.durationAsc
+          : PlaylistSortMode.durationDesc,
     _ => PlaylistSortMode.custom,
   };
 }
@@ -31,26 +30,46 @@ PlaylistSortMode playlistSortFromTableSort(TrackTableSort? sort) {
 TrackTableSort? tableSortFromPlaylistSort(PlaylistSortMode mode) {
   return switch (mode) {
     PlaylistSortMode.custom => null,
-    PlaylistSortMode.dateAddedAsc =>
-      (column: TrackTableColumn.dateAdded, ascending: true),
-    PlaylistSortMode.dateAddedDesc =>
-      (column: TrackTableColumn.dateAdded, ascending: false),
-    PlaylistSortMode.titleAsc =>
-      (column: TrackTableColumn.title, ascending: true),
-    PlaylistSortMode.titleDesc =>
-      (column: TrackTableColumn.title, ascending: false),
-    PlaylistSortMode.artistAsc =>
-      (column: TrackTableColumn.artist, ascending: true),
-    PlaylistSortMode.artistDesc =>
-      (column: TrackTableColumn.artist, ascending: false),
-    PlaylistSortMode.albumAsc =>
-      (column: TrackTableColumn.album, ascending: true),
-    PlaylistSortMode.albumDesc =>
-      (column: TrackTableColumn.album, ascending: false),
-    PlaylistSortMode.durationAsc =>
-      (column: TrackTableColumn.duration, ascending: true),
-    PlaylistSortMode.durationDesc =>
-      (column: TrackTableColumn.duration, ascending: false),
+    PlaylistSortMode.dateAddedAsc => (
+      column: TrackTableColumn.dateAdded,
+      ascending: true,
+    ),
+    PlaylistSortMode.dateAddedDesc => (
+      column: TrackTableColumn.dateAdded,
+      ascending: false,
+    ),
+    PlaylistSortMode.titleAsc => (
+      column: TrackTableColumn.title,
+      ascending: true,
+    ),
+    PlaylistSortMode.titleDesc => (
+      column: TrackTableColumn.title,
+      ascending: false,
+    ),
+    PlaylistSortMode.artistAsc => (
+      column: TrackTableColumn.artist,
+      ascending: true,
+    ),
+    PlaylistSortMode.artistDesc => (
+      column: TrackTableColumn.artist,
+      ascending: false,
+    ),
+    PlaylistSortMode.albumAsc => (
+      column: TrackTableColumn.album,
+      ascending: true,
+    ),
+    PlaylistSortMode.albumDesc => (
+      column: TrackTableColumn.album,
+      ascending: false,
+    ),
+    PlaylistSortMode.durationAsc => (
+      column: TrackTableColumn.duration,
+      ascending: true,
+    ),
+    PlaylistSortMode.durationDesc => (
+      column: TrackTableColumn.duration,
+      ascending: false,
+    ),
   };
 }
 
@@ -185,7 +204,8 @@ Widget buildPlaylistSortButton({
       key: const ValueKey('playlist-sort-button'),
       icon: isCustom ? Icons.sort : Icons.filter_list,
       iconColor: isCustom ? null : Theme.of(btnContext).colorScheme.primary,
-      tooltip: tooltip ??
+      tooltip:
+          tooltip ??
           (isCustom ? 'Sort' : 'Sorted: ${playlistSortLabel(currentSort)}'),
       tonal: true,
       onPressed: () async {

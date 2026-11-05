@@ -6,7 +6,9 @@ import 'package:mornye/widgets/playlist_sort_sheet.dart';
 
 void main() {
   group('PlaylistSortSheet', () {
-    testWidgets('renders sort options in sheet and selects one', (tester) async {
+    testWidgets('renders sort options in sheet and selects one', (
+      tester,
+    ) async {
       PlaylistSortMode? selectedMode;
 
       await tester.pumpWidget(
@@ -45,7 +47,9 @@ void main() {
       expect(selectedMode, PlaylistSortMode.dateAddedDesc);
     });
 
-    testWidgets('omits date added options when hasDateAdded is false', (tester) async {
+    testWidgets('omits date added options when hasDateAdded is false', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         MaterialApp(
           localizationsDelegates: AppLocalizations.localizationsDelegates,
