@@ -20,16 +20,23 @@ Finder _timedPaint() => find.descendant(
   matching: find.byType(CustomPaint),
 );
 
+TextPainter _timedParagraph(WidgetTester tester, Finder paint) {
+  // Inspect the existing painter payload without adding production test hooks.
+  // ignore: avoid_dynamic_calls
+  return (tester.widget<CustomPaint>(paint).painter as dynamic).pendingPainter
+      as TextPainter;
+}
+
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
   tearDown(() => debugDesktopPlatformOverride = null);
 
   for (final desktop in [false, true]) {
     for (final mornye in [false, true]) {
-      for (final timed in [false, true]) {
+      for (final format in ['LRC', 'TTML', 'enhanced LRC']) {
+        final timed = format != 'LRC';
         final platform = desktop ? 'desktop' : 'mobile';
         final style = mornye ? 'Mornye' : 'Material';
-        final format = timed ? 'TTML' : 'LRC';
         testWidgets('$platform $style $format preserves active line wrapping', (
           tester,
         ) async {
@@ -53,7 +60,13 @@ void main() {
                 time: const Duration(seconds: 10),
                 end: const Duration(seconds: 20),
                 text: _text,
-                words: timed
+                words: format == 'enhanced LRC'
+                    ? LyricsParser.parse(
+                        '[00:10.00]<00:10.00>AAAA<00:12.00> '
+                        '<00:12.00>BBBB<00:14.00> '
+                        '<00:14.00>CCCC<00:20.00>',
+                      ).lines.single.words
+                    : timed
                     ? const [
                         LyricWord(
                           time: Duration(seconds: 10),
@@ -124,6 +137,12 @@ void main() {
             preview.value = const Duration(seconds: 11);
             await tester.pump();
             final primary = timed ? _timedPaint() : text;
+            if (timed) {
+              expect(
+                _timedParagraph(tester, primary).text!.toPlainText(),
+                _text,
+              );
+            }
             for (final elapsed in [32, 128]) {
               await tester.pump(Duration(milliseconds: elapsed));
               expect(

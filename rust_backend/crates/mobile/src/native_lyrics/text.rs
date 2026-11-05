@@ -91,11 +91,12 @@ pub(super) fn parse_words(content: &str) -> Vec<Word> {
             .unwrap_or(content.len());
         let text = &content[start..end];
         if trim(text).is_empty() {
-            if let Some(previous) = words.last_mut()
-                && previous.end_ms.is_none()
-                && time_ms >= previous.time_ms
-            {
-                previous.end_ms = Some(time_ms);
+            if let Some(previous) = words.last_mut() {
+                // A closing timestamp can come before the space between words.
+                previous.text.push_str(text);
+                if previous.end_ms.is_none() && time_ms >= previous.time_ms {
+                    previous.end_ms = Some(time_ms);
+                }
             }
         } else {
             words.push(Word {

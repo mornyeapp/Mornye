@@ -1,5 +1,49 @@
 [
   {
+    "name": "enhanced LRC retains spaces after word closing timestamps",
+    "request": {
+      "operation": "parse_lyrics",
+      "raw": "[00:01.00]<00:01.00>First<00:01.50> <00:02.00>second<00:02.50> <00:03.00>line<00:04.00>"
+    },
+    "expected": {
+      "synced": true,
+      "wordSynced": true,
+      "plainText": "First second line",
+      "writers": null,
+      "provider": null,
+      "lines": [
+        {
+          "timeMs": 1000,
+          "endMs": 4000,
+          "text": "First second line",
+          "words": [
+            {
+              "timeMs": 1000,
+              "endMs": 1500,
+              "text": "First "
+            },
+            {
+              "timeMs": 2000,
+              "endMs": 2500,
+              "text": "second "
+            },
+            {
+              "timeMs": 3000,
+              "endMs": 4000,
+              "text": "line"
+            }
+          ],
+          "romanization": null,
+          "romanizationWords": [],
+          "translation": null,
+          "voice": null,
+          "isBackground": false,
+          "vocalGroup": 0
+        }
+      ]
+    }
+  },
+  {
     "name": "untimed provider results retain writer credits",
     "request": {
       "operation": "parse_lyrics",

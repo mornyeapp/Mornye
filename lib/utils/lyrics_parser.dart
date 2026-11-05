@@ -628,11 +628,12 @@ class LyricsParser {
       final word = content.substring(start, end);
       if (word.trim().isEmpty) {
         final previous = words.lastOrNull;
-        if (previous != null && previous.end == null && d >= previous.time) {
+        if (previous != null) {
+          // A closing timestamp can come before the space between words.
           words[words.length - 1] = LyricWord(
             time: previous.time,
-            end: d,
-            text: previous.text,
+            end: previous.end ?? (d >= previous.time ? d : null),
+            text: '${previous.text}$word',
           );
         }
         continue;
