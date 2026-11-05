@@ -228,8 +228,14 @@ class MediaKitSourceException implements Exception {
 /// Gapless uses the native playlist on this same output, including exclusive
 /// mode. AutoMix still owns separate decks while it is enabled.
 class MediaKitPlaybackDeck implements PlaybackDeck, QueuedPlaybackDeck {
-  MediaKitPlaybackDeck({required this.playerId, MpvEngine? engine})
-    : _engine = engine ?? debugEngineFactory?.call() ?? MediaKitEngine() {
+  MediaKitPlaybackDeck({
+    required this.playerId,
+    MpvEngine? engine,
+    Duration loadTimeout = const Duration(seconds: 20),
+    Duration arrivingLoadTimeout = const Duration(seconds: 45),
+  }) : _loadTimeout = loadTimeout,
+       _arrivingLoadTimeout = arrivingLoadTimeout,
+       _engine = engine ?? debugEngineFactory?.call() ?? MediaKitEngine() {
     playbackEqualizer.addListener(_equalizerChanged);
     playbackOutputVolume.addListener(_outputVolumeChanged);
     playbackExclusiveOutput.addListener(_exclusiveChanged);
@@ -291,7 +297,8 @@ class MediaKitPlaybackDeck implements PlaybackDeck, QueuedPlaybackDeck {
     }();
   }
 
-  static const _loadTimeout = Duration(seconds: 20);
+  final Duration _loadTimeout;
+  final Duration _arrivingLoadTimeout;
 
   final _states = StreamController<PlaybackDeckState>.broadcast();
   final _durations = StreamController<Duration>.broadcast();
@@ -624,7 +631,7 @@ class MediaKitPlaybackDeck implements PlaybackDeck, QueuedPlaybackDeck {
 
   @override
   Future<void> setNetworkSource(String url, {bool arriving = false}) =>
-      _load(url);
+      _load(url, arriving: arriving);
 
   @override
   Future<void> setFileSource(
@@ -637,7 +644,11 @@ class MediaKitPlaybackDeck implements PlaybackDeck, QueuedPlaybackDeck {
     bool dapExclusive = false,
   }) => _load(path, requiresDsd: requiresDsd);
 
-  Future<void> _load(String source, {bool requiresDsd = false}) async {
+  Future<void> _load(
+    String source, {
+    bool requiresDsd = false,
+    bool arriving = false,
+  }) async {
     await stop();
     final token = ++_token;
     final loaded = Completer<String?>();
@@ -649,7 +660,7 @@ class MediaKitPlaybackDeck implements PlaybackDeck, QueuedPlaybackDeck {
     try {
       await _engine.open(source);
       error = await loaded.future.timeout(
-        _loadTimeout,
+        arriving ? _arrivingLoadTimeout : _loadTimeout,
         onTimeout: () => 'Timed out opening the source',
       );
     } finally {

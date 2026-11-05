@@ -146,6 +146,13 @@ class LinkArrivingFiles {
       } else if (last != null) {
         start = max(0, size - last);
       }
+      if (!arrival._whole && start > 0 && start >= arrival._written) {
+        response
+          ..statusCode = HttpStatus.requestedRangeNotSatisfiable
+          ..headers.set(HttpHeaders.contentRangeHeader, 'bytes */$size');
+        await response.close();
+        return;
+      }
       if (start > end || start >= size) {
         response
           ..statusCode = HttpStatus.requestedRangeNotSatisfiable
@@ -160,8 +167,10 @@ class LinkArrivingFiles {
           'bytes $start-$end/$size',
         );
     }
+    if (arrival._whole) {
+      response.headers.set(HttpHeaders.acceptRangesHeader, 'bytes');
+    }
     response.headers
-      ..set(HttpHeaders.acceptRangesHeader, 'bytes')
       ..contentType = ContentType.binary
       ..contentLength = end - start + 1;
     try {

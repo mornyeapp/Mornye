@@ -245,6 +245,35 @@ void main() {
     },
   );
 
+  test('arriving network source uses extended load timeout', () async {
+    final customDeck = MediaKitPlaybackDeck(
+      playerId: 'mpv-timeout-test',
+      engine: engine,
+      loadTimeout: const Duration(milliseconds: 40),
+      arrivingLoadTimeout: const Duration(milliseconds: 150),
+    );
+    addTearDown(customDeck.dispose);
+
+    // Without arriving: times out at loadTimeout (40ms).
+    engine.openDuration = null;
+    await expectLater(
+      customDeck.setNetworkSource('http://127.0.0.1/stream'),
+      throwsA(isA<MediaKitSourceException>()),
+    );
+
+    // With arriving: openDuration provided after 60ms (past 40ms, within 150ms).
+    final timer = Timer(const Duration(milliseconds: 60), () {
+      engine.durationEvents.add(const Duration(seconds: 120));
+    });
+    addTearDown(timer.cancel);
+
+    await customDeck.setNetworkSource(
+      'http://127.0.0.1/arriving',
+      arriving: true,
+    );
+    expect(await customDeck.getDuration(), const Duration(seconds: 120));
+  });
+
   test('a runtime source error fails the next resume', () async {
     final errors = <Object>[];
     deck.onPlayerStateChanged.listen((_) {}, onError: errors.add);

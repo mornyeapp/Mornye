@@ -97,7 +97,7 @@ void main() {
     arriving: () => arriving,
     readTags: (path) async =>
         tags[path] ?? (throw const FileSystemException('unreadable')),
-    answerTimeout: answerTimeout ?? const Duration(seconds: 15),
+    answerTimeout: answerTimeout ?? const Duration(seconds: 30),
     lyricsTimeout: lyricsTimeout,
     deleteTimeout: deleteTimeout,
   );
@@ -319,6 +319,43 @@ void main() {
         phone.resolve(sourceId, '${_fileId(1)}.flac'),
         throwsA(linkError('timeout')),
       );
+    });
+
+    test('late filesSending populates sending and serves later resolve', () async {
+      final phone = sources(answerTimeout: const Duration(milliseconds: 30));
+      final name = '${_fileId(1)}.flac';
+      await expectLater(
+        phone.resolve(sourceId, name),
+        throwsA(linkError('timeout')),
+      );
+      expect(sent, hasLength(1));
+
+      expect(phone.onMessage(_phone, sendingMessage(name)), isTrue);
+      await pumpEventQueue();
+
+      final url = await phone.resolve(sourceId, name);
+      expect(url, startsWith('http://127.0.0.1:'));
+      expect(sent, hasLength(1));
+    });
+
+    test('already sending unstreamable file waits for it to complete on resolve', () async {
+      final phone = sources();
+      final name = '${_fileId(1)}.m4a';
+      expect(
+        phone.onMessage(_phone, {...sendingMessage(name), 'streamable': false}),
+        isTrue,
+      );
+      await pumpEventQueue();
+
+      final resolved = phone.resolve(sourceId, name);
+      var done = false;
+      unawaited(resolved.then((_) => done = true));
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(done, isFalse);
+
+      File('${received.path}/$name').writeAsBytesSync([1, 2, 3, 4, 5, 6]);
+      expect(await resolved, '${received.path}${Platform.pathSeparator}$name');
+      expect(sent, isEmpty);
     });
 
     test('fails at once while the phone is not connected', () async {
@@ -741,7 +778,9 @@ void main() {
         final phone = sources();
         final name = '${_fileId(1)}.flac';
         final pending = phone.metadata(sourceId, name);
-        await pumpEventQueue();
+        for (var i = 0; i < 50 && sent.isEmpty; i++) {
+          await pumpEventQueue();
+        }
         expect(sent, hasLength(1));
         final request = sent.single;
         expect(request.deviceId, _phone);
