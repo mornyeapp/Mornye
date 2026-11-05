@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -12,6 +14,7 @@ import 'package:mornye/providers/extension_provider.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/recent_access_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
+import 'package:mornye/routes/now_playing_route.dart';
 import 'package:mornye/screens/home_tab.dart';
 import 'package:mornye/screens/main_shell.dart';
 import 'package:mornye/services/playable_media.dart';
@@ -21,6 +24,7 @@ import 'package:mornye/utils/android_tv.dart';
 import 'package:mornye/utils/adaptive_layout.dart';
 import 'package:mornye/widgets/tv_navigation.dart';
 import 'package:mornye/widgets/tv_shell.dart';
+import 'package:mornye/widgets/expressive_navigation_bar.dart';
 import 'package:mornye/widgets/mornye_bottom_bar.dart';
 import 'package:mornye/widgets/mini_player.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -49,6 +53,8 @@ void main() {
     bool tv = false,
     bool mornye = true,
     bool externalPlayer = false,
+    bool search = false,
+    Stream<MediaItem?>? media,
   }) async {
     debugAndroidTvOverride = tv;
     addTearDown(() => debugAndroidTvOverride = null);
@@ -67,6 +73,10 @@ void main() {
           settingsProvider.overrideWith(
             () => _Settings(externalPlayer: externalPlayer),
           ),
+          if (media != null)
+            currentMediaItemProvider.overrideWithBuild(
+              (ref, notifier) => media,
+            ),
           if (externalPlayer) ...[
             currentMediaItemProvider.overrideWithBuild(
               (ref, notifier) => Stream.value(
@@ -85,7 +95,7 @@ void main() {
               ),
             ),
           ],
-          extensionProvider.overrideWith(_Extensions.new),
+          extensionProvider.overrideWith(() => _Extensions(search: search)),
           exploreProvider.overrideWith(_Explore.new),
           downloadHistoryProvider.overrideWith(_History.new),
           recentAccessProvider.overrideWith(_Recent.new),
@@ -127,6 +137,74 @@ void main() {
 
   bool collapsed(WidgetTester tester) =>
       tester.widget<MornyeBottomBar>(find.byType(MornyeBottomBar)).collapsed;
+
+  testWidgets(
+    'Material Home restores its viewport and navigation after the player',
+    (tester) async {
+      Future<void> settleFrames() async {
+        for (var i = 0; i < 30; i++) {
+          await tester.pump(const Duration(milliseconds: 20));
+        }
+      }
+
+      final media = StreamController<MediaItem?>();
+      addTearDown(media.close);
+      await pumpShell(tester, mornye: false, search: true, media: media.stream);
+      tester.view.padding = const FakeViewPadding(top: 24, bottom: 24);
+      tester.view.viewPadding = const FakeViewPadding(top: 24, bottom: 24);
+      media.add(
+        const MediaItem(id: 'song', title: 'Current song', artist: 'Artist'),
+      );
+      await settleFrames();
+      final scroll = find.descendant(
+        of: find.byType(HomeTab),
+        matching: find.byType(CustomScrollView),
+      );
+      expect(find.text('Continue listening'), findsOneWidget);
+      expect(find.text('Shortcuts'), findsOneWidget);
+      expect(tester.getRect(scroll).bottom, 932);
+      await tester.tap(find.byType(TextField));
+      await tester.pump();
+      expect(tester.testTextInput.isVisible, isTrue);
+      tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+      await tester.pump();
+      expect(tester.getRect(scroll).bottom, 632);
+      final home = tester.element(find.byType(HomeTab));
+      final navigator = Navigator.of(home, rootNavigator: true);
+      unawaited(navigator.push(NowPlayingRoute(child: const Scaffold())));
+      await settleFrames();
+      tester.view.viewInsets = FakeViewPadding.zero;
+      await tester.pump();
+      navigator.pop();
+      await settleFrames();
+      expect(tester.testTextInput.isVisible, isFalse);
+      final bar = find.byType(ExpressiveNavigationBar);
+      Finder destination(String label) =>
+          find.descendant(of: bar, matching: find.text(label));
+      await tester.tap(destination('Home'));
+      await settleFrames();
+      expect(find.text('Shortcuts'), findsOneWidget);
+      expect(tester.getRect(scroll).bottom, 932);
+      final player = tester.getRect(find.byType(MiniPlayer));
+      final viewport = tester.state<ScrollableState>(
+        find.descendant(of: scroll, matching: find.byType(Scrollable)).first,
+      );
+      await tester.dragFrom(
+        Offset(player.center.dx, player.top - 20),
+        const Offset(0, -120),
+      );
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(viewport.position.pixels, greaterThan(0));
+      await tester.tap(destination('Settings'));
+      await settleFrames();
+      expect(tester.widget<ExpressiveNavigationBar>(bar).selectedIndex, 3);
+      await tester.tap(destination('Home'));
+      await settleFrames();
+      expect(tester.widget<ExpressiveNavigationBar>(bar).selectedIndex, 0);
+      expect(tester.getRect(scroll).bottom, 932);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   for (final mornye in [false, true]) {
     testWidgets('external mode hides Home playback and mini player ($mornye)', (
@@ -266,8 +344,27 @@ class _Settings extends SettingsNotifier {
 }
 
 class _Extensions extends ExtensionNotifier {
+  _Extensions({this.search = false});
+
+  final bool search;
+
   @override
-  ExtensionState build() => const ExtensionState(isInitialized: true);
+  ExtensionState build() => ExtensionState(
+    isInitialized: true,
+    extensions: [
+      if (search)
+        const Extension(
+          id: 'example',
+          name: 'example',
+          displayName: 'Example',
+          version: '1.0.0',
+          description: '',
+          enabled: true,
+          status: 'loaded',
+          searchBehavior: SearchBehavior(enabled: true),
+        ),
+    ],
+  );
 }
 
 class _Explore extends ExploreNotifier {

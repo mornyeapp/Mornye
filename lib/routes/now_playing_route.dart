@@ -51,6 +51,12 @@ class NowPlayingRoute extends PageRoute<void> {
 
   @override
   void install() {
+    // The player ends editing. Clear the saved search focus too, so closing
+    // the route cannot reopen the IME and shrink Home behind the bottom bar.
+    final focus = FocusManager.instance.primaryFocus;
+    if (focus?.context?.findAncestorStateOfType<EditableTextState>() != null) {
+      focus?.unfocus();
+    }
     super.install();
     animation!.addStatusListener((status) {
       _coveredOverlaySize = status.isCompleted ? _overlaySize : null;

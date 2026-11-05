@@ -23,6 +23,69 @@ class _TestPlayerRoute extends NowPlayingRoute {
 }
 
 void main() {
+  testWidgets('closing the player keeps the search keyboard dismissed', (
+    tester,
+  ) async {
+    final navigator = GlobalKey<NavigatorState>();
+    final focus = FocusNode();
+    final text = TextEditingController();
+    addTearDown(focus.dispose);
+    addTearDown(text.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        navigatorKey: navigator,
+        home: Scaffold(
+          body: TextField(focusNode: focus, controller: text),
+        ),
+      ),
+    );
+    await tester.enterText(find.byType(TextField), 'Unfinished search');
+    expect(focus.hasFocus, isTrue);
+    expect(tester.testTextInput.isVisible, isTrue);
+
+    navigator.currentState!.push(_TestPlayerRoute());
+    await tester.pumpAndSettle();
+    expect(tester.testTextInput.isVisible, isFalse);
+    navigator.currentState!.pop();
+    await tester.pumpAndSettle();
+
+    expect(text.text, 'Unfinished search');
+    expect(focus.hasFocus, isFalse);
+    expect(tester.testTextInput.isVisible, isFalse);
+    await tester.tap(find.byType(TextField));
+    await tester.pump();
+    expect(focus.hasFocus, isTrue);
+    expect(tester.testTextInput.isVisible, isTrue);
+  });
+
+  testWidgets('closing the player restores focus to a non-editing control', (
+    tester,
+  ) async {
+    final navigator = GlobalKey<NavigatorState>();
+    final focus = FocusNode();
+    addTearDown(focus.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        navigatorKey: navigator,
+        home: Scaffold(
+          body: TextButton(
+            focusNode: focus,
+            onPressed: () {},
+            child: const Text('Play'),
+          ),
+        ),
+      ),
+    );
+    focus.requestFocus();
+    await tester.pump();
+    expect(focus.hasFocus, isTrue);
+    navigator.currentState!.push(_TestPlayerRoute());
+    await tester.pumpAndSettle();
+    navigator.currentState!.pop();
+    await tester.pumpAndSettle();
+    expect(focus.hasFocus, isTrue);
+  });
+
   testWidgets('rotation on close discards stale mini-player bounds', (
     tester,
   ) async {
