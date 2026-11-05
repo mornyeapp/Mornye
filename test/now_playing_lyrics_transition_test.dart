@@ -1001,6 +1001,30 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  for (final landscape in [false, true]) {
+    testWidgets('Mornye lyric masks keep lyrics off their last row '
+        '(landscape: $landscape)', (tester) async {
+      await pumpNowPlaying(
+        tester,
+        theme: MornyeTheme.build(Brightness.dark),
+        size: landscape ? const Size(852, 393) : const Size(393, 852),
+        playback: PlaybackState(playing: true),
+      );
+      mediaItems.add(item('many'));
+      await settlePlayer(tester);
+      await tester.tap(findAppIcon(CupertinoIcons.quote_bubble));
+      await settlePlayer(tester);
+
+      expect(
+        find.descendant(
+          of: find.byType(ShaderMask),
+          matching: find.byType(LyricsMaskEdgeClip),
+        ),
+        findsOneWidget,
+      );
+    });
+  }
+
   for (final reducedMotion in [false, true]) {
     testWidgets(
       'static cover shrinks on pause without moving controls (reduced motion: $reducedMotion)',

@@ -63,6 +63,31 @@ class LyricsCoveredBottom extends InheritedWidget {
       height != oldWidget.height;
 }
 
+/// Keeps lyrics out of the last row of a [ShaderMask] that fades them out.
+///
+/// The mask only partly covers a bottom edge that falls between device pixels,
+/// so the text in that row would show through as a thin line.
+class LyricsMaskEdgeClip extends StatelessWidget {
+  const LyricsMaskEdgeClip({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) =>
+      ClipRect(clipper: const _LyricsMaskEdgeClipper(), child: child);
+}
+
+class _LyricsMaskEdgeClipper extends CustomClipper<Rect> {
+  const _LyricsMaskEdgeClipper();
+
+  @override
+  Rect getClip(Size size) =>
+      Rect.fromLTRB(0, 0, size.width, (size.height - 1).clamp(0, size.height));
+
+  @override
+  bool shouldReclip(_LyricsMaskEdgeClipper oldClipper) => false;
+}
+
 class SyncedLyricsView extends ConsumerStatefulWidget {
   final ParsedLyrics lyrics;
   final ValueListenable<Duration?> seekPreview;

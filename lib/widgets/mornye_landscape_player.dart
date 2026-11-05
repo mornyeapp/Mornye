@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/widgets/audio_output_button.dart';
+import 'package:mornye/widgets/player_lyrics.dart';
 import 'package:mornye/utils/android_tv.dart';
 
 /// Landscape opens on the player. Lyrics can hide their bottom actions until
@@ -377,7 +378,7 @@ class _LandscapeLyricsViewport extends ConsumerWidget {
                   1,
                 ],
               ).createShader(bounds),
-              child: child,
+              child: LyricsMaskEdgeClip(child: child!),
             ),
           ],
         ),
