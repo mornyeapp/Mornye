@@ -16,7 +16,9 @@ Looper. MediaPlayer construction, source changes, reset, release and transport
 commands stay on that thread. A slow media-service reset therefore does not
 hold Android's input/UI thread. Audio focus and SoundPool load callbacks return
 to the same owner; Flutter event-channel registration and delivery stay on the
-main thread. Method errors carry serializable details.
+main thread. `create` replies only after that registration: Dart listens as
+soon as the reply lands, and a stream with no handler then loses every event,
+which left playback loading forever. Method errors carry serializable details.
 
 Detaching removes channel handlers immediately and queues cleanup without
 waiting on the UI thread. The retired worker exits after cleanup, and its

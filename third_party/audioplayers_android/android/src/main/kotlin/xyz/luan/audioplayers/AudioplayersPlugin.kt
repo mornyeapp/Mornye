@@ -158,7 +158,9 @@ class AudioplayersPlugin : FlutterPlugin {
         if (call.method == "create") {
             val eventHandler = EventHandler(EventChannel(binaryMessenger, "xyz.luan/audioplayers/events/$playerId"))
             currentPlayers[playerId] = WrappedPlayer(this, eventHandler, defaultAudioContext.copy(), soundPoolManager)
-            response.success(1)
+            // Dart listens as soon as this reply lands. Replying earlier leaves
+            // the stream without a listener, and the prepared event never arrives.
+            eventHandler.afterRegistration { response.success(1) }
             return
         }
         val player = getPlayer(playerId, currentPlayers)
@@ -353,6 +355,9 @@ class EventHandler(private val eventChannel: EventChannel) : EventChannel.Stream
     init {
         onMain { eventChannel.setStreamHandler(this) }
     }
+
+    /** Runs [action] on the main thread, after the registration queued above. */
+    fun afterRegistration(action: () -> Unit) = onMain(action)
 
     override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
         eventSink = events

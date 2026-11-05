@@ -192,6 +192,27 @@ class AudioPlayerResponsivenessTest {
         }
     }
 
+    @Test fun createRepliesOnlyAfterItsEventChannelCanListen() {
+        val fixture = Fixture()
+        try {
+            val reply = Reply()
+            val eventChannel = "xyz.luan/audioplayers/events/second"
+            instrumentation.runOnMainSync {
+                val payload = codec.encodeMethodCall(MethodCall("create", mapOf("playerId" to "second")))
+                payload.flip()
+                requireNotNull(fixture.messenger.handlers["xyz.luan/audioplayers"]).onMessage(payload, reply)
+                // Dart listens as soon as the reply lands. Holding the main
+                // thread keeps the channel's registration waiting behind it.
+                assertFalse(
+                    "create replied before its event channel was registered",
+                    reply.done.await(500, TimeUnit.MILLISECONDS),
+                )
+            }
+            assertEquals(1, reply.success())
+            assertNotNull(fixture.messenger.handlers[eventChannel])
+        } finally { fixture.detach() }
+    }
+
     @Test fun errorsAreSerializableAndEventsStayOnTheMainThread() {
         val fixture = Fixture()
         try {
