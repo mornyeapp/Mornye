@@ -12,6 +12,18 @@ import 'package:mornye/services/playable_media.dart';
 
 import 'support/link_fakes.dart';
 
+class _PauseProbe extends FakePhonePlayer {
+  _PauseProbe(super.snapshot, this.onPause);
+
+  final void Function() onPause;
+
+  @override
+  Future<void> pause() async {
+    onPause();
+    await super.pause();
+  }
+}
+
 void main() {
   LinkHandoff handoff(
     FakeLinkClient client,
@@ -106,6 +118,66 @@ void main() {
       expect(result!.started, isFalse);
       expect(result.missingTracks, hasLength(1));
       expect(player.calls, isEmpty);
+    });
+
+    group('the song moved', () {
+      final items = [
+        linkMediaItem(linkLocalMedia('first', title: 'First')),
+        linkMediaItem(linkLocalMedia('second', title: 'Second')),
+      ];
+      FakePhonePlayer playing() => FakePhonePlayer(
+        LinkPhoneSnapshot(queue: items, index: 1, playing: true),
+      );
+      LinkHandoff moved(
+        FakePhonePlayer player, {
+        List<int> missing = const [],
+        int Function()? nowMs,
+      }) {
+        final records = FakeLibraryLookup();
+        final client = FakeLinkClient(
+          onPost: (op, body) => {'resolved': 1, 'missing': missing},
+        );
+        return LinkHandoff(
+          client: client,
+          player: player,
+          refs: LinkTrackRefCache(lookup: records, server: client.server),
+          resolver: LinkTrackResolver(lookup: records, server: client.server),
+          nowMs: nowMs ?? () => 0,
+        );
+      }
+
+      test('is known once, and before the phone pauses', () async {
+        late LinkHandoff subject;
+        TrackRef? atPause;
+        final player = _PauseProbe(
+          playing().snapshot,
+          () => atPause = subject.takeArriving(),
+        );
+        subject = moved(player);
+        await subject.playOnDesktop();
+        expect(atPause?.title, 'Second');
+        expect(subject.takeArriving(), isNull);
+      });
+
+      test('is unknown when the desktop lacks it', () async {
+        final subject = moved(playing(), missing: const [1]);
+        await subject.playOnDesktop();
+        expect(subject.takeArriving(), isNull);
+      });
+
+      test('is forgotten after the wait', () async {
+        var now = 0;
+        final subject = moved(playing(), nowMs: () => now);
+        await subject.playOnDesktop();
+        now = linkHandoffArrivalWait.inMilliseconds;
+        expect(subject.takeArriving(), isNull);
+      });
+
+      test('stays unset for songs chosen on the desktop', () async {
+        final subject = moved(FakePhonePlayer());
+        await subject.playItemsOnDesktop(items, index: 1);
+        expect(subject.takeArriving(), isNull);
+      });
     });
 
     test('does nothing while the phone plays nothing', () async {

@@ -958,6 +958,71 @@ void main() {
     );
   });
 
+  group('a song just moved to the desktop', () {
+    const sentRef = TrackRef(title: 'Sent', artist: 'Artist');
+
+    LinkRemotePlayback seeded({Duration wait = linkHandoffArrivalWait}) {
+      final seeded = LinkRemotePlayback(
+        name: 'Studio PC',
+        remote: container.read(linkDesktopRemoteProvider.notifier),
+        handoff: LinkHandoff(
+          client: client,
+          player: FakePhonePlayer(),
+          refs: LinkTrackRefCache(lookup: lookup),
+          resolver: LinkTrackResolver(lookup: lookup),
+        ),
+        covers: covers,
+        arriving: sentRef,
+        arrivalWait: wait,
+        initialItem: linkMediaItem(linkLocalMedia('sent', title: 'Sent')),
+      );
+      addTearDown(seeded.dispose);
+      return seeded;
+    }
+
+    LinkRemoteState desktopPlaying(TrackRef track) => LinkRemoteState(
+      connection: LinkConnectionState.connected,
+      player: LinkPlayerState(
+        track: track,
+        playing: true,
+        positionMs: 30000,
+        durationMs: 200000,
+        updatedMs: 1,
+        queue: [track],
+        index: 0,
+        shuffle: false,
+        repeat: LinkRepeatMode.none,
+        volume: 1,
+      ),
+    );
+
+    test('stays on screen until the desktop reports it', () async {
+      final moved = seeded();
+      moved.update(desktopPlaying(_desktopSong('old')));
+      await settle();
+      expect((await moved.mediaItems.first)?.title, 'Sent');
+      expect((await moved.playbackStates.first).playing, isFalse);
+
+      moved.update(desktopPlaying(sentRef));
+      await settle();
+      expect((await moved.mediaItems.first)?.title, 'Sent');
+      expect((await moved.playbackStates.first).playing, isTrue);
+
+      // The wait is over: later songs show as they play.
+      moved.update(desktopPlaying(_desktopSong('next')));
+      await settle();
+      expect((await moved.mediaItems.first)?.title, 'Song next');
+    });
+
+    test('gives way when the desktop never reports it', () async {
+      final moved = seeded(wait: const Duration(milliseconds: 1));
+      moved.update(desktopPlaying(_desktopSong('old')));
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      await settle();
+      expect((await moved.mediaItems.first)?.title, 'Song old');
+    });
+  });
+
   test('a failed command is logged, not thrown', () async {
     client.onPost = (op, body) => throw StateError('offline');
     client.push(_state());

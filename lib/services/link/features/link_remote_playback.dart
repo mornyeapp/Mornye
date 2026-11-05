@@ -189,6 +189,7 @@ final linkRemotePlaybackProvider = Provider<LinkRemotePlayback?>((ref) {
     remote: remote,
     handoff: handoff,
     covers: runtime.dependencies.coverStore,
+    arriving: handoff.takeArriving(),
     initialItem: ref.read(localMediaItemProvider).value,
     initialState: runtime.handler?.playbackState.value,
     details: (track, local) => readLinkPlaybackDetails(
@@ -243,6 +244,8 @@ class LinkRemotePlayback extends LinkMirroredPlayback {
     required LinkHandoff handoff,
     required super.covers,
     Future<PlayableMedia?> Function(TrackRef, PlayableMedia?)? details,
+    TrackRef? arriving,
+    Duration arrivalWait = linkHandoffArrivalWait,
     super.extractArtwork,
     super.initialItem,
     super.initialState,
@@ -251,12 +254,30 @@ class LinkRemotePlayback extends LinkMirroredPlayback {
     super.nowMs,
   }) : _remote = remote,
        _handoff = handoff,
-       _details = details;
+       _details = details,
+       _arriving = arriving {
+    if (arriving != null) _arrivalTimer = Timer(arrivalWait, _stopWaiting);
+  }
 
   final LinkDesktopRemote _remote;
   final LinkHandoff _handoff;
   final Future<PlayableMedia?> Function(TrackRef, PlayableMedia?)? _details;
   LinkConnectionState? _connection;
+
+  /// The song just moved to the desktop. The state the desktop reports until
+  /// it names this song is older, so it waits in [_held] and the player keeps
+  /// showing the song that was playing.
+  TrackRef? _arriving;
+  LinkRemoteState? _held;
+  Timer? _arrivalTimer;
+
+  void _stopWaiting() {
+    _arrivalTimer?.cancel();
+    _arriving = null;
+    final held = _held;
+    _held = null;
+    if (held != null) update(held);
+  }
 
   /// Shows the desktop's [state].
   void update(LinkRemoteState state) {
@@ -266,7 +287,23 @@ class LinkRemotePlayback extends LinkMirroredPlayback {
       retryFailed();
     }
     _connection = state.connection;
+    final arriving = _arriving;
+    if (arriving != null) {
+      final track = state.player?.track;
+      if (track == null || !linkSameTrack(arriving, track)) {
+        _held = state;
+        return;
+      }
+      _arrivalTimer?.cancel();
+      _arriving = _held = null;
+    }
     show(state.player);
+  }
+
+  @override
+  void dispose() {
+    _arrivalTimer?.cancel();
+    super.dispose();
   }
 
   @override
