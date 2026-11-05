@@ -73,22 +73,26 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen>
   String? _resolvedCoverUrl;
   String? _resolvedHeaderVideoUrl;
   PlaylistSortMode _sortMode = PlaylistSortMode.custom;
+  List<Track> _sortedTracks = const [];
 
   List<Track> get _tracks => _fetchedTracks ?? widget.tracks;
-  List<Track> get _effectiveTracks => sortTracksByMode(_tracks, _sortMode);
   String get _playlistName => _resolvedPlaylistName ?? widget.playlistName;
   String? get _coverUrl => _resolvedCoverUrl ?? widget.coverUrl;
   String? get _headerVideoUrl =>
       _resolvedHeaderVideoUrl ?? widget.headerVideoUrl;
+
+  void _updateSortedTracks() {
+    _sortedTracks = sortTracksByMode(_tracks, _sortMode);
+  }
 
   /// Playlists can legitimately contain the same track twice, so selection is
   /// keyed by position as well as id (matching the album screen).
   String _trackSelectionId(Track track, int index) => '${track.id}#$index';
 
   List<Track> get _selectedTracks => [
-    for (var index = 0; index < _effectiveTracks.length; index++)
-      if (selectedIds.contains(_trackSelectionId(_effectiveTracks[index], index)))
-        _effectiveTracks[index],
+    for (var index = 0; index < _sortedTracks.length; index++)
+      if (selectedIds.contains(_trackSelectionId(_sortedTracks[index], index)))
+        _sortedTracks[index],
   ];
 
   Widget _buildSelectionBottomBar(
@@ -182,7 +186,16 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen>
   @override
   void initState() {
     super.initState();
+    _updateSortedTracks();
     _fetchTracksIfNeeded();
+  }
+
+  @override
+  void didUpdateWidget(PlaylistScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(widget.tracks, oldWidget.tracks)) {
+      _updateSortedTracks();
+    }
   }
 
   Future<void> _fetchTracksIfNeeded() async {
@@ -240,6 +253,7 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen>
             ? headerVideo
             : _resolvedHeaderVideoUrl;
         _isLoading = false;
+        _updateSortedTracks();
       });
     } catch (e) {
       if (!mounted) return;
@@ -268,7 +282,7 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen>
         ? MediaQuery.paddingOf(context).bottom
         : 0.0;
 
-    final tracks = _effectiveTracks;
+    final tracks = _sortedTracks;
     final ids = [
       for (var index = 0; index < tracks.length; index++)
         _trackSelectionId(tracks[index], index),
@@ -364,43 +378,46 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen>
       meta: HeaderMetaRow(
         items: [
           HeaderMetaItem(
-            context.l10n.tracksCount(_effectiveTracks.length),
+            context.l10n.tracksCount(_sortedTracks.length),
             icon: Icons.playlist_play,
           ),
         ],
       ),
       appBarActions: [
-        if (_effectiveTracks.length > 1)
+        if (!isSelectionMode && _sortedTracks.length > 1)
           buildPlaylistSortButton(
             context: context,
             currentSort: _sortMode,
             hasDateAdded: false,
-            onSortChanged: (newSort) => setState(() => _sortMode = newSort),
+            onSortChanged: (newSort) => setState(() {
+              _sortMode = newSort;
+              _updateSortedTracks();
+            }),
           ),
         if (ref.watch(linkPhoneClientProvider) != null) ...[
           const SizedBox(width: 8),
           LinkDownloadOnDesktopButton(
-            tracks: _effectiveTracks,
+            tracks: _sortedTracks,
             service: _recommendedDownloadService(),
             playlistName: _playlistName,
           ),
         ],
       ],
       actions: CollectionHeaderActions(
-        tracks: _effectiveTracks,
-        onLoveAll: () => loveAllTracks(this.context, ref, _effectiveTracks),
+        tracks: _sortedTracks,
+        onLoveAll: () => loveAllTracks(this.context, ref, _sortedTracks),
         downloadIcon: Icons.download_rounded,
         tonalDownload: true,
         onDownloadAll: () => confirmDownloadAllDialog(
           context,
-          _effectiveTracks.length,
+          _sortedTracks.length,
           () => _downloadAll(context),
         ),
         addToPlaylistIcon: Icons.playlist_add,
         onAddToPlaylist: () => showAddTracksToPlaylistSheet(
           context,
           ref,
-          _effectiveTracks,
+          _sortedTracks,
           playlistNamePrefill: widget.playlistName,
           preserveOccurrences: true,
         ),
@@ -412,7 +429,7 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen>
       buildTrackListFooter(
         context,
         colorScheme,
-        _effectiveTracks,
+        _sortedTracks,
         excludeEpochReleaseDate: true,
       );
 
@@ -449,7 +466,7 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen>
       );
     }
 
-    final tracks = _effectiveTracks;
+    final tracks = _sortedTracks;
     _historySnapshot.update(tracks);
     final historyKeys = _historySnapshot.lookupKeys;
     final existingHistoryKeys = ref.watch(
@@ -486,7 +503,10 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen>
         isInHistory: inHistory,
         selectedIds: selectedIds,
         sort: tableSortFromPlaylistSort(_sortMode),
-        onSort: (nextSort) => setState(() => _sortMode = playlistSortFromTableSort(nextSort)),
+        onSort: (nextSort) => setState(() {
+          _sortMode = playlistSortFromTableSort(nextSort);
+          _updateSortedTracks();
+        }),
         onSelect: applyDesktopClick,
         onActivate: activate,
         showArtwork: true,
@@ -574,7 +594,7 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen>
     await queueTracksSkippingDownloaded(
       context,
       ref,
-      _tracks,
+      _sortedTracks,
       artistNameForPicker: _playlistName,
       recommendedService: _recommendedDownloadService(),
       playlistName: _playlistName,

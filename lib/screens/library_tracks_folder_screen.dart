@@ -370,6 +370,7 @@ class _LibraryTracksFolderScreenState
         break;
     }
 
+    final rawEntries = entries;
     entries = _orderDraft ?? entries;
     final effectiveEntries = _editingOrder
         ? entries
@@ -427,7 +428,14 @@ class _LibraryTracksFolderScreenState
         ids,
         bottomPadding,
       ),
-      appBar: _buildAppBar(context, colorScheme, title, effectiveEntries, playlist),
+      appBar: _buildAppBar(
+        context,
+        colorScheme,
+        title,
+        effectiveEntries,
+        playlist,
+        rawEntries: rawEntries,
+      ),
       slivers: [
         if (_editingOrder)
           SliverToBoxAdapter(
@@ -556,11 +564,11 @@ class _LibraryTracksFolderScreenState
         onDelete: isSelectionMode ? () => _removeSelected(entries) : null,
         onActivate: () {
           if (_editingOrder) return;
-          final index = entries.indexWhere(
+          final index = effectiveEntries.indexWhere(
             (entry) => entry.key == selectionAnchorId,
           );
           if (index >= 0) {
-            _activateEntry(entries, folderTracks, inHistory, index);
+            _activateEntry(effectiveEntries, folderTracks, inHistory, index);
           }
         },
         child: scaffold,
@@ -919,8 +927,9 @@ class _LibraryTracksFolderScreenState
     ColorScheme colorScheme,
     String title,
     List<CollectionTrackEntry> entries,
-    UserPlaylistCollection? playlist,
-  ) {
+    UserPlaylistCollection? playlist, {
+    required List<CollectionTrackEntry> rawEntries,
+  }) {
     final expandedHeight = calculateExpandedHeight(context);
     final customCoverPath = playlist?.coverImagePath;
     final isLovedMode = widget.mode == LibraryTracksFolderMode.loved;
@@ -1094,7 +1103,7 @@ class _LibraryTracksFolderScreenState
               icon: Icons.swap_vert,
               iconSize: 20,
               tooltip: context.l10n.playlistEditOrder,
-              onPressed: () => _editOrder(entries),
+              onPressed: () => _editOrder(rawEntries),
             ),
           ],
           if (isPlaylistMode && !isSelectionMode) ...[

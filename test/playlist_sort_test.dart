@@ -112,5 +112,44 @@ void main() {
 
       expect(sorted.map((e) => e.key).toList(), ['3', '1', '2']);
     });
+
+    test('sorts diacritic and accented strings cleanly', () {
+      const track1 = Track(
+        id: 'd1',
+        name: 'Álbum',
+        artistName: 'Édith Piaf',
+        albumName: 'A',
+        duration: 100,
+      );
+      const track2 = Track(
+        id: 'd2',
+        name: 'Amour',
+        artistName: 'Elton John',
+        albumName: 'B',
+        duration: 100,
+      );
+      const track3 = Track(
+        id: 'd3',
+        name: 'e\u0301clair', // decomposed combining acute accent
+        artistName: 'Zebra',
+        albumName: 'C',
+        duration: 100,
+      );
+      const track4 = Track(
+        id: 'd4',
+        name: 'Zoo',
+        artistName: 'ABBA',
+        albumName: 'D',
+        duration: 100,
+      );
+
+      final byTitle = sortTracksByMode([track4, track3, track2, track1], PlaylistSortMode.titleAsc);
+      // 'Álbum' (album) < 'Amour' (amour) < 'éclair' (eclair) < 'Zoo' (zoo)
+      expect(byTitle.map((t) => t.id).toList(), ['d1', 'd2', 'd3', 'd4']);
+
+      final byArtist = sortTracksByMode([track3, track2, track1, track4], PlaylistSortMode.artistAsc);
+      // 'ABBA' (abba) < 'Édith Piaf' (edith piaf) < 'Elton John' (elton john) < 'Zebra' (zebra)
+      expect(byArtist.map((t) => t.id).toList(), ['d4', 'd1', 'd2', 'd3']);
+    });
   });
 }

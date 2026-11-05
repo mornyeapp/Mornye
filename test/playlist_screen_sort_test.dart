@@ -64,4 +64,31 @@ void main() {
     // Sort is active
     expect(find.byKey(const ValueKey('playlist-sort-button')), findsOneWidget);
   });
+
+  testWidgets('sort button is hidden during selection mode in PlaylistScreen', (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: PlaylistScreen(
+            playlistName: 'Explore Playlist',
+            tracks: [trackA, trackB],
+          ),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    // Verify sort button is present initially
+    expect(find.byKey(const ValueKey('playlist-sort-button')), findsOneWidget);
+
+    // Enter selection mode by long-pressing a track tile
+    await tester.longPress(find.text('Zulu'));
+    await tester.pumpAndSettle();
+
+    // Verify sort button is now hidden
+    expect(find.byKey(const ValueKey('playlist-sort-button')), findsNothing);
+  });
 }

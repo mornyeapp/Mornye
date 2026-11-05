@@ -16,14 +16,54 @@ enum PlaylistSortMode {
   durationDesc,
 }
 
-/// Helper comparison for case-insensitive and empty-last string sorting.
+/// Map of common accented/diacritic characters to their base equivalents.
+const _diacritics = <String, String>{
+  'à': 'a', 'á': 'a', 'â': 'a', 'ã': 'a', 'ä': 'a', 'å': 'a', 'ā': 'a', 'ă': 'a', 'ą': 'a',
+  'ç': 'c', 'ć': 'c', 'č': 'c',
+  'ď': 'd', 'đ': 'd',
+  'è': 'e', 'é': 'e', 'ê': 'e', 'ë': 'e', 'ē': 'e', 'ė': 'e', 'ę': 'e', 'ě': 'e',
+  'ğ': 'g',
+  'ì': 'i', 'í': 'i', 'î': 'i', 'ï': 'i', 'ī': 'i', 'į': 'i',
+  'ł': 'l',
+  'ñ': 'n', 'ń': 'n', 'ň': 'n',
+  'ò': 'o', 'ó': 'o', 'ô': 'o', 'õ': 'o', 'ö': 'o', 'ø': 'o', 'ō': 'o', 'ő': 'o',
+  'ř': 'r',
+  'ś': 's', 'š': 's', 'ş': 's', 'ș': 's',
+  'ť': 't', 'ț': 't',
+  'ù': 'u', 'ú': 'u', 'û': 'u', 'ü': 'u', 'ū': 'u', 'ů': 'u', 'ű': 'u',
+  'ý': 'y', 'ÿ': 'y',
+  'ź': 'z', 'ż': 'z', 'ž': 'z',
+  'æ': 'ae', 'œ': 'oe', 'ß': 'ss',
+};
+
+final _combiningMarksRegex = RegExp(r'[\u0300-\u036f]');
+
+String _normalizeForSort(String text) {
+  final stripped = text.toLowerCase().replaceAll(_combiningMarksRegex, '');
+  final buffer = StringBuffer();
+  for (final char in stripped.runes) {
+    final str = String.fromCharCode(char);
+    buffer.write(_diacritics[str] ?? str);
+  }
+  return buffer.toString();
+}
+
+/// Helper comparison for case-insensitive, diacritic-tolerant, and empty-last string sorting.
 int _compareStrings(String? a, String? b, {bool ascending = true}) {
   final strA = (a ?? '').trim();
   final strB = (b ?? '').trim();
   if (strA.isEmpty && strB.isNotEmpty) return 1;
   if (strA.isNotEmpty && strB.isEmpty) return -1;
   if (strA.isEmpty && strB.isEmpty) return 0;
-  final result = strA.toLowerCase().compareTo(strB.toLowerCase());
+  final normA = _normalizeForSort(strA);
+  final normB = _normalizeForSort(strB);
+  var result = normA.compareTo(normB);
+  if (result == 0) {
+    result = strA.toLowerCase().compareTo(strB.toLowerCase());
+  }
+  if (result == 0) {
+    result = strA.compareTo(strB);
+  }
   return ascending ? result : -result;
 }
 

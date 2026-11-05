@@ -93,6 +93,60 @@ void main() {
     // Button tooltip or appearance reflects sorted state
     expect(find.byKey(const ValueKey('playlist-sort-button')), findsOneWidget);
   });
+
+  testWidgets('editing order drafts from true saved custom order even if view is sorted', (tester) async {
+    final state = LibraryCollectionsState(
+      playlists: [playlist],
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          libraryCollectionsProvider.overrideWith(
+            () => _FakeCollectionsNotifier(state),
+          ),
+        ],
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: const LibraryTracksFolderScreen(
+            mode: LibraryTracksFolderMode.playlist,
+            playlistId: 'test-playlist',
+          ),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    // Sort by Title (A-Z)
+    final sortButton = find.byKey(const ValueKey('playlist-sort-button'));
+    await tester.tap(sortButton);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Title (A-Z)'));
+    await tester.pumpAndSettle();
+
+    // Now tap Edit Order button
+    final editOrderButton = find.byKey(const ValueKey('collection-edit-order'));
+    expect(editOrderButton, findsOneWidget);
+    await tester.tap(editOrderButton);
+    await tester.pumpAndSettle();
+
+    // In edit order mode, ReorderableDelayedDragStartListener items are displayed in the draft order.
+    // The true saved custom order is Zeta (entry-1) first, then Alpha (entry-2).
+    final reorderItems = find.byType(ReorderableDelayedDragStartListener);
+    expect(reorderItems, findsNWidgets(2));
+    final firstItemText = find.descendant(
+      of: reorderItems.first,
+      matching: find.text('Zeta'),
+    );
+    expect(firstItemText, findsOneWidget);
+    final secondItemText = find.descendant(
+      of: reorderItems.last,
+      matching: find.text('Alpha'),
+    );
+    expect(secondItemText, findsOneWidget);
+  });
 }
 
 class _FakeCollectionsNotifier extends LibraryCollectionsNotifier {
