@@ -8668,6 +8668,8 @@
   "listeningRewindSlide": "Slide {index} of {count}",
   "@listeningRewindSlide": { "placeholders": { "index": { "type": "int" }, "count": { "type": "int" } } },
   "listeningRewindShare": "Share",
+  "listeningRewindShareCard": "Share summary card",
+  "listeningRewindShareSlide": "Share this slide",
   "listeningRewindShareError": "Could not share your Rewind",
   "listeningRewindNext": "Next",
   "listeningRewindPrevious": "Previous",

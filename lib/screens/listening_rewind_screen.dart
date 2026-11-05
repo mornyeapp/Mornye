@@ -15,6 +15,7 @@ import 'package:mornye/providers/listening_rewind_provider.dart';
 import 'package:mornye/services/listening_rewind.dart';
 import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/app_tokens.dart';
+import 'package:mornye/theme/cover_palette.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/widget_capture.dart';
 import 'package:mornye/widgets/app_action_button.dart';
@@ -31,6 +32,7 @@ import 'package:mornye/widgets/settled_blur.dart';
 
 export 'package:mornye/providers/listening_rewind_provider.dart';
 
+part 'listening_rewind_share_card.dart';
 part 'listening_rewind_story.dart';
 part 'listening_rewind_slides.dart';
 part 'listening_rewind_widgets.dart';

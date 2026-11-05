@@ -488,7 +488,10 @@ void main() {
     await tester.pumpAndSettle();
     expect(blur.debugImage, isNotNull);
 
-    await tester.runAsync(() => tester.tap(find.text('Share')));
+    await tester.tap(find.text('Share'));
+    await tester.pumpAndSettle();
+    expect(find.byType(RewindShareCard), findsOneWidget);
+    await tester.runAsync(() => tester.tap(find.text('Share this slide')));
     await tester.pump();
     for (var attempt = 0; attempt < 100 && !shared.isCompleted; attempt++) {
       await tester.runAsync(
@@ -514,4 +517,110 @@ void main() {
     expect(blur.debugImage, isNotNull);
     expect(tester.takeException(), isNull);
   });
+
+  for (final (choice, fileName, width, height) in [
+    ('Share summary card', 'mornye_rewind_card.png', 1080, 1920),
+    ('Share this slide', 'mornye_rewind.png', _size.width, _size.height),
+  ]) {
+    testWidgets('$choice shares $fileName at $width x $height', (tester) async {
+      reduced.value = true;
+      await open(tester, mornye: false);
+      final temporary = Directory('${directory.path}/share')..createSync();
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      const paths = MethodChannel('plugins.flutter.io/path_provider');
+      const share = MethodChannel('dev.fluttercommunity.plus/share');
+      final shared = Completer<String>();
+      messenger.setMockMethodCallHandler(paths, (_) async => temporary.path);
+      messenger.setMockMethodCallHandler(share, (call) async {
+        final arguments = call.arguments as Map;
+        shared.complete((arguments['paths'] as List).single as String);
+        return 'dev.fluttercommunity.plus/share/success';
+      });
+      addTearDown(() {
+        messenger.setMockMethodCallHandler(paths, null);
+        messenger.setMockMethodCallHandler(share, null);
+      });
+
+      await tester.pumpAndSettle();
+      final story = tester.getRect(find.byType(PageView));
+      while (find.text('Share').evaluate().isEmpty) {
+        await tester.tapAt(Offset(story.right - 40, story.center.dy));
+        await tester.pumpAndSettle();
+      }
+      await tester.tap(find.text('Share'));
+      await tester.pumpAndSettle();
+      expect(find.byType(RewindShareCard), findsOneWidget);
+      await tester.runAsync(() => tester.tap(find.text(choice)));
+      await tester.pump();
+      for (var attempt = 0; attempt < 100 && !shared.isCompleted; attempt++) {
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 10)),
+        );
+        await tester.pump();
+      }
+      expect(shared.isCompleted, isTrue);
+      final file = await shared.future;
+      expect(file, endsWith(fileName));
+      final image = await tester.runAsync(() async {
+        final codec = await ui.instantiateImageCodec(
+          await File(file).readAsBytes(),
+        );
+        return (await codec.getNextFrame()).image;
+      });
+      expect(image!.width, width);
+      expect(image.height, height);
+      expect(tester.takeException(), isNull);
+      // The cover color's sample read gives up after five seconds.
+      await tester.pump(const Duration(seconds: 6));
+    });
+  }
+
+  for (final mornye in [true, false]) {
+    testWidgets('the summary card holds five long names (Mornye: $mornye)', (
+      tester,
+    ) async {
+      final long = 'A very long name that cannot fit on one line ' * 3;
+      final rows = [
+        for (var i = 0; i < 6; i++)
+          _row(
+            '2026-10-0${i + 1}',
+            '$long$i',
+            artist: '$long$i',
+            minutes: 400000 - i,
+          ),
+      ];
+      final rewind = ListeningRewind.compute(
+        range: ListeningRewindRange.of(
+          ListeningRewindPeriod.year,
+          DateTime(2026, 10, 14, 21),
+        ),
+        summary: ListeningSummary.fromRows(rows),
+        previousMilliseconds: 0,
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: mornye ? MornyeTheme.build(Brightness.dark) : ThemeData(),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Center(
+            child: FittedBox(
+              child: MediaQuery(
+                data: const MediaQueryData(textScaler: TextScaler.linear(2)),
+                child: RewindShareCard(
+                  rewind: rewind,
+                  period: ListeningRewindPeriod.year,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      expect(tester.getSize(find.byType(RewindShareCard)), rewindShareCardSize);
+      expect(find.text('5'), findsNWidgets(2));
+      expect(find.text('6'), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+  }
 }

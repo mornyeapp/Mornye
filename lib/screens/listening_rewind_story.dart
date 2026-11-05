@@ -180,6 +180,17 @@ class _RewindStoryState extends State<_RewindStory>
     }
   }
 
+  /// Offers the summary card, with the visible slide as the alternative.
+  Future<void> _chooseShare() async {
+    final shareSlide = await showAppModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) =>
+          _RewindShareSheet(rewind: widget.rewind, period: widget.period),
+    );
+    if (shareSlide == true && mounted) await _share();
+  }
+
   /// Shares the visible slide, without the story controls, as an image.
   Future<void> _share() async {
     if (_sharing) return;
@@ -303,7 +314,7 @@ class _RewindStoryState extends State<_RewindStory>
                         child: _Reveal(
                           order: 4,
                           child: AppActionButton(
-                            onPressed: _sharing ? null : _share,
+                            onPressed: _sharing ? null : _chooseShare,
                             icon: const Icon(Icons.share),
                             label: Text(l10n.listeningRewindShare),
                           ),
