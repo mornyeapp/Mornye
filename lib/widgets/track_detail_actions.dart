@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:mornye/widgets/app_alert_dialog.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/l10n/l10n.dart';
+import 'package:mornye/models/library_database_models.dart';
 import 'package:mornye/models/track.dart';
 import 'package:mornye/providers/download_queue_provider.dart';
 import 'package:mornye/providers/extension_provider.dart';
@@ -169,18 +170,35 @@ Future<void> queueTracksSkippingDownloaded(
         ).future,
       );
     } catch (e) {
-      // Queueing without the skip beats silently doing nothing: several
-      // callers fire this flow unawaited, so a throw here would vanish.
-      AppLogger('DownloadFlow').w('Duplicate check failed, queueing all: $e');
+      // Several callers do not await this flow. A failed history lookup must
+      // still let the local library check and queueing continue.
+      AppLogger(
+        'DownloadFlow',
+      ).w('Download history duplicate check failed: $e');
     }
   }
   if (!context.mounted) return;
-  final localLibState =
-      (skipExisting &&
-          settings.localLibraryEnabled &&
-          settings.localLibraryShowDuplicates)
-      ? ref.read(localLibraryProvider)
-      : null;
+  final existingLocalIndices = <int>{};
+  if (skipExisting && settings.localLibraryEnabled) {
+    try {
+      final matches = await ref
+          .read(localLibraryProvider.notifier)
+          .findExistingBatchAsync([
+            for (final track in tracks)
+              LocalLibraryBatchLookupRequest(
+                isrc: track.isrc,
+                trackName: track.name,
+                artistName: track.artistName,
+              ),
+          ]);
+      for (var i = 0; i < matches.length; i++) {
+        if (matches[i] != null) existingLocalIndices.add(i);
+      }
+    } catch (e) {
+      AppLogger('DownloadFlow').w('Local library duplicate check failed: $e');
+    }
+  }
+  if (!context.mounted) return;
   final tracksToQueue = <Track>[];
   var skippedCount = 0;
 
@@ -189,13 +207,7 @@ Future<void> queueTracksSkippingDownloaded(
     final isInHistory =
         skipExisting &&
         existingHistoryKeys.contains(historyLookups[i].lookupKey);
-    final isInLocal =
-        localLibState?.existsInLibrary(
-          isrc: track.isrc,
-          trackName: track.name,
-          artistName: track.artistName,
-        ) ??
-        false;
+    final isInLocal = existingLocalIndices.contains(i);
 
     if (isInHistory || isInLocal) {
       skippedCount++;

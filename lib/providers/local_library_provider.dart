@@ -783,6 +783,16 @@ class LocalLibraryNotifier extends Notifier<LocalLibraryState> {
     }
     return null;
   }
+
+  /// Reads the persisted index even while the in-memory summary is loading.
+  Future<List<LocalLibraryItem?>> findExistingBatchAsync(
+    List<LocalLibraryBatchLookupRequest> requests,
+  ) async {
+    final rows = await _db.findExistingBatch(requests);
+    return rows
+        .map((row) => row == null ? null : LocalLibraryItem.fromJson(row))
+        .toList(growable: false);
+  }
 }
 
 final localLibraryProvider =
