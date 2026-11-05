@@ -27,21 +27,13 @@ final musicPlayerRuntimeProvider = Provider<MusicPlayerRuntime>(
 /// The app root overrides it with Mornye Link's paired desktop.
 final activeRemotePlaybackProvider = Provider<RemotePlayback?>((ref) => null);
 
-/// External apps own local-file playback. Link and network files still need
-/// the in-app controls when they use a Mornye player.
-final playerUiEnabledProvider = Provider<bool>((ref) {
-  if (ref.watch(settingsProvider.select((s) => s.playerMode == 'internal')) ||
-      ref.watch(activeRemotePlaybackProvider) != null) {
-    return true;
-  }
-  return ref.watch(
-    localMediaItemProvider.select(
-      (state) =>
-          state.value?.extras?['source']?.toString().startsWith('network://') ??
-          false,
-    ),
-  );
-});
+/// External apps own playback on this device. A remote Mornye player keeps
+/// its controls while this device is only controlling it.
+final playerUiEnabledProvider = Provider<bool>(
+  (ref) =>
+      ref.watch(settingsProvider.select((s) => s.playerMode == 'internal')) ||
+      ref.watch(activeRemotePlaybackProvider) != null,
+);
 
 /// The active remote device's volume, 0 to 1; no value while this device
 /// plays.

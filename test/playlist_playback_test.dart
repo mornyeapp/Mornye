@@ -52,6 +52,7 @@ class _Settings extends SettingsNotifier {
 class _Handler extends Fake implements MusicPlayerHandler {}
 
 class _Player extends MusicPlayerController {
+  int initializations = 0;
   List<PlayableMedia> queue = [];
   int? index;
   bool? shuffle;
@@ -67,7 +68,10 @@ class _Player extends MusicPlayerController {
   }
 
   @override
-  Future<MusicPlayerHandler?> ensureInitialized() async => _Handler();
+  Future<MusicPlayerHandler?> ensureInitialized() async {
+    initializations++;
+    return _Handler();
+  }
 
   @override
   Future<void> setShuffle(bool enabled) async => shuffle = enabled;
@@ -83,6 +87,8 @@ class _Player extends MusicPlayerController {
 }
 
 class _Playback extends PlaybackController {
+  _Playback({super.openExternal});
+
   final List<List<String>> resolvedRequests = [];
   final Map<String, String?> paths = {
     'First': 'content://library/first',
@@ -1016,22 +1022,79 @@ void main() {
   });
 
   test(
-    'external mode routes a network fallback to the internal queue',
+    'external mode opens the selected network fallback without an internal queue',
     () async {
       container.read(settingsProvider.notifier).setPlayerMode('external');
-      playback.paths['Selected'] = 'network://storage/track.flac';
+      final opened = <String>[];
+      playback = _Playback(openExternal: (source) async => opened.add(source))
+        ..paths['Selected'] = 'network://storage/track.flac';
       await container
           .read(playbackProvider.notifier)
           .playTrackList(_tracks, startIndex: 1);
-      expect(
-        player.queue[player.index!].source,
-        'network://storage/track.flac',
-      );
-      expect(playback.resolvedRequests.take(2), [
+      expect(opened, ['network://storage/track.flac']);
+      expect(player.queue, isEmpty);
+      expect(player.initializations, 0);
+      expect(playback.resolvedRequests, [
         ['Unavailable'],
         ['Selected'],
       ]);
-      expect(playback.resolvedRequests.last, _tracks.map((track) => track.id));
+    },
+  );
+
+  for (final source in [
+    'network://storage/track.flac',
+    'network://paired-computer/track.m4a',
+  ]) {
+    test(
+      'external mode respects single and queued playback of $source',
+      () async {
+        final opened = <String>[];
+        playback = _Playback(openExternal: (path) async => opened.add(path));
+        container.read(settingsProvider.notifier).setPlayerMode('external');
+        final controller = container.read(playbackProvider.notifier);
+        await controller.playLocalPath(
+          path: source,
+          title: 'Song',
+          artist: 'Artist',
+        );
+        await controller.playMediaQueue(
+          [
+            PlayableMedia(
+              id: source,
+              source: source,
+              title: 'Song',
+              artist: 'Artist',
+            ),
+          ],
+          startIndex: 0,
+          externalPath: source,
+        );
+        expect(opened, [source, source]);
+        expect(player.queue, isEmpty);
+        expect(player.initializations, 0);
+      },
+    );
+  }
+
+  test(
+    'external launch failure never falls back to the internal player',
+    () async {
+      playback = _Playback(
+        openExternal: (_) async => throw StateError('no player'),
+      );
+      container.read(settingsProvider.notifier).setPlayerMode('external');
+      await expectLater(
+        container
+            .read(playbackProvider.notifier)
+            .playLocalPath(
+              path: 'network://storage/track.flac',
+              title: 'Song',
+              artist: 'Artist',
+            ),
+        throwsStateError,
+      );
+      expect(player.initializations, 0);
+      expect(player.queue, isEmpty);
     },
   );
 }

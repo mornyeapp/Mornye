@@ -440,12 +440,26 @@ Future<FileAccessStat?> fileStat(String? path) async {
   return FileAccessStat(size: stat.size, modified: stat.modified);
 }
 
-Future<void> openFile(String path) async {
+Future<void> openFile(String path, {NetworkStorageService? storage}) async {
   if (isCueVirtualPath(path)) {
     throw Exception(cueVirtualTrackRequiresSplitMessage);
   }
 
-  final realPath = path;
+  final realPath = path.startsWith('network://')
+      ? await (storage ?? NetworkStorageService.instance).resolve(path)
+      : path;
+  final uri = Uri.tryParse(realPath);
+  if (uri != null && (uri.scheme == 'http' || uri.scheme == 'https')) {
+    if (!isDesktopPlatform && !Platform.isIOS) {
+      await PlatformBridge.openContentUri(
+        realPath,
+        mimeType: audioMimeTypeForPath(uri.path),
+      );
+    } else if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      throw Exception('No application can open this audio stream');
+    }
+    return;
+  }
   if (isContentUri(realPath)) {
     await PlatformBridge.openContentUri(realPath, mimeType: '');
     return;

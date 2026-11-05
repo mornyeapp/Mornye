@@ -7,17 +7,62 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/l10n/l10n.dart';
+import 'package:mornye/models/settings.dart';
 import 'package:mornye/providers/music_player_provider.dart';
+import 'package:mornye/providers/playback_provider.dart';
+import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/screens/network_storage_screen.dart';
 import 'package:mornye/services/link/link_source_names.dart';
 import 'package:mornye/services/local_network_access.dart';
 import 'package:mornye/services/network_certificate.dart';
 import 'package:mornye/services/network_storage_service.dart';
 import 'package:mornye/services/playable_media.dart';
+import 'package:mornye/services/music_player_service.dart'
+    show MusicPlayerHandler;
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/app_action_button.dart';
 
 void main() {
+  testWidgets('network browser honors external player mode', (tester) async {
+    final opened = <String>[];
+    final played = <PlayableMedia>[];
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          settingsProvider.overrideWith(_ExternalSettings.new),
+          musicPlayerControllerProvider.overrideWithValue(
+            _PlayedController(played),
+          ),
+          playbackProvider.overrideWith(
+            () => PlaybackController(
+              openExternal: (source) async => opened.add(source),
+            ),
+          ),
+        ],
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: NetworkStorageScreen(
+            service: _CoverFolder(),
+            path: 'Album',
+            connection: const NetworkConnection(
+              id: 'nas',
+              name: 'NAS',
+              protocol: NetworkProtocol.webdav,
+              address: 'https://nas.test/music/',
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Song.flac'));
+    await tester.pumpAndSettle();
+    expect(opened, ['network://nas/Album/Song.flac']);
+    expect(played, isEmpty);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('playing a folder passes its cover image as a reference', (
     tester,
   ) async {
@@ -476,10 +521,20 @@ class _CoverFolder extends NetworkStorageService {
   }
 }
 
+class _ExternalSettings extends SettingsNotifier {
+  @override
+  AppSettings build() => const AppSettings(playerMode: 'external');
+}
+
+class _ReadyHandler extends Fake implements MusicPlayerHandler {}
+
 class _PlayedController extends MusicPlayerController {
   _PlayedController(this.played);
 
   final List<PlayableMedia> played;
+
+  @override
+  Future<MusicPlayerHandler?> ensureInitialized() async => _ReadyHandler();
 
   @override
   Future<void> playAll(

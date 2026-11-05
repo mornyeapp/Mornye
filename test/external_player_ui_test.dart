@@ -92,36 +92,31 @@ void main() {
     },
   );
 
-  test(
-    'network playback retains controls when the internal player is required',
-    () async {
-      final runtime = _Runtime('network://fixture/song.flac');
-      addTearDown(runtime.dispose);
-      final container = ProviderContainer(
-        overrides: [
-          settingsProvider.overrideWith(_Settings.new),
-          musicPlayerRuntimeProvider.overrideWithValue(runtime),
-        ],
-      );
-      addTearDown(container.dispose);
-      container.read(settingsProvider.notifier).setPlayerMode('external');
-      container.listen(playerUiEnabledProvider, (_, _) {});
-      container.listen(currentMediaItemProvider, (_, _) {});
-      container.listen(playbackStateProvider, (_, _) {});
-      container.listen(playQueueProvider, (_, _) {});
-      await container.read(localMediaItemProvider.future);
-      await container.pump();
-      expect(container.read(playerUiEnabledProvider), isTrue);
-      expect(
-        (await container.read(currentMediaItemProvider.future))?.id,
-        'song',
-      );
-      expect(
-        (await container.read(playbackStateProvider.future)).playing,
-        isTrue,
-      );
-      expect(await container.read(playQueueProvider.future), hasLength(1));
-      expect(await container.read(playbackResumeProvider.future), isNull);
-    },
-  );
+  test('network sources do not override external player mode', () async {
+    final runtime = _Runtime('network://fixture/song.flac');
+    addTearDown(runtime.dispose);
+    final container = ProviderContainer(
+      overrides: [
+        settingsProvider.overrideWith(_Settings.new),
+        musicPlayerRuntimeProvider.overrideWithValue(runtime),
+      ],
+    );
+    addTearDown(container.dispose);
+    container.read(settingsProvider.notifier).setPlayerMode('external');
+    container.listen(playerUiEnabledProvider, (_, _) {});
+    container.listen(currentMediaItemProvider, (_, _) {});
+    container.listen(playbackStateProvider, (_, _) {});
+    container.listen(playQueueProvider, (_, _) {});
+    container.listen(localMediaItemProvider, (_, _) {});
+    await container.read(localMediaItemProvider.future);
+    await container.pump();
+    expect(container.read(playerUiEnabledProvider), isFalse);
+    expect(await container.read(currentMediaItemProvider.future), isNull);
+    expect(
+      (await container.read(playbackStateProvider.future)).playing,
+      isFalse,
+    );
+    expect(await container.read(playQueueProvider.future), isEmpty);
+    expect(await container.read(playbackResumeProvider.future), isNull);
+  });
 }

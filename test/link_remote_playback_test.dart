@@ -72,6 +72,7 @@ Map<String, dynamic> _state({bool playing = true, int index = 0}) => {
 };
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   late FakeLinkClient client;
   late ProviderContainer container;
   late FakeLibraryLookup lookup;

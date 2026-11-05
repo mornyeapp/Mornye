@@ -2,7 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/l10n/l10n.dart';
-import 'package:mornye/providers/music_player_provider.dart';
+import 'package:mornye/providers/playback_provider.dart';
 import 'package:mornye/providers/local_library_provider.dart';
 import 'package:mornye/providers/network_upload_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
@@ -269,37 +269,54 @@ class _NetworkStorageScreenState extends ConsumerState<NetworkStorageScreen> {
                 }.contains(e.name.toLowerCase()),
           )
           .firstOrNull;
-      await ref.read(musicPlayerControllerProvider).playAll([
-        for (final entry in tracks)
-          PlayableMedia(
-            id: NetworkStorageService.source(connection.id, entry.path),
-            source: NetworkStorageService.source(connection.id, entry.path),
-            title:
-                entry.song?.title ??
-                entry.name.replaceFirst(RegExp(r'\.[^.]+$'), ''),
-            artist: entry.song?.artist ?? connection.name,
-            album:
-                entry.song?.album ??
-                widget.path.split('/').where((p) => p.isNotEmpty).lastOrNull ??
-                '',
-            networkArtworkSource: entry.song?.coverPath != null
-                ? NetworkStorageService.source(
+      await ref
+          .read(playbackProvider.notifier)
+          .playMediaQueue(
+            [
+              for (final entry in tracks)
+                PlayableMedia(
+                  id: NetworkStorageService.source(connection.id, entry.path),
+                  source: NetworkStorageService.source(
                     connection.id,
-                    entry.song!.coverPath!,
-                  )
-                : cover == null
-                ? null
-                : NetworkStorageService.source(connection.id, cover.path),
-            format: entry.extension,
-            duration: entry.song?.metadata['duration'] is int
-                ? Duration(seconds: entry.song!.metadata['duration'] as int)
-                : null,
-            bitDepth: entry.song?.metadata['bit_depth'] as int?,
-            sampleRate: entry.song?.metadata['sample_rate'] as int?,
-            bitrate: entry.song?.metadata['bitrate'] as int?,
-            explicit: entry.song?.metadata['explicit'] == true,
-          ),
-      ], initialIndex: tracks.indexOf(selected));
+                    entry.path,
+                  ),
+                  title:
+                      entry.song?.title ??
+                      entry.name.replaceFirst(RegExp(r'\.[^.]+$'), ''),
+                  artist: entry.song?.artist ?? connection.name,
+                  album:
+                      entry.song?.album ??
+                      widget.path
+                          .split('/')
+                          .where((p) => p.isNotEmpty)
+                          .lastOrNull ??
+                      '',
+                  networkArtworkSource: entry.song?.coverPath != null
+                      ? NetworkStorageService.source(
+                          connection.id,
+                          entry.song!.coverPath!,
+                        )
+                      : cover == null
+                      ? null
+                      : NetworkStorageService.source(connection.id, cover.path),
+                  format: entry.extension,
+                  duration: entry.song?.metadata['duration'] is int
+                      ? Duration(
+                          seconds: entry.song!.metadata['duration'] as int,
+                        )
+                      : null,
+                  bitDepth: entry.song?.metadata['bit_depth'] as int?,
+                  sampleRate: entry.song?.metadata['sample_rate'] as int?,
+                  bitrate: entry.song?.metadata['bitrate'] as int?,
+                  explicit: entry.song?.metadata['explicit'] == true,
+                ),
+            ],
+            startIndex: tracks.indexOf(selected),
+            externalPath: NetworkStorageService.source(
+              connection.id,
+              selected.path,
+            ),
+          );
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
