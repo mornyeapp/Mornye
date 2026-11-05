@@ -35,6 +35,7 @@ import 'package:mornye/widgets/link/link_actions.dart';
 import 'package:mornye/widgets/network_offline_actions.dart';
 import 'package:mornye/widgets/link/link_devices_sheet.dart';
 import 'package:mornye/widgets/lyrics_options_button.dart';
+import 'package:mornye/widgets/lyrics_options_activity.dart';
 import 'package:mornye/widgets/lyrics_screen_awake.dart';
 import 'package:mornye/widgets/player_artwork.dart';
 import 'package:mornye/widgets/player_gesture_regions.dart';
@@ -823,24 +824,26 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
 
   /// A touch on the lyrics page holds the controls; a tap brings hidden
   /// ones back.
-  Widget _lyricsPointerListener(Widget child) => Listener(
-    behavior: HitTestBehavior.translucent,
-    onPointerDown: (event) {
-      if (!_canAutoHideLyricsControls) return;
-      if (_lyricsPointers.isEmpty) _lyricsPointerMoved = false;
-      _lyricsPointers[event.pointer] = event.position;
-      _lyricsIdleTimer?.cancel();
-    },
-    onPointerMove: (event) {
-      final origin = _lyricsPointers[event.pointer];
-      if (origin != null && (event.position - origin).distance > 12) {
-        _lyricsPointerMoved = true;
-      }
-    },
-    onPointerUp: (event) => _endLyricsInteraction(event.pointer),
-    onPointerCancel: (event) =>
-        _endLyricsInteraction(event.pointer, cancelled: true),
-    child: child,
+  Widget _lyricsPointerListener(Widget child) => LyricsOptionsActivity(
+    child: Listener(
+      behavior: HitTestBehavior.translucent,
+      onPointerDown: (event) {
+        if (!_canAutoHideLyricsControls) return;
+        if (_lyricsPointers.isEmpty) _lyricsPointerMoved = false;
+        _lyricsPointers[event.pointer] = event.position;
+        _lyricsIdleTimer?.cancel();
+      },
+      onPointerMove: (event) {
+        final origin = _lyricsPointers[event.pointer];
+        if (origin != null && (event.position - origin).distance > 12) {
+          _lyricsPointerMoved = true;
+        }
+      },
+      onPointerUp: (event) => _endLyricsInteraction(event.pointer),
+      onPointerCancel: (event) =>
+          _endLyricsInteraction(event.pointer, cancelled: true),
+      child: child,
+    ),
   );
 
   void _toggleMaterialLyrics() {

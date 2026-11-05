@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:audio_service/audio_service.dart';
+import 'package:flutter/gestures.dart' show PointerDeviceKind;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -218,6 +219,124 @@ void main() {
   }
 
   for (final mornye in [false, true]) {
+    for (final desktop in [false, true]) {
+      testWidgets('lyrics options fade and reveal without interrupting a menu '
+          '(desktop=$desktop, mornye=$mornye)', (tester) async {
+        debugDesktopPlatformOverride = desktop;
+        addTearDown(() => debugDesktopPlatformOverride = null);
+        tester.view.physicalSize = Size(desktop ? 1200 : 420, 900);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        final metadata = _Lyrics(_lyrics);
+        final preview = PlaybackSeekPreview();
+        addTearDown(metadata.dispose);
+        addTearDown(preview.dispose);
+        await tester.pumpWidget(
+          _app(
+            mornye: mornye,
+            overrides: [
+              initialSettingsProvider.overrideWithValue(
+                const AppSettings(lyricsAiModel: 'gpt-4.1-mini'),
+              ),
+              playbackStateProvider.overrideWith(
+                (ref) => const Stream<PlaybackState>.empty(),
+              ),
+              musicPlayerControllerProvider.overrideWith(
+                (ref) => throw StateError('Unexpected audio access'),
+              ),
+              currentMediaItemProvider.overrideWith(_MediaItems.new),
+              lyricsAiKeyStoreProvider.overrideWithValue(
+                MemoryLyricsAiKeyStore({'openai': 'sk-test-1234'}),
+              ),
+              lyricsTranslationCacheProvider.overrideWithValue(_MemoryCache()),
+            ],
+            home: Scaffold(
+              body: PlayerLyricsSection(
+                metadata: metadata,
+                seekPreview: preview,
+                colorScheme: const ColorScheme.dark(),
+                isActive: true,
+                options: LyricsOptionsButton(
+                  metadata: metadata,
+                  colorScheme: const ColorScheme.dark(),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final options = find.byKey(const ValueKey('lyrics-language-options'));
+        final pane = tester.getRect(find.byType(PlayerLyricsSection));
+        final blank = Offset(pane.right - 4, pane.top + 8);
+        expect(options.hitTestable(), findsOneWidget);
+        await tester.pump(const Duration(seconds: 6));
+        await tester.pumpAndSettle();
+        expect(options.hitTestable(), findsNothing);
+
+        final touch = await tester.startGesture(blank);
+        await tester.pump(const Duration(seconds: 6));
+        await tester.pumpAndSettle();
+        expect(options.hitTestable(), findsOneWidget);
+        await touch.up();
+        await tester.pumpAndSettle();
+        await tester.tap(options);
+        await tester.pumpAndSettle();
+        await tester.pump(const Duration(seconds: 6));
+        expect(find.text('Other Language…').hitTestable(), findsOneWidget);
+        await tester.tapAt(blank);
+        await tester.pumpAndSettle();
+        expect(find.text('Other Language…'), findsNothing);
+        await tester.pump(const Duration(seconds: 6));
+        await tester.pumpAndSettle();
+        expect(options.hitTestable(), findsNothing);
+        await tester.tapAt(blank);
+        await tester.pumpAndSettle();
+        expect(options.hitTestable(), findsOneWidget);
+        if (desktop) {
+          final mouse = await tester.createGesture(
+            kind: PointerDeviceKind.mouse,
+          );
+          await mouse.addPointer(location: blank);
+          await tester.pumpAndSettle();
+          await mouse.moveTo(tester.getCenter(options));
+          await tester.pumpAndSettle();
+          await tester.pump(const Duration(seconds: 6));
+          expect(options.hitTestable(), findsOneWidget);
+          await mouse.moveTo(blank);
+          await tester.pumpAndSettle();
+          await tester.pump(const Duration(seconds: 6));
+          await tester.pumpAndSettle();
+          expect(options.hitTestable(), findsNothing);
+          await mouse.moveTo(blank + const Offset(0, 2));
+          await tester.pumpAndSettle();
+          expect(options.hitTestable(), findsOneWidget);
+          await mouse.removePointer();
+        }
+        final focus = Focus.of(tester.element(options));
+        focus.requestFocus();
+        await tester.pumpAndSettle();
+        await tester.pump(const Duration(seconds: 6));
+        expect(options.hitTestable(), findsOneWidget);
+        focus.unfocus();
+        await tester.pumpAndSettle();
+        await tester.pump(const Duration(seconds: 6));
+        await tester.pumpAndSettle();
+        expect(options.hitTestable(), findsNothing);
+
+        final container = ProviderScope.containerOf(
+          tester.element(find.byType(PlayerLyricsSection)),
+        );
+        container
+            .read(settingsProvider.notifier)
+            .setAutoHideLyricsControls(false);
+        await tester.pumpAndSettle();
+        await tester.pump(const Duration(seconds: 6));
+        expect(options.hitTestable(), findsOneWidget);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      });
+    }
+
     testWidgets('linked AI translation refreshes open lyrics ($mornye)', (
       tester,
     ) async {

@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/controllers/player_metadata_controller.dart';
@@ -8,6 +11,7 @@ import 'package:mornye/services/lyrics_ai_client.dart';
 import 'package:mornye/services/lyrics_translation.dart';
 import 'package:mornye/services/lyrics_translation_languages.dart';
 import 'package:mornye/theme/mornye_theme.dart';
+import 'package:mornye/utils/android_tv.dart';
 import 'package:mornye/utils/lyrics_parser.dart';
 import 'package:mornye/widgets/app_bottom_sheet.dart';
 import 'package:mornye/widgets/app_icon.dart';
@@ -15,7 +19,9 @@ import 'package:mornye/widgets/app_icon_button.dart';
 import 'package:mornye/widgets/app_progress_indicator.dart';
 import 'package:mornye/widgets/app_snack_bar.dart';
 import 'package:mornye/widgets/lyrics_editor_sheet.dart';
+import 'package:mornye/widgets/lyrics_options_activity.dart';
 import 'package:mornye/widgets/mornye_context_menu.dart';
+import 'package:mornye/widgets/player_lyrics_controls.dart';
 
 /// The localized message for a translation failure. Raw errors never reach
 /// the user.
@@ -102,6 +108,51 @@ class LyricsOptionsButton extends ConsumerStatefulWidget {
 
 class _LyricsOptionsButtonState extends ConsumerState<LyricsOptionsButton> {
   bool _open = false;
+  bool _hidden = false;
+  bool _hovered = false;
+  bool _focused = false;
+  bool _canHide = false;
+  Timer? _hideTimer;
+  ValueListenable<(int, bool)>? _activity;
+  ParsedLyrics? _lastLyrics;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final activity = LyricsOptionsActivity.maybeOf(context);
+    if (identical(activity, _activity)) return;
+    _activity?.removeListener(_reveal);
+    _activity = activity;
+    _activity?.addListener(_reveal);
+  }
+
+  @override
+  void dispose() {
+    _hideTimer?.cancel();
+    _activity?.removeListener(_reveal);
+    super.dispose();
+  }
+
+  void _scheduleHide() {
+    _hideTimer?.cancel();
+    if (!_canHide ||
+        _hidden ||
+        _open ||
+        _hovered ||
+        _focused ||
+        _activity?.value.$2 == true) {
+      return;
+    }
+    _hideTimer = Timer(const Duration(seconds: 5), () {
+      if (!mounted || ModalRoute.of(context)?.isCurrent == false) return;
+      setState(() => _hidden = true);
+    });
+  }
+
+  void _reveal() {
+    if (_hidden) setState(() => _hidden = false);
+    _scheduleHide();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -111,10 +162,44 @@ class _LyricsOptionsButtonState extends ConsumerState<LyricsOptionsButton> {
     final apiKey =
         ref.watch(lyricsAiKeyProvider(settings.lyricsAiProvider)).value ?? '';
     final ready = lyricsAiReady(settings, apiKey);
+    final autoHide =
+        settings.autoHideLyricsControls &&
+        !isAndroidTv &&
+        !MediaQuery.accessibleNavigationOf(context);
     return ListenableBuilder(
       listenable: widget.metadata,
-      builder: (context, _) =>
-          _buildButton(context, job, ready) ?? const SizedBox.shrink(),
+      builder: (context, _) {
+        final button = _buildButton(context, job, ready);
+        final canHide = autoHide && button != null && _activity != null;
+        final lyrics = widget.metadata.lyrics;
+        if (_canHide != canHide || !identical(_lastLyrics, lyrics)) {
+          _canHide = canHide;
+          _lastLyrics = lyrics;
+          _hidden = false;
+          _scheduleHide();
+        }
+        if (button == null) return const SizedBox.shrink();
+        return Focus(
+          onFocusChange: (focused) {
+            _focused = focused;
+            _reveal();
+          },
+          child: MouseRegion(
+            onEnter: (_) {
+              _hovered = true;
+              _reveal();
+            },
+            onExit: (_) {
+              _hovered = false;
+              _scheduleHide();
+            },
+            child: PlayerLyricsControlsVisibility(
+              hidden: _hidden,
+              child: button,
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -211,6 +296,7 @@ class _LyricsOptionsButtonState extends ConsumerState<LyricsOptionsButton> {
   void _setOpen(bool open) {
     if (!mounted) return;
     setState(() => _open = open);
+    _reveal();
     widget.onOpenChanged?.call(open);
   }
 

@@ -13,6 +13,7 @@ import 'package:mornye/widgets/app_loading_indicator.dart';
 import 'package:mornye/widgets/app_snack_bar.dart';
 import 'package:mornye/widgets/expressive_button.dart';
 import 'package:mornye/widgets/lyrics_editor_sheet.dart';
+import 'package:mornye/widgets/lyrics_options_activity.dart';
 import 'package:mornye/widgets/player_lyrics.dart';
 import 'package:mornye/widgets/lyrics_text_scale.dart';
 
@@ -64,10 +65,12 @@ class PlayerLyricsSection extends ConsumerWidget {
     final translation = ref.read(lyricsTranslationProvider.notifier);
     return ListenableBuilder(
       listenable: metadata,
-      builder: (context, _) => _buildLyricsSection(
-        context,
-        visibility,
-        translation.display(metadata.lyrics),
+      builder: (context, _) => LyricsOptionsActivity(
+        child: _buildLyricsSection(
+          context,
+          visibility,
+          translation.display(metadata.lyrics),
+        ),
       ),
     );
   }
