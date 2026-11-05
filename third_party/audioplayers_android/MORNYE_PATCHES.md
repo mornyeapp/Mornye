@@ -61,17 +61,21 @@ Dart caller is `lib/services/music_playback_deck.dart` in the app.
 
 ### Mixed output
 
-On Android 9 (API 28) and later, `MediaPlayerWrapper` enables a
-`DynamicsProcessing` effect with no stage in use on the player's own session
-(player/MixedOutput.kt) before each `start()`, and disables it on `pause()`,
+On Nothing phones running Android 9 (API 28) and later, `MediaPlayerWrapper`
+enables a `DynamicsProcessing` effect with no stage in use on the player's own
+session (player/MixedOutput.kt) before each `start()`, and disables it on `pause()`,
 `stop()` and `reset()`; `release()` frees it. Without it, MediaPlayer may
 send long local tracks to a compressed offload output, where the audio DSP
 decodes them outside the platform mixer. Features that read the mixed output
 then get silence, for example the music-synced lights on Nothing phones
 (Mornye issue 802). An enabled effect without offload support makes the
 platform choose PCM through the mixer, which ExoPlayer-based players use by
-default. The effect leaves the sound unchanged. If the device refuses it,
-playback continues and the plugin logs the reason.
+default. Other manufacturers keep the platform's normal output path: even
+without processing stages, `DynamicsProcessing` participates in native volume
+handling. The forced effect is a suspect in reports of speaker volume behaving
+as mute or full volume on Realme GT6, so it is no longer attached there.
+Validation on the reported device is still needed. If a Nothing device refuses
+the effect, playback continues and the plugin logs the reason.
 
 ### Next player
 
