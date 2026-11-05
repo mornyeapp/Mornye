@@ -1,3 +1,4 @@
+import 'package:audio_service/audio_service.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -10,6 +11,7 @@ import 'package:mornye/models/track.dart';
 import 'package:mornye/providers/download_queue_provider.dart';
 import 'package:mornye/providers/library_collections_provider.dart';
 import 'package:mornye/providers/local_library_provider.dart';
+import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/playback_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/screens/mornye_library_screen.dart';
@@ -20,12 +22,15 @@ import 'package:mornye/services/playable_media.dart';
 import 'package:mornye/theme/app_theme.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/desktop_platform.dart';
+import 'package:mornye/widgets/app_icon_button.dart';
 import 'package:mornye/widgets/desktop/track_table.dart';
 import 'package:mornye/widgets/library_track_selection_bar.dart';
 import 'package:mornye/widgets/mornye_context_menu.dart';
 import 'package:mornye/widgets/track_card.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
+
+import 'support/app_icon_finder.dart';
 
 class _Settings extends SettingsNotifier {
   _Settings(this.viewMode, {this.filterMode = 'all'});
@@ -100,6 +105,8 @@ class _Queue extends DownloadQueueNotifier {
 
 class _Playback extends PlaybackController {
   final started = <String>[];
+  List<PlayableMedia> _queue = [];
+  int? _startIndex;
 
   @override
   Future<void> playMediaQueue(
@@ -108,6 +115,17 @@ class _Playback extends PlaybackController {
     required String externalPath,
   }) async {
     started.add(externalPath);
+    _queue = queue.toList();
+    _startIndex = startIndex;
+  }
+}
+
+class _Player extends MusicPlayerController {
+  final toggles = <bool>[];
+
+  @override
+  Future<void> togglePlayPause(bool isPlaying) async {
+    toggles.add(isPlaying);
   }
 }
 
@@ -182,6 +200,10 @@ void main() {
     bool withPlaylistTracks = false,
     bool root = false,
     PlaybackController? playback,
+    MusicPlayerController? player,
+    MediaItem? currentItem,
+    bool playing = false,
+    bool loading = false,
   }) async {
     debugDesktopPlatformOverride = desktop;
     tester.view.physicalSize = desktop
@@ -218,6 +240,13 @@ void main() {
           downloadQueueProvider.overrideWith(_Queue.new),
           downloadQueueLookupProvider.overrideWithValue(queue),
           if (playback != null) playbackProvider.overrideWith(() => playback),
+          if (player != null)
+            musicPlayerControllerProvider.overrideWith((ref) => player),
+          currentMediaItemProvider.overrideWithBuild(
+            (ref, notifier) => Stream.value(currentItem),
+          ),
+          playbackPlayingProvider.overrideWith((ref) => playing),
+          playbackLoadingProvider.overrideWith((ref) => loading),
         ],
         child: MaterialApp(
           theme: mornye
@@ -251,6 +280,103 @@ void main() {
       await _settle(tester);
       final preferences = await SharedPreferences.getInstance();
       expect(loadBootstrapSettings(preferences).historySortMode, 'a-z');
+    });
+
+    testWidgets(
+      'list play button starts the full queue without opening details '
+      '(mornye: $mornye)',
+      (tester) async {
+        final playback = _Playback();
+        await pumpLibrary(
+          tester,
+          desktop: true,
+          mornye: mornye,
+          playback: playback,
+        );
+        final l10n = AppLocalizations.of(tester.element(find.byType(QueueTab)));
+        final button = find.byTooltip(
+          l10n.a11yPlayTrackByArtist('Alpha', 'Artist'),
+        );
+        expect(button.hitTestable(), findsOneWidget);
+        expect(
+          find.descendant(
+            of: button,
+            matching: findAppIcon(Icons.play_circle_outline_rounded),
+          ),
+          findsOneWidget,
+        );
+
+        await tester.tap(button);
+        await _settle(tester);
+        expect(playback.started, ['/music/Alpha.flac']);
+        expect(playback._queue.map((item) => item.source), [
+          '/music/Bravo.flac',
+          '/music/Alpha.flac',
+        ]);
+        expect(playback._startIndex, 1);
+        expect(find.byType(SliverTrackTable), findsOneWidget);
+        expect(find.byType(LibraryTrackSelectionBar), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    for (final playing in [false, true]) {
+      testWidgets('current list play button toggles playback in place '
+          '(mornye: $mornye, playing: $playing)', (tester) async {
+        final playback = _Playback();
+        final player = _Player();
+        await pumpLibrary(
+          tester,
+          desktop: true,
+          mornye: mornye,
+          playback: playback,
+          player: player,
+          currentItem: const MediaItem(
+            id: '/music/Alpha.flac',
+            title: 'Alpha',
+            artist: 'Artist',
+          ),
+          playing: playing,
+        );
+        final icon = findAppIcon(
+          playing
+              ? Icons.pause_circle_filled_rounded
+              : Icons.play_circle_fill_rounded,
+        );
+        expect(icon, findsOneWidget);
+        await tester.tap(icon);
+        await _settle(tester);
+        expect(player.toggles, [playing]);
+        expect(playback.started, isEmpty);
+        expect(find.byType(SliverTrackTable), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      });
+    }
+
+    testWidgets('current list play button is disabled while loading '
+        '(mornye: $mornye)', (tester) async {
+      final player = _Player();
+      await pumpLibrary(
+        tester,
+        desktop: true,
+        mornye: mornye,
+        player: player,
+        currentItem: const MediaItem(
+          id: '/music/Alpha.flac',
+          title: 'Alpha',
+          artist: 'Artist',
+        ),
+        loading: true,
+      );
+      final l10n = AppLocalizations.of(tester.element(find.byType(QueueTab)));
+      final button = find.byWidgetPredicate(
+        (widget) =>
+            widget is AppIconButton &&
+            widget.tooltip == l10n.a11yPlayTrackByArtist('Alpha', 'Artist'),
+      );
+      expect(tester.widget<AppIconButton>(button).onPressed, isNull);
+      expect(player.toggles, isEmpty);
+      expect(tester.takeException(), isNull);
     });
 
     testWidgets('a right-click menu leaves the selection toolbar closed '

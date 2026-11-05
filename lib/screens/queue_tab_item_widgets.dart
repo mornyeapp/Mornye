@@ -1023,6 +1023,21 @@ extension _QueueTabItemWidgets on _QueueTabState {
               _ => null,
             },
             leading: _buildUnifiedCoverImage(item, colorScheme, 32),
+            titleTrailing: Builder(
+              builder: (context) => _LibraryPlaybackButton(
+                playbackKey: _libraryPlaybackKey(item),
+                playTooltip: context.l10n.a11yPlayTrackByArtist(
+                  item.trackName,
+                  item.artistName,
+                ),
+                // Cached rows must use the current page and sort order.
+                onPlay: () => _playLibraryItem(
+                  item,
+                  _songTableByMode[filterMode]?.items ?? items,
+                ),
+                inline: true,
+              ),
+            ),
             playback: mediaItemPlaybackUiProvider(_libraryPlaybackKey(item)),
           );
       rows.add(row);
@@ -1388,12 +1403,14 @@ class _LibraryPlaybackButton extends ConsumerWidget {
     required this.playTooltip,
     required this.onPlay,
     this.grid = false,
+    this.inline = false,
   });
 
   final PlaybackRowKey playbackKey;
   final String playTooltip;
   final VoidCallback onPlay;
   final bool grid;
+  final bool inline;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -1421,6 +1438,35 @@ class _LibraryPlaybackButton extends ConsumerWidget {
     }
 
     final colorScheme = Theme.of(context).colorScheme;
+    if (inline) {
+      return AppIconButton(
+        tooltip: tooltip,
+        onPressed: onPressed,
+        iconSize: 24,
+        padding: EdgeInsets.zero,
+        constraints: BoxConstraints.tightFor(
+          width: context.tokens.minTouchTarget,
+          height: context.tokens.minTouchTarget,
+        ),
+        icon: playback.isLoading
+            ? AppLoadingIndicator(
+                size: 18,
+                strokeWidth: 2,
+                color: colorScheme.primary,
+              )
+            : Icon(
+                playback.isPlaying
+                    ? Icons.pause_circle_filled_rounded
+                    : playback.isCurrent
+                    ? Icons.play_circle_fill_rounded
+                    : Icons.play_circle_outline_rounded,
+                color: playback.isCurrent
+                    ? colorScheme.primary
+                    : colorScheme.onSurfaceVariant,
+              ),
+      );
+    }
+
     // Material draws a filled tonal icon button: a solid role pair rather
     // than a faded primary container.
     final material = !context.isMornye;
