@@ -57,6 +57,7 @@ class MornyePlayerLayout extends ConsumerWidget {
     required this.onPageChanged,
     required this.onTrackNavigation,
     required this.onMoreActions,
+    this.showSourceLabel = true,
     this.artworkAspectRatio,
     this.controlsHeadroom = 0,
   });
@@ -76,6 +77,9 @@ class MornyePlayerLayout extends ConsumerWidget {
   final double artworkTopInset;
   final MornyePlayerArtworkKeys artworkKeys;
   final ValueListenable<Map<String, Color>> artworkForeground;
+
+  /// False where the Playing on row names the song's source instead.
+  final bool showSourceLabel;
   final bool lyricsControlsHidden;
   final bool lyricsOptionsOpen;
   final Widget Function(bool showOptions) lyricsBuilder;
@@ -548,10 +552,11 @@ class MornyePlayerLayout extends ConsumerWidget {
                           ),
                         ),
                       ),
-                      PlaybackSourceLabel(
-                        item: mediaItem,
-                        color: colorScheme.onSurface.withValues(alpha: 0.72),
-                      ),
+                      if (showSourceLabel)
+                        PlaybackSourceLabel(
+                          item: mediaItem,
+                          color: colorScheme.onSurface.withValues(alpha: 0.72),
+                        ),
                     ],
                   ),
                 ),

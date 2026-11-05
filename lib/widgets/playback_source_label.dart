@@ -19,9 +19,19 @@ final _sourceNameProvider = FutureProvider.family<String?, String>((
 /// Describes the file actually opened, including an offline copy preferred
 /// over a network source already in the queue.
 class PlaybackSourceLabel extends ConsumerWidget {
-  const PlaybackSourceLabel({super.key, required this.item, this.color});
+  const PlaybackSourceLabel({
+    super.key,
+    required this.item,
+    this.color,
+    this.style,
+    this.padding = const EdgeInsets.only(top: 4),
+  });
   final MediaItem item;
   final Color? color;
+
+  /// The text style, drawn in [color]; `labelSmall` by default.
+  final TextStyle? style;
+  final EdgeInsetsGeometry padding;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -45,12 +55,14 @@ class PlaybackSourceLabel extends ConsumerWidget {
       label = context.l10n.offlineStreaming(name);
     }
     return Padding(
-      padding: const EdgeInsets.only(top: 4),
+      padding: padding,
       child: Text(
         label,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: Theme.of(context).textTheme.labelSmall?.copyWith(color: color),
+        style: (style ?? Theme.of(context).textTheme.labelSmall)?.copyWith(
+          color: color,
+        ),
       ),
     );
   }

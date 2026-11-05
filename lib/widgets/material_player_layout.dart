@@ -34,8 +34,11 @@ class MaterialPlayerLayout extends StatelessWidget {
     this.immersive = false,
     this.compactPlayer = false,
     this.onCompactPlayerTouch,
+    this.showSourceLabel = true,
   });
 
+  /// False where the Playing on row names the song's source instead.
+  final bool showSourceLabel;
   final MediaItem mediaItem;
   final PlayerMetadataController metadata;
   final PlaybackSeekPreview seekPreview;
@@ -372,10 +375,11 @@ class MaterialPlayerLayout extends StatelessWidget {
                           maxLines: compact ? 1 : 2,
                         ),
                         SizedBox(height: compact ? 4 : 6),
-                        PlaybackSourceLabel(
-                          item: mediaItem,
-                          color: colorScheme.onSurfaceVariant,
-                        ),
+                        if (showSourceLabel)
+                          PlaybackSourceLabel(
+                            item: mediaItem,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
                         Consumer(
                           builder: (context, ref, _) {
                             final track = ref

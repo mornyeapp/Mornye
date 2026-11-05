@@ -210,7 +210,7 @@ class LinkDevicesSheet extends ConsumerWidget {
 /// "Playing on (desktop)" in the player while the paired desktop plays in
 /// the phone's place; tapping it opens the Devices sheet. Empty otherwise.
 class LinkPlayingOnLabel extends ConsumerWidget {
-  const LinkPlayingOnLabel({super.key, this.color, this.height});
+  const LinkPlayingOnLabel({super.key, this.color, this.height, this.idle});
 
   /// The label's color; Material defaults to `primary`.
   final Color? color;
@@ -219,10 +219,13 @@ class LinkPlayingOnLabel extends ConsumerWidget {
   /// target by default.
   final double? height;
 
+  /// Shown instead while this phone plays.
+  final Widget? idle;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     if (ref.watch(activeRemotePlaybackProvider) == null) {
-      return const SizedBox.shrink();
+      return idle ?? const SizedBox.shrink();
     }
     final color = this.color ?? Theme.of(context).colorScheme.primary;
     final textTheme = Theme.of(context).textTheme;

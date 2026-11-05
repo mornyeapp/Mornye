@@ -34,6 +34,7 @@ import 'package:mornye/widgets/desktop/desktop_inspector.dart';
 import 'package:mornye/widgets/link/link_actions.dart';
 import 'package:mornye/widgets/network_offline_actions.dart';
 import 'package:mornye/widgets/link/link_devices_sheet.dart';
+import 'package:mornye/widgets/playback_source_label.dart';
 import 'package:mornye/widgets/lyrics_options_button.dart';
 import 'package:mornye/widgets/lyrics_options_activity.dart';
 import 'package:mornye/widgets/lyrics_screen_awake.dart';
@@ -572,6 +573,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                         onNotification: _onLyricsScroll,
                         child: MornyePlayerLayout(
                           mediaItem: mediaItem,
+                          showSourceLabel: !reservesPlayingOnRow,
                           metadata: _trackMetadata,
                           seekPreview: _seekPreview,
                           colorScheme: colorScheme,
@@ -616,6 +618,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                       )
                     : MaterialPlayerLayout(
                         mediaItem: mediaItem,
+                        showSourceLabel: !reservesPlayingOnRow,
                         metadata: _trackMetadata,
                         seekPreview: _seekPreview,
                         colorScheme: colorScheme,
@@ -748,6 +751,24 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                               child: LinkPlayingOnLabel(
                                 color: mornye ? Colors.white : null,
                                 height: _playingOnRowHeight,
+                                // Where the music plays and where it comes
+                                // from read from one place.
+                                idle: PlaybackSourceLabel(
+                                  item: mediaItem,
+                                  color: mornye
+                                      ? Colors.white
+                                      : colorScheme.primary,
+                                  style: mornye
+                                      ? Theme.of(
+                                          context,
+                                        ).textTheme.labelMedium?.copyWith(
+                                          fontWeight: FontWeight.w600,
+                                        )
+                                      : Theme.of(context).textTheme.labelLarge,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                  ),
+                                ),
                               ),
                             ),
                           ),

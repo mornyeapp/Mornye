@@ -545,6 +545,59 @@ void main() {
   }
 
   for (final mornye in [true, false]) {
+    final style = mornye ? 'Mornye' : 'Material';
+    final theme = mornye
+        ? MornyeTheme.build(Brightness.dark)
+        : AppTheme.light();
+    // An offline copy names its source without loading the network storage
+    // singleton, which would stay tied to this test's fake clock.
+    MediaItem streamed() => item('first').copyWith(
+      extras: {
+        'source': '/music/first.flac',
+        'originSource': 'network://nas/first.flac',
+      },
+    );
+    final source = find.text('Playing from this device');
+    final row = find.byKey(const ValueKey('link-playing-on-row'));
+
+    testWidgets('the Playing on row names the song source ($style)', (
+      tester,
+    ) async {
+      await pumpNowPlaying(tester, theme: theme, size: const Size(412, 915));
+      mediaItems.add(streamed());
+      await settlePlayer(tester);
+      expect(source, findsOneWidget);
+      expect(find.descendant(of: row, matching: source), findsOneWidget);
+      expect(tester.getSize(row).height, 36);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('a computer that plays replaces the song source ($style)', (
+      tester,
+    ) async {
+      await pumpNowPlaying(
+        tester,
+        theme: theme,
+        size: const Size(412, 915),
+        remote: _TestRemote(),
+      );
+      mediaItems.add(streamed());
+      await settlePlayer(tester);
+      expect(source, findsNothing);
+      expect(find.byKey(const ValueKey('link-playing-on')), findsOneWidget);
+    });
+
+    testWidgets('landscape keeps the song source in the header ($style)', (
+      tester,
+    ) async {
+      await pumpNowPlaying(tester, theme: theme, size: const Size(852, 393));
+      mediaItems.add(streamed());
+      await settlePlayer(tester);
+      expect(row, findsNothing);
+      expect(source, findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
     testWidgets('portrait stays put while a computer takes over '
         '(${mornye ? 'Mornye' : 'Material'})', (tester) async {
       Future<({Rect title, Rect toolbar})> measure(
