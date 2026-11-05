@@ -667,11 +667,14 @@ extension _QueueTabItemWidgets on _QueueTabState {
     double? size,
   ]) {
     final isDownloaded = item.source == LibraryItemSource.downloaded;
+    // Grid badges line up with the card's other corner overlays.
+    final badgeInset = size == null ? 4.0 : 0.0;
 
     // Scanned SAF tracks also recover artwork after a transient provider error.
     if (isDownloaded || item.filePath.startsWith('content://')) {
       return OfflineAvailabilityCover(
         item: item,
+        inset: badgeInset,
         child: ValueListenableBuilder<int>(
           valueListenable: _embeddedCoverVersion,
           builder: (context, _, child) => _buildUnifiedCoverImageInner(
@@ -686,6 +689,7 @@ extension _QueueTabItemWidgets on _QueueTabState {
 
     return OfflineAvailabilityCover(
       item: item,
+      inset: badgeInset,
       child: _buildUnifiedCoverImageInner(
         item,
         colorScheme,

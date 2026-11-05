@@ -316,9 +316,14 @@ class OfflineAvailabilityCover extends StatelessWidget {
     super.key,
     required this.item,
     required this.child,
+    this.inset = 0,
   });
   final UnifiedLibraryItem item;
   final Widget child;
+
+  /// Distance from the cover's bottom start corner, which stays free of the
+  /// source and play overlays on a grid card.
+  final double inset;
 
   @override
   Widget build(BuildContext context) {
@@ -332,19 +337,20 @@ class OfflineAvailabilityCover extends StatelessWidget {
         children: [
           child,
           PositionedDirectional(
-            bottom: 0,
-            end: 0,
+            bottom: inset,
+            start: inset,
             child: DecoratedBox(
               decoration: BoxDecoration(
-                color: colors.surfaceContainerHigh,
+                color: colors.secondaryContainer,
                 shape: BoxShape.circle,
               ),
               child: Padding(
-                padding: const EdgeInsets.all(2),
+                padding: const EdgeInsets.all(3),
                 child: AppIcon.adaptive(
-                  local ? Icons.offline_pin_outlined : Icons.cloud_outlined,
+                  local ? Icons.offline_pin : Icons.cloud,
                   size: 14,
-                  color: colors.onSurface,
+                  fill: 1,
+                  color: colors.onSecondaryContainer,
                   semanticLabel: label,
                 ),
               ),
