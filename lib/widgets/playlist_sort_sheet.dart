@@ -5,6 +5,55 @@ import 'package:mornye/widgets/album_detail_header.dart';
 import 'package:mornye/widgets/app_bottom_sheet.dart';
 import 'package:mornye/widgets/desktop/context_menu.dart';
 import 'package:mornye/widgets/desktop/desktop_selection.dart';
+import 'package:mornye/widgets/desktop/track_table.dart';
+
+PlaylistSortMode playlistSortFromTableSort(TrackTableSort? sort) {
+  if (sort == null) return PlaylistSortMode.custom;
+  return switch (sort.column) {
+    TrackTableColumn.dateAdded => sort.ascending
+        ? PlaylistSortMode.dateAddedAsc
+        : PlaylistSortMode.dateAddedDesc,
+    TrackTableColumn.title => sort.ascending
+        ? PlaylistSortMode.titleAsc
+        : PlaylistSortMode.titleDesc,
+    TrackTableColumn.artist => sort.ascending
+        ? PlaylistSortMode.artistAsc
+        : PlaylistSortMode.artistDesc,
+    TrackTableColumn.album => sort.ascending
+        ? PlaylistSortMode.albumAsc
+        : PlaylistSortMode.albumDesc,
+    TrackTableColumn.duration => sort.ascending
+        ? PlaylistSortMode.durationAsc
+        : PlaylistSortMode.durationDesc,
+    _ => PlaylistSortMode.custom,
+  };
+}
+
+TrackTableSort? tableSortFromPlaylistSort(PlaylistSortMode mode) {
+  return switch (mode) {
+    PlaylistSortMode.custom => null,
+    PlaylistSortMode.dateAddedAsc =>
+      (column: TrackTableColumn.dateAdded, ascending: true),
+    PlaylistSortMode.dateAddedDesc =>
+      (column: TrackTableColumn.dateAdded, ascending: false),
+    PlaylistSortMode.titleAsc =>
+      (column: TrackTableColumn.title, ascending: true),
+    PlaylistSortMode.titleDesc =>
+      (column: TrackTableColumn.title, ascending: false),
+    PlaylistSortMode.artistAsc =>
+      (column: TrackTableColumn.artist, ascending: true),
+    PlaylistSortMode.artistDesc =>
+      (column: TrackTableColumn.artist, ascending: false),
+    PlaylistSortMode.albumAsc =>
+      (column: TrackTableColumn.album, ascending: true),
+    PlaylistSortMode.albumDesc =>
+      (column: TrackTableColumn.album, ascending: false),
+    PlaylistSortMode.durationAsc =>
+      (column: TrackTableColumn.duration, ascending: true),
+    PlaylistSortMode.durationDesc =>
+      (column: TrackTableColumn.duration, ascending: false),
+  };
+}
 
 /// Human-readable label for each sort mode.
 String playlistSortLabel(PlaylistSortMode mode) => switch (mode) {

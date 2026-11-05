@@ -24,6 +24,7 @@ import 'package:mornye/widgets/album_detail_header.dart';
 import 'package:mornye/widgets/cached_cover_image.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/l10n/l10n.dart';
+import 'package:mornye/models/playlist_sort.dart';
 import 'package:mornye/models/track.dart';
 import 'package:mornye/services/m3u_playlist_service.dart';
 import 'package:mornye/services/downloaded_embedded_cover_resolver.dart';
@@ -43,6 +44,7 @@ import 'package:mornye/controllers/collapsing_header_scroll_mixin.dart';
 import 'package:mornye/controllers/confirm_and_delete_tracks.dart';
 import 'package:mornye/controllers/library_tracks_folder_data.dart';
 import 'package:mornye/controllers/selection_mode_mixin.dart';
+import 'package:mornye/widgets/playlist_sort_sheet.dart';
 import 'package:mornye/widgets/collection_reorder_sliver.dart';
 import 'package:mornye/widgets/discard_changes_dialog.dart';
 import 'package:mornye/screens/track_metadata_screen.dart';
@@ -92,6 +94,7 @@ class _LibraryTracksFolderScreenState
         CollapsingHeaderScrollMixin<LibraryTracksFolderScreen> {
   UserPlaylistCollection? playlist;
   final _folderData = LibraryTracksFolderData();
+  PlaylistSortMode _sortMode = PlaylistSortMode.custom;
   List<CollectionTrackEntry>? _orderDraft;
   List<String> _orderBefore = const [];
   bool _savingOrder = false;
@@ -109,6 +112,7 @@ class _LibraryTracksFolderScreenState
   void _editOrder(List<CollectionTrackEntry> entries) {
     exitSelectionMode();
     setState(() {
+      _sortMode = PlaylistSortMode.custom;
       _orderDraft = [...entries];
       _orderBefore = [for (final entry in entries) entry.key];
       _draggingOrder = false;
@@ -367,7 +371,10 @@ class _LibraryTracksFolderScreenState
     }
 
     entries = _orderDraft ?? entries;
-    _folderData.update(entries);
+    final effectiveEntries = _editingOrder
+        ? entries
+        : sortCollectionTrackEntries(entries, _sortMode);
+    _folderData.update(effectiveEntries);
     pruneSelection(_folderData.keys);
 
     final title = switch (widget.mode) {
@@ -407,7 +414,8 @@ class _LibraryTracksFolderScreenState
         : 0.0;
 
     final inHistory = _folderData.inHistory(existingHistoryKeys);
-    final ids = [for (final entry in entries) entry.key];
+    final ids = [for (final entry in effectiveEntries) entry.key];
+    final datesAdded = [for (final entry in effectiveEntries) entry.addedAt];
     final scaffold = CollectionScaffold(
       scrollController: scrollController,
       isSelectionMode: showsSelectionBar,
@@ -415,11 +423,11 @@ class _LibraryTracksFolderScreenState
       selectionBar: _buildSelectionBottomBar(
         context,
         colorScheme,
-        entries,
+        effectiveEntries,
         ids,
         bottomPadding,
       ),
-      appBar: _buildAppBar(context, colorScheme, title, entries, playlist),
+      appBar: _buildAppBar(context, colorScheme, title, effectiveEntries, playlist),
       slivers: [
         if (_editingOrder)
           SliverToBoxAdapter(
@@ -462,15 +470,22 @@ class _LibraryTracksFolderScreenState
             tracks: folderTracks,
             ids: ids,
             isInHistory: inHistory,
+            datesAdded: datesAdded,
             selectedIds: selectedIds,
+            sort: tableSortFromPlaylistSort(_sortMode),
+            onSort: (nextSort) {
+              setState(() {
+                _sortMode = playlistSortFromTableSort(nextSort);
+              });
+            },
             onSelect: applyDesktopClick,
             onActivate: (index) =>
-                _activateEntry(entries, folderTracks, inHistory, index),
+                _activateEntry(effectiveEntries, folderTracks, inHistory, index),
             onContextMenu: (index, position) => showSelectionMenu(
-              entries[index].key,
+              effectiveEntries[index].key,
               () => _showEntryMenu(
                 context,
-                entries,
+                effectiveEntries,
                 folderTracks,
                 inHistory,
                 index,
@@ -485,7 +500,7 @@ class _LibraryTracksFolderScreenState
             padding: EdgeInsets.symmetric(horizontal: wideListInset(context)),
             sliver: SliverList(
               delegate: SliverChildBuilderDelegate((context, index) {
-                final entry = entries[index];
+                final entry = effectiveEntries[index];
                 final isSelected = selectedIds.contains(entry.key);
                 final isInHistory = inHistory[index];
                 return KeyedSubtree(
@@ -509,7 +524,7 @@ class _LibraryTracksFolderScreenState
                     ),
                   ),
                 );
-              }, childCount: entries.length),
+              }, childCount: effectiveEntries.length),
             ),
           ),
         if (playlist case final playlist?
@@ -1061,6 +1076,15 @@ class _LibraryTracksFolderScreenState
             const SizedBox(width: 8),
             LinkTrackTransferButton(
               tracks: entries.map((e) => e.track).toList(growable: false),
+            ),
+          ],
+          if (!isSelectionMode && entries.length > 1 && !_editingOrder) ...[
+            const SizedBox(width: 8),
+            buildPlaylistSortButton(
+              context: context,
+              currentSort: _sortMode,
+              hasDateAdded: true,
+              onSortChanged: (newSort) => setState(() => _sortMode = newSort),
             ),
           ],
           if (!isSelectionMode && entries.length > 1) ...[
