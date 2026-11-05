@@ -4,6 +4,21 @@ extension NetworkStorageEdit on NetworkStorageService {
   /// Protocol capability only. Share permissions are checked by the server.
   Future<bool> canEditFile(String source) => canDeleteFile(source);
 
+  Future<bool> editableFileExists(String source) async {
+    final location = await _deletionLocation(source);
+    if (location == null) {
+      throw const FormatException('File editing requires SMB or WebDAV');
+    }
+    final parent = location.path.substring(
+      0,
+      location.path.lastIndexOf('/') + 1,
+    );
+    return (await list(
+      location.connection,
+      parent,
+    )).any((entry) => entry.path == location.path && !entry.directory);
+  }
+
   Future<void> _moveEditedFile(
     NetworkConnection connection,
     String from,

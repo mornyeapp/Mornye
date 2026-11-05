@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import 'package:path/path.dart' as p;
+
 import 'package:mornye/services/network_audio_analysis_input.dart';
 import 'package:mornye/services/network_metadata_service.dart';
 import 'package:mornye/services/network_storage_service.dart';
@@ -26,6 +28,7 @@ class NetworkFileEditor {
     String source,
     Future<T> Function(String path) edit, {
     required bool Function(T result) succeeded,
+    bool publishLyricsSidecar = false,
   }) {
     final result = (_pending[source] ?? Future<void>.value()).then((_) async {
       if (!await _storage.canEditFile(source)) {
@@ -39,7 +42,12 @@ class NetworkFileEditor {
         final result = await edit(working.path);
         if (succeeded(result)) {
           await _storage.replaceFile(source, working, original: input);
-          await _changed(source);
+          try {
+            if (publishLyricsSidecar) await _publishLyrics(source, working);
+          } finally {
+            // The audio was committed even if its optional sidecar failed.
+            await _changed(source);
+          }
         }
         return result;
       });
@@ -52,6 +60,32 @@ class NetworkFileEditor {
     return result.whenComplete(() {
       if (identical(_pending[source], tail)) _pending.remove(source);
     });
+  }
+
+  Future<void> _publishLyrics(String source, File working) async {
+    final sidecar = File(p.setExtension(working.path, '.lrc'));
+    if (!await sidecar.exists()) return;
+    final uri = Uri.parse(source);
+    final destination = uri
+        .replace(path: p.url.setExtension(uri.path, '.lrc'))
+        .toString();
+    if (await _storage.editableFileExists(destination)) {
+      await _input.withFile(destination, (original) async {
+        await _storage.replaceFile(
+          destination,
+          sidecar,
+          original: File(original),
+        );
+      });
+    } else {
+      await _storage.publishUpload(
+        destination,
+        sidecar,
+        NetworkStorageService.newId(),
+        checkpoint: () {},
+        progress: (_, _) {},
+      );
+    }
   }
 
   static String _extension(String path) {
