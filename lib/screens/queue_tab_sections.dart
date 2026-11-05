@@ -45,7 +45,9 @@ extension _QueueTabSections on _QueueTabState {
     final mode =
         widget.librarySection ?? ref.read(settingsProvider).historyFilterMode;
     return mode == 'playlists'
-        ? librarySortModes.where((sort) => !sort.startsWith('size-'))
+        ? librarySortModes.where(
+            (sort) => !sort.startsWith('size-') && !sort.startsWith('year-'),
+          )
         : librarySortModes;
   }
 
@@ -61,6 +63,8 @@ extension _QueueTabSections on _QueueTabState {
       'artist-desc' => l10n.searchSortArtistZA,
       'album-asc' => l10n.libraryFilterSortAlbumAsc,
       'album-desc' => l10n.libraryFilterSortAlbumDesc,
+      'year-asc' => l10n.libraryFilterSortYearAsc,
+      'year-desc' => l10n.libraryFilterSortYearDesc,
       'release-newest' => l10n.searchSortDateNewest,
       'release-oldest' => l10n.searchSortDateOldest,
       'genre-asc' => l10n.libraryFilterSortGenreAsc,
@@ -208,7 +212,10 @@ extension _QueueTabSections on _QueueTabState {
                 'a-z' || 'z-a' => Icons.sort_by_alpha,
                 'artist-asc' || 'artist-desc' => Icons.person_outline,
                 'album-asc' || 'album-desc' => Icons.album_outlined,
-                'release-newest' || 'release-oldest' => Icons.event_outlined,
+                'year-asc' ||
+                'year-desc' ||
+                'release-newest' ||
+                'release-oldest' => Icons.event_outlined,
                 'genre-asc' || 'genre-desc' => Icons.category_outlined,
                 'size-desc' || 'size-asc' => Icons.storage_outlined,
                 _ => Icons.schedule,

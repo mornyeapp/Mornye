@@ -32,6 +32,25 @@ void main() {
     }
   });
 
+  test('album sort restores either year order and tolerates old settings', () {
+    expect(AppSettings.fromJson({}).libraryAlbumSortMode, 'a-z');
+    for (final invalid in [null, '', 'unsupported', 42]) {
+      expect(
+        AppSettings.fromJson({
+          'libraryAlbumSortMode': invalid,
+        }).libraryAlbumSortMode,
+        'a-z',
+      );
+    }
+    for (final mode in ['year-asc', 'year-desc']) {
+      final settings = const AppSettings().copyWith(libraryAlbumSortMode: mode);
+      expect(
+        AppSettings.fromJson(settings.toJson()).libraryAlbumSortMode,
+        mode,
+      );
+    }
+  });
+
   test(
     'retired quality conversion settings do not enable automatic conversion',
     () {

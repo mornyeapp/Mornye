@@ -47,6 +47,7 @@ extension _QueueTabFilterWidgets on _QueueTabState {
     final showFilteringIndicator = filterData.showFilteringIndicator;
     final filteredGroupedAlbums = filterData.filteredGroupedAlbums;
     final filteredGroupedLocalAlbums = filterData.filteredGroupedLocalAlbums;
+    final orderedAlbums = filterData.orderedAlbums;
     final unifiedItems = filterData.unifiedItems;
     final allFilteredUnifiedItems = filterData.filteredUnifiedItems;
     final totalTrackCount = filterData.totalTrackCount;
@@ -472,31 +473,22 @@ extension _QueueTabFilterWidgets on _QueueTabState {
               mainAxisSpacing: 12,
               crossAxisSpacing: 12,
               childAspectRatio: 0.72,
-              delegate: SliverChildBuilderDelegate(
-                (context, index) {
-                  if (index < filteredGroupedAlbums.length) {
-                    final album = filteredGroupedAlbums[index];
-                    return KeyedSubtree(
-                      key: ValueKey(album.key),
-                      child: _buildAlbumGridItem(context, album, colorScheme),
-                    );
-                  } else {
-                    final localIndex = index - filteredGroupedAlbums.length;
-                    final album = filteredGroupedLocalAlbums[localIndex];
-                    return KeyedSubtree(
-                      key: ValueKey('local_${album.key}'),
-                      child: _buildLocalAlbumGridItem(
-                        context,
-                        album,
-                        colorScheme,
-                      ),
-                    );
-                  }
-                },
-                childCount:
-                    filteredGroupedAlbums.length +
-                    filteredGroupedLocalAlbums.length,
-              ),
+              delegate: SliverChildBuilderDelegate((context, index) {
+                return switch (orderedAlbums[index]) {
+                  final _GroupedAlbum album => KeyedSubtree(
+                    key: ValueKey(album.key),
+                    child: _buildAlbumGridItem(context, album, colorScheme),
+                  ),
+                  final _GroupedLocalAlbum album => KeyedSubtree(
+                    key: ValueKey('local_${album.key}'),
+                    child: _buildLocalAlbumGridItem(
+                      context,
+                      album,
+                      colorScheme,
+                    ),
+                  ),
+                };
+              }, childCount: orderedAlbums.length),
             ),
           ),
 
@@ -729,28 +721,28 @@ extension _QueueTabFilterWidgets on _QueueTabState {
 
     // The fast scroller follows the loaded rows. Near-end notifications load
     // the next page while a drag continues.
-    final albumCount =
-        filteredGroupedAlbums.length + filteredGroupedLocalAlbums.length;
+    final albumCount = orderedAlbums.length;
     String? labelAt(double fraction) {
       if (filterMode == 'albums') {
         if (albumCount == 0) return null;
         final index = (fraction * (albumCount - 1)).round();
-        if (index < filteredGroupedAlbums.length) {
-          final album = filteredGroupedAlbums[index];
-          return _albumSectionLabel(
-            context,
-            album: album.albumName,
-            artist: album.artistName,
-            added: album.latestDownload,
-          );
-        }
-        final album =
-            filteredGroupedLocalAlbums[index - filteredGroupedAlbums.length];
+        final (name, artist, added) = switch (orderedAlbums[index]) {
+          final _GroupedAlbum album => (
+            album.albumName,
+            album.artistName,
+            album.latestDownload,
+          ),
+          final _GroupedLocalAlbum album => (
+            album.albumName,
+            album.artistName,
+            album.latestScanned,
+          ),
+        };
         return _albumSectionLabel(
           context,
-          album: album.albumName,
-          artist: album.artistName,
-          added: album.latestScanned,
+          album: name,
+          artist: artist,
+          added: added,
         );
       }
       if (filterMode != 'all' && filterMode != 'singles') return null;

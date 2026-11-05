@@ -35,6 +35,8 @@ const librarySortModes = [
   'artist-desc',
   'album-asc',
   'album-desc',
+  'year-asc',
+  'year-desc',
   'release-newest',
   'release-oldest',
   'genre-asc',
@@ -43,6 +45,18 @@ const librarySortModes = [
 
 String librarySortModeFromJson(Object? value) =>
     value is String && librarySortModes.contains(value) ? value : 'latest';
+
+String libraryAlbumSortModeFromJson(Object? value) =>
+    const [
+      'a-z',
+      'latest',
+      'size-desc',
+      'size-asc',
+      'year-asc',
+      'year-desc',
+    ].contains(value)
+    ? value as String
+    : 'a-z';
 
 @JsonSerializable(explicitToJson: true)
 class AppSettings {
@@ -154,6 +168,8 @@ class AppSettings {
   final String historyFilterMode;
   @JsonKey(fromJson: librarySortModeFromJson)
   final String historySortMode;
+  @JsonKey(fromJson: libraryAlbumSortModeFromJson)
+  final String libraryAlbumSortMode;
 
   /// Library view opened when switching to the Library tab:
   /// 'last' (keep last used), 'all', 'albums', 'singles', or 'playlists'.
@@ -342,6 +358,7 @@ class AppSettings {
     this.historyViewMode = 'grid',
     this.historyFilterMode = 'all',
     this.historySortMode = 'latest',
+    this.libraryAlbumSortMode = 'a-z',
     this.defaultLibraryView = 'last',
     this.libraryQualityLabelMode = AppSettings.libraryQualityLabelBitDepthOnly,
     this.askQualityBeforeDownload = true,
@@ -495,6 +512,7 @@ class AppSettings {
     String? historyViewMode,
     String? historyFilterMode,
     String? historySortMode,
+    String? libraryAlbumSortMode,
     String? defaultLibraryView,
     String? libraryQualityLabelMode,
     bool? askQualityBeforeDownload,
@@ -643,6 +661,7 @@ class AppSettings {
       historyViewMode: historyViewMode ?? this.historyViewMode,
       historyFilterMode: historyFilterMode ?? this.historyFilterMode,
       historySortMode: historySortMode ?? this.historySortMode,
+      libraryAlbumSortMode: libraryAlbumSortMode ?? this.libraryAlbumSortMode,
       defaultLibraryView: defaultLibraryView ?? this.defaultLibraryView,
       libraryQualityLabelMode:
           libraryQualityLabelMode ?? this.libraryQualityLabelMode,

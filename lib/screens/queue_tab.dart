@@ -212,8 +212,11 @@ class _QueueTabState extends ConsumerState<QueueTab> {
     final settings = ref.read(settingsProvider);
     final mode = settings.historySortMode;
     final section = widget.librarySection ?? settings.historyFilterMode;
-    // Playlists have no file size. Keep the saved song order for returning.
-    return section == 'playlists' && mode.startsWith('size-') ? 'latest' : mode;
+    // Playlists have no size or release year. Keep the saved song order.
+    return section == 'playlists' &&
+            (mode.startsWith('size-') || mode.startsWith('year-'))
+        ? 'latest'
+        : mode;
   }
 
   String _libraryQualityLabelMode = AppSettings.libraryQualityLabelBitDepthOnly;

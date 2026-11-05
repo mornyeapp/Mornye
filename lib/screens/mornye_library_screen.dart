@@ -75,7 +75,11 @@ class _MornyeLibraryScreenState extends ConsumerState<MornyeLibraryScreen> {
   @override
   void initState() {
     super.initState();
-    _sort = _overview ? 'latest' : 'a-z';
+    _sort = _overview
+        ? 'latest'
+        : _artists
+        ? 'a-z'
+        : ref.read(settingsProvider).libraryAlbumSortMode;
     _scroll.addListener(() {
       if (_scroll.position.extentAfter < 500 &&
           !_loading &&
@@ -191,6 +195,16 @@ class _MornyeLibraryScreenState extends ConsumerState<MornyeLibraryScreen> {
       ('latest', context.l10n.libraryRecentlyAdded, Icons.schedule),
       if (!_artists) ...[
         (
+          'year-asc',
+          context.l10n.libraryFilterSortYearAsc,
+          Icons.event_outlined,
+        ),
+        (
+          'year-desc',
+          context.l10n.libraryFilterSortYearDesc,
+          Icons.event_outlined,
+        ),
+        (
           'size-desc',
           context.l10n.libraryFilterSortSizeLargest,
           Icons.storage_outlined,
@@ -223,6 +237,9 @@ class _MornyeLibraryScreenState extends ConsumerState<MornyeLibraryScreen> {
               ),
             ));
     if (!mounted || selected == null || selected == _sort) return;
+    if (!_artists && !_overview) {
+      ref.read(settingsProvider.notifier).setLibraryAlbumSortMode(selected);
+    }
     setState(() {
       _sort = selected;
       _rows = const [];

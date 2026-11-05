@@ -21,6 +21,7 @@ import 'package:mornye/theme/app_theme.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/widgets/app_search_field.dart';
+import 'package:mornye/widgets/animated_library_sliver_grid.dart';
 import 'package:mornye/widgets/library_directory_view.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
@@ -90,9 +91,11 @@ class _Queue extends DownloadQueueNotifier {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   final queries = <String>[];
+  final albumRows = <List<Object?>>[];
 
   setUp(() {
     queries.clear();
+    albumRows.clear();
     SharedPreferences.setMockInitialValues({});
     final previousFactory = databaseFactoryOrNull;
     databaseFactory = databaseFactorySqflitePlugin;
@@ -102,7 +105,7 @@ void main() {
     const paths = MethodChannel('plugins.flutter.io/path_provider');
     messenger.setMockMethodCallHandler(paths, (_) async => '/test/documents');
     addTearDown(() => messenger.setMockMethodCallHandler(paths, null));
-    // An empty database: every page query returns no rows.
+    // Most tests use an empty database; album order tests supply page rows.
     const sqlite = MethodChannel('com.tekartik.sqflite');
     final versions = <int, int>{};
     messenger.setMockMethodCallHandler(sqlite, (call) async {
@@ -128,6 +131,23 @@ void main() {
           ],
         };
       }
+      if (sql.trimLeft().startsWith('SELECT *') &&
+          sql.contains('sample_file_path') &&
+          sql.contains('AS queue_source')) {
+        return {
+          'columns': [
+            'queue_source',
+            'album_key',
+            'album_name',
+            'artist_name',
+            'track_count',
+            'sort_added',
+            'sample_file_path',
+            'sort_release',
+          ],
+          'rows': albumRows,
+        };
+      }
       return {'columns': <String>[], 'rows': <List<Object?>>[]};
     });
     addTearDown(() => messenger.setMockMethodCallHandler(sqlite, null));
@@ -142,6 +162,7 @@ void main() {
     List<DateTime>? dates,
     List<UserPlaylistCollection> playlists = const [],
     bool withQueueItem = true,
+    String? librarySection,
   }) async {
     final preferences = await SharedPreferences.getInstance();
     debugDesktopPlatformOverride = desktop;
@@ -197,7 +218,11 @@ void main() {
             child: child!,
           ),
           // Mornye opens Songs as a section page from its Library root.
-          home: Scaffold(body: QueueTab(librarySection: mornye ? 'all' : null)),
+          home: Scaffold(
+            body: QueueTab(
+              librarySection: librarySection ?? (mornye ? 'all' : null),
+            ),
+          ),
         ),
       ),
     );
@@ -331,10 +356,14 @@ void main() {
     });
   }
 
-  testWidgets('the desktop sort menu opens below the sort button', (
+  testWidgets('the desktop sort menu opens below its button when it fits', (
     tester,
   ) async {
     await pumpLibrary(tester, desktop: true);
+    tester.view.physicalSize = const Size(1280, 1200);
+    for (var i = 0; i < 10; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
     final l10n = l10nOf(tester);
     final sort = toolButton(null, label: l10n.libraryFilterSortLatest);
     final sortRect = tester.getRect(sort);
@@ -471,6 +500,120 @@ void main() {
         }
         expect(tester.takeException(), isNull);
       });
+
+      testWidgets('album grid preserves year order across local and downloads '
+          '(desktop: $desktop, Mornye: $mornye)', (tester) async {
+        albumRows.addAll([
+          ['local', 'new|artist', 'New', 'Artist', 2, 1, '/new.flac', 2026],
+          [
+            'downloaded',
+            'old|artist',
+            'Old',
+            'Artist',
+            2,
+            1,
+            '/old.flac',
+            2001,
+          ],
+          [
+            'local',
+            'unknown|artist',
+            'Unknown',
+            'Artist',
+            2,
+            1,
+            '/unknown.flac',
+            0,
+          ],
+        ]);
+        await pumpLibrary(
+          tester,
+          desktop: desktop,
+          mornye: mornye,
+          librarySection: 'albums',
+        );
+        final container = ProviderScope.containerOf(
+          tester.element(find.byType(QueueTab)),
+        );
+        container
+            .read(settingsProvider.notifier)
+            .setHistorySortMode('year-desc');
+        for (var i = 0; i < 20; i++) {
+          await tester.pump(const Duration(milliseconds: 50));
+        }
+        final grid = find.byType(AnimatedLibrarySliverGrid);
+        final delegate =
+            tester.widget<AnimatedLibrarySliverGrid>(grid).delegate
+                as SliverChildBuilderDelegate;
+        expect(delegate.childCount, 3);
+        expect(
+          [
+            for (var i = 0; i < delegate.childCount!; i++)
+              delegate.builder(tester.element(grid), i)!.key,
+          ],
+          [
+            const ValueKey('local_new|artist'),
+            const ValueKey('Old|Artist'),
+            const ValueKey('local_unknown|artist'),
+          ],
+        );
+        expect(tester.takeException(), isNull);
+      });
+
+      for (final newest in [false, true]) {
+        testWidgets('year sort applies and restores from the Library menu '
+            '(desktop: $desktop, Mornye: $mornye, newest: $newest)', (
+          tester,
+        ) async {
+          await pumpLibrary(tester, desktop: desktop, mornye: mornye);
+          final l10n = l10nOf(tester);
+          final label = newest
+              ? l10n.libraryFilterSortYearDesc
+              : l10n.libraryFilterSortYearAsc;
+          final mode = newest ? 'year-desc' : 'year-asc';
+          await tester.tap(
+            find
+                .text(
+                  mornye
+                      ? l10n.libraryFilterTitle
+                      : l10n.libraryFilterSortLatest,
+                )
+                .hitTestable(),
+          );
+          for (var i = 0; i < 10; i++) {
+            await tester.pump(const Duration(milliseconds: 50));
+          }
+          final choice = find.text(label);
+          await tester.ensureVisible(choice);
+          await tester.pump(const Duration(milliseconds: 300));
+          await tester.tap(choice);
+          if (mornye) {
+            await tester.ensureVisible(find.text(l10n.libraryFilterApply));
+            await tester.pump(const Duration(milliseconds: 300));
+            await tester.tap(find.text(l10n.libraryFilterApply));
+          }
+          for (var i = 0; i < 10; i++) {
+            await tester.pump(const Duration(milliseconds: 50));
+          }
+          final preferences = await SharedPreferences.getInstance();
+          expect(loadBootstrapSettings(preferences).historySortMode, mode);
+          expect(
+            queries.any(
+              (sql) =>
+                  sql.contains('THEN CAST(') &&
+                  sql.contains('sort_release ${newest ? 'DESC' : 'ASC'}'),
+            ),
+            isTrue,
+          );
+          await tester.pumpWidget(const SizedBox.shrink());
+          await pumpLibrary(tester, desktop: desktop, mornye: mornye);
+          final container = ProviderScope.containerOf(
+            tester.element(find.byType(QueueTab)),
+          );
+          expect(container.read(settingsProvider).historySortMode, mode);
+          expect(tester.takeException(), isNull);
+        });
+      }
     }
   }
 

@@ -926,6 +926,10 @@ class SettingsNotifier extends Notifier<AppSettings> {
   void setHistorySortMode(String mode) =>
       _commit(state.copyWith(historySortMode: librarySortModeFromJson(mode)));
 
+  void setLibraryAlbumSortMode(String mode) => _commit(
+    state.copyWith(libraryAlbumSortMode: libraryAlbumSortModeFromJson(mode)),
+  );
+
   void setAskQualityBeforeDownload(bool enabled) =>
       _commit(state.copyWith(askQualityBeforeDownload: enabled));
 

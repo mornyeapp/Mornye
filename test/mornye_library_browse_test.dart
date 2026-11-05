@@ -12,11 +12,17 @@ import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/screens/mornye_library_screen.dart';
 import 'package:mornye/services/album_completeness.dart';
 import 'package:mornye/theme/mornye_theme.dart';
+import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/widgets/app_search_field.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class _Settings extends SettingsNotifier {
+  _Settings([this.initial = const AppSettings(localLibraryEnabled: false)]);
+
+  final AppSettings initial;
+
   @override
-  AppSettings build() => const AppSettings(localLibraryEnabled: false);
+  AppSettings build() => initial;
 }
 
 class _History extends DownloadHistoryNotifier {
@@ -34,6 +40,75 @@ LibraryBrowseEntry _album(int index) => LibraryBrowseEntry(
 );
 
 void main() {
+  for (final desktop in [false, true]) {
+    for (final newest in [false, true]) {
+      testWidgets('album year sort applies and survives reopening '
+          '(desktop: $desktop, newest: $newest)', (tester) async {
+        SharedPreferences.setMockInitialValues({});
+        final preferences = await SharedPreferences.getInstance();
+        debugDesktopPlatformOverride = desktop;
+        addTearDown(() => debugDesktopPlatformOverride = null);
+        tester.view.physicalSize = desktop
+            ? const Size(1200, 900)
+            : const Size(390, 844);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        final requests = <LibraryBrowseRequest>[];
+        Future<void> pumpAlbums() async {
+          await tester.pumpWidget(
+            ProviderScope(
+              overrides: [
+                settingsProvider.overrideWith(
+                  () => _Settings(loadBootstrapSettings(preferences)),
+                ),
+                downloadHistoryProvider.overrideWith(_History.new),
+                libraryBrowsePageLoaderProvider.overrideWithValue((page) async {
+                  requests.add(page.browse);
+                  return LibraryBrowsePage([_album(0)]);
+                }),
+              ],
+              child: MaterialApp(
+                theme: MornyeTheme.build(Brightness.light),
+                localizationsDelegates: AppLocalizations.localizationsDelegates,
+                supportedLocales: AppLocalizations.supportedLocales,
+                home: Scaffold(
+                  body: MornyeLibraryScreen(
+                    page: MornyeLibraryPage.albums,
+                    onOpenSection: (_) {},
+                  ),
+                ),
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+        }
+
+        await pumpAlbums();
+        final l10n = AppLocalizations.of(
+          tester.element(find.byType(MornyeLibraryScreen)),
+        );
+        await tester.tap(find.byTooltip(l10n.searchSortTitle));
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.text(
+            newest
+                ? l10n.libraryFilterSortYearDesc
+                : l10n.libraryFilterSortYearAsc,
+          ),
+        );
+        await tester.pumpAndSettle();
+        final mode = newest ? 'year-desc' : 'year-asc';
+        expect(requests.last.sort, mode);
+        expect(loadBootstrapSettings(preferences).libraryAlbumSortMode, mode);
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pumpAndSettle();
+        await pumpAlbums();
+        expect(requests.last.sort, mode);
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
+
   testWidgets(
     'Mornye albums filter incomplete and unknown tags without losing search',
     (tester) async {

@@ -3287,6 +3287,14 @@
   "@libraryFilterSortAlbumDesc": {
     "description": "Sort option - album descending"
   },
+  "libraryFilterSortYearAsc": "Tahun (Terlama dahulu)",
+  "@libraryFilterSortYearAsc": {
+    "description": "Library sort option - release year ascending"
+  },
+  "libraryFilterSortYearDesc": "Tahun (Terbaru dahulu)",
+  "@libraryFilterSortYearDesc": {
+    "description": "Library sort option - release year descending"
+  },
   "libraryFilterSortGenreAsc": "Genre (A-Z)",
   "@libraryFilterSortGenreAsc": {
     "description": "Sort option - genre ascending"

@@ -431,7 +431,7 @@ class LibraryQueueStore {
           h.sort_artist,
           h.sort_album,
           h.sort_genre,
-          h.sort_release,
+          ${_releaseSortColumn(request.sortMode, 'h')},
           h.sort_added
           ${_trackSizeColumns(request.sortMode)}
         FROM history_db.history h
@@ -511,7 +511,7 @@ class LibraryQueueStore {
           l.artist_name_norm AS sort_artist,
           l.album_name_norm AS sort_album,
           l.sort_genre,
-          l.sort_release,
+          ${_releaseSortColumn(request.sortMode, 'l')},
           l.sort_added
           ${_trackSizeColumns(request.sortMode)}
         FROM ${LibrarySchema.visibleView} l
@@ -646,7 +646,7 @@ class LibraryQueueStore {
           ${unfiltered ? 'MAX(COALESCE(h.sort_added, 0))' : 'c.latest_added'} AS sort_added,
           MIN(COALESCE(h.sort_album, '')) AS sort_album,
           MIN(COALESCE(h.sort_album_artist, '')) AS sort_artist,
-          COALESCE(MAX(h.release_date), '') AS sort_release,
+          ${_releaseSortColumn(request.sortMode, 'h', album: true)},
           COALESCE(MAX(h.sort_genre), '') AS sort_genre
           ${_albumSizeColumns(request.sortMode)}
         FROM history_db.history h
@@ -711,7 +711,7 @@ class LibraryQueueStore {
           ${unfiltered ? 'MAX(COALESCE(l.sort_added, 0))' : 'c.latest_added'} AS sort_added,
           MIN(l.album_name_norm) AS sort_album,
           MIN(l.album_artist_norm) AS sort_artist,
-          COALESCE(MAX(l.release_date), '') AS sort_release,
+          ${_releaseSortColumn(request.sortMode, 'l', album: true)},
           COALESCE(MAX(l.sort_genre), '') AS sort_genre
           ${_albumSizeColumns(request.sortMode)}
         FROM ${LibrarySchema.visibleView} l
@@ -1116,6 +1116,29 @@ class LibraryQueueStore {
             'COALESCE(SUM(file_sizes.size_bytes), 0) AS sort_size'
       : '';
 
+  String _releaseSortColumn(
+    String sortMode,
+    String alias, {
+    bool album = false,
+  }) {
+    if (sortMode != 'year-asc' && sortMode != 'year-desc') {
+      return album
+          ? "COALESCE(MAX($alias.release_date), '') AS sort_release"
+          : '$alias.sort_release';
+    }
+    final date = 'TRIM($alias.release_date)';
+    final year = 'SUBSTR($date, 1, 4)';
+    final value =
+        '''CASE
+      WHEN $year GLOB '[0-9][0-9][0-9][0-9]'
+        AND CAST($year AS INTEGER) > 0
+        AND (LENGTH($date) = 4 OR SUBSTR($date, 5, 1) = '-')
+      THEN CAST($year AS INTEGER) END''';
+    // Both sentinels put undated items after every valid four-digit year.
+    final unknown = sortMode == 'year-asc' ? 10000 : 0;
+    return 'COALESCE(${album ? 'MAX($value)' : value}, $unknown) AS sort_release';
+  }
+
   /// Leading sort terms, then [nameColumn], the source and [keyColumn] as the
   /// unique tie-breakers that keyset cursors seek on.
   List<_QueueOrderTerm> _queueOrderTerms(
@@ -1144,10 +1167,10 @@ class LibraryQueueStore {
           _QueueOrderTerm('sort_album', descending: sortMode == 'album-desc'),
           name,
         ],
-        'release-oldest' || 'release-newest' => [
+        'year-asc' || 'year-desc' || 'release-oldest' || 'release-newest' => [
           _QueueOrderTerm(
             'sort_release',
-            descending: sortMode == 'release-newest',
+            descending: sortMode == 'release-newest' || sortMode == 'year-desc',
           ),
           name,
         ],
