@@ -298,9 +298,22 @@ extension NetworkStorageUpload on NetworkStorageService {
         final uploaded = (await list(c, parent))
             .where((e) => e.name == temporary.substring(parent.length))
             .firstOrNull;
-        if (uploaded?.size != length) {
-          throw StateError('Network upload size mismatch');
+        // A directory listing can omit temporary files or lag behind PUT.
+        // Verify the uploaded bytes before trusting a different listed size.
+        if (uploaded?.size != length &&
+            !await _matchesUpload(
+              NetworkStorageService.source(c.id, temporary),
+              file,
+              length,
+              checkpoint,
+            )) {
+          throw StateError(
+            'Network upload size mismatch '
+            '(WebDAV: expected $length bytes, '
+            'reported ${uploaded?.size ?? 'unknown'} bytes)',
+          );
         }
+        checkpoint();
         await _uploadCommand(
           c,
           'MOVE',

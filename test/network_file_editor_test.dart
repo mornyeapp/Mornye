@@ -117,6 +117,69 @@ void main() {
         expect(changes, [NetworkEditFixture.source]);
       });
 
+      if (protocol == NetworkProtocol.webdav) {
+        for (final listing in ['stale', 'missing', 'hidden']) {
+          test(
+            'verifies WebDAV content when upload listing is $listing',
+            () async {
+              nas.temporaryListedSize = listing == 'stale' ? 0 : null;
+              nas.omitTemporarySize = listing == 'missing';
+              nas.hideTemporaryFiles = listing == 'hidden';
+              final result = await save();
+              expect(result.failure, isNull, reason: '${result.error}');
+              expect(jsonDecode(utf8.decode(nas.files['song.flac']!)), {
+                ...original,
+                'title': 'New title',
+                'lyrics': '[00:01.00]New lyrics',
+              });
+              expect(nas.files.keys, ['song.flac']);
+              expect(changes, [NetworkEditFixture.source]);
+            },
+          );
+        }
+      }
+
+      if (protocol == NetworkProtocol.smb) {
+        for (final reportedSize in [0, 1]) {
+          test(
+            'verifies SMB handle and content when stat reports $reportedSize',
+            () async {
+              nas.smbUploadStatSize = reportedSize;
+              final result = await save();
+              expect(result.failure, isNull, reason: '${result.error}');
+              expect(nas.smbUploadVerifications, 1);
+              expect(jsonDecode(utf8.decode(nas.files['song.flac']!)), {
+                ...original,
+                'title': 'New title',
+                'lyrics': '[00:01.00]New lyrics',
+              });
+              expect(nas.files.keys, ['song.flac']);
+              expect(changes, [NetworkEditFixture.source]);
+            },
+          );
+        }
+      }
+
+      for (final truncated in [false, true]) {
+        test('rejects altered $protocol upload before replacing the original '
+            '(truncated=$truncated)', () async {
+          nas.temporaryListedSize = 0;
+          nas.smbUploadStatSize = 0;
+          nas.transformUpload = (bytes) => truncated
+              ? bytes.sublist(0, bytes.length - 1)
+              : [bytes.first ^ 0xff, ...bytes.skip(1)];
+          final result = await save();
+          expect(result.failure, isNotNull);
+          expect(result.error, isStateError);
+          if (protocol == NetworkProtocol.smb) {
+            expect(nas.smbUploadVerifications, 1);
+          }
+          expect(nas.files, {'song.flac': originalBytes()});
+          expect(nas.methods.where((m) => m.startsWith('MOVE ')), isEmpty);
+          expect(changes, isEmpty);
+        });
+      }
+
       test('a failed tag writer never uploads or publishes a change', () async {
         expect(
           (await save(failEdit: true)).failure,
