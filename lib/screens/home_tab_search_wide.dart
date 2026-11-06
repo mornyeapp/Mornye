@@ -744,7 +744,12 @@ class _SearchSongCoverCell extends ConsumerWidget {
                     PositionedDirectional(
                       start: 4,
                       bottom: 4,
-                      child: PreviewButton(track: track, size: 28, dense: true),
+                      child: PreviewButton(
+                        track: track,
+                        size: 28,
+                        dense: true,
+                        overArtwork: true,
+                      ),
                     ),
                     if (isInLocalLibrary)
                       const PositionedDirectional(

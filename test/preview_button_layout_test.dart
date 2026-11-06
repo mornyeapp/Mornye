@@ -10,6 +10,7 @@ import 'package:mornye/providers/library_collections_provider.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/preview_player_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
+import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/preview_button.dart';
 import 'package:mornye/widgets/track_collection_quick_actions.dart';
 
@@ -33,7 +34,12 @@ void main() {
     source: 'metadata-extension',
   );
 
-  Future<void> pumpButton(WidgetTester tester, {MediaItem? currentItem}) async {
+  Future<void> pumpButton(
+    WidgetTester tester, {
+    MediaItem? currentItem,
+    bool overArtwork = false,
+    ThemeData? theme,
+  }) async {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
@@ -42,10 +48,13 @@ void main() {
           ),
           playbackPlayingProvider.overrideWith((ref) => false),
         ],
-        child: const MaterialApp(
+        child: MaterialApp(
+          theme: theme,
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
-          home: Scaffold(body: PreviewButton(track: track)),
+          home: Scaffold(
+            body: PreviewButton(track: track, overArtwork: overArtwork),
+          ),
         ),
       ),
     );
@@ -63,6 +72,34 @@ void main() {
     expect(hitbox.height, greaterThanOrEqualTo(48));
     expect(tester.getCenter(icon), hitbox.center);
   }
+
+  for (final current in [false, true]) {
+    testWidgets('Material fills the button on a cover (current: $current)', (
+      tester,
+    ) async {
+      await pumpButton(
+        tester,
+        overArtwork: true,
+        currentItem: current
+            ? const MediaItem(id: 'current', title: 'Track', artist: 'Artist')
+            : null,
+      );
+      await tester.pump();
+      expect(findAppIcon(Icons.play_arrow), findsOneWidget);
+      expect(findAppIcon(Icons.play_circle_outline_rounded), findsNothing);
+      expect(findAppIcon(Icons.play_circle_fill_rounded), findsNothing);
+      expectCenteredHitbox(tester, Icons.play_arrow);
+    });
+  }
+
+  testWidgets('Mornye keeps its own button on a cover', (tester) async {
+    await pumpButton(
+      tester,
+      overArtwork: true,
+      theme: MornyeTheme.build(Brightness.dark),
+    );
+    expect(findAppIcon(Icons.play_arrow), findsNothing);
+  });
 
   testWidgets('preview icon is centered inside its 48dp hitbox', (
     tester,
