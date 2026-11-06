@@ -130,7 +130,8 @@ extension _TrackMetadataMenu on _TrackMetadataScreenState {
         remote(LinkLibraryAction.editMetadata),
       if (remoteFile)
         remote(LinkLibraryAction.saveCover)
-      else if (!_isNetworkItem && (_coverUrl != null || _fileExists))
+      else if (!_isNetworkItem &&
+          (_coverUrl != null || _fileExists || _hasPath(_localCoverPath)))
         _MetadataOption(
           icon: Icons.image_outlined,
           label: l10n.trackSaveCoverArt,
@@ -138,7 +139,7 @@ extension _TrackMetadataMenu on _TrackMetadataScreenState {
         ),
       if (remoteFile)
         remote(LinkLibraryAction.saveLyrics)
-      else if (!_isNetworkItem && (_fileExists || !_isLocalItem))
+      else if (!_isNetworkItem)
         _MetadataOption(
           icon: Icons.lyrics_outlined,
           label: l10n.trackSaveLyrics,

@@ -2,10 +2,13 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart'
+    show FlutterSecureStorage;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/models/library_database_models.dart';
@@ -23,6 +26,22 @@ import 'support/app_icon_finder.dart';
 class _Extensions extends ExtensionNotifier {
   @override
   ExtensionState build() => const ExtensionState(isInitialized: true);
+}
+
+class _FolderPicker extends FilePickerPlatform {
+  _FolderPicker(this.result);
+
+  final String? result;
+
+  @override
+  Future<String?> getDirectoryPath({
+    String? dialogTitle,
+    String? initialDirectory,
+    AndroidOptions androidOptions = const AndroidOptions(),
+    WindowsOptions windowsOptions = const WindowsOptions(),
+    LinuxOptions linuxOptions = const LinuxOptions(),
+    WebOptions webOptions = const WebOptions(),
+  }) async => result;
 }
 
 class _Transport implements NativeBackendTransport {
@@ -241,4 +260,187 @@ void main() {
       await _settleIo(tester);
     });
   }
+
+  for (final scenario in const [
+    (platform: TargetPlatform.android, picks: true),
+    (platform: TargetPlatform.iOS, picks: true),
+    (platform: TargetPlatform.macOS, picks: true),
+    (platform: TargetPlatform.macOS, picks: false),
+  ]) {
+    testWidgets('a moved library song exports to a chosen folder: $scenario', (
+      tester,
+    ) async {
+      final platform = scenario.platform;
+      final (directory, chosen) = (await tester.runAsync(() async {
+        final directory = await Directory.systemTemp.createTemp(
+          'moved-sidecars-',
+        );
+        await File('${directory.path}/cached.jpg').writeAsBytes(cover);
+        return (
+          directory,
+          await Directory('${directory.path}/chosen').create(),
+        );
+      }))!;
+      final missing = '${directory.path}/old/Moved.flac';
+      final calls = <MethodCall>[];
+      const base = 'Fixture Artist - Fixture Song';
+      Future<Object?> backend(MethodCall call) async {
+        calls.add(call);
+        final args = call.arguments is Map
+            ? Map<Object?, Object?>.from(call.arguments as Map)
+            : const <Object?, Object?>{};
+        switch (call.method) {
+          case 'pickSafTree':
+            return {'tree_uri': 'content://example.documents/tree/chosen'};
+          case 'pickIosDirectory':
+            return {'path': chosen.path, 'bookmark': 'fixture-bookmark'};
+          case 'startAccessingIosBookmark':
+            expect(args['bookmark'], 'fixture-bookmark');
+            return {'path': chosen.path, 'token': 'fixture-lease'};
+          case 'fetchAndSaveLyrics':
+            expect(args['audio_file_path'], '');
+            await File(args['output_path'] as String).writeAsString(lyrics);
+            return {'success': true};
+          case 'safCreateFromPath':
+            expect(args['tree_uri'], 'content://example.documents/tree/chosen');
+            expect(args['relative_dir'], '');
+            final name = args['file_name'] as String;
+            await File(args['src_path'] as String).copy('${chosen.path}/$name');
+            return 'content://example.documents/document/$name';
+          default:
+            return null;
+        }
+      }
+
+      SharedPreferences.setMockInitialValues({});
+      FlutterSecureStorage.setMockInitialValues({});
+      final desktop = platform == TargetPlatform.macOS;
+      debugDesktopPlatformOverride = desktop;
+      debugDefaultTargetPlatformOverride = platform;
+      final picker = FilePickerPlatform.instance;
+      FilePickerPlatform.instance = _FolderPicker(
+        scenario.picks ? chosen.path : null,
+      );
+      const channel = MethodChannel('com.zarz.mornye/backend');
+      const paths = MethodChannel('plugins.flutter.io/path_provider');
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      messenger.setMockMethodCallHandler(channel, backend);
+      messenger.setMockMethodCallHandler(paths, (_) async => directory.path);
+      if (desktop) {
+        final transport = _Transport(backend);
+        RustFfiBackend.debugShared = RustFfiBackend(
+          openTransport: () => transport,
+          loadConfig: () async => DesktopBackendConfig(
+            appSupportDir: directory.path,
+            documentsDir: directory.path,
+            tempDir: directory.path,
+          ),
+        );
+      }
+      addTearDown(() async {
+        debugDesktopPlatformOverride = null;
+        FilePickerPlatform.instance = picker;
+        RustFfiBackend.debugShared = null;
+        messenger.setMockMethodCallHandler(channel, null);
+        messenger.setMockMethodCallHandler(paths, null);
+        await directory.delete(recursive: true);
+      });
+      tester.view.physicalSize = const Size(1200, 1800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [extensionProvider.overrideWith(_Extensions.new)],
+          child: MaterialApp(
+            theme: AppTheme.light(),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: TrackMetadataScreen(
+              localItem: LocalLibraryItem(
+                id: 'moved-$scenario',
+                trackName: 'Fixture Song',
+                artistName: 'Fixture Artist',
+                albumName: 'Fixture Album',
+                filePath: missing,
+                scannedAt: DateTime.utc(2026),
+                format: 'flac',
+                coverPath: '${directory.path}/cached.jpg',
+              ),
+            ),
+          ),
+        ),
+      );
+      await _settleIo(tester);
+      for (final label in ['Save Cover Art', 'Save Lyrics (.lrc)']) {
+        await tester.tap(findAppIcon(Icons.more_vert));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text(label));
+        await _settleIo(tester);
+      }
+      await tester.runAsync(() async {
+        final saved = await chosen.list().map((file) => file.path).toSet();
+        expect(
+          saved,
+          scenario.picks
+              ? {'${chosen.path}/$base.jpg', '${chosen.path}/$base.lrc'}
+              : isEmpty,
+        );
+        if (!scenario.picks) return;
+        expect(await File('${chosen.path}/$base.jpg').readAsBytes(), cover);
+        expect(await File('${chosen.path}/$base.lrc').readAsString(), lyrics);
+      });
+      expect(await tester.runAsync(() => File(missing).exists()), isFalse);
+      expect(
+        calls.where((call) => call.method == 'fetchAndSaveLyrics'),
+        hasLength(scenario.picks ? 1 : 0),
+      );
+      if (platform == TargetPlatform.iOS) {
+        expect(
+          calls.where((call) => call.method == 'stopAccessingIosBookmark'),
+          hasLength(2),
+        );
+      }
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+      await _settleIo(tester);
+      debugDefaultTargetPlatformOverride = null;
+    });
+  }
+
+  testWidgets('a moved song with no saved cover offers lyrics only', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    FlutterSecureStorage.setMockInitialValues({});
+    tester.view.physicalSize = const Size(900, 1800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [extensionProvider.overrideWith(_Extensions.new)],
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: TrackMetadataScreen(
+            localItem: LocalLibraryItem(
+              id: 'moved-no-cover',
+              trackName: 'Fixture Song',
+              artistName: 'Fixture Artist',
+              albumName: 'Fixture Album',
+              filePath: '/missing/Moved.flac',
+              scannedAt: DateTime.utc(2026),
+              format: 'flac',
+            ),
+          ),
+        ),
+      ),
+    );
+    await _settleIo(tester);
+    await tester.tap(findAppIcon(Icons.more_vert));
+    await tester.pumpAndSettle();
+    expect(find.text('Save Cover Art'), findsNothing);
+    expect(find.text('Save Lyrics (.lrc)'), findsOneWidget);
+  });
 }

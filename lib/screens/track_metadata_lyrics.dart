@@ -667,13 +667,36 @@ extension _TrackMetadataLyricsAndSaving on _TrackMetadataScreenState {
 
   bool get _isSafFile => isContentUri(cleanFilePath);
 
+  /// A folder the user chose, as a SAF tree on Android and otherwise a path,
+  /// with a security-scoped bookmark on iOS. Null when they cancel.
+  Future<({String? treeUri, String? path, String? bookmark})?>
+  _pickSidecarFolder() async {
+    switch (defaultTargetPlatform) {
+      case TargetPlatform.android:
+        final picked = await PlatformBridge.pickSafTree();
+        final treeUri = picked?['tree_uri'] as String? ?? '';
+        if (treeUri.isEmpty) return null;
+        return (treeUri: treeUri, path: null, bookmark: null);
+      case TargetPlatform.iOS:
+        final picked = await PlatformBridge.pickIosDirectory();
+        if (picked == null) return null;
+        return (treeUri: null, path: picked.path, bookmark: picked.bookmark);
+      default:
+        final path = await FilePicker.getDirectoryPath();
+        if (path == null) return null;
+        return (treeUri: null, path: path, bookmark: null);
+    }
+  }
+
   /// Writes `baseName.extension` as a sidecar of the current track.
   ///
   /// `writeTo` renders the file at the given path and returns the bridge
   /// result, or null when it has already told the user why nothing was
   /// written. SAF tracks are rendered into a temp directory and published to
   /// the download tree or the scanned audio document's parent; filesystem
-  /// tracks are written next to the audio file.
+  /// tracks are written next to the audio file. Once the audio file is gone,
+  /// its old folder says nothing about where the song went, so the user picks
+  /// the folder instead.
   /// Exceptions propagate to the caller.
   Future<void> _publishSidecarFile({
     required String baseName,
@@ -693,11 +716,22 @@ extension _TrackMetadataLyricsAndSaving on _TrackMetadataScreenState {
     }
 
     final fileName = '$baseName.$extension';
+    final hasFile = _fileExists;
+    final folder = hasFile ? null : await _pickSidecarFolder();
+    if (!mounted) return;
+    if (!hasFile && folder == null) {
+      if (hideCurrentSnackBar) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      }
+      return;
+    }
 
-    if (_isSafFile) {
+    if (folder == null ? _isSafFile : folder.treeUri != null) {
       final audioUri = cleanFilePath;
-      final treeUri = _downloadItem?.downloadTreeUri;
-      final relativeDir = _downloadItem?.safRelativeDir ?? '';
+      final treeUri = folder?.treeUri ?? _downloadItem?.downloadTreeUri;
+      final relativeDir = folder == null
+          ? _downloadItem?.safRelativeDir ?? ''
+          : '';
       final tempDir = await Directory.systemTemp.createTemp(tempDirPrefix);
       final tempOutput = '${tempDir.path}${Platform.pathSeparator}$fileName';
       try {
@@ -742,10 +776,27 @@ extension _TrackMetadataLyricsAndSaving on _TrackMetadataScreenState {
       return;
     }
 
-    final dir = _getFileDirectory();
+    final bookmark = folder?.bookmark;
+    final access = bookmark == null
+        ? null
+        : await PlatformBridge.startAccessingIosBookmark(bookmark);
+    if (bookmark != null && access == null) {
+      if (mounted) {
+        showMessage(context.l10n.trackSaveFailed('No storage access'));
+      }
+      return;
+    }
+    final dir = access?.path ?? folder?.path ?? _getFileDirectory();
     final outputPath = '$dir${Platform.pathSeparator}$fileName';
 
-    final result = await writeTo(outputPath);
+    final Map<String, dynamic>? result;
+    try {
+      result = await writeTo(outputPath);
+    } finally {
+      if (access != null) {
+        await PlatformBridge.stopAccessingIosBookmark(access);
+      }
+    }
     if (result == null) {
       return;
     }
@@ -777,7 +828,7 @@ extension _TrackMetadataLyricsAndSaving on _TrackMetadataScreenState {
         successMessage: () => context.l10n.trackCoverSaved(baseName),
         hideCurrentSnackBar: false,
         writeTo: (outputPath) async {
-          Map<String, dynamic> result;
+          Map<String, dynamic>? result;
           if (hasFile) {
             // Imported files carry their own embedded artwork as well.
             result = await PlatformBridge.extractCoverToFile(
@@ -797,15 +848,9 @@ extension _TrackMetadataLyricsAndSaving on _TrackMetadataScreenState {
               coverUrl,
               outputPath,
             );
-          } else {
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(context.l10n.trackCoverNoSource)),
-              );
-            }
-            return null;
           }
-          if (result['error'] != null && cachedCover != null) {
+          if ((result == null || result['error'] != null) &&
+              cachedCover != null) {
             final uri = Uri.tryParse(cachedCover);
             final file = uri?.scheme == 'file'
                 ? File.fromUri(uri!)
@@ -816,6 +861,11 @@ extension _TrackMetadataLyricsAndSaving on _TrackMetadataScreenState {
               }
               return {'success': true};
             }
+          }
+          if (result == null && mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(context.l10n.trackCoverNoSource)),
+            );
           }
           return result;
         },
