@@ -30,22 +30,20 @@ final _blueLuminance = Float64List.fromList(
 double artworkPixelLuminance(int red, int green, int blue) =>
     _redLuminance[red] + _greenLuminance[green] + _blueLuminance[blue];
 
-/// Samples the rendered artwork and its fade, rather than an album palette.
-/// Static artwork is read again only after its scene or target geometry changes.
+/// Samples the rendered still artwork and its fade, rather than an album
+/// palette, and reads it again only after its scene or target geometry
+/// changes. Moving artwork stays out: labels that followed its frames would
+/// flip between black and white, so the player dims behind them instead.
 class MornyeArtworkContrast extends StatefulWidget {
   const MornyeArtworkContrast({
     super.key,
     required this.enabled,
-    this.continuous = false,
     required this.targets,
     required this.onChanged,
     required this.child,
   });
 
   final bool enabled;
-
-  /// Video textures can change without a new Flutter scene being submitted.
-  final bool continuous;
   final Map<String, GlobalKey> targets;
   final ValueChanged<Map<String, Color>> onChanged;
   final Widget child;
@@ -94,10 +92,7 @@ class _MornyeArtworkContrastState extends State<MornyeArtworkContrast>
   @override
   void didUpdateWidget(MornyeArtworkContrast oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.enabled != widget.enabled ||
-        oldWidget.continuous != widget.continuous) {
-      _schedule();
-    }
+    if (oldWidget.enabled != widget.enabled) _schedule();
   }
 
   void _schedule() {
@@ -113,7 +108,6 @@ class _MornyeArtworkContrastState extends State<MornyeArtworkContrast>
     final lifecycle = WidgetsBinding.instance.lifecycleState;
     if (lifecycle != null && lifecycle != AppLifecycleState.resumed) return;
     WidgetsBinding.instance.addPostFrameCallback((_) => _sample());
-    if (widget.continuous) _queueSample();
   }
 
   void _queueSample() {
@@ -124,10 +118,9 @@ class _MornyeArtworkContrastState extends State<MornyeArtworkContrast>
     if (lifecycle != null && lifecycle != AppLifecycleState.resumed) return;
     // Composition also reports changes inside nested repaint boundaries, such
     // as a late image decode. Coalesce animation frames within one readback.
-    _timer = Timer(const Duration(milliseconds: 333), () async {
+    _timer = Timer(const Duration(milliseconds: 333), () {
       _timer = null;
-      await _sample();
-      if (mounted && widget.continuous) _queueSample();
+      _sample();
     });
   }
 
@@ -165,9 +158,7 @@ class _MornyeArtworkContrastState extends State<MornyeArtworkContrast>
     }
     final revision = boundary.revision;
     if (revision == null) return;
-    if (!widget.continuous &&
-        revision == _sampledRevision &&
-        mapEquals(targets, _sampledTargets)) {
+    if (revision == _sampledRevision && mapEquals(targets, _sampledTargets)) {
       return;
     }
     _sampling = true;

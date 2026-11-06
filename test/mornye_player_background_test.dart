@@ -319,6 +319,54 @@ void main() {
     expect(await difference(tester), greaterThan(3));
   });
 
+  testWidgets('moving artwork dims behind white labels, even when bright', (
+    tester,
+  ) async {
+    const bright = ColoredBox(color: Colors.white);
+    Widget background({required bool dim}) =>
+        MornyePlayerBackground(artUri: null, artwork: bright, dimControls: dim);
+    await tester.pumpWidget(
+      Directionality(
+        textDirection: TextDirection.ltr,
+        child: Row(
+          children: [
+            side(masked, background(dim: false)),
+            side(overlay, background(dim: true)),
+          ],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final plain = await pixels(tester, masked);
+    final dimmed = await pixels(tester, overlay);
+    Color at(Uint8List image, int y) {
+      final index = (y * _width.toInt() + _width ~/ 2) * 4;
+      return Color.fromARGB(
+        255,
+        image[index],
+        image[index + 1],
+        image[index + 2],
+      );
+    }
+
+    // The artwork above its fade stays as it was.
+    expect(at(dimmed, 40), at(plain, 40));
+    // The title sits at or below the fade, where white needs 4.5:1.
+    for (final y in const [(_width * 0.8), _width, _height - 10]) {
+      final luminance = at(dimmed, y.toInt()).computeLuminance();
+      expect(
+        1.05 / (luminance + 0.05),
+        greaterThanOrEqualTo(4.5),
+        reason: '$y',
+      );
+      expect(
+        luminance,
+        lessThan(at(plain, y.toInt()).computeLuminance()),
+        reason: '$y',
+      );
+    }
+  });
+
   testWidgets('full-bleed artwork fades without an offscreen mask', (
     tester,
   ) async {

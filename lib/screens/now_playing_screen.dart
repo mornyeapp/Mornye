@@ -389,7 +389,9 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
         reservesPlayingOnRow && Theme.of(context).platform == TargetPlatform.iOS
         ? bottomInset.clamp(0.0, _homeIndicatorBelowRow)
         : null;
-    if (!fullBleed && _artworkForeground.value.isNotEmpty) {
+    // Moving artwork keeps the theme's white labels over its dimmed fade.
+    final samplesArtwork = fullBleed && motionArtwork == null;
+    if (!samplesArtwork && _artworkForeground.value.isNotEmpty) {
       _artworkForeground.value = {};
     }
     Widget artwork() => MornyePlayerArtwork(
@@ -809,8 +811,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
           fit: StackFit.expand,
           children: [
             MornyeArtworkContrast(
-              enabled: fullBleed && !_landscape && _currentPage == 0,
-              continuous: motionArtwork != null,
+              enabled: samplesArtwork && !_landscape && _currentPage == 0,
               targets: {
                 'header': _artworkHeaderKey,
                 'controls': _artworkControlsKey,
@@ -825,6 +826,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                 squareArtwork: squareArtwork,
                 artworkAspectRatio: artworkRatio,
                 fadeStart: stillFullBleed ? 0.72 : 0.58,
+                dimControls: motionArtwork != null,
                 artwork: fullBleed && !_landscape && _currentPage == 0
                     ? PlayerTransitionArtwork(
                         artworkKey: _motionArtworkKey,

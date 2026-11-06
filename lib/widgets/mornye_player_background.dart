@@ -13,6 +13,7 @@ class MornyePlayerBackground extends StatelessWidget {
     this.squareArtwork = true,
     this.artworkAspectRatio,
     this.fadeStart = 0.58,
+    this.dimControls = false,
   });
 
   final Uri? artUri;
@@ -22,6 +23,10 @@ class MornyePlayerBackground extends StatelessWidget {
 
   /// Fraction of the artwork's height that stays sharp before fading out.
   final double fadeStart;
+
+  /// Keeps white labels readable over moving artwork, whose changing frames
+  /// cannot settle on a label colour: a soft dark layer from the fade down.
+  final bool dimControls;
 
   @override
   Widget build(BuildContext context) {
@@ -83,6 +88,14 @@ class MornyePlayerBackground extends StatelessWidget {
               : squareArtwork
               ? size.width
               : size.height * 0.66;
+          final dimStart = (artworkHeight * fadeStart / size.height).clamp(
+            0.0,
+            1.0,
+          );
+          final dimEnd = ((dimStart + artworkHeight / size.height) / 2).clamp(
+            dimStart,
+            1.0,
+          );
           return TweenAnimationBuilder<LinearGradient>(
             tween: _GradientTween(end: background),
             duration: motion,
@@ -103,6 +116,27 @@ class MornyePlayerBackground extends StatelessWidget {
                         artworkHeight,
                       ),
                     ),
+                  IgnorePointer(
+                    child: AnimatedOpacity(
+                      opacity: dimControls && artwork != null ? 1 : 0,
+                      duration: motion,
+                      curve: Curves.easeInOutCubic,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            stops: [dimStart, dimEnd],
+                            colors: [
+                              Colors.black.withValues(alpha: 0),
+                              // 4.5:1 for white over a white frame mid-fade.
+                              Colors.black.withValues(alpha: 0.4),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
