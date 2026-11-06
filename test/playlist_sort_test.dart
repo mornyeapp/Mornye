@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mornye/models/library_collections.dart';
 import 'package:mornye/models/playlist_sort.dart';
 import 'package:mornye/models/track.dart';
@@ -172,6 +173,61 @@ void main() {
       ], PlaylistSortMode.artistAsc);
       // 'ABBA' (abba) < 'Édith Piaf' (edith piaf) < 'Elton John' (elton john) < 'Zebra' (zebra)
       expect(byArtist.map((t) => t.id).toList(), ['d4', 'd1', 'd2', 'd3']);
+    });
+  });
+
+  group('PlaylistSortStorage', () {
+    setUp(() => SharedPreferences.setMockInitialValues({}));
+
+    test('defaults to PlaylistSortMode.custom when no preference is saved',
+        () async {
+      final mode = await PlaylistSortStorage.getSortMode('playlist-123');
+      expect(mode, PlaylistSortMode.custom);
+    });
+
+    test('persists and retrieves custom sort mode for distinct playlists',
+        () async {
+      await PlaylistSortStorage.setSortMode(
+        'playlist-1',
+        PlaylistSortMode.titleAsc,
+      );
+      await PlaylistSortStorage.setSortMode(
+        'playlist-2',
+        PlaylistSortMode.dateAddedDesc,
+      );
+
+      expect(
+        await PlaylistSortStorage.getSortMode('playlist-1'),
+        PlaylistSortMode.titleAsc,
+      );
+      expect(
+        await PlaylistSortStorage.getSortMode('playlist-2'),
+        PlaylistSortMode.dateAddedDesc,
+      );
+      expect(
+        await PlaylistSortStorage.getSortMode('playlist-3'),
+        PlaylistSortMode.custom,
+      );
+    });
+
+    test('reverting to custom removes or resets the persisted entry', () async {
+      await PlaylistSortStorage.setSortMode(
+        'playlist-1',
+        PlaylistSortMode.artistAsc,
+      );
+      expect(
+        await PlaylistSortStorage.getSortMode('playlist-1'),
+        PlaylistSortMode.artistAsc,
+      );
+
+      await PlaylistSortStorage.setSortMode(
+        'playlist-1',
+        PlaylistSortMode.custom,
+      );
+      expect(
+        await PlaylistSortStorage.getSortMode('playlist-1'),
+        PlaylistSortMode.custom,
+      );
     });
   });
 }

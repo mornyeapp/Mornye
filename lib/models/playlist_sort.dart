@@ -1,3 +1,4 @@
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mornye/models/library_collections.dart';
 import 'package:mornye/models/track.dart';
 
@@ -259,3 +260,38 @@ List<Track> sortTracksByMode(List<Track> tracks, PlaylistSortMode mode) {
 
   return [for (final item in indexed) item.track];
 }
+
+/// Helper for persisting and retrieving playlist sorting modes.
+class PlaylistSortStorage {
+  static const _prefix = 'mornye_playlist_sort_';
+
+  static String storageKey(String playlistKey) => '$_prefix$playlistKey';
+
+  static Future<PlaylistSortMode> getSortMode(
+    String playlistKey, {
+    SharedPreferences? prefs,
+  }) async {
+    final p = prefs ?? await SharedPreferences.getInstance();
+    final name = p.getString(storageKey(playlistKey));
+    if (name == null) return PlaylistSortMode.custom;
+    for (final mode in PlaylistSortMode.values) {
+      if (mode.name == name) return mode;
+    }
+    return PlaylistSortMode.custom;
+  }
+
+  static Future<void> setSortMode(
+    String playlistKey,
+    PlaylistSortMode mode, {
+    SharedPreferences? prefs,
+  }) async {
+    final p = prefs ?? await SharedPreferences.getInstance();
+    final key = storageKey(playlistKey);
+    if (mode == PlaylistSortMode.custom) {
+      await p.remove(key);
+    } else {
+      await p.setString(key, mode.name);
+    }
+  }
+}
+
