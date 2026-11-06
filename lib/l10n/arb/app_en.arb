@@ -7917,6 +7917,18 @@
   "@trackConvertResampler": {
     "description": "Section label for lossless conversion resampler options"
   },
+  "trackConvertDitherSmart": "Smart",
+  "@trackConvertDitherSmart": {
+    "description": "Automatic dither option for lossless file conversion"
+  },
+  "trackConvertDitherSmartDescription": "Automatically applies TPDF dither only when lowering bit depth.",
+  "@trackConvertDitherSmartDescription": {
+    "description": "Explains when Smart Dither adds dither during file conversion"
+  },
+  "downloadAutoConvertSmartDither": "Smart Dither",
+  "@downloadAutoConvertSmartDither": {
+    "description": "Toggle for automatic dither during FLAC download conversion"
+  },
   "trackConvertDitherNone": "None",
   "@trackConvertDitherNone": {
     "description": "Lossless conversion dither option with no dithering applied"

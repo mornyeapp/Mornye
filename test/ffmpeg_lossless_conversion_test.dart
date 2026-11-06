@@ -12,19 +12,32 @@ import 'package:mornye/utils/desktop_platform.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   late DesktopFFmpegTools tools;
+  late DesktopFFmpegTools conversionTools;
   late Directory directory;
+  var haveSoxr = false;
 
   setUpAll(() async {
     tools = await DesktopFFmpegTools.locate(
       environment: {'PATH': Platform.environment['PATH'] ?? ''},
     );
+    // Fixture generation needs lavfi. A bundled converter can still be tested
+    // via MORNYE_FFMPEG_DIR even when that bundle excludes input generators.
+    conversionTools = await DesktopFFmpegTools.locate();
+    if (conversionTools.ffmpegPath != null) {
+      final configuration = await Process.run(conversionTools.ffmpegPath!, [
+        '-buildconf',
+      ]);
+      haveSoxr = '${configuration.stdout}${configuration.stderr}'.contains(
+        '--enable-libsoxr',
+      );
+    }
   });
 
   setUp(() async {
     directory = await Directory.systemTemp.createTemp('lossless-conversion-');
     debugDesktopPlatformOverride = true;
     DesktopFFmpegRunner.debugShared = DesktopFFmpegRunner(
-      tools: () async => tools,
+      tools: () async => conversionTools,
     );
   });
 
@@ -35,7 +48,12 @@ void main() {
   });
 
   bool haveTools() {
-    if (tools.ffmpegPath != null && tools.ffprobePath != null) return true;
+    if (tools.ffmpegPath != null &&
+        tools.ffprobePath != null &&
+        conversionTools.ffmpegPath != null &&
+        conversionTools.ffprobePath != null) {
+      return true;
+    }
     markTestSkipped('Requires ffmpeg and ffprobe on PATH');
     return false;
   }
@@ -293,6 +311,104 @@ void main() {
         expect((artwork['disposition'] as Map)['attached_pic'], 1);
       },
     );
+  }
+
+  for (final format in ['flac', 'alac', 'wav', 'aiff']) {
+    for (final (sourceDepth, targetDepth) in [(24, 16), (32, 24)]) {
+      test('Smart dithers $format $sourceDepth to $targetDepth-bit', () async {
+        if (!haveTools()) return;
+        final input = await source(sourceDepth, 48000);
+        Future<String> convert(String mode) async {
+          final output = await FFmpegConversion.convertAudioFormat(
+            inputPath: input,
+            targetFormat: format,
+            bitrate: '',
+            metadata: const {},
+            // Leave depth unspecified to exercise per-file probing.
+            losslessQuality: LosslessConversionQuality(
+              maxBitDepth: targetDepth,
+            ),
+            losslessProcessing: LosslessConversionProcessing(dither: mode),
+            deleteOriginal: false,
+          );
+          expect(output, isNotNull);
+          final properties = await FFmpegProbe.audioProperties(output!);
+          expect(properties.bitDepth, targetDepth);
+          expect(properties.sampleRate, 48000);
+          return pcmHash(output, targetDepth);
+        }
+
+        final originalHash = await pcmHash(input, sourceDepth);
+        final smart = await convert('auto');
+        expect(smart, await convert('triangular'));
+        expect(smart, isNot(await convert('none')));
+        expect(await pcmHash(input, sourceDepth), originalHash);
+      });
+    }
+  }
+
+  for (final resampler in ['swr', 'soxr']) {
+    for (final depth in [16, 24]) {
+      test(
+        'Smart preserves $depth-bit PCM without a reduction ($resampler)',
+        () async {
+          if (!haveTools()) return;
+          final input = await source(depth, 44100);
+          final originalHash = await pcmHash(input, depth);
+          final output = await FFmpegConversion.convertAudioFormat(
+            inputPath: input,
+            targetFormat: 'flac',
+            bitrate: '',
+            metadata: const {},
+            losslessQuality: const LosslessConversionQuality(
+              maxBitDepth: 24,
+              maxSampleRate: 48000,
+            ),
+            losslessProcessing: LosslessConversionProcessing(
+              resampler: resampler,
+            ),
+            deleteOriginal: false,
+          );
+          expect(output, isNotNull);
+          expect(await pcmHash(output!, depth), originalHash);
+          final properties = await FFmpegProbe.audioProperties(output);
+          expect(properties.bitDepth, depth);
+          expect(properties.sampleRate, 44100);
+        },
+      );
+    }
+
+    test('Smart dithers after resampling with $resampler', () async {
+      if (!haveTools()) return;
+      if (resampler == 'soxr' && !haveSoxr) {
+        markTestSkipped('Requires FFmpeg built with libsoxr');
+        return;
+      }
+      final input = await source(24, 96000);
+      final hashes = <String, String>{};
+      for (final mode in ['auto', 'triangular', 'none']) {
+        final output = await FFmpegConversion.convertAudioFormat(
+          inputPath: input,
+          targetFormat: 'flac',
+          bitrate: '',
+          metadata: const {},
+          sourceBitDepth: 24,
+          losslessQuality: const LosslessConversionQuality(
+            maxBitDepth: 16,
+            maxSampleRate: 48000,
+          ),
+          losslessProcessing: LosslessConversionProcessing(
+            dither: mode,
+            resampler: resampler,
+          ),
+          deleteOriginal: false,
+        );
+        expect(output, isNotNull);
+        hashes[mode] = await pcmHash(output!, 16);
+      }
+      expect(hashes['auto'], hashes['triangular']);
+      expect(hashes['auto'], isNot(hashes['none']));
+    });
   }
 
   test('invalid WAV preserves the source and removes partial FLAC', () async {

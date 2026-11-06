@@ -24,6 +24,7 @@ typedef ConvertDownloadAudio =
       required String bitrate,
       required bool deleteOriginal,
       required LosslessConversionQuality losslessQuality,
+      required LosslessConversionProcessing losslessProcessing,
     });
 
 enum DownloadDecryptionFailure { safAccess, decrypt, safWrite }
@@ -204,6 +205,8 @@ class DownloadFileFinalizer {
       maxBitDepth: 16,
       maxSampleRate: 48000,
     ),
+    LosslessConversionProcessing losslessProcessing =
+        const LosslessConversionProcessing(),
     String? treeUri,
     String relativeDir = '',
     Future<void> Function(String path, String format)? embedMetadata,
@@ -296,6 +299,7 @@ class DownloadFileFinalizer {
         bitrate: targetBitrate,
         deleteOriginal: deleteOriginal,
         losslessQuality: losslessQuality,
+        losslessProcessing: losslessProcessing,
       );
       if (lossless && output != null) {
         PrimaryAudioProperties measured;

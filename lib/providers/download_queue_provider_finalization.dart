@@ -33,6 +33,7 @@ extension _DownloadQueueFinalization on DownloadQueueNotifier {
           required bitrate,
           required deleteOriginal,
           required losslessQuality,
+          required losslessProcessing,
         }) => FFmpegConversion.convertAudioFormat(
           inputPath: inputPath,
           targetFormat: targetFormat,
@@ -40,6 +41,7 @@ extension _DownloadQueueFinalization on DownloadQueueNotifier {
           metadata: const {},
           deleteOriginal: deleteOriginal,
           losslessQuality: losslessQuality,
+          losslessProcessing: losslessProcessing,
         ),
     replaceSafFile: _replaceSafFileVia,
     warn: _log.w,
@@ -107,6 +109,9 @@ extension _DownloadQueueFinalization on DownloadQueueNotifier {
     enabled: settings.autoConvertDownloads,
     targetFormat: settings.autoConvertFormat,
     targetBitrate: settings.autoConvertBitrate,
+    losslessProcessing: LosslessConversionProcessing(
+      dither: settings.autoConvertSmartDither ? 'auto' : 'none',
+    ),
     losslessQuality: LosslessConversionQuality(
       maxBitDepth: settings.autoConvertMaxBitDepth == 0
           ? null

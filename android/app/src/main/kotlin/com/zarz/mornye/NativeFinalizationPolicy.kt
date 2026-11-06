@@ -88,6 +88,7 @@ internal object NativeFinalizationPolicy {
         val bitrateKbps: Int,
         val maxBitDepth: Int? = null,
         val maxSampleRate: Int? = null,
+        val smartDither: Boolean = true,
     )
 
     fun autoConversionTarget(
@@ -96,6 +97,7 @@ internal object NativeFinalizationPolicy {
         bitrate: String?,
         maxBitDepth: Int = 16,
         maxSampleRate: Int = 48000,
+        smartDither: Boolean = true,
     ): AutoConversionTarget? {
         if (!enabled) return null
         val codec = when (format?.trim()?.lowercase(Locale.ROOT)) {
@@ -127,6 +129,7 @@ internal object NativeFinalizationPolicy {
             if (codec == "flac" && maxSampleRate != 0) {
                 maxSampleRate.takeIf { it in setOf(44100, 48000, 96000, 192000) } ?: 48000
             } else null,
+            smartDither,
         )
     }
 
@@ -166,6 +169,10 @@ internal object NativeFinalizationPolicy {
             val options = mutableListOf("resampler=swr")
             if (rate != null) options.add("osr=$rate")
             if (depth != null) options.add("osf=${if (depth <= 16) "s16" else "s32"}")
+            if (target.smartDither && depth != null && bitDepth != null && bitDepth > depth) {
+                options.add("dither_method=triangular")
+                options.add("output_sample_bits=$depth")
+            }
             arguments.addAll(listOf("-af", "aresample=${options.joinToString(":")}"))
         }
         if (depth != null) {

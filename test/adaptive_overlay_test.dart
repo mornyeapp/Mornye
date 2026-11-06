@@ -222,6 +222,19 @@ void main() {
             await tester.pumpAndSettle();
             expect(find.byType(AppBottomSheet), findsNothing);
           }
+          expect(
+            container.read(settingsProvider).autoConvertSmartDither,
+            isTrue,
+          );
+          final smartDither = find.text('Smart Dither');
+          await tester.ensureVisible(smartDither);
+          await tester.pumpAndSettle();
+          await tester.tap(smartDither);
+          await tester.pumpAndSettle();
+          expect(
+            container.read(settingsProvider).autoConvertSmartDither,
+            isFalse,
+          );
           expect(tester.takeException(), isNull);
         } finally {
           semantics.dispose();

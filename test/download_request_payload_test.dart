@@ -31,6 +31,7 @@ void main() {
         autoConvertBitrate: '192k',
         autoConvertMaxBitDepth: 24,
         autoConvertMaxSampleRate: 48000,
+        autoConvertSmartDither: false,
         trackNumber: 7,
         playlistPosition: 3,
         discNumber: 2,
@@ -93,6 +94,7 @@ void main() {
         'auto_convert_bitrate': '192k',
         'auto_convert_max_bit_depth': 24,
         'auto_convert_max_sample_rate': 48000,
+        'auto_convert_smart_dither': false,
         'track_number': 7,
         'playlist_position': 3,
         'disc_number': 2,
@@ -165,6 +167,7 @@ void main() {
         updated.autoConvertMaxSampleRate,
         payload.autoConvertMaxSampleRate,
       );
+      expect(updated.autoConvertSmartDither, payload.autoConvertSmartDither);
       expect(updated.explicit, payload.explicit);
       expect(updated.albumType, payload.albumType);
       expect(updated.upc, payload.upc);

@@ -28,6 +28,48 @@ void main() {
   });
 
   group('lossless processing options', () {
+    test('Smart resolves per source and only dithers a known reduction', () {
+      const smart = LosslessConversionProcessing(resampler: 'soxr');
+      expect(smart.normalizedDither, 'auto');
+      expect(smart.hasDither, isFalse);
+      for (final (source, target, expected) in <(int?, int?, String)>[
+        (24, 16, 'triangular'),
+        (32, 24, 'triangular'),
+        (16, 16, 'none'),
+        (24, 24, 'none'),
+        (16, 24, 'none'),
+        (24, null, 'none'),
+        (null, 16, 'none'),
+        (0, 16, 'none'),
+        (24, 0, 'none'),
+      ]) {
+        final resolved = smart.resolveDither(
+          sourceBitDepth: source,
+          targetBitDepth: target,
+        );
+        expect(
+          resolved.normalizedDither,
+          expected,
+          reason: '$source -> $target',
+        );
+        expect(resolved.normalizedResampler, 'soxr');
+      }
+    });
+
+    test('explicit dither choices override Smart behavior', () {
+      for (final mode in ['none', 'triangular', 'triangular_hp']) {
+        final explicit = LosslessConversionProcessing(dither: mode);
+        for (final depth in [16, 24]) {
+          expect(
+            explicit
+                .resolveDither(sourceBitDepth: depth, targetBitDepth: 16)
+                .normalizedDither,
+            mode,
+          );
+        }
+      }
+    });
+
     test('preserves both resamplers and both dither methods', () {
       const soxrTpdf = LosslessConversionProcessing(
         dither: 'triangular',

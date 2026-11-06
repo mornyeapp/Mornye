@@ -168,6 +168,15 @@ class _DownloadSettingsPageState extends ConsumerState<DownloadSettingsPage> {
                         ref,
                         settings.autoConvertMaxSampleRate,
                       ),
+                    ),
+                    SettingsSwitchItem(
+                      icon: Icons.auto_fix_high_outlined,
+                      title: context.l10n.downloadAutoConvertSmartDither,
+                      subtitle: context.l10n.trackConvertDitherSmartDescription,
+                      value: settings.autoConvertSmartDither,
+                      onChanged: (value) => ref
+                          .read(settingsProvider.notifier)
+                          .setAutoConvertSmartDither(value),
                       showDivider: false,
                     ),
                   ] else

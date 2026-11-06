@@ -216,6 +216,7 @@ class AppSettings {
   final String autoConvertBitrate; // '128k', '160k', '192k', '256k', or '320k'
   final int autoConvertMaxBitDepth; // 0 retains the source bit depth.
   final int autoConvertMaxSampleRate; // 0 retains the source sample rate.
+  final bool autoConvertSmartDither;
   final bool
   useAllFilesAccess; // Android 13+ only: enable MANAGE_EXTERNAL_STORAGE
   final bool autoExportFailedDownloads;
@@ -391,6 +392,7 @@ class AppSettings {
     this.autoConvertBitrate = '320k',
     this.autoConvertMaxBitDepth = 16,
     this.autoConvertMaxSampleRate = 48000,
+    this.autoConvertSmartDither = true,
     this.useAllFilesAccess = false,
     this.autoExportFailedDownloads = false,
     this.downloadNetworkMode = 'any',
@@ -549,6 +551,7 @@ class AppSettings {
     String? autoConvertBitrate,
     int? autoConvertMaxBitDepth,
     int? autoConvertMaxSampleRate,
+    bool? autoConvertSmartDither,
     bool? useAllFilesAccess,
     bool? autoExportFailedDownloads,
     String? downloadNetworkMode,
@@ -711,6 +714,8 @@ class AppSettings {
           autoConvertMaxBitDepth ?? this.autoConvertMaxBitDepth,
       autoConvertMaxSampleRate:
           autoConvertMaxSampleRate ?? this.autoConvertMaxSampleRate,
+      autoConvertSmartDither:
+          autoConvertSmartDither ?? this.autoConvertSmartDither,
       useAllFilesAccess: useAllFilesAccess ?? this.useAllFilesAccess,
       autoExportFailedDownloads:
           autoExportFailedDownloads ?? this.autoExportFailedDownloads,

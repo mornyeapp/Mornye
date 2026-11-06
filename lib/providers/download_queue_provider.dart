@@ -632,6 +632,7 @@ class DownloadQueueNotifier extends Notifier<DownloadQueueState> {
       autoConvertMaxSampleRate: normalizeAutoConvertSampleRate(
         settings.autoConvertMaxSampleRate,
       ),
+      autoConvertSmartDither: settings.autoConvertSmartDither,
       trackNumber: normalizedTrackNumber,
       playlistPosition: _validPlaylistPosition(item),
       discNumber: normalizedDiscNumber,

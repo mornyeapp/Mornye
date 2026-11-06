@@ -1034,6 +1034,9 @@ class SettingsNotifier extends Notifier<AppSettings> {
     ),
   );
 
+  void setAutoConvertSmartDither(bool enabled) =>
+      _commit(state.copyWith(autoConvertSmartDither: enabled));
+
   void setUseAllFilesAccess(bool enabled) =>
       _commit(state.copyWith(useAllFilesAccess: enabled));
 

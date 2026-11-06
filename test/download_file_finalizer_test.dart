@@ -5,6 +5,7 @@ import 'package:mornye/models/download_result.dart';
 import 'package:mornye/services/download_file_finalizer.dart';
 import 'package:mornye/services/download_saf_file_replacer.dart';
 import 'package:mornye/services/ffmpeg_probe.dart';
+import 'package:mornye/utils/audio_conversion_utils.dart';
 
 void main() {
   late Directory directory;
@@ -40,6 +41,7 @@ void main() {
           required bitrate,
           required deleteOriginal,
           required losslessQuality,
+          required losslessProcessing,
         }) async => throw StateError('Unexpected conversion'),
     replaceSafFile:
         replaceSaf ??
@@ -280,6 +282,7 @@ void main() {
               required bitrate,
               required deleteOriginal,
               required losslessQuality,
+              required losslessProcessing,
             }) async => null,
       );
       final outcome = await convert(stage, result, name: 'Song.flac');
@@ -323,10 +326,12 @@ void main() {
               required bitrate,
               required deleteOriginal,
               required losslessQuality,
+              required losslessProcessing,
             }) async {
               expect(targetFormat, 'flac');
               expect(losslessQuality.maxBitDepth, 16);
               expect(losslessQuality.maxSampleRate, 48000);
+              expect(losslessProcessing.normalizedDither, 'auto');
               return '/converted.flac';
             },
       );
@@ -346,6 +351,43 @@ void main() {
       expect(warnings, isEmpty);
     });
   }
+
+  test(
+    'automatic FLAC conversion forwards the disabled Smart setting',
+    () async {
+      final stage = finalizer(
+        properties: (_) async => const PrimaryAudioProperties(
+          codec: 'flac',
+          bitDepth: 24,
+          sampleRate: 48000,
+        ),
+        convert:
+            ({
+              required inputPath,
+              required targetFormat,
+              required bitrate,
+              required deleteOriginal,
+              required losslessQuality,
+              required losslessProcessing,
+            }) async {
+              expect(losslessProcessing.normalizedDither, 'none');
+              return '/converted.flac';
+            },
+      );
+      final outcome = await stage.autoConvert(
+        result: DownloadResult.fromMap({}),
+        filePath: '/source.flac',
+        fileName: 'source.flac',
+        quality: '24-bit/48kHz',
+        enabled: true,
+        targetFormat: 'flac',
+        targetBitrate: '',
+        useSaf: false,
+        losslessProcessing: const LosslessConversionProcessing(dither: 'none'),
+      );
+      expect(outcome.converted, isTrue);
+    },
+  );
 
   test('FLAC auto conversion preserves compliant and lossy sources', () async {
     for (final codec in ['flac', 'aac']) {
@@ -396,6 +438,7 @@ void main() {
               required bitrate,
               required deleteOriginal,
               required losslessQuality,
+              required losslessProcessing,
             }) async {
               expect(deleteOriginal, isTrue);
               expect(targetFormat, 'opus');
@@ -490,6 +533,7 @@ void main() {
               required bitrate,
               required deleteOriginal,
               required losslessQuality,
+              required losslessProcessing,
             }) async => (await output.writeAsString('converted')).path,
       );
       final result = await convert(
@@ -566,6 +610,7 @@ void main() {
                 required bitrate,
                 required deleteOriginal,
                 required losslessQuality,
+                required losslessProcessing,
               }) async {
                 expect(deleteOriginal, isFalse);
                 return (await output.writeAsString('converted')).path;

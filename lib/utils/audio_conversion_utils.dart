@@ -20,6 +20,7 @@ const List<int> losslessConversionSampleRateOptions = [
 const List<int> losslessConversionBitDepthOptions = [16, 24];
 
 const List<String> losslessDitherOptions = [
+  'auto',
   'none',
   'triangular',
   'triangular_hp',
@@ -35,7 +36,7 @@ class LosslessConversionProcessing {
   final String resampler;
 
   const LosslessConversionProcessing({
-    this.dither = 'none',
+    this.dither = 'auto',
     this.resampler = 'swr',
   });
 
@@ -49,7 +50,24 @@ class LosslessConversionProcessing {
     return losslessResamplerOptions.contains(normalized) ? normalized : 'swr';
   }
 
-  bool get hasDither => normalizedDither != 'none';
+  bool get hasDither =>
+      normalizedDither == 'triangular' || normalizedDither == 'triangular_hp';
+
+  LosslessConversionProcessing resolveDither({
+    required int? sourceBitDepth,
+    required int? targetBitDepth,
+  }) {
+    if (normalizedDither != 'auto') return this;
+    final reducesDepth =
+        sourceBitDepth != null &&
+        targetBitDepth != null &&
+        targetBitDepth > 0 &&
+        sourceBitDepth > targetBitDepth;
+    return LosslessConversionProcessing(
+      dither: reducesDepth ? 'triangular' : 'none',
+      resampler: resampler,
+    );
+  }
 }
 
 List<String> losslessResamplerFilterOptions(
@@ -226,6 +244,7 @@ extension LosslessConversionLabelsL10n on AppLocalizations {
 
   String losslessDitherOptionLabel(String dither) =>
       switch (dither.trim().toLowerCase()) {
+        'auto' => trackConvertDitherSmart,
         'triangular' => trackConvertDitherTriangular,
         'triangular_hp' => trackConvertDitherTriangularHp,
         _ => trackConvertDitherNone,

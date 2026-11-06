@@ -146,6 +146,7 @@ AppSettings _$AppSettingsFromJson(Map<String, dynamic> json) => AppSettings(
       (json['autoConvertMaxBitDepth'] as num?)?.toInt() ?? 16,
   autoConvertMaxSampleRate:
       (json['autoConvertMaxSampleRate'] as num?)?.toInt() ?? 48000,
+  autoConvertSmartDither: json['autoConvertSmartDither'] as bool? ?? true,
   useAllFilesAccess: json['useAllFilesAccess'] as bool? ?? false,
   autoExportFailedDownloads:
       json['autoExportFailedDownloads'] as bool? ?? false,
@@ -291,6 +292,7 @@ Map<String, dynamic> _$AppSettingsToJson(
   'autoConvertBitrate': instance.autoConvertBitrate,
   'autoConvertMaxBitDepth': instance.autoConvertMaxBitDepth,
   'autoConvertMaxSampleRate': instance.autoConvertMaxSampleRate,
+  'autoConvertSmartDither': instance.autoConvertSmartDither,
   'useAllFilesAccess': instance.useAllFilesAccess,
   'autoExportFailedDownloads': instance.autoExportFailedDownloads,
   'downloadNetworkMode': instance.downloadNetworkMode,

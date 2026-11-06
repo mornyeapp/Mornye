@@ -19,6 +19,7 @@ internal fun NativeDownloadFinalizer.finalizeAutoConversion(
         bitrate = input.request.optString("auto_convert_bitrate", ""),
         maxBitDepth = input.request.optInt("auto_convert_max_bit_depth", 16),
         maxSampleRate = input.request.optInt("auto_convert_max_sample_rate", 48000),
+        smartDither = input.request.optBoolean("auto_convert_smart_dither", true),
     ) ?: return
     if (target.codec == "flac") {
         refreshFinalAudioQualityMetadata(context, input.result, state)

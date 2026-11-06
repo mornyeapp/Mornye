@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:mornye/theme/mornye_theme.dart';
+import 'package:mornye/theme/app_tokens.dart';
 import 'package:mornye/widgets/app_action_button.dart';
 import 'package:mornye/widgets/app_choice_chip.dart';
 import 'package:mornye/widgets/mornye_chrome.dart';
@@ -60,7 +61,7 @@ class _BatchConvertSheetState extends State<BatchConvertSheet> {
   late String _selectedBitrate;
   int? _selectedMaxBitDepth;
   int? _selectedMaxSampleRate;
-  String _selectedDither = 'none';
+  String _selectedDither = 'auto';
   String _selectedResampler = 'swr';
   bool _keepOriginal = false;
 
@@ -139,7 +140,7 @@ class _BatchConvertSheetState extends State<BatchConvertSheet> {
                     } else {
                       _selectedMaxBitDepth = null;
                       _selectedMaxSampleRate = null;
-                      _selectedDither = 'none';
+                      _selectedDither = 'auto';
                       _selectedResampler = 'swr';
                     }
                   },
@@ -167,7 +168,7 @@ class _BatchConvertSheetState extends State<BatchConvertSheet> {
                     selected: _selectedMaxBitDepth,
                     onSelect: (depth) {
                       _selectedMaxBitDepth = depth;
-                      if (depth == null) _selectedDither = 'none';
+                      if (depth == null) _selectedDither = 'auto';
                     },
                   ),
 
@@ -195,6 +196,9 @@ class _BatchConvertSheetState extends State<BatchConvertSheet> {
                     labelOf: context.l10n.losslessDitherOptionLabel,
                     selected: _selectedDither,
                     onSelect: (mode) => _selectedDither = mode,
+                    description: _selectedDither == 'auto'
+                        ? context.l10n.trackConvertDitherSmartDescription
+                        : null,
                   ),
 
                 if (_isLosslessTarget && _selectedMaxSampleRate != null)
@@ -360,6 +364,7 @@ class _BatchConvertSheetState extends State<BatchConvertSheet> {
     required String Function(T value) labelOf,
     required T selected,
     required void Function(T value) onSelect,
+    String? description,
   }) {
     return _card(
       cs,
@@ -390,6 +395,16 @@ class _BatchConvertSheetState extends State<BatchConvertSheet> {
                 ),
             ],
           ),
+          if (description != null)
+            Padding(
+              padding: EdgeInsets.only(top: context.tokens.gapMd),
+              child: Text(
+                description,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+              ),
+            ),
         ],
       ),
     );

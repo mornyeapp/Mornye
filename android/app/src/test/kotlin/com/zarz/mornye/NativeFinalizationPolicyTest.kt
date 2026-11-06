@@ -249,12 +249,36 @@ class NativeFinalizationPolicyTest {
         assertFalse(NativeFinalizationPolicy.autoConversionAlreadySatisfied(target, "aac", null, 16, 44100))
 
         val highResolution = NativeFinalizationPolicy.flacAutoConversionArguments(target, "in.flac", "out.flac", 24, 96000)
-        assertTrue(highResolution.contains("aresample=resampler=swr:osr=48000:osf=s16"))
+        assertTrue(highResolution.contains("aresample=resampler=swr:osr=48000:osf=s16:dither_method=triangular:output_sample_bits=16"))
         val lowerRate = NativeFinalizationPolicy.flacAutoConversionArguments(target, "in.flac", "out.flac", 24, 44100)
-        assertTrue(lowerRate.contains("aresample=resampler=swr:osf=s16"))
+        assertTrue(lowerRate.contains("aresample=resampler=swr:osf=s16:dither_method=triangular:output_sample_bits=16"))
         assertFalse(lowerRate.any { it.contains("osr=") })
         val original = checkNotNull(NativeFinalizationPolicy.autoConversionTarget(true, "flac", "", 0, 0))
         assertTrue(NativeFinalizationPolicy.autoConversionAlreadySatisfied(original, "flac", null, 24, 96000))
+    }
+
+    @Test
+    fun smartDitherOnlyAppliesToKnownBitDepthReductions() {
+        val target = checkNotNull(NativeFinalizationPolicy.autoConversionTarget(true, "flac", ""))
+        assertTrue(target.smartDither)
+        for (sourceDepth in listOf(16, null)) {
+            val arguments = NativeFinalizationPolicy.flacAutoConversionArguments(
+                target, "in.flac", "out.flac", sourceDepth, 96000,
+            )
+            assertFalse(arguments.any { it.contains("dither_method=") })
+        }
+        val disabled = NativeFinalizationPolicy.flacAutoConversionArguments(
+            target.copy(smartDither = false), "in.flac", "out.flac", 24, 96000,
+        )
+        assertFalse(disabled.any { it.contains("dither_method=") })
+        val to24 = NativeFinalizationPolicy.flacAutoConversionArguments(
+            target.copy(maxBitDepth = 24), "in.wav", "out.flac", 32, 48000,
+        )
+        assertTrue(to24.contains("aresample=resampler=swr:osf=s32:dither_method=triangular:output_sample_bits=24"))
+        val original = NativeFinalizationPolicy.flacAutoConversionArguments(
+            target.copy(maxBitDepth = null), "in.flac", "out.flac", 24, 96000,
+        )
+        assertFalse(original.any { it.contains("dither_method=") })
     }
 
     @Test
