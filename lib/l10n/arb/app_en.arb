@@ -1,4 +1,16 @@
 {
+  "playlistBrowseFolder": "Browse for a folder…",
+  "@playlistBrowseFolder": {
+    "description": "Create-playlist folder sheet: opens the system folder picker"
+  },
+  "playlistBrowseFolderSubtitle": "Includes every subfolder inside it",
+  "@playlistBrowseFolderSubtitle": {
+    "description": "Subtitle of the browse-for-a-folder row: the playlist gets tracks from all nested folders"
+  },
+  "playlistBrowseFolderNoTracks": "No tracks from that folder are in your library yet. Add it as a library source first.",
+  "@playlistBrowseFolderNoTracks": {
+    "description": "Snackbar when the picked folder holds no library tracks"
+  },
   "libraryLyricsSearchDescription": "Search lyrics saved in your songs. The first search may take a while; you can switch filters to stop it.",
   "libraryLyricsIndexing": "Preparing lyrics search: {count} songs checked",
   "@libraryLyricsIndexing": {"placeholders": {"count": {"type": "int"}}},
