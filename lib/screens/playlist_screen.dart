@@ -193,8 +193,9 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen>
   }
 
   Future<void> _loadPersistedSortMode() async {
-    final mode = await PlaylistSortStorage.getSortMode(_playlistKey);
-    if (!mounted || mode == _sortMode) return;
+    final key = _playlistKey;
+    final mode = await PlaylistSortStorage.getSortMode(key);
+    if (!mounted || key != _playlistKey || mode == _sortMode) return;
     setState(() {
       _sortMode = mode;
       _updateSortedTracks();
