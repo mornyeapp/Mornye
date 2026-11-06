@@ -16,6 +16,17 @@ final _log = AppLogger('PlayerMetadata');
 typedef OnlineLyricsFetcher = Future<String> Function(MediaItem item);
 typedef OnlineLyricsSaver = Future<void> Function(String source, String lyrics);
 
+/// One editor's original track, writable source and draft input. The playing
+/// controller may advance while a permission check or the editor is open.
+@immutable
+class PlayerLyricsEdit {
+  const PlayerLyricsEdit._(this.item, this.source, this.rawLyrics);
+
+  final MediaItem item;
+  final String source;
+  final String rawLyrics;
+}
+
 Future<String> _fetchOnlineLyrics(MediaItem item) async {
   final result = await PlatformBridge.getLyricsLRCWithSource(
     '',
@@ -154,13 +165,25 @@ class PlayerMetadataController extends ChangeNotifier {
     if (!_disposed && generation == _generation) notifyListeners();
   }
 
-  /// Embeds [raw] in the original audio file and shows it. Throws when the
-  /// file can't be written, leaving the current lyrics in place.
-  Future<void> saveEditedLyrics(String raw) async {
+  PlayerLyricsEdit? beginLyricsEdit() {
+    final item = _item;
     final source = this.source;
-    if (_disposed || _item == null || source == null) {
-      throw StateError('No editable track is loaded');
-    }
+    if (_disposed || _loading || item == null || source == null) return null;
+    return PlayerLyricsEdit._(item, source, _lyricsRaw);
+  }
+
+  bool isCurrentLyricsEdit(PlayerLyricsEdit edit) =>
+      !_disposed && _item?.id == edit.item.id && source == edit.source;
+
+  /// Writes to the file captured when editing began, even if playback moved
+  /// or stopped. Only updates the player when it still shows that same track.
+  Future<void> saveEditedLyrics(
+    String raw, {
+    required PlayerLyricsEdit edit,
+  }) async {
+    if (_disposed) throw StateError('The lyrics editor is closed');
+    final source = edit.source;
+    final editingCurrentTrack = isCurrentLyricsEdit(edit);
     final generation = _generation;
     final parsed = raw.trim().isEmpty
         ? ParsedLyrics.empty
@@ -174,7 +197,12 @@ class PlayerMetadataController extends ChangeNotifier {
     } finally {
       _savingLyricsSources.remove(source);
     }
-    if (_disposed || generation != _generation) return;
+    if (_disposed ||
+        !editingCurrentTrack ||
+        generation != _generation ||
+        !isCurrentLyricsEdit(edit)) {
+      return;
+    }
     _metadata = Map.unmodifiable({...?_metadata, 'lyrics': raw});
     _lyrics = parsed;
     _lyricsRaw = raw;

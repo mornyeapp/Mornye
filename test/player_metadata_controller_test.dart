@@ -24,6 +24,13 @@ MediaItem _item(
   },
 );
 
+class _EditEvents extends SourceMetadataEvents {
+  final published = <String>[];
+
+  @override
+  Future<void> publish(String source) async => published.add(source);
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -391,6 +398,110 @@ void main() {
       expect(controller.lyrics.lines.single.text, 'Current');
     },
   );
+
+  group('edited lyrics ownership', () {
+    for (final phase in ['parse', 'write']) {
+      test(
+        'SAF edit stays on the original document while $phase is pending',
+        () async {
+          const raw = '[00:01.00]Edited original';
+          final parse = Completer<ParsedLyrics>();
+          final write = Completer<void>();
+          final writes = <(String, String)>[];
+          final events = _EditEvents();
+          final controller = PlayerMetadataController(
+            readMetadata: (path) async => {
+              'lyrics': path == '/music/b.flac'
+                  ? '[00:02.00]Track B lyrics'
+                  : '[00:01.00]Original lyrics',
+            },
+            parseLyrics: (text) async => text == raw && phase == 'parse'
+                ? await parse.future
+                : LyricsParser.parse(text),
+            saveOnlineLyrics: (source, lyrics) async {
+              writes.add((source, lyrics));
+              if (phase == 'write') await write.future;
+            },
+            metadataEvents: events,
+          );
+          addTearDown(controller.dispose);
+          const source =
+              'content://example.documents/tree/music/document/a.flac';
+          await controller.load(
+            _item('a', source: source, resolved: '/cache/a.flac'),
+          );
+          final edit = controller.beginLyricsEdit()!;
+          final pending = controller.saveEditedLyrics(raw, edit: edit);
+          await Future<void>.delayed(Duration.zero);
+          await controller.load(_item('b'));
+          if (phase == 'parse') {
+            parse.complete(LyricsParser.parse(raw));
+          } else {
+            write.complete();
+          }
+          await pending;
+          expect(writes, [(source, raw)]);
+          expect(events.published, [source]);
+          expect(edit.rawLyrics, '[00:01.00]Original lyrics');
+          expect(controller.source, '/music/b.flac');
+          expect(controller.rawLyrics, '[00:02.00]Track B lyrics');
+        },
+      );
+    }
+
+    test(
+      'a saved edit cannot update another source with the same queue ID',
+      () async {
+        final writes = <String>[];
+        final controller = PlayerMetadataController(
+          readMetadata: (source) async => {'lyrics': '[00:01.00]$source'},
+          parseLyrics: (raw) async => LyricsParser.parse(raw),
+          saveOnlineLyrics: (source, _) async => writes.add(source),
+          metadataEvents: _EditEvents(),
+        );
+        addTearDown(controller.dispose);
+        await controller.load(_item('same', source: '/music/a.flac'));
+        final edit = controller.beginLyricsEdit()!;
+        await controller.load(_item('same', source: '/music/b.flac'));
+        await controller.saveEditedLyrics('[00:01.00]Edited A', edit: edit);
+        expect(writes, ['/music/a.flac']);
+        expect(controller.rawLyrics, '[00:01.00]/music/b.flac');
+      },
+    );
+
+    test(
+      'failed writes preserve the original editor snapshot for retry',
+      () async {
+        var fail = true;
+        final sources = <String>[];
+        final events = _EditEvents();
+        final controller = PlayerMetadataController(
+          readMetadata: (_) async => {'lyrics': '[00:01.00]Original'},
+          parseLyrics: (raw) async => LyricsParser.parse(raw),
+          saveOnlineLyrics: (source, _) async {
+            sources.add(source);
+            if (fail) throw StateError('Document write failed');
+          },
+          metadataEvents: events,
+        );
+        addTearDown(controller.dispose);
+        await controller.load(_item('a'));
+        final edit = controller.beginLyricsEdit()!;
+        await expectLater(
+          controller.saveEditedLyrics('[00:01.00]Edited', edit: edit),
+          throwsStateError,
+        );
+        expect(controller.rawLyrics, '[00:01.00]Original');
+        expect(events.published, isEmpty);
+        await controller.load(_item('b'));
+        fail = false;
+        await controller.saveEditedLyrics('[00:01.00]Edited', edit: edit);
+        expect(sources, ['/music/a.flac', '/music/a.flac']);
+        expect(events.published, ['/music/a.flac']);
+        expect(controller.rawLyrics, '[00:01.00]Original');
+      },
+    );
+  });
 
   group('online lyrics search', () {
     PlayerMetadataController controllerFor(
