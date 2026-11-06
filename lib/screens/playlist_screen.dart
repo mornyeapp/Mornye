@@ -412,14 +412,12 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen>
               PlaylistSortStorage.setSortMode(_playlistKey, newSort);
             },
           ),
-        if (ref.watch(linkPhoneClientProvider) != null) ...[
-          const SizedBox(width: 8),
+        if (ref.watch(linkPhoneClientProvider) != null)
           LinkDownloadOnDesktopButton(
             tracks: _sortedTracks,
             service: _recommendedDownloadService(),
             playlistName: _playlistName,
           ),
-        ],
       ],
       actions: CollectionHeaderActions(
         tracks: _sortedTracks,

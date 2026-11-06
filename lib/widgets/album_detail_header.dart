@@ -190,7 +190,7 @@ class AlbumDetailHeader extends StatelessWidget {
       leadingWidth: kToolbarHeight + edgeInset,
       leading: back,
       actionsPadding: EdgeInsetsDirectional.only(end: edgeInset),
-      actions: appBarActions,
+      actions: _buildToolbarActions(context),
     );
     if (immersive) {
       final detailsTop = (artworkSize - 20).clamp(0.0, double.infinity);
@@ -552,8 +552,24 @@ class AlbumDetailHeader extends StatelessWidget {
             ),
       ),
       actionsPadding: EdgeInsetsDirectional.only(end: iosEdgeInset),
-      actions: appBarActions,
+      actions: _buildToolbarActions(context),
     );
+  }
+
+  List<Widget>? _buildToolbarActions(BuildContext context) {
+    final actions = appBarActions;
+    if (actions == null || actions.isEmpty) return null;
+    final filtered = actions.where((w) => w is! SizedBox).toList();
+    if (filtered.isEmpty) return null;
+    if (context.isMornye) {
+      return [MornyeActionCapsule(children: filtered)];
+    }
+    return [
+      for (var i = 0; i < filtered.length; i++) ...[
+        if (i > 0) const SizedBox(width: 8),
+        filtered[i],
+      ],
+    ];
   }
 }
 

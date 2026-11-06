@@ -1104,14 +1104,11 @@ class _LibraryTracksFolderScreenState
           if (isPlaylistMode &&
               !isSelectionMode &&
               entries.isNotEmpty &&
-              ref.watch(linkPhoneClientProvider) != null) ...[
-            const SizedBox(width: 8),
+              ref.watch(linkPhoneClientProvider) != null)
             LinkTrackTransferButton(
               tracks: entries.map((e) => e.track).toList(growable: false),
             ),
-          ],
-          if (!isSelectionMode && entries.length > 1 && !_editingOrder) ...[
-            const SizedBox(width: 8),
+          if (!isSelectionMode && entries.length > 1 && !_editingOrder)
             buildPlaylistSortButton(
               context: context,
               currentSort: _sortMode,
@@ -1121,9 +1118,7 @@ class _LibraryTracksFolderScreenState
                 PlaylistSortStorage.setSortMode(_playlistKey, newSort);
               },
             ),
-          ],
-          if (!isSelectionMode && entries.length > 1) ...[
-            const SizedBox(width: 8),
+          if (!isSelectionMode && entries.length > 1)
             HeaderCircleButton(
               key: const ValueKey('collection-edit-order'),
               icon: Icons.swap_vert,
@@ -1131,9 +1126,7 @@ class _LibraryTracksFolderScreenState
               tooltip: context.l10n.playlistEditOrder,
               onPressed: () => _editOrder(rawEntries),
             ),
-          ],
           if (isPlaylistMode && !isSelectionMode) ...[
-            const SizedBox(width: 8),
             HeaderCircleButton(
               icon: Icons.edit_outlined,
               iconSize: 20,
@@ -1144,7 +1137,6 @@ class _LibraryTracksFolderScreenState
                 _showRenamePlaylistDialog(context, id, playlist?.name ?? title);
               },
             ),
-            const SizedBox(width: 8),
             Builder(
               builder: (buttonContext) => HeaderCircleButton(
                 icon: Icons.camera_alt_outlined,
