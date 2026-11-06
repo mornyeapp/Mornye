@@ -106,6 +106,196 @@ class _LibraryTracksFolderScreenState
       ) ??
       false;
 
+  static int _cmpText(String a, String b) =>
+      a.toLowerCase().compareTo(b.toLowerCase());
+
+  /// Same choices, order and labels as the Library's sort menu, minus file
+  /// size: playlist entries don't carry a file size.
+  static const _orderSortModes = [
+    'latest',
+    'oldest',
+    'a-z',
+    'z-a',
+    'artist-asc',
+    'artist-desc',
+    'artist-album-track',
+    'album-asc',
+    'album-desc',
+    'release-newest',
+    'release-oldest',
+    'genre-asc',
+    'genre-desc',
+  ];
+
+  static String _orderSortLabel(BuildContext context, String mode) {
+    final l10n = context.l10n;
+    return switch (mode) {
+      'oldest' => l10n.libraryFilterSortOldest,
+      'a-z' => l10n.searchSortTitleAZ,
+      'z-a' => l10n.searchSortTitleZA,
+      'artist-asc' => l10n.searchSortArtistAZ,
+      'artist-desc' => l10n.searchSortArtistZA,
+      'artist-album-track' => l10n.libraryFilterSortArtistAlbumTrack,
+      'album-asc' => l10n.libraryFilterSortAlbumAsc,
+      'album-desc' => l10n.libraryFilterSortAlbumDesc,
+      'release-newest' => l10n.searchSortDateNewest,
+      'release-oldest' => l10n.searchSortDateOldest,
+      'genre-asc' => l10n.libraryFilterSortGenreAsc,
+      'genre-desc' => l10n.libraryFilterSortGenreDesc,
+      _ => l10n.libraryFilterSortLatest,
+    };
+  }
+
+  static IconData _orderSortIcon(String mode) => switch (mode) {
+    'a-z' || 'z-a' => Icons.sort_by_alpha,
+    'artist-asc' ||
+    'artist-desc' ||
+    'artist-album-track' => Icons.person_outline,
+    'album-asc' || 'album-desc' => Icons.album_outlined,
+    'release-newest' || 'release-oldest' => Icons.event_outlined,
+    'genre-asc' || 'genre-desc' => Icons.category_outlined,
+    _ => Icons.schedule,
+  };
+
+  /// Missing values (no genre / release date) always sort last.
+  static int _cmpOptional(String? a, String? b, {bool descending = false}) {
+    final x = a?.trim() ?? '';
+    final y = b?.trim() ?? '';
+    if (x.isEmpty && y.isEmpty) return 0;
+    if (x.isEmpty) return 1;
+    if (y.isEmpty) return -1;
+    final r = _cmpText(x, y);
+    return descending ? -r : r;
+  }
+
+  static int _cmpTrackNumber(Track a, Track b) {
+    final r = (a.discNumber ?? 1).compareTo(b.discNumber ?? 1);
+    if (r != 0) return r;
+    return (a.trackNumber ?? 9999).compareTo(b.trackNumber ?? 9999);
+  }
+
+  static int _compareForOrder(
+    String mode,
+    CollectionTrackEntry a,
+    CollectionTrackEntry b,
+  ) {
+    final ta = a.track;
+    final tb = b.track;
+    final byName = _cmpText(ta.name, tb.name);
+    int then(int r, int Function() next) => r != 0 ? r : next();
+    return switch (mode) {
+      'oldest' => then(a.addedAt.compareTo(b.addedAt), () => byName),
+      'a-z' => then(byName, () => _cmpText(ta.artistName, tb.artistName)),
+      'z-a' => then(-byName, () => -_cmpText(ta.artistName, tb.artistName)),
+      'artist-asc' => then(
+        _cmpText(ta.artistName, tb.artistName),
+        () => byName,
+      ),
+      'artist-desc' => then(
+        -_cmpText(ta.artistName, tb.artistName),
+        () => byName,
+      ),
+      'artist-album-track' => then(
+        _cmpText(ta.artistName, tb.artistName),
+        () => then(
+          _cmpText(ta.albumName, tb.albumName),
+          () => then(_cmpTrackNumber(ta, tb), () => byName),
+        ),
+      ),
+      'album-asc' => then(
+        _cmpText(ta.albumName, tb.albumName),
+        () => then(_cmpTrackNumber(ta, tb), () => byName),
+      ),
+      'album-desc' => then(
+        -_cmpText(ta.albumName, tb.albumName),
+        () => then(_cmpTrackNumber(ta, tb), () => byName),
+      ),
+      'release-newest' => then(
+        _cmpOptional(ta.releaseDate, tb.releaseDate, descending: true),
+        () => byName,
+      ),
+      'release-oldest' => then(
+        _cmpOptional(ta.releaseDate, tb.releaseDate),
+        () => byName,
+      ),
+      'genre-asc' => then(_cmpOptional(ta.genre, tb.genre), () => byName),
+      'genre-desc' => then(
+        _cmpOptional(ta.genre, tb.genre, descending: true),
+        () => byName,
+      ),
+      // 'latest'
+      _ => then(b.addedAt.compareTo(a.addedAt), () => byName),
+    };
+  }
+
+  void _sortOrderBy(String mode) {
+    final draft = _orderDraft;
+    if (draft == null || _savingOrder) return;
+    final next = [...draft]..sort((a, b) => _compareForOrder(mode, a, b));
+    setState(() => _orderDraft = next);
+  }
+
+  void _showOrderSortMenu(BuildContext buttonContext) {
+    if (_savingOrder) return;
+    final position = isDesktopPlatform
+        ? contextMenuPositionBelow(buttonContext)
+        : null;
+    if (position != null) {
+      showContextMenu(
+        buttonContext,
+        position: position,
+        groups: [
+          [
+            for (final mode in _orderSortModes)
+              ContextMenuAction(
+                icon: _orderSortIcon(mode),
+                label: _orderSortLabel(buttonContext, mode),
+                onSelected: () => _sortOrderBy(mode),
+              ),
+          ],
+        ],
+      );
+      return;
+    }
+
+    showAppModalBottomSheet<void>(
+      context: buttonContext,
+      useRootNavigator: true,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const AppSheetHandle(),
+            const SizedBox(height: 16),
+            Flexible(
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    for (final mode in _orderSortModes)
+                      AppSheetOption(
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 4,
+                        ),
+                        leading: Icon(_orderSortIcon(mode)),
+                        title: Text(_orderSortLabel(sheetContext, mode)),
+                        onTap: () {
+                          Navigator.pop(sheetContext);
+                          _sortOrderBy(mode);
+                        },
+                      ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _editOrder(List<CollectionTrackEntry> entries) {
     exitSelectionMode();
     setState(() {
@@ -430,7 +620,23 @@ class _LibraryTracksFolderScreenState
                 16 + wideListInset(context),
                 12,
               ),
-              child: Text(context.l10n.playlistEditOrderDescription),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(context.l10n.playlistEditOrderDescription),
+                  const SizedBox(height: 12),
+                  Builder(
+                    builder: (buttonContext) => ExpressiveButton(
+                      tonal: true,
+                      icon: const Icon(Icons.sort),
+                      onPressed: _savingOrder
+                          ? null
+                          : () => _showOrderSortMenu(buttonContext),
+                      child: Text(context.l10n.libraryFilterSort),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         if (entries.isEmpty)

@@ -1,4 +1,8 @@
 {
+  "libraryFilterSortArtistAlbumTrack": "Artist, album, track",
+  "@libraryFilterSortArtistAlbumTrack": {
+    "description": "Library sort option: artist, then album, then track number"
+  },
   "libraryLyricsSearchDescription": "Search lyrics saved in your songs. The first search may take a while; you can switch filters to stop it.",
   "libraryLyricsIndexing": "Preparing lyrics search: {count} songs checked",
   "@libraryLyricsIndexing": {"placeholders": {"count": {"type": "int"}}},
