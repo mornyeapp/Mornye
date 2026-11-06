@@ -60,6 +60,17 @@ import 'package:mornye/providers/player_motion_artwork_provider.dart';
 export 'package:mornye/routes/now_playing_route.dart';
 
 /// Portrait's "Playing on" row, kept while empty.
+/// Light bar icons over the player. `SystemUiOverlayStyle.light` would also
+/// paint Android's navigation bar black, cutting the background off above it.
+const _overCoverBars = SystemUiOverlayStyle(
+  statusBarBrightness: Brightness.dark,
+  statusBarIconBrightness: Brightness.light,
+  systemNavigationBarColor: Colors.transparent,
+  systemNavigationBarDividerColor: Colors.transparent,
+  systemNavigationBarIconBrightness: Brightness.light,
+  systemNavigationBarContrastEnforced: false,
+);
+
 const _playingOnRowHeight = 36.0;
 
 /// Screens shorter than this keep Mornye's volume row clear by leaving the
@@ -490,8 +501,17 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
               : colorScheme.surface,
           foregroundColor: overCover ? Colors.white : colorScheme.onSurface,
           surfaceTintColor: Colors.transparent,
-          systemOverlayStyle: mornye || overCover
-              ? SystemUiOverlayStyle.light
+          systemOverlayStyle: mornye
+              ? _overCoverBars
+              : overCover
+              // The Material player ends on the app's surface, which can be
+              // light, while its status bar stays over the cover.
+              ? _overCoverBars.copyWith(
+                  systemNavigationBarIconBrightness:
+                      colorScheme.brightness == Brightness.dark
+                      ? Brightness.light
+                      : Brightness.dark,
+                )
               : null,
           toolbarHeight: mornyeToolbarHeight ?? kToolbarHeight,
           automaticallyImplyLeading: false,

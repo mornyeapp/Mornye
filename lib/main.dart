@@ -6,7 +6,8 @@ import 'package:crypto/crypto.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show rootBundle;
+import 'package:flutter/services.dart'
+    show SystemChrome, SystemUiMode, rootBundle;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -82,6 +83,9 @@ void main() {
           unawaited(_startBackgroundPlayback());
         }
         await waitForActivityAttachment(binding);
+        // Android 15 and later enforce this; older versions stop the app
+        // above the navigation bar, so no screen could reach the bottom edge.
+        unawaited(SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge));
       }
       // Asked after attachment, so an app a media browser started long
       // before it opens still reads the current wallpaper colors.
