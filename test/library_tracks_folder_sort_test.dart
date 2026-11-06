@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mornye/l10n/l10n.dart';
+import 'package:mornye/models/playlist_sort.dart';
 import 'package:mornye/models/track.dart';
 import 'package:mornye/providers/library_collections_provider.dart';
 import 'package:mornye/screens/library_tracks_folder_screen.dart';
@@ -148,6 +149,55 @@ void main() {
         matching: find.text('Alpha'),
       );
       expect(secondItemText, findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'LibraryTracksFolderScreen loads persisted sort mode and saves updates',
+    (tester) async {
+      await PlaylistSortStorage.setSortMode(
+        'test-playlist',
+        PlaylistSortMode.titleAsc,
+      );
+
+      final state = LibraryCollectionsState(playlists: [playlist]);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            libraryCollectionsProvider.overrideWith(
+              () => _FakeCollectionsNotifier(state),
+            ),
+          ],
+          child: MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: const LibraryTracksFolderScreen(
+              mode: LibraryTracksFolderMode.playlist,
+              playlistId: 'test-playlist',
+            ),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      expect(
+        await PlaylistSortStorage.getSortMode('test-playlist'),
+        PlaylistSortMode.titleAsc,
+      );
+
+      // Change sort to titleDesc
+      final sortButton = find.byKey(const ValueKey('playlist-sort-button'));
+      await tester.tap(sortButton);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Title (Z-A)'));
+      await tester.pumpAndSettle();
+
+      expect(
+        await PlaylistSortStorage.getSortMode('test-playlist'),
+        PlaylistSortMode.titleDesc,
+      );
     },
   );
 }

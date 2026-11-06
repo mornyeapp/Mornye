@@ -102,6 +102,8 @@ class _LibraryTracksFolderScreenState
   bool _confirmingDiscard = false;
   bool _trackActionInProgress = false;
 
+  String get _playlistKey => widget.playlistId ?? widget.mode.name;
+
   bool get _editingOrder => _orderDraft != null;
   bool get _orderChanged =>
       _orderDraft?.indexed.any(
@@ -147,6 +149,7 @@ class _LibraryTracksFolderScreenState
           : await notifier.reorderSavedTracks(widget.mode, keys);
       if (!mounted) return;
       setState(() => _orderDraft = null);
+      PlaylistSortStorage.setSortMode(_playlistKey, PlaylistSortMode.custom);
       showAppSnackBar(
         context,
         content: Text(
@@ -170,6 +173,7 @@ class _LibraryTracksFolderScreenState
   @override
   void initState() {
     super.initState();
+    _loadPersistedSortMode();
     final playlistId = widget.playlistId;
     if (widget.mode == LibraryTracksFolderMode.playlist && playlistId != null) {
       Future.microtask(
@@ -177,6 +181,21 @@ class _LibraryTracksFolderScreenState
             .read(libraryCollectionsProvider.notifier)
             .ensurePlaylistLoaded(playlistId),
       );
+    }
+  }
+
+  Future<void> _loadPersistedSortMode() async {
+    final mode = await PlaylistSortStorage.getSortMode(_playlistKey);
+    if (!mounted || mode == _sortMode) return;
+    setState(() => _sortMode = mode);
+  }
+
+  @override
+  void didUpdateWidget(LibraryTracksFolderScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.playlistId != oldWidget.playlistId ||
+        widget.mode != oldWidget.mode) {
+      _loadPersistedSortMode();
     }
   }
 
@@ -1097,7 +1116,10 @@ class _LibraryTracksFolderScreenState
               context: context,
               currentSort: _sortMode,
               hasDateAdded: true,
-              onSortChanged: (newSort) => setState(() => _sortMode = newSort),
+              onSortChanged: (newSort) {
+                setState(() => _sortMode = newSort);
+                PlaylistSortStorage.setSortMode(_playlistKey, newSort);
+              },
             ),
           ],
           if (!isSelectionMode && entries.length > 1) ...[
