@@ -26,6 +26,7 @@ import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/widgets/app_snack_bar.dart';
 import 'package:mornye/widgets/desktop/context_menu.dart';
 import 'package:mornye/widgets/desktop/hover_play_button.dart';
+import 'package:mornye/widgets/expressive_button.dart';
 import 'package:mornye/widgets/cached_cover_image.dart';
 import 'package:mornye/widgets/local_library_artwork_builder.dart';
 import 'package:mornye/widgets/library_search_results.dart';
@@ -536,6 +537,21 @@ class _MornyeLibraryScreenState extends ConsumerState<MornyeLibraryScreen> {
                           : context.l10n.searchAlbums,
                       style: Theme.of(context).textTheme.headlineSmall
                           ?.copyWith(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
+              ),
+            if (widget.artist != null)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: EdgeInsetsDirectional.only(start: 16 + listInset),
+                  child: Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: ExpressiveButton(
+                      text: true,
+                      onPressed: () =>
+                          navigateToArtist(context, artistName: widget.artist!),
+                      child: Text(context.l10n.libraryArtistPage),
                     ),
                   ),
                 ),

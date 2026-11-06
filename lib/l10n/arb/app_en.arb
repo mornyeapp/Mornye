@@ -7310,6 +7310,14 @@
   "@lyricsAiTargetLanguage": {
     "description": "AI translation setting for the target language"
   },
+  "artistSavedCopyNotice": "You're offline. This is the artist page as you last saw it.",
+  "@artistSavedCopyNotice": {
+    "description": "Note on an artist page shown from its saved copy"
+  },
+  "libraryArtistPage": "Artist Page",
+  "@libraryArtistPage": {
+    "description": "Button on a Library artist's albums that opens the full artist page"
+  },
   "albumSortSongs": "Sort Songs",
   "@albumSortSongs": {
     "description": "Tooltip of the album header button that orders the album's songs"
