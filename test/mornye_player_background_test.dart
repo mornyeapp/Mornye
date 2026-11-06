@@ -39,43 +39,15 @@ class _MaskedBackground extends StatelessWidget {
       child: CoverSourceColorBuilder(
         imageSource: artUri?.toFilePath(),
         builder: (context, sourceColor) {
-          final dominant = HSLColor.fromColor(
-            sourceColor ?? const Color(0xff808080),
-          );
-          final muted = dominant.withSaturation(
-            dominant.saturation.clamp(0.0, 0.34),
-          );
-          final backdrop = dominant.withSaturation(
-            dominant.saturation.clamp(0.0, 0.2),
-          );
           const motion = Duration(milliseconds: 380);
           final size = MediaQuery.sizeOf(context);
           return AnimatedContainer(
             duration: motion,
             curve: Curves.easeInOutCubic,
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: artwork == null
-                    ? Alignment.topLeft
-                    : Alignment.topCenter,
-                end: artwork == null
-                    ? Alignment.bottomRight
-                    : Alignment.bottomCenter,
-                stops: artwork == null ? null : const [0, 0.5, 1],
-                colors: artwork == null
-                    ? [
-                        muted
-                            .withLightness(0.28 + dominant.lightness * 0.24)
-                            .toColor(),
-                        muted
-                            .withLightness(0.14 + dominant.lightness * 0.20)
-                            .toColor(),
-                      ]
-                    : [
-                        backdrop.withLightness(0.62).toColor(),
-                        backdrop.withLightness(0.54).toColor(),
-                        backdrop.withLightness(0.34).toColor(),
-                      ],
+              gradient: mornyePlayerGradient(
+                sourceColor,
+                fullBleed: artwork != null,
               ),
             ),
             child: Stack(
@@ -160,6 +132,46 @@ Future<Uri> _cover(Directory directory, Color color) async {
 }
 
 void main() {
+  group('background follows the cover', () {
+    double lightest(LinearGradient gradient) => gradient.colors
+        .map((color) => HSLColor.fromColor(color).lightness)
+        .reduce((a, b) => a > b ? a : b);
+
+    for (final fullBleed in [true, false]) {
+      test('a black cover ends near black (fullBleed: $fullBleed)', () {
+        final gradient = mornyePlayerGradient(
+          const Color(0xff050505),
+          fullBleed: fullBleed,
+        );
+        expect(lightest(gradient), lessThan(0.1));
+      });
+
+      test('darker covers never get a lighter surface '
+          '(fullBleed: $fullBleed)', () {
+        var last = 0.0;
+        for (var gray = 0; gray <= 255; gray += 5) {
+          final next = lightest(
+            mornyePlayerGradient(
+              Color.fromARGB(255, gray, gray, gray),
+              fullBleed: fullBleed,
+            ),
+          );
+          expect(next, greaterThanOrEqualTo(last));
+          last = next;
+        }
+      });
+    }
+
+    test('a bright cover and a missing cover keep their tones', () {
+      for (final source in [const Color(0xffe0e0e0), null]) {
+        expect(
+          lightest(mornyePlayerGradient(source, fullBleed: true)),
+          closeTo(0.62, 0.01),
+        );
+      }
+    });
+  });
+
   const masked = ValueKey('masked');
   const overlay = ValueKey('overlay');
 
