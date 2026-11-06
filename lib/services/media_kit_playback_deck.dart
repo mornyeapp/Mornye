@@ -70,10 +70,10 @@ class MediaKitEngine implements MpvEngine, MpvPlaylistEngine {
       // Mornye reads sidecar lyrics itself. A failed mpv subtitle autoload
       // must not turn an otherwise playable song into a source error.
       setProperty('sub-auto', 'no'),
-      // Some WASAPI devices glitch after a stream reset at their default
-      // period. Let the driver choose its minimum and align the buffer.
+      // Music playback needs scheduling headroom rather than the shortest
+      // device period, which can underrun on otherwise working endpoints.
       if (defaultTargetPlatform == TargetPlatform.windows)
-        setProperty('wasapi-exclusive-buffer', 'min'),
+        setProperty('wasapi-exclusive-buffer', 'default'),
       // Until a successor is queued, EOF must wait for the output to drain.
       setProperty('gapless-audio', 'no'),
       // Room for an equalizer preamp of +12 dB applied through the volume

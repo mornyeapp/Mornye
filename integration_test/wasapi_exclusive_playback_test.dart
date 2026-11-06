@@ -95,7 +95,10 @@ void main() {
           await deck.resume();
           await Future<void>.delayed(const Duration(milliseconds: 300));
           expect(await deck.debugProperty('current-ao'), 'wasapi');
-          expect(await deck.debugProperty('wasapi-exclusive-buffer'), 'min');
+          expect(
+            await deck.debugProperty('wasapi-exclusive-buffer'),
+            'default',
+          );
           expect(playbackExclusiveStatus.value, ExclusiveOutputStatus.active);
           await _expectNormalSpeed(deck);
 
