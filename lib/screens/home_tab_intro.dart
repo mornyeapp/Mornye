@@ -373,6 +373,8 @@ class _HomeSections extends ConsumerWidget {
         ref.watch(homeOnRepeatProvider.select((s) => s.value)) ?? const [];
     final mixes =
         ref.watch(libraryMixesProvider.select((s) => s.value)) ?? const [];
+    final newReleases =
+        ref.watch(homeNewReleasesProvider.select((s) => s.value)) ?? const [];
 
     final showContinue = hasMediaItem || hasResume;
 
@@ -439,6 +441,20 @@ class _HomeSections extends ConsumerWidget {
           child: _HomeRecentlyAddedShelf(
             items: recentlyAdded.items,
             trackCount: recentlyAdded.trackCount,
+            inset: mornye ? inset + 8 : inset,
+          ),
+        ),
+      if (newReleases.isNotEmpty)
+        _HomeSection(
+          title: l10n.weeklyReleases,
+          inset: inset,
+          shelf: true,
+          onShowAll: () => pushPage<void>(
+            context,
+            (_) => const WeeklyReleasesScreen(days: homeReleaseDays),
+          ),
+          child: _HomeNewReleasesShelf(
+            releases: newReleases,
             inset: mornye ? inset + 8 : inset,
           ),
         ),
@@ -1100,6 +1116,54 @@ class _HomeRecentlyAddedShelf extends ConsumerWidget {
     ref
         .read(musicPlayerControllerProvider)
         .playAll(media, initialIndex: initialIndex);
+  }
+}
+
+/// The favorite artists' latest albums and singles, newest first.
+class _HomeNewReleasesShelf extends StatelessWidget {
+  const _HomeNewReleasesShelf({required this.releases, required this.inset});
+
+  final List<WeeklyRelease> releases;
+  final double inset;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return _HomeShelfSize(
+      inset: inset,
+      builder: (context, coverSize) {
+        final cacheWidth = (coverSize * MediaQuery.devicePixelRatioOf(context))
+            .round();
+        return _HomeShelf(
+          inset: inset,
+          coverSize: coverSize,
+          itemCount: releases.length,
+          itemBuilder: (context, index) {
+            final release = releases[index];
+            return _HomeShelfTile(
+              size: coverSize,
+              title: release.name,
+              subtitle: release.artist,
+              semanticLabel: context.l10n.a11yOpenAlbum(release.name),
+              cover: PlayerArtwork(
+                artUri: release.coverUrl,
+                colorScheme: colorScheme,
+                cacheWidth: cacheWidth,
+                iconSize: 32,
+              ),
+              onTap: () => navigateToAlbum(
+                context,
+                albumName: release.name,
+                albumId: release.id,
+                artistName: release.artist,
+                coverUrl: release.coverUrl,
+                extensionId: release.providerId,
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 }
 

@@ -14,7 +14,10 @@ import 'package:mornye/widgets/error_card.dart';
 import 'package:mornye/widgets/settings_group.dart';
 
 class WeeklyReleasesScreen extends ConsumerStatefulWidget {
-  const WeeklyReleasesScreen({super.key});
+  const WeeklyReleasesScreen({super.key, this.days = 7});
+
+  /// The period selected on opening.
+  final int days;
 
   @override
   ConsumerState<WeeklyReleasesScreen> createState() =>
@@ -22,7 +25,7 @@ class WeeklyReleasesScreen extends ConsumerStatefulWidget {
 }
 
 class _WeeklyReleasesScreenState extends ConsumerState<WeeklyReleasesScreen> {
-  int _days = 7;
+  late int _days = widget.days;
   bool _refresh = false;
 
   Future<void> _reload() async {

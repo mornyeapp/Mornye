@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -108,10 +109,12 @@ void main() {
   var metadataCalls = 0;
   Completer<void>? started;
   Completer<void>? response;
+  var releaseDate = '2026-10-02';
 
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
     metadataCalls = 0;
+    releaseDate = '2026-10-02';
     started = null;
     response = null;
     messenger.setMockMethodCallHandler(channel, (call) async {
@@ -131,7 +134,7 @@ void main() {
           {
             'id': arguments['resource_id'],
             'name': 'Example release',
-            'release_date': '2026-10-02',
+            'release_date': releaseDate,
           },
         ],
       };
@@ -142,6 +145,64 @@ void main() {
   tearDown(() async {
     await PlatformBridge.clearTrackCache();
     messenger.setMockMethodCallHandler(channel, null);
+  });
+
+  group('Home shelf', () {
+    String daysAgo(int days) => DateTime.now()
+        .subtract(Duration(days: days))
+        .toIso8601String()
+        .substring(0, 10);
+
+    void saveCatalog() => SharedPreferences.setMockInitialValues({
+      'weekly_releases_v1:provider-a:first': jsonEncode({
+        'checked_at': DateTime.now()
+            .subtract(const Duration(days: 2))
+            .toIso8601String(),
+        'provider_id': 'provider-a',
+        'albums': [
+          {'id': 'old', 'name': 'Old release', 'release_date': daysAgo(40)},
+          {'id': 'new', 'name': 'Saved release', 'release_date': daysAgo(2)},
+        ],
+      }),
+    });
+
+    List<String>? names(ProviderContainer container) => container
+        .read(homeNewReleasesProvider)
+        .value
+        ?.map((release) => release.name)
+        .toList();
+
+    test('shows saved releases while the check runs', () async {
+      saveCatalog();
+      releaseDate = daysAgo(1);
+      started = Completer<void>();
+      response = Completer<void>();
+      addTearDown(() {
+        if (!response!.isCompleted) response!.complete();
+      });
+      final container = _scope().container;
+      final subscription = container.listen(homeNewReleasesProvider, (_, _) {});
+      addTearDown(subscription.close);
+
+      await started!.future.timeout(const Duration(seconds: 5));
+      await pumpEventQueue();
+      expect(names(container), ['Saved release']);
+
+      response!.complete();
+      await pumpEventQueue();
+      expect(names(container), ['Example release']);
+    });
+
+    test('asks no provider before extensions start', () async {
+      saveCatalog();
+      final container = _scope(initialized: false).container;
+      final subscription = container.listen(homeNewReleasesProvider, (_, _) {});
+      addTearDown(subscription.close);
+
+      await pumpEventQueue();
+      expect(names(container), ['Saved release']);
+      expect(metadataCalls, 0);
+    });
   });
 
   for (final refresh in [false, true]) {

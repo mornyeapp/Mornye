@@ -7,6 +7,37 @@ import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/services/weekly_releases.dart';
 import 'package:mornye/utils/provider_resource_ids.dart';
 
+const homeReleaseDays = 30;
+const _homeReleaseLimit = 20;
+
+/// The Home shelf: saved results at once, then what the check finds, since
+/// checking every favorite artist can take minutes on a slow connection.
+final homeNewReleasesProvider = StreamProvider.autoDispose<List<WeeklyRelease>>(
+  (ref) async* {
+    final favorites = ref.watch(
+      libraryCollectionsProvider.select(
+        (s) => s.isLoaded ? s.favoriteArtists : null,
+      ),
+    );
+    if (favorites == null || favorites.isEmpty) {
+      yield const [];
+      return;
+    }
+    // Before extensions start, the feed is empty rather than checked.
+    final ready = ref.watch(extensionProvider.select((s) => s.isInitialized));
+    final checked = ready
+        ? ref.watch(weeklyReleasesProvider(false).future)
+        : null;
+    List<WeeklyRelease> recent(WeeklyReleaseFeed feed) => feed
+        .inPeriod(DateTime.now(), homeReleaseDays)
+        .take(_homeReleaseLimit)
+        .toList(growable: false);
+    final prefs = await SharedPreferences.getInstance();
+    yield recent(WeeklyReleaseService.saved(prefs, favorites));
+    if (checked != null) yield recent(await checked);
+  },
+);
+
 final weeklyReleasesProvider = FutureProvider.autoDispose
     .family<WeeklyReleaseFeed, bool>((ref, refresh) async {
       final collections = ref.watch(

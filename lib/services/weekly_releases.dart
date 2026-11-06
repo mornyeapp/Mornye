@@ -93,6 +93,20 @@ class WeeklyReleaseService {
   final ArtistReleaseLoader loadArtist;
   final Future<SharedPreferences> preferences;
 
+  /// What the last checks found, without asking a provider.
+  static WeeklyReleaseFeed saved(
+    SharedPreferences prefs,
+    List<CollectionArtistEntry> artists,
+  ) {
+    final releases = <String, WeeklyRelease>{};
+    for (final artist in artists) {
+      for (final release in _savedCatalog(prefs, artist).catalog) {
+        releases['${release.providerId}:${release.id}'] = release;
+      }
+    }
+    return WeeklyReleaseFeed(_newestFirst(releases.values));
+  }
+
   Future<WeeklyReleaseFeed> load(
     List<CollectionArtistEntry> artists, {
     bool refresh = false,
@@ -107,24 +121,8 @@ class WeeklyReleaseService {
     Future<void> worker() async {
       while (next < artists.length && isCancelled?.call() != true) {
         final artist = artists[next++];
-        final key = 'weekly_releases_v1:${artist.key}';
-        var cached = <WeeklyRelease>[];
-        DateTime? checkedAt;
-        try {
-          final raw = prefs.getString(key);
-          if (raw != null) {
-            final json = jsonDecode(raw) as Map<String, dynamic>;
-            checkedAt = DateTime.tryParse(json['checked_at'] as String? ?? '');
-            cached = _parseCatalog(
-              json,
-              artist.name,
-              json['provider_id']?.toString() ?? '',
-            );
-          }
-        } catch (_) {
-          // An invalid cache is rebuilt; it must not break other artists.
-        }
-        var catalog = cached;
+        final (:catalog, :checkedAt) = _savedCatalog(prefs, artist);
+        var current = catalog;
         final age = checkedAt == null ? null : date.difference(checkedAt);
         if (refresh || age == null || age.isNegative || age.inHours >= 24) {
           try {
@@ -138,20 +136,20 @@ class WeeklyReleaseService {
             if (metadata['albums'] is! List && metadata['releases'] is! List) {
               throw StateError('Artist catalog is unavailable');
             }
-            catalog = _parseCatalog(metadata, artist.name, result.providerId);
+            current = _parseCatalog(metadata, artist.name, result.providerId);
             await prefs.setString(
-              key,
+              _cacheKey(artist),
               jsonEncode({
                 'checked_at': date.toIso8601String(),
                 'provider_id': result.providerId,
-                'albums': catalog.map((release) => release.toJson()).toList(),
+                'albums': current.map((release) => release.toJson()).toList(),
               }),
             );
           } catch (_) {
             unavailable.add(artist.name);
           }
         }
-        for (final release in catalog) {
+        for (final release in current) {
           releases['${release.providerId}:${release.id}'] = release;
         }
       }
@@ -159,12 +157,42 @@ class WeeklyReleaseService {
 
     // Keep large favorite lists from issuing a burst of extension requests.
     await Future.wait([worker(), worker()]);
-    final sorted = releases.values.toList()
-      ..sort((a, b) => b.date.compareTo(a.date));
-    return WeeklyReleaseFeed(sorted, unavailableArtists: unavailable);
+    return WeeklyReleaseFeed(
+      _newestFirst(releases.values),
+      unavailableArtists: unavailable,
+    );
   }
 
-  List<WeeklyRelease> _parseCatalog(
+  static String _cacheKey(CollectionArtistEntry artist) =>
+      'weekly_releases_v1:${artist.key}';
+
+  static List<WeeklyRelease> _newestFirst(Iterable<WeeklyRelease> releases) =>
+      releases.toList()..sort((a, b) => b.date.compareTo(a.date));
+
+  static ({List<WeeklyRelease> catalog, DateTime? checkedAt}) _savedCatalog(
+    SharedPreferences prefs,
+    CollectionArtistEntry artist,
+  ) {
+    try {
+      final raw = prefs.getString(_cacheKey(artist));
+      if (raw != null) {
+        final json = jsonDecode(raw) as Map<String, dynamic>;
+        return (
+          catalog: _parseCatalog(
+            json,
+            artist.name,
+            json['provider_id']?.toString() ?? '',
+          ),
+          checkedAt: DateTime.tryParse(json['checked_at'] as String? ?? ''),
+        );
+      }
+    } catch (_) {
+      // An invalid cache is rebuilt; it must not break other artists.
+    }
+    return (catalog: const [], checkedAt: null);
+  }
+
+  static List<WeeklyRelease> _parseCatalog(
     Map<String, dynamic> data,
     String artist,
     String providerId,

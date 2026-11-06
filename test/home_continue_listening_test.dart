@@ -11,8 +11,11 @@ import 'package:mornye/providers/library_mixes_provider.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/recent_access_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
+import 'package:mornye/providers/weekly_releases_provider.dart';
 import 'package:mornye/screens/home_tab.dart';
+import 'package:mornye/screens/weekly_releases_screen.dart';
 import 'package:mornye/services/playable_media.dart';
+import 'package:mornye/services/weekly_releases.dart';
 import 'package:mornye/theme/app_theme.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/widgets/player_artwork.dart';
@@ -23,48 +26,53 @@ const _cover = 'network://nas/Album/cover.jpg';
 
 /// The Material Home without a feed, resuming a saved song unless
 /// [saved] is false.
-Widget _home({bool saved = true}) => ProviderScope(
-  overrides: [
-    settingsProvider.overrideWith(
-      () => FixedSettingsNotifier(
-        const AppSettings(
-          searchProvider: 'example',
-          homeFeedProvider: AppSettings.homeFeedProviderOff,
-          hasSearchedBefore: true,
+Widget _home({bool saved = true, List<WeeklyRelease> releases = const []}) =>
+    ProviderScope(
+      overrides: [
+        homeNewReleasesProvider.overrideWith((ref) => Stream.value(releases)),
+        weeklyReleasesProvider.overrideWith(
+          (ref, refresh) async => WeeklyReleaseFeed(releases),
         ),
+        settingsProvider.overrideWith(
+          () => FixedSettingsNotifier(
+            const AppSettings(
+              searchProvider: 'example',
+              homeFeedProvider: AppSettings.homeFeedProviderOff,
+              hasSearchedBefore: true,
+            ),
+          ),
+        ),
+        extensionProvider.overrideWith(_Extensions.new),
+        exploreProvider.overrideWith(_Explore.new),
+        downloadHistoryProvider.overrideWith(_History.new),
+        recentAccessProvider.overrideWith(_Recent.new),
+        libraryMixesProvider.overrideWith((ref) async => const []),
+        playerUiEnabledProvider.overrideWithValue(true),
+        currentMediaItemProvider.overrideWithBuild(
+          (ref, notifier) => Stream<MediaItem?>.value(null),
+        ),
+        playbackResumeProvider.overrideWith(
+          (ref) async => saved
+              ? (
+                  media: const PlayableMedia(
+                    id: 'network://nas/Album/song.flac',
+                    source: 'network://nas/Album/song.flac',
+                    title: 'Saved song',
+                    artist: 'Artist',
+                    networkArtworkSource: _cover,
+                  ),
+                  position: const Duration(seconds: 23),
+                )
+              : null,
+        ),
+      ],
+      child: MaterialApp(
+        theme: AppTheme.dark(),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: const HomeTab(mode: HomeTabMode.combined),
       ),
-    ),
-    extensionProvider.overrideWith(_Extensions.new),
-    exploreProvider.overrideWith(_Explore.new),
-    downloadHistoryProvider.overrideWith(_History.new),
-    recentAccessProvider.overrideWith(_Recent.new),
-    libraryMixesProvider.overrideWith((ref) async => const []),
-    playerUiEnabledProvider.overrideWithValue(true),
-    currentMediaItemProvider.overrideWithBuild(
-      (ref, notifier) => Stream<MediaItem?>.value(null),
-    ),
-    playbackResumeProvider.overrideWith(
-      (ref) async => saved
-          ? (
-              media: const PlayableMedia(
-                id: 'network://nas/Album/song.flac',
-                source: 'network://nas/Album/song.flac',
-                title: 'Saved song',
-                artist: 'Artist',
-                networkArtworkSource: _cover,
-              ),
-              position: const Duration(seconds: 23),
-            )
-          : null,
-    ),
-  ],
-  child: MaterialApp(
-    theme: AppTheme.dark(),
-    localizationsDelegates: AppLocalizations.localizationsDelegates,
-    supportedLocales: AppLocalizations.supportedLocales,
-    home: const HomeTab(mode: HomeTabMode.combined),
-  ),
-);
+    );
 
 /// Opens [_home] in a [width] wide window, as the desktop app when
 /// [desktop] is true.
@@ -73,13 +81,14 @@ Future<void> _open(
   required bool desktop,
   double width = 1280,
   bool saved = true,
+  List<WeeklyRelease> releases = const [],
 }) async {
   tester.view.physicalSize = Size(width, 1400);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
   debugDesktopPlatformOverride = desktop;
   addTearDown(() => debugDesktopPlatformOverride = null);
-  await tester.pumpWidget(_home(saved: saved));
+  await tester.pumpWidget(_home(saved: saved, releases: releases));
   await tester.pump();
   await tester.pump();
 }
@@ -197,6 +206,41 @@ void main() {
       tester.getRect(find.text('Shortcuts')).top,
       greaterThan(tester.getRect(find.text('Saved song')).bottom),
     );
+  });
+
+  testWidgets('new releases show as a shelf that opens the full list', (
+    tester,
+  ) async {
+    await _open(
+      tester,
+      desktop: false,
+      width: 400,
+      releases: [
+        WeeklyRelease(
+          id: 'release-1',
+          name: 'Example release',
+          artist: 'Example artist',
+          providerId: 'example',
+          date: DateTime(2026, 10, 2),
+        ),
+      ],
+    );
+    await tester.pump();
+    expect(find.text('Example release'), findsOneWidget);
+    expect(find.text('Example artist'), findsOneWidget);
+
+    await tester.pump(const Duration(seconds: 1));
+    await tester.ensureVisible(find.text('New releases'));
+    await tester.pump(const Duration(seconds: 1));
+    await tester.tap(find.text('New releases'));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+    expect(find.byType(WeeklyReleasesScreen), findsOneWidget);
+  });
+
+  testWidgets('no releases leave no heading', (tester) async {
+    await _open(tester, desktop: false, width: 400);
+    expect(find.text('New releases'), findsNothing);
   });
 }
 
