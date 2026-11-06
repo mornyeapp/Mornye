@@ -127,7 +127,11 @@ class _LinkSettingsPageState extends ConsumerState<LinkSettingsPage> {
       ),
     );
     if (paired == true && mounted) {
-      _showMessage(context.l10n.linkPaired(serverName));
+      _showMessage(
+        ref.read(linkPhoneOptionsProvider).showComputerSongs
+            ? context.l10n.linkPaired(serverName)
+            : context.l10n.linkPairedWithoutLibrary(serverName),
+      );
     }
   }
 
@@ -329,6 +333,15 @@ class _LinkSettingsPageState extends ConsumerState<LinkSettingsPage> {
             ...settingsSectionSlivers(
               title: l10n.linkPhoneSection,
               children: [
+                SettingsSwitchItem(
+                  icon: Icons.computer,
+                  title: l10n.linkShowComputerSongsTitle,
+                  subtitle: l10n.linkShowComputerSongsSubtitle,
+                  value: options.showComputerSongs,
+                  onChanged: options.loaded
+                      ? optionsNotifier.setShowComputerSongs
+                      : null,
+                ),
                 SettingsSwitchItem(
                   icon: Icons.library_music_outlined,
                   title: l10n.linkShareSongsTitle,

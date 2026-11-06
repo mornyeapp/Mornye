@@ -8,6 +8,7 @@ import 'package:mornye/services/link/client/link_client_discovery.dart';
 import 'package:mornye/services/link/client/link_client_pairing.dart';
 import 'package:mornye/services/link/client/link_client_session.dart';
 import 'package:mornye/services/link/client/link_client_store.dart';
+import 'package:mornye/services/link/features/link_phone_options.dart';
 import 'package:mornye/services/link/link_client_api.dart';
 import 'package:mornye/services/link/link_protocol.dart';
 import 'package:mornye/services/local_network_access.dart';
@@ -138,6 +139,142 @@ void main() {
     expect(harness.sessions.last.apiKey, 'key-2');
     expect(harness.sessions.first.disposed, isTrue);
     expect(harness.active, same(harness.sessions.last));
+  });
+
+  test(
+    'hiding computer songs keeps all pairings and the active session',
+    () async {
+      final harness = await _started();
+      final a = await harness.controller.pair(linkTestTarget('a'), '123456');
+      final b = await harness.controller.pair(linkTestTarget('b'), '123456');
+      await pumpEventQueue();
+      final session = harness.sessions.single;
+      final options = harness.container.read(linkPhoneOptionsProvider.notifier);
+
+      options.setShowComputerSongs(false);
+      await pumpEventQueue();
+      expect(harness.bridge.librarySources, {
+        a.connectionId: false,
+        b.connectionId: false,
+      });
+      expect(harness.bridge.connections, hasLength(2));
+      expect(harness.state.servers, hasLength(2));
+      expect(harness.active, same(session));
+      expect(session.disposed, isFalse);
+      expect(
+        harness.container.read(linkPhoneOptionsProvider).shareSongs,
+        isTrue,
+      );
+
+      options.setShowComputerSongs(true);
+      await pumpEventQueue();
+      expect(harness.bridge.librarySources.values, everyElement(isTrue));
+      expect(harness.active, same(session));
+      expect(harness.sessions, hasLength(1));
+    },
+  );
+
+  test(
+    'saved hidden songs stay hidden through pairing and catalog changes',
+    () async {
+      SharedPreferences.setMockInitialValues({
+        LinkPhoneOptionsNotifier.showComputerSongsKey: false,
+      });
+      final harness = await _started();
+      final record = await harness.controller.pair(
+        linkTestTarget('a'),
+        '123456',
+      );
+      await pumpEventQueue();
+      expect(harness.bridge.librarySources, isEmpty);
+      expect(harness.bridge.connections, contains(record.connectionId));
+      final session = harness.sessions.single;
+      session.emit(LinkConnectionState.connected);
+      session.push({'type': LinkMessageTypes.catalogChanged, 'version': 1});
+      await Future<void>.delayed(
+        LinkClientController.rescanDelay + const Duration(milliseconds: 200),
+      );
+      expect(
+        harness.bridge.calls.where((c) => c.startsWith('rescan')),
+        isEmpty,
+      );
+      expect(harness.active, same(session));
+
+      harness.container
+          .read(linkPhoneOptionsProvider.notifier)
+          .setShowComputerSongs(true);
+      await pumpEventQueue();
+      expect(harness.bridge.librarySources[record.connectionId], isTrue);
+    },
+  );
+
+  test(
+    'startup hides cached computer songs before starting the session',
+    () async {
+      final record = LinkServerRecord(
+        serverId: 'a',
+        name: 'Desktop a',
+        connectionId: 'connection-a',
+        address: 'https://10.0.0.2:47710',
+        fingerprint: linkTestFingerprint('a'),
+      );
+      SharedPreferences.setMockInitialValues({
+        LinkClientStore.serversKey: jsonEncode([record.toJson()]),
+        LinkPhoneOptionsNotifier.showComputerSongsKey: false,
+      });
+      final harness = LinkClientHarness();
+      addTearDown(harness.container.dispose);
+      harness.bridge.connections[record.connectionId] = const NetworkConnection(
+        id: 'connection-a',
+        name: 'Desktop a',
+        protocol: NetworkProtocol.subsonic,
+        address: 'https://10.0.0.2:47710',
+        apiKey: 'saved-key',
+        subsonicAuth: SubsonicAuth.apiKey,
+      );
+      harness.bridge.librarySources[record.connectionId] = true;
+      await harness.start();
+      expect(harness.bridge.librarySources[record.connectionId], isFalse);
+      expect(harness.active, same(harness.sessions.single));
+      expect(harness.sessions.single.calls, ['start']);
+    },
+  );
+
+  test('hiding songs waits for an in-flight Library addition', () async {
+    final harness = await _started();
+    final entered = Completer<void>();
+    final release = Completer<void>();
+    harness.bridge.beforeSourceAdd = () {
+      entered.complete();
+      return release.future;
+    };
+    final record = await harness.controller.pair(linkTestTarget('a'), '123456');
+    await entered.future;
+    harness.container
+        .read(linkPhoneOptionsProvider.notifier)
+        .setShowComputerSongs(false);
+    await pumpEventQueue();
+    release.complete();
+    await pumpEventQueue();
+    expect(harness.bridge.librarySources[record.connectionId], isFalse);
+    expect(harness.bridge.connections, contains(record.connectionId));
+  });
+
+  test('hiding songs cancels a pending catalog refresh', () async {
+    final harness = await _started();
+    await harness.controller.pair(linkTestTarget('a'), '123456');
+    await pumpEventQueue();
+    final session = harness.sessions.single;
+    session.emit(LinkConnectionState.connected);
+    session.push({'type': LinkMessageTypes.catalogChanged, 'version': 1});
+    await pumpEventQueue();
+    harness.container
+        .read(linkPhoneOptionsProvider.notifier)
+        .setShowComputerSongs(false);
+    await Future<void>.delayed(
+      LinkClientController.rescanDelay + const Duration(milliseconds: 200),
+    );
+    expect(harness.bridge.calls.where((c) => c.startsWith('rescan')), isEmpty);
   });
 
   test('a failed pairing saves nothing', () async {

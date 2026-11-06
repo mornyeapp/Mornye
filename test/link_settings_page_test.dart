@@ -339,12 +339,27 @@ void main() {
           // What this phone does with the computer shows once paired.
           expect(find.text(_l10n.linkPhoneSection), findsOneWidget);
           expect(find.text(_l10n.linkShareSongsTitle), findsOneWidget);
+          final computerSongs = find.text(_l10n.linkShowComputerSongsTitle);
+          await tester.ensureVisible(computerSongs);
+          await tester.pump();
+          await tester.tap(computerSongs);
+          await _settle(tester);
+          final prefs = await SharedPreferences.getInstance();
+          expect(
+            prefs.getBool(LinkPhoneOptionsNotifier.showComputerSongsKey),
+            isFalse,
+          );
+          expect(harness.bridge.librarySources.values, everyElement(isFalse));
+          expect(harness.sessions.single.disposed, isFalse);
+          await tester.tap(computerSongs);
+          await _settle(tester);
+          expect(harness.bridge.librarySources.values, everyElement(isTrue));
+
           final follow = find.text(_l10n.linkFollowDesktopTitle);
           await tester.ensureVisible(follow);
           await tester.pump();
           await tester.tap(follow);
           await _settle(tester);
-          final prefs = await SharedPreferences.getInstance();
           expect(
             prefs.getBool(LinkPhoneOptionsNotifier.followDesktopKey),
             isFalse,

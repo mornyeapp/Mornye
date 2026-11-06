@@ -9597,6 +9597,14 @@
   "@linkShareSongsSubtitle": {
     "description": "Switch subtitle for showing this phone's songs on the computer"
   },
+  "linkShowComputerSongsTitle": "Show computer songs in Library",
+  "@linkShowComputerSongsTitle": {
+    "description": "Switch title: songs from paired computers appear in this phone's Library"
+  },
+  "linkShowComputerSongsSubtitle": "Hide songs from paired computers without disconnecting Mornye Link. Songs saved to this phone stay in Library.",
+  "@linkShowComputerSongsSubtitle": {
+    "description": "Switch subtitle: hiding computer songs preserves the Link connection and songs saved on the phone"
+  },
   "linkFollowDesktopTitle": "Follow the computer's playback",
   "@linkFollowDesktopTitle": {
     "description": "Switch title: the phone's player shows the computer when the computer starts playing"
@@ -9719,6 +9727,15 @@
   "linkPaired": "Paired with {name}. Its music is being added to Library.",
   "@linkPaired": {
     "description": "Message after pairing succeeded",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linkPairedWithoutLibrary": "Paired with {name}. Computer songs stay hidden from Library.",
+  "@linkPairedWithoutLibrary": {
+    "description": "Message after pairing succeeded while computer songs are hidden from this phone's Library",
     "placeholders": {
       "name": {
         "type": "String"
