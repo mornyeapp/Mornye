@@ -7310,6 +7310,22 @@
   "@lyricsAiTargetLanguage": {
     "description": "AI translation setting for the target language"
   },
+  "albumSortSongs": "Sort Songs",
+  "@albumSortSongs": {
+    "description": "Tooltip of the album header button that orders the album's songs"
+  },
+  "albumSortAlbumOrder": "Album Order",
+  "@albumSortAlbumOrder": {
+    "description": "Album song order: disc and track number"
+  },
+  "albumSortMostPlayed": "Most Played",
+  "@albumSortMostPlayed": {
+    "description": "Album song order: most listened songs first"
+  },
+  "albumSortCustom": "Custom Order",
+  "@albumSortCustom": {
+    "description": "Album song order chosen by dragging songs"
+  },
   "lyricsAiSecondLanguage": "Second Language",
   "@lyricsAiSecondLanguage": {
     "description": "AI translation setting: the language for songs already in the target language"

@@ -362,6 +362,9 @@ class ListeningStatisticsStore {
   );
 
   /// Runs a read-only aggregate against the statistics database.
+  Future<Map<String, int>> loadAlbumPlays(String album) async =>
+      readAlbumPlays(await _open(), album);
+
   Future<T> read<T>(Future<T> Function(DatabaseExecutor db) query) async =>
       query(await _open());
 
@@ -525,6 +528,24 @@ Future<List<ListeningTotal>> readReplayableListeningTracks(
         row['plays'] as int,
       ),
   ];
+}
+
+/// Plays of each song recorded under [album], by title. Titles and albums
+/// match without case, since tags and catalogs differ in it.
+Future<Map<String, int>> readAlbumPlays(
+  DatabaseExecutor db,
+  String album,
+) async {
+  final rows = await db.rawQuery(
+    '''
+    SELECT MIN(title) AS title, SUM(plays) AS plays FROM listening
+    WHERE album = ? COLLATE NOCASE
+    GROUP BY title COLLATE NOCASE
+    HAVING SUM(plays) > 0
+    ''',
+    [album],
+  );
+  return {for (final row in rows) row['title'] as String: row['plays'] as int};
 }
 
 final _listeningClock = Stopwatch()..start();

@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:math';
+import 'package:flutter/foundation.dart' show mapEquals;
 import 'package:flutter/material.dart';
 import 'package:mornye/theme/app_tokens.dart';
 import 'package:mornye/theme/mornye_theme.dart';
@@ -11,6 +12,8 @@ import 'package:mornye/services/batch_track_actions.dart';
 import 'package:mornye/models/track.dart';
 import 'package:mornye/models/unified_library_item.dart';
 import 'package:mornye/models/album_track_order.dart';
+import 'package:mornye/providers/album_track_sort_provider.dart';
+import 'package:mornye/widgets/album_track_sort_button.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/utils/adaptive_layout.dart';
 import 'package:mornye/utils/audio_quality_badge_policy.dart';
@@ -77,6 +80,7 @@ class _DownloadedAlbumScreenState extends ConsumerState<DownloadedAlbumScreen>
   bool _embeddedCoverRefreshScheduled = false;
   List<DownloadHistoryItem>? _albumTracksSourceCache;
   AlbumTrackOrder<DownloadHistoryItem>? _albumTrackOrderCache;
+  Map<String, int>? _albumTrackRanksCache;
   List<DownloadHistoryItem>? _commonQualitySourceCache;
   String? _commonQualityCache;
   String? _commonQualityModeCache;
@@ -97,11 +101,17 @@ class _DownloadedAlbumScreenState extends ConsumerState<DownloadedAlbumScreen>
     }
   }
 
+  AlbumTrackSortKey get _sortKey =>
+      (album: widget.albumName, artist: widget.artistName);
+
   AlbumTrackOrder<DownloadHistoryItem> _getAlbumOrder(
     List<DownloadHistoryItem> allItems,
+    Map<String, int>? ranks,
   ) {
     final cached = _albumTrackOrderCache;
-    if (cached != null && identical(allItems, _albumTracksSourceCache)) {
+    if (cached != null &&
+        identical(allItems, _albumTracksSourceCache) &&
+        mapEquals(ranks, _albumTrackRanksCache)) {
       return cached;
     }
 
@@ -118,9 +128,11 @@ class _DownloadedAlbumScreenState extends ConsumerState<DownloadedAlbumScreen>
       discNumber: (track) => track.discNumber,
       trackNumber: (track) => track.trackNumber,
       trackName: (track) => track.trackName,
+      ranks: ranks,
     );
 
     _albumTracksSourceCache = allItems;
+    _albumTrackRanksCache = ranks;
     _invalidateDerivedTrackCaches();
     _albumTrackOrderCache = order;
     return order;
@@ -244,8 +256,9 @@ class _DownloadedAlbumScreenState extends ConsumerState<DownloadedAlbumScreen>
         ),
       ),
     );
+    final ranks = ref.watch(albumTrackRanksProvider(_sortKey));
     final order = tracksValue.maybeWhen(
-      data: (items) => _getAlbumOrder(items),
+      data: (items) => _getAlbumOrder(items, ranks),
       orElse: () => null,
     );
 
@@ -443,6 +456,11 @@ class _DownloadedAlbumScreenState extends ConsumerState<DownloadedAlbumScreen>
           ? _buildDownloadedHeaderMeta(context, tracks, commonQuality)
           : null,
       appBarActions: [
+        if (tracks.isNotEmpty)
+          AlbumTrackSortButton(
+            albumKey: _sortKey,
+            songs: [for (final track in tracks) track.trackName],
+          ),
         NetworkOfflineButton(
           items: [
             for (final track in tracks)

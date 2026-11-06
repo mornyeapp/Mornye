@@ -1,13 +1,16 @@
 import 'dart:io';
 import 'dart:math';
 import 'package:audio_service/audio_service.dart' show MediaItem;
+import 'package:flutter/foundation.dart' show mapEquals;
 import 'package:flutter/material.dart';
 import 'package:mornye/theme/app_tokens.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/theme/cover_palette.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/l10n/l10n.dart';
+import 'package:mornye/providers/album_track_sort_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
+import 'package:mornye/widgets/album_track_sort_button.dart';
 import 'package:mornye/utils/adaptive_layout.dart';
 import 'package:mornye/utils/audio_quality_badge_policy.dart';
 import 'package:mornye/utils/file_access.dart';
@@ -80,6 +83,7 @@ class _LocalAlbumScreenState extends ConsumerState<LocalAlbumScreen>
         SelectionModeMixin<LocalAlbumScreen>,
         CollapsingHeaderScrollMixin<LocalAlbumScreen> {
   late AlbumTrackOrder<LocalLibraryItem> _trackOrder;
+  Map<String, int>? _trackRanks;
   List<LocalLibraryItem> get _sortedTracksCache => _trackOrder.tracks;
   Map<int, List<LocalLibraryItem>> get _discGroupsCache =>
       _trackOrder.discGroups;
@@ -145,6 +149,7 @@ class _LocalAlbumScreenState extends ConsumerState<LocalAlbumScreen>
       discNumber: (track) => track.discNumber,
       trackNumber: (track) => track.trackNumber,
       trackName: (track) => track.trackName,
+      ranks: _trackRanks,
     );
     _commonQualityCache = null;
     _commonQualityModeCache = null;
@@ -274,6 +279,11 @@ class _LocalAlbumScreenState extends ConsumerState<LocalAlbumScreen>
     final bottomPadding = isSelectionMode
         ? MediaQuery.paddingOf(context).bottom
         : 0.0;
+    final ranks = ref.watch(albumTrackRanksProvider(_sortKey));
+    if (!mapEquals(ranks, _trackRanks)) {
+      _trackRanks = ranks;
+      _rebuildTrackCaches();
+    }
     final tracks = _sortedTracksCache;
 
     if (tracks.isEmpty && !_loadingTracks && _loadError == null) {
@@ -443,6 +453,10 @@ class _LocalAlbumScreenState extends ConsumerState<LocalAlbumScreen>
       ),
       meta: _buildLocalHeaderMeta(context, qualityLabelMode),
       appBarActions: [
+        AlbumTrackSortButton(
+          albumKey: _sortKey,
+          songs: [for (final track in _sortedTracksCache) track.trackName],
+        ),
         NetworkOfflineButton(items: _albumItems()),
         NetworkUploadButton(items: _albumItems()),
         if (ref.watch(linkPhoneClientProvider) != null)
@@ -486,6 +500,9 @@ class _LocalAlbumScreenState extends ConsumerState<LocalAlbumScreen>
       ),
     );
   }
+
+  AlbumTrackSortKey get _sortKey =>
+      (album: widget.albumName, artist: widget.artistName);
 
   /// Every song of the album, for the header's album-wide actions.
   List<UnifiedLibraryItem> _albumItems() => [
