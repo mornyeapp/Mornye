@@ -57,7 +57,11 @@ internal class CastOutputPlugin : FlutterPlugin, ActivityAware, EventChannel.Str
         override fun onStatusUpdated() = publish()
         override fun onMetadataUpdated() = publish()
         override fun onMediaError(error: com.google.android.gms.cast.MediaError) {
-            sink?.success(snapshot() + mapOf("error" to "Cast receiver could not play this file"))
+            // Reported for the logs only: a receiver that really stopped says so
+            // with its idle reason, which the snapshot carries as "failed".
+            sink?.success(
+                snapshot() + mapOf("mediaError" to "reason=${error.reason} code=${error.detailedErrorCode}"),
+            )
         }
     }
     private val sessionListener = object : SessionManagerListener<CastSession> {

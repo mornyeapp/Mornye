@@ -170,4 +170,32 @@ void main() {
       expect(deck.state, isNot(PlaybackDeckState.completed));
     },
   );
+
+  test(
+    'a media error from a TV that keeps playing leaves the song in control',
+    () async {
+      final errors = <Object>[];
+      final subscription = deck.onPlayerStateChanged.listen(
+        (_) {},
+        onError: errors.add,
+      );
+      addTearDown(subscription.cancel);
+      await deck.setFileSource('/song.flac');
+      await deck.resume();
+      events.add({
+        'connected': true,
+        'token': load['token'],
+        'state': 2,
+        'position': 170000,
+        'mediaError': 'reason=ERROR code=104',
+      });
+      expect(errors, isEmpty);
+      expect(deck.state, PlaybackDeckState.playing);
+      expect(await deck.getCurrentPosition(), const Duration(seconds: 170));
+
+      calls.clear();
+      await deck.pause();
+      expect(calls.map((call) => call.method), contains('pause'));
+    },
+  );
 }

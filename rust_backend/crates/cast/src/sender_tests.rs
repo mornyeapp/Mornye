@@ -97,6 +97,20 @@ async fn receiver(listener: TcpListener, seen: mpsc::UnboundedSender<(String, Va
                         "mediaSessionId": 1, "playerState": "IDLE", "idleReason": "FINISHED"}]}),
                 ));
             }
+            (MEDIA, "SEEK") => {
+                out.push(reply(
+                    MEDIA,
+                    "web-1",
+                    json!({"type": "ERROR", "requestId": 0, "reason": "ERROR",
+                        "detailedErrorCode": 104}),
+                ));
+                out.push(reply(
+                    MEDIA,
+                    "web-1",
+                    json!({"type": "MEDIA_STATUS", "requestId": id, "status": [{
+                        "mediaSessionId": 1, "playerState": "PLAYING", "currentTime": 170.0}]}),
+                ));
+            }
             (HEARTBEAT, "PING") => {
                 out.push(reply(HEARTBEAT, "receiver-0", json!({"type": "PONG"})));
             }
@@ -162,6 +176,22 @@ async fn a_session_launches_loads_plays_and_stops_the_receiver() {
         finished,
         "the end of the song reaches the app with its token"
     );
+
+    session
+        .media("SEEK", json!({"currentTime": 170.0}))
+        .await
+        .unwrap();
+    tokio::time::sleep(Duration::from_millis(50)).await;
+    {
+        let events = events.lock().unwrap();
+        let reported = events
+            .iter()
+            .find(|event| event["mediaError"].is_string())
+            .expect("a media error reaches the app");
+        assert_eq!(reported["mediaError"], "reason=ERROR code=104");
+        assert!(reported["error"].is_null(), "it does not fail the song");
+        assert!(events.iter().all(|event| event["failed"] != true));
+    }
 
     session.volume(0.25).await.unwrap();
     assert_eq!(status.lock().unwrap().snapshot()["volume"], 0.25);

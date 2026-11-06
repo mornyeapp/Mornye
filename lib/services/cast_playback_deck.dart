@@ -3,6 +3,9 @@ import 'dart:async';
 import 'package:audio_service/audio_service.dart';
 import 'package:mornye/services/cast_output.dart';
 import 'package:mornye/services/playback_deck.dart';
+import 'package:mornye/utils/logger.dart';
+
+final _log = AppLogger('CastPlaybackDeck');
 
 /// Plays the queue on a Cast receiver. Songs reach it through the native
 /// media server (`serve`, `register`), which exposes only the registered
@@ -48,6 +51,8 @@ class CastPlaybackDeck implements PlaybackDeck {
   }
 
   void _receive(Map<Object?, Object?> event) {
+    final mediaError = event['mediaError'];
+    if (mediaError != null) _log.w('TV reported a media error: $mediaError');
     if (!_ready ||
         event['token'] != _token ||
         _state == PlaybackDeckState.disposed) {
