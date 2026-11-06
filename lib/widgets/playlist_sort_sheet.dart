@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:mornye/models/playlist_sort.dart';
-import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/widgets/album_detail_header.dart';
 import 'package:mornye/widgets/app_bottom_sheet.dart';
 import 'package:mornye/widgets/desktop/context_menu.dart';
