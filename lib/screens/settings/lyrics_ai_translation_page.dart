@@ -64,6 +64,9 @@ class _LyricsAiTranslationPageState
     final target = lyricsTranslationLanguageFor(
       settings.lyricsTranslationLanguage,
     );
+    final secondLanguage = lyricsTranslationLanguageFor(
+      settings.lyricsTranslationSecondLanguage,
+    );
     final appLanguage = lyricsTranslationTargetFor(
       settings.copyWith(lyricsTranslationLanguage: ''),
     );
@@ -150,6 +153,26 @@ class _LyricsAiTranslationPageState
                     ),
                   );
                   if (code != null) notifier.setLyricsTranslationLanguage(code);
+                },
+              ),
+              SettingsItem(
+                key: const ValueKey('lyrics-ai-second-language'),
+                icon: Icons.translate_outlined,
+                title: l10n.lyricsAiSecondLanguage,
+                subtitle:
+                    secondLanguage?.nativeName ??
+                    l10n.lyricsAiSecondLanguageSubtitle,
+                onTap: () async {
+                  final code = await showLyricsLanguagePicker(
+                    context,
+                    title: l10n.lyricsAiSecondLanguage,
+                    subtitle: l10n.lyricsAiSecondLanguageSubtitle,
+                    selected: secondLanguage?.code ?? '',
+                    appDefaultLabel: l10n.lyricsAiSecondLanguageOff,
+                  );
+                  if (code != null) {
+                    notifier.setLyricsTranslationSecondLanguage(code);
+                  }
                 },
               ),
               SettingsItem(

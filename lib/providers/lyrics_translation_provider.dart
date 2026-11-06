@@ -12,6 +12,7 @@ import 'package:mornye/services/lyrics_language_guess.dart';
 import 'package:mornye/services/lyrics_translation.dart';
 import 'package:mornye/services/lyrics_translation_languages.dart';
 import 'package:mornye/services/lyrics_translation_sharing.dart';
+import 'package:mornye/services/lyrics_translation_song_languages.dart';
 import 'package:mornye/services/secure_storage_options.dart';
 import 'package:mornye/utils/logger.dart';
 import 'package:mornye/utils/lyrics_parser.dart';
@@ -60,6 +61,11 @@ final lyricsAiKeyStoreProvider = Provider<LyricsAiKeyStore>(
 final lyricsTranslationCacheProvider = Provider<LyricsTranslationCache>(
   (ref) => LyricsTranslationCache(),
 );
+
+final lyricsTranslationSongLanguagesProvider =
+    Provider<LyricsTranslationSongLanguages>(
+      (ref) => LyricsTranslationSongLanguages(),
+    );
 
 /// Creates the HTTP client of one job; tests substitute a mock.
 final lyricsAiHttpClientProvider = Provider<http.Client Function()>(
@@ -183,14 +189,22 @@ class LyricsTranslationController extends Notifier<LyricsTranslationState> {
   final _lookedUp = <String>{};
   final _autoAttempted = <String>{};
   final _merged = Expando<(LyricsTranslationResult, bool, ParsedLyrics)>();
+  final _alreadyInTarget = <String, bool>{};
   LyricsTranslationCancelToken? _cancel;
   Object? _owner;
   int _jobIds = 0;
   late LyricsTranslationSharing _sharing;
+  late LyricsTranslationSongLanguages _songLanguages;
 
   @override
   LyricsTranslationState build() {
     _sharing = ref.watch(lyricsTranslationSharingProvider);
+    _songLanguages = ref.watch(lyricsTranslationSongLanguagesProvider);
+    unawaited(
+      _songLanguages.load().then((loaded) {
+        if (loaded && ref.mounted) _refreshLanguage();
+      }),
+    );
     final incoming = _sharing.incoming.listen((update) {
       if (!ref.mounted) return;
       state = LyricsTranslationState(
@@ -205,6 +219,7 @@ class LyricsTranslationController extends Notifier<LyricsTranslationState> {
       settingsProvider.select(
         (settings) => (
           settings.lyricsTranslationLanguage,
+          settings.lyricsTranslationSecondLanguage,
           settings.locale,
           settings.lyricsAiProvider,
           settings.lyricsAiModel,
@@ -229,9 +244,71 @@ class LyricsTranslationController extends Notifier<LyricsTranslationState> {
     if (source.isEmpty || config.model.isEmpty) return null;
     return lyricsTranslationCacheKey(
       sourceHash: source.hash,
-      language: language ?? lyricsTranslationTargetFor(settings).code,
+      language: language ?? _targetOf(source, settings).code,
       config: config,
     );
+  }
+
+  /// The second language when the song is already in the first, else the
+  /// first.
+  LyricsTranslationLanguage _settingsTargetOf(
+    LyricsTranslationSource source,
+    AppSettings settings,
+  ) {
+    final first = lyricsTranslationTargetFor(settings);
+    final second = lyricsTranslationLanguageFor(
+      settings.lyricsTranslationSecondLanguage,
+    );
+    if (second == null || second.code == first.code) return first;
+    if (_alreadyInTarget.length > 64) _alreadyInTarget.clear();
+    final already = _alreadyInTarget.putIfAbsent(
+      '${source.hash}:${first.code}',
+      () => lyricsAlreadyIn(source.texts, first.code),
+    );
+    return already ? second : first;
+  }
+
+  LyricsTranslationLanguage _targetOf(
+    LyricsTranslationSource source,
+    AppSettings settings,
+  ) =>
+      lyricsTranslationLanguageFor(_songLanguages[source.hash] ?? '') ??
+      _settingsTargetOf(source, settings);
+
+  /// The language [lyrics] translate into: the song's own choice, else what
+  /// the settings give for this song.
+  LyricsTranslationLanguage targetFor(ParsedLyrics lyrics) => _targetOf(
+    LyricsTranslationSource.cached(lyrics),
+    ref.read(settingsProvider),
+  );
+
+  /// What the settings alone give for [lyrics].
+  LyricsTranslationLanguage settingsTargetFor(ParsedLyrics lyrics) =>
+      _settingsTargetOf(
+        LyricsTranslationSource.cached(lyrics),
+        ref.read(settingsProvider),
+      );
+
+  /// The language picked for this song alone, if any.
+  String? songLanguage(ParsedLyrics lyrics) =>
+      _songLanguages[LyricsTranslationSource.cached(lyrics).hash];
+
+  /// Keeps [code] for the song of [lyrics] alone, leaving the settings
+  /// as they are. An empty code follows the settings again.
+  void chooseSongLanguage(ParsedLyrics lyrics, String code) {
+    unawaited(
+      _songLanguages.set(
+        LyricsTranslationSource.cached(lyrics).hash,
+        code.isEmpty ? null : code,
+      ),
+    );
+    _refreshLanguage();
+  }
+
+  void _refreshLanguage() {
+    _sharing.clearReceived();
+    _lookedUp.clear();
+    state = LyricsTranslationState(results: state.results, job: state.job);
   }
 
   /// [lyrics] with the AI translation for the current settings, when one
@@ -313,11 +390,7 @@ class LyricsTranslationController extends Notifier<LyricsTranslationState> {
         job: state.job,
       );
       if (_cacheKey(source, ref.read(settingsProvider)) == key) {
-        _publish(
-          source.hash,
-          lyricsTranslationTargetFor(settings).code,
-          cached,
-        );
+        _publish(source.hash, _targetOf(source, settings).code, cached);
       }
       return;
     }
@@ -328,10 +401,7 @@ class LyricsTranslationController extends Notifier<LyricsTranslationState> {
       return;
     }
     // A song already in the target language has nothing to translate.
-    if (lyricsAlreadyIn(
-      LyricsTranslationSource.cached(lyrics).texts,
-      lyricsTranslationTargetFor(settings).code,
-    )) {
+    if (lyricsAlreadyIn(source.texts, _targetOf(source, settings).code)) {
       return;
     }
     final apiKey = await ref.read(
@@ -365,7 +435,7 @@ class LyricsTranslationController extends Notifier<LyricsTranslationState> {
     final settings = ref.read(settingsProvider);
     final target =
         lyricsTranslationLanguageFor(language ?? '') ??
-        lyricsTranslationTargetFor(settings);
+        _targetOf(source, settings);
     final key = _cacheKey(source, settings, language: target.code);
     if (key == null) {
       return const LyricsTranslationOutcome.failed(

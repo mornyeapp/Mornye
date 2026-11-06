@@ -7310,6 +7310,27 @@
   "@lyricsAiTargetLanguage": {
     "description": "AI translation setting for the target language"
   },
+  "lyricsAiSecondLanguage": "Second Language",
+  "@lyricsAiSecondLanguage": {
+    "description": "AI translation setting: the language for songs already in the target language"
+  },
+  "lyricsAiSecondLanguageSubtitle": "For songs already in your first language",
+  "@lyricsAiSecondLanguageSubtitle": {
+    "description": "Explains the second translation language"
+  },
+  "lyricsAiSecondLanguageOff": "None",
+  "@lyricsAiSecondLanguageOff": {
+    "description": "Second translation language choice that leaves such songs untranslated"
+  },
+  "lyricsTranslateSongDefault": "Default ({language})",
+  "@lyricsTranslateSongDefault": {
+    "description": "Language sheet row that clears this song's own language and follows the settings",
+    "placeholders": {
+      "language": {
+        "type": "String"
+      }
+    }
+  },
   "lyricsAiTargetLanguageApp": "App language ({language})",
   "@lyricsAiTargetLanguageApp": {
     "description": "Target language choice that follows the app language",

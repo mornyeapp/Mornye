@@ -311,7 +311,9 @@ class _LyricsOptionsButtonState extends ConsumerState<LyricsOptionsButton> {
   }) async {
     final settings = ref.read(settingsProvider);
     final l10n = context.l10n;
-    final target = lyricsTranslationTargetFor(settings);
+    final target = ref
+        .read(lyricsTranslationProvider.notifier)
+        .targetFor(original);
     final actions = <(String, String, IconData)>[
       if (pronunciation)
         (
@@ -445,14 +447,13 @@ class _LyricsOptionsButtonState extends ConsumerState<LyricsOptionsButton> {
     }
   }
 
-  /// Translates into the language from settings, or into one picked now
-  /// when [choose] is set. A picked language becomes the new setting.
+  /// Translates into the song's language, or into one picked now when
+  /// [choose] is set. A picked language stays with this song alone.
   Future<void> _translate(ParsedLyrics lyrics, {required bool choose}) async {
     final l10n = context.l10n;
     final settings = ref.read(settingsProvider);
-    final target = lyricsTranslationTargetFor(settings).code;
+    final translations = ref.read(lyricsTranslationProvider.notifier);
     final settingsNotifier = ref.read(settingsProvider.notifier);
-    final String code;
     if (choose) {
       final provider = LyricsAiProvider.fromId(settings.lyricsAiProvider);
       final picked = await showLyricsLanguagePicker(
@@ -461,14 +462,15 @@ class _LyricsOptionsButtonState extends ConsumerState<LyricsOptionsButton> {
         subtitle: l10n.lyricsTranslateSheetSubtitle(
           lyricsAiProviderName(l10n, provider),
         ),
-        selected: target,
+        selected: translations.songLanguage(lyrics) ?? '',
+        appDefaultLabel: l10n.lyricsTranslateSongDefault(
+          translations.settingsTargetFor(lyrics).nativeName,
+        ),
       );
-      if (picked == null || picked.isEmpty || !mounted) return;
-      code = picked;
-      settingsNotifier.setLyricsTranslationLanguage(code);
-    } else {
-      code = target;
+      if (picked == null || !mounted) return;
+      translations.chooseSongLanguage(lyrics, picked);
     }
+    final code = translations.targetFor(lyrics).code;
     if (!ref.read(settingsProvider).playerShowTranslation) {
       settingsNotifier.setPlayerShowTranslation(true);
     }

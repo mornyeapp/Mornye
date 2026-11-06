@@ -181,6 +181,8 @@ AppSettings _$AppSettingsFromJson(Map<String, dynamic> json) => AppSettings(
   lyricsAiBaseUrl: json['lyricsAiBaseUrl'] as String? ?? '',
   lyricsAiModel: json['lyricsAiModel'] as String? ?? '',
   lyricsTranslationLanguage: json['lyricsTranslationLanguage'] as String? ?? '',
+  lyricsTranslationSecondLanguage:
+      json['lyricsTranslationSecondLanguage'] as String? ?? '',
   lyricsAiInstruction: json['lyricsAiInstruction'] as String? ?? '',
   lyricsAutoTranslate: json['lyricsAutoTranslate'] as bool? ?? false,
   lyricsAiRomanize: json['lyricsAiRomanize'] as bool? ?? true,
@@ -314,6 +316,7 @@ Map<String, dynamic> _$AppSettingsToJson(
   'lyricsAiBaseUrl': instance.lyricsAiBaseUrl,
   'lyricsAiModel': instance.lyricsAiModel,
   'lyricsTranslationLanguage': instance.lyricsTranslationLanguage,
+  'lyricsTranslationSecondLanguage': instance.lyricsTranslationSecondLanguage,
   'lyricsAiInstruction': instance.lyricsAiInstruction,
   'lyricsAutoTranslate': instance.lyricsAutoTranslate,
   'lyricsAiRomanize': instance.lyricsAiRomanize,

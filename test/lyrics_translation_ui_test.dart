@@ -482,9 +482,10 @@ void main() {
         final container = ProviderScope.containerOf(
           tester.element(find.byType(PlayerLyricsSection)),
         );
+        // A language picked here stays with the song.
         expect(
           container.read(settingsProvider).lyricsTranslationLanguage,
-          'de',
+          pick ? 'en' : 'de',
         );
 
         // The existing toggle now offers the original lyrics only.

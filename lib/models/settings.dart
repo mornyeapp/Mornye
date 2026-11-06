@@ -269,6 +269,10 @@ class AppSettings {
   /// BCP-47 target language; empty follows the app language.
   final String lyricsTranslationLanguage;
 
+  /// BCP-47 language for songs already in the target; empty leaves them
+  /// untranslated.
+  final String lyricsTranslationSecondLanguage;
+
   /// Optional guidance added to the translation prompt.
   final String lyricsAiInstruction;
 
@@ -418,6 +422,7 @@ class AppSettings {
     this.lyricsAiBaseUrl = '',
     this.lyricsAiModel = '',
     this.lyricsTranslationLanguage = '',
+    this.lyricsTranslationSecondLanguage = '',
     this.lyricsAiInstruction = '',
     this.lyricsAutoTranslate = false,
     this.lyricsAiRomanize = true,
@@ -569,6 +574,7 @@ class AppSettings {
     String? lyricsAiBaseUrl,
     String? lyricsAiModel,
     String? lyricsTranslationLanguage,
+    String? lyricsTranslationSecondLanguage,
     String? lyricsAiInstruction,
     bool? lyricsAutoTranslate,
     bool? lyricsAiRomanize,
@@ -741,6 +747,9 @@ class AppSettings {
       lyricsAiModel: lyricsAiModel ?? this.lyricsAiModel,
       lyricsTranslationLanguage:
           lyricsTranslationLanguage ?? this.lyricsTranslationLanguage,
+      lyricsTranslationSecondLanguage:
+          lyricsTranslationSecondLanguage ??
+          this.lyricsTranslationSecondLanguage,
       lyricsAiInstruction: lyricsAiInstruction ?? this.lyricsAiInstruction,
       lyricsAutoTranslate: lyricsAutoTranslate ?? this.lyricsAutoTranslate,
       lyricsAiRomanize: lyricsAiRomanize ?? this.lyricsAiRomanize,

@@ -15,6 +15,7 @@ import 'package:mornye/services/lyrics_ai_client.dart';
 import 'package:mornye/services/lyrics_translation.dart';
 import 'package:mornye/services/lyrics_translation_alignment.dart';
 import 'package:mornye/services/lyrics_translation_sharing.dart';
+import 'package:mornye/services/lyrics_translation_song_languages.dart';
 import 'package:mornye/utils/lyrics_parser.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -835,6 +836,97 @@ void main() {
       await Future<void>.delayed(const Duration(milliseconds: 10));
     }
     expect(requests, isEmpty);
+  });
+
+  String systemPrompt(http.Request request) {
+    final body = jsonDecode(request.body) as Map<String, dynamic>;
+    return ((body['messages'] as List).first as Map)['content'] as String;
+  }
+
+  ParsedLyrics lyricsOf(List<String> texts) => ParsedLyrics(
+    synced: true,
+    wordSynced: false,
+    lines: [
+      for (var i = 0; i < texts.length; i++)
+        LyricLine(
+          time: Duration(seconds: i),
+          text: texts[i],
+        ),
+    ],
+    plainText: texts.join('\n'),
+  );
+
+  const englishSong = [
+    'I walk the empty streets when the night is falling down',
+    "You told me that you'd stay but now I'm all alone",
+    "And I don't know what to do with all this love I've got",
+    "It's the only thing I want, the only thing I need",
+  ];
+
+  test('songs in the first language go to the second, others stay', () async {
+    final container = await containerFor(
+      settings: _settings.copyWith(
+        lyricsAutoTranslate: true,
+        lyricsTranslationLanguage: 'en',
+        lyricsTranslationSecondLanguage: 'es',
+      ),
+    );
+    final controller = container.read(lyricsTranslationProvider.notifier);
+    final english = lyricsOf(englishSong);
+    expect(controller.targetFor(english).code, 'es');
+    expect(controller.targetFor(_lyrics).code, 'en');
+    controller.display(english);
+    for (var i = 0; i < 30 && requests.isEmpty; i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+    }
+    expect(requests, hasLength(1));
+    expect(systemPrompt(requests.single), contains('Spanish'));
+  });
+
+  test('a language picked for a song leaves the settings alone', () async {
+    final container = await containerFor();
+    final controller = container.read(lyricsTranslationProvider.notifier);
+    final other = lyricsOf(['Another line']);
+
+    controller.chooseSongLanguage(_lyrics, 'ja');
+    expect(controller.targetFor(_lyrics).code, 'ja');
+    expect(controller.songLanguage(_lyrics), 'ja');
+    expect(controller.targetFor(other).code, 'es');
+    expect(container.read(settingsProvider).lyricsTranslationLanguage, 'es');
+
+    expect((await controller.translate(_lyrics)).error, isNull);
+    expect(systemPrompt(requests.single), contains('Japanese'));
+    expect(
+      controller.display(_lyrics).lines.first.translation,
+      'es:Hello',
+      reason: 'The reply mock prefixes every language alike',
+    );
+
+    controller.chooseSongLanguage(_lyrics, '');
+    expect(controller.songLanguage(_lyrics), isNull);
+    expect(controller.targetFor(_lyrics).code, 'es');
+  });
+
+  test('a picked language survives a restart', () async {
+    final first = LyricsTranslationSongLanguages();
+    await first.set('song-a', 'ja');
+    final restarted = LyricsTranslationSongLanguages();
+    expect(await restarted.load(), isTrue);
+    expect(restarted['song-a'], 'ja');
+    await restarted.set('song-a', null);
+    final cleared = LyricsTranslationSongLanguages();
+    await cleared.load();
+    expect(cleared['song-a'], isNull);
+  });
+
+  test('the oldest picked languages leave first', () async {
+    final languages = LyricsTranslationSongLanguages(maxEntries: 2);
+    await languages.set('a', 'ja');
+    await languages.set('b', 'ko');
+    await languages.set('c', 'de');
+    expect(languages['a'], isNull);
+    expect(languages['b'], 'ko');
+    expect(languages['c'], 'de');
   });
 
   test('the target follows the app language by default', () {

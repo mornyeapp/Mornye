@@ -834,6 +834,9 @@ class SettingsNotifier extends Notifier<AppSettings> {
   void setLyricsTranslationLanguage(String code) =>
       _commit(state.copyWith(lyricsTranslationLanguage: code.trim()));
 
+  void setLyricsTranslationSecondLanguage(String code) =>
+      _commit(state.copyWith(lyricsTranslationSecondLanguage: code.trim()));
+
   void setLyricsAiInstruction(String instruction) =>
       _commit(state.copyWith(lyricsAiInstruction: instruction.trim()));
 
