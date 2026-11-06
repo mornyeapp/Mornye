@@ -80,6 +80,7 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen>
   String? get _coverUrl => _resolvedCoverUrl ?? widget.coverUrl;
   String? get _headerVideoUrl =>
       _resolvedHeaderVideoUrl ?? widget.headerVideoUrl;
+  String get _playlistKey => widget.playlistId ?? widget.playlistName;
 
   void _updateSortedTracks() {
     _sortedTracks = sortTracksByMode(_tracks, _sortMode);
@@ -186,13 +187,27 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen>
   @override
   void initState() {
     super.initState();
+    _loadPersistedSortMode();
     _updateSortedTracks();
     _fetchTracksIfNeeded();
+  }
+
+  Future<void> _loadPersistedSortMode() async {
+    final mode = await PlaylistSortStorage.getSortMode(_playlistKey);
+    if (!mounted || mode == _sortMode) return;
+    setState(() {
+      _sortMode = mode;
+      _updateSortedTracks();
+    });
   }
 
   @override
   void didUpdateWidget(PlaylistScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (widget.playlistId != oldWidget.playlistId ||
+        widget.playlistName != oldWidget.playlistName) {
+      _loadPersistedSortMode();
+    }
     if (!identical(widget.tracks, oldWidget.tracks)) {
       _updateSortedTracks();
     }
@@ -389,10 +404,13 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen>
             context: context,
             currentSort: _sortMode,
             hasDateAdded: false,
-            onSortChanged: (newSort) => setState(() {
-              _sortMode = newSort;
-              _updateSortedTracks();
-            }),
+            onSortChanged: (newSort) {
+              setState(() {
+                _sortMode = newSort;
+                _updateSortedTracks();
+              });
+              PlaylistSortStorage.setSortMode(_playlistKey, newSort);
+            },
           ),
         if (ref.watch(linkPhoneClientProvider) != null) ...[
           const SizedBox(width: 8),

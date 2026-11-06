@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mornye/l10n/l10n.dart';
+import 'package:mornye/models/playlist_sort.dart';
 import 'package:mornye/models/track.dart';
 import 'package:mornye/screens/playlist_screen.dart';
 
@@ -94,5 +95,55 @@ void main() {
 
     // Verify sort button is now hidden
     expect(find.byKey(const ValueKey('playlist-sort-button')), findsNothing);
+  });
+
+  testWidgets(
+      'PlaylistScreen loads persisted sort mode on mount and saves updates',
+      (tester) async {
+    const playlistId = 'persisted_playlist_1';
+    await PlaylistSortStorage.setSortMode(
+      playlistId,
+      PlaylistSortMode.titleAsc,
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: PlaylistScreen(
+            playlistId: playlistId,
+            playlistName: 'Persisted Playlist',
+            tracks: [trackA, trackB],
+          ),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    // Verify sort button reflects sorted title state
+    final sortButton = find.byKey(const ValueKey('playlist-sort-button'));
+    expect(sortButton, findsOneWidget);
+
+    // Verify titleAsc is persisted in storage
+    expect(
+      await PlaylistSortStorage.getSortMode(playlistId),
+      PlaylistSortMode.titleAsc,
+    );
+
+    // Tap sort button to change to titleDesc
+    await tester.tap(sortButton);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Title (Z-A)'), findsOneWidget);
+    await tester.tap(find.text('Title (Z-A)'));
+    await tester.pumpAndSettle();
+
+    // Verify updated sort mode was persisted
+    expect(
+      await PlaylistSortStorage.getSortMode(playlistId),
+      PlaylistSortMode.titleDesc,
+    );
   });
 }
