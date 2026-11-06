@@ -77,5 +77,40 @@ void main() {
       expect(find.text('Date added (newest first)'), findsNothing);
       expect(find.text('Title (A-Z)'), findsOneWidget);
     });
+
+    testWidgets('opens context menu when anchor context is provided', (
+      tester,
+    ) async {
+      PlaylistSortMode? selectedMode;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: Builder(
+              builder: (btnContext) => buildPlaylistSortButton(
+                context: btnContext,
+                currentSort: PlaylistSortMode.custom,
+                hasDateAdded: true,
+                onSortChanged: (mode) => selectedMode = mode,
+              ),
+            ),
+          ),
+        ),
+      );
+
+      final button = find.byKey(const ValueKey('playlist-sort-button'));
+      expect(button, findsOneWidget);
+
+      await tester.tap(button);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Title (A-Z)'), findsOneWidget);
+      await tester.tap(find.text('Title (A-Z)'));
+      await tester.pumpAndSettle();
+
+      expect(selectedMode, PlaylistSortMode.titleAsc);
+    });
   });
 }

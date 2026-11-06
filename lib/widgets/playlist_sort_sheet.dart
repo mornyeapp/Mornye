@@ -126,28 +126,26 @@ Future<PlaylistSortMode?> showPlaylistSortSheet({
     PlaylistSortMode.durationDesc,
   ];
 
-  if (isDesktopPlatform) {
-    final position = contextMenuPositionBelow(anchor ?? context);
-    if (position != null) {
-      PlaylistSortMode? picked;
-      final chosen = await showContextMenu(
-        context,
-        position: position,
-        groups: [
-          [
-            for (final mode in modes)
-              ContextMenuAction(
-                icon: playlistSortIcon(mode),
-                label: playlistSortLabel(mode),
-                checked: mode == currentSort,
-                onSelected: () => picked = mode,
-              ),
-          ],
+  final position = contextMenuPositionBelow(anchor ?? context);
+  if (position != null) {
+    PlaylistSortMode? picked;
+    final chosen = await showContextMenu(
+      context,
+      position: position,
+      groups: [
+        [
+          for (final mode in modes)
+            ContextMenuAction(
+              icon: playlistSortIcon(mode),
+              label: playlistSortLabel(mode),
+              checked: mode == currentSort,
+              onSelected: () => picked = mode,
+            ),
         ],
-      );
-      if (chosen && picked != null) return picked;
-      return null;
-    }
+      ],
+    );
+    if (chosen && picked != null) return picked;
+    return null;
   }
 
   return showModalBottomSheet<PlaylistSortMode>(
@@ -207,7 +205,6 @@ Widget buildPlaylistSortButton({
       tooltip:
           tooltip ??
           (isCustom ? 'Sort' : 'Sorted: ${playlistSortLabel(currentSort)}'),
-      tonal: true,
       onPressed: () async {
         final selected = await showPlaylistSortSheet(
           context: btnContext,
