@@ -37,6 +37,28 @@ pub struct Device {
     pub alternates: Vec<Alternate>,
 }
 
+pub struct PacketTiming {
+    pub high_speed: bool,
+    pub interval_us: u32,
+}
+
+/// libusb speed codes describe the negotiated link, not the USB descriptor version.
+/// An unreported speed cannot safely select between frames and microframes.
+pub fn packet_timing(speed: i32, interval: u8) -> Result<PacketTiming, String> {
+    let high_speed = match speed {
+        2 => false,
+        3..=6 => true,
+        _ => return Err("USB bus speed unavailable or unsupported".into()),
+    };
+    if !(1..=4).contains(&interval) {
+        return Err("Unsupported USB packet interval".into());
+    }
+    Ok(PacketTiming {
+        high_speed,
+        interval_us: (if high_speed { 125 } else { 1000 }) * (1 << (interval - 1)),
+    })
+}
+
 fn u16le(b: &[u8]) -> u16 {
     u16::from_le_bytes([b[0], b[1]])
 }
@@ -316,6 +338,33 @@ mod tests {
                 (0..packets).map(|_| clock.next()).sum::<usize>(),
                 rate as usize
             );
+        }
+    }
+
+    #[test]
+    fn negotiated_link_speed_keeps_packet_clock_at_the_source_rate() {
+        for speed in 2..=6 {
+            for interval in 1..=4 {
+                let timing = packet_timing(speed, interval).unwrap();
+                let packets = 1_000_000 / timing.interval_us;
+                let mut clock = PacketClock::new(44100, timing.interval_us);
+                let frames: usize = (0..packets).map(|_| clock.next()).sum();
+                assert_eq!(frames, 44100);
+                assert_eq!(timing.high_speed, speed >= 3);
+            }
+        }
+        assert_eq!(packet_timing(2, 1).unwrap().interval_us, 1000);
+        assert_eq!(packet_timing(3, 1).unwrap().interval_us, 125);
+    }
+
+    #[test]
+    fn unknown_or_unsupported_bus_timing_cannot_start_a_packet_clock() {
+        for speed in [-1, 0, 1, 7] {
+            assert!(packet_timing(speed, 1).is_err());
+        }
+        for interval in [0, 5, 255] {
+            assert!(packet_timing(2, interval).is_err());
+            assert!(packet_timing(3, interval).is_err());
         }
     }
     #[test]

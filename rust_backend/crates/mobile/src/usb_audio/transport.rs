@@ -313,6 +313,7 @@ struct Session {
     alternate: Alternate,
     endpoint: Endpoint,
     feedback: Option<Endpoint>,
+    bus_speed: i32,
     high_speed: bool,
     interval: u32,
     #[allow(clippy::vec_box)] // libusb user_data must survive Vec moves/reallocation.
@@ -346,6 +347,7 @@ impl Session {
             alternate: Alternate::default(),
             endpoint: Endpoint::default(),
             feedback: None,
+            bus_speed: 0,
             high_speed: false,
             interval: 0,
             slots: vec![],
@@ -363,7 +365,7 @@ impl Session {
                 fd as _,
                 &mut s.handle,
             ))?;
-            s.high_speed = usb::libusb_get_device_speed(usb::libusb_get_device(s.handle)) >= 3;
+            s.bus_speed = usb::libusb_get_device_speed(usb::libusb_get_device(s.handle));
             check(usb::libusb_set_auto_detach_kernel_driver(s.handle, 1))?;
         }
         let mut failure = "No supported USB endpoint".to_string();
@@ -426,10 +428,11 @@ impl Session {
             .find(|e| e.address & 0x80 == 0 && e.attributes & 3 == 1 && e.attributes & 0x30 == 0)
             .ok_or("No isochronous audio output")?
             .clone();
-        if !(1..=4).contains(&ep.interval) || ep.max_packet == 0 || ep.max_packet > 3072 {
+        if ep.max_packet == 0 || ep.max_packet > 3072 {
             return Err("Unsupported USB interval/packet size".into());
         }
-        let interval = (if self.high_speed { 125 } else { 1000 }) * (1 << (ep.interval - 1));
+        let timing = descriptors::packet_timing(self.bus_speed, ep.interval)?;
+        let interval = timing.interval_us;
         let maximum_frames = (f.sample_rate as u64 * interval as u64).div_ceil(1_000_000) as usize;
         if maximum_frames * f.channels as usize * f.subslot as usize > ep.max_packet {
             return Err("USB endpoint bandwidth too small".into());
@@ -503,6 +506,7 @@ impl Session {
         self.alternate = a;
         self.endpoint = ep;
         self.feedback = feedback;
+        self.high_speed = timing.high_speed;
         self.interval = interval;
         self.format = f;
         Ok(())
