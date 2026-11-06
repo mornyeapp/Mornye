@@ -98,52 +98,53 @@ void main() {
   });
 
   testWidgets(
-      'PlaylistScreen loads persisted sort mode on mount and saves updates',
-      (tester) async {
-    const playlistId = 'persisted_playlist_1';
-    await PlaylistSortStorage.setSortMode(
-      playlistId,
-      PlaylistSortMode.titleAsc,
-    );
+    'PlaylistScreen loads persisted sort mode on mount and saves updates',
+    (tester) async {
+      const playlistId = 'persisted_playlist_1';
+      await PlaylistSortStorage.setSortMode(
+        playlistId,
+        PlaylistSortMode.titleAsc,
+      );
 
-    await tester.pumpWidget(
-      ProviderScope(
-        child: MaterialApp(
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: AppLocalizations.supportedLocales,
-          home: PlaylistScreen(
-            playlistId: playlistId,
-            playlistName: 'Persisted Playlist',
-            tracks: [trackA, trackB],
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: PlaylistScreen(
+              playlistId: playlistId,
+              playlistName: 'Persisted Playlist',
+              tracks: [trackA, trackB],
+            ),
           ),
         ),
-      ),
-    );
+      );
 
-    await tester.pumpAndSettle();
+      await tester.pumpAndSettle();
 
-    // Verify sort button reflects sorted title state
-    final sortButton = find.byKey(const ValueKey('playlist-sort-button'));
-    expect(sortButton, findsOneWidget);
+      // Verify sort button reflects sorted title state
+      final sortButton = find.byKey(const ValueKey('playlist-sort-button'));
+      expect(sortButton, findsOneWidget);
 
-    // Verify titleAsc is persisted in storage
-    expect(
-      await PlaylistSortStorage.getSortMode(playlistId),
-      PlaylistSortMode.titleAsc,
-    );
+      // Verify titleAsc is persisted in storage
+      expect(
+        await PlaylistSortStorage.getSortMode(playlistId),
+        PlaylistSortMode.titleAsc,
+      );
 
-    // Tap sort button to change to titleDesc
-    await tester.tap(sortButton);
-    await tester.pumpAndSettle();
+      // Tap sort button to change to titleDesc
+      await tester.tap(sortButton);
+      await tester.pumpAndSettle();
 
-    expect(find.text('Title (Z-A)'), findsOneWidget);
-    await tester.tap(find.text('Title (Z-A)'));
-    await tester.pumpAndSettle();
+      expect(find.text('Title (Z-A)'), findsOneWidget);
+      await tester.tap(find.text('Title (Z-A)'));
+      await tester.pumpAndSettle();
 
-    // Verify updated sort mode was persisted
-    expect(
-      await PlaylistSortStorage.getSortMode(playlistId),
-      PlaylistSortMode.titleDesc,
-    );
-  });
+      // Verify updated sort mode was persisted
+      expect(
+        await PlaylistSortStorage.getSortMode(playlistId),
+        PlaylistSortMode.titleDesc,
+      );
+    },
+  );
 }

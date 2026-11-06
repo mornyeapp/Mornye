@@ -179,36 +179,40 @@ void main() {
   group('PlaylistSortStorage', () {
     setUp(() => SharedPreferences.setMockInitialValues({}));
 
-    test('defaults to PlaylistSortMode.custom when no preference is saved',
-        () async {
-      final mode = await PlaylistSortStorage.getSortMode('playlist-123');
-      expect(mode, PlaylistSortMode.custom);
-    });
+    test(
+      'defaults to PlaylistSortMode.custom when no preference is saved',
+      () async {
+        final mode = await PlaylistSortStorage.getSortMode('playlist-123');
+        expect(mode, PlaylistSortMode.custom);
+      },
+    );
 
-    test('persists and retrieves custom sort mode for distinct playlists',
-        () async {
-      await PlaylistSortStorage.setSortMode(
-        'playlist-1',
-        PlaylistSortMode.titleAsc,
-      );
-      await PlaylistSortStorage.setSortMode(
-        'playlist-2',
-        PlaylistSortMode.dateAddedDesc,
-      );
+    test(
+      'persists and retrieves custom sort mode for distinct playlists',
+      () async {
+        await PlaylistSortStorage.setSortMode(
+          'playlist-1',
+          PlaylistSortMode.titleAsc,
+        );
+        await PlaylistSortStorage.setSortMode(
+          'playlist-2',
+          PlaylistSortMode.dateAddedDesc,
+        );
 
-      expect(
-        await PlaylistSortStorage.getSortMode('playlist-1'),
-        PlaylistSortMode.titleAsc,
-      );
-      expect(
-        await PlaylistSortStorage.getSortMode('playlist-2'),
-        PlaylistSortMode.dateAddedDesc,
-      );
-      expect(
-        await PlaylistSortStorage.getSortMode('playlist-3'),
-        PlaylistSortMode.custom,
-      );
-    });
+        expect(
+          await PlaylistSortStorage.getSortMode('playlist-1'),
+          PlaylistSortMode.titleAsc,
+        );
+        expect(
+          await PlaylistSortStorage.getSortMode('playlist-2'),
+          PlaylistSortMode.dateAddedDesc,
+        );
+        expect(
+          await PlaylistSortStorage.getSortMode('playlist-3'),
+          PlaylistSortMode.custom,
+        );
+      },
+    );
 
     test('reverting to custom removes or resets the persisted entry', () async {
       await PlaylistSortStorage.setSortMode(
