@@ -113,6 +113,64 @@ void main() {
     );
   });
 
+  test('tree grouping adds parent folders holding every nested track', () {
+    final folders = groupLibraryFolderTree(
+      [
+        (id: '1', sourceId: 'music', filePath: _document('b/one.flac')),
+        (id: '2', sourceId: 'music', filePath: _document('A/x/two.flac')),
+        (id: '3', sourceId: 'music', filePath: _document('A/three.flac')),
+        (id: '4', sourceId: 'music', filePath: _document('root.flac')),
+      ],
+      sourceNames: {'music': 'Music'},
+    );
+    expect(
+      [
+        for (final folder in folders)
+          (folder.name, folder.path, folder.ids.join(',')),
+      ],
+      [
+        ('A', 'A', '2,3'),
+        ('b', 'b', '1'),
+        ('Music', '', '1,2,3,4'),
+        ('x', 'A/x', '2'),
+      ],
+    );
+  });
+
+  test('tree grouping stops at the folder common to a plain source', () {
+    final folders = groupLibraryFolderTree([
+      (id: '1', sourceId: 'fs', filePath: '/music/A/x/one.flac'),
+      (id: '2', sourceId: 'fs', filePath: '/music/A/two.flac'),
+      (id: '3', sourceId: 'fs', filePath: '/music/B/three.flac'),
+    ]);
+    expect(
+      [
+        for (final folder in folders)
+          (folder.name, folder.path, folder.ids.join(',')),
+      ],
+      [
+        ('A', '/music/A', '1,2'),
+        ('B', '/music/B', '3'),
+        ('music', '/music', '1,2,3'),
+        ('x', '/music/A/x', '1'),
+      ],
+    );
+  });
+
+  test('tree grouping adds no parents above a single plain folder', () {
+    final folders = groupLibraryFolderTree([
+      (id: '1', sourceId: 'fs', filePath: '/sd/solo/a.flac'),
+      (id: '2', sourceId: 'fs', filePath: '/sd/solo/b.flac'),
+    ]);
+    expect(
+      [
+        for (final folder in folders)
+          (folder.name, folder.path, folder.ids.join(',')),
+      ],
+      [('solo', '/sd/solo', '1,2')],
+    );
+  });
+
   test('one numbered album plays by disc and track, others by file', () {
     LocalLibraryItem item(
       String id,
