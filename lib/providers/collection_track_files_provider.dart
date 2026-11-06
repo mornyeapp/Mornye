@@ -1,7 +1,11 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mornye/models/library_database_models.dart';
 import 'package:mornye/models/track.dart';
+import 'package:mornye/providers/local_library_provider.dart';
 import 'package:mornye/providers/playback_provider.dart';
+import 'package:mornye/providers/settings_provider.dart';
+import 'package:mornye/services/local_track_redownload_service.dart';
 import 'package:mornye/services/playable_media.dart';
 import 'package:mornye/utils/file_access.dart';
 
@@ -35,5 +39,36 @@ final collectionTrackFilesProvider = FutureProvider.autoDispose
           if (paths[index] case final path?)
             if (path.isNotEmpty && !isCueVirtualPath(path))
               playableFromTrack(tracks[index], path),
+      ];
+    });
+
+/// Uses scanned metadata so FLAC files behind opaque SAF URIs stay excluded.
+final collectionTrackFlacCandidatesProvider = FutureProvider.autoDispose
+    .family<List<LocalLibraryItem>, CollectionTrackFilesRequest>((
+      ref,
+      request,
+    ) async {
+      if (!ref.watch(settingsProvider.select((s) => s.localLibraryEnabled))) {
+        return const [];
+      }
+      ref.watch(localLibraryIndexRevisionProvider);
+      final items = await ref
+          .read(localLibraryProvider.notifier)
+          .findExistingBatchAsync([
+            for (final track in request.tracks)
+              LocalLibraryBatchLookupRequest(
+                id: track.source?.toLowerCase() == 'local' ? track.id : null,
+                isrc: track.isrc,
+                trackName: track.name,
+                artistName: track.artistName,
+              ),
+          ]);
+      final seen = <String>{};
+      return [
+        for (final item in items)
+          if (item != null &&
+              LocalTrackRedownloadService.isFlacUpgradeEligible(item) &&
+              seen.add(item.filePath))
+            item,
       ];
     });

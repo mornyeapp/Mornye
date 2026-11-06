@@ -23,6 +23,8 @@ import 'package:mornye/widgets/cached_cover_image.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/models/track.dart';
+import 'package:mornye/models/library_database_models.dart'
+    show LocalLibraryItem;
 import 'package:mornye/services/m3u_playlist_service.dart';
 import 'package:mornye/services/downloaded_embedded_cover_resolver.dart';
 import 'package:mornye/utils/file_access.dart';
@@ -40,6 +42,7 @@ import 'package:mornye/utils/cover_art_utils.dart';
 import 'package:mornye/controllers/collapsing_header_scroll_mixin.dart';
 import 'package:mornye/controllers/confirm_and_delete_tracks.dart';
 import 'package:mornye/controllers/library_tracks_folder_data.dart';
+import 'package:mornye/controllers/local_track_batch_actions.dart';
 import 'package:mornye/controllers/selection_mode_mixin.dart';
 import 'package:mornye/widgets/collection_reorder_sliver.dart';
 import 'package:mornye/widgets/discard_changes_dialog.dart';
@@ -586,6 +589,15 @@ class _LibraryTracksFolderScreenState
       if (selectedIds.contains(entry.key)) entry.track,
   ]);
 
+  Future<void> _queueSelectedAsFlac(List<LocalLibraryItem> items) =>
+      queueLocalTracksAsFlac(
+        context,
+        ref,
+        items,
+        isActive: () => mounted,
+        onComplete: exitSelectionMode,
+      );
+
   Future<void> _playSelectedFiles(
     List<PlayableMedia> media, {
     bool? playNext,
@@ -656,9 +668,13 @@ class _LibraryTracksFolderScreenState
     final count = selectedIds.length;
     final isPlaylist = widget.mode == LibraryTracksFolderMode.playlist;
     final request = _selectedTrackFiles(entries);
+    final flacCandidates = ref
+        .read(collectionTrackFlacCandidatesProvider(request).future)
+        .catchError((Object _) => <LocalLibraryItem>[]);
     final media = await ref
         .read(collectionTrackFilesProvider(request).future)
         .catchError((Object _) => <PlayableMedia>[]);
+    final flacEligible = await flacCandidates;
     if (!mounted ||
         !context.mounted ||
         request != _selectedTrackFiles(entries)) {
@@ -695,6 +711,12 @@ class _LibraryTracksFolderScreenState
             ),
         ],
         [
+          if (flacEligible.isNotEmpty)
+            ContextMenuAction(
+              icon: Icons.download_for_offline_outlined,
+              label: '${l10n.queueFlacAction} (${flacEligible.length})',
+              onSelected: () => _queueSelectedAsFlac(flacEligible),
+            ),
           if (showPlayer && media.isNotEmpty)
             for (final next in [true, false])
               ContextMenuAction(
@@ -748,14 +770,15 @@ class _LibraryTracksFolderScreenState
   ) {
     final selectedCount = selectedIds.length;
     final isWishlist = widget.mode == LibraryTracksFolderMode.wishlist;
+    final request = _selectedTrackFiles(entries);
     final files = selectedCount == 0
         ? const <PlayableMedia>[]
-        : ref
-                  .watch(
-                    collectionTrackFilesProvider(_selectedTrackFiles(entries)),
-                  )
-                  .value ??
+        : ref.watch(collectionTrackFilesProvider(request)).value ??
               const <PlayableMedia>[];
+    final flacEligible = selectedCount == 0
+        ? const <LocalLibraryItem>[]
+        : ref.watch(collectionTrackFlacCandidatesProvider(request)).value ??
+              const <LocalLibraryItem>[];
     final showPlayer = ref.watch(playerUiEnabledProvider);
     final localCount = files
         .where((item) => !item.isNetwork)
@@ -771,6 +794,16 @@ class _LibraryTracksFolderScreenState
       children: [
         SelectionActionGrid(
           children: [
+            if (flacEligible.isNotEmpty)
+              SelectionActionButton(
+                icon: Icons.download_for_offline_outlined,
+                label:
+                    '${context.l10n.queueFlacAction} (${flacEligible.length})',
+                onPressed: _trackActionInProgress
+                    ? null
+                    : () => _queueSelectedAsFlac(flacEligible),
+                colorScheme: colorScheme,
+              ),
             SelectionActionButton(
               icon: Icons.play_arrow,
               label: context.l10n.tooltipPlay,

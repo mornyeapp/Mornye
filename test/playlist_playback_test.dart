@@ -9,6 +9,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/models/settings.dart';
+import 'package:mornye/models/library_database_models.dart';
 import 'package:mornye/models/track.dart';
 import 'package:mornye/providers/download_queue_provider.dart';
 import 'package:mornye/providers/extension_provider.dart';
@@ -42,8 +43,13 @@ final _tracks = [
 ];
 
 class _Settings extends SettingsNotifier {
+  _Settings({this.includeLocal = false});
+
+  final bool includeLocal;
+
   @override
-  AppSettings build() => const AppSettings(playerMode: 'internal');
+  AppSettings build() =>
+      AppSettings(playerMode: 'internal', localLibraryEnabled: includeLocal);
 
   @override
   void setPlayerMode(String mode) => state = state.copyWith(playerMode: mode);
@@ -203,10 +209,18 @@ class _RemovalCollections extends _Collections {
 }
 
 class _Library extends LocalLibraryNotifier {
+  _Library({this.matches = const {}});
+
+  final Map<String, LocalLibraryItem> matches;
   final removedFiles = <String>[];
 
   @override
   LocalLibraryState build() => LocalLibraryState();
+
+  @override
+  Future<List<LocalLibraryItem?>> findExistingBatchAsync(
+    List<LocalLibraryBatchLookupRequest> requests,
+  ) async => [for (final request in requests) matches[request.trackName]];
 
   @override
   Future<void> removePhysicalFiles(Iterable<String> paths) async {
@@ -235,9 +249,10 @@ Widget _selectionApp({
   _Library? library,
   _History? history,
   bool internalPlayer = true,
+  bool includeLocal = false,
 }) => ProviderScope(
   overrides: [
-    settingsProvider.overrideWith(_Settings.new),
+    settingsProvider.overrideWith(() => _Settings(includeLocal: includeLocal)),
     playerUiEnabledProvider.overrideWithValue(internalPlayer),
     musicPlayerControllerProvider.overrideWithValue(player),
     playbackProvider.overrideWith(() => playback),
@@ -357,6 +372,87 @@ void main() {
           },
         );
       }
+    }
+
+    for (final desktop in [false, true]) {
+      testWidgets(
+        'playlist queues eligible FLAC selections ($mornye, $desktop)',
+        (tester) async {
+          debugDesktopPlatformOverride = desktop;
+          addTearDown(() => debugDesktopPlatformOverride = null);
+          tester.view.physicalSize = desktop
+              ? const Size(1000, 900)
+              : const Size(390, 844);
+          tester.view.devicePixelRatio = 1;
+          addTearDown(tester.view.reset);
+          final library = _Library(
+            matches: {
+              for (final (name, format) in [
+                ('First', 'mp3'),
+                ('Selected', 'FLAC'),
+                ('Last', 'm4a'),
+              ])
+                name: LocalLibraryItem(
+                  id: name,
+                  trackName: name,
+                  artistName: 'Artist',
+                  albumName: 'Album',
+                  filePath: 'content://library/$name',
+                  scannedAt: DateTime(2026),
+                  format: format,
+                ),
+            },
+          );
+          final player = _Player();
+          await tester.pumpWidget(
+            _selectionApp(
+              mornye: mornye,
+              player: player,
+              playback: _Playback(),
+              library: library,
+              includeLocal: true,
+            ),
+          );
+          await _selectAllTracks(tester);
+          final queue = find.widgetWithText(
+            SelectionActionButton,
+            'Queue FLAC (2)',
+          );
+          expect(queue, findsOneWidget);
+          await tester.ensureVisible(queue);
+          await tester.tap(queue);
+          await tester.pumpAndSettle();
+          final l10n = lookupAppLocalizations(const Locale('en'));
+          expect(find.text(l10n.queueFlacConfirmMessage(2)), findsOneWidget);
+          await tester.tap(find.text('Cancel'));
+          await tester.pumpAndSettle();
+          expect(find.byType(SelectionBottomBar), findsOneWidget);
+          expect(library.removedFiles, isEmpty);
+          expect(player.queue, isEmpty);
+
+          if (desktop) {
+            tester
+                .widget<SelectionBottomBar>(find.byType(SelectionBottomBar))
+                .onClose();
+            await tester.pumpAndSettle();
+            await tester.ensureVisible(find.text('First'));
+            final gesture = await tester.startGesture(
+              tester.getCenter(find.text('First')),
+              kind: PointerDeviceKind.mouse,
+              buttons: kSecondaryButton,
+            );
+            await gesture.up();
+            await tester.pumpAndSettle();
+            expect(find.text('Queue FLAC (1)'), findsOneWidget);
+            await tester.tap(find.text('Queue FLAC (1)'));
+            await tester.pumpAndSettle();
+            expect(find.text(l10n.queueFlacConfirmMessage(1)), findsOneWidget);
+            await tester.tap(find.text('Cancel'));
+            await tester.pumpAndSettle();
+          }
+          expect(tester.takeException(), isNull);
+        },
+      );
     }
 
     testWidgets('playlist desktop menu acts on its clicked track ($mornye)', (
