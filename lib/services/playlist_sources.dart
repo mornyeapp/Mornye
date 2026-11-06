@@ -91,6 +91,118 @@ List<LibraryFolder> groupLibraryFolders(
   return folders;
 }
 
+p.Context _folderContext(String path, bool tree) =>
+    tree || path.startsWith('network://') ? p.posix : p.context;
+
+/// [path] and the folders above it, up to [root]. [root] is the topmost
+/// folder to offer; for a SAF [tree] the chain ends at the tree root, `''`.
+Iterable<String> _folderChain(String path, bool tree, String? root) sync* {
+  if (!tree && root == null) {
+    yield path;
+    return;
+  }
+  final context = _folderContext(path, tree);
+  var current = path;
+  while (true) {
+    yield current;
+    if (current.isEmpty || current == root) return;
+    final parent = context.dirname(current);
+    if (parent == current) return;
+    if (parent == '.') {
+      if (tree) yield '';
+      return;
+    }
+    current = parent;
+  }
+}
+
+/// The deepest folder that holds, or is above, every one of [folders].
+String? _commonFolder(List<String> folders) {
+  if (folders.isEmpty) return null;
+  final context = _folderContext(folders.first, false);
+  var candidate = folders.first;
+  while (true) {
+    final current = candidate;
+    if (folders.every(
+      (folder) => folder == current || context.isWithin(current, folder),
+    )) {
+      return current;
+    }
+    final parent = context.dirname(current);
+    if (parent == current || parent == '.') return null;
+    candidate = parent;
+  }
+}
+
+/// Like [groupLibraryFolders], but every folder also holds the tracks of all
+/// its subfolders, and the folders above the ones with tracks are offered
+/// too, up to the top of their Library source. Picking a folder therefore
+/// takes everything nested inside it, on plain paths and SAF trees alike.
+List<LibraryFolder> groupLibraryFolderTree(
+  List<LibraryFilePathRow> rows, {
+  Map<String, String> sourceNames = const {},
+}) {
+  final direct =
+      <String, ({String sourceId, String path, bool tree, List<String> ids})>{};
+  for (final row in rows) {
+    final folder = libraryFolderPath(row.filePath);
+    if (folder == null) continue;
+    direct
+        .putIfAbsent(
+          '${row.sourceId}\n$folder',
+          () => (
+            sourceId: row.sourceId,
+            path: folder,
+            tree: isContentUri(row.filePath.trim()),
+            ids: <String>[],
+          ),
+        )
+        .ids
+        .add(row.id);
+  }
+
+  final plainFolders = <String, List<String>>{};
+  for (final group in direct.values) {
+    if (!group.tree) {
+      plainFolders.putIfAbsent(group.sourceId, () => []).add(group.path);
+    }
+  }
+  final roots = {
+    for (final entry in plainFolders.entries)
+      entry.key: _commonFolder(entry.value),
+  };
+
+  final totals = <String, ({String sourceId, String path, Set<String> ids})>{};
+  for (final group in direct.values) {
+    final root = group.tree ? '' : roots[group.sourceId];
+    for (final folder in _folderChain(group.path, group.tree, root)) {
+      totals
+          .putIfAbsent(
+            '${group.sourceId}\n$folder',
+            () => (sourceId: group.sourceId, path: folder, ids: <String>{}),
+          )
+          .ids
+          .addAll(group.ids);
+    }
+  }
+
+  final folders = [
+    for (final group in totals.values)
+      LibraryFolder(
+        name: group.path.isEmpty
+            ? sourceNames[group.sourceId] ?? group.sourceId
+            : p.basename(group.path),
+        path: group.path,
+        ids: group.ids.toList(growable: false),
+      ),
+  ];
+  folders.sort((a, b) {
+    final byName = a.name.toLowerCase().compareTo(b.name.toLowerCase());
+    return byName != 0 ? byName : a.path.compareTo(b.path);
+  });
+  return folders;
+}
+
 /// A folder in playback order: by disc and track number when it holds one
 /// album that numbers every track, otherwise by file name, as a file browser
 /// lists it.
@@ -132,7 +244,7 @@ Future<List<LibraryFolder>> loadLibraryFolders(LibraryDatabase library) async {
 
 List<LibraryFolder> _groupFolders(
   ({List<LibraryFilePathRow> rows, Map<String, String> sourceNames}) request,
-) => groupLibraryFolders(request.rows, sourceNames: request.sourceNames);
+) => groupLibraryFolderTree(request.rows, sourceNames: request.sourceNames);
 
 /// The tracks of [folder] in [sortFolderItems] order.
 Future<List<Track>> libraryFolderTracks(
@@ -144,6 +256,45 @@ Future<List<Track>> libraryFolderTracks(
     for (final row in rows) LocalLibraryItem.fromJson(row),
   ]);
   return [for (final item in items) _localTrack(item)];
+}
+
+/// Every Library track inside [root] and all of its subfolders, however
+/// deep. Only files already in the Library are found.
+Future<LibraryFolder> libraryFolderTree(
+  String root,
+  LibraryDatabase library,
+) async {
+  final base = p.normalize(_visiblePath(root) ?? root);
+  final rows = await library.getFilePathRows();
+  final ids = <String>[];
+  for (final row in rows) {
+    final folder = libraryFolderPath(row.filePath);
+    if (folder == null) continue;
+    final dir = p.normalize(folder);
+    if (dir == base || p.isWithin(base, dir)) ids.add(row.id);
+  }
+  return LibraryFolder(name: p.basename(base), path: base, ids: ids);
+}
+
+/// The tracks of [folder] and its subfolders: subfolders in path order, each
+/// one in [sortFolderItems] order.
+Future<List<Track>> libraryFolderTreeTracks(
+  LibraryFolder folder,
+  LibraryDatabase library,
+) async {
+  final byDir = <String, List<LocalLibraryItem>>{};
+  for (final row in await library.getByIds(folder.ids)) {
+    final item = LocalLibraryItem.fromJson(row);
+    byDir
+        .putIfAbsent(libraryFolderPath(item.filePath) ?? '', () => [])
+        .add(item);
+  }
+  final dirs = byDir.keys.toList()
+    ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+  return [
+    for (final dir in dirs)
+      for (final item in sortFolderItems(byDir[dir]!)) _localTrack(item),
+  ];
 }
 
 /// Parses an M3U, M3U8 or CSV playlist file named [fileName].

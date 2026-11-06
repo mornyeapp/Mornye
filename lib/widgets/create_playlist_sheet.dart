@@ -6,6 +6,7 @@ import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/library_collections_provider.dart';
 import 'package:mornye/services/library_database.dart';
 import 'package:mornye/services/playlist_sources.dart';
+import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/utils/logger.dart';
 import 'package:mornye/widgets/app_bottom_sheet.dart';
 import 'package:mornye/widgets/app_icon.dart';
@@ -103,7 +104,7 @@ Future<void> _createFromFolder(BuildContext context, WidgetRef ref) async {
   final name = await _promptName(context, folder.name);
   if (name == null || name.isEmpty || !context.mounted) return;
 
-  final tracks = await libraryFolderTracks(folder, library);
+  final tracks = await libraryFolderTreeTracks(folder, library);
   final notifier = ref.read(libraryCollectionsProvider.notifier);
   final id = await notifier.createPlaylist(name);
   final result = await notifier.addTracksToPlaylist(id, tracks);
@@ -169,6 +170,29 @@ class _FolderList extends StatelessWidget {
   final Future<List<LibraryFolder>> folders;
   final ScrollController controller;
 
+  /// Picks any folder with the system dialog and returns it with the tracks
+  /// of all its subfolders.
+  Future<void> _browse(BuildContext context) async {
+    final String? dir;
+    try {
+      dir = await FilePicker.getDirectoryPath();
+    } catch (e) {
+      _log.e('Folder picker failed: $e');
+      return;
+    }
+    if (dir == null || dir.isEmpty || !context.mounted) return;
+    final folder = await libraryFolderTree(dir, LibraryDatabase.instance);
+    if (!context.mounted) return;
+    if (folder.ids.isEmpty) {
+      showAppSnackBar(
+        context,
+        content: Text(context.l10n.playlistBrowseFolderNoTracks),
+      );
+      return;
+    }
+    Navigator.pop(context, folder);
+  }
+
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<List<LibraryFolder>>(
@@ -228,9 +252,17 @@ class _FolderList extends StatelessWidget {
         return ListView.builder(
           controller: controller,
           padding: const EdgeInsets.only(bottom: 16),
-          itemCount: folders.length,
+          itemCount: folders.length + (isDesktopPlatform ? 1 : 0),
           itemBuilder: (context, index) {
-            final folder = folders[index];
+            if (isDesktopPlatform && index == 0) {
+              return AppSheetOption(
+                leading: const AppIcon(Icons.drive_folder_upload_outlined),
+                title: Text(context.l10n.playlistBrowseFolder),
+                subtitle: Text(context.l10n.playlistBrowseFolderSubtitle),
+                onTap: () => _browse(context),
+              );
+            }
+            final folder = folders[index - (isDesktopPlatform ? 1 : 0)];
             final count = context.l10n.tracksCount(folder.ids.length);
             return AppSheetOption(
               leading: const AppIcon(Icons.folder_outlined),
