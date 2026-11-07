@@ -39,6 +39,19 @@ int syncedLyricsDueLineIndex({
   return dueIndex;
 }
 
+/// The line to show at [position] while playback advances, given the line
+/// [shown] already, which starts at [shownStart]. A [position] only a little
+/// behind [shownStart], as a late position report is, keeps [shown] instead
+/// of stepping back to the line before for a moment. A seek back of
+/// [seekThreshold] or more moves to [index] at once.
+int steadySyncedLyricsIndex({
+  required int index,
+  required int shown,
+  required Duration shownStart,
+  required Duration position,
+  Duration seekThreshold = const Duration(milliseconds: 750),
+}) => index < shown && shownStart - position < seekThreshold ? shown : index;
+
 /// Extrapolates the latest player position for the lyrics animation only.
 ///
 /// The global playback state intentionally updates at a lower frequency to

@@ -15,6 +15,7 @@ import 'package:mornye/providers/theme_provider.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/lyrics_parser.dart';
 import 'package:mornye/utils/lyrics_timeline.dart';
+import 'package:mornye/utils/synced_lyrics_scroll.dart';
 import 'package:mornye/widgets/lyric_line_scroller.dart';
 import 'package:mornye/widgets/player_lyrics.dart';
 
@@ -81,6 +82,10 @@ class _LyricPreviewLineState extends ConsumerState<_LyricPreviewLine> {
   ParsedLyrics? _timelineSource;
   int? _timelineOffsetMs;
   List<LyricLine> _timeline = const [];
+
+  /// The line last shown, by index into [_shownLines].
+  int _shownIndex = -1;
+  List<LyricLine>? _shownLines;
 
   @override
   void initState() {
@@ -191,22 +196,38 @@ class _LyricPreviewLineState extends ConsumerState<_LyricPreviewLine> {
         final position =
             widget.seekPreview.value ?? state?.position ?? Duration.zero;
         final probe = position + _lineLead;
-        final index = LyricsParser.activeIndex(lines, probe);
-        _scheduleNextLine(lines, index, probe, state, visible: visible);
         final speed = state?.speed ?? 1;
+        final advancing =
+            widget.seekPreview.value == null &&
+            state != null &&
+            state.playing &&
+            state.processingState == AudioProcessingState.ready &&
+            speed.isFinite &&
+            speed > 0;
+        var index = LyricsParser.activeIndex(lines, probe);
+        // The timer moves to a line at its start; a late position report
+        // must not step back to the line before for a moment.
+        if (advancing &&
+            identical(lines, _shownLines) &&
+            _shownIndex >= 0 &&
+            _shownIndex < lines.length) {
+          index = steadySyncedLyricsIndex(
+            index: index,
+            shown: _shownIndex,
+            shownStart: lines[_shownIndex].time,
+            position: probe,
+          );
+        }
+        _shownLines = lines;
+        _shownIndex = index;
+        _scheduleNextLine(lines, index, probe, state, visible: visible);
         return _buildLine(
           context,
           line: _sungLine(lines, index, probe),
           nextStart: index + 1 < lines.length ? lines[index + 1].time : null,
           position: position,
           showTranslation: showTranslation,
-          advancing:
-              widget.seekPreview.value == null &&
-              state != null &&
-              state.playing &&
-              state.processingState == AudioProcessingState.ready &&
-              speed.isFinite &&
-              speed > 0,
+          advancing: advancing,
           speed: speed,
         );
       },

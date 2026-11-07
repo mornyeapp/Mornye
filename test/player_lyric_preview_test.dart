@@ -187,6 +187,33 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('keeps the next line when playback reports a little late', (
+    tester,
+  ) async {
+    final view = await pumpPreview(tester, metadata: await _metadata());
+    view.playback.add(_at(const Duration(milliseconds: 4500)));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pumpAndSettle();
+    expect(find.text('First example line'), findsOneWidget);
+
+    // A position report from before the line starts, as one arriving late
+    // over a network is, keeps the line instead of stepping back.
+    view.playback.add(_at(const Duration(milliseconds: 4800)));
+    for (var frame = 0; frame < 6; frame++) {
+      await tester.pump(const Duration(milliseconds: 16));
+      expect(find.text('•••'), findsNothing, reason: 'frame $frame went back');
+      expect(find.text('First example line'), findsOneWidget);
+    }
+
+    // A seek back moves at once.
+    view.playback.add(_at(const Duration(seconds: 2)));
+    await tester.pumpAndSettle();
+    expect(find.text('•••'), findsOneWidget);
+    expect(find.text('First example line'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('applies the lyrics timing offset', (tester) async {
     final view = await pumpPreview(tester, metadata: await _metadata());
     view.playback.add(_at(const Duration(milliseconds: 5500), playing: false));

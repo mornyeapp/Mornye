@@ -14,6 +14,83 @@ import 'package:mornye/widgets/player_lyrics.dart';
 
 void main() {
   for (final mornye in [false, true]) {
+    testWidgets('a late position report keeps the line ($mornye)', (
+      tester,
+    ) async {
+      var now = DateTime(2026);
+      await withClock(Clock(() => now), () async {
+        final playback = StreamController<PlaybackState>.broadcast();
+        final preview = ValueNotifier<Duration?>(null);
+        addTearDown(playback.close);
+        addTearDown(preview.dispose);
+        final theme = mornye
+            ? MornyeTheme.build(Brightness.dark)
+            : AppTheme.dark();
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              playbackStateProvider.overrideWith((ref) => playback.stream),
+            ],
+            child: MaterialApp(
+              theme: theme,
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              home: Scaffold(
+                body: SyncedLyricsView(
+                  lyrics: LyricsParser.parse(
+                    '[00:01.00]First phrase\n[00:04.00]Second phrase\n'
+                    '[00:07.00]Third phrase',
+                  ),
+                  seekPreview: preview,
+                  colorScheme: theme.colorScheme,
+                  isActive: true,
+                  showPronunciation: false,
+                  showTranslation: false,
+                ),
+              ),
+            ),
+          ),
+        );
+        PlaybackState at(Duration position) => PlaybackState(
+          playing: true,
+          processingState: AudioProcessingState.ready,
+          updatePosition: position,
+        );
+        double emphasis(String phrase) => tester
+            .widget<AnimatedOpacity>(
+              find.ancestor(
+                of: find.text(phrase),
+                matching: find.byType(AnimatedOpacity),
+              ),
+            )
+            .opacity;
+
+        playback.add(at(const Duration(seconds: 3)));
+        await tester.pump();
+        await tester.pump();
+        expect(emphasis('First phrase'), 1);
+        // The line timer moves on when the next line starts.
+        now = now.add(const Duration(seconds: 1));
+        await tester.pump(const Duration(seconds: 1));
+        expect(emphasis('Second phrase'), 1);
+
+        // A report from just before that line, as one arriving late over
+        // a network is, keeps it instead of stepping back for a moment.
+        playback.add(at(const Duration(milliseconds: 3800)));
+        await tester.pump();
+        expect(emphasis('Second phrase'), 1);
+        expect(emphasis('First phrase'), lessThan(1));
+
+        // A seek back moves at once.
+        playback.add(at(const Duration(seconds: 2)));
+        await tester.pump();
+        expect(emphasis('First phrase'), 1);
+        expect(emphasis('Second phrase'), lessThan(1));
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      });
+    });
+
     for (final speed in [1.0, 1.5]) {
       testWidgets('late lyric timers catch up to playback ($mornye, $speed)', (
         tester,

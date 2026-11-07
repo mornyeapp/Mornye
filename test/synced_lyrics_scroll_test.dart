@@ -54,6 +54,23 @@ void main() {
     );
   });
 
+  test('keeps the shown line over a slightly late position', () {
+    int steady(int index, int position) => steadySyncedLyricsIndex(
+      index: index,
+      shown: 3,
+      shownStart: const Duration(seconds: 6),
+      position: Duration(milliseconds: position),
+    );
+
+    // A report up to 750 ms behind the shown line keeps it.
+    expect(steady(2, 5800), 3);
+    expect(steady(2, 5251), 3);
+    // Further back is a seek, and a later line always moves on.
+    expect(steady(2, 5250), 2);
+    expect(steady(0, 1000), 0);
+    expect(steady(4, 9000), 4);
+  });
+
   test('only held words glow, rising while sung and fading after', () {
     double glowAt(int position, {required int end}) => syncedLyricSegmentGlow(
       position: Duration(milliseconds: position),

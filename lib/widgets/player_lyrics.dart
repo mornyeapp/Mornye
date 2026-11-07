@@ -394,7 +394,7 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
       playbackPositionProvider,
       (previous, next) {
         if (widget.seekPreview.value != null) return;
-        final active = _activeIndexAt(next);
+        final active = _steadyActiveIndex(_activeIndexAt(next), next);
         _setActiveLine(active, position: next);
         _scheduleNextLine(next);
       },
@@ -478,6 +478,26 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
       if (!_hasStarted) return -1;
     }
     return LyricsParser.activeIndex(_lines, position);
+  }
+
+  /// [active] at [position], keeping the line already shown while playback
+  /// advances. The boundary timer moves to a line at its start, and a
+  /// position report that arrives late (common over Link) would otherwise
+  /// step back to the line before for a moment.
+  int _steadyActiveIndex(int active, Duration position) {
+    final shown = _active;
+    if (!_playing ||
+        _loading ||
+        shown < 0 ||
+        shown >= _timeline.starts.length) {
+      return active;
+    }
+    return steadySyncedLyricsIndex(
+      index: active,
+      shown: shown,
+      shownStart: _timeline.starts[shown],
+      position: position,
+    );
   }
 
   /// The scroll anchor for [active]. When the next line starts while the
