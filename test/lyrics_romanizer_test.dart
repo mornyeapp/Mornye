@@ -63,6 +63,19 @@ void main() {
       expect(filled.lines.single.romanization, 'Provider');
     });
 
+    test('adds a pronunciation per line to lyrics without timing', () async {
+      final filled = await LyricsRomanizer.fillMissing(
+        const ParsedLyrics(
+          synced: false,
+          wordSynced: false,
+          lines: [],
+          plainText: '안녕\nhello\n사랑해',
+        ),
+      );
+      expect(filled.plainPronunciations, ['Annyeong', null, 'Saranghae']);
+      expect(filled.plainText, '안녕\nhello\n사랑해');
+    });
+
     test('returns Latin-only lyrics untouched', () async {
       final lyrics = _lyrics([_line('hello')]);
       final filled = await LyricsRomanizer.fillMissing(lyrics);

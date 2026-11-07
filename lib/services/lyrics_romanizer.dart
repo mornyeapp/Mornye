@@ -99,11 +99,53 @@ class LyricsRomanizer {
     return text[0].toUpperCase() + text.substring(1);
   }
 
+  /// Lyrics without timing have no [ParsedLyrics.lines], only text, so each
+  /// text line gets its own entry in [ParsedLyrics.plainPronunciations].
+  static Future<ParsedLyrics> _fillPlain(ParsedLyrics lyrics) async {
+    if (lyrics.plainPronunciations.isNotEmpty ||
+        lyrics.plainText.trim().isEmpty) {
+      return lyrics;
+    }
+    final rows = lyrics.plainText.split(RegExp(r'\r\n|\r|\n'));
+    final hasKana = lyrics.plainText.codeUnits.any(_isKana);
+
+    final readings = List<String?>.filled(rows.length, null);
+    final japanese = <int>[];
+    for (var i = 0; i < rows.length; i++) {
+      final text = rows[i].trim();
+      if (text.isEmpty) continue;
+      if (isJapanese(text, entireLyricsHasKana: hasKana)) {
+        japanese.add(i);
+      } else if (isKorean(text)) {
+        readings[i] = _tidy(romanizeKorean(text));
+      }
+    }
+    if (japanese.isNotEmpty) {
+      final values = await romanizeJapaneseLines([
+        for (final i in japanese) rows[i].trim(),
+      ]);
+      for (var n = 0; n < japanese.length; n++) {
+        readings[japanese[n]] = _tidy(values[n]);
+      }
+    }
+    if (readings.every((value) => value == null)) return lyrics;
+
+    return ParsedLyrics(
+      synced: lyrics.synced,
+      wordSynced: lyrics.wordSynced,
+      lines: lyrics.lines,
+      plainText: lyrics.plainText,
+      writers: lyrics.writers,
+      provider: lyrics.provider,
+      plainPronunciations: readings,
+    );
+  }
+
   /// Fills [ParsedLyrics.lines] that have no pronunciation yet and are
   /// Japanese or Korean. Lines that already carry a romanization from the
   /// lyrics provider are left alone.
   static Future<ParsedLyrics> fillMissing(ParsedLyrics lyrics) async {
-    if (lyrics.lines.isEmpty) return lyrics;
+    if (lyrics.lines.isEmpty) return _fillPlain(lyrics);
     final hasKana = lyrics.lines.any(
       (line) => line.text.codeUnits.any(_isKana),
     );
