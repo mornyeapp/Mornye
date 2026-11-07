@@ -13,7 +13,6 @@ import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/lyrics_parser.dart';
 import 'package:mornye/utils/lyrics_timeline.dart';
 import 'package:mornye/utils/synced_lyrics_scroll.dart';
-import 'package:mornye/widgets/overflow_marquee.dart';
 import 'package:mornye/widgets/player_lyrics.dart';
 
 /// Single-line real-time lyric preview shown beneath track metadata on the
@@ -254,37 +253,25 @@ class _PlayerLyricPreviewState extends ConsumerState<PlayerLyricPreview> {
             ),
           );
         } else if (isWordTimed) {
-          // Word-timed: marquee wraps the ClipRect so long karaoke lines scroll.
-          lyricWidget = OverflowMarquee(
+          lyricWidget = ClipRect(
             key: ValueKey('word-${activeLine.time.inMilliseconds}'),
-            resetKey: activeLine.time.inMilliseconds,
-            child: ClipRect(
-              child: WordTimedLyricLine(
-                line: activeLine,
-                initialPosition: position,
-                seekPreview: widget.seekPreview,
-                style: textStyle,
-                maxLines: 1,
-              ),
+            child: WordTimedLyricLine(
+              line: activeLine,
+              initialPosition: position,
+              seekPreview: widget.seekPreview,
+              style: textStyle,
+              maxLines: 1,
             ),
           );
         } else {
-          // Plain synced line: marquee so long lines scroll instead of "...".
-          lyricWidget = OverflowMarquee(
+          lyricWidget = Text(
+            currentText,
             key: ValueKey(
               'line-${activeLine.time.inMilliseconds}-$currentText',
             ),
-            resetKey: (activeLine.time.inMilliseconds, currentText),
-            child: Text(
-              currentText,
-              key: ValueKey(
-                'line-text-${activeLine.time.inMilliseconds}-$currentText',
-              ),
-              maxLines: 1,
-              softWrap: false,
-              overflow: TextOverflow.visible,
-              style: textStyle,
-            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: textStyle,
           );
         }
 
@@ -304,9 +291,9 @@ class _PlayerLyricPreviewState extends ConsumerState<PlayerLyricPreview> {
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
                 child: Row(
-                  mainAxisSize: MainAxisSize.max,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Expanded(
+                    Flexible(
                       child: AnimatedSwitcher(
                         duration: const Duration(milliseconds: 180),
                         switchInCurve: Curves.easeOutQuad,
@@ -314,7 +301,10 @@ class _PlayerLyricPreviewState extends ConsumerState<PlayerLyricPreview> {
                         layoutBuilder: (currentChild, previousChildren) =>
                             Stack(
                               alignment: Alignment.centerLeft,
-                              children: [...previousChildren, ?currentChild],
+                              children: [
+                                ...previousChildren,
+                                if (currentChild != null) currentChild,
+                              ],
                             ),
                         transitionBuilder: (child, animation) => FadeTransition(
                           opacity: animation,
