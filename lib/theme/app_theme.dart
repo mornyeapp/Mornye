@@ -57,6 +57,7 @@ class AppTheme {
       menuButtonTheme: _menuButtonTheme,
       tabBarTheme: _tabBarTheme(scheme),
       dividerTheme: _dividerTheme(scheme),
+      tooltipTheme: _tooltipTheme,
       extensions: <ThemeExtension<dynamic>>[
         isDesktopPlatform ? AppTokens.desktop : AppTokens.standard,
       ],
@@ -108,6 +109,7 @@ class AppTheme {
       menuButtonTheme: _menuButtonTheme,
       tabBarTheme: _tabBarTheme(scheme),
       dividerTheme: _dividerTheme(scheme),
+      tooltipTheme: _tooltipTheme,
       extensions: <ThemeExtension<dynamic>>[
         isDesktopPlatform ? AppTokens.desktop : AppTokens.standard,
       ],
@@ -383,4 +385,11 @@ class AppTheme {
 
   static DividerThemeData _dividerTheme(ColorScheme scheme) =>
       DividerThemeData(color: scheme.outlineVariant, thickness: 1, space: 1);
+
+  /// Desktop hover waits half a second before a tooltip shows, the initial
+  /// tooltip delay of the Windows and Linux toolkits, so sweeping across the
+  /// rail or the player bar does not flash a string of labels.
+  static TooltipThemeData? get _tooltipTheme => isDesktopPlatform
+      ? const TooltipThemeData(waitDuration: Duration(milliseconds: 500))
+      : null;
 }

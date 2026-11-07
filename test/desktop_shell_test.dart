@@ -417,6 +417,42 @@ void main() {
       expect(find.text('content'), findsOneWidget);
     });
 
+    testWidgets('the Downloads menu animates only in Material ($mornye)', (
+      tester,
+    ) async {
+      await pumpShell(tester, mornye: mornye, width: 1400);
+      final button = find.byKey(const ValueKey('desktop-downloads-button'));
+      double popoverOpacity() => tester
+          .widgetList<FadeTransition>(
+            find.ancestor(
+              of: find.byType(DesktopDownloadsPopover),
+              matching: find.byType(FadeTransition),
+            ),
+          )
+          .fold(1.0, (opacity, fade) => opacity * fade.opacity.value);
+
+      await tester.tap(button);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(find.byType(DesktopDownloadsPopover), findsOneWidget);
+      expect(popoverOpacity(), mornye ? 1 : lessThan(1));
+      await tester.pumpAndSettle();
+
+      await tester.tap(button);
+      await tester.pump();
+      if (!mornye) {
+        // A click while it closes opens it again.
+        await tester.pump(const Duration(milliseconds: 50));
+        await tester.tap(button);
+      }
+      await tester.pumpAndSettle();
+      expect(
+        find.byType(DesktopDownloadsPopover),
+        mornye ? findsNothing : findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    });
+
     testWidgets('reduced motion swaps Now Playing at once ($mornye)', (
       tester,
     ) async {

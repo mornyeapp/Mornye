@@ -190,6 +190,84 @@ void main() {
       expect(log, isEmpty);
     });
 
+    double menuOpacity(WidgetTester tester, String label) => tester
+        .widgetList<FadeTransition>(
+          find.ancestor(
+            of: find.text(label),
+            matching: find.byType(FadeTransition),
+          ),
+        )
+        .fold(1.0, (opacity, fade) => opacity * fade.opacity.value);
+
+    for (final reducedMotion in [false, true]) {
+      testWidgets('Material menu motion (reduced motion: $reducedMotion)', (
+        tester,
+      ) async {
+        final log = <String>[];
+        await tester.pumpWidget(
+          ProviderScope(
+            child: MaterialApp(
+              theme: AppTheme.light(),
+              builder: (context, child) => MediaQuery(
+                data: MediaQuery.of(
+                  context,
+                ).copyWith(disableAnimations: reducedMotion),
+                child: child!,
+              ),
+              home: Scaffold(
+                body: Builder(
+                  builder: (context) => Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      TextButton(
+                        onPressed: () => log.add('behind'),
+                        child: const Text('Behind'),
+                      ),
+                      TextButton(
+                        onPressed: () => showContextMenu(
+                          context,
+                          position: const Offset(300, 300),
+                          groups: menu(log),
+                        ),
+                        child: const Text('Open'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+
+        await tester.tap(find.text('Open'));
+        await tester.pump();
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 100));
+        if (reducedMotion) {
+          expect(menuOpacity(tester, 'Delete'), 1);
+        } else {
+          expect(menuOpacity(tester, 'Delete'), lessThan(1));
+          // The rows take clicks while the menu reveals.
+          await tester.tap(find.text('Play'));
+          await tester.pumpAndSettle();
+          expect(log, ['play']);
+          await tester.tap(find.text('Open'));
+          await tester.pump();
+          await tester.pump();
+        }
+        await tester.pumpAndSettle();
+        expect(menuOpacity(tester, 'Delete'), 1);
+
+        // Escape closes the menu; a click right after it reaches the page.
+        await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+        await tester.pump(const Duration(milliseconds: 16));
+        await tester.tap(find.text('Behind'));
+        await tester.pumpAndSettle();
+        expect(log.last, 'behind');
+        expect(find.byType(MenuItemButton), findsNothing);
+      });
+    }
+
     testWidgets('Mornye right-click opens the Mornye context menu', (
       tester,
     ) async {

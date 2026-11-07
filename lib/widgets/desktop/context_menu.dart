@@ -3,6 +3,7 @@ import 'package:flutter/gestures.dart' show kPrimaryButton;
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
+import 'package:mornye/theme/material_expressive.dart';
 import 'package:mornye/theme/mornye_icons.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/desktop_platform.dart';
@@ -214,6 +215,18 @@ class _MaterialContextMenuRoute extends PopupRoute<void> {
   @override
   Duration get transitionDuration => Duration.zero;
 
+  /// Set while an animated menu closes. The route stays until the menu has
+  /// gone, but lets clicks through to the page meanwhile.
+  final _closing = ValueNotifier<bool>(false);
+
+  @override
+  Widget buildModalBarrier() => ValueListenableBuilder<bool>(
+    valueListenable: _closing,
+    builder: (context, closing, barrier) =>
+        IgnorePointer(ignoring: closing, child: barrier),
+    child: super.buildModalBarrier(),
+  );
+
   @override
   Widget buildPage(
     BuildContext context,
@@ -224,8 +237,15 @@ class _MaterialContextMenuRoute extends PopupRoute<void> {
       position: position,
       groups: groups,
       onChosen: onChosen,
+      onClosing: () => _closing.value = true,
     ),
   );
+
+  @override
+  void dispose() {
+    _closing.dispose();
+    super.dispose();
+  }
 }
 
 class _MaterialContextMenu extends StatefulWidget {
@@ -233,11 +253,13 @@ class _MaterialContextMenu extends StatefulWidget {
     required this.position,
     required this.groups,
     required this.onChosen,
+    required this.onClosing,
   });
 
   final Offset position;
   final List<List<ContextMenuAction>> groups;
   final VoidCallback onChosen;
+  final VoidCallback onClosing;
 
   @override
   State<_MaterialContextMenu> createState() => _MaterialContextMenuState();
@@ -306,8 +328,14 @@ class _MaterialContextMenuState extends State<_MaterialContextMenu> {
         .expand((group) => group)
         .where((action) => action.onSelected != null)
         .firstOrNull;
+    // Expressive motion reveals the menu and staggers its rows in, then
+    // fades it out; reduced motion opens and closes it at once.
     return MenuAnchor(
       controller: _controller,
+      animated: materialExpressiveEnabled(context),
+      onAnimationStatusChanged: (status) {
+        if (status == AnimationStatus.reverse) widget.onClosing();
+      },
       onClose: _handleClose,
       menuChildren: [
         for (var i = 0; i < widget.groups.length; i++) ...[
