@@ -1,8 +1,8 @@
 import 'package:flutter/foundation.dart';
 
 class AppInfo {
-  static const String version = '5.3.5';
-  static const String buildNumber = '168';
+  static const String version = '5.4.0';
+  static const String buildNumber = '169';
 
   /// The release whose What's New tour people see once after updating. Change
   /// it together with the tour's pages when a release earns a new one.
