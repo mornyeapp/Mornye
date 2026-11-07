@@ -17,6 +17,8 @@ final _log = AppLogger('LockScreenLyrics');
 /// Synced lyrics as the lock screen shows them: the lead line being sung,
 /// and no line before the first one, in a break of [minimumBreak] or more,
 /// or after the last line's known end. Backing vocals never replace it.
+/// A line longer than [partLength] shows in parts, each from when it is
+/// sung, since the system cuts a long title short.
 class LockScreenLyricTimeline {
   LockScreenLyricTimeline(
     List<LyricLine> lines, {
@@ -26,6 +28,21 @@ class LockScreenLyricTimeline {
   /// The shortest silence that shows the song's own title again. Shorter
   /// pauses keep the line, so the title does not flicker between lines.
   static const minimumBreak = Duration(seconds: 3);
+
+  /// About as many characters as a phone's lock screen and notification
+  /// show of a title before cutting it short with an ellipsis. A wide
+  /// character (Chinese, Japanese, Korean) counts as two.
+  static const partLength = 24;
+
+  /// The shortest time a part stays, so it can be read before the next.
+  /// A line sung too fast for that shows in fewer, longer parts.
+  static const minimumPart = Duration(milliseconds: 1500);
+
+  /// The pace of a line with no known end, for timing its parts, and the
+  /// slowest pace a line keeps when the next one starts long after it (an
+  /// instrumental break).
+  static const _paceWithoutEnd = Duration(milliseconds: 70);
+  static const _slowestPace = Duration(milliseconds: 150);
 
   static final _whitespace = RegExp(r'\s+');
 
@@ -47,7 +64,8 @@ class LockScreenLyricTimeline {
     // the lines sung so far. A line without an end lasts until the next.
     Duration? silentFrom;
     Duration? sungUntil;
-    for (final line in lines) {
+    for (var index = 0; index < lines.length; index++) {
+      final line = lines[index];
       if (line.isBackground) continue;
       final text = line.text.replaceAll(_whitespace, ' ').trim();
       if (text.isEmpty) {
@@ -57,7 +75,7 @@ class LockScreenLyricTimeline {
       if (silentFrom != null && line.time - silentFrom >= minimumBreak) {
         rows.add(LyricLine(time: silentFrom, text: ''));
       }
-      rows.add(LyricLine(time: line.time, text: text));
+      rows.addAll(_partsOf(line, text, _nextStart(lines, index)));
       final end = _endOf(line);
       if (end == null) {
         sungUntil = null;
@@ -76,6 +94,195 @@ class LockScreenLyricTimeline {
     if (lastWord != null && (end == null || lastWord > end)) end = lastWord;
     return end != null && end > line.time ? end : null;
   }
+
+  /// When the lead line after [index] starts, or null after the last one.
+  static Duration? _nextStart(List<LyricLine> lines, int index) {
+    final time = lines[index].time;
+    for (var next = index + 1; next < lines.length; next++) {
+      final line = lines[next];
+      if (!line.isBackground && line.time > time) return line.time;
+    }
+    return null;
+  }
+
+  /// [text] of [line] in parts that fit the lock screen, each starting
+  /// when its first word is sung: by the word timing when the line has it,
+  /// else at a steady pace across the line. Every part starts before
+  /// [nextStart], so a line never shows over the one after it.
+  static List<LyricLine> _partsOf(
+    LyricLine line,
+    String text,
+    Duration? nextStart,
+  ) {
+    final own = _endOf(line);
+    var end = own;
+    if (nextStart != null && (end == null || nextStart < end)) end = nextStart;
+    end ??= line.time + _paceWithoutEnd * text.length;
+    final slowest = line.time + _slowestPace * text.length;
+    if (own == null && end > slowest) end = slowest;
+    for (var count = lyricPartCount(text, partLength); count > 1; count--) {
+      final starts = lyricPartStarts(text, count);
+      final parts = starts.length;
+      final times = [
+        line.time,
+        for (final start in starts.skip(1)) _timeAt(line, text, start, end),
+      ];
+      var readable = parts > 1;
+      for (var part = 0; part < parts && readable; part++) {
+        final until = part + 1 < parts ? times[part + 1] : end;
+        readable = until - times[part] >= minimumPart;
+      }
+      if (!readable) continue;
+      return [
+        for (var part = 0; part < parts; part++)
+          LyricLine(
+            time: times[part],
+            text: text
+                .substring(
+                  starts[part],
+                  part + 1 < parts ? starts[part + 1] : text.length,
+                )
+                .trim(),
+          ),
+      ];
+    }
+    return [LyricLine(time: line.time, text: text)];
+  }
+
+  /// When the character at [offset] of [text] is sung.
+  static Duration _timeAt(
+    LyricLine line,
+    String text,
+    int offset,
+    Duration end,
+  ) {
+    if (line.hasWordTiming) {
+      // Spacing differs between the words and the tidied text, so count
+      // the letters before [offset] and find the word that holds the next.
+      var before = text.substring(0, offset).replaceAll(_whitespace, '').length;
+      for (final word in line.words) {
+        final letters = word.text.replaceAll(_whitespace, '').length;
+        if (before < letters) {
+          return word.time < line.time ? line.time : word.time;
+        }
+        before -= letters;
+      }
+    }
+    return line.time + (end - line.time) * (offset / text.length);
+  }
+}
+
+/// How many parts [text] needs so that none is wider than [maxWidth]
+/// characters, counting a wide character as two (see [lyricTextWidth]).
+@visibleForTesting
+int lyricPartCount(String text, int maxWidth) {
+  final width = lyricTextWidth(text);
+  if (width <= maxWidth) return 1;
+  for (var count = (width / maxWidth).ceil(); ; count++) {
+    final starts = lyricPartStarts(text, count);
+    var fits = true;
+    for (var part = 0; part < starts.length && fits; part++) {
+      final until = part + 1 < starts.length ? starts[part + 1] : text.length;
+      fits =
+          lyricTextWidth(text.substring(starts[part], until).trim()) <=
+          maxWidth;
+    }
+    // A single word wider than the lock screen cannot fit however the
+    // line is cut; stop once more parts only cut words.
+    if (fits || count >= text.length || count * maxWidth >= width * 2) {
+      return count;
+    }
+  }
+}
+
+/// Where each of [count] parts of about equal width starts in [text], the
+/// first at 0. A part ends after a space, preferably one after punctuation
+/// near the even split, or after Chinese and Japanese punctuation; text
+/// without either is cut at the even split.
+@visibleForTesting
+List<int> lyricPartStarts(String text, int count) {
+  final widths = [for (final rune in text.runes) _runeWidth(rune)];
+  final chars = text.runes.toList();
+  // Code unit offsets of each rune, so substrings keep surrogate pairs.
+  final offsets = <int>[];
+  var unit = 0;
+  for (final rune in chars) {
+    offsets.add(unit);
+    unit += rune > 0xFFFF ? 2 : 1;
+  }
+  final total = widths.fold(0, (sum, width) => sum + width);
+  final window = total / count * 0.35;
+  final starts = [0];
+  for (var part = 1; part < count; part++) {
+    final ideal = total * part / count;
+    int? best;
+    var bestScore = double.infinity;
+    var position = 0;
+    for (var index = 0; index < chars.length; index++) {
+      if (index > 0 &&
+          offsets[index] > starts.last &&
+          _breaksBefore(chars, index)) {
+        final distance = (position - ideal).abs();
+        final score = _afterPunctuation(chars, index)
+            ? distance - window
+            : distance;
+        if (score < bestScore) {
+          bestScore = score;
+          best = index;
+        }
+      }
+      position += widths[index];
+    }
+    if (best == null || bestScore > window * 2) {
+      // No space or punctuation near the even split: cut there.
+      var at = 0;
+      var width = 0;
+      while (at < chars.length && width < ideal) {
+        width += widths[at];
+        at++;
+      }
+      best = at;
+    }
+    final start = best < offsets.length ? offsets[best] : text.length;
+    if (start <= starts.last || start >= text.length) break;
+    starts.add(start);
+  }
+  return starts;
+}
+
+/// The width [text] takes on screen in characters, a wide character
+/// (Chinese, Japanese, Korean, full width forms) counting as two.
+@visibleForTesting
+int lyricTextWidth(String text) =>
+    text.runes.fold(0, (sum, rune) => sum + _runeWidth(rune));
+
+int _runeWidth(int rune) =>
+    (rune >= 0x1100 && rune <= 0x115F) ||
+        (rune >= 0x2E80 && rune <= 0xA4CF) ||
+        (rune >= 0xAC00 && rune <= 0xD7A3) ||
+        (rune >= 0xF900 && rune <= 0xFAFF) ||
+        (rune >= 0xFE30 && rune <= 0xFE4F) ||
+        (rune >= 0xFF00 && rune <= 0xFF60) ||
+        (rune >= 0xFFE0 && rune <= 0xFFE6)
+    ? 2
+    : 1;
+
+const _wideStops = {0x3001, 0x3002, 0xFF0C, 0xFF01, 0xFF1F, 0xFF1B, 0xFF1A};
+const _stops = {0x2C, 0x3B, 0x3A, 0x2E, 0x21, 0x3F, 0x29};
+
+/// Whether a part may start at rune [index]: after a space, or after
+/// Chinese and Japanese punctuation, which has no space after it.
+bool _breaksBefore(List<int> runes, int index) {
+  final previous = runes[index - 1];
+  return (previous == 0x20 && runes[index] != 0x20) ||
+      _wideStops.contains(previous);
+}
+
+/// Whether the break at rune [index] follows punctuation, a natural pause.
+bool _afterPunctuation(List<int> runes, int index) {
+  final previous = runes[index - 1];
+  if (_wideStops.contains(previous)) return true;
+  return previous == 0x20 && index > 1 && _stops.contains(runes[index - 2]);
 }
 
 /// Whether the lock screen is showing. Android reports the screen on with

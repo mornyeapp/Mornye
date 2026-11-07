@@ -15,6 +15,7 @@ import 'package:mornye/providers/theme_provider.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/lyrics_parser.dart';
 import 'package:mornye/utils/playback_seek_preview.dart';
+import 'package:mornye/widgets/lyric_line_scroller.dart';
 import 'package:mornye/widgets/player_lyric_preview.dart';
 import 'package:mornye/widgets/player_lyrics.dart';
 
@@ -216,6 +217,68 @@ void main() {
     view.seekPreview.end(drag);
     await tester.pumpAndSettle();
     expect(find.text('•••'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('slides a long line with the singing instead of cutting it', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    const long =
+        'This example line is much too long to fit on a narrow phone '
+        'screen at once';
+    final lyrics = LyricsParser.parse('''
+[00:00.00]Short line
+[00:05.00]$long
+[00:15.00]
+''');
+    final view = await pumpPreview(tester, metadata: await _metadata(lyrics));
+    Finder slide() => find.descendant(
+      of: find.byType(LyricLineScroller),
+      matching: find.byType(Transform),
+    );
+    double offset() =>
+        tester.widget<Transform>(slide()).transform.getTranslation().x;
+
+    // A line that fits stays still.
+    view.playback.add(_at(const Duration(seconds: 1), playing: false));
+    await tester.pumpAndSettle();
+    expect(find.text('Short line'), findsOneWidget);
+    expect(slide(), findsNothing);
+
+    view.playback.add(_at(const Duration(seconds: 5)));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text(long), findsOneWidget);
+    expect(offset(), 0, reason: 'The line starts at its beginning');
+
+    // It holds while its first words are sung, then follows the singing.
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pump(const Duration(seconds: 2));
+    final sliding = offset();
+    expect(sliding, lessThan(0));
+
+    // Paused, the line holds where it is.
+    view.playback.add(_at(const Duration(milliseconds: 9300), playing: false));
+    await tester.pumpAndSettle();
+    final paused = offset();
+    await tester.pump(const Duration(seconds: 2));
+    expect(offset(), paused);
+
+    // The line lasts until the next one; near its end its last words are
+    // in view.
+    view.playback.add(_at(const Duration(milliseconds: 14500), playing: false));
+    await tester.pumpAndSettle();
+    final last = offset();
+    expect(last, lessThan(paused));
+    final box = tester.renderObject<RenderBox>(find.byType(LyricLineScroller));
+    final text = tester.renderObject<RenderBox>(find.text(long));
+    expect(
+      text.size.width + last,
+      moreOrLessEquals(box.size.width, epsilon: 0.5),
+    );
     expect(tester.takeException(), isNull);
   });
 

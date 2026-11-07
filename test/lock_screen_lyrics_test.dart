@@ -166,6 +166,76 @@ void main() {
       expect(timeline.at(_seconds(1.2)).line, isNull);
       expect(timeline.at(_seconds(1.6)).line, 'Two words');
     });
+
+    const long = 'You got that long hair slicked back, white t-shirt';
+
+    test('shows a long line in parts at a steady pace', () {
+      final timeline = LockScreenLyricTimeline([
+        _line(10, long, end: 16),
+        _line(20, 'Next'),
+      ]);
+
+      // The second part starts 18 of 50 characters in, the third after the
+      // comma, 37 characters in.
+      expect(timeline.at(_seconds(11)), (
+        line: 'You got that long',
+        next: _seconds(12.16),
+      ));
+      expect(timeline.at(_seconds(13)).line, 'hair slicked back,');
+      expect(timeline.at(_seconds(15)).line, 'white t-shirt');
+      expect(timeline.at(_seconds(21)).line, 'Next');
+    });
+
+    test('starts each part with its first sung word', () {
+      final words = long.split(' ');
+      final timeline = LockScreenLyricTimeline([
+        LyricLine(
+          time: _seconds(10),
+          end: _seconds(18),
+          text: long,
+          words: [
+            for (final (index, word) in words.indexed)
+              LyricWord(
+                time: _seconds(10 + index * 0.9),
+                end: _seconds(10.9 + index * 0.9),
+                text: index + 1 < words.length ? '$word ' : word,
+              ),
+          ],
+        ),
+      ]);
+
+      // "hair" is the fifth word, "white" the eighth.
+      expect(timeline.at(_seconds(13.5)).line, 'You got that long');
+      expect(timeline.at(_seconds(13.6)).line, 'hair slicked back,');
+      expect(timeline.at(_seconds(16.2)).line, 'hair slicked back,');
+      expect(timeline.at(_seconds(16.3)).line, 'white t-shirt');
+    });
+
+    test('paces a long line before a break no slower than singing', () {
+      // The next line starts 30 s later; the parts keep 150 ms a character.
+      final timeline = LockScreenLyricTimeline([
+        _line(10, long),
+        _line(40, 'After the break'),
+      ]);
+
+      expect(timeline.at(_seconds(14)).line, 'hair slicked back,');
+      expect(timeline.at(_seconds(16)).line, 'white t-shirt');
+    });
+
+    test('keeps a line sung too fast to read in parts whole', () {
+      final timeline = LockScreenLyricTimeline([_line(10, long, end: 12)]);
+
+      expect(timeline.at(_seconds(11.9)).line, long);
+    });
+
+    test('cuts lines that fit and wide characters sensibly', () {
+      expect(lyricPartCount('Short line', 24), 1);
+      expect(lyricTextWidth('我们'), 4);
+      // Chinese has no spaces; the comma is the natural place to cut.
+      const chinese = '我们一起走过的那些日子，永远留在我的心里';
+      expect(lyricPartCount(chinese, 24), 2);
+      expect(lyricPartStarts(chinese, 2), [0, 12]);
+    });
   });
 
   group('LockScreenLyrics', () {

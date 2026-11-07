@@ -15,6 +15,7 @@ import 'package:mornye/providers/theme_provider.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/lyrics_parser.dart';
 import 'package:mornye/utils/lyrics_timeline.dart';
+import 'package:mornye/widgets/lyric_line_scroller.dart';
 import 'package:mornye/widgets/player_lyrics.dart';
 
 /// The synced line being sung, under the track title on the player. Tapping
@@ -192,11 +193,21 @@ class _LyricPreviewLineState extends ConsumerState<_LyricPreviewLine> {
         final probe = position + _lineLead;
         final index = LyricsParser.activeIndex(lines, probe);
         _scheduleNextLine(lines, index, probe, state, visible: visible);
+        final speed = state?.speed ?? 1;
         return _buildLine(
           context,
           line: _sungLine(lines, index, probe),
+          nextStart: index + 1 < lines.length ? lines[index + 1].time : null,
           position: position,
           showTranslation: showTranslation,
+          advancing:
+              widget.seekPreview.value == null &&
+              state != null &&
+              state.playing &&
+              state.processingState == AudioProcessingState.ready &&
+              speed.isFinite &&
+              speed > 0,
+          speed: speed,
         );
       },
     );
@@ -215,8 +226,11 @@ class _LyricPreviewLineState extends ConsumerState<_LyricPreviewLine> {
   Widget _buildLine(
     BuildContext context, {
     required LyricLine? line,
+    required Duration? nextStart,
     required Duration position,
     required bool showTranslation,
+    required bool advancing,
+    required double speed,
   }) {
     final mornye = context.isMornye;
     final colorScheme = widget.colorScheme;
@@ -246,23 +260,46 @@ class _LyricPreviewLineState extends ConsumerState<_LyricPreviewLine> {
         ),
       );
     } else if (text == line.text.trim() && line.hasWordTiming) {
+      // A long line slides to keep the sung words in view.
       child = ClipRect(
         key: ValueKey('word-${line.time.inMilliseconds}'),
-        child: WordTimedLyricLine(
-          line: line,
-          initialPosition: position,
-          seekPreview: widget.seekPreview,
+        child: LyricLineScroller(
+          text: line.words.map((word) => word.text).join(),
+          words: line.words,
           style: style,
-          maxLines: 1,
+          start: line.time,
+          end: line.end,
+          nextStart: nextStart,
+          position: position,
+          advancing: advancing,
+          speed: speed,
+          child: WordTimedLyricLine(
+            line: line,
+            initialPosition: position,
+            seekPreview: widget.seekPreview,
+            style: style,
+            maxLines: 1,
+          ),
         ),
       );
     } else {
-      child = Text(
-        text,
+      child = LyricLineScroller(
         key: ValueKey('line-${line.time.inMilliseconds}-$text'),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
+        text: text,
         style: style,
+        start: line.time,
+        end: line.end,
+        nextStart: nextStart,
+        position: position,
+        advancing: advancing,
+        speed: speed,
+        child: Text(
+          text,
+          maxLines: 1,
+          softWrap: false,
+          overflow: TextOverflow.ellipsis,
+          style: style,
+        ),
       );
     }
 
