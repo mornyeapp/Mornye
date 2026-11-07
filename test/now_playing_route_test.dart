@@ -291,6 +291,48 @@ void main() {
     );
   }
 
+  for (final reducedMotion in [false, true]) {
+    testWidgets('Mornye player opens and closes at once only under reduced '
+        'motion ($reducedMotion)', (tester) async {
+      tester.view.physicalSize = const Size(400, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      if (reducedMotion) {
+        tester.platformDispatcher.accessibilityFeaturesTestValue =
+            const FakeAccessibilityFeatures(disableAnimations: true);
+        addTearDown(
+          tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
+        );
+      }
+      final navigator = GlobalKey<NavigatorState>();
+      await tester.pumpWidget(
+        MaterialApp(
+          navigatorKey: navigator,
+          theme: MornyeTheme.build(Brightness.dark),
+          home: const SizedBox(),
+        ),
+      );
+      navigator.currentState!.push(_TestPlayerRoute());
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 16));
+      final top = tester.getTopLeft(find.byKey(_sheet)).dy;
+      if (reducedMotion) {
+        expect(top, 0);
+      } else {
+        expect(top, greaterThan(0));
+      }
+      await tester.pumpAndSettle();
+
+      navigator.currentState!.pop();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 16));
+      expect(find.byKey(_sheet), reducedMotion ? findsNothing : findsOneWidget);
+      await tester.pumpAndSettle();
+      expect(find.byKey(_sheet), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   group('Material morph', () {
     const mini = Rect.fromLTWH(0, 700, 400, 72);
     const morph = AppMotionSpec(Duration(milliseconds: 500), Curves.linear);

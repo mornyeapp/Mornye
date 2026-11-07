@@ -98,6 +98,8 @@ class NowPlayingRoute extends PageRoute<void> {
 
   @override
   TickerFuture didPush() {
+    // Reduced motion opens every style at once, without the slide.
+    if (_reduceMotion) controller!.duration = Duration.zero;
     if (morph case final morph? when morph.duration > Duration.zero) {
       final from = miniPlayerGeometry?.call();
       if (from != null && !from.surface.isEmpty) {
@@ -231,7 +233,14 @@ class NowPlayingRoute extends PageRoute<void> {
   bool didPop(void result) {
     // A committed back gesture already shrinks toward the mini player.
     if (_dismissTarget == null) _captureDismiss();
+    if (_reduceMotion) controller!.reverseDuration = Duration.zero;
     return super.didPop(result);
+  }
+
+  bool get _reduceMotion {
+    final context = navigator?.context;
+    return context != null &&
+        (MediaQuery.maybeDisableAnimationsOf(context) ?? false);
   }
 
   /// Starts the shrink into the mini player from where the page is now.
