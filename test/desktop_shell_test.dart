@@ -417,6 +417,40 @@ void main() {
       expect(find.text('content'), findsOneWidget);
     });
 
+    testWidgets('focus leaves the shell as soon as Now Playing opens '
+        '($mornye)', (tester) async {
+      addTearDown(() => desktopNowPlayingOpen.value = false);
+      await pumpShell(
+        tester,
+        mornye: mornye,
+        width: 1400,
+        nowPlaying: const ColoredBox(color: Colors.black),
+      );
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pump();
+      final shellFocus = FocusManager.instance.primaryFocus!;
+      expect(
+        shellFocus.context!.findAncestorWidgetOfExactType<DesktopShellLayout>(),
+        isNotNull,
+      );
+
+      desktopNowPlayingOpen.value = true;
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 16));
+      // Still mid-entrance, with the shell painted underneath.
+      expect(find.text('content'), findsOneWidget);
+      expect(shellFocus.hasPrimaryFocus, isFalse);
+
+      await tester.pumpAndSettle();
+      desktopNowPlayingOpen.value = false;
+      await tester.pump();
+      // The shell takes focus again while Now Playing leaves.
+      shellFocus.requestFocus();
+      await tester.pump();
+      expect(shellFocus.hasPrimaryFocus, isTrue);
+      await tester.pumpAndSettle();
+    });
+
     testWidgets('the Downloads menu animates only in Material ($mornye)', (
       tester,
     ) async {

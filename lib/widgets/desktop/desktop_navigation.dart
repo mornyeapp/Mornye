@@ -452,19 +452,28 @@ class _NowPlayingTransitionState extends State<_NowPlayingTransition>
           Visibility(
             visible: !covered,
             maintainState: true,
-            child: IgnorePointer(ignoring: widget.open, child: widget.shell),
+            // Focus leaves the shell as soon as Now Playing opens, and leaves
+            // Now Playing as soon as it closes, as without the transition, so
+            // a field left focused underneath cannot take Space meanwhile.
+            child: IgnorePointer(
+              ignoring: widget.open,
+              child: ExcludeFocus(excluding: widget.open, child: widget.shell),
+            ),
           ),
           if (widget.open || !_controller.isDismissed)
             IgnorePointer(
               ignoring: exiting,
-              child: Transform.translate(
-                offset: Offset(0, offset),
-                child: Opacity(
-                  key: const ValueKey('desktop-now-playing-fade'),
-                  opacity: opacity.clamp(0.0, 1.0),
-                  child: KeyedSubtree(
-                    key: const ValueKey('desktop-now-playing'),
-                    child: widget.nowPlaying,
+              child: ExcludeFocus(
+                excluding: exiting,
+                child: Transform.translate(
+                  offset: Offset(0, offset),
+                  child: Opacity(
+                    key: const ValueKey('desktop-now-playing-fade'),
+                    opacity: opacity.clamp(0.0, 1.0),
+                    child: KeyedSubtree(
+                      key: const ValueKey('desktop-now-playing'),
+                      child: widget.nowPlaying,
+                    ),
                   ),
                 ),
               ),
