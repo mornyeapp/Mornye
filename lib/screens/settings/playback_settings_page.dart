@@ -461,16 +461,14 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage>
             ),
             const SliverToBoxAdapter(child: DiscordPresenceSettings()),
           ],
-          if (isDesktopPlatform) ...[
-            const SliverToBoxAdapter(
-              child: SettingsSectionHeader(title: 'Last.fm'),
+          const SliverToBoxAdapter(
+            child: SettingsSectionHeader(title: 'Last.fm'),
+          ),
+          SliverToBoxAdapter(
+            child: LastfmSettings(
+              service: ref.read(musicPlayerRuntimeProvider).lastfm,
             ),
-            SliverToBoxAdapter(
-              child: LastfmSettings(
-                service: ref.read(musicPlayerRuntimeProvider).lastfm,
-              ),
-            ),
-          ],
+          ),
           if (isDesktopPlatform)
             ...settingsSectionSlivers(
               title: context.l10n.sectionAudioOutput,

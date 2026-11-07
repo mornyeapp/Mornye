@@ -41,6 +41,26 @@ void main() {
     },
   );
 
+  test('a request waiting for approval survives in secure storage', () async {
+    final store = LocalLastfmStore();
+    expect(await store.readAuthorization(), isNull);
+    final created = DateTime.utc(2026, 11, 7, 10);
+    await store.writeAuthorization((token: 'request-token', created: created));
+    final restored = await LocalLastfmStore().readAuthorization();
+    expect(restored?.token, 'request-token');
+    expect(restored?.created, created);
+    final preferences = await SharedPreferences.getInstance();
+    for (final key in preferences.getKeys()) {
+      expect('${preferences.get(key)}', isNot(contains('request-token')));
+    }
+    await store.writeAuthorization(null);
+    expect(await store.readAuthorization(), isNull);
+    FlutterSecureStorage.setMockInitialValues({
+      'lastfm_authorization_v1': '{"token":"","created":1}',
+    });
+    expect(await LocalLastfmStore().readAuthorization(), isNull);
+  });
+
   test(
     'new installations opt out and malformed state is not overwritten',
     () async {

@@ -42,9 +42,15 @@ class LastfmScrobble {
   };
 }
 
+/// A token waiting for approval in the browser. It is kept so a phone that
+/// ends the app while the browser is open can still finish connecting.
+typedef LastfmAuthorization = ({String token, DateTime created});
+
 abstract class LastfmStore {
   Future<LastfmSession?> readSession();
   Future<void> writeSession(LastfmSession? session);
+  Future<LastfmAuthorization?> readAuthorization();
+  Future<void> writeAuthorization(LastfmAuthorization? authorization);
   Future<({bool enabled, bool nowPlaying, List<LastfmScrobble> queue})> read();
   Future<void> write({
     required bool enabled,
@@ -63,9 +69,15 @@ class LocalLastfmStore implements LastfmStore {
            const FlutterSecureStorage(
              aOptions: secureStorageAndroidOptions,
              mOptions: secureStorageMacOsOptions,
+             // Playback can start the app in the background while the
+             // phone is locked; the session must still be readable then.
+             iOptions: IOSOptions(
+               accessibility: KeychainAccessibility.first_unlock_this_device,
+             ),
            );
 
   static const _sessionKey = 'lastfm_session_v1';
+  static const _authorizationKey = 'lastfm_authorization_v1';
   static const _stateKey = 'lastfm_scrobbles_v1';
   final Future<SharedPreferences> Function() _preferences;
   final FlutterSecureStorage _storage;
@@ -85,6 +97,35 @@ class LocalLastfmStore implements LastfmStore {
       await _storage.write(
         key: _sessionKey,
         value: jsonEncode(session.toJson()),
+      );
+    }
+  }
+
+  @override
+  Future<LastfmAuthorization?> readAuthorization() async {
+    final raw = await _storage.read(key: _authorizationKey);
+    if (raw == null) return null;
+    final json = jsonDecode(raw);
+    if (json is! Map) return null;
+    final token = json['token'], created = json['created'];
+    if (token is! String || token.isEmpty || created is! int) return null;
+    return (
+      token: token,
+      created: DateTime.fromMillisecondsSinceEpoch(created, isUtc: true),
+    );
+  }
+
+  @override
+  Future<void> writeAuthorization(LastfmAuthorization? authorization) async {
+    if (authorization == null) {
+      await _storage.delete(key: _authorizationKey);
+    } else {
+      await _storage.write(
+        key: _authorizationKey,
+        value: jsonEncode({
+          'token': authorization.token,
+          'created': authorization.created.millisecondsSinceEpoch,
+        }),
       );
     }
   }

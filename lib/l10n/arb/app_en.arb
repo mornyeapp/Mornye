@@ -10382,7 +10382,7 @@
   "lastfmConnect": "Connect Last.fm",
   "lastfmConnecting": "Connecting to Last.fm...",
   "lastfmFinishConnection": "Finish connecting",
-  "lastfmAuthorizeHelp": "Approve access in your browser, then return here and choose Finish connecting.",
+  "lastfmAuthorizeHelp": "Approve access in your browser, then come back to Mornye. If it does not connect on its own, choose Finish connecting.",
   "lastfmScrobbling": "Scrobbling",
   "lastfmScrobblingDescription": "Send songs you listen to in the built-in player to Last.fm.",
   "lastfmNowPlaying": "Show Now Playing",

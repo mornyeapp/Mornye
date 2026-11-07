@@ -26,12 +26,22 @@ class MemoryLastfmStore implements LastfmStore {
   bool enabled = true;
   bool nowPlaying = true;
   List<LastfmScrobble> queue = [];
+  LastfmAuthorization? authorization;
   bool failRead = false, failWrite = false;
   int writes = 0;
   Completer<void>? sessionGate;
 
   @override
   Future<LastfmSession?> readSession() async => session;
+
+  @override
+  Future<LastfmAuthorization?> readAuthorization() async => authorization;
+
+  @override
+  Future<void> writeAuthorization(LastfmAuthorization? value) async {
+    if (failWrite) throw StateError('Secure storage unavailable');
+    authorization = value;
+  }
 
   @override
   Future<void> writeSession(LastfmSession? value) async {

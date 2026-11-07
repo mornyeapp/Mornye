@@ -3,6 +3,8 @@ import 'dart:math';
 
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart'
+    show AppLifecycleListener, AppLifecycleState;
 import 'package:mornye/services/lastfm/lastfm_api.dart';
 import 'package:mornye/services/lastfm/lastfm_listening.dart';
 import 'package:mornye/services/lastfm/lastfm_store.dart';
@@ -56,6 +58,9 @@ class LastfmService extends ChangeNotifier {
   LastfmSession? _session;
   String? _token;
   DateTime? _tokenCreated;
+  AppLifecycleListener? _lifecycle;
+  bool _away = false;
+  static const _tokenLifetime = Duration(hours: 1);
   final _queue = <LastfmScrobble>[];
   Future<void>? _initializing;
   Future<void>? _flushing;
@@ -99,6 +104,7 @@ class LastfmService extends ChangeNotifier {
     try {
       final saved = await _store.read();
       final session = await _store.readSession();
+      final authorization = await _readAuthorization();
       if (_closed) return;
       _enabled = saved.enabled;
       _nowPlaying = saved.nowPlaying;
@@ -109,6 +115,18 @@ class LastfmService extends ChangeNotifier {
       _problem = null;
       _configure();
       unawaited(flush());
+      if (authorization != null) {
+        // The app ended while the browser was open: pick the request up.
+        _token = authorization.token;
+        _tokenCreated = authorization.created;
+        if (session != null ||
+            _now().difference(authorization.created) >= _tokenLifetime) {
+          _clearToken();
+        } else {
+          _watchReturn();
+          unawaited(finishConnection());
+        }
+      }
     } catch (_) {
       _problem = LastfmProblem.storage;
     } finally {
@@ -153,6 +171,17 @@ class LastfmService extends ChangeNotifier {
       unknownTitle: _unknownTitle(),
       unknownArtist: _unknownArtist(),
     );
+    // Counting only matters while a song plays; an idle phone is not woken
+    // every second.
+    if (_active && _listening.playing) {
+      _ticker ??= Timer.periodic(
+        const Duration(seconds: 1),
+        (_) => _listening.tick(),
+      );
+    } else {
+      _ticker?.cancel();
+      _ticker = null;
+    }
   }
 
   void _configure() {
@@ -162,10 +191,6 @@ class LastfmService extends ChangeNotifier {
     _retry = null;
     _updateListening();
     if (!_active) return;
-    _ticker = Timer.periodic(
-      const Duration(seconds: 1),
-      (_) => _listening.tick(),
-    );
     _retry = Timer.periodic(
       const Duration(seconds: 30),
       (_) => unawaited(flush()),
@@ -187,14 +212,25 @@ class LastfmService extends ChangeNotifier {
     try {
       final token = await _api.requestToken();
       if (_closed || generation != _generation) return;
+      final created = _now();
       _token = token;
-      _tokenCreated = _now();
+      _tokenCreated = created;
+      try {
+        // Saved before the browser opens: the app may not outlive it.
+        await _serialize(
+          () => _store.writeAuthorization((token: token, created: created)),
+        );
+      } catch (_) {
+        // Without it, connecting still finishes while the app stays open.
+      }
+      if (_closed || generation != _generation) return;
+      _watchReturn();
       if (!await _openBrowser(_api.authorizationUrl(token))) {
         throw StateError('Could not open Last.fm');
       }
     } catch (_) {
       if (!_closed && generation == _generation) {
-        _token = null;
+        _clearToken();
         _problem = LastfmProblem.connection;
       }
     } finally {
@@ -206,7 +242,7 @@ class LastfmService extends ChangeNotifier {
   Future<void> finishConnection() async {
     final token = _token;
     if (_closed || _busy || token == null) return;
-    if (_now().difference(_tokenCreated!) >= const Duration(hours: 1)) {
+    if (_now().difference(_tokenCreated!) >= _tokenLifetime) {
       cancelConnection();
       _problem = LastfmProblem.expired;
       _notify();
@@ -224,7 +260,7 @@ class LastfmService extends ChangeNotifier {
       await _serialize(() => _store.writeSession(session));
       if (_closed || generation != _generation) return;
       _session = session;
-      _token = null;
+      _clearToken();
       _enabled = true;
       _listening.reset();
       await _save();
@@ -237,7 +273,7 @@ class LastfmService extends ChangeNotifier {
             : error.code == 15 || error.code == 4
             ? LastfmProblem.expired
             : LastfmProblem.connection;
-        if (_problem == LastfmProblem.expired) _token = null;
+        if (_problem == LastfmProblem.expired) _clearToken();
       }
     } catch (_) {
       if (!_closed && generation == _generation) {
@@ -253,10 +289,54 @@ class LastfmService extends ChangeNotifier {
 
   void cancelConnection() {
     _generation++;
-    _token = null;
+    _clearToken();
     _busy = false;
     _problem = null;
     _notify();
+  }
+
+  /// Finishes connecting once the app comes back from the browser. Only a
+  /// return from the background counts, not the notification shade or a
+  /// dialog over the app.
+  void _onLifecycle(AppLifecycleState state) {
+    if (_closed || _token == null) return;
+    switch (state) {
+      case AppLifecycleState.hidden || AppLifecycleState.paused:
+        _away = true;
+      case AppLifecycleState.resumed when _away:
+        _away = false;
+        unawaited(finishConnection());
+      default:
+        break;
+    }
+  }
+
+  void _watchReturn() {
+    _away = false;
+    _lifecycle ??= AppLifecycleListener(onStateChange: _onLifecycle);
+  }
+
+  void _clearToken() {
+    _lifecycle?.dispose();
+    _lifecycle = null;
+    _away = false;
+    if (_token == null) return;
+    _token = null;
+    _tokenCreated = null;
+    unawaited(
+      _serialize(
+        () => _store.writeAuthorization(null),
+      ).catchError((Object _) {}),
+    );
+  }
+
+  Future<LastfmAuthorization?> _readAuthorization() async {
+    try {
+      return await _store.readAuthorization();
+    } catch (_) {
+      // A lost request only means connecting again.
+      return null;
+    }
   }
 
   Future<void> disconnect() async {
@@ -431,7 +511,7 @@ class LastfmService extends ChangeNotifier {
     if (_closed || generation != _generation) return;
     _generation++;
     _busy = false;
-    _token = null;
+    _clearToken();
     _listening.reset();
     _session = null;
     _enabled = false;
@@ -453,6 +533,8 @@ class LastfmService extends ChangeNotifier {
     _generation++;
     _ticker?.cancel();
     _retry?.cancel();
+    _lifecycle?.dispose();
+    _lifecycle = null;
     for (final subscription in _subscriptions) {
       unawaited(subscription.cancel());
     }

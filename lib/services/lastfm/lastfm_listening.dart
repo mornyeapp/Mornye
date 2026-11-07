@@ -55,6 +55,9 @@ class LastfmListening {
   bool _submitted = false;
   bool _announced = false;
 
+  /// Whether listening time is being counted right now.
+  bool get playing => _playing;
+
   void update(
     MediaItem? item,
     PlaybackState state, {

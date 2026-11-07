@@ -8443,7 +8443,7 @@
   "lastfmConnect": "Hubungkan Last.fm",
   "lastfmConnecting": "Menghubungkan ke Last.fm...",
   "lastfmFinishConnection": "Selesaikan koneksi",
-  "lastfmAuthorizeHelp": "Izinkan akses di browser, lalu kembali ke sini dan pilih Selesaikan koneksi.",
+  "lastfmAuthorizeHelp": "Izinkan akses di browser, lalu kembali ke Mornye. Jika belum tersambung sendiri, pilih Selesaikan koneksi.",
   "lastfmScrobbling": "Scrobbling",
   "lastfmScrobblingDescription": "Kirim lagu yang Anda dengarkan lewat pemutar bawaan ke Last.fm.",
   "lastfmNowPlaying": "Tampilkan lagu yang diputar",

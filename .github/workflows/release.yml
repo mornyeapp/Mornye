@@ -151,8 +151,13 @@ jobs:
         run: dart run flutter_launcher_icons
 
       - name: Build release APKs
+        env:
+          LASTFM_API_KEY: ${{ secrets.LASTFM_API_KEY }}
+          LASTFM_API_SECRET: ${{ secrets.LASTFM_API_SECRET }}
         run: |
-          bash scripts/build_android.sh --production --target lib/main.dart
+          bash scripts/build_android.sh --production --target lib/main.dart \
+            --dart-define="LASTFM_API_KEY=$LASTFM_API_KEY" \
+            --dart-define="LASTFM_API_SECRET=$LASTFM_API_SECRET"
           ls -la build/app/outputs/flutter-apk/
 
       - name: Sign and verify release APKs (V1/V2/V3/V4)
@@ -333,8 +338,13 @@ jobs:
           pod install
 
       - name: Build iOS (unsigned)
+        env:
+          LASTFM_API_KEY: ${{ secrets.LASTFM_API_KEY }}
+          LASTFM_API_SECRET: ${{ secrets.LASTFM_API_SECRET }}
         run: |
           flutter build ios --release --no-codesign --config-only --target lib/main.dart \
+            --dart-define="LASTFM_API_KEY=$LASTFM_API_KEY" \
+            --dart-define="LASTFM_API_SECRET=$LASTFM_API_SECRET" \
             --dart-define="GIT_COMMIT=$(git rev-parse --short=8 HEAD)"
 
           cd ios

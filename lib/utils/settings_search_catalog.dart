@@ -258,13 +258,12 @@ class SettingsSearchCatalog {
         ),
       ],
       playback = [
-        if (isDesktopPlatform)
-          SettingsSearchEntry(
-            icon: Icons.history_rounded,
-            title: 'Last.fm',
-            subtitle: l10n.lastfmDescription,
-            keywords: const ['lastfm', 'scrobble', 'scrobbling', 'now playing'],
-          ),
+        SettingsSearchEntry(
+          icon: Icons.history_rounded,
+          title: 'Last.fm',
+          subtitle: l10n.lastfmDescription,
+          keywords: const ['lastfm', 'scrobble', 'scrobbling', 'now playing'],
+        ),
         SettingsSearchEntry(
           icon: Icons.equalizer,
           title: l10n.equalizerTitle,

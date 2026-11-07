@@ -600,13 +600,11 @@ class MusicPlayerRuntime {
       if (dependencies.isAndroid || dependencies.isIOS || isDesktopPlatform) {
         DiscordPresenceService.instance.bind(handler);
       }
-      if (isDesktopPlatform) {
-        lastfm.bind(
-          handler,
-          unknownTitle: () => unknownTitle,
-          unknownArtist: () => unknownArtist,
-        );
-      }
+      lastfm.bind(
+        handler,
+        unknownTitle: () => unknownTitle,
+        unknownArtist: () => unknownArtist,
+      );
       return handler;
     } catch (error, stack) {
       _log.e('Failed to initialize playback', error, stack);
