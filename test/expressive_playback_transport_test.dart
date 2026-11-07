@@ -174,4 +174,62 @@ void main() {
     await tester.tap(find.byTooltip('Play'), warnIfMissed: false);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('the mini pair holds play and next, and a press trades width', (
+    tester,
+  ) async {
+    final scheme = ColorScheme.fromSeed(seedColor: Colors.teal);
+    final calls = <String>[];
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: ThemeData(colorScheme: scheme),
+        home: Scaffold(
+          body: Center(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ExpressivePlaybackTransport(
+                  colorScheme: scheme,
+                  playing: false,
+                  loading: false,
+                  mini: true,
+                  playTooltip: 'Play',
+                  previousTooltip: 'Previous',
+                  nextTooltip: 'Next',
+                  onPlayPause: () => calls.add('play'),
+                  onPrevious: () => calls.add('previous'),
+                  onNext: () => calls.add('next'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('Previous'), findsNothing);
+    final play = tester.getRect(find.byTooltip('Play'));
+    final next = tester.getRect(find.byTooltip('Next'));
+    expect(play.size, const Size(60, 44));
+    expect(next.size, const Size(44, 44));
+    expect(next.left - play.right, moreOrLessEquals(8));
+
+    final gesture = await tester.startGesture(play.center);
+    for (var i = 0; i < 20; i++) {
+      await tester.pump(const Duration(milliseconds: 16));
+      final pressedPlay = tester.getRect(find.byTooltip('Play'));
+      final pressedNext = tester.getRect(find.byTooltip('Next'));
+      expect(pressedPlay.left, moreOrLessEquals(play.left));
+      expect(pressedNext.right, moreOrLessEquals(next.right));
+    }
+    expect(
+      tester.getSize(find.byTooltip('Play')).width,
+      greaterThan(play.width),
+    );
+    await gesture.up();
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Next'));
+    expect(calls, ['play', 'next']);
+    expect(tester.takeException(), isNull);
+  });
 }

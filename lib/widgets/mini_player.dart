@@ -28,6 +28,7 @@ import 'package:mornye/services/link/features/link_phone_client.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/utils/string_utils.dart';
 import 'package:mornye/widgets/audio_quality_badges.dart';
+import 'package:mornye/widgets/expressive_playback_transport.dart';
 import 'package:mornye/widgets/cached_cover_image.dart';
 import 'package:mornye/widgets/decorative_phase.dart';
 import 'package:mornye/widgets/link/link_devices_sheet.dart';
@@ -355,33 +356,26 @@ class _MiniPlayerBodyState extends ConsumerState<_MiniPlayerBody> {
                       LinkDevicesButton(
                         color: mornye ? colorScheme.onSurface : null,
                       ),
-                    if (expressive)
-                      AppIconButton.filled(
-                        tooltip: isPlaying
+                    if (expressive) ...[
+                      const SizedBox(width: 8),
+                      // The full player's transport, collapsed to play-pause
+                      // and next.
+                      ExpressivePlaybackTransport(
+                        colorScheme: colorScheme,
+                        playing: isPlaying,
+                        loading: isLoading,
+                        mini: true,
+                        playTooltip: isPlaying
                             ? context.l10n.actionPause
                             : context.l10n.tooltipPlay,
-                        isSelected: isPlaying,
-                        style: IconButton.styleFrom(
-                          backgroundColor: colorScheme.primary,
-                          foregroundColor: colorScheme.onPrimary,
-                        ),
-                        icon: isLoading
-                            ? AppLoadingIndicator(
-                                size: 20,
-                                color: colorScheme.onPrimary,
-                              )
-                            : const AppIcon(Icons.play_arrow),
-                        selectedIcon: isLoading
-                            ? AppLoadingIndicator(
-                                size: 20,
-                                color: colorScheme.onPrimary,
-                              )
-                            : const AppIcon(Icons.pause),
-                        onPressed: isLoading
-                            ? null
-                            : () => controller.togglePlayPause(isPlaying),
-                      )
-                    else
+                        previousTooltip: context.l10n.nowPlayingPreviousTrack,
+                        nextTooltip: context.l10n.nowPlayingNextTrack,
+                        onPlayPause: () =>
+                            controller.togglePlayPause(isPlaying),
+                        onPrevious: controller.previous,
+                        onNext: controller.next,
+                      ),
+                    ] else ...[
                       AppIconButton(
                         color: mornye ? colorScheme.onSurface : null,
                         tooltip: isPlaying
@@ -405,17 +399,18 @@ class _MiniPlayerBodyState extends ConsumerState<_MiniPlayerBody> {
                             ? null
                             : () => controller.togglePlayPause(isPlaying),
                       ),
-                    if (!compact)
-                      AppIconButton(
-                        color: mornye ? colorScheme.onSurface : null,
-                        tooltip: context.l10n.nowPlayingNextTrack,
-                        icon: AppIcon(
-                          mornye
-                              ? CupertinoIcons.forward_fill
-                              : Icons.skip_next,
+                      if (!compact)
+                        AppIconButton(
+                          color: mornye ? colorScheme.onSurface : null,
+                          tooltip: context.l10n.nowPlayingNextTrack,
+                          icon: AppIcon(
+                            mornye
+                                ? CupertinoIcons.forward_fill
+                                : Icons.skip_next,
+                          ),
+                          onPressed: controller.next,
                         ),
-                        onPressed: controller.next,
-                      ),
+                    ],
                   ],
                 ),
               ),
