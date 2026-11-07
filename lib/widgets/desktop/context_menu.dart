@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart' show kPrimaryButton;
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
+import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:mornye/theme/material_expressive.dart';
 import 'package:mornye/theme/mornye_icons.dart';
 import 'package:mornye/theme/mornye_theme.dart';
@@ -42,11 +45,13 @@ const double _mornyeMenuWidth = 280;
 
 /// Shows [groups] as a context menu at [position], in global coordinates.
 ///
-/// Material opens a [MenuAnchor] with the M3 Expressive menu container;
-/// Mornye opens the dense [MornyeContextMenu]. Empty groups are dropped and
-/// the remaining ones are separated by dividers. The chosen action runs after
-/// the menu closes, so it can open its own dialog or sheet. The future
-/// completes after that action has started, with whether a row was chosen.
+/// Material opens the M3E menu popup of More buttons, or under reduced
+/// motion a [MenuAnchor] with the M3 Expressive menu container; Mornye
+/// opens the dense [MornyeContextMenu]. Empty groups are dropped and the
+/// remaining ones are set apart (dividers, or separate M3E surfaces). The
+/// chosen action runs once the menu has been dismissed, so it can open its
+/// own dialog or sheet. The future completes after that action has started,
+/// with whether a row was chosen.
 ///
 /// The Mornye menu opens out of [origin], the control that asked for it,
 /// or else out of [position].
@@ -94,6 +99,9 @@ Future<bool> showContextMenu(
     chosen?.onSelected?.call();
     return chosen != null;
   }
+  if (materialExpressiveEnabled(context)) {
+    return _showExpressiveContextMenu(context, position, visible);
+  }
   var chosen = false;
   await navigator.push(
     _MaterialContextMenuRoute(
@@ -107,6 +115,110 @@ Future<bool> showContextMenu(
   // The menu pops first and runs the chosen row after that frame.
   await SchedulerBinding.instance.endOfFrame;
   return chosen;
+}
+
+/// The expressive Material context menu: the M3E menu popup that More
+/// buttons open (`AppMenuButton`), anchored at [position], so right-click
+/// and More menus share one skin and one spring. It grows from the pointer
+/// on the spatial spring, takes clicks from its first frame, focuses its
+/// first enabled row, and handles the arrow keys, type-ahead and Escape;
+/// Back closes it through the page route's local history. Reduced motion
+/// keeps the instant [MenuAnchor] route.
+Future<bool> _showExpressiveContextMenu(
+  BuildContext context,
+  Offset position,
+  List<List<ContextMenuAction>> groups,
+) {
+  final overlay = Overlay.of(context, rootOverlay: true);
+  final overlayBox = overlay.context.findRenderObject();
+  final point = overlayBox is RenderBox
+      ? overlayBox.globalToLocal(position)
+      : position;
+  final themes = InheritedTheme.capture(from: context, to: overlay.context);
+  final route = ModalRoute.of(context);
+  final actions = groups.expand((group) => group).toList(growable: false);
+  final result = Completer<bool>();
+  void finish(bool chosen) {
+    if (!result.isCompleted) result.complete(chosen);
+  }
+
+  var index = 0;
+  final children = [
+    for (final group in groups)
+      M3EMenuGroup(
+        children: [
+          for (final action in group)
+            if (action.checked)
+              M3EMenuSelectable(
+                label: action.label,
+                value: index++,
+                leading: AppIcon(action.icon, size: 20),
+                selected: true,
+                enabled: action.onSelected != null,
+              )
+            else
+              M3EMenuEntry(
+                label: action.label,
+                value: index++,
+                leading: AppIcon(action.icon, size: 20),
+                isDestructive: action.destructive,
+                enabled: action.onSelected != null,
+              ),
+        ],
+      ),
+  ];
+  late final OverlayEntry entry;
+  // Once dismissed, the closing menu lets clicks through to the page.
+  var closing = false;
+  void close() {
+    closing = true;
+    entry.markNeedsBuild();
+  }
+
+  entry = OverlayEntry(
+    builder: (context) => IgnorePointer(
+      ignoring: closing,
+      child: themes.wrap(
+        MaterialExpressiveScope(
+          // The popup draws its own scrollbar; the app's desktop scroll
+          // behavior would stack a second one beside it.
+          child: ScrollConfiguration(
+            behavior: ScrollConfiguration.of(
+              context,
+            ).copyWith(scrollbars: false),
+            child: M3EMenuPopup<int>(
+              anchor: Rect.fromLTWH(point.dx, point.dy, 0, 0),
+              historyRoute: route,
+              position: M3EMenuAnchorPosition.bottomStart,
+              children: children,
+              onSelected: (value) {
+                close();
+                if (value is! int) return finish(false);
+                // As a menu item does, run the row once the popup has
+                // started closing and the frame has settled focus.
+                SchedulerBinding.instance.addPostFrameCallback((_) {
+                  FocusManager.instance.applyFocusChangesIfNeeded();
+                  actions[value].onSelected?.call();
+                  finish(true);
+                });
+              },
+              onDismiss: () {
+                close();
+                finish(false);
+              },
+              onRemove: () {
+                entry.remove();
+                entry.dispose();
+                finish(false);
+              },
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+  overlay.insert(entry);
+  return result.future;
 }
 
 /// The center of [context]'s render box, where keyboard-opened menus appear.
@@ -215,18 +327,6 @@ class _MaterialContextMenuRoute extends PopupRoute<void> {
   @override
   Duration get transitionDuration => Duration.zero;
 
-  /// Set while an animated menu closes. The route stays until the menu has
-  /// gone, but lets clicks through to the page meanwhile.
-  final _closing = ValueNotifier<bool>(false);
-
-  @override
-  Widget buildModalBarrier() => ValueListenableBuilder<bool>(
-    valueListenable: _closing,
-    builder: (context, closing, barrier) =>
-        IgnorePointer(ignoring: closing, child: barrier),
-    child: super.buildModalBarrier(),
-  );
-
   @override
   Widget buildPage(
     BuildContext context,
@@ -237,15 +337,8 @@ class _MaterialContextMenuRoute extends PopupRoute<void> {
       position: position,
       groups: groups,
       onChosen: onChosen,
-      onClosing: () => _closing.value = true,
     ),
   );
-
-  @override
-  void dispose() {
-    _closing.dispose();
-    super.dispose();
-  }
 }
 
 class _MaterialContextMenu extends StatefulWidget {
@@ -253,13 +346,11 @@ class _MaterialContextMenu extends StatefulWidget {
     required this.position,
     required this.groups,
     required this.onChosen,
-    required this.onClosing,
   });
 
   final Offset position;
   final List<List<ContextMenuAction>> groups;
   final VoidCallback onChosen;
-  final VoidCallback onClosing;
 
   @override
   State<_MaterialContextMenu> createState() => _MaterialContextMenuState();
@@ -328,14 +419,8 @@ class _MaterialContextMenuState extends State<_MaterialContextMenu> {
         .expand((group) => group)
         .where((action) => action.onSelected != null)
         .firstOrNull;
-    // Expressive motion reveals the menu and staggers its rows in, then
-    // fades it out; reduced motion opens and closes it at once.
     return MenuAnchor(
       controller: _controller,
-      animated: materialExpressiveEnabled(context),
-      onAnimationStatusChanged: (status) {
-        if (status == AnimationStatus.reverse) widget.onClosing();
-      },
       onClose: _handleClose,
       menuChildren: [
         for (var i = 0; i < widget.groups.length; i++) ...[

@@ -34,8 +34,10 @@ Future<void> _pumpArtist(
   List<ArtistAlbum>? albums,
 }) async {
   SharedPreferences.setMockInitialValues({});
-  await tester.binding.setSurfaceSize(const Size(1200, 1800));
-  addTearDown(() => tester.binding.setSurfaceSize(null));
+  // The view size, so MediaQuery matches the window that menus fit into.
+  tester.view.physicalSize = const Size(1200, 1800);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.reset);
   const channel = MethodChannel('com.zarz.mornye/backend');
   final messenger =
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;

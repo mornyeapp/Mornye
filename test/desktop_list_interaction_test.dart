@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:mornye/controllers/selection_mode_mixin.dart';
 import 'package:mornye/l10n/app_localizations.dart';
 import 'package:mornye/theme/app_theme.dart';
@@ -168,13 +169,19 @@ void main() {
       await tester.pumpWidget(_app(card(log)));
 
       await _rightClick(tester, find.text('Song'));
-      expect(find.byType(MenuItemButton), findsNWidgets(2));
+      final menu = find.byType(M3EMenuPopup<int>);
+      expect(menu, findsOneWidget);
       expect(find.text('Play'), findsOneWidget);
+      // The rows grow from the pointer, Play first.
+      final point = tester.getCenter(find.text('Song'));
+      final play = tester.getRect(find.text('Play'));
+      expect(play.top, greaterThanOrEqualTo(point.dy));
+      expect(play.top, lessThan(tester.getRect(find.text('Delete')).top));
 
       await tester.tap(find.text('Delete'));
       await tester.pumpAndSettle();
       expect(log, ['delete']);
-      expect(find.byType(MenuItemButton), findsNothing);
+      expect(menu, findsNothing);
     });
 
     testWidgets('Escape closes the Material menu without an action', (
@@ -186,18 +193,15 @@ void main() {
       await _rightClick(tester, find.text('Song'));
       await tester.sendKeyEvent(LogicalKeyboardKey.escape);
       await tester.pumpAndSettle();
-      expect(find.byType(MenuItemButton), findsNothing);
+      expect(find.byType(M3EMenuPopup<int>), findsNothing);
       expect(log, isEmpty);
     });
 
     double menuOpacity(WidgetTester tester, String label) => tester
-        .widgetList<FadeTransition>(
-          find.ancestor(
-            of: find.text(label),
-            matching: find.byType(FadeTransition),
-          ),
+        .widgetList<Opacity>(
+          find.ancestor(of: find.text(label), matching: find.byType(Opacity)),
         )
-        .fold(1.0, (opacity, fade) => opacity * fade.opacity.value);
+        .fold(1.0, (opacity, fade) => opacity * fade.opacity);
 
     for (final reducedMotion in [false, true]) {
       testWidgets('Material menu motion (reduced motion: $reducedMotion)', (
@@ -239,32 +243,48 @@ void main() {
           ),
         );
 
+        // Reduced motion keeps the instant menu; expressive motion grows
+        // the More menus' popup from the pointer.
+        final menuFinder = find.byType(
+          reducedMotion ? MenuItemButton : M3EMenuPopup<int>,
+        );
         await tester.tap(find.text('Open'));
         await tester.pump();
         await tester.pump();
-        await tester.pump(const Duration(milliseconds: 100));
+        await tester.pump(const Duration(milliseconds: 30));
+        expect(menuFinder, findsWidgets);
         if (reducedMotion) {
           expect(menuOpacity(tester, 'Delete'), 1);
         } else {
           expect(menuOpacity(tester, 'Delete'), lessThan(1));
-          // The rows take clicks while the menu reveals.
+          // The rows take clicks while the menu grows.
           await tester.tap(find.text('Play'));
           await tester.pumpAndSettle();
           expect(log, ['play']);
+          expect(menuFinder, findsNothing);
           await tester.tap(find.text('Open'));
           await tester.pump();
           await tester.pump();
         }
         await tester.pumpAndSettle();
-        expect(menuOpacity(tester, 'Delete'), 1);
+        expect(menuOpacity(tester, 'Delete'), closeTo(1, 0.001));
+
+        // The first row has focus, so the arrows and Enter choose a row.
+        await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+        await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+        await tester.pumpAndSettle();
+        expect(log.last, 'delete');
+        expect(menuFinder, findsNothing);
 
         // Escape closes the menu; a click right after it reaches the page.
+        await tester.tap(find.text('Open'));
+        await tester.pumpAndSettle();
         await tester.sendKeyEvent(LogicalKeyboardKey.escape);
         await tester.pump(const Duration(milliseconds: 16));
         await tester.tap(find.text('Behind'));
         await tester.pumpAndSettle();
         expect(log.last, 'behind');
-        expect(find.byType(MenuItemButton), findsNothing);
+        expect(menuFinder, findsNothing);
       });
     }
 

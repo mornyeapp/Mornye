@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/models/download_item.dart';
 import 'package:mornye/models/settings.dart';
@@ -390,7 +391,7 @@ void main() {
       );
       final toolbar = find.byType(LibraryTrackSelectionBar);
       Finder menuRow(String label) => find.descendant(
-        of: find.byType(mornye ? MornyeContextMenu : MenuItemButton),
+        of: find.byType(mornye ? MornyeContextMenu : M3EMenuPopup<int>),
         matching: find.text(label),
       );
 
@@ -415,6 +416,9 @@ void main() {
 
       // A bulk action keeps the selection, so the toolbar returns.
       await _rightClick(tester, find.text('Bravo'));
+      // The long menu scrolls inside the window.
+      await tester.ensureVisible(menuRow('Delete 1 track'));
+      await _settle(tester);
       await tester.tap(menuRow('Delete 1 track'));
       await _settle(tester);
       expect(toolbar, findsOneWidget);

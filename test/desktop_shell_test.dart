@@ -451,7 +451,7 @@ void main() {
       await tester.pumpAndSettle();
     });
 
-    testWidgets('the Downloads menu animates only in Material ($mornye)', (
+    testWidgets('the Downloads popover opens and closes at once ($mornye)', (
       tester,
     ) async {
       await pumpShell(tester, mornye: mornye, width: 1400);
@@ -467,23 +467,12 @@ void main() {
 
       await tester.tap(button);
       await tester.pump();
-      await tester.pump(const Duration(milliseconds: 50));
       expect(find.byType(DesktopDownloadsPopover), findsOneWidget);
-      expect(popoverOpacity(), mornye ? 1 : lessThan(1));
-      await tester.pumpAndSettle();
+      expect(popoverOpacity(), 1);
 
       await tester.tap(button);
       await tester.pump();
-      if (!mornye) {
-        // A click while it closes opens it again.
-        await tester.pump(const Duration(milliseconds: 50));
-        await tester.tap(button);
-      }
-      await tester.pumpAndSettle();
-      expect(
-        find.byType(DesktopDownloadsPopover),
-        mornye ? findsNothing : findsOneWidget,
-      );
+      expect(find.byType(DesktopDownloadsPopover), findsNothing);
       expect(tester.takeException(), isNull);
     });
 

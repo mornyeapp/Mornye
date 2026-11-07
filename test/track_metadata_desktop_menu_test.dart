@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/download_history_provider.dart';
 import 'package:mornye/providers/extension_provider.dart';
@@ -171,17 +172,18 @@ void main() {
         expect(find.text('Copy file path'), findsOneWidget);
         expect(find.text('Go to Artist'), findsOneWidget);
         if (desktop) {
-          expect(find.byType(MenuItemButton), findsWidgets);
+          final menu = find.byType(M3EMenuPopup<int>);
+          expect(menu, findsOneWidget);
           expect(find.byType(BottomSheet), findsNothing);
           final button = tester.getRect(findAppIcon(Icons.more_vert));
-          final menu = tester.getRect(find.byType(MenuItemButton).first);
-          expect(menu.top, greaterThanOrEqualTo(button.bottom - 1));
+          final row = tester.getRect(find.text('Copy file path'));
+          expect(row.top, greaterThanOrEqualTo(button.bottom - 1));
           await tester.sendKeyEvent(LogicalKeyboardKey.escape);
           await tester.pumpAndSettle();
-          expect(find.byType(MenuItemButton), findsNothing);
+          expect(menu, findsNothing);
         } else {
           expect(find.byType(BottomSheet), findsOneWidget);
-          expect(find.byType(MenuItemButton), findsNothing);
+          expect(find.byType(M3EMenuPopup<int>), findsNothing);
         }
       },
     );

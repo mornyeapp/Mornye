@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/playback_provider.dart';
@@ -124,12 +125,7 @@ void main() {
       // a menu on the row, without the bar under it.
       await _click(tester, find.text('Charlie'), buttons: kSecondaryButton);
       await tester.pumpAndSettle();
-      final menu = mornye
-          ? find.byType(MornyeContextMenu)
-          : find.ancestor(
-              of: find.byType(MenuItemButton).first,
-              matching: find.byType(MenuAnchor),
-            );
+      final menu = find.byType(mornye ? MornyeContextMenu : M3EMenuPopup<int>);
       expect(menu, findsOneWidget);
       expect(
         find.descendant(of: menu, matching: find.text('Play next')),
@@ -143,10 +139,7 @@ void main() {
 
       await tester.sendKeyEvent(LogicalKeyboardKey.escape);
       await tester.pumpAndSettle();
-      expect(
-        find.byType(mornye ? MornyeContextMenu : MenuItemButton),
-        findsNothing,
-      );
+      expect(menu, findsNothing);
       expect(find.byType(SelectionBottomBar), findsNothing);
       expect(find.text('Play next'), findsNothing);
 
@@ -161,12 +154,7 @@ void main() {
 
       await _click(tester, find.text('Charlie'), buttons: kSecondaryButton);
       await tester.pumpAndSettle();
-      await tester.tap(
-        find.descendant(
-          of: find.byType(mornye ? MornyeContextMenu : MenuItemButton),
-          matching: find.text('Play'),
-        ),
-      );
+      await tester.tap(find.descendant(of: menu, matching: find.text('Play')));
       await tester.pumpAndSettle();
       expect(playback.started, ['2', '3']);
       expect(find.byType(SelectionBottomBar), findsNothing);

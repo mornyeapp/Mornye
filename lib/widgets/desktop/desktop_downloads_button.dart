@@ -5,7 +5,6 @@ import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/models/download_item.dart';
 import 'package:mornye/providers/download_queue_provider.dart';
 import 'package:mornye/services/shell_navigation_service.dart';
-import 'package:mornye/theme/material_expressive.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/app_icon_button.dart';
@@ -60,11 +59,7 @@ class _DesktopDownloadsButtonState
     extends ConsumerState<DesktopDownloadsButton> {
   final _menu = MenuController();
 
-  // An animated menu stays open while it closes; a click then reopens it.
-  var _menuStatus = AnimationStatus.dismissed;
-
-  void _toggle() =>
-      _menuStatus.isForwardOrCompleted ? _menu.close() : _menu.open();
+  void _toggle() => _menu.isOpen ? _menu.close() : _menu.open();
 
   @override
   Widget build(BuildContext context) {
@@ -81,8 +76,6 @@ class _DesktopDownloadsButtonState
     return MenuAnchor(
       controller: _menu,
       consumeOutsideTap: true,
-      animated: materialExpressiveEnabled(context),
-      onAnimationStatusChanged: (status) => _menuStatus = status,
       style: MenuStyle(
         padding: const WidgetStatePropertyAll(EdgeInsets.zero),
         backgroundColor: WidgetStatePropertyAll(
