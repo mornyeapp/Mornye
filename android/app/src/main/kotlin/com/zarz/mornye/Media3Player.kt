@@ -39,14 +39,39 @@ import io.flutter.plugin.common.MethodChannel
  * `setPlaybackParams(setSpeed)`. The `DynamicsProcessing` equalizer is an
  * effect on the session in the platform mixer and works with either PCM
  * format, since offload stays disabled.
+ *
+ * Buffer size: see [MAX_BUFFERED_SPEED].
  */
 internal fun media3AudioRenderers(context: Context) = RenderersFactory { handler, _, audioListener, _, _ ->
     val sink = DefaultAudioSink.Builder(context)
         .setEnableFloatOutput(true)
         .setEnableAudioOutputPlaybackParameters(true)
+        .setAudioTrackBufferSizeProvider(cappedSpeedBufferSize)
         .build()
     arrayOf(MediaCodecAudioRenderer(context, MediaCodecSelector.DEFAULT, handler, audioListener, sink))
 }
+
+/**
+ * The fastest speed the `AudioTrack` buffer is sized for. With platform
+ * playback parameters media3 1.9.2 multiplies its PCM buffer (four times
+ * the platform minimum, kept within 250 to 750 ms) by 8, the fastest
+ * `AudioTrack` speed, so it still holds that much time at 8x. That makes
+ * about 3 s at 1x. Once a song's end is in the buffer the track is told to
+ * play out, so a song queued later than that opens a new track at the
+ * handoff, and a short song before a queued one waits on the buffer. The app
+ * changes speed by at most 1.2x (AutoMix), so sizing for 2x keeps at least
+ * the 1x buffer's time up to 2x at a quarter of the size. Volume
+ * (`AudioTrack.setVolume`), speed and the session equalizer act after this
+ * buffer, so its size does not delay them.
+ */
+private const val MAX_BUFFERED_SPEED = 2.0
+
+private val cappedSpeedBufferSize =
+    DefaultAudioSink.AudioTrackBufferSizeProvider { minBuffer, encoding, outputMode, frameSize, rate, bitrate, speed ->
+        DefaultAudioSink.AudioTrackBufferSizeProvider.DEFAULT.getBufferSizeInBytes(
+            minBuffer, encoding, outputMode, frameSize, rate, bitrate, speed.coerceAtMost(MAX_BUFFERED_SPEED),
+        )
+    }
 
 /**
  * One media3 player of the `com.zarz.mornye/media3_player` channel. Every

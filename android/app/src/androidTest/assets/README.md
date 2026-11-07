@@ -22,6 +22,15 @@ ffmpeg -f lavfi -i 'aevalsrc=1193047/8388608|-1193047/8388608:s=96000:d=0.1' \
   -c:a flac -sample_fmt s32 -bits_per_raw_sample 24 pcm24-pattern.flac
 ```
 
+## Synthetic gapless fixtures
+
+`gapless-a.flac` and `gapless-b.flac` are two seconds of mono 16-bit
+44.1-kHz sine tones (440 and 660 Hz) at -20 dB. `Media3GaplessTest` plays
+one into the other to check that a queued handoff keeps its audio track.
+Generate with `ffmpeg -f lavfi -i sine=frequency=440:sample_rate=44100:duration=2
+-af volume=0.1 -ac 1 -c:a flac -sample_fmt s16 gapless-a.flac` (660 for
+`gapless-b.flac`).
+
 ## Synthetic motion artwork fixtures
 
 `motion-probe-h264.mp4` and `motion-probe-hevc.mp4` contain one second of the
