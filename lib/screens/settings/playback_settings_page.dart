@@ -162,7 +162,7 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage>
     final analysis =
         progress != null &&
             progress.total > 0 &&
-            (settings.songAnalysis || progress.analyzed > 0)
+            (settings.songAnalysis || progress.completed > 0)
         ? progress
         : null;
     return Scaffold(
@@ -329,20 +329,26 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage>
                 SettingsItem(
                   icon: Icons.delete_outline,
                   title: context.l10n.songAnalysisClear,
-                  subtitle: context.l10n.songAnalysisProgress(
-                    analysis.analyzed,
-                    analysis.total,
-                  ),
+                  subtitle: analysis.skipped > 0
+                      ? context.l10n.songAnalysisProgressWithSkipped(
+                          analysis.analyzed,
+                          analysis.total,
+                          analysis.skipped,
+                        )
+                      : context.l10n.songAnalysisProgress(
+                          analysis.analyzed,
+                          analysis.total,
+                        ),
                   footer:
                       settings.songAnalysis &&
-                          analysis.analyzed < analysis.total
+                          analysis.completed < analysis.total
                       ? AppProgressIndicator.linear(
-                          value: analysis.analyzed / analysis.total,
+                          value: analysis.completed / analysis.total,
                           trackColor: colorScheme.surfaceContainerHighest,
                           wavy: false,
                         )
                       : null,
-                  onTap: analysis.analyzed > 0 ? _confirmClearAnalysis : null,
+                  onTap: analysis.completed > 0 ? _confirmClearAnalysis : null,
                   showDivider: false,
                 ),
             ],

@@ -7525,6 +7525,7 @@
   "songAnalysisOnlyWhileCharging": "Hanya saat mengisi daya",
   "songAnalysisOnlyWhileChargingDescription": "Analisis Koleksi hanya saat ponsel ini mengisi daya. Lagu yang sedang diputar tetap dianalisis.",
   "songAnalysisProgress": "{analyzed} dari {total} lagu telah dianalisis",
+  "songAnalysisProgressWithSkipped": "{analyzed} dari {total} lagu telah dianalisis; {skipped} dilewati (file hilang, tidak terbaca, atau tanpa suara)",
   "songAnalysisClear": "Hapus analisis lagu",
   "songAnalysisClearConfirmTitle": "Hapus analisis lagu?",
   "songAnalysisClearConfirmMessage": "Autoplay akan melupakan bunyi lagu-lagumu. Selama analisis lagu aktif, Koleksi akan dianalisis ulang.",

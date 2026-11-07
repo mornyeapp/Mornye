@@ -38,12 +38,18 @@ enum SongAnalysisSweep {
 }
 
 class SongAnalysisProgress {
-  const SongAnalysisProgress({required this.analyzed, required this.total});
+  const SongAnalysisProgress({
+    required this.analyzed,
+    required this.total,
+    this.skipped = 0,
+  });
 
-  final int analyzed, total;
+  final int analyzed, total, skipped;
+
+  int get completed => analyzed + skipped;
 }
 
-enum _Outcome { analyzed, failed, unavailable, skipped }
+enum _Outcome { analyzed, failed, missing, unavailable, skipped }
 
 /// Analyzes how each local Library song sounds, once, in the background, so
 /// Autoplay can pick songs that sound like the session. One song at a time,
@@ -97,6 +103,7 @@ class SongAnalysis {
 
   /// How many Library songs are analyzed, once known.
   final progress = ValueNotifier<SongAnalysisProgress?>(null);
+  final _libraryOutcomes = <String, _Outcome>{};
 
   AppSettings _settings = const AppSettings();
   bool _started = false, _disposed = false;
@@ -295,15 +302,6 @@ class SongAnalysis {
       } else {
         unavailable = 0;
       }
-      if (outcome == _Outcome.analyzed) {
-        final known = progress.value;
-        if (known != null && known.analyzed < known.total) {
-          progress.value = SongAnalysisProgress(
-            analyzed: known.analyzed + 1,
-            total: known.total,
-          );
-        }
-      }
       await _wait(_minimumRest + watch.elapsed * _restFactor);
     }
     if (current()) _schedule(_nextPass);
@@ -315,29 +313,58 @@ class SongAnalysis {
     Map<String, SongAnalysisRecord> records,
   ) {
     final work = <SongAnalysisLibrarySong>[];
-    var total = 0;
+    final outcomes = <String, _Outcome>{};
     for (final song in songs) {
       // Autoplay leaves scanned songs out while the local Library is off.
       if (song.local && !_settings.localLibraryEnabled) continue;
       if (!_analyzable(song.path)) continue;
-      total++;
+      if (outcomes.containsKey(song.path)) continue;
       final record = records[song.path];
+      outcomes[song.path] = record?.version == _store.version
+          ? (record!.failed ? _Outcome.failed : _Outcome.analyzed)
+          : _libraryOutcomes[song.path] == _Outcome.missing
+          ? _Outcome.missing
+          : _Outcome.unavailable;
       if (record == null || record.version != _store.version || record.failed) {
         work.add(song);
       }
     }
+    _libraryOutcomes
+      ..clear()
+      ..addAll(outcomes);
+    _publishProgress();
+    return work;
+  }
+
+  void _publishProgress() {
     if (!_disposed) {
       progress.value = SongAnalysisProgress(
-        analyzed: total - work.length,
-        total: total,
+        analyzed: _libraryOutcomes.values
+            .where((outcome) => outcome == _Outcome.analyzed)
+            .length,
+        skipped: _libraryOutcomes.values
+            .where(
+              (outcome) =>
+                  outcome == _Outcome.failed || outcome == _Outcome.missing,
+            )
+            .length,
+        total: _libraryOutcomes.length,
       );
     }
-    return work;
+  }
+
+  _Outcome _recordOutcome(String path, _Outcome outcome) {
+    if (_libraryOutcomes.containsKey(path) &&
+        _libraryOutcomes[path] != outcome) {
+      _libraryOutcomes[path] = outcome;
+      _publishProgress();
+    }
+    return outcome;
   }
 
   /// Library songs that still need analysis. Rows of files the Library no
   /// longer has are removed on the way.
-  Future<List<SongAnalysisLibrarySong>> _plan() async {
+  Future<List<SongAnalysisLibrarySong>> _plan() => _exclusive(() async {
     final songs = await _librarySongs();
     final records = await _store.records();
     final paths = {for (final song in songs) song.path};
@@ -346,7 +373,7 @@ class SongAnalysis {
         if (!paths.contains(path) && path != _currentSource) path,
     ]);
     return _survey(songs, records);
-  }
+  });
 
   /// Analyzes [song] unless this version analyzed or failed on the file as
   /// it is. Sweeps check only songs without a current analysis, so a
@@ -359,12 +386,16 @@ class SongAnalysis {
           if (stamp == null) {
             // The file is gone.
             await _store.remove([song.path]);
-            return _Outcome.skipped;
+            return _recordOutcome(song.path, _Outcome.missing);
           }
           final record = (await _store.records([song.path]))[song.path];
           if (record != null &&
               record.version == _store.version &&
               record.stamp == stamp) {
+            _recordOutcome(
+              song.path,
+              record.failed ? _Outcome.failed : _Outcome.analyzed,
+            );
             return _Outcome.skipped;
           }
           final result = await _analyzer.analyze(
@@ -373,7 +404,10 @@ class SongAnalysis {
           );
           if (result.retry || !_working) return _Outcome.unavailable;
           await _store.save(song.path, stamp, result.features);
-          return result.features == null ? _Outcome.failed : _Outcome.analyzed;
+          return _recordOutcome(
+            song.path,
+            result.features == null ? _Outcome.failed : _Outcome.analyzed,
+          );
         } on Object catch (error) {
           _log.w('Song analysis failed: $error');
           return _Outcome.unavailable;
@@ -381,23 +415,23 @@ class SongAnalysis {
       });
 
   /// Counts the analyzed Library songs now.
-  Future<void> refreshProgress() async {
+  Future<void> refreshProgress() => _exclusive(() async {
     try {
       _survey(await _librarySongs(), await _store.records());
     } on Object catch (error) {
       _log.w('Could not count analyzed songs: $error');
     }
-  }
+  });
 
   /// Forgets every analysis. While analysis is on, the Library is analyzed
   /// again from the start.
   Future<void> clear() async {
     _stop();
-    await _exclusive(_store.clear);
-    final known = progress.value;
-    if (known != null && !_disposed) {
-      progress.value = SongAnalysisProgress(analyzed: 0, total: known.total);
-    }
+    await _exclusive(() async {
+      await _store.clear();
+      _libraryOutcomes.updateAll((_, _) => _Outcome.unavailable);
+      if (progress.value != null) _publishProgress();
+    });
     if (_working) _schedule(_resumeDelay);
   }
 

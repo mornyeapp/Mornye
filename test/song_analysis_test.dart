@@ -320,6 +320,78 @@ void main() {
     expect((await store.records()).keys, isNot(contains('/c.flac')));
   });
 
+  test(
+    'a 255-song sweep completes with unreadable and missing files',
+    () async {
+      library = [for (var i = 0; i < 255; i++) '/song-$i.flac'];
+      files = {
+        for (final path in library.take(254)) path: (size: 1, modified: 1),
+      };
+      analyzer.results[library[253]] = const SongAnalysisResult.failed();
+      final (analysis, _) = create(sweep: SongAnalysisSweep.always);
+      analysis.start(playing.stream);
+      expect(await waits.next(), const Duration(seconds: 90));
+      waits.release();
+      expect(await waits.next(), const Duration(minutes: 30));
+      expect(analysis.progress.value?.analyzed, 253);
+      expect(analysis.progress.value?.skipped, 2);
+      expect(analysis.progress.value?.completed, 255);
+      expect(analysis.progress.value?.total, 255);
+
+      await analysis.refreshProgress();
+      expect(analysis.progress.value?.completed, 255);
+      waits.release();
+      expect(await waits.next(), const Duration(minutes: 30));
+      expect(analyzer.calls, hasLength(254));
+      expect(analysis.progress.value?.completed, 255);
+
+      files[library.last] = (size: 1, modified: 1);
+      files[library[253]] = (size: 2, modified: 2);
+      analyzer.results.clear();
+      waits.release();
+      expect(await waits.next(), const Duration(minutes: 30));
+      expect(analysis.progress.value?.analyzed, 255);
+      expect(analysis.progress.value?.skipped, 0);
+    },
+  );
+
+  test('duplicate Library rows count and analyze each file once', () async {
+    library = ['/a.flac', '/a.flac', '/b.flac'];
+    final (analysis, _) = create(sweep: SongAnalysisSweep.always);
+    analysis.start(playing.stream);
+    expect(await waits.next(), const Duration(seconds: 90));
+    waits.release();
+    expect(await waits.next(), const Duration(minutes: 30));
+    expect(analyzer.calls, ['/a.flac', '/b.flac']);
+    expect(analysis.progress.value?.analyzed, 2);
+    expect(analysis.progress.value?.total, 2);
+  });
+
+  test(
+    'analyzing the playing song updates Library progress immediately',
+    () async {
+      analyzer.results['/b.flac'] = const SongAnalysisResult.unavailable();
+      final (analysis, _) = create(sweep: SongAnalysisSweep.always);
+      analysis.start(playing.stream);
+      expect(await waits.next(), const Duration(seconds: 90));
+      waits.release();
+      expect(await waits.next(), const Duration(minutes: 30));
+      expect(analysis.progress.value?.analyzed, 1);
+
+      final completed = Completer<void>();
+      analysis.progress.addListener(() {
+        if (analysis.progress.value?.analyzed == 2 && !completed.isCompleted) {
+          completed.complete();
+        }
+      });
+      analyzer.results.clear();
+      playing.add(_playing('/b.flac'));
+      await completed.future.timeout(_timeout);
+      expect(analysis.progress.value?.analyzed, 2);
+      expect(analysis.progress.value?.total, 2);
+    },
+  );
+
   test('repeated unavailable analysis backs off', () async {
     library = ['/a.flac', '/b.flac', '/c.flac', '/d.flac'];
     for (final path in library) {

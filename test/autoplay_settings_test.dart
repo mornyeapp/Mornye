@@ -249,6 +249,28 @@ void main() {
       // The charging rule is Android's.
       expect(find.text('Only while charging'), findsNothing);
 
+      for (var i = 1234; i < 5000; i++) {
+        store.rows['/$i.flac'] = const SongAnalysisRecord(
+          stamp: (size: 1, modified: 1),
+          version: SongFeatures.version,
+          failed: true,
+        );
+      }
+      await analysis.refreshProgress();
+      await tester.pumpAndSettle();
+      expect(
+        find.text(
+          '1,234 of 5,000 songs analyzed; 3,766 skipped '
+          '(missing, unreadable or silent)',
+        ),
+        findsOneWidget,
+      );
+      final clearItem = tester.widget<SettingsItem>(
+        find.ancestor(of: clear, matching: find.byType(SettingsItem)),
+      );
+      expect(clearItem.footer, isNull);
+      expect(clearItem.onTap, isNotNull);
+
       final label = find.text('Song analysis');
       await tester.ensureVisible(label);
       await tester.pumpAndSettle();

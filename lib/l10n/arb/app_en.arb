@@ -8445,6 +8445,24 @@
       }
     }
   },
+  "songAnalysisProgressWithSkipped": "{analyzed} of {total} songs analyzed; {skipped} skipped (missing, unreadable or silent)",
+  "@songAnalysisProgressWithSkipped": {
+    "description": "Song analysis progress with files that could not be described, counted as finished rather than pending",
+    "placeholders": {
+      "analyzed": {
+        "type": "int",
+        "format": "decimalPattern"
+      },
+      "total": {
+        "type": "int",
+        "format": "decimalPattern"
+      },
+      "skipped": {
+        "type": "int",
+        "format": "decimalPattern"
+      }
+    }
+  },
   "songAnalysisClear": "Clear song analysis",
   "songAnalysisClearConfirmTitle": "Clear song analysis?",
   "songAnalysisClearConfirmMessage": "Autoplay forgets how your songs sound. While song analysis is on, your Library is analyzed again.",
