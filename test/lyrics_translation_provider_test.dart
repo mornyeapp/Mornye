@@ -225,7 +225,7 @@ void main() {
   }
 
   test(
-    'Fast reuses saved translations and toggles timing without AI',
+    'Fast reuses saved translations and keeps their timing without AI',
     () async {
       final cache = LyricsTranslationCache(directory: () async => directory);
       final key = lyricsTranslationCacheKey(
@@ -247,21 +247,22 @@ void main() {
       final container = await containerFor(cache: cache, keys: {});
       final controller = container.read(lyricsTranslationProvider.notifier);
       expect((await controller.translate(_timedLyrics)).error, isNull);
-      final fast = controller.display(_timedLyrics);
-      expect(fast.lines.single.translation, 'You');
-      expect(fast.lines.single.translationWords, isEmpty);
-      expect(fast.lines.single.romanizationWords, isEmpty);
+      // The mode only decides what a new translation asks for. Timing a
+      // saved or shared translation already has shows in either mode.
+      void expectTimed() {
+        final line = controller.display(_timedLyrics).lines.single;
+        expect(line.translation, 'You');
+        expect(line.translationWords.single.time.inSeconds, 10);
+        expect(line.romanizationWords.last.time.inSeconds, 12);
+      }
+
+      expectTimed();
       final settings = container.read(settingsProvider.notifier);
       settings.setLyricsAiWordSync(true);
-      final synced = controller.display(_timedLyrics);
-      expect(synced.lines.single.translationWords.single.time.inSeconds, 10);
-      expect(synced.lines.single.romanizationWords.last.time.inSeconds, 12);
+      expectTimed();
       expect((await controller.translate(_timedLyrics)).error, isNull);
       settings.setLyricsAiWordSync(false);
-      expect(
-        controller.display(_timedLyrics).lines.single.translationWords,
-        isEmpty,
-      );
+      expectTimed();
       expect((await cache.read(key))!.wordSynced, isTrue);
       expect(requests, isEmpty);
     },

@@ -188,7 +188,7 @@ final lyricsTranslationProvider =
 class LyricsTranslationController extends Notifier<LyricsTranslationState> {
   final _lookedUp = <String>{};
   final _autoAttempted = <String>{};
-  final _merged = Expando<(LyricsTranslationResult, bool, ParsedLyrics)>();
+  final _merged = Expando<(LyricsTranslationResult, ParsedLyrics)>();
   final _alreadyInTarget = <String, bool>{};
   LyricsTranslationCancelToken? _cancel;
   Object? _owner;
@@ -353,27 +353,26 @@ class LyricsTranslationController extends Notifier<LyricsTranslationState> {
     return _apply(lyrics, source, result);
   }
 
+  /// [lyrics] with [result], timed word by word wherever [result] has the
+  /// timing, whatever the mode: the mode only decides whether a new
+  /// translation asks for it. A translation from a linked device, or one
+  /// saved in Synced mode, keeps its timing.
   ParsedLyrics _apply(
     ParsedLyrics lyrics,
     LyricsTranslationSource source,
     LyricsTranslationResult result,
   ) {
-    final wordSync = ref.read(settingsProvider).lyricsAiWordSync;
     final memo = _merged[lyrics];
-    if (memo != null && identical(memo.$1, result) && memo.$2 == wordSync) {
-      return memo.$3;
-    }
+    if (memo != null && identical(memo.$1, result)) return memo.$2;
     final merged = applyLyricsTranslation(
       lyrics,
       source,
       result.translations,
       romanizations: result.romanizations,
-      alignments: wordSync ? result.alignments : const [],
-      romanizationAlignments: wordSync
-          ? result.romanizationAlignments
-          : const [],
+      alignments: result.alignments,
+      romanizationAlignments: result.romanizationAlignments,
     );
-    _merged[lyrics] = (result, wordSync, merged);
+    _merged[lyrics] = (result, merged);
     return merged;
   }
 

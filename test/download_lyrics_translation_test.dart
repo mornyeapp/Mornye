@@ -12,6 +12,7 @@ import 'package:mornye/providers/lyrics_translation_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/services/lyrics_sidecar.dart';
 import 'package:mornye/services/lyrics_translation.dart';
+import 'package:mornye/services/lyrics_translation_alignment.dart';
 import 'package:mornye/services/source_metadata_events.dart';
 import 'package:mornye/utils/lyrics_parser.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -198,6 +199,39 @@ void main() {
     expect(mlrc, startsWith('[x-mlrc:1]'));
     expect(mlrc, contains(_translation(0, 'es:Hello')));
     expect(savedLyrics, isEmpty);
+  });
+
+  test('keeps the word timing of a saved translation in Fast mode', () async {
+    const timed = '[00:00.00]<00:00.00>Hello <00:00.50>there<00:01.00>';
+    final (:container, :translator, queue: _) = setUpTranslator(lyrics: timed);
+    expect(_settings.lyricsAiWordSync, isFalse);
+    await container
+        .read(lyricsTranslationCacheProvider)
+        .write(
+          lyricsTranslationCacheKey(
+            sourceHash: LyricsTranslationSource.of(
+              LyricsParser.parse(timed),
+            ).hash,
+            language: 'es',
+            config: lyricsAiConfigFor(_settings),
+          ),
+          const LyricsTranslationResult(
+            ['Hola amigo'],
+            alignments: [
+              [
+                LyricsTranslationChunk('Hola ', 0),
+                LyricsTranslationChunk('amigo', 1),
+              ],
+            ],
+          ),
+        );
+    translator.enqueue(_song);
+    await _until(() => savedLyrics.isNotEmpty);
+
+    final saved = savedLyrics[_song.source]!;
+    expect(saved, contains(_translation(0, 'Hola amigo')));
+    expect(saved, contains('[x-translation-words:0:'));
+    expect(requests, isEmpty);
   });
 
   test('writes the song file only once the download queue is idle', () async {

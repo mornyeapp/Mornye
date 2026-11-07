@@ -206,10 +206,9 @@ class DownloadLyricsTranslator {
       source,
       result.translations,
       romanizations: result.romanizations,
-      alignments: settings.lyricsAiWordSync ? result.alignments : const [],
-      romanizationAlignments: settings.lyricsAiWordSync
-          ? result.romanizationAlignments
-          : const [],
+      // A translation saved in Synced mode keeps its word timing.
+      alignments: result.alignments,
+      romanizationAlignments: result.romanizationAlignments,
     );
     if (!lyricsTranslationUnsaved(lyrics, shown)) return null;
     return DownloadLyricsWrite(
