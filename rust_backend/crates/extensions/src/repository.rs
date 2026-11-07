@@ -423,6 +423,12 @@ impl ExtensionRepository {
             .iter()
             .find(|entry| entry.id == id)
             .ok_or_else(|| error(format!("extension {id} not found in repo")))?;
+        if !extension.is_supported_runtime() {
+            return Err(error(format!(
+                "extension {id} targets the {} runtime and cannot be installed in this app",
+                extension.runtime.trim()
+            )));
+        }
         require_https(extension.download_url(), "extension download")?;
         let destination = destination_path(directory, id, extension.download_url())?;
         let check = || self.check_generation(generation).map_err(|e| e.to_string());
