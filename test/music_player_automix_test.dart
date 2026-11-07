@@ -119,6 +119,16 @@ void main() {
       );
       await handler.enqueue(manual);
       expect(handler.queue.value[1].id, 'manual');
+      musicPlayerRuntime.configure(
+        musicPlayerRuntime.settings.copyWith(autoplayRandomness: 0.75),
+      );
+      await _until(() => handler.queue.value.length == 4);
+      expect(handler.queue.value.take(2).map((item) => item.id), [
+        'one',
+        'manual',
+      ]);
+      expect(handler.mediaItem.value?.id, 'one');
+      expect(handler.playbackState.value.playing, isTrue);
       await handler.setShuffleMode(AudioServiceShuffleMode.all);
       expect(handler.queue.value[1].id, 'manual');
       await handler.setShuffleMode(AudioServiceShuffleMode.none);
@@ -132,7 +142,12 @@ void main() {
     },
   );
 
-  for (final refresh in ['new search', 'new search after shuffle', 'toggle']) {
+  for (final refresh in [
+    'new search',
+    'new search after shuffle',
+    'toggle',
+    'randomness',
+  ]) {
     test('Autoplay rotates recent suggestions after $refresh', () async {
       final candidates = [
         for (var i = 0; i < 12; i++)
@@ -165,6 +180,10 @@ void main() {
       if (refresh == 'toggle') {
         setAutoplayEnabled(false);
         setAutoplayEnabled(true);
+      } else if (refresh == 'randomness') {
+        musicPlayerRuntime.configure(
+          musicPlayerRuntime.settings.copyWith(autoplayRandomness: 1),
+        );
       } else {
         await handler.setQueueAndPlay([
           const PlayableMedia(

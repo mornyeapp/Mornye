@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mornye/services/automix_analysis.dart';
+import 'package:mornye/services/autoplay_history.dart';
 import 'package:mornye/services/automix_analyzer.dart';
 import 'package:mornye/services/music_player_service.dart';
 import 'package:mornye/services/music_haptics.dart';
@@ -351,7 +352,10 @@ late VirtualTime time;
 
 void _setUpPlayer() {
   musicPlayerRuntime.configure(
-    musicPlayerRuntime.settings.copyWith(musicHaptics: false),
+    musicPlayerRuntime.settings.copyWith(
+      musicHaptics: false,
+      autoplayRandomness: 0,
+    ),
   );
   setPlaybackAutomationOptions(
     enabled: true,
@@ -374,6 +378,10 @@ void _setUpPlayer() {
     autoMixAnalyzer: analyzer,
     autoMixEffectRenderer: effectRenderer,
     autoplayLibraryLoader: (seed) => autoplayLoader(seed),
+    autoplayHistory: AutoplayHistory(
+      read: () async => null,
+      write: (_) async {},
+    ),
     hapticsAnalyzer: hapticsAnalyzer,
     hapticPulse: (_, _) async => hapticSongs.add(handler.mediaItem.value?.id),
   );

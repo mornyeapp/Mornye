@@ -687,6 +687,10 @@ class SettingsNotifier extends Notifier<AppSettings> {
   void setAutoplayPersonalization(bool enabled) =>
       _commit(state.copyWith(autoplayPersonalization: enabled));
 
+  void setAutoplayRandomness(double value) => _commit(
+    state.copyWith(autoplayRandomness: autoplayRandomnessFromJson(value)),
+  );
+
   void setSongAnalysis(bool enabled) =>
       _commit(state.copyWith(songAnalysis: enabled));
 

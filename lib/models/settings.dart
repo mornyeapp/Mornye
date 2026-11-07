@@ -23,6 +23,9 @@ String playbackNormalizationModeFromJson(Object? value) =>
 double musicHapticsLevelFromJson(Object? value) =>
     value is num && value.isFinite ? value.toDouble().clamp(0, 1) : 0.5;
 
+double autoplayRandomnessFromJson(Object? value) =>
+    value is num && value.isFinite ? value.toDouble().clamp(0, 1) : 0;
+
 /// Sort choices offered by the Library, in display order.
 const librarySortModes = [
   'latest',
@@ -142,6 +145,8 @@ class AppSettings {
   final String exclusiveOutputDevice;
   final bool autoplay;
   final bool autoplayPersonalization;
+  @JsonKey(fromJson: autoplayRandomnessFromJson)
+  final double autoplayRandomness;
 
   /// Analyze how each Library song sounds, on this device, so Autoplay picks
   /// songs that sound like the session. Off until turned on: decoding songs
@@ -366,6 +371,7 @@ class AppSettings {
     this.exclusiveOutputDevice = '',
     this.autoplay = false,
     this.autoplayPersonalization = true,
+    this.autoplayRandomness = 0,
     this.songAnalysis = false,
     this.songAnalysisOnlyWhileCharging = true,
     this.musicHaptics = false,
@@ -527,6 +533,7 @@ class AppSettings {
     String? exclusiveOutputDevice,
     bool? autoplay,
     bool? autoplayPersonalization,
+    double? autoplayRandomness,
     bool? songAnalysis,
     bool? songAnalysisOnlyWhileCharging,
     bool? musicHaptics,
@@ -676,6 +683,7 @@ class AppSettings {
       autoplay: autoplay ?? this.autoplay,
       autoplayPersonalization:
           autoplayPersonalization ?? this.autoplayPersonalization,
+      autoplayRandomness: autoplayRandomness ?? this.autoplayRandomness,
       songAnalysis: songAnalysis ?? this.songAnalysis,
       songAnalysisOnlyWhileCharging:
           songAnalysisOnlyWhileCharging ?? this.songAnalysisOnlyWhileCharging,

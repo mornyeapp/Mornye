@@ -36,6 +36,7 @@ import 'package:mornye/services/playback_deck.dart';
 import 'package:mornye/services/automix_analysis.dart';
 import 'package:mornye/services/automix_phase_lock.dart';
 import 'package:mornye/services/autoplay_personalization.dart';
+import 'package:mornye/services/autoplay_history.dart';
 import 'package:mornye/services/autoplay_signal.dart';
 import 'package:mornye/services/automix_analyzer.dart';
 import 'package:mornye/models/settings.dart';
@@ -267,6 +268,7 @@ class MusicPlayerHandler extends BaseAudioHandler
     }
     if (previous.autoplay != settings.autoplay ||
         previous.autoplayPersonalization != settings.autoplayPersonalization ||
+        previous.autoplayRandomness != settings.autoplayRandomness ||
         previous.localLibraryEnabled != settings.localLibraryEnabled) {
       _autoplay.updateMode();
     }
@@ -277,6 +279,7 @@ class MusicPlayerHandler extends BaseAudioHandler
     AutoMixAnalyzer? autoMixAnalyzer,
     AutoMixEffectRenderer? autoMixEffectRenderer,
     AutoplayLibraryLoader? autoplayLibraryLoader,
+    AutoplayHistory? autoplayHistory,
     MusicHapticsAnalyzer? hapticsAnalyzer,
     HapticPulse? hapticPulse,
     CastOutput? castOutput,
@@ -340,6 +343,7 @@ class MusicPlayerHandler extends BaseAudioHandler
     _autoplay = _MusicAutoplay(
       this,
       autoplayLibraryLoader ?? (seed) => loadAutoplayLibrary(seed, _runtime),
+      autoplayHistory ?? AutoplayHistory(),
     );
     try {
       _init();
@@ -2778,6 +2782,7 @@ class MusicPlayerHandler extends BaseAudioHandler
     _autoplay.reset();
     _prefetch.stop();
     _disposed = true;
+    await _autoplay.history.flush();
     await _cast.dispose();
     _runtime.personalization.finish();
     await _runtime.personalization.flush();

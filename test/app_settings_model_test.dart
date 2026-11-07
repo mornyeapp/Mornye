@@ -5,6 +5,33 @@ import 'package:mornye/models/theme_settings.dart';
 import 'package:mornye/utils/artist_utils.dart';
 
 void main() {
+  test('Autoplay randomness defaults to least recent and restores safely', () {
+    expect(const AppSettings().autoplayRandomness, 0);
+    expect(AppSettings.fromJson({}).autoplayRandomness, 0);
+    for (final value in [0.0, 0.5, 1.0]) {
+      final settings = const AppSettings().copyWith(autoplayRandomness: value);
+      final restored = AppSettings.fromJson(settings.toJson());
+      expect(restored.autoplayRandomness, value);
+      expect(restored.copyWith(locale: 'id').autoplayRandomness, value);
+    }
+    for (final invalid in [null, '', double.nan, double.infinity]) {
+      expect(
+        AppSettings.fromJson({
+          'autoplayRandomness': invalid,
+        }).autoplayRandomness,
+        0,
+      );
+    }
+    expect(
+      AppSettings.fromJson({'autoplayRandomness': -5}).autoplayRandomness,
+      0,
+    );
+    expect(
+      AppSettings.fromJson({'autoplayRandomness': 5}).autoplayRandomness,
+      1,
+    );
+  });
+
   test('AI translation defaults to Fast and remembers either mode', () {
     expect(const AppSettings().lyricsAiWordSync, isFalse);
     expect(AppSettings.fromJson({}).lyricsAiWordSync, isFalse);

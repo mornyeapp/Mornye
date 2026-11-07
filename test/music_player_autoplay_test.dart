@@ -3,6 +3,7 @@ import 'dart:math';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/models/settings.dart';
+import 'package:mornye/services/autoplay_history.dart';
 import 'package:mornye/services/library_database.dart';
 import 'package:mornye/services/music_player_service.dart';
 
@@ -77,6 +78,75 @@ class _Library implements LibraryDatabase {
 }
 
 void main() {
+  test('learned scores cannot bypass oldest-first rotation', () {
+    final older = track('older', artist: 'Seed', genre: 'Jazz');
+    final favorite = track('favorite', artist: 'Favorite', genre: 'Rock');
+    final history = AutoplayHistory(
+      read: () async => null,
+      write: (_) async {},
+    );
+    history.remember(older);
+    history.remember(favorite);
+    final selected = selectAutoplayTracks(
+      seed: track('seed', artist: 'Seed', genre: 'Rock'),
+      candidates: [favorite, older],
+      upcoming: [],
+      recent: [],
+      history: history.snapshot(),
+      dismissedSources: {},
+      random: _NoNoise(),
+      preferenceAdjustment: (item) => item == favorite ? 100 : 0,
+      weights: {'preference': 3},
+      limit: 1,
+    );
+    expect(selected, [older]);
+  });
+
+  test('more randomness broadens choices despite strong personalization', () {
+    final candidates = [
+      for (var i = 0; i < 20; i++) track('$i', artist: 'Artist $i'),
+    ];
+    Set<String> choices(double randomness) => {
+      for (var trial = 0; trial < 100; trial++)
+        selectAutoplayTracks(
+          seed: track('seed', artist: 'Seed'),
+          candidates: candidates,
+          upcoming: [],
+          recent: [],
+          dismissedSources: {},
+          random: Random(trial),
+          randomness: randomness,
+          preferenceAdjustment: (item) => item.id == '0' ? 9 : 0,
+          weights: {'preference': 3},
+          limit: 1,
+        ).single.id,
+    };
+    expect(choices(0), {'0'});
+    expect(choices(0.5).length, greaterThan(1));
+    expect(choices(1).length, greaterThan(15));
+  });
+
+  test('every slider position puts fresh songs before repeats', () {
+    final old = track('old');
+    final fresh = track('fresh');
+    for (final randomness in [0.0, 0.5, 1.0]) {
+      expect(
+        selectAutoplayTracks(
+          seed: track('seed'),
+          candidates: [old, fresh],
+          upcoming: [],
+          recent: [old],
+          dismissedSources: {},
+          random: Random(2),
+          randomness: randomness,
+          preferenceAdjustment: (item) => item == old ? 100 : 0,
+          limit: 1,
+        ),
+        [fresh],
+      );
+    }
+  });
+
   test('Autoplay prefers related unplayed Library tracks, after another '
       'artist, and deduplicates', () {
     final seed = track('seed', genre: 'Rock');

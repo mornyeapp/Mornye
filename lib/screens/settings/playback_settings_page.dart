@@ -34,6 +34,7 @@ import 'package:mornye/widgets/settings_group.dart';
 import 'package:mornye/widgets/discord_presence_settings.dart';
 import 'package:mornye/widgets/lastfm_settings.dart';
 import 'package:mornye/widgets/automix_settings.dart';
+import 'package:mornye/widgets/autoplay_randomness_slider.dart';
 import 'package:mornye/widgets/music_haptics_settings.dart';
 import 'package:mornye/widgets/playback_normalization_settings.dart';
 
@@ -285,6 +286,7 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage>
                 onChanged: (value) =>
                     ref.read(settingsProvider.notifier).setAutoplay(value),
               ),
+              const AutoplayRandomnessSlider(),
               SettingsSwitchItem(
                 icon: Icons.auto_awesome_outlined,
                 title: context.l10n.autoplayPersonalization,

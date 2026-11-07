@@ -14,6 +14,7 @@ import 'package:mornye/models/unified_library_item.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/services/app_state_database.dart';
 import 'package:mornye/services/autoplay_personalization.dart';
+import 'package:mornye/services/autoplay_history.dart';
 import 'package:mornye/services/autoplay_ranker.dart';
 import 'package:mornye/services/autoplay_taste.dart';
 import 'package:mornye/services/background_favorites.dart';
@@ -1522,6 +1523,81 @@ void main() {
     expect(handler.mediaItem.value?.id, 'two');
     expect(handler.playbackState.value.updatePosition, Duration.zero);
   });
+
+  for (final personalized in [false, true]) {
+    test(
+      'Autoplay rotates suggestions across restart (personalized: $personalized)',
+      () async {
+        String? stored;
+        final candidates = [
+          for (var i = 0; i < 12; i++)
+            PlayableMedia(
+              id: 'candidate-$i',
+              source: '/candidate-$i.flac',
+              title: 'Candidate $i',
+              artist: 'Artist $i',
+              genre: i < 6 ? 'Pop' : 'Rock',
+            ),
+        ];
+        final model = AutoplayPreferenceModel();
+        for (var i = 0; i < 40; i++) {
+          model.learn(
+            const AutoplayLearningTrack(
+              source: '/candidate-0.flac',
+              title: 'Candidate 0',
+              artist: 'Artist 0',
+              genre: 'Pop',
+            ),
+            at: DateTime(2026),
+            reward: 1,
+          );
+        }
+        Future<(MusicPlayerRuntime, MusicPlayerHandler)> open() async {
+          final learning = AutoplayPersonalization(
+            load: () async => model.encode(),
+            save: (_) async {},
+          );
+          final runtime = _runtime(
+            settings: AppSettings(
+              pauseOnMute: false,
+              autoplay: true,
+              autoplayPersonalization: personalized,
+            ),
+            createPersonalization: () => learning,
+          );
+          final handler = MusicPlayerHandler(
+            runtime: runtime,
+            autoplayLibraryLoader: (_) async => candidates,
+            autoplayHistory: AutoplayHistory(
+              read: () async => stored,
+              write: (value) async => stored = value,
+            ),
+          );
+          await learning.ensureLoaded();
+          await handler.setQueueAndPlay([_track]);
+          await handler.queue
+              .firstWhere((queue) => queue.length == 7)
+              .timeout(const Duration(seconds: 5));
+          return (runtime, handler);
+        }
+
+        final (firstRuntime, firstHandler) = await open();
+        final first = firstHandler.queue.value
+            .skip(1)
+            .map((item) => item.id)
+            .toSet();
+        await firstRuntime.dispose();
+        expect(stored, isNotNull);
+        final (_, secondHandler) = await open();
+        final second = secondHandler.queue.value
+            .skip(1)
+            .map((item) => item.id)
+            .toSet();
+        expect(second, hasLength(6));
+        expect(second.intersection(first), isEmpty);
+      },
+    );
+  }
 
   test(
     'trained personalized ranking runs through the real autoplay worker',

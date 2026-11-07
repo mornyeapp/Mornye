@@ -285,6 +285,12 @@ class SettingsSearchCatalog {
           keywords: const ['autoplay', 'queue', 'recommendation'],
         ),
         SettingsSearchEntry(
+          icon: Icons.shuffle_rounded,
+          title: l10n.autoplayRandomness,
+          subtitle: l10n.autoplayRandomnessDescription,
+          keywords: const ['random', 'variety', 'repeat', 'recent', 'shuffle'],
+        ),
+        SettingsSearchEntry(
           icon: Icons.auto_awesome_outlined,
           title: l10n.autoplayPersonalization,
           subtitle: l10n.autoplayPersonalizationDescription,
