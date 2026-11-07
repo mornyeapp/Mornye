@@ -1,4 +1,6 @@
 import 'package:audio_service/audio_service.dart' show MediaItem;
+import 'package:flutter/gestures.dart'
+    show PointerDeviceKind, kSecondaryMouseButton;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -19,6 +21,7 @@ import 'package:mornye/services/weekly_releases.dart';
 import 'package:mornye/theme/app_theme.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/widgets/player_artwork.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'support/fixed_settings.dart';
 
@@ -91,6 +94,14 @@ Future<void> _open(
   await tester.pumpWidget(_home(saved: saved, releases: releases));
   await tester.pump();
   await tester.pump();
+}
+
+/// Lets a menu, sheet or route finish opening. Home keeps an animation
+/// running, so it never settles; short frames let the menu spring run.
+Future<void> _settle(WidgetTester tester) async {
+  for (var frame = 0; frame < 10; frame++) {
+    await tester.pump(const Duration(milliseconds: 100));
+  }
 }
 
 void main() {
@@ -206,6 +217,57 @@ void main() {
       tester.getRect(find.text('Shortcuts')).top,
       greaterThan(tester.getRect(find.text('Saved song')).bottom),
     );
+  });
+
+  testWidgets('a long press changes a shortcut and Reset restores them', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    await _open(tester, desktop: false, width: 400);
+
+    await tester.longPress(find.text('Equalizer'));
+    await _settle(tester);
+    await tester.tap(find.text('Change shortcut'));
+    await _settle(tester);
+    expect(
+      find.text('A shortcut already on Home swaps places with this one'),
+      findsOneWidget,
+    );
+    await tester.ensureVisible(find.text('Loved'));
+    await _settle(tester);
+    await tester.tap(find.text('Loved'));
+    await _settle(tester);
+
+    // Loved takes the Equalizer's place beside Shuffle.
+    expect(find.text('Equalizer'), findsNothing);
+    expect(
+      tester.getRect(find.text('Loved')).top,
+      tester.getRect(find.text('Shuffle library')).top,
+    );
+
+    await tester.longPress(find.text('Loved'));
+    await _settle(tester);
+    await tester.tap(find.text('Reset shortcuts'));
+    await _settle(tester);
+    expect(find.text('Loved'), findsNothing);
+    expect(find.text('Equalizer'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a right-click opens the shortcut menu on desktop', (
+    tester,
+  ) async {
+    await _open(tester, desktop: true);
+    await _settle(tester);
+    final click = await tester.startGesture(
+      tester.getCenter(find.text('Network storage')),
+      kind: PointerDeviceKind.mouse,
+      buttons: kSecondaryMouseButton,
+    );
+    await click.up();
+    await _settle(tester);
+    expect(find.text('Change shortcut'), findsOneWidget);
+    expect(find.text('Reset shortcuts'), findsOneWidget);
   });
 
   testWidgets('new releases show as a shelf that opens the full list', (

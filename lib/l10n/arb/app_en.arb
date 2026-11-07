@@ -8573,6 +8573,18 @@
   "@homeShortcuts": {
     "description": "Home section header for quick links to player tools"
   },
+  "homeShortcutChange": "Change shortcut",
+  "@homeShortcutChange": {
+    "description": "Menu item and sheet title for replacing one Home shortcut with another"
+  },
+  "homeShortcutChangeSubtitle": "A shortcut already on Home swaps places with this one",
+  "@homeShortcutChangeSubtitle": {
+    "description": "Subtitle of the sheet that replaces a Home shortcut"
+  },
+  "homeShortcutsReset": "Reset shortcuts",
+  "@homeShortcutsReset": {
+    "description": "Menu item that restores the default Home shortcuts"
+  },
   "searchResults": "Search Results",
   "@searchResults": {
     "description": "Heading of a mixed preview of search result types, without implying a relevance ranking"

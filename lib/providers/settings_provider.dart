@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:mornye/models/settings.dart';
+import 'package:mornye/models/home_shortcut.dart';
 import 'package:mornye/models/metadata_separators.dart';
 import 'package:mornye/models/automix_options.dart';
 import 'package:mornye/constants/app_info.dart';
@@ -973,6 +974,10 @@ class SettingsNotifier extends Notifier<AppSettings> {
 
   void setSearchViewMode(String mode) =>
       _commit(state.copyWith(searchViewMode: mode));
+
+  void setHomeShortcuts(List<HomeShortcut> shortcuts) => _commit(
+    state.copyWith(homeShortcuts: [for (final s in shortcuts) s.name]),
+  );
 
   void setDefaultLibraryView(String view) => _commit(
     state.copyWith(defaultLibraryView: _normalizeDefaultLibraryView(view)),

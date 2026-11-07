@@ -126,6 +126,11 @@ AppSettings _$AppSettingsFromJson(Map<String, dynamic> json) => AppSettings(
   defaultSearchTab: json['defaultSearchTab'] as String? ?? 'all',
   searchViewMode: json['searchViewMode'] as String? ?? 'list',
   homeFeedProvider: json['homeFeedProvider'] as String?,
+  homeShortcuts:
+      (json['homeShortcuts'] as List<dynamic>?)
+          ?.map((e) => e as String)
+          .toList() ??
+      const ['shuffle', 'equalizer', 'listeningStats', 'networkStorage'],
   separateSingles: json['separateSingles'] as bool? ?? false,
   singleFilenameFormat:
       json['singleFilenameFormat'] as String? ?? '{title} - {artist}',
@@ -290,6 +295,7 @@ Map<String, dynamic> _$AppSettingsToJson(
   'defaultSearchTab': instance.defaultSearchTab,
   'searchViewMode': instance.searchViewMode,
   'homeFeedProvider': instance.homeFeedProvider,
+  'homeShortcuts': instance.homeShortcuts,
   'separateSingles': instance.separateSingles,
   'singleFilenameFormat': instance.singleFilenameFormat,
   'albumFolderStructure': instance.albumFolderStructure,

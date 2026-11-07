@@ -7608,6 +7608,18 @@
   "@homeShortcuts": {
     "description": "Home section header for quick links to player tools"
   },
+  "homeShortcutChange": "Ganti pintasan",
+  "@homeShortcutChange": {
+    "description": "Menu item and sheet title for replacing one Home shortcut with another"
+  },
+  "homeShortcutChangeSubtitle": "Pintasan yang sudah ada di Beranda bertukar tempat dengan yang ini",
+  "@homeShortcutChangeSubtitle": {
+    "description": "Subtitle of the sheet that replaces a Home shortcut"
+  },
+  "homeShortcutsReset": "Atur ulang pintasan",
+  "@homeShortcutsReset": {
+    "description": "Menu item that restores the default Home shortcuts"
+  },
   "artistUpcomingConcerts": "Konser Mendatang",
   "artistAllUpcomingConcerts": "Semua Konser Mendatang",
   "artistNoUpcomingConcerts": "Tiada konser mendatang.",

@@ -209,6 +209,10 @@ class AppSettings {
   /// shows cover grids and shelves.
   final String searchViewMode;
   final String? homeFeedProvider;
+
+  /// The Material Home's shortcuts, in order, by `HomeShortcut` name. Read
+  /// them through `HomeShortcut.resolve`, which fills in unknown names.
+  final List<String> homeShortcuts;
   final bool separateSingles;
   final String singleFilenameFormat;
   final String albumFolderStructure;
@@ -417,6 +421,12 @@ class AppSettings {
     this.defaultSearchTab = 'all',
     this.searchViewMode = 'list',
     this.homeFeedProvider,
+    this.homeShortcuts = const [
+      'shuffle',
+      'equalizer',
+      'listeningStats',
+      'networkStorage',
+    ],
     this.separateSingles = false,
     this.singleFilenameFormat = '{title} - {artist}',
     this.albumFolderStructure = 'artist_album',
@@ -584,6 +594,7 @@ class AppSettings {
     String? searchViewMode,
     String? homeFeedProvider,
     bool clearHomeFeedProvider = false,
+    List<String>? homeShortcuts,
     bool? separateSingles,
     String? singleFilenameFormat,
     String? albumFolderStructure,
@@ -749,6 +760,7 @@ class AppSettings {
       homeFeedProvider: clearHomeFeedProvider
           ? null
           : (homeFeedProvider ?? this.homeFeedProvider),
+      homeShortcuts: homeShortcuts ?? this.homeShortcuts,
       separateSingles: separateSingles ?? this.separateSingles,
       singleFilenameFormat: singleFilenameFormat ?? this.singleFilenameFormat,
       albumFolderStructure: albumFolderStructure ?? this.albumFolderStructure,
