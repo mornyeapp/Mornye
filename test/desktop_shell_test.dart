@@ -27,6 +27,7 @@ import 'package:mornye/widgets/desktop/desktop_commands.dart';
 import 'package:mornye/widgets/desktop/desktop_downloads_button.dart';
 import 'package:mornye/widgets/desktop/desktop_inspector.dart';
 import 'package:mornye/widgets/desktop/desktop_navigation.dart';
+import 'package:mornye/widgets/desktop/desktop_now_playing.dart';
 import 'package:mornye/widgets/desktop/desktop_player_bar.dart';
 import 'package:mornye/widgets/desktop/desktop_shortcuts.dart';
 import 'package:mornye/widgets/desktop/desktop_window.dart';
@@ -192,6 +193,8 @@ void main() {
     ValueChanged<String>? onOpenLibraryLink,
     VoidCallback? onOpenProfile,
     UserProfile profile = const UserProfile(name: 'Ada Lovelace'),
+    Widget? nowPlaying,
+    bool reducedMotion = false,
   }) async {
     tester.view.physicalSize = Size(width, 800);
     tester.view.devicePixelRatio = 1;
@@ -215,6 +218,12 @@ void main() {
               : AppTheme.light(),
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(
+              context,
+            ).copyWith(disableAnimations: reducedMotion),
+            child: child!,
+          ),
           home: Scaffold(
             body: DesktopShellLayout(
               destinations: _destinations(mornye: mornye),
@@ -223,6 +232,7 @@ void main() {
               libraryLinks: libraryLinks,
               onOpenLibraryLink: onOpenLibraryLink,
               onOpenProfile: onOpenProfile,
+              nowPlaying: nowPlaying ?? const DesktopNowPlaying(),
               body: const Center(child: Text('content')),
             ),
           ),
@@ -336,6 +346,99 @@ void main() {
         0,
       );
       expect(tester.takeException(), isNull);
+    });
+
+    double nowPlayingOpacity(WidgetTester tester) => tester
+        .widget<Opacity>(find.byKey(const ValueKey('desktop-now-playing-fade')))
+        .opacity;
+
+    double nowPlayingRise(WidgetTester tester) =>
+        tester.getTopLeft(find.byKey(const ValueKey('desktop-now-playing'))).dy;
+
+    testWidgets('Now Playing fades in over the shell and out again '
+        '($mornye)', (tester) async {
+      addTearDown(() => desktopNowPlayingOpen.value = false);
+      await pumpShell(
+        tester,
+        mornye: mornye,
+        width: 1400,
+        nowPlaying: const ColoredBox(color: Colors.black),
+      );
+
+      desktopNowPlayingOpen.value = true;
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(nowPlayingOpacity(tester), greaterThan(0));
+      expect(nowPlayingOpacity(tester), lessThan(1));
+      expect(nowPlayingRise(tester), mornye ? 0 : greaterThan(0));
+      // The shell keeps painting under the entrance.
+      expect(find.text('content'), findsOneWidget);
+
+      await tester.pumpAndSettle();
+      expect(nowPlayingOpacity(tester), 1);
+      expect(nowPlayingRise(tester), 0);
+      expect(find.text('content'), findsNothing);
+
+      desktopNowPlayingOpen.value = false;
+      await tester.pump();
+      expect(find.text('content'), findsOneWidget);
+      await tester.pump(const Duration(milliseconds: 80));
+      expect(nowPlayingOpacity(tester), lessThan(1));
+      // The exit is shorter than the entrance.
+      await tester.pump(const Duration(milliseconds: 130));
+      expect(find.byKey(const ValueKey('desktop-now-playing')), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('Esc during the Now Playing entrance fades out from where it '
+        'is ($mornye)', (tester) async {
+      addTearDown(() => desktopNowPlayingOpen.value = false);
+      await pumpShell(
+        tester,
+        mornye: mornye,
+        width: 1400,
+        nowPlaying: const ColoredBox(color: Colors.black),
+      );
+
+      desktopNowPlayingOpen.value = true;
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 60));
+      final opacity = nowPlayingOpacity(tester);
+      final rise = nowPlayingRise(tester);
+      expect(dismissDesktopPlayerLayer(1400, mornye: mornye), isTrue);
+      await tester.pump();
+      expect(nowPlayingOpacity(tester), closeTo(opacity, 0.01));
+      expect(nowPlayingRise(tester), rise);
+      await tester.pump(const Duration(milliseconds: 16));
+      expect(nowPlayingOpacity(tester), lessThan(opacity));
+
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('desktop-now-playing')), findsNothing);
+      expect(find.text('content'), findsOneWidget);
+    });
+
+    testWidgets('reduced motion swaps Now Playing at once ($mornye)', (
+      tester,
+    ) async {
+      addTearDown(() => desktopNowPlayingOpen.value = false);
+      await pumpShell(
+        tester,
+        mornye: mornye,
+        width: 1400,
+        nowPlaying: const ColoredBox(color: Colors.black),
+        reducedMotion: true,
+      );
+
+      desktopNowPlayingOpen.value = true;
+      await tester.pump();
+      expect(nowPlayingOpacity(tester), 1);
+      expect(nowPlayingRise(tester), 0);
+      expect(find.text('content'), findsNothing);
+
+      desktopNowPlayingOpen.value = false;
+      await tester.pump();
+      expect(find.byKey(const ValueKey('desktop-now-playing')), findsNothing);
+      expect(find.text('content'), findsOneWidget);
     });
   }
 

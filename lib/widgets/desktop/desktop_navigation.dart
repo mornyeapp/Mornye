@@ -242,28 +242,15 @@ class DesktopShellLayout extends ConsumerWidget {
   static Size? _fullWindowSize;
 
   /// Now Playing covers the whole window. The destinations keep their state
-  /// underneath, but stop painting and ticking.
+  /// underneath, but stop painting and ticking once it has opened.
   Widget _nowPlayingOrShell(BuildContext context, bool showPlayer) =>
       ValueListenableBuilder<bool>(
         valueListenable: desktopNowPlayingOpen,
-        builder: (context, nowPlayingOpen, shell) {
-          nowPlayingOpen = nowPlayingOpen && showPlayer;
-          return Stack(
-            fit: StackFit.expand,
-            children: [
-              Visibility(
-                visible: !nowPlayingOpen,
-                maintainState: true,
-                child: shell!,
-              ),
-              if (nowPlayingOpen)
-                KeyedSubtree(
-                  key: const ValueKey('desktop-now-playing'),
-                  child: nowPlaying,
-                ),
-            ],
-          );
-        },
+        builder: (context, nowPlayingOpen, shell) => _NowPlayingTransition(
+          open: nowPlayingOpen && showPlayer,
+          shell: shell!,
+          nowPlaying: nowPlaying,
+        ),
         child: Builder(builder: (context) => _shell(context, showPlayer)),
       );
 
@@ -356,6 +343,136 @@ class DesktopShellLayout extends ConsumerWidget {
       ],
     );
   }
+}
+
+/// Opens and closes the full-window Now Playing over [shell]. Material fades
+/// it in on the effects spring while it rises 24dp on the slow spatial
+/// spring, which is critically damped; Mornye dissolves it. Both exit with a
+/// shorter eased fade. The shell keeps painting until the entrance ends and
+/// Now Playing stays mounted until the exit ends, so either can reverse
+/// midway (Esc during the entrance). Reduced motion swaps at once.
+class _NowPlayingTransition extends StatefulWidget {
+  const _NowPlayingTransition({
+    required this.open,
+    required this.shell,
+    required this.nowPlaying,
+  });
+
+  final bool open;
+  final Widget shell;
+  final Widget nowPlaying;
+
+  @override
+  State<_NowPlayingTransition> createState() => _NowPlayingTransitionState();
+}
+
+class _NowPlayingTransitionState extends State<_NowPlayingTransition>
+    with SingleTickerProviderStateMixin {
+  static const double _rise = 24;
+  static const _mornyeEntrance = AppMotionSpec(
+    Duration(milliseconds: 220),
+    Curves.easeOutCubic,
+  );
+
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    value: widget.open ? 1 : 0,
+  );
+
+  // The entrance in use: the fade covers the first [_fadeEnd] of it.
+  AppMotionSpec _fade = _mornyeEntrance;
+  AppMotionSpec _move = _mornyeEntrance;
+  double _fadeEnd = 1;
+  double _distance = 0;
+
+  // Where the exit started, so Esc during the entrance fades out from
+  // there instead of jumping to the exit's start.
+  double _exitFrom = 1;
+  double _exitOpacity = 1;
+  double _exitOffset = 0;
+
+  @override
+  void didUpdateWidget(_NowPlayingTransition oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.open == oldWidget.open) return;
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _controller.value = widget.open ? 1 : 0;
+      return;
+    }
+    if (widget.open) {
+      _fade = AppMotion.effects(context, _mornyeEntrance);
+      _move = AppMotion.spatialSlow(context, _mornyeEntrance);
+      _distance = materialExpressiveEnabled(context) ? _rise : 0;
+      final entrance = _fade.duration > _move.duration
+          ? _fade.duration
+          : _move.duration;
+      _fadeEnd = _fade.duration.inMicroseconds / entrance.inMicroseconds;
+      _controller.duration = entrance;
+      _controller.forward();
+    } else {
+      _exitFrom = _controller.value;
+      _exitOpacity = _entranceOpacity(_exitFrom);
+      _exitOffset = _entranceOffset(_exitFrom);
+      _controller.reverseDuration = context.isMornye
+          ? const Duration(milliseconds: 160)
+          : const Duration(milliseconds: 200);
+      _controller.reverse();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  double _entranceOpacity(double t) =>
+      _fade.curve.transform((t / _fadeEnd).clamp(0.0, 1.0));
+
+  double _entranceOffset(double t) =>
+      _distance * (1 - _move.curve.transform(t));
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: _controller,
+    builder: (context, _) {
+      final t = _controller.value;
+      final exiting = !widget.open;
+      final opacity = exiting
+          ? _exitFrom <= 0
+                ? 0.0
+                : _exitOpacity *
+                      (1 - Curves.easeInCubic.transform(1 - t / _exitFrom))
+          : _entranceOpacity(t);
+      final offset = exiting ? _exitOffset : _entranceOffset(t);
+      final covered = widget.open && _controller.isCompleted;
+      return Stack(
+        fit: StackFit.expand,
+        children: [
+          Visibility(
+            visible: !covered,
+            maintainState: true,
+            child: IgnorePointer(ignoring: widget.open, child: widget.shell),
+          ),
+          if (widget.open || !_controller.isDismissed)
+            IgnorePointer(
+              ignoring: exiting,
+              child: Transform.translate(
+                offset: Offset(0, offset),
+                child: Opacity(
+                  key: const ValueKey('desktop-now-playing-fade'),
+                  opacity: opacity.clamp(0.0, 1.0),
+                  child: KeyedSubtree(
+                    key: const ValueKey('desktop-now-playing'),
+                    child: widget.nowPlaying,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      );
+    },
+  );
 }
 
 /// Gives [child] the size of the space it lays out in, so width-based layout
