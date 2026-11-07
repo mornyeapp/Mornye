@@ -594,6 +594,64 @@ void main() {
       );
       expect(surface.color, scheme.primaryContainer.withValues(alpha: 0.3));
     });
+
+    testWidgets('a Mornye flat row takes its selection tint without dark', (
+      tester,
+    ) async {
+      final selected = ValueNotifier(false);
+      addTearDown(selected.dispose);
+      await tester.pumpWidget(
+        _app(
+          ValueListenableBuilder<bool>(
+            valueListenable: selected,
+            builder: (context, value, _) => TrackCard(
+              leading: const SizedBox.square(dimension: 56),
+              title: 'Song',
+              style: TrackCardStyle.flat,
+              isSelectionMode: true,
+              isSelected: value,
+            ),
+          ),
+          mornye: true,
+        ),
+      );
+      await tester.pump();
+      final scheme = _scheme(tester, find.text('Song'));
+      final target = Color.alphaBlend(
+        scheme.primaryContainer.withValues(alpha: 0.3),
+        scheme.surface,
+      );
+      final low = math.min(
+        target.computeLuminance(),
+        scheme.surface.computeLuminance(),
+      );
+      final high = math.max(
+        target.computeLuminance(),
+        scheme.surface.computeLuminance(),
+      );
+      Color fill() {
+        final box = tester.renderObject<RenderPhysicalShape>(
+          find
+              .descendant(
+                of: find.byType(AppContentCard),
+                matching: find.byType(PhysicalShape),
+              )
+              .first,
+        );
+        return Color.alphaBlend(box.color, scheme.surface);
+      }
+
+      selected.value = true;
+      await tester.pump();
+      // The Mornye card does not animate its colour: the tint cuts in, as
+      // an iOS selection does, so there is no frame between the two.
+      expect(fill(), target);
+      for (var frame = 0; frame < 20; frame++) {
+        expect(fill().computeLuminance(), inInclusiveRange(low, high));
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      expect(fill(), target);
+    });
   });
 
   group('AlbumTrackTile', () {
