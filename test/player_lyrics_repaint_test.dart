@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/providers/music_player_provider.dart';
+import 'package:mornye/providers/runtime_profile_provider.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/lyrics_parser.dart';
 import 'package:mornye/widgets/player_lyrics.dart';
@@ -328,6 +329,59 @@ void main() {
         elapsed.stop();
         expect(advanced, closeTo(elapsed.elapsedMicroseconds * speed, 40000));
       }
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
+
+  for (final (tier, liquid, lowEnd) in [
+    ('standard', false, false),
+    ('low', false, true),
+  ]) {
+    testWidgets('a $tier device skips the per-frame word effects', (
+      tester,
+    ) async {
+      final playback = StreamController<PlaybackState>.broadcast();
+      final preview = ValueNotifier<Duration?>(null);
+      addTearDown(playback.close);
+      addTearDown(preview.dispose);
+      final theme = MornyeTheme.build(Brightness.dark);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            playbackStateProvider.overrideWith((ref) => playback.stream),
+            deviceSupportsLiquidGlassProvider.overrideWithValue(liquid),
+            lowEndDeviceProvider.overrideWithValue(lowEnd),
+          ],
+          child: MaterialApp(
+            theme: theme,
+            home: Scaffold(
+              body: SyncedLyricsView(
+                lyrics: _lyrics,
+                seekPreview: preview,
+                colorScheme: theme.colorScheme,
+                isActive: true,
+                showPronunciation: false,
+                showTranslation: false,
+              ),
+            ),
+          ),
+        ),
+      );
+      playback.add(
+        PlaybackState(
+          processingState: AudioProcessingState.ready,
+          updatePosition: const Duration(seconds: 2),
+        ),
+      );
+      await tester.pumpAndSettle();
+      // ignore: avoid_dynamic_calls
+      final painter = tester.widget<CustomPaint>(_paint).painter! as dynamic;
+      // ignore: avoid_dynamic_calls
+      expect(painter.glowSigma as double, 0, reason: 'No filter per frame');
+      // ignore: avoid_dynamic_calls
+      final lift = painter.highlightLift as double;
+      expect(lift, lowEnd ? 0 : greaterThan(0));
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());
     });

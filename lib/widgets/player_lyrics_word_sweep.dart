@@ -284,8 +284,10 @@ class _WordHighlightedLyricLineState
   }
 
   void _updateVisualEnd() {
-    final decorativeMotion = !MediaQuery.disableAnimationsOf(context);
-    final glow = context.isMornye;
+    final decorativeMotion =
+        !MediaQuery.disableAnimationsOf(context) &&
+        !ref.read(lowEndDeviceProvider);
+    final glow = context.isMornye && ref.read(mornyeLiquidGlassProvider);
     var end = Duration.zero;
     for (final words in [
       widget.line.words,
@@ -389,9 +391,15 @@ class _WordHighlightedLyricLineState
       highlightedColor: highlightedColor,
       semanticsLabel: text,
       // Sung words rise in both styles; the glow behind held words belongs
-      // to Mornye's look.
-      liftEnabled: lift && !MediaQuery.disableAnimationsOf(context),
-      glowEnabled: mornye,
+      // to Mornye's look. Each risen word paints the line again on every
+      // frame and the glow filters it, so a low-end device skips the rise,
+      // and the glow needs a device that draws filtered lyrics (like the
+      // blur of the lines around the current one).
+      liftEnabled:
+          lift &&
+          !MediaQuery.disableAnimationsOf(context) &&
+          !ref.watch(lowEndDeviceProvider),
+      glowEnabled: mornye && ref.watch(mornyeLiquidGlassProvider),
       maxLines: widget.maxLines,
     );
   }
