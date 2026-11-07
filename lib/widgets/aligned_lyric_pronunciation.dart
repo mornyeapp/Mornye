@@ -4,13 +4,33 @@ import 'package:flutter/material.dart';
 import 'package:mornye/widgets/lyric_supplement_transition.dart';
 import 'package:mornye/utils/lyrics_parser.dart';
 
+final _rtlLyricCharacter = RegExp(
+  r'[\u0590-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFF\u{10800}-\u{10FFF}\u{1EE00}-\u{1EEFF}]',
+  unicode: true,
+);
+
+/// Whether [text] contains right-to-left script characters (such as Arabic or
+/// Hebrew).
+bool isRtlLyricText(String text) => _rtlLyricCharacter.hasMatch(text);
+
+/// Resolves the paragraph direction for [text], falling back to [ambient]
+/// when the line does not use a right-to-left script.
+TextDirection lyricTextDirection(
+  String text, [
+  TextDirection ambient = TextDirection.ltr,
+]) => isRtlLyricText(text) ? TextDirection.rtl : ambient;
+
 /// Keeps each pronunciation phrase under the lyric with the same start time.
 /// Only shared word boundaries are used; line-only timing cannot identify
 /// which original characters a pronunciation belongs to.
 class LyricPronunciationLayout {
   final List<_PronunciationRow> _rows;
+  final TextDirection textDirection;
 
-  const LyricPronunciationLayout._(this._rows);
+  const LyricPronunciationLayout._(
+    this._rows, [
+    this.textDirection = TextDirection.ltr,
+  ]);
 
   static const _phraseGap = 4.0;
   static const _pronunciationGap = 2.0;
@@ -42,7 +62,9 @@ class LyricPronunciationLayout {
     if (original.isEmpty ||
         pronunciation.isEmpty ||
         !maxWidth.isFinite ||
-        maxWidth <= 0) {
+        maxWidth <= 0 ||
+        isRtlLyricText(line.text) ||
+        isRtlLyricText(line.romanization ?? '')) {
       return null;
     }
     String normalize(String text) => text.replaceAll(_whitespaceRun, '');
@@ -127,7 +149,7 @@ class LyricPronunciationLayout {
     }
     rows.add(_PronunciationRow(groups, primaryHeight, pronunciationHeight));
     painter.dispose();
-    return LyricPronunciationLayout._(rows);
+    return LyricPronunciationLayout._(rows, textDirection);
   }
 
   static List<LyricWord> _sliceWords(

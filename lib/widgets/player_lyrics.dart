@@ -20,6 +20,8 @@ import 'package:mornye/utils/lyrics_parser.dart';
 import 'package:mornye/utils/lyrics_timeline.dart';
 import 'package:mornye/utils/synced_lyrics_scroll.dart';
 import 'package:mornye/widgets/aligned_lyric_pronunciation.dart';
+export 'package:mornye/widgets/aligned_lyric_pronunciation.dart'
+    show isRtlLyricText, lyricTextDirection;
 import 'package:mornye/widgets/lyric_blur.dart';
 import 'package:mornye/widgets/lyric_supplement_transition.dart';
 import 'package:mornye/widgets/lyric_scroll_motion.dart';
@@ -608,6 +610,8 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
         _measurementRevision++;
         return;
       }
+      final lineDirection = lyricTextDirection(line.text, direction);
+      painter.textDirection = lineDirection;
       painter.text = TextSpan(
         text: line.text,
         style: _primaryLyricStyle(context, background: line.isBackground),
@@ -622,6 +626,7 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
         context,
         line,
       )) {
+        painter.textDirection = lyricTextDirection(text, direction);
         painter.text = TextSpan(text: text, style: style);
         painter.layout(maxWidth: width);
         if (translation) {
@@ -637,7 +642,7 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
             pronunciationStyle: style,
             maxWidth: width,
             textScaler: scaler,
-            textDirection: direction,
+            textDirection: lineDirection,
             locale: locale,
           );
           if (aligned != null) {
@@ -1048,6 +1053,11 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
                   double.infinity,
                 )
               : topPadding;
+          final ambientDirection = Directionality.of(context);
+          final defaultDirection =
+              lines.any((line) => isRtlLyricText(line.text))
+              ? TextDirection.rtl
+              : ambientDirection;
           final list = ListView.builder(
             controller: _scroll,
             itemExtentBuilder: mornye
@@ -1068,6 +1078,9 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
               final line = lines[index];
               final leadIndex = _displayLayout.leadForLine[index];
               final textAlign = _lyricTextAlign(context, lines[leadIndex]);
+              final lineDirection = line.text.isEmpty
+                  ? defaultDirection
+                  : lyricTextDirection(line.text, ambientDirection);
               final reveal = rowVisibility[index];
               if (reveal == 0) return SizedBox.shrink(key: _lineKeys[index]);
               final isActive = _activeLines.contains(index);
@@ -1086,6 +1099,7 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
                   index,
                   reveal,
                   textAlign,
+                  lineDirection,
                   Padding(
                     padding: EdgeInsets.symmetric(
                       vertical: context.tokens.lyricsLinePaddingV,
@@ -1093,7 +1107,9 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
                     child: SizedBox(
                       height: 24,
                       child: Align(
-                        alignment: AlignmentDirectional.centerStart,
+                        alignment: AlignmentDirectional.centerStart.resolve(
+                          lineDirection,
+                        ),
                         child:
                             isActive &&
                                 _visible &&
@@ -1136,6 +1152,7 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
               } else {
                 content = Text(
                   line.text,
+                  textDirection: lineDirection,
                   textAlign: textAlign,
                   style: _primaryLyricStyle(
                     context,
@@ -1199,7 +1216,9 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
                 );
                 content = FittedBox(
                   fit: BoxFit.scaleDown,
-                  alignment: AlignmentDirectional.topStart,
+                  alignment: AlignmentDirectional.topStart.resolve(
+                    lineDirection,
+                  ),
                   child: SizedBox(width: layoutWidth, child: content),
                 );
               }
@@ -1216,6 +1235,7 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
                 index,
                 reveal,
                 textAlign,
+                lineDirection,
                 Padding(
                   padding: _linePadding(index),
                   child: TvTapTarget(
@@ -1241,7 +1261,7 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
                           (textAlign == TextAlign.end
                                   ? AlignmentDirectional.centerEnd
                                   : AlignmentDirectional.centerStart)
-                              .resolve(Directionality.of(context)),
+                              .resolve(lineDirection),
                       duration: motion,
                       curve: Curves.easeOutCubic,
                       child: AnimatedOpacity(
@@ -1269,13 +1289,16 @@ class _SyncedLyricsViewState extends ConsumerState<SyncedLyricsView>
     int index,
     double visibility,
     TextAlign align,
+    TextDirection direction,
     Widget child,
   ) {
-    final AlignmentGeometry alignment = align == TextAlign.end
-        ? AlignmentDirectional.topEnd
-        : align == TextAlign.center
-        ? Alignment.topCenter
-        : AlignmentDirectional.topStart;
+    final AlignmentGeometry alignment =
+        (align == TextAlign.end
+                ? AlignmentDirectional.topEnd
+                : align == TextAlign.center
+                ? Alignment.topCenter
+                : AlignmentDirectional.topStart)
+            .resolve(direction);
     // A fixed-extent row is already shrinking. Measure its contents at full
     // height so fitting does not scale it twice.
     final fullHeight = OverflowBox(

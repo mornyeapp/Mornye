@@ -62,6 +62,21 @@ TextAlign _lyricTextAlign(BuildContext context, LyricLine line) {
   return voice.index.isEven ? TextAlign.start : TextAlign.end;
 }
 
+TextAlign _supplementTextAlign(
+  TextAlign textAlign,
+  TextDirection lineDirection,
+  TextDirection supplementDirection,
+) {
+  if (lineDirection == supplementDirection) return textAlign;
+  return switch (textAlign) {
+    TextAlign.start =>
+      lineDirection == TextDirection.rtl ? TextAlign.right : TextAlign.left,
+    TextAlign.end =>
+      lineDirection == TextDirection.rtl ? TextAlign.left : TextAlign.right,
+    _ => textAlign,
+  };
+}
+
 Widget _withLyricSupplements(
   BuildContext context,
   LyricLine line,
@@ -74,11 +89,13 @@ Widget _withLyricSupplements(
   Widget Function(String, List<LyricWord>, TextStyle)? timedSupplementText,
 }) {
   if (line.romanization == null && line.translation == null) return primary;
-  final AlignmentGeometry alignment = switch (textAlign) {
+  final ambientDirection = Directionality.of(context);
+  final lineDirection = lyricTextDirection(line.text, ambientDirection);
+  final AlignmentGeometry alignment = (switch (textAlign) {
     TextAlign.end => AlignmentDirectional.topEnd,
     TextAlign.center => Alignment.topCenter,
     _ => AlignmentDirectional.topStart,
-  };
+  }).resolve(lineDirection);
   final supplements = _lyricSupplements(context, line).toList();
   Widget withSupplements(Widget primary, {bool aligned = false}) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -96,7 +113,12 @@ Widget _withLyricSupplements(
                   ? timedSupplementText(text, words, style)
                   : Text(
                       text,
-                      textAlign: textAlign,
+                      textDirection: lyricTextDirection(text, ambientDirection),
+                      textAlign: _supplementTextAlign(
+                        textAlign,
+                        lineDirection,
+                        lyricTextDirection(text, ambientDirection),
+                      ),
                       style: style.copyWith(
                         color: color.withValues(alpha: color.a * 0.8),
                       ),
