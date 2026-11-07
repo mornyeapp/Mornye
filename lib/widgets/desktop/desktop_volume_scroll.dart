@@ -7,6 +7,7 @@ import 'package:mornye/providers/system_volume_provider.dart';
 import 'package:mornye/services/playback_deck.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/utils/logger.dart';
+import 'package:mornye/widgets/desktop/desktop_wheel_smoother.dart';
 
 /// Scrolls the desktop app's output volume over a speaker or volume slider.
 class DesktopVolumeScroll extends ConsumerWidget {
@@ -30,19 +31,22 @@ class DesktopVolumeScroll extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     if (!isDesktopPlatform) return child;
-    return Listener(
-      behavior: HitTestBehavior.opaque,
-      onPointerSignal: (event) {
-        if (event is! PointerScrollEvent ||
-            !event.scrollDelta.dy.isFinite ||
-            event.scrollDelta.dy == 0) {
-          return;
-        }
-        GestureBinding.instance.pointerSignalResolver.register(event, (_) {
-          unawaited(_changeVolume(ref, event.scrollDelta.dy));
-        });
-      },
-      child: child,
+    // Volume steps once per notch, so the wheel smoother leaves it alone.
+    return DesktopWheelPassThrough(
+      child: Listener(
+        behavior: HitTestBehavior.opaque,
+        onPointerSignal: (event) {
+          if (event is! PointerScrollEvent ||
+              !event.scrollDelta.dy.isFinite ||
+              event.scrollDelta.dy == 0) {
+            return;
+          }
+          GestureBinding.instance.pointerSignalResolver.register(event, (_) {
+            unawaited(_changeVolume(ref, event.scrollDelta.dy));
+          });
+        },
+        child: child,
+      ),
     );
   }
 }

@@ -55,11 +55,34 @@ import 'package:mornye/widgets/desktop/desktop_commands.dart'
     show restoreDesktopSidebar;
 import 'package:mornye/widgets/desktop/desktop_inspector.dart'
     show bindDesktopFullScreenLyrics;
+import 'package:mornye/widgets/desktop/desktop_wheel_smoother.dart';
 import 'package:mornye/widgets/desktop/desktop_window.dart'
     show listenDesktopWindowFullScreen;
 
 final _log = AppLogger('Main');
 _StartupBenchmark? _startupBenchmark;
+
+/// Desktop binding: eases mouse wheel notches before they reach the
+/// scrollables (see [DesktopWheelSmoother]).
+class _DesktopBinding extends WidgetsFlutterBinding {
+  static _DesktopBinding? _instance;
+
+  static WidgetsBinding ensureInitialized() => _instance ??= _DesktopBinding();
+
+  late final _wheel = DesktopWheelSmoother.forBinding(
+    this,
+    dispatch: _handlePointerEvent,
+  );
+
+  void _handlePointerEvent(PointerEvent event) =>
+      super.handlePointerEvent(event);
+
+  @override
+  void handlePointerEvent(PointerEvent event) {
+    if (_wheel.handlePointerEvent(event)) return;
+    super.handlePointerEvent(event);
+  }
+}
 
 void main() {
   if (const bool.fromEnvironment('CORE_BACKEND_STARTUP_BENCHMARK')) {
@@ -69,7 +92,9 @@ void main() {
   // Native backend crashes still can't be caught here.
   runZonedGuarded(
     () async {
-      final binding = WidgetsFlutterBinding.ensureInitialized();
+      final binding = isDesktopPlatform && kDesktopWheelSmoothing
+          ? _DesktopBinding.ensureInitialized()
+          : WidgetsFlutterBinding.ensureInitialized();
       // The preferences plugin answers without an Activity, so on Android
       // the load overlaps the Activity's creation.
       final preferences = SharedPreferences.getInstance();
