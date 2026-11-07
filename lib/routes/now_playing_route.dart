@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/physics.dart' show SpringSimulation, Tolerance;
 import 'package:flutter/services.dart' show PredictiveBackEvent;
 import 'package:mornye/services/app_orientation.dart';
 import 'package:mornye/theme/app_motion.dart';
@@ -35,7 +36,7 @@ class NowPlayingRoute extends PageRoute<void> {
 
   /// How far a full predictive back swipe shrinks the player toward the
   /// mini player before the person lets go.
-  static const _backGesturePreview = 0.4;
+  static const _backGesturePreview = 0.25;
 
   /// The mini player's bounds while the player grows out of them.
   ({Rect surface, Rect artwork})? _openFrom;
@@ -128,11 +129,42 @@ class NowPlayingRoute extends PageRoute<void> {
   Duration get transitionDuration =>
       morph?.duration ?? const Duration(milliseconds: 400);
 
-  // An exit is shorter than its entrance.
   @override
   Duration get reverseTransitionDuration => morph?.duration == Duration.zero
       ? Duration.zero
       : const Duration(milliseconds: 300);
+
+  /// Moves the Material shrink: critically damped, so the surface never
+  /// passes the mini player, and stiff enough to settle in about 350ms,
+  /// shorter than the slow spatial spring of the entrance (about 485ms).
+  static final _exitSpring = SpringDescription.withDampingRatio(
+    mass: 1,
+    stiffness: 700,
+    ratio: 1,
+  );
+
+  /// Settled once within a fraction of a pixel per screen, as [SpringCurve]
+  /// judges the app's other springs.
+  static const _exitTolerance = Tolerance(distance: 0.002, velocity: 0.02);
+
+  /// The Material shrink runs on [_exitSpring] from wherever the page is,
+  /// so a released drag or back gesture carries on without a seam.
+  @override
+  Simulation? createSimulation({required bool forward}) {
+    if (forward ||
+        _dismissTarget == null ||
+        (morph?.duration ?? Duration.zero) == Duration.zero) {
+      return null;
+    }
+    return SpringSimulation(
+      _exitSpring,
+      controller!.value,
+      0,
+      0,
+      tolerance: _exitTolerance,
+      snapToEnd: true,
+    );
+  }
 
   /// The open morph's surface: the mini player's bounds grown to the screen.
   Rect _openRect(Size size, double value) => Rect.lerp(
@@ -336,9 +368,11 @@ class NowPlayingRoute extends PageRoute<void> {
     // Restoring portrait can resize the window during dismissal. Geometry
     // captured in landscape no longer points at the mini player in that case.
     if (target != null && _dismissSize == size) {
-      final progress = Curves.easeInOutCubic.transform(
-        (1 - animation.value / _dismissStartValue).clamp(0.0, 1.0),
-      );
+      final travel = (1 - animation.value / _dismissStartValue).clamp(0.0, 1.0);
+      // The Material shrink already moves on a spring simulation.
+      final progress = morph != null
+          ? travel
+          : Curves.easeInOutCubic.transform(travel);
       final cover = _dismissArtwork;
       return Stack(
         fit: StackFit.expand,
@@ -385,7 +419,18 @@ class NowPlayingRoute extends PageRoute<void> {
     if (_openFrom != null &&
         _openSize == size &&
         animation.status == AnimationStatus.forward) {
-      final progress = morph!.curve.transform(animation.value);
+      final morph = this.morph!;
+      final progress = morph.curve.transform(animation.value);
+      // The surface moves on the spatial spring; it fades in on the effects
+      // spring, over that spring's own settle time from the start.
+      final fade = AppMotion.effects(
+        context,
+        const AppMotionSpec(Duration(milliseconds: 200), Curves.easeOut),
+      );
+      final fadeShare = morph.duration > Duration.zero
+          ? (fade.duration.inMicroseconds / morph.duration.inMicroseconds)
+                .clamp(0.0, 1.0)
+          : 1.0;
       return Stack(
         fit: StackFit.expand,
         children: [
@@ -396,7 +441,11 @@ class NowPlayingRoute extends PageRoute<void> {
             size: size,
             radius: radius * (1 - progress),
             // The mini player shows through until the surface covers it.
-            opacity: const Interval(0, 0.35).transform(progress),
+            opacity: Interval(
+              0,
+              fadeShare,
+              curve: fade.curve,
+            ).transform(animation.value),
             child: child,
           ),
         ],

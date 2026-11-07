@@ -362,11 +362,45 @@ void main() {
 
       navigator.currentState!.pop();
       await tester.pump();
-      await tester.pump(const Duration(milliseconds: 150));
-      final shrinking = tester.getRect(find.byKey(minimize));
-      expect(shrinking.top, inExclusiveRange(0, mini.top));
-      await tester.pumpAndSettle();
+      // The shrink only moves toward the mini player, never past it, and
+      // ends sooner than the entrance.
+      var previousTop = 0.0;
+      var elapsed = Duration.zero;
+      while (find.byKey(minimize).evaluate().isNotEmpty) {
+        final top = tester.getRect(find.byKey(minimize)).top;
+        expect(top, greaterThanOrEqualTo(previousTop));
+        expect(top, lessThanOrEqualTo(mini.top + 0.01));
+        previousTop = top;
+        await tester.pump(const Duration(milliseconds: 16));
+        elapsed += const Duration(milliseconds: 16);
+      }
+      expect(previousTop, greaterThan(mini.top - 20));
+      expect(elapsed, lessThan(const Duration(milliseconds: 450)));
       expect(find.byKey(_sheet), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('the grow fades in on the effects spring', (tester) async {
+      final navigator = await pumpApp(tester);
+      navigator.currentState!.push(route());
+      await tester.pump();
+      await tester.pump();
+      double opacity() => tester
+          .widget<Opacity>(
+            find.descendant(
+              of: find.byKey(surface),
+              matching: find.byType(Opacity),
+            ),
+          )
+          .opacity;
+      await tester.pump(const Duration(milliseconds: 100));
+      final early = opacity();
+      // The surface is fully opaque well before it stops growing.
+      await tester.pump(const Duration(milliseconds: 220));
+      expect(early, inExclusiveRange(0, 1));
+      expect(opacity(), 1);
+      expect(find.byKey(surface), findsOneWidget);
+      await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
     });
 
