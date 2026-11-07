@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
@@ -163,6 +165,26 @@ class _ArtworkCrossfadeState extends State<_ArtworkCrossfade>
       _current.opacity.dispose();
     }
     _current = _ArtworkLayer(widget.artUri, _opacity(0));
+    _showWhenUnavailable(_current);
+  }
+
+  /// A network cover the store cannot fetch never draws a frame: fade its
+  /// placeholder in once the fetch fails, so the previous song's cover does
+  /// not stay on screen.
+  void _showWhenUnavailable(_ArtworkLayer layer) {
+    final uri = layer.uri;
+    if (!CoverStore.fetches(uri) || coverFilePath(uri) != null) return;
+    void show([Object? _]) {
+      if (!mounted || !identical(layer, _current)) return;
+      _show(layer);
+      SchedulerBinding.instance.ensureVisualUpdate();
+    }
+
+    unawaited(
+      CoverStore.instance.file(uri).then((path) {
+        if (path == null) show();
+      }, onError: show),
+    );
   }
 
   void _show(_ArtworkLayer layer) {
