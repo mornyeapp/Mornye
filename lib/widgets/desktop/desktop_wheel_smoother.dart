@@ -128,6 +128,13 @@ class DesktopWheelSmoother {
     _frameScheduled = false;
     final notch = _notch;
     if (notch == null || _pending == 0) return;
+    if (shiftPressed()) {
+      // Scrollable turns a Shift-held vertical delta sideways, so the rest
+      // of a vertical notch would scroll a row instead.
+      _pending = 0;
+      _notch = null;
+      return;
+    }
     final time = now();
     final elapsedMs = (time - _lastFrame).inMicroseconds / 1000;
     _lastFrame = time;

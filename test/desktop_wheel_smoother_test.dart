@@ -115,6 +115,16 @@ void main() {
       expect(wheel.total, moved);
     });
 
+    test('Shift pressed mid-ease drops the rest of the notch', () {
+      final wheel = _FakeWheel()..notch(60);
+      wheel.runFrames(1);
+      final moved = wheel.total;
+      wheel.shift = true;
+      wheel.runFrames(10);
+      expect(wheel.total, moved);
+      expect(wheel.frames, isEmpty);
+    });
+
     test('a notch elsewhere first finishes the old one', () {
       final wheel = _FakeWheel()..notch(60);
       wheel.runFrames(1);
