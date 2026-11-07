@@ -52,10 +52,10 @@ Stream<double> playbackOutputVolumeChanges() =>
 /// device.
 final playbackExclusiveOutput = ValueNotifier<bool>(false);
 
-/// Android: the beta `media3Engine` setting. While it is on, the music
-/// player and AutoMix decks play through media3 (`Media3EngineDeck`), except
-/// sources for the native USB and AAudio outputs, which stay on
-/// audioplayers. A change applies from the next song.
+/// Android: the beta `media3Engine` setting, on by default. While it is on,
+/// the music player and AutoMix decks play through media3
+/// (`Media3EngineDeck`), except sources for the native USB and AAudio
+/// outputs, which stay on audioplayers. A change applies from the next song.
 final playbackMedia3Engine = ValueNotifier<bool>(false);
 
 /// Linux: the ALSA device [playbackExclusiveOutput] opens, as an mpv device

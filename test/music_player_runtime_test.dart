@@ -868,7 +868,7 @@ void main() {
     }
     expect(deck.nextSource, '/two.flac');
 
-    runtime.configure(runtime.settings.copyWith(media3Engine: true));
+    runtime.configure(runtime.settings.copyWith(media3Engine: false));
     await _settle();
     expect(deck.nextSource, isNull);
     // The next position prepares it again, on the engine now chosen.

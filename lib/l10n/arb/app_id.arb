@@ -216,7 +216,7 @@
   "sectionVolumeAndTransitions": "Volume dan transisi",
   "sectionAudioOutput": "Output audio",
   "newPlaybackEngine": "Mesin pemutar baru",
-  "newPlaybackEngineDescription": "Memutar lewat mesin pemutar milik aplikasi, bukan pemutar media bawaan ponsel. Coba aktifkan jika lagu terdengar kresek atau tidak normal. Berlaku di lagu selanjutnya.",
+  "newPlaybackEngineDescription": "Memutar lewat mesin pemutar milik aplikasi, bukan pemutar media bawaan ponsel. Matikan jika lagu gagal diputar atau terdengar tidak normal. Berlaku di lagu selanjutnya.",
   "usbBitPerfect": "Audio Hi-Res dan Bit-Perfect",
   "usbBitPerfectDescription": "Pertahankan kualitas audio di perangkat output yang didukung. Pilih Direct USB atau AAudio Exclusive di bawah; juga, output USB Android butuh Android 14+. Berlaku di lagu selanjutnya, tanpa AutoMix & normalisasi. Mungkin Anda tidak dapat mengatur volume.",
   "usbHardwareVolume": "Volume hardware DAC",

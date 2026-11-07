@@ -67,7 +67,7 @@ AppSettings _$AppSettingsFromJson(Map<String, dynamic> json) => AppSettings(
   usbDsdOverPcm: json['usbDsdOverPcm'] as bool? ?? false,
   usbAllowFixedVolume: json['usbAllowFixedVolume'] as bool? ?? false,
   dapExclusive: json['dapExclusive'] as bool? ?? false,
-  media3Engine: json['media3Engine'] as bool? ?? false,
+  media3Engine: json['media3Engine'] as bool? ?? true,
   exclusiveOutput: json['exclusiveOutput'] as bool? ?? false,
   exclusiveOutputDevice: json['exclusiveOutputDevice'] as String? ?? '',
   autoplay: json['autoplay'] as bool? ?? false,

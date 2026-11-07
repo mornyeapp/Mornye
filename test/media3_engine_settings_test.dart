@@ -52,12 +52,12 @@ Finder get _switchFinder => find.byWidgetPredicate(
 void main() {
   tearDown(() => debugAndroidAudioSettingsOverride = null);
 
-  test('the setting defaults to off and round-trips through JSON', () {
-    expect(const AppSettings().media3Engine, isFalse);
-    expect(AppSettings.fromJson(const {}).media3Engine, isFalse);
-    final on = const AppSettings().copyWith(media3Engine: true);
-    expect(on.toJson()['media3Engine'], isTrue);
-    expect(AppSettings.fromJson(on.toJson()).media3Engine, isTrue);
+  test('the setting defaults to on and round-trips through JSON', () {
+    expect(const AppSettings().media3Engine, isTrue);
+    expect(AppSettings.fromJson(const {}).media3Engine, isTrue);
+    final off = const AppSettings().copyWith(media3Engine: false);
+    expect(off.toJson()['media3Engine'], isFalse);
+    expect(AppSettings.fromJson(off.toJson()).media3Engine, isFalse);
   });
 
   for (final mornye in [false, true]) {
@@ -73,7 +73,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       final item = tester.widget<SettingsSwitchItem>(_switchFinder);
-      expect(item.value, isFalse);
+      expect(item.value, isTrue);
       expect(item.titleTrailing, isA<BetaBadge>());
       expect(
         item.subtitle,
@@ -82,8 +82,8 @@ void main() {
 
       await tester.tap(find.text(_title));
       await tester.pumpAndSettle();
-      expect(container.read(settingsProvider).media3Engine, isTrue);
-      expect(tester.widget<SettingsSwitchItem>(_switchFinder).value, isTrue);
+      expect(container.read(settingsProvider).media3Engine, isFalse);
+      expect(tester.widget<SettingsSwitchItem>(_switchFinder).value, isFalse);
       expect(tester.takeException(), isNull);
     });
   }
