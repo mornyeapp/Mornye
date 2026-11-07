@@ -217,8 +217,8 @@ dependencies {
     implementation("androidx.documentfile:documentfile:1.1.0")
     implementation("androidx.activity:activity-ktx:1.13.0")
     implementation("com.google.android.gms:play-services-cast-framework:23.0.0")
-    // Same version video_player_android bundles, so the APK keeps one copy.
-    implementation("androidx.media3:media3-exoplayer:1.9.2")
+    // The root build pins every Media3 module, video_player_android's too.
+    implementation("androidx.media3:media3-exoplayer:${rootProject.extra["media3Version"]}")
     // NativeDownloadFinalizer imports FFmpegKit APIs directly. The Flutter
     // plugin owns the runtime AAR; compileOnly avoids packaging it twice here.
     compileOnly("com.antonkarpenko:ffmpeg-kit-audio:2.2.3")

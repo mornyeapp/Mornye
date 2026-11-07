@@ -30,7 +30,7 @@ import io.flutter.plugin.common.MethodChannel
  *
  * High resolution: float output is on, and speed goes through the platform
  * `AudioTrack.setPlaybackParams` (audio output playback parameters). In
- * media3 1.9.2 `DefaultAudioSink` sends 24/32-bit PCM to a float
+ * media3 1.11.1 `DefaultAudioSink` sends 24/32-bit PCM to a float
  * `AudioTrack` only with float output enabled; otherwise the decoder is asked
  * for 16-bit PCM and the low bits are lost. With float output its audio
  * processor chain (Sonic) is skipped for that PCM, so Sonic speed changes
@@ -53,14 +53,14 @@ internal fun media3AudioRenderers(context: Context) = RenderersFactory { handler
 
 /**
  * The fastest speed the `AudioTrack` buffer is sized for. With platform
- * playback parameters media3 1.9.2 multiplies its PCM buffer (four times
- * the platform minimum, kept within 250 to 750 ms) by 8, the fastest
- * `AudioTrack` speed, so it still holds that much time at 8x. That makes
- * about 3 s at 1x. Once a song's end is in the buffer the track is told to
- * play out, so a song queued later than that opens a new track at the
- * handoff, and a short song before a queued one waits on the buffer. The app
- * changes speed by at most 1.2x (AutoMix), so sizing for 2x keeps at least
- * the 1x buffer's time up to 2x at a quarter of the size. Volume
+ * playback parameters media3 1.11.1 multiplies its PCM buffer (a fixed
+ * 500 ms) by 8, the fastest `AudioTrack` speed, so it still holds that much
+ * time at 8x. That makes 4 s at 1x. Once a song's end is in the buffer the
+ * track is told to play out, so a song queued later than that opens a new
+ * track at the handoff, and a short song before a queued one waits on the
+ * buffer. The app changes speed by at most 1.2x (AutoMix), so sizing for 2x
+ * keeps at least the 1x buffer's time up to 2x at a quarter of the size: 1 s
+ * at 1x. Volume
  * (`AudioTrack.setVolume`), speed and the session equalizer act after this
  * buffer, so its size does not delay them.
  */
