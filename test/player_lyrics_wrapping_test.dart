@@ -175,4 +175,144 @@ void main() {
       }
     }
   }
+
+  testWidgets('Arabic word-synced lyrics preserve active line wrapping', (
+    tester,
+  ) async {
+    const arabicLine = 'كان عندك كام سنة لما عرفت';
+    tester.view.physicalSize = const Size(900, 1200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final preview = ValueNotifier<Duration?>(const Duration(seconds: 1));
+    addTearDown(preview.dispose);
+    final theme = MornyeTheme.build(Brightness.dark);
+    const lyrics = ParsedLyrics(
+      synced: true,
+      wordSynced: true,
+      plainText: arabicLine,
+      lines: [
+        LyricLine(time: Duration.zero, text: 'قبل'),
+        LyricLine(
+          time: Duration(seconds: 10),
+          end: Duration(seconds: 20),
+          text: arabicLine,
+          words: [
+            LyricWord(
+              time: Duration(seconds: 10),
+              end: Duration(seconds: 12),
+              text: 'كان ',
+            ),
+            LyricWord(
+              time: Duration(seconds: 12),
+              end: Duration(seconds: 14),
+              text: 'عندك ',
+            ),
+            LyricWord(
+              time: Duration(seconds: 14),
+              end: Duration(seconds: 16),
+              text: 'كام ',
+            ),
+            LyricWord(
+              time: Duration(seconds: 16),
+              end: Duration(seconds: 18),
+              text: 'سنة ',
+            ),
+            LyricWord(
+              time: Duration(seconds: 18),
+              end: Duration(seconds: 19),
+              text: 'لما ',
+            ),
+            LyricWord(
+              time: Duration(seconds: 19),
+              end: Duration(seconds: 20),
+              text: 'عرفت',
+            ),
+          ],
+          romanization: 'kan andak kam sana lamma ereft',
+          romanizationWords: [
+            LyricWord(
+              time: Duration(seconds: 10),
+              end: Duration(seconds: 12),
+              text: 'kan ',
+            ),
+            LyricWord(
+              time: Duration(seconds: 12),
+              end: Duration(seconds: 14),
+              text: 'andak ',
+            ),
+            LyricWord(
+              time: Duration(seconds: 14),
+              end: Duration(seconds: 16),
+              text: 'kam ',
+            ),
+            LyricWord(
+              time: Duration(seconds: 16),
+              end: Duration(seconds: 18),
+              text: 'sana ',
+            ),
+            LyricWord(
+              time: Duration(seconds: 18),
+              end: Duration(seconds: 19),
+              text: 'lamma ',
+            ),
+            LyricWord(
+              time: Duration(seconds: 19),
+              end: Duration(seconds: 20),
+              text: 'ereft',
+            ),
+          ],
+        ),
+      ],
+    );
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          playbackStateProvider.overrideWith(
+            (ref) => Stream.value(PlaybackState()),
+          ),
+        ],
+        child: MaterialApp(
+          theme: theme,
+          home: Scaffold(
+            body: Align(
+              alignment: Alignment.topLeft,
+              child: SizedBox(
+                width: 320,
+                height: 800,
+                child: SyncedLyricsView(
+                  lyrics: lyrics,
+                  seekPreview: preview,
+                  colorScheme: theme.colorScheme,
+                  isActive: true,
+                  showPronunciation: false,
+                  showTranslation: false,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final text = find.text(arabicLine);
+    expect(text, findsOneWidget);
+    final inactiveHeight = tester
+        .renderObject<RenderParagraph>(text)
+        .size
+        .height;
+
+    preview.value = const Duration(seconds: 11);
+    await tester.pumpAndSettle();
+    final activePaint = find.descendant(
+      of: find.byWidgetPredicate(
+        (widget) =>
+            widget is Semantics && widget.properties.label == arabicLine,
+      ),
+      matching: find.byType(CustomPaint),
+    );
+    expect(tester.getSize(activePaint).height, closeTo(inactiveHeight, 0.01));
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
 }

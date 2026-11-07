@@ -791,4 +791,134 @@ void main() {
       await tester.pumpWidget(const SizedBox.shrink());
     },
   );
+
+  testWidgets(
+    'Arabic word-synced lyrics lay out and sweep right-to-left even with romaji words',
+    (tester) async {
+      const arabicText = 'كان عندك';
+      const arabicLyrics = ParsedLyrics(
+        synced: true,
+        wordSynced: true,
+        plainText: arabicText,
+        lines: [
+          LyricLine(
+            time: Duration.zero,
+            end: Duration(seconds: 20),
+            text: arabicText,
+            words: [
+              LyricWord(
+                time: Duration.zero,
+                end: Duration(seconds: 10),
+                text: 'كان ',
+              ),
+              LyricWord(
+                time: Duration(seconds: 10),
+                end: Duration(seconds: 20),
+                text: 'عندك',
+              ),
+            ],
+            romanization: 'kan andak',
+            romanizationWords: [
+              LyricWord(
+                time: Duration.zero,
+                end: Duration(seconds: 10),
+                text: 'kan ',
+              ),
+              LyricWord(
+                time: Duration(seconds: 10),
+                end: Duration(seconds: 20),
+                text: 'andak',
+              ),
+            ],
+          ),
+        ],
+      );
+      final playback = StreamController<PlaybackState>.broadcast();
+      final preview = ValueNotifier<Duration?>(const Duration(seconds: 2));
+      addTearDown(playback.close);
+      addTearDown(preview.dispose);
+      final theme = MornyeTheme.build(Brightness.dark);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            playbackStateProvider.overrideWith((ref) => playback.stream),
+          ],
+          child: MaterialApp(
+            theme: theme,
+            home: Scaffold(
+              body: SizedBox(
+                width: 600,
+                child: SyncedLyricsView(
+                  lyrics: arabicLyrics,
+                  seekPreview: preview,
+                  colorScheme: theme.colorScheme,
+                  isActive: true,
+                  showPronunciation: false,
+                  showTranslation: false,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final arabicPaint = find.descendant(
+        of: find.byWidgetPredicate(
+          (widget) =>
+              widget is Semantics && widget.properties.label == arabicText,
+        ),
+        matching: find.byType(CustomPaint),
+      );
+      expect(arabicPaint, findsOneWidget);
+      // ignore: avoid_dynamic_calls
+      final painter =
+          tester.widget<CustomPaint>(arabicPaint).painter as dynamic;
+      // ignore: avoid_dynamic_calls
+      final boxes = painter.segmentBoxes as List<List<Rect>>;
+      // ignore: avoid_dynamic_calls
+      final directions = painter.segmentDirections as List<List<TextDirection>>;
+      // First Arabic word ('كان ') is to the right of the second word ('عندك').
+      expect(boxes.first.first.left, greaterThan(boxes.last.first.left));
+      expect(directions.first.first, TextDirection.rtl);
+      expect(directions.last.first, TextDirection.rtl);
+
+      // The first word (on the right) is lifted while being sung at t=2s.
+      final size = tester.getSize(arabicPaint);
+      final pixels = (await tester.runAsync(() async {
+        final recorder = ui.PictureRecorder();
+        (painter as CustomPainter).paint(Canvas(recorder), size);
+        final picture = recorder.endRecording();
+        final image = await picture.toImage(
+          size.width.ceil(),
+          size.height.ceil(),
+        );
+        final bytes = (await image.toByteData(
+          format: ui.ImageByteFormat.rawRgba,
+        ))!;
+        final result = bytes.buffer.asUint8List().toList();
+        image.dispose();
+        picture.dispose();
+        return result;
+      }))!;
+      final width = size.width.ceil();
+      double inkTop(int from, int to) {
+        for (var y = 0; y < size.height.ceil(); y++) {
+          for (var x = from; x < to; x++) {
+            if (pixels[(y * width + x) * 4 + 3] >= 16) return y.toDouble();
+          }
+        }
+        return double.infinity;
+      }
+
+      final first = boxes.first.first;
+      final second = boxes.last.first;
+      expect(
+        inkTop(first.left.ceil(), first.right.floor()),
+        lessThan(inkTop(second.left.ceil(), second.right.floor())),
+      );
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
 }

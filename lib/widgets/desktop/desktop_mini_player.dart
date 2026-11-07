@@ -417,7 +417,7 @@ class _MiniPlayerLyricsState extends ConsumerState<_MiniPlayerLyrics>
                 child: Column(
                   key: ValueKey(current),
                   mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     if (current >= 0)
                       if (lines[current].hasWordTiming)
@@ -435,6 +435,10 @@ class _MiniPlayerLyricsState extends ConsumerState<_MiniPlayerLyrics>
                       else
                         Text(
                           lines[current].text,
+                          textDirection: lyricTextDirection(
+                            lines[current].text,
+                            Directionality.of(context),
+                          ),
                           style: textTheme.titleLarge?.copyWith(
                             fontWeight: FontWeight.w700,
                             color: colorScheme.onSurface,
@@ -445,6 +449,10 @@ class _MiniPlayerLyricsState extends ConsumerState<_MiniPlayerLyrics>
                     if (next >= 0)
                       Text(
                         lines[next].text,
+                        textDirection: lyricTextDirection(
+                          lines[next].text,
+                          Directionality.of(context),
+                        ),
                         style: textTheme.bodyLarge?.copyWith(
                           color: colorScheme.onSurfaceVariant,
                         ),
