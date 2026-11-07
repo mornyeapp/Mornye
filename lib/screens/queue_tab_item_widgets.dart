@@ -84,115 +84,115 @@ extension _QueueTabItemWidgets on _QueueTabState {
         onDismissed: (_) {
           ref.read(downloadQueueProvider.notifier).dismissItem(item.id);
         },
-        child: DownloadSuccessOverlay(
-          showSuccess: isCompleted,
-          child: TrackCard(
-            onTap: isCompleted
-                ? () => _navigateToMetadataScreen(item)
-                : item.status == DownloadStatus.failed ||
-                      item.status == DownloadStatus.skipped
-                ? () => _showDownloadErrorDialog(context, item)
-                : null,
-            onLongPress: item.status == DownloadStatus.queued
-                ? () => _showQueuedItemMenu(context, item)
-                : null,
-            onContextMenu: item.status == DownloadStatus.queued
-                ? (position) =>
-                      _showQueuedItemMenu(context, item, position: position)
-                : null,
-            background: item.status == DownloadStatus.downloading
-                ? SmoothedProgressBuilder(
-                    builder: (context, progress, child) => Align(
-                      alignment: AlignmentDirectional.centerStart,
-                      child: FractionallySizedBox(
-                        widthFactor: progress,
-                        child: child,
-                      ),
+        child: TrackCard(
+          onTap: isCompleted
+              ? () => _navigateToMetadataScreen(item)
+              : item.status == DownloadStatus.failed ||
+                    item.status == DownloadStatus.skipped
+              ? () => _showDownloadErrorDialog(context, item)
+              : null,
+          onLongPress: item.status == DownloadStatus.queued
+              ? () => _showQueuedItemMenu(context, item)
+              : null,
+          onContextMenu: item.status == DownloadStatus.queued
+              ? (position) =>
+                    _showQueuedItemMenu(context, item, position: position)
+              : null,
+          background: item.status == DownloadStatus.downloading
+              ? SmoothedProgressBuilder(
+                  builder: (context, progress, child) => Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: FractionallySizedBox(
+                      widthFactor: progress,
+                      child: child,
                     ),
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: AlignmentDirectional.centerStart,
-                          end: AlignmentDirectional.centerEnd,
-                          colors: [
-                            colorScheme.primary.withValues(alpha: 0.16),
-                            colorScheme.primary.withValues(alpha: 0.04),
-                          ],
-                        ),
-                      ),
-                    ),
-                  )
-                : null,
-            leading: isCompleted
-                ? Hero(
-                    tag: 'cover_${item.id}',
-                    child: _buildCoverArt(item, colorScheme),
-                  )
-                : _buildCoverArt(item, colorScheme),
-            title: item.track.name,
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ClickableArtistName(
-                  artistName: item.track.artistName,
-                  artistId: item.track.artistId,
-                  coverUrl: item.track.coverUrl,
-                  extensionId: item.track.source,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
                   ),
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: AlignmentDirectional.centerStart,
+                        end: AlignmentDirectional.centerEnd,
+                        colors: [
+                          colorScheme.primary.withValues(alpha: 0.16),
+                          colorScheme.primary.withValues(alpha: 0.04),
+                        ],
+                      ),
+                    ),
+                  ),
+                )
+              : null,
+          leading: isCompleted
+              ? Hero(
+                  tag: 'cover_${item.id}',
+                  child: _buildCoverArt(item, colorScheme),
+                )
+              : _buildCoverArt(item, colorScheme),
+          title: item.track.name,
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ClickableArtistName(
+                artistName: item.track.artistName,
+                artistId: item.track.artistId,
+                coverUrl: item.track.coverUrl,
+                extensionId: item.track.source,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
                 ),
-                if (item.status == DownloadStatus.downloading) ...[
-                  const SizedBox(height: 5),
-                  Row(
-                    children: [
-                      AppIcon(
-                        Icons.download_rounded,
-                        size: 12,
-                        color: colorScheme.primary,
-                      ),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: SmoothedProgressBuilder(
-                          builder: (context, progress, child) => Text(
-                            _formatDownloadStatusLine(
-                              context,
-                              item,
-                              visualProgress: progress,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.labelSmall
-                                ?.copyWith(
-                                  color: colorScheme.primary,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-                if (item.status == DownloadStatus.finalizing &&
-                    item.preparationStage == 'network_upload') ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    '${context.l10n.networkUploading}${item.bytesTotal > 0 ? ' • ${(100 * item.bytesReceived / item.bytesTotal).round()}%' : ''}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              ),
+              if (item.status == DownloadStatus.downloading) ...[
+                const SizedBox(height: 5),
+                Row(
+                  children: [
+                    AppIcon(
+                      Icons.download_rounded,
+                      size: 12,
                       color: colorScheme.primary,
                     ),
-                  ),
-                ],
-                if (item.status == DownloadStatus.failed) ...[
-                  const SizedBox(height: 4),
-                  _buildDownloadFailureMessage(context, item, colorScheme),
-                ],
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: SmoothedProgressBuilder(
+                        builder: (context, progress, child) => Text(
+                          _formatDownloadStatusLine(
+                            context,
+                            item,
+                            visualProgress: progress,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.labelSmall
+                              ?.copyWith(
+                                color: colorScheme.primary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ],
-            ),
-            trailing: _buildActionButtons(context, item, colorScheme),
+              if (item.status == DownloadStatus.finalizing &&
+                  item.preparationStage == 'network_upload') ...[
+                const SizedBox(height: 4),
+                Text(
+                  '${context.l10n.networkUploading}${item.bytesTotal > 0 ? ' • ${(100 * item.bytesReceived / item.bytesTotal).round()}%' : ''}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.labelSmall?.copyWith(color: colorScheme.primary),
+                ),
+              ],
+              if (item.status == DownloadStatus.failed) ...[
+                const SizedBox(height: 4),
+                _buildDownloadFailureMessage(context, item, colorScheme),
+              ],
+            ],
+          ),
+          trailing: DownloadStateSwitcher(
+            state: item.status,
+            child: _buildActionButtons(context, item, colorScheme),
           ),
         ),
       ),

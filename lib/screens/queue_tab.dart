@@ -11,6 +11,7 @@ import 'package:mornye/services/shell_navigation_service.dart';
 import 'package:mornye/widgets/error_card.dart';
 import 'package:mornye/widgets/settings_group.dart';
 import 'package:mornye/widgets/swipe_delete_dismissible.dart';
+import 'package:mornye/widgets/download_state_switcher.dart';
 import 'package:mornye/widgets/track_card.dart';
 import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/app_tokens.dart';
