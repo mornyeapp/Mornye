@@ -1111,6 +1111,9 @@ class SettingsNotifier extends Notifier<AppSettings> {
   void setLocalLibraryShowDuplicates(bool show) =>
       _commit(state.copyWith(localLibraryShowDuplicates: show));
 
+  void setLinkHideDisconnectedSongs(bool hide) =>
+      _commit(state.copyWith(linkHideDisconnectedSongs: hide));
+
   void setLocalLibraryAutoScan(String mode) =>
       _commit(state.copyWith(localLibraryAutoScan: mode));
 

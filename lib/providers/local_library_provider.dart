@@ -148,6 +148,11 @@ class LocalLibraryState {
 typedef LocalLibraryAvailabilityProbe =
     Future<bool?> Function(String path, {String? bookmark});
 
+/// Whether the songs of the `network://` source [source] (its host) show:
+/// true or false, or null to keep them as they are. Mornye Link decides it,
+/// so a paired device's songs hide while it is not connected.
+typedef NetworkSourceAvailability = bool? Function(String source);
+
 class LocalLibraryNotifier extends Notifier<LocalLibraryState> {
   LocalLibraryNotifier({
     LibraryDatabase? database,
@@ -161,6 +166,10 @@ class LocalLibraryNotifier extends Notifier<LocalLibraryState> {
   final NetworkStorageService _networkStorage;
   void Function()? _unsubscribeNetworkRemoval;
   final LocalLibraryAvailabilityProbe? _availabilityProbe;
+
+  /// Network outages are transient: without a decision here a network
+  /// source keeps its state, so its indexed songs stay visible.
+  NetworkSourceAvailability? _networkAvailability;
   final NotificationService _notificationService = NotificationService();
   static const _progressPollingInterval = Duration(milliseconds: 350);
   static const _progressStreamBootstrapTimeout = Duration(milliseconds: 900);
@@ -475,6 +484,15 @@ class LocalLibraryNotifier extends Notifier<LocalLibraryState> {
       if (!ref.mounted) return;
     }
     await _refreshSummaryFromStorage();
+  }
+
+  /// Applies [availability] to the network sources now and at every later
+  /// availability refresh.
+  Future<void> setNetworkSourceAvailability(
+    NetworkSourceAvailability availability,
+  ) {
+    _networkAvailability = availability;
+    return refreshSourceAvailability();
   }
 
   Future<void> refreshSourceAvailability({bool scanReconnected = false}) {

@@ -9773,6 +9773,14 @@
   "@linkFollowDesktopSubtitle": {
     "description": "Switch subtitle for following the computer's playback"
   },
+  "linkHideDisconnectedTitle": "Hide songs while disconnected",
+  "@linkHideDisconnectedTitle": {
+    "description": "Mornye Link switch, on the phone and on the computer: hide a paired device's songs from the Library while it is not connected"
+  },
+  "linkHideDisconnectedSubtitle": "Songs from a paired device leave Library while it is not connected and return when it connects",
+  "@linkHideDisconnectedSubtitle": {
+    "description": "Subtitle of the Hide songs while disconnected switch"
+  },
   "linkNearbySection": "On this network",
   "@linkNearbySection": {
     "description": "Section header for computers running Mornye found on the local network"

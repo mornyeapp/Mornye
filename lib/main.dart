@@ -43,6 +43,7 @@ import 'package:mornye/services/link/desktop/link_phone_playback.dart';
 import 'package:mornye/services/link/features/link_phone_features.dart';
 import 'package:mornye/services/link/features/link_remote_playback.dart';
 import 'package:mornye/services/link/link_client_api.dart';
+import 'package:mornye/services/link/link_source_presence.dart';
 import 'package:mornye/services/music_player_service.dart';
 import 'package:mornye/services/playback_notification.dart';
 import 'package:mornye/services/player_widget_service.dart';
@@ -611,6 +612,8 @@ class _EagerInitializationState extends ConsumerState<EagerInitialization>
         bindDesktopFullScreenLyrics();
         // Starts the Mornye Link server when the owner turned it on.
         ref.read(linkDesktopHostProvider);
+        // Hides a phone's songs while it is not connected.
+        ref.read(linkSourcePresenceProvider);
       }
       _initializeAppServices();
       _initializeExtensions();

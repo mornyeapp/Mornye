@@ -292,6 +292,23 @@ void main() {
     expect(find.byKey(const ValueKey('link-add-app')), findsNothing);
   });
 
+  testWidgets('paired phones offer keeping their songs while disconnected', (
+    tester,
+  ) async {
+    backend.deviceList = [
+      const LinkPairedDevice(deviceId: 'p1', name: 'Pixel', platform: 'ios'),
+    ];
+    await pumpPage(tester);
+    final toggle = find.byKey(const ValueKey('link-hide-disconnected'));
+    expect(toggle, findsOneWidget);
+    final container = ProviderScope.containerOf(tester.element(toggle));
+    expect(container.read(settingsProvider).linkHideDisconnectedSongs, isTrue);
+
+    await tester.tap(toggle);
+    await tester.pump();
+    expect(container.read(settingsProvider).linkHideDisconnectedSongs, isFalse);
+  });
+
   for (final mornye in [false, true]) {
     testWidgets(
       '${mornye ? 'Mornye' : 'Material'}: a Transfers row follows paired phones',

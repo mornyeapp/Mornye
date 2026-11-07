@@ -332,6 +332,56 @@ void main() {
     expect(loaded.totalCount, 2);
   });
 
+  test('network availability decides network sources only', () async {
+    database.sources = [
+      const LocalLibrarySource(
+        id: 'device',
+        path: 'network://device/',
+        displayName: 'Device',
+        trackCount: 2,
+      ),
+      const LocalLibrarySource(
+        id: 'nas',
+        path: 'network://nas/Music/',
+        displayName: 'NAS / Music',
+        trackCount: 2,
+        available: false,
+      ),
+    ];
+    container.read(localLibraryProvider);
+    await _waitFor(() => !container.read(localLibraryProvider).isLoading);
+    bool available(String id) => container
+        .read(localLibraryProvider)
+        .sources
+        .firstWhere((source) => source.id == id)
+        .available;
+
+    // No decision yet: both keep their stored state.
+    await library.refreshSourceAvailability(scanReconnected: true);
+    expect(available('device'), isTrue);
+    expect(available('nas'), isFalse);
+
+    bool? device;
+    await library.setNetworkSourceAvailability(
+      (source) => source == 'device' ? device : null,
+    );
+    expect(available('device'), isTrue);
+    device = false;
+    await library.refreshSourceAvailability();
+    expect(available('device'), isFalse);
+    expect(available('nas'), isFalse);
+
+    device = true;
+    await library.refreshSourceAvailability(scanReconnected: true);
+    expect(available('device'), isTrue);
+    await Future<void>.delayed(Duration.zero);
+    expect(
+      library.scannedSources,
+      isEmpty,
+      reason: 'A Link device refreshes its own songs when it connects',
+    );
+  });
+
   test(
     'unchanged overlapping availability refreshes share one probe',
     () async {

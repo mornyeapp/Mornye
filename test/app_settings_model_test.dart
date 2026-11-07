@@ -32,6 +32,14 @@ void main() {
     );
   });
 
+  test('Link hides disconnected devices by default and remembers off', () {
+    expect(const AppSettings().linkHideDisconnectedSongs, isTrue);
+    expect(AppSettings.fromJson({}).linkHideDisconnectedSongs, isTrue);
+    final off = const AppSettings().copyWith(linkHideDisconnectedSongs: false);
+    expect(AppSettings.fromJson(off.toJson()).linkHideDisconnectedSongs, false);
+    expect(off.copyWith(locale: 'id').linkHideDisconnectedSongs, isFalse);
+  });
+
   test('AI translation defaults to Fast and remembers either mode', () {
     expect(const AppSettings().lyricsAiWordSync, isFalse);
     expect(AppSettings.fromJson({}).lyricsAiWordSync, isFalse);

@@ -177,6 +177,7 @@ AppSettings _$AppSettingsFromJson(Map<String, dynamic> json) => AppSettings(
   localLibraryShowDuplicates:
       json['localLibraryShowDuplicates'] as bool? ?? true,
   localLibraryAutoScan: json['localLibraryAutoScan'] as String? ?? 'off',
+  linkHideDisconnectedSongs: json['linkHideDisconnectedSongs'] as bool? ?? true,
   hasCompletedTutorial: json['hasCompletedTutorial'] as bool? ?? false,
   whatsNewSeen: json['whatsNewSeen'] as String? ?? '',
   lyricsProviders:
@@ -334,6 +335,7 @@ Map<String, dynamic> _$AppSettingsToJson(
   'localLibraryBookmark': instance.localLibraryBookmark,
   'localLibraryShowDuplicates': instance.localLibraryShowDuplicates,
   'localLibraryAutoScan': instance.localLibraryAutoScan,
+  'linkHideDisconnectedSongs': instance.linkHideDisconnectedSongs,
   'hasCompletedTutorial': instance.hasCompletedTutorial,
   'whatsNewSeen': instance.whatsNewSeen,
   'lyricsProviders': instance.lyricsProviders,

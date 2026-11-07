@@ -276,6 +276,10 @@ class AppSettings {
   final String
   localLibraryAutoScan; // Auto-scan mode: 'off', 'on_open', 'daily', 'weekly'
 
+  /// Hide a Mornye Link device's songs from the Library while it is not
+  /// connected: a phone's on the desktop, a computer's on a phone.
+  final bool linkHideDisconnectedSongs;
+
   final bool hasCompletedTutorial;
 
   /// The last `AppInfo.whatsNewRelease` tour shown or skipped. New installs
@@ -472,6 +476,7 @@ class AppSettings {
     this.localLibraryBookmark = '',
     this.localLibraryShowDuplicates = true,
     this.localLibraryAutoScan = 'off',
+    this.linkHideDisconnectedSongs = true,
     this.hasCompletedTutorial = false,
     this.whatsNewSeen = '',
     this.lyricsProviders = const [
@@ -642,6 +647,7 @@ class AppSettings {
     String? localLibraryBookmark,
     bool? localLibraryShowDuplicates,
     String? localLibraryAutoScan,
+    bool? linkHideDisconnectedSongs,
     bool? hasCompletedTutorial,
     String? whatsNewSeen,
     List<String>? lyricsProviders,
@@ -823,6 +829,8 @@ class AppSettings {
       localLibraryShowDuplicates:
           localLibraryShowDuplicates ?? this.localLibraryShowDuplicates,
       localLibraryAutoScan: localLibraryAutoScan ?? this.localLibraryAutoScan,
+      linkHideDisconnectedSongs:
+          linkHideDisconnectedSongs ?? this.linkHideDisconnectedSongs,
       hasCompletedTutorial: hasCompletedTutorial ?? this.hasCompletedTutorial,
       whatsNewSeen: whatsNewSeen ?? this.whatsNewSeen,
       lyricsProviders: lyricsProviders ?? this.lyricsProviders,

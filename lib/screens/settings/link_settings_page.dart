@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/l10n/l10n.dart';
+import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/screens/settings/link_pairing_dialogs.dart';
 import 'package:mornye/services/link/client/link_client_controller.dart';
 import 'package:mornye/services/link/client/link_client_discovery.dart';
@@ -299,6 +300,9 @@ class _LinkSettingsPageState extends ConsumerState<LinkSettingsPage> {
     final state = ref.watch(linkClientControllerProvider);
     final options = ref.watch(linkPhoneOptionsProvider);
     final optionsNotifier = ref.read(linkPhoneOptionsProvider.notifier);
+    final hideDisconnected = ref.watch(
+      settingsProvider.select((s) => s.linkHideDisconnectedSongs),
+    );
     final unpaired = state.unpaired;
     final searching = state.discovery == LinkDiscoveryStatus.searching;
     final theme = Theme.of(context);
@@ -340,6 +344,17 @@ class _LinkSettingsPageState extends ConsumerState<LinkSettingsPage> {
                   value: options.showComputerSongs,
                   onChanged: options.loaded
                       ? optionsNotifier.setShowComputerSongs
+                      : null,
+                ),
+                SettingsSwitchItem(
+                  icon: Icons.visibility_off,
+                  title: l10n.linkHideDisconnectedTitle,
+                  subtitle: l10n.linkHideDisconnectedSubtitle,
+                  value: hideDisconnected,
+                  onChanged: options.showComputerSongs
+                      ? ref
+                            .read(settingsProvider.notifier)
+                            .setLinkHideDisconnectedSongs
                       : null,
                 ),
                 SettingsSwitchItem(

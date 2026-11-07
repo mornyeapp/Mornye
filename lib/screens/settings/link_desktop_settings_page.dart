@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:mornye/l10n/l10n.dart';
+import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/services/link/desktop/link_desktop_backend.dart';
 import 'package:mornye/services/link/desktop/link_desktop_host.dart';
 import 'package:mornye/theme/app_tokens.dart';
@@ -155,6 +156,20 @@ class LinkDesktopSettingsPage extends ConsumerWidget {
                 else ...[
                   for (final device in phones)
                     _DeviceRow(device: device, showDivider: true),
+                  SettingsSwitchItem(
+                    key: const ValueKey('link-hide-disconnected'),
+                    icon: Icons.visibility_off,
+                    title: l10n.linkHideDisconnectedTitle,
+                    subtitle: l10n.linkHideDisconnectedSubtitle,
+                    value: ref.watch(
+                      settingsProvider.select(
+                        (s) => s.linkHideDisconnectedSongs,
+                      ),
+                    ),
+                    onChanged: ref
+                        .read(settingsProvider.notifier)
+                        .setLinkHideDisconnectedSongs,
+                  ),
                   const LinkTransfersSettingsItem(),
                 ],
               ],

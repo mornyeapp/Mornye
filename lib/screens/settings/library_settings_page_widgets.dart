@@ -170,7 +170,10 @@ class _LibrarySourceSettingsItem extends StatelessWidget {
     final status = !source.enabled
         ? context.l10n.librarySourceDisabled
         : !source.available
-        ? context.l10n.librarySourceOffline
+        // A Link device's songs return by themselves once it connects.
+        ? link
+              ? context.l10n.linkConnectionDisconnected
+              : context.l10n.librarySourceOffline
         : isScanning
         ? isFinalizing
               ? context.l10n.libraryScanFinalizing
