@@ -280,6 +280,9 @@ class AppSettings {
   /// Whether the phone Now Playing screen shows its volume slider.
   final bool playerShowVolume;
 
+  /// Whether the phone Now Playing screen shows a single-line synced lyric preview.
+  final bool playerShowLyricSnippet;
+
   const AppSettings({
     this.defaultService = '',
     this.audioQuality = 'LOSSLESS',
@@ -413,6 +416,7 @@ class AppSettings {
     this.playerShowPronunciation = true,
     this.playerShowTranslation = true,
     this.playerShowVolume = true,
+    this.playerShowLyricSnippet = true,
   });
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -563,6 +567,7 @@ class AppSettings {
     bool? playerShowPronunciation,
     bool? playerShowTranslation,
     bool? playerShowVolume,
+    bool? playerShowLyricSnippet,
   }) {
     return AppSettings(
       defaultService: defaultService ?? this.defaultService,
@@ -736,6 +741,8 @@ class AppSettings {
       playerShowTranslation:
           playerShowTranslation ?? this.playerShowTranslation,
       playerShowVolume: playerShowVolume ?? this.playerShowVolume,
+      playerShowLyricSnippet:
+          playerShowLyricSnippet ?? this.playerShowLyricSnippet,
     );
   }
 
