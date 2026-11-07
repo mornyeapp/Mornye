@@ -38,6 +38,10 @@ import 'package:mornye/widgets/autoplay_randomness_slider.dart';
 import 'package:mornye/widgets/music_haptics_settings.dart';
 import 'package:mornye/widgets/playback_normalization_settings.dart';
 
+/// Shows the Android audio output section on any host, for tests.
+@visibleForTesting
+bool? debugAndroidAudioSettingsOverride;
+
 class PlaybackSettingsPage extends ConsumerStatefulWidget {
   const PlaybackSettingsPage({super.key});
 
@@ -159,6 +163,8 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage>
     final coverStyle = settings.playerCoverStyleFor(mornye: context.isMornye);
     // The charging rule applies to Android's background sweep only.
     final chargingOption = settings.songAnalysis && Platform.isAndroid;
+    final androidAudio =
+        debugAndroidAudioSettingsOverride ?? Platform.isAndroid;
     final progress = _songAnalysis.progress.value;
     final analysis =
         progress != null &&
@@ -512,11 +518,21 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage>
                   _AlsaDeviceItem(device: settings.exclusiveOutputDevice),
               ],
             ),
-          if (Platform.isAndroid)
+          if (androidAudio)
             ...settingsSectionSlivers(
               title: context.l10n.sectionAudioOutput,
               connected: true,
               children: [
+                SettingsSwitchItem(
+                  icon: Icons.play_circle_outline,
+                  title: context.l10n.newPlaybackEngine,
+                  titleTrailing: const BetaBadge(),
+                  subtitle: context.l10n.newPlaybackEngineDescription,
+                  value: settings.media3Engine,
+                  onChanged: (value) => ref
+                      .read(settingsProvider.notifier)
+                      .setMedia3Engine(value),
+                ),
                 ValueListenableBuilder<UsbAudioStatus>(
                   valueListenable: usbAudioStatus,
                   builder: (context, status, _) => SettingsSwitchItem(

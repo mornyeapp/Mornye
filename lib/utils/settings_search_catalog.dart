@@ -410,6 +410,19 @@ class SettingsSearchCatalog {
         ),
         if (androidAudio) ...[
           SettingsSearchEntry(
+            icon: Icons.play_circle_outline,
+            title: l10n.newPlaybackEngine,
+            subtitle: l10n.newPlaybackEngineDescription,
+            keywords: const [
+              'engine',
+              'beta',
+              'crackle',
+              'static',
+              'distortion',
+              'media player',
+            ],
+          ),
+          SettingsSearchEntry(
             icon: Icons.usb,
             title: l10n.usbBitPerfect,
             subtitle: l10n.usbBitPerfectDescription,

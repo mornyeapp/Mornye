@@ -307,6 +307,14 @@
   "sectionPlayer": "Player",
   "sectionVolumeAndTransitions": "Volume and transitions",
   "sectionAudioOutput": "Audio output",
+  "newPlaybackEngine": "New playback engine",
+  "@newPlaybackEngine": {
+    "description": "Android Playback setting, marked Beta, that plays music through the app's own audio engine instead of the system media player"
+  },
+  "newPlaybackEngineDescription": "Plays through the app's own engine instead of the phone's media player. Try it if songs crackle or sound wrong. Applies from the next song.",
+  "@newPlaybackEngineDescription": {
+    "description": "Subtitle of the New playback engine switch. 'Crackle' means short clicks or static in the sound"
+  },
   "usbBitPerfect": "Hi-res and bit-perfect audio",
   "usbBitPerfectDescription": "Preserve source precision on compatible outputs. Choose direct USB or AAudio exclusive below; otherwise Android USB output requires Android 14 or later. Applies from the next track, without AutoMix or normalization. System volume may not control direct USB.",
   "usbHardwareVolume": "DAC hardware volume",
