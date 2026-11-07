@@ -46,16 +46,18 @@ const _lyrics = {
       '[00:20.00]\n'
       '[00:30.00]Third line',
   'music/b.flac': '[00:02.00]Another song',
+  'content://library/c.flac': '[00:01.00]From a picked folder',
 };
 
-SetMediaItemRequest _item(String id, String title) => SetMediaItemRequest(
-  mediaItem: MediaItemMessage(
-    id: id,
-    title: title,
-    artist: 'Artist',
-    extras: {'source': 'music/$id.flac'},
-  ),
-);
+SetMediaItemRequest _item(String id, String title, {String? source}) =>
+    SetMediaItemRequest(
+      mediaItem: MediaItemMessage(
+        id: id,
+        title: title,
+        artist: 'Artist',
+        extras: {'source': source ?? 'music/$id.flac'},
+      ),
+    );
 
 SetStateRequest _state(DateTime at, {bool playing = true, num position = 0}) =>
     SetStateRequest(
@@ -100,8 +102,8 @@ class _Harness {
   }
 
   /// Plays [id] from the start.
-  Future<void> play(String id, String title) {
-    session.setMediaItem(_item(id, title));
+  Future<void> play(String id, String title, {String? source}) {
+    session.setMediaItem(_item(id, title, source: source));
     session.setState(_state(now));
     return flush();
   }
@@ -126,6 +128,18 @@ void main() {
       expect(timeline.at(_seconds(0.5)), (line: null, next: _seconds(1)));
       expect(timeline.at(_seconds(2)), (line: 'First', next: _seconds(4)));
       expect(timeline.at(_seconds(5)), (line: 'Second', next: null));
+    });
+
+    test('keeps the sung line over one timed with it', () {
+      final timeline = LockScreenLyricTimeline(
+        LyricsParser.parse(
+          '[00:01.00]Sung line\n[00:01.00]Its translation\n'
+          '[00:04.00]Next line\n[00:04.00]Next translation',
+        ).lines,
+      );
+
+      expect(timeline.at(_seconds(2)), (line: 'Sung line', next: _seconds(4)));
+      expect(timeline.at(_seconds(5)), (line: 'Next line', next: null));
     });
 
     test('shows no line in a break of three seconds or more', () {
@@ -292,6 +306,18 @@ void main() {
       expect(h.os.titles.last, 'Another song');
       await h.close();
       expect(h.os.titles.last, 'Other');
+    });
+
+    testWidgets('reads a song played straight from a picked folder', (
+      tester,
+    ) async {
+      final h = _Harness(tester)..session.enabled = true;
+      // Playback publishes no resolved copy of an SAF document it streams.
+      await h.play('c', 'Song', source: 'content://library/c.flac');
+      await h.lock(true);
+      await h.elapse(1);
+      expect(h.os.titles.last, 'From a picked folder');
+      await h.close();
     });
 
     testWidgets('keeps the line when the same item is sent again', (

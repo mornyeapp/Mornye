@@ -16,8 +16,9 @@ final _log = AppLogger('LockScreenLyrics');
 
 /// Synced lyrics as the lock screen shows them: the lead line being sung,
 /// and no line before the first one, in a break of [minimumBreak] or more,
-/// or after the last line's known end. Backing vocals never replace it.
-/// A line longer than [partLength] shows in parts, each from when it is
+/// or after the last line's known end. Backing vocals never replace it,
+/// nor does a line starting with it, such as a translation timed with the
+/// line it translates. A line longer than [partLength] shows in parts, each from when it is
 /// sung, since the system cuts a long title short.
 class LockScreenLyricTimeline {
   LockScreenLyricTimeline(
@@ -64,6 +65,7 @@ class LockScreenLyricTimeline {
     // the lines sung so far. A line without an end lasts until the next.
     Duration? silentFrom;
     Duration? sungUntil;
+    Duration? shownFrom;
     for (var index = 0; index < lines.length; index++) {
       final line = lines[index];
       if (line.isBackground) continue;
@@ -72,6 +74,8 @@ class LockScreenLyricTimeline {
         silentFrom ??= line.time;
         continue;
       }
+      if (line.time == shownFrom) continue;
+      shownFrom = line.time;
       if (silentFrom != null && line.time - silentFrom >= minimumBreak) {
         rows.add(LyricLine(time: silentFrom, text: ''));
       }
@@ -448,6 +452,9 @@ class LockScreenLyrics extends AudioServicePlatform {
           duration: item.duration,
           extras: item.extras,
         ),
+        // Playback streams an SAF song straight from its document and
+        // publishes no resolved copy, so the lyrics are read from it.
+        inspectUnresolvedContentUri: true,
       ),
     );
     _lyricsChanged();
