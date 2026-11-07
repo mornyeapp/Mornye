@@ -7235,6 +7235,14 @@
   "@lyricsAiAutoSaveSubtitle": {
     "description": "Subtitle of the automatic save switch for lyrics translations"
   },
+  "lyricsAiTranslateDownloads": "Translate Downloads",
+  "@lyricsAiTranslateDownloads": {
+    "description": "AI Translation switch that translates the lyrics of every downloaded song and saves them with it"
+  },
+  "lyricsAiTranslateDownloadsSubtitle": "Translates each downloaded song's lyrics and saves them with it, so they show offline. Every download uses your API key",
+  "@lyricsAiTranslateDownloadsSubtitle": {
+    "description": "Subtitle of the switch that translates the lyrics of downloaded songs"
+  },
   "nowPlayingTranslatingLyrics": "Translating lyrics, {percent}%",
   "@nowPlayingTranslatingLyrics": {
     "description": "Tooltip and screen reader label of the lyrics menu button while an AI translation runs",

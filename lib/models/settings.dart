@@ -328,6 +328,11 @@ class AppSettings {
   /// Save each lyrics translation once the player shows it.
   final bool lyricsTranslationAutoSave;
 
+  /// Translate the lyrics of each finished download and save them with the
+  /// song, so they show offline. Off by default: every download is a
+  /// request on the user's API key.
+  final bool lyricsTranslateDownloads;
+
   final String
   lastSeenVersion; // Last app version the user has acknowledged (e.g. '3.7.0')
 
@@ -487,6 +492,7 @@ class AppSettings {
     this.lyricsAiWordSync = false,
     this.lyricsTranslationSaveTo = lyricsTranslationSaveToSongFile,
     this.lyricsTranslationAutoSave = false,
+    this.lyricsTranslateDownloads = false,
     this.lastSeenVersion = '',
     this.deduplicateDownloads = true,
     this.allowQualityVariants = false,
@@ -649,6 +655,7 @@ class AppSettings {
     bool? lyricsAiWordSync,
     String? lyricsTranslationSaveTo,
     bool? lyricsTranslationAutoSave,
+    bool? lyricsTranslateDownloads,
     String? lastSeenVersion,
     bool? deduplicateDownloads,
     bool? allowQualityVariants,
@@ -839,6 +846,8 @@ class AppSettings {
           lyricsTranslationSaveTo ?? this.lyricsTranslationSaveTo,
       lyricsTranslationAutoSave:
           lyricsTranslationAutoSave ?? this.lyricsTranslationAutoSave,
+      lyricsTranslateDownloads:
+          lyricsTranslateDownloads ?? this.lyricsTranslateDownloads,
       lastSeenVersion: lastSeenVersion ?? this.lastSeenVersion,
       deduplicateDownloads: deduplicateDownloads ?? this.deduplicateDownloads,
       allowQualityVariants: allowQualityVariants ?? this.allowQualityVariants,
