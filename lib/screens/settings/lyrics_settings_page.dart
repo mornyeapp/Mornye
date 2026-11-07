@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/controllers/clickable_metadata.dart';
@@ -61,6 +63,18 @@ class LyricsSettingsPage extends ConsumerWidget {
                       .read(settingsProvider.notifier)
                       .setKeepScreenOnLyrics(value),
                 ),
+                if (Platform.isAndroid || Platform.isIOS)
+                  SettingsSwitchItem(
+                    icon: Icons.screen_lock_portrait_outlined,
+                    title: context.l10n.lyricsLockScreen,
+                    subtitle: Platform.isIOS
+                        ? context.l10n.lyricsLockScreenSubtitleIos
+                        : context.l10n.lyricsLockScreenSubtitle,
+                    value: settings.lockScreenLyrics,
+                    onChanged: (value) => ref
+                        .read(settingsProvider.notifier)
+                        .setLockScreenLyrics(value),
+                  ),
                 SettingsItem(
                   key: const ValueKey('lyrics-ai-translation'),
                   icon: Icons.auto_awesome_outlined,

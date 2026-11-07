@@ -345,6 +345,7 @@ final Map<IconData, IconData> _outlinedSymbols = {
   Icons.remove_circle_outline: Symbols.remove_circle_rounded,
   Icons.report_gmailerrorred_outlined: Symbols.report_gmailerrorred_rounded,
   Icons.save_outlined: Symbols.save_rounded,
+  Icons.screen_lock_portrait_outlined: Symbols.screen_lock_portrait_rounded,
   Icons.sd_storage_outlined: Symbols.sd_storage_rounded,
   Icons.security_outlined: Symbols.security_rounded,
   Icons.segment_outlined: Symbols.segment_rounded,

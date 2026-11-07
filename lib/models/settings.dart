@@ -215,6 +215,9 @@ class AppSettings {
   final String locale;
   final String lyricsMode;
   final bool keepScreenOnLyrics;
+
+  /// Show the line being sung in place of the song title on the lock screen.
+  final bool lockScreenLyrics;
   final bool motionArtworkEnabled;
 
   /// Copy a download's animated cover into its album folder as `cover.mp4`.
@@ -406,6 +409,7 @@ class AppSettings {
     this.locale = 'system',
     this.lyricsMode = 'embed',
     this.keepScreenOnLyrics = true,
+    this.lockScreenLyrics = false,
     this.motionArtworkEnabled = true,
     this.saveMotionArtworkFile = false,
     this.listeningStatisticsEnabled = true,
@@ -569,6 +573,7 @@ class AppSettings {
     String? locale,
     String? lyricsMode,
     bool? keepScreenOnLyrics,
+    bool? lockScreenLyrics,
     bool? motionArtworkEnabled,
     bool? saveMotionArtworkFile,
     bool? listeningStatisticsEnabled,
@@ -733,6 +738,7 @@ class AppSettings {
       locale: locale ?? this.locale,
       lyricsMode: lyricsMode ?? this.lyricsMode,
       keepScreenOnLyrics: keepScreenOnLyrics ?? this.keepScreenOnLyrics,
+      lockScreenLyrics: lockScreenLyrics ?? this.lockScreenLyrics,
       motionArtworkEnabled: motionArtworkEnabled ?? this.motionArtworkEnabled,
       saveMotionArtworkFile:
           saveMotionArtworkFile ?? this.saveMotionArtworkFile,

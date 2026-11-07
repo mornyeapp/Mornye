@@ -494,6 +494,12 @@ class SettingsSearchCatalog {
           subtitle: l10n.lyricsKeepScreenOnSubtitle,
           keywords: const ['screen timeout', 'awake', 'sleep', 'layar'],
         ),
+        if (!isDesktopPlatform)
+          SettingsSearchEntry(
+            icon: Icons.screen_lock_portrait_outlined,
+            title: l10n.lyricsLockScreen,
+            keywords: const ['lockscreen', 'notification', 'media controls'],
+          ),
         SettingsSearchEntry(
           icon: Icons.auto_awesome_outlined,
           title: l10n.lyricsAiTranslation,

@@ -2043,6 +2043,18 @@
   },
   "lyricsKeepScreenOn": "Keep screen on while viewing lyrics",
   "lyricsKeepScreenOnSubtitle": "Prevent screen timeout while lyrics are open, including when playback is paused.",
+  "lyricsLockScreen": "Lyrics on lock screen",
+  "@lyricsLockScreen": {
+    "description": "Lyrics setting that shows the line being sung in place of the song title in the system media controls"
+  },
+  "lyricsLockScreenSubtitle": "Show the line being sung in place of the song title while the phone is locked. Cars and watches show it too.",
+  "@lyricsLockScreenSubtitle": {
+    "description": "Subtitle of the Lyrics on lock screen switch on Android"
+  },
+  "lyricsLockScreenSubtitleIos": "Show the line being sung in place of the song title while Mornye is in the background. Cars and watches show it too.",
+  "@lyricsLockScreenSubtitleIos": {
+    "description": "Subtitle of the Lyrics on lock screen switch on iOS, where it also shows in Control Center. Keep 'Mornye' as is: it is the app name"
+  },
   "lyricsMode": "Lyrics Mode",
   "@lyricsMode": {
     "description": "Setting - how to save lyrics"

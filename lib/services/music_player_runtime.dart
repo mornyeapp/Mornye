@@ -26,6 +26,7 @@ import 'package:mornye/services/library_collections_database.dart';
 import 'package:mornye/services/library_database.dart';
 import 'package:mornye/services/listening_statistics.dart';
 import 'package:mornye/services/lastfm/lastfm_service.dart';
+import 'package:mornye/services/lock_screen_lyrics.dart';
 import 'package:mornye/services/media_kit_playback_deck.dart';
 import 'package:mornye/services/media_library_browser.dart';
 import 'package:mornye/services/media_session_art_cache.dart';
@@ -274,6 +275,8 @@ class PlaybackDependencies {
     // MPRIS on Linux and SMTC on Windows; other OSes keep the plugin and
     // send it only the states their sessions cannot advance themselves.
     installDesktopMediaSession();
+    // Under the filter, so lyrics replace the title for the system alone.
+    installLockScreenLyrics();
     installMediaSessionFilter();
     late final MusicPlayerHandler handler;
     final session = await AudioService.init(
@@ -411,6 +414,7 @@ class MusicPlayerRuntime {
     final previous = _settings;
     _settings = settings;
     _configureExclusiveOutput(settings);
+    configureLockScreenLyrics(enabled: settings.lockScreenLyrics);
     _songAnalysis?.configure(settings);
     _handler?.applySettings(previous);
     if (previous.playerMode == 'internal' &&

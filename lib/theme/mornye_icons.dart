@@ -189,7 +189,8 @@ IconData _cupertinoFor(IconData icon) {
     Icons.mic => CupertinoIcons.mic_fill,
     Icons.bedtime_outlined => CupertinoIcons.moon_zzz,
     Icons.explore_outlined => CupertinoIcons.compass,
-    Icons.vpn_key_outlined => CupertinoIcons.lock,
+    Icons.vpn_key_outlined ||
+    Icons.screen_lock_portrait_outlined => CupertinoIcons.lock,
     Icons.bookmark_outline => CupertinoIcons.bookmark,
     Icons.low_priority => CupertinoIcons.sort_down,
     Icons.search || Icons.manage_search => CupertinoIcons.search,
