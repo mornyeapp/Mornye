@@ -8,7 +8,7 @@ extension _HomeTabExploreUI on _HomeTabState {
   ) {
     final hasGreeting =
         !context.isMornye && greeting != null && greeting.isNotEmpty;
-    final isTablet = MediaQuery.sizeOf(context).shortestSide >= 600;
+    final isTablet = _usesTabletSizes(context);
     final sectionOffset = hasGreeting ? 1 : 0;
     final totalCount = sections.length + sectionOffset + 1;
 
@@ -57,7 +57,7 @@ extension _HomeTabExploreUI on _HomeTabState {
       );
     }
     final sectionHeight = _exploreSectionHeight(context);
-    final isTablet = MediaQuery.sizeOf(context).shortestSide >= 600;
+    final isTablet = _usesTabletSizes(context);
     if (section.isQuickPicks) {
       return _buildQuickPicksSection(section, colorScheme);
     }
@@ -189,7 +189,7 @@ extension _HomeTabExploreUI on _HomeTabState {
     ColorScheme colorScheme,
   ) {
     final isArtist = item.type == 'artist';
-    final isTablet = MediaQuery.sizeOf(context).shortestSide >= 600;
+    final isTablet = _usesTabletSizes(context);
     final cardSize = _exploreCardSize(context);
     final coverSize = _exploreCoverSize(context);
     final iconSize = cardSize * 0.3;

@@ -1082,7 +1082,12 @@ class _MainShellState extends ConsumerState<MainShell>
                     key: ValueKey('page-$index'),
                     child: TickerMode(
                       enabled: index == _currentIndex,
-                      child: observeScroll(tabs[index], index),
+                      // Kept-alive hidden pages keep their last size, so
+                      // resizes and rail motion rebuild only the page shown.
+                      child: HiddenTabMediaQuery(
+                        hidden: index != _currentIndex,
+                        child: observeScroll(tabs[index], index),
+                      ),
                     ),
                   ),
                 ),

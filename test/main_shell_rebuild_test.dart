@@ -288,6 +288,59 @@ void main() {
     });
   }
 
+  /// The widget [type]'s state built last; a new instance means its state
+  /// built again.
+  Widget builtBy(WidgetTester tester, Type type) {
+    late Widget child;
+    tester
+        .element(find.byType(type, skipOffstage: false).first)
+        .visitChildElements((element) => child = element.widget);
+    return child;
+  }
+
+  testWidgets('desktop Material width changes rebuild neither Home nor a '
+      'hidden Library', (tester) async {
+    await pumpShell(tester, desktop: true, mornye: false);
+    ShellNavigationService.requestTab(ShellTab.library);
+    await settle(tester);
+    ShellNavigationService.requestTab(ShellTab.home);
+    await settle(tester);
+    final home = builtBy(tester, HomeTab);
+    final library = builtBy(tester, QueueTab);
+    Size librarySize() => MediaQuery.sizeOf(
+      tester.element(find.byType(QueueTab, skipOffstage: false).first),
+    );
+    final hiddenSize = librarySize();
+
+    // Width-only frames, as in a live edge drag or the rail expanding.
+    for (var frame = 1; frame <= 10; frame++) {
+      tester.view.physicalSize = Size(1280.0 + frame * 12, 800);
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    await settle(tester);
+    expect(builtBy(tester, HomeTab), same(home));
+    expect(builtBy(tester, QueueTab), same(library));
+
+    // Home follows a height change; the hidden Library keeps its size.
+    tester.view.physicalSize = const Size(1400, 760);
+    await settle(tester);
+    expect(builtBy(tester, HomeTab), isNot(same(home)));
+    expect(builtBy(tester, QueueTab), same(library));
+    expect(librarySize(), hiddenSize);
+
+    // Library takes the new size when it shows again.
+    ShellNavigationService.requestTab(ShellTab.library);
+    await settle(tester);
+    expect(librarySize(), isNot(hiddenSize));
+    expect(
+      librarySize().height,
+      MediaQuery.sizeOf(
+        tester.element(find.byType(HomeTab, skipOffstage: false).first),
+      ).height,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('a Material rail playlist link fades in like a destination', (
     tester,
   ) async {

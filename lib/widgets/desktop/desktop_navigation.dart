@@ -603,9 +603,12 @@ class DesktopNavigationRail extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final background = colorScheme.surfaceContainer;
     if (!materialExpressiveEnabled(context)) {
-      // Reduced motion keeps Flutter's rail; Settings stays last.
+      // Reduced motion keeps Flutter's rail; Settings stays last. A new rail
+      // per state snaps to its width instead of running Flutter's extend
+      // animation, which ignores reduced motion.
       final index = destinations.indexWhere((d) => d.tab == selected);
       return NavigationRail(
+        key: ValueKey('desktop-rail-extended:$extended'),
         extended: extended,
         minExtendedWidth: desktopSidebarWidth,
         // Collapsed, the rail shows icons alone.
@@ -635,9 +638,11 @@ class DesktopNavigationRail extends StatelessWidget {
     final settings = destinations
         .where((destination) => destination.tab == ShellTab.settings)
         .firstOrNull;
+    // Only reached with expressive motion on; reduced motion takes the
+    // static rail above, so the fallback never animates.
     final motion = AppMotion.spatial(
       context,
-      const AppMotionSpec(Duration(milliseconds: 300), Curves.easeInOutCubic),
+      const AppMotionSpec(Duration.zero, Curves.linear),
     );
     final openLink = onOpenLibraryLink;
     // One expansion value drives the width, every pill and every label, so

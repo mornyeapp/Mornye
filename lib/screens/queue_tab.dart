@@ -261,8 +261,11 @@ class _QueueTabState extends ConsumerState<QueueTab> {
   );
 
   double _queueCoverSize() {
-    final shortestSide = MediaQuery.sizeOf(context).shortestSide;
-    final scale = (shortestSide / 390).clamp(0.82, 1.0);
+    // A desktop pane's shortest side is always past 390, so desktop skips
+    // the size read and resizes do not rebuild Library through it.
+    final scale = isDesktopPlatform
+        ? 1.0
+        : (MediaQuery.sizeOf(context).shortestSide / 390).clamp(0.82, 1.0);
     final textScale = effectiveTextScale(context);
     return (56 * scale * (1 + ((textScale - 1) * 0.12))).clamp(46.0, 56.0);
   }

@@ -637,6 +637,32 @@ void main() {
       expect(menuIcon(Icons.menu_open), findsOneWidget);
     });
 
+    testWidgets('reduced motion snaps the rail open and closed', (
+      tester,
+    ) async {
+      tester.platformDispatcher.accessibilityFeaturesTestValue =
+          const FakeAccessibilityFeatures(disableAnimations: true);
+      addTearDown(
+        tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
+      );
+      await pumpShell(tester, mornye: false, width: 1400);
+      double railWidth() => tester.getSize(find.byType(NavigationRail)).width;
+      final expanded = railWidth();
+      expect(expanded, greaterThan(desktopCollapsedRailWidth));
+
+      desktopSidebarCollapsed.value = true;
+      await tester.pump();
+      final collapsed = railWidth();
+      expect(collapsed, lessThan(expanded));
+      // Nothing is left to animate.
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(railWidth(), collapsed);
+
+      desktopSidebarCollapsed.value = false;
+      await tester.pump();
+      expect(railWidth(), expanded);
+    });
+
     testWidgets('narrow windows hide the rail menu button', (tester) async {
       await pumpShell(tester, mornye: false, width: 900);
 

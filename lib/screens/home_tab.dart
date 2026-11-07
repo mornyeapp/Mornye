@@ -191,15 +191,29 @@ class _HomeTabState extends ConsumerState<HomeTab>
   double _exploreCardSize(BuildContext context) {
     // Six phone-sized cards across an iPad made the feed look like a desktop
     // page zoomed out. A higher tablet cap gives roughly five generous cards
-    // in portrait while leaving all phone sizes unchanged.
-    final scale = responsiveScale(context: context, min: 0.82, max: 1.32);
+    // in portrait while leaving all phone sizes unchanged. A desktop pane is
+    // always wider than the 515 that reaches the cap, and one shorter than
+    // that takes the height cap below, so desktop skips the size read and
+    // width-only resizes do not rebuild Home.
+    final scale = isDesktopPlatform
+        ? 1.32
+        : responsiveScale(context: context, min: 0.82, max: 1.32);
     final textScale = effectiveTextScale(context);
     final size = 145 * scale * (1 + (textScale - 1) * 0.12);
     // Landscape tablets are short: one carousel row should not take over a
     // third of the screen. Portrait and phone heights never reach this cap.
-    final heightCap = MediaQuery.sizeOf(context).height * 0.24;
+    final heightCap = MediaQuery.heightOf(context) * 0.24;
     return size < heightCap ? size : heightCap;
   }
+
+  /// Whether Home takes its tablet type sizes (a shortest side of at least
+  /// 600). A Material desktop pane is always wider than that (an 800 window
+  /// less the collapsed rail, or a 1200 window less the expanded rail and
+  /// the inspector beside it), so only its height counts there.
+  bool _usesTabletSizes(BuildContext context) =>
+      isDesktopPlatform && !context.isMornye
+      ? MediaQuery.heightOf(context) >= 600
+      : MediaQuery.sizeOf(context).shortestSide >= 600;
 
   /// The square artwork of an explore card. Each card pads 6 on both sides,
   /// so the artwork takes the width that is left rather than the full card.
@@ -835,7 +849,7 @@ class _HomeTabState extends ConsumerState<HomeTab>
     final isShowingRecentAccess =
         _showsSearch &&
         ref.watch(trackProvider.select((s) => s.isShowingRecentAccess));
-    final screenHeight = MediaQuery.sizeOf(context).height;
+    final screenHeight = MediaQuery.heightOf(context);
 
     final recentModeRequested =
         widget.mode == HomeTabMode.search ||

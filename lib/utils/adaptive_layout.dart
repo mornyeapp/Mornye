@@ -120,7 +120,8 @@ double wideInsetForWidth(
 /// instead of stretching across a wide window.
 double wideListInset(BuildContext context, {double? contentMaxWidth}) =>
     wideInsetForWidth(
-      MediaQuery.sizeOf(context).width,
+      // Width only, so a height change does not rebuild the caller.
+      MediaQuery.widthOf(context),
       contentMaxWidth:
           contentMaxWidth ??
           (isDesktopPlatform
