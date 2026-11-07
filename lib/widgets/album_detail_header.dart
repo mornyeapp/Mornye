@@ -899,6 +899,7 @@ class HeaderCircleButton extends ConsumerWidget {
     this.glassTintOpacity,
     this.buttonSize,
     this.iconSize = 22,
+    this.selected,
   });
 
   final IconData icon;
@@ -907,6 +908,11 @@ class HeaderCircleButton extends ConsumerWidget {
 
   /// Overrides the palette foreground, e.g. to mark an active "loved" state.
   final Color? iconColor;
+
+  /// Makes the Material button a toggle: it morphs its shape on the
+  /// expressive toggle springs and crossfades a changed [icon]. Null keeps
+  /// a plain action. Mornye ignores it.
+  final bool? selected;
 
   /// Uses the same translucent fill as the local album's Play/Shuffle pills.
   final bool tonal;
@@ -1009,9 +1015,19 @@ class HeaderCircleButton extends ConsumerWidget {
         ),
       );
     }
+    final glyph = AppIcon(icon, key: ValueKey(icon), size: iconSize);
     return ExpressiveIconButton(
       onPressed: onPressed,
-      icon: AppIcon(icon, size: iconSize),
+      icon: selected == null
+          ? glyph
+          : AnimatedSwitcher(
+              duration: AppMotion.effectsFast(
+                context,
+                const AppMotionSpec(Duration.zero, Curves.linear),
+              ).duration,
+              child: glyph,
+            ),
+      selected: selected,
       tooltip: tooltip,
       size: buttonSize ?? tokens.minTouchTarget,
       backgroundColor: scheme.surfaceContainerHighest.withValues(alpha: 0.7),

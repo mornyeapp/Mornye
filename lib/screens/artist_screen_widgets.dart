@@ -324,6 +324,7 @@ extension _ArtistScreenSections on _ArtistScreenState {
                           : (mornye
                                 ? CupertinoIcons.star
                                 : Icons.favorite_border),
+                      selected: isFavoriteArtist,
                       iconColor: isFavoriteArtist && !mornye
                           ? headerScheme.error
                           : headerScheme.primary,

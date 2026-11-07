@@ -46,6 +46,7 @@ class CollectionHeaderActions extends StatelessWidget {
             enabled && tracks.every((t) => collectionsState.isLoved(t));
         return HeaderCircleButton(
           icon: allLoved ? Icons.favorite : Icons.favorite_border,
+          selected: allLoved,
           tonal: true,
           iconColor: allLoved ? Theme.of(context).colorScheme.error : null,
           tooltip: allLoved
