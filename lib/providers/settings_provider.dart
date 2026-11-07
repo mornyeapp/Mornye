@@ -1127,6 +1127,9 @@ class SettingsNotifier extends Notifier<AppSettings> {
 
   void setPlayerShowVolume(bool visible) =>
       _commit(state.copyWith(playerShowVolume: visible));
+
+  void setPlayerShowLyricSnippet(bool visible) =>
+      _commit(state.copyWith(playerShowLyricSnippet: visible));
 }
 
 final settingsProvider = NotifierProvider<SettingsNotifier, AppSettings>(
