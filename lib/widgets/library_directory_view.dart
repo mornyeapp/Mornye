@@ -468,6 +468,7 @@ class _LibraryDirectoryViewState extends ConsumerState<LibraryDirectoryView>
           ..._desktopHeader(context, folder)
         else if (widget.showHeader)
           AppSliverHeader.page(title: title),
+        AppRefreshIndicator.sliver(),
         ...body,
         // Same reserve as the Library list, so the last rows can scroll
         // clear of the selection bar; desktop pages scroll under the

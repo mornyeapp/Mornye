@@ -1,7 +1,10 @@
+import 'package:flutter/cupertino.dart'
+    show CupertinoActivityIndicator, CupertinoSliverRefreshControl;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/theme/app_theme.dart';
+import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/app_refresh_indicator.dart';
 import 'package:mornye/widgets/app_sliver_header.dart';
 
@@ -120,4 +123,83 @@ void main() {
     await settle(tester);
     expect(refreshes, 1);
   }, variant: macOS);
+
+  group('Mornye', () {
+    Future<void> pumpMornye(
+      WidgetTester tester, {
+      required bool bounces,
+      bool mornye = true,
+    }) async {
+      refreshes = 0;
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: mornye ? MornyeTheme.build(Brightness.light) : null,
+          // Phones bounce unless the low-end profile turns overscroll off.
+          scrollBehavior: const MaterialScrollBehavior().copyWith(
+            physics: bounces
+                ? const BouncingScrollPhysics(
+                    parent: AlwaysScrollableScrollPhysics(),
+                  )
+                : const ClampingScrollPhysics(
+                    parent: AlwaysScrollableScrollPhysics(),
+                  ),
+          ),
+          home: Scaffold(
+            body: AppRefreshIndicator(
+              onRefresh: () async {
+                refreshes++;
+                await Future<void>.delayed(const Duration(milliseconds: 300));
+              },
+              child: CustomScrollView(
+                slivers: [
+                  const AppSliverHeader.page(title: 'Page'),
+                  AppRefreshIndicator.sliver(),
+                  SliverList.builder(
+                    itemCount: 40,
+                    itemBuilder: (_, i) =>
+                        SizedBox(height: 80, child: Text('row $i')),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    Future<void> pull(WidgetTester tester) async {
+      final gesture = await tester.startGesture(
+        tester.getCenter(find.text('row 2')),
+      );
+      for (var i = 0; i < 8; i++) {
+        await gesture.moveBy(const Offset(0, 40));
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      expect(find.byType(CupertinoActivityIndicator), findsOneWidget);
+      expect(find.byType(RefreshProgressIndicator), findsNothing);
+      await gesture.up();
+    }
+
+    testWidgets('pulls with the iOS refresh control', (tester) async {
+      await pumpMornye(tester, bounces: true);
+      expect(find.byType(RefreshIndicator), findsNothing);
+      await pull(tester);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(refreshes, 1);
+      await settle(tester);
+      expect(find.byType(CupertinoActivityIndicator), findsNothing);
+    });
+
+    testWidgets('keeps the indicator when lists do not bounce', (tester) async {
+      await pumpMornye(tester, bounces: false);
+      expect(find.byType(RefreshIndicator), findsOneWidget);
+      expect(find.byType(CupertinoSliverRefreshControl), findsNothing);
+    });
+
+    testWidgets('Material leaves the sliver empty', (tester) async {
+      await pumpMornye(tester, bounces: true, mornye: false);
+      expect(find.byType(CupertinoSliverRefreshControl), findsNothing);
+    });
+  });
 }

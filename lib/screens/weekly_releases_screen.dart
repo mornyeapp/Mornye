@@ -51,6 +51,7 @@ class _WeeklyReleasesScreenState extends ConsumerState<WeeklyReleasesScreen> {
           physics: const AlwaysScrollableScrollPhysics(),
           slivers: [
             AppSliverHeader.page(title: context.l10n.weeklyReleases),
+            AppRefreshIndicator.sliver(),
             // Centered at the reading width on tablets, under the title.
             SliverPadding(
               padding: EdgeInsets.symmetric(horizontal: wideListInset(context)),

@@ -76,6 +76,7 @@ class _ListeningStatisticsScreenState
         child: CustomScrollView(
           slivers: [
             AppSliverHeader.page(title: context.l10n.listeningStats),
+            AppRefreshIndicator.sliver(),
             // Centered at the reading width on tablets, under the title.
             SliverPadding(
               padding: EdgeInsets.symmetric(horizontal: wideListInset(context)),

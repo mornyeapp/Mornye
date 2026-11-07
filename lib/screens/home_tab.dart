@@ -989,6 +989,7 @@ class _HomeTabState extends ConsumerState<HomeTab>
                 _buildDesktopSearchToolbarSliver()
               else
                 _buildHeaderSliver(greeting: greeting),
+              AppRefreshIndicator.sliver(enabled: showExplore),
               if (_showsHome) const SliverToBoxAdapter(child: AppCrashBanner()),
               _buildHomeIntroSliver(
                 sectionMotion: sectionMotion,

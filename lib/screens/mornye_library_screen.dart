@@ -405,6 +405,7 @@ class _MornyeLibraryScreenState extends ConsumerState<MornyeLibraryScreen> {
             )
           else
             AppSliverHeader.page(title: title, actions: actions),
+          AppRefreshIndicator.sliver(enabled: !searchingLibrary),
           if (_showSearch)
             SliverToBoxAdapter(
               child: Padding(

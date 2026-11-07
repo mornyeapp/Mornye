@@ -125,6 +125,7 @@ class _RepoTabState extends ConsumerState<RepoTab> {
                   ),
               ],
             ),
+            AppRefreshIndicator.sliver(),
 
             if (!hasRegistryUrl)
               SliverFillRemaining(
