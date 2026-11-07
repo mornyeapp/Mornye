@@ -344,4 +344,66 @@ void main() {
     ], isNot(contains('file /one.flac')));
     expect(deck.activeDeck, same(audioplayers));
   });
+
+  group('cleartext streams', () {
+    setUp(() => playbackMedia3Engine.value = true);
+
+    for (final url in [
+      'http://192.168.1.20:4533/rest/stream?id=1',
+      'http://nas.example.com/song.flac',
+      'HTTP://Media.Example.com/song.flac',
+      // The security config allows these loopback names only.
+      'http://[::1]:8080/song.flac',
+      'http://127.0.0.2:8080/song.flac',
+    ]) {
+      test('a stream from another host stays on audioplayers ($url)', () async {
+        await deck.setNetworkSource(url);
+        expect(audioplayers.calls.last, 'url $url');
+        expect(media3, isEmpty);
+        expect(deck.activeDeck, same(audioplayers));
+      });
+    }
+
+    for (final url in [
+      'http://127.0.0.1:8080/song.flac',
+      'http://localhost:8080/song.flac',
+      'https://192.168.1.20/song.flac',
+      'https://example.com/song.flac',
+    ]) {
+      test('loopback http and https play through media3 ($url)', () async {
+        await deck.setNetworkSource(url);
+        expect(media3.single.calls.last, 'url $url');
+        expect(deck.activeDeck, same(media3.single));
+      });
+    }
+
+    test('a LAN stream is not queued on media3', () async {
+      await deck.setFileSource('/one.flac');
+      expect(deck.canQueueNextSource, isTrue);
+      expect(
+        await deck.queueNextSource(
+          'http://192.168.1.20/next.flac',
+          volume: 1,
+          onStarted: () {},
+        ),
+        isFalse,
+      );
+      expect(media3.single.calls, isNot(contains(startsWith('queue'))));
+
+      expect(
+        await deck.queueNextSource(
+          'http://127.0.0.1:8080/next.flac',
+          volume: 1,
+          onStarted: () {},
+        ),
+        isTrue,
+      );
+      expect(media3.single.calls.last, 'queue http://127.0.0.1:8080/next.flac');
+
+      // The ordinary handoff then opens the LAN stream on audioplayers.
+      await deck.setNetworkSource('http://192.168.1.20/next.flac');
+      expect(audioplayers.calls.last, 'url http://192.168.1.20/next.flac');
+      expect(media3.single.disposed, isTrue);
+    });
+  });
 }

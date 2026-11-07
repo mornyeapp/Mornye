@@ -32,6 +32,20 @@ class Media3PlaybackException implements Exception {
       '${errorCode == null ? '' : ' ($errorCode)'}';
 }
 
+/// Whether media3 may fetch [source]. ExoPlayer reads streams inside the
+/// app, so the app's network security config applies: cleartext `http` only
+/// to `localhost` and `127.0.0.1` (`network_security_config.xml`), which the
+/// app's own loopback servers use. MediaPlayer fetches in the media server,
+/// so audioplayers still plays `http` from other hosts, such as a NAS.
+bool media3CanFetch(String source) {
+  final uri = Uri.tryParse(source);
+  if (uri == null || uri.scheme.toLowerCase() != 'http') return true;
+  final host = uri.host.toLowerCase();
+  return host == '127.0.0.1' ||
+      host == 'localhost' ||
+      host.endsWith('.localhost');
+}
+
 PlaybackDeckState? _eventState(Object? state) => switch (state) {
   'playing' => PlaybackDeckState.playing,
   'paused' => PlaybackDeckState.paused,
@@ -537,7 +551,8 @@ class Media3PlaybackDeck implements PlaybackDeck, QueuedPlaybackDeck {
 /// Android's music deck: audioplayers, or media3 while
 /// [playbackMedia3Engine] is on. Sources for the native USB and AAudio
 /// outputs ([DeckSource.needsNativeOutput]) stay on audioplayers, which hosts
-/// them, and so does everything when this build has no media3 player.
+/// them, as do streams media3 may not fetch ([media3CanFetch]), and so does
+/// everything when this build has no media3 player.
 ///
 /// Each source picks its engine as it loads, so turning the setting on or
 /// off applies from the next song; the song playing keeps its engine. It
@@ -563,7 +578,20 @@ class Media3EngineDeck extends SwitchingPlaybackDeck {
   bool wantsAlternate(DeckSource? source) =>
       playbackMedia3Engine.value &&
       Media3PlaybackDeck.isAvailable &&
-      !(source?.needsNativeOutput ?? false);
+      !(source?.needsNativeOutput ?? false) &&
+      (source == null || media3CanFetch(source.location));
+
+  /// Only media3 queues. A song it may not fetch is left to the ordinary
+  /// handoff, which opens it on audioplayers.
+  @override
+  Future<bool> queueNextSource(
+    String source, {
+    required double volume,
+    required void Function() onStarted,
+  }) async {
+    if (!media3CanFetch(source)) return false;
+    return super.queueNextSource(source, volume: volume, onStarted: onStarted);
+  }
 
   @override
   bool alternateUnavailable(Object error) => error is MissingPluginException;
