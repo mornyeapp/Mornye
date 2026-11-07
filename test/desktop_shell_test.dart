@@ -825,9 +825,30 @@ void main() {
       expect(railWidth(), greaterThan(desktopCollapsedRailWidth));
       expect(railWidth(), lessThan(desktopSidebarWidth));
       expect(find.text('library'), findsOneWidget);
+      // The spring moves the pills, but the width stops at its ends, so the
+      // content beside it never narrows or widens past its final size.
+      final widths = <double>[];
+      for (var i = 0; i < 40; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+        widths.add(railWidth());
+      }
+      expect(widths.where((width) => width > desktopSidebarWidth), isEmpty);
       await tester.pumpAndSettle();
       expect(railWidth(), closeTo(desktopSidebarWidth, 0.5));
       expect(menuIcon(Icons.menu_open), findsOneWidget);
+
+      await tester.tap(find.byKey(const ValueKey('desktop-rail-menu')));
+      widths.clear();
+      for (var i = 0; i < 40; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+        widths.add(railWidth());
+      }
+      expect(
+        widths.where((width) => width < desktopCollapsedRailWidth),
+        isEmpty,
+      );
+      await tester.pumpAndSettle();
+      expect(railWidth(), closeTo(desktopCollapsedRailWidth, 0.5));
     });
 
     testWidgets('reduced motion snaps the rail and keeps its focus', (

@@ -797,10 +797,13 @@ class DesktopNavigationRail extends StatelessWidget {
           return ColoredBox(
             color: background,
             child: SizedBox(
+              // The width stops at its ends while the pills and labels keep
+              // the spring: a rail growing past its width would narrow the
+              // content below its final size and flip its breakpoints twice.
               width: lerpDouble(
                 desktopCollapsedRailWidth,
                 desktopSidebarWidth,
-                expansion,
+                expansion.clamp(0.0, 1.0),
               ),
               child: ClipRect(
                 child: Column(
