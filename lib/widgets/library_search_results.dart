@@ -61,6 +61,9 @@ class LibrarySearchResults extends ConsumerStatefulWidget {
 }
 
 class _LibrarySearchResultsState extends ConsumerState<LibrarySearchResults> {
+  /// The largest overview page: a shelf in the cover layout.
+  static const _overviewPageLimit = 20;
+
   LibrarySearchKind? _kind;
   bool _lyricsSearch = false;
   int _pages = 1;
@@ -870,10 +873,13 @@ class _LibrarySearchResultsState extends ConsumerState<LibrarySearchResults> {
             : shelf
             ? 20
             : 8;
+        // The overview asks for its largest page in every layout, so a pane
+        // crossing the cover breakpoint (a resize, the lyrics panel) shows
+        // the hits it has instead of searching again behind a spinner.
         final request = (
           query: widget.query,
           kind: kind,
-          limit: pageSize + 1,
+          limit: (_kind != null ? pageSize : _overviewPageLimit) + 1,
           offset: page * pageSize,
         );
         final result = ref.watch(

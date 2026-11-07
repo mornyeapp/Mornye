@@ -21,6 +21,7 @@ import 'package:mornye/services/music_player_service.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/widgets/app_choice_chip.dart';
+import 'package:mornye/widgets/app_loading_indicator.dart';
 import 'package:mornye/widgets/library_search_results.dart';
 import 'package:mornye/widgets/track_card.dart';
 
@@ -292,7 +293,8 @@ void main() {
         requests.map((r) => r.kind).toSet(),
         LibrarySearchKind.values.toSet(),
       );
-      expect(requests.every((r) => r.limit == 6 && r.offset == 0), isTrue);
+      // The overview asks for its largest page in every layout.
+      expect(requests.every((r) => r.limit == 21 && r.offset == 0), isTrue);
       await tester.tap(find.text('Artists').first);
       await tester.pumpAndSettle();
       expect(requests.last.limit, 41);
@@ -565,4 +567,56 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+
+  testWidgets('crossing the cover breakpoint keeps the overview hits', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    FlutterSecureStorage.setMockInitialValues({});
+    tester.view.physicalSize = const Size(1280, 1600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final requests = <LibrarySearchRequest>[];
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          librarySearchProvider.overrideWith((ref, request) async {
+            requests.add(request);
+            return List.generate(
+              request.limit,
+              (i) => _hit(request.kind, request.offset + i),
+            );
+          }),
+        ],
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: CustomScrollView(
+              slivers: [
+                LibrarySearchResults(query: 'Found', onOpenArtist: (_) {}),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Grid'));
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('List'), findsOneWidget);
+    final searched = requests.length;
+
+    // A pane narrowing past the breakpoint, as when the lyrics panel opens
+    // beside it, switches to rows from the hits already found.
+    for (final width in [700.0, 1280.0, 700.0]) {
+      tester.view.physicalSize = Size(width, 1600);
+      await tester.pump();
+      expect(find.byType(AppLoadingIndicator), findsNothing);
+      expect(find.text('Found songs 0'), findsOneWidget);
+      await tester.pumpAndSettle();
+    }
+    expect(requests, hasLength(searched));
+    expect(tester.takeException(), isNull);
+  });
 }
