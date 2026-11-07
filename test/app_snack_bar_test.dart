@@ -311,6 +311,46 @@ void main() {
     );
   }
 
+  testWidgets('clearing during an exit completes the waiting message', (
+    tester,
+  ) async {
+    late BuildContext messageContext;
+    await tester.pumpWidget(
+      MaterialApp(
+        builder: (context, child) => AppScaffoldMessenger(child: child!),
+        home: Builder(
+          builder: (context) {
+            messageContext = context;
+            return const Scaffold(body: SizedBox.expand());
+          },
+        ),
+      ),
+    );
+    final messenger = ScaffoldMessenger.of(messageContext);
+    ScaffoldFeatureController<SnackBar, SnackBarClosedReason> show(
+      String text,
+    ) => messenger.showSnackBar(SnackBar(content: Text(text)));
+
+    show('First');
+    await tester.pumpAndSettle();
+    final second = show('Second');
+    SnackBarClosedReason? secondReason;
+    second.closed.then((reason) => secondReason = reason);
+    await tester.pump(const Duration(milliseconds: 50));
+
+    // A caller clears the messenger and shows its own message, as batch
+    // actions do, while the second message still waits behind the exit.
+    messenger.clearSnackBars();
+    final third = show('Third');
+    await tester.pumpAndSettle();
+    expect(secondReason, SnackBarClosedReason.remove);
+    expect(find.text('Third'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 3));
+    await tester.pumpAndSettle();
+    expect(await third.closed, SnackBarClosedReason.timeout);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('rapid messages never leave a backlog or persist an action', (
     tester,
   ) async {

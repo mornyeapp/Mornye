@@ -67,6 +67,20 @@ class _AppScaffoldMessengerState extends ScaffoldMessengerState {
     });
     return controller;
   }
+
+  /// Flutter drops queued messages without completing their `closed`
+  /// futures, which would leave a caller waiting on the message queued
+  /// behind an exit (such as a playback notice) waiting forever. Cut both
+  /// instead, so each completes with `remove`.
+  @override
+  void clearSnackBars() {
+    if (_waiting == null) {
+      super.clearSnackBars();
+      return;
+    }
+    removeCurrentSnackBar();
+    removeCurrentSnackBar();
+  }
 }
 
 class _TransientSnackBar extends SnackBar {
