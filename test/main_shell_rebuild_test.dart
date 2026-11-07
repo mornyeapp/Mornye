@@ -238,6 +238,76 @@ void main() {
     }
   }
 
+  /// The tab view's fade and the page it shows. The shell's PageView is the
+  /// first in the tree; Library holds its own.
+  Finder tabView() => find.byType(PageView).first;
+  double tabOpacity(WidgetTester tester) => tester
+      .widget<FadeTransition>(
+        find
+            .ancestor(of: tabView(), matching: find.byType(FadeTransition))
+            .first,
+      )
+      .opacity
+      .value;
+  double? tabPage(WidgetTester tester) =>
+      tester.widget<PageView>(tabView()).controller!.page;
+
+  for (final desktop in [true, false]) {
+    final platform = desktop ? 'desktop' : 'phone';
+    testWidgets('Material destinations fade through instead of sliding '
+        '($platform)', (tester) async {
+      await pumpShell(tester, desktop: desktop, mornye: false);
+      expect(tabOpacity(tester), 1);
+
+      ShellNavigationService.requestTab(ShellTab.library);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 16));
+      // The page jumps at once, then fades in.
+      expect(tabPage(tester), 1.0);
+      expect(tabOpacity(tester), inExclusiveRange(0, 1));
+      await settle(tester);
+      expect(tabPage(tester), 1.0);
+      expect(tabOpacity(tester), 1);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('reduced motion switches Material destinations at once '
+        '($platform)', (tester) async {
+      tester.platformDispatcher.accessibilityFeaturesTestValue =
+          const FakeAccessibilityFeatures(disableAnimations: true);
+      addTearDown(
+        tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
+      );
+      await pumpShell(tester, desktop: desktop, mornye: false);
+
+      ShellNavigationService.requestTab(ShellTab.library);
+      await tester.pump();
+      expect(tabPage(tester), 1.0);
+      expect(tabOpacity(tester), 1);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('a Material rail playlist link fades in like a destination', (
+    tester,
+  ) async {
+    await pumpShell(tester, desktop: true, mornye: false);
+    ShellNavigationService.requestTab(ShellTab.library);
+    await settle(tester);
+    expect(tabOpacity(tester), 1);
+
+    tester
+        .widget<DesktopShellLayout>(find.byType(DesktopShellLayout))
+        .onOpenLibraryLink!(DesktopSidebarLink.allPlaylistsId);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 16));
+    expect(desktopSidebarLink.value, DesktopSidebarLink.allPlaylistsId);
+    expect(tabOpacity(tester), inExclusiveRange(0, 1));
+    await settle(tester);
+    expect(tabOpacity(tester), 1);
+    expect(tester.takeException(), isNull);
+  });
+
   for (final mornye in [false, true]) {
     testWidgets('a phone turned into a tablet still swaps the bar for the '
         'rail (${mornye ? 'Mornye' : 'Material'})', (tester) async {

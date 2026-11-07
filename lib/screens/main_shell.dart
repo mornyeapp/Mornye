@@ -56,6 +56,8 @@ import 'package:mornye/widgets/mornye_bottom_bar.dart';
 import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/app_loading_indicator.dart';
 import 'package:mornye/widgets/mornye_chrome.dart';
+import 'package:mornye/theme/app_motion.dart';
+import 'package:mornye/theme/material_expressive.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/theme/player_artwork_theme.dart';
 import 'package:mornye/widgets/selection_bottom_bar.dart';
@@ -135,16 +137,21 @@ class _MainShellState extends ConsumerState<MainShell>
   final GlobalKey _pageViewKey = GlobalKey();
   late final PageController _pageController;
   late final AnimationController _tabJumpTransitionController;
-  // Transitions update their layers directly; no shell subtree rebuilds per
-  // animation frame.
+  // Material fade through between destinations; [_playTabFadeThrough] sets
+  // the curves. Transitions update their layers directly; no shell subtree
+  // rebuilds per animation frame.
   late final CurvedAnimation _tabJumpOpacity = CurvedAnimation(
+    parent: _tabJumpTransitionController,
+    curve: Curves.easeOutCubic,
+  );
+  late final CurvedAnimation _tabJumpScaleCurve = CurvedAnimation(
     parent: _tabJumpTransitionController,
     curve: Curves.easeOutCubic,
   );
   late final Animation<double> _tabJumpScale = Tween<double>(
     begin: 0.985,
     end: 1,
-  ).animate(_tabJumpOpacity);
+  ).animate(_tabJumpScaleCurve);
   bool _hasCheckedUpdate = false;
   bool _hasCheckedAppAnnouncement = false;
   bool _initialSafRepairComplete = false;
@@ -444,6 +451,7 @@ class _MainShellState extends ConsumerState<MainShell>
     _audioOpenSubscription?.cancel();
     _pageController.dispose();
     _tabJumpOpacity.dispose();
+    _tabJumpScaleCurve.dispose();
     _tabJumpTransitionController.dispose();
     _mornyeChrome.dispose();
     _libraryDepthObserver.dispose();
@@ -522,8 +530,6 @@ class _MainShellState extends ConsumerState<MainShell>
     }
 
     if (_currentIndex != index) {
-      final previousIndex = _currentIndex;
-      final isNonAdjacentJump = (previousIndex - index).abs() > 1;
       HapticFeedback.selectionClick();
       // Stop any preview snippet when leaving the current tab. (_onPageChanged
       // cannot do this because _currentIndex is already updated below.)
@@ -535,24 +541,52 @@ class _MainShellState extends ConsumerState<MainShell>
         showSearchTab: context.isMornye,
       );
       if (!isAndroidTv) FocusManager.instance.primaryFocus?.unfocus();
-      // Jump directly when skipping intermediate tabs to avoid
-      // sliding through them. For those jumps, keep a short fade-in
-      // so the transition still feels intentional.
       if (context.isMornye || isAndroidTv) {
         // The glass pill owns the tab transition. Sliding/fading the whole
         // page at the same time continuously invalidates its live backdrop.
         _tabJumpTransitionController.value = 1;
-      } else if (isNonAdjacentJump) {
-        _pageController.jumpToPage(index);
-        _tabJumpTransitionController.forward(from: 0);
       } else {
-        _pageController.animateToPage(
-          index,
-          duration: const Duration(milliseconds: 250),
-          curve: Curves.easeOutCubic,
-        );
+        // Top-level destinations have no spatial order, so Material jumps
+        // to the page and fades it in (M3 fade through) instead of sliding
+        // through its neighbours.
+        _pageController.jumpToPage(index);
+        _playTabFadeThrough();
       }
     }
+  }
+
+  /// Fades the Material tab view in after a destination change: opacity on
+  /// the effects spring, a slight scale up on the spatial spring. The scale
+  /// spring's overshoot stays below a pixel, so the page never spills over
+  /// the rail. Reduced motion shows the page at once.
+  void _playTabFadeThrough() {
+    if (!materialExpressiveEnabled(context)) {
+      _tabJumpTransitionController.value = 1;
+      return;
+    }
+    const fallback = AppMotionSpec(
+      Duration(milliseconds: 180),
+      Curves.easeOutCubic,
+    );
+    final opacity = AppMotion.effects(context, fallback);
+    final scale = AppMotion.spatial(context, fallback);
+    final total = opacity.duration > scale.duration
+        ? opacity.duration
+        : scale.duration;
+    final micros = total.inMicroseconds;
+    _tabJumpOpacity.curve = Interval(
+      0,
+      opacity.duration.inMicroseconds / micros,
+      curve: opacity.curve,
+    );
+    _tabJumpScaleCurve.curve = Interval(
+      0,
+      scale.duration.inMicroseconds / micros,
+      curve: scale.curve,
+    );
+    _tabJumpTransitionController
+      ..duration = total
+      ..forward(from: 0);
   }
 
   void _onPageChanged(int index) {
@@ -835,7 +869,8 @@ class _MainShellState extends ConsumerState<MainShell>
   void _openDesktopLibraryLink(String id) {
     final page = _desktopLibraryPage(id);
     // A link replaces the Library page at once, as in a source list, so the
-    // Library root never shows on the way from another tab.
+    // Library root never shows on the way from another tab. Material fades
+    // the new page in like a destination change; Mornye cuts.
     void show(NavigatorState navigator) {
       navigator.popUntil((route) => route.isFirst);
       if (page != null) {
@@ -850,6 +885,7 @@ class _MainShellState extends ConsumerState<MainShell>
         );
       }
       desktopSidebarLink.value = page == null ? null : id;
+      if (!context.isMornye) _playTabFadeThrough();
     }
 
     final navigator = _libraryTabNavigatorKey.currentState;
