@@ -460,6 +460,37 @@ void main() {
       });
     }
 
+    testWidgets('a pill deselected mid-grow fades at its width and stops', (
+      tester,
+    ) async {
+      final selected = await pumpRail(tester, extended: true);
+      Finder indicator(ShellTab tab) => find.descendant(
+        of: find.byKey(ValueKey('desktop-rail:${tab.name}')),
+        matching: railIndicator,
+      );
+      final full = tester.getRect(indicator(ShellTab.home)).width;
+
+      selected.value = ShellTab.library;
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 60));
+      final growing = tester.getRect(indicator(ShellTab.library)).width;
+      expect(growing, inExclusiveRange(full / 2, full));
+
+      // Back to Home before Library's pill has grown.
+      selected.value = ShellTab.home;
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 20));
+      expect(indicator(ShellTab.library), findsOneWidget);
+      expect(tester.getRect(indicator(ShellTab.library)).width, growing);
+
+      // Once the fade ends nothing keeps animating.
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(indicator(ShellTab.library), findsNothing);
+      await tester.pump(const Duration(milliseconds: 16));
+      expect(tester.binding.transientCallbackCount, 0);
+      expect(tester.getRect(indicator(ShellTab.home)).width, full);
+    });
+
     testWidgets('reduced motion keeps the static rail', (tester) async {
       tester.platformDispatcher.accessibilityFeaturesTestValue =
           const FakeAccessibilityFeatures(disableAnimations: true);

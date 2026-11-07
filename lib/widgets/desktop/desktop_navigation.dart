@@ -793,51 +793,92 @@ class _RailPlaylists extends ConsumerWidget {
 /// The Material rail's selection fill: a `secondaryContainer` stadium behind
 /// [child]. On selection it grows from its centre, half to full width, on
 /// the fast spatial spring while its fill fades in on the fast effects
-/// spring; on deselection the fill fades out on the effects spring alone,
-/// shorter than the entrance. It paints nothing while unselected and
-/// settled.
-class _RailIndicator extends StatelessWidget {
+/// spring; on deselection the fill fades out on the effects spring alone at
+/// the width it had, shorter than the entrance. It paints nothing and runs
+/// no animation while unselected and faded out.
+class _RailIndicator extends StatefulWidget {
   const _RailIndicator({required this.selected, required this.child});
 
   final bool selected;
   final Widget child;
 
   @override
+  State<_RailIndicator> createState() => _RailIndicatorState();
+}
+
+class _RailIndicatorState extends State<_RailIndicator>
+    with TickerProviderStateMixin {
+  // Linear progress; [_growSpec] and [_fadeSpec] shape it when read, so a
+  // stopped grow keeps the width it reached.
+  late final _grow = AnimationController(
+    vsync: this,
+    value: widget.selected ? 1 : 0,
+  );
+  late final _fade = AnimationController(
+    vsync: this,
+    value: widget.selected ? 1 : 0,
+  );
+  late final _listenable = Listenable.merge([_grow, _fade]);
+
+  AppMotionSpec get _growSpec => AppMotion.spatialFast(
+    context,
+    const AppMotionSpec(Duration(milliseconds: 200), Curves.easeOutCubic),
+  );
+
+  AppMotionSpec get _fadeSpec => AppMotion.effectsFast(
+    context,
+    const AppMotionSpec(Duration(milliseconds: 150), Curves.easeOut),
+  );
+
+  @override
+  void didUpdateWidget(_RailIndicator oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.selected == oldWidget.selected) return;
+    final fade = _fadeSpec;
+    _fade.duration = fade.duration;
+    if (widget.selected) {
+      // A pill that had faded out grows again from half width; one still
+      // fading out grows on from where it is.
+      if (_fade.value == 0) _grow.value = 0;
+      _grow.duration = _growSpec.duration;
+      _grow.forward();
+      _fade.forward();
+    } else {
+      // The outgoing pill keeps its width and only fades.
+      _grow.stop();
+      _fade.reverse();
+    }
+  }
+
+  @override
+  void dispose() {
+    _grow.dispose();
+    _fade.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final color = Theme.of(context).colorScheme.secondaryContainer;
-    final grow = AppMotion.spatialFast(
-      context,
-      const AppMotionSpec(Duration(milliseconds: 200), Curves.easeOutCubic),
-    );
-    final fade = AppMotion.effectsFast(
-      context,
-      const AppMotionSpec(Duration(milliseconds: 150), Curves.easeOut),
-    );
-    final target = selected ? 1.0 : 0.0;
-    return TweenAnimationBuilder<double>(
-      tween: Tween(end: target),
-      duration: grow.duration,
-      curve: grow.curve,
-      child: child,
-      builder: (context, width, child) => TweenAnimationBuilder<double>(
-        tween: Tween(end: target),
-        duration: fade.duration,
-        curve: fade.curve,
-        child: child,
-        builder: (context, fill, child) => Stack(
+    final grow = _growSpec.curve;
+    final fade = _fadeSpec.curve;
+    return AnimatedBuilder(
+      animation: _listenable,
+      child: widget.child,
+      builder: (context, child) {
+        final fill = fade.transform(_fade.value).clamp(0.0, 1.0);
+        return Stack(
           fit: StackFit.passthrough,
           children: [
             if (fill > 0)
               Positioned.fill(
                 child: Center(
                   child: FractionallySizedBox(
-                    widthFactor: selected ? 0.5 + width / 2 : 1,
+                    widthFactor: 0.5 + grow.transform(_grow.value) / 2,
                     child: DecoratedBox(
                       key: const ValueKey('desktop-rail-indicator'),
                       decoration: ShapeDecoration(
-                        color: color.withValues(
-                          alpha: color.a * fill.clamp(0.0, 1.0),
-                        ),
+                        color: color.withValues(alpha: color.a * fill),
                         shape: const StadiumBorder(),
                       ),
                     ),
@@ -846,8 +887,8 @@ class _RailIndicator extends StatelessWidget {
               ),
             child!,
           ],
-        ),
-      ),
+        );
+      },
     );
   }
 }
