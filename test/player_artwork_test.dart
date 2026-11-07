@@ -261,6 +261,74 @@ void main() {
     await tester.pumpWidget(const SizedBox());
   });
 
+  testWidgets('a skip in the middle of a fade keeps fading from there', (
+    tester,
+  ) async {
+    final cache = PaintingBinding.instance.imageCache;
+    addTearDown(() {
+      cache.clear();
+      cache.clearLiveImages();
+    });
+    final image = await tester.runAsync(() async {
+      final recorder = ui.PictureRecorder();
+      Canvas(recorder).drawColor(Colors.green, BlendMode.src);
+      final picture = recorder.endRecording();
+      final result = await picture.toImage(1, 1);
+      picture.dispose();
+      return result;
+    });
+    for (final name in ['first', 'second', 'third']) {
+      cache.putIfAbsent(
+        FileImage(File('/skip-$name.png')),
+        () => OneFrameImageStreamCompleter(
+          Future.value(ImageInfo(image: image!.clone())),
+        ),
+      );
+    }
+    Widget app(String name) => MaterialApp(
+      home: PlayerArtwork(
+        artUri: '/skip-$name.png',
+        colorScheme: const ColorScheme.dark(),
+        crossfade: const AppMotionSpec(
+          Duration(milliseconds: 200),
+          Curves.linear,
+        ),
+      ),
+    );
+    List<double> opacities() => [
+      for (final fade in tester.widgetList<FadeTransition>(
+        find.descendant(
+          of: find.byType(PlayerArtwork),
+          matching: find.byType(FadeTransition),
+        ),
+      ))
+        fade.opacity.value,
+    ];
+
+    await tester.pumpWidget(app('first'));
+    await tester.pump();
+    await tester.pumpWidget(app('second'));
+    for (var frame = 0; frame < 6; frame++) {
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    final halfway = opacities().last;
+    expect(halfway, inExclusiveRange(0, 1));
+
+    // The next song arrives mid-fade: the half-faded cover neither snaps
+    // to full nor vanishes, and keeps fading in under the next one.
+    await tester.pumpWidget(app('third'));
+    expect(opacities(), [1, halfway, 0]);
+    await tester.pump(const Duration(milliseconds: 16));
+    expect(opacities()[1], greaterThan(halfway));
+
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pump(const Duration(milliseconds: 16));
+    expect(opacities(), [1]);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+    image!.dispose();
+  });
+
   testWidgets('covers with no file show the placeholder without throwing', (
     tester,
   ) async {

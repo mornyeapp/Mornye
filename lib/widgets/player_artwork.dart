@@ -157,8 +157,14 @@ class _ArtworkCrossfade extends StatefulWidget {
 
 class _ArtworkCrossfadeState extends State<_ArtworkCrossfade>
     with TickerProviderStateMixin {
-  late _ArtworkLayer _current = _ArtworkLayer(widget.artUri, _opacity(1));
-  _ArtworkLayer? _previous;
+  /// Bottom to top; the last is the current cover. A cover still fading in
+  /// when the next one arrives keeps fading from where it is, so a skip in
+  /// the middle of a fade never jumps.
+  late final _layers = [_ArtworkLayer(widget.artUri, _opacity(1))];
+  _ArtworkLayer get _current => _layers.last;
+
+  /// The opaque base, one cover still fading in and the newest one.
+  static const _maxLayers = 3;
 
   /// One linear timeline per cover: the fade and the growth each run their
   /// own curve over their own share of it.
@@ -184,14 +190,34 @@ class _ArtworkCrossfadeState extends State<_ArtworkCrossfade>
     if (widget.artUri == _current.uri) return;
     // A cover that never showed is dropped, so rapid skips fade from the
     // last cover on screen rather than from a placeholder.
-    if (_current.shown || _previous == null) {
-      _previous?.opacity.dispose();
-      _previous = _current..opacity.value = 1;
-    } else {
-      _current.opacity.dispose();
+    if (!_current.shown && _layers.length > 1) {
+      _layers.removeLast().opacity.dispose();
     }
-    _current = _ArtworkLayer(widget.artUri, _opacity(0));
+    if (_layers.length >= _maxLayers) {
+      // Skips faster than a fade: settle the newest cover on screen into
+      // the base before the next one fades in over it.
+      final base = _current..opacity.value = 1;
+      for (final layer in _layers.take(_layers.length - 1)) {
+        layer.opacity.dispose();
+      }
+      _layers
+        ..clear()
+        ..add(base);
+    }
+    _layers.add(_ArtworkLayer(widget.artUri, _opacity(0)));
     _showWhenUnavailable(_current);
+  }
+
+  /// Covers under a fully faded-in one no longer show.
+  void _dropBelow(_ArtworkLayer layer) {
+    final index = _layers.indexOf(layer);
+    if (index <= 0) return;
+    setState(() {
+      for (final hidden in _layers.take(index)) {
+        hidden.opacity.dispose();
+      }
+      _layers.removeRange(0, index);
+    });
   }
 
   /// A network cover the store cannot fetch never draws a frame: fade its
@@ -218,25 +244,20 @@ class _ArtworkCrossfadeState extends State<_ArtworkCrossfade>
     layer.shown = true;
     // Runs during build: start the fade once this frame is done.
     SchedulerBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || !identical(layer, _current)) return;
+      if (!mounted || !_layers.contains(layer)) return;
       final fade = layer.opacity.animateTo(1);
       fade.whenCompleteOrCancel(() {
-        if (!mounted || !identical(layer, _current) || _previous == null) {
-          return;
-        }
-        if (!layer.opacity.isCompleted) return;
-        setState(() {
-          _previous!.opacity.dispose();
-          _previous = null;
-        });
+        if (!mounted || !_layers.contains(layer)) return;
+        if (layer.opacity.isCompleted) _dropBelow(layer);
       });
     });
   }
 
   @override
   void dispose() {
-    _previous?.opacity.dispose();
-    _current.opacity.dispose();
+    for (final layer in _layers) {
+      layer.opacity.dispose();
+    }
     super.dispose();
   }
 
@@ -259,13 +280,9 @@ class _ArtworkCrossfadeState extends State<_ArtworkCrossfade>
 
   @override
   Widget build(BuildContext context) {
-    final previous = _previous;
     return Stack(
       fit: StackFit.expand,
-      children: [
-        if (previous != null) _build(context, previous),
-        _build(context, _current),
-      ],
+      children: [for (final layer in _layers) _build(context, layer)],
     );
   }
 }
