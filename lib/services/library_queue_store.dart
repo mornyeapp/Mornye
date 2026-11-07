@@ -56,6 +56,7 @@ class LibraryQueueStore {
           switch (request.sortMode) {
             'album-asc' => 'a-z',
             'album-desc' => 'z-a',
+            'artist-album-track' => 'artist-asc',
             final sortMode => sortMode,
           },
           'sort_album',
@@ -432,7 +433,9 @@ class LibraryQueueStore {
           h.sort_album,
           h.sort_genre,
           h.sort_release,
-          h.sort_added
+          h.sort_added,
+          COALESCE(h.disc_number, 1) AS sort_disc,
+          COALESCE(h.track_number, 9999) AS sort_trackno
           ${_trackSizeColumns(request.sortMode)}
         FROM history_db.history h
         ${_sizeJoin(request.sortMode, 'history_db', 'h')}
@@ -512,7 +515,9 @@ class LibraryQueueStore {
           l.album_name_norm AS sort_album,
           l.sort_genre,
           l.sort_release,
-          l.sort_added
+          l.sort_added,
+          COALESCE(l.disc_number, 1) AS sort_disc,
+          COALESCE(l.track_number, 9999) AS sort_trackno
           ${_trackSizeColumns(request.sortMode)}
         FROM ${LibrarySchema.visibleView} l
         ${_sizeJoin(request.sortMode, 'main', 'l')}
@@ -577,7 +582,9 @@ class LibraryQueueStore {
           NULL AS sort_album,
           NULL AS sort_genre,
           NULL AS sort_release,
-          NULL AS sort_added
+          NULL AS sort_added,
+          NULL AS sort_disc,
+          NULL AS sort_trackno
           ${isLibrarySizeSort(request.sortMode) ? ', NULL AS file_size_bytes, 1 AS sort_size_unknown, 0 AS sort_size' : ''}
         WHERE 0
       ''';
@@ -1138,6 +1145,13 @@ class LibraryQueueStore {
         'oldest' => [const _QueueOrderTerm('sort_added'), name],
         'artist-asc' || 'artist-desc' => [
           _QueueOrderTerm('sort_artist', descending: sortMode == 'artist-desc'),
+          name,
+        ],
+        'artist-album-track' => [
+          const _QueueOrderTerm('sort_artist'),
+          const _QueueOrderTerm('sort_album'),
+          const _QueueOrderTerm('sort_disc'),
+          const _QueueOrderTerm('sort_trackno'),
           name,
         ],
         'album-asc' || 'album-desc' => [

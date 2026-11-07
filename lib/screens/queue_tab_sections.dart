@@ -36,7 +36,7 @@ String _sectionInitial(String text) {
 }
 
 const _alphabeticalSorts = {'a-z', 'z-a'};
-const _artistSorts = {'artist-asc', 'artist-desc'};
+const _artistSorts = {'artist-asc', 'artist-desc', 'artist-album-track'};
 const _albumSorts = {'album-asc', 'album-desc'};
 const _dateSorts = {'latest', 'oldest'};
 
@@ -45,7 +45,9 @@ extension _QueueTabSections on _QueueTabState {
     final mode =
         widget.librarySection ?? ref.read(settingsProvider).historyFilterMode;
     return mode == 'playlists'
-        ? librarySortModes.where((sort) => !sort.startsWith('size-'))
+        ? librarySortModes.where(
+            (sort) => !sort.startsWith('size-') && sort != 'artist-album-track',
+          )
         : librarySortModes;
   }
 
@@ -59,6 +61,7 @@ extension _QueueTabSections on _QueueTabState {
       'z-a' => l10n.searchSortTitleZA,
       'artist-asc' => l10n.searchSortArtistAZ,
       'artist-desc' => l10n.searchSortArtistZA,
+      'artist-album-track' => l10n.libraryFilterSortArtistAlbumTrack,
       'album-asc' => l10n.libraryFilterSortAlbumAsc,
       'album-desc' => l10n.libraryFilterSortAlbumDesc,
       'release-newest' => l10n.searchSortDateNewest,
@@ -206,7 +209,9 @@ extension _QueueTabSections on _QueueTabState {
             ContextMenuAction(
               icon: switch (mode) {
                 'a-z' || 'z-a' => Icons.sort_by_alpha,
-                'artist-asc' || 'artist-desc' => Icons.person_outline,
+                'artist-asc' ||
+                'artist-desc' ||
+                'artist-album-track' => Icons.person_outline,
                 'album-asc' || 'album-desc' => Icons.album_outlined,
                 'release-newest' || 'release-oldest' => Icons.event_outlined,
                 'genre-asc' || 'genre-desc' => Icons.category_outlined,

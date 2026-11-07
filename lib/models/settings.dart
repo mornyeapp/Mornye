@@ -33,6 +33,7 @@ const librarySortModes = [
   'z-a',
   'artist-asc',
   'artist-desc',
+  'artist-album-track',
   'album-asc',
   'album-desc',
   'release-newest',
