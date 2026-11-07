@@ -337,12 +337,20 @@ class DesktopInspectorTransition extends StatefulWidget {
 
 class _DesktopInspectorTransitionState extends State<DesktopInspectorTransition>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _controller = AnimationController(
-    vsync: this,
-    value: widget.panel == null ? 0 : 1,
-  );
+  // Created up front: a lazy controller first read when the panel opens
+  // would start at the open value and skip the first opening.
+  late final AnimationController _controller;
   late DesktopInspectorPanel? _shown = widget.panel;
   Curve _curve = Curves.linear;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      value: widget.panel == null ? 0 : 1,
+    );
+  }
 
   @override
   void didUpdateWidget(DesktopInspectorTransition oldWidget) {
@@ -409,9 +417,14 @@ class _DesktopInspectorTransitionState extends State<DesktopInspectorTransition>
       animation: _controller,
       child: content,
       builder: (context, child) {
-        // The open spring may overshoot; the pane can briefly grow past its
-        // width, but never below nothing.
-        final value = math.max(0.0, _curve.transform(_controller.value));
+        // The open spring may overshoot. A floating panel can slide a little
+        // past its place, but the pane beside the content stops at its
+        // width: growing past it would narrow the content below its final
+        // size, flip its layout breakpoints and flip them back.
+        final spring = _curve.transform(_controller.value);
+        final value = widget.overlay
+            ? math.max(0.0, spring)
+            : spring.clamp(0.0, 1.0);
         if (widget.overlay) {
           final translation = Offset((1 - value) * (rtl ? -1 : 1), 0);
           // An opacity layer would hide the backdrop from Mornye's glass.
