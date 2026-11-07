@@ -282,6 +282,28 @@ class NativeFinalizationPolicyTest {
     }
 
     @Test
+    fun smartDitherHighPassSelectsTpdfHp() {
+        val target = checkNotNull(
+            NativeFinalizationPolicy.autoConversionTarget(
+                true, "flac", "", smartDitherHighPass = true,
+            ),
+        )
+        assertTrue(target.smartDitherHighPass)
+        val reduced = NativeFinalizationPolicy.flacAutoConversionArguments(
+            target, "in.flac", "out.flac", 24, 48000,
+        )
+        assertTrue(reduced.contains("aresample=resampler=swr:osf=s16:dither_method=triangular_hp:output_sample_bits=16"))
+        val kept = NativeFinalizationPolicy.flacAutoConversionArguments(
+            target, "in.flac", "out.flac", 16, 48000,
+        )
+        assertFalse(kept.any { it.contains("dither_method=") })
+        val disabled = NativeFinalizationPolicy.flacAutoConversionArguments(
+            target.copy(smartDither = false), "in.flac", "out.flac", 24, 48000,
+        )
+        assertFalse(disabled.any { it.contains("dither_method=") })
+    }
+
+    @Test
     fun matchesSharedCrossPipelineQualityCases() {
         val stream = checkNotNull(
             javaClass.getResourceAsStream("/finalization_quality_cases.tsv"),

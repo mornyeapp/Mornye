@@ -145,6 +145,7 @@ extension _DownloadQueueFinalization on DownloadQueueNotifier {
     targetBitrate: settings.autoConvertBitrate,
     losslessProcessing: LosslessConversionProcessing(
       dither: settings.autoConvertSmartDither ? 'auto' : 'none',
+      highPass: settings.autoConvertSmartDitherHighPass,
     ),
     losslessQuality: LosslessConversionQuality(
       maxBitDepth: settings.autoConvertMaxBitDepth == 0

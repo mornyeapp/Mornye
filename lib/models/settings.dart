@@ -228,6 +228,8 @@ class AppSettings {
   final int autoConvertMaxBitDepth; // 0 retains the source bit depth.
   final int autoConvertMaxSampleRate; // 0 retains the source sample rate.
   final bool autoConvertSmartDither;
+  // Smart Dither uses high-pass TPDF instead of plain TPDF.
+  final bool autoConvertSmartDitherHighPass;
   final bool
   useAllFilesAccess; // Android 13+ only: enable MANAGE_EXTERNAL_STORAGE
   final bool autoExportFailedDownloads;
@@ -414,6 +416,7 @@ class AppSettings {
     this.autoConvertMaxBitDepth = 16,
     this.autoConvertMaxSampleRate = 48000,
     this.autoConvertSmartDither = true,
+    this.autoConvertSmartDitherHighPass = false,
     this.useAllFilesAccess = false,
     this.autoExportFailedDownloads = false,
     this.downloadNetworkMode = 'any',
@@ -576,6 +579,7 @@ class AppSettings {
     int? autoConvertMaxBitDepth,
     int? autoConvertMaxSampleRate,
     bool? autoConvertSmartDither,
+    bool? autoConvertSmartDitherHighPass,
     bool? useAllFilesAccess,
     bool? autoExportFailedDownloads,
     String? downloadNetworkMode,
@@ -744,6 +748,8 @@ class AppSettings {
           autoConvertMaxSampleRate ?? this.autoConvertMaxSampleRate,
       autoConvertSmartDither:
           autoConvertSmartDither ?? this.autoConvertSmartDither,
+      autoConvertSmartDitherHighPass:
+          autoConvertSmartDitherHighPass ?? this.autoConvertSmartDitherHighPass,
       useAllFilesAccess: useAllFilesAccess ?? this.useAllFilesAccess,
       autoExportFailedDownloads:
           autoExportFailedDownloads ?? this.autoExportFailedDownloads,

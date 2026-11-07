@@ -56,6 +56,32 @@ void main() {
       }
     });
 
+    test('Smart high-pass uses TPDF HP only for a known reduction', () {
+      const smart = LosslessConversionProcessing(highPass: true);
+      for (final (source, target, expected) in <(int?, int?, String)>[
+        (24, 16, 'triangular_hp'),
+        (32, 24, 'triangular_hp'),
+        (16, 16, 'none'),
+        (16, 24, 'none'),
+        (null, 16, 'none'),
+      ]) {
+        expect(
+          smart
+              .resolveDither(sourceBitDepth: source, targetBitDepth: target)
+              .normalizedDither,
+          expected,
+          reason: '$source -> $target',
+        );
+      }
+      // The switch belongs to Smart; explicit choices keep their method.
+      expect(
+        const LosslessConversionProcessing(dither: 'triangular', highPass: true)
+            .resolveDither(sourceBitDepth: 24, targetBitDepth: 16)
+            .normalizedDither,
+        'triangular',
+      );
+    });
+
     test('explicit dither choices override Smart behavior', () {
       for (final mode in ['none', 'triangular', 'triangular_hp']) {
         final explicit = LosslessConversionProcessing(dither: mode);

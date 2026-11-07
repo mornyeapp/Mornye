@@ -144,6 +144,7 @@ void main() {
           'maxSampleRate': 44100,
           'dither': 'triangular',
           'resampler': 'soxr',
+          'ditherHighPass': false,
         });
         expect(accepted, 1);
         // Ends like a conversion on this phone: progress, then the result.

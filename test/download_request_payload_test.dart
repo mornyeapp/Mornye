@@ -32,6 +32,7 @@ void main() {
         autoConvertMaxBitDepth: 24,
         autoConvertMaxSampleRate: 48000,
         autoConvertSmartDither: false,
+        autoConvertSmartDitherHighPass: true,
         trackNumber: 7,
         playlistPosition: 3,
         discNumber: 2,
@@ -95,6 +96,7 @@ void main() {
         'auto_convert_max_bit_depth': 24,
         'auto_convert_max_sample_rate': 48000,
         'auto_convert_smart_dither': false,
+        'auto_convert_smart_dither_high_pass': true,
         'track_number': 7,
         'playlist_position': 3,
         'disc_number': 2,
@@ -143,6 +145,7 @@ void main() {
         outputDir: '/downloads',
         albumFolderTemplate: '[2024] {album}',
         filenameFormat: '{title}',
+        autoConvertSmartDitherHighPass: true,
         useExtensions: false,
         useFallback: true,
       );
@@ -168,6 +171,7 @@ void main() {
         payload.autoConvertMaxSampleRate,
       );
       expect(updated.autoConvertSmartDither, payload.autoConvertSmartDither);
+      expect(updated.autoConvertSmartDitherHighPass, isTrue);
       expect(updated.explicit, payload.explicit);
       expect(updated.albumType, payload.albumType);
       expect(updated.upc, payload.upc);

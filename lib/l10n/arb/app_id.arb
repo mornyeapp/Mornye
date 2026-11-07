@@ -7136,13 +7136,21 @@
   "@trackConvertDitherSmart": {
     "description": "Automatic dither option for lossless file conversion"
   },
-  "trackConvertDitherSmartDescription": "Otomatis memakai dither TPDF hanya saat menurunkan bit depth.",
+  "trackConvertDitherSmartDescription": "Otomatis memakai dither hanya saat menurunkan bit depth.",
   "@trackConvertDitherSmartDescription": {
     "description": "Explains when Smart Dither adds dither during file conversion"
   },
   "downloadAutoConvertSmartDither": "Smart Dither",
   "@downloadAutoConvertSmartDither": {
     "description": "Toggle for automatic dither during FLAC download conversion"
+  },
+  "trackConvertDitherHighPass": "Pakai TPDF HP",
+  "@trackConvertDitherHighPass": {
+    "description": "Toggle that makes Smart Dither use high-pass TPDF instead of plain TPDF"
+  },
+  "trackConvertDitherHighPassDescription": "Smart Dither memakai TPDF high-pass, yang memindahkan derau tambahan ke frekuensi tinggi sehingga lebih sulit terdengar.",
+  "@trackConvertDitherHighPassDescription": {
+    "description": "Explains the high-pass option of Smart Dither"
   },
   "trackConvertDitherNone": "Tidak Ada",
   "@trackConvertDitherNone": {
@@ -7152,7 +7160,7 @@
   "@trackConvertDitherTriangular": {
     "description": "Lossless conversion triangular probability density function dither option"
   },
-  "trackConvertDitherTriangularHp": "HP Triangular",
+  "trackConvertDitherTriangularHp": "TPDF HP",
   "@trackConvertDitherTriangularHp": {
     "description": "Lossless conversion high-pass triangular dither option"
   },

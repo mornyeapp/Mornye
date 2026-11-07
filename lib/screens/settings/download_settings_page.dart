@@ -177,6 +177,17 @@ class _DownloadSettingsPageState extends ConsumerState<DownloadSettingsPage> {
                       onChanged: (value) => ref
                           .read(settingsProvider.notifier)
                           .setAutoConvertSmartDither(value),
+                    ),
+                    SettingsSwitchItem(
+                      icon: Icons.waves,
+                      title: context.l10n.trackConvertDitherHighPass,
+                      subtitle:
+                          context.l10n.trackConvertDitherHighPassDescription,
+                      value: settings.autoConvertSmartDitherHighPass,
+                      enabled: settings.autoConvertSmartDither,
+                      onChanged: (value) => ref
+                          .read(settingsProvider.notifier)
+                          .setAutoConvertSmartDitherHighPass(value),
                       showDivider: false,
                     ),
                   ] else

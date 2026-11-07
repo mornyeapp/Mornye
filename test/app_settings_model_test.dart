@@ -103,6 +103,7 @@ void main() {
       expect(settings.autoConvertMaxBitDepth, 16);
       expect(settings.autoConvertMaxSampleRate, 48000);
       expect(settings.autoConvertSmartDither, isTrue);
+      expect(settings.autoConvertSmartDitherHighPass, isFalse);
       expect(
         settings.libraryQualityLabelMode,
         AppSettings.libraryQualityLabelBitDepthOnly,
@@ -189,6 +190,7 @@ void main() {
         autoConvertMaxBitDepth: 24,
         autoConvertMaxSampleRate: 96000,
         autoConvertSmartDither: false,
+        autoConvertSmartDitherHighPass: true,
         libraryQualityLabelMode: AppSettings.libraryQualityLabelBitDepthOnly,
         embeddedCoverMaxDimension: 1500,
       );
@@ -223,6 +225,7 @@ void main() {
       expect(decoded.autoConvertMaxBitDepth, 24);
       expect(decoded.autoConvertMaxSampleRate, 96000);
       expect(decoded.autoConvertSmartDither, isFalse);
+      expect(decoded.autoConvertSmartDitherHighPass, isTrue);
       expect(decoded.copyWith(locale: 'id').autoConvertSmartDither, isFalse);
       expect(
         decoded.copyWith(autoConvertSmartDither: true).autoConvertSmartDither,

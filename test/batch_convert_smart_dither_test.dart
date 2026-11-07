@@ -51,19 +51,27 @@ void main() {
       await tap('16-bit');
       expect(find.text('Smart'), findsOneWidget);
       expect(
-        find.text(
-          'Automatically applies TPDF dither only when lowering bit depth.',
-        ),
+        find.text('Automatically applies dither only when lowering bit depth.'),
         findsOneWidget,
       );
       await tap('Convert now');
       expect(selected?.normalizedDither, 'auto');
+      expect(selected?.highPass, isFalse);
       await tap('None');
+      expect(find.text('Use TPDF HP'), findsNothing);
       await tap('Convert now');
       expect(selected?.normalizedDither, 'none');
       await tap('Smart');
+      await tap('Use TPDF HP');
       await tap('Convert now');
       expect(selected?.normalizedDither, 'auto');
+      expect(selected?.highPass, isTrue);
+      expect(
+        selected
+            ?.resolveDither(sourceBitDepth: 24, targetBitDepth: 16)
+            .normalizedDither,
+        'triangular_hp',
+      );
       await tap('MP3');
       expect(find.text('Dithering'), findsNothing);
       expect(tester.takeException(), isNull);

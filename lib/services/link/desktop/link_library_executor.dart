@@ -193,6 +193,7 @@ class LinkLibraryExecutor {
           losslessProcessing: LosslessConversionProcessing(
             dither: options['dither'] as String? ?? 'none',
             resampler: options['resampler'] as String? ?? 'swr',
+            highPass: options['ditherHighPass'] == true,
           ),
           keepOriginal: options['keepOriginal'] != false,
           shouldEmbedLyrics:

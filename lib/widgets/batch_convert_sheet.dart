@@ -62,6 +62,7 @@ class _BatchConvertSheetState extends State<BatchConvertSheet> {
   int? _selectedMaxBitDepth;
   int? _selectedMaxSampleRate;
   String _selectedDither = 'auto';
+  bool _smartDitherHighPass = false;
   String _selectedResampler = 'swr';
   bool _keepOriginal = false;
 
@@ -141,6 +142,7 @@ class _BatchConvertSheetState extends State<BatchConvertSheet> {
                       _selectedMaxBitDepth = null;
                       _selectedMaxSampleRate = null;
                       _selectedDither = 'auto';
+                      _smartDitherHighPass = false;
                       _selectedResampler = 'swr';
                     }
                   },
@@ -198,6 +200,22 @@ class _BatchConvertSheetState extends State<BatchConvertSheet> {
                     onSelect: (mode) => _selectedDither = mode,
                     description: _selectedDither == 'auto'
                         ? context.l10n.trackConvertDitherSmartDescription
+                        : null,
+                    footer: _selectedDither == 'auto'
+                        ? AppSwitchListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: Text(
+                              context.l10n.trackConvertDitherHighPass,
+                            ),
+                            subtitle: Text(
+                              context
+                                  .l10n
+                                  .trackConvertDitherHighPassDescription,
+                            ),
+                            value: _smartDitherHighPass,
+                            onChanged: (value) =>
+                                setState(() => _smartDitherHighPass = value),
+                          )
                         : null,
                   ),
 
@@ -289,6 +307,7 @@ class _BatchConvertSheetState extends State<BatchConvertSheet> {
                       LosslessConversionProcessing(
                         dither: _selectedDither,
                         resampler: _selectedResampler,
+                        highPass: _smartDitherHighPass,
                       ),
                       _keepOriginal,
                     ),
@@ -365,6 +384,7 @@ class _BatchConvertSheetState extends State<BatchConvertSheet> {
     required T selected,
     required void Function(T value) onSelect,
     String? description,
+    Widget? footer,
   }) {
     return _card(
       cs,
@@ -404,6 +424,11 @@ class _BatchConvertSheetState extends State<BatchConvertSheet> {
                   context,
                 ).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
               ),
+            ),
+          if (footer != null)
+            Padding(
+              padding: EdgeInsets.only(top: context.tokens.gapMd),
+              child: footer,
             ),
         ],
       ),

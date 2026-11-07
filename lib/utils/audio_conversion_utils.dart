@@ -35,9 +35,13 @@ class LosslessConversionProcessing {
   final String dither;
   final String resampler;
 
+  /// Smart dither ('auto') applies high-pass TPDF instead of plain TPDF.
+  final bool highPass;
+
   const LosslessConversionProcessing({
     this.dither = 'auto',
     this.resampler = 'swr',
+    this.highPass = false,
   });
 
   String get normalizedDither {
@@ -64,7 +68,11 @@ class LosslessConversionProcessing {
         targetBitDepth > 0 &&
         sourceBitDepth > targetBitDepth;
     return LosslessConversionProcessing(
-      dither: reducesDepth ? 'triangular' : 'none',
+      dither: !reducesDepth
+          ? 'none'
+          : highPass
+          ? 'triangular_hp'
+          : 'triangular',
       resampler: resampler,
     );
   }
