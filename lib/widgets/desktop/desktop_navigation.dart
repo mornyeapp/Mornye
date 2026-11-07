@@ -603,12 +603,12 @@ class DesktopNavigationRail extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final background = colorScheme.surfaceContainer;
     if (!materialExpressiveEnabled(context)) {
-      // Reduced motion keeps Flutter's rail; Settings stays last. A new rail
-      // per state snaps to its width instead of running Flutter's extend
-      // animation, which ignores reduced motion.
+      // Reduced motion keeps Flutter's rail; Settings stays last. Its extend
+      // controller follows the platform's reduced-motion flag, which cuts
+      // the 200 ms to a single frame, and the rail stays the same element so
+      // a focused destination keeps keyboard focus.
       final index = destinations.indexWhere((d) => d.tab == selected);
       return NavigationRail(
-        key: ValueKey('desktop-rail-extended:$extended'),
         extended: extended,
         minExtendedWidth: desktopSidebarWidth,
         // Collapsed, the rail shows icons alone.

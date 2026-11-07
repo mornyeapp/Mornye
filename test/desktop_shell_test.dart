@@ -668,7 +668,7 @@ void main() {
       expect(menuIcon(Icons.menu_open), findsOneWidget);
     });
 
-    testWidgets('reduced motion snaps the rail open and closed', (
+    testWidgets('reduced motion snaps the rail and keeps its focus', (
       tester,
     ) async {
       tester.platformDispatcher.accessibilityFeaturesTestValue =
@@ -680,18 +680,38 @@ void main() {
       double railWidth() => tester.getSize(find.byType(NavigationRail)).width;
       final expanded = railWidth();
       expect(expanded, greaterThan(desktopCollapsedRailWidth));
+      final rail = tester.element(find.byType(NavigationRail));
+      // Keyboard focus on an unselected destination.
+      final focus = Focus.of(
+        tester.element(
+          find
+              .byWidgetPredicate(
+                (w) => w is AppIcon && w.icon == Icons.circle_outlined,
+              )
+              .first,
+        ),
+      );
+      focus.requestFocus();
+      await tester.pump();
+      expect(focus.hasPrimaryFocus, isTrue);
 
       desktopSidebarCollapsed.value = true;
       await tester.pump();
+      await tester.pump(const Duration(milliseconds: 16));
       final collapsed = railWidth();
       expect(collapsed, lessThan(expanded));
       // Nothing is left to animate.
+      expect(tester.binding.transientCallbackCount, 0);
       await tester.pump(const Duration(milliseconds: 100));
       expect(railWidth(), collapsed);
+      expect(tester.element(find.byType(NavigationRail)), same(rail));
+      expect(focus.hasPrimaryFocus, isTrue);
 
       desktopSidebarCollapsed.value = false;
       await tester.pump();
+      await tester.pump(const Duration(milliseconds: 16));
       expect(railWidth(), expanded);
+      expect(focus.hasPrimaryFocus, isTrue);
     });
 
     testWidgets('narrow windows hide the rail menu button', (tester) async {
