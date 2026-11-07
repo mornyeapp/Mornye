@@ -63,6 +63,17 @@ class _LyricLineScrollerState extends State<LyricLineScroller>
   /// The width of the soft edges where the line runs out of its space.
   static const _fade = 16.0;
 
+  /// The slide follows the mean of the singing over this much song time
+  /// either side, so it eases between words of different lengths and in
+  /// and out of its stops instead of changing pace at once.
+  static const _ease = 250.0;
+
+  /// A reported position this far from the slide's own is a seek, which
+  /// the slide follows at once. A smaller difference is how playback
+  /// reports time: the slide keeps its place and changes pace instead, so
+  /// it never steps back.
+  static const _seekThreshold = 750.0;
+
   /// The pace of a line with no known end, and the slowest pace a line
   /// keeps when the next one starts long after it (an instrumental break).
   static const _paceWithoutEnd = Duration(milliseconds: 70);
@@ -115,17 +126,29 @@ class _LyricLineScrollerState extends State<LyricLineScroller>
   /// Moves the clock to the reported position and, while playback
   /// advances, runs it only for the stretch where the line slides.
   void _sync() {
-    _wait?.cancel();
     final now = _ms(widget.position);
-    _clock.value = now;
     final window = _window;
-    if (window == null ||
-        !widget.advancing ||
-        !widget.speed.isFinite ||
-        widget.speed <= 0 ||
-        now >= window.until) {
-      return;
+    final advancing =
+        window != null &&
+        widget.advancing &&
+        widget.speed.isFinite &&
+        widget.speed > 0;
+    if (advancing && (now - _clock.value).abs() < _seekThreshold) {
+      if (_clock.isAnimating) {
+        // Retime the rest of the slide so it ends when playback does.
+        _clock.animateTo(
+          window.until,
+          duration: _real(math.max(window.until - now, 1000 / 60)),
+          curve: Curves.linear,
+        );
+        return;
+      }
+      // A finished slide stays at its end.
+      if (_clock.value >= window.until) return;
     }
+    _wait?.cancel();
+    _clock.value = now;
+    if (!advancing || now >= window.until) return;
     void slide(double from) => _clock.animateTo(
       window.until,
       duration: _real(window.until - from),
@@ -179,18 +202,15 @@ class _LyricLineScrollerState extends State<LyricLineScroller>
     final knots = <(double, double)>[];
     if (words.isNotEmpty &&
         words.map((word) => word.text).join() == widget.text) {
+      // From each word's start to the next, so a pause between words
+      // slows the slide instead of stopping it.
       var offset = 0;
-      for (var index = 0; index < words.length; index++) {
-        final word = words[index];
-        final next = offset + word.text.length;
-        final wordEnd =
-            word.end ??
-            (index + 1 < words.length ? words[index + 1].time : null);
-        knots
-          ..add((_ms(word.time), fromStart(offset)))
-          ..add((wordEnd == null ? end : _ms(wordEnd), fromStart(next)));
-        offset = next;
+      for (final word in words) {
+        knots.add((_ms(word.time), fromStart(offset)));
+        offset += word.text.length;
       }
+      final lastEnd = words.last.end;
+      knots.add((lastEnd == null ? end : _ms(lastEnd), width));
     } else {
       if (end <= start) end = start + 1;
       knots
@@ -226,8 +246,8 @@ class _LyricLineScrollerState extends State<LyricLineScroller>
             : 0.0;
         final window = extent > 0.5
             ? (
-                from: layout.timeAt(viewport * _lead),
-                until: layout.timeAt(extent + viewport * _lead),
+                from: layout.timeAt(viewport * _lead) - _ease,
+                until: layout.timeAt(extent + viewport * _lead) + _ease,
               )
             : null;
         if (window != _window) {
@@ -241,10 +261,9 @@ class _LyricLineScrollerState extends State<LyricLineScroller>
           animation: _clock,
           child: widget.child,
           builder: (context, child) {
-            var offset = (layout.xAt(_clock.value) - viewport * _lead).clamp(
-              0.0,
-              extent,
-            );
+            var offset =
+                (layout.smoothXAt(_clock.value, _ease) - viewport * _lead)
+                    .clamp(0.0, extent);
             if (stepped) {
               final step = viewport / 2;
               offset = math.min(extent, (offset / step).round() * step);
@@ -320,6 +339,30 @@ class _LineLayout {
       }
     }
     return knots.last.$2;
+  }
+
+  /// The mean of [xAt] over [ms] ± [half].
+  double smoothXAt(double ms, double half) =>
+      (_area(ms + half) - _area(ms - half)) / (2 * half);
+
+  /// The integral of [xAt] from the first knot to [ms].
+  double _area(double ms) {
+    final (firstTime, firstX) = knots.first;
+    if (ms <= firstTime) return (ms - firstTime) * firstX;
+    var area = 0.0;
+    for (var index = 1; index < knots.length; index++) {
+      final (time, x) = knots[index];
+      final (previousTime, previousX) = knots[index - 1];
+      if (ms < time) {
+        final at =
+            previousX +
+            (x - previousX) * (ms - previousTime) / (time - previousTime);
+        return area + (ms - previousTime) * (previousX + at) / 2;
+      }
+      area += (time - previousTime) * (previousX + x) / 2;
+    }
+    final (lastTime, lastX) = knots.last;
+    return area + (ms - lastTime) * lastX;
   }
 
   /// When the singing reaches [x].

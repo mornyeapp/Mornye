@@ -196,10 +196,23 @@ class _WordHighlightedLyricLineState
       widget.seekPreview.addListener(_previewChanged);
       _previewChanged();
     }
-    if (oldWidget.line != widget.line ||
-        oldWidget.initialPosition != widget.initialPosition) {
+    if (oldWidget.line != widget.line) {
       _anchorAt(widget.initialPosition);
       _updateVisualEnd();
+      _syncAnimationClock();
+    } else if (oldWidget.initialPosition != widget.initialPosition &&
+        widget.seekPreview.value == null) {
+      // A parent rebuilding passes the position again. Like a playback
+      // report, a small difference eases in rather than moving the sweep
+      // back a few letters.
+      _anchorAt(
+        _advancing
+            ? reconcileSyncedLyricsPosition(
+                predictedPosition: _currentPosition(),
+                reportedPosition: widget.initialPosition,
+              )
+            : widget.initialPosition,
+      );
       _syncAnimationClock();
     }
     if (oldWidget.animate != widget.animate) {

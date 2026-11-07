@@ -282,6 +282,54 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('keeps sliding forward when playback reports a later time late', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    const long =
+        'This example line is much too long to fit on a narrow phone '
+        'screen at once';
+    final view = await pumpPreview(
+      tester,
+      metadata: await _metadata(
+        LyricsParser.parse('[00:05.00]$long\n[00:15.00]\n'),
+      ),
+    );
+    double offset() => tester
+        .widget<Transform>(
+          find.descendant(
+            of: find.byType(LyricLineScroller),
+            matching: find.byType(Transform),
+          ),
+        )
+        .transform
+        .getTranslation()
+        .x;
+
+    view.playback.add(_at(const Duration(seconds: 5)));
+    await tester.pump();
+    for (var step = 0; step < 20; step++) {
+      await tester.pump(const Duration(milliseconds: 200));
+    }
+    final before = offset();
+    expect(before, lessThan(0));
+
+    // Playback, 9 s in, reports a position 200 ms behind the slide.
+    view.playback.add(_at(const Duration(milliseconds: 8800)));
+    var last = before;
+    for (var step = 0; step < 10; step++) {
+      await tester.pump(const Duration(milliseconds: 16));
+      final now = offset();
+      expect(now, lessThanOrEqualTo(last), reason: 'frame $step went back');
+      last = now;
+    }
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(offset(), lessThan(last), reason: 'It keeps moving forward');
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('sweeps word-timed lines', (tester) async {
     final lyrics = ParsedLyrics(
       synced: true,
