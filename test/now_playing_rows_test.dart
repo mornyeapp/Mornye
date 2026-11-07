@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -495,6 +497,53 @@ void main() {
       current.value = false;
       await _pumpFor(tester, _settle);
       expect(rowClip(tester).clipBehavior, Clip.none);
+    });
+
+    testWidgets('a flat row fades its fill in without passing through dark', (
+      tester,
+    ) async {
+      final current = ValueNotifier(false);
+      addTearDown(current.dispose);
+      await tester.pumpWidget(
+        _app(
+          ValueListenableBuilder<bool>(
+            valueListenable: current,
+            builder: (context, value, _) => TrackCard(
+              leading: const SizedBox.square(dimension: 56),
+              title: 'Song',
+              style: TrackCardStyle.flat,
+              isCurrent: value,
+              isPlaying: false,
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      final scheme = _scheme(tester, find.text('Song'));
+      Color fill() => Color.alphaBlend(
+        (tester
+                    .renderObject<RenderDecoratedBox>(
+                      find
+                          .descendant(
+                            of: find.byType(AppContentCard),
+                            matching: find.byType(DecoratedBox),
+                          )
+                          .first,
+                    )
+                    .decoration
+                as BoxDecoration)
+            .color!,
+        scheme.surface,
+      );
+      expect(fill(), scheme.surface);
+
+      current.value = true;
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 40));
+      final low = scheme.primaryContainer.computeLuminance();
+      final high = scheme.surface.computeLuminance();
+      final mid = fill().computeLuminance();
+      expect(mid, inInclusiveRange(math.min(low, high), math.max(low, high)));
     });
 
     testWidgets('selection uses solid secondaryContainer', (tester) async {

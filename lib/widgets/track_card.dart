@@ -216,8 +216,18 @@ class TrackCard extends StatelessWidget {
     } else if (current) {
       cardColor = colorScheme.primaryContainer;
       contentColor = colorScheme.onPrimaryContainer;
-    } else if (style == TrackCardStyle.flat || context.isMornye) {
+    } else if (context.isMornye) {
       cardColor = Colors.transparent;
+      contentColor = null;
+    } else if (style == TrackCardStyle.flat) {
+      // Rest on the fill the row may take, at zero alpha, so becoming
+      // current or selected only fades it in instead of passing through
+      // the dark tint between transparent black and the fill.
+      cardColor =
+          (isSelectionMode
+                  ? colorScheme.secondaryContainer
+                  : colorScheme.primaryContainer)
+              .withValues(alpha: 0);
       contentColor = null;
     } else {
       // The card theme's tone, which the expressive card does not read.

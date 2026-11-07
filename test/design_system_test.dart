@@ -791,8 +791,15 @@ void main() {
         ),
       );
 
+      // Transparent, in the current-row fill's hue so that fill fades in.
       final card = tester.widget<AppContentCard>(find.byType(AppContentCard));
-      expect(card.color, Colors.transparent);
+      expect(card.color?.a, 0);
+      expect(
+        card.color?.withValues(alpha: 1),
+        Theme.of(
+          tester.element(find.text('Song')),
+        ).colorScheme.primaryContainer,
+      );
     });
 
     testWidgets('flat style keeps trailing actions near the card edge', (
