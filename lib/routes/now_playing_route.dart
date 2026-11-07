@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show PredictiveBackEvent;
 import 'package:mornye/services/app_orientation.dart';
+import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 
 /// Hero tag shared by the mini player artwork and the full player artwork so
@@ -9,8 +11,12 @@ const kNowPlayingArtworkHeroTag = 'now-playing-artwork';
 /// Slide-up route for the full player. Supports live drag-to-dismiss: the
 /// page follows the finger (via [startDrag]/[updateDrag]/[endDrag]) and
 /// settles open or pops based on release position and velocity.
+///
+/// With [morph], the player instead grows out of the mini player's bounds
+/// and shrinks back into them on close, and Android's predictive back
+/// previews that shrink.
 class NowPlayingRoute extends PageRoute<void> {
-  NowPlayingRoute({required this.child, this.miniPlayerGeometry})
+  NowPlayingRoute({required this.child, this.miniPlayerGeometry, this.morph})
     : super(
         fullscreenDialog: true,
         settings: const RouteSettings(name: fullPlayerRouteName),
@@ -21,12 +27,28 @@ class NowPlayingRoute extends PageRoute<void> {
   /// Read at dismissal so rotation and collapsing navigation cannot leave a
   /// stale destination from when the player was opened.
   final ({Rect surface, Rect artwork})? Function()? miniPlayerGeometry;
+
+  /// The Material opening motion. A zero duration (reduced motion) opens
+  /// and closes at once. Null keeps the slide up and, for Mornye, the
+  /// shrink on close.
+  final AppMotionSpec? morph;
+
+  /// How far a full predictive back swipe shrinks the player toward the
+  /// mini player before the person lets go.
+  static const _backGesturePreview = 0.4;
+
+  /// The mini player's bounds while the player grows out of them.
+  ({Rect surface, Rect artwork})? _openFrom;
+  Size? _openSize;
+  _PlayerBackGesture? _backGesture;
+  bool _backGestureActive = false;
   ({Rect bounds, Widget child, bool fullBleed})? Function()? readArtwork;
 
   bool get hasDismissArtwork => _dismissArtwork != null;
   ({Rect surface, Rect artwork})? _dismissTarget;
   ({Rect bounds, Widget child, bool fullBleed})? _dismissArtwork;
   Rect? _dismissStart;
+  Size? _dismissSize;
   double _dismissStartValue = 1;
 
   bool _interactiveTransition = false;
@@ -61,6 +83,36 @@ class NowPlayingRoute extends PageRoute<void> {
     animation!.addStatusListener((status) {
       _coveredOverlaySize = status.isCompleted ? _overlaySize : null;
     });
+    // The controller, not [animation]: the Hero controller's measuring frame
+    // shows the route offstage, where [animation] reads as completed.
+    controller!.addStatusListener((status) {
+      if (status.isCompleted) _openFrom = null;
+    });
+    if (morph != null) {
+      WidgetsBinding.instance.addObserver(
+        _backGesture = _PlayerBackGesture(this),
+      );
+    }
+  }
+
+  @override
+  TickerFuture didPush() {
+    if (morph case final morph? when morph.duration > Duration.zero) {
+      final from = miniPlayerGeometry?.call();
+      if (from != null && !from.surface.isEmpty) {
+        _openFrom = from;
+        _openSize = _overlaySize;
+      }
+    }
+    return super.didPush();
+  }
+
+  @override
+  void dispose() {
+    if (_backGesture case final observer?) {
+      WidgetsBinding.instance.removeObserver(observer);
+    }
+    super.dispose();
   }
 
   @override
@@ -73,13 +125,31 @@ class NowPlayingRoute extends PageRoute<void> {
   bool get maintainState => true;
 
   @override
-  Duration get transitionDuration => const Duration(milliseconds: 400);
+  Duration get transitionDuration =>
+      morph?.duration ?? const Duration(milliseconds: 400);
 
+  // An exit is shorter than its entrance.
   @override
-  Duration get reverseTransitionDuration => const Duration(milliseconds: 300);
+  Duration get reverseTransitionDuration => morph?.duration == Duration.zero
+      ? Duration.zero
+      : const Duration(milliseconds: 300);
+
+  /// The open morph's surface: the mini player's bounds grown to the screen.
+  Rect _openRect(Size size, double value) => Rect.lerp(
+    _openFrom!.surface,
+    Offset.zero & size,
+    morph!.curve.transform(value),
+  )!;
 
   void startDrag() {
     _dragGeneration++;
+    // A drag takes over a cancelled back gesture still settling open.
+    if (isCurrent) _clearDismiss();
+    if (_openFrom != null) {
+      // A drag takes over a player still growing: it continues as the slide.
+      _openFrom = null;
+      controller?.value = 1;
+    }
     controller?.stop();
     if (!_interactiveTransition && controller != null) {
       controller!.value = Easing.emphasizedDecelerate.transform(
@@ -127,32 +197,117 @@ class NowPlayingRoute extends PageRoute<void> {
 
   @override
   bool didPop(void result) {
-    final context = subtreeContext;
-    if (context != null &&
-        context.isMornye &&
-        !MediaQuery.disableAnimationsOf(context) &&
-        (controller?.value ?? 0) > 0) {
-      final coveredSize = _coveredOverlaySize;
-      final target = coveredSize == null || coveredSize == _overlaySize
-          ? miniPlayerGeometry?.call()
-          : null;
-      if (target != null && !target.surface.isEmpty) {
-        final size = MediaQuery.sizeOf(context);
-        _dismissStartValue = controller!.value;
-        final position = _interactiveTransition
-            ? _dismissStartValue
-            : Easing.emphasizedDecelerate.transform(_dismissStartValue);
-        _dismissStart = Rect.fromLTWH(
-          0,
-          size.height * (1 - position),
-          size.width,
-          size.height,
-        );
-        _dismissTarget = target;
-        _dismissArtwork = readArtwork?.call();
-      }
-    }
+    // A committed back gesture already shrinks toward the mini player.
+    if (_dismissTarget == null) _captureDismiss();
     return super.didPop(result);
+  }
+
+  /// Starts the shrink into the mini player from where the page is now.
+  bool _captureDismiss() {
+    final context = subtreeContext;
+    if (context == null ||
+        !(context.isMornye || morph != null) ||
+        MediaQuery.disableAnimationsOf(context) ||
+        (controller?.value ?? 0) <= 0) {
+      return false;
+    }
+    final coveredSize = _coveredOverlaySize;
+    final target = coveredSize == null || coveredSize == _overlaySize
+        ? miniPlayerGeometry?.call()
+        : null;
+    if (target == null || target.surface.isEmpty) return false;
+    final size = MediaQuery.sizeOf(context);
+    _dismissStartValue = controller!.value;
+    final opening = _openFrom != null && _openSize == size
+        ? _openRect(size, _dismissStartValue)
+        : null;
+    _openFrom = null;
+    if (opening != null) {
+      _dismissStart = opening;
+    } else {
+      final position = _interactiveTransition
+          ? _dismissStartValue
+          : Easing.emphasizedDecelerate.transform(_dismissStartValue);
+      _dismissStart = Rect.fromLTWH(
+        0,
+        size.height * (1 - position),
+        size.width,
+        size.height,
+      );
+    }
+    _dismissSize = size;
+    _dismissTarget = target;
+    _dismissArtwork = readArtwork?.call();
+    return true;
+  }
+
+  bool _startBackGesture(PredictiveBackEvent event) {
+    if (event.isButtonEvent ||
+        !isCurrent ||
+        popDisposition != RoutePopDisposition.pop ||
+        !(controller?.isCompleted ?? false) ||
+        !_captureDismiss()) {
+      return false;
+    }
+    _dragGeneration++;
+    _backGestureActive = true;
+    _interactiveTransition = true;
+    navigator?.didStartUserGesture();
+    _updateBackGesture(event);
+    changedInternalState();
+    return true;
+  }
+
+  void _updateBackGesture(PredictiveBackEvent event) {
+    if (!_backGestureActive || !isCurrent) return;
+    controller?.value = 1 - _backGesturePreview * event.progress;
+  }
+
+  void _commitBackGesture() {
+    if (!_backGestureActive) return;
+    _backGestureActive = false;
+    // Popping inside the gesture skips the cover's Hero flight, which would
+    // jump from where the preview left it: the cover shrinks with the page.
+    final navigator = this.navigator;
+    if (isCurrent) {
+      navigator?.pop();
+    } else {
+      // Another route arrived during the gesture; the player stays open.
+      _clearDismiss();
+      _interactiveTransition = false;
+      controller?.value = 1;
+    }
+    navigator?.didStopUserGesture();
+  }
+
+  void _clearDismiss() {
+    _dismissTarget = null;
+    _dismissStart = null;
+    _dismissSize = null;
+    _dismissArtwork = null;
+  }
+
+  void _cancelBackGesture() {
+    if (!_backGestureActive) return;
+    _backGestureActive = false;
+    navigator?.didStopUserGesture();
+    final generation = _dragGeneration;
+    const fallback = AppMotionSpec(
+      Duration(milliseconds: 220),
+      Curves.easeOutCubic,
+    );
+    final context = subtreeContext;
+    final settle = context == null
+        ? fallback
+        : AppMotion.spatialSlow(context, fallback);
+    controller
+        ?.animateTo(1, duration: settle.duration, curve: settle.curve)
+        .whenCompleteOrCancel(() {
+          if (generation != _dragGeneration || !isCurrent) return;
+          _clearDismiss();
+          _interactiveTransition = false;
+          changedInternalState();
+        });
   }
 
   @override
@@ -172,39 +327,30 @@ class NowPlayingRoute extends PageRoute<void> {
     Widget child,
   ) {
     final target = _dismissTarget;
+    final size = MediaQuery.sizeOf(context);
+    // The Mornye mini player is a rounded capsule; the Material one is a
+    // square bar, which the shrinking surface keeps square. Material dims
+    // the page behind while the player covers it.
+    final radius = context.isMornye ? 28.0 : 0.0;
+    final scrim = context.isMornye ? 0.0 : 0.32;
     // Restoring portrait can resize the window during dismissal. Geometry
     // captured in landscape no longer points at the mini player in that case.
-    if (target != null && _dismissStart?.size == MediaQuery.sizeOf(context)) {
+    if (target != null && _dismissSize == size) {
       final progress = Curves.easeInOutCubic.transform(
         (1 - animation.value / _dismissStartValue).clamp(0.0, 1.0),
       );
-      final bounds = Rect.lerp(_dismissStart, target.surface, progress)!;
-      final size = MediaQuery.sizeOf(context);
       final cover = _dismissArtwork;
       return Stack(
         fit: StackFit.expand,
         children: [
-          Positioned.fromRect(
-            rect: bounds,
-            child: ClipRRect(
-              key: const ValueKey('player-minimize-surface'),
-              borderRadius: BorderRadius.circular(28 * progress),
-              child: OverflowBox(
-                alignment: Alignment.topLeft,
-                minWidth: size.width,
-                maxWidth: size.width,
-                minHeight: size.height,
-                maxHeight: size.height,
-                child: Transform.scale(
-                  scale: bounds.width / size.width,
-                  alignment: Alignment.topLeft,
-                  child: Opacity(
-                    opacity: 1 - const Interval(0.15, 0.85).transform(progress),
-                    child: child,
-                  ),
-                ),
-              ),
-            ),
+          if (scrim > 0) _scrim(scrim * (1 - progress)),
+          _surface(
+            key: const ValueKey('player-minimize-surface'),
+            bounds: Rect.lerp(_dismissStart, target.surface, progress)!,
+            size: size,
+            radius: radius * progress,
+            opacity: 1 - const Interval(0.15, 0.85).transform(progress),
+            child: child,
           ),
           if (cover != null)
             Positioned.fromRect(
@@ -235,6 +381,27 @@ class NowPlayingRoute extends PageRoute<void> {
         ],
       );
     }
+    // A rotation while opening leaves the mini player's bounds stale.
+    if (_openFrom != null &&
+        _openSize == size &&
+        animation.status == AnimationStatus.forward) {
+      final progress = morph!.curve.transform(animation.value);
+      return Stack(
+        fit: StackFit.expand,
+        children: [
+          _scrim(scrim * progress),
+          _surface(
+            key: const ValueKey('player-expand-surface'),
+            bounds: _openRect(size, animation.value),
+            size: size,
+            radius: radius * (1 - progress),
+            // The mini player shows through until the surface covers it.
+            opacity: const Interval(0, 0.35).transform(progress),
+            child: child,
+          ),
+        ],
+      );
+    }
     final reversing = animation.status == AnimationStatus.reverse;
     // Mornye's full-bleed artwork travels with its panel. Material keeps the
     // independent cover flight back to the mini-player on button/back pop.
@@ -252,6 +419,63 @@ class NowPlayingRoute extends PageRoute<void> {
       child: FadeTransition(opacity: opacity, child: child),
     );
   }
+
+  Widget _scrim(double opacity) => IgnorePointer(
+    child: ColoredBox(color: Colors.black.withValues(alpha: opacity)),
+  );
+
+  /// The full-size page at [bounds], scaled to their width and clipped to
+  /// their height, so its layout never changes while the surface moves.
+  Widget _surface({
+    required Key key,
+    required Rect bounds,
+    required Size size,
+    required double radius,
+    required double opacity,
+    required Widget child,
+  }) => Positioned.fromRect(
+    rect: bounds,
+    child: ClipRRect(
+      key: key,
+      borderRadius: BorderRadius.circular(radius),
+      child: OverflowBox(
+        alignment: Alignment.topLeft,
+        minWidth: size.width,
+        maxWidth: size.width,
+        minHeight: size.height,
+        maxHeight: size.height,
+        child: Transform.scale(
+          scale: bounds.width / size.width,
+          alignment: Alignment.topLeft,
+          child: Opacity(opacity: opacity, child: child),
+        ),
+      ),
+    ),
+  );
+}
+
+/// Feeds Android's predictive back to the player route while it is the
+/// current route of the root navigator. The app keeps the general
+/// predictive back page transition off (flutter#152323), so only this
+/// route previews its pop.
+class _PlayerBackGesture with WidgetsBindingObserver {
+  _PlayerBackGesture(this.route);
+
+  final NowPlayingRoute route;
+
+  @override
+  bool handleStartBackGesture(PredictiveBackEvent backEvent) =>
+      route._startBackGesture(backEvent);
+
+  @override
+  void handleUpdateBackGestureProgress(PredictiveBackEvent backEvent) =>
+      route._updateBackGesture(backEvent);
+
+  @override
+  void handleCommitBackGesture() => route._commitBackGesture();
+
+  @override
+  void handleCancelBackGesture() => route._cancelBackGesture();
 }
 
 /// Routes vertical drags to [NowPlayingRoute]. Scrollables inside [child]

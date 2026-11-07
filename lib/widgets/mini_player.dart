@@ -159,18 +159,25 @@ class _MiniPlayerBodyState extends ConsumerState<_MiniPlayerBody> {
   bool _dragCancelled = false;
 
   void _openNowPlaying() {
+    final mornye = context.isMornye;
     Navigator.of(context, rootNavigator: true).push(
       NowPlayingRoute(
         child: const NowPlayingScreen(),
-        miniPlayerGeometry: context.isMornye
-            ? () {
-                if (!mounted) return null;
-                final surface = _bounds(_surfaceKey);
-                final artwork = _bounds(_artworkKey);
-                if (surface == null || artwork == null) return null;
-                return (surface: surface, artwork: artwork);
-              }
-            : null,
+        miniPlayerGeometry: () {
+          if (!mounted) return null;
+          final surface = _bounds(_surfaceKey);
+          final artwork = _bounds(_artworkKey);
+          if (surface == null || artwork == null) return null;
+          return (surface: surface, artwork: artwork);
+        },
+        // The Material player is the mini player expanded: it grows out of
+        // this bar and shrinks back into it. Reduced motion opens at once.
+        morph: mornye || isDesktopPlatform
+            ? null
+            : AppMotion.spatialSlow(
+                context,
+                const AppMotionSpec(Duration.zero, Curves.linear),
+              ),
       ),
     );
   }

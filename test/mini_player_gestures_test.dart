@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/runtime_profile_provider.dart';
+import 'package:mornye/routes/now_playing_route.dart';
 import 'package:mornye/services/remote_playback.dart';
 import 'package:mornye/theme/app_theme.dart';
 import 'package:mornye/theme/mornye_theme.dart';
@@ -51,6 +52,14 @@ class _RemotePlayback implements RemotePlayback {
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
+class _PushObserver extends NavigatorObserver {
+  final pushed = <Route<dynamic>>[];
+
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) =>
+      pushed.add(route);
+}
+
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
@@ -67,6 +76,7 @@ void main() {
       bool loading = false,
       RemotePlayback? remote,
       VoidCallback? onDismiss,
+      NavigatorObserver? observer,
     }) async {
       final controller = _Controller(onDismiss: onDismiss);
       await tester.pumpWidget(
@@ -92,6 +102,7 @@ void main() {
             backdropBlurEnabledProvider.overrideWithValue(false),
           ],
           child: MaterialApp(
+            navigatorObservers: [?observer],
             theme: configuration.mornye
                 ? MornyeTheme.build(Brightness.light)
                 : AppTheme.light(),
@@ -372,6 +383,39 @@ void main() {
         expect(tester.getTopLeft(title), start);
         expect(controller.calls, isEmpty);
         expect(tester.takeException(), isNull);
+      });
+    }
+
+    for (final reducedMotion in [false, true]) {
+      testWidgets('${configuration.name}: the full player opens from the mini '
+          'player bounds (reduced motion: $reducedMotion)', (tester) async {
+        if (reducedMotion) {
+          tester.platformDispatcher.accessibilityFeaturesTestValue =
+              const FakeAccessibilityFeatures(disableAnimations: true);
+          addTearDown(
+            tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
+          );
+        }
+        final observer = _PushObserver();
+        await pumpPlayer(tester, observer: observer);
+        await tester.tap(find.text('Song'));
+        final route = observer.pushed.whereType<NowPlayingRoute>().single;
+        final geometry = route.miniPlayerGeometry!()!;
+        // The surface without the Mornye bar's bottom padding.
+        final mini = tester.getRect(find.byType(MiniPlayer));
+        expect(geometry.surface.topLeft, mini.topLeft);
+        expect(geometry.surface.width, mini.width);
+        if (configuration.mornye) {
+          expect(route.morph, isNull);
+        } else {
+          expect(
+            route.morph!.duration,
+            reducedMotion ? Duration.zero : greaterThan(Duration.zero),
+          );
+        }
+        // The test leaves the full player itself unbuilt.
+        route.navigator!.removeRoute(route);
+        await tester.pumpWidget(const SizedBox.shrink());
       });
     }
 

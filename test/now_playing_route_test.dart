@@ -2,17 +2,21 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/screens/now_playing_screen.dart';
+import 'package:mornye/theme/app_motion.dart';
+import 'package:mornye/theme/app_theme.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 
 const _sheet = Key('player-sheet');
 
 class _TestPlayerRoute extends NowPlayingRoute {
-  _TestPlayerRoute({super.miniPlayerGeometry}) : super(child: const SizedBox());
+  _TestPlayerRoute({super.miniPlayerGeometry, super.morph})
+    : super(child: const SizedBox());
 
   @override
   Widget buildPage(
@@ -286,6 +290,173 @@ void main() {
       },
     );
   }
+
+  group('Material morph', () {
+    const mini = Rect.fromLTWH(0, 700, 400, 72);
+    const morph = AppMotionSpec(Duration(milliseconds: 500), Curves.linear);
+    const surface = ValueKey('player-expand-surface');
+    const minimize = ValueKey('player-minimize-surface');
+
+    Future<GlobalKey<NavigatorState>> pumpApp(WidgetTester tester) async {
+      tester.view.physicalSize = const Size(400, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final navigator = GlobalKey<NavigatorState>();
+      await tester.pumpWidget(
+        MaterialApp(
+          navigatorKey: navigator,
+          theme: AppTheme.light(),
+          home: const SizedBox(),
+        ),
+      );
+      return navigator;
+    }
+
+    _TestPlayerRoute route({AppMotionSpec spec = morph}) => _TestPlayerRoute(
+      miniPlayerGeometry: () =>
+          (surface: mini, artwork: const Rect.fromLTWH(12, 714, 44, 44)),
+      morph: spec,
+    );
+
+    Future<void> backGesture(
+      WidgetTester tester,
+      String method, [
+      double? progress,
+    ]) => tester.binding.defaultBinaryMessenger.handlePlatformMessage(
+      'flutter/backgesture',
+      const StandardMethodCodec().encodeMethodCall(
+        MethodCall(
+          method,
+          progress == null
+              ? null
+              : {
+                  'touchOffset': [5.0, 400.0],
+                  'progress': progress,
+                  'swipeEdge': 0,
+                },
+        ),
+      ),
+      (_) {},
+    );
+
+    testWidgets('the player grows out of the mini player and shrinks back', (
+      tester,
+    ) async {
+      final navigator = await pumpApp(tester);
+      navigator.currentState!.push(route());
+      // The first frame lays the route out offstage to measure Heroes.
+      await tester.pump();
+      await tester.pump();
+      expect(tester.getRect(find.byKey(surface)), mini);
+      await tester.pump(const Duration(milliseconds: 150));
+      final growing = tester.getRect(find.byKey(surface));
+      expect(growing.top, inExclusiveRange(0, mini.top));
+      expect(growing.bottom, inInclusiveRange(mini.bottom, 800));
+      expect(growing.height, greaterThan(mini.height));
+      await tester.pumpAndSettle();
+      expect(find.byKey(surface), findsNothing);
+      expect(
+        tester.getRect(find.byKey(_sheet)),
+        const Rect.fromLTWH(0, 0, 400, 800),
+      );
+
+      navigator.currentState!.pop();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 150));
+      final shrinking = tester.getRect(find.byKey(minimize));
+      expect(shrinking.top, inExclusiveRange(0, mini.top));
+      await tester.pumpAndSettle();
+      expect(find.byKey(_sheet), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('reduced motion opens and closes at once', (tester) async {
+      final navigator = await pumpApp(tester);
+      navigator.currentState!.push(
+        route(spec: const AppMotionSpec(Duration.zero, Curves.linear)),
+      );
+      await tester.pump();
+      await tester.pump();
+      expect(find.byKey(surface), findsNothing);
+      expect(
+        tester.getRect(find.byKey(_sheet)),
+        const Rect.fromLTWH(0, 0, 400, 800),
+      );
+      navigator.currentState!.pop();
+      await tester.pump();
+      await tester.pump();
+      expect(find.byKey(_sheet), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('predictive back previews the shrink, cancels and commits', (
+      tester,
+    ) async {
+      final navigator = await pumpApp(tester);
+      navigator.currentState!.push(route());
+      await tester.pumpAndSettle();
+
+      await backGesture(tester, 'startBackGesture', 0);
+      await backGesture(tester, 'updateBackGestureProgress', 0.5);
+      await tester.pump();
+      final half = tester.getRect(find.byKey(minimize));
+      await backGesture(tester, 'updateBackGestureProgress', 1);
+      await tester.pump();
+      final full = tester.getRect(find.byKey(minimize));
+      expect(half.top, greaterThan(0));
+      expect(full.top, greaterThan(half.top));
+      expect(full.top, lessThan(mini.top / 2));
+
+      await backGesture(tester, 'cancelBackGesture');
+      await tester.pumpAndSettle();
+      expect(find.byKey(minimize), findsNothing);
+      expect(
+        tester.getRect(find.byKey(_sheet)),
+        const Rect.fromLTWH(0, 0, 400, 800),
+      );
+
+      await backGesture(tester, 'startBackGesture', 0);
+      await backGesture(tester, 'updateBackGestureProgress', 0.6);
+      await tester.pump();
+      final released = tester.getRect(find.byKey(minimize));
+      await backGesture(tester, 'commitBackGesture');
+      await tester.pump();
+      expect(
+        tester.getRect(find.byKey(minimize)).top,
+        closeTo(released.top, 1),
+      );
+      await tester.pump(const Duration(milliseconds: 60));
+      expect(
+        tester.getRect(find.byKey(minimize)).top,
+        greaterThan(released.top),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byKey(_sheet), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('predictive back leaves a route above the player alone', (
+      tester,
+    ) async {
+      final navigator = await pumpApp(tester);
+      navigator.currentState!.push(route());
+      await tester.pumpAndSettle();
+      navigator.currentState!.push(
+        MaterialPageRoute<void>(builder: (_) => const Text('Sheet')),
+      );
+      await tester.pumpAndSettle();
+      await backGesture(tester, 'startBackGesture', 0);
+      await backGesture(tester, 'updateBackGestureProgress', 0.5);
+      await tester.pump();
+      expect(find.byKey(minimize), findsNothing);
+      await backGesture(tester, 'commitBackGesture');
+      await tester.pumpAndSettle();
+      // The system back closes the route on top, not the player.
+      expect(find.text('Sheet'), findsNothing);
+      expect(find.byKey(_sheet), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  });
 
   for (final dismiss in [false, true]) {
     testWidgets('Player drag settles without a position jump (pop: $dismiss)', (
