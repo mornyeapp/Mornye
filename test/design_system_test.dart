@@ -898,6 +898,7 @@ void main() {
         const overlayHosts = {
           'selection_bottom_bar.dart',
           'app_menu_button.dart',
+          'context_menu.dart',
         };
         final offenders = _libSources()
             .where(
