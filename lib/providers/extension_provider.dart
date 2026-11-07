@@ -508,8 +508,10 @@ class ExtensionNotifier extends Notifier<ExtensionState> {
     }
   }
 
-  Future<bool> upgradeExtension(String filePath) async {
-    state = state.copyWith(isLoading: true, error: null);
+  /// A [quiet] upgrade (a background one) shows neither the loading state nor
+  /// a failure; the native side keeps the old version when it fails.
+  Future<bool> upgradeExtension(String filePath, {bool quiet = false}) async {
+    if (!quiet) state = state.copyWith(isLoading: true, error: null);
 
     try {
       await ensureInitialized();
@@ -518,11 +520,13 @@ class ExtensionNotifier extends Notifier<ExtensionState> {
         'Upgraded extension: ${result['display_name']} to v${result['version']}',
       );
       await refreshExtensions();
-      state = state.copyWith(isLoading: false);
+      if (!quiet) state = state.copyWith(isLoading: false);
       return true;
     } catch (e) {
       _log.e('Failed to upgrade extension: $e');
-      state = state.copyWith(isLoading: false, error: e.toString());
+      if (!quiet) {
+        state = state.copyWith(isLoading: false, error: e.toString());
+      }
       return false;
     }
   }

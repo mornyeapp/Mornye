@@ -197,6 +197,19 @@ class RepoNotifier extends Notifier<RepoState> {
     return const RepoState();
   }
 
+  /// Whether a store registry URL is saved, read without any network work.
+  static Future<bool> hasSavedRegistryUrl() async {
+    final prefs = await SharedPreferences.getInstance();
+    return (prefs.getString(_registryUrlPrefKey) ?? '').isNotEmpty;
+  }
+
+  /// Initializes the store with the app's cache directory.
+  Future<void> initializeToDefaultPaths() async {
+    if (state.isInitialized) return;
+    final cacheDir = _cacheDir ?? (await getApplicationCacheDirectory()).path;
+    await initialize(cacheDir);
+  }
+
   Future<void> initialize(String cacheDir) {
     if (state.isInitialized) return Future<void>.value();
     _cacheDir = cacheDir;
@@ -374,19 +387,29 @@ class RepoNotifier extends Notifier<RepoState> {
     return installExtension(extensionId, tempDir.path, storage.extensionsDir);
   }
 
-  /// Updates [extensionId] using the app's temp directory.
-  Future<bool> updateExtensionToDefaultPaths(String extensionId) async {
+  /// Updates [extensionId] using the app's temp directory. A [quiet] update
+  /// (a background one) logs a failure without showing it on any screen.
+  Future<bool> updateExtensionToDefaultPaths(
+    String extensionId, {
+    bool quiet = false,
+  }) async {
     final tempDir = await getTemporaryDirectory();
-    return updateExtension(extensionId, tempDir.path);
+    return updateExtension(extensionId, tempDir.path, quiet: quiet);
   }
 
-  Future<bool> updateExtension(String extensionId, String tempDir) {
+  Future<bool> updateExtension(
+    String extensionId,
+    String tempDir, {
+    bool quiet = false,
+  }) {
     return _runSerialized(
       () => _downloadAndApplyExtension(
         extensionId,
         tempDir,
         action: 'update',
-        apply: (notifier, path) => notifier.upgradeExtension(path),
+        quiet: quiet,
+        apply: (notifier, path) =>
+            notifier.upgradeExtension(path, quiet: quiet),
       ),
     );
   }
@@ -397,11 +420,12 @@ class RepoNotifier extends Notifier<RepoState> {
     required String action,
     required Future<bool> Function(ExtensionNotifier notifier, String path)
     apply,
+    bool quiet = false,
   }) async {
     state = state.copyWith(
       isDownloading: true,
       downloadingId: extensionId,
-      clearError: true,
+      clearError: !quiet,
     );
 
     try {
@@ -429,7 +453,7 @@ class RepoNotifier extends Notifier<RepoState> {
       state = state.copyWith(
         isDownloading: false,
         clearDownloadingId: true,
-        error: e.toString(),
+        error: quiet ? null : e.toString(),
       );
       return false;
     }

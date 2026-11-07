@@ -797,6 +797,24 @@
   "@optionsExtensionStoreSubtitle": {
     "description": "Subtitle for extension repo toggle"
   },
+  "optionsAutoUpdateExtensions": "Update extensions automatically",
+  "@optionsAutoUpdateExtensions": {
+    "description": "App settings switch that installs extension updates from the extension repository in the background"
+  },
+  "optionsAutoUpdateExtensionsSubtitle": "Installs updates for enabled extensions in the background when no download is running.",
+  "@optionsAutoUpdateExtensionsSubtitle": {
+    "description": "Subtitle of the Update extensions automatically switch. Disabled extensions are not updated, and updates wait until downloads finish"
+  },
+  "extensionsAutoUpdatedCount": "{count, plural, =1{Updated 1 extension} other{Updated {count} extensions}}",
+  "@extensionsAutoUpdatedCount": {
+    "description": "Short notice shown after extensions were updated automatically in the background",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "description": "Number of extensions that were updated"
+      }
+    }
+  },
   "optionsCheckUpdates": "Check for Updates",
   "@optionsCheckUpdates": {
     "description": "Auto update check toggle"

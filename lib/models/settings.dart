@@ -218,6 +218,10 @@ class AppSettings {
   final String albumFolderStructure;
   final bool showExtensionStore;
 
+  /// Installs store updates for enabled extensions after each background
+  /// store check, but only while no download is queued or running.
+  final bool autoUpdateExtensions;
+
   /// Shared-element (Hero) flights, e.g. the mini player artwork expanding
   /// into the full player. Off skips the flights entirely.
   final bool heroAnimationsEnabled;
@@ -436,6 +440,7 @@ class AppSettings {
     this.singleFilenameFormat = '{title} - {artist}',
     this.albumFolderStructure = 'artist_album',
     this.showExtensionStore = true,
+    this.autoUpdateExtensions = true,
     this.heroAnimationsEnabled = true,
     this.forceBackdropBlur = false,
     this.extensionVerificationBrowserMode = 'in_app_first',
@@ -605,6 +610,7 @@ class AppSettings {
     String? singleFilenameFormat,
     String? albumFolderStructure,
     bool? showExtensionStore,
+    bool? autoUpdateExtensions,
     bool? heroAnimationsEnabled,
     bool? forceBackdropBlur,
     String? extensionVerificationBrowserMode,
@@ -772,6 +778,7 @@ class AppSettings {
       singleFilenameFormat: singleFilenameFormat ?? this.singleFilenameFormat,
       albumFolderStructure: albumFolderStructure ?? this.albumFolderStructure,
       showExtensionStore: showExtensionStore ?? this.showExtensionStore,
+      autoUpdateExtensions: autoUpdateExtensions ?? this.autoUpdateExtensions,
       heroAnimationsEnabled:
           heroAnimationsEnabled ?? this.heroAnimationsEnabled,
       forceBackdropBlur: forceBackdropBlur ?? this.forceBackdropBlur,

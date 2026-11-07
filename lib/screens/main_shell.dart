@@ -12,6 +12,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/services/saf_migration_prompt_store.dart';
 import 'package:mornye/providers/download_queue_provider.dart';
+import 'package:mornye/providers/extension_auto_update_provider.dart';
 import 'package:mornye/providers/extension_provider.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/network_upload_provider.dart';
@@ -291,6 +292,11 @@ class _MainShellState extends ConsumerState<MainShell>
       _initialSafRepairComplete = true;
       if (!mounted) return;
       unawaited(_restorePlayback());
+      // Off the startup path: waits for extensions, then fills the Store
+      // badge and installs updates without the Store tab being opened.
+      unawaited(
+        ref.read(extensionAutoUpdateProvider.notifier).checkAfterStartup(),
+      );
       // Library menus are built synchronously and offer an upload only once
       // the writable connections are known.
       ref.read(networkUploadConnectionsProvider);
@@ -346,6 +352,7 @@ class _MainShellState extends ConsumerState<MainShell>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed && _initialSafRepairComplete) {
       unawaited(_repairSafAccessIfNeeded());
+      unawaited(ref.read(extensionAutoUpdateProvider.notifier).checkOnResume());
     } else if (state == AppLifecycleState.paused) {
       unawaited(
         ref.read(musicPlayerRuntimeProvider).handler?.persistCurrentSession(),
@@ -969,6 +976,13 @@ class _MainShellState extends ConsumerState<MainShell>
       settingsProvider.select((s) => s.listeningStatisticsEnabled),
       (_, enabled) => listeningRecorder.setEnabled(enabled),
     );
+    ref.listen(extensionAutoUpdateProvider, (_, notice) {
+      if (notice == null) return;
+      showAppSnackBar(
+        context,
+        content: Text(context.l10n.extensionsAutoUpdatedCount(notice.count)),
+      );
+    });
     final showStore = ref.watch(
       settingsProvider.select((s) => s.showExtensionStore),
     );

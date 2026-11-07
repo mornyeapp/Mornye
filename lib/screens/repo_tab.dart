@@ -55,6 +55,12 @@ class _RepoTabState extends ConsumerState<RepoTab> {
 
     if (!mounted) return;
 
+    final repo = ref.read(repoProvider);
+    // A background check may have initialized the store while offline.
+    if (repo.isInitialized && repo.hasRegistryUrl && repo.error != null) {
+      await ref.read(repoProvider.notifier).refresh();
+      return;
+    }
     await ref.read(repoProvider.notifier).initialize(cacheDir.path);
   }
 

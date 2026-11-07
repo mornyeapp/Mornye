@@ -1025,6 +1025,9 @@ class SettingsNotifier extends Notifier<AppSettings> {
   void setShowExtensionStore(bool enabled) =>
       _commit(state.copyWith(showExtensionStore: enabled));
 
+  void setAutoUpdateExtensions(bool enabled) =>
+      _commit(state.copyWith(autoUpdateExtensions: enabled));
+
   void setHeroAnimationsEnabled(bool enabled) =>
       _commit(state.copyWith(heroAnimationsEnabled: enabled));
 

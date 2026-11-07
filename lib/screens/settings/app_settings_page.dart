@@ -41,6 +41,15 @@ class AppSettingsPage extends ConsumerWidget {
                       .read(settingsProvider.notifier)
                       .setShowExtensionStore(v),
                 ),
+                SettingsSwitchItem(
+                  icon: Icons.update,
+                  title: context.l10n.optionsAutoUpdateExtensions,
+                  subtitle: context.l10n.optionsAutoUpdateExtensionsSubtitle,
+                  value: settings.autoUpdateExtensions,
+                  onChanged: (v) => ref
+                      .read(settingsProvider.notifier)
+                      .setAutoUpdateExtensions(v),
+                ),
                 _VerificationBrowserModeSelector(
                   currentMode: settings.extensionVerificationBrowserMode,
                   onChanged: (mode) => ref

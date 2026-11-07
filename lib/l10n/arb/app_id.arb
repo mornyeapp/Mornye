@@ -662,6 +662,24 @@
   "@optionsExtensionStoreSubtitle": {
     "description": "Subtitle for extension repo toggle"
   },
+  "optionsAutoUpdateExtensions": "Perbarui ekstensi otomatis",
+  "@optionsAutoUpdateExtensions": {
+    "description": "App settings switch that installs extension updates from the extension repository in the background"
+  },
+  "optionsAutoUpdateExtensionsSubtitle": "Memasang pembaruan untuk ekstensi yang aktif di latar belakang saat tidak ada unduhan yang berjalan.",
+  "@optionsAutoUpdateExtensionsSubtitle": {
+    "description": "Subtitle of the Update extensions automatically switch. Disabled extensions are not updated, and updates wait until downloads finish"
+  },
+  "extensionsAutoUpdatedCount": "{count, plural, =1{1 ekstensi diperbarui} other{{count} ekstensi diperbarui}}",
+  "@extensionsAutoUpdatedCount": {
+    "description": "Short notice shown after extensions were updated automatically in the background",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "description": "Number of extensions that were updated"
+      }
+    }
+  },
   "optionsCheckUpdates": "Periksa Update",
   "@optionsCheckUpdates": {
     "description": "Auto update check toggle"

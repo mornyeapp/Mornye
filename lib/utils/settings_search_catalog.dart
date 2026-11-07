@@ -782,6 +782,12 @@ class SettingsSearchCatalog {
           keywords: const ['repository', 'plugin store'],
         ),
         SettingsSearchEntry(
+          icon: Icons.update,
+          title: l10n.optionsAutoUpdateExtensions,
+          subtitle: l10n.optionsAutoUpdateExtensionsSubtitle,
+          keywords: const ['extension updates', 'auto update', 'repository'],
+        ),
+        SettingsSearchEntry(
           icon: Icons.open_in_browser,
           title: l10n.extensionVerificationBrowserTitle,
           keywords: const ['captcha', 'turnstile', 'external browser'],
