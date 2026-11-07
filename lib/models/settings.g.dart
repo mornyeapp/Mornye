@@ -208,7 +208,7 @@ AppSettings _$AppSettingsFromJson(Map<String, dynamic> json) => AppSettings(
   playerShowPronunciation: json['playerShowPronunciation'] as bool? ?? true,
   playerShowTranslation: json['playerShowTranslation'] as bool? ?? true,
   playerShowVolume: json['playerShowVolume'] as bool? ?? true,
-  playerShowLyricSnippet: json['playerShowLyricSnippet'] as bool? ?? true,
+  playerShowLyricSnippet: json['playerShowLyricSnippet'] as bool? ?? false,
 );
 
 Map<String, dynamic> _$AppSettingsToJson(

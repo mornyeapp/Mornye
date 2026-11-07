@@ -78,10 +78,8 @@ class LyricsSettingsPage extends ConsumerWidget {
                 SettingsSwitchItem(
                   key: const ValueKey('lyric-snippet-preview'),
                   icon: Icons.lyrics_outlined,
-                  title: 'Lyric preview in player',
-                  subtitle: settings.playerShowLyricSnippet
-                      ? 'Shows a synced lyric line below the track title'
-                      : 'Lyric preview is hidden on the player screen',
+                  title: context.l10n.lyricsPlayerPreview,
+                  subtitle: context.l10n.lyricsPlayerPreviewSubtitle,
                   value: settings.playerShowLyricSnippet,
                   onChanged: (value) => ref
                       .read(settingsProvider.notifier)

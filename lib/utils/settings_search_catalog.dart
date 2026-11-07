@@ -507,6 +507,17 @@ class SettingsSearchCatalog {
             keywords: const ['lockscreen', 'notification', 'media controls'],
           ),
         SettingsSearchEntry(
+          icon: Icons.lyrics_outlined,
+          title: l10n.lyricsPlayerPreview,
+          subtitle: l10n.lyricsPlayerPreviewSubtitle,
+          keywords: const [
+            'lyric preview',
+            'snippet',
+            'now playing',
+            'karaoke',
+          ],
+        ),
+        SettingsSearchEntry(
           icon: Icons.auto_awesome_outlined,
           title: l10n.lyricsAiTranslation,
           keywords: const [

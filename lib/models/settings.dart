@@ -331,7 +331,8 @@ class AppSettings {
   /// Whether the phone Now Playing screen shows its volume slider.
   final bool playerShowVolume;
 
-  /// Whether the phone Now Playing screen shows a single-line synced lyric preview.
+  /// Whether the Now Playing screen shows the synced line being sung under
+  /// the track title. Off by default; Lyrics settings turns it on.
   final bool playerShowLyricSnippet;
 
   const AppSettings({
@@ -476,7 +477,7 @@ class AppSettings {
     this.playerShowPronunciation = true,
     this.playerShowTranslation = true,
     this.playerShowVolume = true,
-    this.playerShowLyricSnippet = true,
+    this.playerShowLyricSnippet = false,
   });
 
   @JsonKey(includeFromJson: false, includeToJson: false)

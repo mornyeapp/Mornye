@@ -18,7 +18,6 @@ import 'package:material_3_expressive/material_3_expressive.dart'
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mornye/controllers/player_metadata_controller.dart';
 import 'package:mornye/l10n/l10n.dart';
-import 'package:mornye/models/settings.dart';
 import 'package:mornye/models/track.dart';
 import 'package:mornye/providers/library_collections_provider.dart';
 import 'package:mornye/providers/music_player_provider.dart';
@@ -57,6 +56,7 @@ import 'package:mornye/widgets/mini_player.dart';
 import 'package:mornye/widgets/material_player_layout.dart';
 import 'package:mornye/widgets/material_player_backdrop.dart';
 import 'package:mornye/widgets/mornye_player_layout.dart';
+import 'package:mornye/widgets/player_lyric_preview.dart';
 import 'package:mornye/widgets/player_lyrics.dart';
 import 'package:mornye/widgets/player_lyrics_controls.dart';
 import 'package:mornye/widgets/player_metadata_title.dart';
@@ -180,7 +180,6 @@ void main() {
     MusicPlayerController? controller,
     List<MediaItem> queue = const [],
     RemotePlayback? remote,
-    AppSettings settings = const AppSettings(playerShowLyricSnippet: false),
   }) async {
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
@@ -190,7 +189,6 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          initialSettingsProvider.overrideWithValue(settings),
           if (controller != null)
             musicPlayerControllerProvider.overrideWithValue(controller),
           if (remote != null)
@@ -1581,6 +1579,52 @@ void main() {
     expect(bar.toolbarHeight, 0);
     expect(bar.title, isNull);
   });
+
+  for (final mornye in [false, true]) {
+    testWidgets('the lyric line waits for a resolved source and opens lyrics '
+        '(mornye: $mornye)', (tester) async {
+      final playback = StreamController<PlaybackState>.broadcast();
+      addTearDown(playback.close);
+      await pumpNowPlaying(
+        tester,
+        theme: mornye ? MornyeTheme.build(Brightness.dark) : null,
+        size: mornye ? const Size(393, 852) : const Size(1080, 1920),
+        playbackEvents: playback.stream,
+      );
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(NowPlayingScreen)),
+      );
+      container.read(settingsProvider.notifier).setPlayerShowLyricSnippet(true);
+      final unresolved = item('first');
+      mediaItems.add(unresolved);
+      playback.add(PlaybackState(updatePosition: const Duration(seconds: 2)));
+      await settlePlayer(tester);
+      final line = find.descendant(
+        of: find.byType(PlayerLyricPreview),
+        matching: find.text('First lyric'),
+      );
+      // Opening the player never copies an unresolved SAF document.
+      expect(metadataReads, isEmpty);
+      expect(line, findsNothing);
+
+      mediaItems.add(
+        unresolved.copyWith(
+          extras: {
+            ...?unresolved.extras,
+            'resolvedSource': '/cache/first.flac',
+          },
+        ),
+      );
+      await settlePlayer(tester);
+      expect(metadataReads, ['/cache/first.flac']);
+      expect(line, findsOneWidget);
+
+      await tester.tap(line);
+      await settlePlayer(tester);
+      expect(line, findsNothing, reason: 'The full lyrics replace the line');
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   for (final height in [780.0, 520.0]) {
     testWidgets(

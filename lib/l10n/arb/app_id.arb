@@ -1861,6 +1861,8 @@
   },
   "lyricsKeepScreenOn": "Cegah layar mati saat melihat lirik",
   "lyricsKeepScreenOnSubtitle": "Mencegah layar mati saat sedang membuka layar lirik, berlaku saat pemutaran dijeda.",
+  "lyricsPlayerPreview": "Baris lirik di pemutar",
+  "lyricsPlayerPreviewSubtitle": "Tampilkan baris yang sedang dinyanyikan di bawah judul lagu. Ketuk untuk membuka lirik lengkap.",
   "lyricsMode": "Mode Lirik",
   "@lyricsMode": {
     "description": "Setting - how to save lyrics"

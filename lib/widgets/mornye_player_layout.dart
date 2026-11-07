@@ -600,7 +600,7 @@ class MornyePlayerLayout extends ConsumerWidget {
           if (!compact && progress < 1.0)
             SizeTransition(
               sizeFactor: AlwaysStoppedAnimation(1.0 - progress),
-              alignment: Alignment.topLeft,
+              alignment: AlignmentDirectional.topStart,
               child: FadeTransition(
                 opacity: AlwaysStoppedAnimation(
                   (1.0 - progress * 2.5).clamp(0.0, 1.0),

@@ -77,11 +77,6 @@ android {
         targetCompatibility = JavaVersion.VERSION_25
     }
 
-    lint {
-        checkReleaseBuilds = false
-        abortOnError = false
-    }
-
     kotlin {
         compilerOptions {
             jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_25)

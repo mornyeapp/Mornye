@@ -5,10 +5,13 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mornye/controllers/player_metadata_controller.dart';
+import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/models/settings.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
+import 'package:mornye/providers/theme_provider.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/lyrics_parser.dart';
 import 'package:mornye/utils/playback_seek_preview.dart';
@@ -17,244 +20,240 @@ import 'package:mornye/widgets/player_lyrics.dart';
 
 import 'support/fixed_settings.dart';
 
-void main() {
-  TestWidgetsFlutterBinding.ensureInitialized();
-
-  final lrc = '''
+const _lrc = '''
 [00:00.00]
-[00:05.00]paisa mera dialect par -
-[00:10.00]Next line of rap
+[00:05.00]First example line
+[00:10.00]Second example line
 ''';
 
-  group('PlayerLyricPreview Widget Tests', () {
-    testWidgets(
-      'displays real-time active lyric line and chevron, and triggers onTap when clicked',
-      (tester) async {
-        final parsedLyrics = LyricsParser.parse(lrc);
-        final metadata = PlayerMetadataController(
-          parseLyrics: (_) async => parsedLyrics,
-          readMetadata: (_) async => {
-            'title': 'Vibrate',
-            'artist': 'KR\$NA',
-            'lyrics': lrc,
-          },
-        );
-        final item = MediaItem(
-          id: 'vibrate',
-          title: 'Vibrate',
-          artist: 'KR\$NA, Badshah, Phenom',
-          duration: const Duration(minutes: 3),
-          extras: {'source': '/music/vibrate.flac'},
-        );
-        await metadata.load(item);
+const _enabled = AppSettings(playerShowLyricSnippet: true);
 
-        final seekPreview = PlaybackSeekPreview();
-        var openedLyrics = false;
-        final positionController = StreamController<PlaybackState>.broadcast();
-        addTearDown(positionController.close);
+final _item = MediaItem(
+  id: 'example-song',
+  title: 'Example Song',
+  artist: 'Example Artist',
+  duration: const Duration(minutes: 3),
+  extras: const {'source': '/music/example.flac'},
+);
 
-        await tester.pumpWidget(
-          ProviderScope(
-            overrides: [
-              playbackStateProvider.overrideWith(
-                (ref) => positionController.stream,
-              ),
-              settingsProvider.overrideWith(
-                () => FixedSettingsNotifier(
-                  const AppSettings(playerShowLyricSnippet: true),
-                ),
-              ),
-            ],
-            child: MaterialApp(
-              theme: MornyeTheme.build(Brightness.dark),
-              home: Scaffold(
-                body: PlayerLyricPreview(
-                  metadata: metadata,
-                  seekPreview: seekPreview,
-                  colorScheme: const ColorScheme.dark(),
-                  onTap: () => openedLyrics = true,
-                ),
-              ),
-            ),
-          ),
-        );
+Future<PlayerMetadataController> _metadata([ParsedLyrics? lyrics]) async {
+  final parsed = lyrics ?? LyricsParser.parse(_lrc);
+  final metadata = PlayerMetadataController(
+    parseLyrics: (_) async => parsed,
+    readMetadata: (_) async => {
+      'title': 'Example Song',
+      'artist': 'Example Artist',
+      'lyrics': _lrc,
+    },
+  );
+  await metadata.load(_item);
+  return metadata;
+}
 
-        await tester.pump();
+PlaybackState _at(
+  Duration position, {
+  bool playing = true,
+  AudioProcessingState processingState = AudioProcessingState.ready,
+}) => PlaybackState(
+  playing: playing,
+  processingState: processingState,
+  updatePosition: position,
+);
 
-        // At position 00:01 (before 00:05 line):
-        positionController.add(
-          PlaybackState(
-            playing: true,
-            updatePosition: const Duration(seconds: 1),
-          ),
-        );
-        await tester.pumpAndSettle();
-        expect(find.text('•••'), findsOneWidget);
-        expect(find.byIcon(CupertinoIcons.chevron_right), findsOneWidget);
+void main() {
+  setUp(() => SharedPreferences.setMockInitialValues({}));
 
-        // At position 00:06 (active line "paisa mera dialect par -"):
-        positionController.add(
-          PlaybackState(
-            playing: true,
-            updatePosition: const Duration(seconds: 6),
-          ),
-        );
-        await tester.pumpAndSettle();
-        expect(find.text('paisa mera dialect par -'), findsOneWidget);
-        expect(find.byIcon(CupertinoIcons.chevron_right), findsOneWidget);
-
-        // Tap the preview line:
-        await tester.tap(find.text('paisa mera dialect par -'));
-        await tester.pump();
-        expect(openedLyrics, isTrue);
-
-        // At position 00:11 (active line "Next line of rap"):
-        positionController.add(
-          PlaybackState(
-            playing: true,
-            updatePosition: const Duration(seconds: 11),
-          ),
-        );
-        await tester.pumpAndSettle();
-        expect(find.text('Next line of rap'), findsOneWidget);
-      },
+  Future<
+    ({
+      ProviderContainer container,
+      StreamController<PlaybackState> playback,
+      PlaybackSeekPreview seekPreview,
+    })
+  >
+  pumpPreview(
+    WidgetTester tester, {
+    required PlayerMetadataController metadata,
+    AppSettings settings = _enabled,
+    bool mornye = true,
+    VoidCallback? onTap,
+  }) async {
+    final playback = StreamController<PlaybackState>.broadcast();
+    addTearDown(playback.close);
+    final seekPreview = PlaybackSeekPreview();
+    final container = ProviderContainer(
+      overrides: [
+        playbackStateProvider.overrideWith((ref) => playback.stream),
+        settingsProvider.overrideWith(() => FixedSettingsNotifier(settings)),
+      ],
     );
-
-    testWidgets('hides when playerShowLyricSnippet is disabled in settings', (
-      tester,
-    ) async {
-      final parsedLyrics = LyricsParser.parse(lrc);
-      final metadata = PlayerMetadataController(
-        parseLyrics: (_) async => parsedLyrics,
-        readMetadata: (_) async => {'title': 'Vibrate', 'lyrics': lrc},
-      );
-      final item = MediaItem(
-        id: 'vibrate',
-        title: 'Vibrate',
-        extras: {'source': '/music/vibrate.flac'},
-      );
-      await metadata.load(item);
-
-      final seekPreview = PlaybackSeekPreview();
-
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            settingsProvider.overrideWith(
-              () => FixedSettingsNotifier(
-                const AppSettings(playerShowLyricSnippet: false),
-              ),
-            ),
-          ],
-          child: MaterialApp(
-            home: Scaffold(
-              body: PlayerLyricPreview(
-                metadata: metadata,
-                seekPreview: seekPreview,
-                colorScheme: const ColorScheme.dark(),
-              ),
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          theme: mornye ? MornyeTheme.build(Brightness.dark) : ThemeData(),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: PlayerLyricPreview(
+              metadata: metadata,
+              seekPreview: seekPreview,
+              colorScheme: const ColorScheme.dark(),
+              onTap: onTap,
             ),
           ),
         ),
-      );
+      ),
+    );
+    await tester.pump();
+    return (container: container, playback: playback, seekPreview: seekPreview);
+  }
 
+  testWidgets('stays hidden with the default settings', (tester) async {
+    expect(const AppSettings().playerShowLyricSnippet, isFalse);
+    final view = await pumpPreview(
+      tester,
+      metadata: await _metadata(),
+      settings: const AppSettings(),
+    );
+    view.playback.add(_at(const Duration(seconds: 6)));
+    await tester.pumpAndSettle();
+    expect(find.text('First example line'), findsNothing);
+    expect(find.text('•••'), findsNothing);
+    expect(find.byIcon(CupertinoIcons.forward), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final mornye in [true, false]) {
+    testWidgets('follows the sung line and opens lyrics (mornye: $mornye)', (
+      tester,
+    ) async {
+      var opened = 0;
+      final view = await pumpPreview(
+        tester,
+        metadata: await _metadata(),
+        mornye: mornye,
+        onTap: () => opened++,
+      );
+      final chevron = mornye ? CupertinoIcons.forward : Icons.chevron_right;
+
+      view.playback.add(_at(const Duration(seconds: 1), playing: false));
       await tester.pumpAndSettle();
-      expect(find.text('paisa mera dialect par -'), findsNothing);
-      expect(find.byType(PlayerLyricPreview), findsOneWidget);
-      expect(find.byIcon(CupertinoIcons.chevron_right), findsNothing);
-    });
+      expect(find.text('•••'), findsOneWidget);
+      expect(find.byIcon(chevron), findsOneWidget);
 
-    testWidgets('renders WordTimedLyricLine for word-by-word synced lyrics', (
-      tester,
-    ) async {
-      final parsed = ParsedLyrics(
-        synced: true,
-        wordSynced: true,
-        lines: [
-          LyricLine(
-            time: const Duration(seconds: 4),
-            end: const Duration(seconds: 8),
-            text: 'word by word preview',
-            words: [
-              LyricWord(
-                time: const Duration(seconds: 4),
-                end: const Duration(seconds: 5),
-                text: 'word ',
-              ),
-              LyricWord(
-                time: const Duration(seconds: 5),
-                end: const Duration(seconds: 6),
-                text: 'by ',
-              ),
-              LyricWord(
-                time: const Duration(seconds: 6),
-                end: const Duration(seconds: 7),
-                text: 'word ',
-              ),
-              LyricWord(
-                time: const Duration(seconds: 7),
-                end: const Duration(seconds: 8),
-                text: 'preview',
-              ),
-            ],
-          ),
-        ],
-        plainText: 'word by word preview',
+      view.playback.add(_at(const Duration(seconds: 6), playing: false));
+      await tester.pumpAndSettle();
+      expect(find.text('First example line'), findsOneWidget);
+      expect(
+        find.bySemanticsLabel('Lyrics'),
+        findsOneWidget,
+        reason: 'The line reads as one Lyrics button',
       );
 
-      final metadata = PlayerMetadataController(
-        parseLyrics: (_) async => parsed,
-        readMetadata: (_) async => {'title': 'Vibrate', 'lyrics': 'dummy'},
-      );
-      final item = MediaItem(
-        id: 'vibrate',
-        title: 'Vibrate',
-        extras: {'source': '/music/vibrate.flac'},
-      );
-      await metadata.load(item);
-
-      final seekPreview = PlaybackSeekPreview();
-      final positionController = StreamController<PlaybackState>.broadcast();
-      addTearDown(positionController.close);
-
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            playbackStateProvider.overrideWith(
-              (ref) => positionController.stream,
-            ),
-            settingsProvider.overrideWith(
-              () => FixedSettingsNotifier(
-                const AppSettings(playerShowLyricSnippet: true),
-              ),
-            ),
-          ],
-          child: MaterialApp(
-            theme: MornyeTheme.build(Brightness.dark),
-            home: Scaffold(
-              body: PlayerLyricPreview(
-                metadata: metadata,
-                seekPreview: seekPreview,
-                colorScheme: const ColorScheme.dark(),
-              ),
-            ),
-          ),
-        ),
-      );
-
+      await tester.tap(find.text('First example line'));
       await tester.pump();
+      expect(opened, 1);
 
-      // At position 00:05 (active word-timed line):
-      positionController.add(
-        PlaybackState(
-          playing: true,
-          updatePosition: const Duration(seconds: 5),
-        ),
-      );
-      await tester.pump(const Duration(milliseconds: 300));
-
-      expect(find.byType(WordTimedLyricLine), findsOneWidget);
-      expect(find.byIcon(CupertinoIcons.chevron_right), findsOneWidget);
+      view.playback.add(_at(const Duration(seconds: 11), playing: false));
+      await tester.pumpAndSettle();
+      expect(find.text('Second example line'), findsOneWidget);
+      expect(tester.takeException(), isNull);
     });
+  }
+
+  testWidgets('moves to the next line on time without a new state', (
+    tester,
+  ) async {
+    final view = await pumpPreview(tester, metadata: await _metadata());
+    view.playback.add(_at(const Duration(milliseconds: 4500)));
+    await tester.pump();
+    expect(find.text('•••'), findsOneWidget);
+
+    // The extrapolated position reaches the line 80 ms before it starts.
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('First example line'), findsNothing);
+    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pumpAndSettle();
+    expect(find.text('First example line'), findsOneWidget);
+
+    // Pausing stops the line timer.
+    view.playback.add(_at(const Duration(milliseconds: 9500), playing: false));
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pumpAndSettle();
+    expect(find.text('First example line'), findsOneWidget);
+    expect(find.text('Second example line'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('applies the lyrics timing offset', (tester) async {
+    final view = await pumpPreview(tester, metadata: await _metadata());
+    view.playback.add(_at(const Duration(milliseconds: 5500), playing: false));
+    await tester.pumpAndSettle();
+    expect(find.text('First example line'), findsOneWidget);
+
+    // One second later: at 5.5 s the first line, now at 6 s, has not begun.
+    await view.container
+        .read(themeProvider.notifier)
+        .setLyricsOffsetMs(1000, persist: false);
+    await tester.pumpAndSettle();
+    expect(find.text('First example line'), findsNothing);
+    expect(find.text('•••'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('follows the seek preview while dragging', (tester) async {
+    final view = await pumpPreview(tester, metadata: await _metadata());
+    view.playback.add(_at(const Duration(seconds: 1), playing: false));
+    await tester.pumpAndSettle();
+    expect(find.text('•••'), findsOneWidget);
+
+    final drag = view.seekPreview.begin(const Duration(seconds: 11));
+    await tester.pumpAndSettle();
+    expect(find.text('Second example line'), findsOneWidget);
+
+    // Releasing without a seek returns to the playback position.
+    view.seekPreview.end(drag);
+    await tester.pumpAndSettle();
+    expect(find.text('•••'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('sweeps word-timed lines', (tester) async {
+    final lyrics = ParsedLyrics(
+      synced: true,
+      wordSynced: true,
+      plainText: 'one word at a time',
+      lines: [
+        LyricLine(
+          time: const Duration(seconds: 4),
+          end: const Duration(seconds: 8),
+          text: 'one word at a time',
+          words: [
+            for (final (index, word) in [
+              'one ',
+              'word ',
+              'at ',
+              'a ',
+              'time',
+            ].indexed)
+              LyricWord(
+                time: Duration(milliseconds: 4000 + index * 800),
+                end: Duration(milliseconds: 4800 + index * 800),
+                text: word,
+              ),
+          ],
+        ),
+      ],
+    );
+    final view = await pumpPreview(tester, metadata: await _metadata(lyrics));
+    view.playback.add(_at(const Duration(seconds: 5)));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.byType(WordTimedLyricLine), findsOneWidget);
+    expect(find.byIcon(CupertinoIcons.forward), findsOneWidget);
+
+    view.playback.add(_at(const Duration(seconds: 5), playing: false));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
   });
 }
