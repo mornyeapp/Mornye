@@ -28,6 +28,14 @@ class _PlaybackFeedbackState extends ConsumerState<PlaybackFeedback> {
   /// no other notice while it shows.
   ScaffoldFeatureController<SnackBar, SnackBarClosedReason>? _formatNotice;
 
+  /// The error notice may still wait behind another message's exit, where
+  /// its own `close` would hide the wrong message.
+  void _closeErrorNotice() {
+    final notice = _errorNotice;
+    _errorNotice = null;
+    if (notice != null) closeAppSnackBar(context, notice);
+  }
+
   @override
   void initState() {
     super.initState();
@@ -36,8 +44,7 @@ class _PlaybackFeedbackState extends ConsumerState<PlaybackFeedback> {
       (previous, message) {
         if (message == previous || !mounted) return;
         _errorTimer?.cancel();
-        _errorNotice?.close();
-        _errorNotice = null;
+        _closeErrorNotice();
         if (message == null) return;
         // A quick track change can replace a failed preparation immediately.
         // Report only an error that still belongs to the current playback.
@@ -89,8 +96,7 @@ class _PlaybackFeedbackState extends ConsumerState<PlaybackFeedback> {
           return;
         }
         _errorTimer?.cancel();
-        _errorNotice?.close();
-        _errorNotice = null;
+        _closeErrorNotice();
         final l10n = context.l10n;
         final notice = showAppSnackBar(
           context,

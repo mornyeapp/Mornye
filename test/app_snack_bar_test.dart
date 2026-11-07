@@ -351,6 +351,56 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('closing a waiting message cancels it before it shows', (
+    tester,
+  ) async {
+    late BuildContext messageContext;
+    await tester.pumpWidget(
+      MaterialApp(
+        builder: (_, child) => AppScaffoldMessenger(child: child!),
+        home: Builder(
+          builder: (context) {
+            messageContext = context;
+            return const Scaffold(body: SizedBox.expand());
+          },
+        ),
+      ),
+    );
+    ScaffoldFeatureController<SnackBar, SnackBarClosedReason> show(
+      String text,
+    ) => ScaffoldMessenger.of(
+      messageContext,
+    ).showSnackBar(SnackBar(content: Text(text)));
+
+    final first = show('First');
+    await tester.pumpAndSettle();
+    final waiting = show('Waiting');
+    await tester.pump(const Duration(milliseconds: 50));
+    expect(find.text('First'), findsOneWidget);
+    closeAppSnackBar(messageContext, waiting);
+    await tester.pump();
+    expect(find.text('First'), findsNothing);
+    await tester.pumpAndSettle();
+    expect(find.text('Waiting'), findsNothing);
+    expect(await first.closed, SnackBarClosedReason.remove);
+    expect(await waiting.closed, SnackBarClosedReason.hide);
+
+    // Closing it again leaves a newer message alone; closing the shown
+    // message plays its exit.
+    final next = show('Next');
+    await tester.pumpAndSettle();
+    closeAppSnackBar(messageContext, waiting);
+    await tester.pumpAndSettle();
+    expect(find.text('Next'), findsOneWidget);
+    closeAppSnackBar(messageContext, next);
+    await tester.pump(const Duration(milliseconds: 50));
+    expect(find.text('Next'), findsOneWidget);
+    await tester.pumpAndSettle();
+    expect(find.text('Next'), findsNothing);
+    expect(await next.closed, SnackBarClosedReason.hide);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('rapid messages never leave a backlog or persist an action', (
     tester,
   ) async {

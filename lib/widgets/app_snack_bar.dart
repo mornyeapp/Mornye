@@ -68,6 +68,24 @@ class _AppScaffoldMessengerState extends ScaffoldMessengerState {
     return controller;
   }
 
+  /// Closes [controller] wherever it is. Flutter's own `close` asserts that
+  /// the message is the first in the queue and then hides the first one, so
+  /// on a message still waiting behind another's exit it would hide the
+  /// leaving one again and let the stale message show for its full time.
+  void closeSnackBar(
+    ScaffoldFeatureController<SnackBar, SnackBarClosedReason> controller,
+  ) {
+    if (identical(_waiting, controller)) {
+      // The leaving message is cut, then the waiting one is cancelled
+      // before it appears; both `closed` futures complete.
+      removeCurrentSnackBar();
+      removeCurrentSnackBar(reason: SnackBarClosedReason.hide);
+    } else if (identical(_current, controller)) {
+      hideCurrentSnackBar();
+    }
+    // Otherwise it has already closed.
+  }
+
   /// Flutter drops queued messages without completing their `closed`
   /// futures, which would leave a caller waiting on the message queued
   /// behind an exit (such as a playback notice) waiting forever. Cut both
@@ -80,6 +98,22 @@ class _AppScaffoldMessengerState extends ScaffoldMessengerState {
     }
     removeCurrentSnackBar();
     removeCurrentSnackBar();
+  }
+}
+
+/// Closes a message shown through [ScaffoldMessenger.of] at [context], also
+/// while it still waits behind another message's exit. Use it instead of
+/// [ScaffoldFeatureController.close] for a message that may not be on screen
+/// yet. A plain [ScaffoldMessenger] keeps Flutter's `close`.
+void closeAppSnackBar(
+  BuildContext context,
+  ScaffoldFeatureController<SnackBar, SnackBarClosedReason> controller,
+) {
+  final messenger = ScaffoldMessenger.maybeOf(context);
+  if (messenger is _AppScaffoldMessengerState) {
+    messenger.closeSnackBar(controller);
+  } else {
+    controller.close();
   }
 }
 
