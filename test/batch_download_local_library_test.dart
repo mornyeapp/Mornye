@@ -77,7 +77,7 @@ class _Queue extends DownloadQueueNotifier {
 
   final List<DownloadItem> items;
   final added = <Track>[];
-  String? playlist;
+  final playlists = <String?>[];
 
   @override
   DownloadQueueState build() => DownloadQueueState(items: items);
@@ -91,7 +91,7 @@ class _Queue extends DownloadQueueNotifier {
     List<int?>? playlistPositions,
   }) {
     added.addAll(tracks);
-    playlist = playlistName;
+    playlists.add(playlistName);
   }
 }
 
@@ -120,7 +120,7 @@ void main() {
         database.ready!.complete();
         await tester.pumpAndSettle();
         expect(queue.added, [_missingTrack]);
-        expect(queue.playlist, 'Example playlist');
+        expect(queue.playlists, ['Example playlist']);
         expect(
           database.requests.single.map((r) => r.isrc).first,
           _isrcTrack.isrc,
