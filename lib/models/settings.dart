@@ -242,6 +242,10 @@ class AppSettings {
 
   /// Copy a download's animated cover into its album folder as `cover.mp4`.
   final bool saveMotionArtworkFile;
+
+  /// Delete the album and artist folders a deleted song leaves empty, inside
+  /// the download and Local Library folders.
+  final bool removeEmptyFolders;
   final bool listeningStatisticsEnabled;
   final bool autoConvertDownloads;
   // Re-download a Hi-Res request at LOSSLESS when the file measures as fake.
@@ -454,6 +458,7 @@ class AppSettings {
     this.lockScreenLyrics = false,
     this.motionArtworkEnabled = true,
     this.saveMotionArtworkFile = false,
+    this.removeEmptyFolders = true,
     this.listeningStatisticsEnabled = true,
     this.autoConvertDownloads = false,
     this.redownloadFakeHiRes = false,
@@ -625,6 +630,7 @@ class AppSettings {
     bool? lockScreenLyrics,
     bool? motionArtworkEnabled,
     bool? saveMotionArtworkFile,
+    bool? removeEmptyFolders,
     bool? listeningStatisticsEnabled,
     bool? autoConvertDownloads,
     bool? redownloadFakeHiRes,
@@ -798,6 +804,7 @@ class AppSettings {
       motionArtworkEnabled: motionArtworkEnabled ?? this.motionArtworkEnabled,
       saveMotionArtworkFile:
           saveMotionArtworkFile ?? this.saveMotionArtworkFile,
+      removeEmptyFolders: removeEmptyFolders ?? this.removeEmptyFolders,
       listeningStatisticsEnabled:
           listeningStatisticsEnabled ?? this.listeningStatisticsEnabled,
       autoConvertDownloads: autoConvertDownloads ?? this.autoConvertDownloads,

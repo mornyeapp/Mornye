@@ -366,6 +366,16 @@ class _FilesSettingsPageState extends ConsumerState<FilesSettingsPage> {
                   title: context.l10n.reorganizeLibraryTitle,
                   subtitle: context.l10n.reorganizeLibrarySubtitle,
                   onTap: () => _reorganizeExistingDownloads(context, ref),
+                ),
+                SettingsSwitchItem(
+                  key: const ValueKey('remove-empty-folders'),
+                  icon: Icons.folder_delete_outlined,
+                  title: context.l10n.removeEmptyFoldersTitle,
+                  subtitle: context.l10n.removeEmptyFoldersSubtitle,
+                  value: settings.removeEmptyFolders,
+                  onChanged: ref
+                      .read(settingsProvider.notifier)
+                      .setRemoveEmptyFolders,
                   showDivider: false,
                 ),
               ],

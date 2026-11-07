@@ -148,6 +148,7 @@ AppSettings _$AppSettingsFromJson(Map<String, dynamic> json) => AppSettings(
   lockScreenLyrics: json['lockScreenLyrics'] as bool? ?? false,
   motionArtworkEnabled: json['motionArtworkEnabled'] as bool? ?? true,
   saveMotionArtworkFile: json['saveMotionArtworkFile'] as bool? ?? false,
+  removeEmptyFolders: json['removeEmptyFolders'] as bool? ?? true,
   listeningStatisticsEnabled:
       json['listeningStatisticsEnabled'] as bool? ?? true,
   autoConvertDownloads: json['autoConvertDownloads'] as bool? ?? false,
@@ -313,6 +314,7 @@ Map<String, dynamic> _$AppSettingsToJson(
   'lockScreenLyrics': instance.lockScreenLyrics,
   'motionArtworkEnabled': instance.motionArtworkEnabled,
   'saveMotionArtworkFile': instance.saveMotionArtworkFile,
+  'removeEmptyFolders': instance.removeEmptyFolders,
   'listeningStatisticsEnabled': instance.listeningStatisticsEnabled,
   'autoConvertDownloads': instance.autoConvertDownloads,
   'redownloadFakeHiRes': instance.redownloadFakeHiRes,

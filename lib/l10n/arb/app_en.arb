@@ -10544,6 +10544,14 @@
   "@reorganizeLibrarySubtitle": {
     "description": "Subtitle of the apply-rules-to-existing-files action"
   },
+  "removeEmptyFoldersTitle": "Remove Empty Folders",
+  "@removeEmptyFoldersTitle": {
+    "description": "Files settings switch that deletes album and artist folders once the last song in them is deleted"
+  },
+  "removeEmptyFoldersSubtitle": "When you delete the last song in an album or artist folder, delete the folder too",
+  "@removeEmptyFoldersSubtitle": {
+    "description": "Subtitle of the switch that deletes folders left empty by deleted songs"
+  },
   "reorganizeLibraryScanning": "Checking your files…",
   "@reorganizeLibraryScanning": {
     "description": "Shown while Mornye works out which downloaded files need to move"

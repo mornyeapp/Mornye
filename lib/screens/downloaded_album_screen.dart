@@ -18,7 +18,6 @@ import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/utils/adaptive_layout.dart';
 import 'package:mornye/utils/audio_quality_badge_policy.dart';
 import 'package:mornye/utils/cover_art_utils.dart';
-import 'package:mornye/utils/file_access.dart';
 import 'package:mornye/utils/image_cache_utils.dart';
 import 'package:mornye/providers/deleted_library_files.dart';
 import 'package:mornye/providers/download_queue_provider.dart';
@@ -26,6 +25,7 @@ import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/providers/playback_provider.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/player_motion_artwork_provider.dart';
+import 'package:mornye/providers/song_leftovers_provider.dart';
 import 'package:mornye/controllers/collapsing_header_scroll_mixin.dart';
 import 'package:mornye/controllers/confirm_and_delete_tracks.dart';
 import 'package:mornye/controllers/local_track_batch_actions.dart';
@@ -158,7 +158,7 @@ class _DownloadedAlbumScreenState extends ConsumerState<DownloadedAlbumScreen>
       deleteItem: (id) async {
         final item = tracksById[id];
         if (item == null) return false;
-        return deleteFile(item.filePath);
+        return container.read(songLeftoversProvider).delete(item.filePath);
       },
       persistDeletedItems: (ids) => removeDeletedLibraryFileEntries(
         container,

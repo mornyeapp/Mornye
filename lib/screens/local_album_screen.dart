@@ -26,6 +26,7 @@ import 'package:mornye/providers/local_library_provider.dart';
 import 'package:mornye/providers/playback_provider.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/player_motion_artwork_provider.dart';
+import 'package:mornye/providers/song_leftovers_provider.dart';
 import 'package:mornye/controllers/collapsing_header_scroll_mixin.dart';
 import 'package:mornye/controllers/confirm_and_delete_tracks.dart';
 import 'package:mornye/controllers/local_track_batch_actions.dart';
@@ -181,7 +182,9 @@ class _LocalAlbumScreenState extends ConsumerState<LocalAlbumScreen>
         final item = tracksById[id];
         if (item == null) return false;
         if (!isCueVirtualPath(item.filePath)) {
-          final deleted = await deleteFile(item.filePath);
+          final deleted = await ref
+              .read(songLeftoversProvider)
+              .delete(item.filePath);
           if (!deleted) return false;
         }
         return true;

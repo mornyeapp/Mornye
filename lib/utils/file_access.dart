@@ -441,6 +441,29 @@ bool isStorageMountContainer(String directory, {p.Context? context}) {
   };
 }
 
+/// Whether [directory] is a folder the system or the user keeps for more
+/// than one library: a mount container, a drive or volume, a folder right
+/// inside one (such as Android's Music or Download), the home folder or a
+/// folder right inside it. Cleanup never deletes these, even when empty.
+bool isSharedTopFolder(String directory, {p.Context? context, String? home}) {
+  final path = context ?? p.context;
+  final normalized = path.normalize(directory);
+  var current = normalized;
+  for (var depth = 0; depth <= 2; depth++) {
+    if (isStorageMountContainer(current, context: path)) return true;
+    current = path.dirname(current);
+  }
+  final homeFolder = home ?? _homeFolder();
+  if (homeFolder == null || homeFolder.isEmpty) return false;
+  final normalizedHome = path.normalize(homeFolder);
+  return path.equals(normalized, normalizedHome) ||
+      path.isWithin(normalized, normalizedHome) ||
+      path.equals(path.dirname(normalized), normalizedHome);
+}
+
+String? _homeFolder() =>
+    Platform.environment[Platform.isWindows ? 'USERPROFILE' : 'HOME'];
+
 /// Deletes [path] and reports whether the file is confirmed absent afterward.
 ///
 /// SAF providers are allowed to reject a delete request by returning `false`.

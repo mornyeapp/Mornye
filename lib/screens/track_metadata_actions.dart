@@ -188,7 +188,7 @@ extension _TrackMetadataFileActions on _TrackMetadataScreenState {
             .read(localLibraryProvider.notifier)
             .removeItem(cueItem.id);
       } else {
-        if (!await deleteFile(filePath)) {
+        if (!await container.read(songLeftoversProvider).delete(filePath)) {
           if (screenContext.mounted) {
             ScaffoldMessenger.of(screenContext).showSnackBar(
               SnackBar(

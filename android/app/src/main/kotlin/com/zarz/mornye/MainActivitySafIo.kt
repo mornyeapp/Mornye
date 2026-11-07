@@ -549,6 +549,95 @@ internal fun Context.findSafSibling(audioUri: Uri, name: String): Map<String, An
     }
 }
 
+/**
+ * A SAF song document's file name and the folders holding it, nearest first,
+ * each as its uri and whether it is the granted tree's own folder, or null
+ * when the provider cannot tell. Without the provider's ancestry only the
+ * song's verified parent is known. Asked before the song is deleted: a
+ * deleted document has no name or ancestry left.
+ */
+internal fun Context.safSongFolders(audioUri: Uri): Map<String, Any>? {
+    return try {
+        val docId = DocumentsContract.getDocumentId(audioUri)
+        val treeDocId = DocumentsContract.getTreeDocumentId(audioUri)
+        if (docId.isNullOrEmpty() || treeDocId.isNullOrEmpty() || docId == treeDocId) {
+            return null
+        }
+        val name = DocumentFile.fromSingleUri(this, audioUri)?.name
+            ?.takeIf(String::isNotEmpty) ?: return null
+        val path = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            try {
+                DocumentsContract.findDocumentPath(contentResolver, audioUri)?.path
+            } catch (_: Exception) {
+                null
+            }
+        } else null
+        val folderIds = if (path != null) {
+            if (path.size < 2 || path.first() != treeDocId || path.last() != docId) {
+                return null
+            }
+            path.subList(0, path.lastIndex).asReversed()
+        } else {
+            val parent = safParentDir(audioUri) ?: return null
+            listOf(DocumentsContract.getDocumentId(parent.uri))
+        }
+        mapOf(
+            "name" to name,
+            "folders" to folderIds.map { id ->
+                mapOf(
+                    "uri" to DocumentsContract.buildDocumentUriUsingTree(audioUri, id).toString(),
+                    "root" to (id == treeDocId),
+                )
+            },
+        )
+    } catch (e: Exception) {
+        android.util.Log.w("Mornye", "Song folder lookup failed: ${e.message}")
+        null
+    }
+}
+
+/**
+ * The entries of a SAF folder document, each as its name, uri and whether it
+ * is a folder, or null when the folder cannot be listed. An entry whose kind
+ * the provider does not tell counts as a folder.
+ */
+internal fun Context.listSafFolder(folderUri: Uri): List<Map<String, Any>>? {
+    return try {
+        if (!DocumentsContract.isTreeUri(folderUri)) return null
+        val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(
+            folderUri,
+            DocumentsContract.getDocumentId(folderUri),
+        )
+        val projection = arrayOf(
+            DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+            DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+            DocumentsContract.Document.COLUMN_MIME_TYPE,
+        )
+        contentResolver.query(childrenUri, projection, null, null, null)?.use { cursor ->
+            val idColumn = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
+            val nameColumn = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
+            val mimeColumn = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_MIME_TYPE)
+            if (idColumn < 0 || nameColumn < 0) return null
+            val entries = mutableListOf<Map<String, Any>>()
+            while (cursor.moveToNext()) {
+                val id = cursor.getString(idColumn)?.takeIf(String::isNotEmpty) ?: return null
+                val mime = if (mimeColumn < 0) null else cursor.getString(mimeColumn)
+                entries.add(
+                    mapOf(
+                        "name" to (cursor.getString(nameColumn) ?: ""),
+                        "uri" to DocumentsContract.buildDocumentUriUsingTree(folderUri, id).toString(),
+                        "folder" to (mime == null || mime == DocumentsContract.Document.MIME_TYPE_DIR),
+                    )
+                )
+            }
+            entries
+        }
+    } catch (e: Exception) {
+        android.util.Log.w("Mornye", "SAF folder listing failed: ${e.message}")
+        null
+    }
+}
+
 internal fun Context.runPostProcessingSafV2(
     coreBackend: CoreBackend,
     fileUriStr: String,

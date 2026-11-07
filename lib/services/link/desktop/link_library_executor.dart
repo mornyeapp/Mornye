@@ -10,6 +10,7 @@ import 'package:mornye/providers/deleted_library_files.dart';
 import 'package:mornye/providers/download_history_provider.dart';
 import 'package:mornye/providers/player_motion_artwork_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
+import 'package:mornye/providers/song_leftovers_provider.dart';
 import 'package:mornye/services/batch_metadata_re_enrich.dart';
 import 'package:mornye/services/downloaded_embedded_cover_resolver.dart';
 import 'package:mornye/services/history_database.dart';
@@ -116,7 +117,9 @@ class LinkLibraryExecutor {
           },
         };
       case LinkLibraryAction.delete:
-        if (!await deleteFile(path)) return {'error': 'delete_failed'};
+        if (!await container.read(songLeftoversProvider).delete(path)) {
+          return {'error': 'delete_failed'};
+        }
         await removeDeletedLibraryFileEntries(container, [path]);
       case LinkLibraryAction.replayGain:
       case LinkLibraryAction.removeReplayGain:

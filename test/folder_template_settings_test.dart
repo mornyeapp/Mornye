@@ -15,6 +15,7 @@ import 'package:mornye/services/backend/rust_ffi_backend.dart';
 import 'package:mornye/theme/app_theme.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/desktop_platform.dart';
+import 'package:mornye/utils/settings_search_catalog.dart';
 import 'package:mornye/widgets/app_alert_dialog.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -194,4 +195,66 @@ void main() {
       }),
     );
   }
+
+  testWidgets('Remove Empty Folders starts on, turns off and is '
+      'searchable', (tester) async {
+    tester.view.physicalSize = const Size(430, 932);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    const channel = MethodChannel('com.zarz.mornye/backend');
+    final messenger = tester.binding.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(
+      channel,
+      (call) async => _result(call.method, call.arguments),
+    );
+    addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+    RustFfiBackend.debugShared = RustFfiBackend(
+      openTransport: _Transport.new,
+      loadConfig: () async => const DesktopBackendConfig(
+        appSupportDir: '/support',
+        documentsDir: '/documents',
+        tempDir: '/tmp',
+      ),
+    );
+    final container = ProviderContainer(
+      overrides: [settingsProvider.overrideWith(FixedSettingsNotifier.new)],
+    );
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: const FilesSettingsPage(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final row = find.byKey(const ValueKey('remove-empty-folders'));
+    await tester.scrollUntilVisible(
+      row,
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+    expect(container.read(settingsProvider).removeEmptyFolders, isTrue);
+
+    await tester.tap(row);
+    await tester.pumpAndSettle();
+    expect(container.read(settingsProvider).removeEmptyFolders, isFalse);
+
+    final l10n = AppLocalizations.of(
+      tester.element(find.byType(FilesSettingsPage)),
+    );
+    expect(
+      SettingsSearchCatalog(
+        l10n,
+      ).files.any((entry) => entry.title == l10n.removeEmptyFoldersTitle),
+      isTrue,
+    );
+    await tester.pumpWidget(const SizedBox());
+    await tester.pumpAndSettle();
+  });
 }

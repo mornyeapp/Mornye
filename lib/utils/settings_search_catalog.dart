@@ -768,6 +768,18 @@ class SettingsSearchCatalog {
           ],
         ),
         SettingsSearchEntry(
+          icon: Icons.folder_delete_outlined,
+          title: l10n.removeEmptyFoldersTitle,
+          subtitle: l10n.removeEmptyFoldersSubtitle,
+          keywords: const [
+            'empty folders',
+            'delete folder',
+            'artist folder',
+            'album folder',
+            'clean up',
+          ],
+        ),
+        SettingsSearchEntry(
           icon: Icons.folder_special_outlined,
           title: l10n.allFilesAccess,
           subtitle: l10n.allFilesAccessDescription,

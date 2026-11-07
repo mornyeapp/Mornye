@@ -792,6 +792,9 @@ class SettingsNotifier extends Notifier<AppSettings> {
   void setSaveMotionArtworkFile(bool enabled) =>
       _commit(state.copyWith(saveMotionArtworkFile: enabled));
 
+  void setRemoveEmptyFolders(bool enabled) =>
+      _commit(state.copyWith(removeEmptyFolders: enabled));
+
   void setListeningStatisticsEnabled(bool enabled) =>
       _commit(state.copyWith(listeningStatisticsEnabled: enabled));
 

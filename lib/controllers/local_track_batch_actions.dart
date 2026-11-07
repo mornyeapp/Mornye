@@ -13,6 +13,7 @@ import 'package:mornye/providers/extension_provider.dart';
 import 'package:mornye/providers/local_library_provider.dart';
 import 'package:mornye/providers/player_motion_artwork_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
+import 'package:mornye/providers/song_leftovers_provider.dart';
 import 'package:mornye/services/batch_metadata_re_enrich.dart';
 import 'package:mornye/services/downloaded_embedded_cover_resolver.dart';
 import 'package:mornye/services/library_database.dart';
@@ -20,7 +21,6 @@ import 'package:mornye/services/network_file_editor.dart';
 import 'package:mornye/services/local_track_redownload_service.dart';
 import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/services/ffmpeg_reenrich.dart';
-import 'package:mornye/utils/file_access.dart';
 import 'package:mornye/utils/int_utils.dart';
 import 'package:mornye/utils/lyrics_metadata_helper.dart';
 import 'package:mornye/utils/logger.dart';
@@ -697,12 +697,13 @@ Future<void> deleteLibraryTracks(
   final messenger = ScaffoldMessenger.of(context);
   final l10n = context.l10n;
   final deletedPaths = <String>{};
+  final leftovers = container.read(songLeftoversProvider);
   var deletedCount = 0;
   for (final item in selected) {
     final cleanPath = DownloadedEmbeddedCoverResolver.cleanFilePath(
       item.filePath,
     );
-    if (!await deleteFile(cleanPath)) continue;
+    if (!await leftovers.delete(cleanPath)) continue;
     deletedPaths.add(cleanPath);
     deletedCount++;
   }

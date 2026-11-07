@@ -436,6 +436,22 @@ internal suspend fun MainActivity.handleFindSafSibling(call: MethodCall, result:
     result.success(sibling)
 }
 
+internal suspend fun MainActivity.handleSafSongFolders(call: MethodCall, result: MethodChannel.Result) {
+    val safUri = call.argument<String>("saf_uri") ?: ""
+    val folders = withContext(Dispatchers.IO) {
+        safSongFolders(Uri.parse(safUri))
+    }
+    result.success(folders)
+}
+
+internal suspend fun MainActivity.handleListSafFolder(call: MethodCall, result: MethodChannel.Result) {
+    val folderUri = call.argument<String>("folder_uri") ?: ""
+    val entries = withContext(Dispatchers.IO) {
+        listSafFolder(Uri.parse(folderUri))
+    }
+    result.success(entries)
+}
+
 internal suspend fun MainActivity.handleGetSafFileModTimes(call: MethodCall, result: MethodChannel.Result) {
     val uris = call.argument<String>("uris") ?: "[]"
     val response = withContext(Dispatchers.IO) {

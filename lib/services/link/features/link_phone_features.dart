@@ -9,6 +9,7 @@ import 'package:mornye/providers/download_history_provider.dart';
 import 'package:mornye/providers/local_library_provider.dart';
 import 'package:mornye/providers/music_player_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
+import 'package:mornye/providers/song_leftovers_provider.dart';
 import 'package:mornye/providers/system_volume_provider.dart';
 import 'package:mornye/services/history_database.dart';
 import 'package:mornye/services/library_database.dart';
@@ -258,7 +259,9 @@ final linkPhoneLibraryProvider = Provider<LinkPhoneLibraryPublisher?>((ref) {
     offered: ref.watch(linkPhoneSenderProvider).fileNamed,
     deleteSharedFile: options.shareSongs
         ? (path) async {
-            if (!await deleteFile(path)) return false;
+            if (!await container.read(songLeftoversProvider).delete(path)) {
+              return false;
+            }
             await removeDeletedLibraryFileEntries(container, [path]);
             publisher.publish();
             return true;

@@ -1719,6 +1719,56 @@ class PlatformBridge {
     return (uri: uri, size: size, modified: modified);
   }
 
+  /// The file name of the SAF document [safUri] and the folders holding it,
+  /// nearest first, each with whether it is the granted tree's own folder,
+  /// or null when the provider cannot tell. Ask before deleting the
+  /// document.
+  static Future<({String name, List<({String uri, bool root})> folders})?>
+  safSongFolders(String safUri) async {
+    final result = await _channel.invokeMethod<Map<Object?, Object?>>(
+      'safSongFolders',
+      {'saf_uri': safUri},
+    );
+    if (result case {
+      'name': final String name,
+      'folders': final List<Object?> folders,
+    }) {
+      return (
+        name: name,
+        folders: [
+          for (final folder in folders)
+            if (folder case {'uri': final String uri, 'root': final bool root})
+              (uri: uri, root: root),
+        ],
+      );
+    }
+    return null;
+  }
+
+  /// The entries of the SAF folder [folderUri], or null when it cannot be
+  /// listed.
+  static Future<List<({String name, String uri, bool folder})>?> listSafFolder(
+    String folderUri,
+  ) async {
+    final result = await _channel.invokeMethod<List<Object?>>('listSafFolder', {
+      'folder_uri': folderUri,
+    });
+    if (result == null) return null;
+    final entries = <({String name, String uri, bool folder})>[];
+    for (final entry in result) {
+      if (entry case {
+        'name': final String name,
+        'uri': final String uri,
+        'folder': final bool folder,
+      }) {
+        entries.add((name: name, uri: uri, folder: folder));
+      } else {
+        return null;
+      }
+    }
+    return entries;
+  }
+
   static Future<void> startDownloadService({
     String trackName = '',
     String artistName = '',
