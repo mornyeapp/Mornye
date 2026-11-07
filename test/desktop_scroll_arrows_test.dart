@@ -10,8 +10,10 @@ import 'package:mornye/widgets/mornye_chrome.dart';
 
 void main() {
   late ScrollController controller;
+  var shelfBuilds = 0;
 
   Future<void> pumpShelf(WidgetTester tester) async {
+    shelfBuilds = 0;
     await tester.pumpWidget(
       MaterialApp(
         localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -23,6 +25,7 @@ void main() {
             child: DesktopScrollArrows(
               builder: (context, scrollController) {
                 controller = scrollController;
+                shelfBuilds++;
                 return ListView.builder(
                   controller: scrollController,
                   scrollDirection: Axis.horizontal,
@@ -106,6 +109,63 @@ void main() {
     await tester.pumpAndSettle();
     expect(arrow, findsNothing);
   });
+
+  for (final reduced in [false, true]) {
+    testWidgets('Material fades its arrows in and out faster'
+        '${reduced ? ' (reduced motion)' : ''}', (tester) async {
+      if (reduced) {
+        tester.platformDispatcher.accessibilityFeaturesTestValue =
+            const FakeAccessibilityFeatures(disableAnimations: true);
+        addTearDown(
+          tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
+        );
+      }
+      debugDesktopPlatformOverride = true;
+      await pumpShelf(tester);
+      final arrow = find.byTooltip('Scroll forward');
+      double opacity() => tester
+          .widget<Opacity>(
+            find.ancestor(of: arrow, matching: find.byType(Opacity)).first,
+          )
+          .opacity;
+      // At rest the shelf holds a zero-size child and no arrows.
+      expect(arrow, findsNothing);
+
+      final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      addTearDown(mouse.removePointer);
+      await mouse.addPointer(location: Offset.zero);
+      await mouse.moveTo(tester.getCenter(find.byType(ListView)));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 16));
+      if (reduced) {
+        expect(arrow, findsOneWidget);
+        expect(
+          find.ancestor(of: arrow, matching: find.byType(Opacity)),
+          findsNothing,
+        );
+      } else {
+        expect(opacity(), inExclusiveRange(0, 1));
+        await tester.pumpAndSettle();
+        expect(opacity(), 1);
+      }
+
+      await mouse.moveTo(Offset.zero);
+      await tester.pump();
+      if (reduced) {
+        await tester.pump();
+        expect(arrow, findsNothing);
+      } else {
+        await tester.pump(const Duration(milliseconds: 50));
+        expect(opacity(), inExclusiveRange(0, 1));
+        // The exit is shorter than Mornye's 250 ms.
+        await tester.pump(const Duration(milliseconds: 60));
+        await tester.pump();
+        expect(arrow, findsNothing);
+      }
+      // Hovering never rebuilt the list.
+      expect(shelfBuilds, 1);
+    });
+  }
 
   testWidgets('desktop shows arrows on hover in the open directions', (
     tester,

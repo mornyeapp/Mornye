@@ -237,6 +237,9 @@ void main() {
     }
   }
 
+  /// The Material rail's selection fill.
+  final railIndicator = find.byKey(const ValueKey('desktop-rail-indicator'));
+
   /// The page shown in the content pane.
   Finder contentPage() => find
       .ancestor(of: find.text('content'), matching: find.byType(Center))
@@ -382,6 +385,99 @@ void main() {
         }
       }
     }
+
+    Future<ValueNotifier<ShellTab>> pumpRail(
+      WidgetTester tester, {
+      required bool extended,
+    }) async {
+      final selected = ValueNotifier(ShellTab.home);
+      addTearDown(selected.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light(),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: Align(
+              alignment: Alignment.centerLeft,
+              child: ValueListenableBuilder<ShellTab>(
+                valueListenable: selected,
+                builder: (context, tab, _) => DesktopNavigationRail(
+                  destinations: _destinations(mornye: false),
+                  selected: tab,
+                  onSelected: (_) {},
+                  extended: extended,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      return selected;
+    }
+
+    for (final extended in [true, false]) {
+      testWidgets('the rail selection grows from its centre and fades in '
+          '(${extended ? 'expanded' : 'collapsed'})', (tester) async {
+        final selected = await pumpRail(tester, extended: extended);
+        Finder indicator(ShellTab tab) => find.descendant(
+          of: find.byKey(ValueKey('desktop-rail:${tab.name}')),
+          matching: railIndicator,
+        );
+        Color fill(ShellTab tab) =>
+            (tester.widget<DecoratedBox>(indicator(tab)).decoration
+                    as ShapeDecoration)
+                .color!;
+        expect(indicator(ShellTab.home), findsOneWidget);
+        expect(indicator(ShellTab.library), findsNothing);
+        final full = tester.getRect(indicator(ShellTab.home));
+
+        selected.value = ShellTab.library;
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 16));
+        final growing = tester.getRect(indicator(ShellTab.library));
+        expect(growing.width, inExclusiveRange(full.width / 2, full.width));
+        expect(growing.height, full.height);
+        // Centred on the pill it grows into.
+        final library = tester.getRect(
+          find.byKey(const ValueKey('desktop-rail:library')),
+        );
+        expect(growing.center.dx, closeTo(full.center.dx, 0.5));
+        expect(growing.center.dy, closeTo(library.center.dy, 0.5));
+        expect(fill(ShellTab.library).a, inExclusiveRange(0, 1));
+        // The old pill keeps its width and fades out.
+        expect(tester.getRect(indicator(ShellTab.home)).width, full.width);
+        expect(fill(ShellTab.home).a, inExclusiveRange(0, 1));
+
+        await tester.pumpAndSettle();
+        expect(indicator(ShellTab.home), findsNothing);
+        expect(
+          tester.getRect(indicator(ShellTab.library)).width,
+          closeTo(full.width, 0.01),
+        );
+        expect(fill(ShellTab.library).a, 1);
+      });
+    }
+
+    testWidgets('reduced motion keeps the static rail', (tester) async {
+      tester.platformDispatcher.accessibilityFeaturesTestValue =
+          const FakeAccessibilityFeatures(disableAnimations: true);
+      addTearDown(
+        tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
+      );
+      final selected = await pumpRail(tester, extended: true);
+      expect(find.byType(NavigationRail), findsOneWidget);
+      expect(railIndicator, findsNothing);
+      selected.value = ShellTab.library;
+      await tester.pump();
+      expect(
+        tester
+            .widget<NavigationRail>(find.byType(NavigationRail))
+            .selectedIndex,
+        1,
+      );
+    });
 
     testWidgets('collapses the rail at 900 and shows the player bar', (
       tester,
@@ -593,12 +689,7 @@ void main() {
         onOpenLibraryLink: opened.add,
       );
       bool selectedFill(Finder finder) =>
-          tester
-              .widget<Material>(
-                find.descendant(of: finder, matching: find.byType(Material)),
-              )
-              .type ==
-          MaterialType.canvas;
+          tester.any(find.descendant(of: finder, matching: railIndicator));
       final mix = find.byKey(const ValueKey('desktop-rail-link:playlist:mix'));
       expect(selectedFill(mix), isFalse);
       desktopSidebarLink.value = 'playlist:mix';
@@ -841,6 +932,54 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byKey(backdrop), findsNothing);
     });
+
+    for (final reduced in [false, true]) {
+      testWidgets('the sidebar tint follows the backdrop crossfade'
+          '${reduced ? ' (reduced motion)' : ''}', (tester) async {
+        if (reduced) {
+          tester.platformDispatcher.accessibilityFeaturesTestValue =
+              const FakeAccessibilityFeatures(disableAnimations: true);
+          addTearDown(
+            tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
+          );
+        }
+        addTearDown(() => ShellNavigationService.chromeSurface.value = null);
+        await pumpShell(tester, mornye: true, width: 1400);
+        Color panel() =>
+            (tester
+                        .widget<DecoratedBox>(
+                          find
+                              .descendant(
+                                of: find.byType(DesktopSidebar),
+                                matching: find.byType(DecoratedBox),
+                              )
+                              .first,
+                        )
+                        .decoration
+                    as BoxDecoration)
+                .color!;
+        final context = tester.element(find.byType(DesktopSidebar));
+        final start = DesktopSidebar.panelColor(context, null);
+        final end = DesktopSidebar.panelColor(context, const Color(0xffc02040));
+        expect(panel(), start);
+
+        ShellNavigationService.chromeSurface.value = const Color(0xffc02040);
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 150));
+        if (reduced) {
+          expect(panel(), end);
+        } else {
+          expect(panel(), isNot(start));
+          expect(panel(), isNot(end));
+          expect(
+            (panel().g - start.g) / (end.g - start.g),
+            inExclusiveRange(0, 1),
+          );
+          await tester.pumpAndSettle();
+          expect(panel(), end);
+        }
+      });
+    }
 
     testWidgets('sidebar lists Library pages and playlists', (tester) async {
       final opened = <String>[];

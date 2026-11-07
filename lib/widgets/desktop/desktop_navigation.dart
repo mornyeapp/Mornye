@@ -784,6 +784,68 @@ class _RailPlaylists extends ConsumerWidget {
   }
 }
 
+/// The Material rail's selection fill: a `secondaryContainer` stadium behind
+/// [child]. On selection it grows from its centre, half to full width, on
+/// the fast spatial spring while its fill fades in on the fast effects
+/// spring; on deselection the fill fades out on the effects spring alone,
+/// shorter than the entrance. It paints nothing while unselected and
+/// settled.
+class _RailIndicator extends StatelessWidget {
+  const _RailIndicator({required this.selected, required this.child});
+
+  final bool selected;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = Theme.of(context).colorScheme.secondaryContainer;
+    final grow = AppMotion.spatialFast(
+      context,
+      const AppMotionSpec(Duration(milliseconds: 200), Curves.easeOutCubic),
+    );
+    final fade = AppMotion.effectsFast(
+      context,
+      const AppMotionSpec(Duration(milliseconds: 150), Curves.easeOut),
+    );
+    final target = selected ? 1.0 : 0.0;
+    return TweenAnimationBuilder<double>(
+      tween: Tween(end: target),
+      duration: grow.duration,
+      curve: grow.curve,
+      child: child,
+      builder: (context, width, child) => TweenAnimationBuilder<double>(
+        tween: Tween(end: target),
+        duration: fade.duration,
+        curve: fade.curve,
+        child: child,
+        builder: (context, fill, child) => Stack(
+          fit: StackFit.passthrough,
+          children: [
+            if (fill > 0)
+              Positioned.fill(
+                child: Center(
+                  child: FractionallySizedBox(
+                    widthFactor: selected ? 0.5 + width / 2 : 1,
+                    child: DecoratedBox(
+                      key: const ValueKey('desktop-rail-indicator'),
+                      decoration: ShapeDecoration(
+                        color: color.withValues(
+                          alpha: color.a * fill.clamp(0.0, 1.0),
+                        ),
+                        shape: const StadiumBorder(),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            child!,
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 /// A row in the expanded Material rail's Playlists section: the icon in line
 /// with the destination icons, a stadium hover layer and the selected
 /// destination's fill.
@@ -820,36 +882,38 @@ class _RailLinkRow extends StatelessWidget {
           selected: selected,
           label: label,
           excludeSemantics: true,
-          child: Material(
-            color: selected ? colorScheme.secondaryContainer : null,
-            type: selected ? MaterialType.canvas : MaterialType.transparency,
-            shape: const StadiumBorder(),
-            clipBehavior: Clip.antiAlias,
-            child: InkWell(
-              onTap: onTap,
-              hoverColor: foreground.withValues(alpha: 0.08),
-              child: SizedBox(
-                height: 44,
-                child: Row(
-                  children: [
-                    const SizedBox(width: 16),
-                    AppIcon(icon, size: 24, color: foreground),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        label,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.labelLarge?.copyWith(
-                          color: foreground,
-                          fontWeight: selected
-                              ? FontWeight.w700
-                              : FontWeight.w500,
+          child: _RailIndicator(
+            selected: selected,
+            child: Material(
+              type: MaterialType.transparency,
+              shape: const StadiumBorder(),
+              clipBehavior: Clip.antiAlias,
+              child: InkWell(
+                onTap: onTap,
+                hoverColor: foreground.withValues(alpha: 0.08),
+                child: SizedBox(
+                  height: 44,
+                  child: Row(
+                    children: [
+                      const SizedBox(width: 16),
+                      AppIcon(icon, size: 24, color: foreground),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.labelLarge?.copyWith(
+                            color: foreground,
+                            fontWeight: selected
+                                ? FontWeight.w700
+                                : FontWeight.w500,
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 16),
-                  ],
+                      const SizedBox(width: 16),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -918,16 +982,18 @@ class _RailDestination extends StatelessWidget {
 
     // A stadium with the selected fill, the hover layer and the ink ripple
     // of the Playlists rows.
-    Widget surface({required bool active, Widget? child}) => Material(
-      color: selected ? colorScheme.secondaryContainer : null,
-      type: selected ? MaterialType.canvas : MaterialType.transparency,
-      shape: const StadiumBorder(),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: active ? onTap : null,
-        canRequestFocus: active,
-        hoverColor: foreground.withValues(alpha: 0.08),
-        child: child ?? const SizedBox.expand(),
+    Widget surface({required bool active, Widget? child}) => _RailIndicator(
+      selected: selected,
+      child: Material(
+        type: MaterialType.transparency,
+        shape: const StadiumBorder(),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: active ? onTap : null,
+          canRequestFocus: active,
+          hoverColor: foreground.withValues(alpha: 0.08),
+          child: child ?? const SizedBox.expand(),
+        ),
       ),
     );
 
@@ -1184,21 +1250,31 @@ class DesktopSidebar extends ConsumerWidget {
     );
     final panel = ValueListenableBuilder<Color?>(
       valueListenable: ShellNavigationService.chromeSurface,
-      builder: (context, tint, child) => DecoratedBox(
-        // One piece with the window: only a hairline parts it
-        // from the content, and the window's own corners are its corners.
-        decoration: BoxDecoration(
-          color: panelColor(context, tint),
-          border: BorderDirectional(
-            end: BorderSide(
-              color: Theme.of(
-                context,
-              ).colorScheme.onSurface.withValues(alpha: 0.1),
-              width: 0.5,
+      // The tint follows the backdrop's 300 ms crossfade instead of
+      // landing in one frame.
+      builder: (context, tint, child) => TweenAnimationBuilder<Color?>(
+        tween: ColorTween(end: panelColor(context, tint)),
+        duration: MediaQuery.disableAnimationsOf(context)
+            ? Duration.zero
+            : const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+        child: child,
+        builder: (context, color, child) => DecoratedBox(
+          // One piece with the window: only a hairline parts it
+          // from the content, and the window's own corners are its corners.
+          decoration: BoxDecoration(
+            color: color,
+            border: BorderDirectional(
+              end: BorderSide(
+                color: Theme.of(
+                  context,
+                ).colorScheme.onSurface.withValues(alpha: 0.1),
+                width: 0.5,
+              ),
             ),
           ),
+          child: child,
         ),
-        child: child,
       ),
       child: Stack(
         fit: StackFit.expand,

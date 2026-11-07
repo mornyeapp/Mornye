@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:mornye/l10n/l10n.dart';
+import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/widgets/desktop/desktop_inspector.dart';
@@ -76,7 +77,22 @@ class _DesktopScrollArrowsState extends State<DesktopScrollArrows> {
               if (context.isMornye) {
                 return _ArrowsFade(hovered: hovered, child: _arrows(context));
               }
-              return hovered ? _arrows(context) : const SizedBox.shrink();
+              // Material fades on the effects spring and leaves faster.
+              return _ArrowsFade(
+                hovered: hovered,
+                enter: AppMotion.effectsFast(
+                  context,
+                  const AppMotionSpec(
+                    Duration(milliseconds: 150),
+                    Curves.easeOut,
+                  ),
+                ),
+                exit: const AppMotionSpec(
+                  Duration(milliseconds: 100),
+                  Curves.easeOut,
+                ),
+                child: _arrows(context),
+              );
             },
           ),
         ],
@@ -194,13 +210,26 @@ class _DesktopScrollArrowsState extends State<DesktopScrollArrows> {
   }
 }
 
-/// Fades Mornye's arrows in and out with the pointer, building them only
-/// while they show so a shelf at rest stays free of scroll listeners.
+/// Fades the arrows in and out with the pointer, building them only while
+/// they show so a shelf at rest stays free of scroll listeners.
 class _ArrowsFade extends StatefulWidget {
-  const _ArrowsFade({required this.hovered, required this.child});
+  const _ArrowsFade({
+    required this.hovered,
+    required this.child,
+    this.enter = _mornyeFade,
+    this.exit = _mornyeFade,
+  });
+
+  /// Mornye fades 250 ms each way.
+  static const _mornyeFade = AppMotionSpec(
+    Duration(milliseconds: 250),
+    Curves.linear,
+  );
 
   final bool hovered;
   final Widget child;
+  final AppMotionSpec enter;
+  final AppMotionSpec exit;
 
   @override
   State<_ArrowsFade> createState() => _ArrowsFadeState();
@@ -217,14 +246,20 @@ class _ArrowsFadeState extends State<_ArrowsFade> {
 
   @override
   Widget build(BuildContext context) {
+    // Reduced motion shows and hides at once. A zero-length fade would end
+    // during this build and set state inside it.
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _shown = widget.hovered;
+      return widget.hovered ? widget.child : const SizedBox.shrink();
+    }
     if (!_shown) return const SizedBox.shrink();
+    final motion = widget.hovered ? widget.enter : widget.exit;
     return IgnorePointer(
       ignoring: !widget.hovered,
       child: TweenAnimationBuilder<double>(
         tween: Tween(begin: 0, end: widget.hovered ? 1 : 0),
-        duration: MediaQuery.disableAnimationsOf(context)
-            ? Duration.zero
-            : const Duration(milliseconds: 250),
+        duration: motion.duration,
+        curve: motion.curve,
         onEnd: () {
           if (!widget.hovered) setState(() => _shown = false);
         },
