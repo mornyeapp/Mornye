@@ -8,6 +8,7 @@ import 'package:mornye/theme/app_tokens.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/desktop/context_menu.dart';
+import 'package:mornye/widgets/desktop/desktop_row_ink.dart';
 import 'package:mornye/widgets/desktop/desktop_selection.dart';
 import 'package:mornye/widgets/now_playing_indicator.dart';
 
@@ -749,6 +750,7 @@ class _TrackTableRowViewState extends State<_TrackTableRowView> {
     final selectedFill = context.isMornye
         ? colorScheme.primary.withValues(alpha: 0.16)
         : colorScheme.secondaryContainer;
+    final press = desktopRowInk(context, content: content);
     final ink = InkWell(
       onTap: onTap,
       onHover: (hovered) => _hovered.value = hovered,
@@ -756,6 +758,8 @@ class _TrackTableRowViewState extends State<_TrackTableRowView> {
       hoverColor: material
           ? (content ?? colorScheme.onSurface).withValues(alpha: 0.08)
           : null,
+      splashFactory: press.splashFactory,
+      highlightColor: press.highlightColor,
       child: ConstrainedBox(
         constraints: BoxConstraints(
           minHeight: TrackTableLayout.rowMinHeightFor(context),
@@ -951,6 +955,10 @@ class _AlbumRowViewState extends State<_AlbumRowView> {
     final selectedFill = context.isMornye
         ? scheme.primary.withValues(alpha: 0.16)
         : scheme.secondaryContainer;
+    final press = desktopRowInk(
+      context,
+      content: widget.selected ? scheme.onSecondaryContainer : null,
+    );
     return Semantics(
       selected: widget.selected,
       label: [row.title, ?widget.artist].join(', '),
@@ -968,6 +976,8 @@ class _AlbumRowViewState extends State<_AlbumRowView> {
             onTap: widget.onTap,
             onHover: (hovered) => setState(() => _hovered = hovered),
             hoverColor: Colors.transparent,
+            splashFactory: press.splashFactory,
+            highlightColor: press.highlightColor,
             child: ConstrainedBox(
               constraints: const BoxConstraints(
                 minHeight: TrackTableLayout.albumRowHeight,

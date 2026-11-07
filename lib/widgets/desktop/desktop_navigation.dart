@@ -19,6 +19,7 @@ import 'package:mornye/widgets/desktop/desktop_commands.dart';
 import 'package:mornye/widgets/desktop/desktop_inspector.dart';
 import 'package:mornye/widgets/desktop/desktop_now_playing.dart';
 import 'package:mornye/widgets/desktop/desktop_player_bar.dart';
+import 'package:mornye/widgets/desktop/desktop_row_ink.dart';
 import 'package:mornye/widgets/desktop/desktop_window.dart';
 import 'package:mornye/widgets/profile_avatar.dart';
 import 'package:mornye/widgets/no_scrollbars.dart';
@@ -870,6 +871,7 @@ class _RailLinkRow extends StatelessWidget {
     final foreground = selected
         ? colorScheme.onSecondaryContainer
         : colorScheme.onSurfaceVariant;
+    final press = desktopRowInk(context, content: foreground);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: _RailDestination._inset),
       // Long playlist names are cut, so the tooltip shows them whole.
@@ -891,6 +893,8 @@ class _RailLinkRow extends StatelessWidget {
               child: InkWell(
                 onTap: onTap,
                 hoverColor: foreground.withValues(alpha: 0.08),
+                splashFactory: press.splashFactory,
+                highlightColor: press.highlightColor,
                 child: SizedBox(
                   height: 44,
                   child: Row(
@@ -931,7 +935,7 @@ class _RailLinkRow extends StatelessWidget {
 /// labels under the icons. Expanded, a 56dp row spans the rail with the
 /// label beside the icon, as wide as the Playlists rows below (the owner's
 /// call over M3 Expressive's pill that hugs its label). Both take the
-/// Playlists rows' fill, hover and ripple, and in between they cross-fade
+/// Playlists rows' fill, hover and press, and in between they cross-fade
 /// around a fixed icon while the row narrows with the rail, as the owner
 /// preferred to a morphing pill. Only the row, or the whole 56dp square
 /// while collapsed, takes clicks and hover.
@@ -979,9 +983,10 @@ class _RailDestination extends StatelessWidget {
     final foreground = selected
         ? colorScheme.onSecondaryContainer
         : colorScheme.onSurfaceVariant;
+    final press = desktopRowInk(context, content: foreground);
 
-    // A stadium with the selected fill, the hover layer and the ink ripple
-    // of the Playlists rows.
+    // A stadium with the selected fill and the hover and press layers of
+    // the Playlists rows.
     Widget surface({required bool active, Widget? child}) => _RailIndicator(
       selected: selected,
       child: Material(
@@ -992,6 +997,8 @@ class _RailDestination extends StatelessWidget {
           onTap: active ? onTap : null,
           canRequestFocus: active,
           hoverColor: foreground.withValues(alpha: 0.08),
+          splashFactory: press.splashFactory,
+          highlightColor: press.highlightColor,
           child: child ?? const SizedBox.expand(),
         ),
       ),

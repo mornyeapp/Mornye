@@ -27,6 +27,7 @@ import 'package:mornye/widgets/desktop/desktop_cast_button.dart';
 import 'package:mornye/widgets/desktop/desktop_downloads_button.dart';
 import 'package:mornye/widgets/desktop/desktop_inspector.dart';
 import 'package:mornye/widgets/desktop/desktop_link_devices_button.dart';
+import 'package:mornye/widgets/desktop/desktop_row_ink.dart';
 import 'package:mornye/widgets/desktop/desktop_window.dart';
 import 'package:mornye/widgets/desktop/desktop_volume_scroll.dart';
 import 'package:mornye/widgets/expressive_playback_transport.dart';
@@ -328,9 +329,12 @@ class _TrackSummary extends StatelessWidget {
       ],
     );
     if (item == null) return content;
+    final press = desktopRowInk(context);
     return InkWell(
       borderRadius: BorderRadius.circular(12),
       onTap: _toggleNowPlaying,
+      splashFactory: press.splashFactory,
+      highlightColor: press.highlightColor,
       child: Padding(padding: const EdgeInsets.all(4), child: content),
     );
   }
