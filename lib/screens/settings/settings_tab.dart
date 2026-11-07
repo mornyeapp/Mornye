@@ -29,6 +29,7 @@ import 'package:mornye/screens/settings/playback_settings_page.dart';
 import 'package:mornye/utils/settings_search_catalog.dart';
 import 'package:mornye/services/app_remote_config_service.dart';
 import 'package:mornye/services/shell_navigation_service.dart';
+import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/app_tokens.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/adaptive_layout.dart';
@@ -124,6 +125,10 @@ class _SettingsTabState extends ConsumerState<SettingsTab> {
   String? _selectedTarget;
   var _detailNavigatorKey = GlobalKey<NavigatorState>();
   static const int _profileSelection = -1;
+
+  /// Whether the detail pane fades in: after a category change, not when
+  /// Settings first opens.
+  bool _fadeDetail = false;
 
   bool get _supportsListDetail => isDesktopPlatform && !widget.asPage;
 
@@ -539,6 +544,7 @@ class _SettingsTabState extends ConsumerState<SettingsTab> {
       _selected = index;
       _selectedTarget = target;
       _detailNavigatorKey = GlobalKey<NavigatorState>();
+      _fadeDetail = true;
     });
   }
 
@@ -561,6 +567,32 @@ class _SettingsTabState extends ConsumerState<SettingsTab> {
       child: target == null
           ? page
           : SettingsSearchHighlightScope(targetLabel: target, child: page),
+    );
+  }
+
+  /// Material fades a new category's page in on the fast effects spring.
+  /// Keyed by the navigator key, so each category mounts one fresh navigator
+  /// and the previous one leaves at once; the two never share the pane.
+  /// Mornye keeps the source-list cut, and reduced motion cuts too.
+  Widget _detailFade(BuildContext context, Widget navigator) {
+    final fade = AppMotion.effectsFast(
+      context,
+      const AppMotionSpec(Duration.zero, Curves.linear),
+    );
+    return TweenAnimationBuilder<double>(
+      key: ObjectKey(_detailNavigatorKey),
+      tween: Tween<double>(
+        begin: _fadeDetail && fade.duration > Duration.zero ? 0 : 1,
+        end: 1,
+      ),
+      duration: fade.duration,
+      curve: fade.curve,
+      builder: (context, opacity, child) => Opacity(
+        key: const ValueKey('settings-detail-fade'),
+        opacity: opacity,
+        child: child,
+      ),
+      child: navigator,
     );
   }
 
@@ -610,16 +642,19 @@ class _SettingsTabState extends ConsumerState<SettingsTab> {
                         // modal barriers from hiding the category list.
                         child: Semantics(
                           container: true,
-                          child: HeroControllerScope.none(
-                            child: Navigator(
-                              key: _detailNavigatorKey,
-                              onGenerateInitialRoutes: (_, _) => [
-                                PageRouteBuilder<void>(
-                                  transitionDuration: Duration.zero,
-                                  reverseTransitionDuration: Duration.zero,
-                                  pageBuilder: (_, _, _) => _detailPage(),
-                                ),
-                              ],
+                          child: _detailFade(
+                            context,
+                            HeroControllerScope.none(
+                              child: Navigator(
+                                key: _detailNavigatorKey,
+                                onGenerateInitialRoutes: (_, _) => [
+                                  PageRouteBuilder<void>(
+                                    transitionDuration: Duration.zero,
+                                    reverseTransitionDuration: Duration.zero,
+                                    pageBuilder: (_, _, _) => _detailPage(),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         ),

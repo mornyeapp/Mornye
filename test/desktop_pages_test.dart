@@ -194,6 +194,51 @@ void main() {
         expect(tester.takeException(), isNull);
       });
 
+      testWidgets('a new category ${mornye ? 'cuts in' : 'fades in'}', (
+        tester,
+      ) async {
+        await setWindow(tester, 1400);
+        await tester.pumpWidget(
+          app(
+            mornye: mornye,
+            home: Scaffold(
+              body: SettingsTab(
+                remoteConfigService: AppRemoteConfigService(
+                  client: MockClient((_) async => http.Response('{}', 200)),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+        final fade = find.byKey(const ValueKey('settings-detail-fade'));
+        // Opening Settings shows the first page without a fade.
+        expect(tester.widget<Opacity>(fade).opacity, 1);
+        await tester.pumpAndSettle();
+
+        final other = find.byWidgetPredicate((widget) {
+          final key = widget.key;
+          return key is ValueKey<String> &&
+              key.value.startsWith('settings-category:') &&
+              key.value != 'settings-category:Appearance';
+        }).first;
+        await tester.tap(other);
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 40));
+        final opacity = tester.widget<Opacity>(fade).opacity;
+        if (mornye) {
+          expect(opacity, 1);
+        } else {
+          expect(opacity, greaterThan(0));
+          expect(opacity, lessThan(1));
+        }
+        // The previous category's navigator is gone at once.
+        expect(find.byType(Navigator), findsNWidgets(2));
+        await tester.pumpAndSettle();
+        expect(tester.widget<Opacity>(fade).opacity, 1);
+        expect(tester.takeException(), isNull);
+      });
+
       testWidgets('keeps the single list in narrow panes', (tester) async {
         await setWindow(tester, 600);
         await tester.pumpWidget(
