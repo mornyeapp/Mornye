@@ -6,7 +6,11 @@ import 'package:mornye/widgets/app_icon_button.dart';
 import 'package:mornye/widgets/mornye_chrome.dart';
 
 /// Applies the same transient-message policy to existing snackbar call sites.
-/// A new message replaces the old one instead of building a stale FIFO queue.
+/// A new message replaces the old one instead of building a stale FIFO queue:
+/// the visible message plays its short exit and the new one follows it. A
+/// message that arrives while another already waits cuts the exit and drops
+/// the waiting one, so at most one message is ever queued. Reduced motion
+/// cuts the visible message at once.
 class AppScaffoldMessenger extends ScaffoldMessenger {
   const AppScaffoldMessenger({super.key, required super.child});
 
@@ -15,16 +19,53 @@ class AppScaffoldMessenger extends ScaffoldMessenger {
 }
 
 class _AppScaffoldMessengerState extends ScaffoldMessengerState {
+  /// Flutter's entrance with a shorter exit. The messenger rebuilds its
+  /// controller whenever the style differs, so the default entrance length
+  /// is spelled out to keep the style stable.
+  static const _animationStyle = AnimationStyle(
+    duration: Duration(milliseconds: 250),
+    reverseDuration: Duration(milliseconds: 150),
+  );
+
+  /// The message on screen (entering, shown or leaving) and the one queued
+  /// behind its exit. Both follow the controllers' `closed` futures, which
+  /// complete a microtask late; a stale value only shortens an exit.
+  ScaffoldFeatureController<SnackBar, SnackBarClosedReason>? _current;
+  ScaffoldFeatureController<SnackBar, SnackBarClosedReason>? _waiting;
+
   @override
   ScaffoldFeatureController<SnackBar, SnackBarClosedReason> showSnackBar(
     SnackBar snackBar, {
     AnimationStyle? snackBarAnimationStyle,
   }) {
-    removeCurrentSnackBar();
-    return super.showSnackBar(
+    final reduced = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    final queue = !reduced && _waiting == null && _current != null;
+    if (queue) {
+      hideCurrentSnackBar(reason: SnackBarClosedReason.remove);
+    } else {
+      // Cut the visible message, then the one waiting behind it.
+      if (_waiting != null) removeCurrentSnackBar();
+      removeCurrentSnackBar();
+    }
+    final controller = super.showSnackBar(
       _TransientSnackBar(snackBar),
-      snackBarAnimationStyle: snackBarAnimationStyle,
+      snackBarAnimationStyle: snackBarAnimationStyle ?? _animationStyle,
     );
+    if (queue) {
+      _waiting = controller;
+    } else {
+      _current = controller;
+      _waiting = null;
+    }
+    controller.closed.then((_) {
+      if (identical(_current, controller)) {
+        _current = _waiting;
+        _waiting = null;
+      } else if (identical(_waiting, controller)) {
+        _waiting = null;
+      }
+    });
+    return controller;
   }
 }
 
