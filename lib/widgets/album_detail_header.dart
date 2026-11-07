@@ -1015,7 +1015,19 @@ class HeaderCircleButton extends ConsumerWidget {
         ),
       );
     }
-    final glyph = AppIcon(icon, key: ValueKey(icon), size: iconSize);
+    final foreground = iconColor ?? scheme.onSurfaceVariant;
+    // A toggle's glyph carries its own colour, so the outgoing one keeps
+    // the old colour while it fades instead of taking the new one.
+    final glyph = AppIcon(
+      icon,
+      key: ValueKey(icon),
+      size: iconSize,
+      color: selected == null
+          ? null
+          : onPressed == null
+          ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.38)
+          : foreground,
+    );
     return ExpressiveIconButton(
       onPressed: onPressed,
       icon: selected == null
@@ -1031,7 +1043,7 @@ class HeaderCircleButton extends ConsumerWidget {
       tooltip: tooltip,
       size: buttonSize ?? tokens.minTouchTarget,
       backgroundColor: scheme.surfaceContainerHighest.withValues(alpha: 0.7),
-      foregroundColor: iconColor ?? scheme.onSurfaceVariant,
+      foregroundColor: foreground,
     );
   }
 }

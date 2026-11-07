@@ -63,6 +63,49 @@ void main() {
     expect(find.byKey(const ValueKey(Icons.favorite)), findsOneWidget);
   });
 
+  testWidgets('each glyph keeps its own colour through the crossfade', (
+    tester,
+  ) async {
+    const loveRed = Color(0xFFB3261E);
+    final loved = ValueNotifier(false);
+    addTearDown(loved.dispose);
+    await tester.pumpWidget(
+      _app(
+        ValueListenableBuilder<bool>(
+          valueListenable: loved,
+          // As the collection Love button colours its active state.
+          builder: (context, value, _) => HeaderCircleButton(
+            icon: value ? Icons.favorite : Icons.favorite_border,
+            selected: value,
+            iconColor: value ? loveRed : null,
+            tonal: true,
+            tooltip: 'Love',
+            onPressed: () {},
+          ),
+        ),
+      ),
+    );
+    Color? glyphColor(IconData icon) => tester
+        .widget<RichText>(
+          find.descendant(
+            of: find.byKey(ValueKey(icon)),
+            matching: find.byType(RichText),
+          ),
+        )
+        .text
+        .style
+        ?.color;
+    final resting = glyphColor(Icons.favorite_border);
+    expect(resting, isNot(loveRed));
+
+    loved.value = true;
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 40));
+    expect(glyphColor(Icons.favorite_border), resting);
+    expect(glyphColor(Icons.favorite), loveRed);
+    await tester.pump(const Duration(seconds: 1));
+  });
+
   testWidgets('reduced motion keeps a static toggle', (tester) async {
     await tester.pumpWidget(_app(_love(true), reduced: true));
     expect(find.byType(M3EIconButton), findsNothing);
