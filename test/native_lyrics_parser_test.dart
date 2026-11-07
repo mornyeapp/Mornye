@@ -27,6 +27,9 @@ Map<String, dynamic> _dto(ParsedLyrics value) => {
         'romanization': line.romanization,
         'romanizationWords': line.romanizationWords.map(_word).toList(),
         'translation': line.translation,
+        // The native parser sends it only for lines that have it.
+        if (line.translationWords.isNotEmpty)
+          'translationWords': line.translationWords.map(_word).toList(),
         'voice': line.voice == null
             ? null
             : {

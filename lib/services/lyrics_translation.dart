@@ -262,27 +262,44 @@ ParsedLyrics lyricsWithPlainLines(ParsedLyrics lyrics) {
 
 String _supplementText(String? value) => value?.trim() ?? '';
 
-/// Whether [shown] gives a lyric line a translation or pronunciation that
-/// [original], the lyrics as they are saved, does not have. [shown] is
-/// [original] as the player displays it, line for line.
+/// Whether [shown] gives a lyric line a translation or pronunciation, or
+/// word timing for one, that [original], the lyrics as they are saved, does
+/// not have. [shown] is [original] as the player displays it, line for line.
 bool lyricsTranslationUnsaved(ParsedLyrics original, ParsedLyrics shown) {
   if (identical(original, shown)) return false;
   final saved = lyricsWithPlainLines(original).lines;
   for (var i = 0; i < saved.length && i < shown.lines.length; i++) {
     final line = shown.lines[i];
+    final stored = saved[i];
     if (line.isBackground) continue;
-    for (final (value, stored) in [
-      (line.translation, saved[i].translation),
-      (line.romanization, saved[i].romanization),
+    for (final (value, words, storedValue, storedWords) in [
+      (
+        line.translation,
+        line.translationWords,
+        stored.translation,
+        stored.translationWords,
+      ),
+      (
+        line.romanization,
+        line.romanizationWords,
+        stored.romanization,
+        stored.romanizationWords,
+      ),
     ]) {
       final text = _supplementText(value);
-      if (text.isNotEmpty && text != _supplementText(stored)) return true;
+      if (text.isEmpty) continue;
+      if (text != _supplementText(storedValue)) return true;
+      final timing = _timedSupplement(text, words);
+      if (timing.isNotEmpty && timing != _timedSupplement(text, storedWords)) {
+        return true;
+      }
     }
   }
   return false;
 }
 
-/// `[x-romaji-words:...]` JSON for [words], as both lyrics parsers read it.
+/// `[x-romaji-words:...]` and `[x-translation-words:...]` JSON for [words],
+/// as both lyrics parsers read it.
 /// Empty when a word cannot be given a valid time range.
 String lyricWordsSupplement(List<LyricWord> words) {
   final rows = <Map<String, Object>>[];
@@ -302,29 +319,41 @@ String lyricWordsSupplement(List<LyricWord> words) {
   return rows.isEmpty ? '' : jsonEncode(rows);
 }
 
+/// The `-words` JSON for [words] timing [text], or empty when they do not
+/// spell it: both lyrics parsers drop such timing.
+String _timedSupplement(String text, List<LyricWord> words) =>
+    text.isEmpty || words.map((word) => word.text).join() != text
+    ? ''
+    : lyricWordsSupplement(words);
+
 /// The supplement tags a lyric line written as LRC carries for [line]'s
-/// translation and pronunciation, as (kind, payload) in the order they are
-/// written.
+/// translation and pronunciation, with their word timing, as
+/// (kind, payload) in the order they are written.
 List<(String, String)> lyricLineSupplements(LyricLine line) {
   String encode(String text) => base64.encode(utf8.encode(text));
   final romanization = _supplementText(line.romanization);
-  final words = romanization.isEmpty
-      ? ''
-      : lyricWordsSupplement(line.romanizationWords);
+  final romanizationWords = _timedSupplement(
+    romanization,
+    line.romanizationWords,
+  );
   final translation = _supplementText(line.translation);
+  final translationWords = _timedSupplement(translation, line.translationWords);
   return [
-    if (words.isNotEmpty) ('romaji-words', encode(words)),
+    if (romanizationWords.isNotEmpty)
+      ('romaji-words', encode(romanizationWords)),
     if (romanization.isNotEmpty) ('romaji', encode(romanization)),
+    if (translationWords.isNotEmpty)
+      ('translation-words', encode(translationWords)),
     if (translation.isNotEmpty) ('translation', encode(translation)),
   ];
 }
 
 /// [raw] LRC with each timed line carrying the translation and
 /// pronunciation [shown] gives it, as the `[x-translation:<ms>:...]` and
-/// `[x-romaji:<ms>:...]` tags both lyrics parsers read back, so they stay
-/// with the song's file alongside its own lyrics. Other lines, tags and
-/// supplements stay as they are. Null when [raw] is not synced LRC or
-/// already holds these.
+/// `[x-romaji:<ms>:...]` tags both lyrics parsers read back, with their
+/// `-words` timing, so they stay with the song's file alongside its own
+/// lyrics. Other lines, tags and supplements stay as they are. Null when
+/// [raw] is not synced LRC or already holds these.
 String? lyricsWithTranslations(String raw, ParsedLyrics shown) {
   if (!LyricsDraft.canEdit(raw)) return null;
   final draft = LyricsDraft.parse(raw);
@@ -359,12 +388,11 @@ String? lyricsWithTranslations(String raw, ParsedLyrics shown) {
       for (final (kind, payload) in lyricLineSupplements(shownLine))
         kind: payload,
     };
-    // A pronunciation written anew drops word timing kept for the old one.
-    if (tags.containsKey('romaji') && !tags.containsKey('romaji-words')) {
-      final old = line.supplements.where((tag) => tag.$1 == 'romaji');
-      if (old.isEmpty || old.first.$2 != tags['romaji']) {
-        tags['romaji-words'] = '';
-      }
+    // Text written anew drops word timing kept for the old text.
+    for (final kind in const ['romaji', 'translation']) {
+      if (!tags.containsKey(kind) || tags.containsKey('$kind-words')) continue;
+      final old = line.supplements.where((tag) => tag.$1 == kind);
+      if (old.isEmpty || old.first.$2 != tags[kind]) tags['$kind-words'] = '';
     }
     // The parsers keep a line's first tag of a kind, so a new one takes the
     // old one's place and any later copy goes.

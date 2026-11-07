@@ -19,16 +19,19 @@ import 'package:mornye/utils/lyrics_parser.dart';
 /// - The lyrics follow as LRC, with word timing as enhanced LRC, a singer as
 ///   a `v1:` prefix and backing vocals as `[bg:...]` rows.
 /// - A line's `[x-romaji-words:<key>:<base64 JSON>]`,
-///   `[x-romaji:<key>:<base64>]` and `[x-translation:<key>:<base64>]` tags
-///   follow it. The key is the line's time in milliseconds, so the file also
-///   reads as ordinary LRC; in lyrics without timing it is the line's index,
-///   counted from 0.
+///   `[x-romaji:<key>:<base64>]`, `[x-translation-words:<key>:<base64 JSON>]`
+///   and `[x-translation:<key>:<base64>]` tags follow it. The key is the
+///   line's time in milliseconds, so the file also reads as ordinary LRC; in
+///   lyrics without timing it is the line's index, counted from 0, and there
+///   is no word timing.
+/// - Word timing JSON is `[{"text", "startTimeMs", "endTimeMs"}]` in absolute
+///   milliseconds; the texts spell the line's pronunciation or translation.
 const mlrcExtension = 'mlrc';
 const _mlrcHeader = '[x-mlrc:1]';
 const _maxMlrcBytes = 8 * 1024 * 1024;
 
 final _supplementRow = RegExp(
-  r'^\[x-(romaji-words|romaji|translation):(\d+):([^\]]*)\]$',
+  r'^\[x-(romaji-words|romaji|translation-words|translation):(\d+):([^\]]*)\]$',
   caseSensitive: false,
 );
 // The LRC ID tags the lyrics parsers drop.
@@ -131,7 +134,7 @@ Future<ParsedLyrics> readMlrc(
         final value = utf8.decode(base64.decode(supplement.group(3)!)).trim();
         final kind = supplement.group(1)!.toLowerCase();
         final index = int.parse(supplement.group(2)!);
-        if (value.isNotEmpty && kind != 'romaji-words') {
+        if (value.isNotEmpty && !kind.endsWith('-words')) {
           (supplements[index] ??= {}).putIfAbsent(kind, () => value);
         }
       } on FormatException {
@@ -196,19 +199,23 @@ ParsedLyrics mergeSavedLyrics(ParsedLyrics lyrics, ParsedLyrics? saved) {
         saved?.trim().isNotEmpty == true ? saved!.trim() : own;
     final translation = pick(match.translation, line.translation);
     final romanization = pick(match.romanization, line.romanization);
-    final words = timed != null && timed.romanizationWords.isNotEmpty
-        ? timed.romanizationWords
-        : null;
+    // The parsers keep only timing that spells its saved text.
+    List<LyricWord>? timing(List<LyricWord>? words) =>
+        words != null && words.isNotEmpty ? words : null;
+    final romanizationWords = timing(timed?.romanizationWords);
+    final translationWords = timing(timed?.translationWords);
     if (translation == line.translation &&
         romanization == line.romanization &&
-        words == null) {
+        romanizationWords == null &&
+        translationWords == null) {
       return line;
     }
     changed = true;
     return line.withTranslation(
       translation,
       romanization: romanization,
-      romanizationWords: words,
+      romanizationWords: romanizationWords,
+      translationWords: translationWords,
     );
   }
 

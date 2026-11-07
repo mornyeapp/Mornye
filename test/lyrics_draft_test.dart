@@ -55,6 +55,48 @@ void main() {
     );
   });
 
+  test('a moved line carries its pronunciation and translation timing', () {
+    String words(int start) => _b64(
+      jsonEncode([
+        {'text': 'Pri', 'startTimeMs': start, 'endTimeMs': start + 300},
+        {'text': 'mera', 'startTimeMs': start + 300, 'endTimeMs': start + 600},
+      ]),
+    );
+    final draft = LyricsDraft.parse(
+      [
+        '[00:01.00]<00:01.00>First <00:01.50>line',
+        '[x-romaji-words:1000:${words(1000)}]',
+        '[x-romaji:1000:${_b64('Primera')}]',
+        '[x-translation-words:1000:${words(1000)}]',
+        '[x-translation:1000:${_b64('Primera')}]',
+      ].join('\n'),
+    );
+    expect(draft.lines.single.supplements.map((tag) => tag.$1), [
+      'romaji-words',
+      'romaji',
+      'translation-words',
+      'translation',
+    ]);
+    final moved = LyricsDraft(
+      lines: [
+        draft.lines.single.copyWith(time: const Duration(milliseconds: 2000)),
+      ],
+    );
+    expect(
+      moved.toLrc(),
+      [
+        '[00:02.00]<00:02.00>First <00:02.50>line',
+        '[x-romaji-words:2000:${words(2000)}]',
+        '[x-romaji:2000:${_b64('Primera')}]',
+        '[x-translation-words:2000:${words(2000)}]',
+        '[x-translation:2000:${_b64('Primera')}]',
+      ].join('\n'),
+    );
+    final line = LyricsParser.parse(moved.toLrc()).lines.single;
+    expect(line.translationWords.first.time, const Duration(seconds: 2));
+    expect(line.romanizationWords.first.time, const Duration(seconds: 2));
+  });
+
   test('changed text drops the word timing it no longer matches', () {
     final draft = LyricsDraft.parse('[00:01.00]<00:01.00>Frist <00:01.50>line');
     final edited = LyricsDraft(

@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:mornye/services/lyrics_ai_client.dart';
 import 'package:mornye/services/lyrics_translation.dart';
+import 'package:mornye/services/lyrics_translation_alignment.dart';
 import 'package:mornye/utils/lyrics_parser.dart';
 
 ParsedLyrics _lyrics(List<String> texts, {int offsetMs = 0}) => ParsedLyrics(
@@ -411,6 +412,64 @@ void main() {
         ),
       )!;
       expect(reworded, isNot(contains('x-romaji-words')));
+    });
+
+    test('keeps AI translation word timing through a save', () {
+      const raw =
+          '[offset:-500]\n'
+          '[00:01.00]<00:01.00>Hola <00:01.50>mundo<00:02.00>\n'
+          '[00:03.00]Otra';
+      final lyrics = LyricsParser.parse(raw);
+      final source = LyricsTranslationSource.of(lyrics);
+      ParsedLyrics display(ParsedLyrics lyrics) => applyLyricsTranslation(
+        lyrics,
+        LyricsTranslationSource.of(lyrics),
+        ['Hello world', 'Another'],
+        alignments: [
+          const [
+            LyricsTranslationChunk('Hello ', 0),
+            LyricsTranslationChunk('world', 1),
+          ],
+          const [],
+        ],
+      );
+      expect(source.words.first, ['Hola', 'mundo']);
+      final shown = display(lyrics);
+      final timing = shown.lines.first.translationWords;
+      expect(timing.map((word) => word.text), ['Hello ', 'world']);
+      // The offset moved the line and its words to 1.5s.
+      expect(timing.first.time, const Duration(milliseconds: 1500));
+      expect(lyricsTranslationUnsaved(lyrics, shown), isTrue);
+
+      final updated = lyricsWithTranslations(raw, shown)!;
+      final words = lyricWordsSupplement(timing);
+      expect(updated, contains('[x-translation-words:1500:${encoded(words)}]'));
+      final reread = LyricsParser.parse(updated);
+      expect(lyricWordsSupplement(reread.lines.first.translationWords), words);
+      expect(reread.lines.last.translationWords, isEmpty);
+      // Shown again over the saved file, nothing is left to save.
+      expect(lyricsTranslationUnsaved(reread, display(reread)), isFalse);
+      expect(lyricsWithTranslations(updated, display(reread)), isNull);
+
+      // The file without the timing still needs it saved.
+      final untimed = LyricsParser.parse(
+        updated.replaceFirst(RegExp(r'\[x-translation-words:[^\]]*\]\n'), ''),
+      );
+      expect(untimed.lines.first.translation, 'Hello world');
+      expect(lyricsTranslationUnsaved(untimed, display(untimed)), isTrue);
+
+      // A new translation drops the timing written for the old one.
+      final retranslated = lyricsWithTranslations(
+        updated,
+        ParsedLyrics(
+          synced: true,
+          wordSynced: true,
+          lines: [reread.lines.first.withTranslation('Hi world')],
+          plainText: 'Hola mundo',
+        ),
+      )!;
+      expect(retranslated, isNot(contains('x-translation-words')));
+      expect(retranslated, contains(encoded('Hi world')));
     });
 
     test('translates lyrics without timing line by line', () {

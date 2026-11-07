@@ -1447,5 +1447,57 @@
         }
       ]
     }
+  },
+  {
+    "name": "translation word timing follows the offset and its text",
+    "request": {
+      "operation": "parse_lyrics",
+      "raw": "[offset:-500]\n[00:01.00]Hola mundo\n[x-translation-words:1000:W3sidGV4dCI6IkhlbGxvICIsInN0YXJ0VGltZU1zIjoxMDAwLCJlbmRUaW1lTXMiOjE1MDB9LHsidGV4dCI6IndvcmxkIiwic3RhcnRUaW1lTXMiOjE1MDAsImVuZFRpbWVNcyI6MjAwMH1d]\n[x-translation:1000:SGVsbG8gd29ybGQ=]\n[00:03.00]Otra\n[x-translation-words:3000:W3sidGV4dCI6Ik90aGVyIiwic3RhcnRUaW1lTXMiOjMwMDAsImVuZFRpbWVNcyI6MzUwMH1d]\n[x-translation:3000:QW5vdGhlcg==]"
+    },
+    "expected": {
+      "synced": true,
+      "wordSynced": false,
+      "plainText": "Hola mundo\nOtra",
+      "writers": null,
+      "provider": null,
+      "lines": [
+        {
+          "timeMs": 1500,
+          "endMs": null,
+          "text": "Hola mundo",
+          "words": [],
+          "romanization": null,
+          "romanizationWords": [],
+          "translation": "Hello world",
+          "translationWords": [
+            {
+              "timeMs": 1500,
+              "endMs": 2000,
+              "text": "Hello "
+            },
+            {
+              "timeMs": 2000,
+              "endMs": 2500,
+              "text": "world"
+            }
+          ],
+          "voice": null,
+          "isBackground": false,
+          "vocalGroup": 0
+        },
+        {
+          "timeMs": 3500,
+          "endMs": null,
+          "text": "Otra",
+          "words": [],
+          "romanization": null,
+          "romanizationWords": [],
+          "translation": "Another",
+          "voice": null,
+          "isBackground": false,
+          "vocalGroup": 1
+        }
+      ]
+    }
   }
 ]

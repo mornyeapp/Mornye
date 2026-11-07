@@ -15,6 +15,11 @@ String _encoded(String text) => base64.encode(utf8.encode(text));
 
 Future<ParsedLyrics> _parse(String? raw) async => LyricsParser.parse(raw);
 
+final _translationWords = jsonEncode([
+  {'text': 'Hola ', 'startTimeMs': 1000, 'endTimeMs': 1400},
+  {'text': 'mundo', 'startTimeMs': 1400, 'endTimeMs': 2000},
+]);
+
 ParsedLyrics _translated(ParsedLyrics lyrics, List<String?> translations) =>
     applyLyricsTranslation(
       lyrics,
@@ -98,6 +103,18 @@ void main() {
             ],
             voice: LyricVoice(id: 'v2', index: 1, isGroup: false),
             translation: 'Hola mundo',
+            translationWords: [
+              LyricWord(
+                time: Duration(seconds: 1),
+                end: Duration(milliseconds: 1400),
+                text: 'Hola ',
+              ),
+              LyricWord(
+                time: Duration(milliseconds: 1400),
+                end: Duration(seconds: 2),
+                text: 'mundo',
+              ),
+            ],
             romanization: 'Hello world',
           ),
           LyricLine(
@@ -124,6 +141,7 @@ void main() {
         '[x-mlrc:1]\n'
         '[00:01.00]v2: <00:01.00>Hello <00:01.50>world<00:02.00>\n'
         '[x-romaji:1000:${_encoded('Hello world')}]\n'
+        '[x-translation-words:1000:${_encoded(_translationWords)}]\n'
         '[x-translation:1000:${_encoded('Hola mundo')}]\n'
         '[bg:<00:01.20>ooh<00:01.60>]\n',
       );
@@ -135,6 +153,10 @@ void main() {
         'world',
       ]);
       expect(read.lines.first.translation, 'Hola mundo');
+      expect(
+        lyricWordsSupplement(read.lines.first.translationWords),
+        _translationWords,
+      );
       expect(read.lines.last.isBackground, isTrue);
     });
 
@@ -174,8 +196,15 @@ void main() {
       );
       final saved = LyricsParser.parse(
         '[00:01.00]Hola\n'
+        '[x-translation-words:1000:${_encoded(jsonEncode([
+          {'text': 'Hel', 'startTimeMs': 1000, 'endTimeMs': 1300},
+          {'text': 'lo', 'startTimeMs': 1300, 'endTimeMs': 1600},
+        ]))}]\n'
         '[x-translation:1000:${_encoded('Hello')}]\n'
         '[00:09.00]Mundo\n'
+        '[x-translation-words:9000:${_encoded(jsonEncode([
+          {'text': 'World', 'startTimeMs': 9000, 'endTimeMs': 9400},
+        ]))}]\n'
         '[x-translation:9000:${_encoded('World')}]\n'
         '[x-romaji-words:9000:${_encoded(jsonEncode([
           {'text': 'mun', 'startTimeMs': 9000, 'endTimeMs': 9200},
@@ -188,9 +217,14 @@ void main() {
         'World',
         null,
       ]);
+      expect(merged.lines.first.translationWords.map((word) => word.text), [
+        'Hel',
+        'lo',
+      ]);
       expect(merged.lines[1].romanization, 'mun');
       // Word timing from another time does not fit this line.
       expect(merged.lines[1].romanizationWords, isEmpty);
+      expect(merged.lines[1].translationWords, isEmpty);
       expect(mergeSavedLyrics(song, null), same(song));
       expect(mergeSavedLyrics(ParsedLyrics.empty, saved), same(saved));
     });
