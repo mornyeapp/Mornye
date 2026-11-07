@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/services/link/features/link_downloads.dart';
 import 'package:mornye/services/link/features/link_phone_client.dart';
 import 'package:mornye/services/link/link_client_api.dart';
+import 'package:mornye/services/link/link_clock_offset.dart';
 import 'package:mornye/services/link/link_protocol.dart';
 
 /// What the phone knows about the paired desktop: its connection, its
@@ -84,6 +85,10 @@ class LinkDesktopRemote extends Notifier<LinkRemoteState> {
     : _nowMs = nowMs ?? (() => DateTime.now().millisecondsSinceEpoch);
 
   final int Function() _nowMs;
+
+  /// The desktop's clock against the phone's, from `GET state` replies.
+  final _clock = LinkClockOffset();
+  bool _sampling = false;
   LinkClientApi? _client;
   int _generation = 0;
   int _refreshRequest = 0;
@@ -94,6 +99,7 @@ class LinkDesktopRemote extends Notifier<LinkRemoteState> {
   LinkRemoteState build() {
     _generation++;
     _downloadsReady = false;
+    _clock.clear();
     final client = _client = ref.watch(linkPhoneClientProvider);
     if (client == null) return const LinkRemoteState();
     final messages = client.messages.listen((message) {
@@ -103,6 +109,8 @@ class LinkDesktopRemote extends Notifier<LinkRemoteState> {
       if (!ref.mounted || _client != client) return;
       _generation++;
       _downloadsReady = false;
+      // Another connection may take another path, with another delay.
+      _clock.clear();
       state = state.copyWith(connection: connection);
       if (connection == LinkConnectionState.connected) unawaited(refresh());
     });
@@ -115,14 +123,50 @@ class LinkDesktopRemote extends Notifier<LinkRemoteState> {
     return LinkRemoteState(connection: client.connectionState, loading: true);
   }
 
+  /// The longest a state may have taken to arrive. A stamp further back,
+  /// such as after the desktop's clock was set, is not trusted.
+  static const _maxTransitMs = 5000;
+
   /// Receivers extrapolate from [LinkPlayerState.updatedMs]. The desktop
-  /// stamps it with its own clock, so the phone restamps the position with
-  /// the time it arrived; another device's clock may run seconds apart.
-  LinkPlayerState _received(LinkPlayerState player) => linkPlayerStateWith(
-    player,
-    positionMs: player.positionMs,
-    updatedMs: _nowMs(),
-  );
+  /// stamps it with its own clock, which may run seconds apart, so the
+  /// phone moves the stamp onto its own clock by the offset its requests
+  /// measured. That keeps the time the state spent on the way, so lyrics
+  /// follow the desktop's audio instead of trailing it. Before any
+  /// measurement, or for a stamp that makes no sense, the state counts as
+  /// read when it arrived.
+  LinkPlayerState _received(LinkPlayerState player) {
+    final now = _nowMs();
+    final offset = _clock.offsetMs;
+    var updated = offset == null ? now : player.updatedMs - offset;
+    if (updated > now) updated = now;
+    if (now - updated > _maxTransitMs) updated = now;
+    return linkPlayerStateWith(
+      player,
+      positionMs: player.positionMs,
+      updatedMs: updated,
+    );
+  }
+
+  /// Reads the desktop's player once more, only to measure its clock.
+  Future<void> _sampleClock(LinkClientApi client) async {
+    if (_sampling) return;
+    _sampling = true;
+    try {
+      final sent = _nowMs();
+      final player = LinkPlayerState.fromJson(await client.get(LinkOps.state));
+      if (player != null && ref.mounted && _client == client) {
+        _clock.add(
+          sentMs: sent,
+          receivedMs: _nowMs(),
+          remoteMs: player.updatedMs,
+        );
+      }
+    } on Object {
+      // The next push tries again; until then the last offset stays.
+    } finally {
+      _sampling = false;
+    }
+  }
 
   void _onMessage(Map<String, dynamic> message) {
     if (!ref.mounted) return;
@@ -130,6 +174,10 @@ class LinkDesktopRemote extends Notifier<LinkRemoteState> {
       case LinkMessageTypes.playerState:
         final player = LinkPlayerState.fromJson(message['state']);
         if (player != null) state = state.copyWith(player: _received(player));
+        final client = _client;
+        if (client != null && _clock.wantsSample(_nowMs())) {
+          unawaited(_sampleClock(client));
+        }
       case LinkMessageTypes.downloadsChanged:
         _downloadPushes++;
         _downloadsReady = true;
@@ -159,8 +207,16 @@ class LinkDesktopRemote extends Notifier<LinkRemoteState> {
         _generation == generation &&
         _refreshRequest == request;
     try {
+      final sent = _nowMs();
       final player = LinkPlayerState.fromJson(await client.get(LinkOps.state));
       if (!current()) return;
+      if (player != null) {
+        _clock.add(
+          sentMs: sent,
+          receivedMs: _nowMs(),
+          remoteMs: player.updatedMs,
+        );
+      }
       state = LinkRemoteState(
         connection: state.connection,
         player: player == null ? null : _received(player),

@@ -90,6 +90,45 @@ void main() {
     expect(download.progress, closeTo(0.4, 1e-9));
   });
 
+  test('counts the time a state spent on the way from the desktop', () async {
+    // The desktop's clock runs 5 s ahead. Each read takes 200 ms there and
+    // back, and the desktop stamps its reply halfway.
+    client.onGet = (op, query) {
+      if (op != LinkOps.state) return null;
+      now += 100;
+      final stamp = now + 5000;
+      now += 100;
+      return _desktopState(updatedMs: stamp);
+    };
+    await start();
+
+    // A state the desktop read at its 5 s ahead time arrives 150 ms later.
+    final readAt = now;
+    final arrived = now += 150;
+    client.push({
+      'type': LinkMessageTypes.playerState,
+      'state': _desktopState(positionMs: 20000, updatedMs: readAt + 5000),
+    });
+    expect(read().player?.updatedMs, readAt);
+    expect(read().player?.positionAt(arrived), 20150);
+    await pumpEventQueue();
+    expect(
+      client.gets.where((op) => op == LinkOps.state),
+      hasLength(2),
+      reason: 'The push reads the clock once more while samples are few',
+    );
+
+    // A stamp from long ago, as after the desktop's clock was set, counts
+    // as read when it arrived.
+    final late = now;
+    client.push({
+      'type': LinkMessageTypes.playerState,
+      'state': _desktopState(positionMs: 30000, updatedMs: readAt - 60000),
+    });
+    expect(read().player?.updatedMs, late);
+    expect(read().player?.positionAt(late), 30000);
+  });
+
   test('follows player.state and downloads.changed pushes', () async {
     await start();
     client.push({
