@@ -1,10 +1,10 @@
 import 'dart:convert';
 import 'dart:io';
 
-const _patchedVersion = '3.47.8';
+const _patchedVersion = '3.47.9';
 
 /// Backport for https://github.com/flutter/flutter/pull/192724.
-/// Reviewed against 3.47.8, which still lacks the ancestor-cache refresh.
+/// Reviewed against 3.47.9, which still lacks the ancestor-cache refresh.
 /// Retire or review this patch when upgrading the pinned SDK.
 Future<bool> prepareFlutterSdk({
   required Directory sdk,
