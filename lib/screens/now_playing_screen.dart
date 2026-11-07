@@ -138,6 +138,13 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
   ProviderSubscription<AsyncValue<MediaItem?>>? _mediaItemSub;
   ProviderSubscription<bool>? _lyricsPlayingSub;
   ProviderSubscription<bool>? _lyricsAutoHideSub;
+  ProviderSubscription<bool>? _lyricLineSub;
+
+  /// Whether to read the song file itself, even an SAF document playback
+  /// plays directly (it publishes no resolved copy then): only while lyrics
+  /// show, on the lyrics page or in the lyric line under the title.
+  bool get _readsSongFile =>
+      _currentPage == 1 || ref.read(settingsProvider).playerShowLyricSnippet;
   late final _trackMetadata =
       widget.metadataControllerFactory?.call() ?? PlayerMetadataController();
   late final LyricsTranslationController _lyricsTranslation;
@@ -180,7 +187,19 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
         unawaited(
           _trackMetadata.load(
             next.value,
-            inspectUnresolvedContentUri: _currentPage == 1,
+            inspectUnresolvedContentUri: _readsSongFile,
+          ),
+        );
+      },
+    );
+    _lyricLineSub = ref.listenManual<bool>(
+      settingsProvider.select((settings) => settings.playerShowLyricSnippet),
+      (_, enabled) {
+        if (!enabled) return;
+        unawaited(
+          _trackMetadata.load(
+            ref.read(currentMediaItemProvider).value,
+            inspectUnresolvedContentUri: true,
           ),
         );
       },
@@ -212,7 +231,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
       unawaited(
         _trackMetadata.load(
           ref.read(currentMediaItemProvider).value,
-          inspectUnresolvedContentUri: _currentPage == 1,
+          inspectUnresolvedContentUri: _readsSongFile,
         ),
       );
     });
@@ -278,6 +297,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
     _mediaItemSub?.close();
     _lyricsPlayingSub?.close();
     _lyricsAutoHideSub?.close();
+    _lyricLineSub?.close();
     _lyricsTranslation.cancel(owner: this);
     _trackMetadata.dispose();
     _artworkForeground.dispose();

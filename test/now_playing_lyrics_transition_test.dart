@@ -1581,8 +1581,8 @@ void main() {
   });
 
   for (final mornye in [false, true]) {
-    testWidgets('the lyric line waits for a resolved source and opens lyrics '
-        '(mornye: $mornye)', (tester) async {
+    testWidgets('the lyric line reads a directly played SAF song and opens '
+        'lyrics (mornye: $mornye)', (tester) async {
       final playback = StreamController<PlaybackState>.broadcast();
       addTearDown(playback.close);
       await pumpNowPlaying(
@@ -1594,34 +1594,35 @@ void main() {
       final container = ProviderScope.containerOf(
         tester.element(find.byType(NowPlayingScreen)),
       );
-      container.read(settingsProvider.notifier).setPlayerShowLyricSnippet(true);
-      final unresolved = item('first');
-      mediaItems.add(unresolved);
+      mediaItems.add(item('first'));
       playback.add(PlaybackState(updatePosition: const Duration(seconds: 2)));
       await settlePlayer(tester);
       final line = find.descendant(
         of: find.byType(PlayerLyricPreview),
         matching: find.text('First lyric'),
       );
-      // Opening the player never copies an unresolved SAF document.
+      // Without lyrics on screen, opening the player reads no SAF document.
       expect(metadataReads, isEmpty);
-      expect(line, findsNothing);
 
-      mediaItems.add(
-        unresolved.copyWith(
-          extras: {
-            ...?unresolved.extras,
-            'resolvedSource': '/cache/first.flac',
-          },
-        ),
-      );
+      // Direct SAF playback publishes no resolved copy, so the lyric line
+      // reads the document itself.
+      container.read(settingsProvider.notifier).setPlayerShowLyricSnippet(true);
       await settlePlayer(tester);
-      expect(metadataReads, ['/cache/first.flac']);
+      expect(metadataReads, ['content://library/first.flac']);
       expect(line, findsOneWidget);
-
-      await tester.tap(line);
+      // So does the next song, while the line is on.
+      mediaItems.add(item('second'));
       await settlePlayer(tester);
-      expect(line, findsNothing, reason: 'The full lyrics replace the line');
+      expect(metadataReads.last, 'content://library/second.flac');
+      final next = find.descendant(
+        of: find.byType(PlayerLyricPreview),
+        matching: find.text('Second lyric'),
+      );
+      expect(next, findsOneWidget);
+
+      await tester.tap(next);
+      await settlePlayer(tester);
+      expect(next, findsNothing, reason: 'The full lyrics replace the line');
       expect(tester.takeException(), isNull);
     });
   }
