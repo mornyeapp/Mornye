@@ -358,6 +358,7 @@ impl ExtensionEnvironment {
                     network_timeout(manifest.capabilities.get("networkTimeoutSeconds")),
                 )
             });
+        network.set_grants(manifest.network_grants(&settings));
         // Legacy metadata helpers do not require the general file permission.
         // They receive read access to this sandbox and native-granted roots.
         let legacy_files = self

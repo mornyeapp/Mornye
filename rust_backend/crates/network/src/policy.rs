@@ -3,6 +3,31 @@
 use crate::url::UrlParts;
 use std::net::IpAddr;
 
+/// A host the user typed into an extension setting marked `grantsNetwork`.
+/// It extends that extension's allowlist; private-network checks still apply.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct GrantedOrigin {
+    pub scheme: String,
+    pub host: String,
+}
+
+impl GrantedOrigin {
+    /// Accepts an `http` or `https` URL with a host and no credentials.
+    pub fn parse(input: &str) -> Option<Self> {
+        let url = UrlParts::parse(input.trim())?;
+        if !matches!(url.scheme.as_str(), "http" | "https")
+            || url.has_credentials
+            || url.hostname.is_empty()
+        {
+            return None;
+        }
+        Some(Self {
+            scheme: url.scheme,
+            host: url.hostname.trim().to_lowercase(),
+        })
+    }
+}
+
 #[derive(Clone, Debug, Default)]
 pub struct NetworkPermissions {
     pub domains: Vec<String>,
@@ -29,11 +54,28 @@ impl NetworkPermissions {
         allow_private: bool,
         redirect: bool,
     ) -> Result<UrlParts, String> {
+        self.validate_with_grants(input, allow_private, redirect, &[])
+    }
+
+    /// Like `validate`, also admitting hosts the user granted in settings.
+    /// A grant made with `http://` allows plain HTTP for that host only.
+    pub fn validate_with_grants(
+        &self,
+        input: &str,
+        allow_private: bool,
+        redirect: bool,
+        grants: &[GrantedOrigin],
+    ) -> Result<UrlParts, String> {
         let url = UrlParts::parse(input).ok_or_else(|| "invalid URL".to_owned())?;
         if url.scheme.is_empty() && !redirect {
             return Err("invalid URL: scheme is required".to_owned());
         }
-        if url.scheme != "https" && !(self.allow_http && url.scheme == "http") {
+        let host = url.hostname.trim().to_lowercase();
+        let granted = grants.iter().any(|grant| grant.host == host);
+        let granted_http = grants
+            .iter()
+            .any(|grant| grant.host == host && grant.scheme == "http");
+        if url.scheme != "https" && !(url.scheme == "http" && (self.allow_http || granted_http)) {
             return Err(if redirect {
                 "redirect blocked: only https is allowed"
             } else {
@@ -58,7 +100,7 @@ impl NetworkPermissions {
                 url.hostname
             ));
         }
-        if !self.allows_domain(&url.hostname) {
+        if !granted && !self.allows_domain(&url.hostname) {
             return Err(format!(
                 "{}: domain '{}' not in allowed list",
                 if redirect {
@@ -254,5 +296,36 @@ mod tests {
                 .validate("http://user:secret@192.168.178.20", true, false)
                 .is_err()
         );
+    }
+
+    #[test]
+    fn granted_hosts_extend_the_allowlist_without_lifting_other_checks() {
+        let permissions = NetworkPermissions {
+            domains: vec!["api.example.test".into()],
+            allow_http: false,
+        };
+        let grants = [
+            GrantedOrigin::parse("https://Self.Example.org/api").unwrap(),
+            GrantedOrigin::parse("http://192.168.1.20:8000").unwrap(),
+        ];
+        let check = |input: &str, allow_private: bool| {
+            permissions.validate_with_grants(input, allow_private, false, &grants)
+        };
+        assert!(check("https://self.example.org/track", false).is_ok());
+        assert!(check("https://api.example.test/x", false).is_ok());
+        assert!(
+            permissions
+                .validate("https://self.example.org/track", false, false)
+                .is_err()
+        );
+        // An https grant does not open plain http.
+        assert!(check("http://self.example.org/track", false).is_err());
+        assert!(check("https://other.example.org", false).is_err());
+        // An http grant opens http for that host only; private hosts still need the app toggle.
+        assert!(check("http://192.168.1.20:8000/x", false).is_err());
+        assert!(check("http://192.168.1.20:8000/x", true).is_ok());
+        assert!(check("http://192.168.1.21:8000/x", true).is_err());
+        assert!(GrantedOrigin::parse("ftp://example.org").is_none());
+        assert!(GrantedOrigin::parse("https://user:pw@example.org").is_none());
     }
 }

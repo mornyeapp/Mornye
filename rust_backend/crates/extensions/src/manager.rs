@@ -228,10 +228,21 @@ impl ExtensionManager {
     ) -> Result<(), ManagerError> {
         let _metadata = MetadataChange(&self.metadata_revision);
         let _mutation = self.mutation.lock().expect("extension mutation lock");
-        self.get(id)?;
+        let entry = self.get(id)?;
         self.environment
             .replace_settings(id, settings.clone())
             .map_err(error_from_environment)?;
+        // A runtime that is already loaded keeps its session; refresh its grants.
+        if let Some(network) = entry
+            .engine
+            .lock()
+            .expect("extension engine lock")
+            .runtime
+            .as_ref()
+            .and_then(|runtime| runtime.network_session())
+        {
+            network.set_grants(entry.manifest.network_grants(&settings));
+        }
         self.initialize(id, settings)
     }
 
