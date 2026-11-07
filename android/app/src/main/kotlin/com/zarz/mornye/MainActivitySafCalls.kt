@@ -390,6 +390,38 @@ internal suspend fun MainActivity.handleWriteSafSidecarLrc(call: MethodCall, res
     result.success(response)
 }
 
+internal suspend fun MainActivity.handleWriteSafSidecar(call: MethodCall, result: MethodChannel.Result) {
+    val safUri = call.argument<String>("saf_uri") ?: ""
+    val content = call.argument<String>("content") ?: ""
+    val extension = call.argument<String>("extension") ?: ""
+    val written = withContext(Dispatchers.IO) {
+        try {
+            extension.matches(Regex("[a-z0-9]{1,8}")) &&
+                writeSafSidecar(Uri.parse(safUri), content, extension)
+        } catch (_: Exception) {
+            false
+        }
+    }
+    result.success(written)
+}
+
+internal suspend fun MainActivity.handleReadSafSidecar(call: MethodCall, result: MethodChannel.Result) {
+    val safUri = call.argument<String>("saf_uri") ?: ""
+    val extension = call.argument<String>("extension") ?: ""
+    val content = withContext(Dispatchers.IO) {
+        try {
+            if (extension.matches(Regex("[a-z0-9]{1,8}"))) {
+                readSafSidecar(Uri.parse(safUri), extension)
+            } else {
+                null
+            }
+        } catch (_: Exception) {
+            null
+        }
+    }
+    result.success(content)
+}
+
 internal suspend fun MainActivity.handleGetSafFileModTimes(call: MethodCall, result: MethodChannel.Result) {
     val uris = call.argument<String>("uris") ?: "[]"
     val response = withContext(Dispatchers.IO) {

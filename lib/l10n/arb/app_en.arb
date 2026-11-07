@@ -7163,6 +7163,42 @@
   "@nowPlayingTranslationSaved": {
     "description": "Snackbar after the shown lyrics translation was written into the song's audio file"
   },
+  "nowPlayingTranslationSavedMlrc": "Translation saved to a .mlrc file",
+  "@nowPlayingTranslationSavedMlrc": {
+    "description": "Snackbar after the shown lyrics translation was written into a .mlrc lyrics file next to the song. Keep '.mlrc' as is: it is a file extension"
+  },
+  "lyricsAiSectionFiles": "Files",
+  "@lyricsAiSectionFiles": {
+    "description": "AI Translation settings section about saving translations with the songs"
+  },
+  "lyricsAiSaveTo": "Save To",
+  "@lyricsAiSaveTo": {
+    "description": "AI Translation setting that picks where a saved lyrics translation is written"
+  },
+  "lyricsAiSaveToSongFile": "Song File",
+  "@lyricsAiSaveToSongFile": {
+    "description": "Choice that saves lyrics translations inside the song's own audio file"
+  },
+  "lyricsAiSaveToSongFileDescription": "Inside the song's lyrics. Lyrics in TTML or without timing go to a .mlrc file, because other apps would show the added lines.",
+  "@lyricsAiSaveToSongFileDescription": {
+    "description": "Description of the Song File choice. Keep '.mlrc' as is: it is a file extension"
+  },
+  "lyricsAiSaveToMlrc": ".mlrc File",
+  "@lyricsAiSaveToMlrc": {
+    "description": "Choice that saves lyrics translations in a separate .mlrc file next to the song. Keep '.mlrc' as is: it is a file extension"
+  },
+  "lyricsAiSaveToMlrcDescription": "A separate file next to the song with its lyrics, translation and pronunciation. The song file stays as it is.",
+  "@lyricsAiSaveToMlrcDescription": {
+    "description": "Description of the .mlrc File choice"
+  },
+  "lyricsAiAutoSave": "Save Automatically",
+  "@lyricsAiAutoSave": {
+    "description": "AI Translation switch that saves every lyrics translation to the song once it is shown"
+  },
+  "lyricsAiAutoSaveSubtitle": "Saves each translation once it's shown, so it stays with the song",
+  "@lyricsAiAutoSaveSubtitle": {
+    "description": "Subtitle of the automatic save switch for lyrics translations"
+  },
   "nowPlayingTranslatingLyrics": "Translating lyrics, {percent}%",
   "@nowPlayingTranslatingLyrics": {
     "description": "Tooltip and screen reader label of the lyrics menu button while an AI translation runs",

@@ -2,12 +2,15 @@ import 'dart:async';
 
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/foundation.dart';
+import 'package:mornye/services/lyrics_sidecar.dart';
+import 'package:mornye/services/lyrics_translation.dart';
 import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/services/playback_metadata.dart';
 import 'package:mornye/services/player_lyrics_persistence.dart';
 import 'package:mornye/services/source_metadata_events.dart';
 import 'package:mornye/utils/int_utils.dart';
 import 'package:mornye/utils/logger.dart';
+import 'package:mornye/utils/lyrics_draft.dart';
 import 'package:mornye/utils/lyrics_parser.dart';
 
 final _log = AppLogger('PlayerMetadata');
@@ -15,6 +18,24 @@ final _log = AppLogger('PlayerMetadata');
 /// Returns LRC text from the configured lyrics providers, or empty.
 typedef OnlineLyricsFetcher = Future<String> Function(MediaItem item);
 typedef OnlineLyricsSaver = Future<void> Function(String source, String lyrics);
+
+/// Where [PlayerMetadataController.saveShownLyrics] wrote.
+enum LyricsSaveTarget {
+  /// Tags in the song's own LRC lyrics.
+  songFile,
+
+  /// The `.mlrc` file next to the song.
+  sidecar,
+}
+
+/// Neither the song's lyrics nor a `.mlrc` file next to it can take the
+/// translations: TTML or plain lyrics of a song without a writable folder.
+class LyricsSaveUnsupported implements Exception {
+  const LyricsSaveUnsupported();
+
+  @override
+  String toString() => 'These lyrics cannot be saved for this song';
+}
 
 /// One editor's original track, writable source and draft input. The playing
 /// controller may advance while a permission check or the editor is open.
@@ -46,11 +67,13 @@ class PlayerMetadataController extends ChangeNotifier {
     OnlineLyricsFetcher? fetchOnlineLyrics,
     OnlineLyricsSaver? saveOnlineLyrics,
     SourceMetadataEvents? metadataEvents,
+    LyricsSidecarStore? sidecar,
   }) : _readMetadata = readMetadata ?? readPlaybackFileMetadataWithRetry,
        _parseLyrics = parseLyrics ?? LyricsParser.parseAsyncNative,
        _fetchOnline = fetchOnlineLyrics ?? _fetchOnlineLyrics,
        _saveOnline = saveOnlineLyrics ?? persistPlayerLyrics,
-       _metadataEvents = metadataEvents ?? SourceMetadataEvents.instance {
+       _metadataEvents = metadataEvents ?? SourceMetadataEvents.instance,
+       _sidecar = sidecar ?? const LyricsSidecarStore() {
     _unsubscribeMetadata = _metadataEvents.subscribe((changed) async {
       if (_disposed ||
           changed != source ||
@@ -69,7 +92,14 @@ class PlayerMetadataController extends ChangeNotifier {
   final OnlineLyricsFetcher _fetchOnline;
   final OnlineLyricsSaver _saveOnline;
   final SourceMetadataEvents _metadataEvents;
+  final LyricsSidecarStore _sidecar;
   final _savingLyricsSources = <String>{};
+
+  /// The song's `.mlrc` lyrics, laid over [_fileLyrics] for [lyrics].
+  ParsedLyrics? _saved;
+
+  /// The lyrics the song's own file holds, as parsed from [_lyricsRaw].
+  ParsedLyrics _fileLyrics = ParsedLyrics.empty;
   MediaItem? _item;
   bool _searchingOnline = false;
   bool _onlineSearchMissed = false;
@@ -141,8 +171,7 @@ class PlayerMetadataController extends ChangeNotifier {
     if (parsed.isEmpty) {
       _onlineSearchMissed = true;
     } else {
-      _lyrics = parsed;
-      _lyricsRaw = raw;
+      _setFileLyrics(parsed, raw);
     }
     notifyListeners();
     if (parsed.isEmpty) return;
@@ -153,8 +182,7 @@ class PlayerMetadataController extends ChangeNotifier {
       await _metadataEvents.publish(source);
       if (_disposed || generation != _generation) return;
       _metadata = Map.unmodifiable({...?_metadata, 'lyrics': raw});
-      _lyrics = parsed;
-      _lyricsRaw = raw;
+      _setFileLyrics(parsed, raw);
     } catch (error) {
       _log.w('Could not embed online lyrics: $error');
       if (_disposed || generation != _generation) return;
@@ -204,11 +232,114 @@ class PlayerMetadataController extends ChangeNotifier {
       return;
     }
     _metadata = Map.unmodifiable({...?_metadata, 'lyrics': raw});
-    _lyrics = parsed;
-    _lyricsRaw = raw;
+    _setFileLyrics(parsed, raw);
     _onlineSearchMissed = false;
     _onlineLyricsSaveFailed = false;
     notifyListeners();
+  }
+
+  void _setFileLyrics(ParsedLyrics parsed, String raw) {
+    _fileLyrics = parsed;
+    _lyricsRaw = raw;
+    _lyrics = mergeSavedLyrics(parsed, _saved);
+  }
+
+  /// Whether translations shown over these lyrics can be saved: into the
+  /// song's own synced LRC lyrics, or a `.mlrc` file next to it.
+  bool get canSaveTranslations {
+    final source = this.source;
+    if (_disposed || _loading || _item == null || source == null) return false;
+    if (source.isEmpty ||
+        const {'http', 'https'}.contains(Uri.tryParse(source)?.scheme)) {
+      return false;
+    }
+    return _sidecar.canWrite(source) || _songFileTakesTranslations;
+  }
+
+  bool get _songFileTakesTranslations =>
+      _fileLyrics.synced &&
+      _lyricsRaw.trim().isNotEmpty &&
+      LyricsDraft.canEdit(_lyricsRaw);
+
+  /// Saves the translations and pronunciations [shown], these lyrics as the
+  /// player displays them, adds. They go into the song's own LRC lyrics
+  /// unless [preferSidecar] is set or those cannot carry them (TTML, lyrics
+  /// without timing, none at all); then into a `.mlrc` file next to the
+  /// song. An existing `.mlrc` file is kept in step with the song's file.
+  /// Throws [LyricsSaveUnsupported] when neither can be written.
+  Future<LyricsSaveTarget> saveShownLyrics(
+    ParsedLyrics shown, {
+    required bool preferSidecar,
+  }) async {
+    final source = this.source;
+    if (_disposed || _item == null || source == null || source.isEmpty) {
+      throw StateError('There is no song to save lyrics to');
+    }
+    final generation = _generation;
+    final raw = _lyricsRaw;
+    final embedded = _songFileTakesTranslations
+        ? lyricsWithTranslations(raw, shown)
+        : null;
+    final sidecarWritable = _sidecar.canWrite(source);
+    final LyricsSaveTarget target;
+    if ((preferSidecar || embedded == null) && sidecarWritable) {
+      target = LyricsSaveTarget.sidecar;
+    } else if (embedded != null) {
+      target = LyricsSaveTarget.songFile;
+    } else {
+      throw const LyricsSaveUnsupported();
+    }
+    _savingLyricsSources.add(source);
+    try {
+      String? mlrc;
+      if (target == LyricsSaveTarget.songFile) {
+        await _saveOnline(source, embedded!);
+        // An older .mlrc file would bring back what the song now replaces.
+        if (_saved != null && sidecarWritable) {
+          mlrc = buildMlrc(raw: embedded, shown: shown);
+          await _sidecar.write(source, mlrc);
+        }
+      } else {
+        mlrc = buildMlrc(raw: raw, shown: shown);
+        await _sidecar.write(source, mlrc);
+      }
+      await _metadataEvents.publish(source);
+      if (_disposed || generation != _generation || this.source != source) {
+        return target;
+      }
+      final file = target == LyricsSaveTarget.songFile
+          ? await _parseLyrics(embedded!)
+          : _fileLyrics;
+      final saved = mlrc == null ? _saved : await readMlrc(mlrc, _parseLyrics);
+      if (_disposed || generation != _generation || this.source != source) {
+        return target;
+      }
+      _saved = saved;
+      if (target == LyricsSaveTarget.songFile) {
+        _metadata = Map.unmodifiable({...?_metadata, 'lyrics': embedded});
+        _setFileLyrics(file, embedded!);
+      } else {
+        _lyrics = mergeSavedLyrics(_fileLyrics, saved);
+      }
+      notifyListeners();
+      return target;
+    } finally {
+      _savingLyricsSources.remove(source);
+    }
+  }
+
+  /// The song's `.mlrc` lyrics, or null when it has none or they cannot be
+  /// read.
+  Future<ParsedLyrics?> _readSaved(String source) async {
+    try {
+      final raw = await _sidecar.read(source);
+      if (raw == null || raw.trim().isEmpty) return null;
+      final saved = await readMlrc(raw, _parseLyrics);
+      return saved.isEmpty ? null : saved;
+    } catch (error) {
+      _log.w('Could not read the .mlrc lyrics: $error');
+      return null;
+    }
   }
 
   /// Reads deferred file tags when opening technical details. Already loaded
@@ -261,6 +392,7 @@ class PlayerMetadataController extends ChangeNotifier {
       _resetOnlineSearch();
       _requestKey = key;
       _loadedPath = null;
+      _saved = null;
     }
     if (const {'http', 'https'}.contains(Uri.tryParse(source)?.scheme)) {
       _loadedPath = source;
@@ -289,6 +421,9 @@ class PlayerMetadataController extends ChangeNotifier {
     _loading = true;
     notifyListeners();
     final generation = _generation;
+    // The .mlrc file sits next to the song itself, not a resolved copy. It
+    // never holds up the song's own lyrics.
+    unawaited(_loadSaved(source, generation));
     try {
       final probed = await _readMetadata(path);
       if (_disposed || generation != _generation) return;
@@ -305,6 +440,17 @@ class PlayerMetadataController extends ChangeNotifier {
       final pending = _replaceMetadata(_fallback);
       if (pending != null) await pending;
     }
+  }
+
+  /// Lays the song's `.mlrc` lyrics over its own once they are read. While
+  /// the song's lyrics still load, publishing them applies these.
+  Future<void> _loadSaved(String source, int generation) async {
+    final saved = await _readSaved(source);
+    if (_disposed || generation != _generation || saved == null) return;
+    _saved = saved;
+    if (_loading) return;
+    _lyrics = mergeSavedLyrics(_fileLyrics, saved);
+    notifyListeners();
   }
 
   Future<void>? _replaceMetadata(Map<String, dynamic> value) {
@@ -354,8 +500,7 @@ class PlayerMetadataController extends ChangeNotifier {
     String raw = '',
   }) {
     _metadata = value.isEmpty ? null : Map.unmodifiable(value);
-    _lyrics = parsed;
-    _lyricsRaw = raw;
+    _setFileLyrics(parsed, raw);
     _loading = _probePending;
     notifyListeners();
   }

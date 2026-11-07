@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/controllers/player_metadata_controller.dart';
 import 'package:mornye/l10n/l10n.dart';
+import 'package:mornye/models/settings.dart';
 import 'package:mornye/providers/lyrics_translation_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/services/lyrics_ai_client.dart';
@@ -116,7 +117,6 @@ class _LyricsOptionsButtonState extends ConsumerState<LyricsOptionsButton> {
   bool _hovered = false;
   bool _focused = false;
   bool _canHide = false;
-  bool _savingTranslation = false;
   Timer? _hideTimer;
   ValueListenable<(int, bool)>? _activity;
   ParsedLyrics? _lastLyrics;
@@ -216,7 +216,6 @@ class _LyricsOptionsButtonState extends ConsumerState<LyricsOptionsButton> {
     final metadata = widget.metadata;
     if (metadata.loading || metadata.lyrics.isEmpty) return null;
     final canEdit = canEditPlayerLyrics(metadata);
-    if (!metadata.lyrics.synced) return canEdit ? _editButton(context) : null;
     final original = metadata.lyrics;
     final lyrics = ref
         .read(lyricsTranslationProvider.notifier)
@@ -229,7 +228,13 @@ class _LyricsOptionsButtonState extends ConsumerState<LyricsOptionsButton> {
     final translating = job != null && job.sourceHash == source.hash;
     final canTranslate = ready && !source.isEmpty && job == null;
     final canSaveTranslation =
-        canEdit && !translating && lyricsTranslationUnsaved(original, lyrics);
+        metadata.canSaveTranslations &&
+        !translating &&
+        lyricsTranslationUnsaved(original, lyrics);
+    if (canSaveTranslation &&
+        ref.read(settingsProvider).lyricsTranslationAutoSave) {
+      _scheduleAutoSave(lyrics);
+    }
     if (!pronunciation && !translation && !canTranslate && !translating) {
       return canEdit ? _editButton(context) : null;
     }
@@ -460,38 +465,63 @@ class _LyricsOptionsButtonState extends ConsumerState<LyricsOptionsButton> {
     }
   }
 
-  /// Writes the translation the player shows into the song's own lyrics, so
-  /// it plays offline and travels with the file. Uses the editor's save, so
-  /// the same files can be written.
-  Future<void> _saveTranslation() async {
-    if (_savingTranslation) return;
-    final l10n = context.l10n;
+  /// Songs a save is writing to, across every player view: two views of one
+  /// song must not both save the same translation.
+  static final _savingSources = <String>{};
+
+  /// Translations already saved automatically here, or tried once.
+  final _autoSaved = <(String, ParsedLyrics)>{};
+
+  /// Saves [shown] once it is on screen, when the settings ask for that.
+  void _scheduleAutoSave(ParsedLyrics shown) {
+    final source = widget.metadata.source;
+    if (source == null || _savingSources.contains(source)) return;
+    if (_autoSaved.length > 32) _autoSaved.clear();
+    if (!_autoSaved.add((source, shown))) return;
+    scheduleMicrotask(() {
+      if (mounted) unawaited(_saveTranslation(automatic: true));
+    });
+  }
+
+  /// Saves the translation and pronunciation the player shows with the
+  /// song, so they play offline and travel with it: in the song's own lyrics
+  /// or a `.mlrc` file next to it, as the settings choose. An automatic save
+  /// stays quiet; one that fails is only logged.
+  Future<void> _saveTranslation({bool automatic = false}) async {
     final metadata = widget.metadata;
-    final edit = metadata.beginLyricsEdit();
-    if (edit == null) return;
-    final raw = lyricsWithTranslations(
-      edit.rawLyrics,
-      ref.read(lyricsTranslationProvider.notifier).display(metadata.lyrics),
-    );
-    _savingTranslation = true;
+    final source = metadata.source;
+    if (source == null || !_savingSources.add(source)) return;
+    final l10n = context.l10n;
+    final saveTo = ref.read(settingsProvider).lyricsTranslationSaveTo;
+    final shown = ref
+        .read(lyricsTranslationProvider.notifier)
+        .display(metadata.lyrics);
     String message;
     try {
-      if (raw == null) {
-        message = l10n.lyricsEditSaveFailed;
-      } else if (edit.source.startsWith('network://') &&
-          !await NetworkStorageService.instance.canEditFile(edit.source)) {
+      // Only SMB and WebDAV network songs can be rewritten in place.
+      if (source.startsWith('network://') &&
+          !await NetworkStorageService.instance.canEditFile(source)) {
         message = l10n.lyricsEditReadOnly;
       } else {
-        await metadata.saveEditedLyrics(raw, edit: edit);
-        message = l10n.nowPlayingTranslationSaved;
+        final target = await metadata.saveShownLyrics(
+          shown,
+          preferSidecar: saveTo == lyricsTranslationSaveToMlrc,
+        );
+        message = target == LyricsSaveTarget.sidecar
+            ? l10n.nowPlayingTranslationSavedMlrc
+            : l10n.nowPlayingTranslationSaved;
       }
+    } on LyricsSaveUnsupported {
+      message = l10n.lyricsEditReadOnly;
     } catch (error) {
       _log.w('Could not save the lyrics translation: $error');
       message = l10n.lyricsEditSaveFailed;
     } finally {
-      _savingTranslation = false;
+      _savingSources.remove(source);
     }
-    if (mounted) showAppSnackBar(context, content: Text(message));
+    if (!automatic && mounted) {
+      showAppSnackBar(context, content: Text(message));
+    }
   }
 
   /// Translates into the song's language, or into one picked now when

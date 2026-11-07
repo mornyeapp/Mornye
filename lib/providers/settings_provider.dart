@@ -849,6 +849,15 @@ class SettingsNotifier extends Notifier<AppSettings> {
   void setLyricsAiWordSync(bool enabled) =>
       _commit(state.copyWith(lyricsAiWordSync: enabled));
 
+  void setLyricsTranslationSaveTo(String target) => _commit(
+    state.copyWith(
+      lyricsTranslationSaveTo: lyricsTranslationSaveToFromJson(target),
+    ),
+  );
+
+  void setLyricsTranslationAutoSave(bool enabled) =>
+      _commit(state.copyWith(lyricsTranslationAutoSave: enabled));
+
   Future<void> setFirstLaunchComplete() async {
     // The router leaves setup as soon as this flag changes. Persist the final
     // folder settings first so a restart cannot send the user back to setup.

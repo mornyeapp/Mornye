@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mornye/l10n/l10n.dart';
+import 'package:mornye/models/settings.dart';
 import 'package:mornye/providers/lyrics_translation_provider.dart';
 import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/services/lyrics_ai_client.dart';
@@ -217,6 +218,30 @@ class _LyricsAiTranslationPageState
               ),
             ],
           ),
+          ...settingsSectionSlivers(
+            title: l10n.lyricsAiSectionFiles,
+            children: [
+              SettingsItem(
+                key: const ValueKey('lyrics-ai-save-to'),
+                icon: Icons.save_alt,
+                title: l10n.lyricsAiSaveTo,
+                subtitle:
+                    settings.lyricsTranslationSaveTo ==
+                        lyricsTranslationSaveToMlrc
+                    ? l10n.lyricsAiSaveToMlrc
+                    : l10n.lyricsAiSaveToSongFile,
+                onTap: () => _pickSaveTo(settings.lyricsTranslationSaveTo),
+              ),
+              SettingsSwitchItem(
+                icon: Icons.autorenew_rounded,
+                title: l10n.lyricsAiAutoSave,
+                subtitle: l10n.lyricsAiAutoSaveSubtitle,
+                value: settings.lyricsTranslationAutoSave,
+                onChanged: notifier.setLyricsTranslationAutoSave,
+                showDivider: false,
+              ),
+            ],
+          ),
           const SliverToBoxAdapter(child: SizedBox(height: 32)),
           const NavBarSliverSpacer(),
         ],
@@ -226,6 +251,32 @@ class _LyricsAiTranslationPageState
 
   static String _keySuffix(String key) =>
       key.length > 8 ? key.substring(key.length - 4) : '••••';
+
+  void _pickSaveTo(String current) {
+    final l10n = context.l10n;
+    showAppChoiceSheet<String>(
+      context: context,
+      title: l10n.lyricsAiSaveTo,
+      selected: current,
+      choices: [
+        AppChoice(
+          lyricsTranslationSaveToSongFile,
+          Icons.audio_file_outlined,
+          l10n.lyricsAiSaveToSongFile,
+          subtitle: l10n.lyricsAiSaveToSongFileDescription,
+        ),
+        AppChoice(
+          lyricsTranslationSaveToMlrc,
+          Icons.insert_drive_file_outlined,
+          l10n.lyricsAiSaveToMlrc,
+          subtitle: l10n.lyricsAiSaveToMlrcDescription,
+        ),
+      ],
+      onSelected: ref
+          .read(settingsProvider.notifier)
+          .setLyricsTranslationSaveTo,
+    );
+  }
 
   void _pickMode(bool wordSync) {
     final l10n = context.l10n;

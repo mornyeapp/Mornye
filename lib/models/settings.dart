@@ -58,6 +58,14 @@ String libraryAlbumSortModeFromJson(Object? value) =>
     ? value as String
     : 'a-z';
 
+const lyricsTranslationSaveToSongFile = 'songFile';
+const lyricsTranslationSaveToMlrc = 'mlrc';
+
+String lyricsTranslationSaveToFromJson(Object? value) =>
+    value == lyricsTranslationSaveToMlrc
+    ? lyricsTranslationSaveToMlrc
+    : lyricsTranslationSaveToSongFile;
+
 @JsonSerializable(explicitToJson: true)
 class AppSettings {
   static const String homeFeedProviderOff = '__off__';
@@ -287,6 +295,15 @@ class AppSettings {
   /// Align AI translations and readings to sung words instead of whole lines.
   final bool lyricsAiWordSync;
 
+  /// Where saved lyrics translations go: [lyricsTranslationSaveToSongFile],
+  /// the song's own lyrics where they can carry them, or
+  /// [lyricsTranslationSaveToMlrc], a `.mlrc` file next to the song.
+  @JsonKey(fromJson: lyricsTranslationSaveToFromJson)
+  final String lyricsTranslationSaveTo;
+
+  /// Save each lyrics translation once the player shows it.
+  final bool lyricsTranslationAutoSave;
+
   final String
   lastSeenVersion; // Last app version the user has acknowledged (e.g. '3.7.0')
 
@@ -429,6 +446,8 @@ class AppSettings {
     this.lyricsAutoTranslate = false,
     this.lyricsAiRomanize = true,
     this.lyricsAiWordSync = false,
+    this.lyricsTranslationSaveTo = lyricsTranslationSaveToSongFile,
+    this.lyricsTranslationAutoSave = false,
     this.lastSeenVersion = '',
     this.deduplicateDownloads = true,
     this.allowQualityVariants = false,
@@ -582,6 +601,8 @@ class AppSettings {
     bool? lyricsAutoTranslate,
     bool? lyricsAiRomanize,
     bool? lyricsAiWordSync,
+    String? lyricsTranslationSaveTo,
+    bool? lyricsTranslationAutoSave,
     String? lastSeenVersion,
     bool? deduplicateDownloads,
     bool? allowQualityVariants,
@@ -759,6 +780,10 @@ class AppSettings {
       lyricsAutoTranslate: lyricsAutoTranslate ?? this.lyricsAutoTranslate,
       lyricsAiRomanize: lyricsAiRomanize ?? this.lyricsAiRomanize,
       lyricsAiWordSync: lyricsAiWordSync ?? this.lyricsAiWordSync,
+      lyricsTranslationSaveTo:
+          lyricsTranslationSaveTo ?? this.lyricsTranslationSaveTo,
+      lyricsTranslationAutoSave:
+          lyricsTranslationAutoSave ?? this.lyricsTranslationAutoSave,
       lastSeenVersion: lastSeenVersion ?? this.lastSeenVersion,
       deduplicateDownloads: deduplicateDownloads ?? this.deduplicateDownloads,
       allowQualityVariants: allowQualityVariants ?? this.allowQualityVariants,

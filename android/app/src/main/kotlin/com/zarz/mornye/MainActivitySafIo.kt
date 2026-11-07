@@ -459,41 +459,75 @@ internal fun Context.writeSafSidecarFromPath(
      * mode requests an external/both sidecar. Callers must handle false so a
      * failed lyrics write cannot be reported as a successful refresh.
      */
-internal fun Context.writeSafSidecarLrc(audioUri: Uri, lrcContent: String): Boolean {
-        if (lrcContent.isBlank()) return false
-        try {
-            val parent = safParentDir(audioUri) ?: run {
-                android.util.Log.w("Mornye", "LRC sidecar: no SAF parent dir")
-                return false
-            }
-            val audioName = try {
-                DocumentFile.fromSingleUri(this, audioUri)?.name
-            } catch (_: Exception) {
-                null
-            } ?: return false
-            val baseName = audioName.substringBeforeLast('.', audioName)
-            val lrcName = "$baseName.lrc"
+internal fun Context.writeSafSidecarLrc(audioUri: Uri, lrcContent: String): Boolean =
+    writeSafSidecar(audioUri, lrcContent, "lrc")
 
-            val target = SafDownloadHandler.createOrReuseDocumentFile(
-                this,
-                parent,
-                "application/octet-stream",
-                lrcName
-            ) ?: run {
-                android.util.Log.w("Mornye", "LRC sidecar: failed to create $lrcName")
-                return false
-            }
+/** The sidecar name for [audioUri]: its base name with [extension]. */
+private fun Context.safSidecarName(audioUri: Uri, extension: String): String? {
+    val audioName = try {
+        DocumentFile.fromSingleUri(this, audioUri)?.name
+    } catch (_: Exception) {
+        null
+    } ?: return null
+    return "${audioName.substringBeforeLast('.', audioName)}.$extension"
+}
 
-            contentResolver.openOutputStream(target.uri, "wt")?.use { output ->
-                output.write(lrcContent.toByteArray(Charsets.UTF_8))
-            } ?: return false
-            android.util.Log.d("Mornye", "LRC sidecar written: $lrcName")
-            return true
-        } catch (e: Exception) {
-            android.util.Log.w("Mornye", "LRC sidecar write failed: ${e.message}")
+/**
+ * Write a text sidecar next to a SAF audio document, such as "Song.lrc" or
+ * "Song.mlrc" for "Song.flac", in the same parent directory. Callers must
+ * handle false so a failed write cannot be reported as saved.
+ */
+internal fun Context.writeSafSidecar(audioUri: Uri, content: String, extension: String): Boolean {
+    if (content.isBlank()) return false
+    try {
+        val parent = safParentDir(audioUri) ?: run {
+            android.util.Log.w("Mornye", "Sidecar: no SAF parent dir")
             return false
         }
+        val name = safSidecarName(audioUri, extension) ?: return false
+        val target = SafDownloadHandler.createOrReuseDocumentFile(
+            this,
+            parent,
+            "application/octet-stream",
+            name
+        ) ?: run {
+            android.util.Log.w("Mornye", "Sidecar: failed to create $name")
+            return false
+        }
+
+        contentResolver.openOutputStream(target.uri, "wt")?.use { output ->
+            output.write(content.toByteArray(Charsets.UTF_8))
+        } ?: return false
+        android.util.Log.d("Mornye", "Sidecar written: $name")
+        return true
+    } catch (e: Exception) {
+        android.util.Log.w("Mornye", "Sidecar write failed: ${e.message}")
+        return false
     }
+}
+
+/**
+ * Read the text sidecar with [extension] next to a SAF audio document, or
+ * null when there is none or it exceeds [maxBytes].
+ */
+internal fun Context.readSafSidecar(
+    audioUri: Uri,
+    extension: String,
+    maxBytes: Int = 8 * 1024 * 1024,
+): String? {
+    return try {
+        val parent = safParentDir(audioUri) ?: return null
+        val name = safSidecarName(audioUri, extension) ?: return null
+        val sidecar = findSafChild(this, parent, name)?.takeIf { it.isFile } ?: return null
+        if (sidecar.length() > maxBytes) return null
+        contentResolver.openInputStream(sidecar.uri)?.use { input ->
+            input.readBytes().toString(Charsets.UTF_8)
+        }
+    } catch (e: Exception) {
+        android.util.Log.w("Mornye", "Sidecar read failed: ${e.message}")
+        null
+    }
+}
 
 internal fun Context.runPostProcessingSafV2(
     coreBackend: CoreBackend,

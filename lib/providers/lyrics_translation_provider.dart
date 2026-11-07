@@ -315,7 +315,7 @@ class LyricsTranslationController extends Notifier<LyricsTranslationState> {
   /// was made. Looks the cache up once per song and may start an automatic
   /// translation; both report back through the state.
   ParsedLyrics display(ParsedLyrics lyrics) {
-    if (!lyrics.synced || lyrics.lines.isEmpty) return lyrics;
+    if (lyrics.isEmpty) return lyrics;
     final settings = ref.read(settingsProvider);
     final source = LyricsTranslationSource.cached(lyrics);
     if (source.isEmpty) return lyrics;
@@ -394,7 +394,10 @@ class LyricsTranslationController extends Notifier<LyricsTranslationState> {
       }
       return;
     }
+    // Automatic translation is for synced lyrics, as its setting says;
+    // plain lyrics translate when asked.
     if (!settings.lyricsAutoTranslate ||
+        !lyrics.synced ||
         state.job != null ||
         lyricsHaveTranslation(lyrics) ||
         !_autoAttempted.add(key)) {
@@ -429,7 +432,7 @@ class LyricsTranslationController extends Notifier<LyricsTranslationState> {
   }) async {
     if (state.job != null) return const LyricsTranslationOutcome.busy();
     final source = LyricsTranslationSource.cached(lyrics);
-    if (!lyrics.synced || source.isEmpty) {
+    if (source.isEmpty) {
       return const LyricsTranslationOutcome.failed(LyricsAiErrorKind.noLyrics);
     }
     final settings = ref.read(settingsProvider);

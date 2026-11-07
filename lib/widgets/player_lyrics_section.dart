@@ -210,14 +210,7 @@ class PlayerLyricsSection extends ConsumerWidget {
                     onShareLyrics!(null);
                   },
             child: LyricsTextScale(
-              child: Text(
-                metadata.lyrics.plainText,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  height: 1.6,
-                  color: colorScheme.onSurface,
-                ),
-                textAlign: TextAlign.center,
-              ),
+              child: _plainLyrics(context, visibility, lyrics),
             ),
           ),
           ?_lyricsCredits(),
@@ -234,6 +227,62 @@ class PlayerLyricsSection extends ConsumerWidget {
           bottom: 8,
           child: options!,
         ),
+      ],
+    );
+  }
+
+  /// Lyrics without timing, with each line's pronunciation and translation
+  /// under it while they are shown.
+  Widget _plainLyrics(
+    BuildContext context,
+    (bool, bool) visibility,
+    ParsedLyrics lyrics,
+  ) {
+    final style = Theme.of(context).textTheme.titleMedium?.copyWith(
+      height: 1.6,
+      color: colorScheme.onSurface,
+    );
+    String? shown(String? value, bool visible) =>
+        visible && value?.trim().isNotEmpty == true ? value!.trim() : null;
+    final hasSupplements = lyrics.lines.any(
+      (line) =>
+          shown(line.romanization, visibility.$1) != null ||
+          shown(line.translation, visibility.$2) != null,
+    );
+    if (!hasSupplements) {
+      return Text(
+        metadata.lyrics.plainText,
+        style: style,
+        textAlign: TextAlign.center,
+      );
+    }
+    final supplementStyle = Theme.of(context).textTheme.bodyLarge?.copyWith(
+      height: 1.4,
+      color: colorScheme.onSurfaceVariant,
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final line in lyrics.lines)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(line.text, style: style, textAlign: TextAlign.center),
+                for (final supplement in [
+                  shown(line.romanization, visibility.$1),
+                  shown(line.translation, visibility.$2),
+                ])
+                  if (supplement != null)
+                    Text(
+                      supplement,
+                      style: supplementStyle,
+                      textAlign: TextAlign.center,
+                    ),
+              ],
+            ),
+          ),
       ],
     );
   }

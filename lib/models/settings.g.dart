@@ -188,6 +188,11 @@ AppSettings _$AppSettingsFromJson(Map<String, dynamic> json) => AppSettings(
   lyricsAutoTranslate: json['lyricsAutoTranslate'] as bool? ?? false,
   lyricsAiRomanize: json['lyricsAiRomanize'] as bool? ?? true,
   lyricsAiWordSync: json['lyricsAiWordSync'] as bool? ?? false,
+  lyricsTranslationSaveTo: json['lyricsTranslationSaveTo'] == null
+      ? lyricsTranslationSaveToSongFile
+      : lyricsTranslationSaveToFromJson(json['lyricsTranslationSaveTo']),
+  lyricsTranslationAutoSave:
+      json['lyricsTranslationAutoSave'] as bool? ?? false,
   lastSeenVersion: json['lastSeenVersion'] as String? ?? '',
   deduplicateDownloads: json['deduplicateDownloads'] as bool? ?? true,
   allowQualityVariants: json['allowQualityVariants'] as bool? ?? false,
@@ -323,6 +328,8 @@ Map<String, dynamic> _$AppSettingsToJson(
   'lyricsAutoTranslate': instance.lyricsAutoTranslate,
   'lyricsAiRomanize': instance.lyricsAiRomanize,
   'lyricsAiWordSync': instance.lyricsAiWordSync,
+  'lyricsTranslationSaveTo': instance.lyricsTranslationSaveTo,
+  'lyricsTranslationAutoSave': instance.lyricsTranslationAutoSave,
   'lastSeenVersion': instance.lastSeenVersion,
   'deduplicateDownloads': instance.deduplicateDownloads,
   'allowQualityVariants': instance.allowQualityVariants,

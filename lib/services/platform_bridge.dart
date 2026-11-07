@@ -1680,6 +1680,28 @@ class PlatformBridge {
     return map['success'] == true;
   }
 
+  /// Writes [content] as the sidecar with [extension] next to the Android
+  /// document [safUri], in its folder. Returns whether it was written.
+  static Future<bool> writeSafSidecar(
+    String safUri,
+    String content,
+    String extension,
+  ) async =>
+      await _invokeAs<bool?>('writeSafSidecar', {
+        'saf_uri': safUri,
+        'content': content,
+        'extension': extension,
+      }) ??
+      false;
+
+  /// The sidecar with [extension] next to the Android document [safUri], or
+  /// null when it has none.
+  static Future<String?> readSafSidecar(String safUri, String extension) =>
+      _invokeAs<String?>('readSafSidecar', {
+        'saf_uri': safUri,
+        'extension': extension,
+      });
+
   static Future<void> startDownloadService({
     String trackName = '',
     String artistName = '',
