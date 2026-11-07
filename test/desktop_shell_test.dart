@@ -833,12 +833,14 @@ void main() {
     testWidgets('reduced motion snaps the rail and keeps its focus', (
       tester,
     ) async {
+      // The platform flag shortens Flutter's extend controller; the harness
+      // passes the same setting on to MediaQuery, as the app does.
       tester.platformDispatcher.accessibilityFeaturesTestValue =
           const FakeAccessibilityFeatures(disableAnimations: true);
       addTearDown(
         tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
       );
-      await pumpShell(tester, mornye: false, width: 1400);
+      await pumpShell(tester, mornye: false, width: 1400, reducedMotion: true);
       double railWidth() => tester.getSize(find.byType(NavigationRail)).width;
       final expanded = railWidth();
       expect(expanded, greaterThan(desktopCollapsedRailWidth));
