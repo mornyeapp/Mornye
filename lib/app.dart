@@ -124,10 +124,12 @@ ScrollBehavior appScrollBehavior({required bool disableOverscrollEffects}) {
   return const _FluidScrollBehavior();
 }
 
-/// Fades the app content in after an orientation change or a width change
-/// across the shell's rail breakpoint (fold/unfold, split-screen resize) —
-/// Flutter reflows the layout in a single frame, so without this the new
-/// layout pops in.
+/// Fades the app content in on phones and tablets after an orientation change
+/// or a width change across the shell's rail breakpoint (fold/unfold,
+/// split-screen resize). Flutter reflows the layout in a single frame, so
+/// without this the new layout pops in. Desktop windows skip it: maximize,
+/// Snap and edge drags would blink the whole window from opacity 0, and the
+/// desktop shell does not use this breakpoint.
 class _OrientationFade extends StatefulWidget {
   final Widget child;
 
@@ -190,15 +192,14 @@ Widget buildAppContent(
   Widget? child, {
   required bool heroAnimationsEnabled,
 }) {
-  Widget appContent = _OrientationFade(
-    child: AppScaffoldMessenger(
-      child: PlaybackFeedback(
-        child: DesktopLibraryDropTarget(
-          child: child ?? const SizedBox.shrink(),
-        ),
-      ),
+  Widget appContent = AppScaffoldMessenger(
+    child: PlaybackFeedback(
+      child: DesktopLibraryDropTarget(child: child ?? const SizedBox.shrink()),
     ),
   );
+  if (!isDesktopPlatform) {
+    appContent = _OrientationFade(child: appContent);
+  }
   // HeroMode only affects heroes below a *route* subtree. At this level it
   // sits above the router's Navigator, so the controller never encounters it
   // while collecting heroes. Removing the inherited controller disables
