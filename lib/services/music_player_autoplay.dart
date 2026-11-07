@@ -144,6 +144,7 @@ List<PlayableMedia> selectAutoplayTracks({
   required List<PlayableMedia> recent,
   required Set<String> dismissedSources,
   required Random random,
+  List<PlayableMedia> recentChoices = const [],
   int limit = 6,
   double Function(PlayableMedia)? preferenceAdjustment,
   double Function(PlayableMedia)? exploration,
@@ -157,6 +158,7 @@ List<PlayableMedia> selectAutoplayTracks({
     recent: recent,
     dismissedSources: dismissedSources,
     random: random,
+    recentChoices: recentChoices,
     limit: limit,
     preferenceAdjustment: preferenceAdjustment,
     exploration: exploration,
@@ -175,7 +177,9 @@ List<PlayableMedia> selectAutoplayTracks({
 /// priority, so a favorite artist cannot take over the queue. [signals] add
 /// what metadata cannot tell, such as how well a song follows the one before.
 /// [exploration] adds a sampled bonus for trying artists, and [weights]
-/// multiply the score parts by name (1 when absent).
+/// multiply the score parts by name (1 when absent). [recentChoices] keeps
+/// played and suggested songs out of fresh picks across queue replacements,
+/// without making an earlier queue's genres part of the current session.
 List<AutoplayPick> rankAutoplayTracks({
   required PlayableMedia seed,
   required List<PlayableMedia> candidates,
@@ -183,6 +187,7 @@ List<AutoplayPick> rankAutoplayTracks({
   required List<PlayableMedia> recent,
   required Set<String> dismissedSources,
   required Random random,
+  List<PlayableMedia> recentChoices = const [],
   int limit = 6,
   double Function(PlayableMedia)? preferenceAdjustment,
   double Function(PlayableMedia)? exploration,
@@ -210,9 +215,10 @@ List<AutoplayPick> rankAutoplayTracks({
   final seedAlbum = normalized(seed.album);
   final recentSources = <String, int>{};
   final recentSongs = <String, int>{};
-  for (var i = 0; i < recent.length; i++) {
-    recentSources[recent[i].source] = i;
-    recentSongs[songKey(recent[i])] = i;
+  final seenRecently = [...recentChoices, ...recent];
+  for (var i = 0; i < seenRecently.length; i++) {
+    recentSources[seenRecently[i].source] = i;
+    recentSongs[songKey(seenRecently[i])] = i;
   }
 
   // The session in playback order: history, the seed (often its last entry
@@ -265,6 +271,7 @@ List<AutoplayPick> rankAutoplayTracks({
         ({
           PlayableMedia item,
           double score,
+          bool repeated,
           String artist,
           String album,
           Map<String, double> parts,
@@ -314,6 +321,7 @@ List<AutoplayPick> rankAutoplayTracks({
     scored.add((
       item: item,
       score: score + weighted(parts),
+      repeated: played >= 0,
       artist: artist,
       album: album,
       parts: parts,
@@ -350,6 +358,7 @@ List<AutoplayPick> rankAutoplayTracks({
       }
     }
     int? best;
+    final hasFresh = scored.any((entry) => !entry.repeated);
     // Artists spaced apart first, then only not twice in a row, then the
     // best of what is left.
     for (final rule in [
@@ -359,6 +368,7 @@ List<AutoplayPick> rankAutoplayTracks({
     ]) {
       for (var i = 0; i < scored.length; i++) {
         final entry = scored[i];
+        if (hasFresh && entry.repeated) continue;
         if (entry.artist.isNotEmpty && rule.contains(entry.artist)) continue;
         if (best == null || totals[i] > totals[best]) best = i;
       }
@@ -385,6 +395,7 @@ List<AutoplayPick> rankAutoplayTracks({
         scored[i] = (
           item: entry.item,
           score: entry.score - 3,
+          repeated: entry.repeated,
           artist: entry.artist,
           album: entry.album,
           parts: entry.parts,
@@ -401,6 +412,7 @@ class _MusicAutoplay {
   final MusicPlayerHandler handler;
   final AutoplayLibraryLoader loadLibrary;
   final Set<String> _dismissed = {};
+  final List<PlayableMedia> _recentChoices = [];
   Future<void>? _pending;
   int _generation = 0;
   (String, int)? _attempt;
@@ -424,6 +436,13 @@ class _MusicAutoplay {
   }
 
   void dismiss(PlayableMedia item) => _dismissed.add(item.source);
+
+  // Queue resets and shuffle must not erase which songs were just offered.
+  void remember(PlayableMedia item) {
+    _recentChoices.removeWhere((previous) => previous.source == item.source);
+    _recentChoices.add(item);
+    if (_recentChoices.length > 200) _recentChoices.removeAt(0);
+  }
 
   void updateMode() {
     reset();
@@ -538,6 +557,7 @@ class _MusicAutoplay {
         recent: recent,
         dismissedSources: _dismissed,
         random: handler._random,
+        recentChoices: _recentChoices,
         limit: 6 - upcoming.length,
       );
       List<AutoplayPick> selected;
@@ -552,6 +572,7 @@ class _MusicAutoplay {
               candidates: candidates,
               upcoming: upcoming,
               recent: recent,
+              recentChoices: List.of(_recentChoices),
               dismissed: Set<String>.of(_dismissed),
               model: model,
               signals: signals,
@@ -580,6 +601,9 @@ class _MusicAutoplay {
         return;
       }
       if (selected.isEmpty) return;
+      for (final pick in selected) {
+        remember(pick.media);
+      }
       // How the listener takes each pick teaches the weights.
       if (learning) {
         for (final pick in selected) {
@@ -613,6 +637,7 @@ class _AutoplayRanking {
     required this.candidates,
     required this.upcoming,
     required this.recent,
+    required this.recentChoices,
     required this.dismissed,
     required this.model,
     required this.signals,
@@ -623,7 +648,7 @@ class _AutoplayRanking {
   });
 
   final PlayableMedia seed;
-  final List<PlayableMedia> candidates, upcoming, recent;
+  final List<PlayableMedia> candidates, upcoming, recent, recentChoices;
   final Set<String> dismissed;
   final AutoplayPreferenceModel? model;
   final List<AutoplaySignal> signals;
@@ -643,6 +668,7 @@ List<AutoplayPick> _rankPersonalizedAutoplay(_AutoplayRanking input) {
     candidates: input.candidates,
     upcoming: input.upcoming,
     recent: input.recent,
+    recentChoices: input.recentChoices,
     dismissedSources: input.dismissed,
     random: random,
     limit: input.limit,

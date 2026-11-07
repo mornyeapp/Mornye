@@ -2105,6 +2105,7 @@ class MusicPlayerHandler extends BaseAudioHandler
   }
 
   void _recordPlayHistory(int index) {
+    _autoplay.remember(_media[index]);
     _playHistory.add(index);
     if (_playHistory.length > 200) _playHistory.removeAt(0);
   }

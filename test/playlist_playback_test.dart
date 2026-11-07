@@ -1010,6 +1010,26 @@ void main() {
   );
 
   test(
+    'single-file and catalog playback keep the genre for Autoplay',
+    () async {
+      final controller = container.read(playbackProvider.notifier);
+      await controller.playLocalPath(
+        path: '/jazz.flac',
+        title: 'Jazz',
+        artist: 'Artist',
+        genre: 'Jazz',
+      );
+      expect(player.queue.single.genre, 'Jazz');
+
+      await controller.playTrackList([
+        _tracks.first.copyWith(genre: 'Rock'),
+        _tracks.last.copyWith(genre: 'Pop'),
+      ]);
+      expect(player.queue.map((item) => item.genre), ['Rock', 'Pop']);
+    },
+  );
+
+  test(
     'missing and virtual CUE tracks do not shift the selected track',
     () async {
       playback.paths['Unavailable'] = '/album.cue#track02';

@@ -213,6 +213,7 @@ PlayableMedia playableFromTrack(Track track, String path) {
         : null,
     duration: track.duration > 0 ? Duration(seconds: track.duration) : null,
     explicit: track.isExplicit,
+    genre: track.genre,
   );
 }
 

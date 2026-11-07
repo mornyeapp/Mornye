@@ -132,6 +132,57 @@ void main() {
     },
   );
 
+  for (final refresh in ['new search', 'new search after shuffle', 'toggle']) {
+    test('Autoplay rotates recent suggestions after $refresh', () async {
+      final candidates = [
+        for (var i = 0; i < 12; i++)
+          PlayableMedia(
+            id: 'suggestion-$i',
+            source: '/suggestion-$i.flac',
+            title: 'Suggestion $i',
+            artist: 'Artist $i',
+            genre: i < 6 ? 'Pop; Dance' : 'Rock',
+          ),
+      ];
+      autoplayLoader = (_) async => candidates;
+      setAutoplayEnabled(true);
+      await handler.setQueueAndPlay([
+        const PlayableMedia(
+          id: 'search-pop',
+          source: '/search-pop.flac',
+          title: 'Search Pop',
+          artist: 'Seed',
+          genre: 'Pop',
+        ),
+      ]);
+      await _until(() => handler.queue.value.length == 7);
+      final first = handler.queue.value.skip(1).map((item) => item.id).toSet();
+      expect(first, candidates.take(6).map((item) => item.id).toSet());
+
+      if (refresh == 'new search after shuffle') {
+        await handler.setShuffleMode(AudioServiceShuffleMode.all);
+      }
+      if (refresh == 'toggle') {
+        setAutoplayEnabled(false);
+        setAutoplayEnabled(true);
+      } else {
+        await handler.setQueueAndPlay([
+          const PlayableMedia(
+            id: 'search-dance',
+            source: '/search-dance.flac',
+            title: 'Search Dance',
+            artist: 'Another seed',
+            genre: 'Dance',
+          ),
+        ]);
+      }
+      await _until(() => handler.queue.value.length == 7);
+      final next = handler.queue.value.skip(1).map((item) => item.id).toSet();
+      expect(next.intersection(first), isEmpty);
+      expect(next, candidates.skip(6).map((item) => item.id).toSet());
+    });
+  }
+
   test(
     'pending Autoplay is discarded after disabling or replacing the queue',
     () async {
@@ -147,6 +198,28 @@ void main() {
       expect(native.sources['music-player'], '/three.flac');
     },
   );
+
+  test('Autoplay remembers a manual play from a replaced queue', () async {
+    final played = _tracks.first;
+    await handler.setQueueAndPlay([played]);
+    final fresh = [
+      for (var i = 0; i < 6; i++)
+        PlayableMedia(
+          id: 'fresh-$i',
+          source: '/fresh-$i.flac',
+          title: 'Fresh $i',
+          artist: played.artist,
+        ),
+    ];
+    autoplayLoader = (_) async => [played, ...fresh];
+    await handler.setQueueAndPlay([_tracks.last]);
+    setAutoplayEnabled(true);
+    await _until(() => handler.queue.value.length == 7);
+    expect(
+      handler.queue.value.skip(1).map((item) => item.id).toSet(),
+      fresh.map((item) => item.id).toSet(),
+    );
+  });
 
   test('pause during an Autoplay refill prevents automatic resume', () async {
     final pending = Completer<List<PlayableMedia>>();

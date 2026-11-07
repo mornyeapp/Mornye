@@ -1562,6 +1562,7 @@ void main() {
         ),
         createPersonalization: () => learning,
       );
+      var includeFresh = false;
       final handler = MusicPlayerHandler(
         runtime: runtime,
         autoplayLibraryLoader: (_) async => [
@@ -1581,6 +1582,15 @@ void main() {
             genre: 'Jazz',
             duration: Duration(seconds: 60),
           ),
+          if (includeFresh)
+            for (var i = 0; i < 6; i++)
+              PlayableMedia(
+                id: 'fresh-$i',
+                source: '/fresh-$i.flac',
+                title: 'Fresh $i',
+                artist: 'Fresh artist $i',
+                genre: 'Rock',
+              ),
         ],
       );
       await learning.ensureLoaded();
@@ -1594,6 +1604,15 @@ void main() {
         'rock',
       ]);
       expect(handler.playbackState.value.playing, isTrue);
+      includeFresh = true;
+      await handler.setQueueAndPlay([_track]);
+      await handler.queue
+          .firstWhere((queue) => queue.length == 7)
+          .timeout(const Duration(seconds: 5));
+      expect(handler.queue.value.skip(1).map((item) => item.id).toSet(), {
+        for (var i = 0; i < 6; i++) 'fresh-$i',
+      });
+      includeFresh = false;
       await resetAutoplayLearning(runtime: runtime);
       expect(learning.observations, 0);
       await handler.queue

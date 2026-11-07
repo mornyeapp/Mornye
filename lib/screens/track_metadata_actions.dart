@@ -236,6 +236,7 @@ extension _TrackMetadataFileActions on _TrackMetadataScreenState {
             title: trackName,
             artist: artistName,
             album: albumName,
+            genre: genre,
             coverUrl: playbackCover,
             duration: durationSeconds != null && durationSeconds > 0
                 ? Duration(seconds: durationSeconds)

@@ -220,6 +220,23 @@ void main() {
     expect(selected, hasLength(4));
   });
 
+  test('unheard songs take priority over spacing a recently heard artist', () {
+    final seed = track('seed', artist: 'A', genre: 'Rock');
+    final heard = track('heard', artist: 'B', genre: 'Rock');
+    final unheard = track('unheard', artist: 'A', genre: 'Rock');
+    final selected = selectAutoplayTracks(
+      seed: seed,
+      candidates: [heard, unheard],
+      upcoming: [],
+      recent: [heard, seed],
+      dismissedSources: {},
+      random: _NoNoise(),
+      limit: 1,
+      preferenceAdjustment: (item) => item == heard ? 100 : 0,
+    );
+    expect(selected, [unheard]);
+  });
+
   test('a small Library never recommends the current song to itself', () {
     final seed = track('only');
     expect(
@@ -233,6 +250,42 @@ void main() {
       ),
       isEmpty,
     );
+  });
+
+  test('previous suggestions do not set the new seed genre', () {
+    final selected = selectAutoplayTracks(
+      seed: track('seed', artist: 'Seed', genre: 'Jazz'),
+      candidates: [
+        track('rock', artist: 'R', genre: 'Rock'),
+        track('jazz', artist: 'J', genre: 'Jazz'),
+      ],
+      upcoming: [],
+      recent: [],
+      recentChoices: [
+        for (var i = 0; i < 12; i++)
+          track('old$i', artist: 'Old $i', genre: 'Rock'),
+      ],
+      dismissedSources: {},
+      random: _NoNoise(),
+      limit: 1,
+    );
+    expect(selected.single.id, 'jazz');
+  });
+
+  test('rotation recognizes copies and reuses songs after fresh ones', () {
+    final heard = track(' Song ', artist: ' ARTIST ', source: '/copy.flac');
+    final fresh = track('fresh', artist: 'New');
+    final selected = selectAutoplayTracks(
+      seed: track('seed', artist: 'Seed'),
+      candidates: [heard, fresh],
+      upcoming: [],
+      recent: [],
+      recentChoices: [track('song', artist: 'artist')],
+      dismissedSources: {},
+      random: _NoNoise(),
+      preferenceAdjustment: (item) => item == heard ? 100 : 0,
+    );
+    expect(selected, [fresh, heard]);
   });
 
   test('recency uses the latest source or normalized song match', () {

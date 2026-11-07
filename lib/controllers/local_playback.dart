@@ -44,6 +44,7 @@ Future<bool> playLocalIfAvailable(
               title: track.name,
               artist: track.artistName,
               album: track.albumName,
+              genre: historyItem.genre ?? track.genre,
               coverUrl: track.coverUrl ?? '',
             );
         return true;
@@ -68,6 +69,7 @@ Future<bool> playLocalIfAvailable(
             title: localItem.trackName,
             artist: localItem.artistName,
             album: localItem.albumName,
+            genre: localItem.genre ?? track.genre,
             coverUrl: localItem.coverPath ?? track.coverUrl ?? '',
           );
       return true;
