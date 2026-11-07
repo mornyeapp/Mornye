@@ -1357,6 +1357,7 @@ void main() {
     await tester.pumpWidget(const SizedBox());
     await pump();
     await tester.pumpAndSettle();
-    expect(touchGestures(), findsOneWidget);
+    // The surface and its title lines share one sideways swipe.
+    expect(touchGestures(), findsWidgets);
   });
 }

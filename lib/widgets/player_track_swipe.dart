@@ -11,13 +11,31 @@ class PlayerTrackSwipe extends StatefulWidget {
     super.key,
     required this.queue,
     required this.currentIndex,
-    required this.onSelected,
+    required Future<void> Function(MediaItem) this.onSelected,
     required this.child,
-  });
+  }) : onRelease = null;
+
+  /// The titles follow the finger without showing a neighbor and return
+  /// to rest on release; [onRelease] decides what the swipe does, from the
+  /// drag's travel and its end details. A skip then lands as an ordinary
+  /// track change. Reduced motion keeps the titles still.
+  const PlayerTrackSwipe.follow({
+    super.key,
+    required void Function(DragEndDetails details, double travel)
+    this.onRelease,
+    required this.child,
+  }) : queue = const [],
+       currentIndex = -1,
+       onSelected = null;
+
+  /// Travel that commits a [PlayerTrackSwipe.follow] swipe. The titles
+  /// follow one to one up to here and with resistance beyond.
+  static const followCommitDistance = 48.0;
 
   final List<MediaItem> queue;
   final int currentIndex;
-  final Future<void> Function(MediaItem) onSelected;
+  final Future<void> Function(MediaItem)? onSelected;
+  final void Function(DragEndDetails details, double travel)? onRelease;
   final Widget child;
 
   @override
@@ -57,7 +75,26 @@ class _PlayerTrackSwipeState extends State<PlayerTrackSwipe>
     _offset.value = 0;
   }
 
+  bool get _follows => widget.onRelease != null;
+  double _travel = 0;
+
+  double _followOffset(double drag) {
+    if (MediaQuery.disableAnimationsOf(context)) return 0;
+    const linear = PlayerTrackSwipe.followCommitDistance;
+    final distance = drag.abs();
+    final offset = distance <= linear
+        ? distance
+        : linear + (distance - linear) * 0.35;
+    return drag.sign * offset.clamp(0.0, _width);
+  }
+
   void _start(DragStartDetails details) {
+    if (_follows) {
+      // A new swipe takes over a title that is still returning to rest.
+      _generation++;
+      _settling = false;
+      _travel = 0;
+    }
     if (_settling) return;
     _offset.stop();
     _drag = _offset.value;
@@ -65,13 +102,43 @@ class _PlayerTrackSwipeState extends State<PlayerTrackSwipe>
 
   void _update(DragUpdateDetails details) {
     if (_settling) return;
-    _drag += details.primaryDelta ?? 0;
+    final delta = details.primaryDelta ?? 0;
+    _drag += delta;
+    if (_follows) {
+      _travel += delta;
+      _offset.value = _followOffset(_drag);
+      return;
+    }
     _offset.value = _neighbor(_drag) == null
         ? _drag * 0.18 / (1 + _drag.abs() / _width)
         : _drag.clamp(-_pageExtent, _pageExtent);
   }
 
+  Future<void> _finishFollow(DragEndDetails? details) async {
+    final travel = _travel;
+    _travel = 0;
+    if (details != null) widget.onRelease!(details, travel);
+    if (!mounted) return;
+    final generation = ++_generation;
+    try {
+      await _offset
+          .animateTo(
+            0,
+            duration: MediaQuery.disableAnimationsOf(context)
+                ? Duration.zero
+                : const Duration(milliseconds: 280),
+            curve: Curves.easeOutCubic,
+          )
+          .orCancel;
+    } on TickerCanceled {
+      // A new swipe took the titles over.
+    } finally {
+      if (mounted && generation == _generation) _reset();
+    }
+  }
+
   Future<void> _finish([DragEndDetails? details]) async {
+    if (_follows) return _finishFollow(details);
     if (_settling) return;
     final offset = _offset.value;
     final velocity = details?.primaryVelocity ?? 0;
@@ -94,7 +161,7 @@ class _PlayerTrackSwipeState extends State<PlayerTrackSwipe>
           )
           .orCancel;
       if (!mounted || generation != _generation) return;
-      if (commit) await widget.onSelected(target);
+      if (commit) await widget.onSelected!(target);
     } on TickerCanceled {
       // A new song/queue or closing the player supersedes this gesture.
     } finally {

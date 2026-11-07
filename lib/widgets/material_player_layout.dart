@@ -17,6 +17,7 @@ import 'package:mornye/widgets/player_lyrics_controls.dart';
 import 'package:mornye/widgets/player_metadata_title.dart';
 import 'package:mornye/widgets/playback_source_label.dart';
 import 'package:mornye/widgets/player_playback_controls.dart';
+import 'package:mornye/widgets/player_track_crossfade.dart';
 import 'package:mornye/widgets/player_volume_control.dart';
 
 class MaterialPlayerLayout extends StatelessWidget {
@@ -113,23 +114,7 @@ class MaterialPlayerLayout extends StatelessWidget {
                       child: SizedBox(
                         width: artSize,
                         height: artSize,
-                        child: AnimatedSwitcher(
-                          duration: MediaQuery.disableAnimationsOf(context)
-                              ? Duration.zero
-                              : const Duration(milliseconds: 450),
-                          switchInCurve: Curves.easeOutCubic,
-                          switchOutCurve: Curves.easeInCubic,
-                          transitionBuilder: (child, animation) =>
-                              FadeTransition(
-                                opacity: animation,
-                                child: ScaleTransition(
-                                  scale: Tween(
-                                    begin: 0.94,
-                                    end: 1.0,
-                                  ).animate(animation),
-                                  child: child,
-                                ),
-                              ),
+                        child: _CoverSwitcher(
                           child: PlayerArtwork(
                             key: ValueKey(
                               mediaItem.artUri?.toString() ?? mediaItem.id,
@@ -321,88 +306,60 @@ class MaterialPlayerLayout extends StatelessWidget {
     bool showMetadata = true,
     bool showControls = true,
   }) {
-    final fallback = AppMotionSpec(
-      MediaQuery.disableAnimationsOf(context)
-          ? Duration.zero
-          : const Duration(milliseconds: 350),
-      Curves.linear,
-    );
-    final slide = AppMotion.spatial(context, fallback);
-    final fade = AppMotion.effects(context, fallback);
     return [
       if (showMetadata) ...[
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 28),
-          child: ClipRect(
-            child: AnimatedSwitcher(
-              duration: slide.duration,
-              // Finish fading the old title before revealing the next one. This
-              // also keeps rapid skips from stacking several readable titles.
-              transitionBuilder: (child, animation) => FadeTransition(
-                opacity: animation.drive(
-                  CurveTween(curve: Interval(0.5, 1, curve: fade.curve)),
-                ),
-                child: SlideTransition(
-                  position: Tween(begin: const Offset(0, 0.4), end: Offset.zero)
-                      .chain(
-                        CurveTween(curve: Interval(0.5, 1, curve: slide.curve)),
-                      )
-                      .animate(animation),
-                  child: child,
-                ),
-              ),
-              child: Row(
-                key: ValueKey(mediaItem.id),
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        PlayerMetadataTitle(
-                          mediaItem: mediaItem,
-                          metadata: metadata,
-                          style:
-                              (compact
-                                      ? Theme.of(context).textTheme.titleLarge
-                                      : Theme.of(
-                                          context,
-                                        ).textTheme.headlineSmall)
-                                  ?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                    color: colorScheme.onSurface,
-                                  ),
-                          textAlign: TextAlign.start,
-                          maxLines: compact ? 1 : 2,
+          // A skip the app started crossfades in place, without moving.
+          child: PlayerTrackCrossfade(
+            trackKey: mediaItem.id,
+            alignment: AlignmentDirectional.topStart,
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      PlayerMetadataTitle(
+                        mediaItem: mediaItem,
+                        metadata: metadata,
+                        style:
+                            (compact
+                                    ? Theme.of(context).textTheme.titleLarge
+                                    : Theme.of(context).textTheme.headlineSmall)
+                                ?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: colorScheme.onSurface,
+                                ),
+                        textAlign: TextAlign.start,
+                        maxLines: compact ? 1 : 2,
+                      ),
+                      SizedBox(height: compact ? 4 : 6),
+                      if (showSourceLabel)
+                        PlaybackSourceLabel(
+                          item: mediaItem,
+                          color: colorScheme.onSurfaceVariant,
                         ),
-                        SizedBox(height: compact ? 4 : 6),
-                        if (showSourceLabel)
-                          PlaybackSourceLabel(
-                            item: mediaItem,
-                            color: colorScheme.onSurfaceVariant,
-                          ),
-                        Consumer(
-                          builder: (context, ref, _) {
-                            final track = ref
-                                .watch(playerCollectionTrackProvider(mediaItem))
-                                .value;
-                            // No extensionId: a downloaded track's source is
-                            // its download service, not a metadata catalog.
-                            return ClickableArtistName(
-                              artistName: mediaItem.artist ?? '',
-                              artistId: track?.artistId,
-                              style: Theme.of(context).textTheme.titleMedium
-                                  ?.copyWith(
-                                    color: colorScheme.onSurfaceVariant,
-                                  ),
-                              textAlign: TextAlign.start,
-                            );
-                          },
-                        ),
-                      ],
-                    ),
+                      Consumer(
+                        builder: (context, ref, _) {
+                          final track = ref
+                              .watch(playerCollectionTrackProvider(mediaItem))
+                              .value;
+                          // No extensionId: a downloaded track's source is
+                          // its download service, not a metadata catalog.
+                          return ClickableArtistName(
+                            artistName: mediaItem.artist ?? '',
+                            artistId: track?.artistId,
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(color: colorScheme.onSurfaceVariant),
+                            textAlign: TextAlign.start,
+                          );
+                        },
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ),
@@ -434,5 +391,41 @@ class MaterialPlayerLayout extends StatelessWidget {
           ),
       ],
     ];
+  }
+}
+
+/// The cover's track change: the new cover fades in on the effects spring
+/// and grows from 0.94 on the slow spatial spring, which does not overshoot
+/// because the app started this motion. The previous cover stays opaque
+/// underneath until the new one covers it.
+class _CoverSwitcher extends StatelessWidget {
+  const _CoverSwitcher({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final fade = playerTrackChangeMotion(context);
+    final scale = AppMotion.spatialSlow(context, fade);
+    final total = fade.duration > scale.duration
+        ? fade.duration
+        : scale.duration;
+    double share(Duration part) =>
+        total == Duration.zero ? 1 : part.inMicroseconds / total.inMicroseconds;
+    final fadeCurve = Interval(0, share(fade.duration), curve: fade.curve);
+    final scaleCurve = Interval(0, share(scale.duration), curve: scale.curve);
+    return AnimatedSwitcher(
+      duration: total,
+      transitionBuilder: (child, animation) => FadeTransition(
+        opacity: animation.drive(CurveTween(curve: fadeCurve)),
+        child: ScaleTransition(
+          scale: animation.drive(
+            Tween(begin: 0.94, end: 1.0).chain(CurveTween(curve: scaleCurve)),
+          ),
+          child: child,
+        ),
+      ),
+      child: child,
+    );
   }
 }

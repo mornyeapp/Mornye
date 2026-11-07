@@ -11,6 +11,7 @@ import 'package:mornye/services/remote_playback.dart';
 import 'package:mornye/theme/app_theme.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/mini_player.dart';
+import 'package:mornye/widgets/player_artwork.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class _Controller implements MusicPlayerController {
@@ -324,6 +325,79 @@ void main() {
         },
       );
     }
+
+    for (final reducedMotion in [false, true]) {
+      testWidgets('${configuration.name}: the title lines follow a sideways '
+          'drag while the cover stays (reduced motion: $reducedMotion)', (
+        tester,
+      ) async {
+        if (reducedMotion) {
+          tester.platformDispatcher.accessibilityFeaturesTestValue =
+              const FakeAccessibilityFeatures(disableAnimations: true);
+          addTearDown(
+            tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
+          );
+        }
+        final controller = await pumpPlayer(tester, playing: true);
+        final title = find.text('Song');
+        final cover = find.byType(PlayerArtwork);
+        final start = tester.getTopLeft(title);
+        final coverRect = tester.getRect(cover);
+
+        final gesture = await tester.startGesture(tester.getCenter(title));
+        for (var step = 0; step < 4; step++) {
+          await gesture.moveBy(const Offset(-10, 0));
+          await tester.pump(const Duration(milliseconds: 16));
+        }
+        // The Mornye glass leans toward a held finger, carrying the cover
+        // with it; only the lines move against the cover.
+        final coverShift = tester.getCenter(cover).dx - coverRect.center.dx;
+        final moved = tester.getTopLeft(title).dx - start.dx;
+        expect(coverShift.abs(), lessThan(6));
+        if (reducedMotion) {
+          expect(moved - coverShift, closeTo(0, 0.5));
+        } else {
+          expect(moved - coverShift, lessThan(-20));
+        }
+
+        // A short, slow release keeps the song and returns the lines.
+        await tester.pump(const Duration(milliseconds: 250));
+        await gesture.up();
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 140));
+        if (!reducedMotion) {
+          expect(tester.getTopLeft(title).dx, greaterThan(start.dx + moved));
+        }
+        await tester.pumpAndSettle();
+        expect(tester.getTopLeft(title), start);
+        expect(controller.calls, isEmpty);
+        expect(tester.takeException(), isNull);
+      });
+    }
+
+    testWidgets('${configuration.name}: a new song fades the lines through', (
+      tester,
+    ) async {
+      final mediaItems = StreamController<MediaItem?>();
+      addTearDown(mediaItems.close);
+      await pumpPlayer(tester, mediaItems: mediaItems.stream);
+      mediaItems.add(
+        const MediaItem(id: 'first', title: 'First', artist: 'Artist A'),
+      );
+      await tester.pumpAndSettle();
+      mediaItems.add(
+        const MediaItem(id: 'second', title: 'Second', artist: 'Artist B'),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(find.text('First'), findsOneWidget);
+      expect(find.text('Second'), findsOneWidget);
+      await tester.pumpAndSettle();
+      expect(find.text('First'), findsNothing);
+      expect(find.text('Second'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
 
     testWidgets('${configuration.name}: short and cancelled drags do not act', (
       tester,

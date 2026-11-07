@@ -35,6 +35,7 @@ import 'package:mornye/widgets/player_lyrics_section.dart';
 import 'package:mornye/widgets/player_metadata_title.dart';
 import 'package:mornye/widgets/playback_source_label.dart';
 import 'package:mornye/widgets/player_playback_controls.dart';
+import 'package:mornye/widgets/player_track_crossfade.dart';
 import 'package:mornye/widgets/player_volume_control.dart';
 import 'package:mornye/widgets/playlist_picker_sheet.dart';
 import 'package:share_plus/share_plus.dart';
@@ -414,6 +415,7 @@ class _PlayerColumn extends StatelessWidget {
       colorScheme: colorScheme,
       iconSize: 96,
       cacheWidth: (decodeSize * MediaQuery.devicePixelRatioOf(context)).round(),
+      crossfade: playerTrackChangeMotion(context),
     );
     final subtitle = [
       mediaItem.artist,
@@ -445,34 +447,42 @@ class _PlayerColumn extends StatelessWidget {
         Row(
           children: [
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  PlayerMetadataTitle(
-                    mediaItem: mediaItem,
-                    metadata: metadata,
-                    style:
-                        (mornye ? textTheme.titleMedium : textTheme.titleLarge)
-                            ?.copyWith(
-                              fontWeight: FontWeight.w600,
-                              color: colorScheme.onSurface,
-                            ),
-                    maxLines: 1,
-                  ),
-                  if (subtitle.isNotEmpty)
-                    Text(
-                      subtitle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+              child: PlayerTrackCrossfade(
+                trackKey: mediaItem.id,
+                alignment: AlignmentDirectional.topStart,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    PlayerMetadataTitle(
+                      mediaItem: mediaItem,
+                      metadata: metadata,
                       style:
-                          (mornye ? textTheme.bodyMedium : textTheme.titleSmall)
-                              ?.copyWith(color: colorScheme.onSurfaceVariant),
+                          (mornye
+                                  ? textTheme.titleMedium
+                                  : textTheme.titleLarge)
+                              ?.copyWith(
+                                fontWeight: FontWeight.w600,
+                                color: colorScheme.onSurface,
+                              ),
+                      maxLines: 1,
                     ),
-                  PlaybackSourceLabel(
-                    item: mediaItem,
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                ],
+                    if (subtitle.isNotEmpty)
+                      Text(
+                        subtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style:
+                            (mornye
+                                    ? textTheme.bodyMedium
+                                    : textTheme.titleSmall)
+                                ?.copyWith(color: colorScheme.onSurfaceVariant),
+                      ),
+                    PlaybackSourceLabel(
+                      item: mediaItem,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ],
+                ),
               ),
             ),
             if (mornye) ...[

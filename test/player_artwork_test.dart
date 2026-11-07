@@ -4,6 +4,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/widgets/app_icon.dart';
 import 'package:mornye/widgets/player_artwork.dart';
 
@@ -88,6 +89,94 @@ void main() {
       await tester.pumpWidget(const SizedBox());
     },
   );
+
+  for (final reducedMotion in [false, true]) {
+    testWidgets('a crossfade reveals the next cover only once it has a frame '
+        '(reduced motion: $reducedMotion)', (tester) async {
+      final cache = PaintingBinding.instance.imageCache;
+      addTearDown(() {
+        cache.clear();
+        cache.clearLiveImages();
+      });
+      Future<ui.Image> pixel(Color color) async {
+        final recorder = ui.PictureRecorder();
+        Canvas(recorder).drawColor(color, BlendMode.src);
+        final picture = recorder.endRecording();
+        final image = await picture.toImage(1, 1);
+        picture.dispose();
+        return image;
+      }
+
+      final first = await tester.runAsync(() => pixel(Colors.red));
+      final second = await tester.runAsync(() => pixel(Colors.blue));
+      final pending = Completer<ImageInfo>();
+      cache.putIfAbsent(
+        FileImage(File('/fade-first.png')),
+        () => OneFrameImageStreamCompleter(
+          Future.value(ImageInfo(image: first!)),
+        ),
+      );
+      cache.putIfAbsent(
+        FileImage(File('/fade-second.png')),
+        () => OneFrameImageStreamCompleter(pending.future),
+      );
+      Widget app(String path) => MaterialApp(
+        home: MediaQuery(
+          data: MediaQueryData(disableAnimations: reducedMotion),
+          child: PlayerArtwork(
+            artUri: path,
+            colorScheme: const ColorScheme.dark(),
+            crossfade: const AppMotionSpec(
+              Duration(milliseconds: 200),
+              Curves.linear,
+            ),
+          ),
+        ),
+      );
+      List<ui.Image?> shown() => [
+        for (final image in tester.widgetList<RawImage>(find.byType(RawImage)))
+          image.image,
+      ];
+
+      await tester.pumpWidget(app('/fade-first.png'));
+      await tester.pump();
+      final displayed = shown().single;
+      expect(displayed, isNotNull);
+
+      // The old cover stays while the next one decodes.
+      await tester.pumpWidget(app('/fade-second.png'));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(shown(), [same(displayed)]);
+
+      pending.complete(ImageInfo(image: second!));
+      // The decoded frame lands a frame later; the fade starts after it.
+      for (var frame = 0; frame < 6; frame++) {
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      if (reducedMotion) {
+        expect(shown().single, isNot(same(displayed)));
+      } else {
+        // Both covers paint mid-fade, the new one over the old one.
+        expect(shown(), hasLength(2));
+        expect(shown().first, same(displayed));
+        final fade = tester.widget<FadeTransition>(
+          find
+              .ancestor(
+                of: find.byType(RawImage).last,
+                matching: find.byType(FadeTransition),
+              )
+              .first,
+        );
+        expect(fade.opacity.value, inExclusiveRange(0, 1));
+      }
+
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(shown().single, isNot(same(displayed)));
+      expect(find.byIcon(Icons.music_note), findsNothing);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+    });
+  }
 
   testWidgets('covers with no file show the placeholder without throwing', (
     tester,

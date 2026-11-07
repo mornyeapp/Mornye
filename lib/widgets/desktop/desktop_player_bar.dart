@@ -38,6 +38,7 @@ import 'package:mornye/widgets/mornye_player_background.dart';
 import 'package:mornye/widgets/overflow_marquee.dart';
 import 'package:mornye/widgets/player_artwork.dart';
 import 'package:mornye/widgets/player_lyrics.dart';
+import 'package:mornye/widgets/player_track_crossfade.dart';
 import 'package:mornye/widgets/player_volume_control.dart';
 import 'package:mornye/widgets/playback_seek_slider.dart';
 
@@ -349,32 +350,36 @@ class _TitleAndArtist extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final colorScheme = Theme.of(context).colorScheme;
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        ExplicitTrackTitle(
-          title: mediaItem.title,
-          explicit: parseExplicitFlag(mediaItem.extras?['explicit']) == true,
-          style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        Text(
-          mediaItem.artist ?? '',
-          style: textTheme.bodySmall?.copyWith(
-            color: colorScheme.onSurfaceVariant,
+    return PlayerTrackCrossfade(
+      trackKey: mediaItem.id,
+      alignment: AlignmentDirectional.topStart,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ExplicitTrackTitle(
+            title: mediaItem.title,
+            explicit: parseExplicitFlag(mediaItem.extras?['explicit']) == true,
+            style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        // While the desktop follows a phone, the bar shows and drives it.
-        LinkPlayingOnText(
-          color: colorScheme.primary,
-          style: textTheme.labelSmall,
-          glyphSize: 14,
-        ),
-      ],
+          Text(
+            mediaItem.artist ?? '',
+            style: textTheme.bodySmall?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          // While the desktop follows a phone, the bar shows and drives it.
+          LinkPlayingOnText(
+            color: colorScheme.primary,
+            style: textTheme.labelSmall,
+            glyphSize: 14,
+          ),
+        ],
+      ),
     );
   }
 }
@@ -403,6 +408,7 @@ class _Artwork extends StatelessWidget {
           colorScheme: Theme.of(context).colorScheme,
           cacheWidth: (size * 2).round(),
           iconSize: size * 0.4,
+          crossfade: playerTrackChangeMotion(context),
         ),
       ),
     );
@@ -764,49 +770,53 @@ class _MornyeLcdLines extends ConsumerWidget {
       mediaItem.album,
     ].where((part) => part != null && part.trim().isNotEmpty).join(' · ');
     final style = textTheme.bodyMedium?.copyWith(fontSize: 13, height: 1.25);
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        OverflowMarquee(
-          resetKey: (mediaItem.id, mediaItem.title),
-          maxCycles: 2,
-          child: ExplicitTrackTitle(
-            title: mediaItem.title,
-            explicit: parseExplicitFlag(mediaItem.extras?['explicit']) == true,
-            style: style?.copyWith(
-              color: colorScheme.onSurface,
-              fontWeight: FontWeight.w600,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-        // The capsule has two lines: while the desktop follows a phone,
-        // the second names it instead.
-        if (ref.watch(
-          activeRemotePlaybackProvider.select((remote) => remote != null),
-        ))
-          LinkPlayingOnText(
-            color: colorScheme.primary,
-            style: style?.copyWith(fontWeight: FontWeight.w600),
-            glyphSize: 12,
-          )
-        else if (subtitle.isNotEmpty)
+    return PlayerTrackCrossfade(
+      trackKey: mediaItem.id,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
           OverflowMarquee(
-            resetKey: (mediaItem.id, subtitle),
+            resetKey: (mediaItem.id, mediaItem.title),
             maxCycles: 2,
-            child: Text(
-              subtitle,
-              // Keep the subtitle legible over the capsule's glass.
+            child: ExplicitTrackTitle(
+              title: mediaItem.title,
+              explicit:
+                  parseExplicitFlag(mediaItem.extras?['explicit']) == true,
               style: style?.copyWith(
-                color: colorScheme.onSurface.withValues(alpha: 0.78),
+                color: colorScheme.onSurface,
+                fontWeight: FontWeight.w600,
               ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
           ),
-      ],
+          // The capsule has two lines: while the desktop follows a phone,
+          // the second names it instead.
+          if (ref.watch(
+            activeRemotePlaybackProvider.select((remote) => remote != null),
+          ))
+            LinkPlayingOnText(
+              color: colorScheme.primary,
+              style: style?.copyWith(fontWeight: FontWeight.w600),
+              glyphSize: 12,
+            )
+          else if (subtitle.isNotEmpty)
+            OverflowMarquee(
+              resetKey: (mediaItem.id, subtitle),
+              maxCycles: 2,
+              child: Text(
+                subtitle,
+                // Keep the subtitle legible over the capsule's glass.
+                style: style?.copyWith(
+                  color: colorScheme.onSurface.withValues(alpha: 0.78),
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

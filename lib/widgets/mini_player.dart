@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:audio_service/audio_service.dart' show MediaItem;
 import 'package:flutter/gestures.dart' show DragStartBehavior;
 import 'package:flutter/semantics.dart' show SemanticsRole;
 import 'package:flutter/material.dart';
@@ -34,6 +35,8 @@ import 'package:mornye/widgets/decorative_phase.dart';
 import 'package:mornye/widgets/link/link_devices_sheet.dart';
 import 'package:mornye/widgets/overflow_marquee.dart';
 import 'package:mornye/widgets/player_artwork.dart';
+import 'package:mornye/widgets/player_track_crossfade.dart';
+import 'package:mornye/widgets/player_track_swipe.dart';
 import 'package:mornye/widgets/settings_group.dart';
 import 'package:mornye/widgets/mornye_chrome.dart';
 import 'package:mornye/widgets/mornye_glass_press.dart';
@@ -153,7 +156,6 @@ class _MiniPlayerBodyState extends ConsumerState<_MiniPlayerBody> {
 
   /// Upward travel of the current vertical drag, in logical pixels.
   double _dragUp = 0;
-  double _dragAcross = 0;
   bool _dragCancelled = false;
 
   void _openNowPlaying() {
@@ -184,11 +186,13 @@ class _MiniPlayerBodyState extends ConsumerState<_MiniPlayerBody> {
     }
   }
 
-  void _onHorizontalDragEnd(DragEndDetails details) {
-    final travel = _dragAcross;
-    _dragAcross = 0;
+  void _onHorizontalRelease(DragEndDetails details, double travel) {
     final velocity = details.primaryVelocity ?? 0;
-    if (_dragCancelled || (travel.abs() < 48 && velocity.abs() < 550)) return;
+    if (_dragCancelled ||
+        (travel.abs() < PlayerTrackSwipe.followCommitDistance &&
+            velocity.abs() < 550)) {
+      return;
+    }
     final direction = velocity.abs() >= 550 ? velocity : travel;
     final controller = ref.read(musicPlayerControllerProvider);
     if (!context.isMornye &&
@@ -202,6 +206,63 @@ class _MiniPlayerBodyState extends ConsumerState<_MiniPlayerBody> {
     } else {
       controller.previous();
     }
+  }
+
+  Widget _titles(
+    BuildContext context,
+    MediaItem mediaItem, {
+    required bool remote,
+    required int? marqueeCycles,
+  }) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final mornye = context.isMornye;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        OverflowMarquee(
+          resetKey: (mediaItem.id, mediaItem.title),
+          maxCycles: marqueeCycles,
+          child: ExplicitTrackTitle(
+            title: mediaItem.title,
+            explicit: parseExplicitFlag(mediaItem.extras?['explicit']) == true,
+            style: Theme.of(
+              context,
+            ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        // Where the music plays while the paired desktop plays in this
+        // phone's place.
+        if (remote)
+          LinkPlayingOnText(
+            key: const ValueKey('mini-player-playing-on'),
+            color: colorScheme.primary,
+            style: Theme.of(context).textTheme.bodySmall,
+            glyphSize: 14,
+          )
+        else
+          OverflowMarquee(
+            resetKey: (mediaItem.id, mediaItem.artist),
+            maxCycles: marqueeCycles,
+            child: Text(
+              mediaItem.artist ?? '',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: mornye
+                    ? Color.lerp(
+                        colorScheme.onSurfaceVariant,
+                        colorScheme.onSurface,
+                        colorScheme.brightness == Brightness.dark ? 0.7 : 0.6,
+                      )
+                    : colorScheme.onSurfaceVariant,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+      ],
+    );
   }
 
   @override
@@ -291,65 +352,25 @@ class _MiniPlayerBodyState extends ConsumerState<_MiniPlayerBody> {
                             colorScheme: colorScheme,
                             cacheWidth: PlayerArtwork.miniCacheWidth,
                             iconSize: 22,
+                            crossfade: playerTrackChangeMotion(context),
                           ),
                         ),
                       ),
                     ),
                     SizedBox(width: compact ? 8 : 12),
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          OverflowMarquee(
-                            resetKey: (mediaItem.id, mediaItem.title),
-                            maxCycles: marqueeCycles,
-                            child: ExplicitTrackTitle(
-                              title: mediaItem.title,
-                              explicit:
-                                  parseExplicitFlag(
-                                    mediaItem.extras?['explicit'],
-                                  ) ==
-                                  true,
-                              style: Theme.of(context).textTheme.titleSmall
-                                  ?.copyWith(fontWeight: FontWeight.w600),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
+                      // The lines follow a sideways swipe; the cover stays.
+                      child: PlayerTrackCrossfade(
+                        trackKey: mediaItem.id,
+                        child: PlayerTrackSwipeTitles(
+                          current: mediaItem,
+                          builder: (mediaItem) => _titles(
+                            context,
+                            mediaItem,
+                            remote: remote,
+                            marqueeCycles: marqueeCycles,
                           ),
-                          // Where the music plays while the paired desktop
-                          // plays in this phone's place.
-                          if (remote)
-                            LinkPlayingOnText(
-                              key: const ValueKey('mini-player-playing-on'),
-                              color: colorScheme.primary,
-                              style: Theme.of(context).textTheme.bodySmall,
-                              glyphSize: 14,
-                            )
-                          else
-                            OverflowMarquee(
-                              resetKey: (mediaItem.id, mediaItem.artist),
-                              maxCycles: marqueeCycles,
-                              child: Text(
-                                mediaItem.artist ?? '',
-                                style: Theme.of(context).textTheme.bodySmall
-                                    ?.copyWith(
-                                      color: mornye
-                                          ? Color.lerp(
-                                              colorScheme.onSurfaceVariant,
-                                              colorScheme.onSurface,
-                                              colorScheme.brightness ==
-                                                      Brightness.dark
-                                                  ? 0.7
-                                                  : 0.6,
-                                            )
-                                          : colorScheme.onSurfaceVariant,
-                                    ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                        ],
+                        ),
                       ),
                     ),
                     if (!compact && ref.watch(linkPhoneClientProvider) != null)
@@ -420,28 +441,29 @@ class _MiniPlayerBodyState extends ConsumerState<_MiniPlayerBody> {
       ),
     );
     // Swiping up opens the full player. Sideways swipes dismiss a paused
-    // local Material player; otherwise they change tracks.
+    // local Material player; otherwise they change tracks. The title lines
+    // follow the finger and return to rest on release.
     // Desktop has no touch gestures: a click opens the player instead.
     final swipeable = isDesktopPlatform
         ? surface
-        : GestureDetector(
-            // Measure from touch-down so the slop counts toward the swipe.
-            dragStartBehavior: DragStartBehavior.down,
-            onVerticalDragStart: (_) => _dragUp = 0,
-            onVerticalDragUpdate: (details) =>
-                _dragUp -= details.primaryDelta ?? 0,
-            onVerticalDragEnd: _onVerticalDragEnd,
-            onVerticalDragCancel: () => _dragUp = 0,
-            onHorizontalDragStart: (_) => _dragAcross = 0,
-            onHorizontalDragUpdate: (details) =>
-                _dragAcross += details.primaryDelta ?? 0,
-            onHorizontalDragEnd: _onHorizontalDragEnd,
-            onHorizontalDragCancel: () => _dragAcross = 0,
-            child: Listener(
-              // Flutter ends an accepted drag even after a pointer cancel.
-              onPointerDown: (_) => _dragCancelled = false,
-              onPointerCancel: (_) => _dragCancelled = true,
-              child: surface,
+        : PlayerTrackSwipe.follow(
+            onRelease: _onHorizontalRelease,
+            child: GestureDetector(
+              // Measure from touch-down so the slop counts toward the swipe.
+              dragStartBehavior: DragStartBehavior.down,
+              onVerticalDragStart: (_) => _dragUp = 0,
+              onVerticalDragUpdate: (details) =>
+                  _dragUp -= details.primaryDelta ?? 0,
+              onVerticalDragEnd: _onVerticalDragEnd,
+              onVerticalDragCancel: () => _dragUp = 0,
+              child: PlayerTrackSwipeRegion(
+                child: Listener(
+                  // Flutter ends an accepted drag even after a pointer cancel.
+                  onPointerDown: (_) => _dragCancelled = false,
+                  onPointerCancel: (_) => _dragCancelled = true,
+                  child: surface,
+                ),
+              ),
             ),
           );
     return mornye
