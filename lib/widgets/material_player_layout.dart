@@ -114,17 +114,21 @@ class MaterialPlayerLayout extends StatelessWidget {
                       child: SizedBox(
                         width: artSize,
                         height: artSize,
-                        child: _CoverSwitcher(
-                          child: PlayerArtwork(
-                            key: ValueKey(
-                              mediaItem.artUri?.toString() ?? mediaItem.id,
-                            ),
-                            artUri: mediaItem.artUri?.toString(),
-                            colorScheme: colorScheme,
-                            cacheWidth:
-                                (artSize *
-                                        MediaQuery.devicePixelRatioOf(context))
-                                    .round(),
+                        // A track change keeps the old cover until the new
+                        // one has a frame. It then fades in on the effects
+                        // spring and grows from 0.94 on the slow spatial
+                        // spring, which does not overshoot because the app
+                        // started this motion.
+                        child: PlayerArtwork(
+                          artUri: mediaItem.artUri?.toString(),
+                          colorScheme: colorScheme,
+                          cacheWidth:
+                              (artSize * MediaQuery.devicePixelRatioOf(context))
+                                  .round(),
+                          crossfade: playerTrackChangeMotion(context),
+                          crossfadeScale: AppMotion.spatialSlow(
+                            context,
+                            playerTrackChangeMotion(context),
                           ),
                         ),
                       ),
@@ -391,41 +395,5 @@ class MaterialPlayerLayout extends StatelessWidget {
           ),
       ],
     ];
-  }
-}
-
-/// The cover's track change: the new cover fades in on the effects spring
-/// and grows from 0.94 on the slow spatial spring, which does not overshoot
-/// because the app started this motion. The previous cover stays opaque
-/// underneath until the new one covers it.
-class _CoverSwitcher extends StatelessWidget {
-  const _CoverSwitcher({required this.child});
-
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    final fade = playerTrackChangeMotion(context);
-    final scale = AppMotion.spatialSlow(context, fade);
-    final total = fade.duration > scale.duration
-        ? fade.duration
-        : scale.duration;
-    double share(Duration part) =>
-        total == Duration.zero ? 1 : part.inMicroseconds / total.inMicroseconds;
-    final fadeCurve = Interval(0, share(fade.duration), curve: fade.curve);
-    final scaleCurve = Interval(0, share(scale.duration), curve: scale.curve);
-    return AnimatedSwitcher(
-      duration: total,
-      transitionBuilder: (child, animation) => FadeTransition(
-        opacity: animation.drive(CurveTween(curve: fadeCurve)),
-        child: ScaleTransition(
-          scale: animation.drive(
-            Tween(begin: 0.94, end: 1.0).chain(CurveTween(curve: scaleCurve)),
-          ),
-          child: child,
-        ),
-      ),
-      child: child,
-    );
   }
 }

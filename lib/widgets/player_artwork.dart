@@ -13,6 +13,8 @@ class PlayerArtwork extends StatelessWidget {
   /// Shared decode for the mini player and the full player's blurred cover.
   static const miniCacheWidth = 132;
 
+  static const _grownFrom = 0.94;
+
   /// An HTTP(S) URL, file URI, absolute local artwork path, or `network://`
   /// cover reference.
   final String? artUri;
@@ -25,6 +27,10 @@ class PlayerArtwork extends StatelessWidget {
   /// Null, a zero duration or reduced motion swap the cover at once.
   final AppMotionSpec? crossfade;
 
+  /// With [crossfade], the new cover also grows from 0.94 on this motion
+  /// while it fades in.
+  final AppMotionSpec? crossfadeScale;
+
   const PlayerArtwork({
     super.key,
     required this.artUri,
@@ -32,6 +38,7 @@ class PlayerArtwork extends StatelessWidget {
     this.cacheWidth,
     this.iconSize = 40,
     this.crossfade,
+    this.crossfadeScale,
   });
 
   /// Share one full-size decode while artwork moves between player panels.
@@ -55,7 +62,12 @@ class PlayerArtwork extends StatelessWidget {
     if (motion != null &&
         motion.duration > Duration.zero &&
         !MediaQuery.disableAnimationsOf(context)) {
-      return _ArtworkCrossfade(artUri: artUri, motion: motion, builder: _layer);
+      return _ArtworkCrossfade(
+        artUri: artUri,
+        motion: motion,
+        scale: crossfadeScale,
+        builder: _layer,
+      );
     }
     final placeholder = _placeholder();
 
@@ -130,11 +142,13 @@ class _ArtworkCrossfade extends StatefulWidget {
   const _ArtworkCrossfade({
     required this.artUri,
     required this.motion,
+    required this.scale,
     required this.builder,
   });
 
   final String? artUri;
   final AppMotionSpec motion;
+  final AppMotionSpec? scale;
   final Widget Function(BuildContext, String?, VoidCallback onShown) builder;
 
   @override
@@ -146,11 +160,23 @@ class _ArtworkCrossfadeState extends State<_ArtworkCrossfade>
   late _ArtworkLayer _current = _ArtworkLayer(widget.artUri, _opacity(1));
   _ArtworkLayer? _previous;
 
-  AnimationController _opacity(double value) => AnimationController(
-    vsync: this,
-    value: value,
-    duration: widget.motion.duration,
-  );
+  /// One linear timeline per cover: the fade and the growth each run their
+  /// own curve over their own share of it.
+  Duration get _total {
+    final scale = widget.scale?.duration ?? Duration.zero;
+    return scale > widget.motion.duration ? scale : widget.motion.duration;
+  }
+
+  Animation<double> _part(_ArtworkLayer layer, AppMotionSpec motion) {
+    final total = _total.inMicroseconds;
+    final share = total == 0 ? 1.0 : motion.duration.inMicroseconds / total;
+    return layer.opacity.drive(
+      CurveTween(curve: Interval(0, share, curve: motion.curve)),
+    );
+  }
+
+  AnimationController _opacity(double value) =>
+      AnimationController(vsync: this, value: value, duration: _total);
 
   @override
   void didUpdateWidget(_ArtworkCrossfade oldWidget) {
@@ -193,7 +219,7 @@ class _ArtworkCrossfadeState extends State<_ArtworkCrossfade>
     // Runs during build: start the fade once this frame is done.
     SchedulerBinding.instance.addPostFrameCallback((_) {
       if (!mounted || !identical(layer, _current)) return;
-      final fade = layer.opacity.animateTo(1, curve: widget.motion.curve);
+      final fade = layer.opacity.animateTo(1);
       fade.whenCompleteOrCancel(() {
         if (!mounted || !identical(layer, _current) || _previous == null) {
           return;
@@ -214,13 +240,22 @@ class _ArtworkCrossfadeState extends State<_ArtworkCrossfade>
     super.dispose();
   }
 
-  Widget _build(BuildContext context, _ArtworkLayer layer) => KeyedSubtree(
-    key: layer.key,
-    child: FadeTransition(
-      opacity: layer.opacity,
-      child: widget.builder(context, layer.uri, () => _show(layer)),
-    ),
-  );
+  Widget _build(BuildContext context, _ArtworkLayer layer) {
+    Widget child = widget.builder(context, layer.uri, () => _show(layer));
+    if (widget.scale case final scale?) {
+      child = ScaleTransition(
+        scale: _part(
+          layer,
+          scale,
+        ).drive(Tween(begin: PlayerArtwork._grownFrom, end: 1.0)),
+        child: child,
+      );
+    }
+    return KeyedSubtree(
+      key: layer.key,
+      child: FadeTransition(opacity: _part(layer, widget.motion), child: child),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {

@@ -2940,7 +2940,11 @@ void main() {
       matching: find.byType(PlayerArtwork),
     );
     expect(covers, findsOneWidget);
-    expect(tester.widget<PlayerArtwork>(covers).key, const ValueKey('second'));
+    // Reduced motion swaps the cover in place, with no fading layers.
+    expect(
+      find.descendant(of: covers, matching: find.byType(FadeTransition)),
+      findsNothing,
+    );
     expect(tester.takeException(), isNull);
   });
 

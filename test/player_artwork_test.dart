@@ -178,6 +178,89 @@ void main() {
     });
   }
 
+  testWidgets('a growing crossfade waits for the frame, then fades and grows', (
+    tester,
+  ) async {
+    final cache = PaintingBinding.instance.imageCache;
+    addTearDown(() {
+      cache.clear();
+      cache.clearLiveImages();
+    });
+    final image = await tester.runAsync(() async {
+      final recorder = ui.PictureRecorder();
+      Canvas(recorder).drawColor(Colors.green, BlendMode.src);
+      final picture = recorder.endRecording();
+      final result = await picture.toImage(1, 1);
+      picture.dispose();
+      return result;
+    });
+    final pending = Completer<ImageInfo>();
+    cache.putIfAbsent(
+      FileImage(File('/grow-first.png')),
+      () => OneFrameImageStreamCompleter(
+        Future.value(ImageInfo(image: image!.clone())),
+      ),
+    );
+    cache.putIfAbsent(
+      FileImage(File('/grow-second.png')),
+      () => OneFrameImageStreamCompleter(pending.future),
+    );
+    Widget app(String path) => MaterialApp(
+      home: PlayerArtwork(
+        artUri: path,
+        colorScheme: const ColorScheme.dark(),
+        crossfade: const AppMotionSpec(
+          Duration(milliseconds: 100),
+          Curves.linear,
+        ),
+        crossfadeScale: const AppMotionSpec(
+          Duration(milliseconds: 400),
+          Curves.linear,
+        ),
+      ),
+    );
+    ({double opacity, double scale}) top() {
+      final layer = find.byType(KeyedSubtree).last;
+      return (
+        opacity: tester
+            .widget<FadeTransition>(
+              find.descendant(of: layer, matching: find.byType(FadeTransition)),
+            )
+            .opacity
+            .value,
+        scale: tester
+            .widget<ScaleTransition>(
+              find
+                  .descendant(of: layer, matching: find.byType(ScaleTransition))
+                  .first,
+            )
+            .scale
+            .value,
+      );
+    }
+
+    await tester.pumpWidget(app('/grow-first.png'));
+    await tester.pump();
+    expect(top(), (opacity: 1.0, scale: 1.0));
+    await tester.pumpWidget(app('/grow-second.png'));
+    await tester.pump(const Duration(milliseconds: 300));
+    // No frame yet: the new cover waits, hidden and small.
+    expect(top(), (opacity: 0.0, scale: 0.94));
+
+    pending.complete(ImageInfo(image: image!));
+    for (var frame = 0; frame < 10; frame++) {
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    // The fade is done well before the growth.
+    expect(top().opacity, 1);
+    expect(top().scale, inExclusiveRange(0.94, 1));
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(top(), (opacity: 1.0, scale: 1.0));
+    expect(find.byType(RawImage), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+  });
+
   testWidgets('covers with no file show the placeholder without throwing', (
     tester,
   ) async {
