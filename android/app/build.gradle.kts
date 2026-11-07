@@ -56,6 +56,12 @@ android {
     }
     packaging {
         if (discordSdkEnabled) jniLibs.pickFirsts += "**/libdiscord_partner_sdk.so"
+        // kuromoji-core and kuromoji-ipadic ship the same metadata files.
+        resources.pickFirsts += setOf(
+            "META-INF/CONTRIBUTORS.md",
+            "META-INF/LICENSE.md",
+            "META-INF/NOTICE.md",
+        )
     }
 
     externalNativeBuild {
