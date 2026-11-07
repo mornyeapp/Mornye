@@ -325,9 +325,9 @@ class _LyricsOptionsButtonState extends ConsumerState<LyricsOptionsButton> {
   }) async {
     final settings = ref.read(settingsProvider);
     final l10n = context.l10n;
-    final target = ref
-        .read(lyricsTranslationProvider.notifier)
-        .targetFor(original);
+    final translations = ref.read(lyricsTranslationProvider.notifier);
+    final target = translations.targetFor(original);
+    final inTarget = translations.inTargetLanguage(original);
     final actions = <(String, String, IconData)>[
       if (pronunciation)
         (
@@ -355,15 +355,19 @@ class _LyricsOptionsButtonState extends ConsumerState<LyricsOptionsButton> {
         )
       else if (canTranslate) ...[
         // The language from settings applies at once; the picker is only
-        // for another language.
-        (
-          'translate',
-          l10n.nowPlayingTranslateLyricsTo(target.nativeName),
-          Icons.auto_awesome_outlined,
-        ),
+        // for another language. Lyrics already in it, or translated into
+        // it, only offer the picker.
+        if (!inTarget)
+          (
+            'translate',
+            l10n.nowPlayingTranslateLyricsTo(target.nativeName),
+            Icons.auto_awesome_outlined,
+          ),
         (
           'translateInto',
-          l10n.nowPlayingTranslateOtherLanguage,
+          inTarget
+              ? l10n.nowPlayingTranslateInto
+              : l10n.nowPlayingTranslateOtherLanguage,
           Icons.language_rounded,
         ),
       ],

@@ -260,12 +260,15 @@ class LyricsTranslationController extends Notifier<LyricsTranslationState> {
       settings.lyricsTranslationSecondLanguage,
     );
     if (second == null || second.code == first.code) return first;
+    return _alreadyIn(source, first.code) ? second : first;
+  }
+
+  bool _alreadyIn(LyricsTranslationSource source, String code) {
     if (_alreadyInTarget.length > 64) _alreadyInTarget.clear();
-    final already = _alreadyInTarget.putIfAbsent(
-      '${source.hash}:${first.code}',
-      () => lyricsAlreadyIn(source.texts, first.code),
+    return _alreadyInTarget.putIfAbsent(
+      '${source.hash}:$code',
+      () => lyricsAlreadyIn(source.texts, code),
     );
-    return already ? second : first;
   }
 
   LyricsTranslationLanguage _targetOf(
@@ -281,6 +284,22 @@ class LyricsTranslationController extends Notifier<LyricsTranslationState> {
     LyricsTranslationSource.cached(lyrics),
     ref.read(settingsProvider),
   );
+
+  /// Whether [lyrics] already read in the language [targetFor] gives: they
+  /// are written in it, or its AI translation is shown.
+  bool inTargetLanguage(ParsedLyrics lyrics) {
+    final source = LyricsTranslationSource.cached(lyrics);
+    if (source.isEmpty) return false;
+    final settings = ref.read(settingsProvider);
+    final target = _targetOf(source, settings).code;
+    // A linked device's translation is the one [display] shows, if any.
+    final shared = _sharing.receivedFor(source.hash);
+    final key = _cacheKey(source, settings, language: target);
+    final shown = shared != null
+        ? shared.language == target
+        : key != null && state.results.containsKey(key);
+    return shown || _alreadyIn(source, target);
+  }
 
   /// What the settings alone give for [lyrics].
   LyricsTranslationLanguage settingsTargetFor(ParsedLyrics lyrics) =>
@@ -404,7 +423,7 @@ class LyricsTranslationController extends Notifier<LyricsTranslationState> {
       return;
     }
     // A song already in the target language has nothing to translate.
-    if (lyricsAlreadyIn(source.texts, _targetOf(source, settings).code)) {
+    if (_alreadyIn(source, _targetOf(source, settings).code)) {
       return;
     }
     final apiKey = await ref.read(

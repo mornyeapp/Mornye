@@ -511,9 +511,12 @@ void main() {
           pick ? 'en' : 'de',
         );
 
-        // The existing toggle now offers the original lyrics only.
+        // The existing toggle now offers the original lyrics only, and the
+        // lyrics are not offered for the language they are shown in.
         await tester.tap(options);
         await tester.pumpAndSettle();
+        expect(find.text('Translate to Deutsch'), findsNothing);
+        expect(find.text('Translate Into…'), findsOneWidget);
         expect(find.text('Hide Translation'), findsOneWidget);
         await tester.tap(find.text('Hide Translation'));
         await tester.pumpAndSettle();
@@ -821,6 +824,88 @@ void main() {
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
   });
+
+  for (final language in ['en', 'de']) {
+    testWidgets('English lyrics ${language == 'en' ? 'skip' : 'offer'} '
+        'Translate to $language', (tester) async {
+      tester.view.physicalSize = const Size(420, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final playback = StreamController<PlaybackState>.broadcast();
+      addTearDown(playback.close);
+      final english = [
+        'I know you never like the way it was',
+        'But we can be all that you want now',
+        'When the night is over you will know',
+        "It's just my heart and your love",
+      ];
+      final metadata = _Lyrics(
+        ParsedLyrics(
+          synced: true,
+          wordSynced: false,
+          lines: [
+            for (final (index, text) in english.indexed)
+              LyricLine(
+                time: Duration(seconds: index * 3),
+                end: Duration(seconds: index * 3 + 3),
+                text: text,
+              ),
+          ],
+          plainText: english.join('\n'),
+        ),
+      );
+      final preview = PlaybackSeekPreview();
+      addTearDown(metadata.dispose);
+      addTearDown(preview.dispose);
+      await tester.pumpWidget(
+        _app(
+          mornye: false,
+          overrides: [
+            initialSettingsProvider.overrideWithValue(
+              AppSettings(
+                lyricsAiModel: 'gpt-4.1-mini',
+                lyricsTranslationLanguage: language,
+              ),
+            ),
+            playbackStateProvider.overrideWith((ref) => playback.stream),
+            musicPlayerControllerProvider.overrideWith(
+              (ref) => throw StateError('Unexpected audio access'),
+            ),
+            currentMediaItemProvider.overrideWith(_MediaItems.new),
+            lyricsAiKeyStoreProvider.overrideWithValue(
+              MemoryLyricsAiKeyStore({'openai': 'sk-test-1234'}),
+            ),
+            lyricsTranslationCacheProvider.overrideWithValue(_MemoryCache()),
+          ],
+          home: Scaffold(
+            body: PlayerLyricsSection(
+              metadata: metadata,
+              seekPreview: preview,
+              colorScheme: const ColorScheme.dark(),
+              isActive: true,
+              options: LyricsOptionsButton(
+                metadata: metadata,
+                colorScheme: const ColorScheme.dark(),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('lyrics-language-options')));
+      await tester.pumpAndSettle();
+      if (language == 'en') {
+        expect(find.textContaining('Translate to'), findsNothing);
+        expect(find.text('Translate Into…'), findsOneWidget);
+      } else {
+        expect(find.text('Translate to Deutsch'), findsOneWidget);
+        expect(find.text('Other Language…'), findsOneWidget);
+      }
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
 
   testWidgets('the menu stays hidden until a provider is set up', (
     tester,
