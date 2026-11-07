@@ -248,20 +248,20 @@ void main() {
           _row('scrolled-track-$index'),
         );
         final subscription = container.listen(provider, (_, _) {});
-        expect(container.exists(provider), isTrue);
+        expect(container.read(provider.exists), isTrue);
         subscription.close();
       }
       await container.pump();
 
       for (var index = 0; index < 200; index++) {
         expect(
-          container.exists(
-            mediaItemPlaybackUiProvider(_row('scrolled-track-$index')),
+          container.read(
+            mediaItemPlaybackUiProvider(_row('scrolled-track-$index')).exists,
           ),
           isFalse,
         );
       }
-      expect(container.exists(visibleProvider), isTrue);
+      expect(container.read(visibleProvider.exists), isTrue);
       expect(visibleSubscription.read(), (
         isCurrent: true,
         isPlaying: true,

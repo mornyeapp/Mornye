@@ -153,10 +153,10 @@ void main() {
           playerMotionArtworkProvider(album).future,
         );
         expect(initial, isNull);
-        expect(container.exists(extensionProvider), isFalse);
+        expect(container.read(extensionProvider.exists), isFalse);
         // Playback reads the motion-artwork preference without loading an
         // extension or fetching any artwork.
-        expect(container.exists(settingsProvider), isTrue);
+        expect(container.read(settingsProvider.exists), isTrue);
         if (legacy != null) {
           expect(await legacy.readAsBytes(), [1]);
         } else {
@@ -212,7 +212,7 @@ void main() {
         playerMotionArtworkProvider(album).future,
       );
       expect(playback?.source, cached?.source);
-      expect(container.exists(extensionProvider), isFalse);
+      expect(container.read(extensionProvider.exists), isFalse);
     },
   );
 

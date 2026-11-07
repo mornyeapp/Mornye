@@ -344,7 +344,7 @@ void main() {
     expect(metadataCalls, 2);
     subscription.close();
     await container.pump();
-    expect(container.exists(provider), isFalse);
+    expect(container.read(provider.exists), isFalse);
     // Remove bridge caching so only the weekly catalog cache can satisfy this.
     await PlatformBridge.clearTrackCache();
     final restored = container.listen(provider, (_, _) {});

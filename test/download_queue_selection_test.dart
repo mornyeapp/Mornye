@@ -372,7 +372,7 @@ void main() {
         ], 'example');
         expect(publications, 1);
         expect(container.read(downloadQueueProvider).items, isEmpty);
-        expect(container.exists(extensionProvider), false);
+        expect(container.read(extensionProvider.exists), false);
         expect(
           container.read(downloadQueueProvider).outputDir,
           _settings.downloadDirectory,

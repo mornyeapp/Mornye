@@ -330,7 +330,7 @@ void main() {
         expect(added.items.first.historyItem?.id, 'd9');
         expect(added.trackCount, includeLocal ? 6 : 5);
         // The Library index loads with its own startup warmup.
-        expect(container.exists(localLibraryProvider), isFalse);
+        expect(container.read(localLibraryProvider.exists), isFalse);
       });
     }
 

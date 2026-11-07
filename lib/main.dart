@@ -616,20 +616,20 @@ class _EagerInitializationState extends ConsumerState<EagerInitialization>
       CoverCacheManager.scheduleMaintenance();
       // Native downloads can finish while Flutter is suspended. Refresh the
       // persisted history even when no queued item remains to reconcile.
-      if (ref.exists(downloadHistoryProvider)) {
+      if (ref.read(downloadHistoryProvider.exists)) {
         unawaited(
           ref.read(downloadHistoryProvider.notifier).refreshFromStorage(),
         );
       }
       _maybeAutoScanLocalLibrary();
-      if (ref.exists(localLibraryProvider)) {
+      if (ref.read(localLibraryProvider.exists)) {
         unawaited(
           ref
               .read(localLibraryProvider.notifier)
               .refreshSourceAvailability(scanReconnected: true),
         );
       }
-      if (ref.exists(downloadQueueProvider)) {
+      if (ref.read(downloadQueueProvider.exists)) {
         ref
             .read(downloadQueueProvider.notifier)
             .resumePendingDownloadsOnForeground();
@@ -638,7 +638,7 @@ class _EagerInitializationState extends ConsumerState<EagerInitialization>
       CoverCacheManager.stopMaintenance();
       // Last reliable moment before the OS may kill the process: make sure
       // any debounced download-queue persistence reaches disk.
-      if (ref.exists(downloadQueueProvider)) {
+      if (ref.read(downloadQueueProvider.exists)) {
         unawaited(
           ref
               .read(downloadQueueProvider.notifier)
@@ -703,7 +703,7 @@ class _EagerInitializationState extends ConsumerState<EagerInitialization>
   void _updateDesktopLibraryWatcher() {
     if (!isDesktopPlatform || !mounted) return;
     if (!_desktopLibraryWatchEnabled(ref.read(settingsProvider)) ||
-        !ref.exists(localLibraryProvider)) {
+        !ref.read(localLibraryProvider.exists)) {
       _stopDesktopLibraryWatcher();
       return;
     }
