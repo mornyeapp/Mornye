@@ -140,6 +140,38 @@ Iterable<String> _queueKeys(Track track) sync* {
   if (isrc != null && isrc.isNotEmpty) yield 'isrc:$isrc';
 }
 
+/// Positions of [tracks] already in the Local Library, matched by ISRC and
+/// then title and artist, so files from another app or an older copy count
+/// as downloaded. Empty while the Local Library is off, and empty when the
+/// lookup fails so the caller can still queue.
+Future<Set<int>> localLibraryMatchIndices(
+  WidgetRef ref,
+  List<Track> tracks,
+) async {
+  if (tracks.isEmpty || !ref.read(settingsProvider).localLibraryEnabled) {
+    return const {};
+  }
+  try {
+    final matches = await ref
+        .read(localLibraryProvider.notifier)
+        .findExistingBatchAsync([
+          for (final track in tracks)
+            LocalLibraryBatchLookupRequest(
+              isrc: track.isrc,
+              trackName: track.name,
+              artistName: track.artistName,
+            ),
+        ]);
+    return {
+      for (var i = 0; i < matches.length; i++)
+        if (matches[i] != null) i,
+    };
+  } catch (e) {
+    AppLogger('DownloadFlow').w('Local library duplicate check failed: $e');
+    return const {};
+  }
+}
+
 /// Shared batch "add to queue" flow for detail screens: skips tracks already
 /// present in download history, the local library or the download queue,
 /// then either shows the
@@ -188,26 +220,9 @@ Future<void> queueTracksSkippingDownloaded(
     }
   }
   if (!context.mounted) return;
-  final existingLocalIndices = <int>{};
-  if (skipExisting && settings.localLibraryEnabled) {
-    try {
-      final matches = await ref
-          .read(localLibraryProvider.notifier)
-          .findExistingBatchAsync([
-            for (final track in tracks)
-              LocalLibraryBatchLookupRequest(
-                isrc: track.isrc,
-                trackName: track.name,
-                artistName: track.artistName,
-              ),
-          ]);
-      for (var i = 0; i < matches.length; i++) {
-        if (matches[i] != null) existingLocalIndices.add(i);
-      }
-    } catch (e) {
-      AppLogger('DownloadFlow').w('Local library duplicate check failed: $e');
-    }
-  }
+  final existingLocalIndices = skipExisting
+      ? await localLibraryMatchIndices(ref, tracks)
+      : const <int>{};
   if (!context.mounted) return;
   // Quality variants ask for a second copy of a song on purpose.
   final waiting = settings.allowQualityVariants

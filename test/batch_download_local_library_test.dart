@@ -286,6 +286,62 @@ void main() {
       },
     );
   }
+
+  group('localLibraryMatchIndices', () {
+    Future<Set<int>> matches(
+      WidgetTester tester,
+      LibraryDatabase database, {
+      bool libraryEnabled = true,
+    }) async {
+      late WidgetRef widgetRef;
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            settingsProvider.overrideWith(
+              () => FixedSettingsNotifier(
+                AppSettings(localLibraryEnabled: libraryEnabled),
+              ),
+            ),
+            localLibraryProvider.overrideWith(() => _Library(database)),
+          ],
+          child: Consumer(
+            builder: (context, ref, _) {
+              widgetRef = ref;
+              return const SizedBox();
+            },
+          ),
+        ),
+      );
+      return localLibraryMatchIndices(widgetRef, const [
+        _isrcTrack,
+        _nameTrack,
+        _missingTrack,
+      ]);
+    }
+
+    testWidgets('finds songs by ISRC and by title and artist', (tester) async {
+      expect(await matches(tester, _Database()), {0, 1});
+    });
+
+    testWidgets('looks nothing up while the Local Library is off', (
+      tester,
+    ) async {
+      final database = _Database();
+      expect(await matches(tester, database, libraryEnabled: false), isEmpty);
+      expect(database.requests, isEmpty);
+    });
+
+    testWidgets('finds nothing when the lookup fails', (tester) async {
+      expect(await matches(tester, _FailingDatabase()), isEmpty);
+    });
+  });
+}
+
+class _FailingDatabase extends Fake implements LibraryDatabase {
+  @override
+  Future<List<Map<String, dynamic>?>> findExistingBatch(
+    List<LocalLibraryBatchLookupRequest> tracks,
+  ) async => throw StateError('Library lookup failed');
 }
 
 Future<void> _pump(
