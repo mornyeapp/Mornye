@@ -17,6 +17,7 @@ import 'package:mornye/utils/adaptive_layout.dart';
 import 'package:mornye/utils/provider_resource_ids.dart';
 import 'package:mornye/widgets/playlist_picker_sheet.dart';
 import 'package:mornye/widgets/animation_utils.dart';
+import 'package:mornye/widgets/loaded_sliver_fade_in.dart';
 import 'package:mornye/widgets/cached_cover_image.dart';
 import 'package:mornye/widgets/link/link_actions.dart';
 import 'package:mornye/widgets/motion_header_banner.dart';
@@ -286,7 +287,13 @@ class _PlaylistScreenState extends ConsumerState<PlaylistScreen>
         ),
         appBar: _buildAppBar(context, colorScheme),
         slivers: [
-          _buildTrackList(context, colorScheme),
+          // The desktop table fades in once over its skeleton's place;
+          // phone rows stagger in on their own.
+          LoadedSliverFadeIn(
+            loading: _isLoading,
+            enabled: isDesktopPlatform,
+            sliver: _buildTrackList(context, colorScheme),
+          ),
           _buildPlaylistFooter(context, colorScheme),
           if (!_isLoading && _tracks.isNotEmpty && !isSelectionMode)
             CollectionSuggestionsSliver(

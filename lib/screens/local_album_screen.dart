@@ -46,6 +46,7 @@ import 'package:mornye/widgets/desktop/track_table.dart';
 import 'package:mornye/widgets/expressive_button.dart';
 import 'package:mornye/widgets/album_track_tile.dart';
 import 'package:mornye/widgets/animation_utils.dart';
+import 'package:mornye/widgets/loaded_sliver_fade_in.dart';
 import 'package:mornye/widgets/app_snack_bar.dart';
 import 'package:mornye/widgets/library_track_selection_bar.dart';
 import 'package:mornye/widgets/link/link_actions.dart';
@@ -314,15 +315,26 @@ class _LocalAlbumScreenState extends ConsumerState<LocalAlbumScreen>
               ),
             ),
           )
-        else if (_loadingTracks)
-          const SliverToBoxAdapter(
-            child: RepaintBoundary(
-              child: AlbumTrackListSkeleton(itemCount: 8, showQuality: true),
-            ),
-          )
         else ...[
-          _buildTrackList(context, colorScheme, tracks),
-          if (!showsSelectionBar)
+          // Loaded songs fade in once over the skeleton's place where their
+          // rows do not stagger in: the desktop table, and phone rows that
+          // load after the page opens.
+          LoadedSliverFadeIn(
+            key: const ValueKey('local-album-tracks'),
+            loading: _loadingTracks,
+            enabled: isDesktopPlatform || widget.loadTracks != null,
+            sliver: _loadingTracks
+                ? const SliverToBoxAdapter(
+                    child: RepaintBoundary(
+                      child: AlbumTrackListSkeleton(
+                        itemCount: 8,
+                        showQuality: true,
+                      ),
+                    ),
+                  )
+                : _buildTrackList(context, colorScheme, tracks),
+          ),
+          if (!_loadingTracks && !showsSelectionBar)
             CollectionSuggestionsSliver(
               collectionKey:
                   'local-album:${widget.artistName}:${widget.albumName}',

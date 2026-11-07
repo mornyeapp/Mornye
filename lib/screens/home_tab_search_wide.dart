@@ -43,20 +43,31 @@ extension _HomeTabSearchWideUI on _HomeTabState {
         ?.id;
 
     final hasActualData = tracks.isNotEmpty;
+    // The results fade in once over the skeleton's place; a new search
+    // shows the skeleton again, while results that refine keep the stage.
+    Widget reveal({required bool loading, required Widget sliver}) =>
+        LoadedSliverFadeIn(
+          key: const ValueKey('wide-search-results'),
+          loading: loading,
+          sliver: sliver,
+        );
     if (!hasActualData && isLoading) {
       return [
-        SliverToBoxAdapter(
-          child: HomeSearchSkeleton(
-            layout: switch (overview
-                ? 'all'
-                : canonicalExtensionSearchFilterId(displayFilter)) {
-              'all' => HomeSearchSkeletonLayout.overview,
-              'artist' => HomeSearchSkeletonLayout.artistGrid,
-              'track' ||
-              'album' ||
-              'playlist' => HomeSearchSkeletonLayout.coverGrid,
-              _ => HomeSearchSkeletonLayout.rows,
-            },
+        reveal(
+          loading: true,
+          sliver: SliverToBoxAdapter(
+            child: HomeSearchSkeleton(
+              layout: switch (overview
+                  ? 'all'
+                  : canonicalExtensionSearchFilterId(displayFilter)) {
+                'all' => HomeSearchSkeletonLayout.overview,
+                'artist' => HomeSearchSkeletonLayout.artistGrid,
+                'track' ||
+                'album' ||
+                'playlist' => HomeSearchSkeletonLayout.coverGrid,
+                _ => HomeSearchSkeletonLayout.rows,
+              },
+            ),
           ),
         ),
       ];
@@ -233,7 +244,9 @@ extension _HomeTabSearchWideUI on _HomeTabState {
     if (!songsAdded && songs.isNotEmpty) addSongs();
 
     slivers.add(const SliverToBoxAdapter(child: SizedBox(height: 16)));
-    return slivers;
+    return [
+      reveal(loading: false, sliver: SliverMainAxisGroup(slivers: slivers)),
+    ];
   }
 
   /// Which results fill the preview cards: a song first, then the first
