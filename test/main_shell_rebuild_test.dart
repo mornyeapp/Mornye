@@ -286,6 +286,40 @@ void main() {
       expect(tabOpacity(tester), 1);
       expect(tester.takeException(), isNull);
     });
+
+    testWidgets('rapid Material destination changes settle on the last one '
+        '($platform)', (tester) async {
+      await pumpShell(tester, desktop: desktop, mornye: false);
+      ShellNavigationService.requestTab(ShellTab.library);
+      await settle(tester);
+      final home = tester.state(find.byType(HomeTab, skipOffstage: false));
+      final library = tester.state(find.byType(QueueTab, skipOffstage: false));
+
+      // Two requests in one frame, then one per frame mid-fade.
+      ShellNavigationService.requestTab(ShellTab.settings);
+      ShellNavigationService.requestTab(ShellTab.home);
+      await tester.pump();
+      for (final tab in [ShellTab.library, ShellTab.settings, ShellTab.home]) {
+        ShellNavigationService.requestTab(tab);
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      await settle(tester);
+
+      expect(tabPage(tester), 0.0);
+      expect(tabOpacity(tester), 1);
+      // One page paints at rest; the others keep their state offstage.
+      expect(find.byType(HomeTab), findsOneWidget);
+      expect(find.byType(QueueTab), findsNothing);
+      expect(
+        tester.state(find.byType(HomeTab, skipOffstage: false)),
+        same(home),
+      );
+      expect(
+        tester.state(find.byType(QueueTab, skipOffstage: false)),
+        same(library),
+      );
+      expect(tester.takeException(), isNull);
+    });
   }
 
   /// The widget [type]'s state built last; a new instance means its state
