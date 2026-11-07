@@ -46,21 +46,33 @@ class DownloadStateSwitcher extends StatelessWidget {
       clipBehavior: Clip.none,
       child: AnimatedSwitcher(
         duration: duration,
+        // The outgoing control leaves on the fade alone, without overshoot.
+        // Replaying the entrance springs backwards kept it fully opaque on
+        // top of the new control for most of the switch.
+        reverseDuration: fade.duration,
         layoutBuilder: (current, previous) => Stack(
           alignment: AlignmentDirectional.centerEnd,
           children: [...previous, ?current],
         ),
         transitionBuilder: (child, animation) {
+          final exit = fade.curve.flipped;
           final opacity = FadeTransition(
-            opacity: CurvedAnimation(parent: animation, curve: over(fade)),
+            opacity: CurvedAnimation(
+              parent: animation,
+              curve: over(fade),
+              reverseCurve: exit,
+            ),
             child: child,
           );
           if (!expressive) return opacity;
           return ScaleTransition(
-            scale: Tween<double>(
-              begin: 0.8,
-              end: 1,
-            ).animate(CurvedAnimation(parent: animation, curve: over(scale))),
+            scale: Tween<double>(begin: 0.8, end: 1).animate(
+              CurvedAnimation(
+                parent: animation,
+                curve: over(scale),
+                reverseCurve: exit,
+              ),
+            ),
             child: opacity,
           );
         },

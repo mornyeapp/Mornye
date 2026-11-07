@@ -61,6 +61,17 @@ void main() {
             .first,
       );
       expect(opacity.opacity.value, inExclusiveRange(0, 1));
+      // The old control fades out at the same time instead of staying
+      // opaque on top of the new one.
+      final outgoing = tester.widget<FadeTransition>(
+        find
+            .ancestor(
+              of: find.byKey(const ValueKey('stop')),
+              matching: inSwitcher(FadeTransition),
+            )
+            .first,
+      );
+      expect(outgoing.opacity.value, inExclusiveRange(0, 1));
       expect(
         find.ancestor(
           of: find.byKey(const ValueKey('done')),
