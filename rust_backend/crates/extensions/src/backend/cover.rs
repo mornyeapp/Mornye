@@ -854,6 +854,14 @@ pub(super) mod tests {
         );
         assert_eq!(std::fs::read(&legacy).unwrap(), pictures[0]);
 
+        // Coarse filesystem timestamps can give the legacy file and the marker
+        // the same mtime, which keeps the legacy file current.
+        std::fs::File::options()
+            .write(true)
+            .open(&legacy)
+            .unwrap()
+            .set_modified(SystemTime::now() - Duration::from_secs(60))
+            .unwrap();
         std::fs::write(cache.join(LIBRARY_COVER_REGENERATE_MARKER), "").unwrap();
         let replacement = backend
             .cache_cover(
