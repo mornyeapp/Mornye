@@ -798,17 +798,22 @@ extension _ArtistScreenSections on _ArtistScreenState {
         onTap: () => _navigateToAlbum(album),
         child: Row(
           children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: SizedBox.square(
-                dimension: extent,
-                child: album.coverUrl != null
-                    ? CachedCoverImage(
-                        imageUrl: album.coverUrl!,
-                        fit: BoxFit.cover,
-                      )
-                    : const Icon(CupertinoIcons.square_stack, size: 32),
-              ),
+            Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: SizedBox.square(
+                    dimension: extent,
+                    child: album.coverUrl != null
+                        ? CachedCoverImage(
+                            imageUrl: album.coverUrl!,
+                            fit: BoxFit.cover,
+                          )
+                        : const Icon(CupertinoIcons.square_stack, size: 32),
+                  ),
+                ),
+                DesktopCoverHover(borderRadius: BorderRadius.circular(8)),
+              ],
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -1512,6 +1517,7 @@ extension _ArtistScreenSections on _ArtistScreenState {
                       size: tileSize,
                       enabled: !isSelectionMode,
                     ),
+                    DesktopCoverHover(borderRadius: BorderRadius.circular(8)),
                     if (isSelected || showsSelectionBar)
                       Positioned.fill(
                         child: AnimatedContainer(

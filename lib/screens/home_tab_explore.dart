@@ -193,6 +193,7 @@ extension _HomeTabExploreUI on _HomeTabState {
     final cardSize = _exploreCardSize(context);
     final coverSize = _exploreCoverSize(context);
     final iconSize = cardSize * 0.3;
+    final coverRadius = BorderRadius.circular(isArtist ? coverSize / 2 : 10);
 
     return Semantics(
       button: true,
@@ -213,44 +214,48 @@ extension _HomeTabExploreUI on _HomeTabState {
                   baseName: item.artists.isEmpty
                       ? item.name
                       : '${item.artists} - ${item.name}',
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(
-                      isArtist ? coverSize / 2 : 10,
-                    ),
-                    child: item.coverUrl != null && item.coverUrl!.isNotEmpty
-                        ? CachedCoverImage(
-                            imageUrl: item.coverUrl!,
-                            width: coverSize,
-                            height: coverSize,
-                            fit: BoxFit.cover,
-                            placeholder: (context, url) => ShimmerLoading(
-                              child: Container(
+                  child: Stack(
+                    children: [
+                      ClipRRect(
+                        borderRadius: coverRadius,
+                        child:
+                            item.coverUrl != null && item.coverUrl!.isNotEmpty
+                            ? CachedCoverImage(
+                                imageUrl: item.coverUrl!,
+                                width: coverSize,
+                                height: coverSize,
+                                fit: BoxFit.cover,
+                                placeholder: (context, url) => ShimmerLoading(
+                                  child: Container(
+                                    width: coverSize,
+                                    height: coverSize,
+                                    color: colorScheme.surfaceContainerHighest,
+                                  ),
+                                ),
+                                errorWidget: (context, url, error) => Container(
+                                  width: coverSize,
+                                  height: coverSize,
+                                  color: colorScheme.surfaceContainerHighest,
+                                  child: Icon(
+                                    _getIconForType(item.type),
+                                    color: colorScheme.onSurfaceVariant,
+                                    size: iconSize,
+                                  ),
+                                ),
+                              )
+                            : Container(
                                 width: coverSize,
                                 height: coverSize,
                                 color: colorScheme.surfaceContainerHighest,
+                                child: Icon(
+                                  _getIconForType(item.type),
+                                  color: colorScheme.onSurfaceVariant,
+                                  size: iconSize,
+                                ),
                               ),
-                            ),
-                            errorWidget: (context, url, error) => Container(
-                              width: coverSize,
-                              height: coverSize,
-                              color: colorScheme.surfaceContainerHighest,
-                              child: Icon(
-                                _getIconForType(item.type),
-                                color: colorScheme.onSurfaceVariant,
-                                size: iconSize,
-                              ),
-                            ),
-                          )
-                        : Container(
-                            width: coverSize,
-                            height: coverSize,
-                            color: colorScheme.surfaceContainerHighest,
-                            child: Icon(
-                              _getIconForType(item.type),
-                              color: colorScheme.onSurfaceVariant,
-                              size: iconSize,
-                            ),
-                          ),
+                      ),
+                      DesktopCoverHover(borderRadius: coverRadius),
+                    ],
                   ),
                 ),
                 const SizedBox(height: 8),

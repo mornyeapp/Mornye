@@ -168,6 +168,7 @@ class _ArtistAlbumCell extends StatelessWidget {
               fit: StackFit.expand,
               children: [
                 _ArtistAlbumCover(album: album, size: coverSize),
+                DesktopCoverHover(borderRadius: BorderRadius.circular(8)),
                 if (showTypeBadge) _ArtistAlbumTypeBadge(album: album),
               ],
             ),

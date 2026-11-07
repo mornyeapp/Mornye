@@ -8,6 +8,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:path/path.dart' as p;
 import 'package:mornye/services/cover_cache_manager.dart';
 import 'package:mornye/services/cover_store.dart';
+import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/utils/image_cache_utils.dart';
 
 class CachedCoverImage extends StatelessWidget {
@@ -24,8 +25,19 @@ class CachedCoverImage extends StatelessWidget {
   final Widget Function(BuildContext, String, Object)? errorWidget;
   final Widget Function(BuildContext, String)? placeholder;
   final BorderRadius? borderRadius;
-  final Duration fadeInDuration;
+
+  /// How long a cover fades in once it decodes. Null fades it on the effects
+  /// spring on Material and over [_fadeIn] on Mornye, except under reduced
+  /// motion or while its list flings. Zero keeps the cut (player artwork).
+  /// A cover already in the memory cache never fades: octo_image shows a
+  /// synchronous hit at once, so scrolling back does not fade it again.
+  final Duration? fadeInDuration;
   final Duration fadeOutDuration;
+
+  static const _fadeIn = AppMotionSpec(
+    Duration(milliseconds: 150),
+    Curves.easeOut,
+  );
 
   const CachedCoverImage({
     super.key,
@@ -39,9 +51,29 @@ class CachedCoverImage extends StatelessWidget {
     this.errorWidget,
     this.placeholder,
     this.borderRadius,
-    this.fadeInDuration = Duration.zero,
+    this.fadeInDuration,
     this.fadeOutDuration = Duration.zero,
   });
+
+  /// The fade a cover building in [context] gets once it decodes.
+  AppMotionSpec _fade(BuildContext context) {
+    if (MediaQuery.disableAnimationsOf(context)) {
+      return const AppMotionSpec(Duration.zero, Curves.linear);
+    }
+    final explicit = fadeInDuration;
+    if (explicit != null) return AppMotionSpec(explicit, Curves.easeIn);
+    // A fast fling builds many cells at once; their covers cut in rather
+    // than stacking opacity layers into the scroll frames. A shelf scrolls
+    // across while the page flings down, so ask the vertical list too.
+    if (Scrollable.recommendDeferredLoadingForContext(context) ||
+        Scrollable.recommendDeferredLoadingForContext(
+          context,
+          axis: Axis.vertical,
+        )) {
+      return const AppMotionSpec(Duration.zero, Curves.linear);
+    }
+    return AppMotion.effectsFast(context, _fadeIn);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -83,6 +115,11 @@ class CachedCoverImage extends StatelessWidget {
         );
       }
     }
+    final fade = _fade(context);
+    // octo_image stacks the placeholder over the cover. Dissolving the
+    // placeholder off the decoded cover avoids fading the cover in over
+    // the page, which would flash the page between the two.
+    final dissolve = fadeInDuration == null && placeholder != null;
     final image = CachedNetworkImage(
       imageUrl: imageUrl,
       width: width,
@@ -92,8 +129,10 @@ class CachedCoverImage extends StatelessWidget {
       memCacheWidth: autoMemCacheWidth,
       memCacheHeight: autoMemCacheHeight,
       cacheManager: CoverCacheManager.instance,
-      fadeInDuration: fadeInDuration,
-      fadeOutDuration: fadeOutDuration,
+      fadeInDuration: dissolve ? Duration.zero : fade.duration,
+      fadeInCurve: fade.curve,
+      fadeOutDuration: dissolve ? fade.duration : fadeOutDuration,
+      fadeOutCurve: dissolve ? fade.curve : Curves.easeOut,
       useOldImageOnUrlChange: true,
       filterQuality: FilterQuality.low,
       errorWidget: errorWidget,
@@ -162,7 +201,7 @@ class LocalOrNetworkCoverImage extends StatelessWidget {
         fit: fit,
         memCacheWidth: networkCacheWidth,
         borderRadius: borderRadius,
-        fadeInDuration: fadeInDuration ?? Duration.zero,
+        fadeInDuration: fadeInDuration,
         fadeOutDuration: fadeOutDuration,
         placeholder: (_, _) => placeholder(context),
         errorWidget: (_, _, _) => placeholder(context),

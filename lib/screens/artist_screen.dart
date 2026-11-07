@@ -71,6 +71,7 @@ import 'package:mornye/widgets/desktop/context_menu.dart';
 import 'package:mornye/widgets/desktop/desktop_scroll_arrows.dart';
 import 'package:mornye/widgets/desktop/desktop_selection.dart';
 import 'package:mornye/widgets/desktop/detail_header.dart';
+import 'package:mornye/widgets/desktop/hover_play_button.dart';
 import 'package:mornye/utils/desktop_platform.dart';
 import 'package:mornye/theme/app_motion.dart';
 import 'package:mornye/theme/material_expressive.dart';
