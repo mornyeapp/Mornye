@@ -24,6 +24,8 @@ import 'package:mornye/utils/lyrics_parser.dart';
 import 'package:mornye/utils/lyrics_timeline.dart';
 import 'package:mornye/utils/synced_lyrics_scroll.dart';
 import 'package:mornye/widgets/aligned_lyric_pronunciation.dart';
+export 'package:mornye/widgets/aligned_lyric_pronunciation.dart'
+    show isRtlLyricText, lyricTextDirection;
 import 'package:mornye/widgets/lyric_blur.dart';
 import 'package:mornye/widgets/lyric_supplement_transition.dart';
 import 'package:mornye/widgets/lyric_scroll_motion.dart';

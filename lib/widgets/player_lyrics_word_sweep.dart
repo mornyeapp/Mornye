@@ -356,6 +356,11 @@ class _WordHighlightedLyricLineState
 
   @override
   Widget build(BuildContext context) {
+    final ambientDirection = Directionality.of(context);
+    final lineDirection = lyricTextDirection(
+      widget.line.text,
+      ambientDirection,
+    );
     final style =
         widget.textStyle ??
         _primaryLyricStyle(context, background: widget.line.isBackground);
@@ -363,6 +368,7 @@ class _WordHighlightedLyricLineState
         ? _buildTimedText(widget.line.text, widget.line.words, style)
         : Text(
             widget.line.text,
+            textDirection: lineDirection,
             textAlign: widget.textAlign,
             style: style.copyWith(color: widget.colorScheme.onSurface),
             maxLines: widget.maxLines,
@@ -376,8 +382,17 @@ class _WordHighlightedLyricLineState
       primary,
       widget.colorScheme.onSurface,
       timedText: _buildTimedText,
-      timedSupplementText: (text, words, style) =>
-          _buildTimedText(text, words, style, lift: false),
+      timedSupplementText: (text, words, style) => _buildTimedText(
+        text,
+        words,
+        style,
+        lift: false,
+        textAlign: _supplementTextAlign(
+          widget.textAlign,
+          lineDirection,
+          lyricTextDirection(text, ambientDirection),
+        ),
+      ),
       visibility: widget.supplementVisibility,
       pronunciationLayout: widget.pronunciationLayout,
       textAlign: widget.textAlign,
@@ -389,6 +404,7 @@ class _WordHighlightedLyricLineState
     List<LyricWord> words,
     TextStyle style, {
     bool lift = true,
+    TextAlign? textAlign,
   }) {
     final highlightedColor = widget.colorScheme.onSurface;
     final mornye = context.isMornye;
@@ -405,7 +421,7 @@ class _WordHighlightedLyricLineState
       currentPosition: _currentPosition,
       repaint: _animationClock,
       style: style,
-      textAlign: widget.textAlign,
+      textAlign: textAlign ?? widget.textAlign,
       pendingColor: pendingColor,
       highlightedColor: highlightedColor,
       semanticsLabel: text,
@@ -476,6 +492,7 @@ class _SweepingTimedLyricTextState extends State<_SweepingTimedLyricText> {
   int? _cachedMaxLines;
   List<String>? _cachedSegments;
   List<List<Rect>>? _cachedSegmentBoxes;
+  List<List<TextDirection>>? _cachedSegmentDirections;
   double? _cachedMinWidth;
   double? _cachedMaxWidth;
 
@@ -500,6 +517,7 @@ class _SweepingTimedLyricTextState extends State<_SweepingTimedLyricText> {
     _pendingPainter?.dispose();
     _highlightedPainter?.dispose();
     _cachedSegmentBoxes = null;
+    _cachedSegmentDirections = null;
     _pendingPainter = TextPainter(
       text: TextSpan(
         text: text,
@@ -535,32 +553,46 @@ class _SweepingTimedLyricTextState extends State<_SweepingTimedLyricText> {
     _cachedHighlightedColor = widget.highlightedColor;
   }
 
-  List<List<Rect>> _segmentBoxes(double minWidth, double maxWidth) {
+  (List<List<Rect>>, List<List<TextDirection>>) _segmentBoxes(
+    double minWidth,
+    double maxWidth,
+  ) {
     if (_cachedSegmentBoxes != null &&
+        _cachedSegmentDirections != null &&
         _cachedMinWidth == minWidth &&
         _cachedMaxWidth == maxWidth &&
         listEquals(_cachedSegments, widget.segments)) {
-      return _cachedSegmentBoxes!;
+      return (_cachedSegmentBoxes!, _cachedSegmentDirections!);
     }
 
     final segmentBoxes = <List<Rect>>[];
+    final segmentDirections = <List<TextDirection>>[];
     var segmentOffset = 0;
     for (final segment in widget.segments) {
       final segmentEnd = segmentOffset + segment.length;
       // Select the whole timed word, keeping paragraph shaping and wrapping
       // intact. All of its text runs share the same vertical movement.
-      final boxes = _highlightedPainter!
+      final textBoxes = _highlightedPainter!
           .getBoxesForSelection(
             TextSelection(baseOffset: segmentOffset, extentOffset: segmentEnd),
             boxHeightStyle: BoxHeightStyle.max,
           )
-          .map((box) => box.toRect())
           .toList();
-      boxes.sort((a, b) {
+      final segmentRtl = isRtlLyricText(segment);
+      textBoxes.sort((a, b) {
         final row = a.top.compareTo(b.top);
-        return row == 0 ? a.left.compareTo(b.left) : row;
+        if (row != 0) return row;
+        final rtl =
+            segmentRtl ||
+            a.direction == TextDirection.rtl ||
+            b.direction == TextDirection.rtl;
+        return rtl ? b.left.compareTo(a.left) : a.left.compareTo(b.left);
       });
-      segmentBoxes.add(boxes);
+      segmentBoxes.add([for (final box in textBoxes) box.toRect()]);
+      segmentDirections.add([
+        for (final box in textBoxes)
+          segmentRtl ? TextDirection.rtl : box.direction,
+      ]);
       segmentOffset = segmentEnd;
     }
     // Snapshot contents: callers can rebuild equal lists or mutate boundaries
@@ -568,7 +600,9 @@ class _SweepingTimedLyricTextState extends State<_SweepingTimedLyricText> {
     _cachedSegments = List<String>.of(widget.segments);
     _cachedMinWidth = minWidth;
     _cachedMaxWidth = maxWidth;
-    return _cachedSegmentBoxes = segmentBoxes;
+    _cachedSegmentBoxes = segmentBoxes;
+    _cachedSegmentDirections = segmentDirections;
+    return (segmentBoxes, segmentDirections);
   }
 
   @override
@@ -580,10 +614,10 @@ class _SweepingTimedLyricTextState extends State<_SweepingTimedLyricText> {
 
   @override
   Widget build(BuildContext context) {
-    final textDirection = Directionality.of(context);
+    final text = widget.segments.join();
+    final textDirection = lyricTextDirection(text, Directionality.of(context));
     final textScaler = MediaQuery.textScalerOf(context);
     final locale = Localizations.maybeLocaleOf(context);
-    final text = widget.segments.join();
     _ensurePainters(text, textDirection, textScaler, locale);
 
     return LayoutBuilder(
@@ -600,7 +634,10 @@ class _SweepingTimedLyricTextState extends State<_SweepingTimedLyricText> {
             ? constraints.maxWidth
             : pendingPainter.width;
         final height = pendingPainter.height;
-        final segmentBoxes = _segmentBoxes(minWidth, maxWidth);
+        final (segmentBoxes, segmentDirections) = _segmentBoxes(
+          minWidth,
+          maxWidth,
+        );
 
         return Semantics(
           label: widget.semanticsLabel,
@@ -608,6 +645,7 @@ class _SweepingTimedLyricTextState extends State<_SweepingTimedLyricText> {
             size: Size(width, height),
             painter: _TimedLyricSweepPainter(
               segmentBoxes: segmentBoxes,
+              segmentDirections: segmentDirections,
               starts: widget.starts,
               ends: widget.ends,
               currentPosition: widget.currentPosition,
@@ -631,6 +669,7 @@ class _SweepingTimedLyricTextState extends State<_SweepingTimedLyricText> {
 
 class _TimedLyricSweepPainter extends CustomPainter {
   final List<List<Rect>> segmentBoxes;
+  final List<List<TextDirection>> segmentDirections;
   final List<Duration> starts;
   final List<Duration> ends;
   final Duration Function() currentPosition;
@@ -643,6 +682,7 @@ class _TimedLyricSweepPainter extends CustomPainter {
 
   _TimedLyricSweepPainter({
     required this.segmentBoxes,
+    required this.segmentDirections,
     required this.starts,
     required this.ends,
     required this.currentPosition,
@@ -657,7 +697,7 @@ class _TimedLyricSweepPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final pendingPaths = <double, Path>{};
     final completedPaths = <double, Path>{};
-    final partialBoxes = <(Rect, double, double, double)>[];
+    final partialBoxes = <(Rect, double, double, double, bool)>[];
     final glows = <(Path, double, double)>[];
     final position = currentPosition();
     for (var index = 0; index < segmentBoxes.length; index++) {
@@ -670,6 +710,9 @@ class _TimedLyricSweepPainter extends CustomPainter {
             )
           : 0.0;
       final boxes = segmentBoxes[index];
+      final directions = index < segmentDirections.length
+          ? segmentDirections[index]
+          : const <TextDirection>[];
       final width = boxes.fold<double>(0, (sum, box) => sum + box.width);
       final lift = highlightLift > 0 && timed
           ? highlightLift *
@@ -688,8 +731,12 @@ class _TimedLyricSweepPainter extends CustomPainter {
           : 0.0;
       final glowPath = glow > 0.01 ? Path() : null;
       var consumed = 0.0;
-      for (final box in boxes) {
+      for (var boxIndex = 0; boxIndex < boxes.length; boxIndex++) {
+        final box = boxes[boxIndex];
         if (box.width <= 0) continue;
+        final rtl =
+            boxIndex < directions.length &&
+            directions[boxIndex] == TextDirection.rtl;
         if (highlightLift > 0) {
           pendingPaths.putIfAbsent(lift, Path.new).addRect(box);
         }
@@ -703,19 +750,27 @@ class _TimedLyricSweepPainter extends CustomPainter {
         );
         // Only the sung part glows, so unsung letters never light up early.
         if (glowPath != null && revealWidth > 0) {
+          final clampedReveal = revealWidth.clamp(0.0, box.width);
           glowPath.addRect(
-            Rect.fromLTRB(
-              box.left,
-              box.top,
-              box.left + revealWidth.clamp(0.0, box.width),
-              box.bottom,
-            ),
+            rtl
+                ? Rect.fromLTRB(
+                    box.right - clampedReveal,
+                    box.top,
+                    box.right,
+                    box.bottom,
+                  )
+                : Rect.fromLTRB(
+                    box.left,
+                    box.top,
+                    box.left + clampedReveal,
+                    box.bottom,
+                  ),
           );
         }
         if (value > 0 && revealWidth >= box.width) {
           completedPaths.putIfAbsent(lift, Path.new).addRect(box);
         } else if (value > 0 && revealWidth > -feather) {
-          partialBoxes.add((box, revealWidth / box.width, lift, feather));
+          partialBoxes.add((box, revealWidth / box.width, lift, feather, rtl));
         }
         consumed += box.width;
       }
@@ -756,17 +811,28 @@ class _TimedLyricSweepPainter extends CustomPainter {
       _paintLiftedText(canvas, highlightedPainter, entry.value, entry.key);
     }
 
-    for (final (box, value, lift, feather) in partialBoxes) {
+    for (final (box, value, lift, feather, rtl) in partialBoxes) {
       // Feather the leading edge so the highlight flows through each letter
       // while the word rises as a single unit.
-      final boundary = box.left + box.width * value;
-      final revealRight = (boundary + feather).clamp(box.left, box.right);
-      final revealRect = Rect.fromLTRB(
-        box.left,
-        box.top,
-        revealRight,
-        box.bottom,
-      );
+      final boundary = rtl
+          ? box.right - box.width * value
+          : box.left + box.width * value;
+      final revealRect = rtl
+          ? Rect.fromLTRB(
+              (boundary - feather).clamp(box.left, box.right),
+              box.top,
+              box.right,
+              box.bottom,
+            )
+          : Rect.fromLTRB(
+              box.left,
+              box.top,
+              (boundary + feather).clamp(box.left, box.right),
+              box.bottom,
+            );
+      final shaderRect = rtl
+          ? Rect.fromLTRB(boundary - feather, box.top, boundary, box.bottom)
+          : Rect.fromLTRB(boundary, box.top, boundary + feather, box.bottom);
       canvas.save();
       canvas.translate(0, -lift);
       canvas.clipRect(revealRect);
@@ -774,12 +840,11 @@ class _TimedLyricSweepPainter extends CustomPainter {
       highlightedPainter.paint(canvas, Offset.zero);
       final mask = Paint()
         ..blendMode = BlendMode.dstIn
-        ..shader =
-            LinearGradient(
-              colors: const [Colors.white, Colors.transparent],
-            ).createShader(
-              Rect.fromLTRB(boundary, box.top, boundary + feather, box.bottom),
-            );
+        ..shader = LinearGradient(
+          colors: rtl
+              ? const [Colors.transparent, Colors.white]
+              : const [Colors.white, Colors.transparent],
+        ).createShader(shaderRect);
       canvas.drawRect(revealRect, mask);
       canvas.restore();
       canvas.restore();
@@ -802,6 +867,7 @@ class _TimedLyricSweepPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _TimedLyricSweepPainter oldDelegate) {
     return oldDelegate.segmentBoxes != segmentBoxes ||
+        oldDelegate.segmentDirections != segmentDirections ||
         oldDelegate.starts != starts ||
         oldDelegate.ends != ends ||
         oldDelegate.currentPosition != currentPosition ||

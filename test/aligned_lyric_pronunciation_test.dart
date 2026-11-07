@@ -90,6 +90,35 @@ void main() {
     );
   });
 
+  test('does not split right-to-left lyrics into left-to-right word boxes', () {
+    expect(isRtlLyricText('قطة صغيرة على الشباك'), isTrue);
+    expect(isRtlLyricText('qitta saghira ala ashubbak'), isFalse);
+    expect(lyricTextDirection('قطة صغيرة على الشباك'), TextDirection.rtl);
+    expect(lyricTextDirection('qitta saghira ala ashubbak'), TextDirection.ltr);
+    expect(
+      _layout(
+        LyricLine(
+          time: Duration.zero,
+          text: 'قطة صغيرة على الشباك',
+          words: [
+            _word('قطة ', 0, 400),
+            _word('صغيرة ', 400, 800),
+            _word('على ', 800, 1200),
+            _word('الشباك', 1200, 1600),
+          ],
+          romanization: 'qitta saghira ala ashubbak',
+          romanizationWords: [
+            _word('qitta ', 0, 400),
+            _word('saghira ', 400, 800),
+            _word('ala ', 800, 1200),
+            _word('ashubbak', 1200, 1600),
+          ],
+        ),
+      ),
+      isNull,
+    );
+  });
+
   for (final width in [320.0, 170.0]) {
     for (final scale in [1.0, 1.8]) {
       testWidgets(
