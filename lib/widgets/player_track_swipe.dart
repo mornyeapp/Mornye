@@ -2,6 +2,7 @@ import 'package:audio_service/audio_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:mornye/widgets/swipe_commit_haptic.dart';
 
 /// Shares one horizontal gesture between artwork and metadata. Only the
 /// titles translate; artwork, menus and the rest of the player stay anchored.
@@ -108,6 +109,15 @@ class _PlayerTrackSwipeState extends State<PlayerTrackSwipe>
     super.dispose();
   }
 
+  final _haptic = SwipeCommitHaptic();
+
+  // Ticks each time the titles cross the distance where letting go skips.
+  void _updateHaptic() => _haptic.update(
+    !_settling &&
+        _neighbor(_offset.value) != null &&
+        _offset.value.abs() > _width * 0.25,
+  );
+
   @override
   Widget build(BuildContext context) =>
       _SwipeScope(state: this, child: widget.child);
@@ -139,7 +149,10 @@ class PlayerTrackSwipeRegion extends StatelessWidget {
       // Keep the initial movement when a cover/title tap competes with a swipe.
       dragStartBehavior: DragStartBehavior.down,
       onHorizontalDragStart: state._start,
-      onHorizontalDragUpdate: state._update,
+      onHorizontalDragUpdate: (details) {
+        state._update(details);
+        state._updateHaptic();
+      },
       onHorizontalDragEnd: state._finish,
       onHorizontalDragCancel: state._finish,
       child: child,

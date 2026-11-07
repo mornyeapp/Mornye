@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:mornye/theme/material_expressive.dart';
 import 'package:mornye/widgets/app_icon.dart';
+import 'package:mornye/widgets/swipe_commit_haptic.dart';
 import 'package:mornye/widgets/track_card.dart';
 
 /// End-to-start swipe that removes a track row over a delete background.
@@ -30,6 +31,7 @@ class SwipeDeleteDismissible extends StatefulWidget {
 class _SwipeDeleteDismissibleState extends State<SwipeDeleteDismissible> {
   static const _threshold = 0.4;
   final _swipe = ValueNotifier<DismissUpdateDetails?>(null);
+  final _haptic = SwipeCommitHaptic();
 
   @override
   void dispose() {
@@ -74,7 +76,10 @@ class _SwipeDeleteDismissibleState extends State<SwipeDeleteDismissible> {
       dismissThresholds: const {DismissDirection.endToStart: _threshold},
       confirmDismiss: widget.confirmDismiss,
       onDismissed: widget.onDismissed,
-      onUpdate: expressive ? (details) => _swipe.value = details : null,
+      onUpdate: (details) {
+        _haptic.update(details.reached);
+        if (expressive) _swipe.value = details;
+      },
       background: expressive
           ? ValueListenableBuilder(
               valueListenable: _swipe,

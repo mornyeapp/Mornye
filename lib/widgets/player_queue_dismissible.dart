@@ -1,8 +1,10 @@
 import 'package:flutter/cupertino.dart' show CupertinoColors, CupertinoIcons;
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart' show SchedulerBinding;
 import 'package:mornye/l10n/l10n.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/widgets/app_icon.dart';
+import 'package:mornye/widgets/swipe_commit_haptic.dart';
 
 /// Removing a row affects the queue only, never the song on disk.
 class PlayerQueueDismissible extends StatefulWidget {
@@ -21,17 +23,66 @@ class PlayerQueueDismissible extends StatefulWidget {
   State<PlayerQueueDismissible> createState() => _PlayerQueueDismissibleState();
 }
 
-class _PlayerQueueDismissibleState extends State<PlayerQueueDismissible> {
+class _PlayerQueueDismissibleState extends State<PlayerQueueDismissible>
+    with SingleTickerProviderStateMixin {
   final _progress = ValueNotifier<double>(0);
+  final _haptic = SwipeCommitHaptic();
+
+  // Closes the row's gap before the song leaves, so the rows below follow
+  // instead of jumping. An exit, so it is short and accelerates.
+  late final _collapse = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 200),
+  );
+  late final _height = Tween<double>(
+    begin: 1,
+    end: 0,
+  ).animate(CurvedAnimation(parent: _collapse, curve: Curves.easeIn));
 
   @override
   void dispose() {
+    _collapse.dispose();
     _progress.dispose();
     super.dispose();
   }
 
+  // The row never stays dismissed in the tree: Dismissible only ever hears
+  // false, so a row the queue keeps (it became the playing song, or a
+  // remote queue answers late) slides back. The service resolves the entry
+  // by identity, and a row whose song left the queue during the collapse is
+  // disposed before it can remove anything.
+  Future<bool> _confirmRemove() async {
+    if (!MediaQuery.disableAnimationsOf(context)) {
+      try {
+        await _collapse.forward().orCancel;
+      } on TickerCanceled {
+        return false;
+      }
+      if (!mounted) return false;
+      if (!widget.enabled) {
+        _collapse.reverse();
+        return false;
+      }
+    }
+    widget.onRemove();
+    // A removed row leaves the list on the queue's next rebuild.
+    await SchedulerBinding.instance.endOfFrame;
+    if (mounted) await SchedulerBinding.instance.endOfFrame;
+    if (mounted) _collapse.reverse();
+    return false;
+  }
+
   @override
-  Widget build(BuildContext context) => Dismissible(
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: _height,
+    builder: (context, child) => ClipRect(
+      clipBehavior: _collapse.isDismissed ? Clip.none : Clip.hardEdge,
+      child: Align(heightFactor: _height.value, widthFactor: 1, child: child),
+    ),
+    child: _buildDismissible(context),
+  );
+
+  Widget _buildDismissible(BuildContext context) => Dismissible(
     key: const ValueKey('queue-dismiss'),
     direction: widget.enabled
         ? DismissDirection.endToStart
@@ -39,15 +90,11 @@ class _PlayerQueueDismissibleState extends State<PlayerQueueDismissible> {
     dismissThresholds: context.isMornye
         ? const {DismissDirection.endToStart: 0.5}
         : const {},
-    onUpdate: context.isMornye
-        ? (details) => _progress.value = details.progress
-        : null,
-    // Remove before collapsing so a concurrently playing row is never left
-    // dismissed in the tree. The service resolves the entry by identity.
-    confirmDismiss: (_) async {
-      widget.onRemove();
-      return false;
+    onUpdate: (details) {
+      _haptic.update(details.reached);
+      if (context.isMornye) _progress.value = details.progress;
     },
+    confirmDismiss: (_) => _confirmRemove(),
     background: context.isMornye
         ? _buildMornyeBackground(context)
         : Container(
