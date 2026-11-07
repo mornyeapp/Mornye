@@ -18,6 +18,7 @@ import 'package:material_3_expressive/material_3_expressive.dart'
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mornye/controllers/player_metadata_controller.dart';
 import 'package:mornye/l10n/l10n.dart';
+import 'package:mornye/models/settings.dart';
 import 'package:mornye/models/track.dart';
 import 'package:mornye/providers/library_collections_provider.dart';
 import 'package:mornye/providers/music_player_provider.dart';
@@ -179,6 +180,7 @@ void main() {
     MusicPlayerController? controller,
     List<MediaItem> queue = const [],
     RemotePlayback? remote,
+    AppSettings settings = const AppSettings(playerShowLyricSnippet: false),
   }) async {
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
@@ -188,6 +190,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          initialSettingsProvider.overrideWithValue(settings),
           if (controller != null)
             musicPlayerControllerProvider.overrideWithValue(controller),
           if (remote != null)

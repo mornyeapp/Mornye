@@ -17,6 +17,7 @@ import 'package:mornye/widgets/player_volume_control.dart';
 import 'package:mornye/widgets/overflow_marquee.dart';
 import 'package:mornye/widgets/player_artwork.dart';
 import 'package:mornye/widgets/player_gesture_regions.dart';
+import 'package:mornye/widgets/player_lyric_preview.dart';
 import 'package:mornye/widgets/player_lyrics.dart';
 import 'package:mornye/widgets/player_lyrics_controls.dart';
 import 'package:mornye/widgets/player_metadata_title.dart';
@@ -503,84 +504,110 @@ class MornyePlayerLayout extends ConsumerWidget {
         ? (page == 0 ? 24.0 : _mornyeCompactIconSize)
         : 24 + (_mornyeCompactIconSize - 24) * progress;
     return Builder(
-      builder: (context) => Row(
+      builder: (context) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Expanded(
-            child: PlayerTrackSwipeTitles(
-              current: mediaItem,
-              builder: (mediaItem) => Builder(
-                builder: (titleContext) => InkWell(
-                  borderRadius: BorderRadius.circular(8),
-                  onTap:
-                      (mediaItem.artist ?? '').trim().isEmpty &&
-                          (mediaItem.album ?? '').trim().isEmpty
-                      ? null
-                      : () => onTrackNavigation(titleContext, mediaItem),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      OverflowMarquee(
-                        resetKey: (mediaItem.id, mediaItem.title),
-                        child: PlayerMetadataTitle(
-                          mediaItem: mediaItem,
-                          metadata: metadata,
-                          maxLines: 1,
-                          style: TextStyle(
-                            fontSize: 22 - 4 * progress,
-                            fontWeight: FontWeight.w600,
-                            color: colorScheme.onSurface,
+          Row(
+            children: [
+              Expanded(
+                child: PlayerTrackSwipeTitles(
+                  current: mediaItem,
+                  builder: (mediaItem) => Builder(
+                    builder: (titleContext) => InkWell(
+                      borderRadius: BorderRadius.circular(8),
+                      onTap:
+                          (mediaItem.artist ?? '').trim().isEmpty &&
+                              (mediaItem.album ?? '').trim().isEmpty
+                          ? null
+                          : () => onTrackNavigation(titleContext, mediaItem),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          OverflowMarquee(
+                            resetKey: (mediaItem.id, mediaItem.title),
+                            child: PlayerMetadataTitle(
+                              mediaItem: mediaItem,
+                              metadata: metadata,
+                              maxLines: 1,
+                              style: TextStyle(
+                                fontSize: 22 - 4 * progress,
+                                fontWeight: FontWeight.w600,
+                                color: colorScheme.onSurface,
+                              ),
+                            ),
                           ),
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      OverflowMarquee(
-                        resetKey: (mediaItem.id, mediaItem.artist),
-                        child: Text(
-                          mediaItem.artist ?? '',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 20 - 4 * progress,
+                          const SizedBox(height: 4),
+                          OverflowMarquee(
+                            resetKey: (mediaItem.id, mediaItem.artist),
+                            child: Text(
+                              mediaItem.artist ?? '',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 20 - 4 * progress,
+                                color: colorScheme.onSurface.withValues(
+                                  alpha: 0.72,
+                                ),
+                              ),
+                            ),
+                          ),
+                          PlaybackSourceLabel(
+                            item: mediaItem,
                             color: colorScheme.onSurface.withValues(
                               alpha: 0.72,
                             ),
                           ),
-                        ),
+                        ],
                       ),
-                      PlaybackSourceLabel(
-                        item: mediaItem,
-                        color: colorScheme.onSurface.withValues(alpha: 0.72),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
               ),
-            ),
-          ),
-          MornyePlayerFavoriteButton(
-            key: ValueKey(mediaItem.id),
-            mediaItem: mediaItem,
-            compact: page != 0,
-            iconSize: actionSize,
-            color: colorScheme.onSurface,
-          ),
-          Builder(
-            builder: (buttonContext) => SizedBox.square(
-              dimension: _mornyeHeaderButtonSize,
-              child: IconButton(
-                tooltip: MaterialLocalizations.of(context).moreButtonTooltip,
-                color: colorScheme.onSurface,
+              MornyePlayerFavoriteButton(
+                key: ValueKey(mediaItem.id),
+                mediaItem: mediaItem,
+                compact: page != 0,
                 iconSize: actionSize,
-                icon: const Icon(CupertinoIcons.ellipsis),
-                onPressed: () => onMoreActions(
-                  buttonContext,
-                  mediaItem,
-                  mornyeMenuAnchor(buttonContext),
+                color: colorScheme.onSurface,
+              ),
+              Builder(
+                builder: (buttonContext) => SizedBox.square(
+                  dimension: _mornyeHeaderButtonSize,
+                  child: IconButton(
+                    tooltip: MaterialLocalizations.of(
+                      context,
+                    ).moreButtonTooltip,
+                    color: colorScheme.onSurface,
+                    iconSize: actionSize,
+                    icon: const Icon(CupertinoIcons.ellipsis),
+                    onPressed: () => onMoreActions(
+                      buttonContext,
+                      mediaItem,
+                      mornyeMenuAnchor(buttonContext),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (!compact && progress < 1.0)
+            SizeTransition(
+              sizeFactor: AlwaysStoppedAnimation(1.0 - progress),
+              alignment: Alignment.topLeft,
+              child: FadeTransition(
+                opacity: AlwaysStoppedAnimation(
+                  (1.0 - progress * 2.5).clamp(0.0, 1.0),
+                ),
+                child: PlayerLyricPreview(
+                  metadata: metadata,
+                  seekPreview: seekPreview,
+                  colorScheme: colorScheme,
+                  onTap: () => onPageChanged(1),
                 ),
               ),
             ),
-          ),
         ],
       ),
     );

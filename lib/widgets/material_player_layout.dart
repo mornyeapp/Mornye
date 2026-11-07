@@ -13,6 +13,7 @@ import 'package:mornye/utils/playback_seek_preview.dart';
 import 'package:mornye/widgets/player_artwork.dart';
 import 'package:mornye/widgets/player_compact_bar.dart';
 import 'package:mornye/widgets/player_gesture_regions.dart';
+import 'package:mornye/widgets/player_lyric_preview.dart';
 import 'package:mornye/widgets/player_lyrics_controls.dart';
 import 'package:mornye/widgets/player_metadata_title.dart';
 import 'package:mornye/widgets/playback_source_label.dart';
@@ -29,6 +30,7 @@ class MaterialPlayerLayout extends StatelessWidget {
     required this.showLyrics,
     required this.lyricsBuilder,
     required this.onOpenQueue,
+    this.onOpenLyrics,
     this.fullScreenArtwork = false,
     this.landscapeLyricsArtwork = false,
     this.immersive = false,
@@ -43,6 +45,7 @@ class MaterialPlayerLayout extends StatelessWidget {
   final bool showLyrics;
   final WidgetBuilder lyricsBuilder;
   final VoidCallback onOpenQueue;
+  final VoidCallback? onOpenLyrics;
 
   /// The page backdrop paints the cover; this area only keeps its gestures.
   final bool fullScreenArtwork;
@@ -394,6 +397,13 @@ class MaterialPlayerLayout extends StatelessWidget {
                             );
                           },
                         ),
+                        if (!showLyrics && !compact)
+                          PlayerLyricPreview(
+                            metadata: metadata,
+                            seekPreview: seekPreview,
+                            colorScheme: colorScheme,
+                            onTap: onOpenLyrics,
+                          ),
                       ],
                     ),
                   ),
