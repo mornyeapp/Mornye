@@ -1000,6 +1000,22 @@ class DownloadQueueNotifier extends Notifier<DownloadQueueState> {
     playlistName: playlistName,
   );
 
+  @visibleForTesting
+  Future<bool> holdsAlbumFilesFor(
+    DownloadItem item,
+    AppSettings settings, {
+    required String filePath,
+    String? relativeDir,
+    String quality = 'LOSSLESS',
+  }) => _holdsAlbumFiles(
+    item.track,
+    item,
+    settings,
+    quality,
+    filePath: filePath,
+    relativeDir: relativeDir,
+  );
+
   DownloadItem? _findItemById(String id) {
     return state.lookup.byItemId[id];
   }

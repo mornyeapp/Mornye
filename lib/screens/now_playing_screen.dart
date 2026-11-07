@@ -353,9 +353,10 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
             ref.watch(settingsProvider.select((s) => s.motionArtworkEnabled)) &&
             !MediaQuery.disableAnimationsOf(context)
         ? ref.watch(
-            playerMotionArtworkProvider((
+            songMotionArtworkProvider((
               album: mediaItem.album ?? '',
               artist: mediaItem.artist ?? '',
+              source: source,
             )),
           )
         : null;

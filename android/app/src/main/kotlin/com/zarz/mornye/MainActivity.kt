@@ -123,6 +123,7 @@ class MainActivity: FlutterFragmentActivity() {
         "writeSafSidecarLrc",
         "writeSafSidecar",
         "readSafSidecar",
+        "findSafSibling",
         "downloadCoverToFile",
         "extractCoverToFile",
         "rewriteSplitArtistTags",
@@ -562,6 +563,7 @@ class MainActivity: FlutterFragmentActivity() {
                         "writeSafSidecarLrc" -> handleWriteSafSidecarLrc(call, result)
                         "writeSafSidecar" -> handleWriteSafSidecar(call, result)
                         "readSafSidecar" -> handleReadSafSidecar(call, result)
+                        "findSafSibling" -> handleFindSafSibling(call, result)
                         "downloadCoverToFile" -> handleDownloadCoverToFile(call, result)
                         "extractCoverToFile" -> handleExtractCoverToFile(call, result)
                         "reEnrichFile" -> handleReEnrichFile(call, result)

@@ -1702,6 +1702,23 @@ class PlatformBridge {
         'extension': extension,
       });
 
+  /// The file named [name] in the folder of the SAF document [safUri], or
+  /// null when the folder has none.
+  static Future<({String uri, int size, int modified})?> findSafSibling(
+    String safUri,
+    String name,
+  ) async {
+    final result = await _channel.invokeMethod<Map<Object?, Object?>>(
+      'findSafSibling',
+      {'saf_uri': safUri, 'name': name},
+    );
+    final uri = result?['uri'];
+    final size = result?['size'];
+    final modified = result?['modified'];
+    if (uri is! String || size is! int || modified is! int) return null;
+    return (uri: uri, size: size, modified: modified);
+  }
+
   static Future<void> startDownloadService({
     String trackName = '',
     String artistName = '',

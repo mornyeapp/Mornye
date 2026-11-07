@@ -1682,6 +1682,11 @@ class _DownloadRun {
         item,
         trackToDownload,
         result,
+        settings: settings,
+        quality: quality,
+        filePath: historyFilePath,
+        treeUri: effectiveSafMode ? settings.downloadTreeUri : null,
+        relativeDir: effectiveSafMode ? effectiveOutputDir : null,
       );
       onStageCompleted?.call('optional motion artwork');
       await persistBeforePublishingDownloadCompletion(

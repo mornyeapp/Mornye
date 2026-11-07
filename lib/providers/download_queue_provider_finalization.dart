@@ -48,12 +48,22 @@ extension _DownloadQueueFinalization on DownloadQueueNotifier {
     info: _log.i,
   );
 
+  /// Saves the album's animated cover for the player and, when the settings
+  /// ask, as `cover.mp4` beside [filePath] in the album's own folder: an
+  /// Android document there needs [treeUri] and [relativeDir]. The folder
+  /// was planned from [folderTrack], when it differs from [track].
   Future<void> _saveDownloadedMotionArtwork(
     Ref ref,
     DownloadItem item,
     Track track,
-    Map<String, dynamic> result,
-  ) async {
+    Map<String, dynamic> result, {
+    required AppSettings settings,
+    required String quality,
+    String? filePath,
+    String? treeUri,
+    String? relativeDir,
+    Track? folderTrack,
+  }) async {
     // Store independently of history preferences and the selected UI theme.
     // A later switch to Mornye must still work without network access.
     try {
@@ -84,6 +94,30 @@ extension _DownloadQueueFinalization on DownloadQueueNotifier {
       if (artwork != null && ref.mounted) {
         ref.invalidate(playerMotionArtworkProvider(album));
       }
+      if (artwork == null ||
+          filePath == null ||
+          !settings.saveMotionArtworkFile ||
+          !ref.mounted ||
+          !await _holdsAlbumFiles(
+            folderTrack ?? track,
+            item,
+            settings,
+            quality,
+            filePath: filePath,
+            relativeDir: relativeDir,
+          ) ||
+          !ref.mounted) {
+        return;
+      }
+      final saved = await ref
+          .read(motionArtworkFolderProvider)
+          .save(
+            File.fromUri(Uri.parse(artwork.source)),
+            song: filePath,
+            treeUri: treeUri,
+            relativeDir: relativeDir,
+          );
+      if (saved) _log.i('Animated cover saved to the album folder');
     } catch (error) {
       _log.w('Optional motion artwork was not saved: ${error.runtimeType}');
     }

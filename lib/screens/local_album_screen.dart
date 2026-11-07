@@ -368,11 +368,12 @@ class _LocalAlbumScreenState extends ConsumerState<LocalAlbumScreen>
     final motion = context.isMornye && !MediaQuery.disableAnimationsOf(context)
         ? ref
               .watch(
-                playerMotionArtworkProvider((
+                songMotionArtworkProvider((
                   album: widget.albumName,
                   artist:
                       _sortedTracksCache.firstOrNull?.artistName ??
                       widget.artistName,
+                  source: _sortedTracksCache.firstOrNull?.filePath ?? '',
                 )),
               )
               .value

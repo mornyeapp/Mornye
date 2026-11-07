@@ -220,6 +220,15 @@ class _FilesSettingsPageState extends ConsumerState<FilesSettingsPage> {
                     description:
                         context.l10n.downloadSingleFilenameFormatDescription,
                   ),
+                ),
+                SettingsSwitchItem(
+                  icon: Icons.motion_photos_on_outlined,
+                  title: context.l10n.downloadSaveMotionArtwork,
+                  subtitle: context.l10n.downloadSaveMotionArtworkSubtitle,
+                  value: settings.saveMotionArtworkFile,
+                  onChanged: ref
+                      .read(settingsProvider.notifier)
+                      .setSaveMotionArtworkFile,
                   showDivider: false,
                 ),
               ],

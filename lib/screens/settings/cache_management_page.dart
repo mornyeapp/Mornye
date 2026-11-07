@@ -154,7 +154,9 @@ class _CacheManagementPageState extends ConsumerState<CacheManagementPage> {
   }
 
   Future<void> _clearMotionArtwork() async {
+    // Copies of folder covers live in the same directory.
     await ref.read(motionArtworkStoreProvider).clear();
+    ref.read(motionArtworkFolderProvider).forget();
     if (mounted) ref.invalidate(playerMotionArtworkProvider);
   }
 

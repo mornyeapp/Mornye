@@ -529,6 +529,26 @@ internal fun Context.readSafSidecar(
     }
 }
 
+/**
+ * The file named [name] in the folder of a SAF audio document, such as an
+ * album's "cover.mp4", as its uri, size and modification time, or null when
+ * the folder has none.
+ */
+internal fun Context.findSafSibling(audioUri: Uri, name: String): Map<String, Any>? {
+    return try {
+        val parent = safParentDir(audioUri) ?: return null
+        val sibling = findSafChild(this, parent, name)?.takeIf { it.isFile } ?: return null
+        mapOf(
+            "uri" to sibling.uri.toString(),
+            "size" to sibling.length(),
+            "modified" to sibling.lastModified(),
+        )
+    } catch (e: Exception) {
+        android.util.Log.w("Mornye", "Sibling lookup failed: ${e.message}")
+        null
+    }
+}
+
 internal fun Context.runPostProcessingSafV2(
     coreBackend: CoreBackend,
     fileUriStr: String,

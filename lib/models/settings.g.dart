@@ -136,6 +136,7 @@ AppSettings _$AppSettingsFromJson(Map<String, dynamic> json) => AppSettings(
   lyricsMode: json['lyricsMode'] as String? ?? 'embed',
   keepScreenOnLyrics: json['keepScreenOnLyrics'] as bool? ?? true,
   motionArtworkEnabled: json['motionArtworkEnabled'] as bool? ?? true,
+  saveMotionArtworkFile: json['saveMotionArtworkFile'] as bool? ?? false,
   listeningStatisticsEnabled:
       json['listeningStatisticsEnabled'] as bool? ?? true,
   autoConvertDownloads: json['autoConvertDownloads'] as bool? ?? false,
@@ -290,6 +291,7 @@ Map<String, dynamic> _$AppSettingsToJson(
   'lyricsMode': instance.lyricsMode,
   'keepScreenOnLyrics': instance.keepScreenOnLyrics,
   'motionArtworkEnabled': instance.motionArtworkEnabled,
+  'saveMotionArtworkFile': instance.saveMotionArtworkFile,
   'listeningStatisticsEnabled': instance.listeningStatisticsEnabled,
   'autoConvertDownloads': instance.autoConvertDownloads,
   'redownloadFakeHiRes': instance.redownloadFakeHiRes,

@@ -666,6 +666,12 @@ class SettingsSearchCatalog {
           keywords: const ['single naming', 'file template'],
         ),
         SettingsSearchEntry(
+          icon: Icons.motion_photos_on_outlined,
+          title: l10n.downloadSaveMotionArtwork,
+          subtitle: l10n.downloadSaveMotionArtworkSubtitle,
+          keywords: const ['cover.mp4', 'motion cover', 'video', 'animation'],
+        ),
+        SettingsSearchEntry(
           icon: Icons.library_music_outlined,
           title: l10n.downloadSeparateSinglesFolder,
           keywords: const ['singles directory'],

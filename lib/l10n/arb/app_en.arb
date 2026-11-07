@@ -528,6 +528,14 @@
   "@downloadSingleFilenameFormatDescription": {
     "description": "Subtitle description for single filename format setting"
   },
+  "downloadSaveMotionArtwork": "Save Animated Covers",
+  "@downloadSaveMotionArtwork": {
+    "description": "Files setting that copies an album's animated cover video into the album's download folder"
+  },
+  "downloadSaveMotionArtworkSubtitle": "Adds the album's animated cover to its folder as cover.mp4, for albums that have their own folder",
+  "@downloadSaveMotionArtworkSubtitle": {
+    "description": "Subtitle of the Save Animated Covers switch. Keep 'cover.mp4' as is: it is a file name"
+  },
   "downloadFolderOrganization": "Folder Organization",
   "@downloadFolderOrganization": {
     "description": "Title of the folder organization picker bottom sheet"
