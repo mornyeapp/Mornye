@@ -151,9 +151,9 @@ class _DownloadRun {
     }
 
     if (!isNetworkDownload && !n._hasActiveDownloadProvider(item.service)) {
-      n.updateItemStatus(
+      _log.w('No active download provider "${item.service}" for ${item.id}');
+      n._recordFailedDownload(
         item.id,
-        DownloadStatus.failed,
         error: 'Download provider is no longer available',
         errorType: DownloadErrorType.notFound,
       );
@@ -921,9 +921,8 @@ class _DownloadRun {
           errorMsg = 'Failed to decrypt encrypted stream';
           break;
       }
-      n.updateItemStatus(
+      n._recordFailedDownload(
         item.id,
-        DownloadStatus.failed,
         error: errorMsg,
         errorType: DownloadErrorType.unknown,
       );

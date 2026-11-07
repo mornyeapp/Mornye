@@ -230,9 +230,9 @@ void main() {
         first.lookup.byItemId['unavailable']!.error,
         'Download provider is no longer available',
       );
-      // Provider availability failures and cancellation have never contributed
-      // to the session failure total, even though the queue retains their rows.
-      expect(summaries, ['0 downloaded, 3 failed']);
+      // A missing provider counts toward the session failure total; a
+      // cancellation does not.
+      expect(summaries, ['0 downloaded, 4 failed']);
       expect(
         LogBuffer().entries.where(
           (entry) => entry.message.contains('Download queue processing failed'),
@@ -251,7 +251,7 @@ void main() {
         'backend-failure',
       ]);
       expect(container.read(downloadQueueProvider).lookup.failedCount, 4);
-      expect(summaries, ['0 downloaded, 3 failed', '0 downloaded, 1 failed']);
+      expect(summaries, ['0 downloaded, 4 failed', '0 downloaded, 1 failed']);
       await queue.flushQueuePersistence();
       await (await AppStateDatabase.instance.database).close();
     },
