@@ -1582,7 +1582,9 @@ class AnimatedSelectionCheckbox extends StatelessWidget {
   }
 }
 
-/// Wraps a [Badge] child and plays a brief scale-bump whenever [count] changes.
+/// Wraps a [Badge] child and plays a brief scale-bump whenever [count] grows.
+/// Material settles from 1.15 on the fast spatial spring; Mornye keeps its
+/// eased bump; reduced motion shows the new count without one.
 class AnimatedBadge extends StatefulWidget {
   final int count;
   final Widget child;
@@ -1595,29 +1597,46 @@ class AnimatedBadge extends StatefulWidget {
 
 class _AnimatedBadgeState extends State<AnimatedBadge>
     with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _scaleAnimation;
+  static const _bump = AppMotionSpec(
+    Duration(milliseconds: 300),
+    Curves.linear,
+  );
+
+  // At rest (1) both scales are 1.
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    value: 1,
+  );
+  late final Animation<double> _bumpScale = TweenSequence<double>([
+    TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.3), weight: 40),
+    TweenSequenceItem(tween: Tween(begin: 1.3, end: 1.0), weight: 60),
+  ]).animate(_controller);
+  late Animation<double> _scaleAnimation = _bumpScale;
   int _previousCount = 0;
 
   @override
   void initState() {
     super.initState();
     _previousCount = widget.count;
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 300),
-    );
-    _scaleAnimation = TweenSequence<double>([
-      TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.3), weight: 40),
-      TweenSequenceItem(tween: Tween(begin: 1.3, end: 1.0), weight: 60),
-    ]).animate(_controller);
   }
 
   @override
   void didUpdateWidget(AnimatedBadge oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.count != _previousCount && widget.count > _previousCount) {
-      _controller.forward(from: 0);
+    if (widget.count > _previousCount &&
+        !MediaQuery.disableAnimationsOf(context)) {
+      final motion = AppMotion.spatialFast(context, _bump);
+      _scaleAnimation = materialExpressiveEnabled(context)
+          ? _controller.drive(
+              Tween<double>(
+                begin: 1.15,
+                end: 1,
+              ).chain(CurveTween(curve: motion.curve)),
+            )
+          : _bumpScale;
+      _controller
+        ..duration = motion.duration
+        ..forward(from: 0);
     }
     _previousCount = widget.count;
   }
