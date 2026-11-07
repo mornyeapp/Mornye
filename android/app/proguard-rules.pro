@@ -23,6 +23,11 @@
     native <methods>;
 }
 
+# Kuromoji loads its dictionary through its own class loader and resource names.
+-keep class com.atilika.kuromoji.** { *; }
+-keepnames class com.atilika.kuromoji.** { *; }
+-dontwarn com.atilika.kuromoji.**
+
 # Kotlin coroutines - expanded rules
 -keepnames class kotlinx.coroutines.internal.MainDispatcherFactory {}
 -keepnames class kotlinx.coroutines.CoroutineExceptionHandler {}

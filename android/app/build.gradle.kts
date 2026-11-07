@@ -217,6 +217,8 @@ dependencies {
     implementation("androidx.documentfile:documentfile:1.1.0")
     implementation("androidx.activity:activity-ktx:1.13.0")
     implementation("com.google.android.gms:play-services-cast-framework:23.0.0")
+    // Japanese lyric readings (kanji to katakana) for on-device romaji.
+    implementation("com.atilika.kuromoji:kuromoji-ipadic:0.9.0")
     // NativeDownloadFinalizer imports FFmpegKit APIs directly. The Flutter
     // plugin owns the runtime AAR; compileOnly avoids packaging it twice here.
     compileOnly("com.antonkarpenko:ffmpeg-kit-audio:2.2.3")
