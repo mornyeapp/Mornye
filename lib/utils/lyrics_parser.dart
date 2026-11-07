@@ -145,6 +145,10 @@ class ParsedLyrics {
   final String? writers;
   final String? provider;
 
+  /// One pronunciation per line of [plainText] (null where a line has none),
+  /// for lyrics without timing. Empty when there is nothing to show.
+  final List<String?> plainPronunciations;
+
   const ParsedLyrics({
     required this.synced,
     required this.wordSynced,
@@ -152,6 +156,7 @@ class ParsedLyrics {
     required this.plainText,
     this.writers,
     this.provider,
+    this.plainPronunciations = const [],
   });
 
   bool get isEmpty => lines.isEmpty && plainText.trim().isEmpty;

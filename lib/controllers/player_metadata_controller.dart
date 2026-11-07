@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/foundation.dart';
+import 'package:mornye/services/lyrics_romanizer.dart';
 import 'package:mornye/services/platform_bridge.dart';
 import 'package:mornye/services/playback_metadata.dart';
 import 'package:mornye/services/player_lyrics_persistence.dart';
@@ -26,6 +27,11 @@ Future<String> _fetchOnlineLyrics(MediaItem item) async {
   return result['lyrics']?.toString() ?? '';
 }
 
+/// Parses lyrics and adds on-device pronunciation to Japanese and Korean lines
+/// the provider left without one. The saved lyrics text is not changed.
+Future<ParsedLyrics> _parseLyricsWithPronunciation(String? raw) async =>
+    LyricsRomanizer.fillMissing(await LyricsParser.parseAsyncNative(raw));
+
 /// Owns file metadata and lyrics for the full player. Requests are scoped to
 /// the current queue item so a late probe cannot replace another track's data.
 class PlayerMetadataController extends ChangeNotifier {
@@ -36,7 +42,7 @@ class PlayerMetadataController extends ChangeNotifier {
     OnlineLyricsSaver? saveOnlineLyrics,
     SourceMetadataEvents? metadataEvents,
   }) : _readMetadata = readMetadata ?? readPlaybackFileMetadataWithRetry,
-       _parseLyrics = parseLyrics ?? LyricsParser.parseAsyncNative,
+       _parseLyrics = parseLyrics ?? _parseLyricsWithPronunciation,
        _fetchOnline = fetchOnlineLyrics ?? _fetchOnlineLyrics,
        _saveOnline = saveOnlineLyrics ?? persistPlayerLyrics,
        _metadataEvents = metadataEvents ?? SourceMetadataEvents.instance {

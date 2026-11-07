@@ -207,14 +207,7 @@ class PlayerLyricsSection extends ConsumerWidget {
                     onShareLyrics!(null);
                   },
             child: LyricsTextScale(
-              child: Text(
-                metadata.lyrics.plainText,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  height: 1.6,
-                  color: colorScheme.onSurface,
-                ),
-                textAlign: TextAlign.center,
-              ),
+              child: _plainLyricsText(context, visibility.$1),
             ),
           ),
           ?_lyricsCredits(),
@@ -231,6 +224,41 @@ class PlayerLyricsSection extends ConsumerWidget {
           bottom: 8,
           child: options!,
         ),
+      ],
+    );
+  }
+
+  /// Lyrics without timing, with each line's pronunciation beneath it when
+  /// there is one and pronunciation is shown.
+  Widget _plainLyricsText(BuildContext context, bool showPronunciation) {
+    final style = Theme.of(context).textTheme.titleMedium?.copyWith(
+      height: 1.6,
+      color: colorScheme.onSurface,
+    );
+    final plainText = metadata.lyrics.plainText;
+    final pronunciations = showPronunciation
+        ? metadata.lyrics.plainPronunciations
+        : const <String?>[];
+    if (!pronunciations.any((value) => value != null)) {
+      return Text(plainText, style: style, textAlign: TextAlign.center);
+    }
+    final rows = plainText.split(RegExp(r'\r\n|\r|\n'));
+    final pronunciationStyle = style?.copyWith(
+      fontSize: (style.fontSize ?? 16) * 0.8,
+      color: colorScheme.onSurface.withValues(alpha: 0.65),
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (var i = 0; i < rows.length; i++) ...[
+          Text(rows[i], style: style, textAlign: TextAlign.center),
+          if (i < pronunciations.length && pronunciations[i] != null)
+            Text(
+              pronunciations[i]!,
+              style: pronunciationStyle,
+              textAlign: TextAlign.center,
+            ),
+        ],
       ],
     );
   }
