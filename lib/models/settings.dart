@@ -134,6 +134,12 @@ class AppSettings {
   final bool usbAllowFixedVolume;
   final bool dapExclusive;
 
+  /// Android beta: play the music player and AutoMix through the app's own
+  /// media3 engine instead of the platform MediaPlayer. Songs for the USB
+  /// and AAudio outputs ([usbBitPerfect]) stay on the platform player.
+  /// Applies from the next song.
+  final bool media3Engine;
+
   /// Desktop: take the output device for the music player alone, bypassing
   /// the system mixer (WASAPI exclusive on Windows, hog mode on macOS, an
   /// ALSA `hw:` device on Linux). AutoMix and previews stay off while it is
@@ -371,6 +377,7 @@ class AppSettings {
     this.usbDsdOverPcm = false,
     this.usbAllowFixedVolume = false,
     this.dapExclusive = false,
+    this.media3Engine = false,
     this.exclusiveOutput = false,
     this.exclusiveOutputDevice = '',
     this.autoplay = false,
@@ -534,6 +541,7 @@ class AppSettings {
     bool? usbDsdOverPcm,
     bool? usbAllowFixedVolume,
     bool? dapExclusive,
+    bool? media3Engine,
     bool? exclusiveOutput,
     String? exclusiveOutputDevice,
     bool? autoplay,
@@ -683,6 +691,7 @@ class AppSettings {
       usbDsdOverPcm: usbDsdOverPcm ?? this.usbDsdOverPcm,
       usbAllowFixedVolume: usbAllowFixedVolume ?? this.usbAllowFixedVolume,
       dapExclusive: dapExclusive ?? this.dapExclusive,
+      media3Engine: media3Engine ?? this.media3Engine,
       exclusiveOutput: exclusiveOutput ?? this.exclusiveOutput,
       exclusiveOutputDevice:
           exclusiveOutputDevice ?? this.exclusiveOutputDevice,

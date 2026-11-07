@@ -738,6 +738,9 @@ class SettingsNotifier extends Notifier<AppSettings> {
     state.copyWith(dapExclusive: enabled, usbDirect: enabled ? false : null),
   );
 
+  void setMedia3Engine(bool enabled) =>
+      _commit(state.copyWith(media3Engine: enabled));
+
   void setExclusiveOutput(bool enabled) =>
       _commit(state.copyWith(exclusiveOutput: enabled));
 

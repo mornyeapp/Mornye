@@ -828,6 +828,58 @@ void main() {
     expect(created, 1);
   });
 
+  test('the media3 engine setting reaches the decks on Android only', () {
+    addTearDown(() => playbackMedia3Engine.value = false);
+    final android = _runtime(isAndroid: true);
+    android.configure(android.settings.copyWith(media3Engine: true));
+    expect(playbackMedia3Engine.value, isTrue);
+    android.configure(android.settings.copyWith(media3Engine: false));
+    expect(playbackMedia3Engine.value, isFalse);
+
+    final other = _runtime();
+    other.configure(other.settings.copyWith(media3Engine: true));
+    expect(playbackMedia3Engine.value, isFalse);
+  });
+
+  test('changing the engine drops a song queued on the old one', () async {
+    final deck = _QueuedDeck();
+    final runtime = _runtime(
+      settings: const AppSettings(
+        pauseOnMute: false,
+        gaplessPlayback: true,
+        autoMix: false,
+      ),
+      createDeck: (_) => deck,
+    );
+    final player = await runtime.initialize();
+    await player.setQueueAndPlay([
+      _track,
+      const PlayableMedia(
+        id: 'two',
+        source: '/two.flac',
+        title: 'Two',
+        artist: 'Artist',
+        duration: Duration(seconds: 60),
+      ),
+    ]);
+    deck.positionEvents.add(const Duration(seconds: 45));
+    for (var i = 0; i < 30 && deck.nextSource == null; i++) {
+      await _settle();
+    }
+    expect(deck.nextSource, '/two.flac');
+
+    runtime.configure(runtime.settings.copyWith(media3Engine: true));
+    await _settle();
+    expect(deck.nextSource, isNull);
+    // The next position prepares it again, on the engine now chosen.
+    deck.positionEvents.add(const Duration(seconds: 46));
+    for (var i = 0; i < 30 && deck.nextSource == null; i++) {
+      await _settle();
+    }
+    expect(deck.nextSource, '/two.flac');
+    expect(deck.queued, 2);
+  });
+
   for (final failure in [false, true]) {
     test(
       'exclusive gapless handles cancellation and queue failure ($failure)',

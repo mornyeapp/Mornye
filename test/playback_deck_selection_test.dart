@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/services/exclusive_output_deck.dart';
+import 'package:mornye/services/media3_playback_deck.dart';
 import 'package:mornye/services/media_kit_playback_deck.dart';
 import 'package:mornye/services/music_playback_deck.dart';
 import 'package:mornye/services/music_player_runtime.dart';
@@ -92,14 +93,25 @@ void main() {
       select(TargetPlatform.macOS, desktop: true);
       created.add(dependencies.createDeck('main'));
       expect(created.last, isA<ExclusiveOutputDeck>());
+      // Android plays through audioplayers until its media3 engine is on.
+      // Previews stay on audioplayers either way.
       select(TargetPlatform.android, desktop: false);
       created
         ..add(dependencies.createDeck('main'))
         ..add(dependencies.createPreviewDeck('preview'));
       expect(
-        created.reversed.take(2),
-        everyElement(isA<AudioplayersPlaybackDeck>()),
+        created[created.length - 2],
+        isA<Media3EngineDeck>().having(
+          (deck) => deck.activeDeck,
+          'activeDeck',
+          isA<AudioplayersPlaybackDeck>(),
+        ),
       );
+      expect(created.last, isA<AudioplayersPlaybackDeck>());
+      // iOS keeps audioplayers alone.
+      select(TargetPlatform.iOS, desktop: false);
+      created.add(dependencies.createDeck('main'));
+      expect(created.last, isA<AudioplayersPlaybackDeck>());
     } finally {
       for (final deck in created) {
         await deck.dispose();

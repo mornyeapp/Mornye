@@ -33,6 +33,7 @@ import 'package:mornye/services/network_playback_cache.dart';
 import 'package:mornye/services/network_storage_service.dart'
     show subsonicSongIdFromPath;
 import 'package:mornye/services/playback_deck.dart';
+import 'package:mornye/services/switching_playback_deck.dart';
 import 'package:mornye/services/automix_analysis.dart';
 import 'package:mornye/services/automix_phase_lock.dart';
 import 'package:mornye/services/autoplay_personalization.dart';
@@ -239,16 +240,21 @@ class MusicPlayerHandler extends BaseAudioHandler
             settings.playbackNormalizationMode) {
       reapplyNormalization();
     }
+    // A prepared or queued next song must not keep the engine it was
+    // prepared on; it prepares again on the new one.
+    final engineChanged = previous.media3Engine != settings.media3Engine;
     if (previous.autoMix != settings.autoMix ||
         previous.autoMixOptions != settings.autoMixOptions ||
         previous.usbBitPerfect != settings.usbBitPerfect ||
-        previous.exclusiveOutput != settings.exclusiveOutput) {
+        previous.exclusiveOutput != settings.exclusiveOutput ||
+        engineChanged) {
       unawaited(_autoMix.cancel());
     }
     if (previous.gaplessPlayback != settings.gaplessPlayback ||
         previous.autoMix != settings.autoMix ||
         previous.usbBitPerfect != settings.usbBitPerfect ||
-        previous.exclusiveOutput != settings.exclusiveOutput) {
+        previous.exclusiveOutput != settings.exclusiveOutput ||
+        engineChanged) {
       unawaited(_gapless.cancel());
     }
     // USB changes apply at the next source boundary, without raising volume.
@@ -1133,7 +1139,10 @@ class MusicPlayerHandler extends BaseAudioHandler
   );
 
   Future<void> refreshOutputStatus() async {
-    final player = _player;
+    final player = switch (_player) {
+      SwitchingPlaybackDeck(:final activeDeck) => activeDeck,
+      final deck => deck,
+    };
     if (player is AudioplayersPlaybackDeck) await player.refreshNativeStatus();
   }
 

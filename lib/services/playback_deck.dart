@@ -9,7 +9,8 @@ enum PlaybackDeckState { stopped, playing, paused, completed, disposed }
 /// The engine behind `PlaybackDependencies.createDeck`.
 enum PlaybackEngine {
   /// audioplayers: Android, iOS and macOS, where the forks carry the
-  /// equalizer tap and Android's USB output.
+  /// equalizer tap and Android's USB output. Android can move ordinary
+  /// sources to media3 ([playbackMedia3Engine]).
   audioplayers,
 
   /// libmpv through media_kit: Windows and Linux.
@@ -50,6 +51,12 @@ Stream<double> playbackOutputVolumeChanges() =>
 /// previews stay off while it is on, so only the main player opens the
 /// device.
 final playbackExclusiveOutput = ValueNotifier<bool>(false);
+
+/// Android: the beta `media3Engine` setting. While it is on, the music
+/// player and AutoMix decks play through media3 (`Media3EngineDeck`), except
+/// sources for the native USB and AAudio outputs, which stay on
+/// audioplayers. A change applies from the next song.
+final playbackMedia3Engine = ValueNotifier<bool>(false);
 
 /// Linux: the ALSA device [playbackExclusiveOutput] opens, as an mpv device
 /// name. Empty until one is known; the output stays shared meanwhile.

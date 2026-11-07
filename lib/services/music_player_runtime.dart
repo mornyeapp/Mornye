@@ -27,6 +27,7 @@ import 'package:mornye/services/library_database.dart';
 import 'package:mornye/services/listening_statistics.dart';
 import 'package:mornye/services/lastfm/lastfm_service.dart';
 import 'package:mornye/services/lock_screen_lyrics.dart';
+import 'package:mornye/services/media3_playback_deck.dart';
 import 'package:mornye/services/media_kit_playback_deck.dart';
 import 'package:mornye/services/media_library_browser.dart';
 import 'package:mornye/services/media_session_art_cache.dart';
@@ -199,15 +200,27 @@ class PlaybackDependencies {
   /// The macOS app, which plays through AVPlayer like iOS.
   bool get isMacOS => _isMacOS ?? (isDesktopPlatform && Platform.isMacOS);
 
+  static int _media3Decks = 0;
+
   // Windows and Linux play through libmpv. Without the library they fall
   // back to audioplayers, which has no equalizer there. macOS plays through
-  // AVPlayer and moves to libmpv for exclusive output (hog mode).
+  // AVPlayer and moves to libmpv for exclusive output (hog mode). Android
+  // moves ordinary sources to media3 while its beta engine is on.
   static PlaybackDeck _createDeck(String playerId) {
     if (playbackEngine == PlaybackEngine.mediaKit &&
         MediaKitPlaybackDeck.isAvailable) {
       return MediaKitPlaybackDeck(playerId: playerId);
     }
     final shared = AudioplayersPlaybackDeck(playerId: playerId);
+    if (!isDesktopPlatform && defaultTargetPlatform == TargetPlatform.android) {
+      return Media3EngineDeck(
+        audioplayers: shared,
+        // A fresh native id each time, so a player still being released
+        // never shares one with its successor.
+        createMedia3: () =>
+            Media3PlaybackDeck(playerId: '$playerId-media3-${_media3Decks++}'),
+      );
+    }
     if (!isDesktopPlatform || defaultTargetPlatform != TargetPlatform.macOS) {
       return shared;
     }
@@ -224,7 +237,9 @@ class PlaybackDependencies {
   ) => CastPlaybackDeck(output: output, metadata: metadata);
 
   // Previews follow the in-app volume on desktop. Mobile previews keep
-  // playing without the equalizer.
+  // playing without the equalizer, and on Android through audioplayers
+  // whichever engine the music player uses: they are short streamed clips,
+  // and a second media3 player would only add one more output to manage.
   static PlaybackDeck _createPreviewDeck(String playerId) => isDesktopPlatform
       ? _createDeck(playerId)
       : AudioplayersPlaybackDeck(playerId: playerId, equalizerAvailable: false);
@@ -414,6 +429,9 @@ class MusicPlayerRuntime {
     final previous = _settings;
     _settings = settings;
     _configureExclusiveOutput(settings);
+    // The decks read it as each song loads.
+    playbackMedia3Engine.value =
+        settings.media3Engine && dependencies.isAndroid;
     configureLockScreenLyrics(enabled: settings.lockScreenLyrics);
     _songAnalysis?.configure(settings);
     _handler?.applySettings(previous);
