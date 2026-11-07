@@ -1,11 +1,21 @@
 import 'dart:async';
 import 'dart:collection';
 import 'dart:io';
+import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
 import 'package:logger/logger.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:mornye/constants/app_info.dart';
 import 'package:mornye/services/native_log_source.dart';
+
+/// The renderer line of a log export. Only Impeller supports shader image
+/// filters, so their support tells Impeller from Skia.
+String rendererDiagnosticLine({bool? shaderFilters}) {
+  final impeller = shaderFilters ?? ui.ImageFilter.isShaderFilterSupported;
+  return impeller
+      ? 'Renderer: Impeller (shader filters supported)'
+      : 'Renderer: Skia (no shader filters)';
+}
 
 const int _maxLogMessageLength = 500;
 const int _maxBufferedLogMessageLength = 4000;
@@ -297,7 +307,8 @@ class LogBuffer extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<String> exportWithDeviceInfo() async {
+  /// [glassLevel] names the Mornye glass level the app renders.
+  Future<String> exportWithDeviceInfo({String? glassLevel}) async {
     final buffer = StringBuffer();
 
     buffer.writeln('=' * 60);
@@ -368,6 +379,12 @@ class LogBuffer extends ChangeNotifier {
     } catch (e) {
       buffer.writeln('Failed to get device info: $e');
     }
+    buffer.writeln();
+
+    // Smoothness reports depend on the renderer and the glass level.
+    buffer.writeln('--- Rendering ---');
+    buffer.writeln(rendererDiagnosticLine());
+    if (glassLevel != null) buffer.writeln('Glass Level: $glassLevel');
     buffer.writeln();
 
     buffer.writeln('--- Log Summary ---');
