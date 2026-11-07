@@ -179,10 +179,13 @@ class _PlayerTrackSwipeState extends State<PlayerTrackSwipe>
   final _haptic = SwipeCommitHaptic();
 
   // Ticks each time the titles cross the distance where letting go skips.
+  // A follow swipe has no neighbour; its commit point is the travel.
   void _updateHaptic() => _haptic.update(
-    !_settling &&
-        _neighbor(_offset.value) != null &&
-        _offset.value.abs() > _width * 0.25,
+    _follows
+        ? _travel.abs() >= PlayerTrackSwipe.followCommitDistance
+        : !_settling &&
+              _neighbor(_offset.value) != null &&
+              _offset.value.abs() > _width * 0.25,
   );
 
   @override

@@ -38,6 +38,7 @@ import 'package:mornye/widgets/player_artwork.dart';
 import 'package:mornye/widgets/player_track_crossfade.dart';
 import 'package:mornye/widgets/player_track_swipe.dart';
 import 'package:mornye/widgets/settings_group.dart';
+import 'package:mornye/widgets/swipe_commit_haptic.dart';
 import 'package:mornye/widgets/mornye_chrome.dart';
 import 'package:mornye/widgets/mornye_glass_press.dart';
 
@@ -157,6 +158,12 @@ class _MiniPlayerBodyState extends ConsumerState<_MiniPlayerBody> {
   /// Upward travel of the current vertical drag, in logical pixels.
   double _dragUp = 0;
   bool _dragCancelled = false;
+  final _openHaptic = SwipeCommitHaptic();
+
+  void _onVerticalDragUpdate(DragUpdateDetails details) {
+    _dragUp -= details.primaryDelta ?? 0;
+    _openHaptic.update(_dragUp > 48);
+  }
 
   void _openNowPlaying() {
     final mornye = context.isMornye;
@@ -458,9 +465,11 @@ class _MiniPlayerBodyState extends ConsumerState<_MiniPlayerBody> {
             child: GestureDetector(
               // Measure from touch-down so the slop counts toward the swipe.
               dragStartBehavior: DragStartBehavior.down,
-              onVerticalDragStart: (_) => _dragUp = 0,
-              onVerticalDragUpdate: (details) =>
-                  _dragUp -= details.primaryDelta ?? 0,
+              onVerticalDragStart: (_) {
+                _dragUp = 0;
+                _openHaptic.update(false);
+              },
+              onVerticalDragUpdate: _onVerticalDragUpdate,
               onVerticalDragEnd: _onVerticalDragEnd,
               onVerticalDragCancel: () => _dragUp = 0,
               child: PlayerTrackSwipeRegion(

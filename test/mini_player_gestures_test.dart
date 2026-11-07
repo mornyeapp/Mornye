@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mornye/l10n/l10n.dart';
@@ -441,6 +442,46 @@ void main() {
       expect(find.text('Second'), findsOneWidget);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());
+    });
+
+    testWidgets('${configuration.name}: an upward drag ticks once where '
+        'letting go opens the player', (tester) async {
+      final haptics = <Object?>[];
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (call) async {
+          if (call.method == 'HapticFeedback.vibrate') {
+            haptics.add(call.arguments);
+          }
+          return null;
+        },
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform,
+          null,
+        ),
+      );
+      final observer = _PushObserver();
+      final controller = await pumpPlayer(tester, observer: observer);
+      final gesture = await tester.startGesture(
+        tester.getCenter(find.text('Song')),
+      );
+      await gesture.moveBy(const Offset(0, -30));
+      await tester.pump();
+      await gesture.moveBy(const Offset(0, -12));
+      await tester.pump();
+      expect(haptics, isEmpty);
+      await gesture.moveBy(const Offset(0, -20));
+      await tester.pump();
+      await gesture.moveBy(const Offset(0, -20));
+      await tester.pump();
+      expect(haptics, hasLength(1));
+      // Cancelling keeps the player closed.
+      await gesture.cancel();
+      await tester.pumpAndSettle();
+      expect(observer.pushed.whereType<NowPlayingRoute>(), isEmpty);
+      expect(controller.calls, isEmpty);
     });
 
     testWidgets('${configuration.name}: short and cancelled drags do not act', (

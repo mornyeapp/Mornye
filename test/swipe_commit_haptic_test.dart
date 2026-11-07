@@ -269,4 +269,47 @@ void main() {
     await gesture.cancel();
     await tester.pumpAndSettle();
   });
+
+  testWidgets('a follow swipe ticks at its commit travel', (tester) async {
+    final releases = <double>[];
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PlayerTrackSwipe.follow(
+          onRelease: (_, travel) => releases.add(travel),
+          child: Scaffold(
+            body: Center(
+              child: SizedBox(
+                width: 300,
+                child: PlayerTrackSwipeTitles(
+                  current: songs[0],
+                  builder: (item) => Text(item.title),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.text('Song 0')),
+    );
+    await gesture.moveBy(const Offset(-20, 0));
+    await tester.pump();
+    await gesture.moveBy(const Offset(-20, 0));
+    await tester.pump();
+    expect(haptics, isEmpty);
+    await gesture.moveBy(const Offset(-20, 0));
+    await tester.pump();
+    expect(haptics, hasLength(1));
+    // Back inside the commit travel and out again on the other side.
+    await gesture.moveBy(const Offset(40, 0));
+    await tester.pump();
+    expect(haptics, hasLength(1));
+    await gesture.moveBy(const Offset(70, 0));
+    await tester.pump();
+    expect(haptics, hasLength(2));
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(releases.single, greaterThanOrEqualTo(48));
+  });
 }
