@@ -10,8 +10,10 @@ import 'package:mornye/providers/settings_provider.dart';
 import 'package:mornye/services/lyrics_ai_client.dart';
 import 'package:mornye/services/lyrics_translation.dart';
 import 'package:mornye/services/lyrics_translation_languages.dart';
+import 'package:mornye/services/network_storage_service.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/android_tv.dart';
+import 'package:mornye/utils/logger.dart';
 import 'package:mornye/utils/lyrics_parser.dart';
 import 'package:mornye/widgets/app_bottom_sheet.dart';
 import 'package:mornye/widgets/app_icon.dart';
@@ -22,6 +24,8 @@ import 'package:mornye/widgets/lyrics_editor_sheet.dart';
 import 'package:mornye/widgets/lyrics_options_activity.dart';
 import 'package:mornye/widgets/mornye_context_menu.dart';
 import 'package:mornye/widgets/player_lyrics_controls.dart';
+
+final _log = AppLogger('LyricsOptions');
 
 /// The localized message for a translation failure. Raw errors never reach
 /// the user.
@@ -112,6 +116,7 @@ class _LyricsOptionsButtonState extends ConsumerState<LyricsOptionsButton> {
   bool _hovered = false;
   bool _focused = false;
   bool _canHide = false;
+  bool _savingTranslation = false;
   Timer? _hideTimer;
   ValueListenable<(int, bool)>? _activity;
   ParsedLyrics? _lastLyrics;
@@ -223,6 +228,8 @@ class _LyricsOptionsButtonState extends ConsumerState<LyricsOptionsButton> {
     final translation = lyricsHaveTranslation(lyrics);
     final translating = job != null && job.sourceHash == source.hash;
     final canTranslate = ready && !source.isEmpty && job == null;
+    final canSaveTranslation =
+        canEdit && !translating && lyricsTranslationUnsaved(original, lyrics);
     if (!pronunciation && !translation && !canTranslate && !translating) {
       return canEdit ? _editButton(context) : null;
     }
@@ -260,6 +267,7 @@ class _LyricsOptionsButtonState extends ConsumerState<LyricsOptionsButton> {
           translation: translation,
           canTranslate: canTranslate,
           translating: translating,
+          canSaveTranslation: canSaveTranslation,
           canEdit: canEdit,
         ),
       ),
@@ -307,6 +315,7 @@ class _LyricsOptionsButtonState extends ConsumerState<LyricsOptionsButton> {
     required bool translation,
     required bool canTranslate,
     required bool translating,
+    required bool canSaveTranslation,
     required bool canEdit,
   }) async {
     final settings = ref.read(settingsProvider);
@@ -353,6 +362,8 @@ class _LyricsOptionsButtonState extends ConsumerState<LyricsOptionsButton> {
           Icons.language_rounded,
         ),
       ],
+      if (canSaveTranslation)
+        ('saveTranslation', l10n.nowPlayingSaveTranslation, Icons.save_alt),
       if (canEdit) ('edit', l10n.lyricsEditTitle, Icons.edit_note),
     ];
     _setOpen(true);
@@ -425,6 +436,8 @@ class _LyricsOptionsButtonState extends ConsumerState<LyricsOptionsButton> {
           notifier.setPlayerShowTranslation(!settings.playerShowTranslation);
         case 'cancelTranslation':
           ref.read(lyricsTranslationProvider.notifier).cancel();
+        case 'saveTranslation':
+          unawaited(_saveTranslation());
       }
     } finally {
       // The language sheet and the editor keep controls visible until they
@@ -445,6 +458,40 @@ class _LyricsOptionsButtonState extends ConsumerState<LyricsOptionsButton> {
         _setOpen(false);
       }
     }
+  }
+
+  /// Writes the translation the player shows into the song's own lyrics, so
+  /// it plays offline and travels with the file. Uses the editor's save, so
+  /// the same files can be written.
+  Future<void> _saveTranslation() async {
+    if (_savingTranslation) return;
+    final l10n = context.l10n;
+    final metadata = widget.metadata;
+    final edit = metadata.beginLyricsEdit();
+    if (edit == null) return;
+    final raw = lyricsWithTranslations(
+      edit.rawLyrics,
+      ref.read(lyricsTranslationProvider.notifier).display(metadata.lyrics),
+    );
+    _savingTranslation = true;
+    String message;
+    try {
+      if (raw == null) {
+        message = l10n.lyricsEditSaveFailed;
+      } else if (edit.source.startsWith('network://') &&
+          !await NetworkStorageService.instance.canEditFile(edit.source)) {
+        message = l10n.lyricsEditReadOnly;
+      } else {
+        await metadata.saveEditedLyrics(raw, edit: edit);
+        message = l10n.nowPlayingTranslationSaved;
+      }
+    } catch (error) {
+      _log.w('Could not save the lyrics translation: $error');
+      message = l10n.lyricsEditSaveFailed;
+    } finally {
+      _savingTranslation = false;
+    }
+    if (mounted) showAppSnackBar(context, content: Text(message));
   }
 
   /// Translates into the song's language, or into one picked now when

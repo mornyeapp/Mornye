@@ -89,6 +89,7 @@ IconData _cupertinoFor(IconData icon) {
     Icons.download_for_offline_outlined => CupertinoIcons.arrow_down_circle,
     Icons.call_split => CupertinoIcons.arrow_branch,
     Icons.download_rounded => CupertinoIcons.arrow_down,
+    Icons.save_alt => CupertinoIcons.square_arrow_down,
     Icons.info_outline => CupertinoIcons.info,
     Icons.settings || Icons.settings_outlined => CupertinoIcons.gear_alt,
     Icons.tune ||

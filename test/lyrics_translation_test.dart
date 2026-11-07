@@ -270,6 +270,90 @@ void main() {
     });
   });
 
+  group('save to file', () {
+    String encoded(String text) => base64.encode(utf8.encode(text));
+
+    ParsedLyrics translated(ParsedLyrics lyrics, List<String?> translations) =>
+        applyLyricsTranslation(
+          lyrics,
+          LyricsTranslationSource.of(lyrics),
+          translations,
+        );
+
+    test('writes shown translations that the parser reads back', () {
+      const raw =
+          '[ti:Song]\n'
+          '[00:01.00]Hola\n'
+          '[00:02.50]<00:02.50>Mundo <00:03.00>bello\n'
+          '[00:04.00]Hola';
+      final lyrics = LyricsParser.parse(raw);
+      final shown = translated(lyrics, ['Hello', 'Beautiful world']);
+      expect(lyricsTranslationUnsaved(lyrics, shown), isTrue);
+
+      final updated = lyricsWithTranslations(raw, shown)!;
+      expect(updated, startsWith('[ti:Song]\n'));
+      expect(updated, contains('[00:02.50]<00:02.50>Mundo <00:03.00>bello'));
+      expect(updated, contains('[x-translation:1000:${encoded('Hello')}]'));
+      expect(
+        updated,
+        contains('[x-translation:2500:${encoded('Beautiful world')}]'),
+      );
+      expect(updated, contains('[x-translation:4000:${encoded('Hello')}]'));
+
+      final reread = LyricsParser.parse(updated);
+      expect(reread.lines.map((line) => line.text), [
+        'Hola',
+        'Mundo bello',
+        'Hola',
+      ]);
+      expect(reread.lines.map((line) => line.translation), [
+        'Hello',
+        'Beautiful world',
+        'Hello',
+      ]);
+      // Saved once, the same translation offers nothing more to save.
+      final shownAgain = translated(reread, ['Hello', 'Beautiful world']);
+      expect(lyricsTranslationUnsaved(reread, shownAgain), isFalse);
+      expect(lyricsWithTranslations(updated, shownAgain), isNull);
+    });
+
+    test('replaces an older translation in place and keeps the rest', () {
+      final raw =
+          '[00:01.00]Bonjour\n'
+          '[x-romaji:1000:${encoded('bonjour')}]\n'
+          '[x-translation:1000:${encoded('Old')}]\n'
+          '[00:02.00]Merci';
+      final lyrics = LyricsParser.parse(raw);
+      final updated = lyricsWithTranslations(
+        raw,
+        translated(lyrics, ['Hello', null]),
+      )!;
+      expect(
+        updated,
+        '[00:01.00]Bonjour\n'
+        '[x-romaji:1000:${encoded('bonjour')}]\n'
+        '[x-translation:1000:${encoded('Hello')}]\n'
+        '[00:02.00]Merci',
+      );
+    });
+
+    test('leaves plain, TTML and untranslated lyrics alone', () {
+      const synced = '[00:01.00]Hola';
+      final lyrics = LyricsParser.parse(synced);
+      final shown = translated(lyrics, ['Hello']);
+      expect(lyricsWithTranslations('Hola', shown), isNull);
+      expect(
+        lyricsWithTranslations(
+          '<tt xmlns="http://www.w3.org/ns/ttml"><body/></tt>',
+          shown,
+        ),
+        isNull,
+      );
+      expect(lyricsWithTranslations(synced, lyrics), isNull);
+      expect(lyricsTranslationUnsaved(lyrics, lyrics), isFalse);
+    });
+  });
+
   group('batching', () {
     test('respects the line and character limits in order', () {
       final items = [

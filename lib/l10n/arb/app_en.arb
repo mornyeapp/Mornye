@@ -7155,6 +7155,14 @@
   "@nowPlayingCancelTranslation": {
     "description": "Player lyrics menu action that stops an AI lyrics translation in progress"
   },
+  "nowPlayingSaveTranslation": "Save Translation to File",
+  "@nowPlayingSaveTranslation": {
+    "description": "Player lyrics menu action that writes the shown lyrics translation into the song's audio file, next to its original lyrics, so it stays with the file"
+  },
+  "nowPlayingTranslationSaved": "Translation saved to the song's file",
+  "@nowPlayingTranslationSaved": {
+    "description": "Snackbar after the shown lyrics translation was written into the song's audio file"
+  },
   "nowPlayingTranslatingLyrics": "Translating lyrics, {percent}%",
   "@nowPlayingTranslatingLyrics": {
     "description": "Tooltip and screen reader label of the lyrics menu button while an AI translation runs",

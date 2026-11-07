@@ -6,6 +6,7 @@ import 'package:crypto/crypto.dart';
 import 'package:mornye/services/lyrics_ai_client.dart';
 import 'package:mornye/services/lyrics_translation_alignment.dart';
 import 'package:mornye/utils/logger.dart';
+import 'package:mornye/utils/lyrics_draft.dart';
 import 'package:mornye/utils/lyrics_parser.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -235,6 +236,93 @@ ParsedLyrics applyLyricsTranslation(
     writers: lyrics.writers,
     provider: lyrics.provider,
   );
+}
+
+/// Whether [shown] gives a lyric line a translation that [original], the
+/// lyrics as the file holds them, does not have. [shown] is [original] as
+/// the player displays it, line for line.
+bool lyricsTranslationUnsaved(ParsedLyrics original, ParsedLyrics shown) {
+  if (identical(original, shown)) return false;
+  for (var i = 0; i < original.lines.length && i < shown.lines.length; i++) {
+    final line = shown.lines[i];
+    final translation = line.translation?.trim() ?? '';
+    if (line.isBackground || translation.isEmpty) continue;
+    if (translation != (original.lines[i].translation?.trim() ?? '')) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/// [raw] LRC with each timed line carrying the translation [shown] gives it,
+/// as the `[x-translation:<ms>:...]` tags both lyrics parsers read back, so
+/// the translation stays with the song's file alongside its own lyrics.
+/// Other lines, tags and supplements stay as they are. Null when [raw] is
+/// not synced LRC or already holds these translations.
+String? lyricsWithTranslations(String raw, ParsedLyrics shown) {
+  if (!LyricsDraft.canEdit(raw)) return null;
+  final draft = LyricsDraft.parse(raw);
+  if (!draft.synced) return null;
+  final byTime = <int, Map<String, String>>{};
+  for (final line in shown.lines) {
+    final text = translatableLyricText(line.text);
+    final translation = line.translation?.trim() ?? '';
+    if (line.isBackground || text.isEmpty || translation.isEmpty) continue;
+    (byTime[line.time.inMilliseconds] ??= {}).putIfAbsent(
+      text,
+      () => translation,
+    );
+  }
+  if (byTime.isEmpty) return null;
+
+  String? translationOf(LyricsDraftLine line) {
+    final time = line.time;
+    final text = translatableLyricText(line.text);
+    if (time == null || text.isEmpty) return null;
+    // Older files mix centisecond lines with millisecond keys; the parsers
+    // match within 10ms.
+    final ms = time.inMilliseconds;
+    for (var delta = 0; delta <= 10; delta++) {
+      final match = byTime[ms - delta]?[text] ?? byTime[ms + delta]?[text];
+      if (match != null) return match;
+    }
+    return null;
+  }
+
+  LyricsDraftLine withTranslation(LyricsDraftLine line) {
+    final translation = translationOf(line);
+    if (translation == null) return line;
+    // The parsers keep a line's first translation, so the new one takes the
+    // old one's place and any later copy goes.
+    final tag = ('translation', base64.encode(utf8.encode(translation)));
+    final supplements = <(String, String)>[];
+    var placed = false;
+    for (final supplement in line.supplements) {
+      if (supplement.$1 != 'translation') {
+        supplements.add(supplement);
+      } else if (!placed) {
+        supplements.add(tag);
+        placed = true;
+      }
+    }
+    if (!placed) supplements.add(tag);
+    return LyricsDraftLine(
+      time: line.time,
+      text: line.text,
+      voice: line.voice,
+      content: line.content,
+      contentTime: line.contentTime,
+      supplements: supplements,
+      background: line.background,
+    );
+  }
+
+  final updated = LyricsDraft(
+    header: draft.header,
+    lines: [for (final line in draft.lines) withTranslation(line)],
+    footer: draft.footer,
+  ).toLrc();
+  return updated == draft.toLrc() ? null : updated;
 }
 
 /// Splits [items] into requests of at most [maxItems] lines and [maxChars]

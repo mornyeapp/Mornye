@@ -21,6 +21,7 @@ import 'package:mornye/screens/settings/lyrics_ai_translation_page.dart';
 import 'package:mornye/services/lyrics_ai_client.dart';
 import 'package:mornye/services/lyrics_translation.dart';
 import 'package:mornye/services/lyrics_translation_sharing.dart';
+import 'package:mornye/services/source_metadata_events.dart';
 import 'package:mornye/theme/app_theme.dart';
 import 'package:mornye/theme/mornye_theme.dart';
 import 'package:mornye/utils/desktop_platform.dart';
@@ -59,6 +60,13 @@ class _MemoryCache extends LyricsTranslationCache {
 
   @override
   Future<void> clear() async => entries.clear();
+}
+
+class _Events extends SourceMetadataEvents {
+  final published = <String>[];
+
+  @override
+  Future<void> publish(String source) async => published.add(source);
 }
 
 class _MediaItems extends CurrentMediaItemNotifier {
@@ -499,6 +507,118 @@ void main() {
         await tester.pumpWidget(const SizedBox.shrink());
       });
     }
+  }
+
+  for (final mornye in [false, true]) {
+    testWidgets('the lyrics menu saves the translation to the file ($mornye)', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(420, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final playback = StreamController<PlaybackState>.broadcast();
+      addTearDown(playback.close);
+      final saved = <(String, String)>[];
+      final events = _Events();
+      final metadata = PlayerMetadataController(
+        readMetadata: (path) async => {
+          'lyrics': '[00:00.00]Hello there\n[00:03.00]Second line',
+        },
+        parseLyrics: (raw) async => LyricsParser.parse(raw),
+        saveOnlineLyrics: (source, raw) async => saved.add((source, raw)),
+        metadataEvents: events,
+      );
+      final preview = PlaybackSeekPreview();
+      addTearDown(metadata.dispose);
+      addTearDown(preview.dispose);
+      await metadata.load(
+        const MediaItem(
+          id: '/music/Album/song.flac',
+          title: 'Song',
+          artist: 'Artist',
+          extras: {'source': '/music/Album/song.flac'},
+        ),
+      );
+      await tester.pumpWidget(
+        _app(
+          mornye: mornye,
+          overrides: [
+            initialSettingsProvider.overrideWithValue(
+              const AppSettings(
+                lyricsAiModel: 'gpt-4.1-mini',
+                lyricsTranslationLanguage: 'de',
+              ),
+            ),
+            playbackStateProvider.overrideWith((ref) => playback.stream),
+            musicPlayerControllerProvider.overrideWith(
+              (ref) => throw StateError('Unexpected audio access'),
+            ),
+            currentMediaItemProvider.overrideWith(_MediaItems.new),
+            lyricsAiKeyStoreProvider.overrideWithValue(
+              MemoryLyricsAiKeyStore({'openai': 'sk-test-1234'}),
+            ),
+            lyricsTranslationCacheProvider.overrideWithValue(_MemoryCache()),
+            lyricsAiHttpClientProvider.overrideWithValue(
+              () => MockClient((request) async => _translated(request, 'de:')),
+            ),
+          ],
+          home: Scaffold(
+            body: PlayerLyricsSection(
+              metadata: metadata,
+              seekPreview: preview,
+              colorScheme: const ColorScheme.dark(),
+              isActive: true,
+              options: LyricsOptionsButton(
+                metadata: metadata,
+                colorScheme: const ColorScheme.dark(),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final options = find.byKey(const ValueKey('lyrics-language-options'));
+      await tester.tap(options);
+      await tester.pumpAndSettle();
+      // Nothing is translated yet, so nothing can be saved.
+      expect(find.text('Save Translation to File'), findsNothing);
+      await tester.tap(find.text('Translate to Deutsch'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(options);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Save Translation to File'));
+      await tester.pumpAndSettle();
+
+      String tag(int ms, String text) =>
+          '[x-translation:$ms:${base64.encode(utf8.encode(text))}]';
+      expect(saved, [
+        (
+          '/music/Album/song.flac',
+          '[00:00.00]Hello there\n'
+              '${tag(0, 'de:Hello there')}\n'
+              '[00:03.00]Second line\n'
+              '${tag(3000, 'de:Second line')}',
+        ),
+      ]);
+      expect(find.text("Translation saved to the song's file"), findsOneWidget);
+      expect(events.published, ['/music/Album/song.flac']);
+      expect(metadata.lyrics.lines.map((line) => line.translation), [
+        'de:Hello there',
+        'de:Second line',
+      ]);
+
+      // The file holds the translation now, so the action goes.
+      await tester.pump(const Duration(seconds: 4));
+      await tester.pumpAndSettle();
+      await tester.tap(options);
+      await tester.pumpAndSettle();
+      expect(find.text('Hide Translation'), findsOneWidget);
+      expect(find.text('Save Translation to File'), findsNothing);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
   }
 
   testWidgets('the menu stays hidden until a provider is set up', (
