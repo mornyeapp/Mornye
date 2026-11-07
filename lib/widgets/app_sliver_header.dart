@@ -19,6 +19,7 @@ class AppSliverHeader extends StatelessWidget {
     super.key,
     required this.title,
     this.actions,
+    this.titleTrailing,
     this.alignToContent = false,
     this.contentInset,
   }) : leading = null,
@@ -33,10 +34,17 @@ class AppSliverHeader extends StatelessWidget {
     this.leading,
     this.alignToContent = true,
   }) : contentInset = null,
+       titleTrailing = null,
        _showLeading = true;
 
   final String title;
   final List<Widget>? actions;
+
+  /// One button on the title's line at its trailing end, such as Home's
+  /// account avatar, as beside iOS large titles. It follows the title as the
+  /// header collapses and ends centered in the bar; [actions] stay in the top
+  /// row. It must fit a [_titleTrailingExtent] square.
+  final Widget? titleTrailing;
 
   /// Overrides the default back button. Only used by the page variant.
   final Widget? leading;
@@ -56,6 +64,31 @@ class AppSliverHeader extends StatelessWidget {
 
   /// Content margin the expanded title aligns to.
   static const double _contentMargin = 24;
+
+  /// Square slot for [titleTrailing]: a 44pt avatar in a 56pt touch target.
+  static const double _titleTrailingExtent = 56;
+
+  /// Height of the title's line, which [titleTrailing] centers on. The title
+  /// inherits the style [FlexibleSpaceBar] gives it under Material 3.
+  static double _titleLineHeight(
+    BuildContext context,
+    String text,
+    TextStyle style,
+  ) {
+    final painter = TextPainter(
+      text: TextSpan(
+        text: text,
+        style: Theme.of(context).textTheme.titleLarge!.merge(style),
+      ),
+      textDirection: Directionality.of(context),
+      textScaler: MediaQuery.textScalerOf(context),
+      locale: Localizations.maybeLocaleOf(context),
+      maxLines: 1,
+    )..layout();
+    final height = painter.height;
+    painter.dispose();
+    return height;
+  }
 
   static bool _isNestedNavigatorRoot(BuildContext context) {
     if (ModalRoute.of(context)?.canPop ?? true) return false;
@@ -147,9 +180,11 @@ class AppSliverHeader extends StatelessWidget {
           final expandRatio = extentDelta > 0
               ? ((currentExtent - minExtent) / extentDelta).clamp(0.0, 1.0)
               : 0.0;
-          final contentMargin =
-              _contentMargin +
-              (alignToContent ? contentInset ?? wideListInset(context) : 0);
+          final contentOffset = alignToContent
+              ? contentInset ?? wideListInset(context)
+              : 0.0;
+          final contentMargin = _contentMargin + contentOffset;
+          final trailingInset = edgeInset + contentOffset;
           final leftPadding = showLeading
               ? (_leadingClearance + edgeInset) -
                     (((_leadingClearance + edgeInset) - contentMargin) *
@@ -160,13 +195,22 @@ class AppSliverHeader extends StatelessWidget {
               (tokens.headerExpandedTitleSize -
                       tokens.headerCollapsedTitleSize) *
                   expandRatio;
+          final titleStyle = TextStyle(
+            fontSize: fontSize,
+            fontWeight: FontWeight.bold,
+            letterSpacing: context.isMornye ? -0.7 * expandRatio : null,
+            color: colorScheme.onSurface,
+          );
 
-          final bar = FlexibleSpaceBar(
+          final flexibleBar = FlexibleSpaceBar(
             centerTitle: false,
             expandedTitleScale: 1.0,
             titlePadding: EdgeInsetsDirectional.only(
               start: leftPadding,
-              end: tokens.gapLg,
+              // A long greeting ellipsizes before it reaches the avatar.
+              end: titleTrailing == null
+                  ? tokens.gapLg
+                  : trailingInset + _titleTrailingExtent + tokens.gapSm,
               bottom: tokens.gapLg,
             ),
             title: Semantics(
@@ -177,15 +221,30 @@ class AppSliverHeader extends StatelessWidget {
                 // localized title overflowed instead of ellipsizing.
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: fontSize,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: context.isMornye ? -0.7 * expandRatio : null,
-                  color: colorScheme.onSurface,
-                ),
+                style: titleStyle,
               ),
             ),
           );
+          final bar = titleTrailing == null
+              ? flexibleBar
+              : Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    flexibleBar,
+                    PositionedDirectional(
+                      end: trailingInset,
+                      bottom:
+                          tokens.gapLg +
+                          (_titleLineHeight(context, title, titleStyle) -
+                                  _titleTrailingExtent) /
+                              2,
+                      child: SizedBox.square(
+                        dimension: _titleTrailingExtent,
+                        child: Center(child: titleTrailing),
+                      ),
+                    ),
+                  ],
+                );
           if (context.isMornye) return bar;
           // Collapsed expressive bars sit on a container tone, like a
           // scrolled-under app bar, and fade back to the surface on expand.

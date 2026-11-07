@@ -563,6 +563,75 @@ void main() {
       );
     }
 
+    testWidgets('title trailing button stays on the title line', (
+      tester,
+    ) async {
+      final controller = ScrollController();
+      addTearDown(controller.dispose);
+      var taps = 0;
+      const title = 'Good afternoon, someone with a long name';
+      const avatar = Key('avatar');
+      await tester.binding.setSurfaceSize(const Size(430, 932));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: MornyeTheme.build(
+            Brightness.light,
+          ).copyWith(platform: TargetPlatform.iOS),
+          home: MediaQuery(
+            data: const MediaQueryData(
+              size: Size(430, 932),
+              padding: EdgeInsets.only(top: 59),
+            ),
+            child: Scaffold(
+              body: CustomScrollView(
+                controller: controller,
+                slivers: [
+                  AppSliverHeader.tabRoot(
+                    title: title,
+                    titleTrailing: IconButton(
+                      key: avatar,
+                      constraints: const BoxConstraints(
+                        minWidth: 56,
+                        minHeight: 56,
+                      ),
+                      onPressed: () => taps++,
+                      icon: const SizedBox.square(dimension: 44),
+                    ),
+                  ),
+                  const SliverToBoxAdapter(child: SizedBox(height: 1200)),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+
+      void expectOnTitleLine() {
+        final text = tester.getRect(find.text(title));
+        final button = tester.getRect(find.byKey(avatar));
+        expect(button.center.dy, moreOrLessEquals(text.center.dy, epsilon: 1));
+        expect(button.right, 430 - 12);
+        expect(text.right, lessThanOrEqualTo(button.left));
+      }
+
+      expectOnTitleLine();
+      await tester.tap(find.byKey(avatar));
+      expect(taps, 1);
+
+      controller.jumpTo(AppTokens.standard.headerExpandedHeight);
+      await tester.pump();
+      expectOnTitleLine();
+      final bar = tester.getRect(find.byKey(avatar));
+      expect(
+        bar.center.dy,
+        moreOrLessEquals(59 + kToolbarHeight / 2, epsilon: 2),
+      );
+      await tester.tap(find.byKey(avatar));
+      expect(taps, 2);
+    });
+
     test('is the only collapsing header implementation left', () {
       final offenders = _libSources()
           .where(

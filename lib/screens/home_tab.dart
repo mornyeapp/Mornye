@@ -1191,8 +1191,8 @@ class _HomeTabState extends ConsumerState<HomeTab>
           ? context.l10n.mornyeSearch
           : greeting ?? context.l10n.homeTitle,
       // The desktop sidebar's account row already opens the profile.
-      actions: context.isMornye && _showsHome && !isDesktopPlatform
-          ? const [HomeProfileButton()]
+      titleTrailing: context.isMornye && _showsHome && !isDesktopPlatform
+          ? const HomeProfileButton()
           : null,
     );
   }
