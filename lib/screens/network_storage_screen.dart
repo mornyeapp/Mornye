@@ -219,8 +219,7 @@ class _NetworkStorageScreenState extends ConsumerState<NetworkStorageScreen> {
 
   Future<void> _edit([NetworkConnection? connection]) async {
     await Navigator.of(context).push(
-      _networkRoute<void>(
-        context,
+      MaterialPageRoute<void>(
         builder: (_) =>
             _NetworkConnectionForm(service: service, connection: connection),
       ),
@@ -236,8 +235,7 @@ class _NetworkStorageScreenState extends ConsumerState<NetworkStorageScreen> {
     String? displayName,
   ]) async {
     final picked = await Navigator.of(context).push(
-      _networkRoute<String>(
-        context,
+      MaterialPageRoute<String>(
         builder: (_) => NetworkStorageScreen(
           connection: connection,
           path: path,
@@ -1091,13 +1089,6 @@ class _NetworkConnectionFormState extends State<_NetworkConnectionForm> {
   );
 }
 
-PageRoute<T> _networkRoute<T>(
-  BuildContext context, {
-  required WidgetBuilder builder,
-}) => context.isMornye
-    ? CupertinoPageRoute<T>(builder: builder)
-    : MaterialPageRoute<T>(builder: builder);
-
 /// Browses [connection] for a folder to upload into: the folder's
 /// `network://` source, or null when the person goes back.
 Future<String?> browseNetworkUploadFolder(
@@ -1105,8 +1096,7 @@ Future<String?> browseNetworkUploadFolder(
   NetworkConnection connection, {
   NetworkStorageService? service,
 }) => Navigator.of(context).push(
-  _networkRoute<String>(
-    context,
+  MaterialPageRoute<String>(
     builder: (_) => NetworkStorageScreen(
       connection: connection,
       service: service,

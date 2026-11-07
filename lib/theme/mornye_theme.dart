@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:mornye/models/theme_settings.dart';
 import 'package:mornye/theme/app_tokens.dart';
+import 'package:mornye/theme/page_transitions.dart';
 
 /// Flutter counterpart of Mornye's iPhone visual system. Reference values come
 /// from AccentColor.colorset, Components.swift, PlayerViews.swift and Motion.md
@@ -369,13 +370,7 @@ class MornyeTheme extends ThemeExtension<MornyeTheme> {
         bodyColor: scheme.onPrimary,
         displayColor: scheme.onPrimary,
       ),
-      pageTransitionsTheme: const PageTransitionsTheme(
-        builders: {
-          TargetPlatform.android: FadeForwardsPageTransitionsBuilder(),
-          TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
-          TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
-        },
-      ),
+      pageTransitionsTheme: mornyePageTransitionsTheme,
       appBarTheme: AppBarTheme(
         backgroundColor: surface,
         foregroundColor: accent,
