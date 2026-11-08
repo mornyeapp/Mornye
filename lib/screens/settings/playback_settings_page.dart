@@ -362,6 +362,22 @@ class _PlaybackSettingsPageState extends ConsumerState<PlaybackSettingsPage>
                 ),
             ],
           ),
+          ...settingsSectionSlivers(
+            title: context.l10n.sectionPlaybackQueue,
+            children: [
+              SettingsSwitchItem(
+                icon: Icons.playlist_remove,
+                title: context.l10n.queueNoDuplicates,
+                subtitle: context.l10n.queueNoDuplicatesDescription,
+                value: settings.queueNoDuplicates,
+                enabled: settings.playerMode == 'internal',
+                onChanged: (value) => ref
+                    .read(settingsProvider.notifier)
+                    .setQueueNoDuplicates(value),
+                showDivider: false,
+              ),
+            ],
+          ),
           // Mute and headphone routes come from mobile system audio.
           if (!isDesktopPlatform)
             ...settingsSectionSlivers(

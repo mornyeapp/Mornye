@@ -33,6 +33,7 @@ import 'package:mornye/services/network_playback_cache.dart';
 import 'package:mornye/services/network_storage_service.dart'
     show subsonicSongIdFromPath;
 import 'package:mornye/services/playback_deck.dart';
+import 'package:mornye/services/queue_dedup.dart';
 import 'package:mornye/services/switching_playback_deck.dart';
 import 'package:mornye/services/automix_analysis.dart';
 import 'package:mornye/services/automix_phase_lock.dart';
@@ -1536,6 +1537,7 @@ class MusicPlayerHandler extends BaseAudioHandler
       await setQueueAndPlay([item]);
       return;
     }
+    _withoutQueuedDuplicates([item]);
     final insertAt = playNext
         ? (_index + 1).clamp(0, _media.length)
         : _autoplay.manualInsertIndex;
@@ -1560,14 +1562,23 @@ class MusicPlayerHandler extends BaseAudioHandler
   }) async {
     if (items.isEmpty) return;
     if (_media.isEmpty || _index < 0) {
-      await setQueueAndPlay(items);
+      await setQueueAndPlay(
+        _settings.queueNoDuplicates
+            ? planQueueWithoutDuplicates(
+                queue: const [],
+                current: -1,
+                incoming: items,
+              ).insert
+            : items,
+      );
       return;
     }
+    final added = _withoutQueuedDuplicates(items);
     var at = playNext
         ? (_index + 1).clamp(0, _media.length)
         : _autoplay.manualInsertIndex;
     final queued = <MediaItem>[];
-    for (final item in items) {
+    for (final item in added) {
       _media.insert(at, item);
       final queueItem = _toMediaItem(item);
       _queueItems.insert(at, queueItem);
@@ -1621,7 +1632,18 @@ class MusicPlayerHandler extends BaseAudioHandler
     final at = _queueItems.indexWhere((entry) => identical(entry, item));
     if (_disposed || at < 0 || at == _index) return;
     _autoplay.dismiss(_media[at]);
-    _queueItems.removeAt(at);
+    _removeQueuedAt(at);
+    _markSessionQueueChanged();
+    unawaited(_cancelTransitions());
+    queue.add(List<MediaItem>.unmodifiable(_queueItems));
+    _broadcastState();
+    unawaited(_persistSession(position: playbackState.value.position));
+  }
+
+  /// Drops the entry at [at], never the current one, from the queue, its
+  /// shuffle order and the play history.
+  void _removeQueuedAt(int at) {
+    final item = _queueItems.removeAt(at);
     _media.removeAt(at);
     _originalQueueOrder?.removeWhere((entry) => identical(entry, item));
     if (at < _index) _index--;
@@ -1632,11 +1654,20 @@ class MusicPlayerHandler extends BaseAudioHandler
     _playHistory
       ..clear()
       ..addAll(history);
-    _markSessionQueueChanged();
-    unawaited(_cancelTransitions());
-    queue.add(List<MediaItem>.unmodifiable(_queueItems));
-    _broadcastState();
-    unawaited(_persistSession(position: playbackState.value.position));
+  }
+
+  /// With `queueNoDuplicates` on, [items] each once, with the upcoming
+  /// entries of the same songs removed so the insert moves them
+  /// ([planQueueWithoutDuplicates]). Unchanged otherwise.
+  List<PlayableMedia> _withoutQueuedDuplicates(List<PlayableMedia> items) {
+    if (!_settings.queueNoDuplicates) return items;
+    final plan = planQueueWithoutDuplicates(
+      queue: _media,
+      current: _index,
+      incoming: items,
+    );
+    plan.remove.forEach(_removeQueuedAt);
+    return plan.insert;
   }
 
   Future<void> _playIndex(

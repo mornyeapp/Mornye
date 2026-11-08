@@ -146,6 +146,10 @@ class AppSettings {
   /// decodes to 16-bit, which its silence detection needs.
   final bool skipSilence;
 
+  /// Adding a song already coming up in the queue moves that entry instead
+  /// of queueing a second copy. The current and played entries stay.
+  final bool queueNoDuplicates;
+
   /// Desktop: take the output device for the music player alone, bypassing
   /// the system mixer (WASAPI exclusive on Windows, hog mode on macOS, an
   /// ALSA `hw:` device on Linux). AutoMix and previews stay off while it is
@@ -406,6 +410,7 @@ class AppSettings {
     this.dapExclusive = false,
     this.media3Engine = true,
     this.skipSilence = false,
+    this.queueNoDuplicates = false,
     this.exclusiveOutput = false,
     this.exclusiveOutputDevice = '',
     this.autoplay = false,
@@ -581,6 +586,7 @@ class AppSettings {
     bool? dapExclusive,
     bool? media3Engine,
     bool? skipSilence,
+    bool? queueNoDuplicates,
     bool? exclusiveOutput,
     String? exclusiveOutputDevice,
     bool? autoplay,
@@ -737,6 +743,7 @@ class AppSettings {
       dapExclusive: dapExclusive ?? this.dapExclusive,
       media3Engine: media3Engine ?? this.media3Engine,
       skipSilence: skipSilence ?? this.skipSilence,
+      queueNoDuplicates: queueNoDuplicates ?? this.queueNoDuplicates,
       exclusiveOutput: exclusiveOutput ?? this.exclusiveOutput,
       exclusiveOutputDevice:
           exclusiveOutputDevice ?? this.exclusiveOutputDevice,

@@ -316,6 +316,12 @@ class SettingsSearchCatalog {
           keywords: const ['sound', 'tempo', 'bpm', 'key', 'recommendation'],
         ),
         SettingsSearchEntry(
+          icon: Icons.playlist_remove,
+          title: l10n.queueNoDuplicates,
+          subtitle: l10n.queueNoDuplicatesDescription,
+          keywords: const ['duplicate', 'queue', 'twice', 'play next', 'once'],
+        ),
+        SettingsSearchEntry(
           icon: Icons.insights_outlined,
           title: l10n.listeningStats,
           subtitle: l10n.listeningStatsDescription,

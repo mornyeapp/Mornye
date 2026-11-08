@@ -739,6 +739,88 @@ void main() {
     },
   );
 
+  group('no duplicates in queue', () {
+    const four = PlayableMedia(
+      id: 'four',
+      source: '/four.flac',
+      title: 'Four',
+      artist: 'Artist',
+    );
+
+    void setNoDuplicates(bool enabled) => musicPlayerRuntime.configure(
+      musicPlayerRuntime.settings.copyWith(queueNoDuplicates: enabled),
+    );
+
+    List<String> ids() => [for (final item in handler.queue.value) item.id];
+
+    setUp(() {
+      setNoDuplicates(true);
+      addTearDown(() => setNoDuplicates(false));
+    });
+
+    test('Play next and Add to queue move an upcoming entry', () async {
+      await handler.setQueueAndPlay([..._tracks, four]);
+      await handler.enqueue(four, playNext: true);
+      expect(ids(), ['one', 'four', 'two', 'three']);
+      await handler.enqueue(_tracks[1]);
+      expect(ids(), ['one', 'four', 'three', 'two']);
+      expect(handler.playbackState.value.queueIndex, 0);
+      expect(handler.mediaItem.value?.id, 'one');
+    });
+
+    test('the current and played songs are queued again', () async {
+      await handler.setQueueAndPlay(_tracks);
+      await handler.skipToQueueItem(1);
+      await handler.enqueueAll([_tracks[0], _tracks[1]]);
+      expect(ids(), ['one', 'two', 'three', 'one', 'two']);
+      expect(handler.playbackState.value.queueIndex, 1);
+      expect(handler.mediaItem.value?.id, 'two');
+    });
+
+    test('adding many keeps each song once, in the order given', () async {
+      await handler.setQueueAndPlay(_tracks);
+      await handler.enqueueAll([four, _tracks[2], four], playNext: true);
+      expect(ids(), ['one', 'four', 'three', 'two']);
+    });
+
+    test('a song matches by its source, whatever its id', () async {
+      await handler.setQueueAndPlay(_tracks);
+      await handler.enqueue(
+        const PlayableMedia(
+          id: 'library-3',
+          source: '/three.flac',
+          title: 'Three',
+          artist: 'Artist',
+        ),
+        playNext: true,
+      );
+      expect(ids(), ['one', 'library-3', 'two']);
+    });
+
+    test('shuffle keeps one entry, also once unshuffled', () async {
+      await handler.setQueueAndPlay(_tracks);
+      await handler.setShuffleMode(AudioServiceShuffleMode.all);
+      final current = handler.mediaItem.value!.id;
+      final upcoming = ids().skip(1).first;
+      await handler.enqueue(
+        _tracks.firstWhere((track) => track.id == upcoming),
+      );
+      expect(ids().where((id) => id == upcoming), hasLength(1));
+      expect(ids().last, upcoming);
+      await handler.setShuffleMode(AudioServiceShuffleMode.none);
+      expect(ids().toSet(), {'one', 'two', 'three'});
+      expect(ids(), hasLength(3));
+      expect(handler.mediaItem.value!.id, current);
+    });
+
+    test('off: a second copy is queued', () async {
+      setNoDuplicates(false);
+      await handler.setQueueAndPlay(_tracks);
+      await handler.enqueue(_tracks[1]);
+      expect(ids(), ['one', 'two', 'three', 'two']);
+    });
+  });
+
   test(
     'queue removal preserves duplicates, current audio and unshuffled order',
     () async {

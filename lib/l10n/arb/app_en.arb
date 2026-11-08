@@ -328,6 +328,15 @@
   "@skipSilenceAutoMix": {
     "description": "Added to the Skip silence subtitle while AutoMix is on, which suspends silence skipping"
   },
+  "sectionPlaybackQueue": "Queue",
+  "@sectionPlaybackQueue": {
+    "description": "Playback settings section for how the play queue behaves"
+  },
+  "queueNoDuplicates": "No duplicates in queue",
+  "@queueNoDuplicates": {
+    "description": "Playback setting: adding a song already coming up in the queue moves it instead of adding a second copy"
+  },
+  "queueNoDuplicatesDescription": "Adding a song that is already coming up moves it instead of queueing it twice. The playing song and songs already played stay where they are.",
   "usbBitPerfect": "Hi-res and bit-perfect audio",
   "usbBitPerfectDescription": "Preserve source precision on compatible outputs. Choose direct USB or AAudio exclusive below; otherwise Android USB output requires Android 14 or later. Applies from the next track, without AutoMix or normalization. System volume may not control direct USB.",
   "usbHardwareVolume": "DAC hardware volume",
