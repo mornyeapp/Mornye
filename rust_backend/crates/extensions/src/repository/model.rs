@@ -50,6 +50,34 @@ impl NullField for Tags {
     }
 }
 
+/// Optional display text that never fails a registry: any value other than
+/// a string reads as empty.
+#[derive(Clone, Debug, Default, Serialize)]
+#[serde(transparent)]
+pub struct LenientString(String);
+
+impl<'de> Deserialize<'de> for LenientString {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        Ok(Self(match Value::deserialize(deserializer)? {
+            Value::String(value) => value,
+            _ => String::new(),
+        }))
+    }
+}
+
+impl std::ops::Deref for LenientString {
+    type Target = str;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl NullField for LenientString {
+    fn clear_null(&mut self) {
+        self.0.clear();
+    }
+}
+
 // `folded_key` comes from `field_name`, which leaves no ASCII uppercase, so an
 // ASCII case-insensitive comparison equals comparing it with the lowercased wire.
 fn field_matches(folded_key: &str, wire: &str) -> bool {
@@ -99,6 +127,7 @@ wire_struct!(Registry {
     version: isize => "version",
     updated_at: String => "updated_at",
     extensions: Vec<RepoExtension> => "extensions",
+    name: LenientString => "name",
 });
 
 wire_struct!(RepoExtension {
@@ -330,5 +359,25 @@ mod tests {
             .collect();
         assert_eq!(ids, ["plain", "js"]);
         assert!(registry.responses(&BTreeMap::new(), "py", "").is_empty());
+    }
+
+    #[test]
+    fn registry_name_is_optional_and_lenient() {
+        let name = |body: &[u8]| Registry::parse(body).unwrap().name.to_string();
+        assert_eq!(name(br#"{"extensions":[]}"#), "");
+        assert_eq!(
+            name(br#"{"Name":"Example Store","extensions":[]}"#),
+            "Example Store"
+        );
+        assert_eq!(name(br#"{"name":5,"extensions":[{"id":"a"}]}"#), "");
+        assert_eq!(name(br#"{"name":{"en":"Store"}}"#), "");
+        assert_eq!(name(br#"{"name":"Store","name":null}"#), "");
+        assert_eq!(
+            Registry::parse(br#"{"name":[1],"extensions":[{"id":"a"}]}"#)
+                .unwrap()
+                .extensions[0]
+                .id,
+            "a"
+        );
     }
 }

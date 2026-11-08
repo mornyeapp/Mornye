@@ -126,33 +126,32 @@ pub(crate) static METHODS: &[Entry] = &[
                 .initialize_repository(&a.string("cache_dir", "")),
         )
     }),
-    pool("getRepoRegistryUrl", |c, _| {
-        text(c.rt.backend.repository()?.registry_url())
+    pool("setRepoRegistryUrls", |c, a| {
+        let Some(Ok(urls)) = a.string_list("registry_urls") else {
+            return Err(CallError::failure("Expected registry_urls string list"));
+        };
+        null(c.rt.backend.repository()?.set_registry_urls(urls).or_fail())
     }),
-    pool("setRepoRegistryUrl", |c, a| {
-        null(
-            c.rt.backend
-                .repository()?
-                .set_registry_url(a.string("registry_url", ""))
-                .or_fail(),
-        )
-    }),
-    pool("clearRepoRegistryUrl", |c, _| {
-        null(c.rt.backend.repository()?.clear_registry_url().or_fail())
-    }),
-    pool("getRepoExtensions", |c, a| {
+    pool("resolveRepoRegistryUrl", |c, a| {
         text(
             c.rt.backend
                 .repository()?
-                .extensions(a.bool("force_refresh", false)),
+                .resolve_registry_url(a.string("registry_url", "")),
+        )
+    }),
+    pool("getRepoCatalog", |c, a| {
+        text(
+            c.rt.backend
+                .repository()?
+                .catalog(a.bool("force_refresh", false)),
         )
     }),
     pool("downloadRepoExtension", |c, a| {
-        text(
-            c.rt.backend
-                .repository()?
-                .download(a.string("extension_id", ""), a.string("dest_dir", "")),
-        )
+        text(c.rt.backend.repository()?.download(
+            a.string("extension_id", ""),
+            a.string("dest_dir", ""),
+            a.string("registry_url", ""),
+        ))
     }),
     pool("cleanupExtensions", |c, _| {
         c.rt.backend.shutdown_owner();

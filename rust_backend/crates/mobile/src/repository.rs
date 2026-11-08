@@ -38,52 +38,56 @@ impl ExtensionRepository {
         Ok(Self { inner, manager })
     }
 
-    pub fn registry_url(&self) -> Result<String, ExtensionRepositoryError> {
-        self.inner.registry_url().map_err(Into::into)
-    }
-
-    pub fn set_registry_url(&self, url: String) -> Result<(), ExtensionRepositoryError> {
-        self.inner.set_registry_url(&url).map_err(Into::into)
-    }
-
-    pub fn clear_registry_url(&self) -> Result<(), ExtensionRepositoryError> {
-        self.inner.clear_registry_url().map_err(Into::into)
-    }
-
-    pub fn extensions(&self, force_refresh: bool) -> Result<String, ExtensionRepositoryError> {
-        self.search_inner(force_refresh, "", "")
-    }
-
-    pub fn download(
+    /// Replaces the ordered registry list; an invalid URL changes nothing.
+    pub fn set_registry_urls(
         &self,
-        extension_id: String,
-        destination_directory: String,
-    ) -> Result<String, ExtensionRepositoryError> {
+        registry_urls: Vec<String>,
+    ) -> Result<(), ExtensionRepositoryError> {
         self.inner
-            .download(&extension_id, Path::new(&destination_directory))
-            .map(|path| path.to_string_lossy().into_owned())
+            .set_registry_urls(&registry_urls)
             .map_err(Into::into)
     }
 
-    pub fn shutdown(&self) {
-        self.inner.shutdown();
-    }
-}
-
-impl ExtensionRepository {
-    fn search_inner(
+    /// Resolves user input to a registry URL without changing any state.
+    pub fn resolve_registry_url(
         &self,
-        force: bool,
-        query: &str,
-        category: &str,
+        registry_url: String,
     ) -> Result<String, ExtensionRepositoryError> {
+        self.inner
+            .resolve_registry_url(&registry_url)
+            .map_err(Into::into)
+    }
+
+    /// The catalog JSON of every configured registry.
+    pub fn catalog(&self, force_refresh: bool) -> Result<String, ExtensionRepositoryError> {
         let installed = self
             .manager
             .inner
             .installed_versions()
             .map_err(|e| ExtensionRepositoryError::Operation(e.to_string()))?;
         self.inner
-            .extensions(force, &installed, query, category)
+            .catalog(force_refresh, &installed)
             .map_err(Into::into)
+    }
+
+    /// An empty `registry_url` downloads from the first registry listing the id.
+    pub fn download(
+        &self,
+        extension_id: String,
+        destination_directory: String,
+        registry_url: String,
+    ) -> Result<String, ExtensionRepositoryError> {
+        self.inner
+            .download(
+                &extension_id,
+                Path::new(&destination_directory),
+                &registry_url,
+            )
+            .map(|path| path.to_string_lossy().into_owned())
+            .map_err(Into::into)
+    }
+
+    pub fn shutdown(&self) {
+        self.inner.shutdown();
     }
 }
